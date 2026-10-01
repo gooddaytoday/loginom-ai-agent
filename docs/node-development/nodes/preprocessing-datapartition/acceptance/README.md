@@ -48,3 +48,14 @@ CLI workspace. Будущая модель Sol/low, CLI limit7200s; сейчас
 Проверка офлайн из repo root: `python3 docs/node-development/check-three-node-plans.py`.
 Она сверяет frozen JSON, SHA CSV, покрытие и ручные математические опоры трёх узлов;
 не доказывает native contract или node PASS.
+
+## Precision and actual membership collision fixture
+
+`data/typed-int64-collision.csv` and `typed-int64-source-expected.json` are independently
+written source payload, not native output expected. Native execution: **NOT_RUN**.
+The fixture adds positive/negative int64 boundaries, typed NULL versus empty/literal NULL,
+boolean, real, full datetime milliseconds and an incoming string `IsTestSet`.
+Integer payload comparison uses exact decimal strings; real payload is exact.
+The datetime import profile and native membership collision strategy must be proved before
+this becomes an acceptance case. Do not rename the input to avoid the collision or infer
+a membership name from the output under test.

@@ -1,0 +1,240 @@
+{
+  "version": "independent-source-v1",
+  "status": "NATIVE_NOT_RUN",
+  "null_marker": "?",
+  "schema": [
+    {
+      "index": 0,
+      "name": "RowID",
+      "label": "RowID",
+      "type": "integer",
+      "data_kind": "Дискретный"
+    },
+    {
+      "index": 1,
+      "name": "LargeInteger",
+      "label": "LargeInteger",
+      "type": "integer",
+      "data_kind": "Дискретный"
+    },
+    {
+      "index": 2,
+      "name": "Category",
+      "label": "Category",
+      "type": "string",
+      "data_kind": "Дискретный"
+    },
+    {
+      "index": 3,
+      "name": "Text",
+      "label": "Text",
+      "type": "string",
+      "data_kind": "Дискретный"
+    },
+    {
+      "index": 4,
+      "name": "Real",
+      "label": "Real",
+      "type": "real",
+      "data_kind": "Непрерывный"
+    },
+    {
+      "index": 5,
+      "name": "Flag",
+      "label": "Flag",
+      "type": "boolean",
+      "data_kind": "Дискретный"
+    },
+    {
+      "index": 6,
+      "name": "Date",
+      "label": "Date",
+      "type": "datetime",
+      "data_kind": "Дискретный"
+    },
+    {
+      "index": 7,
+      "name": "IsTestSet",
+      "label": "IsTestSet",
+      "type": "string",
+      "data_kind": "Дискретный"
+    }
+  ],
+  "source_rows": [
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "1"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "9007199254740993"
+      },
+      {
+        "type": "string",
+        "is_null": true,
+        "value": null
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": ""
+      },
+      {
+        "type": "real",
+        "is_null": false,
+        "value": 1.25
+      },
+      {
+        "type": "boolean",
+        "is_null": false,
+        "value": true
+      },
+      {
+        "type": "datetime",
+        "is_null": false,
+        "value": "2024-02-29T12:34:56.123"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "source-A"
+      }
+    ],
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "2"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "9223372036854775807"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "NULL"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "NULL"
+      },
+      {
+        "type": "real",
+        "is_null": false,
+        "value": -2.5
+      },
+      {
+        "type": "boolean",
+        "is_null": false,
+        "value": false
+      },
+      {
+        "type": "datetime",
+        "is_null": false,
+        "value": "2024-01-02T00:00:00.000"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "source-B"
+      }
+    ],
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "3"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "-9223372036854775808"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": ""
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "кириллица"
+      },
+      {
+        "type": "real",
+        "is_null": true,
+        "value": null
+      },
+      {
+        "type": "boolean",
+        "is_null": true,
+        "value": null
+      },
+      {
+        "type": "datetime",
+        "is_null": true,
+        "value": null
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "source-C"
+      }
+    ],
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "4"
+      },
+      {
+        "type": "integer",
+        "is_null": true,
+        "value": null
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "A"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": ""
+      },
+      {
+        "type": "real",
+        "is_null": false,
+        "value": 0.0
+      },
+      {
+        "type": "boolean",
+        "is_null": false,
+        "value": true
+      },
+      {
+        "type": "datetime",
+        "is_null": false,
+        "value": "2024-01-01T00:00:00.000"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "source-D"
+      }
+    ]
+  ],
+  "rules": [
+    "Integer decimal strings exact, including values outside safe JavaScript integer range.",
+    "Real payload exact; no computation tolerance.",
+    "NULL differs from empty string and literal NULL.",
+    "Incoming IsTestSet is string payload; native membership collision strategy must be discovered, not guessed.",
+    "Datetime profile must explicitly declare native full timestamp parsing and prove millisecond precision."
+  ]
+}

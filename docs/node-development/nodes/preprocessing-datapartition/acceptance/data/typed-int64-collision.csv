@@ -1,0 +1,5 @@
+RowID,LargeInteger,Category,Text,Real,Flag,Date,IsTestSet
+1,9007199254740993,?,,1.25,true,2024-02-29T12:34:56.123,source-A
+2,9223372036854775807,NULL,NULL,-2.5,false,2024-01-02T00:00:00.000,source-B
+3,-9223372036854775808,,кириллица,?,?,?,source-C
+4,?,A,,0,true,2024-01-01T00:00:00.000,source-D
