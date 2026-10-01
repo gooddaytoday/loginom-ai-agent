@@ -4439,11 +4439,12 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
-      "initial_scope": "Один наблюдённый режим разделения обучающей/тестовой выборки с явными размерами и всеми тремя выходами.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "card": "nodes/preprocessing-datapartition/README.md",
+      "initial_scope": "Все пять методов; строки/проценты, приоритет/положение test, seed, strata/bias, три выхода и повторное чтение/save/cold.",
+      "scope_basis": "documentation_full_scope",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку.",
+        "Подплан по документации завершён; точные native defaults/schema и неописанные математические правила требуют фиксации при реализации, живых проверок этого этапа нет."
       ],
       "prerequisites": [
         "accepted_base",
@@ -4453,7 +4454,9 @@
       "historical_subplan": null,
       "help_reference": {
         "historical_source_path": "data/processors/preprocessing/partitioning.md",
-        "review_status": "detailed_mode_review_required"
+        "review_status": "documentation_reviewed",
+        "url": "https://help.loginom.ru/userguide/processors/preprocessing/partitioning.html",
+        "review_date": "2026-10-01"
       },
       "readiness": {
         "implementation": {
@@ -4486,7 +4489,11 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Документальный подплан готов: [plan.md](nodes/preprocessing-datapartition/plan.md). Реализация по отдельному поручению; детали версии уточняются в разработке без новой planning-задачи.",
+      "plan": "nodes/preprocessing-datapartition/plan.md",
+      "planning_status": "documentation_complete",
+      "plan_status": "discovery_required",
+      "plan_basis": "documentation_no_live"
     },
     {
       "component_id": "component.preprocessing.Elimoutlier",
@@ -4495,11 +4502,12 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
-      "initial_scope": "Один наблюдённый метод порогов и явные параметры; обработанные данные, выбросы и экстремальные значения.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "card": "nodes/preprocessing-elimoutlier/README.md",
+      "initial_scope": "SD/IQR, все семь actions отдельно для outliers/extremes, все типы/виды/ordered и несколько полей; три выхода, source mutation/save/cold.",
+      "scope_basis": "documentation_full_scope",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку.",
+        "Подплан по документации завершён; точные native defaults/schema и неописанные математические правила требуют фиксации при реализации, живых проверок этого этапа нет."
       ],
       "prerequisites": [
         "accepted_base",
@@ -4509,7 +4517,9 @@
       "historical_subplan": null,
       "help_reference": {
         "historical_source_path": "data/processors/preprocessing/eliminate-outliers.md",
-        "review_status": "detailed_mode_review_required"
+        "review_status": "documentation_reviewed",
+        "url": "https://help.loginom.ru/userguide/processors/preprocessing/eliminate-outliers.html",
+        "review_date": "2026-10-01"
       },
       "readiness": {
         "implementation": {
@@ -4542,7 +4552,11 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Документальный подплан готов: [plan.md](nodes/preprocessing-elimoutlier/plan.md). Реализация по отдельному поручению; детали версии уточняются в разработке без новой planning-задачи.",
+      "plan": "nodes/preprocessing-elimoutlier/plan.md",
+      "planning_status": "documentation_complete",
+      "plan_status": "discovery_required",
+      "plan_basis": "documentation_no_live"
     },
     {
       "component_id": "component.preprocessing.Sampling",
@@ -4835,11 +4849,12 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
-      "initial_scope": "Коэффициент Пирсона для нескольких выбранных числовых полей; явная обработка констант и пропусков.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "card": "nodes/research-corranalysis/README.md",
+      "initial_scope": "Пирсон/Спирмен/Кендалл tau-b/экстремум CCF с лагом, все 15 непустых комбинаций, два набора полей, динамическая схема, NULL/categories/save/cold.",
+      "scope_basis": "documentation_full_scope",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку.",
+        "Подплан по документации завершён; точные native defaults/schema и неописанные математические правила требуют фиксации при реализации, живых проверок этого этапа нет."
       ],
       "prerequisites": [
         "accepted_base",
@@ -4849,7 +4864,9 @@
       "historical_subplan": null,
       "help_reference": {
         "historical_source_path": "data/processors/scrutiny/correlation-analysis.md",
-        "review_status": "detailed_mode_review_required"
+        "review_status": "documentation_reviewed",
+        "url": "https://help.loginom.ru/userguide/processors/scrutiny/correlation-analysis.html",
+        "review_date": "2026-10-01"
       },
       "readiness": {
         "implementation": {
@@ -4882,7 +4899,11 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Документальный подплан готов: [plan.md](nodes/research-corranalysis/plan.md). Реализация по отдельному поручению; детали версии уточняются в разработке без новой planning-задачи.",
+      "plan": "nodes/research-corranalysis/plan.md",
+      "planning_status": "documentation_complete",
+      "plan_status": "discovery_required",
+      "plan_basis": "documentation_no_live"
     },
     {
       "component_id": "component.research.FactorAnalysis",

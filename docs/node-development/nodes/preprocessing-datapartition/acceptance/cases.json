@@ -1,0 +1,2440 @@
+{
+  "format": "documentation-planning-v1-proposed",
+  "node": "preprocessing-datapartition",
+  "base_sha": "9b17e7dd947c016395e8e32e439ca775b1cbe780",
+  "status": "OFFLINE_ONLY_NOT_NODE_PASS",
+  "inputs": [
+    {
+      "file": "data/base.csv",
+      "rows": 12,
+      "fields": [
+        "RowID",
+        "Group",
+        "Value"
+      ],
+      "sha256": "10ee55a1b11489d38ac47afa259495153df135459a6b953df4b30d64c4b3e047"
+    },
+    {
+      "file": "data/bias.csv",
+      "rows": 8,
+      "fields": [
+        "RowID",
+        "Category",
+        "Value"
+      ],
+      "sha256": "2ec615462684b974943079180fad3ca81153e95f7cdfcb3930e4752110917822"
+    },
+    {
+      "file": "data/changed.csv",
+      "rows": 12,
+      "fields": [
+        "RowID",
+        "Group",
+        "Value"
+      ],
+      "sha256": "9030084f27bfd76111d8e16c1783365f12cce55a15910a8c431323555fe2163a"
+    },
+    {
+      "file": "data/empty.csv",
+      "rows": 0,
+      "fields": [
+        "RowID",
+        "Group",
+        "Value"
+      ],
+      "sha256": "e76c08a9110272f2b2b24302dfb63739a2b8d0110796546f23d2d48b6e2e84f9"
+    },
+    {
+      "file": "data/schema-added.csv",
+      "rows": 12,
+      "fields": [
+        "RowID",
+        "Group",
+        "Value",
+        "Flag",
+        "Real",
+        "Text"
+      ],
+      "sha256": "b20bbcc7638a2e475862ffae9aa42c5c2422951b362e9509ca82bf71356016e3"
+    },
+    {
+      "file": "data/schema-metadata.csv",
+      "rows": 12,
+      "fields": [
+        "RowID",
+        "Group",
+        "Value"
+      ],
+      "sha256": "10ee55a1b11489d38ac47afa259495153df135459a6b953df4b30d64c4b3e047"
+    },
+    {
+      "file": "data/strata.csv",
+      "rows": 12,
+      "fields": [
+        "RowID",
+        "Group",
+        "Subgroup",
+        "Value"
+      ],
+      "sha256": "f7bbe3cba86db0799daf2b7f1d6e611f385721e3efd5ea2a347836345c2ad7f8"
+    },
+    {
+      "file": "data/tiny.csv",
+      "rows": 1,
+      "fields": [
+        "RowID",
+        "Group",
+        "Value"
+      ],
+      "sha256": "2a5f6fd9eb33aa017b4eac5708969dd1301db5a940fdbb6ad4ee570c8e8f0580"
+    },
+    {
+      "file": "data/typed.csv",
+      "rows": 4,
+      "fields": [
+        "RowID",
+        "Category",
+        "Text",
+        "Real",
+        "Flag",
+        "Date",
+        "test_set"
+      ],
+      "sha256": "bbf7a9477de72c814dd75d7033270c019b903cb4c194df79c988fbfa9945c0f5"
+    },
+    {
+      "file": "data/uneven.csv",
+      "rows": 7,
+      "fields": [
+        "RowID",
+        "Group",
+        "Value"
+      ],
+      "sha256": "0ef0b8791a470e0b37d937cf8c3c7e19b23a70e88298e47aa5eaf7ac73edb56d"
+    }
+  ],
+  "core": [
+    {
+      "id": "random-rows-rows-training-algorithm",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-rows-rows-test-algorithm",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-rows-rows-test-start",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-rows-rows-test-end",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-rows-percent-training-algorithm",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-rows-percent-test-algorithm",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-rows-percent-test-start",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-rows-percent-test-end",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-percent-rows-training-algorithm",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-percent-rows-test-algorithm",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-percent-rows-test-start",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-percent-rows-test-end",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-percent-percent-training-algorithm",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-percent-percent-test-algorithm",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-percent-percent-test-start",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "random-percent-percent-test-end",
+      "mode": "random",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-rows-rows-training-algorithm",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-rows-rows-test-algorithm",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-rows-rows-test-start",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-rows-rows-test-end",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-rows-percent-training-algorithm",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-rows-percent-test-algorithm",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-rows-percent-test-start",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-rows-percent-test-end",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-percent-rows-training-algorithm",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-percent-rows-test-algorithm",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-percent-rows-test-start",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-percent-rows-test-end",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-percent-percent-training-algorithm",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-percent-percent-test-algorithm",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-percent-percent-test-start",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "uniform-percent-percent-test-end",
+      "mode": "uniform",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "uniform": {
+          "group_size": 3
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-rows-rows-training-algorithm",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-rows-rows-test-algorithm",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-rows-rows-test-start",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-rows-rows-test-end",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-rows-percent-training-algorithm",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-rows-percent-test-algorithm",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-rows-percent-test-start",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-rows-percent-test-end",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-percent-rows-training-algorithm",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-percent-rows-test-algorithm",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-percent-rows-test-start",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-percent-rows-test-end",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-percent-percent-training-algorithm",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-percent-percent-test-algorithm",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-percent-percent-test-start",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "stratified-percent-percent-test-end",
+      "mode": "stratified",
+      "fixture": "data/strata.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "stratified": {
+          "fields": [
+            "Group",
+            "Subgroup"
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-rows-rows-training-algorithm",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-rows-rows-test-algorithm",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-rows-rows-test-start",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-rows-rows-test-end",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-rows-percent-training-algorithm",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-rows-percent-test-algorithm",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-rows-percent-test-start",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-rows-percent-test-end",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-percent-rows-training-algorithm",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-percent-rows-test-algorithm",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-percent-rows-test-start",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-percent-rows-test-end",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-percent-percent-training-algorithm",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-percent-percent-test-algorithm",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-percent-percent-test-start",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "sequential-percent-percent-test-end",
+      "mode": "sequential",
+      "fixture": "data/base.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "sequential": {
+          "take": 2,
+          "skip": 1
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-rows-rows-training-algorithm",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-rows-rows-test-algorithm",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-rows-rows-test-start",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-rows-rows-test-end",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-rows-percent-training-algorithm",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-rows-percent-test-algorithm",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-rows-percent-test-start",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-rows-percent-test-end",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "rows",
+          "value": 6
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-percent-rows-training-algorithm",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-percent-rows-test-algorithm",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-percent-rows-test-start",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-percent-rows-test-end",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "rows",
+          "value": 3
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-percent-percent-training-algorithm",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "training",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-percent-percent-test-algorithm",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "algorithm",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-percent-percent-test-start",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "start",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    },
+    {
+      "id": "biased-percent-percent-test-end",
+      "mode": "biased",
+      "fixture": "data/bias.csv",
+      "parameters": {
+        "training": {
+          "unit": "percent",
+          "value": 50
+        },
+        "test": {
+          "unit": "percent",
+          "value": 25
+        },
+        "priority": "test",
+        "test_position": "end",
+        "seed": {
+          "policy": "fixed",
+          "value": 17
+        },
+        "biased": {
+          "field": "Category",
+          "adjustments": [
+            {
+              "key": "A",
+              "factor": 2
+            },
+            {
+              "key": "B",
+              "factor": 1
+            },
+            {
+              "key": null,
+              "factor": 1
+            }
+          ]
+        }
+      },
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+    }
+  ],
+  "core_count": 80,
+  "edges": [
+    {
+      "id": "edge-sizes",
+      "fixtures": [
+        "data/base.csv",
+        "data/empty.csv",
+        "data/tiny.csv"
+      ],
+      "check": "0/0,0/100%,100%/0,9/9 priorities; fractional percent candidates",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "uniform-remainder",
+      "fixtures": [
+        "data/base.csv",
+        "data/uneven.csv"
+      ],
+      "check": "group_size1/3/5; source and remainder quotas",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "strata-null",
+      "fixtures": [
+        "data/strata.csv"
+      ],
+      "check": "one/two fields; typed NULL versus literal NULL; uneven strata",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "blocks",
+      "fixtures": [
+        "data/base.csv"
+      ],
+      "check": "take2/skip1, take12/skip0, exhausted and incomplete block",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "bias-frequency",
+      "fixtures": [
+        "data/bias.csv"
+      ],
+      "check": "factor0/1/2/0.5 and explicit count0/1/8; percent population and duplicate occurrences",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "seed",
+      "fixtures": [
+        "data/base.csv",
+        "data/tiny.csv"
+      ],
+      "check": "fixed replay, always_random, independent cold replay; no assertion different seed changes tiny result",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "typed-membership-collision",
+      "fixtures": [
+        "data/typed.csv"
+      ],
+      "check": "all payload types/NULL and existing test_set; exact integer strings",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "original-operation-mutation",
+      "fixtures": [
+        "data/base.csv",
+        "data/changed.csv",
+        "data/schema-added.csv",
+        "data/schema-metadata.csv"
+      ],
+      "check": "same IDs/S; values, 3→6 width, same-width label/kind change, independent cold",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "validation-recovery",
+      "fixtures": [
+        "data/base.csv"
+      ],
+      "check": "invalid field/size/seed/typed adjustment; no side effect; recover same graph",
+      "execution": "NOT_RUN"
+    }
+  ]
+}

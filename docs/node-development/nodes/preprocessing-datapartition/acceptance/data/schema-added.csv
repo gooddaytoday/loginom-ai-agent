@@ -1,0 +1,13 @@
+RowID,Group,Value,Flag,Real,Text
+1,A,10,true,1.25,row-1
+2,A,20,false,2.25,row-2
+3,A,30,true,3.25,?
+4,A,40,false,4.25,row-4
+5,A,50,true,5.25,row-5
+6,A,60,false,6.25,row-6
+7,B,70,true,7.25,row-7
+8,B,80,false,8.25,row-8
+9,B,90,true,9.25,row-9
+10,B,100,false,10.25,row-10
+11,B,110,true,11.25,row-11
+12,B,120,false,12.25,row-12

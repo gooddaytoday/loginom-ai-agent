@@ -1,0 +1,13 @@
+RowID,Group,Subgroup,Value
+1,A,X,10
+2,A,Y,20
+3,A,X,30
+4,A,Y,40
+5,A,X,50
+6,B,Y,60
+7,B,X,70
+8,B,Y,80
+9,C,X,90
+10,C,Y,100
+11,?,X,110
+12,NULL,Y,120

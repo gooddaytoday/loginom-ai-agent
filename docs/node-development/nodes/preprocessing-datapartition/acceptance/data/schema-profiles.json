@@ -1,0 +1,97 @@
+{
+  "status": "PROPOSED_IMPORT_PROFILES_NOT_RUN",
+  "null_marker": "?",
+  "profiles": {
+    "base": [
+      {
+        "name": "RowID",
+        "label": "RowID",
+        "type": "integer",
+        "data_kind": "discrete",
+        "nullable": false
+      },
+      {
+        "name": "Group",
+        "label": "Group",
+        "type": "string",
+        "data_kind": "discrete",
+        "nullable": false
+      },
+      {
+        "name": "Value",
+        "label": "Value",
+        "type": "integer",
+        "data_kind": "discrete",
+        "nullable": false
+      }
+    ],
+    "added": [
+      {
+        "name": "RowID",
+        "label": "RowID",
+        "type": "integer",
+        "data_kind": "discrete",
+        "nullable": false
+      },
+      {
+        "name": "Group",
+        "label": "Group",
+        "type": "string",
+        "data_kind": "discrete",
+        "nullable": false
+      },
+      {
+        "name": "Value",
+        "label": "Value",
+        "type": "integer",
+        "data_kind": "discrete",
+        "nullable": false
+      },
+      {
+        "name": "Flag",
+        "label": "Flag",
+        "type": "boolean",
+        "data_kind": "discrete",
+        "nullable": false
+      },
+      {
+        "name": "Real",
+        "label": "Real",
+        "type": "real",
+        "data_kind": "continuous",
+        "nullable": false
+      },
+      {
+        "name": "Text",
+        "label": "Text",
+        "type": "string",
+        "data_kind": "discrete",
+        "nullable": true
+      }
+    ],
+    "metadata": [
+      {
+        "name": "RowID",
+        "label": "RowID",
+        "type": "integer",
+        "data_kind": "discrete",
+        "nullable": false
+      },
+      {
+        "name": "Group",
+        "label": "Group",
+        "type": "string",
+        "data_kind": "discrete",
+        "nullable": false
+      },
+      {
+        "name": "Value",
+        "label": "Measured amount",
+        "type": "integer",
+        "data_kind": "continuous",
+        "nullable": false
+      }
+    ]
+  },
+  "note": "Apply profiles on existing import; verify actual public import schema before partition execution. Same-count category means data_kind discrete -> continuous, NOT string business category. Native physical types/port identities remain D1 unresolved."
+}

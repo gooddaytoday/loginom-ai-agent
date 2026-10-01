@@ -1,0 +1,117 @@
+{
+  "format": "documentation-sources-v1",
+  "author": "Codex",
+  "checked_date": "2026-10-01",
+  "base_sha": "9b17e7dd947c016395e8e32e439ca775b1cbe780",
+  "note": "HTTP response hashes identify bytes read on this date; pages may change. Source version does not identify any Loginom installation.",
+  "sources": [
+    {
+      "id": "partition-help",
+      "title": "Разбиение на множества",
+      "url": "https://help.loginom.ru/userguide/processors/preprocessing/partitioning.html",
+      "effective_url": "https://help.loginom.ru/userguide/processors/preprocessing/partitioning.html",
+      "http_status": 200,
+      "checked_date": "2026-10-01",
+      "response_sha256": "d7946b64d073ff40aac0690ea9e81839f1c1f8750f46a41a64ade59255d566a9",
+      "scope": "settings, methods, seed, input and three outputs",
+      "evidence": "DOCUMENTATION_NOT_LIVE_LOGINOM",
+      "page_version": "not specified"
+    },
+    {
+      "id": "outlier-help",
+      "title": "Редактирование выбросов",
+      "url": "https://help.loginom.ru/userguide/processors/preprocessing/eliminate-outliers.html",
+      "effective_url": "https://help.loginom.ru/userguide/processors/preprocessing/eliminate-outliers.html",
+      "http_status": 200,
+      "checked_date": "2026-10-01",
+      "response_sha256": "8fa2a6eb8b7779cdec8d4d548812e5b1850362541fc7f747a25878dd98094ae8",
+      "scope": "SD/IQR, methods, SVG type applicability and outputs",
+      "evidence": "DOCUMENTATION_NOT_LIVE_LOGINOM",
+      "page_version": "not specified"
+    },
+    {
+      "id": "correlation-help",
+      "title": "Корреляционный анализ",
+      "url": "https://help.loginom.ru/userguide/processors/scrutiny/correlation-analysis.html",
+      "effective_url": "https://help.loginom.ru/userguide/processors/scrutiny/correlation-analysis.html",
+      "http_status": 200,
+      "checked_date": "2026-10-01",
+      "response_sha256": "11ad5b71d7de77adc129212327493b5c65865a75add9b016e1829eeaf386fde1",
+      "scope": "four flags, sets, schema roles, Pearson text coding",
+      "evidence": "DOCUMENTATION_NOT_LIVE_LOGINOM",
+      "page_version": "not specified"
+    },
+    {
+      "id": "iqr-wiki",
+      "title": "Интерквартильный размах",
+      "url": "https://wiki.loginom.ru/articles/iqr.html",
+      "effective_url": "https://wiki.loginom.ru/articles/iqr.html",
+      "http_status": 200,
+      "checked_date": "2026-10-01",
+      "response_sha256": "91b3adaa8b13ae9a2c8313a9e9c4a6004c2e1a4533c31687c117636a7d987a5f",
+      "scope": "definition and illustrative quartile example; not complete native algorithm",
+      "evidence": "DOCUMENTATION_NOT_LIVE_LOGINOM",
+      "page_version": "not specified"
+    },
+    {
+      "id": "modal-wiki",
+      "title": "Наиболее вероятный интервал",
+      "url": "https://wiki.loginom.ru/articles/mean-most-likely-interval.html",
+      "effective_url": "https://wiki.loginom.ru/articles/mean-most-likely-interval.html",
+      "http_status": 200,
+      "checked_date": "2026-10-01",
+      "response_sha256": "60f00feed54cd0eaec5f9d93b1e88b18571d1dae0a0b2926094c819fae35721b",
+      "scope": "Sturges/modal interval; rounding and ties not specified",
+      "evidence": "DOCUMENTATION_NOT_LIVE_LOGINOM",
+      "page_version": "not specified"
+    },
+    {
+      "id": "ccf-wiki",
+      "title": "Экстремум взаимнокорреляционной функции",
+      "url": "https://wiki.loginom.ru/articles/ccf-max.html",
+      "effective_url": "https://wiki.loginom.ru/articles/ccf-max.html",
+      "http_status": 200,
+      "checked_date": "2026-10-01",
+      "response_sha256": "980d8bbe7adf31a5a5a9aeca6546d794a82549c9be92e840b70785ac060c887c",
+      "scope": "discrete shifted sum; native normalization not specified",
+      "evidence": "DOCUMENTATION_NOT_LIVE_LOGINOM",
+      "page_version": "not specified"
+    },
+    {
+      "id": "kendall-wiki",
+      "title": "Корреляция Кендалла",
+      "url": "https://wiki.loginom.ru/articles/rank-correlation-kendall.html",
+      "effective_url": "https://wiki.loginom.ru/articles/rank-correlation-kendall.html",
+      "http_status": 200,
+      "checked_date": "2026-10-01",
+      "response_sha256": "08636757a84cfe63be4c50325eae2d00701125db594ea08e5a3febc3c1f05a9f",
+      "scope": "rank correlation context; ambiguous formula is not used in oracle",
+      "evidence": "DOCUMENTATION_NOT_LIVE_LOGINOM",
+      "page_version": "not specified"
+    },
+    {
+      "id": "spearman-wiki",
+      "title": "Корреляция Спирмена",
+      "url": "https://wiki.loginom.ru/articles/rank-correlation-spearman.html",
+      "effective_url": "https://wiki.loginom.ru/articles/rank-correlation-spearman.html",
+      "http_status": 200,
+      "checked_date": "2026-10-01",
+      "response_sha256": "490c6f74837c66c03b52414685aac79ff7d5ef3dc8fb7bce1a6d2247ba2f5371",
+      "scope": "rank context; independent mean-rank oracle",
+      "evidence": "DOCUMENTATION_NOT_LIVE_LOGINOM",
+      "page_version": "not specified"
+    },
+    {
+      "id": "kendall-primary",
+      "title": "SciPy kendalltau mathematical definition",
+      "url": "https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.kendalltau.html",
+      "effective_url": "https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.kendalltau.html",
+      "http_status": 200,
+      "checked_date": "2026-10-01",
+      "response_sha256": "38c519e18e3dfd59db5619877f7639bc71aff4bdc142c3c371667ec9d10bd77f",
+      "scope": "independent tau-b tie definition; no native Loginom claim",
+      "evidence": "DOCUMENTATION_NOT_LIVE_LOGINOM",
+      "page_version": "not specified"
+    }
+  ]
+}

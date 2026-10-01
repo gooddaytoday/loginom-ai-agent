@@ -1,0 +1,5 @@
+row_id,integer_value,real_value,date_value,boolean_value,text_value,empty_text,unicode_text
+1,1,1.5,2026-01-01,true,a,"",Ё
+2,2,2.5,2026-01-02,false,b,"",Е
+3,3,3.5,2026-01-03,true,c,"",е
+4,4,4.5,2026-01-04,false,d,"",ё
