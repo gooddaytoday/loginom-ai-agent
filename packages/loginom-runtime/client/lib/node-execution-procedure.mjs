@@ -180,7 +180,10 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         }
       }
       s=await channel.observe({condition:'native execution control for selected node',readOutputs:true,
-        ready:s=>same(s)&&s.node_outputs.node_selected&&launch(s).length===1});
+        ready:s=>same(s)&&s.node_outputs.node_selected&&launch(s).length===1,
+        // Deactivation repaints the native graph body after enabling F9.
+        // Wait for the exact body and launch mode to settle before authorizing it.
+        confirmIdentity:s=>({node:s.prepared_node_context,launch:one(launch(s),'Unique native execution control required').graph_execution})});
       // Never repeat an issued or uncertain launch in this driver instance.
       launchAttempted=true;
       const result=await channel.perform({condition:'execute the configured graph node',initialObservation:s,
