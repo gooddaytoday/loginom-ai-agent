@@ -16,7 +16,7 @@ CONNECTION="$SLOT_ROOT/profile/loginom/connection/connection.json"
 mkdir -m 700 "$OUT"
 trap 'rm -f "$OUT/.cold-config.json"' EXIT
 USER_NAME="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["username"])' "$CONNECTION")"
-PACKAGE="/$USER_NAME/sliding-$SCENARIO-$(basename "$OUT").lgp"
+PACKAGE="/$USER_NAME/sliding-$SCENARIO-$(basename "$(dirname "$OUT")").lgp"
 DISPLAY_NUM=$((11 + $(printf '%d' "'$NODE_SLOT") - 97))
 BWRAP=/usr/local/libexec/loginom-swarm/bwrap
 HARNESS=/opt/loginom-worker/cli-v017-20260926
