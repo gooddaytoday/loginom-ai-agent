@@ -12,10 +12,24 @@ import {makeJavascriptExistingGraphTypeCode} from '../../client/lib/javascript-e
 import {javascriptSourceIdentity} from '../../client/lib/javascript-source-read.mjs';
 import {javascriptSourceSettingsDigest} from '../../client/lib/javascript-source-admission.mjs';
 import {verifyJavascriptMappingGraph} from '../../client/lib/javascript-graph-preservation.mjs';
+import {createNodeProcedure} from '../../client/lib/node-procedure.mjs';
 import {makeJavascriptUiProfileCode} from './javascript-ui-profile.mjs';
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const same=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
+
+// SavedExecutionRuntime intentionally has no channel/configuration surface.
+// This private observer exposes only the existing prepared-node observation.
+export function createJavascriptUiProfileChannel({prepared,node,deadline,targetOrigin,execute,record}) {
+  need(prepared?.document_id===node?.document_id&&prepared.workflow_ref?.workflow_id===node.workflow_id
+    &&typeof node.node_id==='string'&&Number.isSafeInteger(deadline)&&deadline>Date.now(),
+  'UI profile observation channel owner/deadline unavailable');
+  const reader=createNodeProcedure({operation:{id:'js-ui-observe-'+randomUUID(),
+    action:{action_key:'diagnostic.javascript',revision:'1'},deadline},execute,record,
+    targetOrigin,targetBuild:'7.4.2',maxSteps:4096,
+    preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node}});
+  return Object.freeze({observe:options=>reader.observe(options)});
+}
 
 // Two independent preserved openings, never a writer/Done/Execute procedure.
 export async function runJavascriptUiProfile({page,prepared,node,targetOrigin,deadline,record,
@@ -71,7 +85,8 @@ export async function runJavascriptUiProfile({page,prepared,node,targetOrigin,de
         return result;
       }};
     const adapter=createJavascriptManagedSourceAdapter({page,prepared,node,uiEpoch:index,deadline,targetOrigin,
-      execute,record,driver,channel:until=>runtime.channel(node,until),
+      execute,record,driver,channel:until=>createJavascriptUiProfileChannel({prepared,node,deadline:until,
+        targetOrigin,execute,record}),
       receiptOptions:(id,key,signature)=>({receipt_namespace:namespace,receipt_id:id,receipt_signature:signature})});
     report.stage='ui-profile-opening-'+index;onPending(true);await save();
     const handle=await adapter.open({owner,deadline}),source=await adapter.read(handle,{owner,deadline});
