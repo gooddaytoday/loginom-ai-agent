@@ -215,8 +215,8 @@ Rename/Done отдельно не доказывают полный J19 или a
 **Статус: пользователь явно принял `allow_configured_output: true` 2026-10-01.**
 Обычный запрос сохраняет строгую materialized-only проверку; opt-in возвращает
 current source, verified input и configured output со статусом `source_pending`,
-без утверждения о подтверждении выхода выполнением. Реализация и приёмка ниже
-ещё требуются. Code440
+без утверждения о подтверждении выхода выполнением. Реализация child `9bc52b9468` прошла actual addressed/full client и operator
+checks; positive live/independent acceptance ещё требуются. Code440
 подтвердил default refusal, предусмотренный выше: после Input Done output0 имеет
 полный configured target inventory, но materialized sources отсутствуют.
 Не запускать old source для обхода отказа. Technical rename и ACK подтверждены;

@@ -275,6 +275,46 @@ remaining F/candidate/CLI/natural diagnostics открыты. Untracked
 acceleration-review.md в commits не добавлять. Выполненные разовые указания
 и unchanged accepted проверки не повторять.
 
+### E/J19: реализация opt-in и pin до fresh live — 2026-10-01
+
+Child `9bc52b94686af82bfa1411adacffd1f56c0de399` реализует optional boolean
+allow_configured_output только для initial context. Default input/output guard
+остаётся materialized-only; source/другие requests флаг не принимают. Exact flag
+входит в registry signature, conflicting SAME-ID reuse refused. Pending output0
+принимается только с own cached native witness, complete configured targets,
+пустыми sources, exact scalar/flags/order/IDs и hidden source column/counts.
+Ответ имеет source_pending/configured_inventory_verified=true и
+native_reciprocity_verified=false, configured scope; journal ports_complete=false.
+Полностью materialized ответ сохраняет прежнюю форму. Input строго verified.
+Два независимых snapshots/source/settings/ports, graph, ACK/unknown ownership,
+Close/discard, redaction и budgets сохранены. Product handler не зарегистрирован.
+
+Fixed renamed operator в одном новом run проверяет default refusal/full cleanup,
+затем NEW opt-in reply с old source/current technical Name. Correction берётся
+из public reply; exact new и historical baseline retries должны дать zero events.
+Финальный default context остаётся materialized. Actual MCP transport проверен
+для full и compact profiles; configured input, dishonest scope/reciprocity,
+foreign/incomplete/native witness/scalar drift, secrets/budgets/deadline/unknown
+Close counterexamples покрыты. Malformed mapping metadata отказывает после own
+prepared port Close; loss of Close ownership/receipt остаётся unresolved/no replay.
+
+Actualexit0: addressed client182/exec25961, operator80/exec48248;
+full client3419PASS+10SKIP/exec22746/concurrency4 (logSHA2389d338),
+full operator18502PASS/exec46685/concurrency4 (logSHA0ae1a363).
+Новая freeze v5:12748 files/61 symlinks, SHAca599a39; independent oracle
+32bc3cfd неизменён. v5 pin SHAbb773e76 закрепил source/tests/auditor/handoff
+и119 meaningful negatives ДО browser. Python syntax PASS. Audit различает
+before/final materialized и renamed configured, две native observations/settings/
+source receipts, default refusal с двумя Closes; не заявляет actual model resistance.
+
+Fresh ordinary headed Code441 (`e-public-context-renamed-code-05`) запущен на
+этом immutable source, original exec55146 наблюдается до terminal. Registry
+исправлен с ошибочно введённого bookkeeping id79491 на actual tool id55146 до
+зависимых действий, private correction receipt сохранён. Это не второй запуск.
+Positive J19 ещё не принят: дождаться actualexit, independent v5 audit/119
+negatives и full cleanup/process absence; только затем отдельный declared442.
+Во время live child source не менять. Предыдущие failed reports не переоценивать.
+
 ### E/J25: owned technical-details expansion432 принят — 2026-10-01
 
 Ordinary headed `e-native-details-expansion-code-01`/exec41667 actualexit0/OBSERVED
