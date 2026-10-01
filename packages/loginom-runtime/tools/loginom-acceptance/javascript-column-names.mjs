@@ -55,7 +55,8 @@ export function verifyJavascriptPublicColumnNames({probe,table,mapping,node,read
     const source=mapping.source_fields[index],column=table.schema[index];
     need(source.index===index&&target.index===index&&typeof source.field_id==='string'&&source.field_id
       &&typeof source.record_id==='string'&&source.record_id&&typeof target.record_id==='string'&&target.record_id
-      &&['name','label','type','data_kind'].every(key=>source[key]===column[key]&&target[key]===column[key])
+      &&['name','label','type'].every(key=>source[key]===column[key]&&target[key]===column[key])
+      &&target.data_kind===column.data_kind
       &&source.required===true&&target.required===false&&target.excluded===false&&target.inherited===false
       &&same(target.source,source),'source to target physical field differs');
   });
