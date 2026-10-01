@@ -120,3 +120,31 @@ test('wide precision readback visits stored fields once without returning to col
   }
  }
 });
+
+test('cold filter audit normalizes native empty defaults and refuses active or hidden predicates before reading',async()=>{
+ const {prepareTableRead}=await import('../lib/node-output-procedure.mjs');
+ for(const coverage of ['complete_empty','complete_nonempty','incomplete','hidden_empty']){
+  const table={table_tid:'table',view_guid:'view'},actions=[];let open=false,enabled=true;
+  const control=tid=>({tid,ref:tid,allowed_actions:['click','set_checked'],interaction:{state:'point_observed'}});
+  const state=()=>({ui:{dialogs:open?[{title:'Фильтр'}]:[],elements:open?
+   [control('checkbox'),control('table;ModalWindow_BrowseFilter;btnApply'),control('table;ModalWindow_BrowseFilter;btnCancel')]:
+   [control('table;btnDataGridFilter'),...['nulls','data_types'].map(kind=>({...control(kind),view_toggle:{kind,pressed:true}}))]},
+   node_outputs:{tables:[{active:true,view_guid:'view'}]},table_settings:open?{filter:{enabled:{status:'observed',value:enabled,input_ref:'checkbox'},
+    predicate_coverage:coverage==='hidden_empty'?'complete_empty':coverage,predicates_complete:['complete_empty','complete_nonempty'].includes(coverage)}}:null});
+  const channel={observe:async options=>{const value=state();assert.equal(options.ready(value),true,options.condition);return value;},
+   perform:async options=>{const value=state();assert.equal(options.ready(value),true,options.condition);const action=options.resolve(value);actions.push(action);
+    if(action.ref==='table;btnDataGridFilter')open=true;
+    if(action.verb==='set_checked'){assert.equal(coverage,'complete_empty','a nonempty/unknown predicate must not be cleared');enabled=action.checked;}
+    if(action.ref.endsWith('btnApply')||action.ref.endsWith('btnCancel'))open=false;
+   }};
+  if(coverage==='complete_empty'){
+   const result=await prepareTableRead(channel,table,{requireUnfiltered:true});assert.equal(result.filter_enabled,false);
+   assert.equal(actions.filter(a=>a.verb==='set_checked').length,1);
+  } else {
+   await assert.rejects(prepareTableRead(channel,table,{requireUnfiltered:true}),/Active or unobserved filter/);
+   assert.equal(enabled,true);assert.equal(actions.filter(a=>a.verb==='set_checked'||a.ref.endsWith('btnApply')).length,0);
+   assert.equal(actions.at(-1).ref,'table;ModalWindow_BrowseFilter;btnCancel');
+  }
+  assert.equal(open,false,'precision restoration must not encounter the filter modal');
+ }
+});

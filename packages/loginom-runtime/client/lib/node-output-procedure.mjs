@@ -281,7 +281,17 @@ export async function prepareTableRead(channel,table,{requireUnfiltered=false}={
     resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===table.table_tid+';btnDataGridFilter'),'Unique Table Filter required').ref}),identity:()=>({table})});
   const read=()=>channel.observe({condition:'Table filter setting ready',tableDialog:{table,kind:'filter'},ready:s=>s.table_settings?.filter?.enabled?.status==='observed'});
   s=await read();
-  requireValue(!requireUnfiltered||s.table_settings.filter.enabled.value===false,'Active filter is forbidden for complete cold read');
+  // New native Tables enable an empty predicate list by default. Only a
+  // complete empty list may be normalized; never remove an active/unknown filter
+  // to make a cold oracle pass. Close its modal before precision restoration.
+  if(requireUnfiltered&&s.table_settings.filter.enabled.value
+    &&!(s.table_settings.filter.predicates_complete===true&&s.table_settings.filter.predicate_coverage==='complete_empty')) {
+    await channel.perform({condition:'cancel forbidden Table filter audit',initialObservation:s,
+      ready:s=>s.table_settings?.filter?.enabled?.value===true,
+      resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===table.table_tid+';ModalWindow_BrowseFilter;btnCancel'&&e.allowed_actions.includes('click')),'Unique Table Filter Cancel required').ref}),identity:()=>({table})});
+    await channel.observe({condition:'forbidden Table filter dialog closed',tableDialog:{table,kind:'filter'},ready:s=>s.ui.dialogs.length===0});
+    throw Error('Active or unobserved filter is forbidden for complete cold read');
+  }
   if(s.table_settings.filter.enabled.value) {
     await channel.perform({condition:'disable output Table filtering',initialObservation:s,ready:s=>s.table_settings?.filter?.enabled?.value===true,
       resolve:s=>{const setting=s.table_settings.filter.enabled,refs=[setting.input_ref,setting.display_ref];return {verb:'set_checked',checked:false,

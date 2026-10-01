@@ -14,6 +14,12 @@ retained workflow identity is rebound only after this complete saved graph audit
 The candidate manifest must be clean and match oracle `owner.source_sha`.
 Each scenario launches one fresh completed execution and reads all oracle ports.
 Active filters, incomplete pages and schema without fresh data-kind evidence fail.
+A new native Table enables its filter checkbox with a complete empty predicate list.
+Cold read may disable that empty default only when `predicates_complete: true` and
+`predicate_coverage: "complete_empty"` are freshly observed. Nonempty, hidden or
+incomplete predicates are refused without clearing them; the modal is cancelled
+before precision restoration so the primary refusal remains visible. The final
+observation must still have `filter_enabled: false`.
 Legacy expected without `version` keeps its separate single-port comparator.
 Unknown versions do not fall back. Node-plan specifications require an explicit
 adapter; they are not executable inputs merely because they have familiar fields.
