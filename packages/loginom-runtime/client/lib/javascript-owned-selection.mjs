@@ -4,7 +4,8 @@ export function captureJavascriptSelection({binding,node}) {
     const diagram=tab?.Controller?.FController?.FDiagram,nodes=diagram?.FNodes?.FCollection;
     const found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===node.id):[];
     if(tab!==binding.tab||found.length!==1)throw Error('Private selection binding unavailable');
-    return {document,controller:tab.Controller,tabRoot:tab.el?.dom,model:tab.Controller.FController,diagram,graph:diagram.FmxGraph,container:diagram.FmxGraph.container,native:found[0],cell:found[0].FCell,shape:diagram.FmxGraph.view.getState(found[0].FCell)?.shape?.node,replacements:0};
+    const selected=diagram.FmxGraph.getSelectionCells();
+    return {document,controller:tab.Controller,tabRoot:tab.el?.dom,model:tab.Controller.FController,diagram,graph:diagram.FmxGraph,container:diagram.FmxGraph.container,native:found[0],cell:found[0].FCell,shape:diagram.FmxGraph.view.getState(found[0].FCell)?.shape?.node,replacements:0,initialSelected:Array.isArray(selected)&&selected.length===1&&selected[0]===found[0].FCell};
   }
 
 export function inspectJavascriptSelection({binding,node,icon,retained:r,requireSettings,requireVisualizers,inspectPhase,deadline,targetOrigin,targetBuild,poll=false,afterGesture=false}) {
@@ -25,7 +26,8 @@ export function inspectJavascriptSelection({binding,node,icon,retained:r,require
     if(!shape?.isConnected||shape.getAttribute('data-tid')!==node.tid||!graph.contains(shape)
       ||unique.length!==1||unique[0]!==shape)throw Error('Private selection DOM changed: '+JSON.stringify({kind:'current_shape',phase:inspectPhase,connected:shape?.isConnected===true,tid_matches:typeof shape?.getAttribute==='function'&&shape.getAttribute('data-tid')===node.tid,inside_graph:!!shape&&graph.contains(shape),unique_count:unique.length,unique_matches:unique[0]===shape,after_gesture:afterGesture,node_selected:nodeSelected}));
     if(shape!==r.shape){
-      if(!afterGesture||r.replacements>=2||r.shape?.isConnected||!nodeSelected)throw Error('Private selection DOM changed: '+JSON.stringify({kind:'replacement',phase:inspectPhase,after_gesture:afterGesture,replacements:r.replacements,previous_connected:r.shape?.isConnected===true,node_selected:nodeSelected}));
+      const beforeSelection=!poll&&inspectPhase==='pre_select_click'&&!afterGesture&&r.initialSelected===true&&r.replacements===0;
+      if((!afterGesture&&!beforeSelection)||r.replacements>=2||r.shape?.isConnected||!nodeSelected)throw Error('Private selection DOM changed: '+JSON.stringify({kind:'replacement',phase:inspectPhase,after_gesture:afterGesture,replacements:r.replacements,previous_connected:r.shape?.isConnected===true,node_selected:nodeSelected}));
       // Loginom may redraw the same selected native cell twice before Setting opens.
       r.shape=shape;r.replacements++;
     }
@@ -140,11 +142,13 @@ export async function selectJavascriptForSettings(page,{binding,node,icon,deadli
       await acknowledge({phase:'javascript_private_selection_dispatch',node_id:node.id,point:before.body_point,deadline,require_visualizers:requireVisualizers},'Private selection dispatch journal ACK differs');
       await beforeSelect();
       const checked=await read('pre_select_click');
-      if(JSON.stringify(checked)!==JSON.stringify(before))throw Error('Private selection changed before click');
+      const ownedRedraw=before.node_selected&&checked.dom_replacements===before.dom_replacements+1;
+      if((checked.dom_replacements!==before.dom_replacements&&!ownedRedraw)
+        ||JSON.stringify({...checked,dom_replacements:before.dom_replacements})!==JSON.stringify(before))throw Error('Private selection changed before click');
       if(Date.now()>=deadline)throw Error('Private selection deadline');
       dispatched=true;
       await page.mouse.click(before.body_point.x,before.body_point.y);
-      await record({phase:'javascript_private_selection_gesture_returned',node_id:node.id});
+      await record({phase:'javascript_private_selection_gesture_returned',node_id:node.id,pre_click_dom_replacements:checked.dom_replacements});
       args.afterGesture=true;
       const remaining=deadline-Date.now();if(remaining<=0)throw Error('Private selection deadline');
       const ready=await page.waitForFunction(inspectJavascriptSelection,{...args,inspectPhase:'post_select_poll',poll:true},{timeout:remaining,polling:100});await ready.dispose();

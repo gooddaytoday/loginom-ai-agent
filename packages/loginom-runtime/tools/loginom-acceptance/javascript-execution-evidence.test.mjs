@@ -420,6 +420,58 @@ test('selection admits two detached DOM redraws only after the returned gesture 
   assert.equal(third.clicks,1);assert.equal(third.records.at(-1).opening_dispatched,false);
 });
 
+function beforeSelectedRedrawFixture(fault) {
+  const f=privateSelectionFixture(fault==='not_initially_selected'?undefined:'already'),graph=f.tab.Controller.FController.FDiagram.FmxGraph;
+  const [initial,setting]=graph.container.querySelectorAll();let shape=initial,controls=false;
+  graph.container.querySelectorAll=()=>controls?[shape,setting]:[shape];
+  graph.container.contains=e=>e===shape||e===setting;
+  graph.view.getState=()=>({shape:{node:shape}});
+  f.realm.document.elementFromPoint=()=>controls?setting:shape;
+  const click=f.page.mouse.click;
+  f.page.mouse.click=async(...args)=>{await click(...args);controls=true;};
+  return {...f,run:(deadline=Date.now()+5000)=>f.run(deadline,{openSettings:true,record:async event=>{
+    f.records.push(event);
+    if(event.phase==='javascript_private_selection_dispatch'){
+      initial.isConnected=fault==='connected';shape={...initial,isConnected:true};
+      if(fault==='owner')f.native.data={};
+      if(fault==='cell')f.native.FCell={};
+      if(fault==='foreign_selection')graph.getSelectionCells=()=>[{}];
+      if(fault==='initially_unselected')graph.getSelectionCells=()=>[];
+      if(fault==='not_initially_selected')graph.getSelectionCells=()=>[f.native.FCell];
+      if(fault==='duplicate')graph.container.querySelectorAll=()=>[shape,{...shape}];
+      if(fault==='point')shape.getBoundingClientRect=()=>({x:120,y:100,width:80,height:100});
+      if(fault==='controls')controls=true;
+      if(fault==='transport')throw Error('lost dispatch ACK');
+      if(fault==='ack')return {};
+      if(fault==='late')await new Promise(resolve=>setTimeout(resolve,80));
+    }
+    return event;
+  }}),get clicks(){return f.clicks;},get disposed(){return f.disposed;}};
+}
+
+test('same already selected native cell admits one detached redraw before its first body gesture',async()=>{
+  const f=beforeSelectedRedrawFixture();const result=await f.run();
+  assert.equal(result.selected,true);assert.equal(result.opening_dispatched,true);assert.equal(result.dom_replacements,1);
+  assert.equal(f.clicks,2);assert.equal(f.disposed,1);
+  const returned=f.records.find(e=>e.phase==='javascript_private_selection_gesture_returned');
+  assert.equal(returned.pre_click_dom_replacements,1);
+  assert.equal(f.records.filter(e=>e.phase==='javascript_private_selection_dispatch').length,1);
+  assert.equal(f.records.filter(e=>e.phase==='javascript_private_open_dispatch').length,1);
+});
+
+for(const fault of ['connected','owner','cell','foreign_selection','initially_unselected','not_initially_selected','duplicate','point','controls','transport','ack'])
+  test('pre-body selected redraw refuses changed evidence without any gesture: '+fault,async()=>{
+    const f=beforeSelectedRedrawFixture(fault);await assert.rejects(f.run());
+    assert.equal(f.clicks,0);assert.equal(f.disposed,1);
+    assert.equal(f.records.some(e=>e.phase==='javascript_private_selection_dispatch'),true);
+    assert.equal(f.records.at(-1).effect_possible,false);assert.equal(f.records.at(-1).opening_dispatched,false);
+  });
+
+test('pre-body selected redraw never extends the original deadline after ACK',async()=>{
+  const f=beforeSelectedRedrawFixture('late');await assert.rejects(f.run(Date.now()+40),/Private selection deadline/);
+  assert.equal(f.clicks,0);assert.equal(f.disposed,1);
+});
+
 test('private Setting opening has one journaled click after selection and refuses a changed owner before dispatch',async()=>{
   const f=privateSelectionFixture('replace');const result=await f.run(undefined,{openSettings:true});
   assert.equal(result.opening_dispatched,true);assert.equal(f.clicks,2);
