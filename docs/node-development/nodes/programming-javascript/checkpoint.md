@@ -319,6 +319,26 @@ auditor pin. Если native поддержан или primary sufficient, insuf
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
 
+### F prerequisite: product registry source tests RUNNING — 2026-10-01
+
+На childfecbc tracked edits: node-support/bridge, product registration test,
+existing JS catalog/trial assertions, actual bridge budget fixture (JS injection
+удалена), user response budget (actual registry), provenance transforms2 mapped
+files. General lifecycle/knowledge/managed editor не менялись. JS регистрируется
+только targetBuild7.4.2/nonempty origin; actual bridge redactor передан, source-only
+callers используют standard sanitizer. Generic reread получает тот же redactor;
+forced-details/operator helpers не подключены. Design committed main00e9ef38a2.
+
+Addressed03 actualexit0/54PASS после удаления последних budget injections;
+Addressed02 exit0/54PASS, addressed01 original56039 actualexit1/44PASS/10FAIL:
+новый fixture имел неподдержанные workflow prefix/tab_tid, исправлен до effects.
+Provenance actualexit0/5045; original hashes/source-map untouched, transforms
+refresh только bridge/node-support. Полный client original69309 RUNNING и operator
+original50710 RUNNING; source не менять до terminal. После green — exact source
+commit и canonical checkpoint, затем one same-task Astra/medium review. Model
+switch async pending; сейчас review не выполнен. Candidate не собран, JS не выпущен.
+Browser/lease450 closed_verified; active browser operations отсутствуют.
+
 ### E/J14: new standalone Done обоих modes accepted2/2 — 2026-10-01
 
 Childfecbc9f44d: Code449/original66167 и declared450/original73246 actualexit0/
