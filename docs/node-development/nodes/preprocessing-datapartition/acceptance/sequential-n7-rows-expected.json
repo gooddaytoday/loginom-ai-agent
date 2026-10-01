@@ -1,0 +1,1230 @@
+{
+  "version": "independent-sequential-row-math-v1",
+  "frozen_at": "2026-10-01T18:11:50.499725+00:00",
+  "source_sha256": "0ef0b8791a470e0b37d937cf8c3c7e19b23a70e88298e47aa5eaf7ac73edb56d",
+  "status": "FROZEN_BEFORE_ROW_CASE_RESULTS_NATIVE_NOT_RUN",
+  "cases": {
+    "seq-overflow-training": {
+      "training": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "test": [],
+      "basis": "Help priority/residual allocation, N7 requests9/9 training priority",
+      "expected_training": [
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "1"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "10"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "2"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "20"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "3"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "30"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "4"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "40"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "5"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "50"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "6"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "60"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "7"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "70"
+          }
+        ]
+      ],
+      "expected_test": [],
+      "expected_combined": [
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "1"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "10"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "2"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "20"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "3"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "30"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "4"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "40"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "5"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "50"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "6"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "60"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "7"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "70"
+          }
+        ]
+      ]
+    },
+    "seq-overflow-test": {
+      "training": [],
+      "test": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "basis": "Help priority/residual allocation, N7 requests9/9 test priority",
+      "expected_training": [],
+      "expected_test": [
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "1"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "10"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "2"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "20"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "3"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "30"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "4"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "40"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "5"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "50"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "6"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "60"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "7"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "70"
+          }
+        ]
+      ],
+      "expected_combined": [
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "1"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "10"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "2"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "20"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "3"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "30"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "4"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "40"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "5"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "50"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "6"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "60"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "7"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "70"
+          }
+        ]
+      ]
+    },
+    "seq-test-start": {
+      "training": [
+        4,
+        5
+      ],
+      "test": [
+        1,
+        2,
+        3
+      ],
+      "basis": "Help start test priority and sequential training from remaining input",
+      "expected_training": [
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "4"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "40"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "5"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "50"
+          }
+        ]
+      ],
+      "expected_test": [
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "1"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "10"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "2"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "20"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "3"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "30"
+          }
+        ]
+      ],
+      "expected_combined": [
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "4"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "40"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "5"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "50"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "1"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "10"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "2"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "20"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "3"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "30"
+          }
+        ]
+      ]
+    },
+    "seq-test-end": {
+      "training": [
+        1,
+        2
+      ],
+      "test": [
+        5,
+        6,
+        7
+      ],
+      "basis": "Help end test priority and sequential training from remaining input",
+      "expected_training": [
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "1"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "10"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "2"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "20"
+          }
+        ]
+      ],
+      "expected_test": [
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "5"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "50"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "6"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "60"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "7"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "70"
+          }
+        ]
+      ],
+      "expected_combined": [
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "1"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "10"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "2"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "20"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "5"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "50"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "6"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "60"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "7"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "70"
+          }
+        ]
+      ]
+    },
+    "seq-order-unused-test-training": {
+      "training": [
+        6,
+        7
+      ],
+      "test": [
+        3,
+        4,
+        5
+      ],
+      "basis": "Native order labels unused/test/training: unused2 then test3 then training2; analytical source sequence, frozen before observed case output",
+      "expected_training": [
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "6"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "60"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "7"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "70"
+          }
+        ]
+      ],
+      "expected_test": [
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "3"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "30"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "4"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "40"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "5"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "50"
+          }
+        ]
+      ],
+      "expected_combined": [
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "6"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "60"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "7"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "70"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "3"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "30"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "4"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "40"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "5"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "50"
+          }
+        ]
+      ]
+    }
+  },
+  "percent_rules": "UNRESOLVED: percentage cases are discovery only; never accept multiple candidate formulas."
+}
