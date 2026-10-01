@@ -15,6 +15,7 @@ import {verifyNativeRoundtripInput} from './javascript-native-roundtrip-contract
 import {javascriptDiscoveryProbe,javascriptDiscoveryOracle} from './javascript-discovery-probes.mjs';
 import {javascriptColumnNameIds,verifyJavascriptPublicColumnNames} from './javascript-column-names.mjs';
 import {runJavascriptPublicPolicyReread} from './javascript-public-policy-reread.mjs';
+import {javascriptPublicSourceCase,javascriptPublicSourceOutputOracle} from './javascript-public-source-cases.mjs';
 
 const need=(value,message)=>{if(!value)throw Error(message);};
 
@@ -30,17 +31,21 @@ const codeTypedIds=Object.freeze(['g5-knowledge-v1','g5-native-integer-outside-s
 export const javascriptPublicTypedIds=Object.freeze([...javascriptColumnNameIds,...codeTypedIds,...codeTypedIds.map(id=>'declared-'+id),
   'g5-native-cardinality-keep2','g5-native-cardinality-odd','g5-native-cardinality-duplicate','declared-g5-native-cardinality-empty']);
 
-export function javascriptPublicCodeProbe(probeId,schemaMode) {
+export function javascriptPublicCodeProbe(probeId,schemaMode,sourceCaseId=null) {
   need(probeId===null||javascriptPublicTypedIds.includes(probeId),'Public typed probe requires a fixed typed case');
+  need(sourceCaseId===null||sourceCaseId==='fidelity-bound-code'&&probeId===null&&schemaMode==='code',
+    'Public fidelity requires its fixed Code business source');
   const probe=javascriptDiscoveryProbe(probeId??'p1-business-'+schemaMode+'-base');
   need(probe.schema_mode===schemaMode,'Public typed probe requires its fixed schema mode');
-  return probe;
+  if(sourceCaseId===null)return probe;
+  const source=javascriptPublicSourceCase(sourceCaseId);
+  return {...probe,source_case_id:sourceCaseId,source:source.source,source_sha256:source.source_sha256};
 }
 
 export function javascriptPublicCodeRequest({prepared,input,probe,schemaMode,remaining}) {
   need(['code','declared'].includes(schemaMode)&&Number.isSafeInteger(remaining)&&remaining>=600000,
     'Public Code request mode/original budget unavailable');
-  const pinned=javascriptPublicCodeProbe(javascriptPublicTypedIds.includes(probe.id)?probe.id:null,schemaMode);
+  const pinned=javascriptPublicCodeProbe(javascriptPublicTypedIds.includes(probe.id)?probe.id:null,schemaMode,probe.source_case_id??null);
   need(JSON.stringify(probe)===JSON.stringify(pinned),'Public Code probe pin changed');
   return {operation_id:'js-public-code-'+randomUUID(),contract_revision:'1.0.0',
     document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,
@@ -56,7 +61,7 @@ export function javascriptPublicCodeRequest({prepared,input,probe,schemaMode,rem
 // Pure operator boundary: native bytes and released reads precede public JS.
 export function verifyJavascriptPublicCodeInput(probe,input) {
   const mode=probe.schema_mode;
-  const pinned=javascriptPublicCodeProbe(javascriptPublicTypedIds.includes(probe.id)?probe.id:null,mode);
+  const pinned=javascriptPublicCodeProbe(javascriptPublicTypedIds.includes(probe.id)?probe.id:null,mode,probe.source_case_id??null);
   need(JSON.stringify(probe)===JSON.stringify(pinned),'Public Code input probe pin changed');
   if(probe.native_input_fixture!==undefined){
     need(['real','boolean','string','integer-safe','integer-outside-safe','civil-datetime',
@@ -80,6 +85,11 @@ export function verifyJavascriptPublicCodeInput(probe,input) {
 // Outside-safe is an observation of exact decimal output, never a fixed
 // identity oracle. Safe-range cases keep their existing fixed-value contract.
 export function javascriptPublicCodeOracle(probe,table,input) {
+  if(probe.source_case_id!==undefined){
+    need(JSON.stringify(probe)===JSON.stringify(javascriptPublicCodeProbe(null,'code',probe.source_case_id)),
+      'Public fidelity oracle source pin changed');
+    return javascriptPublicSourceOutputOracle(probe.source_case_id,table);
+  }
   if(probe.native_input_fixture!=='integer-outside-safe')return javascriptDiscoveryOracle(probe,table);
   verifyJavascriptPublicCodeInput(probe,input);
   verifyJavascriptMismatchTable(table);
@@ -102,12 +112,12 @@ export function javascriptPublicCodeOracle(probe,table,input) {
 }
 
 export async function runJavascriptPublicCodeLive({page,prepared,input,targetOrigin,redactor,record,
-  report,save,deadline,onPending,schemaMode='code',probeId=null,policyReread=false}) {
+  report,save,deadline,onPending,schemaMode='code',probeId=null,policyReread=false,sourceCaseId=null}) {
   need(['code','declared'].includes(schemaMode),'Public JavaScript schema mode unavailable');
-  need(typeof policyReread==='boolean'&&(!policyReread||probeId===null),'Policy reread requires the fixed business mode');
+  need(typeof policyReread==='boolean'&&(!policyReread||probeId===null&&sourceCaseId===null),'Policy reread requires the fixed business mode');
   const key=schemaMode==='declared'?'public_declared':'public_code';
   const stage=schemaMode==='declared'?'public-declared':'public-code';
-  const probe=javascriptPublicCodeProbe(probeId,schemaMode);
+  const probe=javascriptPublicCodeProbe(probeId,schemaMode,sourceCaseId);
   const remaining=deadline-Date.now()-60000;
   need(remaining>=600000,'Public Code lifecycle requires original time budget');
   const inputProof=verifyJavascriptPublicCodeInput(probe,input);
@@ -135,7 +145,7 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
   Object.assign(report,{scope:'isolated public '+(probeId===null?(schemaMode==='code'?'C Code':'D declared'):'E typed '+probeId)+' lifecycle; full typed UI output',
     original_deadline:deadline,explicit_execution_limit:2,gates_closed:[],candidate_verified:false,
     cli_verified:false,native_bytes_verified:false,native_input_bytes_verified:inputProof.native_input_bytes_verified,stage:stage+'-apply',
-    [key]:{status:'RUNNING',probe_id:probe.id,operation_id:request.operation_id,target_kind:'new',
+    [key]:{status:'RUNNING',probe_id:probe.id,...(sourceCaseId===null?{}:{source_case_id:sourceCaseId}),operation_id:request.operation_id,target_kind:'new',
       source_sha256:probe.source_sha256,oracle_sha256:probe.oracle_sha256,raw_source_in_report:false,
       ...(probe.knowledge?{knowledge:structuredClone(probe.knowledge)}:{})}});
   onPending(true);await save();
@@ -178,7 +188,7 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
     &&compact.sample.length===table.sample.length&&compact.sample.every((row,index)=>row.length===table.sample[index].length
       &&row.every((cell,column)=>['type','value','is_null','precision'].every(key=>cell[key]===table.sample[index][column][key]))),
   'Public Code user-v1 full output differs');
-  if(probe.knowledge||javascriptColumnNameIds.includes(probe.id))report[key].user_v1_result=structuredClone(projected);
+  if(probe.knowledge||javascriptColumnNameIds.includes(probe.id)||sourceCaseId!==null)report[key].user_v1_result=structuredClone(projected);
   if(javascriptColumnNameIds.includes(probe.id))report[key].column_names=verifyJavascriptPublicColumnNames({
     probe,table,mapping:columnNameMapping,node:result.node,readback:projected.configuration.readback});
   if(policyReread){
@@ -191,15 +201,22 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
   }
   report.stage=stage+'-independent-source-read';await save();
   onPending(true);
-  const sourceRead=await dispatchNodeApi(runtime,'dock_node_read',{kind:'source',operation_id:'js-code-after-'+randomUUID(),
-    document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node:result.node,
-    budget_ms:Math.max(1,Math.min(180000,deadline-Date.now()-30000))});
+  const sourceRead=sourceCaseId===null
+    ?await dispatchNodeApi(runtime,'dock_node_read',{kind:'source',operation_id:'js-code-after-'+randomUUID(),
+      document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node:result.node,
+      budget_ms:Math.max(1,Math.min(180000,deadline-Date.now()-30000))})
+    :await (async()=>{
+      const {readJavascriptPublicExistingSource}=await import('./javascript-public-existing-live.mjs');
+      return readJavascriptPublicExistingSource({runtime,prepared,node:result.node,deadline,record});
+    })();
   need(sourceRead.kind==='source'&&sourceRead.source_text===probe.source&&sourceRead.source_sha256===probe.source_sha256
     &&sourceRead.cursor===null&&!runtime.hasUnsettledWork(),'Independent public Code saved source differs');
   Object.assign(report[key],{status:'OBSERVED',configuration:result.configuration,
     execution:result.execution,output:result.output,node:result.node,oracle,
     independent_source:{source_sha256:sourceRead.source_sha256,source_utf8_bytes:sourceRead.source_utf8_bytes,
-      source_lf_lines:sourceRead.source_lf_lines,complete:true,raw_source_in_report:false}});
+      source_lf_lines:sourceRead.source_lf_lines,complete:true,raw_source_in_report:false,
+      ...(sourceCaseId===null?{}:{chunks:sourceRead.chunks,source_read_operation_id:sourceRead.source_read_operation_id})}});
+  if(sourceCaseId!==null)report.scope='isolated E J23 fixed public long Code source/Execute/full typed6x4/user-v1/chunk read before owned Save';
   report.stage=stage+'-observed';onPending(false);await save();
   return result.node;
 }
