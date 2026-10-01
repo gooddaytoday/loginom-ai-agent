@@ -71,5 +71,22 @@ PASS проверки полного JS результата. Source cap/chunk l
   В candidate проверить effective limits и actual `metadata.truncated=false`,
   отсутствие `readback_summary` и полный маленький6×4 результат.
 
-Все перечисленные проверки здесь запланированы. Source-only sizing не закрывает
-J21; текущая точка продолжения — в [checkpoint](checkpoint.md).
+Source/direct реализация — child8bca1b00aa: final local user-v1 bridge boundary,
+node replies и сохранение полной JS configuration вместо readback summary.
+Single-card overflow сообщает отдельное ограничение; smaller-batch предложение
+применяется к переполнению набора. Первый rejected prepare сохраняет bundle.
+Remote memory replies имеют собственный consumer путь.
+
+Addressed76, related operator45 и final full client3188 PASS/10 SKIP, actual
+exit0; hashes8 финальных файлов совпали до/после full run. MCP SDK fixture
+проверил first/reused prepare, полные JS/schema/pins, fitting pair, отказ batch15
+и следующий успешный запрос, final diagnostics. Source-public fixture доставил
+все chunks empty/32KiB quotes/backslashes/control/Unicode/1024LF без потери.
+Pure replay8 immutable accepted Code410/Declared411 replies дал11952–18152
+wire bytes, полные context mappings и warmup/final6×4 без readback summary.
+Это не новые live, model/candidate/CLI или effective override proofs.
+
+Actual CLI effective limits, `metadata.truncated=false` и immutable candidate
+остаются обязательными в F. J21 этим source/direct результатом полностью не
+закрыт; следующая точка — [G1/J22 UI profile](ui-profile-design.md) и
+[checkpoint](checkpoint.md).

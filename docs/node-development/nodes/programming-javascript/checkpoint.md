@@ -30,7 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — [полные response budgets](response-budget-design.md) J21;
+следующий шаг — [G1/J22 профиль своего мастера](ui-profile-design.md);
+source/direct [response budgets](response-budget-design.md) J21 приняты ниже;
 Code410/Declared411 reordered context приняты2/2 на immutable child9c93 ниже.
 Context Code403/declared404 и bridge fix, J09 Code399/declared400 и exact knowledge v1 Code401/declared402 также приняты. Fixed source32768/
 empty и schema-mode refusal уже приняты ниже; сохранение manual mapping, дополнительные
@@ -48,6 +49,57 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J21: полная граница local user-v1 delivery — 2026-10-01
+
+Child8bca1b00aa добавляет проверку final serialized CallToolResult после всех
+content/structuredContent/advice blocks:46000 wire bytes, default Agent50KiB/
+2000 joined text lines; JS description с manifests отдельно20000 wire bytes.
+Batch overflow явно предлагает меньше node_types; single-card overflow
+сообщает limitation, без бесконечного повтора того же запроса. Полный результат
+не сокращается этим guard. Node receipts/effects остаются исходными; ошибка
+доставки не означает NOT_APPLIED. Полная JS configuration не превращается в
+readback summary. Refused first prepare сохраняет pending knowledge bundle.
+Diagnostic и remote memory consumer paths сохраняют собственные ограничения.
+
+Addressed76/exec30534, final full client3188 PASS/10 SKIP/0 FAIL/exec88725,
+related operator45/exec30468 — actual exit0, diff PASS. Final8 source hashes
+не менялись во время full02. Addressed01 ошибочно ожидал TAP от child test при
+унаследованном NODE_TEST_CONTEXT (serialized binary stdout); сам protocol
+fixture прошёл. Исправлен harness: explicit TAP/unset child context; исходный
+failed log сохранён. Full01 ранее также3188/10SKIP PASS; после единственной
+финальной правки guidance single-card refusal выполнен final full02.
+Addressed/final full/operator/source snapshot SHA256:
+`5be4612ac555372b242ae18b30b4a8d796dcc28a995133168f974bf86b1b5fd2` /
+`c5e8dde48f53ba1f937ac4a6629909770478e63a3d80dc32c990b68938309e7f` /
+`f2cb0e21580f7cf472ac67d315649a9cbcb9421217326e16306694b1b21d03f1` /
+`b05f6e3be6a9b9824fa7660c8bfc76d4f802d166216b25276be0162aaac636e5`.
+
+Actual MCP Server/Client fixture с external catalog/skill/browser transport
+проверил полный prepare/bundle, его сохранность после oversize first reply,
+reused prepare, JS knowledge/schema/pins, pair, batch15 bounded refusal,
+успешный следующий запрос по тому же соединению и final diagnostics. Это
+simulated Linux7.4.2 source fixture, не fresh Loginom/model/candidate.
+Source-public reader доставил полностью empty/32KiB quotes/backslashes/control/
+Unicode/1024LF через реальные registry/dispatch/chunks; external source adapter
+подставлен, Execute не вызывается. Actual source cap и response limits независимы.
+
+Pure replay eight immutable audited Code410/Declared411 context/output replies
+через новый guard принят8/8,11952–18152 wire bytes. Оба полных contexts,
+warmup/final6×4/totalNet1950 и source metadata сохранены, readback_summary нет.
+Replay JSON SHA256
+`afadd084bdd780b53eb52d848b5166872602c352b666fb828e04a144ff73e490`.
+Это совместимость с real live evidence, не новый browser/CLI delivery proof.
+Effective Agent tool_output overrides и metadata.truncated=false проверить на
+immutable candidate в F. JS production registration отсутствует, registry14.
+
+Registry411 closed_verified/active exec null; ни browser, ни live process
+не запущены. Следующий scoped результат — [G1/J22 UI profile](ui-profile-design.md)
+для обоих saved modes, с существующими managed source/page/stage leases,
+без helper invocation/engine switch/source edits/Done/Save/explicit Execute.
+Source/helper/cases/oracle сначала зафиксировать. Current G1 FullType и assistant/
+engine presence ещё не доказаны. Далее J24/J26/cold long source/Done refusal,
+один F review/fix, product registration/candidate/J27 и две Sol low CLI attempts.
 
 ### E/J19: reordered405 отказал до context; recovery407 завершён — 2026-10-01
 
