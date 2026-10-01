@@ -307,6 +307,31 @@ auditor pin. Если native поддержан или primary sufficient, insuf
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
 
+### E/J14: Code444 отказ и отдельная verified recovery — 2026-10-01
+
+Original6043749a3f/profile444/exec57140 actualexit1: general Done OBSERVED с
+independent full source и same-ID zero events; NEW Close AMBIGUOUS/pending open.
+Ошибка `Private selection DOM changed`, managed_observe, after_gesture=false,
+old SVG disconnected/current node unselected. Это отказ до body click; Close,
+Execute/full output и независимый positive/negative audit не выполнены.
+Report **5e2ce66a1974962ff4bc38e15ead9f9c1039ccec0e4fc4f33571d27b73514f66**,
+original CLEANUP_UNCONFIRMED не повышен до PASS. Browser444 closed/process absent.
+
+First recovery445/71013 exit0 завершилась по stdin EOF: admin packages0/browser
+closed, original cleanup/logout не доказаны. Script retry в том же profile не
+выполнялся. Fresh headed tty recovery446/original2767 actualexit0: exact own
+idle package (Stop disabled/Close enabled) в jsteach:4314 закрыт без сохранения,
+потом exact idle session; Refresh подтвердил обе absence. Другие accounts/sessions
+не закрывались. Admin logout/browser close и process absence444/445/446 проверены.
+Private recovery journal SHA **96b8b605ebf9d30f32c481e7642c09c65e84e4c47ea2f15d759e9144cd5cec9b**,
+verification **857fe826a00ba8d6fb93623700e358d35dadfd1279cca187356b63d16dc57a1d**.
+Registry/lease446 closed_verified/active_exec=null; product readiness unchanged.
+
+Следующее — bounded managed pre-body same-native/unselected detached redraw
+из [design](configuration-lifecycle-design.md), strict snapshot/point/no-replay,
+actual serialized tests и affected suites. После нового freeze/audit pin fresh447
+Code, далее separate declared. Child604 source пока неизменён; новых браузеров нет.
+
 ### E/J14: общий configuration live закреплён перед браузером — 2026-10-01
 
 Child **6043749a3f9cc22d344b7d8e4d9afd8d41dc1d15** добавляет fixed operator

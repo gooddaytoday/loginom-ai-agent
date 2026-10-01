@@ -75,3 +75,30 @@ process absence и независимые corrupted-copy negative auditor tests 
 за proof natural Done refusal. Не вводить ошибки через FException/RPC/DOM patches,
 не расширять исчерпанную regex/import матрицу. После двух accepted modes —
 пересмотреть remaining E requirements, затем F по полному плану.
+
+## Подтверждённая pre-body перерисовка — 2026-10-01
+
+Original headed444 на6043749a3f: Done/source/user-v1/zero-event retry OBSERVED;
+Close остановлен в open до body click на detached old SVG при same native owner,
+unselected cell и exact current shape. Journal содержит body_prepared, без returned;
+originalexec57140 actualexit1/CLEANUP_UNCONFIRMED. Отдельная recovery446/2767exit0
+закрыла exact idle package и jsteach:4314 без Save, подтвердив absence после
+Refresh, затем admin logout/browser/process absence. Исходный Close остаётся
+AMBIGUOUS и весь run не принят; дополнительных сообщений о клике не было.
+
+Узкая поправка к прежнему selection guard: только managed body pre-click, до
+первого gesture, one detached redraw same previously unselected native cell.
+Native document/account/preparation/workflow/model/diagram/graph/container/node
+object/data/cell/icon, уникальная current connected shape/tid и original deadline
+обязательны. Old shape disconnected, initial/current selection одинаково empty,
+replacement count0→1. Полный snapshot/point/controls/blockers должен совпасть
+с pre-ACK snapshot, кроме подтверждённого counter; точка click берётся из fresh
+inspection. Default read/poll/private selected policy не расширяется. Owner,
+selection, geometry, connected old shape, duplicate, second pre-click redraw,
+blockers, ACK/deadline и unknown click reply по-прежнему refused; no replay.
+
+Выбран этот bounded native redraw path вместо повторного открытия мастера или
+отключения held-DOM guard. Нужны actual serialized managed body/native inspection
+положительная и отрицательные проверки, client/operator regressions и новый
+freeze/pin. Accepted original artifacts неизменны; next live — новый profile447,
+не повтор старого operation_id и не повышение failed run до PASS.
