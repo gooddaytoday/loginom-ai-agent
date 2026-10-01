@@ -78,6 +78,7 @@ import {createJavascriptHeadedFocusX11} from './javascript-headed-focus-x11.mjs'
 import {runJavascriptStopProbe} from './javascript-stop-probe.mjs';
 import {javascriptPublicTypedIds,javascriptPublicCodeProbe,runJavascriptPublicCodeLive} from './javascript-public-code-live.mjs';
 import {runJavascriptPublicExistingLive} from './javascript-public-existing-live.mjs';
+import {captureJavascriptNativeDetailsInventory} from './javascript-native-details-discovery.mjs';
 
 export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null,publicSourceCaseId=null,publicSchemaRefusalCaseId=null,publicWizardRefusalCaseId=null,publicStopCaseId=null,publicCancelResumeCaseId=null,publicLostReplyCaseId=null,publicRequiredCaseId=null,publicContextCaseId=null,uiProfileMode=null,publicPolicyMode=null,publicFidelitySave=false}={}) {
 if(typeof publicFidelitySave!=='boolean'||publicFidelitySave&&(coldReader||packageFile||batchCases!==null
@@ -109,7 +110,7 @@ if(publicSchemaRefusalCaseId!==null&&(publicSourceCaseId!==null||existingInputVa
   ||publicSchemaRefusalCaseId!==(existingLifecycle==='code'?'code-to-declared':'declared-to-code')))
   throw Error('Public schema refusal requires its separate fixed existing mode/base entrypoint');
 if(publicWizardRefusalCaseId!==null&&(publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null
-  ||existingInputVariant!==null||existingLifecycle===null||!['syntax-'+existingLifecycle,'throw-'+existingLifecycle].includes(publicWizardRefusalCaseId)))
+  ||existingInputVariant!==null||existingLifecycle===null||!['syntax-'+existingLifecycle,'throw-'+existingLifecycle,...(existingLifecycle==='code'?['import-code']:[])].includes(publicWizardRefusalCaseId)))
   throw Error('Public wizard refusal requires its separate fixed existing mode/base entrypoint');
 if(publicStopCaseId!==null&&(publicStopCaseId!=='stop-code'||existingLifecycle!=='code'||existingInputVariant!==null
   ||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null||publicWizardRefusalCaseId!==null))
@@ -313,6 +314,13 @@ const executionRecord=async event=>{
       prefix:saved.outcome.output.workflow_ref?.prefix};
   }
   (report.execution_records??=[]).push(compactJavascriptJournalRecord(saved,line));
+  if(publicWizardRefusalCaseId==='import-code'&&event.phase==='javascript_managed_error_ok_prepared') {
+    const observation=await captureJavascriptNativeDetailsInventory(page,event);
+    const inventory=await executionJournal({phase:'javascript_native_details_inventory',operation_id:event.operation_id,
+      deadline:event.deadline,...observation});
+    (report.execution_records??=[]).push(compactJavascriptJournalRecord(inventory,++executionJournalLine));
+    (report.native_details_discovery??=[]).push(redactor.redact(observation));
+  }
   await save();return acknowledged;
 };
 const createRemaining=()=>{const remaining=createDeadline-Date.now();if(remaining<=0)throw Error('Original package preparation deadline expired');return remaining;};

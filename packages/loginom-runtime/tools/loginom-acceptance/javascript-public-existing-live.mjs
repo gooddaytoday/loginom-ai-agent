@@ -15,6 +15,7 @@ import {javascriptStopProbe} from './javascript-stop-case.mjs';
 import {stopJavascriptPublicExecution} from './javascript-public-stop.mjs';
 import {createJavascriptPublicCancelResume} from './javascript-public-cancel-resume.mjs';
 import {runJavascriptPublicLostApplyReply} from './javascript-public-lost-reply.mjs';
+import {javascriptImportRefusalSource} from './javascript-native-details-discovery.mjs';
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 
@@ -77,7 +78,7 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   need(schemaRefusalCaseId===null||sourceCaseId===null&&inputVariant==='base'
     &&schemaRefusalCaseId===(schemaMode==='code'?'code-to-declared':'declared-to-code'),'Public schema refusal requires its fixed mode/base');
   need(wizardRefusalCaseId===null||sourceCaseId===null&&schemaRefusalCaseId===null&&inputVariant==='base'
-    &&['syntax-'+schemaMode,'throw-'+schemaMode].includes(wizardRefusalCaseId)&&typeof readGraph==='function','Public wizard refusal requires its fixed mode/base');
+    &&['syntax-'+schemaMode,'throw-'+schemaMode,...(schemaMode==='code'?['import-code']:[])].includes(wizardRefusalCaseId)&&typeof readGraph==='function','Public wizard refusal requires its fixed mode/base');
   need(stopCaseId===null||stopCaseId==='stop-code'&&schemaMode==='code'&&inputVariant==='base'
     &&sourceCaseId===null&&schemaRefusalCaseId===null&&wizardRefusalCaseId===null&&typeof readGraph==='function',
   'Public Stop requires its fixed Code mode/base');
@@ -153,7 +154,8 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   if(wizardRefusalCaseId!==null) {
     const operation_id='js-public-native-refusal-'+randomUUID();
     const throwing=wizardRefusalCaseId.startsWith('throw-');
-    const source_text=before.source_text+(throwing?'\nthrow new Error("E_JS_SYNC_THROW");\n':'\nconst unsupported = ({})?.value;\n');
+    const importing=wizardRefusalCaseId==='import-code';
+    const source_text=importing?javascriptImportRefusalSource(before.source_text):before.source_text+(throwing?'\nthrow new Error("E_JS_SYNC_THROW");\n':'\nconst unsupported = ({})?.value;\n');
     const identity=javascriptSourceIdentity(source_text),remaining=deadline-Date.now()-60000;
     need(remaining>=1200000,'Public wizard refusal/repair original budget unavailable');
     report.scope='isolated E public native wizard refusal and NEW same-node repair/full typed UI';
@@ -171,6 +173,9 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
       report.public_existing.wizard_refusal.progress=job.progress;await save();
     }
     report.public_existing.wizard_refusal.job=job;await save();
+    // A surprising native result is still not diagnostic acceptance. A settled
+    // owned runtime may clean up normally before the operator reports failure.
+    if(importing&&job.state==='settled'&&job.outcome?.cleanup_complete===true&&!runtime.hasUnsettledWork())onPending(false);
     const result=job.outcome?.output,native=result?.error?.native;
     if(throwing){verifyJavascriptPublicSyncThrow(job,node);need(!runtime.hasUnsettledWork(),'Public failed execution remains unresolved');}
     if(!throwing)need(job.state==='settled'&&job.outcome?.status==='FAILED'&&job.outcome.cleanup_complete===true
@@ -178,8 +183,8 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
       &&JSON.stringify(result.node)===JSON.stringify(node)&&result.configuration?.status==='discarded'
       &&result.execution.status==='not_requested'&&result.output.status==='not_refreshed'&&result.output.ports.length===0
       &&native?.kind==='javascript_wizard'&&['code_next','done'].includes(native.stage)&&native.source_sha256===identity.source_sha256
-      &&native.dialog_closed===true&&native.error_class?.name==='SyntaxError'
-      &&(native.tooltip+'\n'+native.dialog_text).includes('SyntaxError: Syntax error at code')&&!runtime.hasUnsettledWork(),
+      &&native.dialog_closed===true&&(importing||native.error_class?.name==='SyntaxError'
+      &&(native.tooltip+'\n'+native.dialog_text).includes('SyntaxError: Syntax error at code'))&&!runtime.hasUnsettledWork(),
     'Public native wizard diagnostic/discard/cleanup boundary unconfirmed');
     need(new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(result).valid,
       'Public native refusal violates diagnostic schema');
