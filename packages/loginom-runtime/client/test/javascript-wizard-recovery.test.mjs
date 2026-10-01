@@ -78,8 +78,10 @@ test('native class and location remain explicitly unrecognized for absent or con
  assert.equal(result.tooltip_truncated,true);assert.equal(result.dialog_text_truncated,true);assert.ok(result.dialog_text.isWellFormed());
 });
 
-for(const failure of [null,'owner','operation','digest','settings','graph','discard','execute','class','location','journal','foreign-type'])test('actual node shell accepts only the complete native wizard recovery proof '+failure,async()=>{
- const f=await fixture(),error=await refusalError(f.options),proof=error.nodePhaseRefusal.proof,calls=[];
+for(const failure of [null,'details','owner','operation','digest','settings','graph','discard','execute','class','location','journal','foreign-type'])test('actual node shell accepts only the complete native wizard recovery proof '+failure,async()=>{
+ const f=await fixture();
+ if(failure==='details')f.options.refusal.diagnostic.technical_details={expanded:true,truncated:false,text:'Подробности '+ '😀'.repeat(600)};
+ const error=await refusalError(f.options),proof=error.nodePhaseRefusal.proof,calls=[];
  if(failure==='owner')proof.owner.node_id='foreign';if(failure==='operation')proof.owner.operation_id='foreign';
  if(failure==='digest')proof.retained_source={...proof.retained_source,source_sha256:'b'.repeat(64)};if(failure==='settings')proof.native_settings_unchanged=false;
  if(failure==='graph')proof.full_graph_unchanged=false;if(failure==='discard')proof.draft_discarded=false;
@@ -94,13 +96,28 @@ for(const failure of [null,'owner','operation','digest','settings','graph','disc
  const result=await applyNode({request:f.request,operation:{id:f.request.operation_id},handlers:new Map([[f.request.target.type,handler]]),drivers,
   record:async event=>{if(failure==='journal'&&event.phase==='node_phase_refused')throw Error('lost ACK');return event;}});
  assert.deepEqual(calls,['node_finish']);assert.equal(result.output.status,'not_refreshed');assert.equal(result.execution.status,'not_requested');
- if(failure){assert.equal(result.status,'AMBIGUOUS');assert.equal(result.cleanup_complete,false);assert.equal(result.pending_phase,'node_finish');return;}
+ if(failure&&failure!=='details'){assert.equal(result.status,'AMBIGUOUS');assert.equal(result.cleanup_complete,false);assert.equal(result.pending_phase,'node_finish');return;}
  assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
  assert.equal(result.configuration.status,'discarded');assert.equal(result.error.native.source_sha256,proof.rejected_source_sha256);
  assert.match(result.next_step.instruction,new RegExp(proof.retained_source.source_sha256));
  const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema);
  assert.equal(validate(result).valid,true);const compact=compactNodeResult(result);
  assert.equal(compact.error.native.location.line,4);assert.ok(Buffer.byteLength(JSON.stringify(compact))<16384);
+ if(failure==='details'){
+  assert.deepEqual(compact.error.native.technical_details,result.error.native.technical_details);
+  assert.equal(compact.error.native.technical_details.expanded,true);assert.equal(compact.error.native.technical_details.truncated,true);
+  assert.ok(Buffer.byteLength(compact.error.native.technical_details.text)<=2048);
+  assert.equal(compact.error.native.technical_details.text.isWellFormed(),true);
+ }
+});
+
+for(const [name,change] of [
+ ['not expanded',x=>x.expanded=false],['missing truncation',x=>delete x.truncated],
+ ['UTF8 overflow',x=>x.text='😀'.repeat(600)],['unpaired surrogate',x=>x.text='\ud800'],['unknown key',x=>x.foreign=true],
+])test('actual recovery verifier refuses native technical details '+name,async()=>{
+ const f=await fixture();f.options.refusal.diagnostic.technical_details={expanded:true,truncated:false,text:'Native details'};
+ const error=await refusalError(f.options);change(error.nodePhaseRefusal.proof.native.technical_details);
+ assert.equal(verifiedJavascriptWizardRefusal(error.nodePhaseRefusal,f.request),false);
 });
 
 for(const mode of ['code','declared'])test('Done recovery declares discard only after new full baseline and graph proof '+mode,async()=>{

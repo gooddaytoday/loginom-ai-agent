@@ -13,7 +13,9 @@ const javascriptNativeError=object({kind:values('javascript_wizard'),stage:value
  error_class:{anyOf:[object({status:values('unrecognized')}),object({status:values('recognized'),
   name:values('SyntaxError','TypeError','ReferenceError','RangeError','EvalError','URIError','Error')})]},
  location:{anyOf:[object({status:values('unrecognized')}),object({status:values('recognized'),
-  line:{type:'integer',minimum:1},column:{type:'integer',minimum:1}})]}});
+  line:{type:'integer',minimum:1},column:{type:'integer',minimum:1}})]},
+ technical_details:object({text:{type:'string',maxLength:2048},truncated:bool,expanded:{type:'boolean',const:true}})},
+ ['kind','stage','node','source_sha256','tooltip','tooltip_truncated','dialog_text','dialog_text_truncated','dialog_closed','error_class','location']);
 const error=object({code:str,message:str,cause:object({code:str,message:str}),native:javascriptNativeError},['code','message']);
 const phase=values('validate','source','workflow','target','input_mapping','open','configure','node_finish','materialization_start','materialization_execute','output_mapping','finish','execute','read');
 const execution={anyOf:[object({status:values('not_requested','pending','completed','cancelled'),execution_id:nullable(str),stop_verified:bool},['status','execution_id']),

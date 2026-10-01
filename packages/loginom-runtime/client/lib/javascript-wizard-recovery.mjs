@@ -2,6 +2,7 @@ import {createHash} from 'node:crypto';
 import {verifyJavascriptMappingGraph} from './javascript-graph-preservation.mjs';
 import {journalManagedJavascriptError} from './javascript-managed-wizard-error.mjs';
 import {javascriptSourceIdentity} from './javascript-source-read.mjs';
+import {javascriptWizardTextClassification} from './javascript-wizard-error-details.mjs';
 const same=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
 const need=(value,message)=>{if(!value)throw Error(message);};
 const verification='javascript_native_refusal_draft_discarded_baseline_retained';
@@ -16,17 +17,13 @@ export function javascriptWizardDiagnostic(diagnostic,node) {
     return {text,truncated:text!==value};
   };
   const tooltip=bounded(diagnostic.tooltip),dialog=bounded(diagnostic.dialog_text);
-  const text=diagnostic.tooltip+'\n'+diagnostic.dialog_text;
-  const classes=[...new Set([...text.matchAll(/\b(SyntaxError|TypeError|ReferenceError|RangeError|EvalError|URIError|Error):/g)].map(item=>item[1]))];
-  const positions=[...new Set([...text.matchAll(/\(:(\d+):(\d+)\)/g)].map(item=>item[1]+':'+item[2]))];
-  const at=positions.length===1?['',...positions[0].split(':')]:null;
-  const line=at&&Number(at[1]),column=at&&Number(at[2]);
+  const technical=diagnostic.technical_details?bounded(diagnostic.technical_details.text):null;
+  const classification=javascriptWizardTextClassification(diagnostic.tooltip+'\n'+diagnostic.dialog_text+'\n'+(diagnostic.technical_details?.text??''));
   return {kind:'javascript_wizard',stage:diagnostic.error_stage??'code_next',node,source_sha256:diagnostic.source_sha256,
     tooltip:tooltip.text,tooltip_truncated:diagnostic.tooltip_truncated||tooltip.truncated,
     dialog_text:dialog.text,dialog_text_truncated:diagnostic.dialog_text_truncated||dialog.truncated,dialog_closed:true,
-    error_class:classes.length===1?{status:'recognized',name:classes[0]}:{status:'unrecognized'},
-    location:at&&Number.isSafeInteger(line)&&line>0&&Number.isSafeInteger(column)&&column>0
-      ?{status:'recognized',line,column}:{status:'unrecognized'}};
+    ...(technical?{technical_details:{text:technical.text,truncated:technical.truncated||diagnostic.technical_details.truncated,expanded:true}}:{}),
+    ...classification};
 }
 
 // Fresh independent source admission/discard, all semantic native settings and
@@ -35,6 +32,10 @@ export async function retainedJavascriptWizardRefusal({refusal,owner,admitted,af
   beforeGraph,afterGraph,record,deadline}) {
   const node=Object.fromEntries(['document_id','workflow_id','node_id'].map(key=>[key,owner[key]]));
   const diagnostic=refusal?.diagnostic,closed=refusal?.closed;
+  need(diagnostic?.technical_details===undefined||diagnostic.technical_details?.expanded===true
+    &&typeof diagnostic.technical_details.text==='string'&&diagnostic.technical_details.text.isWellFormed()
+    &&Buffer.byteLength(diagnostic.technical_details.text)<=4096&&typeof diagnostic.technical_details.truncated==='boolean',
+  'JavaScript native technical details proof unavailable');
   need(diagnostic?.dialog_closed===true&&diagnostic.native_owner_verified===true&&same(diagnostic.owner,node)
     &&diagnostic.explicit_execute_requested===false&&diagnostic.source_sha256===admitted.effective_source.source_sha256
     &&['code_next','done'].includes(diagnostic.error_stage??'code_next')
@@ -87,6 +88,10 @@ export function verifiedJavascriptWizardRefusal(refusal,request) {
     &&native.source_sha256===proof.rejected_source_sha256&&native.dialog_closed===true
     &&typeof native.tooltip==='string'&&Buffer.byteLength(native.tooltip)<=2048&&typeof native.tooltip_truncated==='boolean'
     &&typeof native.dialog_text==='string'&&Buffer.byteLength(native.dialog_text)<=2048&&typeof native.dialog_text_truncated==='boolean'
+    &&(native.technical_details===undefined||native.technical_details?.expanded===true
+      &&typeof native.technical_details.text==='string'&&native.technical_details.text.isWellFormed()
+      &&Buffer.byteLength(native.technical_details.text)<=2048&&typeof native.technical_details.truncated==='boolean'
+      &&same(Object.keys(native.technical_details).sort(),['expanded','text','truncated']))
     &&(native.error_class?.status==='unrecognized'&&same(Object.keys(native.error_class),['status'])
       ||native.error_class?.status==='recognized'&&['SyntaxError','TypeError','ReferenceError','RangeError','EvalError','URIError','Error'].includes(native.error_class.name)
         &&same(Object.keys(native.error_class).sort(),['name','status']))

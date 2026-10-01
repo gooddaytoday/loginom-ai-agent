@@ -4,6 +4,7 @@ import {makeJavascriptManagedStageCode,javascriptManagedStageInspector} from './
 import {readJavascriptWizardErrorDialog} from './javascript-wizard-error-dialog.mjs';
 import {isCurrentJavascriptWizardRefusal} from './javascript-wizard-refusal.mjs';
 import {createRedactor} from './redact.mjs';
+import {inspectJavascriptWizardErrorDetails,javascriptWizardTextClassification} from './javascript-wizard-error-details.mjs';
 
 export async function journalManagedJavascriptError({record,deadline},event) {
   const expected=JSON.stringify(event);
@@ -51,7 +52,7 @@ export function inspectManagedJavascriptErrorDraft({held,task,editor,expectedSou
 
 // Browser-local owner, native dialog, exact control and hit-test are refreshed
 // immediately before the single gesture. The retained lease supplies all roots.
-export function inspectManagedJavascriptErrorPoint({held,task,editor,expectedSource},readStage,readDialog,readDraft) {
+export function inspectManagedJavascriptErrorPoint({held,task,editor,expectedSource},readStage,readDialog,readDraft,readDetails) {
   const stage=readStage({held,task});
   if(stage.wizard_visible!==true||stage.page_tid!==task.page_tid||stage.pending!==false
     ||stage.preview_visible||stage.wizard_error?.visible!==true||stage.wizard_error.exact_count!==1
@@ -69,7 +70,7 @@ export function inspectManagedJavascriptErrorPoint({held,task,editor,expectedSou
   } else if(task.mode==='button') {
     if(stage.boundary_refusal!==null||stage.owner_verified!==true||dialog.present)
       throw Error('Managed JavaScript error button blocked');
-  } else if(task.mode==='ok'&&!held.errorDialogRoot||stage.boundary_refusal!=='foreign_dialog'||dialogs.length!==1||!dialog.present
+  } else if(['ok','details','expanded'].includes(task.mode)&&!held.errorDialogRoot||stage.boundary_refusal!=='foreign_dialog'||dialogs.length!==1||!dialog.present
     ||stage.dialog_diagnostic.foreign_count!==1||stage.dialog_diagnostic.roots.length!==1
     ||stage.dialog_diagnostic.roots[0].tid!==dialog.tid||stage.dialog_diagnostic.roots[0].native_el!==true
     ||held.errorDialogRoot&&held.errorDialogRoot!==root
@@ -82,6 +83,14 @@ export function inspectManagedJavascriptErrorPoint({held,task,editor,expectedSou
     held.errorDialogClosedFor=task.page_tid;
     return {dialog_closed:true,page_tid:task.page_tid,source_sha256:task.expected_source_sha256};
   }
+  if(task.mode==='details'||task.mode==='expanded') {
+    const result=task.mode==='details'?{...readDetails({held,task}),dialog}:{details:readDetails({held,task}),dialog};
+    if(new TextEncoder().encode(JSON.stringify(result)).length>16384)throw Error('Managed JavaScript details response bound exceeded');
+    return result;
+  }
+  const details=held.errorDetailsBinding?readDetails({held,task:{...task,mode:'expanded'}}):null;
+  if(details&&(details.expanded!==true||task.technical_details!==undefined&&JSON.stringify(details)!==JSON.stringify(task.technical_details)))
+    throw Error('Managed JavaScript expanded details changed');
   const tid=task.mode==='button'?stage.wizard_error.tid:dialog.ok_tid;
   const controls=[...root.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')].filter(visible);
   const control=controls[0],native=control&&globalThis.Ext?.getCmp?.(control.id);
@@ -91,7 +100,7 @@ export function inspectManagedJavascriptErrorPoint({held,task,editor,expectedSou
   const box=control.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);
   if(x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===control||control.contains(hit)))
     throw Error('Managed JavaScript error control covered');
-  const result={point:{x,y,tid,node_id:task.owner.node_id,page_tid:task.page_tid},dialog};
+  const result={point:{x,y,tid,node_id:task.owner.node_id,page_tid:task.page_tid},dialog,...(details?{details}:{})};
   if(new TextEncoder().encode(JSON.stringify(result)).length>16384)
     throw Error('Managed JavaScript error response bound exceeded');
   // Retain the exact DOM object only after the full native/dialog/control proof.
@@ -106,7 +115,7 @@ export async function runManagedJavascriptErrorRead(page,task,inspect) {
     ||lease.codeNextAttempted!==true||lease.sourceDraftSha256!==task.expected_source_sha256
     ||!lease.sourceEditorCaptured||typeof lease.sourceDraftText!=='string'
     ||(task.error_stage==='done'?lease.doneAttempted!==true:lease.doneAttempted===true)
-    ||task.mode==='closed'&&lease.errorOkAttempted!==true||Date.now()>=task.deadline)
+    ||task.mode==='closed'&&lease.errorOkAttempted!==true||task.mode==='expanded'&&lease.errorDetailsAttempted!==true||Date.now()>=task.deadline)
     throw Error('Managed JavaScript error lease unavailable');
   return page.evaluate(inspect,{held:lease.handle,task,editor:lease.sourceEditorCaptured,expectedSource:lease.sourceDraftText});
 }
@@ -114,8 +123,8 @@ export async function runManagedJavascriptErrorRead(page,task,inspect) {
 export async function runManagedJavascriptErrorGesture(page,task,inspect) {
   const lease=page[Symbol.for('loginom-dock.javascript-owned-selection-v1')]?.get(task.operation_id);
   const identity=JSON.stringify([task.owner,task.workflow_ref,task.targetOrigin,task.targetBuild,task.deadline]);
-  const key=task.mode==='button'?'javascript.wizard.error.open':'javascript.wizard.error.ok';
-  const flag=task.mode==='button'?'errorButtonAttempted':'errorOkAttempted';
+  const key=task.mode==='button'?'javascript.wizard.error.open':task.mode==='details'?'javascript.wizard.error.details':'javascript.wizard.error.ok';
+  const flag=task.mode==='button'?'errorButtonAttempted':task.mode==='details'?'errorDetailsAttempted':'errorOkAttempted';
   const outcome=(status,phase,effect_possible,output,error=null)=>({status,phase,effect_possible,
     cleanup_complete:true,action_key:key,action_revision:'1',operation_id:task.gesture_id,output,error,trace:[]});
   if(!lease||lease.identity!==identity||lease.settingAttempted!==true||!lease.wizardCaptured
@@ -132,12 +141,13 @@ export async function runManagedJavascriptErrorGesture(page,task,inspect) {
 }
 
 function validate(task) {
-  const {mode,page_tid,tooltip,tooltip_truncated,expected_source_sha256,dialog,gesture_id,point,error_stage='code_next',...base}=task??{};
+  const {mode,page_tid,tooltip,tooltip_truncated,expected_source_sha256,dialog,technical_details,gesture_id,point,error_stage='code_next',...base}=task??{};
   makeJavascriptManagedStageCode(base);
-  if(!['button','dialog','ok','closed'].includes(mode)||!['code_next','done'].includes(error_stage)
+  if(!['button','dialog','ok','closed','details','expanded'].includes(mode)||!['code_next','done'].includes(error_stage)
     ||page_tid!==task.workflow_ref.prefix+';WizrdMCF;'+(error_stage==='done'?'DoneWizard':'JavaScriptCodeWizard')
     ||typeof tooltip!=='string'||tooltip.length<1||tooltip.length>4096||typeof tooltip_truncated!=='boolean'
-    ||!/^[a-f0-9]{64}$/.test(expected_source_sha256)||dialog!==undefined&&Buffer.byteLength(JSON.stringify(dialog))>16384)
+    ||!/^[a-f0-9]{64}$/.test(expected_source_sha256)||dialog!==undefined&&Buffer.byteLength(JSON.stringify(dialog))>16384
+    ||technical_details!==undefined&&Buffer.byteLength(JSON.stringify(technical_details))>8192)
     throw Error('Invalid managed JavaScript error task');
 }
 
@@ -145,7 +155,8 @@ function inspector() {
   return `function inspect(args){const stage=${javascriptManagedStageInspector()};`+
     `const dialog=${readJavascriptWizardErrorDialog.toString()};`+
     `const draft=${inspectManagedJavascriptErrorDraft.toString()};`+
-    `return (${inspectManagedJavascriptErrorPoint.toString()})(args,stage,dialog,draft);}`;
+    `const details=${inspectJavascriptWizardErrorDetails.toString()};`+
+    `return (${inspectManagedJavascriptErrorPoint.toString()})(args,stage,dialog,draft,details);}`;
 }
 
 export function makeJavascriptManagedErrorReadCode(task) {
@@ -157,10 +168,11 @@ export function makeJavascriptManagedErrorReadCode(task) {
 
 export function makeJavascriptManagedErrorGestureCode(task) {
   validate(task);
-  if(!['button','ok'].includes(task.mode)||task.gesture_id!==task.operation_id+':error-'+task.mode
+  if(!['button','ok','details'].includes(task.mode)||task.gesture_id!==task.operation_id+':error-'+task.mode
     ||task.point?.node_id!==task.owner.node_id||task.point.page_tid!==task.page_tid
     ||!Number.isFinite(task.point.x)||!Number.isFinite(task.point.y)
     ||task.mode==='button'&&task.point.tid!==task.workflow_ref.prefix+';WizrdMCF;btnError'
+    ||task.mode==='details'&&(task.point.tid!=='DetailPanel;btnDetais'||task.dialog?.present!==true)
     ||task.mode==='ok'&&(task.dialog?.present!==true||task.point.tid!==task.dialog.ok_tid))
     throw Error('Invalid managed JavaScript error gesture');
   return `async page=>(${runManagedJavascriptErrorGesture.toString()})(page,${JSON.stringify(task)},${inspector()})`;
@@ -169,7 +181,8 @@ export function makeJavascriptManagedErrorGestureCode(task) {
 // Called only after the sole Code Next or Done returns its owned receipt.
 // Unknown ACKs/replies keep the adapter uncertain and never authorize discard.
 export async function captureManagedJavascriptWizardError({task,before,after,expected_source_sha256,
-  execute,record,receiptOptions,error_stage='code_next',redactor=createRedactor(),wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}) {
+  execute,record,receiptOptions,error_stage='code_next',require_details=false,redactor=createRedactor(),wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}) {
+  if(typeof require_details!=='boolean')throw Error('Managed JavaScript details policy unavailable');
   if(before.owner_verified!==true||before.pending!==false||before.preview_visible||before.dialog_diagnostic?.foreign_count!==0
     ||after.wizard_error_refusal!==true||!isCurrentJavascriptWizardRefusal({before,after,pendingSeen:after.pending_seen===true})
     ||Date.now()>=task.deadline)throw Error('Managed JavaScript current refusal unavailable');
@@ -177,8 +190,9 @@ export async function captureManagedJavascriptWizardError({task,before,after,exp
     tooltip_truncated:after.wizard_error.tooltip_truncated,expected_source_sha256};
   const journal=event=>journalManagedJavascriptError({record,deadline:task.deadline},event);
   const send=async(mode,read)=>{
-    const gesture_id=task.operation_id+':error-'+mode,key=mode==='button'?'javascript.wizard.error.open':'javascript.wizard.error.ok';
-    const request={...base,mode,point:read.point,gesture_id,...(mode==='ok'?{dialog:read.dialog}:{})};
+    const gesture_id=task.operation_id+':error-'+mode,key=mode==='button'?'javascript.wizard.error.open':mode==='details'?'javascript.wizard.error.details':'javascript.wizard.error.ok';
+    const request={...base,mode,point:read.point,gesture_id,...(mode==='ok'||mode==='details'?{dialog:read.dialog}:{}),
+      ...(mode==='ok'&&read.details?{technical_details:read.details}:{})};
     const code=makeJavascriptManagedErrorGestureCode(request);
     await journal({phase:'javascript_managed_error_'+mode+'_prepared',operation_id:task.operation_id,owner:task.owner,
       gesture_id,source_sha256:expected_source_sha256,point:read.point,deadline:task.deadline,effect_possible:false});
@@ -219,6 +233,26 @@ export async function captureManagedJavascriptWizardError({task,before,after,exp
   if(!observed?.dialog?.present)throw Error('Managed JavaScript error dialog original deadline expired');
   if(after.boundary_refusal==='foreign_dialog'&&observed.dialog.tid!==after.dialog_diagnostic.roots[0]?.tid)
     throw Error('Managed JavaScript automatic dialog changed');
+  const primary=observed.dialog,classification=javascriptWizardTextClassification(base.tooltip+'\n'+primary.text);
+  let technical;
+  if(require_details||base.tooltip_truncated||primary.text_truncated
+    ||classification.error_class.status!=='recognized'||classification.location.status!=='recognized') {
+    const prepared=await execute(makeJavascriptManagedErrorReadCode({...base,mode:'details'}));
+    await send('details',prepared);
+    while(Date.now()<task.deadline) {
+      const expanded=await execute(makeJavascriptManagedErrorReadCode({...base,mode:'expanded'}));
+      if(expanded.details?.expanded===true) {
+        technical=expanded.details;
+        await journal({phase:'javascript_managed_error_details_observed',operation_id:task.operation_id,
+          owner:task.owner,source_sha256:expected_source_sha256,deadline:task.deadline,details:redactor.redact(technical)});
+        break;
+      }
+      await wait(Math.min(100,Math.max(1,task.deadline-Date.now())));
+    }
+    if(!technical)throw Error('Managed JavaScript details original deadline expired');
+    observed=await execute(readCode);
+    if(JSON.stringify(observed.details)!==JSON.stringify(technical))throw Error('Managed JavaScript expanded diagnostic changed');
+  }
   await send('ok',observed);
   while(Date.now()<task.deadline) {
     const stage=await execute(makeJavascriptManagedStageCode(task));
@@ -231,7 +265,8 @@ export async function captureManagedJavascriptWizardError({task,before,after,exp
         throw Error('Managed JavaScript error closed draft unconfirmed');
       const result={owner:task.owner,operation_id:task.operation_id,error_stage,source_sha256:expected_source_sha256,
         page_tid:base.page_tid,tooltip:redactor.text(base.tooltip),tooltip_truncated:base.tooltip_truncated,
-        dialog_text:redactor.text(observed.dialog.text),dialog_text_truncated:observed.dialog.text_truncated,
+        dialog_text:redactor.text(primary.text),dialog_text_truncated:primary.text_truncated,
+        ...(technical?{technical_details:{text:redactor.text(technical.text),truncated:technical.text_truncated,expanded:true}}:{}),
         dialog_tid:observed.dialog.tid,dialog_closed:true,native_owner_verified:true,explicit_execute_requested:false};
       if(Buffer.byteLength(JSON.stringify(result))>16384)throw Error('Managed JavaScript native diagnostic response bound exceeded');
       await journal({phase:'javascript_managed_error_observed',deadline:task.deadline,...result});

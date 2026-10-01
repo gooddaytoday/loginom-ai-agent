@@ -64,9 +64,9 @@ export function javascriptCodeReadback({node,phases}) {
     package_persistence_verified:false};
 }
 
-export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redactor}) {
+export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redactor,requireWizardErrorDetails=false}) {
   need(targetBuild==='7.4.2'&&typeof targetOrigin==='string'&&typeof redactor?.text==='function'
-    &&typeof redactor?.redact==='function','JavaScript Code runtime dependencies unavailable');
+    &&typeof redactor?.redact==='function'&&typeof requireWizardErrorDetails==='boolean','JavaScript Code runtime dependencies unavailable');
   const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-script-lifecycle-v4',modes:['script'],
     parameter_schema:javascriptParametersSchema,output_wizard:'separate',materialize_output:true,fullUiOutput:true,
     validate:validateJavascriptCodeRequest,configure:(ctx,parameters,drivers)=>drivers.configureJavascript(ctx,parameters),
@@ -99,7 +99,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       const selected=createJavascriptManagedSourceAdapter({page:{},
         prepared:{document_id:owner.document_id,workflow_ref:request.workflow_ref,node:nodeRef(owner)},node:nodeRef(owner),
         uiEpoch:owner.ui_epoch,deadline,targetOrigin,execute,record:onRecord,receiptOptions,redactor,
-        channel:remaining=>{operation.deadline=remaining;return channel;},openingBudgetMs:180000});
+        channel:remaining=>{operation.deadline=remaining;return channel;},openingBudgetMs:180000,requireErrorDetails:requireWizardErrorDetails});
       const open=selected.open.bind(selected);
       selected.open=async input=>{
         const opened=await open(input);
