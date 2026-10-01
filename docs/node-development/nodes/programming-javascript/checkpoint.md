@@ -206,6 +206,30 @@ Oracle32bc3cfd и бизнес-срез неизменны. Positive full J19 au
 После absence439/closed_verified назначить Code440 и наблюдать original exec;
 после terminal actualexit0 выполнить positive audit/negative89 и cleanup/process
 absence до separate declared. Source не менять в течение live run.
+
+Code440/exec29461 на immutablee954 завершился actualexit1/**FAILED**, с полным
+PackageClose/logout/browserClose/process absence; registry closed_verified,
+active_exec=null. Rename/Input Done и committed ACK прошли. NEW old-source
+context получил предусмотренный default refusal:
+`JavaScript context: complete materialized port owner/schema unavailable`.
+Own fresh input mapping содержит target CustomerNow/source-label Customer;
+old source delivery SHA совпал с pinned original. Output0: cached
+`mapping_source_pending`, configured_inventory_verified/inventory_complete=true,
+source_identity_verified/verified=false, source_fields=[], четыре target fields
+с source=null, original names/types/Required и manual label сохранены,
+autosync=false. Native hidden source header verified, same output0 owner/GUID.
+Ровно два warmup Execute до rename; source edit/новый Execute/Save после него нет.
+Оба port Close и unchanged graph подтверждены до отказа; никакой old-code Execute
+ради заполнения источников не допускается. Полный J19 не принят.
+Original report SHA87fb7c94/journal8de38587 неизменны; post-live diagnostic
+verification SHAefc8b1e6 подтверждает OBSERVED_REFUSAL, не pre-pinned positive audit.
+
+Следующий шаг требует решения о расширении context, описанного в конце
+[context design](context-delivery-design.md): явный opt-in для verified configured
+output inventory при сохранении default materialized-only refusal. Предложение
+ещё не принято; runtime/schema не менять до решения. Code/declared full J19,
+candidate/CLI и remaining natural diagnostics остаются открытыми. Новый браузер
+не назначен, live процессов нет; child HEAD e954, main документы актуализируются.
 Natural insufficient-primary/Done/actual model/candidate/CLI/Gates остаются открытыми;
 accepted milestones не повторять.
 

@@ -209,3 +209,68 @@ actualexit0/18500PASS, client source unchanged. Child `e9541c0415`, source freez
 e1bdd95f/v4 pin19df9881 закреплены до fresh Code440;
 v4 audit сверяет persisted canonical origin и89 negatives, oracle unchanged.
 Rename/Done отдельно не доказывают полный J19 или actual model resistance.
+
+## Предлагаемое уточнение context после input Name change — 2026-10-01
+
+**Статус: предложение для решения, runtime/schema ещё не изменены.** Code440
+подтвердил default refusal, предусмотренный выше: после Input Done output0 имеет
+полный configured target inventory, но materialized sources отсутствуют.
+Не запускать old source для обхода отказа. Technical rename и ACK подтверждены;
+полный J19/final business Execute этим не доказаны. Evidence/cleanup — checkpoint.
+
+Возможные подходы:
+
+| Подход | Следствие |
+| --- | --- |
+| Явный `allow_configured_output:true` в context request — рекомендуется | Агент получает current source/input Name и честно обозначенные configured output fields до correction/Execute; default materialized-only контракт сохраняется |
+| Сохранить только нынешний refusal | Нового публичного context до correction/Execute нет; technical-name case остаётся ограниченным negative proof |
+| Автоматически выдавать configured output в обычном context | Меняет default semantics всех callers; требует более широкой совместимости и пересмотра существующих contracts |
+
+Рекомендуемый request остаётся `kind:context` с optional boolean
+`allow_configured_output`, по умолчанию false. Точное значение входит в admission
+и SAME-ID retry identity; conflicting reuse не допускается. Source request и
+остальные node operations не получают этот параметр. Default context продолжает
+требовать полную materialized схему.
+
+Opt-in допускает только **output0** с уже наблюдённым bounded native состоянием:
+`mapping_source_pending`, configured_inventory_verified/inventory_complete=true,
+verified/source_identity_verified=false, cached_mapping_stores, источник пуст,
+полный набор target fields, verified hidden native source header/counts, original
+owned wizard/node/GUID, settings_applied/package_saved=false. Unknown reason,
+foreign owner/GUID, неполные caches, маски/loading, повреждённые types/flags/order
+или источники блокируют delivery. Input mapping остаётся полностью verified;
+порог 64 fields и прежние cache/reciprocity guards не ослабляются.
+
+В configured output port response сохраняются только наблюдённые scalar fields
+и field IDs; ephemeral Ext record IDs удаляются прежним normalizer. Добавляются
+`schema_state:source_pending`, configured_inventory_verified=true,
+native_reciprocity_verified=false; source_fields пуст, target source=null.
+Observation scope — `current_owned_source_and_configured_ports`. Никакие source
+fields/связи не восстанавливаются из предыдущего receipt. Full materialized
+responses сохраняют прежнюю форму и scope. Schema union строго различает эти
+варианты; delivery journal для configured варианта не заявляет ports_complete=true.
+
+Read session дважды независимо читает exact source/settings/input/output и
+сравнивает семантику. Source identity, current technical Name, состояние output
+и scalar definitions входят в semantic digest. Existing ownership, ACK/unknown
+effect/one-flight, graph checks, close/discard, redaction, deadlines и response
+budgets 46000 bytes/2000 lines сохраняются. Read не вызывает Execute/Save/Apply,
+server/data loading APIs и не приписывает configured inventory свежие output cells.
+
+Fixed renamed case сначала доказывает default refusal и verified cleanup,
+затем делает **NEW** opt-in context request на том же owned node. Его reply должен
+содержать CustomerNow при source/label Customer, exact old code, четыре configured
+output targets с сохранённой manual label/autosync=false и honest pending status.
+Correction берёт technical Name из этого public reply. Exact retry самого NEW
+request и старого baseline receipt не добавляет runtime events. Затем corrected
+apply/два completed Execute/full6×4/1950 и final default materialized context.
+
+До live нужны actual runtime/MCP schema/admission tests, pending/default/foreign/
+incomplete/stale-owner/changed-source/changed-settings/budget/redaction/cancellation
+counterexamples и затронутые regressions. Независимые два snapshots должны
+отклонять любую metadata/state drift. Новый immutable source/freeze/oracle/auditor
+и negative mutations закрепляются до ordinary headed Code, затем отдельно declared
+после audit/cleanup/process absence. Existing accepted base/reordered cases не
+переигрываются без затронувшего изменения; actual model resistance/candidate/CLI
+остаются отдельными F obligations. Публичный product handler не регистрировать
+и API не выпускать этим prototype slice.
