@@ -4,8 +4,8 @@
 
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
-standalone CLI transport/bundle/admission. Child
-**1b3ed092e62ba83c2047d1942fe1e5ae72a9e40f** tracked clean; registration на161353
+standalone CLI transport/bundle/admission/public-node binding. Child
+**631bfbe75cd5924b5bc3772eaadf18b7cb0fe02f** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 адресных test methods PASS, в том числе48 non-noop native mutations.
 Итоговый `javascript_node_acceptance.py` ещё TO_IMPLEMENT: подготовить связку
@@ -15,6 +15,8 @@ standalone CLI transport/bundle/admission. Child
 fixtures, actualexit0; никаких compiled CLI/browser runs в этой итерации нет.
 Admission дополнительно11PASS; CLI metadata binding13PASS; native regression9PASS
 на неизменённых captures и явно отдельной тестовой проекции production header.
+Compact public-node binding дополнительно17PASS на actual runtime-produced
+receipts/defaults и реальной SQLite; Save/cold/cleanup ещё не объединены.
 JS general lifecycle-v5/driver/knowledge в product registry только7.4.2/nonempty
 origin, actual bridge redactor. Addressed65, full client3442PASS+10SKIP,
 operator18583PASS, provenance5045 actualexit0. Existing Done/Close447/448 и
@@ -40,6 +42,63 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: compact public-node → native binding — 2026-10-02
+
+Child **631bfbe75cd5924b5bc3772eaadf18b7cb0fe02f** добавляет
+`javascript_cli_nodes.py` и17 адресных test methods. Проверка связывает одну
+normal attempt1 операцию с actual compact standalone CLI arguments, native
+`node_apply_prepared`, `node_checkpoint`, completed outcome и public terminal
+delivery. Полный workflow_ref должен быть выдан real prepare или Save continuation;
+Host read/mapping/budget defaults восстановлены независимо. New text import
+source/format/column defaults и путь связываются с matching delivery receipts.
+Явные параметры и `source_text` не подменяются; `budgets` в compact call refused.
+Status/wait и identical SAME-ID apply retry не создают нового native admission.
+
+Public node/configuration/execution identities и output metadata сверяются с
+native checkpoint. Все доставленные public schema/cells/precision/NULL/counts
+должны совпасть с native facts, с допустимым удалением избыточного `display_text`
+по действительному `compactNodeResult`. JSON digests сохраняют различие number/
+boolean и false/0. Remote knowledge может быть plain text, не ошибочно разбирается
+как local receipt; оно остаётся под outer CLI/SQLite transport check. Полный
+business oracle этим не проверяется; `cli_acceptance_verified=false`, как и
+upload/persistence/code-semantics flags. Resume/multiple outcomes требуют ещё
+reconciliation audit и не считаются закрытыми этим normal-worker helper.
+
+Fixtures производят **фактические** `createUserWorkflowBindings.expandNode`,
+`compactNodeResult` и `compactActionResult` из source на Node24.19.0, затем
+сохраняют public parts в настоящую SQLite и сверяют transport. Переданный
+JavaScript — лишь текст тестового параметра; модельный код не исполняется.
+Native records минимальные тестовые данные, не новые Loginom observations.
+Проверены explicit read/mappings/declared settings, import delivered path,
+Save navigation continuation, running→wait→settled, SAME-ID retry и согласованные
+подмены параметров/источника/owner/runtime/IDs/cells/NULL/types/precision/count.
+
+Команда из child `packages/loginom-runtime`:
+
+```sh
+LOGINOM_NODE=/home/george/.local/state/loginom-ai-agent/node-development/toolchains/node-v24.19.0-linux-x64/bin/node python3 -m unittest discover -s tools/loginom-acceptance -p test_javascript_cli_nodes.py -v
+```
+
+Addressed05 original972cfc actualexit0,17PASS. Private log SHA256
+`f23e2cca45af526205f9832cbacaced2b5cfc5b027ad065fe31581b2c19e03fd`.
+Receipt `f-javascript-cli-nodes-validation-v1.json`, SHA256
+`6b5626cf2728fb0f582fe1a4505c678c5e7a859a8151d313542ad12930e02a1c`,
+закрепляет2 auditor/test hashes и2 actual producer module hashes, exact Node/argv/cwd.
+Первый failed01 actualexit1: fixture generator ошибочно передавал fd0 в
+`fs/promises.readFile`; исправлен на `readFileSync(0)`. Failed03 actualexit1:
+Python projection удаляла `value` вместо `display_text` при одинаковом строковом
+представлении. Actual runtime-generated fixture обнаружил ошибку; поправлен
+аудитор, не expected. Оба FAIL logs сохранены в receipt; source runtime не менялся.
+
+Следующее независимое доказательство: **последний собственный Save + dirty-state**,
+затем path-only cold source/settings/graph/новое исполнение/full6×4 и own cleanup/
+process termination. Task требует итоговый Save по unique path; два Save из
+старого calculator-аудитора и model Save As/reopen не обязательны. Поздний model
+`dock_node_read` может доставить весь небольшой результат: apply default5-row
+preview не считать full6-row proof и не заменять его controller-only чтением.
+Итоговый `javascript_node_acceptance.py` всё ещё TO_IMPLEMENT, ready_for_acceptance
+не повышен. Candidate/browser/model в этой итерации не запускались; F pending.
 
 ### Фаза 4: standalone native admission и production target — 2026-10-02
 

@@ -63,6 +63,28 @@ input/output digests, полнота завершённых вызовов, от
 
 ## Проверки и воспроизводимость
 
+Связка публичного node call с native admission проверяет реальный compact
+profile. Agent `session/tools.ts` соединяет MCP text blocks через `\n\n`;
+первый JSON block — receipt, следующие blocks могут содержать advice. Runtime
+`user-workflow.mjs` восстанавливает полный ранее выданный workflow_ref, добавляет
+read/mapping/budget defaults, а для нового text import — source/format/column
+defaults и путь из подтверждённой delivery. Поэтому raw compact arguments не
+обязаны равняться expanded journal request. Аудитор проверяет точное ожидаемое
+расширение и сохранение всех явно заданных параметров/source_text, original ID,
+public polling/retry, final checkpoint/outcome и public execution/node identities.
+Это отдельная связка; она не доказывает бизнес-правильность или отсутствие hardcode.
+Текущий normal-worker binding охватывает attempt1, status/wait и SAME-ID apply
+retry без повторного native admission. Resume/multiple terminal outcomes требуют
+отдельной проверки reconciliation; не игнорируются и не объявляются этим helper
+принятыми. Общий acceptance verdict до добавления всех обязательных слоёв отсутствует.
+
+Итоговая задача требует Save последней редакции по unique path, а не два Save
+из исторического calculator сценария. Проверка не вводит искусственное требование
+`package.save_as` или модельного reopen: обычный `package.save_checkpoint` и
+последующий независимый cold reader должны закрывать persistence. Full small
+result может быть прочитан поздним `dock_node_read`; сам default apply preview
+на5 строк не является полным6-row proof и не заменяется controller-only read.
+
 Native admission связывается с фактическим standalone Host, без Codex/Hermes
 ticket envelope. `packages/loginom-host/src/host.ts` передаёт в `inputStore`
 chat `${generation}:${cliSessionID}` и исходный user message ID. `inputs.ts`

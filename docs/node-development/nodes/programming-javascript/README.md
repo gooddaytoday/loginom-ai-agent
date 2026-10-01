@@ -16,6 +16,9 @@ Child **8d3eb30f1a4f** добавляет partial CLI evidence/bundle прове
 Запуск compiled candidate и native Save/cold/cleanup они не подтверждают.
 На **1b3ed092e62b** добавлены standalone Host admission binding и product target
 pins:11/13/9 адресных tests PASS. [Подробности и границы](checkpoint.md#фаза-4-standalone-native-admission-и-production-target--2026-10-02).
+На **631bfbe75cd5** compact public-node/native binding прошёл17 tests с actual
+runtime-produced fixtures и SQLite. [Checkpoint](checkpoint.md#фаза-4-compact-public-node--native-binding--2026-10-02).
+Save/cold/cleanup и итоговая CLI-приёмка остаются открытыми.
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·

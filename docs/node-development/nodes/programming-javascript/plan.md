@@ -916,6 +916,11 @@ Child **1b3ed092e62b** дополнительно связывает standalone 
 pin в configuration/output auditors. Admission11/CLI metadata13/native regression9
 PASS, включая прежние48 native negatives; header projection — source test,
 не новый live proof. [Точный checkpoint](checkpoint.md#фаза-4-standalone-native-admission-и-production-target--2026-10-02).
+Child **631bfbe75cd5** добавляет compact public-node/native binding:17PASS на
+actual runtime-produced receipts/defaults и SQLite, без модели/браузера.
+Следующий слой — latest own Save/dirty-state и independent cold/cleanup;
+два Save из старого calculator сценария и model reopen не вводятся как gate.
+[Границы и оставшиеся связи](checkpoint.md#фаза-4-compact-public-node--native-binding--2026-10-02).
 `javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
 он должен связать native проверки с фактическими standalone CLI evidence
 model/input/candidate/Save/cold/cleanup до ready_for_acceptance.
