@@ -31,7 +31,8 @@ def terminal_tool(part):
         raise ValueError('cli_terminal_error_shape')
     return dict(id=part['id'],message_id=part['messageID'],session_id=part['sessionID'],call_id=part['callID'],
         tool=part['tool'],status=state['status'],time={k:state['time'][k] for k in ('start','end')},
-        time_sha256=value_digest(state['time']),input_sha256=value_digest(state.get('input')),
+        time_sha256=value_digest(state['time']),metadata_sha256=value_digest(state.get('metadata',{})),
+        input_sha256=value_digest(state.get('input')),
         output_sha256=value_digest(state.get('output')),error_sha256=value_digest(state.get('error')),
         truncated=state.get('metadata',{}).get('truncated') is True,
         output_utf8_bytes=len(state.get('output','').encode('utf-8')),

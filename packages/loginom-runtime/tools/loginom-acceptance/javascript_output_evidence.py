@@ -10,7 +10,7 @@ from import_execution_evidence import verify_execution_observations
 from import_output_evidence import verify_table_output_observations
 
 
-def verify_javascript_output(events, request, expected_columns, expected_rows):
+def verify_javascript_output(events, request, expected_columns, expected_rows, *, expected_target=None, expected_origin=None):
     failures = []
     execution_id = materialization_id = None
     try:
@@ -30,7 +30,7 @@ def verify_javascript_output(events, request, expected_columns, expected_rows):
                     raise ValueError('javascript_oracle_string')
                 if column['type'] == 'integer' and (type(cell) is not int or not -(2**63) <= cell < 2**63):
                     raise ValueError('javascript_oracle_integer')
-        operation = javascript_operation(events,request)
+        operation = javascript_operation(events,request,expected_target=expected_target,expected_origin=expected_origin)
         phases = operation['phases']
         identities = []
         final_observations = final_mutations = None
