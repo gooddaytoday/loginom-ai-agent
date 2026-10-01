@@ -304,6 +304,24 @@ auditor pin. Если native поддержан или primary sufficient, insuf
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
 
+### E/J25: pin и fresh natural regex live — 2026-10-01
+
+Child `280a94c76fb210eb3af259d422db7dcbf9f7baf5`: operator-only fixed regex case,
+public/client guards unchanged. Addressed exec42720 actualexit0/38PASS; full
+operator exec58861 actualexit0/18508PASS. Client source unchanged относительно
+9bc; прежние3419PASS+10SKIP не объявлены новым запуском. Source freeze v1 содержит
+12748files/61symlinks, SHA256
+`d1b3260d0a081652d3e6dd4a8b62d38f53333c281ad1943ed4ea5527a0ae364c`.
+Immutable private pin `e-natural-regex-pin-v1.json`, SHA256
+`d2c5327f1b8a040578a0904089f38bce0dfbd53394f5f7d4fc323dbfc8359db5`
+фиксирует exact source/oracle, auditor/negative checker/handoff до browser.
+
+Profile443 назначен под registry.lock; fresh ordinary headed
+`e-natural-regex-code-01`, original exec57694 зарегистрирован. Stand/user прежние;
+no forced details/no Save/no custom source. До original terminal не менять
+child source, не запускать новый browser/replay. Natural insufficient-primary
+и Done ещё не доказаны; audit различает sufficient/insufficient observations.
+
 ### E/J19: реализация opt-in и pin до fresh live — 2026-10-01
 
 Child `9bc52b94686af82bfa1411adacffd1f56c0de399` реализует optional boolean
