@@ -294,6 +294,44 @@ test('native process, port and mapping reads share the prepared node and durable
  await assert.rejects(fixture().channel.observe({condition:'unbound controls',readProcessControls:true,ready:()=>true}),/prepared node/);
 });
 
+for(const fault of ['other field','source connection','port owner','incomplete mapping'])
+test('actual generated input mapping gate blocks post-ACK '+fault+' before UI dispatch',async()=>{
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',
+  navigation_path:[{tid:'crumb',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const editor={opening_operation_id:'input:n1',port_guid:'00000000-0000-4000-8000-000000000001',record_id:'target-customer'};
+ const owner={verified:true,...binding.node,surface:'wizard',tid:'MF;TF-1;WizrdMCF',
+  input_port:{direction:'input',port:0,port_guid:editor.port_guid,opening_operation_id:editor.opening_operation_id}};
+ const mapping={verified:true,inventory_complete:true,source_identity_verified:true,node_context:owner,
+  target_fields:[{record_id:editor.record_id,name:'Customer',source:{record_id:'source-customer'}},{name:'Qty'}],rendered_indices:[0,1]};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,prepared_node_context:owner,
+  dom_epoch:{document:'doc',revision:1},scan:{complete:true},wizard:{status:'observed',stage:'input_mapping',root_tid:owner.tid,root_ref:'ui-root'},
+  ui:{elements:[{ref:'ui-button',allowed_actions:['click']}],masks:[],dialogs:[],truncated:{elements:false,masks:false,dialogs:false}}};
+ const receipts=[];let nativeReads=0;
+ const page={evaluate:async(fn)=>{nativeReads++;return structuredClone(fn.name==='readMappingBrowser'?mapping:owner);}};
+ const channel=createNodeProcedure({operation:{id:'owned-gate',deadline:10000,action:{action_key:'diagnostic.input',revision:'1'}},
+  preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>1,
+  record:async event=>{receipts.push(structuredClone(event));
+   if(event.phase==='node_step_prepared'){
+    if(fault==='other field')mapping.target_fields[1].name='foreign';
+    if(fault==='source connection')mapping.target_fields[0].source.record_id='foreign';
+    if(fault==='port owner')owner.input_port.port_guid='foreign';
+    if(fault==='incomplete mapping')mapping.inventory_complete=false;
+   }return event;},wrapMutation:(code,options)=>({code,options}),
+  execute:async code=>{
+   if(typeof code==='string')return code.includes('function workspaceUiCapability')?{status:'SUCCEEDED',output:structuredClone(state)}:structuredClone(mapping);
+   return Function('return ('+code.code+')')()(page);
+  }});
+ const observed=await channel.observe({condition:'original complete mapping',readMappings:true,mappingEditor:editor,ready:()=>true});
+ editor.record_id='caller-mutated';assert.equal(observed.node_mapping_editor.record_id,'target-customer');
+ await assert.rejects(channel.perform({condition:'same owned field ready',initialObservation:observed,ready:()=>true,
+  identity:()=>({node:binding.node,field:'Customer'}),resolve:()=>({verb:'click',ref:'ui-button'})}),
+  error=>error.receipt?.status==='NOT_APPLIED'&&error.receipt.effect_possible===false
+   &&error.receipt.cleanup_complete===true&&error.receipt.error.code==='MAPPING_BINDING_CHANGED');
+ assert.equal(nativeReads,fault==='port owner'?1:3);
+ assert.equal(receipts.filter(e=>e.phase==='node_step_prepared').length,1);
+ assert.equal(receipts.filter(e=>e.phase==='node_step_completed').length,1);
+});
+
 test('JavaScript schema read uses the prepared node channel and journals its exact owner',async()=>{
  const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Scenario',label:'Scenario'}]};
  const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'js'}};
