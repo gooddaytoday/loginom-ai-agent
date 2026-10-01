@@ -152,3 +152,18 @@ Private source freeze a7b96ef4/12748files+61symlinks, oracle32bc3cfd,
 auditor6f989c8c/negative84/handoff13bbba32, pin2e69f11d; Python syntax PASS.
 Это подготовка, не live J19 acceptance; positive audit и actual non-noop negatives
 требуются после первого headed Code run.
+
+Warmup433 на1aa остановился до rename: preserve source передал расширенный
+`effective_source` (policy/parser/status) в exact identity binding перед финальным
+Execute. Для preserve брать `previous_source`, уже независимо прочитанный actual
+source reader; его SHA должен совпадать с effective source. Binding по-прежнему
+допускает ровно source_sha256/source_utf8_bytes/source_lf_lines и свежую проверку
+settings. Не ослаблять constructor или заменять preserve явным source_text ради
+обхода ошибки. Source/settings drift блокируют новый Execute; original failed
+report и отдельный verified cleanup434 сохранены в checkpoint.
+
+Исправление child7ec313f9de: addressed124PASS, full client3321PASS+10SKIP/
+exec31098 и full operator18493PASS/exec63984, actualexit0/concurrency4.
+Новый freeze f87e60c8/pin771c8015 закрепляют same oracle32bc3cfd и v2
+independent auditor/negative84. Fresh headed Code435 начат; live acceptance
+требует terminal report, actual audit и cleanup, затем separate declared case.

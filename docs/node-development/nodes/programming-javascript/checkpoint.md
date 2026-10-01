@@ -55,7 +55,7 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
-### E/J19: technical-name cases/source готовы; Code433 выполняется — 2026-10-01
+### E/J19: Code433 остановлен на preserve warmup; own cleanup434 подтверждён — 2026-10-01
 
 Child1aa8d49f09 добавил два closed operator cases `context-code-renamed` /
 `context-declared-renamed`. Existing shared field procedure, own input0,
@@ -83,9 +83,39 @@ Chromium остановилось до browser launch: profile/evidence отсу
 process absence verified; original logSHA4e3c7212 и separate prelaunch receipt
 сохранены. Correct pinned chrome-linux64 запущен после этой проверки; это
 первый browser process433, не replay неизвестного UI effect.
-Наблюдать тот же59005 до terminal, затем independent audit/negative84 и
-cleanup/process absence перед declared. Natural insufficient-primary/Done/
-actual model/candidate/CLI/Gates остаются открытыми; accepted milestones не повторять.
+Exec59005 завершился actualexit1/CLEANUP_UNCONFIRMED до rename/context. Warmup
+завершил ровно один materialization Execute, затем `finish` отказал с
+`JavaScript source admission refused: source_binding`. Original report SHA
+b5be7302/journal e51591ec сохранены; переименование не достигнуто, J19 не принят.
+Source1aa: при отсутствующем source_text `expected` получал whole
+`admitted.effective_source` с policy/parser/status, а constructor допускает только
+три source identity keys. Это host-side shape refusal, не ошибка Chakra или
+свидетельство вмешательства пользователя. Исправление использует independently
+read `admitted.previous_source` для preserve; строгий constructor не ослабляется.
+
+Separate ordinary headed admin recovery434/exec22752 actualexit0: в Dispatcher
+сопоставлен только собственный сеанс `jsteach:4028` по времени/pinned package path;
+Stop disabled, Close exact package без Save, refresh absence, Close exact idle
+session, refresh absence. Foreign rows unchanged; admin logout/browser close и
+absence процессов433/434 проверены. Private journal SHA9b202e44,
+verification SHA6c5e0d5a, registry `closed_verified`, active exec null.
+Original failed433 status не повышался до PASS.
+
+Addressed preserve-binding02 actualexit0/124PASS проверяет actual reader →
+receipt identity → fresh execution admission и source/settings drift refusal.
+Initial01 сохранил test-only неверное ожидание числа Close (4, не3); исправленная
+проверка требует закрытия каждого actual open. Child7ec313f9de сохраняет исправление.
+Full client31098 actualexit0/3321PASS+10SKIP, logSHAca014359;
+full operator63984 actualexit0/18493PASS, logSHA9df65060, оба concurrency4.
+Addressed124 logSHA16055241. Private v2 source freeze f87e60c8/12748files+61symlinks,
+oracle32bc3cfd, auditorcedf5b32/negative84/handoff1dd017c7, pin771c8015;
+исходные v1 files/reports неизменны. Python syntax PASS; positive live audit ещё нет.
+После verified cleanup434 registry назначил435: ordinary headed
+`e-public-context-renamed-code-02`/exec93145 на immutable7ec выполняется,
+original30min. Наблюдать этот handle до terminal, затем actual independent
+v2 audit/negative84 и cleanup/process absence перед declared.
+Natural insufficient-primary/Done/actual model/candidate/CLI/Gates остаются открытыми;
+accepted milestones не повторять.
 
 ### E/J25: owned technical-details expansion432 принят — 2026-10-01
 
