@@ -1,3 +1,4 @@
+import {javascriptWizardTextClassification} from '../../client/lib/javascript-wizard-error-details.mjs';
 // Operator-only, bounded read-only discovery. Never calls UI handlers/getters,
 // reveals hidden exception text, or authorizes a gesture.
 export function readJavascriptNativeDetailsInventory({held,owner,source_sha256,ok_tid}) {
@@ -41,4 +42,27 @@ export async function captureJavascriptNativeDetailsInventory(page,event) {
 
 export function javascriptImportRefusalSource(source) {
   return source+'\nimport { E_JS_UNKNOWN_EXPORT_'+ 'Z'.repeat(4500)+' } from "builtIn/Data";\n';
+}
+
+
+// Closed operator source: native regex support and diagnostic format are
+// observations, never inferred from the Acorn admission result.
+export function javascriptNaturalRegexRefusalSource(source) {
+  return source+'\nconst diagnosticRegex = /(?<=Error: )x/;\n';
+}
+
+
+export function observeJavascriptNaturalDetailsPolicy(native) {
+  if(native?.kind!=='javascript_wizard')return {status:'no_wizard_refusal_observed',require_details:false,
+    insufficient_primary_verified:false,technical_details_expanded:false};
+  if(typeof native.tooltip!=='string'||typeof native.dialog_text!=='string'
+    ||typeof native.tooltip_truncated!=='boolean'||typeof native.dialog_text_truncated!=='boolean')
+    throw Error('Natural details primary provenance unavailable');
+  const primary=javascriptWizardTextClassification(native.tooltip+'\n'+native.dialog_text);
+  const required=native.tooltip_truncated||native.dialog_text_truncated
+    ||primary.error_class.status!=='recognized'||primary.location.status!=='recognized';
+  const expanded=native.technical_details?.expanded===true;
+  if(required!==expanded)throw Error('Natural details default policy differs from observed primary');
+  return {status:required?'insufficient_primary':'sufficient_primary',require_details:false,
+    insufficient_primary_verified:required,technical_details_expanded:expanded,primary};
 }
