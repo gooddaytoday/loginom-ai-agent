@@ -1,5 +1,51 @@
 # JavaScript: сохранение последней редакции и холодное открытие
 
+## Продолжение E/J23: cold именно long source — 2026-10-01
+
+J26 Code422/Declared423 на3b59423f1a принят2/2; новый результат — сохранность
+длинного source в новом процессе. Прежний public existing fidelity32KiB/1024
+LF-lines прошёл whole digest/8chunks/Execute/full6×4 без Save; C/D public Save/
+cold уже прошли с коротким business source. Эти принятые случаи не повторять.
+
+Выбран closed operator-only writer: новый public Code apply с exact fixed
+`fidelity-bound-code` из существующего `javascript-public-source-cases.mjs`,
+тот же business input/full typed6×4 и два owned explicit Execute. Writer
+использует существующие source policy/admission/managed writer, затем existing
+public chunk collector читает whole source под одним operation/deadline.
+Сохранить новый пакет через прежний owner-bound save checkpoint/dirty-state
+verifier; чужие/ранние C/D пакеты не заменять. Альтернатива редактировать и
+пересохранить старый C package затронула бы baseline будущих tests; новое
+частное выполнение вместо public handler не дало бы требуемого уровня proof.
+
+Код source и oracle остаются только в acceptance operator. Никакого caller
+source override, расширения публичных JS параметров, смены knowledge или
+product registration. Путь writer принимает только техническое назначение;
+fixed source factory проверяется против своего pin в request/input/oracle.
+Source-bound output reread J26 в этой итерации не запускается. Общий writer
+deadline30min; Source read/Save/cleanup не обнуляют его. Unknown effect не
+повторяется, unsettled attempt сохраняется.
+
+После actual writer exit/audit/cleanup/process absence — fresh profile и
+существующий отдельный cold reader с10min budget. Только exact newly saved
+package path и технические paths; без source factory/expected/schema/CSV input
+в cold execution path. Production source admission читает actual full source,
+settings/mappings и повторяет digest/policy checks до fresh owned Execute;
+source/settings/configuration не записываются. Полный6×4 output сравнивается
+независимым host auditor после наблюдения. Reopen в writer browser и ZIP-only
+comparison не заменяют cold execution. Byte download для этого J23 не требуется;
+native bytes/package-file SHA не заявляются без отдельной реальной проверки.
+
+Перед live: адресные fixed-probe/request/policy/chunk/oracle/entrypoint guards,
+relevant operator regression, immutable source freeze + independently authored
+full-source/6×4 oracle + pinned auditor/negative checker. Аудитор связывает
+writer source/chunks/configuration/phase/execution/full user-v1, new Save/clean
+state и cold actual full source/settings/mapping/graph/new document/execution/
+full output, все full-source deliveries с own discard, cleanup обоих процессов.
+Counterfactual source/chunk/Save/dirty/cold identity/schema/value/order/count/
+execution/Close/candidate claims должны быть отклонены. Actual candidate/CLI,
+прочий J/E/F остаток остаются отдельными этапами. Это уточнение реализации
+уже согласованного J23, не новый gate или новое согласование общей цели.
+
 ## Актуальный итог private G7 — 2026-09-29
 
 Новые headed writer/cold/byte-reader тройки для `code` и `declared` дали
