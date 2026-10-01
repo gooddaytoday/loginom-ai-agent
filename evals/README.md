@@ -70,7 +70,9 @@ bun run src/compare.ts <run-a> <run-b>       # сравнить два прог�
 `interrupted`, `harness_error`, `infra_error` исключаются из метрик качества и
 разброса; инфраструктурные и судейские сбои показываются отдельно. Расходы
 непрерванных запусков сохраняются. `pass_rate` считается по оценённым попыткам,
-отказ судьи с `pass=null` его не снижает. Если измеренных попыток нет, показатель
+отказ судьи с `pass=null` его не снижает. Доказанный провал oracle сохраняет
+`pass=false` и входит в знаменатель даже при отказе судьи; `score=null` и
+`judge_status: error` при этом сохраняются. Если измеренных попыток нет, показатель
 равен `null`, а в Markdown выводится «—».
 
 `pass` требует порога баллов и всех обязательных `checklist.required` и
@@ -86,6 +88,12 @@ bun run src/compare.ts <run-a> <run-b>       # сравнить два прог�
 `judge_status`: с `--skip-judge` у **всех** попыток `skipped` (score `null`), независимо от артефакта; oracle тоже пропущен. Без `--skip-judge` попытка без `.lgp` получает score 0 и `judge_status: no_artifact`. `scored` — валидный вердикт; `error` — отказ, таймаут или невалидный вердикт судьи после повтора (или убийство судьи по Ctrl+C). `harness_error` / `infra_error` / `interrupted` и Ctrl+C до старта судьи тоже дают `skipped`.
 
 Артефакты попытки: `<attempt>/judge/` (входы судьи и `verdict.json`), `<attempt>/judge-events-<n>.jsonl`, `<attempt>/judge-stderr-<n>.txt`. После `--judge-only`: `<attempt>/verdict.prev.json` (рядом с `judge/`) и `results/<run>/summary.prev.json`.
+
+`--judge-only` пересчитывает oracle у ранее оценённых `no_artifact` по текущей
+рубрике: при наличии oracle отсутствие артефакта даёт `false`, без oracle — `null`.
+Явный `--tasks` сохраняется в `summary.config.tasks_dir` и используется следующим
+пересудейством без этого флага. Исходный `config.json` и `agent_inputs_hash`
+сохраняют происхождение артефактов.
 
 Известные причины `CLI_PERMISSION_REJECTED` (→ `failed/permission`): агент запросил `question`, зациклился (`doom_loop`) или обратился вне workspace (`external_directory`) — в headless-режиме такие запросы отклоняются автоматически.
 

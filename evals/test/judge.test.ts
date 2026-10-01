@@ -5,7 +5,8 @@ import os from "node:os"
 import { fetchArtifact, parseArtifactSource } from "../src/artifact"
 import { evalsRoot, loadConfig } from "../src/config"
 import { EvalFailure } from "../src/fail"
-import { judgeCommand, judgeInfo, judgeTask, prepareJudgeDir, scoreVerdict, type JudgeSettings, type Verdict } from "../src/judge"
+import { judgeCommand, judgedFields, judgeInfo, judgeTask, prepareJudgeDir, scoreVerdict, type JudgeSettings, type Verdict } from "../src/judge"
+import { aggregate } from "../src/report"
 import { loadTasks } from "../src/task"
 
 const checklist = [
@@ -213,6 +214,50 @@ test("judgeTask: fail → 0; half → округлённая доля", async ()
 test("judgeTask: постоянный отказ → error после двух попыток", async () => {
   expect(await judgeFixture({ FAKE_CODEX_EXIT: "1" })).toMatchObject({ ok: false, attempts: 2 })
   expect(await judgeFixture({ FAKE_CODEX_VERDICT: "invalid" })).toMatchObject({ ok: false, attempts: 2 })
+})
+
+test("judgeTask: доказанный провал oracle учитывается в pass_rate даже при отказе судьи", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-judge-oracle-error-"))
+  const artifact = await fixtureArtifact()
+  try {
+    await cp(path.join(evalsRoot, "tasks", "group-sum-qty"), path.join(dir, "group-sum-qty"), { recursive: true })
+    await Bun.write(path.join(dir, "group-sum-qty", "oracle.csv"), "Item,Qty\nA,15\nB,25\n")
+    const [task] = await loadTasks(dir)
+    const input = {
+      task: task!, artifactDir: path.dirname(artifact.unpackedDir), prompt: "p", outDir: path.join(dir, "judge"),
+      run: { finalText: "готово", tools: [], nodeReceipts: [], nodeReceiptsDropped: 0 },
+    }
+    const result = path.join(input.artifactDir, "results", "fixture-group-sum-qty.result.csv")
+    await Bun.write(result, "Item,Qty\nA,15\nB,25\n")
+    const correct = judgedFields(await judgeTask({ ...input, judge: settings() }))
+    expect(correct).toMatchObject({ pass: true, oracle_pass: true, score: 100 })
+    await Bun.write(result, "Item,Qty\nA,16\nB,25\n")
+    const incorrect = judgedFields(await judgeTask({ ...input, judge: settings({ FAKE_CODEX_EXIT: "1" }) }))
+    expect(incorrect).toMatchObject({ pass: false, oracle_pass: false, score: null, judge_status: "error", judge_attempts: 2 })
+    const attempt = {
+      task_id: task!.id, attempt: 1, status: "completed" as const, exit_code: 0,
+      timed_out: false, interrupted: false, failure_kind: null,
+      duration_ms: 1000, cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0 },
+      counters: { toolCalls: 0, loginomToolCalls: 0, toolErrors: 0, memoryToolCalls: 0 },
+      package_path: artifact.packagePath, artifact_origin: artifact.origin, artifact_ambiguous: [], cleanup_error: null,
+      action_manifest_sha256: null, session_id: null, profile_recovered: false, errors: [], harness_error: null, stderr_head: null,
+    }
+    expect(aggregate([{ ...attempt, ...correct }, { ...attempt, ...incorrect, attempt: 2 }], false)).toMatchObject({
+      pass_rate: 0.5, pass_evaluated_count: 2, mean_score: 100, scored_count: 1, judge_error_count: 1,
+    })
+    await Bun.write(result, "Item,Qty\nA,15\nB,25\n")
+    expect(judgedFields(await judgeTask({ ...input, judge: settings({ FAKE_CODEX_EXIT: "1" }) }))).toMatchObject({
+      pass: null, oracle_pass: true, score: null, judge_status: "error",
+    })
+    const [withoutOracle] = await loadTasks(path.join(evalsRoot, "tasks"), ["group-sum-qty"])
+    expect(judgedFields(await judgeTask({ ...input, task: withoutOracle!, judge: settings({ FAKE_CODEX_EXIT: "1" }) }))).toMatchObject({
+      pass: null, oracle_pass: null, score: null, judge_status: "error",
+    })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+    await rm(path.dirname(artifact.unpackedDir), { recursive: true, force: true })
+  }
 })
 
 test("judgeTask: judge.env проходит в процесс, EVAL_* из process.env — нет", async () => {
