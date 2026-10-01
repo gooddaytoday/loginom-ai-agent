@@ -251,26 +251,29 @@ typecheck и actual compiled CLI setup/status/restart на новом private pr
 direct headed runtime probes не доказывают candidate persistence.
 Pending context design по-прежнему не принят; нового browser profile/process нет.
 
-### Граница возобновления: требуется решение по context — 2026-10-01
+### Граница возобновления: opt-in утверждён — 2026-10-01
 
-Повторная сверка после трёх последовательных goal turns: человеческого выбора
-по explicit opt-in нет; автоматическое продолжение исходной Goal не утверждает
-предложенное изменение публичного контракта. Child HEAD e954/source/schema
-не изменились, main99c1 содержит завершённое независимое J27 comparison.
-Последняя проверка подтвердила terminal FAILED у Code440, PackageClose/logout/
-browserClose, отсутствие profile440 процессов, согласованный registry/lease
-closed_verified и active_exec=null. Это не ожидание работающего процесса.
+Пользователь явно принял `allow_configured_output: true` из context design.
+Default остаётся materialized-only; opt-in допускает только verified configured
+output0 со статусом source_pending, current source и полностью verified input.
+Это не свидетельство выполненного выхода. Предыдущие ожидания решения выше —
+историческое состояние, блокировка снята человеческим утверждением.
 
-Remaining positive J19 Code/declared зависит от решения в конце context design;
-следующие F/candidate/CLI gates этим не выполнены. Независимая предпосылка J27
-comparison завершена; прежние accepted проверки не повторять ради продолжения.
-Blocked audit threshold достигнут: следующая runtime/schema доработка требует
-выбора пользователя, goal нельзя считать complete или paused. Существующий
-async вопрос не дублировать. При возобновлении сначала учесть ответ; если opt-in
-принят, зафиксировать утверждение в design/checkpoint и реализовать описанный
-contract/tests с новым immutable freeze/auditor/pin до fresh headed Code.
-Не переиспользовать Code440 profile/evidence и не запускать old source для обхода
-materialization refusal. Untracked acceleration-review.md не включать в commits.
+Следующие шаги: реализация request/receipt/runtime и fixed operator, actual
+runtime/MCP admission/negative tests, owning regressions. После actualexit0 —
+новый immutable child commit, source freeze/oracle/auditor/pin, fresh ordinary
+headed Code441; positive independent audit/non-noop negatives/full cleanup/process
+absence до отдельного declared. Code440 profile/evidence не переиспользовать,
+old source не выполнять для обхода refusal. В новом run сначала default refusal
+с verified cleanup, затем NEW opt-in, correction из его public input Name,
+точные retries без events, final Execute/full6×4/1950 и default materialized read.
+
+Последнее observed состояние: child e954, Code440 FAILED/actualexit1 с полным
+PackageClose/logout/browserClose/process absence; registry closed_verified,
+active_exec=null. Нового live процесса ещё нет. J27 comparison завершено;
+remaining F/candidate/CLI/natural diagnostics открыты. Untracked
+acceleration-review.md в commits не добавлять. Выполненные разовые указания
+и unchanged accepted проверки не повторять.
 
 ### E/J25: owned technical-details expansion432 принят — 2026-10-01
 

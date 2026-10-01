@@ -210,9 +210,13 @@ e1bdd95f/v4 pin19df9881 закреплены до fresh Code440;
 v4 audit сверяет persisted canonical origin и89 negatives, oracle unchanged.
 Rename/Done отдельно не доказывают полный J19 или actual model resistance.
 
-## Предлагаемое уточнение context после input Name change — 2026-10-01
+## Утверждённое уточнение context после input Name change — 2026-10-01
 
-**Статус: предложение для решения, runtime/schema ещё не изменены.** Code440
+**Статус: пользователь явно принял `allow_configured_output: true` 2026-10-01.**
+Обычный запрос сохраняет строгую materialized-only проверку; opt-in возвращает
+current source, verified input и configured output со статусом `source_pending`,
+без утверждения о подтверждении выхода выполнением. Реализация и приёмка ниже
+ещё требуются. Code440
 подтвердил default refusal, предусмотренный выше: после Input Done output0 имеет
 полный configured target inventory, но materialized sources отсутствуют.
 Не запускать old source для обхода отказа. Technical rename и ACK подтверждены;
@@ -226,7 +230,7 @@ Rename/Done отдельно не доказывают полный J19 или a
 | Сохранить только нынешний refusal | Нового публичного context до correction/Execute нет; technical-name case остаётся ограниченным negative proof |
 | Автоматически выдавать configured output в обычном context | Меняет default semantics всех callers; требует более широкой совместимости и пересмотра существующих contracts |
 
-Рекомендуемый request остаётся `kind:context` с optional boolean
+Утверждённый request остаётся `kind:context` с optional boolean
 `allow_configured_output`, по умолчанию false. Точное значение входит в admission
 и SAME-ID retry identity; conflicting reuse не допускается. Source request и
 остальные node operations не получают этот параметр. Default context продолжает
