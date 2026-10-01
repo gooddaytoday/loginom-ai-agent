@@ -87,12 +87,24 @@ test('technical text is UTF8 bounded and redacted before durable observation and
 for(const [name,change] of [
  ['source',f=>f.lease.sourceEditorCaptured.doc.getLine=()=> 'foreign'],
  ['point',f=>f.button.rect.x++],['controller',f=>f.view.Controller={}],
+ ['items',f=>f.controller.FItems={...f.controller.FItems}],
+ ['items panel',f=>f.controller.FItems.pnlDetail={}],
+ ['exception',f=>f.controller.FDetailedException={}],
+ ['handler',f=>f.nativeButton.toggleHandler=f.DetailPanel.prototype.btnDetaisHandler=()=>{}],
  ['foreign modal',f=>f.dialogs.push(f.element('foreign','msgbox-2'))],
 ])test('fresh pre-gesture inspection after details prepared ACK refuses '+name,async()=>{
  const f=await managedJavascriptErrorDetailsFixture();
  await assert.rejects(captureManagedJavascriptWizardError({...f.options,require_details:true,record:async event=>{
   if(event.phase==='javascript_managed_error_details_prepared')change(f);return f.options.record(event);
  }}),/changed|unconfirmed/);assert.deepEqual(f.calls,[]);assert.equal(f.lease.errorDetailsAttempted,undefined);
+});
+
+for(const field of ['FItems','FDetailedException'])test('fresh expanded inspection after observed ACK refuses '+field+' replacement without OK',async()=>{
+ const f=await managedJavascriptErrorDetailsFixture();
+ await assert.rejects(captureManagedJavascriptWizardError({...f.options,require_details:true,record:async event=>{
+  if(event.phase==='javascript_managed_error_details_observed')f.controller[field]=field==='FItems'?{...f.controller.FItems}:{};
+  return f.options.record(event);
+ }}),/captured identities changed/);assert.deepEqual(f.calls,['details']);assert.equal(f.lease.errorOkAttempted,undefined);
 });
 
 for(const mode of ['text','dialog'])test('fresh OK inspection after prepared ACK refuses '+mode+' drift without OK',async()=>{

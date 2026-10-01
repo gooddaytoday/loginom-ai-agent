@@ -8,6 +8,8 @@ test('serialized helper captures exact native controller/toggle/owner chains wit
   assert.equal(first.point.tid,'DetailPanel;btnDetais');assert.equal(first.native_owner_verified,true);
   assert.equal(first.expanded,false);assert.equal(binding.controller,f.controller);
   assert.equal(binding.button_native,f.nativeButton);assert.equal(binding.text_native,f.nativeText);
+  assert.equal(binding.items,f.controller.FItems);assert.equal(binding.exception,f.controller.FDetailedException);
+  assert.equal(binding.handler,f.DetailPanel.prototype.btnDetaisHandler);
   assert.deepEqual(await f.readDetails(),first);assert.equal(f.held.errorDetailsBinding,binding);
   assert.deepEqual(f.calls,[]);assert.equal(f.nativeButton.pressed,false);assert.equal(f.text.innerText,'');
 });
@@ -17,6 +19,14 @@ for(const [name,change] of [
   ['controller root',f=>f.controller.FView={el:{dom:f.root}}],
   ['view Controller',f=>f.view.Controller={}],
   ['controller prototype',f=>Object.setPrototypeOf(f.controller,{})],
+  ['missing items',f=>delete f.controller.FItems],
+  ['items accessor',f=>Object.defineProperty(f.controller,'FItems',{get(){throw Error('Getter invoked');}})],
+  ['foreign items button',f=>f.controller.FItems.btnDetais={}],
+  ['foreign items panel',f=>f.controller.FItems.pnlDetail={}],
+  ['foreign items text',f=>f.controller.FItems.cmpDetailText={}],
+  ['items text accessor',f=>Object.defineProperty(f.controller.FItems,'cmpDetailText',{get(){throw Error('Getter invoked');}})],
+  ['missing exception',f=>delete f.controller.FDetailedException],
+  ['exception accessor',f=>Object.defineProperty(f.controller,'FDetailedException',{get(){throw Error('Getter invoked');}})],
   ['button scope',f=>f.nativeButton.scope={}],
   ['toggle handler',f=>f.nativeButton.toggleHandler=()=>{}],
   ['enableToggle',f=>f.nativeButton.enableToggle=false],
@@ -39,11 +49,18 @@ for(const [name,change] of [
   assert.deepEqual(f.calls,[]);assert.equal(f.held.errorDetailsBinding,undefined);
 });
 
-for(const name of ['instance','panel','text'])test('captured details refuses remounted '+name+' without recapture',async()=>{
+for(const name of ['instance','panel','text','items','exception','handler','constructor'])test('captured details refuses remounted '+name+' without recapture',async()=>{
   const f=await managedJavascriptErrorDetailsFixture();await f.readDetails();const captured=f.held.errorDetailsBinding;
   if(name==='instance')f.context.bg.ext.errormessage.ErrorMsg.FInstance={...f.instance};
-  if(name==='panel')f.controls[f.panel.id]={...f.nativePanel};
-  if(name==='text')f.controls[f.text.id]={...f.nativeText};
+  if(name==='panel')f.controller.FItems.pnlDetail=f.controls[f.panel.id]={...f.nativePanel};
+  if(name==='text')f.controller.FItems.cmpDetailText=f.controls[f.text.id]={...f.nativeText};
+  if(name==='items')f.controller.FItems={...f.controller.FItems};
+  if(name==='exception')f.controller.FDetailedException={};
+  if(name==='handler')f.nativeButton.toggleHandler=f.DetailPanel.prototype.btnDetaisHandler=()=>{};
+  if(name==='constructor'){
+    function Replacement() {}
+    Replacement.prototype=f.DetailPanel.prototype;f.context.bg.ext.errormessage.DetailPanel=Replacement;
+  }
   await assert.rejects(f.readDetails(),/captured identities changed/);
   assert.equal(f.held.errorDetailsBinding,captured);assert.deepEqual(f.calls,[]);
 });
