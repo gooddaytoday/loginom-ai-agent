@@ -307,6 +307,39 @@ auditor pin. Если native поддержан или primary sufficient, insuf
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
 
+### E/J14: общий Done/Close source подтверждён — 2026-10-01
+
+На child30b после committed design a87f в основном checkout добавлены source
+изменения: lifecycle-v5 допускает new/existing Done и existing-only Close с
+read.ports=[]/no coverage; new/combined Close pure-refused. JS configuration-only
+node.apply не materializes и не проходит output mapping. Execute phase order
+unchanged. Done повторно полностью читает source/settings и сверяет graph без
+второго Done/Execute; code/declared result schema сохраняет internal=null и
+output=not_refreshed. Close sole-discard подтверждает native flags, затем full
+retained source/settings/unchanged graph и ACK; неизвестное не подменено успехом.
+Product registry пока не включён.
+
+Original apply_patch отказал атомарно на неверном anchor (файлы не менялись).
+Первая попытка test-edit Python получила неверный cwd; source edit не произошёл,
+последующий original addressed01 actualexit1 выявил3 устаревших execute-only
+expectations. Оригинал сохранён. После corrected edits actual addressed02 exit0:
+**148PASS**, actual generic apply/validator/readback JSON/user-v1/source-adapter.
+Это source-only; реальные Done/Close ветви общего handler пока не live-проверены.
+
+Original full client exec36593 actualexit0: **3425PASS+10SKIP**, full operator
+exec32411 actualexit0: **18508PASS**, concurrency4. Три mapped transformations
+обновлены с сохранением original baseHash/reasons; verify_sources actualexit0 /
+**5045 files**. Реализация и tests committed child **f06680e0d8**; TypeScript
+readback declaration уже допускает code/declared и explicit=false/internal=null,
+публичный Protocol/HttpApi не менялся. Private source receipt
+`e-general-config-source-receipt-01.json` закрепляет original logs/exit/counts;
+SHA256 d2ab6fc1b724dcc847b376a959b9b09c35de9c480e832a1ed707165a7ad12f5f.
+
+Далее fixed code/declared Done→Close→NEW Execute live operator с независимыми
+source/settings/graph, same-ID zero-event retry, pre-live oracle/auditor/freeze.
+Свежий profile444 ещё не назначен; браузерных операций нет. Product registration,
+review/candidate/CLI acceptance открыты; source-only PASS их не заменяет.
+
 ### E/J14: найден общий Done/Close gap — 2026-10-01
 
 Предыдущая итерация — progress: J27 owning44/typecheck и source provenance5045/
