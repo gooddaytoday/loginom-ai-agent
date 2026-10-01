@@ -307,7 +307,7 @@ auditor pin. Если native поддержан или primary sufficient, insuf
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
 
-### E/J14: bounded pre-body redraw source pending / suites running — 2026-10-01
+### E/J14: bounded pre-body redraw source принят, fresh447 pinned — 2026-10-01
 
 На child604 текущие незакоммиченные изменения ограничены owned-selection,
 managed-selection и actual serialized operator tests. Only managed first body
@@ -318,18 +318,24 @@ selection и full snapshot/point compare; default inspection refused. Добав
 Initial addressed01 fail1 был некорректным expiry test (менял host object после
 serialization); исправлен реальным истечением original deadline после ACK.
 
-Full client originalexec96946 и operator42983 RUNNING на одном pending source,
-concurrency4; до terminal source/tests не менять и browser не запускать.
-Три changed files local/unmapped, source attribution не изменяется. Private
-v2 oracle unchanged7042b040, auditor/36 negatives/handoff prepared и Python syntax
-PASS; freeze/pin ещё отсутствуют, не выданы за live acceptance. После terminal —
-source commit/verifier, новый freeze/pin, fresh447 Code, затем declared.
+Original full client96946 actualexit0/**3425PASS+10SKIP**, operator42983
+actualexit0/**18580PASS**, concurrency4. Три changed files local/unmapped,
+source attribution unchanged; verify_sources actualexit0/**5045files**.
+Child source committed **73a8e9df312a00e4449a20e752f7788cf20522ee**.
+Private v2 oracle unchanged7042b040, auditor/36 negatives/handoff Python syntax
+PASS. Новый freeze **bba970950ea2d233dab59776f9cb8d61c9aad59f683491da1b9ba937132a76ff**
+(12751files/61symlinks), pin
+**d3c0087813e2bfe5a1d1fdf46a4c25045ae45167ca9d88ede8f69d081367ede6**
+закреплены до live. Registry/lease под lock назначили fresh447 для
+`e-general-config-code-02`; actual positive/negative audit ещё pending.
+Следующее — original447 terminal/audit/cleanup/reconcile, затем fresh declared.
+Во время live child source/evidence не менять; failed444 не переигрывать.
 
 Уточнение original444: прежний dispatch не писал body_returned вообще, поэтому
 само отсутствие такой записи не доказывает no click. Pre-gesture место отказа
 установлено по actual stack/source (`inspect` до mouse.click); original outcome
 AMBIGUOUS остаётся неизменным. Separate verified recovery446 освобождает resources,
-но не превращает failed live в PASS. Registry446 closed_verified/active_exec=null.
+но не превращает failed live в PASS. Registry446 был closed_verified/active_exec=null до назначения447.
 
 ### E/J14: Code444 отказ и отдельная verified recovery — 2026-10-01
 
