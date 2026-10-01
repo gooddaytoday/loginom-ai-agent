@@ -63,6 +63,16 @@ input/output digests, полнота завершённых вызовов, от
 
 ## Проверки и воспроизводимость
 
+`javascript_cli_candidate.py` отдельно сверяет Linux x64 bundle с внешними
+immutable pins: исходный commit/tree, manifest, Node/browser и модуль JS knowledge.
+Проверка читает полный inventory, права и symlinks по контракту `cli-manifest.ts`,
+а вложенный resource manifest связывает с фактическими файлами и ограничивает
+ссылки своим resource root по `resources.mjs`. `sourceDirty` сохраняется как
+факт manifest; clean tree не вводится как дополнительное условие. Файловые
+fixtures проверяют также согласованные изменения inventory/resource manifests,
+чтобы отказ не ограничивался внешним hash manifest. Этот модуль не исполняет
+бинарники и не доказывает доставку knowledge или использование candidate моделью.
+
 Unit/regression tests проверяют настоящие Python функции и отказ при изменениях
 owner/deadline/sequence/source/settings/mapping/value/type/NULL/row/schema/freshness.
 Санитизированные минимальные fixtures не содержат secrets, полных логов,

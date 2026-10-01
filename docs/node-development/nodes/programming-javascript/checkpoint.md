@@ -3,13 +3,16 @@
 ## Текущее состояние
 
 Актуальная граница на 2026-10-02: source product registration завершён;
-дополнительно реализованы два независимых native-аудитора фазы 4. Child
-**7855b9bf11cb0f091b65d105b18d945339ee6677** tracked clean; registration на161353
+реализованы два независимых native-аудитора фазы 4 и частичные проверки
+standalone CLI transport/bundle. Child
+**8d3eb30f1a4fded7fddb9f0070bef495848adfd9** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 адресных test methods PASS, в том числе48 non-noop native mutations.
 Итоговый `javascript_node_acceptance.py` ещё TO_IMPLEMENT: подготовить связку
 с фактическими standalone CLI model/input/candidate/Save/cold/cleanup evidence
 до ready_for_acceptance. [Дизайн и границы](cli-auditor-design.md).
+Новые CLI evidence/candidate модули прошли23 теста на физических SQLite/filesystem
+fixtures, actualexit0; никаких compiled CLI/browser runs в этой итерации нет.
 JS general lifecycle-v5/driver/knowledge в product registry только7.4.2/nonempty
 origin, actual bridge redactor. Addressed65, full client3442PASS+10SKIP,
 operator18583PASS, provenance5045 actualexit0. Existing Done/Close447/448 и
@@ -35,6 +38,57 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: standalone CLI transport/bundle — 2026-10-02
+
+Child **8d3eb30f1a4fded7fddb9f0070bef495848adfd9** добавляет
+`javascript_cli_evidence.py`, `javascript_cli_candidate.py` и два адресных
+test modules. Первый читает только собственную settled fresh root session из
+SQLite `mode=ro`/`query_only`, восстанавливает фактические v1 identities,
+проверяет OAuth configuration, модели OpenAI Sol/low и исходные30 минут.
+File snapshots сравниваются по точным UTF-8 bytes/hash/name/count. Терминальные
+tool parts CLI сопоставляются с SQLite по IDs/callIDs/input/output/time digests;
+идентичный повтор доставки допустим, изменённый refused. Публичные provider/cancel
+errors, скрытые event types, truncation, неполная tool coverage refused.
+Реальный tool error сохраняется для последующего native recovery audit:
+это transport evidence, а не успешное исполнение узла. Reasoning/auth/prompt/file/
+tool bodies и дополнительные поля time не экспортируются.
+
+Bundle auditor сверяет внешний manifest/source/tree/version/node/browser/JS
+knowledge pins с полным физическим inventory, mode/link и resource manifest.
+Contained directory/file symlinks поддержаны по product contract; ссылки за
+resource root, даже остающиеся внутри CLI bundle, refused. Coherent repinned
+manifest с неверными metadata/resource records не обходит содержательные проверки.
+`sourceDirty=true` допустим как записанный факт, clean-only gate не добавлен.
+Fixtures — неисполняемые тестовые bytes: ни запуск candidate, ни фактическая
+доставка knowledge этим не подтверждены.
+
+Из child `packages/loginom-runtime` выполнены отдельные команды:
+
+```sh
+python3 -m unittest discover -s tools/loginom-acceptance -p test_javascript_cli_candidate.py -v
+python3 -m unittest discover -s tools/loginom-acceptance -p test_javascript_cli_evidence.py -v
+```
+
+| Проверка | Результат / SHA256 приватного log |
+| --- | --- |
+| Candidate addressed01, original88e97b | 10PASS, actualexit0; `ab4f7f35e9bcf98292d8ac7a575ea9ba1fd61765a2b33bce2d2342ea7646a751` |
+| CLI evidence addressed04, originalbb1020 | 13PASS, actualexit0; `f118679c6a67faefaf578243a208fcdbacc448037873e543fa93abb6a8742d20` |
+
+Private `f-javascript-cli-evidence-validation-v1.json` закрепляет source commit,
+четыре source hashes, exact argv/cwd/original exits/logs. SHA256
+`af661a6ebc2288f859846f08b0f35c82eeab405a53a1fd992ddff0d575d9383a`.
+Предыдущие CLI evidence addressed01–03 logs сохранены. Source-only Python,
+unmapped modules; TS/Protocol/HttpApi/mapped runtime не менялись.
+
+Оба partial modules явно возвращают `cli_acceptance_verified=false`.
+OAuth файл не доказывает actual transport/no API override; module bytes не
+доказывают J01 knowledge delivery; user prompt hashes ещё предстоит связать с
+operator admission. Следующий шаг — итоговый аудитор: actual public prepare/
+input_artifacts/delivery/import/native source+output/graph/Save/cold/cleanup,
+authored-code и candidate-use binding. До этого ready_for_acceptance не выставлять.
+F same-task Astra/medium pending; browser/CLI candidate не запускались,
+fresh451 не назначен, lease450 закрыт ранее. `acceleration-review.md` не добавлен.
 
 ### Фаза 4: configuration/output auditors — 2026-10-02
 

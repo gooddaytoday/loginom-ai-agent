@@ -906,6 +906,11 @@ handler и автономная CLI-приёмка остаются открыт
 40 адресных test methods и повторный audit Code449/declared450 прошли.
 [Дизайн](cli-auditor-design.md), exact invocation/hashes/границы — в
 [checkpoint](checkpoint.md#фаза-4-configurationoutput-auditors--2026-10-02).
+Дополнительно child **8d3eb30f1a4f** реализует partial CLI evidence/bundle
+проверки:23 адресных SQLite/filesystem tests PASS, без live/candidate запуска.
+[Границы](checkpoint.md#фаза-4-standalone-cli-transportbundle--2026-10-02):
+transport и целостность файлов не заменяют native/Save/cold/cleanup и
+авторство модели; итогового acceptance PASS эти модули не выставляют.
 `javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
 он должен связать native проверки с фактическими standalone CLI evidence
 model/input/candidate/Save/cold/cleanup до ready_for_acceptance.
