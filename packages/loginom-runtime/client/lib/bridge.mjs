@@ -1,4 +1,5 @@
 import {nodeResultReply} from './node-result-reply.mjs';
+import {boundedUserToolReply} from './user-response-budget.mjs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -197,7 +198,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         : 'Call dock_prepare before Loginom work to load the verified full skill into the current context. Dock provides shared knowledge and a local browser. Source files and live DOM take precedence over recalled context. All clipboard copy/paste must use dock_clipboard_transfer so other Dock sessions cannot overwrite it during the operation. The installed native adapter activates shared session archiving after successful preparation. Check dock_diagnostics for actual archive activation and delivery state.',
     });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: structuredClone(catalog.tools) }));
-    server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+    const callTool = async (request, extra) => {
       if (shutdownStarted) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
       const owner = catalog.routes.get(request.params.name);
       if (!owner) throw new McpError(ErrorCode.InvalidParams, 'Unknown Dock tool');
@@ -289,8 +290,9 @@ export async function createBridge(config, session, { browserTransport: managedB
               knowledge: bundle ?? { reused: true, skillRevision: prepared.detail.revision },
               ...(first ? { instructions: userWorkflowInstructions } : {}) };
             await logResult('dock_prepare', result);
-            if (ready) userBundleDelivered = true;
-            return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+            const reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(result)}]},{tool:'dock_prepare'});
+            if (ready && reply.isError !== true) userBundleDelivered = true;
+            return reply;
           }
           return { content: [{ type: 'text', text: JSON.stringify({
             prepared: !actionRuntime || session.metadata.workspaceReady === true, sessionId: session.metadata.sessionId,
@@ -437,6 +439,11 @@ export async function createBridge(config, session, { browserTransport: managedB
         }
         return { isError: true, content: [{ type: 'text', text: message }] };
       }
+    };
+    server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+      const reply=await callTool(request,extra);
+      return userProfile && ['local','action'].includes(catalog.routes.get(request.params.name))
+        ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
     });
     return { server, catalog, hasActiveWork: () => !clipboardUncertain && !!actionRuntime?.hasActiveWork(),
       hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0, close() {
