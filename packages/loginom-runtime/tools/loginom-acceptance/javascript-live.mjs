@@ -80,7 +80,7 @@ import {javascriptPublicTypedIds,javascriptPublicCodeProbe,runJavascriptPublicCo
 import {runJavascriptPublicExistingLive} from './javascript-public-existing-live.mjs';
 import {captureJavascriptNativeDetailsInventory} from './javascript-native-details-discovery.mjs';
 
-export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null,publicSourceCaseId=null,publicSchemaRefusalCaseId=null,publicWizardRefusalCaseId=null,publicStopCaseId=null,publicCancelResumeCaseId=null,publicLostReplyCaseId=null,publicRequiredCaseId=null,publicContextCaseId=null,uiProfileMode=null,publicPolicyMode=null,publicFidelitySave=false}={}) {
+export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null,publicSourceCaseId=null,publicSchemaRefusalCaseId=null,publicWizardRefusalCaseId=null,publicStopCaseId=null,publicCancelResumeCaseId=null,publicLostReplyCaseId=null,publicRequiredCaseId=null,publicContextCaseId=null,uiProfileMode=null,publicPolicyMode=null,publicFidelitySave=false,publicConfigurationCaseId=null}={}) {
 if(typeof publicFidelitySave!=='boolean'||publicFidelitySave&&(coldReader||packageFile||batchCases!==null
   ||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null||existingLifecycle!==null||existingInputVariant!==null
   ||publicProbeId!==null||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null||publicWizardRefusalCaseId!==null
@@ -88,6 +88,13 @@ if(typeof publicFidelitySave!=='boolean'||publicFidelitySave&&(coldReader||packa
   ||publicContextCaseId!==null||uiProfileMode!==null||publicPolicyMode!==null))
   throw Error('Public fidelity Save requires its separate fixed new Code entrypoint');
 process.umask(0o077);
+if(publicConfigurationCaseId!==null&&(publicConfigurationCaseId!=='configuration-'+existingLifecycle
+  ||!coldReader||!['code','declared'].includes(existingLifecycle)||packageFile||batchCases!==null
+  ||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null||existingInputVariant!==null
+  ||publicProbeId!==null||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null||publicWizardRefusalCaseId!==null
+  ||publicStopCaseId!==null||publicCancelResumeCaseId!==null||publicLostReplyCaseId!==null||publicRequiredCaseId!==null
+  ||publicContextCaseId!==null||uiProfileMode!==null||publicPolicyMode!==null||publicFidelitySave))
+  throw Error('Public configuration requires its separate fixed saved mode/base entrypoint');
 if(publicPolicyMode!==null&&(!['code','declared'].includes(publicPolicyMode)||coldReader||packageFile||batchCases!==null
   ||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null||existingLifecycle!==null||existingInputVariant!==null
   ||publicProbeId!==null||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null||publicWizardRefusalCaseId!==null
@@ -1959,7 +1966,7 @@ try {
         onPending:value=>{managedCloseUncertain=value;},schemaMode:existingLifecycle,
         graph:existingInputVariant===null?graph:await executionRuntime.graph(),
         inputVariant:existingInputVariant??'base',sourceCaseId:publicSourceCaseId,schemaRefusalCaseId:publicSchemaRefusalCaseId,
-        wizardRefusalCaseId:publicWizardRefusalCaseId,stopCaseId:publicStopCaseId,cancelResumeCaseId:publicCancelResumeCaseId,lostReplyCaseId:publicLostReplyCaseId,readGraph:()=>executionRuntime.graph()});
+        wizardRefusalCaseId:publicWizardRefusalCaseId,stopCaseId:publicStopCaseId,cancelResumeCaseId:publicCancelResumeCaseId,lostReplyCaseId:publicLostReplyCaseId,configurationCaseId:publicConfigurationCaseId,readGraph:()=>executionRuntime.graph()});
       if(existingInputVariant!==null){report.explicit_execution_limit=publicContextCaseId===null?3:5;
         report.scope=publicContextCaseId===null?'isolated E existing input freshness: one import and two JavaScript Execute; fixed '+existingInputVariant
           :'isolated E current JavaScript context: one reordered import and four warmup/edit JavaScript Execute; full typed business and read-only current mappings';}
