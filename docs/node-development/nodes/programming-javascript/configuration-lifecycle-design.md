@@ -76,6 +76,27 @@ process absence и независимые corrupted-copy negative auditor tests 
 не расширять исчерпанную regex/import матрицу. После двух accepted modes —
 пересмотреть remaining E requirements, затем F по полному плану.
 
+## Следующий обязательный срез: new standalone Done — 2026-10-01
+
+Fresh saved Code447/declared448 проверили existing lifecycle. Ранее new C/D
+проверили intermediate Done внутри Execute; они не заменяют отдельный public
+finish=done на новом узле. Использовать общий handler без продуктовых изменений:
+фиксированный оператор создаёт new JS с одним verified input0 и business source,
+finish=done/read.ports=[] в code/declared. Проверить terminal configuration=applied,
+execution=not_requested/output=not_refreshed, explicit_execute=false/internal=null,
+full independent source/settings и новый node/input link в owned graph. Exact-ID
+retry должен вернуть прежний job без новых runtime events. Затем NEW existing
+Execute с parameters={schema_mode}, inputs=[]/mappings=[]: исходник и declared
+settings сохраняются, два distinct completed executions и full6×4/1950 совпадают
+с независимым oracle. No Save; каждый fresh profile ordinary headed, cleanup
+package/logout/browser/process absence. Source tests + fixed operator composition,
+immutable source/freeze/oracle/auditor/negative checks закрепить до первого live.
+
+Не создавать второй writer или публичный флаг для этого сценария. Добавить
+закрытый operator-only entrypoint по аналогии с existing configuration case;
+он принимает лишь mode и назначенные приватные paths. Штатный new Execute
+сохраняет прежнее поведение. Natural Done refusal этим не доказывается.
+
 ## Подтверждённая pre-body перерисовка — 2026-10-01
 
 Original headed444 на6043749a3f: Done/source/user-v1/zero-event retry OBSERVED;

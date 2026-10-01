@@ -307,6 +307,29 @@ auditor pin. Если native поддержан или primary sufficient, insuf
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
 
+### E: адресная сверка исходных требований / new Done — 2026-10-01
+
+J02 больше не pending: actual C writer323/ed56268a6d и D writer334/418abc95c0
+independent receipts подтверждают full6×5/all30cells, names/types/order/Customer
+spaces до JS. Повторная read-only проверка 2026-10-01 сравнила каждую ячейку с
+sales.csv и report/journal hashes с прежними PASS receipts. Code receipt
+f0ba219f285e1e300847f9875b0faad128cfcc4a4afa8ed6ca896772c26e2241;
+declared receipt9ee50c10d9143bc5bdfbf30035e777c6f00f6e5e4db72adaccca4f053cdbaab2.
+Это typed UI evidence, не native input bytes и не candidate/CLI.
+
+Original ad92ddbf8c J25 требует preflight/native parse/sync throw и наблюдённые
+class/text/position либо явное отсутствие, digest/owner. Последующие natural
+insufficient-primary/Done probes расширяют фактическую coverage; их отсутствие
+нельзя выдать за PASS или молча превратить в новый hard gate. Подтверждённые
+parse/throw/owned details и source conditional guards сохраняются; естественные
+редкие случаи по-прежнему not_observed, финальная оценка границ — F review.
+
+Следующий обязательный kernel path — отдельный public new Done обоих modes:
+source tests и intermediate new C/D Done есть, fresh standalone new Done нет.
+Композиция фиксированного оператора и pre-live checks описаны в configuration
+lifecycle design. Source остаётся73a8; браузер не назначен, lease448 closed_verified.
+После new Done/preserve Execute/full output/cleanup — F readiness/review по плану.
+
 ### E/J14: общий Done/Close Code+declared принят2/2 — 2026-10-01
 
 General lifecycle-v5 source **f06680e0d8**, operator6043749a3f и bounded redraw /
