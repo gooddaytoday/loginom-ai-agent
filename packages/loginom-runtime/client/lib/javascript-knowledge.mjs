@@ -56,10 +56,36 @@ const knowledge=Object.freeze({
   ]),
 });
 
-export const JAVASCRIPT_KNOWLEDGE_SHA256=createHash('sha256').update(JSON.stringify(knowledge)).digest('hex');
-export const JAVASCRIPT_CARD_LIMITATIONS=knowledge.limitations;
+// Preserve the exact 1.0 asset and its two already accepted example identities.
+// New guidance changes the default asset/cache identity without rewriting history.
+const current=Object.freeze({...knowledge,version:'1.1.0',
+  limitations:Object.freeze([...knowledge.limitations,
+    'Для нового кода предпочитать ASCII Name; пользовательскую Unicode-метку задавать в DisplayName. После Execute брать фактические имена из schema/readback, не угадывать нормализацию.']),
+  column_names:Object.freeze({
+    method:'AssignColumns',
+    evidence:'docs/node-development/nodes/programming-javascript/public-column-names-design.md',
+    scope:'Five fixed headed public Code cases on Loginom7.4.2/Linux; observed code API, native mapping and physical schema.',
+    name:'Техническое имя для доступа к столбцу; может отличаться от запрошенного Name.',
+    display_name:'Пользовательская метка; в проверенном случае Сумма ё сохранена без изменения.',
+    observed_pairs:Object.freeze([
+      Object.freeze({requested_name:'Value',actual_name:'Value',display_name:'Value'}),
+      Object.freeze({requested_name:'Сумма',actual_name:'Summa',display_name:'Value'}),
+      Object.freeze({requested_name:'Value Total',actual_name:'Value_Total',display_name:'Value'}),
+      Object.freeze({requested_name:'1Value',actual_name:'_1Value',display_name:'Value'}),
+      Object.freeze({requested_name:'Value',actual_name:'Value',display_name:'Сумма ё'}),
+    ]),
+    normalization_algorithm_verified:false,
+    add_column_verified:false,
+    rule:'Это конкретные наблюдения, не общий алгоритм. Не переносить результат на AddColumn, пустые имена или коллизии без проверки.',
+  }),
+});
 
-export function describeJavascriptKnowledge(observedBuild) {
+export const JAVASCRIPT_KNOWLEDGE_SHA256=createHash('sha256').update(JSON.stringify(current)).digest('hex');
+export const JAVASCRIPT_CARD_LIMITATIONS=current.limitations;
+
+export function describeJavascriptKnowledge(observedBuild,version=current.version) {
   if(observedBuild!==knowledge.validated_for.loginom_build)throw Error('JavaScript knowledge is not validated for observed Loginom build');
-  return structuredClone({...knowledge,knowledge_sha256:JAVASCRIPT_KNOWLEDGE_SHA256});
+  const selected=version===knowledge.version?knowledge:version===current.version?current:null;
+  if(!selected)throw Error('Unsupported JavaScript knowledge version');
+  return structuredClone({...selected,knowledge_sha256:createHash('sha256').update(JSON.stringify(selected)).digest('hex')});
 }

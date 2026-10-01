@@ -30,6 +30,8 @@ test('actual factory descriptions retain complete JS knowledge/schema/pins and r
   assert.equal(JSON.stringify(value),before);assert.ok(bytes(value)<=46000);
   const card=JSON.parse(value.content[0].text).node_types.find(node=>node.type==='programming.javascript');
   assert.equal(card.javascript_knowledge.validated_for.loginom_build,'7.4.2');
+  assert.equal(card.javascript_knowledge.version,'1.1.0');
+  assert.equal(card.javascript_knowledge.column_names.observed_pairs.length,5);
   assert.ok(card.parameter_schema.properties.source_text);assert.ok(card.session_manifest.skillRevision);
   assert.equal(card.knowledge_sha256.length,64);
  }
