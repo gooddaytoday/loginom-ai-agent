@@ -113,6 +113,70 @@ Done refusal/technical details, J19 actual model resistance, F review/registrati
 candidate/J01/J21 actual effective limits/J27/two autonomous Sol low CLI attempts.
 Цель не завершена; никаких merge/push/rebase в этом шаге не было.
 
+### E/J24: public column-name cases подготовлены — 2026-10-01
+
+Продолжение после9f75/child8acf; registry415 closed_verified, active exec/evidence
+null, принадлежность lease и отсутствие своих процессов сверены. Выбран
+[public column-name contract](public-column-names-design.md): пять отдельных
+публичных новых Code nodes на exact T96 sources с independently observed names,
+actual native source→target mapping/full physical UI/user-v1/source read.
+Это новая проверка публичного пути, не повтор private T96 и не общий алгоритм.
+Addressed1340/1340 прошли actual exit0/exec81149; full regression/live ещё впереди.
+Knowledge1.0 пока сохранена; новая version/rule — после независимой приёмки.
+
+Full operator18389/18389/exec73794 завершён actual exit0. Child frozen commit
+`34c5a492038d19bc076889f8e067a874e9b8a7f3`,1514 source paths; freeze SHA
+`d1a2569a1ad59e66a3e00aaf148966d404b1836c7c079670311c4bcc4e0dc8c8`.
+Независимый oracle v1 SHA`fa0a06f71d169d9dc4f75df38e134fa6527e33caab64c61a45d6b46d9fc2c885`,
+auditor SHA`355c345caaaf32101be595db07a19bd247487d4a65d73fd31ddb1cb8a844f59f`.
+Control416/exec35561 назначен и запущен ordinary headed через fixed public
+entrypoint; прежний profile415 absent, registry synchronized. Evidence
+`e-public-column-names-control-01`. Результат ещё не принят; наблюдать этот handle,
+не переигрывать gesture/запуск по timeout ожидания. Другие4cases не назначены.
+
+Control416 завершился actual exit1/FAILED при подтверждённом cleanup3/3 и
+отсутствии своих процессов. Его public apply/оба Execute/full output завершены
+SUCCEEDED; новый operator verifier ошибочно требовал source.data_kind, которого
+в native source descriptors нет. Target/physical data_kind наблюдён отдельно.
+Independent source-read до отказа не выполнен; run не принят и не переписан.
+Report SHA`aa8e6ea99779bc3e7b226d9dc87e934b33a65cbacca05cdaa523fa14dea582e5`,
+journal SHA`bf01051276291a9f25dc2102d9c84e218d2ff0b7a5a0e0a3b7b6ffd8650181ef`.
+Registry416 closed_verified, active handles null. Исправленный verifier на exact
+preserved live payload подтвердил code API/native mapping/physical table;
+это offline check, не live acceptance. Fixture теперь соответствует native
+source shape; target kind guard сохранён. Full/новый freeze/control ещё впереди.
+Frozen v1 helpers/oracle/evidence сохраняются; auditor v2 учитывает отсутствие
+source.data_kind. Исходники JS/ожидания имён и runtime handler не менялись.
+
+После исправления addressed1341/1341/exec11238 и full operator18390/18390/
+exec22989 прошли actual exit0. Child immutable
+`eed5760102f4ac32b57ee1363521aa28bb8b1c63`; source freeze v2/1514paths SHA
+`db6ed2819d7fa9f9b650f2ea6bef2b41215a7340990926ce9c9dfc5263acf1a7`.
+Original oracle v1 unchanged. Auditor v2 SHA
+`93e48bc647bf1c48f77d8584b23a78a2ebd9c09e4f3816c3a91185ce87fff06a`.
+Новый control417/exec14929 ordinary headed назначен/запущен в
+`e-public-column-names-control-02`; наблюдать original handle. Результат не принят
+до independent audit/negative50/50, source-read и cleanup. Остальные4cases
+по-прежнему не назначены. Failed416 не повышать до PASS.
+
+Control417/exec14929 завершён actual exit0/OBSERVED, cleanup3/3/process absence.
+Independent audit v3 PASS; negative checker v3 exec73309 actual exit0,50/50
+non-noop mutations refused. Source1376bytes/20LF lines exact, output1×2,
+native input4cells, native source→target/physical/user-v1 and source-read полные.
+Report SHA`35376346d964dee9727371fbd307458938e093283c28bf705855efff080ca13c`,
+journal SHA`cc72c62473d2103f17db5e6af4e4b66775c38b9123d2f84c4a9dcb01add4368b`;
+audit receipt SHA`5c520e47be79a0bd7ae881fbc7b97e0e5200b85ebe122fa61b0fb7b9bd8da1a2`,
+negative receipt SHA`88b73f8334edbe6b302bc0ac9fb5fa08efb8737f186d76ae5f4eb42a644dd8f4`.
+Auditor v2 сначала не сформировал PASS receipt из-за legacy manifest filename,
+затем footer `len(sales)`, оставшегося от прежнего sales audit. V2 сохранён,
+v3 исправляет canonical freeze path и native input_rows receipt metadata;
+source/oracle/evidence unchanged, browser не переигрывался. Original assigned
+auditor v2 SHA проверяется отдельно alongside frozen v3 SHA
+`460b8df0f8f4a2426a0cfae4ac958645e02c21e6df5258fb650fade25a404d0f`.
+Private handoff v3 завершил417 и назначил headed Cyrillic418/exec66795,
+`e-public-column-names-cyrillic-01`, на том же immutable childeed576.
+J24 принят только1/5: следующие4cases и knowledge rule ещё не приняты.
+
 ### E/G1/J22: Code414 принят; Declared415 в работе — 2026-10-01
 
 Code414/exec98974 ordinary headed на immutable8acf: actual exit0/OBSERVED,

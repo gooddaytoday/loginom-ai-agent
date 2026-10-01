@@ -103,7 +103,10 @@ audit/negative57 каждого и cleanup. Для existing connected input0 н�
 выбран bounded identity contract; runtime FullType остаётся null/false, hidden
 menus и engine conformance не заявлены. Final addressed97/full18327 PASS.
 Следующий шаг — J24 technical names/invalid/Cyrillic source→physical,
-далее module/cold long source/Done refusal/J19 model resistance и E/F/candidate/CLI.
+по [public column-name contract](public-column-names-design.md): control417 принят,
+четыре следующих cases и обновление knowledge ещё впереди; private T96 не
+заменяет публичную проверку. Точный текущий handle/status — в checkpoint.
+Далее module/cold long source/Done refusal/J19 model resistance и E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 
