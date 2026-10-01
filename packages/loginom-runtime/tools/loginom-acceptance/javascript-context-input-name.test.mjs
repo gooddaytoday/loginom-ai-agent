@@ -1,5 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {renameJavascriptContextInput,javascriptContextInputName} from './javascript-context-input-name.mjs';
 
 function fixture() {
@@ -34,7 +38,10 @@ function fixture() {
       f.beforeGesture?.();const s=structuredClone(state());assert.ok(options.ready(s),options.condition);options.identity(s);
       const action=options.resolve(s);calls.push(action);
       if(action.verb==='double_click'){editor=true;draft={name:mapping.target_fields[1].name,label:mapping.target_fields[1].label};}
-      if(action.verb==='set_wizard_field')draft[action.ref]=action.text;
+      if(action.verb==='set_wizard_field'){
+        draft[action.ref]=action.text;
+        if(f.autoLabel&&action.ref==='name')draft.label=action.text;
+      }
       if(action.verb==='apply_output_column'){mapping.target_fields[1]={...mapping.target_fields[1],...draft,origin_type:1};editor=false;}
       if(action.verb==='finish_wizard')closed=true;
       const result={status:'SUCCEEDED',cleanup_complete:true,action_key:'ui.act',operation_id:'rename:'+calls.length,
@@ -62,6 +69,47 @@ test('fixed input name helper runs the actual shared field procedure and exact i
   assert.deepEqual(f.events.map(e=>e.phase),['javascript_context_input_name_prepared','javascript_context_input_name_done_prepared',
     'javascript_context_input_name_committed']);
   await assert.rejects(renameJavascriptContextInput(f.options),/one-flight/);assert.equal(f.calls.length,6);
+});
+
+test('input rename uses the real durable journal and reconciles only its canonical origin representation',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'js-input-name-journal-'));
+  try{
+    const f=fixture(),journal=createExecutionJournal({directory,metadata:{sessionId:'rename',clientRevision:'test'}});
+    f.afterRecord=journal;
+    const proof=await renameJavascriptContextInput(f.options);
+    const rows=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(line=>JSON.parse(line));
+    assert.equal(rows.length,3);assert.equal(rows[2].phase,'javascript_context_input_name_committed');
+    assert.equal(rows[2].proof.done.output.origin,'http://logi-test-plan.bg.local/');
+    assert.equal(proof.done.output.origin,'http://logi-test-plan.bg.local');assert.equal(f.lifecycle.closed,true);
+    const durable=structuredClone(rows[2].proof);durable.done.output.origin=proof.done.output.origin;
+    assert.deepEqual(durable,proof);assert.equal(f.calls.length,6);
+  }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('input rename restores the original label when the native Name editor updates it automatically',async()=>{
+  const f=fixture();f.autoLabel=true;
+  const proof=await renameJavascriptContextInput(f.options);
+  assert.deepEqual(f.calls.filter(a=>a?.verb==='set_wizard_field').map(a=>({ref:a.ref,text:a.text})),[
+    {ref:'name',text:'CustomerNow'},{ref:'label',text:'Customer'}]);
+  assert.equal(proof.after.target_fields[1].name,'CustomerNow');assert.equal(proof.after.target_fields[1].label,'Customer');
+  assert.equal(proof.after.target_fields[1].source.name,'Customer');assert.equal(f.lifecycle.closed,true);
+});
+
+for(const [fault,change] of [
+  ['foreign origin',p=>p.done.output.origin='http://foreign/'],
+  ['origin with path',p=>p.done.output.origin='http://logi-test-plan.bg.local/app/'],
+  ['changed field',p=>p.after.target_fields[1].name='Foreign'],
+  ['changed owner',p=>p.done.output.prepared_node_context.node_id='foreign'],
+  ['unknown Done',p=>p.done.status='AMBIGUOUS'],
+])test('real journal input rename still refuses '+fault+' ACK without replay',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'js-input-name-journal-refusal-'));
+  try{
+    const f=fixture(),journal=createExecutionJournal({directory,metadata:{sessionId:'rename',clientRevision:'test'}});
+    f.afterRecord=async event=>{const saved=await journal(event);if(event.phase==='javascript_context_input_name_committed')change(saved.proof);return saved;};
+    await assert.rejects(renameJavascriptContextInput(f.options),/ACK differs/);
+    assert.equal(f.lifecycle.closed,undefined);const count=f.calls.length;
+    await assert.rejects(renameJavascriptContextInput(f.options),/one-flight/);assert.equal(f.calls.length,count);
+  }finally{await rm(directory,{recursive:true,force:true});}
 });
 
 for(const [name,change] of [
