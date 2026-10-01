@@ -132,3 +132,49 @@ test('Code lifecycle has full UI materialization capability but is absent from t
  assert.equal(handler.materialize_output,true);assert.equal(handler.fullUiOutput,true);
  assert.equal(createCandidateNodeSupport(config).nodeApplyHandlers.has('programming.javascript'),false);
 });
+
+
+for(const mode of ['code','declared'])test('general configuration-only Done and existing Close admit preserved scope '+mode,()=>{
+ const parameters={source_text:request.parameters.source_text,schema_mode:mode,
+  ...(mode==='declared'?{columns:[{name:'Amount',label:'Amount',type:'integer',data_kind:'Непрерывный',usage:'Выходное'}]}:{})};
+ const done={...structuredClone(request),parameters,finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false}};
+ assert.equal(validateJavascriptCodeRequest(parameters,'script',done),parameters);
+ const close={...done,target:{kind:'existing',type:'programming.javascript',ref:node},inputs:[],
+  parameters:{source_text:'// draft',expected_source_sha256:'a'.repeat(64),schema_mode:mode},finish:'close'};
+ assert.equal(validateJavascriptCodeRequest(close.parameters,'script',close),close.parameters);
+ for(const mutate of [r=>r.inputs=request.inputs,r=>r.parameters.columns=parameters.columns??[],
+  r=>r.mappings=[{direction:'input',port:0,autosync:true}],r=>r.parameters.source_text='import fs from "fs";',
+  r=>r.target={kind:'new',type:'programming.javascript',position:{x:256,y:256}},r=>r.read.ports=[0]]){
+  const bad=structuredClone(close);mutate(bad);assert.throws(()=>validateJavascriptCodeRequest(bad.parameters,'script',bad));
+ }
+});
+
+for(const mode of ['code','declared'])test('configuration-only readback survives actual result/user-v1 schemas without executed output '+mode,()=>{
+ const p=phases().filter(p=>['source','workflow','target','input_mapping','open','configure','node_finish','finish'].includes(p.phase));
+ const column={index:0,name:'Amount',label:'Amount',type:'integer',data_kind:'Непрерывный',usage:'Выходное',usage_type:0,default_usage_type:4,required:false};
+ const value={mode:'done',schema_mode:mode,source_sha256:'a'.repeat(64),source_utf8_bytes:80,source_lf_lines:3,
+  settings_sha256:'b'.repeat(64),settings_preserved:true,source_readback_verified:true,wizard_commit_verified:true,
+  graph_owner_verified:true,owned_done_settled:true,settings_applied:true,execution_id:null,execution_started:null,
+  explicit_execute_requested:false,...(mode==='declared'?{declared_columns:[column]}:{})};
+ for(const phase of p.filter(p=>['node_finish','finish'].includes(p.phase)))phase.value=structuredClone(value);
+ const readback=javascriptCodeReadback({node,phases:p});assert.equal(readback.execution_effects.explicit_execute_requested,false);
+ assert.equal(Object.hasOwn(readback,'output_mapping'),false);
+ const result={operation_id:'op',status:'SUCCEEDED',node,effect_possible:true,cleanup_complete:true,
+  phases:p.map(({value,...phase})=>phase),execution:{status:'not_requested',execution_id:null},
+  output:{status:'not_refreshed',evidence_ref:null,ports:[]},package_saved:false,warnings:[],
+  configuration:{status:'applied',readback},persisted_package_verified:false,checkpoint_kind:'local_node_checkpoint'};
+ const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema);
+ assert.equal(validate(JSON.parse(JSON.stringify(result))).valid,true,JSON.stringify(validate(result)));
+ assert.deepEqual(compactNodeResult({operation_id:'op',state:'settled',outcome:{status:'SUCCEEDED',output:result}}).configuration,result.configuration);
+ for(const mutate of [v=>v.mode='execute',v=>v.source_sha256='c'.repeat(64),v=>v.source_utf8_bytes++,v=>v.source_lf_lines++,
+  v=>v.settings_sha256='c'.repeat(64),v=>v.execution_id='made-up',v=>v.execution_started=false,
+  v=>v.explicit_execute_requested=true,v=>v.graph_owner_verified=false,v=>v.owned_done_settled=false,
+  v=>v.settings_preserved=false,v=>v.declared_columns=[]]){
+  const bad=structuredClone(p);mutate(bad.find(p=>p.phase==='finish').value);
+  assert.throws(()=>javascriptCodeReadback({node,phases:bad}),/readback incomplete/);
+ }
+ for(const phase of ['materialization_start','materialization_execute','output_mapping','read'])
+  assert.throws(()=>javascriptCodeReadback({node,phases:[...p,{phase,value:{}}]}),/readback incomplete/);
+ const forged=structuredClone(result);forged.configuration.readback.output_mapping={port:0,fields:[]};
+ assert.equal(validate(forged).valid,false);
+});

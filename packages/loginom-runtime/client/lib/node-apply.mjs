@@ -128,7 +128,9 @@ export async function applyNode({request, operation, handlers, drivers, record,
   const {graph,handler}=validateNodeApplyRequest(request,handlers);
   requireValue(operation.id===request.operation_id, 'node.apply operation identity differs');
   const separateOutput=handler.output_wizard==='separate';
-  const materialize=handler.materialize_output===true;
+  const javascriptConfigurationOnly=request.target.type==='programming.javascript'
+    &&handler.materialize_output===true&&request.finish!=='execute';
+  const materialize=handler.materialize_output===true&&!javascriptConfigurationOnly;
   requireValue(!materialize||request.target.type==='programming.javascript'&&separateOutput
     &&request.finish==='execute'&&typeof drivers.materializeOutput==='function',
   'JavaScript materialization requires separate output and explicit Execute');
@@ -356,7 +358,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
       const terminal=await waitForExecution('materialization_execute');
       if(terminal)return terminal;
     }
-    if(!separateOutput||request.finish!=='close')await phase('output_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='output'),ctx));
+    if((!separateOutput||request.finish!=='close')&&!javascriptConfigurationOnly)
+      await phase('output_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='output'),ctx));
     }
     const finish=await phase('finish',ctx=>(readingOnly||separateOutput&&request.finish!=='close')
       ?drivers.finishGraph(request.finish,ctx):drivers.finish(request.finish,ctx),{verify:value=>{

@@ -30,9 +30,12 @@ const verified=(value={})=>({verified:true,cleanup_complete:true,effect_possible
 // candidate delivery are complete. No operator fixture or expected data enters it.
 export function validateJavascriptCodeRequest(parameters,mode,request) {
   validateJavascriptParameters(parameters,mode,request);
-  need(request.finish==='execute'
-    &&request.mappings.length===0,'JavaScript lifecycle requires preserved port mappings and explicit Execute');
+  need(['done','close','execute'].includes(request.finish)
+    &&request.mappings.length===0,'JavaScript lifecycle requires preserved port mappings');
+  need(request.finish==='execute'||request.read?.ports?.length===0&&request.read.coverage===undefined,
+    'JavaScript Done/Close cannot request output reading');
   if(request.target.kind==='new'){
+    need(request.finish!=='close','JavaScript new Close cannot discard committed target/input effects');
     need(['code','declared'].includes(parameters.schema_mode),'JavaScript new schema mode unavailable');
     if(parameters.schema_mode==='declared')validateJavascriptDeclaredPrimitiveColumns(parameters.columns);
     return parameters;
@@ -44,6 +47,27 @@ export function validateJavascriptCodeRequest(parameters,mode,request) {
 
 export function javascriptCodeReadback({node,phases}) {
   const configured=phases.find(phase=>phase.phase==='node_finish')?.value;
+  if(!phases.some(phase=>phase.phase==='execute')){
+    const finish=phases.find(phase=>phase.phase==='finish')?.value;
+    need(configured?.source_readback_verified===true&&configured.wizard_commit_verified===true
+      &&finish?.mode==='done'&&finish.source_readback_verified===true&&finish.wizard_commit_verified===true
+      &&finish.graph_owner_verified===true&&finish.owned_done_settled===true
+      &&finish.settings_applied===true&&finish.execution_id===null&&finish.execution_started===null
+      &&finish.explicit_execute_requested===false&&finish.settings_preserved===true
+      &&finish.source_sha256===configured.source_sha256&&finish.source_utf8_bytes===configured.source_utf8_bytes
+      &&finish.source_lf_lines===configured.source_lf_lines&&same(finish.declared_columns,configured.declared_columns)
+      &&/^[a-f0-9]{64}$/.test(finish.settings_sha256)&&finish.settings_sha256===configured.settings_sha256
+      &&finish.schema_mode===configured.schema_mode&&['code','declared'].includes(finish.schema_mode)
+      &&(finish.schema_mode!=='declared'||Array.isArray(finish.declared_columns)&&finish.declared_columns.length>0)
+      &&!phases.some(phase=>['materialization_start','materialization_execute','output_mapping','read'].includes(phase.phase)),
+    'JavaScript configuration-only readback incomplete');
+    return {kind:'javascript',scope:'observed_after_verified_finish',node,
+      receipt_ids:phases.map(phase=>phase.receipt_id),values_are:'independent_owned_source_readback',schema_mode:finish.schema_mode,
+      ...(finish.schema_mode==='declared'?{columns:finish.declared_columns}:{}),
+      source:{sha256:finish.source_sha256,utf8_bytes:finish.source_utf8_bytes,lf_lines:finish.source_lf_lines},
+      settings_preserved:true,wizard_commit_verified:true,
+      execution_effects:{explicit_execute_requested:false,internal_execution_started:null},package_persistence_verified:false};
+  }
   const mapping=phases.find(phase=>phase.phase==='output_mapping')?.value?.native_mapping;
   const input=phases.find(phase=>phase.phase==='input_mapping')?.value?.native_mapping;
   const first=phases.find(phase=>phase.phase==='materialization_execute')?.value;
@@ -67,7 +91,7 @@ export function javascriptCodeReadback({node,phases}) {
 export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redactor,requireWizardErrorDetails=false}) {
   need(targetBuild==='7.4.2'&&typeof targetOrigin==='string'&&typeof redactor?.text==='function'
     &&typeof redactor?.redact==='function'&&typeof requireWizardErrorDetails==='boolean','JavaScript Code runtime dependencies unavailable');
-  const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-script-lifecycle-v4',modes:['script'],
+  const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-script-lifecycle-v5',modes:['script'],
     parameter_schema:javascriptParametersSchema,output_wizard:'separate',materialize_output:true,fullUiOutput:true,
     validate:validateJavascriptCodeRequest,configure:(ctx,parameters,drivers)=>drivers.configureJavascript(ctx,parameters),
     configurationReadback:javascriptCodeReadback}]]);
@@ -79,7 +103,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       node_id:request.target.kind==='existing'?request.target.ref.node_id:null,operation_id:operation.id,ui_epoch:Date.now()};
     let expected=request.parameters.source_text===undefined?null:javascriptSourceIdentity(request.parameters.source_text);
     let owner,channel,signal,adapter,handle,admission,admitted,configured,committed,
-      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline;
+      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline,doneReceipt;
     const enter=ctx=>{
       signal=ctx.signal;signal?.throwIfAborted();operation.deadline=ctx.deadline;
       if(ctx.node){
@@ -228,7 +252,31 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
         return verified({effect_possible:true,draft_source_sha256:written.source_sha256,wizard_commit_verified:false});
       },
       async finish(mode,ctx){
-        enter(ctx);need(mode==='done'&&handle&&adapter&&admission&&admitted,'JavaScript owned Done unavailable');
+        enter(ctx);need(['done','close'].includes(mode)&&handle&&adapter&&admission&&admitted,'JavaScript owned finish unavailable');
+        if(mode==='close'){
+          need(request.finish==='close'&&existingBaseline&&existingGraphBaseline,
+            'JavaScript Close requires an existing retained baseline');
+          const closed=await adapter.discard(handle,{owner,deadline:ctx.deadline});
+          need(closed.closed===true&&same(closed.owner,owner)&&closed.draft_discarded===true
+            &&closed.settings_applied===false&&closed.execution_started===false
+            &&adapter.active===false&&adapter.uncertain===false,'JavaScript Close discard unconfirmed');
+          handle=null;
+          const retained=policyAdmission('existing',owner,ctx.deadline,admitted.previous_source,existingBaseline.settings_sha256);
+          const receipt=await retained.admit({});
+          const baseline=javascriptExistingLifecycleBaseline({receipt,snapshot:sourceSnapshot,
+            parameters:{schema_mode:existingBaseline.schema_mode},owner});
+          need(same(baseline,existingBaseline)&&receipt.previous_source.source_sha256===admitted.previous_source.source_sha256,
+            'JavaScript Close retained source/settings changed');
+          const after=await graph(ctx);verifyJavascriptMappingGraph(existingGraphBaseline,after,nodeRef(owner));
+          const proof={phase:'javascript_public_close_baseline_retained',operation_id:operation.id,node:nodeRef(owner),
+            previous_source_sha256:admitted.previous_source.source_sha256,retained_source_sha256:receipt.previous_source.source_sha256,
+            settings_sha256:baseline.settings_sha256,source_read_discard_verified:true,
+            graph_before:existingGraphBaseline,graph_after:after,explicit_execute_requested:false};
+          const ack=await onRecord(structuredClone(proof));
+          need(Object.keys(proof).every(key=>same(ack?.[key],proof[key])),'JavaScript Close retained baseline ACK differs');
+          return verified({effect_possible:true,mode,settings_applied:false,draft_discarded:true,
+            execution_id:null,execution_started:false,explicit_execute_requested:false,source_readback_verified:true});
+        }
         const settings=javascriptSourceSettingsDigest(handle.settings);
         const declaredColumns=handle.declaredColumns;
         if(existingBaseline){
@@ -271,19 +319,37 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
             'JavaScript existing commit journal ACK differs');
         }
         handle=null;
-        return verified({effect_possible:true,mode,settings_applied:true,execution_id:null,execution_started:null,
+        doneReceipt=verified({effect_possible:true,mode,settings_applied:true,execution_id:null,execution_started:null,
           schema_mode:existingBaseline?.schema_mode??request.parameters.schema_mode,
           ...(declaredColumns?{declared_columns:declaredColumns}:{}),
           explicit_execute_requested:false,wizard_commit_verified:true,graph_owner_verified:committed.graph_owner_verified,
-          owned_done_settled:committed.owned_done_settled,source_readback_verified:true,settings_preserved:true,
+          owned_done_settled:committed.owned_done_settled,source_readback_verified:true,settings_preserved:true,settings_sha256:settings,
           source_sha256:expected.source_sha256,source_utf8_bytes:expected.source_utf8_bytes,source_lf_lines:expected.source_lf_lines});
+        return doneReceipt;
       },
       async materializeOutput(ctx){
         enter(ctx);return withJavascriptSourcePolicyBoundary({phase:'materialization_start',owner,deadline:ctx.deadline,record:onRecord},
           ()=>admission.withEffect({receipt:configured,owner},()=>launch(ctx)));
       },
       async finishGraph(mode,ctx){
-        enter(ctx);need(mode==='execute'&&outputMapping&&executionReceipt?.status==='completed',
+        enter(ctx);
+        if(mode==='done'){
+          need(request.finish==='done'&&doneReceipt&&committed?.owned_done_settled===true,
+            'JavaScript configuration-only Done receipt unavailable');
+          const before=await graph(ctx);
+          const fresh=policyAdmission('existing',owner,ctx.deadline,expected,configured.settings_sha256);
+          const receipt=await fresh.admit({});
+          need(receipt.intent==='preserve'&&receipt.effective_source.source_sha256===doneReceipt.source_sha256
+            &&receipt.settings_sha256===doneReceipt.settings_sha256,'JavaScript final Done source/settings changed');
+          const after=await graph(ctx);verifyJavascriptMappingGraph(before,after,nodeRef(owner));
+          const proof={phase:'javascript_public_done_source_reconfirmed',operation_id:operation.id,node:nodeRef(owner),
+            source_sha256:receipt.effective_source.source_sha256,settings_sha256:receipt.settings_sha256,
+            graph_before:before,graph_after:after,explicit_execute_requested:false};
+          const ack=await onRecord(structuredClone(proof));
+          need(Object.keys(proof).every(key=>same(ack?.[key],proof[key])),'JavaScript final Done ACK differs');
+          return {...doneReceipt};
+        }
+        need(mode==='execute'&&outputMapping&&executionReceipt?.status==='completed',
           'JavaScript final Execute requires completed materialization and full output mapping');
         return withJavascriptSourcePolicyBoundary({phase:'finish',owner,deadline:ctx.deadline,record:onRecord},async()=>{
           const fresh=policyAdmission('existing',owner,ctx.deadline,expected,configured.settings_sha256),receipt=await fresh.admit({});

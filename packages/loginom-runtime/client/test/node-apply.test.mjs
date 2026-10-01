@@ -526,8 +526,7 @@ test('unowned materialization terminal and reused final identity cannot produce 
 });
 
 test('materialization requires explicit Execute and cannot be enabled for another node type',async()=>{
- const f=javascriptMaterializationFixture();f.p.finish='done';f.p.read.ports=[];
- await assert.rejects(()=>f.run(),/materialization requires/);assert.deepEqual(f.calls,[]);
+ const f=javascriptMaterializationFixture();
  const other=separateFixture();other.handlers.get('imports.text').materialize_output=true;
  other.drivers.materializeOutput=f.drivers.materializeOutput;
  await assert.rejects(()=>other.run(),/materialization requires/);assert.deepEqual(other.calls,[]);
@@ -559,4 +558,26 @@ for(const failure of [null,'owner','operation','mode','settings','digest','close
  if(failure){assert.equal(r.status,'AMBIGUOUS');assert.equal(r.cleanup_complete,false);assert.equal(r.pending_phase,'target');return;}
  assert.equal(r.status,'FAILED');assert.equal(r.cleanup_complete,true);assert.equal(r.pending_phase,null);
  assert.equal(r.effect_possible,true);assert.equal(r.execution.status,'not_requested');assert.deepEqual(f.calls,['source']);
+});
+
+
+for(const mode of ['done','close'])test('actual generic JS lifecycle '+mode+' omits materialization/output mapping and never calls Execute',async()=>{
+ const f=javascriptMaterializationFixture();f.p.finish=mode;f.p.read.ports=[];
+ if(mode==='done')f.drivers.finishGraph=async received=>{
+  assert.equal(received,'done');f.calls.push('graph-done');
+  return {verified:true,cleanup_complete:true,effect_possible:true,mode:received,execution_id:null,execution_started:null,
+   explicit_execute_requested:false,settings_applied:true,wizard_commit_verified:true,graph_owner_verified:true,
+   source_readback_verified:true,owned_done_settled:true};
+ };
+ if(mode==='close')f.drivers.finish=async received=>{
+  assert.equal(received,'close');f.calls.push('node-close');
+  return {verified:true,cleanup_complete:true,effect_possible:true,mode:received,execution_id:null,execution_started:false,
+   settings_applied:false,draft_discarded:true};
+ };
+ const result=await f.run();assert.equal(result.status,'SUCCEEDED');
+ assert.deepEqual(f.calls,['source','target','mapping','open','configure',...(mode==='done'?['node-done','graph-done']:['node-close'])]);
+ assert.equal(result.configuration.status,mode==='done'?'applied':'discarded');
+ assert.deepEqual(result.execution,{status:'not_requested',execution_id:null});assert.equal(result.output.status,'not_refreshed');
+ assert.deepEqual(result.output.ports,[]);
+ assert.ok(result.phases.every(p=>!['materialization_start','materialization_execute','output_mapping','execute','read'].includes(p.phase)));
 });
