@@ -159,6 +159,53 @@ Python syntax PASS. V3 audit сохраняет прежние84 negative checks
 Далее fresh ordinary headed Code438 на этом immutable source/pin, audit/cleanup,
 затем separate declared. Перед запуском registry должен подтвердить отсутствие437;
 observe original exec handle, не менять child source во время run.
+
+Code438/exec48132 завершился actualexit1/CLEANUP_UNCONFIRMED на immutablee2e.
+Warmup оба Execute/full6×4 подтверждены, baseline context и manual output label
+прочитаны. Original full mapping читался под own editor backdrop;
+open_input_port/double_click/Name fill/Label restore/Apply/Done
+переименовали target Customer→CustomerNow, сохранив source/label Customer и прочие
+fields/settings. Input Done receipt SUCCEEDED/cleanup true, graph retained/unlocked.
+Затем committed proof journal ACK refused; NEW old-source context, corrected
+source и следующие Execute не начались. J19 целиком не принят.
+Original report SHAb1fb8238/journal24c70e4b сохраняются неизменными.
+
+Actual redactor воспроизвёл observed durable proof после единственного
+восстановления done.output.origin из verified location.origin producer:
+native `http://logi-test-plan.bg.local` становится в журнале URL с `/`.
+Все прочие proof fields совпали. Old exact ACK refused; existing bounded
+`acknowledgeJavascriptCalibrationRecord` принял только эту representation delta,
+не меняя журнал. Private root-cause receipt SHA f59ed9c1. Использовать этот
+existing reconciler в input helper, после него сохранять exact ACK comparison;
+не нормализовать source/IDs/mapping и не отключать redactor.
+
+Separate ordinary headed recovery439/exec72609 actualexit0 закрыл только exact
+idle own `jsteach:4036`/pinned package без Save; оба refresh absence, foreign rows
+unchanged, admin logout/browserClose/process absence438/439 verified.
+Journal SHAb72c69e3/verificationdda3444b, registry closed_verified/active_exec=null.
+Original failed run не повышается до PASS и unknown ACK не переигрывается.
+Addressed real durable journal integration97317 actualexit0/77PASS подтверждает
+canonical origin, immutable durable bytes и refusal foreign origin/path/field/
+owner/unknown Done ACK без replay. Full operator71715 actualexit0/18499PASS.
+Дополнительная actual native особенность: после Name fill draft Label стал
+CustomerNow; shared field procedure отдельным Label fill восстановила Customer.
+Это не replay Name. Partial verification SHAab7f2876 сверила каждый original
+mapping/editor binding, sole successful gestures, Name/Label field refs и точную
+Name/origin-only metadata delta. Full J19 этим не закрыт.
+Новая regression auto-label restore проходит в addressed02/exec19037 actualexit0/
+78PASS. Final full operator32786 actualexit0/18500PASS (concurrency4);
+client source не менялся, 3365PASS+10SKIP/59505 не повторять.
+Child `e9541c041542b6d2f32c2dabf13f29609f151567` содержит bounded ACK reconciliation
+и actual durable/auto-label regressions; addressed logSHA4d34762e/full operator
+2d10b653. Новый freeze e1bdd95f/12748files+61symlinks/v4 pin19df9881 и Python
+syntax PASS закреплены до fresh Code440. Предыдущие originals/v1–v3 не менялись.
+V4 auditor ожидает actual durable canonical origin и89 non-noop negatives;
+допускает единственный optional Label restore только на observed label field,
+если после Name fill его draft value стал CustomerNow. Иные шаги/replay refused.
+Oracle32bc3cfd и бизнес-срез неизменны. Positive full J19 audit ещё отсутствует.
+После absence439/closed_verified назначить Code440 и наблюдать original exec;
+после terminal actualexit0 выполнить positive audit/negative89 и cleanup/process
+absence до separate declared. Source не менять в течение live run.
 Natural insufficient-primary/Done/actual model/candidate/CLI/Gates остаются открытыми;
 accepted milestones не повторять.
 

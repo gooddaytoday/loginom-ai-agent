@@ -190,3 +190,22 @@ v3 pin6cdea9de закреплены до browser; oracle32bc3cfd неизмен�
 v3 audit требует88 non-noop negatives; source/direct уровень не заменяет live
 J19 acceptance. Следующий ordinary headed Code438 должен пройти этот audit и
 cleanup до отдельного declared run; во время run child source не менять.
+
+Code438 подтвердил owned full mapping read и technical rename/Input Done,
+но завершился до NEW context на committed journal ACK: native location.origin
+в proof отличался от URL formatter durable redactor ровно trailing `/`.
+Reproduction с actual redactor подтвердил эту единственную дельту; failure и
+отдельный verified own cleanup439 сохранены. Для helper ACK использовать
+existing bounded `acknowledgeJavascriptCalibrationRecord`, затем прежнюю exact
+сверку. Он допускает только canonical HTTP(S) origin→origin+`/` в origin key;
+source/owner/IDs/fields/diagnostic text и любые другие дельты refused.
+Actual durable integration77PASS/full operator18499PASS. Code438 также observed
+native auto-label draft: Name fill меняет Label в CustomerNow. Existing shared
+procedure восстанавливает Customer отдельным label-field gesture; final mapping
+по-прежнему отличается только target Name/origin. Optional label restoration
+в v4 audit разрешена только при этом observed draft и original label field ref;
+другие шаги/replay refused. Новая regression/addressed78PASS; final full operator
+actualexit0/18500PASS, client source unchanged. Child `e9541c0415`, source freeze
+e1bdd95f/v4 pin19df9881 закреплены до fresh Code440;
+v4 audit сверяет persisted canonical origin и89 negatives, oracle unchanged.
+Rename/Done отдельно не доказывают полный J19 или actual model resistance.
