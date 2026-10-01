@@ -91,7 +91,7 @@ test('canonical public native cardinality binds nonempty Code and empty declared
 });
 
 for(const mode of ['code','declared'])test('public knowledge v1 executes the exact published '+mode+' example with an independent full oracle',()=>{
- const knowledge=describeJavascriptKnowledge('7.4.2'),example=knowledge.examples.find(e=>e.schema_mode===mode);
+ const knowledge=describeJavascriptKnowledge('7.4.2','1.0.0'),example=knowledge.examples.find(e=>e.schema_mode===mode);
  const probe=javascriptPublicCodeProbe((mode==='declared'?'declared-':'')+'g5-knowledge-v1',mode);
  assert.equal(probe.source,example.source);assert.equal(probe.source_sha256,example.source_sha256);
  assert.equal(probe.knowledge.knowledge_sha256,knowledge.knowledge_sha256);assert.equal(probe.knowledge.example_id,example.id);

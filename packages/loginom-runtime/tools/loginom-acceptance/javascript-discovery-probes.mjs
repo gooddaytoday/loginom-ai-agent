@@ -15,7 +15,7 @@ const column=type=>[{name:'Result',label:'Result',type}];
 const source=(type,expression)=>'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
   +'OutputTable.AssignColumns([{Name:"Result",DataType:DataType.'+type+'}]);\n'+expression+'\n';
 const rows=expressions=>expressions.map(e=>'OutputTable.Append(); OutputTable.Set("Result", '+e+');').join('\n');
-const knowledge=describeJavascriptKnowledge('7.4.2');
+const knowledge=describeJavascriptKnowledge('7.4.2','1.0.0');
 need(knowledge.version==='1.0.0'&&knowledge.examples.length===2,'Fixed knowledge v1 examples changed');
 const knowledgeProbes=knowledge.examples.map(example=>{
   need(['code-table-v1','declared-table-v1'].includes(example.id)
