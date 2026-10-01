@@ -59,7 +59,7 @@ export function javascriptRequiredOutputOracle(schemaMode,table,manualLabel=java
 
 export async function runJavascriptPublicRequiredLive({page,prepared,node,targetOrigin,redactor,record,report,
   save,deadline,onPending,schemaMode,graph,readGraph,contextCase=false,inputVariant='base'}) {
-  need(inputVariant==='base'||contextCase&&inputVariant==='reordered','Fixed required/context input variant unavailable');
+  need(inputVariant==='base'||contextCase&&['reordered','renamed'].includes(inputVariant),'Fixed required/context input variant unavailable');
   need(['code','declared'].includes(schemaMode)&&Date.now()+660000<deadline,'Required fixed mode/original budget unavailable');
   const probe=javascriptDiscoveryProbe('p1-business-'+schemaMode+'-base'),base=createCandidateNodeSupport({targetOrigin,targetBuild:'7.4.2'}),
     support=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor}),mappings=new Map();
@@ -105,7 +105,7 @@ export async function runJavascriptPublicRequiredLive({page,prepared,node,target
     report.public_context={status:'RUNNING',schema_mode:schemaMode,input_variant:inputVariant,node,model_resistance_verified:false};
     report.stage='public-context-before';onPending(true);await save();
     report.public_context.before=await context.readJavascriptPublicContext({runtime,prepared,node,schemaMode,source:before.source_text,
-      manual:false,deadline,record,readGraph,onPending,inputVariant});onPending(false);await save();
+      manual:false,deadline,record,readGraph,onPending,inputVariant:inputVariant==='renamed'?'base':inputVariant});onPending(false);await save();
   }
   const channel=until=>createNodeProcedure({operation:{id:'js-required-manual-'+randomUUID(),action:{action_key:'diagnostic.javascript.required',revision:'1'},deadline:until},
     execute:source=>Function('return ('+source+')')()(page),record,targetOrigin,targetBuild:'7.4.2',maxSteps:4096,
@@ -131,8 +131,28 @@ export async function runJavascriptPublicRequiredLive({page,prepared,node,target
   need(refusal&&!runtime.hasUnsettledWork()&&!mappings.has(refused.operation_id),'Required unsupported edit was not refused before admission');
   await record({phase:'javascript_required_mapping_edit_refused',request:refused,refusal});
   report.public_required.refused={request:refused,refusal};
+  if(contextCase&&inputVariant==='renamed'){
+    const {renameJavascriptContextInput}=await import('./javascript-context-input-name.mjs');
+    report.stage='public-context-input-name';onPending(true);await save();
+    report.public_context.input_name=await renameJavascriptContextInput({reader:channel(deadline),node,targetOrigin,
+      inputPortGuid:report.public_context.before.reply.ports[0].port_guid,deadline,record,lifecycle:{},
+      verifyGraph:async()=>verifyJavascriptMappingGraph(graph,await readGraph(),node)});
+    report.stage='public-context-renamed-old-source';await save();
+    report.public_context.renamed=await context.readJavascriptPublicContext({runtime,prepared,node,schemaMode,source:before.source_text,
+      manual:true,deadline,record,readGraph,onPending,inputVariant});
+    const previous=report.public_context.before,count=runtimeRecords;
+    need(same(await dispatchNodeApi(runtime,'dock_node_read',previous.request),previous.reply)&&count===runtimeRecords,
+      'Historical baseline context retry changed after input rename');
+    need(previous.reply.source.source_sha256===report.public_context.renamed.reply.source.source_sha256
+      &&previous.reply.semantic_sha256!==report.public_context.renamed.reply.semantic_sha256,
+      'Renamed context did not retain old code or current mapping');
+    report.public_context.baseline_retry_after_rename_verified=true;
+    report.public_context.baseline_retry_runtime_events_added=0;onPending(false);await save();
+  }
   report.stage='public-required-source-edit';onPending(true);await save();
-  const source_text=before.source_text+(context?.javascriptContextDataComment??'\n// E/J09: preserve manual output mapping and required source fields.\n'),identity=javascriptSourceIdentity(source_text);
+  const source_text=inputVariant==='renamed'?context.javascriptContextRenamedSource(report.public_context.renamed.reply,node)
+    :before.source_text+(context?.javascriptContextDataComment??'\n// E/J09: preserve manual output mapping and required source fields.\n');
+  const identity=javascriptSourceIdentity(source_text);
   const edited=request({schema_mode:schemaMode,source_text,expected_source_sha256:before.source_sha256}),job=await apply(edited),result=job.outcome.output;
   verifyJavascriptRequiredManualMapping(mappings.get(edited.operation_id),node,{manualLabel});
   const oracle=javascriptRequiredOutputOracle(schemaMode,result.output.ports[0],manualLabel);

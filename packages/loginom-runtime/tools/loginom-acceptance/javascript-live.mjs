@@ -125,7 +125,8 @@ if(publicRequiredCaseId!==null&&(publicRequiredCaseId!=='required-'+existingLife
   ||!['code','declared'].includes(existingLifecycle)||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null
   ||publicWizardRefusalCaseId!==null||publicStopCaseId!==null||publicCancelResumeCaseId!==null||publicLostReplyCaseId!==null))
   throw Error('Public required requires its separate fixed saved mode/base entrypoint');
-if(publicContextCaseId!==null&&(publicContextCaseId!=='context-'+existingLifecycle+(existingInputVariant==='reordered'?'-reordered':'')
+if(publicContextCaseId!==null&&(!['context-'+existingLifecycle+(existingInputVariant==='reordered'?'-reordered':''),
+  ...(existingInputVariant===null?['context-'+existingLifecycle+'-renamed']:[])].includes(publicContextCaseId)
   ||existingInputVariant!==null&&existingInputVariant!=='reordered'
   ||!['code','declared'].includes(existingLifecycle)||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null
   ||publicWizardRefusalCaseId!==null||publicStopCaseId!==null||publicCancelResumeCaseId!==null||publicLostReplyCaseId!==null||publicRequiredCaseId!==null))
@@ -1950,7 +1951,8 @@ try {
         await runJavascriptPublicRequiredLive({page,prepared:executionPrepared,node:executionNode,targetOrigin:address.origin,
           redactor,record:executionRecord,report,save,deadline:batchDeadline,onPending:value=>{managedCloseUncertain=value;},
           schemaMode:existingLifecycle,graph:existingInputVariant===null?graph:await executionRuntime.graph(),
-          readGraph:()=>executionRuntime.graph(),contextCase:publicContextCaseId!==null,inputVariant:existingInputVariant??'base'});
+          readGraph:()=>executionRuntime.graph(),contextCase:publicContextCaseId!==null,
+          inputVariant:publicContextCaseId?.endsWith('-renamed')?'renamed':existingInputVariant??'base'});
       }
       if(publicRequiredCaseId===null&&publicContextCaseId===null)await runJavascriptPublicExistingLive({page,prepared:executionPrepared,node:executionNode,
         targetOrigin:address.origin,redactor,record:executionRecord,report,save,deadline:batchDeadline,

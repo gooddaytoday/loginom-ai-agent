@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {javascriptContextDataLabel,javascriptContextDataComment,verifyJavascriptPublicContext} from './javascript-public-context.mjs';
+import {javascriptContextDataLabel,javascriptContextDataComment,verifyJavascriptPublicContext,javascriptContextRenamedSource} from './javascript-public-context.mjs';
 import {javascriptDiscoveryProbe} from './javascript-discovery-probes.mjs';
 import {javascriptContextReply} from '../../client/lib/javascript-context-read.mjs';
 import {createRedactor} from '../../client/lib/redact.mjs';
@@ -18,12 +18,13 @@ function fixture(mode,manual,inputVariant='base'){
       .map((name,i)=>({...source_fields.find(f=>f.name===name),index:i})):source_fields;
     return {direction:['input','output'][index],port:0,port_guid:'port'+index,autosync:index===0||!manual,
       native_reciprocity_verified:true,source_fields:ordered,target_fields:source_fields.map((f,i)=>({...f,required:false,...(index===1?{excluded:false}:{}),
+        ...(index===0&&inputVariant==='renamed'&&i===1?{name:'CustomerNow',origin_type:1}:{}),
         label:index===1&&manual&&i===2?javascriptContextDataLabel:f.label,source:{...ordered.find(sf=>sf.name===f.name)}}))};
   });
   return {source,reply:javascriptContextReply({owner:{...node,operation_id:'context',ui_epoch:1},source,
     settings:{generation:mode==='code'},ports,redactor:createRedactor()})};
 }
-for(const mode of ['code','declared'])for(const manual of [false,true])for(const inputVariant of ['base','reordered'])
+for(const mode of ['code','declared'])for(const manual of [false,true])for(const inputVariant of ['base','reordered','renamed'])
   test('fixed context oracle verifies '+mode+' complete current source/mappings/data '+manual+' '+inputVariant,()=>{
     const f=fixture(mode,manual,inputVariant),expected={node,schemaMode:mode,source:f.source,manual,inputVariant};
     assert.equal(verifyJavascriptPublicContext(f.reply,expected).structuredContent,f.reply);
@@ -34,9 +35,23 @@ for(const mode of ['code','declared'])for(const manual of [false,true])for(const
       const changed=structuredClone(f.reply);mutate(changed);assert.throws(()=>verifyJavascriptPublicContext(changed,expected));
     }
   });
+for(const mode of ['code','declared'])test('renamed source uses observed Name, retains old context and rejects label/stale/foreign data: '+mode,()=>{
+  const f=fixture(mode,false,'renamed'),original=structuredClone(f.reply);
+  const source=javascriptContextRenamedSource(f.reply,node);
+  assert.equal(source,f.source.replace('InputTable.Get(row,"Customer")','InputTable.Get(row,"CustomerNow")')+javascriptContextDataComment);
+  assert.deepEqual(f.reply,original);assert.ok(f.reply.source.text.includes('InputTable.Get(row,"Customer")'));
+  for(const mutate of [r=>r.ports[0].target_fields[1].name='Customer',r=>r.ports[0].target_fields[1].label='CustomerNow',
+    r=>r.ports[0].target_fields[1].source.name='Other',r=>r.ports[0].target_fields[1].origin_type=0,
+    r=>r.owner.node_id='foreign',r=>r.content_is_data=false,r=>r.explicit_execute_requested=true,
+    r=>r.source.source_sha256='0'.repeat(64),r=>r.source.delivery='separate_read_required',
+    r=>r.ports[0].native_reciprocity_verified=false,r=>r.ports[0].target_fields.push({...r.ports[0].target_fields[1]})]){
+    const changed=structuredClone(f.reply);mutate(changed);assert.throws(()=>javascriptContextRenamedSource(changed,node));
+  }
+});
 const entry=fileURLToPath(new URL('./javascript-public-context-live.mjs',import.meta.url));
 for(const args of [[],['--case','foreign'],['--case','context-code','--source','x'],['--case','context-declared','--headless','true'],
-  ['--case','context-code','--x11-no-focus','true']])test('context entrypoint refuses uncontrolled inputs '+JSON.stringify(args),()=>{
+  ['--case','context-code','--x11-no-focus','true'],['--case','context-code-renamed','--name','Anything'],
+  ['--case','context-declared-renamed','--source','foreign'],['--case','context-code-renamed','--headless','true']])test('context entrypoint refuses uncontrolled inputs '+JSON.stringify(args),()=>{
     const result=spawnSync(process.execPath,[entry,...args],{encoding:'utf8'});assert.equal(result.status,1);
     assert.match(result.stderr,/Fixed public context|Only assigned public context/);
   });
