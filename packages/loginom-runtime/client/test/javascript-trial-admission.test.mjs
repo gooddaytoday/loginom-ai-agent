@@ -38,9 +38,9 @@ test('trial rejects every unsupported operation before target or editor access',
  for(const change of changes){const trial=request();change(trial);assert.throws(()=>validateNodeApplyRequest(trial,handlers));}
 });
 
-test('trial support composes with the candidate map but remains absent from the product catalog',()=>{
+test('fixed trial overrides the general product handler only inside its isolated candidate map',()=>{
  const base=createCandidateNodeSupport({targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2'});
- assert.equal(base.nodeApplyHandlers.has('programming.javascript'),false);
+ assert.equal(base.nodeApplyHandlers.get('programming.javascript').revision,'javascript-script-lifecycle-v5');
  const trial=createJavascriptTrialNodeSupport({page:{},targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2',
   redactor:createRedactor(),pinned:{node,expected_source_sha256:'a'.repeat(64),source_text:source}});
  const combined=new Map([...base.nodeApplyHandlers,...trial.nodeApplyHandlers]);
