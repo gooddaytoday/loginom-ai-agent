@@ -50,6 +50,52 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/G1/J22: recovery413 принят; final channel fix — 2026-10-01
+
+Recovery413/exec21136 завершён actual exit0, ordinary headed. В Диспетчере
+наблюдён только exact пакет failed412 в jsteach:3985; при его выборе Stop
+disabled. Close/Yes отправлены по точной package confirmation «без сохранения»,
+после refresh пакет отсутствует. Другие session/package не закрывались.
+Admin logout/browser close и отсутствие процессов412/413 подтверждены.
+Original failed412 report/journal не переписаны и не повышены до PASS.
+Recovery receipt SHA `b1bde63ad307d966b22008ad81ce7285ba74678fc772d1b1dab5a6a3d0b17630`,
+journal SHA `da1f00c05f57936893c6dfa4ea23b6546db834c73a1830cae8ff67e82eb05cab`.
+Registry413 closed_verified, active exec null.
+
+Child `8acf42099772190632c3ab30f1df5e4ff0a15657`: saved runtime сохраняет
+узкий контракт без channel/configuration. Private UI helper самостоятельно
+создаёт prepared NodeProcedure, наружу предоставляет только observe; публичные
+mutation methods не добавлены. Actual NodeProcedure через external browser
+transport/journal ACK и его immutable observe-only interface покрыты отдельно.
+Addressed07:97/97 PASS, exec28447 actual exit0. Final operator03 на8acf ещё
+в работе, exec24984; code/browser test fixtures не являются live UI acceptance.
+Source freeze v2:1512 files, SHA
+`fccd5a4fd150f8f538024efdd82164ce921bd32013b81d31a98ad915bfe60a12`.
+
+Pre-live auditor v2 также исправляет свою проверку реального формата
+execution_records: это массив compact line references, не integer count.
+Проверять line/metadata/SHA каждого raw JSONL record. Negative checker v2
+пересобирает references после non-noop mutations, чтобы проверялась semantic
+граница, а не только mismatch checksum. v1 сохранён, он live PASS не выдавал.
+Oracle сохранённых source/package остаётся immutable v1. После actual regression
+completion/hash verification — новый pin v2 и fresh414 Code. G1/J22 открыты.
+
+### E/G1/J22: failed412; recovery413 в работе — 2026-10-01
+
+Fresh412 Code/exec24865 завершён actual exit1/CLEANUP_UNCONFIRMED. До первого
+Setting/Next/source-read: TypeError `runtime.channel is not a function`.
+SavedExecutionRuntime намеренно не предоставляет channel; private helper
+ошибочно предположил этот интерфейс. Journal содержит только cold_workspace_prepared;
+JS configure/source/Next/Execute не отправлены. Первоначальный report/journal
+не изменялись: SHA256 `3084dfd039c230d4e54f25446b6bca692e9fc0ad13f21a735c2f9cd7402527ce` /
+`1bfeee7e0b2121c5d3369a32d9bdd08f07025c9f382bbfdfb84364b02150bd27`.
+Browser закрыт, отсутствие процессов412 подтверждено; package close/logout
+не подтверждены. Fresh413/exec21136 — ordinary headed recovery только exact
+своего nonexecuting Code package через admin. Ни Code PASS, ни Declared run нет.
+После recovery: private bounded observe-only procedure вместо runtime.channel,
+addressed actual contract test, новый source freeze/auditor v2/fresh profile.
+G1/J22 остаются открытыми; failed412 не переигрывать и не повышать до PASS.
+
 ### E/G1/J22: private observer закреплён; fresh412 Code назначен — 2026-10-01
 
 Child `35bbf88e7dd5a88f1b92e67db0e17fe2dfd3d509` добавляет fixed headed
