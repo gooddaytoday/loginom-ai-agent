@@ -251,6 +251,27 @@ typecheck и actual compiled CLI setup/status/restart на новом private pr
 direct headed runtime probes не доказывают candidate persistence.
 Pending context design по-прежнему не принят; нового browser profile/process нет.
 
+### Граница возобновления: требуется решение по context — 2026-10-01
+
+Повторная сверка после трёх последовательных goal turns: человеческого выбора
+по explicit opt-in нет; автоматическое продолжение исходной Goal не утверждает
+предложенное изменение публичного контракта. Child HEAD e954/source/schema
+не изменились, main99c1 содержит завершённое независимое J27 comparison.
+Последняя проверка подтвердила terminal FAILED у Code440, PackageClose/logout/
+browserClose, отсутствие profile440 процессов, согласованный registry/lease
+closed_verified и active_exec=null. Это не ожидание работающего процесса.
+
+Remaining positive J19 Code/declared зависит от решения в конце context design;
+следующие F/candidate/CLI gates этим не выполнены. Независимая предпосылка J27
+comparison завершена; прежние accepted проверки не повторять ради продолжения.
+Blocked audit threshold достигнут: следующая runtime/schema доработка требует
+выбора пользователя, goal нельзя считать complete или paused. Существующий
+async вопрос не дублировать. При возобновлении сначала учесть ответ; если opt-in
+принят, зафиксировать утверждение в design/checkpoint и реализовать описанный
+contract/tests с новым immutable freeze/auditor/pin до fresh headed Code.
+Не переиспользовать Code440 profile/evidence и не запускать old source для обхода
+materialization refusal. Untracked acceleration-review.md не включать в commits.
+
 ### E/J25: owned technical-details expansion432 принят — 2026-10-01
 
 Ordinary headed `e-native-details-expansion-code-01`/exec41667 actualexit0/OBSERVED
