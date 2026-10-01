@@ -6,23 +6,23 @@
   },
   "packages/loginom-runtime/client/lib/bridge.mjs": {
     "baseHash": "c56450b8f4db74c4ccfbf3162d1a7d6dc7422bab3ac35704f7d45923282630c3",
-    "hash": "9fc063185cfd888c807325e4da4c1f29efdd31505d4441295b19914d8d95dfee",
-    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets."
+    "hash": "23580e5bf1a4e37fdfaa89f05fc126e5c3f5ed1b77cb75baba8f57a05f94c7f9",
+    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Record committed transformations after 3e19818b6f: fc3798f0ac fix(runtime): bypass proxies in Loginom Chromium; 0c513c445a feat(javascript): expose owned source reading through node API; 23e8488e29 fix(javascript): publish context in compact MCP bridge; 8bca1b00aa fix(loginom-runtime): bound complete user tool replies. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/lib/executor.mjs": {
     "baseHash": "df21720858bb89bb40d6c4fe46620728b1d6e86b0d9d7aafa4992c8f2cf93a6e",
-    "hash": "430222a937bf805a14aa2354c7f375ff9794591f8f2c6e64447c5d828a729cff",
-    "reason": "Merge main retained-uncertainty host leases for bounded status/resume with RC9 settled pre-upload checkpoint semantics. Inspect a retained node operation before claiming the action gate, so saves return its outcome instead of a phantom active call; list no available actions in refusals while an operation is pending. Refuse impossible node resumes at admission through the shared resume predicate. Hold a single managed port drag until the exact cached asynchronous compatibility result settles within its original deadline, refresh the native target marker, and retain identity and cleanup guards."
+    "hash": "0a339f4916751e02eece5417a52dc0b6e82b3567da177abaf3d24a3f62583825",
+    "reason": "Merge main retained-uncertainty host leases for bounded status/resume with RC9 settled pre-upload checkpoint semantics. Inspect a retained node operation before claiming the action gate, so saves return its outcome instead of a phantom active call; list no available actions in refusals while an operation is pending. Refuse impossible node resumes at admission through the shared resume predicate. Hold a single managed port drag until the exact cached asynchronous compatibility result settles within its original deadline, refresh the native target marker, and retain identity and cleanup guards. Record committed transformations after 2bac319e8f: a66ca792c9 fix(runtime): settle owned file storage before refresh; f24b82001f fix(runtime): distinguish storage filenames from code editors; 295aa76b99 fix(javascript): bound persistence saves by original deadline; 168d4f88d0 feat(loginom-runtime): expose JavaScript contract and knowledge cards; 0c513c445a feat(javascript): expose owned source reading through node API; b0ecbeaadf feat(javascript): read current owned source and port context; 3b59423f1a feat(javascript): bind output rereads to verified source policy. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/lib/session.mjs": {
     "baseHash": "db89431390466874ef7ea709f5e8c866d1558dd54fc776c9ea1befd3bf286ef3",
-    "hash": "81ab34c12d9211ede9ff19b20ed888c64246093531761b2c45e3bc2c04bcc56b",
-    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Record the browser-download init script already introduced in 75bc5d86e; runtime source is unchanged in this release."
+    "hash": "9c42b9c0efd34e937b9e8f250b67aa8f1cc4e084f900b76a23daf7c9134006f9",
+    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Record the browser-download init script already introduced in 75bc5d86e; runtime source is unchanged in this release. Record committed transformations after 75bc5d86ed: 9b68f346d6 fix(runtime): normalize browser scale and tolerate fractional geometry; fc3798f0ac fix(runtime): bypass proxies in Loginom Chromium; 58d85fe07c fix(runtime): update pinned Chromium after Linux download crashes. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/lib/workspace-ui.mjs": {
     "baseHash": "cd5898556ca838c2a00e9b5a5a717c614de72f7962c034d95fcdc26b832a7624",
-    "hash": "63ed423cf6ff1550b9b0ce984435463fbe72ca31051c8e3023f53a1d24c9d509",
-    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance. Use the observed and re-hit-tested point of a partly clipped graph visualizer, preserving no-effect refusal for a covered target. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership."
+    "hash": "b03dc0f086e668557708cdc6a71b7d021f39313f1451b982f1323134846d7f53",
+    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance. Use the observed and re-hit-tested point of a partly clipped graph visualizer, preserving no-effect refusal for a covered target. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Record committed transformations after 5a144cd7c1: 9b68f346d6 fix(runtime): normalize browser scale and tolerate fractional geometry; 9b49c28b3a fix(runtime): retain output mapping identity in editor reads; f24b82001f fix(runtime): distinguish storage filenames from code editors; 6d8b16e8c2 fix(runtime): deny renamed native javascript controls; 14a9df5fce fix(runtime): bind native workspace through own FItems; 05186b8f67 fix(runtime): wait for owned wizard opening masks; 8c05bcc6d7 fix(runtime): bind pinned process console to observed namespace; 9c93b067e1 fix(loginom-runtime): wait for owned import preview on opening. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/test/action-catalog-lifecycle.test.mjs": {
     "baseHash": "6004e3b91aa6afd3eff0a3f36d3d054ae840e6c432d57853320033b3fc59389a",
@@ -41,8 +41,8 @@
   },
   "packages/loginom-runtime/client/test/executor.test.mjs": {
     "baseHash": "45efb45e922f9a347a6ce56763280d5edf8dde4d3a9840816bb8f4df44b7d519",
-    "hash": "28c0bf7c16f276bae47caa268109a0d2c4c77327a75a276c261285d1d85d1372",
-    "reason": "Verify main retained ambiguous execution remains active for the owning host lease."
+    "hash": "9572a154464c0a90bb87e4dad64399619b96eeacd7d247d68588a7767be96564",
+    "reason": "Verify main retained ambiguous execution remains active for the owning host lease. Record committed transformations after 9d905279ad: 295aa76b99 fix(javascript): bound persistence saves by original deadline. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/test/hooks.test.mjs": {
     "baseHash": "5eec1e38bd6b401eaf5c3b3a36fb06ab723ca1330013ba246621e60a6de6b290",
@@ -86,13 +86,13 @@
   },
   "packages/loginom-runtime/client/test/user-results.test.mjs": {
     "baseHash": "ceaeda7fc36aa403837bbbd4424be0a870995fa0088a51143168521e5eef2ae9",
-    "hash": "930a53af5740d06e03086a0a7b3d2c083a599879650061d44cc7e1f636d410d3",
-    "reason": "Align the stale upstream assertion with RC9 behaviour: the compact prepare bundle lists installed node types without inline parameter schemas, which dock_action_describe supplies for the selected type; remaining assertions unchanged."
+    "hash": "7bb84d1a96b097d4dac3d5637fad4793b0c71af9125c57cbd4d3503dc3eab96f",
+    "reason": "Align the stale upstream assertion with RC9 behaviour: the compact prepare bundle lists installed node types without inline parameter schemas, which dock_action_describe supplies for the selected type; remaining assertions unchanged. Record committed transformations after 1988be3b69: 57b074fc7b feat(javascript): add isolated public configure trial. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/test/workspace-ui.test.mjs": {
     "baseHash": "2c3fa72c098e439a19b4a309e4acb244d34816aa6891926f3e9ae897cfad5a49",
-    "hash": "4ac7b1ab1768fcc8d9dd4503cda16a0871faaae6dc59bfda2c8dfb265fb91c12",
-    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance. Regress clipped visualizer geometry and newly covered targets against the real workspace UI executor. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership."
+    "hash": "bf449f36ad972c72b6c385c00f0b3e540af402ea58780456eee393ca7b9ba59f",
+    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance. Regress clipped visualizer geometry and newly covered targets against the real workspace UI executor. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Record committed transformations after 5a144cd7c1: 9b68f346d6 fix(runtime): normalize browser scale and tolerate fractional geometry; 9b49c28b3a fix(runtime): retain output mapping identity in editor reads; f24b82001f fix(runtime): distinguish storage filenames from code editors; 5bacf283ac fix(runtime): open native JavaScript preview through owned port; 6d8b16e8c2 fix(runtime): deny renamed native javascript controls; 05186b8f67 fix(runtime): wait for owned wizard opening masks; 8c05bcc6d7 fix(runtime): bind pinned process console to observed namespace; 9c93b067e1 fix(loginom-runtime): wait for owned import preview on opening. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/tools/loginom-acceptance/date-time-public-fixture-schema.mjs": {
     "baseHash": "27c57585cd3f391ebc2ae30115f2f4bb3f8414c614f07204460bb5f1a77ba461",
@@ -116,18 +116,18 @@
   },
   "packages/loginom-runtime/client/lib/node-target-browser.mjs": {
     "baseHash": "aebab1ef9bc8b6df4c13b5d06b8d28980b7affe07d7badf5a39b070503ded39a",
-    "hash": "377c44afce18a8d420f83827df7053544d06184a0431fc007d1a985334a05c76",
-    "reason": "Merge main bounded headed-browser port rendering waits and ordinary-node mask handling with RC9 complete native bindings, hover/rebind and bounded placement. Include observed node and port identities in rendering refusal diagnostics without weakening ownership checks. Bound frame wait during read-only retries when background animation is suspended. Bind an initially unlabelled alternate SVG only to a unique rendered tabular port whose hit-test resolves to the exact native cell; retain previously observed identity and graph ownership checks."
+    "hash": "f54a335160bc27d8bf0178044a2ff1b86529f89c42764dab19a9cc9d5531c817",
+    "reason": "Merge main bounded headed-browser port rendering waits and ordinary-node mask handling with RC9 complete native bindings, hover/rebind and bounded placement. Include observed node and port identities in rendering refusal diagnostics without weakening ownership checks. Bound frame wait during read-only retries when background animation is suspended. Bind an initially unlabelled alternate SVG only to a unique rendered tabular port whose hit-test resolves to the exact native cell; retain previously observed identity and graph ownership checks. Record committed transformations after 8ab08274c7: 6c7f594028 fix(loginom): diagnose strict link hover graph refusal; f96f2e81fc fix(loginom): rebind replaced node drawing before link hover; f343af1c40 fix(loginom): align connect graph rebinding checks. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/test/node-placement.test.mjs": {
     "baseHash": "4ce1a2ec34ce3c5b68dcacc15d05cc438e70ec7cddcc7ff3b76f7edc1038b278",
-    "reason": "Exercise the real browser-adapter chooser at 150/200 percent zoom, translated viewports, and both model-coordinate bounds.",
-    "hash": "2a04117979f38a7165f9e9d1a0b862c7c64982f64d0f7ba357ed895a4452f42d"
+    "hash": "fde9d5e9a996fa97083864ea565428c1e751aa6f7e937a0e9fce40f3ad4804e7",
+    "reason": "Exercise the real browser-adapter chooser at 150/200 percent zoom, translated viewports, and both model-coordinate bounds. Record committed transformations after 8e67b29306: 9b68f346d6 fix(runtime): normalize browser scale and tolerate fractional geometry. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/lib/artifact-discovery.mjs": {
     "baseHash": "54b42a453c083e73e96b812a82d080d4b36645caaef65b4de41113702ba816ab",
-    "hash": "8b0763b6be72704b4f7e0adfe9ea1f3ed3a5f653d45523dfc0005c27b6028a93",
-    "reason": "Merge main Windows upload verification: wait for the final server-side size, refresh only the verified directory and retain bounded discovery."
+    "hash": "27074ae6b3ffb94ea2ea8cd4602c9e3d0286bddbbe943ec6c0affb8338d0b227",
+    "reason": "Merge main Windows upload verification: wait for the final server-side size, refresh only the verified directory and retain bounded discovery. Record committed transformations after bca7f53ef9: a66ca792c9 fix(runtime): settle owned file storage before refresh; 84dd84a6be fix(runtime): settle same-owner artifact readiness races. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/lib/artifacts.mjs": {
     "baseHash": "cf15b29e251069957916d4c1db31172fbeb34d42fc973e0cca82da8fe744dcef",
@@ -136,8 +136,8 @@
   },
   "packages/loginom-runtime/client/lib/node-operation-runner.mjs": {
     "baseHash": "04b740ef6b0cd2bb6a9da1a88f75e80d27c1f0f0dca73acfcd03f83d9d741e8d",
-    "hash": "3743c9996b0a3a5e5791cdaa512c4eb834b805b26e18550de5fbf1bebe53560a",
-    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Consult an optional resume admission check before launching a new attempt; running, completed and verified-final jobs keep their early snapshots."
+    "hash": "a768dc94251f9e571d0deccb1989e9bf8be6af1b0a5f0583c600e55a4471eb71",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Consult an optional resume admission check before launching a new attempt; running, completed and verified-final jobs keep their early snapshots. Record committed transformations after e14adf382b: 0c513c445a feat(javascript): expose owned source reading through node API; 88fdebcd54 feat(javascript): expose owned materialization execution phases. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/lib/platform.mjs": {
     "baseHash": "5bd3c93fd075b22a376fc14e8bd465ed348ad79797a4d570a021bf7e6dd37999",
@@ -146,8 +146,8 @@
   },
   "packages/loginom-runtime/client/test/artifact-discovery.test.mjs": {
     "baseHash": "808decca4fd2ccc1fa7db20a1c9cc52d2c07bbaa386b226475eafba8e30bfd3c",
-    "hash": "8e9fbe8e9edd149368fb978439340642c1ae648a3a10fff3432a308da79a2207",
-    "reason": "Cover main Windows delayed upload size publication and verified-directory refresh."
+    "hash": "833e3af37ba15164d98b0bd984f6a9990b4227f2a223be92a953a6935905d9bc",
+    "reason": "Cover main Windows delayed upload size publication and verified-directory refresh. Record committed transformations after bca7f53ef9: a66ca792c9 fix(runtime): settle owned file storage before refresh; 84dd84a6be fix(runtime): settle same-owner artifact readiness races. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/test/artifacts.test.mjs": {
     "baseHash": "c1d81f52b4d7098f840098bf1b391ba421b3db758d091879a4c6dad4dd98085d",
@@ -156,38 +156,38 @@
   },
   "packages/loginom-runtime/client/test/text-export-connect.test.mjs": {
     "baseHash": "115c7fb88c1c3a128bd4b4b5da4edff2287d31d32fa9356418d215fb1bdcb4c8",
-    "hash": "6ada240b4a961f03f41e4065cdd757f40b727e5f1b93567cb3eae2755ed336ab",
-    "reason": "Merge main ordinary-node transient mask regression with RC9 export-link identity checks."
+    "hash": "d8f83a83d328f16b7370727dc552cf6c528e5b3046de13d9c12858b8f2a660b8",
+    "reason": "Merge main ordinary-node transient mask regression with RC9 export-link identity checks. Record committed transformations after a6048e7562: f343af1c40 fix(loginom): align connect graph rebinding checks. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/test/node-target.test.mjs": {
     "baseHash": "040ed302e9817e19f8beb5f825747be5cc683ee596ed172f70eaedd620596dcb",
-    "hash": "a810dfb7fd46b26e86b4fba346cf1d7d2d42940b455b5d92af084579f98fbf34",
-    "reason": "Verify merged read-only port observation with deterministic transient, caller-deadline and 15-second render-deadline coverage instead of the superseded three-attempt limit."
+    "hash": "9cb6969e99ff7ebd39fe22a323bcef449a4592186579a76a646ee17972c881a9",
+    "reason": "Verify merged read-only port observation with deterministic transient, caller-deadline and 15-second render-deadline coverage instead of the superseded three-attempt limit. Record committed transformations after a6048e7562: b47ead6d82 test(loginom): use complete graph in connect refusal fixture. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/lib/node-api.mjs": {
     "baseHash": "e7b2e721bc5a1c9d2a3c575e05b7776558e6b18970f769b688a3d34a82a29fc4",
-    "hash": "9f3191d49b1a1fb2b2345a25a396ac6b83d8f566b69e01ba9167d3e3192cca81",
-    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label. Describe shared phase and total deadlines, exact-read cleanup cost and the 60000 ms wait limit."
+    "hash": "dd0782ebe7952756e0074c9e4c15fbec60f4036b7fa9b4465827e5550724208c",
+    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label. Describe shared phase and total deadlines, exact-read cleanup cost and the 60000 ms wait limit. Record committed transformations after 658b8ab953: e75e8ad99c feat(loginom-runtime): prepare JavaScript parameter contract; 168d4f88d0 feat(loginom-runtime): expose JavaScript contract and knowledge cards; 7e3f608577 feat(javascript): gate complete bounded UI output reads; 7ffe7ac1fc feat(javascript): validate bounded script parameters before mutation; 82ff10da7e Revert \"feat(javascript): validate bounded script parameters before mutation\"; 0c513c445a feat(javascript): expose owned source reading through node API; b0ecbeaadf feat(javascript): read current owned source and port context. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/lib/node-apply.mjs": {
     "baseHash": "d9f4f12730a3195e893cd04244fa7d53cf7c16604e49cae3334a013903c1dcb3",
-    "hash": "15510617c4456311804b023265766e3845bd03fb79ad5ed60f59ddbbe942f831",
-    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Accept a verified discarded import draft after a configure readiness timeout and ask to repeat the same settings on the same node."
+    "hash": "007a20f5dfd486acbcb6e42e37b532314fe96c030753e5dc3a91a3653b049295",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Accept a verified discarded import draft after a configure readiness timeout and ask to repeat the same settings on the same node. Record committed transformations after 3278040c8f: 7e3f608577 feat(javascript): gate complete bounded UI output reads; 57b074fc7b feat(javascript): add isolated public configure trial; 88fdebcd54 feat(javascript): expose owned materialization execution phases; b17c5b7719 fix(javascript): settle verified existing schema mode refusals; 010dca575d fix(javascript): recover owned native wizard refusals with retained baseline proof; 3b59423f1a feat(javascript): bind output rereads to verified source policy. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/lib/text-import-node.mjs": {
     "baseHash": "c8df9578829bbde45d6f8513f5cfcc721019c701fbdf94f80de59479ef63c7ef",
-    "hash": "9914dd751a5690d8b159e4a227171744e86f3070bb65b07edacf61b0109ae8bc",
-    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Discard only the owned import draft after a configure readiness timeout without transport uncertainty."
+    "hash": "6a6333be1ebfa5a0bdda658888c78b4473d1de55487bb8169592aeddb43b9e9b",
+    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Discard only the owned import draft after a configure readiness timeout without transport uncertainty. Record committed transformations after 3278040c8f: c642e6bab3 feat(runtime): add private civil datetime roundtrip admission. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/lib/text-import-procedure.mjs": {
     "baseHash": "5a72ca1d8972a313737cf73713e2a3e2c219acb99d44cef550fa495826eecc00",
-    "hash": "6723603d744b9c08193e11265d84c082271a08fdfb6af5823266a45ce95d4867",
-    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Require full verified source settings for an existing unconfigured import before attempting schema preservation. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label. Bind import metadata commit to the observed owner, column and draft, permitting strict no-effect epoch refresh. Bind import type/data-kind option selection to its current editor and allow only a proven pre-gesture epoch refresh. Bind metadata text fills to the unchanged editor through bounded pre-gesture refresh, with owner, value and schema drift refusals. Reopen a column type/data-kind editor that Loginom closed right after a confirmed opening, only for an unchanged column observed twice and at most twice; exhausted reopenings are readiness timeouts."
+    "hash": "0bbd6406b22d1d3eeca04834385ae9bf1addec43e8ce5206bdb1c06db806bd4a",
+    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Require full verified source settings for an existing unconfigured import before attempting schema preservation. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label. Bind import metadata commit to the observed owner, column and draft, permitting strict no-effect epoch refresh. Bind import type/data-kind option selection to its current editor and allow only a proven pre-gesture epoch refresh. Bind metadata text fills to the unchanged editor through bounded pre-gesture refresh, with owner, value and schema drift refusals. Reopen a column type/data-kind editor that Loginom closed right after a confirmed opening, only for an unchanged column observed twice and at most twice; exhausted reopenings are readiness timeouts. Record committed transformations after 0b7dc08f37: dbd93e32d4 fix(runtime): bind import format field refreshes. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/test/node-apply.test.mjs": {
     "baseHash": "09e457cc476dc16b0790fad7d1742737cdbc59563a27594624b25056781bd00c",
-    "hash": "b4e7ed678d375ec88d952f49792565ec1a1001d7e4837fb6c1fe0e5963610dfa",
-    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines. Cover the readiness draft-discard proof matrix."
+    "hash": "d88add977a9764f7182cee2466380b01e36e81960fd5b106be890249193c7125",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines. Cover the readiness draft-discard proof matrix. Record committed transformations after 3278040c8f: 7e3f608577 feat(javascript): gate complete bounded UI output reads; 57b074fc7b feat(javascript): add isolated public configure trial; 88fdebcd54 feat(javascript): expose owned materialization execution phases; b17c5b7719 fix(javascript): settle verified existing schema mode refusals. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/test/text-import-patch.test.mjs": {
     "baseHash": "8742700e801f3157a7f596e5c2d64468440de27223df210e551d0f9bd23251aa",
@@ -196,8 +196,8 @@
   },
   "packages/loginom-runtime/client/lib/node-procedure.mjs": {
     "baseHash": "eb08dda1ea023c1df95bac5efd4c6bccf314bea277f2d4bafd9396bec4ee94ff",
-    "hash": "5bb25314fcd135ac5b4f4ac26d240198d429fa04762ad78b55e7be779edf2ecf",
-    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Preserve refused native observations without granting a usable snapshot or permitting a gesture. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines. Give each observation read at least 5000 ms instead of the remaining readiness budget, so an expiring observation reports a readiness timeout rather than an MCP transport timeout."
+    "hash": "9728b59a64d21d4b5c4cf5b14d4e790789f8cb1a412737d7b38ee04b8617a900",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Preserve refused native observations without granting a usable snapshot or permitting a gesture. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines. Give each observation read at least 5000 ms instead of the remaining readiness budget, so an expiring observation reports a readiness timeout rather than an MCP transport timeout. Record committed transformations after b2888431d0: 9b68f346d6 fix(runtime): normalize browser scale and tolerate fractional geometry; 86cd64e2ef fix(runtime): retain bounded node observation refusal; f0ea862736 fix(runtime): read console controls before process history; a06baf65c5 fix(runtime): await port opening within original operation budget; c0217169b6 feat(javascript): expose owned schema read in node procedure; 05186b8f67 fix(runtime): wait for owned wizard opening masks; 75d04b7489 fix(runtime): settle owned output cards within node budget; ba46d2ecda fix(runtime): distinguish pending output table cards; daf5605a8b fix(runtime): issue process UI epoch after native cache reads; 8c05bcc6d7 fix(runtime): bind pinned process console to observed namespace; 0328cadfc9 fix(runtime): dispatch owned Stop with fresh native ticket; e2e814a060 fix(javascript): bind input editor mapping reads to original port. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/lib/user-preview-budget.mjs": {
     "baseHash": "b0f8bf12969340df0456c27bffdac2e5e102a2e1520ba75176a4851f8162799f",
@@ -206,8 +206,8 @@
   },
   "packages/loginom-runtime/client/test/node-operation-runner.test.mjs": {
     "baseHash": "e3fe166737560bc7b507cc08a3a615b1b4ccf96b9f16d6817043670e8aefad3c",
-    "hash": "54270b3924191971b38540b91e50dbb8c5c25cb3149d30c00273a79e14bfe8e5",
-    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Cover resume admission refusal without a new attempt."
+    "hash": "b6a32aef7adc6413667ae46c02be9558f87a78b7e32436be879475f7375ae3a4",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Cover resume admission refusal without a new attempt. Record committed transformations after e14adf382b: 88fdebcd54 feat(javascript): expose owned materialization execution phases. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/test/user-preview-budget.test.mjs": {
     "baseHash": "a603727daf3ea0ed415b4d8147e68bd7dc5c94963250aff26a0aa9d7b97f72c6",
@@ -221,8 +221,8 @@
   },
   "packages/loginom-runtime/client/test/text-import-wide.test.mjs": {
     "baseHash": "c4ea4fb47539acbd8e9edb0ac48c6893f2131546875fb963383266cc194d7f3d",
-    "hash": "b18f7fd698796754b076ec4919aeaa571439c8773f5f2dd01359ae138fa1a16e",
-    "reason": "Exercise bound metadata commit using refreshed references and reject changed owner, column, draft, original value, type or stage. Bind metadata text fills to the unchanged editor through bounded pre-gesture refresh, with owner, value and schema drift refusals."
+    "hash": "bed0dcf96f60c8a775e213b3474b7d542fe062cf85351037480f0034645d4ef5",
+    "reason": "Exercise bound metadata commit using refreshed references and reject changed owner, column, draft, original value, type or stage. Bind metadata text fills to the unchanged editor through bounded pre-gesture refresh, with owner, value and schema drift refusals. Record committed transformations after 361b13682c: dbd93e32d4 fix(runtime): bind import format field refreshes. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/test/node-target-port-render.test.mjs": {
     "baseHash": "ae1ca9bd5ecc473a9a73dc49aed8146b335aab063a868c72b1052687dffd91f3",
@@ -231,18 +231,18 @@
   },
   "packages/loginom-runtime/client/lib/user-workflow.mjs": {
     "baseHash": "cc84d83a95211bdcceadeeed7e57599ed90e9431fdae2dfc7f1913148877f1c2",
-    "hash": "24cf4aaf66f9fe78bbc7221877e91c3c9d9457af3f38b6d917172c6cf73248c3",
-    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines."
+    "hash": "882f1981e1216a691a4fc256de0e85677eb93f4e7bd758262fae7a5cccdcebf6",
+    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines. Record committed transformations after 617f37364a: 0c513c445a feat(javascript): expose owned source reading through node API; b0ecbeaadf feat(javascript): read current owned source and port context; 9bc52b9468 feat(javascript): allow explicit configured output context. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/test/user-workflow.test.mjs": {
     "baseHash": "61ab452f9c710aef8bb7afa11996f55974d22f5cb216ba1644f4725751a37a47",
-    "hash": "59680264ccf9e375aa351d5e72cbe386f197d5c736e8d0ff8057560a4aff7e2a",
-    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines."
+    "hash": "d00d78c5f95bcdfe1066c14a850e1798855d2f32afec828183f5f21797797310",
+    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines. Record committed transformations after 617f37364a: 0c513c445a feat(javascript): expose owned source reading through node API. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/test/node-procedure.test.mjs": {
     "baseHash": "91f5b67c0bd4c21a12d143eb78c6a5700812d40b3d5d5403cd0164731e9b514f",
-    "reason": "Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Verify refusal journaling and absence of mutation authority for unverified or foreign previews. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines. Cover an observation that expires in the middle of a read.",
-    "hash": "469223ad8c087d5cd87861fac0e25106d8b2b31ebfdc78df610636397fc04f81"
+    "hash": "6c278d290e20cce1faced59f1ee19f07ef794f13ad60ce90e816352db1935805",
+    "reason": "Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Verify refusal journaling and absence of mutation authority for unverified or foreign previews. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines. Cover an observation that expires in the middle of a read. Record committed transformations after b2888431d0: 9b68f346d6 fix(runtime): normalize browser scale and tolerate fractional geometry; 86cd64e2ef fix(runtime): retain bounded node observation refusal; f0ea862736 fix(runtime): read console controls before process history; a06baf65c5 fix(runtime): await port opening within original operation budget; c0217169b6 feat(javascript): expose owned schema read in node procedure; 05186b8f67 fix(runtime): wait for owned wizard opening masks; daf5605a8b fix(runtime): issue process UI epoch after native cache reads; e2e814a060 fix(javascript): bind input editor mapping reads to original port. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "packages/loginom-runtime/client/lib/node-preview-schema.mjs": {
     "baseHash": "36f345b3e26e04dc8d65340a8f5e54b86da128b6a5cb994f0c45da61473b2c38",
@@ -256,8 +256,8 @@
   },
   "packages/loginom-runtime/client/test/node-read.test.mjs": {
     "baseHash": "302b52662243395d43941b5620de342324e6b1305f436c06d0a7166593c0343b",
-    "hash": "213dfa3b861aacdfde1a4430ff423872aaee6b362f8a85002735efd9dd16facf",
-    "reason": "Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets."
+    "hash": "4cf5cda22e628347d77ac571e835af12a23e1e539f0869766b6d31a96323584f",
+    "reason": "Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Record committed transformations after 3e19818b6f: 19105bd87d fix(javascript): guard output reread until source admission; 3b59423f1a feat(javascript): bind output rereads to verified source policy. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   },
   "apps/loginom-site/index.html": {
     "baseHash": "47608c281b7d6cc1c8bb5684f1dcc77268eadc04c77646a51f506de42ee174b5",
@@ -2008,5 +2008,240 @@
     "baseHash": "1fb5d7d07fb6fa868127a15b31b6ba6e880c1d25f292518f9edcf40f42b0e29d",
     "hash": "cf92229b08aa83d26eb3b90b0900f323302df868836db1f30ba0b3fbcee9e25c",
     "reason": "Regress private login followed by workspace preparation using the same canonical public/custom URL; preserve strict foreign-page rejection."
+  },
+  "packages/loginom-runtime/client/README.md": {
+    "baseHash": "8f5e1b098d40b4061a26327673f3da2ebe957e4d86d04aa612d9945e87dd337a",
+    "hash": "c80b3a0651432829c1dd5f977bafc19698175a85a661c77dd0801f28860c7aa4",
+    "reason": "Record committed transformations after 26ff8fa766: 58d85fe07c fix(runtime): update pinned Chromium after Linux download crashes. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/action-catalog.mjs": {
+    "baseHash": "906022e59fa8150ec209368f1ce0210df5adc14e98d7d7b24b61a3c6d837434e",
+    "hash": "e0713ec66002ff9a5237a1435e162c4555dc092af5c010dadcbe76e163300abf",
+    "reason": "Record committed transformations after f03b2dbdf0: 0c513c445a feat(javascript): expose owned source reading through node API. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/browser-geometry.mjs": {
+    "baseHash": "6083c3622feaba5aabddaeaf700d50eed6d9bd012479dbf6c94be9e18bd8a843",
+    "hash": "0b7027db8db0e164659de33423ea122d791a9eabbcbf9691eac2c5eeba7df89f",
+    "reason": "Record committed transformations after 26ff8fa766: 9b68f346d6 fix(runtime): normalize browser scale and tolerate fractional geometry. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/calculator-node.mjs": {
+    "baseHash": "bc0606ee6d2b969e776aed56036e75418a2230db4ac1b100b1fadb00d8415577",
+    "hash": "042fa298c71143d14ed697d8e17e8bd102019d3028628900f8eefc2cdac0b45c",
+    "reason": "Record committed transformations after f03b2dbdf0: 7e3f608577 feat(javascript): gate complete bounded UI output reads. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/execution-journal.mjs": {
+    "baseHash": "ffdd2c6909eba4a7a001128ee8aae3ecc2bb039a36f0c03881052e9bbcf5f842",
+    "hash": "402232d16cc6f88f701c66f9f05982e6f36e251f14999c94414fd1a4487acf43",
+    "reason": "Record committed transformations after 26ff8fa766: 0c513c445a feat(javascript): expose owned source reading through node API. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/node-contracts.d.ts": {
+    "baseHash": "6010d1dfda79b52b3bfd3ab2789360843fbdd8a4fc10b7d47179f327cd54cc8c",
+    "hash": "fc2ba26c81aac6ed489e2d4651fd715320bb8413bd578bf0198029537768c5bd",
+    "reason": "Record committed transformations after 26ff8fa766: 168d4f88d0 feat(loginom-runtime): expose JavaScript contract and knowledge cards; 57b074fc7b feat(javascript): add isolated public configure trial; 88fdebcd54 feat(javascript): expose owned materialization execution phases; 8d57cf5bdf feat(javascript): compose public Code materialization lifecycle; e615f4df7f fix(javascript): align input mapping result with native fields; dd4768a44e feat(javascript): add owned declared lifecycle and Save trial. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/node-contracts.mjs": {
+    "baseHash": "8cd9f420678106657e06e0a01032d4b4515c216a0cfe65e57d855aa1a0d2bcc3",
+    "hash": "1ec7680b9d41189572b3b51a9179e0da5d1611443187ba5c77b3635c604261a3",
+    "reason": "Record committed transformations after f03b2dbdf0: 168d4f88d0 feat(loginom-runtime): expose JavaScript contract and knowledge cards. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/node-execution-evidence.mjs": {
+    "baseHash": "3f08a2a88599d255091bc9db9fac969f4344d7a109d185bd5b84edc824830833",
+    "hash": "5e84ee6dc6bc9a834c2792945afa7fa04617eb01f7ca418a9803196e5136bac4",
+    "reason": "Record committed transformations after 26ff8fa766: 6139df500a fix(runtime): verify failed JavaScript process ownership; 56f8df0250 feat(javascript): resume verified read waits with the same execution. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/node-execution-procedure.mjs": {
+    "baseHash": "a4b7d0bb90a51a2d9f31e3e71a8a04bbb519068cc92c1b34b3c653bffac14a12",
+    "hash": "c5d47b23b1671ee30b023da88f2ee107ecd27c29314c55dbb799e6a6d139911e",
+    "reason": "Record committed transformations after f03b2dbdf0: 6139df500a fix(runtime): verify failed JavaScript process ownership; a66165a347 fix(loginom): open process console before requiring its grids; f0ea862736 fix(runtime): read console controls before process history; c5415d9316 fix(runtime): read native inventory from an open console; feca3b193e test(javascript): retain owned console before finite execution; daf5605a8b fix(runtime): issue process UI epoch after native cache reads; 0d306421f7 fix(runtime): pin retained process console before graph launch; 8c05bcc6d7 fix(runtime): bind pinned process console to observed namespace; 0328cadfc9 fix(runtime): dispatch owned Stop with fresh native ticket; 56f8df0250 feat(javascript): resume verified read waits with the same execution. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/node-mapping-context.mjs": {
+    "baseHash": "c5577f0085dca6ca2fc3cbe7010832e1ec628debddfdf150ff715c205f159a46",
+    "hash": "b11f44c39cfc85b4c941e615ac06b465b0add4ada3b1dfc2349bb150ea829194",
+    "reason": "Record committed transformations after 26ff8fa766: 0b9b7e2c1c fix(runtime): report bounded mapping cell mismatch evidence; bc34daf8fa fix(runtime): expose owned mapping header diagnostics; 81c7c9b53c fix(javascript): distinguish configured-only output mappings; 0268af373e fix(runtime): read mapping under native disabled column mask; cc883ef03a fix(runtime): observe empty cold output mapping inventories; e2e814a060 fix(javascript): bind input editor mapping reads to original port. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/node-output-context.mjs": {
+    "baseHash": "1c4b1791786c30a0f8247fe90de14368a793b1a5e393554a192787f4adc044e0",
+    "hash": "8ac76f0ac5cb50b5398f8dd828dfd7fd30d4370e1e6164c03ceda30aa027114a",
+    "reason": "Record committed transformations after f03b2dbdf0: ba46d2ecda fix(runtime): distinguish pending output table cards. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/node-output-procedure.mjs": {
+    "baseHash": "3d90fcbde17adceb3708d033b598e64bae7f848ee4674cc3a1afe664b309899f",
+    "hash": "5d0de6badb52d02f63703fd3230244096647a2d93d620251991e5f41a7096be6",
+    "reason": "Record committed transformations after f03b2dbdf0: 166d01077c test(runtime): add headed JavaScript discovery runner; 75d04b7489 fix(runtime): settle owned output cards within node budget; 4d70ea22fb feat(javascript): open owned output Views with one managed gesture. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/node-port-open.mjs": {
+    "baseHash": "d1ce993e307033c186a698d62750a7af0d171ad1495e2c85d538d78fffde0f0c",
+    "hash": "00664dfc19fab6648b3bb74231981c5522fae779c8f910510f4f730d47298eb8",
+    "reason": "Record committed transformations after f03b2dbdf0: 7c9cb2cb1f fix(loginom): diagnose pending port wizard opening; 8ce147ae33 fix(runtime): distinguish disabled output column mask from loading. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/node-process-context.mjs": {
+    "baseHash": "4e3f28dc36c8d0c2d4e43f3af3e9e26fa42de1a5269ba61b6738050e09a45b7c",
+    "hash": "b5f5bdf3f3ced3bb3b96a8487961ff94217feae0a24542f36c5420b0c9b31ef7",
+    "reason": "Record committed transformations after 26ff8fa766: 8c05bcc6d7 fix(runtime): bind pinned process console to observed namespace. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/node-read-contract.mjs": {
+    "baseHash": "48381128aa5b19e0246f7653612c550a9e3c54e3bae41a811eb64c8552ac7ef4",
+    "hash": "b6d3e09da41cc3f631a9e0dd7b7cfa6c0ca13604702dd6295204857af2c78684",
+    "reason": "Record committed transformations after f03b2dbdf0: 19105bd87d fix(javascript): guard output reread until source admission; 3b59423f1a feat(javascript): bind output rereads to verified source policy. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/node-read-driver.mjs": {
+    "baseHash": "3275e61017813cec3fdba6c083a3edcc8049c25cba6e7ae02b9644d42bb425f5",
+    "hash": "37c29d87f9eabc0a2a757826fa90871faff76cd9e2fe527c2097561387061a15",
+    "reason": "Record committed transformations after f03b2dbdf0: 3b59423f1a feat(javascript): bind output rereads to verified source policy. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/node-result-reply.mjs": {
+    "baseHash": "4bfb831c81ebcf6eb196576681f6f1439d6d6d64ff287e94b53e770aa0a4757e",
+    "hash": "cae64062d7e0997d902941efa489f344b4dc270c993c4afdc55a5f215b8abcf4",
+    "reason": "Record committed transformations after 26ff8fa766: 0c513c445a feat(javascript): expose owned source reading through node API; b0ecbeaadf feat(javascript): read current owned source and port context; 8bca1b00aa fix(loginom-runtime): bound complete user tool replies. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/node-result-schema.mjs": {
+    "baseHash": "534b71c4605fcdac44ce1dced6e1b2d25e05a68ccdab0e8c686beb002018c9d9",
+    "hash": "85ceeb2a7160e8be67d10a75b85eb71727be5297391e04c20721be4b0e8a6043",
+    "reason": "Record committed transformations after f03b2dbdf0: 57b074fc7b feat(javascript): add isolated public configure trial; 88fdebcd54 feat(javascript): expose owned materialization execution phases; 8d57cf5bdf feat(javascript): compose public Code materialization lifecycle; e615f4df7f fix(javascript): align input mapping result with native fields; dd4768a44e feat(javascript): add owned declared lifecycle and Save trial; 010dca575d fix(javascript): recover owned native wizard refusals with retained baseline proof; 349486dabd fix(javascript): settle owned Done refusal and preserve recovery proof; 3b59423f1a feat(javascript): bind output rereads to verified source policy; 9f17063f0f feat(javascript): read owned native technical details before error recovery. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/observation-pages.mjs": {
+    "baseHash": "162e74afe5509b63eec3017f1d45dc23c941533bbd7fe53786f80aa2b16a4c0a",
+    "hash": "0fea109e7a91ec9f69762dba0ed443aa59b5a4610f7c41fed72dd7579845fc76",
+    "reason": "Record committed transformations after 26ff8fa766: 9b68f346d6 fix(runtime): normalize browser scale and tolerate fractional geometry. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/port-mapping-procedure.mjs": {
+    "baseHash": "3bfea2f4afae1896f670dad288dc6f8890f64bf4588e1462ffdd801d450a1d2a",
+    "hash": "b7df4d0fc2d289327a11269d4f6c8dbdea212ef63eb352db7b341f640c2fada4",
+    "reason": "Record committed transformations after f03b2dbdf0: 05e40b740b fix(runtime): support DataSet output mapping controls. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/process-node-focus.mjs": {
+    "baseHash": "426058ec485b1fbf7bc35446932be6942be9f7f49d9db327adbadf038a828ee9",
+    "hash": "b7634c255780d57ad0967d3e87dde6aa71a51c9489375fd904308af30dab0476",
+    "reason": "Record committed transformations after 26ff8fa766: 8c05bcc6d7 fix(runtime): bind pinned process console to observed namespace. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/user-results.mjs": {
+    "baseHash": "eac6f265dbc083c8be2e17331681a063d4b91d332c5e634dcb2204439962af9a",
+    "hash": "add84b4af8aa76203e9139a4e844cd794b00c7ae872e92b461d02c8884b4bcdf",
+    "reason": "Record committed transformations after f03b2dbdf0: 168d4f88d0 feat(loginom-runtime): expose JavaScript contract and knowledge cards; 0c513c445a feat(javascript): expose owned source reading through node API; b0ecbeaadf feat(javascript): read current owned source and port context; 23e8488e29 fix(javascript): publish context in compact MCP bridge; 8bca1b00aa fix(loginom-runtime): bound complete user tool replies; 3b59423f1a feat(javascript): bind output rereads to verified source policy. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/variant-native-read.mjs": {
+    "baseHash": "baa09af7f840315c4cff1848804085eef47d4ff57381a8d08fd9a7047ec9d06c",
+    "hash": "d1478c2aca3abb75c2bcd5d82727524212148169730941c982f7d8759d1bf8f8",
+    "reason": "Record committed transformations after 26ff8fa766: 8c05bcc6d7 fix(runtime): bind pinned process console to observed namespace. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/package-lock.json": {
+    "baseHash": "e05c8ba33f055e321f04760d55eb9e23b00bfe011fe5a68a1118461cc2ae095a",
+    "hash": "349887bff383c30e3450e0978658a0d75fb854b9cd47c1f644d0e2b03c646c3c",
+    "reason": "Record committed transformations after f03b2dbdf0: 58d85fe07c fix(runtime): update pinned Chromium after Linux download crashes; beaf849091 feat(javascript): add source policy and admission guards. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/package.json": {
+    "baseHash": "4acacab41dea58cf19135522580a232165076718a39e7aaec9a88cc97126df56",
+    "hash": "901f86c089a0f5118a515c7cddeaa00aa8765f29bd10eb336f2a759ff35bd59b",
+    "reason": "Record committed transformations after f03b2dbdf0: 58d85fe07c fix(runtime): update pinned Chromium after Linux download crashes; beaf849091 feat(javascript): add source policy and admission guards. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/acceptance-observation.test.mjs": {
+    "baseHash": "3ca75b3855280b759be4d5064c5d3c49bc4547af80b1a7c77132b96c55bc2f48",
+    "hash": "2a48dc7d0aa614458057d8998d735fff764d9c9dfee8656477c8490aa7ad7ff4",
+    "reason": "Record committed transformations after 26ff8fa766: 9b68f346d6 fix(runtime): normalize browser scale and tolerate fractional geometry. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/artifact-download.test.mjs": {
+    "baseHash": "12d9b841e5e659fe00bd2331e0eb7f060539f846825265d97df07d3fac1c567e",
+    "hash": "c6c0108c33cd1ed8727afc8a7668577865feefd8983b25f0488f578a882f3a77",
+    "reason": "Record committed transformations after 26ff8fa766: a66ca792c9 fix(runtime): settle owned file storage before refresh; f24b82001f fix(runtime): distinguish storage filenames from code editors. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/execution-journal.test.mjs": {
+    "baseHash": "706a316b0c01267ecc1d8533fe937dd18ec1415399868d0b8d0aafd3ab7823b4",
+    "hash": "85e73712bb1735b1e1fcd95d6707655c4b1d1ddb3968f880298754422884533f",
+    "reason": "Record committed transformations after 26ff8fa766: 0c513c445a feat(javascript): expose owned source reading through node API. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/node-api.test.mjs": {
+    "baseHash": "665f0a90717ab46f1dabf9c3056ceea837484b68698e0a0635a4a56a10568054",
+    "hash": "037c0ef3dde617efc5f9abd3f6a6e5c88f430447829410e98b88fc040f85ced4",
+    "reason": "Record committed transformations after f03b2dbdf0: 7e3f608577 feat(javascript): gate complete bounded UI output reads. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/node-execution-evidence.test.mjs": {
+    "baseHash": "2d3ff68cd501f67feb08f607cabc58b882df7ec6e95dca3bacb66bb3bdea3d8d",
+    "hash": "6d047f52899e6718f29d21b1ecd1992383c23a85c7c6a65ff2beb1cfecc64e6e",
+    "reason": "Record committed transformations after 26ff8fa766: 6139df500a fix(runtime): verify failed JavaScript process ownership. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/node-execution-focus.test.mjs": {
+    "baseHash": "49a1896d72031f4d8ab6cbc4b19ab1c9228b76815472e8b4b8b1d6b2475de9a1",
+    "hash": "729334ce354995fab9a56c61249473fc4f85364060240ded4a5796d06efb6725",
+    "reason": "Record committed transformations after 26ff8fa766: 6139df500a fix(runtime): verify failed JavaScript process ownership. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/node-execution-stop.test.mjs": {
+    "baseHash": "2225c091f0f0ad591e9979c98f81bf7d60a8f42e16d0de66e9cff044c598d289",
+    "hash": "053b75583a7b85f741fa2b68fa166eab79de45866e2a94b62f71b9cd2f08c16a",
+    "reason": "Record committed transformations after 26ff8fa766: c5415d9316 fix(runtime): read native inventory from an open console; feca3b193e test(javascript): retain owned console before finite execution; daf5605a8b fix(runtime): issue process UI epoch after native cache reads; 0d306421f7 fix(runtime): pin retained process console before graph launch; 8c05bcc6d7 fix(runtime): bind pinned process console to observed namespace; 56f8df0250 feat(javascript): resume verified read waits with the same execution. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/node-graph-launch.test.mjs": {
+    "baseHash": "c68b08b5000df061a68c45c9157804681742e8b695c5104fed50255e3bb8c605",
+    "hash": "7fcb42161e30bae77c611044657e859909119ddf44442b7e37562eb32656e41e",
+    "reason": "Record committed transformations after f03b2dbdf0: a66165a347 fix(loginom): open process console before requiring its grids; f0ea862736 fix(runtime): read console controls before process history. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/node-link-hover.test.mjs": {
+    "baseHash": "cc7142e2067f533c2c9b7fe454f519fc2f8e8926dbf6994ffa142fd021c9a26b",
+    "hash": "e020c8208693478d55fa2c19a48ebe8635965697bb6d573356d10039cd403846",
+    "reason": "Record committed transformations after f03b2dbdf0: 6c7f594028 fix(loginom): diagnose strict link hover graph refusal; f96f2e81fc fix(loginom): rebind replaced node drawing before link hover. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/node-mapping-context.test.mjs": {
+    "baseHash": "e5344ba08666250d63a5e5cc7c214bfffda84a3e5309d7cc3f18471c56800fb6",
+    "hash": "48c5c576dfe10a6c89f4c9ad4c748531d775685f154652d05ffc6f89be5cd4ee",
+    "reason": "Record committed transformations after 26ff8fa766: 0b9b7e2c1c fix(runtime): report bounded mapping cell mismatch evidence; bc34daf8fa fix(runtime): expose owned mapping header diagnostics; 81c7c9b53c fix(javascript): distinguish configured-only output mappings; 0268af373e fix(runtime): read mapping under native disabled column mask; cc883ef03a fix(runtime): observe empty cold output mapping inventories; e2e814a060 fix(javascript): bind input editor mapping reads to original port. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/node-output-context.test.mjs": {
+    "baseHash": "603d970b566b67d0f856bc1b3eb63af81cc1d8a930c713b5cf79cced9e7cce0a",
+    "hash": "7358a66f829568f63083dce7fc655d2863159e5369e4e2acd9be003008120ca1",
+    "reason": "Record committed transformations after f03b2dbdf0: ba46d2ecda fix(runtime): distinguish pending output table cards. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/node-port-open.test.mjs": {
+    "baseHash": "f6fdc3c9b85f40a60b7b27c165ab4bcaaac047719751e97e2ad6dfef637993f0",
+    "hash": "fab77c5f53cfc0ec584579fa2fd014391d338e16c61a13158bab8fad526b3529",
+    "reason": "Record committed transformations after f03b2dbdf0: 7c9cb2cb1f fix(loginom): diagnose pending port wizard opening; 8ce147ae33 fix(runtime): distinguish disabled output column mask from loading. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/node-process-context.test.mjs": {
+    "baseHash": "d5011fba50b1d1c17645c8676ae45b8f78b483c0e16a74c4184777fe0c5d1c5a",
+    "hash": "1bff19c648715e04fbc68eeec5a6dedba1571ba06c370b28ea0fdba15887fc0c",
+    "reason": "Record committed transformations after 26ff8fa766: 8c05bcc6d7 fix(runtime): bind pinned process console to observed namespace. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/node-result-schema.test.mjs": {
+    "baseHash": "f031173f591886eebda731808bdde27022a299478ba97a90012d4a937cc92c17",
+    "hash": "d7d69352d74aa7861137565c158a9df2cb21e9833d186d685dcefcdf1038aa16",
+    "reason": "Record committed transformations after f03b2dbdf0: 57b074fc7b feat(javascript): add isolated public configure trial. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/port-mapping-procedure.test.mjs": {
+    "baseHash": "2c25216d5e10680fade2b17b0e53f72c8da0ff6331256401229d82f6d1e1af8f",
+    "hash": "a004ac997e676438c6a35e5bcd40a6e17a8b6341acfd95f5180ca0efe49209fb",
+    "reason": "Record committed transformations after 26ff8fa766: 05e40b740b fix(runtime): support DataSet output mapping controls. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/process-node-focus.test.mjs": {
+    "baseHash": "cb0a560c168ebaead766849c1f16452b8bbbbfe3cede154b1834893778a1fa79",
+    "hash": "3ca7a0add987a601098af9d13711fb6eba530b4b873aa9c1bc4fbf4cd24dfa6a",
+    "reason": "Record committed transformations after 26ff8fa766: 8c05bcc6d7 fix(runtime): bind pinned process console to observed namespace. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/support/bridge-contract.mjs": {
+    "baseHash": "7a9ed0443eef7105eaef18878eaf6e9ca68c83840955278f88eecb3d6eadd5b6",
+    "hash": "bdf064624ec91a1731125b6dd4ec5ddbbb8360608ba2ddddf9af97910ee1c829",
+    "reason": "Record committed transformations after 26ff8fa766: d17723e59c test(javascript): verify source receipts across MCP bridge; 23e8488e29 fix(javascript): publish context in compact MCP bridge. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/variant-native-read.test.mjs": {
+    "baseHash": "6957a3e1c397b86acbbf6527acee431e5467bb0cb71b55c36d16f6337fdef7ab",
+    "hash": "7cc30b1ecde65de1c8823d284e8f960be46e509a454fdb0d84edd25e994b4a75",
+    "reason": "Record committed transformations after 26ff8fa766: 8c05bcc6d7 fix(runtime): bind pinned process console to observed namespace. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/collapse/native-gates/readonly-download.mjs": {
+    "baseHash": "e8d81fe6c433bf312c114f5eb94c4b8fbccb0e62feda551ceab0e42025575415",
+    "hash": "5cb1dcbfd38a003634d61f39091037882b51760cb4c174f87511b9c98ea7b85c",
+    "reason": "Record committed transformations after 26ff8fa766: c853b9fe00 test(javascript): audit saved package bytes through native reader; f2d3f06a5d test(javascript): read owned saved package by bound path. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/fault-wrappers.test.mjs": {
+    "baseHash": "6980a951f3e540d01563e85806a3f84e32f3f840314f9800480fc7d6701ef36e",
+    "hash": "91dd26030175fe7335c8626be124adf8a4f8e49027ba1f47071dfd5619367e0e",
+    "reason": "Record committed transformations after 26ff8fa766: 3f3366e678 fix(testing): parse current browser envelopes in fault harness. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/rename-client.mjs": {
+    "baseHash": "9424b2ff44130b0a867c23313091d183a4f7611f18daa6f10c8aeefe818af6bf",
+    "hash": "56f10e25524c4ca2dc707b766e69a199bb6bc580846ab86efef1e008b2c8cf55",
+    "reason": "Record committed transformations after 26ff8fa766: 3f3366e678 fix(testing): parse current browser envelopes in fault harness. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/rename_effect.py": {
+    "baseHash": "9280899083ee0f86867d1b2fa5f5ed392adb99ee079d84466990da7cbd7b3ded",
+    "hash": "6e53e311bfe0f881e5e699e220f06d65e1242dfd12b019fffeb4fc12d9ed32bb",
+    "reason": "Record committed transformations after 26ff8fa766: 9b68f346d6 fix(runtime): normalize browser scale and tolerate fractional geometry. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
   }
 }
