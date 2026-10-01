@@ -307,6 +307,35 @@ auditor pin. Если native поддержан или primary sufficient, insuf
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
 
+### E/J14: найден общий Done/Close gap — 2026-10-01
+
+Предыдущая итерация — progress: J27 owning44/typecheck и source provenance5045/
+Python6 прошли, source docs30b703fac0 clean. Registry443 closed_verified/active
+exec=null; текущих live процессов нет. Пользовательский вопрос о естественном
+Done/insufficient примере pending, нового решения/ответа не предполагать.
+
+Адресная сверка согласованного scope и actual source обнаружила **обязательный
+product composition gap**: validateJavascriptCodeRequest разрешает только
+finish=execute; materialize_output=true требует explicit Execute. Общий Done
+покрыт только fixed B trial, общий Close не подключён. Это нельзя заменить
+регистрацией execute-only prototype и выдачей его за всё ядро.
+
+Зафиксирован [Done/Close design](configuration-lifecycle-design.md): дополнить
+existing lifecycle/admission, общий Done new/existing и existing-only Close;
+no output materialization/explicit Execute/fresh output claim при Done/Close,
+independent committed/retained source/settings и unchanged graph/one-shot/ACK.
+New/combined Close pure-refused before target/input effects. Code/declared
+result schema/user-v1 и actual generic apply/driver tests, затем два fresh
+headed saved-package modes с независимым oracle и cleanup. Product registration
+и review/candidate/CLI не выполнены.
+
+**Следующее:** реализация этого ранее согласованного scope, addressed/affected
+regressions, provenance; после freeze/pin — fresh code и declared Done→Close→
+NEW Execute/full6x4 проверки. Не повторять accepted unchanged trials. Пока natural
+triggers не установлены, не создавать synthetic native failure и не ждать
+вместо независимой обязательной реализации J14. Дополнительный вопрос не
+блокирует эту работу. Source ещё не менялся, новый browser не назначен.
+
 ### J27/source provenance: owning проверки перед candidate — 2026-10-01
 
 Предыдущая Goal-итерация — progress: natural regex443 принят с honest sufficient
