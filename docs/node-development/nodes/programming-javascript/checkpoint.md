@@ -7,8 +7,10 @@ handler73a8e9df31 и свежие existing Code447/declared448 Done/Close/preser
 приняты2/2; package/logout/browser/process cleanup и lease448 closed_verified.
 Operator source fecbc9f44deeb1045794811674e67ae28da4caa4 добавляет фиксированный
 new Done обоих modes; addressed125/operator18583PASS, client runtime не менялся.
-Pre-live pin61a391ba/oracle70c6b2a3/freezebdbe903c/auditor888a9fdf/negative426de96e/
-handoff1c73899c сохранены; fresh449 пока не назначен. J02 public input подтверждён.
+Code449 standalone Done принят: original66167 actualexit0, independent v4 audit/27
+negatives/cleanup, lease closed_verified. v1–v3 audit failures сохранены; v4 Code
+проверен после live. Private v4 pin c33cb466 до fresh declared450 сохранён.
+J02 public input подтверждён. Fresh450 пока не назначен.
 Natural insufficient-primary/Done error not_observed; оригинальные требования
 J25 и пределы дополнительной coverage сверены ниже. Продуктовая регистрация,
 F review/immutable candidate и Sol CLI ещё открыты. Следующий текст сохраняет
@@ -313,6 +315,41 @@ public API/handler. До live нужны addressed/operator tests/source/freeze/
 auditor pin. Если native поддержан или primary sufficient, insufficient-primary
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
+
+### E/J14: new Done Code449 accepted; declared next — 2026-10-01
+
+Ordinary headed fresh449 на immutable childfecbc9f44d/original66167 actualexit0:
+new public Done/read.ports=[] → independent full source/settings/new node/input0
+link/exact-ID retry zero events → NEW existing preserve Execute parameters=
+{schema_mode:'code'}/two distinct completed executions/full6×4/all cells/1950/
+user-v1/final source. Done execution=not_requested/output=not_refreshed,
+explicit=false/internal=null; no Save. PackageClose/logout/browser/process absence
+verified; lease449 reconciled closed_verified/active_exec=null.
+Reportf3d26c03e21aa30991c527960ea57419cf2145aaca134fc4bab5540dc3e25604;
+journalc9bd479581e02f8f829dff2bfa468e47da2f3ee5f2579e28b523bd54838b52c0;
+v4 receipt af17d7373c12f187314193ad68fd749a25f6315df7459949086c98c2a1177ed0;
+negative714edb3864e98db1eb5d35c013200341ac6e2383971e91605e664a3a40dad445.
+Independent v4 audit actualexit0; original22068 actualexit0/27of27 non-noop
+corrupted-copy refusals, включая compact value/schema и early native source.
+Materialization1790884340935-qhgl156zat9:1325:3, final:1325:4.
+
+Auditor v1 pre-pinned, но actualexit1: ошибочное whole-cell equality требовало
+omitted diagnostic display_text в user-v1. Отдельный v2 amendment сравнил все
+остальные cell fields/schema и positive PASS, но negative original69118 actualexit1
+выявил пропущенную early source-admission delivery. v3 positiveactualexit1: owner/
+step1 законно повторяются между независимыми admissions. v4 проверяет каждую
+full native delivery и одну open/discard пару в её chronological interval. Все
+v1–v3 scripts/pins/logs/negative copies/partial receipts сохранены, original
+report/journal/source/oracle не менялись. Code v4 — post-live mechanical audit
+amendment, не pre-pinned v4 trial; повторять браузер для исправления аудитора не нужно.
+
+Private v4 pin c33cb466809012e657a4fb656f69f5b75175018ee89e2013b0b325e342a298d7
+закрепляет те же source/oracle/freeze и новый auditor/negative27/handoff **до**
+следующего fresh declared450. Source tests125/operator18583 наfecbc остаются;
+product/candidate/CLI не подтверждены. Fresh450 пока не assigned.
+Actual Codex turn_context 2026-10-01T19:34:30.268Z: gpt-6.1-sol/high. Это не
+предусмотренный F same-task Astra/medium review; не заявлять такой review без
+фактического переключения модели этой задачи.
 
 ### E/J14: new standalone Done source и pre-live pin — 2026-10-01
 
