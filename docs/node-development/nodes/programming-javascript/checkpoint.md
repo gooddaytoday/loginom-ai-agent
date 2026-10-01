@@ -27,7 +27,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Persistence — J15/J23 | Приватные code/declared/usage writer–cold–bytes, dirty-state; см. G7 discovery и исторические SHA ниже | Только фиксированные 6×2; нужны handler 6×4 и CLI |
 | Бизнес и freshness — J03/J04/J11 | Private code/base и declared/base 6×4 `ba46d2ecda`: полный typed UI oracle и fresh owned Execute | Code changed/reordered тоже прошли; остаются existing freshness, declared variants и public C/D/E; native bytes этими runs не доказаны |
 | Stop/cancel — J13 | Private run08; public Stop/repair fresh393 на `69c1f3d60c`; public local read cancel/SAME-ID continuation того же native execution fresh394 на `56f8df0250`, audit/negative87/87 и cleanup/process absence | Public lost reply fresh398 на `90c3bdd7c6` также принят, status/Stop/settlement/inspect и negative88/88; CLI lifecycle и полный G6 открыты |
-| Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
+| Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck; ancestry/byte comparison с `1b8d100392` выполнено на e954 | Explicit URL contract выбран; owning checks перед candidate и actual compiled CLI setup/status/restart остаются |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
 следующий шаг — fixed J19 technical-name freshness Code, затем declared;
@@ -232,6 +232,24 @@ candidate/CLI и remaining natural diagnostics остаются открытым
 не назначен, live процессов нет; child HEAD e954, main документы актуализируются.
 Natural insufficient-primary/Done/actual model/candidate/CLI/Gates остаются открытыми;
 accepted milestones не повторять.
+
+### J27: source contract comparison выполнено — 2026-10-01
+
+Пока ожидается решение по новому context opt-in, выполнена независимая read-only
+предпосылка J27 из плана. На child e954 `git merge-base --is-ancestor` подтвердил
+9d75933fac как ancestor, 1b8d100392 не ancestor. Service/store/migration test
+побайтно совпали с9d. SHA256 соответственно 82265e3f/dedc130a/7a097758.
+Выбран ранее утверждённый explicit-marker контракт: validated save сохраняет
+urlSource=explicit, в том числе exact URL стенда; unmarked legacy records мигрируют
+по прежнему правилу. Marker не становится public/model parameter.
+Alternate полностью убирает legacy migration и дополнительно не prepare active
+при любом pending; это иной contract, его code/tests не смешивались с9d.
+Source не менялся; unchanged owning suites повторно не запускались. Comparison
+требование закрыто, J27 целиком — нет. Перед candidate нужны owning regression/
+typecheck и actual compiled CLI setup/status/restart на новом private profile,
+через validated API save, с exact assigned origin/path. Старые source tests и
+direct headed runtime probes не доказывают candidate persistence.
+Pending context design по-прежнему не принят; нового browser profile/process нет.
 
 ### E/J25: owned technical-details expansion432 принят — 2026-10-01
 
