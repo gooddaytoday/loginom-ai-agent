@@ -110,7 +110,7 @@ if(publicSchemaRefusalCaseId!==null&&(publicSourceCaseId!==null||existingInputVa
   ||publicSchemaRefusalCaseId!==(existingLifecycle==='code'?'code-to-declared':'declared-to-code')))
   throw Error('Public schema refusal requires its separate fixed existing mode/base entrypoint');
 if(publicWizardRefusalCaseId!==null&&(publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null
-  ||existingInputVariant!==null||existingLifecycle===null||!['syntax-'+existingLifecycle,'throw-'+existingLifecycle,...(existingLifecycle==='code'?['import-code','syntax-details-code','syntax-details-expand-code']:[])].includes(publicWizardRefusalCaseId)))
+  ||existingInputVariant!==null||existingLifecycle===null||!['syntax-'+existingLifecycle,'throw-'+existingLifecycle,...(existingLifecycle==='code'?['import-code','syntax-details-code','syntax-details-expand-code','regex-details-auto-code']:[])].includes(publicWizardRefusalCaseId)))
   throw Error('Public wizard refusal requires its separate fixed existing mode/base entrypoint');
 if(publicStopCaseId!==null&&(publicStopCaseId!=='stop-code'||existingLifecycle!=='code'||existingInputVariant!==null
   ||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null||publicWizardRefusalCaseId!==null))

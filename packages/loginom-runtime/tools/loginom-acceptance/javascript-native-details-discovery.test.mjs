@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {managedJavascriptErrorFixture} from '../../client/test/support/javascript-managed-error-fixture.mjs';
 import {makeJavascriptManagedErrorReadCode} from '../../client/lib/javascript-managed-wizard-error.mjs';
-import {readJavascriptNativeDetailsInventory,captureJavascriptNativeDetailsInventory,javascriptImportRefusalSource} from './javascript-native-details-discovery.mjs';
+import {readJavascriptNativeDetailsInventory,captureJavascriptNativeDetailsInventory,javascriptImportRefusalSource,javascriptNaturalRegexRefusalSource,observeJavascriptNaturalDetailsPolicy} from './javascript-native-details-discovery.mjs';
 import {inspectJavascriptModulePolicy} from '../../client/lib/javascript-module-policy.mjs';
 import {javascriptDiscoveryProbe} from './javascript-discovery-probes.mjs';
 
@@ -63,4 +63,31 @@ test('fixed long missing export stays within source bounds and is admitted only 
   assert.equal(source.startsWith(baseline+'\nimport { E_JS_UNKNOWN_EXPORT_'),true);
   assert.equal(source.endsWith('Z'.repeat(4500)+' } from "builtIn/Data";\n'),true);
   assert.equal(result.source_utf8_bytes,Buffer.byteLength(source));assert.ok(result.source_utf8_bytes<32768);
+});
+
+
+test('natural regex diagnostic source is fixed, bounded, admitted and has no extra API or forced-details switch',()=>{
+  const original='import {GetInputTable} from "builtIn/Data";\nconst input = GetInputTable();';
+  const source=javascriptNaturalRegexRefusalSource(original);
+  assert.equal(source,original+'\nconst diagnosticRegex = /(?<=Error: )x/;\n');
+  assert.equal(inspectJavascriptModulePolicy(source).status,'ADMITTED');
+  assert.equal(source.split('const diagnosticRegex = ').length,2);
+  assert.ok(Buffer.byteLength(source)<32768);assert.equal(source.split('\n').length,4);
+});
+
+
+test('natural details policy separates sufficient, insufficient and no wizard observations without inventing acceptance',()=>{
+  const native={kind:'javascript_wizard',tooltip:'SyntaxError: Syntax error at code (:17:26)',
+    dialog_text:'SyntaxError: Syntax error at code (:17:26)',tooltip_truncated:false,dialog_text_truncated:false};
+  assert.equal(observeJavascriptNaturalDetailsPolicy(native).status,'sufficient_primary');
+  assert.equal(observeJavascriptNaturalDetailsPolicy(null).status,'no_wizard_refusal_observed');
+  for(const patch of [{tooltip_truncated:true},{dialog_text_truncated:true},{tooltip:'Error: unknown',dialog_text:'unknown'},
+    {tooltip:'unknown',dialog_text:'unknown'}]){
+    const insufficient={...native,...patch};assert.throws(()=>observeJavascriptNaturalDetailsPolicy(insufficient),/policy differs/);
+    const result=observeJavascriptNaturalDetailsPolicy({...insufficient,technical_details:{expanded:true}});
+    assert.equal(result.status,'insufficient_primary');assert.equal(result.insufficient_primary_verified,true);
+    assert.equal(result.require_details,false);
+  }
+  assert.throws(()=>observeJavascriptNaturalDetailsPolicy({...native,technical_details:{expanded:true}}),/policy differs/);
+  assert.throws(()=>observeJavascriptNaturalDetailsPolicy({...native,tooltip_truncated:undefined}),/provenance/);
 });
