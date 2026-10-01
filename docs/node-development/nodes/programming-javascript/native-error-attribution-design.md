@@ -410,3 +410,53 @@ FInnerExceptions отказал бы реальному этому storage. Root
 работающую задачу: поддержать подтверждённый backing storage без вызова getters,
 закрепить prototype/method identity и добавить regression на vendor constructors,
 а неизвестные структуры по-прежнему явно отвергать. Финальный фикс ещё не принят.
+
+## 11. E/J25: actual Done и technical details — следующий bounded шаг
+
+На 2026-10-01 fixed public Syntax/Throw и J23 long-source persistence уже
+приняты. Новый шаг проверяет оставшуюся диагностику; эти результаты не повторяет
+и не повышает до полного J25/candidate/CLI.
+
+Read-only HTTP GET actual стенда закрепил пять frontend scripts в private
+`e-done-native-source-discovery-01/manifest.json`: DoneWizard/Vendor, WizardForm,
+ErrorMsg и DetailPanel. Это primary source evidence, не browser acceptance.
+`DoneWizard.PageExitAsync` записывает generated title, Caption, Description и
+log row settings; Code/Verify выполняется на Code Next. Invalid display name
+сбрасывается на blur, поэтому пустое имя не является доказанным способом отказа
+Done. Ошибка после начала CloseWizard также не доказывает owned Done refusal.
+Нельзя подставлять FException, ломать RPC или выдумывать Done failure. Его live
+proof остаётся открытым, пока естественный воспроизводимый путь не установлен.
+
+`ErrorMsg.FInstance.FMessageBox` владеет native modal, `FDetails` — native
+DetailPanel. Штатный `btnDetais` раскрывает `pnlDetail` и заполняет
+`cmpDetailText` подробным текстом; это точное spelling в primary source, пока
+не наблюдённый DOM tid. Copy/mailto и вызовы этих методов запрещены для пробы.
+
+Выбран следующий operator-only fixed `import-code`: добавить к прежнему saved
+C business source один well-formed named import отсутствующего длинного
+экспорта из разрешённого `builtIn/Data` (4500 ASCII filler characters). Acorn
+module policy допускает supported module path, но не доказывает наличие
+экспорта или поведение Chakra. Гипотеза: native Code Next откажет и покажет
+длинную диагностику; actual stage/class/truncation записываются как наблюдения,
+без заранее назначенного текста/класса/Done claim. Если импорт неожиданно
+пройдёт, такой run не повышается до diagnostic PASS.
+
+До единственного штатного error OK этот fixed case сохраняет read-only native
+dialog inventory из той же authenticated page: exact captured modal, current
+owner/source, bounded controls и own-data native DetailPanel fields. Это
+discovery hook без mouse/keyboard/DOM/server mutation и без нового публичного
+API. Затем прежний путь обязан закрыть error, discard, независимо прочитать
+старый source, выполнить NEW same-node repair и два fresh Execute/full typed
+6×4. Save не вызывается. Original30min/operation deadlines не расширяются;
+foreign/stale owner, source drift, masks, unknown ACK/reply остаются отказом.
+
+Альтернативы отклонены: повтор короткой optional-chain syntax ничего не
+проверяет о truncation; принудительная подстановка native exception не является
+естественной ошибкой. Runtime expansion details будет отдельным narrow design
+после actual UI inventory, а не догадкой по имени из frontend source.
+Перед live: actual source commit/freeze, operator guards и direct serialized
+read-only regressions, independent private source/output oracle, assignment
+под registry lock и fresh ordinary headed profile. После — original report,
+journal hashes, независимый audit и terminal/cleanup/process absence. Никаких
+секретов/raw logs в Git; child historical dirty docs и acceleration review
+сохраняются отдельно.
