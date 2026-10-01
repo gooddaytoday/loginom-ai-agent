@@ -30,7 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — final tests child6531d36f1c, затем fresh J23 path-only cold после exact recovery425;
+следующий шаг — текущий J23 cold428/exec96638, затем independent v7 audit/negative16/cleanup;
 long source writer424 принят ниже. J26 Code422/Declared423
 приняты2/2 на immutable child `3b59423f1a`, source/direct и live уровни ниже;
 [G1/J22 профиль своего мастера](ui-profile-design.md) принят в bounded scope ниже;
@@ -52,6 +52,25 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J23: final tests PASS; fresh cold428 выполняется — 2026-10-01
+
+На immutable child6531d36f1c final client70285 actual exit0 — **3246PASS+10SKIP**,
+log SHA256 `398788d022c48a3c88abc376383b42664debba8266911617999a82265d579763`;
+operator87324 actual exit0 — **18436PASS**, log
+`510ddb5c7a331e3acd89461032ce047e2e96b4bee8f3a7d12de8ac42e8cc082b`.
+Адресные186PASS/exec55413 остаются final. Private v7 pin SHA256
+`f05987102e7196719154a4edf8b3be841ec5784601ca6a587083e83ec143b3f6`;
+auditor `dc053069b8dcddb628efe497f12ef0d4d2ab9ab94b30258409ffd8dc42e51a51`.
+
+Fresh428 `e-long-source-cold-02`/exec96638 ordinary headed запущен после exact
+recovery425 и verified absence427. Original10min process budget,1owned fresh
+Execute, вход только verified Save path writer424 и technical args. Новый cold
+source6531 и прежний writer060a/v6receipt явно раздельно закреплены v7; source/
+expected/schema/CSV cold не передавались. Наблюдать тот же handle; original425
+failed status/report/journal неизменны, writer424 не повторялся. После terminal —
+v7 independent audit/negative16/cleanup/process absence/registry finish; никакие
+persistence/native bytes/candidate/CLI/Gates пока не повышены.
 
 ### E/J23: адресный pre-click redraw fix — 2026-10-01
 
