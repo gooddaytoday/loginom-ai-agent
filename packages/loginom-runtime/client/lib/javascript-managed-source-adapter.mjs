@@ -42,7 +42,7 @@ export function javascriptManagedSourceSettings(schema) {
 // No model-provided script, navigation target, or executable callback enters it.
 export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEpoch, deadline, targetOrigin,
   execute, record, receiptOptions, channel, wait = ms => new Promise(resolve => setTimeout(resolve, ms)),
-  redactor=createRedactor(),
+  redactor=createRedactor(),requireErrorDetails=false,
   openingBudgetMs = 90000,
   driver = {openManagedJavascriptExistingWizard, dispatchManagedJavascriptNext, dispatchManagedJavascriptGeneration,
     dispatchManagedJavascriptCodeNext, dispatchManagedJavascriptDone, dispatchManagedJavascriptDeclared,
@@ -56,7 +56,7 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
     && Number.isSafeInteger(deadline) && deadline > Date.now()
     && typeof targetOrigin === 'string' && targetOrigin.length > 0
     && typeof execute === 'function' && typeof record === 'function'
-    && typeof receiptOptions === 'function' && typeof channel === 'function',
+    && typeof receiptOptions === 'function' && typeof channel === 'function'&&typeof requireErrorDetails==='boolean',
   'Managed JavaScript source adapter dependencies unavailable');
   need(Number.isSafeInteger(openingBudgetMs) && openingBudgetMs >= 1 && openingBudgetMs <= 180000,
     'Managed JavaScript opening budget unavailable');
@@ -93,7 +93,7 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
   };
   const rejectDraft=async(handle,before,settled,error_stage)=>{
     const diagnostic=await driver.captureManagedJavascriptWizardError({task:handle.task,before,after:settled,
-      expected_source_sha256:handle.draftSha256,execute,record,receiptOptions,wait,redactor,error_stage});
+      expected_source_sha256:handle.draftSha256,execute,record,receiptOptions,wait,redactor,error_stage,require_details:requireErrorDetails});
     need(diagnostic?.dialog_closed===true&&diagnostic.native_owner_verified===true
       &&same(diagnostic.owner,handle.task.owner)&&diagnostic.source_sha256===handle.draftSha256,
     'Managed JavaScript native refusal unconfirmed');

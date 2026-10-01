@@ -12,7 +12,7 @@ for(const mode of ['code','declared'])test('fixed native syntax case is parseabl
  assert.equal(inspectJavascriptModulePolicy(source+'\nconst unsupported = ({})?.value;\n').status,'ADMITTED');
  assert.equal(inspectJavascriptModulePolicy(source+'\n// E: public native refusal repair on the SAME node.\n').status,'ADMITTED');
 });
-for(const args of [['--case','syntax-details-code','--source','foreign'],['--case','syntax-details-declared'],['--case','import-code','--source','foreign'],['--case','import-code','--headless','true'],['--case','import-declared'],['--case','throw-code','--source','foreign'],['--case','throw-declared','--headless','true'],[],['--case','other'],['--case','syntax-code','--headless','true'],
+for(const args of [['--case','syntax-details-expand-code','--require-details','false'],['--case','syntax-details-expand-code','--headless','true'],['--case','syntax-details-expand-declared'],['--case','syntax-details-code','--source','foreign'],['--case','syntax-details-declared'],['--case','import-code','--source','foreign'],['--case','import-code','--headless','true'],['--case','import-declared'],['--case','throw-code','--source','foreign'],['--case','throw-declared','--headless','true'],[],['--case','other'],['--case','syntax-code','--headless','true'],
  ['--case','syntax-code','--x11-no-focus','true'],['--case','syntax-code','--source','arbitrary'],
  ['--case','syntax-code','--case','syntax-declared']])test('fixed entrypoint refuses unassigned case or browser/source controls '+JSON.stringify(args),()=>{
  const result=spawnSync(process.execPath,[entry,...args],{encoding:'utf8'});

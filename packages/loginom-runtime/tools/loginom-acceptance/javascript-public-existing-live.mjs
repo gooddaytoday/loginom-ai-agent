@@ -78,7 +78,7 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   need(schemaRefusalCaseId===null||sourceCaseId===null&&inputVariant==='base'
     &&schemaRefusalCaseId===(schemaMode==='code'?'code-to-declared':'declared-to-code'),'Public schema refusal requires its fixed mode/base');
   need(wizardRefusalCaseId===null||sourceCaseId===null&&schemaRefusalCaseId===null&&inputVariant==='base'
-    &&['syntax-'+schemaMode,'throw-'+schemaMode,...(schemaMode==='code'?['import-code','syntax-details-code']:[])].includes(wizardRefusalCaseId)&&typeof readGraph==='function','Public wizard refusal requires its fixed mode/base');
+    &&['syntax-'+schemaMode,'throw-'+schemaMode,...(schemaMode==='code'?['import-code','syntax-details-code','syntax-details-expand-code']:[])].includes(wizardRefusalCaseId)&&typeof readGraph==='function','Public wizard refusal requires its fixed mode/base');
   need(stopCaseId===null||stopCaseId==='stop-code'&&schemaMode==='code'&&inputVariant==='base'
     &&sourceCaseId===null&&schemaRefusalCaseId===null&&wizardRefusalCaseId===null&&typeof readGraph==='function',
   'Public Stop requires its fixed Code mode/base');
@@ -90,7 +90,8 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   'Public lost reply requires its fixed Code mode/base');
   const probe=javascriptDiscoveryProbe('p1-business-'+schemaMode+'-'+inputVariant);
   const base=createCandidateNodeSupport({targetOrigin,targetBuild:'7.4.2'});
-  const support=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor});
+  const support=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor,
+    requireWizardErrorDetails:wizardRefusalCaseId==='syntax-details-expand-code'});
   let cancelResume;
   const runtime=createActionRuntime({pinned:await javascriptPublicCodePins(),allowCandidate:true,
     targetOrigin,targetBuild:'7.4.2',redactor,onRecord:async event=>{
@@ -155,6 +156,7 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
     const operation_id='js-public-native-refusal-'+randomUUID();
     const throwing=wizardRefusalCaseId.startsWith('throw-');
     const importing=wizardRefusalCaseId==='import-code';
+    const expanding=wizardRefusalCaseId==='syntax-details-expand-code';
     const source_text=importing?javascriptImportRefusalSource(before.source_text):before.source_text+(throwing?'\nthrow new Error("E_JS_SYNC_THROW");\n':'\nconst unsupported = ({})?.value;\n');
     const identity=javascriptSourceIdentity(source_text),remaining=deadline-Date.now()-60000;
     need(remaining>=1200000,'Public wizard refusal/repair original budget unavailable');
@@ -183,9 +185,12 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
       &&JSON.stringify(result.node)===JSON.stringify(node)&&result.configuration?.status==='discarded'
       &&result.execution.status==='not_requested'&&result.output.status==='not_refreshed'&&result.output.ports.length===0
       &&native?.kind==='javascript_wizard'&&['code_next','done'].includes(native.stage)&&native.source_sha256===identity.source_sha256
-      &&native.dialog_closed===true&&(importing||native.error_class?.name==='SyntaxError'
+      &&native.dialog_closed===true&&(importing||expanding||native.error_class?.name==='SyntaxError'
       &&(native.tooltip+'\n'+native.dialog_text).includes('SyntaxError: Syntax error at code'))&&!runtime.hasUnsettledWork(),
     'Public native wizard diagnostic/discard/cleanup boundary unconfirmed');
+    if(expanding)need(native.technical_details?.expanded===true&&typeof native.technical_details.text==='string'
+      &&native.technical_details.text.length>0&&typeof native.technical_details.truncated==='boolean',
+    'Public native technical details expansion/delivery unconfirmed');
     need(new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(result).valid,
       'Public native refusal violates diagnostic schema');
     const compact=nodeResultReply(job,{userProfile:true}).structuredContent;
