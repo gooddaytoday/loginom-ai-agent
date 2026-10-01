@@ -50,6 +50,54 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/G1/J22: private observer закреплён; fresh412 Code назначен — 2026-10-01
+
+Child `35bbf88e7dd5a88f1b92e67db0e17fe2dfd3d509` добавляет fixed headed
+`javascript-ui-profile-live.mjs --case ui-code|ui-declared`: два независимых
+preserve-open/read/discard, Columns/Code controls и cached engine metadata,
+masked images. Новых public callbacks/JS production registration нет.
+Source/settings сравниваются между открытиями; граф проверяет существующий
+semantic preservation guard. Helper/engine selector не вызываются, source/
+settings/Done/Save/explicit Execute не запрашиваются. Потенциальный эффект
+Columns→Code остаётся явно отмеченным; скрытое выполнение не исключается.
+
+Обнаруженная в прежнем accepted live маска disabled delete-all header допускается
+только существующим точным native column/grid/page/root/cache classifier.
+General stage pending сохраняется, private profile отдельно доказывает quiet
+по этой классификации. Foreign/plain/loading mask отказывает. G1 cached arrays
+читаются по own data slots, без accessor/inherited getter; empty conditional
+FPages допустим, собственный Code controller всё равно должен быть уникальным.
+
+Final addressed05:95/95 PASS, actual exec44711 exit0. Full operator02:
+18324/18324 PASS, actual exec58763 exit0; он завершён до последней narrow
+совместимости empty conditional FPages, после которой выполнен final95.
+Full01 отказал в двух cold-handoff VM fixtures из-за отсутствующей новой
+uiProfileMode; actual source branch не падал по этой причине. Addressed01/
+03 также сохранили fixture failures (getCmp читал изменённый slot; simplified
+DOM не представлял Columns/mask classList). Fixtures исправлены, исходные
+logs сохранены, failed runs не повышались до PASS. Diff check PASS.
+
+До live закреплены1512 source files и независимый oracle сохранённых пакетов
+по исходному source SHA836 bytes Code /634 bytes declared из accepted410/411.
+Freeze / oracle / auditor / negative-checker / handoff SHA256:
+`d622c3c27fd03021d38d892dfe36126c2624b22a579d17f871876fe363fcac92` /
+`65320c5ade9cb90159cb0346ff318a66957591642f74720f3a2ef43e8a485f7b` /
+`73d77dd506d1afd783c983d5a42d0ca28ebf8c67ec2febaf9cd46dbe7afda6e9` /
+`c5c804cf290b169d6edbb7c48edbdac6e2e6597395d30400a5bd14bcead58fa6` /
+`76e53529eda6da52644220e4b1fd58607e2277a65665125c013f873b7689613c`.
+Pin SHA `6af673d48ee324d3e5238ca0fcda8d00a8b2ac48afcb523a0d087f5155668ad0`.
+Final addressed/full02 logs SHA:
+`f8b4c4e3b089e921d8b45e9511f7588e6fd84f3079001dea9590f0f92b477fb8` /
+`bb5e5919777f234fcc9d1b7c7b41abafbd3af2f9524bcd54e4036dbb819bde0e`.
+Все raw evidence/helpers находятся в private campaign, в Git не добавлены.
+
+Registry атомарно назначил fresh412 `e-ui-profile-code-01`; предыдущий411
+closed_verified, отсутствие прежних процессов проверено. Browser ещё не запущен,
+active exec null. Следующее действие — один Code live на immutable35bb,
+independent audit +57 non-noop negatives, затем полный cleanup/process absence
+и только после reconciliation fresh Declared. G1/J22 пока открыты; current
+FullType/assistant/engine presence пока не установлены. Остаток E/F сохранён.
+
 ### E/J21: полная граница local user-v1 delivery — 2026-10-01
 
 Child8bca1b00aa добавляет проверку final serialized CallToolResult после всех

@@ -67,3 +67,15 @@ actual process absence проверить отдельно. Unknown effect не 
 Independent audit сопоставляет inventory и реальные allowed gesture receipts,
 source/settings/owner witnesses и cleanup; только после него обновить G1/J22.
 J24, module policy, cold long source, Done refusal и F остаются открытыми.
+
+## Закреплённая реализация перед live
+
+Child35bbf88e7d: observer использует retained stage lease, а private fixed
+entrypoint — существующий source adapter и cleanup. Два отдельных открытия
+дают самостоятельные settings witnesses. Маска disabled delete-all header
+проверяется существующим native classifier; общий stage pending остаётся
+видимым, scoped quiet — отдельный факт. Cached wizard arrays проверяют own
+slots без getters, включая пустые conditional FPages. Final addressed95 и
+operator full18324 подтверждены с оговоркой последнего narrow изменения в
+[checkpoint](checkpoint.md). Source freeze1512/helper/oracle закреплены до
+fresh412 Code. Это source verification; live identity/UI решение ещё открыто.
