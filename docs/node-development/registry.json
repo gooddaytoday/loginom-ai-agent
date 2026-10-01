@@ -281,7 +281,7 @@
     },
     "calculator-handler": {
       "path": "../../packages/loginom-runtime/client/lib/calculator-node.mjs",
-      "sha256": "bc0606ee6d2b969e776aed56036e75418a2230db4ac1b100b1fadb00d8415577",
+      "sha256": "38f096c084daa2906b6d101eaff0a80cb890a66ab2d72790fd9bb44078e3b132",
       "kind": "source",
       "availability": "retained_document",
       "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",

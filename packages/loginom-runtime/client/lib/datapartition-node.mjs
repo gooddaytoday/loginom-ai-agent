@@ -4,12 +4,13 @@ import {configureDataPartition} from './datapartition-procedure.mjs';
 import {configureDataPartitionOutputs,readDataPartitionOutputs} from './datapartition-output.mjs';
 import {dataPartitionConfigurationReadback} from './datapartition-readback.mjs';
 import {dataPartitionParametersSchema} from './datapartition-schema.mjs';
+import {prepareDataPartitionExecution} from './datapartition-execution.mjs';
 import {preflightTabularSource} from './sorting-preflight.mjs';
 const need=(value,message)=>{if(!value)throw Error(message);};
 
 export function createDataPartitionNodeSupport(config){return createTabularTransformNodeSupport(config,{
  type:'preprocessing.data_partition',modes:DATAPARTITION_MODES,revision:'data-partition-v1-internal-1',
- inputMappingRecovery:true,parameterSchema:dataPartitionParametersSchema,readback:dataPartitionConfigurationReadback,
+ inputMappingRecovery:true,prepareExecutionAfterConfiguration:prepareDataPartitionExecution,parameterSchema:dataPartitionParametersSchema,readback:dataPartitionConfigurationReadback,
  validate:validateDataPartitionParameters,validateInput:validateDataPartitionInputParameters,
  preflight:(options,ctx,config)=>preflightTabularSource(options,ctx,config,{required:options.operation.parameters.parameters.stratified!==undefined||options.operation.parameters.parameters.biased!==undefined,
   resolve:(parameters,fields)=>validateDataPartitionInputParameters(parameters,{fields},{},{preview:true}),label:'DataPartition'}),

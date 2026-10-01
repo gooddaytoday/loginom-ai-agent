@@ -48,7 +48,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
   validate:implementation.validate,configure:(ctx,p,drivers)=>drivers.configureCalculator(ctx,p)});}
  const nodeApplyDriverFactory=options=>{
   const {operation,execute,onRecord,now,receiptOptions}=options;
-  let channel,activeSignal,configured,mapping,columns,executionDriver,executionReceipt,multipleOutputs,preconfiguration,inputCheckpoint,outputCheckpoint,configurationGraph;
+  let channel,activeSignal,configured,mapping,columns,executionDriver,executionBaseline,executionBaselineRefreshed=false,executionReceipt,multipleOutputs,preconfiguration,inputCheckpoint,outputCheckpoint,configurationGraph;
   const graphForRejection=async()=>{
    const g=await operation.nodeTargetAdapter.observe({document_id:operation.nodeApply.request.document_id,workflow_ref:operation.nodeApply.request.workflow_ref},operation.deadline);
    requireValue(g.complete===true&&g.document_id===operation.nodeApply.node.document_id&&g.workflow_ref.workflow_id===operation.nodeApply.node.workflow_id,'Complete calculator rollback graph required');
@@ -101,7 +101,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
    ...(!implementation||implementation.preflight?{beforeTarget:ctx=>(implementation?.preflight??preflightCalculatorSource)(options,ctx,{targetOrigin,targetBuild})}:{}),
    verifySource:async()=>verified({not_applicable:true,source_kind:'upstream_table'}),
    async openWizard(ctx) {
-    enter(ctx);executionDriver=createNodeExecutionProcedure(channel,ctx.node);await executionDriver.prepare();
+    enter(ctx);executionDriver=createNodeExecutionProcedure(channel,ctx.node);executionBaseline=await executionDriver.prepare();
     if(!implementation)configurationGraph=await graphForRejection();
     if(implementation?.beforeOpen)preconfiguration=await implementation.beforeOpen(channel,operation.nodeApply.request);
     const s=await channel.observe({condition:'calculator graph before opening',ready:s=>s.prepared_node_context?.surface==='graph'});
@@ -240,7 +240,15 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     // The normal node selection redraws it before the next graph checkpoint.
     await selectPreparedGraphNode(channel,graph,'select configured calculator after port commit',{
      refreshReplacedBody:implementation?.refreshGraphBodyAfterPortCommit===true});
+    let configurationExecution;
+    if(mode==='execute'&&implementation?.prepareExecutionAfterConfiguration){
+     requireValue(!executionBaselineRefreshed,'Configured execution baseline cannot be prepared twice');
+     executionBaselineRefreshed=true;
+     const prepared=await implementation.prepareExecutionAfterConfiguration(channel,ctx.node,{baseline:executionBaseline,configuration:configured,outputs:multipleOutputs,operation});
+     executionDriver=prepared.driver;configurationExecution=prepared.evidence;
+    }
     const finish=await finishConfiguredGraph(channel,executionDriver,mode,ctx.node);
+    if(configurationExecution)finish.configuration_execution=configurationExecution;
     if(mode==='execute')finish.continuation_surface=finishedImportSurface(await channel.observe({
      condition:'calculator graph execution continuity checkpoint',readProcesses:true,readOutputs:true,
      ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true&&s.node_outputs?.verified===true}));

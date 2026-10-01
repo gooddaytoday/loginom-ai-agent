@@ -1,6 +1,6 @@
 # DataPartition: execution baseline proposal
 
-Status: proposed, owner scope approval required; product execution is NOT_RUN.
+Status: approved by owner interaction8a9e0227-fb03-4848-b185-0adc05697688; implemented-source, native retest NOT_RUN.
 
 Exact current candidate: `11ed7f7d95bf050a8f146b2803b6c538e3244708`.
 Attempt: `LOG-52-public-e97416e0-3`, own slot a, qualified wrapper.
@@ -23,3 +23,17 @@ remain unchanged. Never select the last process or discard arbitrary roots.
 Addressed tests must prove deferred preparation follows configuration, precedes launch,
 and that other handlers preserve their baseline timing. Fresh exact-SHA build/native
 bias/math/recovery/CLI/cold are required after approval.
+
+## Implemented refinement after owner approval
+
+The original pre-configuration baseline is retained as a history checkpoint.
+Only DataPartition installs an optional deferred prepare hook. After confirmed
+configure/output commits, it prepares a fresh standard driver and compares both
+baselines with the fully journaled native process inventory. At most one added
+group is permitted: completed `Активация входов узла`, one native-model-owned
+child matching the requested node. Unknown/actual Execute captions, wrong owner,
+extra roots, reused/missing records, stale root and already-launched baselines fail.
+Uncertain transport or missing commit proofs fail before prepare. The shared hook
+can run once; its attempt flag is set before any work, including a lost reply.
+The standard driver's single-new-group/launch-once/owner/completion guards remain.
+Fresh native/CLI/cold acceptance is NOT_RUN; source tests do not prove product PASS.
