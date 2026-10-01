@@ -48,6 +48,25 @@ test("oracle: неполные колонки, переставленные ст
   ]) expect(compareCsv(expected, actual)).toMatchObject({ passed: false })
 })
 
+test("oracle: колонки сопоставляются по именам, их порядок не проверяется", () => {
+  const expected = "category,revenue,average\nBooks,100.5,2.25\nFood,50,1.5\n"
+  expect(compareCsv(expected, "revenue,average,category\n100.505,2.25,Books\n50,1.5,Food\n")).toMatchObject({ passed: true })
+  expect(compareCsv(expected, "revenue,average,category\n100.5,2.25,Food\n50,1.5,Books\n")).toMatchObject({ passed: false })
+})
+
+test("oracle: недостающая, лишняя и повторяющаяся колонки отклоняются с именами", () => {
+  const expected = "category,revenue\nBooks,100\n"
+  expect(compareCsv(expected, "category\nBooks\n")).toMatchObject({ passed: false, error: expect.stringContaining('"revenue"') })
+  expect(compareCsv(expected, "category,revenue,extra\nBooks,100,1\n")).toMatchObject({ passed: false, error: expect.stringContaining('"extra"') })
+  expect(compareCsv(expected, "category,revenue,revenue\nBooks,100,100\n")).toMatchObject({ passed: false, error: expect.stringContaining('"revenue"') })
+})
+
+test("oracle: регистр и пробелы в именах колонок значимы", () => {
+  const expected = "category,revenue\nBooks,100\n"
+  expect(compareCsv(expected, "Category,revenue\nBooks,100\n")).toMatchObject({ passed: false, error: expect.stringContaining('"Category"') })
+  expect(compareCsv(expected, "category ,revenue\nBooks,100\n")).toMatchObject({ passed: false, error: expect.stringContaining('"category "') })
+})
+
 test("oracle: несколько файлов результата не позволяют выбрать удачный случайно", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-oracle-"))
   try {

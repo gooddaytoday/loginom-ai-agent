@@ -23,12 +23,22 @@ export function compareCsv(expected: string, actual: string, tolerance = 0.01) {
   if ("error" in result) return { passed: false, error: `Некорректный CSV результата: ${result.error}` }
   const left = reference.rows
   const right = result.rows
-  if (JSON.stringify(left[0]) !== JSON.stringify(right[0])) return { passed: false, error: "Колонки результата не совпадают с oracle" }
+  const columns = left[0] ?? []
+  const header = right[0] ?? []
+  // Порядок колонок выгрузки не входит в задание: колонки сопоставляются по точным именам.
+  const missing = columns.filter((name) => !header.includes(name))
+  const extra = header.filter((name) => !columns.includes(name))
+  if (missing.length || extra.length) {
+    const listed = [missing.length ? `нет ${names(missing)}` : "", extra.length ? `лишние ${names(extra)}` : ""]
+    return { passed: false, error: `Колонки результата не совпадают с oracle: ${listed.filter(Boolean).join("; ")}` }
+  }
   if (left.length !== right.length) return { passed: false, error: "Количество строк результата не совпадает с oracle" }
+  const positions = columns.map((name) => header.indexOf(name))
   for (const [index, row] of left.entries()) {
+    if (index === 0) continue
     if (row.length !== right[index]?.length) return { passed: false, error: `Строка ${index}: количество полей не совпадает` }
     for (const [column, value] of row.entries()) {
-      const found = right[index]?.[column] ?? ""
+      const found = right[index]?.[positions[column] ?? -1] ?? ""
       if (value === found) continue
       const expectedNumber = number(value)
       const actualNumber = number(found)
@@ -85,10 +95,16 @@ function parseCsv(source: string) {
   }
   if (quoted) return { error: "незакрытая кавычка" }
   if (field || row.length || closed) rows.push([...row, field])
-  if (!rows.length || rows[0]?.some((name) => !name) || new Set(rows[0]).size !== rows[0]?.length)
-    return { error: "пустые или повторяющиеся имена колонок" }
-  if (rows.some((value) => value.length !== rows[0]?.length)) return { error: "разное количество полей в строках" }
+  const columns = rows[0] ?? []
+  if (!columns.length || columns.some((name) => !name)) return { error: "пустые имена колонок" }
+  const repeated = columns.filter((name, index) => columns.indexOf(name) !== index)
+  if (repeated.length) return { error: `повторяющиеся имена колонок: ${names([...new Set(repeated)])}` }
+  if (rows.some((value) => value.length !== columns.length)) return { error: "разное количество полей в строках" }
   return { rows }
+}
+
+function names(list: string[]) {
+  return list.map((name) => JSON.stringify(name)).join(", ")
 }
 
 function number(value: string) {
