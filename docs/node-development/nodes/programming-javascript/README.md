@@ -67,6 +67,11 @@ Outside-safe2/2 characterized на `81b4bfef74`: native9007199254740993
 переходит в9007199254740992 в обоих modes, общей гарантии int64 нет.
 Native cardinality4/4 принят на `3bfbd9968b`: native input baseline,
 ordered keep2/odd/duplicate Code и canonical declared-empty/schema/cleanup.
+Fixed J23 public Code writer424/Save060a и independent path-only cold428/6531
+приняты: exact32768bytes/1024LF, source/settings и1fresh cold Execute/full6×4;
+v6/v7 independent audits/negative16 каждого и cleanup/process absence. Source
+revisions разделены, failed425 сохранён с exact recovery. Native LGP bytes и
+actual candidate/CLI/Gates этим не доказаны; дальше J25/J19 и F.
 Fixed public Code32768bytes/1024lines и declared-empty source-read, schema-mode
 refusal2/2, native Code Next SyntaxError и explicit sync throw/NEW repair обоих
 modes приняты; точные SHA и пределы в checkpoint. Public finite Stop/NEW

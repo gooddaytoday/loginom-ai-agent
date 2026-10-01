@@ -30,7 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — текущий J23 cold428/exec96638, затем independent v7 audit/negative16/cleanup;
+следующий шаг — E/J25 actual Done diagnostics и J19 technical-name freshness; fixed J23 writer424/cold428 принят;
 long source writer424 принят ниже. J26 Code422/Declared423
 приняты2/2 на immutable child `3b59423f1a`, source/direct и live уровни ниже;
 [G1/J22 профиль своего мастера](ui-profile-design.md) принят в bounded scope ниже;
@@ -52,6 +52,36 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J23: длинный source Save + independent cold принят — 2026-10-01
+
+Writer424/public Code/Save на060a принят v6 ранее; cold428/exec96638 на6531
+actual exit0/**OBSERVED** подтвердил actual32768UTF8bytes/1024LF-lines, тот же
+source SHA85acd23d, canonical native settings/generation true/empty grids, новые
+document/workflow при прежнем native node GUID,1fresh owned completed Execute
+`1790844246134-rxuoa12ef0g:742:1` и полный typed6×4. Cold получил только exact
+saved path/technical args, source/oracle/schema/CSV не передавались. Все24 chunks
+(3full source reads) delivered после owned Close; до/после source-effect ACK
+source/settings/policy/graph/process identities проверены. Live pre-body detached
+same-cell redraw bound успешно наблюдён 4 раз; body/Setting не повторялись.
+
+v7 independent audit/PASS; negative exec53080 actual exit0 **16/16** non-noop
+mutations refused. PackageClose/logout/browserClose/process absence verified;
+registry428 closed_verified. Report SHA256
+`c1067ee8ebbc9b7a2ecb2ef969f54641ea4be2a3f6ee4c1ffa799c6bb1d97434`,
+journal `2bc340ece45bea2b644282e18cf1f1128192b590a322d7583720c6f70bf26ecd`,
+audit receipt `17b39db4d5f9dd879038ea82b97ab3f99ef226d9556aff7ae9db86dd83723c59`,
+negative `b56375d0504865a0f6202479d473fbc5b8bed64c18c732cd7d1239fa5409aa61`.
+Private aggregate `e-long-source-accepted-v1.json` SHA256
+`021e5d8acc4d1a2741aedbc61d9a08397ea5f0971cdb8c3934e59b5c683803d0` связывает оба source commits/receipts и
+3distinct owned executions. Writer424 не повторён; failed425/report/journal/
+exact recovery и отклонённый intermediate wait остаются separate evidence.
+
+J23 fixed long-source persistence принят в этом isolated scope; native LGP
+bytes/полная engine grammar/actual candidate/CLI/Gates не заявлены. Далее E
+J25 Done diagnostics/technical details при insufficient text и J19 current
+technical names; actual model resistance и J01/J18/J21/J27/F остаются открытыми.
+Не повторять fixed long-source run без затрагивающего изменения.
 
 ### E/J23: final tests PASS; fresh cold428 выполняется — 2026-10-01
 

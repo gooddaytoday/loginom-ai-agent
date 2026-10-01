@@ -41,7 +41,15 @@ retained physical mapping binding и actual source/settings/policy до/посл
 dispatch ACK проверены на этих paths. Saved unsupported source/drift/closed
 policy refusal/unknown cleanup — direct tests, не live injection. Sandbox/
 full engine grammar/candidate/CLI не заявлены; exact hashes в checkpoint,
-остаток J23 cold именно long source/Done refusal/J19 model resistance/E/F.
+fixed J23 long source принят ниже; остаток Done refusal/J19 technical names/model resistance/E/F.
+
+E/J23 fixed long-source persistence принят: public new Code writer424/Save на
+060a и независимый path-only cold428 на6531 (actual exit0) подтвердили exact
+32768bytes/1024LF/source SHA, native settings,1fresh cold Execute/full6×4 и
+cleanup/process absence. v6/v7 independent audits/negative16 each;24 cold source
+chunks delivered после Close. Source revisions разделены, writer не повторён;
+failed425 сохранён и exact recovery завершён. Native LGP bytes/candidate/CLI/
+aggregate Gates остаются открытыми; hashes и pre-body redraw fix — в checkpoint.
 
 E/J12/J25 source/local milestone `010dca575d`: runtime распознаёт свежий
 owned Code Next refusal, читает native error dialog, закрывает его OK и
