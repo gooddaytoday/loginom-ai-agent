@@ -479,3 +479,65 @@ details gesture. Он не доказывает недостаточность �
 раскрытие details, естественный Done refusal или полное J25. Source/settings/
 owned discard/NEW repair/two fresh Execute/full6×4 и cleanup остаются обязательны.
 Импорт не расширяется на другие API/модули и не маскируется как SyntaxError.
+
+### 11.2. Native inventory431 — проверенное основание
+
+Actual child1a754aa192/exec72018 exit0/OBSERVED и supplemental independent v4
+audit/20 negative mutations подтвердили own Code Next modal и read-only inventory
+перед sole OK; retained baseline/NEW repair/two fresh Execute/full6×4/cleanup.
+Идентификаторы: `DetailPanel;btnDetais`, `DetailPanel;pnlDetail`,
+`DetailPanel;cmpDetailText`. Это отдельный namespace внутри `msgbox-1`, не tid с
+его префиксом. Native ErrorMsg.FMessageBox связывает modal; FDetails own fields
+FView/FItems/FDetailedException наблюдены. Button own scope/toggleHandler и
+enableToggle, panel own collapsed, root own Controller/ownerCt/el присутствуют.
+Values/identity этих дополнительных полей ещё не проверены, getters не вызывать.
+Panel и detail text hidden; button visible/native. Источники/точные SHA и ошибки
+первых audit versions — в checkpoint; browser evidence не переигрывалось.
+
+## 12. E/J25: narrow owned details expansion — реализация следующего шага
+
+Композиция с существующим managed error capability; generic JS/RPC/script
+actions не расширяются. Default policy раскрывает details, если первичные
+tooltip/dialog усечены либо класс/позиция не распознаны. Для проверки helper
+добавить **внутреннюю** closed policy `required` только в fixed operator case
+`syntax-details-expand-code`; публичные parameters/tool schemas этот переключатель
+не принимают. Такой live доказывает expansion/helper/delivery/repair; сам по себе
+не доказывает естественный insufficient-primary или Done refusal.
+
+Перед одним details click удерживать exact ErrorMsg instance/message/DetailPanel
+controller, FView/native root/DOM, captured modal, native button/scope/handler,
+panel/text objects. Сверять fresh owned stage/error tooltip и полный exact
+CodeMirror draft (в Done hidden), origin/build/account/node, blockers и deadline.
+Контролы искать только внутри captured modal; native DetailPanel root.Controller
+и FView обязаны совпасть, button scope/known prototype toggleHandler — относиться
+к нему, native ownerCt chains — вести к тому же FView. Читать только data
+descriptors, не hidden exception getters. Missing/foreign/remounted identities,
+changed point/state или accessor вместо ожидаемого data — отказ до gesture.
+
+Details policy не является правом на повтор. One-flight lease flag до sole click,
+durable prepared ACK, свежая повторная проверка непосредственно перед gesture,
+returned receipt и read-only settlement на исходном deadline. Признать expanded
+только при той же native панели/тексте, visible text и действительном toggled
+state; UI handler не вызывать. Полный draft/owner проверить и после expansion.
+Затем fresh OK point/diagnostic snapshot, sole OK, dialog closure и прежний owned
+Close/discard/independent baseline proof. Lost reply/ACK, extra dialog/mask,
+timeout/cancel не разрешают OK/discard/replay как будто expansion состоялась.
+
+Сохранять первичный текст отдельно; возвращать redacted technical details с
+явным UTF8 truncation и признаком observed expansion. Не читать больше bounded
+DOM text и не объявлять backend/frontend stack Chakra span. Native source digest/
+owner, class/location или явное unrecognized, user-v1 и node result schema обязаны
+совпасть. Учесть raw helper16KiB и публичный JSON envelope: Unicode не разрезать,
+не терять provenance/schema, oversized delivery отказывать явно. Нельзя скрывать
+truncation или менять source32KiB cap ради диагностики.
+
+Direct serialized tests: actual helper+capture orchestration, default sufficient
+без extra click, insufficient/required expansion и bounded/redacted result;
+stale native root/controller/scope/handler/button/panel/text/owner/source/point,
+accessors/extra dialogs/masks, повтор gesture, ACK/reply loss, original deadline,
+unconfirmed expansion/OK, byte limits/user-v1/schema и отсутствие output на FAILED.
+После source freeze/адресных и затронутых общих regressions — fresh432 ordinary
+headed fixed required-details case, pre-live independent oracle/auditor;
+native technical text/one click/Close/source/NEW repair/2fresh Execute/full6×4,
+then cleanup/process absence/negative auditor mutations. Existing short syntax/
+throw/long-source milestones без затронувшего изменения не повторять.

@@ -72,6 +72,11 @@ Fixed J23 public Code writer424/Save060a и independent path-only cold428/6531
 v6/v7 independent audits/negative16 каждого и cleanup/process absence. Source
 revisions разделены, failed425 сохранён с exact recovery. Native LGP bytes и
 actual candidate/CLI/Gates этим не доказаны; дальше J25/J19 и F.
+J25 read-only native details inventory431/1a754aa192 принят: actual
+`DetailPanel;btnDetais` внутри owned error modal, retained source/NEW repair/
+2fresh Execute/full6×4 и cleanup/process absence; v4 audit/negative20/20.
+Раскрытие details/insufficient-primary и Done refusal этим не доказаны;
+следующий шаг — §12 [native error design](native-error-attribution-design.md).
 Fixed public Code32768bytes/1024lines и declared-empty source-read, schema-mode
 refusal2/2, native Code Next SyntaxError и explicit sync throw/NEW repair обоих
 modes приняты; точные SHA и пределы в checkpoint. Public finite Stop/NEW
@@ -119,8 +124,8 @@ user-v1 output не теряет строки при budget fence. Headed Code42
 приняты2/2: public apply/8preflight refusals/source-bound reread/3distinct owned
 Execute/full6×4/user-v1/source read, v3 audit/negative14 каждый/cleanup. Saved
 unsupported source и drift проверены direct, без live injection/sandbox claim.
-Следующий шаг — Save/cold именно long source; далее
-Done refusal/J19 model resistance и E/F/candidate/CLI.
+Fixed long-source Save/cold принят выше; далее
+technical-details expansion/Done refusal/J19 model resistance и E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 

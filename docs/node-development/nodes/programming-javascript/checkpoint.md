@@ -30,7 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — E/J25 actual Done diagnostics и J19 technical-name freshness; fixed J23 writer424/cold428 принят;
+следующий шаг — E/J25 owned technical-details expansion по §12 native error design,
+actual Done diagnostics и J19 technical-name freshness; fixed J23 writer424/cold428 принят;
 long source writer424 принят ниже. J26 Code422/Declared423
 приняты2/2 на immutable child `3b59423f1a`, source/direct и live уровни ниже;
 [G1/J22 профиль своего мастера](ui-profile-design.md) принят в bounded scope ниже;
@@ -52,6 +53,41 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J25: native details inventory431 принят; expansion остаётся — 2026-10-01
+
+Ordinary headed `e-native-details-syntax-code-01`/exec72018 actualexit0/**OBSERVED**
+на child1a754aa192: fresh owned Code Next SyntaxError, единственные error button/OK,
+read-only native inventory до OK, verified discard/independent retained source/
+settings/mappings/full graph, NEW same-node repair и два fresh completed Execute
+`1790846122240-sn58plnpfuo:814:1`/`:2`, полный typed6×4. Cleanup PackageClose/logout/
+browserClose/process absence verified; registry431 closed_verified/active_exec=null.
+
+Actual modal `msgbox-1`, native ErrorMsg.FMessageBox/FDetails bound. Внутри него
+отдельный namespace **DetailPanel**, точная кнопка `DetailPanel;btnDetais`,
+панель `DetailPanel;pnlDetail`, текст `DetailPanel;cmpDetailText`; native Ext
+identities подтверждены, panel/text hidden. Own controller fields FView/FItems
+наблюдены. Это inventory, **не expanded/insufficient-primary/Done proof**.
+Controller HTTP source SHA960886f9 отдельно подтверждает owning frontend;
+неудачный GET `/bg/Controller.js`404 не является недоступностью Loginom.
+
+Pre-live pin651f685c/source freeze v3, addressed29PASS, final operator69606
+actualexit0/18453PASS (log d23704f6). Client production не изменён. Original audit
+v2 отказал по ошибочному сравнению с отсутствующим public dialog_tid; v3 отказал
+по старому admission hash. Оба failure/log/pin сохранены. Supplemental v4
+сверяет tid с исходной owned observation и actual DetailPanel namespace, сохраняя
+source/report/journal/requirements и первоначальный admission pin v2.
+v4 audit/PASS; negative74684 actualexit0/**20/20** non-noop mutations refused.
+Report SHA `b31cd13326c9a76776bb46d2e38bb221f5291e3d2d038f7f33d84a563f9738e0`,
+journal `1d92b35d9a1ad2c771924ef1e1b42e8f6b012d0ecacea44e42f07934cdc93d92`,
+receipt `e6e978b8df6c4f9a1c7f72b3163179d91fde7300da9f4e6cfeaa96f027bfe79d`,
+negative `7c0564165a9d13dc596a748c011933ac66e2a1a55847f55ccf23ed0655cd2be7`.
+
+Далее §12 [native error design](native-error-attribution-design.md): typed
+details helper/auto insufficient-primary policy и отдельный fixed internal
+required-details headed proof. Новый profile432 пока не назначен. Done natural
+refusal/J19 technical names/actual model/candidate/CLI остаются открытыми;
+E/J25 целиком и Gates не повышаются. Импорт429 не повторять: гипотеза не дала modal.
 
 ### E/J25: import429 не дал modal; exact recovery430 завершена — 2026-10-01
 

@@ -51,6 +51,17 @@ chunks delivered после Close. Source revisions разделены, writer �
 failed425 сохранён и exact recovery завершён. Native LGP bytes/candidate/CLI/
 aggregate Gates остаются открытыми; hashes и pre-body redraw fix — в checkpoint.
 
+E/J25 read-only native details inventory431 на1a754aa192 принят independent v4
+audit/negative20/20/actualexit0/cleanup/process absence. Fresh Code Next
+SyntaxError → owned error modal/OK/discard → retained source/settings/graph →
+NEW repair/two fresh Execute/full6×4 проверены. Actual button namespace —
+`DetailPanel;btnDetais` внутри exact native ErrorMsg modal, panel/text hidden;
+это не expansion или insufficient-primary/Done failure proof. Import429 прошёл
+Next/Done и отказал before Execute; original failure сохранён, exact own idle
+package/session закрыты отдельно. Далее owned details expansion по §12
+[native error design](native-error-attribution-design.md), затем J19/F;
+J25/candidate/CLI/Gates остаются открытыми. Точные SHA в checkpoint.
+
 E/J12/J25 source/local milestone `010dca575d`: runtime распознаёт свежий
 owned Code Next refusal, читает native error dialog, закрывает его OK и
 разрешает один discard своего draft. Existing handler независимо перечитывает
