@@ -18,6 +18,8 @@ export async function managedJavascriptErrorDetailsFixture({auto=true,stage='cod
   const nativeButton=Object.assign(Object.create({pressed:false,disabled:false}),{el:{dom:button},ownerCt:view,
     enableToggle:true,scope:controller,toggleHandler:DetailPanel.prototype.btnDetaisHandler});
   const nativePanel={el:{dom:panel},ownerCt:view},nativeText={el:{dom:text},ownerCt:nativePanel};
+  controller.FItems={btnDetais:nativeButton,pnlDetail:nativePanel,cmpDetailText:nativeText};
+  controller.FDetailedException={get DetailText(){throw Error('Hidden exception getter must not be invoked');}};
   const instance={FMessageBox:f.dialogComponent,FDetails:controller};
   f.context.bg.ext={errormessage:{ErrorMsg:{FInstance:instance},DetailPanel}};
   Object.assign(f.controls,{[root.id]:view,[button.id]:nativeButton,[panel.id]:nativePanel,[text.id]:nativeText});

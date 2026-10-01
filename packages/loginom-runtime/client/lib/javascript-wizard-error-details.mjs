@@ -20,10 +20,12 @@ export function inspectJavascriptWizardErrorDetails({held,task}) {
   const instance=own(globalThis.bg?.ext?.errormessage?.ErrorMsg,'FInstance');
   const message=own(instance,'FMessageBox'),controller=own(instance,'FDetails');
   const view=own(controller,'FView'),root=own(own(view,'el'),'dom');
+  const items=own(controller,'FItems'),exception=own(controller,'FDetailedException');
   const constructor=globalThis.bg?.ext?.errormessage?.DetailPanel;
   if(!instance||own(own(message,'el'),'dom')!==dialog||!controller||!root||!visible(root)
     ||!dialog.contains(root)||root.getAttribute('data-tid')!=='DetailPanel'
     ||globalThis.Ext?.getCmp?.(root.id)!==view||own(view,'Controller')!==controller
+    ||!items||typeof items!=='object'||!exception||typeof exception!=='object'
     ||typeof constructor!=='function'||Object.getPrototypeOf(controller)!==constructor.prototype
     ||typeof own(constructor.prototype,'btnDetaisHandler')!=='function')
     throw Error('Native details controller changed');
@@ -41,12 +43,18 @@ export function inspectJavascriptWizardErrorDetails({held,task}) {
     return {element,native};
   };
   const button=control('DetailPanel;btnDetais'),panel=control('DetailPanel;pnlDetail'),text=control('DetailPanel;cmpDetailText');
+  // The native toggle follows Items (own FItems) and FDetailedException, not DOM
+  // ownership alone. Never invoke Items or the exception's DetailText getter.
+  if(own(items,'btnDetais')!==button.native||own(items,'pnlDetail')!==panel.native
+    ||own(items,'cmpDetailText')!==text.native)throw Error('Native details items binding changed');
   if(!visible(button.element)||data(button.native,'disabled')!==false
     ||button.element.closest('.x-item-disabled,.x-btn-disabled')||button.element.getAttribute('aria-disabled')==='true'
     ||own(button.native,'enableToggle')!==true||own(button.native,'scope')!==controller
     ||own(button.native,'toggleHandler')!==own(constructor.prototype,'btnDetaisHandler'))
     throw Error('Native details toggle binding changed');
-  const identities={instance,message,controller,view,root,button:button.element,button_native:button.native,
+  const identities={instance,message,controller,view,root,items,exception,constructor,
+    prototype:constructor.prototype,handler:own(constructor.prototype,'btnDetaisHandler'),
+    button:button.element,button_native:button.native,
     panel:panel.element,panel_native:panel.native,text:text.element,text_native:text.native};
   const captured=held.errorDetailsBinding;
   if(captured&&Object.keys(identities).some(key=>captured[key]!==identities[key])||task.mode==='expanded'&&!captured)
