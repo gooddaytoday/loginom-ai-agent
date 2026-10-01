@@ -30,7 +30,9 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — current context при изменённом входе/старом коде и remaining delivery budgets (J19/J21); context Code403/declared404 и bridge fix приняты ниже. J09 Code399/declared400 и exact knowledge v1 Code401/declared402 также приняты. Fixed source32768/
+следующий шаг — Declared reordered current context на immutable child9c93,
+затем [полные response budgets](response-budget-design.md) J21; Code410 принят ниже.
+Context Code403/declared404 и bridge fix, J09 Code399/declared400 и exact knowledge v1 Code401/declared402 также приняты. Fixed source32768/
 empty и schema-mode refusal уже приняты ниже; сохранение manual mapping, дополнительные
 limits/redaction и context/engine/module/budgets остаются открытыми.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
@@ -73,7 +75,7 @@ Failed405 evidence не переписано и не повышено до PASS.
 prepared native identity, проверить foreign/owner/deadline/no-replay regressions,
 новый immutable freeze/oracle pin, затем fresh reordered Code/Declared live.
 
-### E/J19: owned import preview fix; fresh410 RUNNING — 2026-10-01
+### E/J19: owned import preview fix; Code410 принят — 2026-10-01
 
 Child `9c93b067e1206c16653b83751f9fbe289eb80c2b` допускает ожидание только
 unique contained import-preview mask в text_import_file, при прежних exact
@@ -110,9 +112,43 @@ Recovery receipt SHA256
 `1cf26c97d5818c57c1e5da09bf14e40dc5f6a998f4cc0c471f89b110f61570a5`.
 Freeze02/1449 files повторно проверены без изменения. Fresh410/exec34782,
 e-public-context-reordered-code-03, ordinary headed на том же immutable source/
-oracle v1/auditor v2. Runtime events/report/cleanup ещё не приняты;
-reordered context/model/candidate/CLI PASS пока нет. Следить за original
-exec34782 до terminal, затем independent audit/negative77/cleanup/absence.
+oracle v1, actual exit0/OBSERVED, package/logout/browser cleanup3/3 и process
+absence. Original report/journal SHA256
+`5415569fb3c12c9122e11068c97d4d271a82ffd56a0c957e947471a95bf5b766` /
+`2bb744f7a0b9547402ca108e7f7401bfac7faa6a5a7d5c856cca58475074ddb6`.
+Import открывается одним begin_wizard; preview child mask в этом успешном
+trace не появился. Reordered source order и сохранённый target order различны,
+полная name/field_id reciprocity подтверждена. Два current context reads до/
+после source edit сохраняют полный код, оба mappings, ручной label/Required/
+autosync и граф; same-ID retry добавляет0 событий. Import1 и JS4 explicit
+executions дают full6×4/totalNet1950; это не утверждение об отсутствии скрытых
+native executions. Model resistance/candidate/CLI не проверены.
+
+Auditor v2/exec7781 отказал из-за неверного ожидания execute_graph_node для
+импорта. Текущий text-import-node:212 и прежние accepted J11 journals используют
+execute_wizard. Исправленный v3 проверяет10 реальных import phases, native
+owner, terminal execution binding, один execute_wizard и0 graph/finish_wizard.
+Source/oracle/original live evidence неизменны; браузер не переигрывался.
+Amendment после Code410/до Declared сохранён, SHA256
+`ef537606bff2fa3a25a2861cdb952d04f5cca8c0edfde1ca46a3e3ff56986452`.
+Auditor v3 SHA256
+`1c3763b75918bb3baf5a3f79952261a9808620d7f5301658b54f535402f3ba9f`,
+primary exec17103 actual exit0/PASS, receipt SHA256
+`e39d04d2457fc63a81c02e283dc97677e3c0b66f3959583a0892c87547332599`.
+Negative checker03/exec78088 отказал на собственной no-op mutation5→5;
+это неизменная копия, корректно принятая аудитором. Original refusal сохранён.
+Checker04 меняет лимит5→6 и проверяет non-noop каждого case: exec18523 actual
+exit0, negative80/80, result SHA256
+`20e3dbdb510928f42c9116184d5a4d892c2ffbc8b8b7c53bcc67ce43b34d4e9c`.
+Registry410 reconciled closed_verified/active exec null. Следующий live —
+fresh Declared reordered на том же source/oracle и preassigned auditor v3;
+negative checker05 выполняет те же80 независимых cases в4 процессах.
+
+J21 sizing через actual factories с синтетическими pins показал JS11597,
+весь batch15=62163 и compact bundle7313 wire bytes. Это source-only fixture,
+не pins текущего target/MCP/Agent delivery. Решение и пределы проверки — в
+[response-budget-design](response-budget-design.md); реализация пока не начата.
+Canonical docs validation89 active/304 total/14 handlers PASS, diff PASS.
 
 ### E/J19: reordered current context подготовлен к live — 2026-10-01
 
