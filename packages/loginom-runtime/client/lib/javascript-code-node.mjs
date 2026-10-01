@@ -178,7 +178,9 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
         if(request.target.kind==='existing'){
           existingBaseline=await admitJavascriptExistingSchema({receipt:admitted,snapshot:sourceSnapshot,
             parameters:request.parameters,owner,record:onRecord,deadline:ctx.deadline});
-          expected??=admitted.effective_source;
+          // Preserve binds the reader's exact identity; effective_source also
+          // contains module-policy/parser metadata and is not a source binding.
+          expected??=admitted.previous_source;
           need(admitted.effective_source.source_sha256===expected.source_sha256,
             'JavaScript existing effective source admission differs');
           existingGraphBaseline=await graph({...ctx,node:request.target.ref});
