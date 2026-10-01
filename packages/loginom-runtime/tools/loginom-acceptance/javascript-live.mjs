@@ -79,8 +79,13 @@ import {runJavascriptStopProbe} from './javascript-stop-probe.mjs';
 import {javascriptPublicTypedIds,javascriptPublicCodeProbe,runJavascriptPublicCodeLive} from './javascript-public-code-live.mjs';
 import {runJavascriptPublicExistingLive} from './javascript-public-existing-live.mjs';
 
-export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null,publicSourceCaseId=null,publicSchemaRefusalCaseId=null,publicWizardRefusalCaseId=null,publicStopCaseId=null,publicCancelResumeCaseId=null,publicLostReplyCaseId=null,publicRequiredCaseId=null,publicContextCaseId=null}={}) {
+export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null,publicSourceCaseId=null,publicSchemaRefusalCaseId=null,publicWizardRefusalCaseId=null,publicStopCaseId=null,publicCancelResumeCaseId=null,publicLostReplyCaseId=null,publicRequiredCaseId=null,publicContextCaseId=null,uiProfileMode=null}={}) {
 process.umask(0o077);
+if(uiProfileMode!==null&&(!['code','declared'].includes(uiProfileMode)||!coldReader||packageFile||existingLifecycle!==null
+  ||existingInputVariant!==null||publicProbeId!==null||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null
+  ||publicWizardRefusalCaseId!==null||publicStopCaseId!==null||publicCancelResumeCaseId!==null
+  ||publicLostReplyCaseId!==null||publicRequiredCaseId!==null||publicContextCaseId!==null))
+  throw Error('UI profile requires its separate fixed saved mode entrypoint');
 if(publicProbeId!==null&&(!javascriptPublicTypedIds.includes(publicProbeId)||coldReader||packageFile||batchCases!==null
   ||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null||existingLifecycle!==null))
   throw Error('Public typed probe requires its separate fixed entrypoint');
@@ -254,7 +259,7 @@ if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||per
 const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},redactor});
 const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOString(),status:'RUNNING',stage:'login',
   ...(coldReader||persistence||packageFile?{host_process:{pid:process.pid,started_at:new Date(performance.timeOrigin).toISOString(),profile:resolve(options['--profile'])}}:{}),
-  ...(coldReader?{scope:existingLifecycle===null?'private G7 cold saved-package observation':'isolated E existing saved-package lifecycle',original_deadline:batchDeadline,explicit_execution_limit:existingLifecycle===null?1:existingInputVariant===null?2:3,gates_closed:[]}:{}),
+  ...(coldReader?{scope:uiProfileMode!==null?'private G1/J22 saved wizard UI profile':existingLifecycle===null?'private G7 cold saved-package observation':'isolated E existing saved-package lifecycle',original_deadline:batchDeadline,explicit_execution_limit:uiProfileMode!==null?0:existingLifecycle===null?1:existingInputVariant===null?2:3,gates_closed:[]}:{}),
   ...(packageFile?{scope:'private G7 saved-package byte audit',original_deadline:batchDeadline,explicit_execution_limit:0,gates_closed:[]}:{}),
   ...(persistence?{persistence_mode:persistence.schema_mode,original_deadline:batchDeadline,explicit_execution_limit:2}:{}),
   node:process.versions.node,headless:false,server_os:{status:'not_observed'},storage:{status:'not_observed'},
@@ -1935,7 +1940,13 @@ try {
           :'isolated E current JavaScript context: one reordered import and four warmup/edit JavaScript Execute; full typed business and read-only current mappings';}
       (report.public_required??report.public_existing).graph_after=await executionRuntime.graph();await save();
     }
-    if(existingLifecycle===null)await runColdRead();
+    if(uiProfileMode!==null){
+      const {runJavascriptUiProfile}=await import('./javascript-ui-profile-run.mjs');
+      await runJavascriptUiProfile({page,prepared:executionPrepared,node:executionNode,targetOrigin:address.origin,
+        deadline:batchDeadline,record:executionRecord,report,save,schemaMode:uiProfileMode,runtime:executionRuntime,
+        directory,onPending:value=>{managedCloseUncertain=value;}});
+    }
+    if(existingLifecycle===null&&uiProfileMode===null)await runColdRead();
   }
   if (options['--create-node']||options['--palette-only']||options['--palette-hit-test']) {
     report.stage='create-draft';await guard();
