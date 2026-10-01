@@ -33,3 +33,6 @@ logs/
 *.bun-build
 tsconfig.tsbuildinfo
 /.local/project-memory/
+
+# Run-owned state can contain credentials.
+/.paperclip-runtime/

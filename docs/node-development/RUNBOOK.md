@@ -126,6 +126,16 @@ python3 scripts/node-acceptance/diagnostic-slot.py run \
   -- <команда диагностического скрипта>
 ```
 
+Команда после `--` запускается ровно как задана: wrapper **не добавляет bwrap/Xvfb**.
+Для standalone auth/read-only/wizard probe caller обязан использовать квалифицированный
+bwrap/Xvfb/headed-entry из существующего harness и exact resources/bin/node/browser.
+Прямой host Chromium не подтверждает этот маршрут. `--out` ещё не должен существовать;
+подготовительные материалы держать отдельно. Пароль профиля читать из decoded JSON
+`secrets.payload`, не из `profile.password`; значения не публиковать. Prepare и cleanup
+используют один `sessionId` через `withDiagnosticSession` и немедленный `bindPrepared`.
+Administrative auth-only/RECOVERED/cleanup/cache probes не заменяют candidate build и
+CLI/cold/public/math PASS.
+
 Wrapper проверяет соответствие `--slot` назначенному `NODE_SLOT`, сохраняет `owner.json` до запуска,
 держит блокировку до окончания очистки и не выдаёт агенту административные данные в выводе.
 В `owner.json` PID относится к локальному процессу, а не к серверной сессии Loginom.

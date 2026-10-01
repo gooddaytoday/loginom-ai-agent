@@ -42,7 +42,8 @@ export function buildNodeReadRequest(args,source){
  const schemas=[...previews,...retained.filter(p=>!previews.some(s=>s.port===p.port))];
  need(schemas?.length>0,'Invalid parameters.source_operation_id: the source operation has no verified table output');
  const ports=args.read?.ports??schemas.map(p=>p.port);
- need(ports.length>0&&ports.every(p=>schemas.some(s=>s.port===p)),
+ need(ports.length>0&&ports.length<=3&&new Set(ports).size===ports.length
+  &&ports.every(p=>Number.isInteger(p)&&p>=0&&p<=2&&schemas.filter(s=>s.port===p).length===1),
   'Invalid parameters.read.ports: choose ports present in the completed source result');
  const budget=args.budget_ms??300000;
  return {operation_id:args.operation_id,contract_revision:request.contract_revision,

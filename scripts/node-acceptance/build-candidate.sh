@@ -72,6 +72,9 @@ fi
 [[ "$BUILD_ROOT" == /* ]] || { echo "LOGINOM_BUILD_ROOT must be absolute" >&2; exit 1; }
 [[ "$OUT" != "$BUILD_ROOT"/* ]] || { echo "out must be outside $BUILD_ROOT" >&2; exit 1; }
 
+source "$(dirname "${BASH_SOURCE[0]}")/build-environment.sh"
+configure_build_environment "$BUILD_ROOT"
+
 mkdir -p "$BUILD_ROOT"
 REPO="$BUILD_ROOT/repo"
 

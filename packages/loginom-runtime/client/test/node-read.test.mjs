@@ -17,6 +17,18 @@ test('read API accepts only local operation identity and bounded reading options
  }
  assert.equal(calls.length,1);
 });
+test('three owned outputs retain native GUIDs, schemas and empty-output identity',async()=>{
+ const s=source();
+ s.outcome.output.output.ports=[0,1,2].map(port=>({port,port_guid:'native-'+port,schema:structuredClone(schema),sample:[],sample_complete:true}));
+ const input={...args,read:{ports:[2,0,1],sample_rows:100,require_exact_numbers:true}};
+ const runtime={tools:nodeApiTools,startNodeRead:a=>buildNodeReadRequest(a,s)};
+ const request=await dispatchNodeApi(runtime,'dock_node_read',input);
+ assert.deepEqual(request.read.ports,[2,0,1]);
+ assert.deepEqual(request.parameters.schemas.map(p=>[p.port,p.port_guid]),[[0,'native-0'],[1,'native-1'],[2,'native-2']]);
+ for(const ports of [[0,0],[3],[0,1,2,0]])assert.throws(()=>buildNodeReadRequest({...args,read:{ports}},s));
+ s.outcome.output.output.ports.pop();
+ assert.throws(()=>buildNodeReadRequest(input,s));
+});
 test('unknown, failed, unsettled, file-only and absent-port sources refuse before execution',()=>{
  for(const mutate of [s=>s.outcome.status='FAILED',s=>s.outcome.cleanup_complete=false,s=>s.outcome.output.execution.status='pending',s=>s.parameters.target.type='exports.text',s=>s.outcome.output.output.ports=[]]){
   const s=source();mutate(s);assert.throws(()=>buildNodeReadRequest(args,s));
