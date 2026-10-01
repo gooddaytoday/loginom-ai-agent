@@ -2,15 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from '../lib/node-execution-procedure.mjs';
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
-function fixture({selected=false,fail=false,active=false,allowDeactivate=false,loseDeactivation=false}={}){
+function fixture({selected=false,fail=false,active=false,allowDeactivate=false,loseDeactivation=false,verifyRepaint=false}={}){
  const actions=[];let consoleOpen=false;
  const element=(tid,actions,extra={})=>({tid,ref:tid,allowed_actions:actions,...extra});
  const state=()=>({prepared_node_context:{verified:true,...node,surface:'graph',locked:false,tid:'graph-node'},wizard:{status:'absent'},
  node_outputs:{verified:true,node_selected:selected},node_processes:{verified:true,show_completed:true,inventory_complete:true,root_id:'root',node_context:{verified:true,...node},processes:[]},
  ui:{elements:[element('MF;cntMain;tlbMainToolbar;btnProgress',['click']),element('mnContextMenu;mniShowCompletedProcesses',['click','press']),element('ConsoleForm;btnClose',['click']),
  ...(consoleOpen?[element('ConsoleForm;ProgressForm;trpProgress;grd;tbl',['right_click'])]:[]),element('graph-node',['click'],{graph_node:{part:'body'}}),
- ...(selected?[element('launch',[active?'deactivate_graph_node':'execute_graph_node'],{graph_execution:{node_id:'node',mode:active?'deactivate':'execute',source:'native_selected_graph_node'}})]:[])]}});
- const channel={observe:async({ready})=>{const s=state();assert.equal(ready(s),true);return s;},perform:async p=>{const s=state();assert.equal(p.ready(s),true);const a=p.resolve(s);actions.push(a);
+ ...(selected?[element('launch',[active?'deactivate_graph_node':'execute_graph_node'],{graph_execution:{node_id:'node',mode:active?'deactivate':'execute',source:'native_selected_graph_node',node_ref:'before'}})]:[])]}});
+ const channel={observe:async({ready})=>{const s=state();assert.equal(ready(s),true);return s;},perform:async p=>{const s=state();assert.equal(p.ready(s),true);const a=p.resolve(s);
+ if(verifyRepaint&&a.verb.endsWith('_graph_node')) {
+  const original=p.identity(s),repainted=structuredClone(s);
+  repainted.ui.elements.find(e=>e.ref==='launch').graph_execution.node_ref='after';
+  assert.deepEqual(p.identity(repainted),original,'DOM repaint must preserve the owned semantic recovery target');
+  for(const key of ['node_id','mode','source']){
+   const changed=structuredClone(repainted);changed.ui.elements.find(e=>e.ref==='launch').graph_execution[key]='different';
+   if(key==='node_id'||key==='mode'&&a.verb==='deactivate_graph_node')assert.throws(()=>p.identity(changed));
+   if(key==='source'||key==='mode'&&a.verb==='execute_graph_node')assert.notDeepEqual(p.identity(changed),original,'Native '+key+' drift must change recovery identity');
+  }
+ }
+ actions.push(a);
  if(a.ref==='MF;cntMain;tlbMainToolbar;btnProgress')consoleOpen=true;
  if(a.ref==='ConsoleForm;btnClose')consoleOpen=false;
  if(a.ref==='graph-node')selected=true;
@@ -67,4 +78,9 @@ test('lost deactivation response blocks retries and does not execute',async()=>{
  const f=fixture({active:true,allowDeactivate:true,loseDeactivation:true});await f.driver.prepare();await assert.rejects(f.driver.launchGraph(),/lost deactivation/);
  await assert.rejects(f.driver.launchGraph());assert.equal(f.actions.filter(a=>a.verb==='deactivate_graph_node').length,1);
  assert.equal(f.actions.filter(a=>a.verb==='execute_graph_node').length,0);
+});
+
+test('graph recovery binds native owner/mode while fresh snapshots rebind a repainted body',async()=>{
+ const f=fixture({active:true,allowDeactivate:true,verifyRepaint:true});await f.driver.prepare();await f.driver.launchGraph();
+ assert.deepEqual(f.actions.filter(a=>a.verb.endsWith('_graph_node')).map(a=>a.verb),['deactivate_graph_node','execute_graph_node']);
 });

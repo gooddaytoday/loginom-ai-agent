@@ -176,20 +176,21 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
           await channel.perform({condition:'deactivate the owned completed node before fresh execution',initialObservation:s,
             ready:s=>same(s)&&s.node_outputs.node_selected&&deactivate(s).length===1,
             resolve:s=>({verb:'deactivate_graph_node',ref:one(deactivate(s),'Unique native deactivation control required').ref}),
-            identity:s=>({node,deactivation:one(deactivate(s),'Unique native deactivation control required').graph_execution})});
+            identity:s=>graphExecutionIdentity(node,one(deactivate(s),'Unique native deactivation control required').graph_execution)});
         }
       }
+      const settled=s=>({node:s.prepared_node_context,launch:one(launch(s),'Unique native execution control required').graph_execution});
       s=await channel.observe({condition:'native execution control for selected node',readOutputs:true,
         ready:s=>same(s)&&s.node_outputs.node_selected&&launch(s).length===1,
         // Deactivation repaints the native graph body after enabling F9.
         // Wait for the exact body and launch mode to settle before authorizing it.
-        confirmIdentity:s=>({node:s.prepared_node_context,launch:one(launch(s),'Unique native execution control required').graph_execution})});
+        confirmIdentity:settled});
       // Never repeat an issued or uncertain launch in this driver instance.
       launchAttempted=true;
-      const result=await channel.perform({condition:'execute the configured graph node',initialObservation:s,
+      const result=await channel.perform({condition:'execute the configured graph node',initialObservation:s,confirmIdentity:settled,
         ready:s=>same(s)&&s.node_outputs.node_selected&&launch(s).length===1,
         resolve:s=>({verb:'execute_graph_node',ref:one(launch(s),'Unique native execution control required').ref}),
-        identity:s=>({node,launch:one(launch(s),'Unique native execution control required').graph_execution})});
+        identity:s=>graphExecutionIdentity(node,one(launch(s),'Unique native execution control required').graph_execution)});
       return {verified:true,launch_gesture_verified:true,execution_completed:false,receipt:result};
     },
     async identify() {
@@ -337,4 +338,11 @@ export async function finishConfiguredGraph(channel,driver,mode,node) {
     execution_started:mode==='execute',execution_id:execution?.execution_id??null,
     ...(execution?{execution_group:execution,launch_receipt:{operation_id:launch.receipt.operation_id,action_key:launch.receipt.action_key,action_revision:launch.receipt.action_revision,gesture_applied:true}}:{}),
     node_context:graph.prepared_node_context,package_saved:false,reopen_performed:false};
+}
+
+// Semantic recovery identity excludes the ephemeral graph body reference. Each
+// initial/recovery snapshot still verifies its exact DOM incarnation and epoch
+// before a gesture; only a confirmed pre-gesture refusal permits a fresh read.
+function graphExecutionIdentity(node,control) {
+  return {node,control:{node_id:control.node_id,mode:control.mode,source:control.source}};
 }

@@ -100,3 +100,9 @@ route using the independent `fixtures/source-dynamics` CSV/expected definitions.
 It checks 3→6 and 6→6 metadata, exact int64, payload/NULL, failure/correction,
 save and versioned cold source/profile/schema readback. The fixture's numeric
 expectations are authored independently, not copied from a Loginom result.
+
+Execution recovery binds the owned native node GUID, mode and source. Ephemeral
+graph-body DOM references remain strict within each snapshot and pre-gesture
+check; they are rebound only after a confirmed pre-gesture refusal. A recovery
+launch requires two matching fresh observations. Issued or uncertain launches
+and cancellations are never repeated.
