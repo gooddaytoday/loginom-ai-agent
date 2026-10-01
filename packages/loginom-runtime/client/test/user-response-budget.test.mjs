@@ -4,7 +4,6 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {boundedUserToolReply} from '../lib/user-response-budget.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
-import {createJavascriptCodeNodeSupport} from '../lib/javascript-code-node.mjs';
 import {describeNodeTypes} from '../lib/node-contracts.mjs';
 import {userActionInventory} from '../lib/user-workflow.mjs';
 import {createRedactor} from '../lib/redact.mjs';
@@ -14,7 +13,7 @@ const reply=value=>({content:[{type:'text',text:JSON.stringify(value)}]});
 const bytes=value=>Buffer.byteLength(JSON.stringify(value),'utf8');
 function catalog(types) {
  const config={targetOrigin:'http://loginom.test',targetBuild:'7.4.2',redactor:createRedactor()};
- const handlers=new Map([...createCandidateNodeSupport(config).nodeApplyHandlers,...createJavascriptCodeNodeSupport(config).nodeApplyHandlers]);
+ const handlers=createCandidateNodeSupport(config).nodeApplyHandlers;
  const pins={capabilityAbi:1,executorRevision:'1.3.0',actionCatalogVersion:'fixture',actionCatalogDigest:'a'.repeat(64),
    selectorCatalogDigest:'b'.repeat(64),e2eCommit:'c'.repeat(40),actionManifestDigest:'d'.repeat(64),
    catalogLifecycleStatus:'candidate',acceptanceVerified:false,acceptanceDigest:null,

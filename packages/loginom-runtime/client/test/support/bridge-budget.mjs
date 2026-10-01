@@ -6,8 +6,6 @@ import {join} from 'node:path';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {createArtifactStore} from '../../lib/artifacts.mjs';
-import {createRedactor} from '../../lib/redact.mjs';
-import {createJavascriptCodeNodeSupport} from '../../lib/javascript-code-node.mjs';
 import {javascriptParametersSchema} from '../../lib/node-api.mjs';
 
 // Real bridge, factories, MCP Server/Client and schemas; only external catalog,
@@ -49,10 +47,6 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
  mock.module(new URL('../../lib/skill.mjs',import.meta.url).href,{namedExports:{...skill,
    skillTransport:()=>({}),createSkillLoader:()=>({prepare:async()=>({main:'/unit/SKILL.md',directory:'/unit',
      detail:{revision,source:'protocol-fixture',content:'Inert fixture skill.'}})})}});
- mock.module(new URL('../../lib/node-support.mjs',import.meta.url).href,{namedExports:{createCandidateNodeSupport:config=>{
-  const ordinary=createCandidateNodeSupport(config),javascript=createJavascriptCodeNodeSupport({...config,redactor:createRedactor()});
-  return {...ordinary,nodeApplyHandlers:new Map([...ordinary.nodeApplyHandlers,...javascript.nodeApplyHandlers])};
- }}});
  const {createBridge}=await import('../../lib/bridge.mjs');
  let bridge,client;
  try{

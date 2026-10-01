@@ -126,11 +126,11 @@ test('executed Code readback survives full/user-v1 schemas and retains mapping w
  }
 });
 
-test('Code lifecycle has full UI materialization capability but is absent from the product catalog',()=>{
+test('Code lifecycle has full UI materialization capability in the product catalog',()=>{
  const config={targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2',redactor:createRedactor()};
  const support=createJavascriptCodeNodeSupport(config),handler=support.nodeApplyHandlers.get('programming.javascript');
  assert.equal(handler.materialize_output,true);assert.equal(handler.fullUiOutput,true);
- assert.equal(createCandidateNodeSupport(config).nodeApplyHandlers.has('programming.javascript'),false);
+ assert.equal(createCandidateNodeSupport(config).nodeApplyHandlers.get('programming.javascript').revision,handler.revision);
 });
 
 

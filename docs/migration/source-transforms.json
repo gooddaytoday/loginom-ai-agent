@@ -6,8 +6,8 @@
   },
   "packages/loginom-runtime/client/lib/bridge.mjs": {
     "baseHash": "c56450b8f4db74c4ccfbf3162d1a7d6dc7422bab3ac35704f7d45923282630c3",
-    "hash": "23580e5bf1a4e37fdfaa89f05fc126e5c3f5ed1b77cb75baba8f57a05f94c7f9",
-    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Record committed transformations after 3e19818b6f: fc3798f0ac fix(runtime): bypass proxies in Loginom Chromium; 0c513c445a feat(javascript): expose owned source reading through node API; 23e8488e29 fix(javascript): publish context in compact MCP bridge; 8bca1b00aa fix(loginom-runtime): bound complete user tool replies. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+    "hash": "67e68a506b494a9df1cb91ce74303577ec01c52f4eabb5cb4930c16d7ce7820d",
+    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Record committed transformations after 3e19818b6f: fc3798f0ac fix(runtime): bypass proxies in Loginom Chromium; 0c513c445a feat(javascript): expose owned source reading through node API; 23e8488e29 fix(javascript): publish context in compact MCP bridge; 8bca1b00aa fix(loginom-runtime): bound complete user tool replies. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance. Register general JavaScript lifecycle-v5 only for the validated 7.4.2 target/origin, route its ordinary driver without operator hooks and pass the bridge redactor with known secrets; default registry-only callers use the standard sanitizer. Source provenance does not certify candidate or CLI acceptance."
   },
   "packages/loginom-runtime/client/lib/executor.mjs": {
     "baseHash": "df21720858bb89bb40d6c4fe46620728b1d6e86b0d9d7aafa4992c8f2cf93a6e",
@@ -86,8 +86,8 @@
   },
   "packages/loginom-runtime/client/test/user-results.test.mjs": {
     "baseHash": "ceaeda7fc36aa403837bbbd4424be0a870995fa0088a51143168521e5eef2ae9",
-    "hash": "7bb84d1a96b097d4dac3d5637fad4793b0c71af9125c57cbd4d3503dc3eab96f",
-    "reason": "Align the stale upstream assertion with RC9 behaviour: the compact prepare bundle lists installed node types without inline parameter schemas, which dock_action_describe supplies for the selected type; remaining assertions unchanged. Record committed transformations after 1988be3b69: 57b074fc7b feat(javascript): add isolated public configure trial. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+    "hash": "91268d85ad119099080145dc2354286e9d978e44929987e83994ef392a695ac9",
+    "reason": "Align the stale upstream assertion with RC9 behaviour: the compact prepare bundle lists installed node types without inline parameter schemas, which dock_action_describe supplies for the selected type; remaining assertions unchanged. Record committed transformations after 1988be3b69: 57b074fc7b feat(javascript): add isolated public configure trial. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance. Product JavaScript registration: full catalog fixture supplies the observed 7.4.2 build explicitly; missing or mismatched build knowledge remains refused."
   },
   "packages/loginom-runtime/client/test/workspace-ui.test.mjs": {
     "baseHash": "2c3fa72c098e439a19b4a309e4acb244d34816aa6891926f3e9ae897cfad5a49",
@@ -2243,5 +2243,10 @@
     "baseHash": "9280899083ee0f86867d1b2fa5f5ed392adb99ee079d84466990da7cbd7b3ded",
     "hash": "6e53e311bfe0f881e5e699e220f06d65e1242dfd12b019fffeb4fc12d9ed32bb",
     "reason": "Record committed transformations after 26ff8fa766: 9b68f346d6 fix(runtime): normalize browser scale and tolerate fractional geometry. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/lib/node-support.mjs": {
+    "baseHash": "ad4e46a95b88681128bd25b6628b78ebe2014a8f1be1ba576d9b3077e3757352",
+    "hash": "c85936d15b64380e9ede2871da3e44be636fd9ff6e7dc6a18f6573151b2bb0cf",
+    "reason": "Original upstream source identity/hash retained in source-map.json. Register general JavaScript lifecycle-v5 only for the validated 7.4.2 target/origin, route its ordinary driver without operator hooks and pass the bridge redactor with known secrets; default registry-only callers use the standard sanitizer. Source provenance does not certify candidate or CLI acceptance."
   }
 }
