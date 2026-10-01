@@ -10,7 +10,9 @@ new Done обоих modes; addressed125/operator18583PASS, client runtime не �
 Code449 standalone Done принят: original66167 actualexit0, independent v4 audit/27
 negatives/cleanup, lease closed_verified. v1–v3 audit failures сохранены; v4 Code
 проверен после live. Private v4 pin c33cb466 до fresh declared450 сохранён.
-J02 public input подтверждён. Fresh450 пока не назначен.
+J02 public input подтверждён. Fresh450 assigned/registered на том же source/v4
+pin: e-new-done-declared-01/original73246 RUNNING, ordinary headed. До terminal
+исходники child/evidence не менять; ждать именно этот handle, затем audit27/cleanup.
 Natural insufficient-primary/Done error not_observed; оригинальные требования
 J25 и пределы дополнительной coverage сверены ниже. Продуктовая регистрация,
 F review/immutable candidate и Sol CLI ещё открыты. Следующий текст сохраняет
