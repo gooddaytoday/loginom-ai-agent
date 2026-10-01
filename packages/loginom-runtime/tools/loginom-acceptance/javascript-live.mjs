@@ -79,7 +79,13 @@ import {runJavascriptStopProbe} from './javascript-stop-probe.mjs';
 import {javascriptPublicTypedIds,javascriptPublicCodeProbe,runJavascriptPublicCodeLive} from './javascript-public-code-live.mjs';
 import {runJavascriptPublicExistingLive} from './javascript-public-existing-live.mjs';
 
-export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null,publicSourceCaseId=null,publicSchemaRefusalCaseId=null,publicWizardRefusalCaseId=null,publicStopCaseId=null,publicCancelResumeCaseId=null,publicLostReplyCaseId=null,publicRequiredCaseId=null,publicContextCaseId=null,uiProfileMode=null,publicPolicyMode=null}={}) {
+export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null,publicSourceCaseId=null,publicSchemaRefusalCaseId=null,publicWizardRefusalCaseId=null,publicStopCaseId=null,publicCancelResumeCaseId=null,publicLostReplyCaseId=null,publicRequiredCaseId=null,publicContextCaseId=null,uiProfileMode=null,publicPolicyMode=null,publicFidelitySave=false}={}) {
+if(typeof publicFidelitySave!=='boolean'||publicFidelitySave&&(coldReader||packageFile||batchCases!==null
+  ||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null||existingLifecycle!==null||existingInputVariant!==null
+  ||publicProbeId!==null||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null||publicWizardRefusalCaseId!==null
+  ||publicStopCaseId!==null||publicCancelResumeCaseId!==null||publicLostReplyCaseId!==null||publicRequiredCaseId!==null
+  ||publicContextCaseId!==null||uiProfileMode!==null||publicPolicyMode!==null))
+  throw Error('Public fidelity Save requires its separate fixed new Code entrypoint');
 process.umask(0o077);
 if(publicPolicyMode!==null&&(!['code','declared'].includes(publicPolicyMode)||coldReader||packageFile||batchCases!==null
   ||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null||existingLifecycle!==null||existingInputVariant!==null
@@ -190,6 +196,8 @@ if(options['--verify-public-declared-save']&&!options['--verify-public-declared-
 if(options['--verify-public-code-lifecycle']&&options['--verify-public-declared-lifecycle'])
   throw Error('Public JavaScript lifecycle requires one schema mode');
 const publicMode=options['--verify-public-code-lifecycle']?'code':options['--verify-public-declared-lifecycle']?'declared':null;
+if(publicFidelitySave&&(publicMode!=='code'||options['--verify-public-code-save']!==true))
+  throw Error('Public fidelity Save requires its fixed public Code lifecycle and owned Save');
 if(publicPolicyMode!==null&&(publicMode!==publicPolicyMode||options['--verify-public-code-save']||options['--verify-public-declared-save']))
   throw Error('Public policy reread requires its fixed public lifecycle without Save');
 const publicInputFixture=publicProbeId===null?null:javascriptPublicCodeProbe(publicProbeId,publicProbeId.startsWith('declared-')?'declared':'code').native_input_fixture??null;
@@ -2026,7 +2034,8 @@ try {
     if(publicMode){
       executionNode=await runJavascriptPublicCodeLive({page,prepared:executionPrepared,input:executionInput,
         targetOrigin:address.origin,redactor,record:executionRecord,report,save,deadline:batchDeadline,
-        onPending:value=>{managedCloseUncertain=value;},schemaMode:publicMode,probeId:publicProbeId,policyReread:publicPolicyMode!==null});
+        onPending:value=>{managedCloseUncertain=value;},schemaMode:publicMode,probeId:publicProbeId,policyReread:publicPolicyMode!==null,
+        sourceCaseId:publicFidelitySave?'fidelity-bound-code':null});
       if(options['--verify-public-'+publicMode+'-save']){
         // Preserve the public result's package_saved=false. This separately
         // observed Save never turns configuration readback into disk evidence.
