@@ -70,7 +70,7 @@ export async function readJavascriptPublicExistingSource({runtime,prepared,node,
 
 export async function runJavascriptPublicExistingLive({page,prepared,node,targetOrigin,redactor,record,
   report,save,deadline,onPending,schemaMode,graph,inputVariant='base',sourceCaseId=null,schemaRefusalCaseId=null,
-  wizardRefusalCaseId=null,stopCaseId=null,cancelResumeCaseId=null,lostReplyCaseId=null,readGraph}) {
+  wizardRefusalCaseId=null,stopCaseId=null,cancelResumeCaseId=null,lostReplyCaseId=null,configurationCaseId=null,readGraph}) {
   need(['code','declared'].includes(schemaMode)&&['base','changed','reordered'].includes(inputVariant)&&Date.now()+660000<deadline,
     'Public existing JavaScript mode/original budget unavailable');
   const sourceCase=sourceCaseId===null?null:javascriptPublicSourceCase(sourceCaseId);
@@ -88,13 +88,18 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   need(lostReplyCaseId===null||lostReplyCaseId==='lost-apply-execute-code'&&stopCaseId===null&&cancelResumeCaseId===null
     &&schemaMode==='code'&&inputVariant==='base'&&sourceCaseId===null&&schemaRefusalCaseId===null&&wizardRefusalCaseId===null&&typeof readGraph==='function',
   'Public lost reply requires its fixed Code mode/base');
+  need(configurationCaseId===null||configurationCaseId==='configuration-'+schemaMode&&inputVariant==='base'
+    &&sourceCaseId===null&&schemaRefusalCaseId===null&&wizardRefusalCaseId===null&&stopCaseId===null
+    &&cancelResumeCaseId===null&&lostReplyCaseId===null&&typeof readGraph==='function',
+  'Public configuration requires its fixed mode/base');
   const probe=javascriptDiscoveryProbe('p1-business-'+schemaMode+'-'+inputVariant);
   const base=createCandidateNodeSupport({targetOrigin,targetBuild:'7.4.2'});
   const support=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor,
     requireWizardErrorDetails:wizardRefusalCaseId==='syntax-details-expand-code'});
-  let cancelResume;
+  let cancelResume,runtimeRecords=0;
   const runtime=createActionRuntime({pinned:await javascriptPublicCodePins(),allowCandidate:true,
     targetOrigin,targetBuild:'7.4.2',redactor,onRecord:async event=>{
+      runtimeRecords++;
       if((stopCaseId!==null||cancelResumeCaseId!==null||lostReplyCaseId!==null)&&event.phase==='node_phase_prepared'&&event.receipt?.phase==='materialization_start'
         &&event.operation_id===report.public_existing?.stop?.operation_id)
         report.public_existing.stop.launch_window_started=Date.now();
@@ -254,7 +259,14 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
       independent_source:{complete:true,...javascriptSourceIdentity(after.source_text),chunks:after.chunks,source_read_operation_id:after.source_read_operation_id}});
     onPending(false);await save();
   }
-  const source_text=sourceCase?.source??before.source_text+(lostReplyCaseId!==null
+  let configurationSource;
+  if(configurationCaseId!==null){
+    const {runJavascriptPublicConfiguration}=await import('./javascript-public-configuration.mjs');
+    configurationSource=await runJavascriptPublicConfiguration({runtime,prepared,node,schemaMode,before,
+      readSource,readGraph,record,runtimeEventCount:()=>runtimeRecords,report,save,deadline,onPending});
+    repairBaseline=configurationSource.source_sha256;
+  }
+  const source_text=configurationSource?.source_text??sourceCase?.source??before.source_text+(lostReplyCaseId!==null
     ?'\n// E: public lost apply reply repair on the SAME node.\n':cancelResumeCaseId!==null
     ?'\n// E: public local cancel and SAME-ID resume repair on the SAME node.\n':stopCaseId!==null
     ?'\n// E: public native Stop repair on the SAME node.\n':wizardRefusalCaseId===null
@@ -265,7 +277,8 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   need(remaining>=600000,'Public existing original time budget unavailable');
   const request={operation_id,contract_revision:'1.0.0',document_id:prepared.document_id,
     workflow_ref:prepared.workflow_ref,target:{kind:'existing',type:'programming.javascript',ref:node},
-    inputs:[],mode:'script',parameters:{source_text,expected_source_sha256:repairBaseline,schema_mode:schemaMode},
+    inputs:[],mode:'script',parameters:configurationCaseId===null
+      ?{source_text,expected_source_sha256:repairBaseline,schema_mode:schemaMode}:{schema_mode:schemaMode},
     mappings:[],finish:'execute',read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'},
     budgets:{configure_ms:remaining,execute_ms:300000,total_ms:remaining}};
   Object.assign(report.public_existing,{operation_id,previous_source_sha256:repairBaseline,
@@ -318,6 +331,11 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   const after=await readSource();
   need(after.source_text===source_text&&after.source_sha256===expected.source_sha256
     &&after.cursor===null&&!runtime.hasUnsettledWork(),'Public existing independent final source differs');
+  if(configurationCaseId!==null){
+    const {readJavascriptPublicContext}=await import('./javascript-public-context.mjs');
+    report.public_configuration.materialized_context=await readJavascriptPublicContext({runtime,prepared,node,
+      schemaMode,source:source_text,manual:false,deadline,record,readGraph,onPending});
+  }
   Object.assign(report.public_existing,{status:'OBSERVED',configuration:result.configuration,execution:result.execution,
     output:result.output,oracle,independent_source:{complete:true,...expected,chunks:after.chunks,source_read_operation_id:after.source_read_operation_id}});
   report.stage='public-existing-observed';onPending(false);await save();

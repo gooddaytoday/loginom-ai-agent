@@ -27,3 +27,18 @@ test('schema refusal entrypoint rejects unknown case, wrong mode and mixed edit 
   {coldReader:true,existingLifecycle:'code',publicSchemaRefusalCaseId:'code-to-declared',existingInputVariant:'changed'}])
   await assert.rejects(()=>runJavascriptOperator(paths,options),/Public schema refusal|Public source case/);
 });
+
+test('configuration entrypoint rejects wrong mode and all mixed scenarios before reading config',async()=>{
+ for(const mode of ['code','declared']){
+  const base={coldReader:true,existingLifecycle:mode,publicConfigurationCaseId:'configuration-'+mode};
+  for(const patch of [{publicConfigurationCaseId:'unknown'},{coldReader:false},{packageFile:true},
+    {existingLifecycle:mode==='code'?'declared':'code'},{publicSourceCaseId:'fidelity-bound-code'},
+    {existingInputVariant:'changed'},{publicWizardRefusalCaseId:'syntax-'+mode},
+    {publicContextCaseId:'context-'+mode},{publicRequiredCaseId:'required-'+mode},
+    {publicStopCaseId:'stop-code'},{publicCancelResumeCaseId:'cancel-resume-code'},
+    {publicLostReplyCaseId:'lost-apply-execute-code'},{publicPolicyMode:mode},{uiProfileMode:mode}])
+    await assert.rejects(()=>runJavascriptOperator(paths,{...base,...patch}));
+  for(const extra of [['--source','payload'],['--headless'],['--x11-no-focus'],['--verify-public-code-lifecycle']])
+    await assert.rejects(()=>runJavascriptOperator([...paths,'--package',saved,...extra],base));
+ }
+});
