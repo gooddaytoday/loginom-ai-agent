@@ -219,3 +219,27 @@ cleanup при возможно открывающемся мастере. Ус�
 Actual node-procedure test проверяет deadline и transport остаток больше20s;
 actual readPortMapping tests проверяют отсутствие Close после ambiguous/lost opening
 и uncertainty после отказа cleanup. Затем runtime regression перед новым live.
+
+### Адресное продолжение после cold425 DOM отказа — 2026-10-01
+
+Cold425 прочитал полный32KiB, но при read_id2 step4 initial native cell уже
+selected, Setting ещё absent. Перед лишним body selection old shape detached;
+pre_select_click отказал без UI effect. Exact admin recovery закрыла только
+пакет writer424/сеанс4008; отказ не повышается до PASS.
+
+Доработать private owned selection: при initial same-native-cell selected,
+required controls absent — только read-only readiness poll до original deadline,
+без body/Setting/Execute жестов. При этом разрешены максимум2 detached redraws
+того же выбранного native cell исключительно внутри этого poll; native objects,
+document/tab/workflow/graph/cell/data/GUID/icon, unique data-tid, graph containment,
+blockers и control hit-test сохраняются. Connected old shape, foreign selection,
+третья замена, duplicate/current shape mismatch, transport/ACK/expiry — отказ
+без replay. После settlement — свежая проверка и отдельный прежний Setting ACK/
+pre-click check, максимум1 actual Setting. Не выставлять afterGesture для
+read-only poll и не ослаблять обычные pre_select/pre_open проверки.
+
+Проверить production closure в VM плюс адресные client/operator tests; новый
+immutable source/freeze/pins с прежними writer424/oracle hashes. Новый path-only
+cold в fresh profile получает только exact saved path и technical config;
+writer424 на060a не переигрывать и не приписывать ему новую ревизию. После
+actual terminal — independent audit/negative mutations/cleanup/process absence.

@@ -53,6 +53,18 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J23: exact recovery cold425 завершён — 2026-10-01
+
+Recovery427/exec26492 actual exit0, ordinary headed admin Dispatcher: exact
+saved path writer424 и idle `jsteach:4008` наблюдены; Stop disabled перед Close.
+Закрыты только этот пакет и сеанс; fresh Refresh подтвердил отсутствие обоих.
+Own admin4009 от zero-action recovery426/EOF также закрыт; текущий admin logout/
+browserClose true. /proc profiles425/426/427 absent. Original failed report/
+journal unchanged и cold PASS не заявлен. Private recovery receipt SHA256
+`da21c2a2c6e789542f768af40401b11f08cc6a7664b8024de766f2ac8f6cb2b4`.
+Далее адресное selected-controls settlement согласно persistence-design, tests,
+новая immutable cold ревизия; не повторять writer424 и не закрывать чужие сессии.
+
 ### E/J23: cold425 отказал до Execute; exact cleanup назначен — 2026-10-01
 
 Original exec35552 actual exit1: `e-long-source-cold-01`/profile425 на immutable
