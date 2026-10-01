@@ -307,13 +307,24 @@ full operator18502PASS/exec46685/concurrency4 (logSHA0ae1a363).
 before/final materialized и renamed configured, две native observations/settings/
 source receipts, default refusal с двумя Closes; не заявляет actual model resistance.
 
-Fresh ordinary headed Code441 (`e-public-context-renamed-code-05`) запущен на
-этом immutable source, original exec55146 наблюдается до terminal. Registry
-исправлен с ошибочно введённого bookkeeping id79491 на actual tool id55146 до
-зависимых действий, private correction receipt сохранён. Это не второй запуск.
-Positive J19 ещё не принят: дождаться actualexit, independent v5 audit/119
-negatives и full cleanup/process absence; только затем отдельный declared442.
-Во время live child source не менять. Предыдущие failed reports не переоценивать.
+Fresh ordinary headed Code441 (`e-public-context-renamed-code-05`) на immutable
+9bc завершился original exec55146 actualexit0/OBSERVED; full6×4/1950, финальный
+default materialized context и PackageClose/logout/browserClose/process absence
+подтверждены. Registry entry исправлен с ошибочно введённого bookkeeping79491
+на actual55146 до зависимых действий; private correction receipt сохранён.
+Это не второй запуск. ReportSHAe3898113/journal37ce1354 остаются immutable.
+
+Independent v5 audit PASS, но checker67505 actualexit1 выявил ignored preparation
+editor observation: mutation editor_binding_missing меняла первый full read,
+который не был latest read перед gesture. Полный J19 этим ещё не принят.
+V7 audit дополнительно проверяет binding/full mapping каждого rename read после
+original capture (rb до Apply, ra после); исходный browser не повторён, source
+unchanged. V6 source-only попытка filename replacement в freeze JSON отказала
+до acceptance; v7 копирует oracle/freeze bytes точно. Originals/v5/v6 сохраняются.
+V7 pin SHAa5ccb6af: для Code это явно **post-live strengthening**, для следующего
+declared будет pre-live. V7 audit PASS/receipt80bea89d; новые119 non-noop copies
+в checker exec8636 наблюдаются до terminal. Пока не закончить registry как PASS
+и не назначать declared442. Child source во время audit/live не менять.
 
 ### E/J25: owned technical-details expansion432 принят — 2026-10-01
 
