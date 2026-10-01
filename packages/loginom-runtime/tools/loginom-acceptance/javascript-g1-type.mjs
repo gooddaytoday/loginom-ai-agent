@@ -15,11 +15,18 @@ export function readJavascriptG1Type({root,native,binding,prefix,account,build})
   if(roots.length!==1)throw Error('G1 code page not unique and visible');
   const codeView=globalThis.Ext?.getCmp?.(roots[0].id);
   if(own(own(codeView,'el'),'dom')!==roots[0])throw Error('G1 code page native view differs');
-  const items=own(own(model,'FWizardItems'),'FItems');
-  if(!Array.isArray(items)||items.length<1||items.length>32)throw Error('G1 wizard items unavailable');
+  const dataArray=array=>{
+    // A skipped conditional item may retain an empty FPages array.
+    if(!Array.isArray(array)||array.length>32)throw Error('G1 wizard array unavailable');
+    const values=Array.from({length:array.length},(_,index)=>own(array,String(index)));
+    if(values.some(value=>!value||typeof value!=='object')||new Set(values).size!==values.length)
+      throw Error('G1 wizard array data ambiguous');
+    return values;
+  };
+  const items=dataArray(own(own(model,'FWizardItems'),'FItems'));
   const candidates=items.filter(item=>{
-    const pages=own(item,'FPages');
-    return Array.isArray(pages)&&pages.length<=32&&pages.includes(codeView);
+    const pages=dataArray(own(item,'FPages'));
+    return pages.includes(codeView);
   });
   if(candidates.length!==1)throw Error('G1 code wizard controller ambiguous');
   const controller=own(candidates[0],'FWizard');
@@ -39,7 +46,8 @@ export function readJavascriptG1Type({root,native,binding,prefix,account,build})
     const names=[];
     for(let proto=Object.getPrototypeOf(object);proto&&names.length<4;proto=Object.getPrototypeOf(proto)){
       const ctor=own(proto,'constructor');
-      if(typeof ctor==='function'&&typeof ctor.name==='string'&&ctor.name)names.push(ctor.name.slice(0,120));
+      const name=own(ctor,'name');
+      if(typeof ctor==='function'&&typeof name==='string'&&name)names.push(name.slice(0,120));
     }
     return names;
   };

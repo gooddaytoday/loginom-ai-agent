@@ -150,7 +150,7 @@ for(const fault of ['ok','existing','open','not-ready','foreign-path','binding',
     package_ref:{name:'saved',persisted:true,path:fault==='foreign-path'?path.replace('/jsteach/','/other/'):path}};
   const observed={...f.observed,package_name:fault==='metadata'?'other':'saved'};
   const packageNode={};
-  const env={coldReader:true,existingLifecycle:fault==='existing'?'code':null,existingInputVariant:null,publicSourceCaseId:null,
+  const env={coldReader:true,uiProfileMode:null,existingLifecycle:fault==='existing'?'code':null,existingInputVariant:null,publicSourceCaseId:null,
     publicSchemaRefusalCaseId:null,publicWizardRefusalCaseId:null,publicStopCaseId:null,publicCancelResumeCaseId:null,publicLostReplyCaseId:null,publicRequiredCaseId:null,publicContextCaseId:null,
     address:{origin:'http://logi-test-plan.bg.local'},redactor:createRedactor(),managedCloseUncertain:false,
     report,config:{url:'http://logi-test-plan.bg.local/app/',username:'jsteach'},options:{'--package':path},

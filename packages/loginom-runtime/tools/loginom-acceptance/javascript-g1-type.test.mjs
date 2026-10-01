@@ -7,15 +7,16 @@ function fixture(){
   const session={},native={},nodeData={};
   const code={id:'owned-code',isConnected:true,getBoundingClientRect:()=>({width:100,height:100})};
   const root={isConnected:true,querySelectorAll:()=>[code]};
+  const codeView={el:{dom:code}};
   const engine={$S:session,$:{$OW:0,$O:18,$I:781}};
   const moduleSystem={$S:session,$:{$OW:0,$O:18,$I:900}};
   const model={FModelNode:nodeData,FView:{el:{dom:root}}};
   const controller={FWizardForm:model,FEngine:engine,FModuleSystem:moduleSystem};
-  model.FWizardItems={FItems:[{FPages:[{el:{dom:code}}],FWizard:controller}]};
+  model.FWizardItems={FItems:[{FPages:[codeView],FWizard:controller}]};
   const tab={Controller:{Node:{data:{node:native}},FController:model}};
   const connection={UserName:'jsteach',Connected:true};
   const realm=vm.createContext({getComputedStyle:()=>({visibility:'visible'}),
-    Ext:{getCmp:()=>model.FWizardItems.FItems[0].FPages[0]},
+    Ext:{getCmp:()=>codeView},
     bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:connection},
       Items:{Workspace:{getActiveTab:()=>tab}}}}}}}});
   const args={root,native,binding:{tab,nodeData},prefix:'MF;TF-1',account:'jsteach',build:'7.4.2'};
@@ -62,4 +63,20 @@ test('G1 type reader never invokes proxy getters',()=>{
   Object.defineProperty(f.moduleSystem,'Code',{get(){calls++;throw Error('remote getter');}});
   assert.equal(f.read().verified,true);
   assert.equal(calls,0);
+});
+
+test('G1 cached wizard arrays never invoke accessor or inherited item slots',()=>{
+  for(const location of ['items','pages'])for(const kind of ['accessor','inherited']){
+    const f=fixture();let calls=0;
+    const array=location==='items'?f.model.FWizardItems.FItems:f.model.FWizardItems.FItems[0].FPages;
+    const previous=array[0];delete array[0];
+    if(kind==='accessor')Object.defineProperty(array,'0',{get(){calls++;throw Error('remote getter');}});
+    if(kind==='inherited')Object.setPrototypeOf(array,Object.assign(Object.create(Array.prototype),{0:previous}));
+    assert.throws(f.read,/wizard array/);assert.equal(calls,0);
+  }
+});
+
+test('G1 permits an empty conditional page item without changing its owned code controller',()=>{
+  const f=fixture();f.model.FWizardItems.FItems.push({FPages:[],FWizard:{}});
+  assert.equal(f.read().verified,true);
 });
