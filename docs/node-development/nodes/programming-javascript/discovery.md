@@ -247,3 +247,19 @@ source/settings/schema/complete graph и cleanup/process absence провере�
 Pre-live independent v5 audit PASS2/2, meaningful mutations47/47 refused в каждом.
 Точные reports/receipts/hashes — в checkpoint. Это частичное закрытие G6/J12/J25;
 live Done refusal/Stop/lost reply/same-ID/candidate/CLI открыты.
+
+## Граница перед F review — 2026-10-01
+
+General lifecycle-v5 существующих Code447/declared448 Done/Close и new standalone
+Done Code449/declared450 принят2/2 каждый: ordinary headed/full source/settings/
+exact-ID zero events/NEW preserve Execute/full6×4/1950/independent audit+negatives/
+cleanup. J02 public full input6×5/whitespace/types/order подтверждён actual C/D
+writer receipts; runtime/profile limits и редкие natural errors — в checkpoint.
+
+Source product registry child161353dadef6 подключает общий handler/driver/knowledge
+и bridge redactor без fixed trials; addressed65, client3442PASS+10SKIP, operator
+18583PASS и provenance5045 actualexit0. Это source/direct boundary, не повышение
+старых исторических rows до global PASS и не compiled candidate/CLI. Next —
+один same-task Astra/medium review; current model gpt-6.1-sol/high, переключение
+запрошено. Natural insufficient-primary/Done refusals not_observed, TestCafe not_run.
+Canonical accepted registry пока14, product branch не merged/released.

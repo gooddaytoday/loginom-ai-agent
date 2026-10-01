@@ -9,7 +9,8 @@
 Подготовительный статус: **discovery_required**; часть runtime уже реализована.
 Component ID: `component.programming.JavaScript`.
 Runtime type: `programming.javascript`; mode: `script`. В ветке `node-javascript`
-они уже описаны в схемах, но публичный apply handler ещё не зарегистрирован.
+они описаны в схемах, general apply handler source зарегистрирован на161353dadef6
+для7.4.2; source registration не означает compiled candidate/CLI acceptance.
 Исторического номера нет.
 Исследованная база `loginom`: `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Живой стенд по назначению пользователя:

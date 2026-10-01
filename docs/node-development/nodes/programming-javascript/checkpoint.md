@@ -2,21 +2,20 @@
 
 ## Текущее состояние
 
-Актуальная граница на 2026-10-01: E/new standalone Done перед F. General
-handler73a8e9df31 и свежие existing Code447/declared448 Done/Close/preserve Execute
-приняты2/2; package/logout/browser/process cleanup и lease448 closed_verified.
-Operator source fecbc9f44deeb1045794811674e67ae28da4caa4 добавляет фиксированный
-new Done обоих modes; addressed125/operator18583PASS, client runtime не менялся.
-Code449 standalone Done принят: original66167 actualexit0, independent v4 audit/27
-negatives/cleanup, lease closed_verified. v1–v3 audit failures сохранены; v4 Code
-проверен после live. Private v4 pin c33cb466 до fresh declared450 сохранён.
-J02 public input подтверждён. Declared450/original73246 actualexit0/OBSERVED,
-pre-pinned v4 audit/27 negatives/cleanup PASS; new Done2/2, lease450 closed_verified.
-Далее product registration и F review/candidate/CLI. Astra/medium переключение
-этой же задачи запрошено async; фактически сейчас gpt-6.1-sol/high.
-Natural insufficient-primary/Done error not_observed; оригинальные требования
-J25 и пределы дополнительной coverage сверены ниже. Продуктовая регистрация,
-F review/immutable candidate и Sol CLI ещё открыты. Следующий текст сохраняет
+Актуальная граница на 2026-10-01: source product registration завершён, далее
+F same-task review. Child161353dadef69e3806a8b14ae14575c40c3475d7 tracked clean:
+JS general lifecycle-v5/driver/knowledge в product registry только7.4.2/nonempty
+origin, actual bridge redactor. Addressed65, full client3442PASS+10SKIP,
+operator18583PASS, provenance5045 actualexit0. Existing Done/Close447/448 и
+standalone new Done449/450/preserve Execute/full6×4/1950 приняты2/2 каждый,
+ordinary headed/independent audits/negative/cleanup. Lease450 closed_verified,
+active_exec=null, процессов/browser/tests нет. J02 public input подтверждён.
+Next one **same-task Astra/medium review**, затем candidate/J01/J21/J27 и Sol CLI.
+Actual current task model gpt-6.1-sol/high; async запрос переключения этой же
+задачи pending, F review не выполнен. Product release/accepted registry не повышены.
+Natural insufficient-primary/Done errors not_observed — явная граница coverage;
+original J25 requirements сверены, не новый hard gate и не false PASS.
+Следующий текст сохраняет
 историческую сводку после B, private P1, C0/G3 и public C full read 6×4.
 Public run05 дал ограниченный output proof; исправленный Code → Save и
 независимый cold Execute/read6×4 прошли audit и cleanup. D declared → Save и
@@ -318,6 +317,46 @@ public API/handler. До live нужны addressed/operator tests/source/freeze/
 auditor pin. Если native поддержан или primary sufficient, insufficient-primary
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
+
+### F: product registry source committed; same-task review next — 2026-10-01
+
+Child **161353dadef69e3806a8b14ae14575c40c3475d7**: general lifecycle-v5
+зарегистрирован в штатном node-support для pinned7.4.2/nonempty origin,
+product driver route/knowledge, bridge known-secret redactor и standard fallback,
+generic reread тот же redactor. Forced-details/trial/operator helpers в продукт
+не импортируются. Real bridge MCP budget fixture больше не подставляет JS support;
+selected/default knowledge/user-v1 проверяются через actual registry. Source
+available15 на7.4.2, offline/other build14. Canonical accepted registry остаётся14:
+это source в child, не подтверждённый выпуск/compiled candidate/CLI.
+
+Addressed04 actualexit0/65PASS; full client02 original2743 actualexit0/
+**3442PASS+10SKIP**; full operator original50710 actualexit0/**18583PASS**;
+provenance02 actualexit0/5045. Source/Protocol/HttpApi TS не менялись, regeneration/
+typecheck не нужны. Mapped bridge/node-support/user-results test transforms3
+обновлены с сохранением original source-map/baseHash; остальной provenance неизменён.
+Validation receipt b71e55ae2e09ef4da21dae65b698b1b319978f09e40cf515b9f41361b7b192ce,
+private f-product-registration-source-validation-v1.json.
+
+Full client01 original69309 actualexit1/3441PASS+10SKIP/1FAIL: устаревший all-types
+fixture не передавал observed build; JS knowledge корректно rejected. Fixture
+явно передаёт7.4.2, product missing/mismatch knowledge negative сохранён. Runtime
+не ослаблен. Initial addressed01/10 fixture failures сохранены ниже. Operator
+не переигрывался после test-only correction; его runtime bytes совпадают.
+
+Операции и processes terminal, browsers closed/lease450 closed_verified, tests
+не выполняются. Main canonical docs; child tracked clean, historical untracked
+files preserved. Следующий шаг **один same-task gpt-6-astra/medium review** по
+полной реализации ядра/исходным G/J требованиям и фактическим границам coverage,
+не новое исследование всей истории. Затем один раунд confirmed live fixes,
+immutable standalone candidate/J01/J21/J27 и две Sol/low/30min CLI попытки.
+
+Current actual task model gpt-6.1-sol/high (turn_context19:34:30.268Z); async
+configuration question pending. Пока переключение этой же задачи на Astra/medium
+не подтверждено фактическим новым turn_context, F review не запускать/не заявлять.
+Goal active, не complete/paused. Natural insufficient-primary/Done refusals
+not_observed; не выдавать отсутствие за PASS, не придумывать native failures.
+External TestCafe not_run. OpenViking errors не было, routine health не запускался.
+No push/rebase/merge/release, installed client unchanged. Fresh451 не assigned.
 
 ### F prerequisite: product registry source tests RUNNING — 2026-10-01
 

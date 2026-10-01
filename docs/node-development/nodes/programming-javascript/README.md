@@ -2,7 +2,9 @@
 
 Устойчивый ID: `component.programming.JavaScript`. Slug: `programming-javascript`.
 Исторического номера подплана нет. Runtime type `programming.javascript`
-описан в оболочке ветки `node-javascript`; **apply handler ещё не зарегистрирован**.
+зарегистрирован в source ветки `node-javascript` на **161353dadef6** для7.4.2
+с general lifecycle-v5. Compiled candidate и CLI ещё не проверены; accepted
+registry readiness не повышена.
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·
