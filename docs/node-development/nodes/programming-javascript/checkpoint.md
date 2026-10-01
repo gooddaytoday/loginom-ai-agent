@@ -30,7 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — завершить текущий J23 cold425/exec35552 и independent audit;
+следующий шаг — exact cleanup cold425/exec35552 (exit1), затем разбор native DOM отказа;
 long source writer424 принят ниже. J26 Code422/Declared423
 приняты2/2 на immutable child `3b59423f1a`, source/direct и live уровни ниже;
 [G1/J22 профиль своего мастера](ui-profile-design.md) принят в bounded scope ниже;
@@ -52,6 +52,25 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J23: cold425 отказал до Execute; exact cleanup назначен — 2026-10-01
+
+Original exec35552 actual exit1: `e-long-source-cold-01`/profile425 на immutable
+child060a8d1cc7 имеет status **CLEANUP_UNCONFIRMED**. Полный исходный source
+32768bytes/1024LF прочитан; в повторном полном read_id2 step4 перед Execute
+native selection отказала на detached DOM replacement в `pre_select_click`,
+`after_gesture=false`, replacements0, native cell selected. Журнал389 events,
+JS Execute dispatch0; это отказ проверки, не PASS cold persistence.
+PackageClose/logout false, browserClose true; /proc отсутствие original Node/
+Chromium профиля425 проверено отдельно. Report SHA256
+`a2df58ea6dbbc0923a56845004863bb848046c5b4386fe67b90b5035b00d07c0`,
+journal `d073a23f6c81c400c441ad49d6a1baae6da2ade3b21c0e05f8ebb005a9c72738`.
+
+До нового вычислительного прогона reserved fresh426 — ordinary headed admin
+Dispatcher для exact собственного saved пакета long-source writer424, только
+при observed nonexecuting. Original report/journal и failed status не менять;
+никакого повтора неизвестного жеста, Execute/Save или закрытия чужих сеансов.
+После cleanup — адресный разбор selection settlement; writer424 PASS сохранён.
 
 ### E/J23: long source writer424 принят; cold425 выполняется — 2026-10-01
 
