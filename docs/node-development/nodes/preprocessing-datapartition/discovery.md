@@ -218,3 +218,24 @@ immutable node deadline; никакой исторический FAIL не за�
 
 Остальные методы/math/limits/fulltype/edition, dynamic/recovery/save/cold/CLI7200
 остаются NOT_RUN. Этот один public PASS не является приёмкой полного узла.
+
+## Public attempt 26 / guarded epoch recovery
+
+Clean candidate `0c6fc58c67822c33c68281c091c3b64162a5e0de`, sourceDirty=false,
+remote SHA confirmed. Source delivery/import succeeded. Random configure stopped
+with AMBIGUOUS, no execution, while switching test size percent→rows. The primary
+journal shows NOT_APPLIED/UI_EPOCH_CHANGED with no effect, then authorized retry
+whose observation omitted node_data_partition. Its semantic readiness therefore
+timed out. This is a missing DataPartition dispatch in the shared refresh path,
+not a native sampling result. The own dispatch is now retained on refresh; a
+regression proves fresh native observation before the second guarded gesture.
+
+Local cleanup encountered DIAGNOSTIC_SAVE_PROMPT_CHANGED. Wrapper lifecycle
+retains FAILED/command_exit=1, cleanup_confirmed=true, closed=1/loggedOut=true
+for lab-slot-a only. Historical FAIL is preserved. New native run is required.
+
+Int64 bias keys now decode only native plain hi/lo data descriptors, safe numbers
+or bigint within signed int64. Datetime keys decode valid cached Date objects
+to local ISO milliseconds. Offline tests reject unsafe numeric values and
+getters; native bias int64/datetime remains NOT_RUN. Canonical typed key identity
+is shared between validation and selection, including local datetime precision.

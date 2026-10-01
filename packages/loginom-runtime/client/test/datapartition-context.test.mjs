@@ -21,7 +21,7 @@ function fixture(){
  component('StratifiedMethodForm;grdStratifiedGrid',null).getStore=()=>chain;
  component('StratifiedMethodForm;pedCompleteUniqueValues;ValueControl',false);
  const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>all.filter(e=>e.tid===JSON.parse(q.slice(10,-1)))}};
- return {rows,sizes,values,fields,chain,source,root,read:()=>vm.runInNewContext('('+readDataPartitionBrowser.toString()+')("MF;TF")',context)};
+ return {rows,sizes,values,fields,chain,source,root,component,store,context,read:()=>vm.runInNewContext('('+readDataPartitionBrowser.toString()+')("MF;TF")',context)};
 }
 
 test('DataPartition reads owned size editors and complete source behind a filtered chain',()=>{
@@ -47,4 +47,20 @@ test('DataPartition readback refuses owner changes and separate port wizards',as
  const binding={workflow_ref:{prefix:'MF;TF'}};
  assert.equal((await readDataPartitionContext({evaluate:async()=>({verified:true})},binding,async()=>({verified:true,surface:'wizard',node_id:++count}))).reason,'data_partition_node_changed');
  assert.equal((await readDataPartitionContext({},binding,async()=>({verified:true,surface:'wizard',output_port:{}}))).reason,'data_partition_node_surface');
+});
+
+test('DataPartition bias decodes exact native Int64 limbs and local dates without coercing getters',()=>{
+ const f=fixture();f.values.method=4;f.fields[0].data.UsageType=3;
+ f.component('BiasedMethodForm;grdBiasedColumns',null).getStore=()=>f.chain;
+ const row={isModel:true,internalId:'b0',data:{Index:0,Value:{lo:1,hi:2097152},Factor:1,Count:1,RefCount:1}};
+ f.component('BiasedMethodForm;grdBiased',null).getStore=()=>f.store([row]);
+ f.fields[0].data.DataType=4;
+ assert.equal(f.read().parameters.biased.adjustments[0].value.value,'9007199254740993');
+ row.data.Value={lo:4294967295,hi:-1};assert.equal(f.read().parameters.biased.adjustments[0].value.value,'-1');
+ row.data.Value=9007199254740992;assert.equal(f.read().parameters.biased,undefined);
+ let accessed=false;row.data.Value={get lo(){accessed=true;return 1;},hi:0};
+ assert.equal(f.read().parameters.biased,undefined);assert.equal(accessed,false);
+ f.fields[0].data.DataType=2;row.data.Value=vm.runInNewContext('new Date(2026,9,1,12,34,56,789)',f.context);
+ assert.equal(f.read().parameters.biased.adjustments[0].value.value,'2026-10-01T12:34:56.789');
+ row.data.Value=null;assert.equal(f.read().parameters.biased.adjustments[0].value.is_null,true);
 });

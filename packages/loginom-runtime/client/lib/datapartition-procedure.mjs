@@ -1,4 +1,4 @@
-import {resolveDataPartitionParameters} from './datapartition-parameters.mjs';
+import {dataPartitionValueIdentity,resolveDataPartitionParameters} from './datapartition-parameters.mjs';
 const need=(value,message)=>{if(!value)throw Error(message);};
 
 export async function configureDataPartition(channel,parameters,{mode,newNode=false}={}){
@@ -197,7 +197,7 @@ export async function setDataPartitionBias(channel,bias){
   return channel.observe({condition:'complete DataPartition unique value inventory',readDataPartition:true,
    ready:s=>ready(s)&&s.node_data_partition.parameters.biased?.field===bias.field&&s.node_data_partition.parameters.biased.adjustments.length>0});
  })();
- const identity=value=>JSON.stringify([value.type,value.is_null,value.value]);
+ const identity=dataPartitionValueIdentity;
  for(const adjustment of bias.adjustments){
   need(adjustment.value.type===field.type,'DataPartition bias key type differs from source');
   const matches=inventory.node_data_partition.parameters.biased.adjustments.map((r,index)=>({r,index})).filter(({r})=>identity(r.value)===identity(adjustment.value));

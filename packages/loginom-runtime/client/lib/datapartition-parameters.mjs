@@ -81,7 +81,7 @@ export function validateDataPartitionInputParameters(parameters,resolved,native)
  }
 }
 
-function dataPartitionValueIdentity(value){
+export function dataPartitionValueIdentity(value){
  requireValue(object(value,['type','is_null','value'])&&['integer','real','boolean','string','datetime'].includes(value.type)&&typeof value.is_null==='boolean'&&Object.hasOwn(value,'value'),'Explicit typed bias value required');
  if(value.is_null){requireValue(value.value===null,'Typed NULL requires null value');return JSON.stringify([value.type,null]);}
  requireValue(value.value!==null,'Non-NULL bias key requires value');

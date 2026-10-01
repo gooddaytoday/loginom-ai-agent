@@ -102,10 +102,26 @@ export function readDataPartitionBrowser(prefix){
   if(selected.length>1)return fail('data_partition_bias_field');
   const chosen=selected[0];
   if(chosen){
-   const typed=value=>value===null?{type:chosen.type,is_null:true,value:null}
-    :chosen.type==='string'&&typeof value==='string'||chosen.type==='boolean'&&typeof value==='boolean'||chosen.type==='real'&&Number.isFinite(value)
-     ?{type:chosen.type,is_null:false,value}
-     :chosen.type==='integer'&&Number.isSafeInteger(value)?{type:'integer',is_null:false,value:String(value)}:null;
+   const typed=value=>{
+    if(value===null)return {type:chosen.type,is_null:true,value:null};
+    if(chosen.type==='string'&&typeof value==='string'||chosen.type==='boolean'&&typeof value==='boolean'||chosen.type==='real'&&typeof value==='number'&&Number.isFinite(value))return {type:chosen.type,is_null:false,value};
+    if(chosen.type==='integer'){
+     let integer;
+     if(typeof value==='bigint'||typeof value==='number'&&Number.isSafeInteger(value))integer=BigInt(value);
+     if(value&&typeof value==='object'){
+      // Native Int64 values use plain signed high/unsigned low limbs. Read
+      // data descriptors only: do not call RPC getters or value coercion.
+      const descriptors=Object.getOwnPropertyDescriptors(value),low=descriptors.lo?.value,high=descriptors.hi?.value;
+      if(Object.keys(descriptors).sort().join(',')==='hi,lo'&&Number.isInteger(low)&&low>=0&&low<=4294967295&&Number.isInteger(high)&&high>=-2147483648&&high<=4294967295)integer=BigInt.asIntN(64,(BigInt(high>>>0)<<32n)|BigInt(low));
+     }
+     if(integer!==undefined&&integer>=-9223372036854775808n&&integer<=9223372036854775807n)return {type:'integer',is_null:false,value:String(integer)};
+    }
+    if(chosen.type==='datetime'&&value instanceof Date&&Number.isFinite(+value)){
+     const pad=(number,length=2)=>String(number).padStart(length,'0');
+     return {type:'datetime',is_null:false,value:pad(value.getFullYear(),4)+'-'+pad(value.getMonth()+1)+'-'+pad(value.getDate())+'T'+pad(value.getHours())+':'+pad(value.getMinutes())+':'+pad(value.getSeconds())+'.'+pad(value.getMilliseconds(),3)};
+    }
+    return null;
+   };
    const adjustments=methodRows.map(r=>({value:typed(r.value),factor:r.factor}));
    if(adjustments.every(r=>r.value))parameters.biased={field:chosen.name,adjustments};
   }
