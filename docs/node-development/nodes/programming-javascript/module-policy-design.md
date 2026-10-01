@@ -109,3 +109,38 @@ acceptance остаются обязательными при подготовк
 Следующий шаг: source98 implementation в существующей задаче разработчика;
 ROOT проверяет код, тесты и production dependency closure. Live на этом этапе
 не нужен; следующий браузер — только headed с новым профилем115.
+
+## Продолжение J26 на текущем runtime — 2026-10-01
+
+На child276c новый текст уже проверяется в validate/verifySource и owned writer;
+existing beforeTarget полностью читает/discard source до mappings/configuration.
+Materialization и final Execute используют source admission с повторной проверкой
+после dispatch ACK. Эти пути заново не разрабатывать. Пробел — synthetic output
+`dock_node_read`: node-read-contract пока запрещает JavaScript, generic read driver
+сразу выполняет узел без source admission.
+
+Связать JS reread только с завершённым локальным результатом своего handler:
+проверенные configuration readback/phase receipts, прежняя полная source identity
+и retained mapping/schema. Модель передаёт лишь source_operation_id и bounded
+read options; source binding формирует host. В beforeTarget прочесть/discard
+полный preserved source, проверить policy и прежний digest; перед fresh Execute
+повторить actual read/policy/settings под оригинальным deadline. При расхождении
+не выполнять неизвестную редакцию. Драйвер сохраняет запрет configure/port
+mapping/wizard commit; остальные узлы продолжают прежний read lifecycle.
+
+Проверка идёт перед Execute, который обслуживает output-read. Дополнительный
+Setting после него не является безопасным read-only guard: фактический
+openManagedJavascriptExistingWizard допускает native deactivation confirmation.
+Такое открытие могло бы разрушить активный результат. Финальный apply read уже
+привязан к своему fresh final Execute и output port; чтение таблицы не получает
+ещё один цикл Setting/Execute и не выдаётся за атомарную защиту от внешних edits.
+Отдельный kind:source сохраняет существующий open/read/discard без Execute.
+
+Локальные проверки должны покрыть retained JS receipts и schema при отсутствии
+preview, forged/foreign/stale binding, preserved source с неподдержанным import,
+source/settings drift перед dispatch, неоднозначный Close/ACK и запрет replay.
+В фиксированных headed Code/Declared cases проверить public apply и отдельный
+source-bound output reread, его собственный fresh Execute, typed output и source
+после операции. Pure parser corpus отличает executable AST от comments/strings/
+plain templates; source/direct и live уровни записывать отдельно. Это выполнение
+утверждённого J26, а не регистрация candidate или объявление полного gate PASS.
