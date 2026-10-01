@@ -50,6 +50,27 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/G1/J22: final97/full18327 PASS; fresh414 Code назначен — 2026-10-01
+
+На immutable8acf завершены addressed97/exec28447 и final serial operator03
+18327/18327/exec24984 — actual exit0. Все1512 frozen source hashes после
+completion совпали. Source diff check PASS. No browser сейчас: registry413
+closed_verified; fresh414 `e-ui-profile-code-02` назначен, active exec null.
+Original failed412/recovery413 сохраняются ниже; master не был открыт412.
+
+До нового live pin v2 SHA
+`f19be53d0b1c8a485d34403ef5cdb305de1caee4b3b24c2b10180f799440ad53`.
+Oracle v1 unchanged; source freeze v2 указан ниже. Auditor/negative/handoff SHA:
+`3107efe77b11e46a39f752227a3b5c07eb3512b17f6c2986a082e337cc250b6a` /
+`c02b0a985fb3854573b8ee25d683a734e26aa18ca6c520c9a72cbc85ad7ef73e` /
+`dcb4975b328ecf67dff67bf9c00d7d5b6cb8f21b1eaea2a48903f9cf4a9a9170`.
+Final addressed/full03 logs SHA:
+`15f9e0670077be4f727468301639596d8c5a6b29dcc73bfa675c9a1fd815018e` /
+`f8cd444eded323825c84e9573481ff8078610d75c9dd610cdff33c810fa4a9ec`.
+Следующее действие: Code414 ordinary headed, source/settings/controls/engine
+witnesses и image readback, independent v2 audit/57 negatives; complete cleanup
+и process absence перед следующей fresh Declared. G1/J22 ещё открыты.
+
 ### E/G1/J22: recovery413 принят; final channel fix — 2026-10-01
 
 Recovery413/exec21136 завершён actual exit0, ordinary headed. В Диспетчере
