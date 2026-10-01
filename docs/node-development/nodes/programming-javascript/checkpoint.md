@@ -30,7 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — exact cleanup cold425/exec35552 (exit1), затем разбор native DOM отказа;
+следующий шаг — final tests child6531d36f1c, затем fresh J23 path-only cold после exact recovery425;
 long source writer424 принят ниже. J26 Code422/Declared423
 приняты2/2 на immutable child `3b59423f1a`, source/direct и live уровни ниже;
 [G1/J22 профиль своего мастера](ui-profile-design.md) принят в bounded scope ниже;
@@ -52,6 +52,33 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J23: адресный pre-click redraw fix — 2026-10-01
+
+Child `6531d36f1ca9a490d969f6760e725320dd4d3c9d`: captured initialSelected,
+только1 detached replacement в pre_select_click при неизменном already selected
+native cell; вся pre-click state/point сравнивается, нормализован лишь счётчик.
+Native ownership/unique/current-shape/blockers/hit-test, total cap2, deadlines,
+ACK и one body/Setting gesture сохранены; returned event пишет pre-click counter.
+Source/oracle/product registration/knowledge не менялись. Адресный final
+exec55413 actual exit0 — **186PASS**, log SHA256
+`05405a90b75c7568621b08ad1d7bc71ca908c7645ff0c19245e3f50d52751d3b`.
+Final full client70285 и operator87324 выполняются; live ещё не запускался.
+
+Первый uncommitted вариант read-only waiting отклонён: full operator42504/exit1
+дал2 regression failures materialized toolbar; actual client5054/exit0
+3246PASS+10SKIP относится к промежуточному варианту и не final code. First
+адресный02/exec65526 failed2 из-за fixture hit-test, исправлен production-VM
+fixture, final03 дополнительно проверяет достижение dispatch перед negative
+refusal. Оригинальные logs сохранены; failed runs не повышаются до PASS.
+
+New source freeze-v2 SHA256
+`805f8076c3a3beb163efcc1b1aa03480a4635fe3f29e40a3beaef2e02e88e19a`
+содержит12740tracked files/61symlinks. Private v7 audit pins cold source6531
+отдельно от accepted writer060a/v6receipt; raw source/oracle/Save/report/journal
+writer424 неизменны. После final suites — v7 pin/fresh428 path-only cold10min,
+ordinary headed, без expected/source/schema/CSV, затем independent audit/
+negative16/cleanup/process absence. Persistence/candidate/CLI/Gates ещё открыты.
 
 ### E/J23: exact recovery cold425 завершён — 2026-10-01
 

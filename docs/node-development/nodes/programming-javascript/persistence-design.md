@@ -243,3 +243,27 @@ immutable source/freeze/pins с прежними writer424/oracle hashes. Нов
 cold в fresh profile получает только exact saved path и technical config;
 writer424 на060a не переигрывать и не приписывать ему новую ревизию. После
 actual terminal — independent audit/negative mutations/cleanup/process absence.
+
+### Уточнение по regression tests: toolbar требует body gesture — 2026-10-01
+
+Первый вариант selected-controls wait прошёл адресные174 tests, но full operator
+выявил2 real regressions в production output-opening: hovered toolbar может
+материализоваться именно body gesture. Ожидание без клика как решение **отклонено**;
+эта незакоммиченная реализация снята до live, failed log сохранён. Stand не запускался.
+
+Суженный фикс: только `pre_select_click`, до actual mouse gesture, при initial и
+current выбранном том же native cell допускается **одна** detached replacement
+между initial observation и journal ACK. Весь native owner/current-shape/unique
+identity/blockers/hit-test contract сохраняется. Сравнить новое наблюдение с
+initial целиком, нормализуя только `dom_replacements` (+1); любое изменение
+ready/settings/body coordinates/state — отказ. Connected old shape, initially
+unselected/foreign node, duplicate/current mismatch, третья total replacement,
+изменённый ACK/transport/deadline — отказ. Existing общий cap2 сохраняется.
+Body-click остаётся максимум1; его returned event пишет observed pre-click redraw
+count, затем прежние post-gesture/Setting checks. Нет recapture/DOM rewrite,
+ожидания предполагаемой готовности, повторов gestures или продления deadline.
+
+Проверка — existing output-opening suite (toolbar contract) и production closure
+VM tests для cold425 exact detached same-selected-cell/unchanged-point случая
+и negative owner/selection/connected/point/settings/duplicate/ACK/expiry cases.
+Новая immutable ревизия/freeze/pins отдельно от writer060a; далее path-only cold.
