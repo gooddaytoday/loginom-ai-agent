@@ -13,6 +13,7 @@ import {verifyJavascriptMismatchTable} from './javascript-mismatch-probe.mjs';
 import {verifyNativeInputUi} from './javascript-native-input-contract.mjs';
 import {verifyNativeRoundtripInput} from './javascript-native-roundtrip-contract.mjs';
 import {javascriptDiscoveryProbe,javascriptDiscoveryOracle} from './javascript-discovery-probes.mjs';
+import {javascriptColumnNameIds,verifyJavascriptPublicColumnNames} from './javascript-column-names.mjs';
 
 const need=(value,message)=>{if(!value)throw Error(message);};
 
@@ -25,7 +26,7 @@ export async function javascriptPublicCodePins() {
 
 const codeTypedIds=Object.freeze(['g5-knowledge-v1','g5-native-integer-outside-safe','g5-native-civil-datetime','g5-native-integer-safe','g5-native-string','g5-native-boolean','g5-native-real','g5-null-empty','g5-boolean','g5-real',
   'g5-safe-integer','g5-date-civil','g5-named-access','g5-empty-output','g5-one-output','g5-empty-input']);
-export const javascriptPublicTypedIds=Object.freeze([...codeTypedIds,...codeTypedIds.map(id=>'declared-'+id),
+export const javascriptPublicTypedIds=Object.freeze([...javascriptColumnNameIds,...codeTypedIds,...codeTypedIds.map(id=>'declared-'+id),
   'g5-native-cardinality-keep2','g5-native-cardinality-odd','g5-native-cardinality-duplicate','declared-g5-native-cardinality-empty']);
 
 export function javascriptPublicCodeProbe(probeId,schemaMode) {
@@ -114,8 +115,14 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
   }
   const base=createCandidateNodeSupport({targetOrigin,targetBuild:'7.4.2'});
   const code=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor});
+  let columnNameMapping;
   const runtime=createActionRuntime({pinned:await javascriptPublicCodePins(),
-    allowCandidate:true,targetOrigin,targetBuild:'7.4.2',redactor,onRecord:record,
+    allowCandidate:true,targetOrigin,targetBuild:'7.4.2',redactor,onRecord:async event=>{
+      const ack=await record(event);
+      if(javascriptColumnNameIds.includes(probe.id)&&event.phase==='node_phase_completed'
+        &&event.receipt?.phase==='output_mapping')columnNameMapping=structuredClone(ack.receipt.value.native_mapping);
+      return ack;
+    },
     execute:source=>Function('return ('+source+')')()(page),
     nodeApplyHandlers:new Map([...base.nodeApplyHandlers,...code.nodeApplyHandlers]),
     nodeApplyDriverFactory:options=>options.operation.parameters.target.type==='programming.javascript'
@@ -167,7 +174,9 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
     &&compact.sample.length===table.sample.length&&compact.sample.every((row,index)=>row.length===table.sample[index].length
       &&row.every((cell,column)=>['type','value','is_null','precision'].every(key=>cell[key]===table.sample[index][column][key]))),
   'Public Code user-v1 full output differs');
-  if(probe.knowledge)report[key].user_v1_result=structuredClone(projected);
+  if(probe.knowledge||javascriptColumnNameIds.includes(probe.id))report[key].user_v1_result=structuredClone(projected);
+  if(javascriptColumnNameIds.includes(probe.id))report[key].column_names=verifyJavascriptPublicColumnNames({
+    probe,table,mapping:columnNameMapping,node:result.node,readback:projected.configuration.readback});
   report.stage=stage+'-independent-source-read';await save();
   onPending(true);
   const sourceRead=await dispatchNodeApi(runtime,'dock_node_read',{kind:'source',operation_id:'js-code-after-'+randomUUID(),

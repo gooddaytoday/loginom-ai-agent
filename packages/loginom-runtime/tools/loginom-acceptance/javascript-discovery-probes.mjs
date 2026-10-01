@@ -5,6 +5,7 @@ import {javascriptEngineProbes,inputTextProbe} from './javascript-engine-probes.
 import {javascriptBusinessProbes} from './javascript-business-probes.mjs';
 import {javascriptStopProbe} from './javascript-stop-case.mjs';
 import {javascriptBridgeProbe} from './javascript-bridge-probe.mjs';
+import {javascriptColumnNameProbes} from './javascript-column-names.mjs';
 import {describeJavascriptKnowledge} from '../../client/lib/javascript-knowledge.mjs';
 import {verifyJavascriptMismatchTable,verifyJavascriptPreviousExecution} from './javascript-mismatch-probe.mjs';
 
@@ -33,6 +34,7 @@ const typed=(id,type,expressions,values,note)=>({id,scope:'G5',source:source(typ
   expected:values===null?null:values.map(value=>[value]),note,expectation:values===null?'characterization':'fixed'});
 
 const codeProbes=[
+  ...javascriptColumnNameProbes,
   ...knowledgeProbes,
   ...javascriptEngineProbes.map(p=>({...p,id:'engine-'+p.id,schema:column('string'),
     expected:p.expected?.map(v=>[v])??null,expectation:p.expectedError?'diagnostic':'fixed'})),
