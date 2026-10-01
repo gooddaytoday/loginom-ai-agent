@@ -185,7 +185,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, readCalculator = false, readJavascript = false, readGrouping = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -200,6 +200,11 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
       if(tableDialog)makeNodeTableContextCode(preparedNodeContext,tableDialog.table,{row_offset:0,row_limit:0,column_offset:0,column_limit:1});
       if ((readProcesses || readProcessControls || readOutputs || readMappings || readCalculator || readJavascript || readGrouping || readDateTime || readCollapse || readMissingValues || readSorting || readReplacement || readDuplicates || readReform || readFilter || readJoin || readUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
+      if(mappingEditor!==undefined){
+        if(!readMappings||!preparedNodeContext)throw Error('Owned input editor requires a prepared full mapping read');
+        makeNodeMappingContextCode(preparedNodeContext,mappingEditor);
+      }
+      const mappingEditorBinding=mappingEditor===undefined?undefined:structuredClone(mappingEditor);
       // A failed wait must invalidate even a previously usable observation.
       snapshot = null;
       evidenceSnapshot = null;
@@ -376,8 +381,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           [readCollapse,'node_collapse',makeCollapseContextCode], [readDateTime,'node_date_time',makeDateTimeContextCode], [readDuplicates,'node_duplicates',makeDuplicatesContextCode], [readUnion,'node_union',makeUnionContextCode], [readJoin,'node_join',makeJoinContextCode], [readCalculator,'node_calculator',makeCalculatorContextCode], [readJavascript,'node_javascript_schema',makeJavascriptSchemaContextCode], [readGrouping,'node_grouping',makeGroupingContextCode], [readReplacement,'node_replacement',makeReplacementContextCode], [readSorting,'node_sorting',makeSortingContextCode], [readReform,'node_reform',makeReformContextCode]]) {
           if (!requested) continue;
           if (observationNow() >= deadline) break;
-          const native=await execute(makeCode(preparedNodeContext),{timeout:readTimeout()});
+          const native=await execute(key==='node_mapping'?makeCode(preparedNodeContext,mappingEditorBinding):makeCode(preparedNodeContext),{timeout:readTimeout()});
           result.output[key]=native;
+          if(key==='node_mapping'&&mappingEditorBinding)result.output.node_mapping_editor=structuredClone(mappingEditorBinding);
           if(native.node_context && JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
             throw new Error('Native process/output context changed during observation');
         }
@@ -486,7 +492,15 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         ...(openingWait?{opening_timeout_ms:openingWait}:{}),
         ...boundOptions,
         snapshot: before, expected_origin: targetOrigin, expected_build: targetBuild });
-      const wrapped = wrapMutation(code, { id, signature, action_key: 'ui.act' });
+      const wrapped = wrapMutation(before.node_mapping_editor?`async page=>{
+        const current=await (${makeNodeMappingContextCode(preparedNodeContext,before.node_mapping_editor)})(page);
+        const {rendered_indices,...definition}=current;
+        if(JSON.stringify(definition)!==${JSON.stringify(JSON.stringify((({rendered_indices,...definition})=>definition)(before.node_mapping)))})
+          return {status:'NOT_APPLIED',action_key:'ui.act',action_revision:'1',operation_id:${JSON.stringify(id)},
+            phase:'preconditions',effect_possible:false,cleanup_complete:true,trace:[],
+            error:{code:'MAPPING_BINDING_CHANGED',message:'Original owned input mapping changed before gesture'}};
+        return (${code})(page);
+      }`:code, { id, signature, action_key: 'ui.act' });
       let result;
       try { result = await execute(wrapped, { timeout: settlementWait?settlementWait+5000:openingWait?openingWait+5000:35000 }); }
       catch (error) {
@@ -535,6 +549,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           wizardConfirmation:initialObservation?.node_wizard_confirmation,
           readNavigation:initialObservation?.node_navigation_read===true,
           readMappings:initialObservation?.node_mapping!==undefined,
+          mappingEditor:initialObservation?.node_mapping_editor,
           readCalculator:initialObservation?.node_calculator!==undefined,
           readJavascript:initialObservation?.node_javascript_schema!==undefined,
           readGrouping:initialObservation?.node_grouping!==undefined,

@@ -1,21 +1,32 @@
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
 
-export function makeNodeMappingContextCode(binding) {
+export function makeNodeMappingContextCode(binding, editor) {
   validatePreparedNodeContext(binding);
-  return `async page=>(${readNodeMapping.toString()})(page,${JSON.stringify(binding)},${readPreparedNodeContext.toString()},${readMappingBrowser.toString()})`;
+  if(editor!==undefined&&(!editor||Object.getPrototypeOf(editor)!==Object.prototype
+    ||Object.getOwnPropertySymbols(editor).length!==0
+    ||Object.values(Object.getOwnPropertyDescriptors(editor)).some(d=>!Object.hasOwn(d,'value'))
+    ||Object.keys(editor).sort().join(',')!=='opening_operation_id,port_guid,record_id'
+    ||!['opening_operation_id','record_id'].every(k=>typeof editor[k]==='string'&&editor[k].length>0&&editor[k].length<=256)
+    ||typeof editor.port_guid!=='string'||!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(editor.port_guid)))
+    throw Error('Exact owned input mapping editor binding required');
+  return `async page=>(${readNodeMapping.toString()})(page,${JSON.stringify(binding)},${readPreparedNodeContext.toString()},${readMappingBrowser.toString()},${JSON.stringify(editor)})`;
 }
 
-export async function readNodeMapping(page,binding,readNode=readPreparedNodeContext,readBrowser=readMappingBrowser) {
+export async function readNodeMapping(page,binding,readNode=readPreparedNodeContext,readBrowser=readMappingBrowser,editor) {
   const before=await readNode(page,binding);
   if(before.verified!==true||before.surface!=='wizard')return {verified:false,reason:'mapping_node_surface'};
-  const result=await page.evaluate(readBrowser,binding.workflow_ref.prefix);
+  if(editor&&(!before.input_port||before.input_port.direction!=='input'||before.input_port.port!==0
+    ||before.input_port.port_guid!==editor.port_guid||before.input_port.opening_operation_id!==editor.opening_operation_id))
+    return {verified:false,reason:'mapping_editor_owner'};
+  const result=await page.evaluate(readBrowser,editor?{prefix:binding.workflow_ref.prefix,editor}:binding.workflow_ref.prefix);
   const after=await readNode(page,binding);
   if(JSON.stringify(before)!==JSON.stringify(after))return {verified:false,reason:'mapping_node_changed'};
   return {...result,node_context:after};
 }
 
 // Only local UI stores are read. No model loads, server requests or dataset APIs.
-export function readMappingBrowser(prefix) {
+export function readMappingBrowser(request) {
+  const prefix=typeof request==='string'?request:request.prefix,editor=typeof request==='string'?null:request.editor;
   const fail=reason=>({verified:false,reason,source_identity_verified:false});
   const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'};
   const exact=tid=>[...document.querySelectorAll('[data-tid]')].filter(e=>e.getAttribute('data-tid')===tid);
@@ -31,6 +42,33 @@ export function readMappingBrowser(prefix) {
     const parent=e.parentElement,columnTid=base+'colTargetDelete',wizard=exact(prefix+';WizrdMCF');
     const model=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
     const column=parent&&globalThis.Ext?.getCmp?.(parent.id);
+    // A fixed host binding may read the original caches behind its own input
+    // field editor. The global modal backdrop is not a loading/reconnect mask.
+    if(input&&editor&&masks.length===1&&e.classList?.contains('x-mask')
+      &&!e.classList.contains('x-mask-msg')&&!e.classList.contains('bg-mask-message')
+      &&e.getAttribute('role')==='presentation'&&!e.textContent.trim()&&parent===document.body
+      &&parent.getAttribute('data-tid')==='MF'&&wizard.length===1&&model?.FView?.el?.dom===wizard[0]
+      &&wizard[0].contains(root)){
+      const forms=exact('EditTuneColumnDefForm').filter(f=>f.checkVisibility({checkVisibilityCSS:true}));
+      const grids=exact(base+'grdTargetColumns;tbl').filter(g=>root.contains(g));
+      const component=forms.length===1&&globalThis.Ext?.getCmp?.(forms[0].id),native=component?.Controller;
+      const records=Object.getOwnPropertyDescriptor(native??{},'Records')?.value;
+      const nativeView=Object.getOwnPropertyDescriptor(native??{},'FView')?.value;
+      const addMode=Object.getOwnPropertyDescriptor(native??{},'FAddMode')?.value;
+      const manager=component?.zIndexManager,view=grids.length===1&&globalThis.Ext?.getCmp?.(grids[0].id),store=view?.getStore?.();
+      const selected=grids.length===1?[...grids[0].querySelectorAll('table.x-grid-item-selected')]:[];
+      const rowIndex=selected.length===1?selected[0].getAttribute('data-recordindex'):null;
+      const index=typeof rowIndex==='string'&&/^(?:0|[1-9]\d*)$/.test(rowIndex)?Number(rowIndex):-1;
+      if(forms.length===1&&forms[0].matches('.x-window')&&component?.el?.dom===forms[0]
+        &&component.$className==='bg.wizards.columns.view.EditColumnDefForm'&&component.modal===true&&component.hidden===false
+        &&native?.constructor?.name==='EditTuneColumnDefForm'&&nativeView?.el?.dom===forms[0]&&addMode===false
+        &&manager===globalThis.Ext?.WindowManager&&manager?.front===component&&manager.mask?.dom===e
+        &&Array.isArray(records)&&records.length===1&&records[0]?.isModel===true&&String(records[0].internalId)===editor.record_id
+        &&view?.el?.dom===grids[0]&&store?.$className==='Ext.data.Store'&&!store.isLoading?.()
+        &&Number.isSafeInteger(index)&&index>=0&&store.getAt?.(index)===records[0]
+        &&selected[0].getAttribute('data-recordid')===editor.record_id&&selected[0].getAttribute('data-boundview')===grids[0].id)
+        return false;
+    }
     return !(form==='DataSetOutputSocketWizard'&&e.classList?.contains('x-mask')
       &&!e.classList.contains('x-mask-msg')&&!e.classList.contains('bg-mask-message')
       &&e.getAttribute('role')!=='dialog'&&!e.textContent.trim()

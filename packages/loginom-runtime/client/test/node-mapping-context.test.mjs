@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {readMappingBrowser,readNodeMapping} from '../lib/node-mapping-context.mjs';
+import {readMappingBrowser,readNodeMapping,makeNodeMappingContextCode} from '../lib/node-mapping-context.mjs';
 function fixture({grouped=false,input=false,socket=false}={}) {
  grouped ||= socket;
  const base='MF;TF;WizrdMCF;'+(input?'TuneDataSourceMappingWizard':socket?'DataSetOutputSocketWizard':grouped?'DerivedDataSourceOutputSocketWizard':'ColumnsMappingEngineOutputPortWizard')+';',all=[],views={};
@@ -300,6 +300,81 @@ test('mapping read admits only its native disabled output delete-column mask',()
   const result=f.read();
   assert.equal(result.verified,variant==='valid',variant+': '+result.reason);
   if(variant!=='valid')assert.equal(result.reason,'mapping_mask',variant);
+ }
+});
+
+function inputEditorFixture() {
+ const f=fixture({input:true}),wizard=f.el('MF;TF;WizrdMCF'),body=f.el('MF');f.root.parent=wizard;
+ const form=f.el('EditTuneColumnDefForm'),mask=f.el(null,'',body);mask.mask=true;mask.parentElement=body;mask.attrs.role='presentation';
+ const classes=new Set(['x-mask','x-border-box']);mask.classList.contains=key=>classes.has(key);form.matches=key=>key==='.x-window';
+ const native={constructor:{name:'EditTuneColumnDefForm'},FView:{el:{dom:form}},FAddMode:false,Records:[f.target[0]]};
+ const component={$className:'bg.wizards.columns.view.EditColumnDefForm',el:{dom:form},Controller:native,modal:true,hidden:false};
+ const manager={front:component,mask:{dom:mask}};component.zIndexManager=manager;f.context.Ext.WindowManager=manager;f.views[form.id]=component;
+ const model={FView:{el:{dom:wizard}}},workspace={getActiveTab:()=>({Controller:{FController:model}})};
+ f.context.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:workspace}}}}}};
+ f.context.document.body=body;f.stores[1].getAt=i=>f.target[i];
+ const query=f.grids[1].querySelectorAll.bind(f.grids[1]);f.grids[1].querySelectorAll=q=>q==='table.x-grid-item-selected'?[f.rows[0]]:query(q);
+ const editor={opening_operation_id:'owned-input:n1',port_guid:'00000000-0000-4000-8000-000000000001',record_id:'t0'};
+ return {...f,wizard,body,form,mask,classes,native,component,manager,model,editor,
+  readOwned:()=>vm.runInNewContext('('+readMappingBrowser.toString()+')('+JSON.stringify({prefix:'MF;TF',editor})+')',f.context)};
+}
+
+test('an explicitly bound original input editor reads complete reciprocal caches; default masked read still refuses',()=>{
+ const f=inputEditorFixture();assert.equal(f.read().reason,'mapping_mask');
+ const result=f.readOwned();assert.equal(result.verified,true);assert.equal(result.inventory_complete,true);
+ assert.equal(result.source_identity_verified,true);assert.deepEqual(Array.from(result.target_fields,t=>t.source.name),['A','B']);
+ assert.equal(result.settings_applied,false);assert.equal(result.package_saved,false);
+});
+
+for(const [name,change] of [
+ ['unbound record',f=>f.editor.record_id=null],['foreign field',f=>f.editor.record_id='t1'],
+ ['foreign manager',f=>f.component.zIndexManager={...f.manager}],['foreign front',f=>f.manager.front={}],
+ ['foreign mask',f=>f.manager.mask.dom={}],['duplicate mask',f=>{const m=f.el(null);m.mask=true;m.parentElement=f.body;}],
+ ['foreign parent',f=>f.mask.parentElement={}],['wrong body',f=>f.body.tid='foreign'],
+ ['loading',f=>f.classes.add('x-mask-msg')],['message',f=>f.classes.add('bg-mask-message')],
+ ['wrong role',f=>f.mask.attrs.role='dialog'],['mask text',f=>f.mask.textContent='Loading'],
+ ['foreign wizard',f=>f.model.FView.el.dom={}],['foreign component',f=>f.component.el.dom={}],
+ ['foreign native view',f=>f.native.FView.el.dom={}],['wrong native class',f=>f.native.constructor.name='OtherForm'],
+ ['wrong component class',f=>f.component.$className='OtherForm'],['nonmodal',f=>f.component.modal=false],
+ ['hidden editor',f=>f.component.hidden=true],['add mode',f=>f.native.FAddMode=true],
+ ['foreign records',f=>f.native.Records=[{...f.target[0]}]],['two records',f=>f.native.Records.push(f.target[1])],
+ ['record accessor',f=>Object.defineProperty(f.native,'Records',{get(){throw Error('getter must not run');}})],
+ ['view accessor',f=>Object.defineProperty(f.native,'FView',{get(){throw Error('getter must not run');}})],
+ ['add mode accessor',f=>Object.defineProperty(f.native,'FAddMode',{get(){throw Error('getter must not run');}})],
+ ['wrong selected ID',f=>f.rows[0].attrs['data-recordid']='foreign'],['wrong selected index',f=>f.rows[0].attrs['data-recordindex']='1'],
+ ['missing selected index',f=>delete f.rows[0].attrs['data-recordindex']],
+ ['wrong selected view',f=>f.rows[0].attrs['data-boundview']='foreign'],['two selected rows',f=>f.grids[1].querySelectorAll=()=>f.rows],
+ ['loading store',f=>f.stores[1].isLoading=()=>true],['foreign grid view',f=>f.views[f.grids[1].id].el.dom={}],
+ ['two editors',f=>f.el('EditTuneColumnDefForm')],
+])test('owned input backdrop refuses '+name,()=>{
+ const f=inputEditorFixture();change(f);assert.equal(f.readOwned().reason,'mapping_mask');
+});
+
+for(const change of [f=>f.source[0].data.ConnectedRecord=f.target[1],f=>f.target[0].data.SourceDataType=4,
+ f=>f.stores[0].getTotalCount=()=>3,f=>f.target[1].data.Required='false'])
+test('owned editor backdrop retains full native inventory and reciprocal guards '+change.toString(),()=>{
+ const f=inputEditorFixture();change(f);assert.equal(f.readOwned().verified,false);
+});
+
+test('owned editor context requires its original input0 opening and brackets the cache read',async()=>{
+ const f=inputEditorFixture(),node={verified:true,surface:'wizard',input_port:{direction:'input',port:0,
+  port_guid:f.editor.port_guid,opening_operation_id:f.editor.opening_operation_id}},binding={workflow_ref:{prefix:'MF;TF'}};
+ let reads=0;const page={evaluate:async(fn,arg)=>{reads++;return vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context);}};
+ assert.equal((await readNodeMapping(page,binding,async()=>node,readMappingBrowser,f.editor)).verified,true);
+ for(const change of [p=>p.direction='output',p=>p.port=1,p=>p.port_guid='foreign',p=>p.opening_operation_id='foreign']){
+  const foreign=structuredClone(node);change(foreign.input_port);const before=reads;
+  assert.equal((await readNodeMapping(page,binding,async()=>foreign,readMappingBrowser,f.editor)).reason,'mapping_editor_owner');assert.equal(reads,before);
+ }
+ let n=0;assert.equal((await readNodeMapping(page,binding,async()=>({...node,node_id:String(++n)}),readMappingBrowser,f.editor)).reason,'mapping_node_changed');
+});
+
+test('owned mapping editor generator refuses changed binding shapes without reading getters',()=>{
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb',
+  navigation_path:[{tid:'crumb',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const editor=inputEditorFixture().editor;assert.doesNotThrow(()=>makeNodeMappingContextCode(binding,editor));
+ for(const change of [e=>delete e.record_id,e=>e.extra=true,e=>e.record_id='',e=>e.port_guid='foreign',
+  e=>Object.defineProperty(e,'record_id',{get(){throw Error('getter must not run');}}),e=>e[Symbol('foreign')]=true]){
+  const value={...editor};change(value);assert.throws(()=>makeNodeMappingContextCode(binding,value),/Exact owned input mapping editor/);
  }
 });
 

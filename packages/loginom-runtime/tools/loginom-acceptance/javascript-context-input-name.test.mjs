@@ -29,7 +29,7 @@ function fixture() {
     async openPort(direction,index){calls.push('open');assert.equal(direction,'input');assert.equal(index,0);
       return {status:'SUCCEEDED',cleanup_complete:true,action_key:'node.input_port.open.internal',operation_id:'rename:open',
         output:{...node,...owner.input_port,verified:true}};},
-    async observe(options){const s=structuredClone(state());assert.ok(options.ready(s),options.condition);return s;},
+    async observe(options){if(options.mappingEditor)f.bindings.push(structuredClone(options.mappingEditor));const s=structuredClone(state());assert.ok(options.ready(s),options.condition);return s;},
     async perform(options){
       f.beforeGesture?.();const s=structuredClone(state());assert.ok(options.ready(s),options.condition);options.identity(s);
       const action=options.resolve(s);calls.push(action);
@@ -46,7 +46,7 @@ function fixture() {
   const options={reader,node,inputPortGuid:'port',targetOrigin:origin,deadline:Date.now()+60000,lifecycle,
     record:async event=>{events.push(structuredClone(event));return await f.afterRecord?.(event)??event;},
     verifyGraph:async()=>{calls.push('graph');f.afterGraph?.();}};
-  const f={options,reader,node,owner,mapping,calls,events,lifecycle};return f;
+  const f={options,reader,node,owner,mapping,calls,events,lifecycle,bindings:[]};return f;
 }
 
 test('fixed input name helper runs the actual shared field procedure and exact input Done without Execute',async()=>{
@@ -56,6 +56,9 @@ test('fixed input name helper runs the actual shared field procedure and exact i
   assert.equal(proof.after.target_fields[1].source.name,'Customer');assert.equal(proof.after.target_fields[1].origin_type,1);
   assert.deepEqual(f.calls.filter(c=>typeof c==='object').map(a=>a.verb),['double_click','set_wizard_field','apply_output_column','finish_wizard']);
   assert.equal(f.calls.find(c=>c?.verb==='set_wizard_field').text,'CustomerNow');assert.equal(f.lifecycle.closed,true);
+  assert.ok(f.bindings.length>0);assert.ok(f.bindings.every(b=>JSON.stringify(b)===JSON.stringify({
+    opening_operation_id:proof.opening.output.opening_operation_id,port_guid:proof.opening.output.port_guid,
+    record_id:proof.before.target_fields[1].record_id})));
   assert.deepEqual(f.events.map(e=>e.phase),['javascript_context_input_name_prepared','javascript_context_input_name_done_prepared',
     'javascript_context_input_name_committed']);
   await assert.rejects(renameJavascriptContextInput(f.options),/one-flight/);assert.equal(f.calls.length,6);

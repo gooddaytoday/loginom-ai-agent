@@ -58,7 +58,8 @@ export async function renameJavascriptContextInput({reader,node,inputPortGuid,ta
       'original full input mapping changed');return true;
   };
   const tracked={...reader,
-    async observe(options){const state=await reader.observe({...options,readMappings:true});mappingBound(state);return state;},
+    async observe(options){const state=await reader.observe({...options,readMappings:true,
+      mappingEditor:{opening_operation_id:port.opening_operation_id,port_guid:port.port_guid,record_id:before.target_fields[1].record_id}});mappingBound(state);return state;},
     async perform(options){
       const result=await reader.perform({...options,ready:s=>mappingBound(s)&&options.ready(s),
         identity:s=>({owner,root,definition:s.node_mapping,field:options.identity(s)}),
