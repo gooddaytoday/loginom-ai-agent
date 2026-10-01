@@ -271,6 +271,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
         return [owner,owner+' input','[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
       })),
+      ...['cntTestPriority;cnt;chb','cntTestPriority;cnt;chb;InputEl','cntTestPriority;cnt;chb;DisplayEl'].map(name=>'[data-tid$=";WizrdMCF;PartitionComponentWizard;'+name+'"]'),
       ...['pedSamplingMethod;ValueControl','pedTestPriorityPosition;ValueControl','RandSeedEdit;edtRandSeed;ValueControl','StratifiedMethodForm;pedCompleteUniqueValues;ValueControl'].flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;PartitionComponentWizard;'+name+'"]';return [owner,owner+' input'];
       }),

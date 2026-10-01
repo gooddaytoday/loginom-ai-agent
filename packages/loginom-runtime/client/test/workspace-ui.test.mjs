@@ -5130,3 +5130,22 @@ test('DataPartition option waits for its native panel after one gesture and reta
   assert.equal(page.events.filter(e=>e==='click').length,1);assert.ok(waits>0&&waits<=24);
  }
 });
+
+
+test('DataPartition priority checkbox exposes the owned Ext state and confirms one gesture',async()=>{
+ const page=new Page();page.waitForTimeout=async()=>{};
+ const wizard=page.add('div','MF;TF-1;WizrdMCF');
+ const base='MF;TF-1;WizrdMCF;PartitionComponentWizard;';
+ const method=page.add('div',base+'pedSamplingMethod;ValueControl','',undefined,wizard);
+ page.add('input',null,'',undefined,method).value='Последовательный';
+ const owner=page.add('div',base+'cntTestPriority;cnt;chb','',undefined,wizard);
+ const display=page.add('span',base+'cntTestPriority;cnt;chb;DisplayEl','',{x:100,y:100,width:20,height:20},owner);
+ display.attrs.class='x-form-checkbox';
+ const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);owner.attrs.class='x-form-cb-checked';};
+ const snapshot=await page.observe(),target=snapshot.ui.elements.find(e=>e.tid===display.getAttribute('data-tid'));
+ assert.equal(snapshot.wizard.stage,'data_partition');assert.equal(target.check_state.source,'loginom_ext');
+ assert.equal(target.check_state.checked,false);assert.ok(target.allowed_actions.includes('set_checked'));
+ const changed=await page.act({verb:'set_checked',ref:target.ref,checked:true},snapshot);
+ assert.equal(changed.status,'SUCCEEDED',JSON.stringify(changed.error));assert.equal(page.events.filter(e=>e==='click').length,1);
+ assert.equal((await page.observe()).ui.elements.find(e=>e.tid===display.getAttribute('data-tid')).check_state.checked,true);
+});

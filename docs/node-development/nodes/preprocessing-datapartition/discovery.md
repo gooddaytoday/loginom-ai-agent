@@ -298,3 +298,23 @@ Attempt2 целиком FAILED; local cleanup и wrapper подтвердили 
 Полные math/method axes/typed limits/dynamic/recovery/save/cold/CLI и product
 result.json PASS пока отсутствуют. Исторические FAIL сохранены; draft PR не
 передан в review.
+
+## Current-run sequential N7 investigation
+
+Candidate `11ed7f7d95bf050a8f146b2803b6c538e3244708`, sourceDirty=false.
+Qualified attempt `LOG-52-math-e97416e0-4` ended **FAIL**, not full product acceptance.
+- Public sequential 50%/25%: training4, test1, combined5 on N7; effective settings verified.
+- Public sequential 30%/30%: training2, test2, combined4. Percentage formula remains unresolved.
+- Rows9/9 training priority: exact training IDs1..7, test empty with retained schema;
+  independently frozen N7 row oracle PASS, 14 corruption controls rejected.
+- Following test-priority configure failed AMBIGUOUS: Unique DataPartition priority checkbox required.
+  Original operation inspected; remaining test-priority/start/end/reordered cases NOT_RUN.
+- Primary native observation omitted priority checkbox from narrow UI elements, while
+  cached native settings showed its state. Own exact checkbox owner/InputEl/DisplayEl markers
+  added under existing DataPartition observer permission; addressed tests2/2 and procedure100/100 PASS.
+  Native retest of this change NOT_RUN. Initial addressed-test FAIL came from fixture missing
+  waitForTimeout; fixed without changing product guards.
+- Local cleanup BLOCKED/DIAGNOSTIC_SAVE_PROMPT_CHANGED; wrapper cleanup_confirmed=true,
+  own lab-slot-a seen1/closed1/loggedOut=true. Administrative closure does not make attempt PASS.
+- Pending owner scope card8a9e0227-fb03-4848-b185-0adc05697688 concerns calculator-node.mjs
+  execution-baseline timing for bias native input activation. That shared change is not implemented.
