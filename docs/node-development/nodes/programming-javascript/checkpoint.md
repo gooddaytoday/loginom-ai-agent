@@ -307,6 +307,30 @@ auditor pin. Если native поддержан или primary sufficient, insuf
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
 
+### E/J14: general Code447 accepted, declared448 RUNNING — 2026-10-01
+
+Ordinary headed Code447/original78799 actualexit0 на73a8e9df31: public NEW Done
+с comment/source/full settings/graph, NEW Close другого draft/source retained,
+exact same-ID retries zero runtime events; NEW preserve Execute/two distinct
+completed executions/full6×4/all cells types/order/1950, default materialized
+context и final full source read. No Save; package close/logout/browser/process
+absence подтверждены independent v2 auditor actualexit0 и **36/36 non-noop
+corrupted-copy negatives** original13385 actualexit0. Report
+**9be702a8e7f31ee5822fc03810cd49a5aa8e60d5ca6ef6ff21cb2ed283dd105d**,
+journal **dfc6bb2226736f16547a8d9da0edcfe96398df86b527085b1f0f66412004cc06**,
+audit receipt **502f40fc62bd33b2179143205a8201d69509bed3e1a6114880ec9679fa98a89c**,
+negative receipt **f42888c00706d0573881dc87ecae81811ad97ada7850a7de35fe763caa1d8883**.
+Native pre-click counters в этом run равны0: общий lifecycle live проверен,
+редкая redraw ветвь прямо exercised actual serialized tests и original trace,
+её возникновение в fresh live не утверждается. Failed444 не повышен до PASS.
+
+Registry447 reconciled closed_verified/active_exec=null. Тот же source/freeze/
+oracle/auditor v2 pre-pin закрепляет separate declared case. Под lock assigned
+fresh448 для `e-general-config-declared-01`, original47270 RUNNING/ordinary headed;
+до terminal не менять child source/evidence и не назначать второй browser.
+Далее original terminal/independent audit36 negatives/cleanup/reconcile и
+remaining E/F requirements по полному плану. Product/candidate/CLI ещё открыты.
+
 ### E/J14: bounded pre-body redraw source принят, fresh447 pinned — 2026-10-01
 
 На child604 текущие незакоммиченные изменения ограничены owned-selection,
