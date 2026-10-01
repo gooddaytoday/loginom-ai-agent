@@ -167,3 +167,26 @@ exec31098 и full operator18493PASS/exec63984, actualexit0/concurrency4.
 Новый freeze f87e60c8/pin771c8015 закрепляют same oracle32bc3cfd и v2
 independent auditor/negative84. Fresh headed Code435 начат; live acceptance
 требует terminal report, actual audit и cleanup, затем separate declared case.
+
+Code435 завершился actualexit1 до Name fill: scoped input editor открылся,
+но default cached mapping read отказал с mapping_mask. Fields drift этим не
+доказан. Exact idle own package/session закрыты отдельным recovery436; исходный
+failed report не повышен до PASS. Readonly headed inventory437 actualexit0
+подтвердил native editor/backdrop binding до mutation, typed Cancel, полное
+retained mapping/graph и PackageClose/logout/browserClose/process absence.
+
+Разрешён узкий internal cached read под собственным input field editor:
+original input0 opening operation/GUID/target record id обязательны; единственная
+plain body presentation-mask должна быть mask.dom того же Ext.WindowManager,
+editor — его visible modal front; native own Records/FView/FAddMode, wizard/grid/
+selected cached store record должны совпадать. Default masked read по-прежнему
+refused. Никаких load/server/dataset APIs или getters вместо own cached data.
+Full cache/reciprocal/type/order guards сохраняются. Перед каждым gesture после
+durable journal ACK fresh full mapping/owner compare блокирует любую семантическую
+дельту как NOT_APPLIED/no effect/MAPPING_BINDING_CHANGED, без replay.
+Child `e2e814a060`: addressed314PASS/helper71PASS, full client3365PASS+10SKIP и
+operator18493PASS, actualexit0/concurrency4. Новый source freeze fece6d3f и
+v3 pin6cdea9de закреплены до browser; oracle32bc3cfd неизменён. Independent
+v3 audit требует88 non-noop negatives; source/direct уровень не заменяет live
+J19 acceptance. Следующий ordinary headed Code438 должен пройти этот audit и
+cleanup до отдельного declared run; во время run child source не менять.

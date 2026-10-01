@@ -110,10 +110,55 @@ full operator63984 actualexit0/18493PASS, logSHA9df65060, оба concurrency4.
 Addressed124 logSHA16055241. Private v2 source freeze f87e60c8/12748files+61symlinks,
 oracle32bc3cfd, auditorcedf5b32/negative84/handoff1dd017c7, pin771c8015;
 исходные v1 files/reports неизменны. Python syntax PASS; positive live audit ещё нет.
-После verified cleanup434 registry назначил435: ordinary headed
-`e-public-context-renamed-code-02`/exec93145 на immutable7ec выполняется,
-original30min. Наблюдать этот handle до terminal, затем actual independent
-v2 audit/negative84 и cleanup/process absence перед declared.
+Fresh ordinary headed Code435/exec93145 actualexit1/CLEANUP_UNCONFIRMED:
+оба warmup Execute завершились, preserve binding исправлен в actual runtime.
+После baseline context и manual output label shared field double_click открыл
+own global `EditTuneColumnDefForm`. До Name fill/Apply/Done guard отказал:
+`Context input name: original full input mapping changed`; actual node_mapping
+не изменённые fields, а `{verified:false,reason:mapping_mask}`. Native prepared
+input owner/root/GUID и observed portal-bound Customer editor сохранились.
+Это readonly admission gap под modal backdrop; не считать fields изменёнными.
+Original report395aa19f/journalbbfc2fba сохранены; J19 rename ещё не принят.
+Separate admin recovery436/exec7938 actualexit0 закрыл exact idle
+`jsteach:4030`/own package без Save, refresh absence обоих, foreign rows unchanged,
+logout/browser/process absence435/436; journal1dec59bd/verificationb84da774.
+Registry reconciled closed_verified перед новым profile.
+
+Readonly ordinary headed inventory437/exec26743 на immutable7ec завершился actualexit0/PASS:
+open exact saved Code input0 → shared field editor double_click → native modal/
+mask ownership inventory до любого fill → typed Cancel → полный retained mapping/
+own input Close/discard → sole PackageClose → logout/browserClose/process absence.
+Name fill/Apply/Execute/Save отсутствуют; graph retained/unlocked. Private journal
+SHA1ac7a3f0/script5a187bdd/verificationd4766e63; registry closed_verified,
+active_exec=null. Это readonly inventory, не rename acceptance.
+
+Наблюдённый global modal `EditTuneColumnDefForm` принадлежит native
+`bg.wizards.columns.view.EditColumnDefForm`; own cached Records содержит ровно
+выбранную target record, FView указывает на тот же DOM, FAddMode=false.
+Компонент modal/visible и front собственного Ext.WindowManager, его mask.dom —
+единственная plain empty presentation-mask под body MF. Native wizard/view/grid/
+store/selected recordindex/recordid/boundview совпадают с исходным input0.
+Observed IDs не закрепляются как константы: binding содержит original opening
+operation id, GUID input0 и original target record id.
+
+Узкая source-доработка требует эту explicit host-only binding и все указанные
+native связи для чтения original full caches под собственным editor backdrop.
+Default mapping_mask guard и full cache/reciprocity/type/order checks сохраняются;
+getters вместо own cached Records/FView/FAddMode и missing selected index refused.
+После durable node_step_prepared ACK и до каждого gesture снова читаются полный
+mapping и original owner; семантическая дельта даёт NOT_APPLIED/no effect,
+MAPPING_BINDING_CHANGED без replay. Публичный mapping API не расширяется.
+Addressed05 actualexit0/314PASS; shared helper02 exec57681 actualexit0/71PASS.
+Initial addressed01 syntax/02 fixture failures сохранены; corrected03/04 также PASS.
+Full client59505 actualexit0/3365PASS+10SKIP и operator81919 actualexit0/18493PASS,
+оба concurrency4. Source child `e2e814a06038a41aa08776608a97c4628ecd5481`;
+client logSHAfcb781d2/operator9f2fee94/addressed496c8059/helper5d483402.
+Новый freeze fece6d3f/12748files+61symlinks/oracle32bc3cfd/v3 pin6cdea9de.
+Python syntax PASS. V3 audit сохраняет прежние84 negative checks и добавляет4
+проверки editor binding/full caches (88 total); positive live audit отсутствует.
+Далее fresh ordinary headed Code438 на этом immutable source/pin, audit/cleanup,
+затем separate declared. Перед запуском registry должен подтвердить отсутствие437;
+observe original exec handle, не менять child source во время run.
 Natural insufficient-primary/Done/actual model/candidate/CLI/Gates остаются открытыми;
 accepted milestones не повторять.
 
