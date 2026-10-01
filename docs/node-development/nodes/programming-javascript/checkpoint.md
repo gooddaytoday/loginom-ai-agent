@@ -54,6 +54,39 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J25: owned expansion final checks PASS; fresh432 назначен — 2026-10-01
+
+Child9f17063f0f добавил serialized owned details inspector, default expansion
+при truncated/unrecognized primary, внутренний required-details fixed probe,
+one-flight prepared/fresh/returned/observed ACK, bounded technical text4096UTF8 /
+public2048, явное truncation/redaction и user-v1/schema delivery. Code/hidden Done
+paths покрыты direct tests; actual expanded live ещё не выполнен.
+
+Дополнительный source review: native toggle использует Items/FDetailedException.
+Child22f2cffa89 удерживает own FItems и exact btnDetais/pnlDetail/cmpDetailText,
+exception identity, constructor/prototype/handler. Fresh inspection после ACK
+и перед OK отказывает remap/replacement без getter/handler invocation и replay.
+Frontend Controller.FillItems source подтверждает прямые ссылки по itemId.
+
+Адресный06/actualexit0 —142PASS; failed05 сохранён: тестовая замена exception
+через spread вызвала forbidden getter в самом тесте, исправлено без изменения
+production guard. Прежний9f170 full client54816 actualexit0/3300PASS+10SKIP и
+operator61490 actualexit0/18456PASS относятся к прежней версии. На22f final
+operator28311 actualexit0/18456PASS. Client74206 actualexit1/3317PASS+1FAIL+10SKIP:
+existing native-read5ms test ожидал pending1, actual0; original failed log сохранён.
+Isolated native-read37PASS/actualexit0. Final full client69911 actualexit0:
+3318PASS+10SKIP, test-concurrency4 на неизменном22f; logSHA5c55e854. Original
+failed74206 не переименован в PASS. Operator28311 logSHA656cdf1b, addressed06
+logSHA0b4f4f4a. Full tests повторены из-за дополнительного owning guard change.
+
+Private freeze-v2 SHA44433f74,12746files+61symlinks, independent oracle/auditor/
+negative25/handoff v2 подготовлены, Python syntax PASS. Pre-live pinSHA7905dafc,
+auditor8027c201. Под registry lock назначен fresh432 после verified absence431:
+`e-native-details-expansion-code-01`, source22f2cffa89. Один ordinary headed fixed
+required-details на saved C, original30min, no Save. Actual terminal/report/
+independent audit/negative25 и cleanup/process absence обязательны перед следующим
+profile. Natural insufficient-primary/Done/J19/candidate/CLI/Gates остаются открытыми.
+
 ### E/J25: native details inventory431 принят; expansion остаётся — 2026-10-01
 
 Ordinary headed `e-native-details-syntax-code-01`/exec72018 actualexit0/**OBSERVED**

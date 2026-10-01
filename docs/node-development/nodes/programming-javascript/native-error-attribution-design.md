@@ -506,12 +506,17 @@ tooltip/dialog усечены либо класс/позиция не распо
 
 Перед одним details click удерживать exact ErrorMsg instance/message/DetailPanel
 controller, FView/native root/DOM, captured modal, native button/scope/handler,
-panel/text objects. Сверять fresh owned stage/error tooltip и полный exact
+panel/text objects, own FItems с точными ссылками btnDetais/pnlDetail/cmpDetailText
+и identity FDetailedException. Закреплять constructor/prototype/handler: замена
+обработчика вместе с button.toggleHandler не допускает повторный capture.
+Frontend DetailPanel использует Items/FDetailedException при toggle, а owning
+Controller.FillItems кладёт компоненты по itemId в items; одного DOM ownerCt
+для этой границы недостаточно. Сверять fresh owned stage/error tooltip и полный exact
 CodeMirror draft (в Done hidden), origin/build/account/node, blockers и deadline.
 Контролы искать только внутри captured modal; native DetailPanel root.Controller
 и FView обязаны совпасть, button scope/known prototype toggleHandler — относиться
 к нему, native ownerCt chains — вести к тому же FView. Читать только data
-descriptors, не hidden exception getters. Missing/foreign/remounted identities,
+descriptors, не Items/hidden exception getters. Missing/foreign/remounted identities,
 changed point/state или accessor вместо ожидаемого data — отказ до gesture.
 
 Details policy не является правом на повтор. One-flight lease flag до sole click,
