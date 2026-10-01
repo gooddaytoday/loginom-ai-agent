@@ -52,6 +52,41 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J23: long source writer/cold подготовлен — 2026-10-01
+
+Child `060a8d1cc7eeda1b258b2d2a368fe5719c444b82` добавляет closed operator-only
+`javascript-public-fidelity-live.mjs`: только4technical paths, fixed new Code
+business apply с `fidelity-bound-code`, public chunk read всего source и прежний
+owner-bound Save в новый пакет. Arbitrary source/package/cold/typed/J26/focus
+combinations отказывают до config/browser. Public runtime/knowledge не менялись;
+kind:source collector и path-only cold reader переиспользуются.
+[Решение](persistence-design.md#продолжение-ej23-cold-именно-long-source--2026-10-01).
+
+Addressed01 exec30904/actual exit0: **161PASS**; full operator01 exec46947/actual
+exit0: **18423PASS**. Новый direct test наблюдает exact32768bytes/1024LF-lines
+через production cold admission:24full-source chunk deliveries/24matching Close
+и один callback Execute; это source/direct, не live ChakraCore/cold persistence.
+Source SHA256 `85acd23df49eed604fafc875942e6f8a75a26d1f9f65bab90ac71f3ce886f16e`.
+Client source не менялся после J26 final3246+10SKIP, его full suite не повторялся.
+
+Private `e-long-source-pin-v1.json` SHA256
+`00ca04ca0288e5752f413707baf02ef40f33359a2b3813d565a23df5f4d4aa9e`
+закрепляет immutable code,12801tracked entries/61symlinks, source asset, full
+source/6×4 independent oracle, auditor/negative checker/handoff и final logs.
+Oracle `cda351143685f40947f01f36df21564db9c4b88b0d1bc16ae92a4b3a3fd50329`,
+freeze `39c77eb3fbd5f224db1df72493afacac4056befe38f3328fb9a18976b89fdccb`,
+auditor `2f8621199653558a466062a8e723d438bc85597f75cc9f487555ec2a073bc5fd`.
+Full source reused из прежнего independently authored fidelity oracle2893;
+не из live output. Helpers syntax проверен, semantic audit/negative16 ещё нет.
+
+Registry423 `closed_verified`, active exec/evidence null, нового browser ещё нет.
+Следующий шаг — fresh424 `e-long-source-writer-01`, ordinary headed, original30min:
+2owned Execute/full6×4/user-v1/public chunks →owned new Save/dirty-state →cleanup.
+После actual exit/v1audit/negative16/process absence — fresh425 path-only cold
+reader10min/1fresh Execute/full6×4 и отдельный audit/negative16/cleanup. Exact
+package path берётся только из verified writer receipt; C/D baseline не заменять.
+Candidate/CLI/native bytes/Gates этим не объявляются; J26 fixed2/2 не повторять.
+
 ### E/J26: Code/Declared source-bound reread принят2/2 — 2026-10-01
 
 Code422/exec74045 и Declared423/exec38595 завершились actual exit0/OBSERVED на
