@@ -110,7 +110,7 @@ if(publicSchemaRefusalCaseId!==null&&(publicSourceCaseId!==null||existingInputVa
   ||publicSchemaRefusalCaseId!==(existingLifecycle==='code'?'code-to-declared':'declared-to-code')))
   throw Error('Public schema refusal requires its separate fixed existing mode/base entrypoint');
 if(publicWizardRefusalCaseId!==null&&(publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null
-  ||existingInputVariant!==null||existingLifecycle===null||!['syntax-'+existingLifecycle,'throw-'+existingLifecycle,...(existingLifecycle==='code'?['import-code']:[])].includes(publicWizardRefusalCaseId)))
+  ||existingInputVariant!==null||existingLifecycle===null||!['syntax-'+existingLifecycle,'throw-'+existingLifecycle,...(existingLifecycle==='code'?['import-code','syntax-details-code']:[])].includes(publicWizardRefusalCaseId)))
   throw Error('Public wizard refusal requires its separate fixed existing mode/base entrypoint');
 if(publicStopCaseId!==null&&(publicStopCaseId!=='stop-code'||existingLifecycle!=='code'||existingInputVariant!==null
   ||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null||publicWizardRefusalCaseId!==null))
@@ -314,7 +314,7 @@ const executionRecord=async event=>{
       prefix:saved.outcome.output.workflow_ref?.prefix};
   }
   (report.execution_records??=[]).push(compactJavascriptJournalRecord(saved,line));
-  if(publicWizardRefusalCaseId==='import-code'&&event.phase==='javascript_managed_error_ok_prepared') {
+  if(['import-code','syntax-details-code'].includes(publicWizardRefusalCaseId)&&event.phase==='javascript_managed_error_ok_prepared') {
     const observation=await captureJavascriptNativeDetailsInventory(page,event);
     const inventory=await executionJournal({phase:'javascript_native_details_inventory',operation_id:event.operation_id,
       deadline:event.deadline,...observation});

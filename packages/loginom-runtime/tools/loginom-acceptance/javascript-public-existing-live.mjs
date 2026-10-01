@@ -78,7 +78,7 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   need(schemaRefusalCaseId===null||sourceCaseId===null&&inputVariant==='base'
     &&schemaRefusalCaseId===(schemaMode==='code'?'code-to-declared':'declared-to-code'),'Public schema refusal requires its fixed mode/base');
   need(wizardRefusalCaseId===null||sourceCaseId===null&&schemaRefusalCaseId===null&&inputVariant==='base'
-    &&['syntax-'+schemaMode,'throw-'+schemaMode,...(schemaMode==='code'?['import-code']:[])].includes(wizardRefusalCaseId)&&typeof readGraph==='function','Public wizard refusal requires its fixed mode/base');
+    &&['syntax-'+schemaMode,'throw-'+schemaMode,...(schemaMode==='code'?['import-code','syntax-details-code']:[])].includes(wizardRefusalCaseId)&&typeof readGraph==='function','Public wizard refusal requires its fixed mode/base');
   need(stopCaseId===null||stopCaseId==='stop-code'&&schemaMode==='code'&&inputVariant==='base'
     &&sourceCaseId===null&&schemaRefusalCaseId===null&&wizardRefusalCaseId===null&&typeof readGraph==='function',
   'Public Stop requires its fixed Code mode/base');
