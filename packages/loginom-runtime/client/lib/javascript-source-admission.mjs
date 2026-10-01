@@ -63,9 +63,21 @@ function policyFor(source) {
 // sourceAdapter is trusted owned navigation; callbacks are host driver functions,
 // never model-provided scripts. Existing/new identities are checked by the real
 // source reader, not by an injected "verified:true" admission result.
-export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAdapter, redactor, record, chunkBytes = 4096, settingsTransition}) {
+export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAdapter, redactor, record, chunkBytes = 4096, settingsTransition, expectedSource, expectedSettings}) {
   need(kind === 'new' || kind === 'existing', 'kind');
   const initialOwner = normalizedOwner(owner, kind), admissionId = randomUUID();
+  need(expectedSource === undefined || kind === 'existing' && expectedSource
+    && Object.getPrototypeOf(expectedSource) === Object.prototype && Object.getOwnPropertySymbols(expectedSource).length === 0
+    && Object.values(Object.getOwnPropertyDescriptors(expectedSource)).every(item => Object.hasOwn(item,'value'))
+    && equal(Object.keys(expectedSource).sort(), ['source_lf_lines','source_sha256','source_utf8_bytes'])
+    && /^[a-f0-9]{64}$/.test(expectedSource.source_sha256)
+    && Number.isInteger(expectedSource.source_utf8_bytes) && expectedSource.source_utf8_bytes >= 0 && expectedSource.source_utf8_bytes <= 32768
+    && Number.isInteger(expectedSource.source_lf_lines) && expectedSource.source_lf_lines >= 1 && expectedSource.source_lf_lines <= 1024,
+  'source_binding');
+  const sourceBinding = expectedSource === undefined ? null : immutable({source_sha256:expectedSource.source_sha256,
+    source_utf8_bytes:expectedSource.source_utf8_bytes,source_lf_lines:expectedSource.source_lf_lines});
+  need(expectedSettings === undefined || kind === 'existing' && typeof expectedSettings === 'string'
+    && /^[a-f0-9]{64}$/.test(expectedSettings), 'settings_binding');
   need(settingsTransition === undefined || settingsTransition && equal(Object.keys(settingsTransition).sort(), ['expected_after','kind'])
     && settingsTransition.kind === 'replace', 'settings_transition');
   const plannedSettings = settingsTransition === undefined ? undefined : immutable(canonicalSettings(settingsTransition.expected_after));
@@ -74,7 +86,7 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
   need(typeof sourceAdapter === 'function' && typeof record === 'function'
     && typeof redactor?.text === 'function' && typeof redactor?.redact === 'function'
     && Number.isInteger(chunkBytes) && chunkBytes >= 4 && chunkBytes <= 4096, 'dependencies');
-  let state = 'idle', receipt, effectiveSource, effectivePolicy, intent, previous, targetOwner = initialOwner, observedSettings, readId = 0;
+  let state = 'idle', receipt, effectiveSource, effectivePolicy, intent, previous, targetOwner = initialOwner, observedSettings, readId = 0, lastClosedRead;
   const timely = () => need(Date.now() < deadline, 'deadline');
   const bounded = async operation => {
     timely(); let timer;
@@ -93,7 +105,19 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
     need(Object.keys(expected).every(key => equal(ack?.[key], expected[key])), 'ack');
   };
   const retire = async error => {
+    const before = state;
     state = 'retired';
+    // Only a completely delivered owned read/discard, before a host callback,
+    // can settle a policy refusal. Unknown Close/ACK/callback failures cannot.
+    if (error instanceof SourceAdmissionError && ['admitting','checking_effect'].includes(before)
+      && ['policy','stale_identity','effect_drift'].includes(error.code) && lastClosedRead?.read_id === readId) {
+      const proof = immutable({owner:targetOwner,admission_id:admissionId,read_id:readId,deadline,
+        reason:error.code,source_identity:lastClosedRead.identity,settings_sha256:lastClosedRead.settings,
+        policy:inspectJavascriptModulePolicy(lastClosedRead.source),source_read_discard_verified:true,
+        check_callback_dispatched:false});
+      await journal({phase:'javascript_source_closed_check_refused',proof});
+      error.javascriptSourceClosedRefusal = proof;
+    }
     // Preserve the trusted adapter/driver refusal privately before replacing
     // its public message. Recording it cannot authorize a retry or an effect.
     if (!(error instanceof SourceAdmissionError) && Date.now() < deadline) {
@@ -126,7 +150,8 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
       request = part.cursor === null ? null : {owner: boundOwner, cursor: part.cursor, expected_source_sha256: part.source_sha256};
     } while (request);
     need(equal(javascriptSourceIdentity(source), metadata), 'read_digest');
-    timely(); return {source, identity: metadata, settings};
+    timely(); lastClosedRead = {source,identity:metadata,settings,read_id:currentRead};
+    return {source, identity: metadata, settings};
   };
   const validateReceipt = input => {
     need(input && equal(input.receipt, receipt), 'receipt');
@@ -137,7 +162,8 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
   const prepareDelivery=source=>prepareJavascriptSourceDelivery({source,owner:targetOwner,redactor,chunkBytes});
   const currentReceipt = phase => immutable({admission_id: admissionId, phase, kind, owner: targetOwner, deadline,
     intent,
-    previous_source: previous?.identity ?? null, effective_source: effectivePolicy, settings_sha256: observedSettings ?? null, planned_settings_sha256: plannedSettingsDigest});
+    previous_source: previous?.identity ?? null, effective_source: effectivePolicy, settings_sha256: observedSettings ?? null, planned_settings_sha256: plannedSettingsDigest,
+    ...(sourceBinding ? {expected_source_identity:sourceBinding} : {})});
   return {
     get state() { return state; },
     async admit(parameters) {
@@ -152,14 +178,20 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
         need(kind !== 'new' || supplied && !expected, 'new_source');
         need(kind !== 'existing' || (supplied ? expected && typeof requested.expected_source_sha256 === 'string'
           && /^[a-f0-9]{64}$/.test(requested.expected_source_sha256) : !expected), 'expected_digest');
-        if (supplied) prepareDelivery(requested.source_text);
+        if (supplied) {
+          prepareDelivery(requested.source_text);
+          // A known unsupported replacement must not open an existing wizard.
+          effectivePolicy = policyFor(requested.source_text);
+        }
         if (kind === 'existing') {
           previous = await readFull(initialOwner); observedSettings = previous.settings;
+          need(sourceBinding === null || equal(previous.identity, sourceBinding), 'stale_identity');
+          need(expectedSettings === undefined || previous.settings === expectedSettings, 'effect_drift');
           need(!supplied || requested.expected_source_sha256 === previous.identity.source_sha256, 'stale_digest');
         }
         effectiveSource = supplied ? requested.source_text : previous.source;
         prepareDelivery(effectiveSource);
-        effectivePolicy = policyFor(effectiveSource);
+        effectivePolicy ??= policyFor(effectiveSource);
         // Preserve explicit empty/same-text replacement intent; digest equality
         // must never turn a supplied replacement into an omitted-source request.
         intent = kind === 'new' ? 'create' : supplied ? 'replace' : 'preserve';

@@ -18,6 +18,9 @@ import {validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-d
 import {javascriptExistingLifecycleBaseline} from './javascript-existing-lifecycle.mjs';
 import {admitJavascriptExistingSchema} from './javascript-existing-schema-refusal.mjs';
 import {javascriptExecutionWaitContext} from './javascript-execution-continuation.mjs';
+import {NODE_READ_MODE} from './node-read-contract.mjs';
+import {createNodeReadDrivers} from './node-read-driver.mjs';
+import {withJavascriptSourcePolicyBoundary} from './javascript-source-policy-refusal.mjs';
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const same=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
@@ -69,6 +72,8 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
     validate:validateJavascriptCodeRequest,configure:(ctx,parameters,drivers)=>drivers.configureJavascript(ctx,parameters),
     configurationReadback:javascriptCodeReadback}]]);
   const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions})=>{
+    if(operation.parameters.mode===NODE_READ_MODE)return createNodeReadDrivers({operation,execute,onRecord,now,receiptOptions},
+      {targetOrigin,targetBuild,redactor});
     const request=operation.parameters;
     const initialOwner={document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,
       node_id:request.target.kind==='existing'?request.target.ref.node_id:null,operation_id:operation.id,ui_epoch:Date.now()};
@@ -104,8 +109,8 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       };
       return selected;
     };
-    const policyAdmission=(kind,boundOwner,deadline)=>createJavascriptSourceAdmission({kind,owner:boundOwner,
-      deadline,sourceAdapter:current=>sourceAdapter(current,deadline),redactor,record:onRecord});
+    const policyAdmission=(kind,boundOwner,deadline,expectedSource,expectedSettings)=>createJavascriptSourceAdmission({kind,owner:boundOwner,
+      deadline,sourceAdapter:current=>sourceAdapter(current,deadline),redactor,record:onRecord,expectedSource,expectedSettings});
     const graph=async ctx=>{
       need(typeof operation.nodeTargetAdapter?.observe==='function','JavaScript complete graph observer unavailable');
       const value=await operation.nodeTargetAdapter.observe({document_id:request.document_id,
@@ -166,9 +171,10 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       async beforeTarget(ctx){
         enter(request.target.kind==='existing'?{...ctx,node:request.target.ref}:ctx);
         admission=policyAdmission(request.target.kind,initialOwner,ctx.deadline);
-        admitted=await admission.admit(request.parameters.source_text===undefined?{}:
+        admitted=await withJavascriptSourcePolicyBoundary({phase:'target',owner:initialOwner,deadline:ctx.deadline,record:onRecord},
+          ()=>admission.admit(request.parameters.source_text===undefined?{}:
           {source_text:request.parameters.source_text,
-            ...(request.target.kind==='existing'?{expected_source_sha256:request.parameters.expected_source_sha256}:{})});
+            ...(request.target.kind==='existing'?{expected_source_sha256:request.parameters.expected_source_sha256}:{})}));
         if(request.target.kind==='existing'){
           existingBaseline=await admitJavascriptExistingSchema({receipt:admitted,snapshot:sourceSnapshot,
             parameters:request.parameters,owner,record:onRecord,deadline:ctx.deadline});
@@ -271,15 +277,16 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           source_sha256:expected.source_sha256,source_utf8_bytes:expected.source_utf8_bytes,source_lf_lines:expected.source_lf_lines});
       },
       async materializeOutput(ctx){
-        enter(ctx);return admission.withEffect({receipt:configured,owner},()=>launch(ctx));
+        enter(ctx);return withJavascriptSourcePolicyBoundary({phase:'materialization_start',owner,deadline:ctx.deadline,record:onRecord},
+          ()=>admission.withEffect({receipt:configured,owner},()=>launch(ctx)));
       },
       async finishGraph(mode,ctx){
         enter(ctx);need(mode==='execute'&&outputMapping&&executionReceipt?.status==='completed',
           'JavaScript final Execute requires completed materialization and full output mapping');
-        const fresh=policyAdmission('existing',owner,ctx.deadline),receipt=await fresh.admit({});
-        need(receipt.previous_source.source_sha256===expected.source_sha256&&receipt.settings_sha256===configured.settings_sha256,
-          'JavaScript source/settings changed before final Execute');
-        return fresh.withEffect({receipt,owner},()=>launch(ctx));
+        return withJavascriptSourcePolicyBoundary({phase:'finish',owner,deadline:ctx.deadline,record:onRecord},async()=>{
+          const fresh=policyAdmission('existing',owner,ctx.deadline,expected,configured.settings_sha256),receipt=await fresh.admit({});
+          return fresh.withEffect({receipt,owner},()=>launch(ctx));
+        });
       },
       async waitExecution(ctx){
         enter(ctx);need(executionDriver,'JavaScript owned execution driver unavailable');

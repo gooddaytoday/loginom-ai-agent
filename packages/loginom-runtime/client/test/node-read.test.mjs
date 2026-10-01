@@ -4,6 +4,7 @@ import {buildNodeReadRequest,alignReadSchema} from '../lib/node-read-contract.mj
 import {applyNode,validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {dispatchNodeApi,nodeApiTools} from '../lib/node-api.mjs';
 import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
+import {javascriptCodeReadback} from '../lib/javascript-code-node.mjs';
 const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
 const schema=[{index:0,name:'value',label:'Value',type:'real'}];
 const source=()=>({parameters:{contract_revision:'1.0.0',target:{type:'transform.calculator',label:'Calculation'},workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;path',label:'Scenario'}]}},outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node,cleanup_complete:true,execution:{status:'completed'},output:{ports:[{port:0,schema}]}}}});
@@ -99,4 +100,52 @@ for(const [name,mutate] of Object.entries({
 test('first read rejects unverified phases and never borrows a missing port',()=>{
  const s=unreadSource();s.outcome.output.phases[0].status='pending';assert.throws(()=>buildNodeReadRequest(args,s));
  assert.throws(()=>buildNodeReadRequest({...args,read:{ports:[1]}},unreadSource()));
+});
+
+function javascriptSource(){
+ const s=source();s.parameters.target.type='programming.javascript';s.outcome.output.output.ports=[];
+ const mapping={verified:true,source_identity_verified:true,autosync:true,target_fields:[
+  {...schema[0],data_kind:'Непрерывный',excluded:false,source:{name:'Raw'}}]};
+ const phases=['source','workflow','target','input_mapping','open','configure','node_finish','materialization_start',
+  'materialization_execute','output_mapping','finish','execute','read'].map(phase=>({phase,receipt_id:'created:'+phase,
+  status:'verified',effect_possible:true,value:phase==='node_finish'?{source_readback_verified:true,wizard_commit_verified:true,
+   source_sha256:'a'.repeat(64),source_utf8_bytes:80,source_lf_lines:3}
+   :phase==='output_mapping'||phase==='input_mapping'?{native_mapping:mapping}
+   :phase==='materialization_execute'||phase==='execute'?{owner_verified:true,status:'completed',execution_id:phase}:{}}));
+ s.outcome.output.phases=phases.map(({value,...phase})=>phase);
+ s.outcome.output.configuration={status:'applied',readback:javascriptCodeReadback({node:structuredClone(node),phases})};return s;
+}
+test('JavaScript reread is built from actual executed handler readback and never caller source',()=>{
+ const s=javascriptSource(),before=structuredClone(s),request=buildNodeReadRequest(args,s);
+ const support=new Map([['programming.javascript',{revision:'js',modes:['script'],configure(){throw Error('No configuration');}}]]);
+ validateNodeApplyRequest(request,support);
+ assert.deepEqual(request.parameters.javascript_source,{source_sha256:'a'.repeat(64),source_utf8_bytes:80,source_lf_lines:3});
+ assert.deepEqual(request.parameters.schemas,[{port:0,schema:[{...schema[0],data_kind:'Непрерывный'}]}]);
+ assert.deepEqual(s,before);s.outcome.output.configuration.readback.source.sha256='b'.repeat(64);
+ assert.equal(request.parameters.javascript_source.source_sha256,'a'.repeat(64));
+ for(const patch of [{source_text:'require("private")'},{javascript_source:request.parameters.javascript_source}])
+  assert.throws(()=>validateNodeApplyRequest({...request,parameters:{...request.parameters,...patch,extra:true}},support));
+});
+test('JavaScript reread uses the retained physical mapping rather than an untrusted preview',()=>{
+ const s=javascriptSource();s.outcome.output.output.ports=[{port:0,schema:[{...schema[0],name:'Wrong'}]}];
+ const request=buildNodeReadRequest(args,s);assert.equal(request.parameters.schemas[0].schema[0].name,'value');
+});
+for(const [name,mutate] of Object.entries({
+ kind:r=>r.kind='calculator',scope:r=>r.scope='observed_before_verified_finish',values:r=>r.values_are='requested_values',
+ owner:r=>r.node.node_id='foreign',commit:r=>r.wizard_commit_verified=false,settings:r=>r.settings_preserved=false,
+ execution:r=>r.execution_effects.explicit_execute_requested=false,internal:r=>r.execution_effects.internal_execution_started=false,
+ missingDigest:r=>delete r.source.sha256,digest:r=>r.source.sha256='bad',bytes:r=>r.source.utf8_bytes=32769,
+ lines:r=>r.source.lf_lines=1025,extraSource:r=>r.source.raw_text='secret',schema:r=>r.schema_mode='unknown',
+ missingNodeFinish:r=>r.receipt_ids=r.receipt_ids.filter(id=>id!=='created:node_finish'),
+ missingExecute:r=>r.receipt_ids=r.receipt_ids.filter(id=>id!=='created:execute'),
+ missingMaterialization:r=>r.receipt_ids=r.receipt_ids.filter(id=>id!=='created:materialization_execute'),
+ outputPort:r=>r.output_mapping.port=1,mapping:r=>delete r.output_mapping,
+ }))test('JavaScript reread rejects untrusted source boundary: '+name,()=>{
+ const s=javascriptSource();mutate(s.outcome.output.configuration.readback);assert.throws(()=>buildNodeReadRequest(args,s));
+});
+test('JavaScript declared readback and original verified phase identities remain mandatory',()=>{
+ const s=javascriptSource();s.outcome.output.configuration.readback.schema_mode='declared';
+ assert.equal(buildNodeReadRequest(args,s).target.type,'programming.javascript');
+ s.outcome.output.phases.find(phase=>phase.phase==='node_finish').status='pending';
+ assert.throws(()=>buildNodeReadRequest(args,s));
 });

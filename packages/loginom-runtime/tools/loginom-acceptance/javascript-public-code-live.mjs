@@ -14,6 +14,7 @@ import {verifyNativeInputUi} from './javascript-native-input-contract.mjs';
 import {verifyNativeRoundtripInput} from './javascript-native-roundtrip-contract.mjs';
 import {javascriptDiscoveryProbe,javascriptDiscoveryOracle} from './javascript-discovery-probes.mjs';
 import {javascriptColumnNameIds,verifyJavascriptPublicColumnNames} from './javascript-column-names.mjs';
+import {runJavascriptPublicPolicyReread} from './javascript-public-policy-reread.mjs';
 
 const need=(value,message)=>{if(!value)throw Error(message);};
 
@@ -101,8 +102,9 @@ export function javascriptPublicCodeOracle(probe,table,input) {
 }
 
 export async function runJavascriptPublicCodeLive({page,prepared,input,targetOrigin,redactor,record,
-  report,save,deadline,onPending,schemaMode='code',probeId=null}) {
+  report,save,deadline,onPending,schemaMode='code',probeId=null,policyReread=false}) {
   need(['code','declared'].includes(schemaMode),'Public JavaScript schema mode unavailable');
+  need(typeof policyReread==='boolean'&&(!policyReread||probeId===null),'Policy reread requires the fixed business mode');
   const key=schemaMode==='declared'?'public_declared':'public_code';
   const stage=schemaMode==='declared'?'public-declared':'public-code';
   const probe=javascriptPublicCodeProbe(probeId,schemaMode);
@@ -116,9 +118,11 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
   const base=createCandidateNodeSupport({targetOrigin,targetBuild:'7.4.2'});
   const code=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor});
   let columnNameMapping;
+  const apiRecords=[];
   const runtime=createActionRuntime({pinned:await javascriptPublicCodePins(),
     allowCandidate:true,targetOrigin,targetBuild:'7.4.2',redactor,onRecord:async event=>{
       const ack=await record(event);
+      if(policyReread)apiRecords.push(structuredClone(ack));
       if(javascriptColumnNameIds.includes(probe.id)&&event.phase==='node_phase_completed'
         &&event.receipt?.phase==='output_mapping')columnNameMapping=structuredClone(ack.receipt.value.native_mapping);
       return ack;
@@ -177,6 +181,14 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
   if(probe.knowledge||javascriptColumnNameIds.includes(probe.id))report[key].user_v1_result=structuredClone(projected);
   if(javascriptColumnNameIds.includes(probe.id))report[key].column_names=verifyJavascriptPublicColumnNames({
     probe,table,mapping:columnNameMapping,node:result.node,readback:projected.configuration.readback});
+  if(policyReread){
+    report[key].user_v1_result=structuredClone(projected);
+    report.explicit_execution_limit=3;
+    report.scope='isolated E J26 public '+schemaMode+' apply/preflight refusal/source-bound output reread; full typed UI';
+    report[key].policy_reread=await runJavascriptPublicPolicyReread({runtime,request,prior:result,
+      sourceIdentity:result.configuration.readback.source,record,report,save,deadline,onPending,
+      apiRecords,verifyOracle:table=>javascriptPublicCodeOracle(probe,table,input)});
+  }
   report.stage=stage+'-independent-source-read';await save();
   onPending(true);
   const sourceRead=await dispatchNodeApi(runtime,'dock_node_read',{kind:'source',operation_id:'js-code-after-'+randomUUID(),

@@ -108,6 +108,23 @@ test('JS full configuration is retained for bounded delivery instead of a readba
  assert.equal(JSON.stringify(result),before);assert.equal(result.outcome.output.configuration.readback_summary,undefined);
 });
 
+test('source-bound JS output reread refuses overflow without dropping rows or its source binding',()=>{
+ const javascript_source={source_operation_id:'created-js',source_sha256:'a'.repeat(64),source_utf8_bytes:80,
+  source_lf_lines:3,settings_sha256:'b'.repeat(64),policy:'javascript-module-v1'};
+ const result={operation_id:'reread-js',attempt:1,state:'settled',outcome:{status:'SUCCEEDED',effect_possible:true,
+  cleanup_complete:true,action_key:'node.apply',phase:'read',output:{configuration:{status:'not_requested'},
+   output:{status:'complete',javascript_source,ports:[{port:0,schema:[{index:0,name:'Value',label:'Value',type:'string'}],
+    row_count:1,sample_rows:1,sample_complete:true,
+    sample:[[{type:'string',value:'"'.repeat(20000),is_null:false,precision:'display_text'}]]}]}}}};
+ const before=JSON.stringify(result),refused=nodeResultReply(result,{userProfile:true});
+ assert.equal(refused.isError,true);assert.equal(JSON.parse(refused.content[0].text).original_operation_id,'reread-js');
+ assert.equal(JSON.stringify(result),before);assert.equal(result.outcome.output.output.ports[0].sample.length,1);
+ result.outcome.output.output.ports[0].sample[0][0].value='value';
+ const delivered=nodeResultReply(result,{userProfile:true});assert.equal(delivered.isError,undefined);
+ assert.deepEqual(delivered.structuredContent.output.javascript_source,javascript_source);
+ assert.equal(delivered.structuredContent.configuration.status,'not_requested');
+});
+
 test('real bridge MCP protocol retains knowledge after a refused prepare and continues after describe overflow',async()=>{
  const result=await promisify(execFile)(process.execPath,['--test','--test-reporter=tap','--experimental-test-module-mocks',
    new URL('./support/bridge-budget.mjs',import.meta.url).pathname],{maxBuffer:200000,env:{...process.env,NODE_TEST_CONTEXT:undefined}});

@@ -3,6 +3,7 @@ import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs
 import {verifiedNativeReadRefusal} from './native-read-refusal.mjs';
 import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-schema-refusal.mjs';
 import {verifiedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
+import {verifiedJavascriptSourcePolicyRefusal} from './javascript-source-policy-refusal.mjs';
 import {NODE_CONTRACT_REVISION, validateNodeTargetRequest} from './node-contracts.mjs';
 import {NODE_READ_MODE,nodeReadHandler} from './node-read-contract.mjs';
 
@@ -199,6 +200,13 @@ export async function applyNode({request, operation, handlers, drivers, record,
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
         state.native_read_refusal=true;
+      }
+      if(refusal?.phase===name&&refusal.status==='FAILED'&&refusal.effect_possible===true
+        &&refusal.cleanup_complete===true&&refusal.settings_unchanged===true
+        &&refusal.proof?.closed?.deadline===pending.deadline
+        &&verifiedJavascriptSourcePolicyRefusal(refusal,request,state.node)){
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
       }
       if(name==='node_finish'&&refusal?.phase===name&&refusal.status==='FAILED'&&refusal.effect_possible===true
         &&refusal.cleanup_complete===true&&refusal.settings_unchanged===true&&verifiedJavascriptWizardRefusal(refusal,request)) {
