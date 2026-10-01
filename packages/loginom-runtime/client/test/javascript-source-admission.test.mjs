@@ -147,6 +147,26 @@ for(const source_text of ['import "PRIVATE_SENTINEL";', 'export * from "PRIVATE_
  });
 
 const binding=()=>({source_sha256:digest(original),source_utf8_bytes:Buffer.byteLength(original),source_lf_lines:1});
+for(const drift of ['none','source','settings'])test('preserved source receipt binds a fresh final execution admission '+drift,async()=>{
+ const f=fixture(),preserved=await f.admission.admit({});
+ assert.equal(preserved.intent,'preserve');
+ assert.equal(preserved.effective_source.policy,'javascript-module-v1');
+ assert.throws(()=>fixture({expectedSource:preserved.effective_source}),{code:'source_binding'});
+ const final=createJavascriptSourceAdmission({kind:'existing',owner:f.owner,deadline:f.deadline,
+  sourceAdapter:f.sourceAdapter,redactor:createRedactor(),record:async event=>event,
+  expectedSource:preserved.previous_source,expectedSettings:preserved.settings_sha256});
+ if(drift==='source')f.browser.setSource(original+'\n// changed after materialization');
+ if(drift==='settings')f.settings.generation=false;
+ if(drift==='none'){
+  const receipt=await final.admit({});
+  await final.withEffect(input(f,receipt),f.effect);
+  assert.equal(f.calls.filter(call=>call==='effect').length,1);
+  assert.equal(f.calls.filter(call=>call==='close').length,f.calls.filter(call=>call==='open').length);
+  return;
+ }
+ await assert.rejects(()=>final.admit({}),{code:drift==='source'?'stale_identity':'effect_drift'});
+ assert.equal(final.state,'retired');assert.equal(f.calls.at(-1),'close');assert.ok(!f.calls.includes('effect'));
+});
 test('retained output source binding is snapshotted, canonically ordered and checked by the actual reader',async()=>{
  const expectedSource={source_lf_lines:1,source_utf8_bytes:Buffer.byteLength(original),source_sha256:digest(original)};
  const f=fixture({expectedSource});expectedSource.source_sha256=digest('changed');
