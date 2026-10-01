@@ -41,6 +41,33 @@ test("bundled Node host handshakes without Electron, manages its profile and clo
   await expect(host.request("connection.status", {})).rejects.toThrow("LOGINOM_HOST_CLOSED")
 }, 15_000)
 
+test("host startup permits readiness after 30 seconds and still closes completely", async () => {
+  const entry = join(fixture.directory, "slow-start.mjs")
+  await writeFile(entry, `
+    process.on('message', message => {
+      if (message.method === 'start') setTimeout(() => process.send({
+        id: message.id, result: { protocol: 1, ready: true, pid: process.pid }
+      }), 31_000);
+      if (message.method === 'close') process.send({
+        id: message.id, result: { closed: true }
+      }, () => process.disconnect());
+    });
+  `)
+  const host = await launchNodeHost({
+    node: fixture.node,
+    entry,
+    root: fixture.directory,
+    resources: fixture.directory,
+    headless: true,
+  })
+  try {
+    expect(host.alive).toBe(true)
+  } finally {
+    await host.close()
+  }
+  expect(await host.exited).toEqual({ code: 0, signal: null })
+}, 40_000)
+
 test("a non-boolean recovery mode is rejected before the host starts", async () => {
   await expect(
     launchNodeHost({

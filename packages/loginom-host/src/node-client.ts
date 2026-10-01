@@ -71,7 +71,6 @@ export async function launchNodeHost(input: {
         headless: input.headless,
         ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
       },
-      30_000,
     )
     .catch(async (error: unknown) => {
       child.kill("SIGTERM")
