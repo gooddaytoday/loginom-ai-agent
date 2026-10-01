@@ -194,7 +194,7 @@ export function judgedFields(judged: Judged) {
     }
   return {
     score: null,
-    pass: null,
+    pass: "oracle_pass" in judged && judged.oracle_pass === false ? false : null,
     judge_status: "error" as const,
     judge_attempts: judged.attempts,
     judge_confidence: null,

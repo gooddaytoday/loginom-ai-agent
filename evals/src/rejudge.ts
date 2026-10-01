@@ -43,8 +43,8 @@ export async function rejudge(config: EvalConfig, runId: string) {
       const units = await Array.fromAsync(new Bun.Glob("unpacked/Unit_*/Unit.xml").scan(artifactDir)).catch(() => [])
       const judgeable = task && units.length > 0 && attempt.status !== "harness_error" && attempt.status !== "infra_error" && attempt.status !== "interrupted"
       if (!judgeable || controller.signal.aborted) {
-        // Dry-run/--skip-judge оставляют score=null; при --judge-only нет артефакта → те же поля, что у живого прогона.
-        if (controller.signal.aborted || attempt.status === "harness_error" || attempt.status === "infra_error" || attempt.status === "interrupted" || attempt.judge_status !== "skipped") {
+        // Без артефакта пересчитываем также старый no_artifact по текущей рубрике.
+        if (controller.signal.aborted || attempt.status === "harness_error" || attempt.status === "infra_error" || attempt.status === "interrupted" || (attempt.judge_status !== "skipped" && attempt.judge_status !== "no_artifact")) {
           attempts.push(attempt)
           continue
         }
@@ -88,6 +88,7 @@ export async function rejudge(config: EvalConfig, runId: string) {
     interrupted: prev.interrupted || controller.signal.aborted,
     judge,
     rubric_hash: await rubricHash(tasks),
+    config: { ...prev.config, tasks_dir: tasksDir },
     metrics: aggregate(attempts, false),
     tasks: prev.tasks.map((group) => {
       const own = attempts.filter((item) => item.task_id === group.id)
