@@ -130,7 +130,7 @@ test('actual journal integration retains only verified completed graph binding a
   const sandbox=vm.createContext({});
   const result=await vm.runInContext(`(async()=>{
     let nativeClassifierBinding,executionJournalLine=0;
-    const calibrationTrial=null,nativeRoundtrip=true,discoveryProbe=false,report={stage:'prepare-typed-input'},save=async()=>{},compactJavascriptJournalRecord=()=>({});
+    const calibrationTrial=null,nativeRoundtrip=true,discoveryProbe=false,publicWizardRefusalCaseId=null,report={stage:'prepare-typed-input'},save=async()=>{},compactJavascriptJournalRecord=()=>({});
     let persist=true;
     const executionJournal=async e=>{if(!persist)throw Error('journal failure');return e;};
     ${code}
