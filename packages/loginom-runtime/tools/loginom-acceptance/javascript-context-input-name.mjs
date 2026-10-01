@@ -1,6 +1,7 @@
 // Closed operator fixture. This is not a public mapping API or model tool.
 import {configureOutputField} from '../../client/lib/port-mapping-procedure.mjs';
 import {inputMappingOrigin,verifyInputMappingFinish} from '../../client/lib/node-input-mapping-recovery.mjs';
+import {acknowledgeJavascriptCalibrationRecord} from './javascript-calibration-journal.mjs';
 
 const need=(value,message)=>{if(!value)throw Error('Context input name: '+message);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -46,7 +47,7 @@ export async function renameJavascriptContextInput({reader,node,inputPortGuid,ta
         &&typeof source.field_id==='string'&&typeof target.field_id==='string'&&same(target.source,source);
     }),'fixed full input mapping differs');
   const acknowledge=async proof=>{
-    timely();const saved=structuredClone(proof),ack=await record(saved);timely();
+    timely();const saved=structuredClone(proof),ack=acknowledgeJavascriptCalibrationRecord(saved,await record(saved));timely();
     need(Object.keys(saved).every(k=>same(saved[k],ack?.[k])),'journal ACK differs');
   };
   await acknowledge({phase:'javascript_context_input_name_prepared',node,deadline,opening,before,
