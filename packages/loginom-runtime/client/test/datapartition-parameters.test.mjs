@@ -75,3 +75,10 @@ test('bias preview validates name/type while native mapping requires an observed
  assert.throws(()=>validateDataPartitionInputParameters(parameters,{fields:[]},{},{preview:true}));
  assert.throws(()=>validateDataPartitionInputParameters(parameters,{fields:[{...fields[0],type:'integer'}]},{},{preview:true}));
 })
+
+
+test('DataPartition rejects native-unrepresentable bias factors without rounding valid decimals',()=>{
+ const parameters=factor=>({...settings(),biased:{field:'Group',adjustments:[{value:{type:'string',is_null:false,value:'A'},factor}]}});
+ for(const factor of [0,0.01,0.25,0.29,0.74,0.75,1.5,2])assert.doesNotThrow(()=>validateDataPartitionParameters(parameters(factor),'biased',request));
+ for(const factor of [0.125,0.375,0.001,1.999])assert.throws(()=>validateDataPartitionParameters(parameters(factor),'biased',request),/two decimal places/);
+});

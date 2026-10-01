@@ -42,6 +42,7 @@ export function validateDataPartitionParameters(parameters,mode,request){
    const identities=settings.adjustments.map(adjustment=>{
     requireValue(object(adjustment,['value','factor','count'])&&Object.hasOwn(adjustment,'factor')!==Object.hasOwn(adjustment,'count'),'Bias adjustment requires exactly one factor or count');
     requireValue(Object.hasOwn(adjustment,'count')?Number.isSafeInteger(adjustment.count)&&adjustment.count>=0:Number.isFinite(adjustment.factor)&&adjustment.factor>=0,'Bias factor/count must be nonnegative');
+    if(Object.hasOwn(adjustment,'factor'))requireValue(Number(adjustment.factor.toFixed(2))===adjustment.factor,'Bias factor supports at most two decimal places in Loginom');
     return dataPartitionValueIdentity(adjustment.value);
    });
    requireValue(new Set(identities).size===identities.length,'Duplicate typed bias value');

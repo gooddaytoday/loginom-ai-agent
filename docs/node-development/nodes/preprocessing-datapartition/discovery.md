@@ -318,3 +318,28 @@ Qualified attempt `LOG-52-math-e97416e0-4` ended **FAIL**, not full product acce
   own lab-slot-a seen1/closed1/loggedOut=true. Administrative closure does not make attempt PASS.
 - Pending owner scope card8a9e0227-fb03-4848-b185-0adc05697688 concerns calculator-node.mjs
   execution-baseline timing for bias native input activation. That shared change is not implemented.
+
+## Bias fraction discovery on guarded candidate6d7cfab3d
+
+Qualified own attempt `LOG-52-bias-e97416e0-5` ended **FAIL**, not product PASS.
+Factor2 (A4/B2/NULL2) returned12/12/0, explicit counts6/1/1 returned8/8/0,
+factor0.5 returned4/4/0; all three public outputs and native setting inventories read.
+The new finish evidence retained initial roots1/2 and prepared roots1/2/3. Root3 is
+completed native input activation, with one verified own child; explicit Execute
+was a separate new group. Activation is not hidden or accepted as execution.
+
+The next factor0.125 request stopped in configure with strict
+`DataPartition bias adjustment readback differs`: actual cached factor0.13,
+count1/source_count4. Other class adjustments had not yet been changed.
+This establishes loss of the requested factor through the native factor editor;
+public input now rejects factors with more than two decimal places before effects,
+never silently rounding them. Addressed precision validation includes0.29 to
+avoid a false binary-floating multipleOf rejection. Explicit count remains a separate
+choice; effective factor/count/source_count are returned separately.
+Native retest of this validation delta is NOT_RUN.
+
+Local cleanup was BLOCKED/DIAGNOSTIC_SAVE_PROMPT_CHANGED. Qualified wrapper
+confirmed own lab-slot-a seen1/closed1/loggedOut=true; that administrative cleanup
+does not convert the attempt to PASS. Remaining tie/zero cases NOT_RUN.
+Use source_count2 with factors0.25/0.75 for representable 0.5/1.5 ties; also
+non-ties0.24/0.74. Round rule and partial percentage basis remain unresolved.
