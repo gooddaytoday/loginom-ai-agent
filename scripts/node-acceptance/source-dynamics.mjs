@@ -76,6 +76,7 @@ try{
  // same import. Preserve the failure; do not relaunch an uncertain operation.
  const bad=await ipc('call',{name:'dock_node_apply',arguments:{...common,operation_id:'missing-source-field',target:{kind:'existing',type:'imports.text',ref:source.node},parameters:{settings:{columns:[{name:'MissingSourceField',label:'Missing'}]}}}});
  failed=bad.result.structuredContent??JSON.parse(bad.result.content.find(c=>c.type==='text').text.split('\n\n')[0]);
+ while(failed.state==='running')failed=await call('dock_node_wait',{operation_id:'missing-source-field',timeout_ms:60000});
  await writeFile(join(args.output,'failure.json'),JSON.stringify(redactor.redact(failed),null,2)+'\n');
  assert.equal(failed.status,'FAILED');assert.equal(failed.cleanup_complete,true);assert.deepEqual(failed.node,source.node);
  finalImport=await apply(3,'import-corrected',specifications.scenarios[3].fields);
