@@ -50,10 +50,27 @@ export function buildNodeReadRequest(args,source){
  const schemas=[...previews,...retained.filter(p=>!previews.some(s=>s.port===p.port))];
  need(schemas?.length>0,'Invalid parameters.source_operation_id: the source operation has no verified table output');
  if(request.target.type==='imports.text')schemas.forEach(p=>p.dynamic_schema={kind:'text_import_output_v1'});
+ if(request.target.type==='preprocessing.data_partition'){
+  const readback=node.configuration?.readback;
+  const mappings=readback?.output_mappings;
+  if(readback?.kind==='data_partition'&&readback.input_mapping.autosync===true&&mappings?.length===3
+   &&mappings.every(m=>m.autosync===true&&m.fields.every(f=>f.excluded!==true&&f.name===f.source_name))){
+   const combined=mappings.find(m=>m.port===0);
+   need(combined?.membership?.type==='boolean','Invalid DataPartition retained membership');
+   schemas.forEach(p=>p.dynamic_schema={kind:'data_partition_output_v1',role:['combined','training','test'][p.port],
+    ...(p.port===0?{membership:structuredClone(combined.membership)}:{})});
+  }
+  if(request.mode===NODE_READ_MODE)schemas.forEach(p=>{
+   const prior=request.parameters.schemas.find(s=>s.port===p.port);
+   if(prior?.dynamic_schema?.kind==='data_partition_output_v1')p.dynamic_schema=structuredClone(prior.dynamic_schema);
+  });
+ }
+
  const ports=args.read?.ports??schemas.map(p=>p.port);
  need(ports.length>0&&ports.length<=3&&new Set(ports).size===ports.length
   &&ports.every(p=>Number.isInteger(p)&&p>=0&&p<=2&&schemas.filter(s=>s.port===p).length===1),
   'Invalid parameters.read.ports: choose ports present in the completed source result');
+ need(request.target.type!=='preprocessing.data_partition'||ports.length===3&&[0,1,2].every(port=>ports.includes(port)),'DataPartition reads require all three retained ports');
  const guids=schemas.filter(s=>ports.includes(s.port)&&s.port_guid).map(s=>s.port_guid);
  need(new Set(guids).size===guids.length,'Invalid parameters.source_operation_id: duplicate retained native output GUID');
  const budget=args.budget_ms??300000;

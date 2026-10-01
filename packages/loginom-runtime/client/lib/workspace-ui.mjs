@@ -7,7 +7,7 @@ export const uiActionSchema = {
   type: 'object', additionalProperties: false, required: ['verb'],
   properties: {
     verb: { type: 'string', enum: ['click', 'double_click', 'right_click', 'fill', 'press', 'drag', 'scroll', 'scroll_horizontal', 'set_checked', 'replace_expression', 'set_wizard_field', 'wizard_step', 'select_wizard_option', 'apply_expression_parameters', 'cancel_expression_parameters', 'open_wizard', 'begin_wizard', 'confirm_wizard_deactivation', 'finish_wizard', 'execute_wizard', 'execute_graph_node', 'deactivate_graph_node', 'confirm_wizard_close', 'show_process_node', 'cancel_process', 'open_node_views', 'enter_table', 'apply_output_column', 'cancel_output_column', 'apply_reform_column', 'cancel_reform_column'] },
-    expected_stage: { oneOf:[{type:'string',enum:['text_import_file','text_import_format','text_export_params','text_export_format','input_mapping','output_mapping','calculator','grouping','cross_table','sorting','replacement','collapse','missing_values','date_time','field_parameters','row_filter','join','union','done']},{const:['output_mapping','done']}],
+    expected_stage: { oneOf:[{type:'string',enum:['text_import_file','text_import_format','text_export_params','text_export_format','input_mapping','output_mapping','calculator','grouping','cross_table','sorting','replacement','collapse','missing_values','data_partition','date_time','field_parameters','row_filter','join','union','done']},{const:['output_mapping','done']}],
       description: 'Required only for wizard_step: destination after the observed next/previous control, not the current stage. For delimited Text Import, next follows text_import_file → text_import_format → output_mapping → done; previous reverses this order. input_mapping means a separate INPUT PORT mapping wizard, never Text Import output columns. Calculator, Grouping and Sorting validation may use [output_mapping, done] for its conditional output page. Other wizard families may have different paths; inspect their current UI and sources instead of guessing. Do not pass this field to open_wizard or finish_wizard.' },
     checked: { type: 'boolean' },
     delta_y: { type: 'integer', minimum: -1000, maximum: 1000 },
@@ -35,7 +35,7 @@ export function validateUiAction(action, snapshot) {
   if (action.verb === 'scroll_horizontal' && (!Number.isInteger(action.delta_x) || !action.delta_x || Math.abs(action.delta_x)>1000)) throw new Error('Horizontal scroll requires a nonzero integer delta_x within -1000..1000');
   if (action.verb === 'set_checked' && typeof action.checked !== 'boolean') throw new Error('set_checked requires a boolean checked value');
   if (snapshot) {
-    if(action.verb==='wizard_step'&&Array.isArray(action.expected_stage)&&!['calculator','grouping','cross_table','sorting','replacement','collapse','missing_values','date_time','field_parameters','row_filter','join','union'].includes(snapshot.wizard?.stage))throw new Error('Conditional destinations require a supported transform configuration');
+    if(action.verb==='wizard_step'&&Array.isArray(action.expected_stage)&&!['calculator','grouping','cross_table','sorting','replacement','collapse','missing_values','data_partition','date_time','field_parameters','row_filter','join','union'].includes(snapshot.wizard?.stage))throw new Error('Conditional destinations require a supported transform configuration');
     if(action.verb==='wizard_step' && (snapshot.wizard?.status!=='observed' || snapshot.wizard.stage===action.expected_stage))throw new Error('wizard_step requires a different destination stage and an observed wizard');
     if (!Array.isArray(snapshot.ui?.elements)) throw new Error('UI action requires an observation snapshot');
     for (const ref of refs) {
@@ -260,7 +260,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       text_export_format:';ExportTextFilePreviewWizard;edtCodePage',
       input_mapping:[';TuneDataSourceInputPortWizard;grdTargetColumns',';TuneDataSourceInputPortWizard;btnAddMappingColumn',';TuneDataSourceMappingWizard;btnAddMappingColumn'],
       output_mapping:[';DataSetOutputSocketWizard;grdTargetColumns;tbl',';ColumnsMappingEngineOutputPortWizard;btnAddMappingColumn',';DerivedDataSourceOutputSocketWizard;btnAddMappingColumn',';DerivedDataSourceMappingEngineOutputPortWizard;btnAddMappingColumn'],
-      missing_values:';DataRecoveryWizard;grdColumnsSettings;tbl',collapse:';ColumnFlippingWizard;grdUsedFields;tbl',date_time:';DateReformWizard;grdDataFormat;tbl',replacement:';ReplaceColumnsWizard;grdDataList;tbl',calculator:';CalcDataWizard;btnAddExpr',grouping:';GroupDataWizard;grdUsedFields;tbl',cross_table:';CrossTabWizard;grdUsedFields;tbl',sorting:';SortingWizard;SortingColumnCollection;grdSorting;tbl',
+      data_partition:';PartitionComponentWizard;pedSamplingMethod;ValueControl',missing_values:';DataRecoveryWizard;grdColumnsSettings;tbl',collapse:';ColumnFlippingWizard;grdUsedFields;tbl',date_time:';DateReformWizard;grdDataFormat;tbl',replacement:';ReplaceColumnsWizard;grdDataList;tbl',calculator:';CalcDataWizard;btnAddExpr',grouping:';GroupDataWizard;grdUsedFields;tbl',cross_table:';CrossTabWizard;grdUsedFields;tbl',sorting:';SortingWizard;SortingColumnCollection;grdSorting;tbl',
       union:';UnionDataWizard;grdUnionData;grd-1;tbl',join:';JoinDataWizard;grdSourceColumns;tbl',row_filter:';FilterDataWizard;FilterDataPanel;tbl',field_parameters:';ReformColumnsWizard;grdTargetColumns;tbl',done:';DoneWizard;edtDisplayName'};
     const wizardButtons=['btnPrev','btnNext','btnDone','btnExecute','btnClose','btnError'];
     // Breadcrumb labels are fixed global context even for a narrow file row;
@@ -271,6 +271,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
         return [owner,owner+' input','[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
       })),
+      ...['pedSamplingMethod;ValueControl','pedTestPriorityPosition;ValueControl','RandSeedEdit;edtRandSeed;ValueControl','StratifiedMethodForm;pedCompleteUniqueValues;ValueControl'].flatMap(name=>{
+        const owner='[data-tid$=";WizrdMCF;PartitionComponentWizard;'+name+'"]';return [owner,owner+' input'];
+      }),
       '[data-tid$=";WizrdMCF;FilterDataWizard;FilterDataPanel"]','[data-tid*=";WizrdMCF;FilterDataWizard;FilterDataPanel;tbl;celleditor"]','[data-tid*=";WizrdMCF;CalcDataWizard;colExpressionName_"]','[data-tid*=";WizrdMCF;CalcDataWizard;colExpressionDisplayName_"]','[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"]','[data-tid$=";WizrdMCF;CalcDataWizard;btnCalcMode"]','[data-tid$=";WizrdMCF;CalcDataWizard;btnReplaceField"]','span.bg-TBGCalcMode-cmExpression,span.bg-TBGCalcMode-cmJavaScript',
       ...['edtDelimiterChar','edtTextQualifier','edtValueNull','edtDecimalSeparator'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+';ValueControl"]';return [owner,owner+' input',owner+' textarea'];}),
       ...['edtConnection','edtFileName;ValueControl','edtCodePage;ValueControl','edtRowsToSkip;ValueControl'].flatMap(name=>{
@@ -1486,6 +1489,50 @@ function readRenderedInputMapping(observation) {
       if(f?.status==='observed'&&f.enabled&&!f.truncated)wizardCombos.set(wizard.root_tid+';ImportTextFilePreviewWizard;edtCodePage;ValueControl',
         {name:'encoding',scope:'import_source',owner_ref:f.owner_ref,input_ref:f.input_ref,root_ref:wizard.root_ref,value:f.value});
     }
+    if(!discoverRoots&&wizard.stage==='data_partition'){
+      const base=wizard.root_tid+';PartitionComponentWizard;';
+      for(const name of ['pedSamplingMethod','pedTestPriorityPosition','StratifiedMethodForm;pedCompleteUniqueValues']){
+        const ownerTid=base+name+';ValueControl',owners=tids.get(ownerTid)??[];
+        if(owners.length!==1||!visible(owners[0])||!enabled(owners[0]))continue;
+        const inputs=[...owners[0].querySelectorAll('input')].filter(visible);
+        if(inputs.length===1)wizardCombos.set(ownerTid,{name,scope:'data_partition',owner_ref:refOf(owners[0]),input_ref:refOf(inputs[0]),root_ref:wizard.root_ref,value:inputs[0].value});
+      }
+      const register=(owner,name,binding)=>{
+        if(!owner||!visible(owner)||!enabled(owner)||sensitive(owner))return;
+        const inputs=[...owner.querySelectorAll('input')].filter(e=>visible(e)&&enabled(e)&&!e.readOnly);
+        if(inputs.length===1)wizardFields.set(inputs[0],{name,scope:'data_partition',max_length_utf16:32,stage:wizard.stage,
+          root_ref:wizard.root_ref,owner_ref:refOf(owner),...binding});
+      };
+      const biasGrids=tids.get(base+'BiasedMethodForm;grdBiased')??[];
+      if(biasGrids.length===1){
+        const grid=globalThis.Ext?.getCmp?.(biasGrids[0].id),plugin=grid?.editingPlugin,context=plugin?.context,rs=grid?.getStore?.()?.getData?.()?.items;
+        if(grid?.el?.dom===biasGrids[0]&&plugin?.editing===true&&context?.grid===grid&&Array.isArray(rs)&&rs.length<=1000
+          &&rs.includes(context.record)&&context.record?.isModel&&['Factor','Count'].includes(context.field)){
+          const editor=plugin.getActiveEditor?.(),field=editor?.field,owner=field?.el?.dom;
+          if(owner&&grid.el.dom.contains(owner)&&field.inputEl?.dom&&owner.contains(field.inputEl.dom))
+            register(owner,'bias:'+String(context.record.internalId)+':'+(context.field==='Factor'?'factor':'count'),
+              {record_id:String(context.record.internalId),property:context.field});
+        }
+      }
+      const seeds=tids.get(base+'RandSeedEdit;edtRandSeed;ValueControl')??[];
+      if(seeds.length===1)register(seeds[0],'seed',{});
+      for(const form of ['SizeGridForm','RandomUniformMethodForm;SizeGridForm']){
+        const grids=tids.get(base+form+';grdDataSet')??[];
+        if(grids.length!==1)continue;
+        const grid=globalThis.Ext?.getCmp?.(grids[0].id),store=grid?.getStore?.(),rs=store?.getData?.()?.items;
+        if(grid?.el?.dom!==grids[0]||store?.$className!=='Ext.data.Store'||store.isLoading?.()||!Array.isArray(rs)||rs.length!==2)continue;
+        for(const [index,r] of rs.entries())for(const [property,key] of [['rows','AbsoluteEditor'],['percent','RelativeEditor']]){
+          const editor=r?.data?.[key],owner=editor?.Controller?.Items?.ValueControl?.el?.dom;
+          if(!r?.isModel||!editor?.el?.dom||!grids[0].contains(editor.el.dom)||!owner||!editor.el.dom.contains(owner))continue;
+          register(owner,form+':'+(index===0?'training':'test')+':'+property,{record_id:String(r.internalId),size_path:r.data.SizePath,unit:property});
+        }
+      }
+    }
+    if(!discoverRoots&&wizard.stage==='data_partition')wizard.data_partition={status:'draft_ui_values',settings_applied:false,
+      fields:Object.fromEntries([...wizardFields].filter(([,field])=>field.scope==='data_partition').map(([input,field])=>[field.name,
+        {status:'observed',value:String(input.value??''),value_length_utf16:String(input.value??'').length,truncated:false,input_ref:refOf(input),owner_ref:field.owner_ref,enabled:enabled(input),read_only:input.readOnly===true}]).concat(
+        [...wizardCombos].filter(([,field])=>field.scope==='data_partition').map(([,field])=>[field.name,{status:'observed',value:field.value,
+          value_length_utf16:field.value.length,truncated:false,input_ref:field.input_ref,owner_ref:field.owner_ref}])))};
     const reformParams=wizard.reform_parameters;
     if(reformParams?.status==='observed' && reformParams.selected_column && Object.keys(reformParams.fields??{}).length===7
       && Object.values(reformParams.fields).every(f=>f.status==='observed' && !f.truncated)) {
@@ -2039,7 +2086,7 @@ function readRenderedInputMapping(observation) {
         processMenuControls.set(refOf(filters[0]),{action:'mniShowCompletedProcesses',menu_ref:refOf(menus[0]),
           panel_ref:refOf(consoles[0]),checked:filters[0].classList.contains('x-menu-item-checked'),opening_verified:false});
     }
-    const candidates = select('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"],[data-tid],[data-tid$=";DateReformWizard"] img.x-grid-checkcolumn')
+    const candidates = select('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"],[data-tid],[data-tid$=";DateReformWizard"] img.x-grid-checkcolumn,[data-tid$=";PartitionComponentWizard;StratifiedMethodForm"] img.x-grid-checkcolumn')
       .filter(element => visible(element) && !sensitive(element) && scopeOf(element) !== 'inactive_workflow');
     const selectedRoot = rootRef ? dom.find(element=>state.ids.get(element)===rootRef) : null;
     if (rootRef && (!selectedRoot || !visible(selectedRoot) || sensitive(selectedRoot) || scopeOf(selectedRoot)==='inactive_workflow')) {
@@ -2275,6 +2322,35 @@ function readRenderedInputMapping(observation) {
         }
       }
     }
+    const dataPartitionCells=new Map();
+    if(!discoverRoots&&wizard.stage==='data_partition'){
+      const base=wizard.root_tid+';PartitionComponentWizard;';
+      for(const [name,kind] of [['SizeGridForm;grdDataSet','size'],['RandomUniformMethodForm;SizeGridForm;grdDataSet','group'],
+        ['StratifiedMethodForm;grdStratifiedGrid','stratum'],['SequenceMethodForm;grdSequence','sequence'],['BiasedMethodForm;grdBiasedColumns','bias_field'],['BiasedMethodForm;grdBiased','bias_value']]){
+        const grids=tids.get(base+name+';tbl')??[];
+        if(grids.length!==1)continue;
+        const grid=grids[0],view=globalThis.Ext?.getCmp?.(grid.id),store=view?.getStore?.(),rs=store?.getData?.()?.items;
+        if(view?.el?.dom!==grid||!['Ext.data.Store','Ext.data.ChainedStore'].includes(store?.$className)||store.isLoading?.()||!Array.isArray(rs)||rs.length>1000)continue;
+        const form=name.slice(0,name.lastIndexOf(';'));
+        for(const row of grid.querySelectorAll('table.x-grid-item')){
+          const r=rs.find(r=>String(r.internalId)===row.getAttribute('data-recordid')),d=r?.data;
+          if(!r?.isModel||row.getAttribute('data-boundview')!==grid.id)continue;
+          const columns=kind==='size'||kind==='group'?[['colSizeType_',rs.indexOf(r),'unit']]
+            :kind==='stratum'?[['grdStratifiedGrid;headercontainer;UsageFlag_',d.Name,'used'],['colDisplayName_',d.Name,'field']]
+            :kind==='bias_field'?[['colDisplayName_',d.Name,'field']]
+            :kind==='sequence'?[['colSequenceName_',d.DisplayName.replace(/\s/g,'_'),'order']]
+            :[['colBiasedFactor_',d.Index,'factor'],['colBiasedCount_',d.Index,'count']];
+          for(const [column,key,part] of columns){
+            const cells=[...row.querySelectorAll('[data-tid]')].filter(e=>getTid(e)===base+form+';'+column+key&&!e.closest('tr.x-grid-row-summary'));
+            if(cells.length!==1||!visible(cells[0])||sensitive(cells[0]))continue;
+            const targets=part==='unit'?[...cells[0].querySelectorAll('img[role="button"]')]:part==='used'?[...cells[0].querySelectorAll('img.x-grid-checkcolumn')]:[cells[0]];
+            if(targets.length!==1||!visible(targets[0])||!enabled(targets[0]))continue;
+            dataPartitionCells.set(refOf(targets[0]),{kind,part,field_key:d.Name??null,index:d.Index??rs.indexOf(r),partition_type:d.PartitionType??null,
+              record_id:String(r.internalId),size_path:d.SizePath??null,row_ref:refOf(row),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
+          }
+        }
+      }
+    }
     const missingValuesCells=new Map();
     if(!discoverRoots&&wizard.stage==='missing_values'){
       const base=wizard.root_tid+';DataRecoveryWizard;',grids=tids.get(base+'grdColumnsSettings;tbl')??[];
@@ -2434,7 +2510,7 @@ function readRenderedInputMapping(observation) {
       &&visible(storageRootPanels[0])&&storageRootPanels[0].contains(storageRootCandidates[0])
       &&visible(storageRootCandidates[0])&&!sensitive(storageRootCandidates[0])
       &&textOf(storageRootCandidates[0],true)==='Файлы'?storageRootCandidates[0]:null;
-    const interesting = element => collapseCells.has(state.ids.get(element)) || missingValuesCells.has(state.ids.get(element)) || dateTimeCells.has(state.ids.get(element)) || !!graphNodeOf(element) || /;btnProduceType;mn;dpt(?:Default|Supplement|Replace)$/.test(getTid(element)??'') || replacementCells.has(state.ids.get(element)) || unionCells.has(state.ids.get(element)) || joinCells.has(state.ids.get(element)) || /^MF;TF(?:-\d+)?;ModelForm;PreviewWindow;p\.h;close$/.test(getTid(element)??'') || element===storageRoot || filterCells.has(state.ids.get(element)) || reformColumnCells.has(state.ids.get(element)) || outputColumnCells.has(state.ids.get(element)) || tableScrollers.has(state.ids.get(element)) || viewerControls.has(state.ids.get(element)) || /;ViewsForm;colVendors_Визуализаторы>[^;]+;TreeText$/.test(getTid(element)??'') || processGridControls.has(state.ids.get(element)) || processExpanders.has(state.ids.get(element)) || outputScroller(element) || importScroller(element) || processCells.has(state.ids.get(element)) || processMenuControls.has(state.ids.get(element)) || sortingCells.has(state.ids.get(element)) || groupingCells.has(state.ids.get(element)) || !!comboPart(element) || importColumnCellRefs.has(state.ids.get(element)) || element.matches('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"]')
+    const interesting = element => dataPartitionCells.has(state.ids.get(element)) || collapseCells.has(state.ids.get(element)) || missingValuesCells.has(state.ids.get(element)) || dateTimeCells.has(state.ids.get(element)) || !!graphNodeOf(element) || /;btnProduceType;mn;dpt(?:Default|Supplement|Replace)$/.test(getTid(element)??'') || replacementCells.has(state.ids.get(element)) || unionCells.has(state.ids.get(element)) || joinCells.has(state.ids.get(element)) || /^MF;TF(?:-\d+)?;ModelForm;PreviewWindow;p\.h;close$/.test(getTid(element)??'') || element===storageRoot || filterCells.has(state.ids.get(element)) || reformColumnCells.has(state.ids.get(element)) || outputColumnCells.has(state.ids.get(element)) || tableScrollers.has(state.ids.get(element)) || viewerControls.has(state.ids.get(element)) || /;ViewsForm;colVendors_Визуализаторы>[^;]+;TreeText$/.test(getTid(element)??'') || processGridControls.has(state.ids.get(element)) || processExpanders.has(state.ids.get(element)) || outputScroller(element) || importScroller(element) || processCells.has(state.ids.get(element)) || processMenuControls.has(state.ids.get(element)) || sortingCells.has(state.ids.get(element)) || groupingCells.has(state.ids.get(element)) || !!comboPart(element) || importColumnCellRefs.has(state.ids.get(element)) || element.matches('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"]')
       || /;(?:Input|Output)_[^;]+$|;Label;Label$|;Graph;[^;]+$|;btn[^;]+$|;edt[^;]+$|;mi[^;]+$|;tb(?:-\d+)?$/.test(getTid(element) ?? '')
       // Pinned E2E bg/selectors.ts:272,279,286: palette tree labels and
       // expanders are spans without button/treeitem roles in some UI builds.
@@ -2679,6 +2755,7 @@ function readRenderedInputMapping(observation) {
       const unionField=unionCells.get(state.ids.get(element));
       const replacementField=replacementCells.get(state.ids.get(element));
       const missingValuesField=missingValuesCells.get(state.ids.get(element));
+      const dataPartitionCell=dataPartitionCells.get(state.ids.get(element));
       const collapseField=collapseCells.get(state.ids.get(element));
       const sortingField=sortingCells.get(state.ids.get(element)),joinField=joinCells.get(state.ids.get(element));
       const viewToggle=new RegExp('^'+workflow?.prefix+';ViewsForm;BrowseView(?:-[0-9]+)?;btnDataGrid(?:ShowNulls|DataTypeIcon)$').test(tid??'')
@@ -2772,7 +2849,7 @@ function readRenderedInputMapping(observation) {
         ? 'Открыть список: '+(combo.field.name==='type'?'Тип данных':'Вид данных'):''), scope: scopeOf(element), ...fieldValue,
         ...(viewToggle?{view_toggle:viewToggle}:{}),...(viewerVendor?{viewer_vendor:viewerVendor}:{}),...(viewerControl?{viewer_card:viewerControl}:{}),...(tableScroller?{table_scroller:tableScroller}:{}),...(processGrid?{process_grid:processGrid}:{}),...(processExpander?{process_expander:processExpander}:{}),...(processRow?{process_row:processRow}:{}),...(processMenu?{process_menu:processMenu}:{}),
         ...(outputColumn?{output_column:outputColumn}:{}),...(reformColumnField?{reform_column:reformColumnField}:{}),...(importDefinitionCell?{import_definition_cell:importDefinitionCell}:{}),
-        ...(collapseField?{collapse_field:collapseField}:{}),...(missingValuesField?{missing_values_field:missingValuesField}:{}),...(dateTimeCell?{date_time_cell:dateTimeCell}:{}),...(replacementField?{replacement_field:replacementField}:{}), ...(groupingField ? {grouping_field:groupingField} : {}), ...(sortingField?{sorting_field:sortingField}:{}),
+        ...(dataPartitionCell?{data_partition_cell:dataPartitionCell}:{}),...(collapseField?{collapse_field:collapseField}:{}),...(missingValuesField?{missing_values_field:missingValuesField}:{}),...(dateTimeCell?{date_time_cell:dateTimeCell}:{}),...(replacementField?{replacement_field:replacementField}:{}), ...(groupingField ? {grouping_field:groupingField} : {}), ...(sortingField?{sorting_field:sortingField}:{}),
         ...(storageEntry ? {storage_entry:storageEntry} : {}),
         ...(graphNodeOf(element) ? {graph_node:graphNodeOf(element)} : {}),
         ...(scroll ? { scroll } : {}),
@@ -2791,11 +2868,11 @@ function readRenderedInputMapping(observation) {
         ...(wizardFields.has(element) ? {wizard_field:wizardFields.get(element)} : {}),
         ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),
         ...(filterCell?{filter_cell:filterCell}:{}),
-        signature: { ...(collapseField?{collapse_field:collapseField}:{}), ...(missingValuesField?{missing_values_field:missingValuesField}:{}), ...(dateTimeCell?{date_time_cell:dateTimeCell}:{}), ...(replacementField?{replacement_field:replacementField}:{}), ...(unionField?{union_field:unionField}:{}), ...(joinField?{join_field:joinField}:{}), ...(filterCell?{filter_cell:filterCell}:{}),tag, tid, role, type: element.getAttribute('type'), name: element.getAttribute('name'), label, ...fieldValue, dialog_ref: dialogRef(element), scroll, check_state:checkState, ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),...(groupingField?{grouping_field:groupingField}:{}),...(sortingField?{sorting_field:sortingField}:{}),...(viewToggle?{view_toggle:viewToggle}:{}),...(viewerVendor?{viewer_vendor:viewerVendor}:{}),...(viewerControl?{viewer_card:viewerControl}:{}),...(tableScroller?{table_scroller:tableScroller}:{}),...(processGrid?{process_grid:processGrid}:{}),...(processExpander?{process_expander:processExpander}:{}),...(processRow?{process_row:processRow}:{}),...(processMenu?{process_menu:processMenu}:{}),...(outputColumn?{output_column:outputColumn}:{}),...(reformColumnField?{reform_column:reformColumnField}:{}),...(importDefinitionCell?{import_definition_cell:importDefinitionCell}:{}) },
+        signature: { ...(dataPartitionCell?{data_partition_cell:dataPartitionCell}:{}),...(collapseField?{collapse_field:collapseField}:{}), ...(missingValuesField?{missing_values_field:missingValuesField}:{}), ...(dateTimeCell?{date_time_cell:dateTimeCell}:{}), ...(replacementField?{replacement_field:replacementField}:{}), ...(unionField?{union_field:unionField}:{}), ...(joinField?{join_field:joinField}:{}), ...(filterCell?{filter_cell:filterCell}:{}),tag, tid, role, type: element.getAttribute('type'), name: element.getAttribute('name'), label, ...fieldValue, dialog_ref: dialogRef(element), scroll, check_state:checkState, ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),...(groupingField?{grouping_field:groupingField}:{}),...(sortingField?{sorting_field:sortingField}:{}),...(viewToggle?{view_toggle:viewToggle}:{}),...(viewerVendor?{viewer_vendor:viewerVendor}:{}),...(viewerControl?{viewer_card:viewerControl}:{}),...(tableScroller?{table_scroller:tableScroller}:{}),...(processGrid?{process_grid:processGrid}:{}),...(processExpander?{process_expander:processExpander}:{}),...(processRow?{process_row:processRow}:{}),...(processMenu?{process_menu:processMenu}:{}),...(outputColumn?{output_column:outputColumn}:{}),...(reformColumnField?{reform_column:reformColumnField}:{}),...(importDefinitionCell?{import_definition_cell:importDefinitionCell}:{}) },
         enabled: isEnabled, visible: true, interaction, bounding_box: boxOf(element),
         // A bounded prefix is not a sufficient value precondition. A dedicated
         // large-field driver must establish its own complete read/write contract.
-        allowed_actions: collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && interaction.state==='point_observed'?[...(scroll?.ref===refOf(element)?['scroll']:[]),...(horizontalScroll?.ref===refOf(element)?['scroll_horizontal']:[])]:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
+        allowed_actions: dataPartitionCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && interaction.state==='point_observed'?[...(scroll?.ref===refOf(element)?['scroll']:[]),...(horizontalScroll?.ref===refOf(element)?['scroll_horizontal']:[])]:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
     });
     scanStage='data_views';
     const nodes = labels.slice(0, 200).map(label => {
@@ -3588,7 +3665,7 @@ function readRenderedInputMapping(observation) {
             timeout();
             if(task.action.text)await page.keyboard.type(task.action.text,{delay:0});
             else await first.press('Backspace',{timeout:timeout()});
-            if(['expression_parameter','output_column','reform_column','import_format','export_format'].includes(before.wizard_field.scope)) {
+            if(['expression_parameter','output_column','reform_column','import_format','export_format','data_partition'].includes(before.wizard_field.scope)) {
               if(!await first.evaluate(element=>document.activeElement===element))fail('WIZARD_FIELD_CHANGED','Wizard field lost focus before edit completion');
               // Loginom updates a linked display label on input completion.
               // Commit the draft input before reading coupled parameter values.
@@ -3897,7 +3974,7 @@ function readRenderedInputMapping(observation) {
               ||!same(observed.ui.dialogs,current.ui.dialogs)||f?.input_ref!==choice.field.input_ref||f?.owner_ref!==choice.field.owner_ref)break;
             timeout();await page.waitForTimeout(Math.min(100,timeout()));observed=await readUi();
           }
-          const field=observed.wizard[sourceOption?'import_source':parameterKey??'settings']?.fields?.[choice.field.name];
+          const field=observed.wizard[sourceOption?'import_source':choice.field.scope==='data_partition'?'data_partition':parameterKey??'settings']?.fields?.[choice.field.name];
           const expected=JSON.parse(JSON.stringify(current.wizard));
           if(expressionParameter)expected[parameterKey].fields[choice.field.name].value=choice.label;
           if(expressionParameter)expected[parameterKey].fields[choice.field.name].value_length_utf16=choice.label.length;
@@ -3996,11 +4073,11 @@ function readRenderedInputMapping(observation) {
           // Their new values are exposed for separate verification, not admitted
           // as the requested schema by a successful format-field edit.
           if(before.wizard_field.scope==='import_format')expected.import_columns=observed.wizard.import_columns;
-          const fields=expressionParameter?expected.expression_parameters.fields:before.wizard_field.scope==='output_column'?expected.column_parameters.fields:before.wizard_field.scope==='reform_column'?expected.reform_parameters.fields:expected.settings.fields;
+          const fields=expressionParameter?expected.expression_parameters.fields:before.wizard_field.scope==='output_column'?expected.column_parameters.fields:before.wizard_field.scope==='reform_column'?expected.reform_parameters.fields:before.wizard_field.scope==='data_partition'?expected.data_partition.fields:expected.settings.fields;
           // Native name editing can update a still-linked display label. Accept
           // only the original label or this exact name, and expose the readback.
           const linkedLabelFields=expressionParameter?observed.wizard.expression_parameters?.fields
-            :before.wizard_field.scope==='output_column'?observed.wizard.column_parameters?.fields:before.wizard_field.scope==='reform_column'?observed.wizard.reform_parameters?.fields:null;
+            :before.wizard_field.scope==='output_column'?observed.wizard.column_parameters?.fields:before.wizard_field.scope==='reform_column'?observed.wizard.reform_parameters?.fields:before.wizard_field.scope==='data_partition'?observed.wizard.data_partition?.fields:null;
           if(linkedLabelFields && before.wizard_field.name==='name' && fields.label.value===fields.name.value
             && linkedLabelFields.label?.value===task.action.text)
             Object.assign(fields.label,{value:task.action.text,value_length_utf16:task.action.text.length,truncated:false});
