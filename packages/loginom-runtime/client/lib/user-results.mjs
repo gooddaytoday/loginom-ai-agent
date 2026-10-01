@@ -86,7 +86,9 @@ export function compactNodeResult(result) {
     limitations,
     ...(next?{next_step:next}:{}),
   };
-  budgetUserPreview(reply);
+  // JS readback carries the complete observed mappings and schema. Refuse an
+  // oversized final reply instead of converting these facts into a summary.
+  if(node?.configuration?.readback?.kind!=='javascript')budgetUserPreview(reply);
   for(const port of output.ports??[])if(Number.isSafeInteger(port.row_count)&&port.sample_rows<port.row_count)
     limitations.push('Output port '+port.port+': only '+port.sample_rows+' of '+port.row_count+' rows returned. Do not report unseen rows or a complete ranking from this preview. Compute report statistics in nodes and request the needed output.');
   for(const port of output.ports??[])if(port.sample.length){

@@ -6,6 +6,7 @@ import {createActionRuntime} from '../lib/executor.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 import {dispatchNodeApi,nodeApiTools} from '../lib/node-api.mjs';
 import {nodeResultReply} from '../lib/node-result-reply.mjs';
+import {boundedUserToolReply} from '../lib/user-response-budget.mjs';
 import {createUserWorkflowBindings,userNodeTool} from '../lib/user-workflow.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 
@@ -67,6 +68,24 @@ test('public source route returns exact text to full and user replies without ou
   assert.deepEqual(f.calls,['open','read','read','read','discard']);
   const schema=nodeApiTools.find(tool=>tool.name==='dock_node_read').outputSchema;
   assert.equal(new AjvJsonSchemaValidator().getValidator(schema)(receipt).valid,true);
+});
+
+test('maximum allowed source escapes and lines deliver every public chunk within the final MCP budget',async()=>{
+ for(const source of ['', '"'.repeat(32768),'\\'.repeat(32768),'\u0001'.repeat(32768),
+   '😀'.repeat(8192),Array(1024).fill('//x').join('\n')]){
+  const f=fixture({source});let request=initial,full='';
+  while(request){
+   const receipt=await dispatchNodeApi(f.runtime,'dock_node_read',request);
+   const reply=nodeResultReply(receipt,{userProfile:true});
+   assert.equal(reply.isError,undefined);assert.equal(boundedUserToolReply(reply),reply);
+   assert.ok(Buffer.byteLength(JSON.stringify(reply))<=46000);
+   assert.deepEqual(reply.structuredContent,receipt);assert.deepEqual(JSON.parse(reply.content[0].text),receipt);
+   full+=receipt.source_text;
+   request=receipt.cursor?{kind:'source',operation_id:initial.operation_id,cursor:receipt.cursor,expected_source_sha256:receipt.source_sha256}:null;
+  }
+  assert.equal(full,source);assert.equal(f.runtime.hasUnsettledWork(),false);
+  assert.equal(f.calls.filter(call=>call==='open').length,f.calls.filter(call=>call==='discard').length);
+ }
 });
 
 test('public source continuation binds digest and reopens only for a new chunk',async()=>{

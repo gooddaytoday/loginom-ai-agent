@@ -1,4 +1,5 @@
 import {compactNodeResult} from './user-results.mjs';
+import {boundedUserToolReply} from './user-response-budget.mjs';
 
 // Check the actual MCP envelope, including its JSON-escaped text copy. Never
 // truncate exact_table or turn full coverage into an ordinary sample on overflow.
@@ -11,5 +12,5 @@ export function nodeResultReply(result,{userProfile=false}={}) {
   const error=Error('Exact full result exceeds the 1 MiB serialized MCP limit; no table was delivered. The original node checkpoint is retained.');
   error.code='EXACT_FULL_SERIALIZATION_LIMIT';throw error;
  }
- return reply;
+ return userProfile?boundedUserToolReply(reply):reply;
 }
