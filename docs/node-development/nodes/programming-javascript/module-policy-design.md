@@ -175,3 +175,22 @@ source read и cleanup. Независимый oracle авторский; full t
 auditor и negative checker закреплены private pin. Headed ещё не выполнен,
 состояние и exact hashes — в актуальном checkpoint. Сохранённый unsupported
 source/closed policy refusal доказан direct tests, не live editor injection.
+
+### Headed public apply/refusals/reread — 2026-10-01
+
+Code422 и Declared423 на immutable3b59423f1a завершились actual exit0/OBSERVED:
+public apply13 verified phases,8public new/existing parameter preflight refusals
+без editor/Execute/journal additions, output reread6 phases,3distinct owned
+explicit Execute каждого, original source/configuration/retained physical port,
+оба full typed6×4/user-v1, same-ID delivery retry без нового эффекта и independent
+full source read. Журнал доказывает все full-source delivery с matching prior
+discard, admissions/digest/settings/policy до и после dispatch ACK. PackageClose/
+logout/browser/process absence подтверждены. Independent audit v3/PASS и14/14
+counterfactual refusals каждого; v1/v2 auditor errors и исправления сохранены
+отдельно, runtime/browser не переигрывались. Hashes/aggregate — в checkpoint.
+
+Live проверяет public unsupported parameter preflight и effective source на
+поддержанных apply/Execute/reread путях. Уже сохранённый unsupported source,
+source/settings drift, closed policy refusal и unknown ACK/Close проверены
+direct tests, без live editor injection. Candidate/CLI, native bytes, Save/cold,
+full engine grammar, sandbox и атомарность против внешнего editor не заявлены.

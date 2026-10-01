@@ -110,8 +110,11 @@ prepare/describe/budgets проверены; actual candidate/CLI delivery ос�
 [J26 source-bound output reread](module-policy-design.md) реализован на3b59423f1a:
 addressed415/full client3246+10SKIP/operator18411 PASS; beforeTarget/fresh Execute
 сверяют actual source/settings, verified closed refusals сохраняют owner/эффекты,
-user-v1 output не теряет строки при budget fence. Headed Code/Declared live ещё
-не выполнены; следующий шаг — fixed public apply/refusals/reread. Далее cold long source/
+user-v1 output не теряет строки при budget fence. Headed Code422/Declared423
+приняты2/2: public apply/8preflight refusals/source-bound reread/3distinct owned
+Execute/full6×4/user-v1/source read, v3 audit/negative14 каждый/cleanup. Saved
+unsupported source и drift проверены direct, без live injection/sandbox claim.
+Следующий шаг — Save/cold именно long source; далее
 Done refusal/J19 model resistance и E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.

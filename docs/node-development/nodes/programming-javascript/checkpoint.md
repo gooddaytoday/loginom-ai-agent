@@ -30,8 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — завершить текущий J26 Declared423/exec38595 и независимый audit;
-Code422 принят на immutable child `3b59423f1a`, source/direct проверки ниже;
+следующий шаг — J23 Save/cold именно long source; J26 Code422/Declared423
+приняты2/2 на immutable child `3b59423f1a`, source/direct и live уровни ниже;
 [G1/J22 профиль своего мастера](ui-profile-design.md) принят в bounded scope ниже;
 source/direct [response budgets](response-budget-design.md) J21 приняты ниже;
 Code410/Declared411 reordered context приняты2/2 на immutable child9c93 ниже.
@@ -51,6 +51,41 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J26: Code/Declared source-bound reread принят2/2 — 2026-10-01
+
+Code422/exec74045 и Declared423/exec38595 завершились actual exit0/OBSERVED на
+immutable child `3b59423f1a2b3c722a0b399fe5a58a5400673823`. Каждый: public new
+apply13 verified phases →8unsupported public new/existing source refusals без
+editor/Execute/journal additions →отдельный output reread6 verified phases с
+original source/configuration/retained physical mapping и новым owned Execute →
+independent full source read. Три distinct owned explicit executions каждого;
+обе output таблицы full typed6×4/user-v1, source policy/digest/settings проверены
+до и после dispatch ACK. Same-ID delivery retry не повторил UI/Execute.
+Ordinary headed7.4.2/Linux, PackageClose/logout/browser/process absence3/3+absence.
+Оба v3 independent audit PASS; negative14/14 каждого, Code exec47296/exit0,
+Declared exec51721/exit0. Source836bytes/16LF-lines и634bytes/15LF-lines.
+
+Declared report SHA256
+`a22cd16b37c9f45cd4f28f235b991ca22089b300b7204178cbf005cdee89f09f`,
+journal `c08ac6551169fb11d575fddecdcf639692c76b701bf7b0ed3c8daafc545e0db0`,
+audit receipt `bf7f76ca2fcdcfd5746c400391c0d4d5ff2814bc4b21fa6eaf5f0cd52169a23d`,
+negative receipt `135361525d2cb328d75f89253bb90803c6fa14ee732a070fc760b1a9f4d8e232`.
+Code hashes и private auditor v1/v2 corrections сохранены в записи ниже.
+Aggregate `e-source-policy-accepted-v1.json` SHA256
+`78ecbff0430e95d36a3d6ad3b5f7cabf4db73714dace3bce45ad4fd455b0e4f2`
+связывает оба actual handles/exit0, report/journal/receipts, immutable source,
+v3 pin и scoped acceptance. Registry423 `closed_verified`, active exec/evidence
+null; браузерные процессы отсутствуют. Admin/новый bootstrap не выполнялись.
+
+Границы:8refusals — actual public parameter preflight; уже сохранённый unsupported
+source, closed policy refusal, source/settings drift/unknown ACK/Close проверены
+source/direct tests, не live injection. Full ChakraCore grammar, sandbox,
+атомарность против внешнего editor, native bytes, Save/cold, candidate/CLI и
+Gates не заявлены этим результатом. Final source/direct checks прежние:415 /
+3246PASS+10SKIP /18411PASS. Следующий связный результат — J23 long-source Save/
+cold в отдельном процессе; затем Done refusal/J19 model resistance/E/F. Fixed
+J24/J26 и прежние C/D Save/cold заново не повторять без затрагивающего изменения.
 
 ### E/J26: Code422 принят; Declared423 выполняется — 2026-10-01
 
