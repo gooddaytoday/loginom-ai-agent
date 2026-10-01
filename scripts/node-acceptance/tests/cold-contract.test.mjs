@@ -39,3 +39,21 @@ test('cold saved settings use complete native roles/options and reject changes o
  assert.deepEqual(coldSettings(importer,{kind:'text-import-ui-v1',values:structuredClone(importer)}),importer);
  assert.throws(()=>coldSettings({...importer,format:{null_marker:''}},{kind:'text-import-ui-v1',values:importer}));
 });
+
+test('DataPartition cold settings preserve all method parameters and field identities without applying',()=>{
+  for(const mode of ['random','uniform','stratified','sequential','biased']){
+    const observed={verified:true,inventory_complete:true,state_source:'cached_data_partition_ui',settings_applied:false,mode,
+      parameters:{training:{unit:'rows',value:2},test:{unit:'percent',value:25},priority:'test',test_position:'end',seed:{policy:'fixed',value:17},
+        ...(mode==='uniform'?{uniform:{training:{unit:'rows',value:1},test:{unit:'rows',value:2}}}:{}),
+        ...(mode==='stratified'?{stratified:{fields:['Group'],complete_unique_values:true}}:{}),
+        ...(mode==='sequential'?{sequential:{order:['test','unused','training']}}:{}),
+        ...(mode==='biased'?{biased:{field:'Group',adjustments:[{value:{type:'string',is_null:true,value:null},factor:2}]}}:{})},
+      input_fields:[{record_id:'old',index:0,name:'Group',label:'Group',type:'string',data_kind:'Дискретный',usage:3,used:true}]}
+    const expected={kind:'data-partition-ui-v1',values:{mode,parameters:structuredClone(observed.parameters),fields:observed.input_fields.map(({record_id,...field})=>field)}}
+    assert.deepEqual(coldSettings(observed,expected),expected.values)
+    assert.deepEqual(coldSettings({...observed,input_fields:observed.input_fields.map(f=>({...f,record_id:'new'}))},expected),expected.values)
+    for(const change of [o=>o.verified=false,o=>o.inventory_complete=false,o=>o.settings_applied=true,o=>o.state_source='guessed',o=>o.parameters.seed.value=18,o=>o.input_fields[0].name='different',o=>o.parameters.test.value=30]){
+      const bad=structuredClone(observed);change(bad);assert.throws(()=>coldSettings(bad,expected))
+    }
+  }
+})

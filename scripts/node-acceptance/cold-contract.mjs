@@ -18,7 +18,7 @@ export function coldScenarios(expected) {
       && typeof s.id==="string" && /^[a-z0-9-]+$/.test(s.id)
       && typeof s.output_node_type==="string" && Array.isArray(s.nodes) && s.graph && Array.isArray(s.settings) && s.settings.length>0, "COLD_SCENARIO")
     need(s.settings.every(rule=>rule&&Object.keys(rule).every(k=>["node_id","kind","values"].includes(k))
-      &&typeof rule.node_id==="string"&&["text-import-ui-v1","grouping-ui-v1","crosstable-ui-v1"].includes(rule.kind)
+      &&typeof rule.node_id==="string"&&["text-import-ui-v1","grouping-ui-v1","crosstable-ui-v1","data-partition-ui-v1"].includes(rule.kind)
       &&rule.values&&typeof rule.values==="object"),"COLD_SETTINGS_RULE")
     validateExpected(s.oracle)
     need(s.oracle.owner.package_path===expected.package_path,"COLD_PACKAGE")
@@ -53,12 +53,21 @@ export function observationPort(data, expected, executionID) {
 }
 
 export function coldSettings(observed,expected){
-  need(["crosstable-ui-v1","grouping-ui-v1","text-import-ui-v1"].includes(expected.kind),"COLD_SETTINGS_KIND")
+  need(["crosstable-ui-v1","grouping-ui-v1","text-import-ui-v1","data-partition-ui-v1"].includes(expected.kind),"COLD_SETTINGS_KIND")
   if(expected.kind==="text-import-ui-v1"){
     need(isDeepStrictEqual(observed,expected.values),"COLD_IMPORT_SETTINGS_CHANGED")
     return observed
   }
   need(observed?.verified===true&&observed.inventory_complete!==false&&Array.isArray(observed.input_fields),"COLD_SETTINGS_INCOMPLETE")
+  if(expected.kind==="data-partition-ui-v1"){
+    need(observed.inventory_complete===true&&observed.settings_applied===false
+      &&["random","uniform","stratified","sequential","biased"].includes(observed.mode)
+      &&observed.parameters&&observed.state_source==="cached_data_partition_ui","COLD_PARTITION_SETTINGS_INCOMPLETE")
+    const actual={mode:observed.mode,parameters:observed.parameters,
+      fields:observed.input_fields.map(({record_id,...field})=>field)}
+    need(isDeepStrictEqual(actual,expected.values),"COLD_SETTINGS_CHANGED")
+    return actual
+  }
   const actual={fields:observed.input_fields.map(({record_id,...field})=>field),options:observed.options}
   need(isDeepStrictEqual(actual,expected.values),"COLD_SETTINGS_CHANGED")
   return actual

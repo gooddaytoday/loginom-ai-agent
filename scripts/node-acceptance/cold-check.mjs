@@ -150,7 +150,7 @@ try {
   const settingsEvidence=[]
   for(const settings of scenario.settings??[]){
     if(settings.node_id!==node.node_id)throw Error("COLD_SETTINGS_NODE")
-    const inspect=settings.kind==="crosstable-ui-v1"?{readCrossTable:true}:settings.kind==="grouping-ui-v1"?{readGrouping:true}:settings.kind==="text-import-ui-v1"?{}:null
+    const inspect=settings.kind==="crosstable-ui-v1"?{readCrossTable:true}:settings.kind==="grouping-ui-v1"?{readGrouping:true}:settings.kind==="data-partition-ui-v1"?{readDataPartition:true}:settings.kind==="text-import-ui-v1"?{}:null
     if(!inspect)throw Error("COLD_SETTINGS_KIND")
     const selection=await channel.observe({condition:"saved node settings audit",ready:s=>s.prepared_node_context?.surface==="graph"})
     await selectPreparedGraphNode(channel,selection,"select saved node for settings audit")
@@ -158,8 +158,8 @@ try {
     const observed = await (async()=>{
       if(settings.kind!=="text-import-ui-v1"){
         const state=await channel.observe({condition:"saved effective settings",...inspect,
-          ready:s=> (s.node_cross_table??s.node_grouping)?.verified===true})
-        return state.node_cross_table??state.node_grouping
+          ready:s=> (s.node_cross_table??s.node_grouping??s.node_data_partition)?.verified===true})
+        return state.node_cross_table??state.node_grouping??state.node_data_partition
       }
       const state=await channel.observe({condition:"saved import source",ready:s=>s.wizard?.stage==="text_import_file"&&s.wizard.import_source?.status==="draft_ui_values"})
       const source=observedSettingsFields(state.wizard.import_source,["source_path","connection","encoding","rows_to_skip","first_line_as_title"])

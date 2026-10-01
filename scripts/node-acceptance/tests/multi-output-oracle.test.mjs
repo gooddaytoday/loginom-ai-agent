@@ -126,3 +126,41 @@ test("executable emits comparator FAIL and nonzero exit, not shell success", asy
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+test('selected partition constrains subset payload/multiplicity/membership without exhaustive source',()=>{
+  const want=structuredClone(expected)
+  want.ports.forEach((port,index)=>{
+    port.schema=structuredClone(schema);port.role=['combined','training','test'][index];port.comparator='invariants';port.rows=[]
+    port.rules=port.schema.map(()=>({kind:'exact'}))
+  })
+  want.ports[0].schema.push({index:3,name:'IsTestSet',label:'Test',type:'boolean',data_kind:'discrete',null_semantics:'typed_null'})
+  want.ports[0].rules.push({kind:'exact'})
+  want.invariants=[{kind:'partition-selected',ports:[0,1,2],sizes:[2,1,1],source_rows:[row('1'),row('2',4,'B'),row('3')],provenance_field:'RowID',replacement:false,membership_field:'IsTestSet'}]
+  const actual=observed(want)
+  actual.ports[1].rows=[row('1')];actual.ports[2].rows=[row('2',4,'B')]
+  actual.ports[0].rows=[[...row('1'),cell('boolean',false)],[...row('2',4,'B'),cell('boolean',true)]]
+  actual.ports.forEach(port=>port.row_count=port.rows.length)
+  verdict(want,actual,'PASS')
+  for(const corrupt of [
+    a=>a.ports[1].rows[0][2]=cell('string',''),
+    a=>a.ports[1].rows[0][0]=cell('integer','3'),
+    a=>a.ports[0].rows[0][3]=cell('boolean',true),
+    a=>a.ports[0].rows[0][3]=cell('boolean',null),
+    a=>a.ports[0].rows[1]=structuredClone(a.ports[0].rows[0]),
+    a=>{a.ports[2].rows=[row('1')];a.ports[0].rows[1]=[...row('1'),cell('boolean',true)]},
+    a=>{a.ports[0].rows.pop();a.ports[0].row_count--},
+    a=>{a.ports[0].rows.push([...row('3'),cell('boolean',true)]);a.ports[0].row_count++},
+    a=>a.ports[2].guid='foreign',a=>a.ports[2].role='training',
+    a=>a.ports[2].schema[0].label='changed',a=>a.ports[2].schema_source='cached',
+    a=>a.ports[2].execution_id='old',a=>a.execution.fresh=false,
+    a=>a.ports[2].filter_enabled=true,a=>a.ports[2].complete=false,
+    a=>a.ports[1].rows[0][1].value=1e-14,
+  ]){const bad=structuredClone(actual);corrupt(bad);verdict(want,bad,'FAIL')}
+  const repeated=structuredClone(actual)
+  repeated.ports[2].rows=[row('1')];repeated.ports[0].rows[1]=[...row('1'),cell('boolean',true)]
+  want.invariants[0].replacement=true
+  verdict(want,repeated,'PASS')
+  for(const corrupt of [w=>w.invariants[0].sizes[0]=3,w=>w.invariants[0].source_rows.push(row('1')),w=>w.ports[0].schema[3].type='string',w=>w.invariants[0].membership_field='unknown']){
+    const bad=structuredClone(want);corrupt(bad);verdict(bad,actual,'FAIL')
+  }
+})

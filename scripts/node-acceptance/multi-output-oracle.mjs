@@ -127,6 +127,44 @@ function sameRow(expected, actual, rules) {
 }
 
 function checkInvariant(rule, expected, observation) {
+  if(rule.kind === "partition-selected") {
+    object(rule, ["kind", "ports", "sizes", "source_rows", "provenance_field", "replacement", "membership_field"])
+    need(isDeepStrictEqual(rule.ports,[0,1,2]) && expected.ports.length===3
+      && rule.ports.every((index)=>expected.ports.find(port=>port.index===index)?.role===["combined","training","test"][index]),"SELECTED_PORT_ROLES")
+    need(Array.isArray(rule.sizes)&&rule.sizes.length===3&&rule.sizes.every(size=>Number.isSafeInteger(size)&&size>=0)
+      &&rule.sizes[0]===rule.sizes[1]+rule.sizes[2],"SELECTED_SIZES")
+    need(typeof rule.replacement==="boolean"&&typeof rule.provenance_field==="string"
+      &&typeof rule.membership_field==="string"&&Array.isArray(rule.source_rows),"SELECTED_SOURCE")
+    const schema=expected.ports.find(port=>port.index===1).schema
+    need(isDeepStrictEqual(schema,expected.ports.find(port=>port.index===2).schema),"SELECTED_SCHEMA")
+    const combinedSchema=expected.ports.find(port=>port.index===0).schema
+    const member=combinedSchema.findIndex(field=>field.name===rule.membership_field)
+    need(member>=0&&combinedSchema[member].type==="boolean"
+      &&isDeepStrictEqual(combinedSchema.filter((_,index)=>index!==member).map((field,index)=>({...field,index})),schema),"MEMBERSHIP_SCHEMA")
+    const column=schema.findIndex(field=>field.name===rule.provenance_field)
+    need(column>=0,"PROVENANCE_FIELD")
+    rule.source_rows.forEach(row=>validateRow(row,schema))
+    const source=new Map(rule.source_rows.map(row=>[JSON.stringify(row[column]),row]))
+    need(source.size===rule.source_rows.length&&rule.source_rows.every(row=>!row[column].is_null),"SOURCE_OCCURRENCE_ID")
+    const seen=new Set(),wanted=new Map()
+    rule.ports.forEach((index,position)=>need(observation.ports.find(port=>port.index===index).rows.length===rule.sizes[position],"SELECTED_SIZE"))
+    for(const index of [1,2]) for(const row of observation.ports.find(port=>port.index===index).rows){
+      const key=JSON.stringify(row[column])
+      need(isDeepStrictEqual(source.get(key),row),"PROVENANCE_OR_PAYLOAD")
+      need(rule.replacement||!seen.has(key),"DUPLICATE_OCCURRENCE")
+      seen.add(key)
+      const occurrence=JSON.stringify([row,index===2])
+      wanted.set(occurrence,(wanted.get(occurrence)??0)+1)
+    }
+    for(const row of observation.ports.find(port=>port.index===0).rows){
+      need(row[member].type==="boolean"&&!row[member].is_null,"MEMBERSHIP_VALUE")
+      const occurrence=JSON.stringify([row.filter((_,index)=>index!==member),row[member].value])
+      need((wanted.get(occurrence)??0)>0,"COMBINED_OCCURRENCE")
+      wanted.set(occurrence,wanted.get(occurrence)-1)
+    }
+    need([...wanted.values()].every(count=>count===0),"COMBINED_MISSING_OCCURRENCE")
+    return
+  }
   object(rule, ["kind", "ports", "sizes", "source_rows", "provenance_field", "replacement"])
   need(rule.kind === "partition", "UNKNOWN_INVARIANT")
   need(Array.isArray(rule.ports) && rule.ports.length > 0 && new Set(rule.ports).size === rule.ports.length

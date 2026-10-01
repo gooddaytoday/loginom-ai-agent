@@ -2,7 +2,7 @@
 
 Сформирован из [registry.json](registry.json). Не редактировать сводные числа вручную.
 
-Исторический каталог: **78** компонентов. Обработчики: **15**; обычный остаток: **60**; условный резерв: **3**.
+Исторический каталог: **78** компонентов. Обработчики: **16**; обычный остаток: **59**; условный резерв: **3**.
 
 Реализация и историческая приёмка не равны повторной аналитической приёмке текущего CLI. Старые номера 01/02 — инфраструктура, а не дополнительные типы узлов.
 
@@ -24,6 +24,7 @@
 | 14 | [Заполнение пропусков](nodes/missing-values/README.md) | `preprocessing.data_recovery` / impute | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
 | 16 | [Свёртка столбцов](nodes/collapse-columns/README.md) | `transform.collapse_columns` / unpivot | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
 | 17 | [Текстовый экспорт](nodes/text-export/README.md) | `exports.text` / delimited | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
+| None | [Разбиение на множества](nodes/preprocessing-datapartition/README.md) | `preprocessing.data_partition` / random, uniform, stratified, sequential, biased | not_accepted | not_validated; аналитика: not_revalidated_standalone |
 | 15 | [Кросс-таблица](nodes/transform-crosstable/README.md) | `transform.cross_table` / pivot | accepted_scoped | validated_standalone_cli; аналитика: accepted_scoped_standalone |
 
 ## Компоненты без полного обработчика
@@ -69,7 +70,6 @@
 | `component.integration.SqlScript` | SQL-скрипт | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.preprocessing.Binning` | Квантование | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.preprocessing.CoarseClasses` | Конечные классы | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
-| `component.preprocessing.DataPartition` | Разбиение на множества | backlog | Документальный подплан готов: [plan.md](nodes/preprocessing-datapartition/plan.md). Реализация по отдельному поручению; детали версии уточняются в разработке без новой planning-задачи. |
 | `component.preprocessing.Elimoutlier` | Редактирование выбросов | backlog | Документальный подплан готов: [plan.md](nodes/preprocessing-elimoutlier/plan.md). Реализация по отдельному поручению; детали версии уточняются в разработке без новой planning-задачи. |
 | `component.preprocessing.Sampling` | Сэмплинг | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.preprocessing.Smoothing` | Сглаживание | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |

@@ -90,13 +90,13 @@
     },
     "runtime-registry": {
       "path": "../../packages/loginom-runtime/client/lib/node-support.mjs",
-      "sha256": "2d8cc3db1f064e055066e8c9a0d89382ceb642f4d5bd7128a58d69258d37a43a",
+      "sha256": "3d65fe3d4c9662304b7794ca50257eb16b3e1ffac72ffd60edd654f098fd647f",
       "kind": "source",
       "availability": "retained_document",
       "source_commit": null,
       "runtime": null,
       "platform": null,
-      "scope": "Статически зарегистрированы 15 обработчиков в текущем worktree; код узла проверен адресными тестами, автономная приёмка ожидается."
+      "scope": "16 registered source handlers including DataPartition candidate; registration is not acceptance or readiness promotion."
     },
     "migration-map": {
       "path": "../../docs/migration/source-map.json",
@@ -4437,14 +4437,25 @@
       "name": "Разбиение на множества",
       "slug": "preprocessing-datapartition",
       "legacy_subplan": null,
-      "queue_class": "backlog",
-      "handler": null,
+      "queue_class": "implemented",
+      "handler": {
+        "type": "preprocessing.data_partition",
+        "modes": [
+          "random",
+          "uniform",
+          "stratified",
+          "sequential",
+          "biased"
+        ],
+        "source": "../../packages/loginom-runtime/client/lib/datapartition-node.mjs",
+        "parameters_source": "../../packages/loginom-runtime/client/lib/datapartition-parameters.mjs"
+      },
       "card": "nodes/preprocessing-datapartition/README.md",
       "initial_scope": "Все пять методов; строки/проценты, приоритет/положение test, seed, strata/bias, три выхода и повторное чтение/save/cold.",
       "scope_basis": "documentation_full_scope",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку.",
-        "Подплан по документации завершён; точные native defaults/schema и неописанные математические правила требуют фиксации при реализации, живых проверок этого этапа нет."
+        "Зарегистрированный candidate handler; полная native математическая/public dynamic/recovery/CLI/cold приёмка и независимый review ещё NOT_RUN.",
+        "Partial sequential/random evidence не является полной приёмкой; plan_status остаётся discovery_required."
       ],
       "prerequisites": [
         "accepted_base",
@@ -4464,7 +4475,8 @@
           "evidence": [
             "runtime-registry",
             "historical-roadmap"
-          ]
+          ],
+          "note": "Candidate source registered; readiness not promoted until full exact-SHA acceptance."
         },
         "historical_acceptance": {
           "status": "not_accepted",
@@ -4489,7 +4501,7 @@
           "evidence": []
         }
       },
-      "next_action": "Документальный подплан готов: [plan.md](nodes/preprocessing-datapartition/plan.md). Реализация по отдельному поручению; детали версии уточняются в разработке без новой planning-задачи.",
+      "next_action": "Завершить native contract/math, все public методы/dynamic/recovery, CLI/save/cold и independent exact-SHA review.",
       "plan": "nodes/preprocessing-datapartition/plan.md",
       "planning_status": "documentation_complete",
       "plan_status": "discovery_required",

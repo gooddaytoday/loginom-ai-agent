@@ -1,6 +1,6 @@
 # DataPartition: предлагаемая интеграция cold harness
 
-Статус: PENDING_OWNER_SCOPE, не реализация и не PASS.
+Статус: APPROVED_SCOPE / IMPLEMENTED_SOURCE, native cold NOT_RUN, не PASS.
 Interaction: 3c0080b6-e8cc-4172-9076-35015885781c.
 Исследованный source SHA: 270098e12bcb466bfb27bc29df757d8658cfc777.
 
@@ -32,4 +32,4 @@ Native random outputs нельзя записывать как independent expec
 
 Legacy behavior, guards, owner/SHA/links, lifecycle, formats restoration и другие
 handlers сохраняются. Никаких сервисов, discovery механизмов, release или merge.
-Canonical registry/inventory/readiness — оператор; этот документ их не повышает.
+Собственная registry entry/hash/generated inventory разрешены plan от 14:36; readiness не повышается.
