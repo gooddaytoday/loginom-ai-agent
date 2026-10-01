@@ -47,6 +47,73 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J19: reordered405 отказал до context; recovery407 завершён — 2026-10-01
+
+Child `1bf25ca33b`, ordinary headed fresh405/exec70110, actual exit1.
+Existing import begin_wizard отправлен один раз; мастер появился и prepared
+native GUID подтвердился, но WIZARD_OPEN_NOT_CONFIRMED при двух busy masks:
+корень WizrdMCF и его ImportTextFilePreviewWizard;pnlPreview («Подготовка
+предпросмотра»). Wait predicate принимал только корень и прекращал ожидание
+на второй маске. Это подтверждённая причина данного отказа; изменения source,
+context reads и JS Execute ещё не начались, reordered PASS нет.
+Original report/journal SHA256
+`ad414323f4c3516b7378f9f5ec2154812ab096e8e629d6b3f1db2de783b84e20` /
+`75b40f782def9826d63912ad41154d731c2bd78791c8cb9885e5d1a48df71a27`.
+Unknown opening не переигрывался. Recovery406/exec89326 закрыл браузер при
+закрытом stdin, не подтвердил logout или server cleanup. Следующий recovery407/
+exec5895 использовал interactive tty и обычный headed. Dispatcher подтвердил
+точный owned пакет в nonexecuting jsteach:3812; закрыт только этот сеанс,
+после Refresh сеанс/пакет отсутствуют. Admin logout/browser close/actual process
+absence PASS; registry407 closed_verified/active exec null, pending снят.
+Recovery journal SHA256
+`660c082d1839c48a8cc845fb2dd9163fa8029ca6bdcfdd7929de221c91d1718c`, receipt
+`ca1eb699f33a0238f82d2d62499314fd6c8bec6f60558652ca922ca09ae62ac9`.
+Failed405 evidence не переписано и не повышено до PASS. Следующий шаг:
+ограниченно разрешить ожидание exact owned import-preview mask на той же
+prepared native identity, проверить foreign/owner/deadline/no-replay regressions,
+новый immutable freeze/oracle pin, затем fresh reordered Code/Declared live.
+
+### E/J19: owned import preview fix; fresh410 RUNNING — 2026-10-01
+
+Child `9c93b067e1206c16653b83751f9fbe289eb80c2b` допускает ожидание только
+unique contained import-preview mask в text_import_file, при прежних exact
+package/workflow/native node proofs и исходном deadline. Один opening click;
+foreign/outside/duplicate masks, unprepared owner, stage/GUID changes и expiry
+отказывают. Trace хранит безопасные mask owner/ref/TID для проверки ожидания.
+Addressed3 PASS (включая девять новых preview variations в opening test),
+client3179 PASS/10 SKIP/0 FAIL, sequential operator18287 PASS/0 FAIL,
+actual exit0 и diff PASS. Parallel operator02 получил один отказ раньше
+ожидаемого download в cancellation test с лимитом100ms; addressed9 PASS и
+sequential full03 PASS на том же source, исходный log сохранён.
+Final addressed/client/operator SHA256
+`c7754b32d37f456c26f2323132537e1f7ed98feffd3ed9a2690a69f7dc88aa17` /
+`271acf5c11c4fb02a302f204cd7110f599b2cb58b3f059be3063766bb465bed0` /
+`f7ccfae01bb6aeada81b8441de669e76a39c918476d08ce83a72302c283ef8b0`.
+Pre-live business oracle v1 не изменён. Independent auditor v2 SHA256
+`f41283eb9ace2f5ae6468a34bcb864b539841421f3e2b0a57ac54bb580441d68`
+добавляет one-shot import opening/native owner/mask wait proofs; negative
+checker77 подготовлен. Freeze02/1449 files SHA256
+`ea428de7a85a7a1a37e7fd9e39d91b0386b16a670ada7b77fe37d6a957c95dd9`.
+Fresh408/exec21314, e-public-context-reordered-code-02, был прерван вместе
+с turn. При продолжении handle отсутствует, original browser process absent;
+report остался RUNNING, stream оборвался после prepared click step125 без
+квитанции. Opening SUCCEEDED/native owner подтверждён, Execute/Done ещё не
+запрашивались; preview child mask в данном trace не появился. Original exit
+code неизвестен; report не переписан и не является PASS. Report/journal SHA256
+`4ce67b5815e15f693721c8616bee2eeafae650993fec6e262a7461826574c830` /
+`5d3511627e45d392e27677b831366458f967aff202e0071152de5a2af236607e`.
+Recovery409/exec15518 подтвердил после Dispatcher Refresh отсутствие owned
+пакета и package children у всех сеансов jsteach. Серверное закрытие этим
+recovery не отправлялось; причина отсутствия не установлена. Admin logout,
+browser close/actual process absence PASS, registry409 reconciled closed_verified.
+Recovery receipt SHA256
+`1cf26c97d5818c57c1e5da09bf14e40dc5f6a998f4cc0c471f89b110f61570a5`.
+Freeze02/1449 files повторно проверены без изменения. Fresh410/exec34782,
+e-public-context-reordered-code-03, ordinary headed на том же immutable source/
+oracle v1/auditor v2. Runtime events/report/cleanup ещё не приняты;
+reordered context/model/candidate/CLI PASS пока нет. Следить за original
+exec34782 до terminal, затем independent audit/negative77/cleanup/absence.
+
 ### E/J19: reordered current context подготовлен к live — 2026-10-01
 
 Child `1bf25ca33b53911beeef8dfd45a7efefa9b06518` добавил два fixed cases
@@ -65,8 +132,9 @@ auditor v1 `5dcf31f241e282d63d58799723c8118b6f5780f18bb3cf7ada140f4e79a45a3d`,
 freeze01/1448 files
 `0b8470d43400bb0b37825d544b12f0389415d9098c2e56637cf8c31078033102`.
 72 meaningful negative cases подготовлены, применяются после primary PASS.
-Registry404 closed_verified/active exec null. Следующий fresh405 Code на этом
-неизменном HEAD; reordered context/model/CLI PASS ещё нет.
+На момент подготовки registry404 closed_verified/active exec null. Fresh405
+отказал до context, recovery и следующий шаг записаны выше; reordered
+context/model/CLI PASS ещё нет.
 
 ### E/J19/J21: оба context modes приняты; compact bridge исправлен — 2026-10-01
 
