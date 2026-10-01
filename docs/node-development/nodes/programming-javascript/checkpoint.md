@@ -2,7 +2,10 @@
 
 ## Текущее состояние
 
-Сводка на 2026-09-30 после B, private P1, C0/G3 и public C full read 6×4.
+Актуальная граница на 2026-10-01: E diagnostics и prerequisites перед F;
+source child30b703fac0, последняя live443 закрыта. Новые результаты J19/J25 и
+J27/source provenance — в адресных разделах ниже. Следующий текст сохраняет
+историческую сводку после B, private P1, C0/G3 и public C full read 6×4.
 Public run05 дал ограниченный output proof; исправленный Code → Save и
 независимый cold Execute/read6×4 прошли audit и cleanup. D declared → Save и
 независимый cold Execute/read6×4 также проверены; текущий этап E. Исходный срез
@@ -27,7 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Persistence — J15/J23 | Приватные code/declared/usage writer–cold–bytes, dirty-state; см. G7 discovery и исторические SHA ниже | Только фиксированные 6×2; нужны handler 6×4 и CLI |
 | Бизнес и freshness — J03/J04/J11 | Private code/base и declared/base 6×4 `ba46d2ecda`: полный typed UI oracle и fresh owned Execute | Code changed/reordered тоже прошли; остаются existing freshness, declared variants и public C/D/E; native bytes этими runs не доказаны |
 | Stop/cancel — J13 | Private run08; public Stop/repair fresh393 на `69c1f3d60c`; public local read cancel/SAME-ID continuation того же native execution fresh394 на `56f8df0250`, audit/negative87/87 и cleanup/process absence | Public lost reply fresh398 на `90c3bdd7c6` также принят, status/Stop/settlement/inspect и negative88/88; CLI lifecycle и полный G6 открыты |
-| Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck; ancestry/byte comparison с `1b8d100392` выполнено на e954 | Explicit URL contract выбран; owning checks перед candidate и actual compiled CLI setup/status/restart остаются |
+| Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck; ancestry/byte comparison с `1b8d100392` выполнено на e954 | Explicit URL contract выбран; свежие owning44PASS/Host typecheck прошли на280a94c76f; actual compiled CLI setup/status/restart остаётся |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
 fixed J19 technical-name freshness Code441/declared442 принят2/2 на9bc;
@@ -303,6 +306,52 @@ public API/handler. До live нужны addressed/operator tests/source/freeze/
 auditor pin. Если native поддержан или primary sufficient, insufficient-primary
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
+
+### J27/source provenance: owning проверки перед candidate — 2026-10-01
+
+Предыдущая Goal-итерация — progress: natural regex443 принят с honest sufficient
+primary и full recovery/cleanup. Новый browser не нужен для unchanged milestones;
+registry/lease443 closed_verified/active_exec=null, процессы443 отсутствуют.
+
+На child280a94c76f выполнены owning source-only J27 checks: Host migration22PASS
+(exec85171 actualexit0, один файл) и Desktop service/store22PASS (actualexit0,
+два файла), вместе44PASS; `bun typecheck` из Host actualexit0. Migration suite
+действительно включает6 отдельных Bun процессов Desktop/CLI codecs, validated
+save и explicit marker; browser/runtime I/O в ней заменён штатной test boundary.
+Это **не** actual compiled CLI setup/status/restart. Первоначальная команда также
+назвала два отсутствующих Host test paths; Bun разрешил только migration suite,
+никакого покрытия этих путей не заявлено. Private receipt
+`f-target-persistence-source-receipt-01.json`, SHA256
+`4e0cae3249bb0516a0ad74bc9b3ce8fe6562cc3983a1d6c19d360553ba4fd3f4`.
+Owning files неизменны в subsequent docs-only child30b703fac0; перед candidate
+проверять затрагивающие изменения, не повторять unchanged suite автоматически.
+
+Штатный `verify_sources.py` сначала actualexit1 по stale transformed README hash.
+Адресная полная inventory установила73 stale records. Для каждого прежний hash
+найден в фактической истории соответствующего path; current bytes совпали с
+committed HEAD. Child `30b703fac035699e58f7ce4466ff39f4d79ff441` обновил только
+`docs/migration/source-transforms.json` и source-selection: original baseHash,
+предыдущие rationale и source-map сохранены; reason перечисляет все intervening
+commit IDs/subjects. Runtime/исходные notices/file modes не менялись; новые local
+JS файлы не выданы за original imported sources. Existing record order сохранён.
+
+Final штатный verifier actualexit0/**5045 files PASS**; Python migration checks
+actualexit0/**6 tests PASS**. Private `f-source-provenance-receipt-01.json`, SHA256
+`45089afa83be67e17df890fe5d4b923454584a29ddeb2cf949777cd79f3398f9`;
+transforms SHA256 `81f3edc85c82f336978e66e0864aec338afd8aa1a7130d9fa703f6e1ee29fe4d`;
+unchanged source-map SHA256
+`c3c39a1a3c54e81e042e24688e2d0215774c67b0c015e9354b53bda2fbb251f6`.
+Original failure/inventory/history receipts сохранены. Это byte provenance, не
+behavioral review, product registration/candidate/CLI. Future mapped file changes
+требуют нового verifier; old live freezes443/441/442 и их receipts не переписаны.
+
+**Продолжение:** remaining E/J12/J25 natural insufficient-primary/Done trigger
+пока неизвестен. Пользователю задан вопрос о известном воспроизводимом примере;
+ответ не подменять истечением времени. Не делать synthetic native/RPC injection
+и не расширять исчерпанную regex/import matrix. Обязательные live gates открыты.
+Независимые prerequisites J27 source tests/typecheck и provenance теперь выполнены;
+actual compiled target restart ждёт итогового candidate. Same-task review,
+product registration/candidate и две CLI attempts остаются впереди; Goal active.
 
 ### E/J25: natural regex observation принято — 2026-10-01
 
