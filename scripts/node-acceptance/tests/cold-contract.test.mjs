@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { coldScenarios, verifyColdGraph, observationPort } from "../cold-contract.mjs"
+import { coldScenarios, verifyColdGraph, observationPort, coldSettings } from "../cold-contract.mjs"
 
 test("legacy is explicit absence of version; unknown versions never fall back",()=>{
   const legacy={nodes:[],output_node_type:"grouping",columns:[],rows:[]}
@@ -27,3 +27,15 @@ test("multi-output adapter preserves integer strings and typed null; refuses cac
     const d=structuredClone(data);mutate(d);assert.throws(()=>observationPort(d,{role:"third"},"execution"))
   }
 })
+
+test('cold saved settings use complete native roles/options and reject changes or unknown kinds',()=>{
+ const observed={verified:true,inventory_complete:true,input_fields:[{record_id:'ephemeral',name:'Amount',functions:1,disposition:7}],options:{sort:true}};
+ const expected={kind:'grouping-ui-v1',values:{fields:[{name:'Amount',functions:1,disposition:7}],options:{sort:true}}};
+ assert.deepEqual(coldSettings(observed,expected),expected.values);
+ assert.throws(()=>coldSettings({...observed,verified:false},expected));
+ assert.throws(()=>coldSettings({...observed,options:{sort:false}},expected));
+ assert.throws(()=>coldSettings(observed,{...expected,kind:'guessed-handler'}));
+ const importer={source:{path:'owned'},format:{null_marker:'?'},columns:[{name:'Amount',data_kind:'Непрерывный'}]};
+ assert.deepEqual(coldSettings(importer,{kind:'text-import-ui-v1',values:structuredClone(importer)}),importer);
+ assert.throws(()=>coldSettings({...importer,format:{null_marker:''}},{kind:'text-import-ui-v1',values:importer}));
+});

@@ -127,3 +127,9 @@ test('original input GUID and port must still own the read graph',()=>{
   const g=structuredClone(graph);change(g);assert.throws(()=>verifyReadInputLinks(g,node,inputs));
  }
 });
+
+test('reconfigured existing nodes retain observed incoming links even when the request omitted inputs',()=>{
+ const s=source();s.targetPhase={completed:true,final_graph:{complete:true,document_id:'doc',workflow_ref:{workflow_id:'wf'},foreign_links:[],nodes:[{ref:node},{ref:{node_id:'upstream'}}],links:[{source:'upstream',output:1,target:'node',input:0}]}};
+ assert.deepEqual(buildNodeReadRequest(args,s).parameters.input_links,[{source:{document_id:'doc',workflow_id:'wf',node_id:'upstream'},output:1,input:0}]);
+ s.targetPhase.final_graph.document_id='foreign';assert.throws(()=>buildNodeReadRequest(args,s));
+});

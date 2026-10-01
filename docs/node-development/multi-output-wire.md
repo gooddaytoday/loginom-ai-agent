@@ -7,7 +7,7 @@ returns exit 0 only for comparator PASS, and exit 1 for comparator FAIL.
 
 The cold runner accepts an explicit `loginom-cold-scenarios-v1` envelope with
 `package_path` and `scenarios`. Each scenario has `id`, `nodes`,
-`output_node_type`, `graph`, and the independent `oracle` document above.
+`output_node_type`, `graph`, `settings`, and the independent `oracle` document above.
 Graph binding contains exact native node GUIDs/types/input/output indices, links,
 and navigation labels. Cold UI document/workflow refs are newly created; the
 retained workflow identity is rebound only after this complete saved graph audit.
@@ -79,3 +79,18 @@ Original input node GUIDs/ports are checked against the owned graph before execu
 Full prerequisite acceptance still requires actual clean build, legacy CLI/cold,
 Sliding and 3→6/6→6 metadata scenarios, recovery/save and native settings evidence.
 Unit comparator PASS and administrative cleanup do not prove those requirements.
+
+The cold settings adapter supports explicit `text-import-ui-v1`,
+`grouping-ui-v1`, and `crosstable-ui-v1` read-only audits. It opens the owned saved
+wizard, observes source/format/complete import definitions or complete processor
+roles/options, cancels without configure/finish, then starts the fresh execution.
+Record IDs and UI refs are not compared as persisted identities. Settings values
+come from verified hot UI receipts and remain separate from independent expected
+rows. Unknown settings kinds fail. Additional processor adapters belong to their
+subsequent handler implementations.
+
+`run-source-dynamics.sh <candidate> <new-out>` exercises the public original-S
+route using the independent `fixtures/source-dynamics` CSV/expected definitions.
+It checks 3→6 and 6→6 metadata, exact int64, payload/NULL, failure/correction,
+save and versioned cold source/profile/schema readback. The fixture's numeric
+expectations are authored independently, not copied from a Loginom result.

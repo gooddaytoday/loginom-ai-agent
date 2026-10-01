@@ -1,0 +1,211 @@
+{
+  "version": "loginom-source-dynamics-v1",
+  "scenarios": [
+    {
+      "id": "baseline",
+      "fields": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        }
+      ],
+      "rows": [
+        [
+          "9007199254740993",
+          "A",
+          1.25
+        ],
+        [
+          "2",
+          "B",
+          2.5
+        ]
+      ]
+    },
+    {
+      "id": "values",
+      "fields": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        }
+      ],
+      "rows": [
+        [
+          "9007199254740993",
+          "A",
+          3.5
+        ],
+        [
+          "2",
+          "B",
+          4.25
+        ]
+      ]
+    },
+    {
+      "id": "width",
+      "fields": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Qty",
+          "label": "Qty",
+          "type": "integer",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Status",
+          "label": "Status",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Note",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "rows": [
+        [
+          "9007199254740993",
+          "A",
+          3.5,
+          "1",
+          "ok",
+          null
+        ],
+        [
+          "2",
+          "B",
+          4.25,
+          "2",
+          "ready",
+          ""
+        ]
+      ]
+    },
+    {
+      "id": "metadata",
+      "fields": [
+        {
+          "name": "RowID",
+          "label": "RowID C",
+          "type": "integer",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Category",
+          "label": "Category C",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Amount C",
+          "type": "real",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Qty",
+          "label": "Qty C",
+          "type": "integer",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Status",
+          "label": "Status C",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Note C",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "rows": [
+        [
+          "9007199254740993",
+          "X",
+          5.5,
+          "3",
+          "new",
+          null
+        ],
+        [
+          "2",
+          "Y",
+          6.25,
+          "4",
+          "new",
+          ""
+        ]
+      ]
+    }
+  ]
+}

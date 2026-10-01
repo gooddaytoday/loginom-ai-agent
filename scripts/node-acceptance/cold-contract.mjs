@@ -17,6 +17,9 @@ export function coldScenarios(expected) {
     need(Object.keys(s).every(k=>["id","nodes","output_node_type","graph","settings","oracle"].includes(k))
       && typeof s.id==="string" && /^[a-z0-9-]+$/.test(s.id)
       && typeof s.output_node_type==="string" && Array.isArray(s.nodes) && s.graph && Array.isArray(s.settings) && s.settings.length>0, "COLD_SCENARIO")
+    need(s.settings.every(rule=>rule&&Object.keys(rule).every(k=>["node_id","kind","values"].includes(k))
+      &&typeof rule.node_id==="string"&&["text-import-ui-v1","grouping-ui-v1","crosstable-ui-v1"].includes(rule.kind)
+      &&rule.values&&typeof rule.values==="object"),"COLD_SETTINGS_RULE")
     validateExpected(s.oracle)
     need(s.oracle.owner.package_path===expected.package_path,"COLD_PACKAGE")
   })
@@ -26,9 +29,15 @@ export function coldScenarios(expected) {
 export function verifyColdGraph(graph, expected) {
   need(graph.complete===true && graph.foreign_links.length===0,"COLD_GRAPH_INCOMPLETE")
   if (!expected) return // Legacy has no stored GUID binding.
-  need(Object.keys(expected).every(k=>["nodes","links","navigation_path"].includes(k)),"COLD_GRAPH_FIELDS")
+  need(Object.keys(expected).every(k=>["nodes","links","navigation_path","service_nodes"].includes(k)),"COLD_GRAPH_FIELDS")
   need(Array.isArray(expected.navigation_path)&&isDeepStrictEqual(graph.workflow_ref.navigation_path.map(p=>p.label),expected.navigation_path),"COLD_WORKFLOW_CHANGED")
-  const nodes=graph.nodes.map(n=>({id:n.ref.node_id,type:n.type,inputs:n.inputs,outputs:n.outputs})).sort((a,b)=>a.id.localeCompare(b.id))
+  const services=expected.service_nodes??[]
+  services.forEach(rule=>{
+    need(Object.keys(rule).every(k=>["type","count"].includes(k))&&rule.type==="bg-vendor-icon-modelvariables"&&rule.count===1,"COLD_SERVICE_RULE")
+    const matches=graph.nodes.filter(n=>n.type===rule.type)
+    need(matches.length===rule.count&&matches.every(n=>n.inputs.length===0&&n.outputs.length===0),"COLD_SERVICE_CHANGED")
+  })
+  const nodes=graph.nodes.filter(n=>!services.some(s=>s.type===n.type)).map(n=>({id:n.ref.node_id,type:n.type,inputs:n.inputs,outputs:n.outputs})).sort((a,b)=>a.id.localeCompare(b.id))
   need(isDeepStrictEqual(nodes,[...expected.nodes].sort((a,b)=>a.id.localeCompare(b.id)))
     && isDeepStrictEqual(graph.links,expected.links),"COLD_GRAPH_CHANGED")
 }

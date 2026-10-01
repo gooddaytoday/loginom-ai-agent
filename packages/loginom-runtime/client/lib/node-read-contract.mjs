@@ -31,6 +31,14 @@ export function buildNodeReadRequest(args,source){
  need(outcome?.status==='SUCCEEDED'&&outcome.cleanup_complete===true&&node?.cleanup_complete===true
   &&node.execution?.status==='completed'&&node.node&&request?.target?.type!=='exports.text',
   'Invalid parameters.source_operation_id: a completed local table node operation with confirmed cleanup is required');
+ const graph=source.targetPhase?.completed?source.targetPhase.final_graph:undefined;
+ if(graph)need(graph.complete===true&&graph.document_id===node.node.document_id
+  &&graph.workflow_ref.workflow_id===node.node.workflow_id&&graph.foreign_links.length===0
+  &&graph.nodes.filter(n=>n.ref.node_id===node.node.node_id).length===1,
+  'Invalid parameters.source_operation_id: retained graph ownership differs');
+ const inputLinks=graph?graph.links.filter(link=>link.target===node.node.node_id).map(link=>({
+  source:{document_id:node.node.document_id,workflow_id:node.node.workflow_id,node_id:link.source},output:link.output,input:link.input
+ })):request.mode===NODE_READ_MODE?request.parameters.input_links:request.inputs??[];
  const previews=node.output?.ports?.map(p=>({port:p.port,schema:p.schema,
   ...(p.port_guid?{port_guid:p.port_guid}:{}),
   ...(request.target.type==='transform.cross_table'&&request.parameters?.columns?.mode==='sliding'
@@ -46,16 +54,18 @@ export function buildNodeReadRequest(args,source){
  need(ports.length>0&&ports.length<=3&&new Set(ports).size===ports.length
   &&ports.every(p=>Number.isInteger(p)&&p>=0&&p<=2&&schemas.filter(s=>s.port===p).length===1),
   'Invalid parameters.read.ports: choose ports present in the completed source result');
+ const guids=schemas.filter(s=>ports.includes(s.port)&&s.port_guid).map(s=>s.port_guid);
+ need(new Set(guids).size===guids.length,'Invalid parameters.source_operation_id: duplicate retained native output GUID');
  const budget=args.budget_ms??300000;
  return {operation_id:args.operation_id,contract_revision:request.contract_revision,
   document_id:node.node.document_id,workflow_ref:structuredClone(request.workflow_ref),
   target:{kind:'existing',type:request.target.type,label:request.target.label,ref:structuredClone(node.node)},inputs:[],
-  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,schemas:structuredClone(schemas.filter(p=>ports.includes(p.port))),input_links:structuredClone(request.mode===NODE_READ_MODE?request.parameters.input_links:request.inputs??[])},
+  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,schemas:structuredClone(schemas.filter(p=>ports.includes(p.port))),input_links:structuredClone(inputLinks)},
   mappings:[],finish:'execute',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
 }
 export function nodeReadHandler(handler){
- return {revision:handler.revision+':read-existing-v1',modes:[NODE_READ_MODE],
+ return {revision:handler.revision+':read-existing-v2',modes:[NODE_READ_MODE],
   validate(parameters,mode,request){
    need(mode===NODE_READ_MODE&&request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0
     &&request.finish==='execute'&&request.read.coverage!== 'full'&&handler.fileOutput!==true,
