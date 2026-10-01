@@ -37,6 +37,30 @@ model/variant, доставкой входных файлов, Save/cold и clea
 `ready_for_acceptance`. Проверки конфигурации/выхода сами по себе не доказывают
 автономность модели, отсутствие hardcode, persistence или готовность продукта.
 
+## Входная проверка standalone CLI
+
+Первый транспортный модуль — `javascript_cli_evidence.py`: собственная сессия
+из `<profile>/data/loginom-ai-agent.db` читается SQLite `mode=ro`/`query_only`.
+Используется фактическая v1 схема `session`/`message`/`part` и восстанавливаются
+ID из колонок, как `message-v2.ts`. Наружу выходят только модель/вариант,
+hash/размер/имя текстовых file snapshots и metadata/digests публичных tool parts.
+Reasoning, system/developer, auth secrets, бинарные вложения и исходные payloads
+не сохраняются и не печатаются. Этот модуль не экспортирует базу.
+
+Очищенные CLI `events.jsonl` сопоставляются с metadata собственной сессии:
+фактические OpenAI Sol/low, terminal tool IDs/callIDs/messageIDs/status/time,
+input/output digests, полнота завершённых вызовов, отсутствие truncation и
+соблюдение исходных30 минут. Повтор идентичного terminal event допускается
+как повтор доставки; изменённый terminal part с тем же ID refused. Все события
+сохраняются у controller до проверки, а не заменяются последним статусом.
+
+Проверка file snapshots не заменяет native admission/upload: следующий слой
+итогового аудитора отдельно связывает prepare/input_artifacts, delivery/import,
+свежую JS операцию, Save/cold/cleanup и candidate/knowledge pins. Пока эти слои
+не реализованы, успешный транспортный тест не получает acceptance PASS.
+Первый модуль проверяется на SQLite fixtures фактической структуры и
+самостоятельных негативных случаях, без запуска candidate до F review.
+
 ## Проверки и воспроизводимость
 
 Unit/regression tests проверяют настоящие Python функции и отказ при изменениях
