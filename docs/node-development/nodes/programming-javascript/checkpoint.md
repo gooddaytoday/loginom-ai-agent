@@ -104,6 +104,21 @@ same-task Astra/medium F review pending, прежний async вопрос не 
 Execute/full6×4 и own normal cleanup/process termination; поздний model output-read
 и итоговая composition остаются обязательными. Общая Goal active, готовность не повышена.
 
+Адресное чтение источника для следующего слоя: durable product graph находится
+в **`node_target_checkpoint.target_state.final_graph`**, а не в кратком
+`node_checkpoint.result.phases.target.value`. `prepareNodeTarget` сохраняет
+completed/final_graph/result до return. На неизменённом Code449 journal это
+подтверждено для import, initial JS и NEW preserve Execute: document/workflow,
+node GUID/type/label/position, indexed inputs/outputs/other_ports, links и
+foreign_links. Это graph target-фазы **до** configure/execute; он сам не доказывает
+post-Save сохранность. Cold graph discovery в `javascript-cold-binding.mjs`
+выбирает unique native icon/GUID и endpoints без writer refs/labels/ordinals.
+Сравнение старого `graphMeaning` нормализует document/workflow/DOM epoch, сохраняя
+node GUID, position и port/link meaning; физические port GUIDs не добавлять
+догадкой к этому graph. Фактические JS mapping/port identities проверять по
+отдельным native observations. Старый fixed persistence auditor привязан к
+двум source revisions/6×2 и не подходит как общий standalone CLI auditor.
+
 ### Фаза 4: compact public-node → native binding — 2026-10-02
 
 Child **631bfbe75cd5924b5bc3772eaadf18b7cb0fe02f** добавляет
