@@ -107,7 +107,11 @@ source→physical/API/full user-v1/source read, audit/negative50 каждого/
 Knowledge1.1 на276c содержит scoped rule и пять observed пар; legacy1.0/exact
 examples сохранены. Client3189/10SKIP, operator126, addressed14/actual MCP
 prepare/describe/budgets проверены; actual candidate/CLI delivery остаётся F.
-Следующий шаг — J26 module/effective source policy; далее cold long source/
+[J26 source-bound output reread](module-policy-design.md) реализован на3b59423f1a:
+addressed415/full client3246+10SKIP/operator18411 PASS; beforeTarget/fresh Execute
+сверяют actual source/settings, verified closed refusals сохраняют owner/эффекты,
+user-v1 output не теряет строки при budget fence. Headed Code/Declared live ещё
+не выполнены; следующий шаг — fixed public apply/refusals/reread. Далее cold long source/
 Done refusal/J19 model resistance и E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.

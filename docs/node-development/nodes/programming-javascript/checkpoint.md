@@ -30,7 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — J26 effective source/module policy на всех apply/Execute/read;
+следующий шаг — J26 headed Code/Declared apply и source-bound output reread
+на immutable child `3b59423f1a`; source/direct проверки приняты ниже;
 [G1/J22 профиль своего мастера](ui-profile-design.md) принят в bounded scope ниже;
 source/direct [response budgets](response-budget-design.md) J21 приняты ниже;
 Code410/Declared411 reordered context приняты2/2 на immutable child9c93 ниже.
@@ -50,6 +51,49 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J26: source-bound reread реализован; direct checks приняты — 2026-10-01
+
+Child `3b59423f1a2b3c722a0b399fe5a58a5400673823` связывает JS output reread
+только с завершённым своим apply: full source identity, verified configuration/
+phase receipts и retained physical mapping. beforeTarget читает/discard полный
+actual source; перед fresh Execute проверяются прежние source/settings и policy,
+включая повторное чтение после dispatch ACK. Source/settings drift и unsupported
+source получают закрытый отказ лишь при доказанном discard/точном journal ACK;
+unknown effect/Close/ACK сохраняют неоднозначность. Настройки и source при reread
+не записываются. После Execute мастер дополнительно не открывается: native
+deactivation confirmation могла бы нарушить активный результат. kind:source
+по-прежнему читает/discard без Execute. Sandbox/атомарная защита от внешнего
+редактирования не заявлены. [Решение и границы](module-policy-design.md).
+
+Фактические final checks: addressed04 **415PASS**; full client02 **3246PASS /
+10SKIP**, exec70804/actual exit0; full operator02 **18411PASS**, exec47468/
+actual exit0. Проверены original-source binding, forged/foreign/stale receipts,
+unsupported AST/inert text, closed refusal vs unknown Close/ACK, отсутствие
+replay и lossless JS output в user-v1/budget fence. Это source/direct уровень,
+не live-отказ уже сохранённого неподдержанного кода и не candidate/CLI.
+
+Private `e-source-policy-pin-v1.json` SHA256
+`5d6a9c89f8ed3c937dd090d9989932d4dfe8c61615cddc68e474140025c2426c`
+закрепляет code SHA, 12799 tracked entries (61 symlink target отдельно), oracle,
+auditor/negative checker/handoff и final test log hashes. Source freeze SHA256
+`2090db56b99d7c0dfbb9aac93c7e6a9264f766ef8a7245118d6af0eef7e380a9`;
+oracle SHA256
+`f3eb8679365714ef7b80fde0daa5c019e0f1f1f305cd332ca2f0f005ed3948f5`.
+Expected6×4 взят из независимо написанного canonical fixture, не из наблюдения;
+fixed source836bytes/16LF-lines Code и634bytes/15LF-lines Declared — отдельные
+assets. Helpers syntax проверен; semantic audit/negative14 ещё не выполнены.
+
+Registry421 остаётся `closed_verified`, active exec/evidence null, процессы
+старого профиля отсутствуют. Нового браузера пока нет. Следующий шаг — fresh422
+`e-source-policy-code-01`, затем после actual exit/audit/negative14/cleanup fresh
+Declared423. Каждый fixed public apply →8new/existing preflight refusals без
+editor/Execute →отдельный source-bound output reread со своим fresh Execute →
+independent source read; всего3owned explicit executions, полный typed6×4/
+user-v1, same-ID delivery retry без нового эффекта, PackageClose/logout/browser/
+process absence. Обычный headed, без Save. После этого остаются J23 cold именно
+long source, Done refusal, J19 model resistance, F review/candidate/CLI.
+Readiness/Gates не повышались; предыдущие accepted runs повторять не требуется.
 
 ### E/G1/J22: обе UI profiles приняты; bounded identity decision — 2026-10-01
 

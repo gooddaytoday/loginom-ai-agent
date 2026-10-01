@@ -144,3 +144,34 @@ source-bound output reread, его собственный fresh Execute, typed o
 после операции. Pure parser corpus отличает executable AST от comments/strings/
 plain templates; source/direct и live уровни записывать отдельно. Это выполнение
 утверждённого J26, а не регистрация candidate или объявление полного gate PASS.
+
+### Реализация и direct проверка — child3b59423f1a
+
+`node-read-contract` строит host source binding из локального SUCCEEDED apply:
+configuration/readback, unique own phase IDs, completed materialization/final
+Execute и полного retained mapping. Caller не задаёт reread source. JS routing
+использует существующий `createNodeReadDrivers`; beforeTarget выполняет полный
+owned read/discard, перед fresh Execute admission сравнивает исходную identity и
+settings baseline, повторяя проверку после journal dispatch ACK. Source marker
+сохраняется в diagnostic/user-v1 output; budget fence отказывает всему ответу
+вместо обрезания строк. Финальное чтение apply остаётся связано с его fresh
+Execute без дополнительного Setting.
+
+`javascript_source_closed_check_refused` возникает только после verified
+read/discard и exact ACK, когда callback текущей проверки ещё не отправлен.
+Wrapper связывает его с own phase/node/deadline и сохраняет прежние эффекты;
+эта квитанция не утверждает, что более ранних source writes/Execute не было.
+Unknown read/Close/ACK/dispatch не становятся clean refusal. Обычный source
+read и admission recheck используют прежний reader, без второй реализации.
+
+Actual final addressed415, client3246PASS/10SKIP, operator18411PASS; все exit0.
+Локальный corpus и actual public API boundary проверяют unsupported new/existing
+source до browser/journal, inert comments/strings/templates, template substitutions,
+receipt forgery/drift/unknown cleanup/no replay и actual serialized MCP budget.
+Это не проверка полной ChakraCore grammar и не sandbox. Live подготовлен отдельно:
+Code и Declared public apply, восемь preflight refusals, source-bound output
+reread/новый owned Execute/full typed6×4/user-v1/same-ID delivery retry, final
+source read и cleanup. Независимый oracle авторский; full tracked source,
+auditor и negative checker закреплены private pin. Headed ещё не выполнен,
+состояние и exact hashes — в актуальном checkpoint. Сохранённый unsupported
+source/closed policy refusal доказан direct tests, не live editor injection.
