@@ -36,7 +36,7 @@ async function integration(directory,{knownSecrets=[],mutate,writer,caseId}={}){
  const code=source.slice(source.indexOf('const executionRecord=async event=>{'),source.indexOf('const createRemaining='));
  const report={stage:'prepare-typed-input',...(caseId?{case_id:caseId}:{})};
  const result=vm.runInNewContext('let executionJournalLine=0,nativeClassifierBinding;'+code+'\n({record:executionRecord,get line(){return executionJournalLine;},get binding(){return nativeClassifierBinding;}})',{
-  report,calibrationTrial:{},nativeRoundtrip:true,discoveryProbe:false,executionCase:'code-table-execute',structuredClone,
+  report,calibrationTrial:{},nativeRoundtrip:true,discoveryProbe:false,publicWizardRefusalCaseId:null,executionCase:'code-table-execute',structuredClone,
   acknowledgeJavascriptCalibrationRecord,compactJavascriptJournalRecord,save:async()=>{},
   executionJournal:writer??(async e=>{const saved=await journal(e);return mutate?mutate(saved,e):saved;})});
  return {record:result.record,result,report,journal,lines:async()=> (await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n')};

@@ -26,6 +26,13 @@ test('serialized discovery reads the exact captured native modal without gesture
   assert.equal(result.controls[0].text,'OK');assert.equal(result.text_truncated,false);
 });
 
+test('host discovery uses the original owned lease and returns the actual read-only inventory',async()=>{
+  const f=await fixture(),result=await captureJavascriptNativeDetailsInventory(f.page,f.event);
+  assert.equal(result.native_details_owner_verified,true);assert.equal(result.source_sha256,f.sha);
+  assert.equal(result.controls[0].tid,f.event.point.tid);assert.deepEqual(f.calls,[]);
+  assert.equal(f.lease.errorOkAttempted,undefined);
+});
+
 for(const [name,change] of [
   ['foreign modal',f=>f.held.errorDialogRoot=f.element('foreign','foreign')],
   ['second modal',f=>f.dialogs.push(f.element('foreign','foreign'))],
