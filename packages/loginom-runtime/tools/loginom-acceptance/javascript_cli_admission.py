@@ -72,7 +72,9 @@ def verify_cli_admission(events, projection, expected_files, native_events, expe
                 or not isinstance(expected['target'].get('profile_id'),str) or not expected['target']['profile_id']):
             raise ValueError('cli_admission_external_target')
         pins = result.get('knowledge',{}).get('session_manifest',{})
-        if (pins.get('clientRevision') != expected['runtime_revision']
+        # The public catalog pins omit clientRevision. The original native
+        # collector checks it against candidate bytes and private session.json.
+        if ('clientRevision' in pins and pins['clientRevision'] != expected['runtime_revision']
                 or pins.get('actionManifestDigest') != expected['action_manifest_sha256']):
             raise ValueError('cli_admission_public_runtime_pins')
         if (not native_events or any(e.get('session_id') != result['sessionId']
