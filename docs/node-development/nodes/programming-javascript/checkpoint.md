@@ -27,6 +27,15 @@ Actual JS card17510 wire bytes (<20000), knowledge7.4.2/Linux, no truncation.
 Normal CLI last-confirmed-own-Save → guarded native Close/logout source проверен.
 Полный остаток аудита и report SHA — в completion-audit; registry пока не повышен.
 
+Completion audit02: повторно разобраны16 historical public scalar/cardinality
+reports с original oracle и native input payloads; все16 исходных requests
+допущены текущим pure parameter/module preflight. Outside-safe остаётся
+characterization, Date без epoch/timezone. Audit03 сверил8 прежних proofs:
+manual/Required2, freshness4, UI inventory2; original bytes/cleanup согласованы.
+Границы, hashes и оставшиеся проверки — в completion-audit. Это не fresh live
+и не закрытие всей Goal; следующий шаг — remaining lifecycle/diagnostics/
+source/context/module/oracle tests и полнота 0A/named artifacts.
+
 ### Предыдущая точка: Code13 выполнялся
 
 **Pair13: Declared13 original whole PASS/released; Code13 выполняется.**

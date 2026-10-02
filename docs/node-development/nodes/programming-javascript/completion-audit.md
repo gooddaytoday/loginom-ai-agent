@@ -30,6 +30,54 @@ J21 `f-cli-j21-read-09/delivery-audit.json`, SHA256
 Knowledge semantic SHA256
 `86506db742980407b41de7c042edcd622d4809b339141b2065e936f5803049c0`.
 
+## Типы, кардинальность и сохранность прежних proofs — 2026-10-02
+
+Заново разобраны16 исходных report/journal pairs и их независимые oracle:
+real, Boolean, String, safe integer, civil Date и outside-safe integer по два
+schema modes, а также keep2/odd/duplicate Code и declared-empty. SHA receipts
+сопоставлены с ранее записанными в checkpoint; report/journal/oracle/source
+остались неизменными. Проверены полные values/types/NULL/order/count/schema,
+два различных execution IDs, native input payloads и cleanup. Это исторические
+public handler runs, не новые candidate15 браузерные прогоны.
+
+| J / случаи | Повторно подтверждённое содержание | Граница |
+| --- | --- | --- |
+| J06 real | NULL/0/−1.25/10.125 обоих modes, входные binary64 bytes и полное точное совпадение output values | Не объявляется native output-byte proof этих публичных runs |
+| J06 Boolean/String | NULL/false/true; NULL/empty/литералы/Unicode/quote/backslash/LF, без отождествления false и0 | Input payload форматы проверены отдельно: Boolean byte, String length/codepage65001/UTF-8, не общий числовой decoder |
+| J06 Date | NULL и две civil даты с milliseconds, прежняя native civil attestation сохранена | Epoch/timezone не установлены |
+| J07 integer | NULL/0/±9007199254740991 exact decimal output в обоих modes | Outside-safe отдельно characterized:9007199254740993→9007199254740992, exact_pass=false; общей гарантии int64 нет |
+| J08 cardinality | [1,2,3]→[2], [1,3], [1,1,2,2,3,3], []; полная Integer schema сохранена при0 строк | Empty INPUT и declared nonempty counterparts — отдельные evidence, ещё нужны в полном аудите |
+
+Приватный `completion-audit-evidence-02.json` SHA256
+`5d882623d92f43f803a2d8046698d0011f4dbb4ecec34b7dd4f18d0e8350cd15`;
+проверяющий script `completion-types-revalidation-02.py` SHA256
+`edddc7c23fd3df66e1dbbab4457c9b0db34f3e9b5c39e3f2213212ba595a66c8`.
+Первый запуск этого нового checker остановился на неверном предположении об
+общем native payload layout. После чтения оригинальных type-specific auditors
+checker исправлен; исходные reports/oracles/receipts не менялись. Это ошибка
+новой перепроверки, не регрессия Loginom и не причина повторять live.
+
+Все16 **фактических старых requests** дополнительно пропущены через текущий
+`validateJavascriptParameters` (включая module policy) на pinned Node24.19.0:
+16PASS. Старые declared columns уже используют Boolean/String discrete и
+Integer/Real/Date continuous; исправление общего declared-контракта не делает
+эти inputs неподдержанными. Это подтверждение admission, не доказательство
+неизменности всего текущего lifecycle. Receipt
+`completion-types-current-preflight-02.json` SHA256
+`29107fb708a579f6843e3b801f8c7e351ad0e7c89b4d1a3b9861bb88d637775d`.
+
+Также повторно сверены8 receipts с исходными report/journal и cleanup:
+J09 manual/Required2, J11 changed/reordered4, J22 UI-profile2.
+`completion-audit-evidence-03.json` SHA256
+`e2de5c4a1b6ee497e758d47bdb4d2e93d0c67bc70f5bf0dcb6404991c6740bcf`.
+J09 доказывает source Required=true/target Required=false, autosync=false,
+manual label и явный отказ неподдержанного mapping edit до admission;
+target Required=true этим не покрыт. J11 проверял все6×5 входных и6×4 выходных
+ячеек после замены/перестановки input при сохранённом JS GUID. J22 — bounded
+visible inventory двух openings; нет доказательства глобального отсутствия
+assistant или runtime FullType. Проверка сохранности этих proofs не заменяет
+оставшуюся оценку текущих lifecycle/source изменений.
+
 ## Обязательный остаток аудита
 
 «Проверить» ниже означает оценить сохранённые доказательства и текущий код,
