@@ -936,6 +936,9 @@ PASS. Native source/Execute/Table/business6×4/restoration/workflow-return ау�
 реализован на **5326767d6278**:9PASS, affected native9/public read11PASS.
 Historical captures и actual reader multi-chunk unit seam не заменяют fresh CLI.
 [Scope и следующий шаг](checkpoint.md#фаза-4-native-late-read-sourceexecutefull-table--2026-10-02).
+Общий closed-source chunk audit на **1c846a7c2f21** применяется к configuration/read/cold;
+финальные9/9/9 PASS и actual historical cold32KiB/1024LF/3×8 fragments/full6×4
+проверены. [Границы](checkpoint.md#фаза-4-единый-closed-source-chunk-audit-и-native32kib-cold--2026-10-02).
 Normal CLI package/logout/process cleanup ещё открыт; special `acceptanceCleanupPackage`
 receipt не является обычным CLI контрактом. [Checkpoint](checkpoint.md#фаза-4-late-cli-output-read-delivery-binding--2026-10-02).
 `javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:

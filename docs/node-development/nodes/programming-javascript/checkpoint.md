@@ -5,9 +5,10 @@
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
 standalone CLI transport/bundle/admission/public-node/Save binding. Child
-**5326767d6278a957c98a6e462dde83d6a3684403** tracked clean; registration на161353
+**1c846a7c2f218183b3f548c81f5e4c746c0ffc2b** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
-40 адресных test methods PASS, в том числе48 non-noop native mutations.
+40 первоначальных адресных test methods PASS; усиленная configuration/output
+regression9PASS теперь включает62 non-noop native mutations.
 Итоговый `javascript_node_acceptance.py` ещё TO_IMPLEMENT: подготовить связку
 с фактическими standalone CLI model/input/candidate/Save/cold/cleanup evidence
 до ready_for_acceptance. [Дизайн и границы](cli-auditor-design.md).
@@ -17,7 +18,8 @@ Admission дополнительно11PASS; CLI metadata binding13PASS; native r
 на неизменённых captures и явно отдельной тестовой проекции production header.
 Compact public-node binding дополнительно17PASS на actual runtime-produced
 receipts/defaults и реальной SQLite. Last Save/dirty-state binding дополнительно19PASS;
-cold source/state/Execute/full6×4 отдельно8PASS на immutable captures;
+cold source/state/Execute/full6×4 отдельно9PASS на immutable captures,
+включая32KiB/1024LF и3×8 native chunks;
 cleanup и итоговая связка ещё не реализованы, fresh standalone Save не запускался.
 Late model-output-read delivery binding дополнительно11PASS; native source/fresh
 Execute/full6×4/restoration/workflow-return audit дополнительно9PASS. Обычный CLI не принимает `acceptanceCleanupPackage`:
@@ -47,6 +49,50 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: единый closed-source chunk audit и native32KiB cold — 2026-10-02
+
+Child **1c846a7c2f218183b3f548c81f5e4c746c0ffc2b** добавляет общий
+`javascript_source_evidence.py`, используемый configuration, late-read и cold
+аудиторами. Проверяется отдельный closed lifecycle **каждого** chunk, его step,
+UTF-8 boundary/offset/digest/cursor/полнота, точные owner/UI epoch/deadline.
+Cold перестал ошибочно требовать один cycle на whole read_id, а configuration
+теперь проверяет dispatch/settled Close каждого фрагмента, включая продолжения.
+Configuration source admission deadline связан с actual `node_apply_prepared`,
+не с более ранним внешним `prepared`; лимит не продлевается. Default script,
+проверенные настройки и source_pending contract не ослаблены.
+
+Финальные три suites из child `packages/loginom-runtime`, каждый9PASS/actualexit0:
+`test_javascript_evidence.py` originalf4ee23/terminal06686a;
+`test_javascript_cold_evidence.py` original35e1cb/terminald4e296;
+`test_javascript_read_output_evidence.py` original4fe6d0/terminalbc57e5.
+Для всех задан `LOGINOM_JAVASCRIPT_AUDIT_EVIDENCE_ROOT=<private campaign>`;
+для reader также `LOGINOM_NODE=<pinned Node24.19.0>`; команда `python3 -m unittest
+discover -s tools/loginom-acceptance -p <pattern> -v`. Проверены62 configuration/output,
+140 cold и68 late native non-noop mutations, отдельно8 runtime-reader unit mutations.
+Неуспешная configuration01 actualexit1 originalac0f0d/terminal5cdcc5 сохранена:
+обнаружила неверную внешнюю привязку deadline, исправленную перед final02.
+
+Исторические writer424/cold428 capture files дополнительно закреплены literal
+SHA256; всего в cold tests12 pins. Actual cold содержит32768 UTF-8 bytes/1024LF,
+три owned source-read по8 fragments, один новый native Execute и полный6×4 oracle.
+Все прежние cold negatives повторены на этом третьем реальном pair; ещё8 подмен
+второго fragment/Close/step/cursor/admission/group отвергнуты. Writer lifecycle
+старого протокола, native LGP bytes и нынешний candidate этим не сертифицированы.
+`f-javascript-source-multichunk-validation-v1.json` SHA256
+`33947b097f2a9b59ad35545679cdd5d1ad1a13ffc224b71633e9cb27a038bf80`
+фиксирует final source/producers,20 capture hashes, все actual exits/log hashes,
+включая failed01. Immutable журналы не переписаны; нового browser/candidate/CLI
+и lease нет. Это завершает найденный fragment gap из следующего раздела.
+
+Следующий слой — normal own package/logout/process cleanup и итоговый
+`javascript_node_acceptance.py`, затем same-task Astra/medium F и fresh ordinary
+headed candidate/J01/J21/J27, два Sol trials. Обычный CLI не получает special
+`acceptanceCleanupPackage`. Runtime resource close ACK не доказывает native
+package/logout; verified saved identity/dirty-state и browser ownership обязательны.
+Фактический `managed-entry.mjs:close` дополнительно не проверяет boolean поля
+результата `bridge.close`; этот факт нужно учитывать отдельно от awaited child exit.
+Новые runtime management APIs/normal product auto-close пока не добавлялись.
 
 ### Фаза 4: native late-read source/Execute/full Table — 2026-10-02
 

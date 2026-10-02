@@ -30,6 +30,9 @@ procedure21PASS. [Scope и оставшиеся связи](checkpoint.md#фаз
 прошёл11 tests, node17 и Save19 regression PASS. На **5326767d6278** native
 late source/Execute/full6×4/restoration/workflow-return audit прошёл9 tests,
 affected configuration/output9 и public read11PASS. [Границы](checkpoint.md#фаза-4-native-late-read-sourceexecutefull-table--2026-10-02).
+Общий chunk audit на **1c846a7c2f21** проверен configuration9/cold9/read9 PASS;
+actual cold32KiB/1024LF содержит3×8 fragments и полный6×4.
+[Checkpoint](checkpoint.md#фаза-4-единый-closed-source-chunk-audit-и-native32kib-cold--2026-10-02).
 Normal CLI package/logout/process cleanup ещё открыт; special supervised
 cleanup не подставляется вместо обычного CLI. [Checkpoint](checkpoint.md#фаза-4-late-cli-output-read-delivery-binding--2026-10-02).
 

@@ -138,7 +138,13 @@ auditor по-прежнему требует original apply/read phase; journal 
 подтверждённой Execute procedure и actual terminal, не с общим status отчёта.
 
 Writer baseline содержит actual source, native settings digest, обе mappings,
-GUID/indexed-port graph и execution identities. Сравнение нормализует только
+GUID/indexed-port graph и execution identities. `javascript_source_evidence.py`
+общий для configuration/read/cold: каждый fragment имеет свой step и четыре
+ordered open/discard dispatch/settled receipts перед delivery; owner/epoch/deadline,
+UTF-8 offset/digest/cursor и весь source проверяются для каждой full-read группы.
+Configuration связывает original ceiling с `node_apply_prepared`; cold сохраняет
+три fresh full-read группы даже для32KiB/8 fragments каждая.
+Сравнение нормализует только
 document/workflow/DOM epoch, wizard prefix и уже принятый `ConnectedRecord:null`
 как отсутствие; любое non-null значение и остальные настройки сохраняются.
 Первые cold output caches могут быть пустыми для code или configured/source_pending
