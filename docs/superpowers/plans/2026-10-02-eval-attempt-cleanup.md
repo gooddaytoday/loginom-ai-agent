@@ -218,3 +218,40 @@ pass. Новых источников ownership нет: browserAncestor испо
 уже доказанного потомка; PID/parent provenance остаётся прежним единым ledger.
 Далее свежие native readiness/control/addressed на этом code SHA, без cold reader
 вне обязательного контракта и без изменений установленного продукта.
+
+
+## Checkpoint validation lifecycle — 2026-10-02
+
+На HEAD 8e676dbce control 20261002-142112-8e676dbce-dirty сохранил no_artifact
+и completed, но bounded profile idle после второй попытки отказал. Process proof
+самой попытки confirmed; причина временного owner не установлена. Environment
+cleanup failed, run exit 1, результаты и report сохранены. Этот run не заменяет
+требуемую положительную приёмку.
+
+Guard default eval-профиля содержит другого owner (PID 295436, nonce
+66789ed1-a3c7-4899-99ba-2580b51a6835); provenance с control не совпала.
+Guard не удалён. Повторный запуск безопасно отказал на lease до dispatch.
+Для окончательной приёмки выбран отдельный private profile; исходный профиль,
+его настройки/БД и неизвестный guard остаются без изменений.
+
+Первый private bootstrap отказал на browser binding в management status.
+Read-only исследование продуктовых host.ts/managed-entry.mjs подтвердило:
+check(connection) запускает browser в loginom/validation/generations/.../attempts,
+не создаёт execution journal и после close удаляет validation chat. Supervisor
+учитывал только runtime. Failed private guard, receipts и runtime оставлены;
+неудачное доказательство не переписано.
+
+Один новый реальный child-тест воспроизвёл failed cleanup (red, 2 assertions).
+Минимальная правка наблюдает runtime и validation одним scanner/ledger и сохраняет
+историю новых каталогов после продуктового удаления. Exact executable, origin
+и точный новый browser-profile обязательны для обоих namespaces. Manifest явно
+фиксирует removed_validation_directories; обычный исчезнувший runtime по-прежнему
+запрещает продолжение. Targeted pruning допускает лишь те же exact own attempts.
+Green: 12 pass / 0 fail, 57 assertions, 49.12 с (process + diagnostics).
+Typecheck/diff-check pass. Полный gate запущен, native приёмка на новой версии
+остаётся открытой. Установленный CLI не пересобирался; goal active.
+
+Итоговый gate validation-среза: 228 pass / 0 fail, 990 assertions, 297.87 с
+(/tmp/eval-subreaper-acceptance/full-validation-v3.log); bun typecheck и
+git diff --check pass. Далее свежий private bootstrap и оба обязательных native
+прогона; прежние failed guards/evidence остаются без удаления.

@@ -28,3 +28,14 @@ test("archiveDiagnostics: только собственные execution journals
     expect(await Bun.file(path.join(own, "execution-events.jsonl")).exists()).toBe(true)
   } finally { await rm(profile, { recursive: true }); await rm(out, { recursive: true }) }
 })
+
+test("archiveDiagnostics: исчезновение обычного runtime не принимается за validation без журнала", async () => {
+  const profile = await mkdtemp(path.join(os.tmpdir(), "evals-archive-missing-"))
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-archive-out-"))
+  try {
+    await expect(archiveDiagnostics(profile,
+      [path.join(profile, "loginom/runtime/generations/1/chats/chat/attempts/gone")], out))
+      .rejects.toThrow("Diagnostic runtime ownership path differs")
+    expect(await Bun.file(path.join(out, "diagnostics/manifest.json")).exists()).toBe(false)
+  } finally { await rm(profile, { recursive: true }); await rm(out, { recursive: true }) }
+})

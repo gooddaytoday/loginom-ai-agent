@@ -12,10 +12,24 @@ const hash = (text: string) => new Bun.CryptoHasher("sha256").update(text).diges
 export async function archiveDiagnostics(profile: string, directories: string[], out: string, secrets: string[] = []) {
   const canonical = await realpath(profile)
   const known = new Set(secrets.filter(Boolean))
+  const removedValidation: string[] = []
   const sources = await Promise.all([...new Set(directories)].sort().map(async (directory) => {
     const relative = path.relative(canonical, directory)
-    if (!/^loginom\/runtime\/generations\/[^/]+\/chats\/[^/]+\/attempts\/[^/]+$/.test(relative) ||
-      await realpath(directory) !== directory || !(await lstat(directory)).isDirectory())
+    if (!/^loginom\/(runtime|validation)\/generations\/[^/]+\/chats\/[^/]+\/attempts\/[^/]+$/.test(relative))
+      throw Error("Diagnostic runtime ownership path differs")
+    const actual = await realpath(directory).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined
+      throw error
+    })
+    if (!actual && relative.startsWith("loginom/validation/")) {
+      // Connection validation creates no execution journal and the product
+      // removes its chat directory before returning. Record this absence.
+      const root = path.join(canonical, "loginom", "validation")
+      if (await realpath(root) !== root) throw Error("Diagnostic validation root differs")
+      removedValidation.push(relative)
+      return undefined
+    }
+    if (actual !== directory || !(await lstat(directory)).isDirectory())
       throw Error("Diagnostic runtime ownership path differs")
     const file = path.join(directory, "execution-events.jsonl")
     const info = await lstat(file).catch((error: NodeJS.ErrnoException) => {
@@ -45,7 +59,8 @@ export async function archiveDiagnostics(profile: string, directories: string[],
     if (hash(await Bun.file(path.join(out, archive)).text()) !== hash(text)) throw Error("Diagnostic archive read-back differs")
     files.push({ source: source.source, archive, bytes: Buffer.byteLength(text), sha256: hash(text) })
   }
-  const manifest = { version: 1, runtime_directories: directories.map((directory) => path.relative(canonical, directory)), files }
+  const manifest = { version: 1, runtime_directories: directories.map((directory) => path.relative(canonical, directory)),
+    removed_validation_directories: removedValidation.sort(), files }
   const handle = await open(path.join(out, "diagnostics/manifest.json"), "wx", 0o600)
   try { await handle.writeFile(JSON.stringify(manifest, null, 2)); await handle.sync() } finally { await handle.close() }
   if (JSON.stringify(await Bun.file(path.join(out, "diagnostics/manifest.json")).json()) !== JSON.stringify(manifest))

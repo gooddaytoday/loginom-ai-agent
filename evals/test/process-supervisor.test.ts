@@ -6,6 +6,7 @@ import os from "node:os"
 import { agentCommand, runAgent } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
 import { signalProcess, type ProcessIdentity } from "../src/process-supervisor"
+import { archiveDiagnostics } from "../src/diagnostics"
 
 test("signalProcess: другая birth или executable identity не разрешает сигнал", async () => {
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { detached: true, stdio: "ignore" })
@@ -231,6 +232,35 @@ test("supervisor: неизвестный потомок браузера вне 
   } finally {
     if (await Bun.file(helperFile).exists()) {
       const pid = Number(await Bun.file(helperFile).text())
+      const saved = run?.processCleanup.processes.find((entry) => entry.pid === pid)
+      if (saved) await signalProcess(saved, "SIGKILL")
+    }
+  }
+}, 20_000)
+
+test("supervisor: validation browser требует точного нового каталога и сохраняет binding после удаления temp продуктом", async () => {
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-validation-browser-"))
+  const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-validation-bundle-"))
+  await Bun.build({ entrypoints: [path.join(evalsRoot, "fixtures/fake-browser.ts")], compile: { outfile: path.join(bundle, "chrome") } })
+  await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
+  const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: out })
+  const pidFile = path.join(out, "browser.pid")
+  let run: Awaited<ReturnType<typeof runAgent>> | undefined
+  try {
+    run = await runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+      EVAL_FAKE_BROWSER_PID_FILE: pidFile, EVAL_FAKE_VALIDATION: "1" } }, taskId: "default", model: "fake/model",
+      prompt: "test", files: [], workdir: out, outDir: out, profileDir: out, timeoutMs: 30_000 })
+    expect(run.exitCode).toBe(0)
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.processCleanup.browserBindings).toHaveLength(1)
+    expect(run.processCleanup.runtimeDirectories).toHaveLength(1)
+    const archive = await archiveDiagnostics(out, run.processCleanup.runtimeDirectories, path.join(out, "archive"))
+    expect(archive.files).toEqual([])
+    expect(archive.runtime_directories[0]).toContain("loginom/validation/")
+    expect(archive.removed_validation_directories).toEqual(archive.runtime_directories)
+  } finally {
+    if (await Bun.file(pidFile).exists()) {
+      const pid = Number(await Bun.file(pidFile).text())
       const saved = run?.processCleanup.processes.find((entry) => entry.pid === pid)
       if (saved) await signalProcess(saved, "SIGKILL")
     }
