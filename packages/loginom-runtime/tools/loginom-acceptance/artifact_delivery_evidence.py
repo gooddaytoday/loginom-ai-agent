@@ -1,8 +1,63 @@
 """Independent audit of private delivery followed by the full text import."""
 import re
+from datetime import datetime
 from import_output_evidence import verify_text_import_output
 from import_source_binding import source_with_delivery_metadata
 from import_execution_evidence import verify_text_import_source_execution
+
+
+def preupload_delivery_restarts(events, operation_id):
+    """Validate retained navigation checkpoints without erasing failed attempts.
+
+    Each restart precedes the only upload. Public resume authorization is checked
+    separately by the CLI binding auditor; this function proves native continuity.
+    """
+    phases = [(i,e) for i,e in enumerate(events) if e.get('operation_id') == operation_id]
+    starts = [(i,e) for i,e in phases if e.get('phase') == 'artifact_delivery_prepared']
+    checkpoints = [(i,e) for i,e in phases if e.get('phase') == 'artifact_delivery_preupload_checkpoint']
+    if len(starts) <= 1 and not checkpoints:return []
+    if len(starts) != len(checkpoints)+1 or not starts:
+        raise ValueError('delivery_preupload_restart_count')
+    owner = ('session_id','runtime_revision','manifest_sha256','target')
+    identity = ('artifact_id','destination','bytes','sha256','overwrite')
+    first = starts[0][1]
+    if (any(first.get(k) is None for k in owner+identity)
+            or type(first['bytes']) is not int or first['bytes'] < 0
+            or not re.fullmatch('[a-f0-9]{64}',first['sha256']) or first['overwrite'] not in ('reject','replace')):
+        raise ValueError('delivery_preupload_identity')
+    upload_id = operation_id+':upload'
+    if any(e.get('operation_id') == upload_id or str(e.get('operation_id','')).startswith(upload_id+':')
+            for e in events[:starts[-1][0]]):
+        raise ValueError('delivery_preupload_effect_before_restart')
+    result = []
+    upload_index = next((i for i,e in enumerate(events) if e.get('operation_id') == upload_id),len(events))
+    for ordinal,(checkpoint_index,checkpoint) in enumerate(checkpoints):
+        begin,start = starts[ordinal]
+        restart,next_start = starts[ordinal+1]
+        if ([e.get('phase') for _,e in phases[ordinal*2:ordinal*2+3]] !=
+                ['artifact_delivery_prepared','artifact_delivery_preupload_checkpoint','artifact_delivery_prepared']
+                or not begin < checkpoint_index < restart
+                or checkpoint.get('upload_started') is not False
+                or type(checkpoint.get('navigation_step')) is not int or checkpoint['navigation_step'] < 0
+                or not isinstance(checkpoint.get('document'),str) or not checkpoint['document']
+                or any(e.get('internal_provenance') != 'artifact_delivery_v1' for e in (start,checkpoint,next_start))
+                or any(any(e.get(k) != first[k] for k in owner) for e in (start,checkpoint,next_start))
+                or any(next_start.get(k) != first[k] for k in identity)):
+            raise ValueError('delivery_preupload_checkpoint_binding')
+        before = [e for e in events[begin+1:checkpoint_index] if e.get('phase') == 'observation_completed']
+        times = [datetime.fromisoformat(e['recorded_at'].replace('Z','+00:00')) for e in (start,checkpoint,next_start)]
+        if not times[0] <= times[1] <= times[2]:raise ValueError('delivery_preupload_native_order')
+        after = [e for e in events[restart+1:upload_index] if e.get('phase') == 'observation_completed']
+        if not before or not after:
+            raise ValueError('delivery_preupload_document_observation')
+        for row in (before[-1],after[0]):
+            outcome = row.get('outcome',{})
+            if (any(row.get(k) != first[k] for k in owner) or outcome.get('status') != 'SUCCEEDED'
+                    or outcome.get('action_key') != 'workspace.observe'
+                    or outcome.get('output',{}).get('dom_epoch',{}).get('document') != checkpoint['document']):
+                raise ValueError('delivery_preupload_document_observation')
+        result.append((start,checkpoint,next_start))
+    return result
 
 
 def verify_integrated_delivery(events, request, source_bytes, delivery, replay, runtime_revision):
@@ -64,7 +119,13 @@ def _verify_delivery(events,request,delivery,runtime_revision,result,*,replay=No
     phases = [e for e in events if e.get('operation_id') == delivery.get('operation_id')]
     upload_recovery = [e for e in phases if e['phase'] == 'artifact_delivery_upload_reconciled']
     verify_recovery = [e for e in phases if e['phase'] == 'artifact_delivery_verification_reconciled']
-    expected_phases = ['artifact_delivery_prepared', 'artifact_delivery_upload_receipt']
+    try:
+        restarts = preupload_delivery_restarts(events,delivery.get('operation_id'))
+    except (ValueError,KeyError,TypeError) as error:
+        failures.append(str(error) if isinstance(error,ValueError) else 'delivery_preupload_malformed')
+        restarts = []
+    expected_phases = ['artifact_delivery_prepared','artifact_delivery_preupload_checkpoint'] * len(restarts)
+    expected_phases.extend(['artifact_delivery_prepared', 'artifact_delivery_upload_receipt'])
     if upload_recovery:
         expected_phases.append('artifact_delivery_upload_reconciled')
         recovered_rows = [e for e in events if e.get('operation_id') == upload_id and e.get('phase') == 'receipt_recovered']

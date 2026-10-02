@@ -119,7 +119,7 @@ def bound_native_intervals(events,native,operations):
         # Upload is a private child of artifact delivery, not a separate public
         # tool call. Its exact ID comes from the already audited delivery proof.
         parents={c['result']['operation_id'] for c in calls if c['part']['tool'] in
-            ('loginom_dock_artifact_deliver','loginom_dock_artifact_delivery_status')
+            ('loginom_dock_artifact_deliver','loginom_dock_artifact_delivery_status','loginom_dock_artifact_delivery_resume')
             and c['result'] and c['result'].get('state')=='settled'
             and c['result'].get('output',{}).get('status')=='SUCCEEDED'
             and c['result']['output'].get('upload_operation_id')==operation}
@@ -207,7 +207,7 @@ def delivered_input(events,native,request,baseline,expected,source_bytes):
     require_proof(verify_configuration_readback(native,imported),'javascript_acceptance_import_configuration')
     upload=imported['parameters']['source']['upload_operation_id']
     deliveries=[c['result'] for c in cli_public_calls(events) if c['part']['tool'] in (
-        'loginom_dock_artifact_deliver','loginom_dock_artifact_delivery_status') and c['result']
+        'loginom_dock_artifact_deliver','loginom_dock_artifact_delivery_status','loginom_dock_artifact_delivery_resume') and c['result']
         and c['result'].get('state')=='settled' and c['result'].get('output',{}).get('upload_operation_id')==upload]
     if not deliveries:raise ValueError('javascript_acceptance_public_input_delivery_missing')
     delivered=deliveries[-1]
