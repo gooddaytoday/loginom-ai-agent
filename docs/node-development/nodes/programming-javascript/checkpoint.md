@@ -3,8 +3,8 @@
 ## Текущее состояние
 
 Оперативная точка **2026-10-02, pair08**: original holder **exec32766**,
-private `f-cli-pair-08.py`: Declared08 writerPID639971 exit0/whole writer PASS;
-coldPID647223 выполняется в ordinary headed. Candidate11/reader11 на child **f2a0cdd991**, knowledge1.2. Контракт
+private `f-cli-pair-08.py`: Declared08 original whole trial PASS/released;
+Code08 запускается в ordinary headed на том же candidate. Candidate11/reader11 на child **f2a0cdd991**, knowledge1.2. Контракт
 Declared исправлен после собственного CLI-отказа; source60/full3446+10SKIP PASS,
 build/roundtrip/freeze PASS. Code07 на предыдущем candidate имеет original whole
 PASS, Declared07 failed/очищен; эта неполная пара не заменяет pair08.
@@ -302,7 +302,15 @@ Writer auditSHA`f0dbaf7b5eb420d26096b03ced39470d4f0c87a450c626b7a07403455a766631
 executions`1790965358489-cenlolmr53q:1076:3` и`:4`.
 Own saved `/jsteach/JavaScript-declared-62aa0c39-0ccf-44f8-800a-2ef9985cf753.lgp`;
 normal Save/Close/logout PASS. Cold factory вернул originalPID647223, collector
-ещё выполняется. Ждать результат exec32766; при whole PASS release и start/code.
+завершился PASS; original whole trial PASS, SHA
+`ac9ab743bc06683c005ad1e59af167add4160be3253252a006b60da897bd65ec`.
+Cold fresh execution`1790965638454-gg0ywdwnr6b:760:1`, reportSHA
+`877a0c7bb699d9355080b423b5d6ca928ab7f8b320f8d60f0e02cdb13eaeec5f`,
+journalSHA`542425a7d69ee3d3b72e23e4cc026bca5d78ca65f90d11da4fafb051ce7b7ebe`.
+Original release подтвердил trials=1, normal writer/cold cleanup PASS;
+Declared object остаётся в holder для pair. Отправлена start/code08; следующий
+шаг — дождаться writer и отдельно прочитать новый source, затем audit/cold/
+release/pair. Declared заново не запускать. Whole pair/accepted ещё не закрыты.
 
 
 
