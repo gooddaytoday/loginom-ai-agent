@@ -13,7 +13,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
-from artifact_delivery_evidence import verify_delivered_import_output
+from artifact_delivery_evidence import verify_delivered_import_source_execution
 from javascript_cli_admission import verify_cli_admission
 from javascript_cli_candidate import file_sha256,verify_cli_candidate
 from javascript_cli_capture import RedactedCliCapture
@@ -116,9 +116,18 @@ def bound_native_intervals(events,native,operations):
     """Actual native work stays between submission and its public terminal."""
     calls=cli_public_calls(events)
     for operation in set(operations):
-        related=[c for c in calls if c['part']['state']['input'].get('operation_id')==operation
-            or c['result'] and c['result'].get('operation_id')==operation]
-        terminal=[c for c in related if c['result'] and c['result'].get('operation_id')==operation
+        # Upload is a private child of artifact delivery, not a separate public
+        # tool call. Its exact ID comes from the already audited delivery proof.
+        parents={c['result']['operation_id'] for c in calls if c['part']['tool'] in
+            ('loginom_dock_artifact_deliver','loginom_dock_artifact_delivery_status')
+            and c['result'] and c['result'].get('state')=='settled'
+            and c['result'].get('output',{}).get('status')=='SUCCEEDED'
+            and c['result']['output'].get('upload_operation_id')==operation}
+        if len(parents)>1:raise ValueError('javascript_acceptance_native_public_parent_ambiguous')
+        public_operation=next(iter(parents),operation)
+        related=[c for c in calls if c['part']['state']['input'].get('operation_id')==public_operation
+            or c['result'] and c['result'].get('operation_id')==public_operation]
+        terminal=[c for c in related if c['result'] and c['result'].get('operation_id')==public_operation
             and (c['result'].get('status')=='SUCCEEDED' or c['result'].get('output',{}).get('status')=='SUCCEEDED')]
         records=[r for r in native if r.get('operation_id')==operation]
         if not related or not terminal or not records:
@@ -205,7 +214,7 @@ def delivered_input(events,native,request,baseline,expected,source_bytes):
     view=dict(state=delivered['state'],phase='completed',error=delivered.get('error'),
         operation_id=delivered['operation_id'],upload_operation_id=upload,outcome=delivered['output'])
     bound_native_intervals(events,native,[delivered['operation_id']])
-    require_proof(verify_delivered_import_output(native,imported,source_bytes,view,expected['runtime_revision']),
+    require_proof(verify_delivered_import_source_execution(native,imported,source_bytes,view,expected['runtime_revision']),
         'javascript_acceptance_delivered_input_bytes_and_execution')
     edge=dict(source=source['node_id'],output=0,target=baseline['node']['node_id'],input=0)
     if edge not in baseline['graph']['links']:
@@ -251,6 +260,17 @@ proof of program equivalence or cryptographic reviewer authentication.
         program_equivalence_proved=False,reviewer_cryptographically_authenticated=False)
 
 
+def verify_cli_prompt_snapshot(projection,prompt):
+    # run.ts formats each positional argument before resolveRunInput.
+    # This controller supplies exactly one argument and no piped stdin.
+    delivered=('"'+prompt.replace('"','\\"')+'"' if ' ' in prompt else prompt).encode('utf-8')
+    users=[m['message_id'] for m in projection['models'] if m['role']=='user']
+    if (len(users)!=1 or len(projection['user_prompts'])!=1 or projection['user_prompts']!=[dict(
+            part_id=projection['user_prompts'][0]['part_id'],message_id=users[0],bytes=len(delivered),
+            sha256=hashlib.sha256(delivered).hexdigest())]):
+        raise ValueError('javascript_acceptance_original_user_prompt_snapshot')
+
+
 class JavascriptCliAcceptance:
     def __init__(self,writer,capture,*,reader,expected,prompt,data_filename,input_columns,output_columns,expected_rows,source_review=None):
         self.writer,self.capture=writer,capture
@@ -284,10 +304,7 @@ class JavascriptCliAcceptance:
             if not writer.native_watch.revalidate():raise ValueError('javascript_acceptance_sealed_native_changed')
             native,receipt=writer.native_watch.sealed['events'],writer.native_watch.sealed['receipt']
             projection=read_cli_session(writer.owner.profile,self.expected['cli_session_id'])
-            users=[m['message_id'] for m in projection['models'] if m['role']=='user']
-            if (len(users)!=1 or projection['user_prompts']!=[dict(part_id=projection['user_prompts'][0]['part_id'],
-                    message_id=users[0],bytes=len(self.prompt.encode('utf-8')),sha256=hashlib.sha256(self.prompt.encode('utf-8')).hexdigest())]):
-                raise ValueError('javascript_acceptance_original_user_prompt_snapshot')
+            verify_cli_prompt_snapshot(projection,self.prompt)
             files=[dict(filename=r['name'],bytes=r['bytes'],sha256=r['sha256']) for r in writer.launch['files']]
             for item in files:
                 path=Path(writer.launch['directory'])/item['filename']
@@ -334,7 +351,7 @@ class JavascriptCliAcceptance:
                 final_path=self.expected['package_path'],revisions=self.expected['revisions'],expected=self.expected,
                 receipt=receipt,projection=projection)
             stages['cleanup']=require_proof(verify_cli_package_cleanup(**cleanup),'javascript_acceptance_last_save_native_close')
-            bound_native_intervals(events,native,[author,request['operation_id'],output,imported,
+            bound_native_intervals(events,native,[author,request['operation_id'],output,imported,upload,
                 stages['cleanup']['save_operation_id']])
             if not writer.submitted_at<=native_time(receipt['started_at'])<=native_time(receipt['completed_at'])<=writer.result['finished_at']:
                 raise ValueError('javascript_acceptance_cleanup_original_process_order')

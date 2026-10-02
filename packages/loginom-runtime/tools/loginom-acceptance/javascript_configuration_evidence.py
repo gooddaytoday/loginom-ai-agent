@@ -184,13 +184,16 @@ def verify_javascript_configuration(events, request, expected_source, input_colu
                 and r['receipt'].get('admission_id') == admission_id and r['receipt'].get('owner',{}).get('operation_id') == request['operation_id']]
             if len(admissions) != 1:raise ValueError('javascript_source_admission_identity')
             admission = admissions[0]
-            if (any(admission['owner'].get(k) != node[k] for k in OWNER_KEYS) or admission.get('deadline') != next(r['deadline_at'] for r in operation['rows'] if r.get('phase') == 'node_apply_prepared')):
+            owner = admission['owner']
+            if admission.get('kind') == 'new':
+                owner = configured_new_owner(all_rows,admission,request,node,operation['identity'])
+            if (any(owner.get(k) != node[k] for k in OWNER_KEYS) or admission.get('deadline') != next(r['deadline_at'] for r in operation['rows'] if r.get('phase') == 'node_apply_prepared')):
                 raise ValueError('javascript_source_admission_owner_deadline')
             closed = [(i,r) for i,r in enumerate(all_rows) if r.get('phase') in ('source_open_dispatch','source_open_settled',
                 'source_discard_dispatch','source_discard_settled','source_delivery_verified') and r.get('admission_id') == admission_id and r.get('read_id') == read_id]
             if any(tuple(r.get(k) for k in ('session_id','runtime_revision','target')) != operation['identity'] for i,r in closed):
                 raise ValueError('javascript_source_delivery_identity')
-            start,end = verify_closed_source_read(closed,expected_source,metadata,admission['owner'],admission['deadline'])
+            start,end = verify_closed_source_read(closed,expected_source,metadata,owner,admission['deadline'])
             if start <= previous:raise ValueError('javascript_source_read_order')
             previous = end
         finish = phases['node_finish']['value']
@@ -204,6 +207,34 @@ def verify_javascript_configuration(events, request, expected_source, input_colu
     return dict(passed=not failures, failures=sorted(set(failures)), source_sha256=source_sha,
         scope='native_javascript_execute_configuration', journal_authenticated=False,
         model_authorship_verified=False, package_persistence_verified=False)
+
+
+def configured_new_owner(events,admission,request,node,identity):
+    """Prove the one null-to-native-GUID transition of a create admission."""
+    rows = [(i,r) for i,r in enumerate(events) if r.get('phase') in
+        ('javascript_source_admitted','javascript_source_mutation_dispatch','javascript_source_configured')
+        and r.get('admission_id') == admission['admission_id']]
+    if (request['target']['kind'] != 'new' or admission.get('phase') != 'admitted'
+            or admission.get('intent') != 'create' or admission['owner'].get('node_id','missing') is not None
+            or admission.get('previous_source') is not None
+            or [r['phase'] for i,r in rows] != ['javascript_source_admitted','javascript_source_mutation_dispatch','javascript_source_configured']
+            or any(tuple(r.get(k) for k in ('session_id','runtime_revision','target')) != identity for i,r in rows)
+            or any(r.get('deadline') != admission['deadline'] for i,r in rows)
+            or rows[0][1]['receipt'] != admission or rows[1][1]['receipt'] != admission):
+        raise ValueError('javascript_new_source_admission_transition')
+    configured = rows[2][1]['receipt']
+    owner = configured['owner']
+    if (owner != dict(admission['owner'],node_id=node['node_id'])
+            or configured.get('phase') != 'configured'
+            or {k:v for k,v in configured.items() if k not in ('owner','phase','settings_sha256')} !=
+                {k:v for k,v in admission.items() if k not in ('owner','phase','settings_sha256')}
+            or not isinstance(configured.get('settings_sha256'),str) or len(configured['settings_sha256']) != 64):
+        raise ValueError('javascript_new_source_configured_owner')
+    deliveries = [(i,r) for i,r in enumerate(events) if r.get('phase') == 'source_delivery_verified'
+        and r.get('admission_id') == admission['admission_id']]
+    if not deliveries or not rows[1][0] < deliveries[0][0] < rows[2][0]:
+        raise ValueError('javascript_new_source_configured_order')
+    return owner
 
 
 if __name__ == '__main__':

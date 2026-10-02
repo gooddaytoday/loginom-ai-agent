@@ -2,6 +2,7 @@
 import re
 from import_output_evidence import verify_text_import_output
 from import_source_binding import source_with_delivery_metadata
+from import_execution_evidence import verify_text_import_source_execution
 
 
 def verify_integrated_delivery(events, request, source_bytes, delivery, replay, runtime_revision):
@@ -23,6 +24,13 @@ def verify_delivered_existing_import_output(events, seed_request, request, sourc
                                    seed_request=seed_request, seed_source_bytes=seed_source_bytes)
 
 
+def verify_delivered_import_source_execution(events, request, source_bytes, delivery, runtime_revision):
+    """Delivery, configuration and native execution, never exact preview cells."""
+    result = verify_text_import_source_execution(events, request, source_bytes)
+    return _verify_delivery(events,request,delivery,runtime_revision,result,
+        scope='integrated_delivery_to_fresh_import_execution_without_output_data_proof')
+
+
 def _verify_delivered_import(events, request, source_bytes, delivery, runtime_revision, *, replay=None, require_replay=False,
                              seed_request=None, seed_source_bytes=None):
     if seed_request is None:
@@ -30,6 +38,11 @@ def _verify_delivered_import(events, request, source_bytes, delivery, runtime_re
     else:
         from existing_import_evidence import verify_existing_import_output
         result = verify_existing_import_output(events, seed_request, request, source_bytes, seed_source_bytes=seed_source_bytes)
+    return _verify_delivery(events,request,delivery,runtime_revision,result,replay=replay,require_replay=require_replay)
+
+
+def _verify_delivery(events,request,delivery,runtime_revision,result,*,replay=None,require_replay=False,
+                     scope='integrated_delivery_to_fresh_import_output'):
     failures = list(result['failures'])
     source = source_with_delivery_metadata(events, request['parameters']['source'])
     path = request['parameters']['settings']['source']['source_path']
@@ -130,7 +143,11 @@ def _verify_delivered_import(events, request, source_bytes, delivery, runtime_re
                     or any(d.get(k) != binding.get(k) for k in ['document', 'workflow_ref', 'active_tab_ref'])):
                 failures.append('delivery_discovery_binding')
             moves = [e for e in trace if e.get('event') == 'artifact_discovery_scroll']
-            if len(moves) > 16 or d.get('scrolls') != len(moves):
+            # Native discovery uses at most 96 iterations. Its legacy `scrolls`
+            # field is trace.length BEFORE appending the discovery event, and
+            # includes readiness/refresh/size observations as well as moves.
+            if (len(moves) >= 96 or type(d.get('scrolls')) is not int or d['scrolls'] != trace.index(d)
+                    or any(trace.index(move) >= trace.index(d) for move in moves)):
                 failures.append('delivery_scroll_bound')
             previous = None
             for move in moves:
@@ -143,5 +160,5 @@ def _verify_delivered_import(events, request, source_bytes, delivery, runtime_re
                 previous = move.get('to')
         if len(gestures) != 1 or gestures[0].get('status') != 'SUCCEEDED' or gestures[0].get('cleanup_complete') is not True:
             failures.append('delivery_download_gesture')
-    return dict(result, passed=not failures, failures=sorted(set(failures)), scope='integrated_delivery_to_fresh_import_output',
+    return dict(result, passed=not failures, failures=sorted(set(failures)), scope=scope,
                 integrated_delivery_verified=not failures, package_persistence_verified=False, hermes_acceptance_verified=False)

@@ -12,6 +12,12 @@ from javascript_cli_nodes import cli_public_calls,native_identity,verify_cli_nod
 SAVE_KEYS = ('package.save_checkpoint','package.save_as')
 
 
+def rendered_label(label):
+    # ECMAScript /\s/g used by Loginom data-tid, not Python's broader \s.
+    if not isinstance(label,str) or not label:raise ValueError('cli_save_native_label_missing')
+    return re.sub('[\u0009-\u000d\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]', '_', label).replace(',', '')
+
+
 def public_json_blocks(part):
     text = part['state']['output'].strip()
     values = []
@@ -133,7 +139,7 @@ def verify_cli_last_save(events,native_events,source_operation_id,final_path,rev
                     or len(graph['ports']) != len(graph['nodes']) or any(not isinstance(p['tids'],list)
                         or any(not isinstance(t,str) or not t for t in p['tids']) for p in graph['ports'])
                     or not isinstance(graph['links'],list) or any(not isinstance(t,str) or not t for t in graph['links'])
-                    or op == final_id and (node.get('label') or source_start['target'].get('label')) not in graph['nodes']):
+                    or op == final_id and rendered_label(node.get('label') or source_start['target'].get('label')) not in graph['nodes']):
                 raise ValueError('cli_save_rendered_graph_shape')
             if (any(r.get('action_key') != key or r.get('action_revision') != revisions[key]
                     or value_digest(r.get('parameters')) != value_digest(parameters)

@@ -148,6 +148,16 @@ def verify_execution_observations(observations, mutations, node, *, launch_mode=
 
 
 def verify_text_import_execution(events, request, source_bytes):
+    result = verify_text_import_source_execution(events, request, source_bytes)
+    failures = list(result['failures'])
+    checkpoints = [e.get('result', {}) for e in events if e.get('operation_id') == request['operation_id'] and e.get('phase') == 'node_checkpoint']
+    if (len(checkpoints) != 1 or checkpoints[0].get('output', {}).get('ports') != [] or request.get('read', {}).get('ports') != []):
+        failures.append('execution_checkpoint_identity')
+    return dict(result,passed=not failures,failures=sorted(set(failures)),execution_verified=not failures)
+
+
+def verify_text_import_source_execution(events, request, source_bytes):
+    """Original file, configuration and fresh process only; preview is not data proof."""
     result = _verify_text_import(events, request, source_bytes, 'execute')
     seq = verify_internal_sequence(events, request['operation_id'], max_steps=import_operation_step_budget(events, request['operation_id']))
     bindings = [s.get('prepared_node_context', {}) for _, s in seq['observations']]
@@ -156,8 +166,7 @@ def verify_text_import_execution(events, request, source_bytes):
     proof = verify_execution_observations(seq['observations'], seq['mutations'], bindings[0])
     failures = result['failures'] + proof['failures']
     checkpoints = [e.get('result', {}) for e in events if e.get('operation_id') == request['operation_id'] and e.get('phase') == 'node_checkpoint']
-    if (len(checkpoints) != 1 or checkpoints[0].get('execution', {}).get('execution_id') != proof['execution_id']
-            or checkpoints[0].get('output', {}).get('ports') != [] or request.get('read', {}).get('ports') != []):
+    if (len(checkpoints) != 1 or checkpoints[0].get('execution', {}).get('execution_id') != proof['execution_id']):
         failures.append('execution_checkpoint_identity')
     return dict(result, passed=not failures, failures=sorted(set(failures)), execution_verified=not failures,
                 execution_id=proof['execution_id'], output_data_verified=False)
