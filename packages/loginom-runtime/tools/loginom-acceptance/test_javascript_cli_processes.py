@@ -6,7 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from javascript_cli_processes import LinuxProcessOwner,linux_process
+from javascript_cli_processes import LinuxProcessOwner,linux_process,browser_arguments
 
 
 @unittest.skipUnless(sys.platform == 'linux','actual /proc and Linux PID-fds required')
@@ -119,6 +119,31 @@ sys.exit(7 if MODE=='failed' else 0)
     def test_pid_parser_rejects_nonpositive_or_boolean_identity(self):
         for value in (None,True,0,-1,'1'):
             with self.subTest(value=value),self.assertRaisesRegex(ValueError,'pid_invalid'):linux_process(value)
+
+
+class ChromiumProcessTitleTests(unittest.TestCase):
+    def test_observed_chromium_title_preserves_policy_switches(self):
+        args=['/usr/bin/chrome','--no-proxy-server','--user-data-dir=/private/profile/browser-profile',
+            '--remote-debugging-pipe','about:blank']
+        self.assertEqual(browser_arguments((' '.join(args)+'\0').encode(),args[0]),args)
+        for flag in ('--headless=new','--no-sandbox','--type=renderer'):
+            changed=[*args[:-1],flag,args[-1]]
+            self.assertIn(flag,browser_arguments((' '.join(changed)+'\0').encode(),args[0]))
+
+    def test_native_argv_keeps_spaces_inside_profile(self):
+        args=['/usr/bin/chrome','--user-data-dir=/private/my profile','--no-proxy-server']
+        self.assertEqual(browser_arguments(('\0'.join(args)+'\0').encode(),args[0]),args)
+
+    def test_ambiguous_or_foreign_process_titles_are_rejected(self):
+        for title in (
+            '/other/chrome --user-data-dir=/private/profile about:blank',
+            '/usr/bin/chrome --user-data-dir=/private/my profile about:blank',
+            '/usr/bin/chrome --user-data-dir="/private/profile" about:blank',
+            '/usr/bin/chrome --user-data-dir=/private/profile\t--headless about:blank',
+            '/usr/bin/chrome --user-data-dir=/private/profile http://example.org',
+            '/usr/bin/chrome  --user-data-dir=/private/profile about:blank',
+        ):
+            with self.subTest(title=title):self.assertEqual(browser_arguments((title+'\0').encode(),'/usr/bin/chrome'),[])
 
 
 if __name__ == '__main__':unittest.main()
