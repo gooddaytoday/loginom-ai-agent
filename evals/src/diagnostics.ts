@@ -61,7 +61,9 @@ function prime(value: unknown, known: Set<string>, depth = 0) {
   if (!value || typeof value !== "object") return
   for (const [key, item] of Object.entries(value)) {
     if (sensitive.test(key) && typeof item === "string" && item) known.add(item)
-    if (!forbidden.test(key)) prime(item, known, depth + 1)
+    // Omitted config/auth fields can contain secrets repeated in event text.
+    // Learn those values before dropping the fields from the archive.
+    prime(item, known, depth + 1)
   }
 }
 

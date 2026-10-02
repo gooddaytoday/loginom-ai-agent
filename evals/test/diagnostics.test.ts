@@ -12,7 +12,7 @@ test("archiveDiagnostics: только собственные execution journals
   try {
     await mkdir(path.join(own, "browser-profile"), { recursive: true })
     await mkdir(foreign)
-    await Bun.write(path.join(own, "execution-events.jsonl"), JSON.stringify({ phase: "AMBIGUOUS", password: "secret-password",
+    await Bun.write(path.join(own, "execution-events.jsonl"), JSON.stringify({ phase: "AMBIGUOUS", config: { apiKey: "hidden-config-credential" }, auth: { access_token: "hidden-auth-credential" }, note: "hidden-config-credential hidden-auth-credential", password: "secret-password",
       receipt: JSON.stringify({ apiKey: "dock-key-value", note: "secret-password", url: "https://user:password@host/?token=secret" }) }) + "\n")
     await Bun.write(path.join(own, "browser-profile", "Cookies"), "private-browser-cookie")
     await Bun.write(path.join(own, "session.json"), "private-config")
@@ -21,7 +21,7 @@ test("archiveDiagnostics: только собственные execution journals
     expect(archive.files).toHaveLength(1)
     const text = await Bun.file(path.join(out, archive.files[0]!.archive)).text()
     expect(text).toContain("AMBIGUOUS")
-    for (const secret of ["secret-password", "dock-key-value", "user:password", "token=secret", "private-config", "private-browser-cookie", "unrelated"])
+    for (const secret of ["hidden-config-credential", "hidden-auth-credential", "secret-password", "dock-key-value", "user:password", "token=secret", "private-config", "private-browser-cookie", "unrelated"])
       expect(text).not.toContain(secret)
     expect(archive.files[0]!.sha256).toBe(new Bun.CryptoHasher("sha256").update(text).digest("hex"))
     expect(await Bun.file(path.join(out, "diagnostics/manifest.json")).json()).toEqual(archive)
