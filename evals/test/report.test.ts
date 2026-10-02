@@ -139,6 +139,19 @@ test("aggregateTask: разброс score по попыткам", () => {
   expect(task).toMatchObject({ attempts: 2, completed: 2, mean_score: 65, min_score: 40, max_score: 90, pass_rate: 1 })
 })
 
+test("aggregate: cleanup отдельно от качества, включая interrupted и legacy", () => {
+  const attempts = [
+    attempt({ status: "no_artifact", score: 0, pass: false, environment_cleanup: { status: "failed", evidence: "cleanup.json", error: "owner unknown" } }),
+    attempt({ environment_cleanup: { status: "confirmed", evidence: "cleanup.json", error: null } }),
+    attempt({ status: "interrupted", environment_cleanup: { status: "failed", evidence: "cleanup.json", error: "leftover" } }),
+    attempt({}),
+  ]
+  expect(aggregate(attempts, false)).toMatchObject({
+    total: 3, completed: 2, mean_score: 66.7, pass_rate: 0.667,
+    environment_cleanup_error_count: 2, environment_cleanup_checked_count: 3,
+  })
+})
+
 const summary = (): RunSummary => {
   const attempts = [attempt({ task_id: "group-sum-qty" }), attempt({ task_id: "group-sum-qty", attempt: 2, status: "failed", failure_kind: "provider", score: null, pass: null, judge_status: "error", errors: ["APIError"] })]
   return {
