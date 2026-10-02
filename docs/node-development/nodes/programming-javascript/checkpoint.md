@@ -97,6 +97,39 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
 
+### Linux browser observer исправлен и проверен live — 2026-10-02
+
+Следующий шаг теперь: собрать новый candidate с QA на88548421a1 и freeze reader,
+затем закончить full-source/apply/output J21 и две независимые Code/declared trials.
+Предыдущая ошибка browser ownership устранена; старые FAIL не переоценивать.
+
+В technical delivery04, original exec50254/CLI PID307383, read-only /proc monitor
+подтвердил причину: Chromium после старта переписывает NUL-separated argv в одну
+строку process title. Owned-browser parser искал отдельные switches и пропускал
+root. Реальный user-data-dir находится внутри собственного CLI profile; настройки
+runtime менять не требовалось. Delivery04 exit0/Save/Close/logout подтверждены,
+collector сохраняет прежний FAIL; native процессы завершились, lock освобождён.
+
+Исправление QA **88548421a1**: parser понимает однозначную строку Chromium с
+точным executable prefix, switch tokens и final about:blank. Кавычки, escape,
+неоднозначные пробелы/positional arguments отклоняются; исходный NUL argv с
+пробелами в пути остаётся поддержан. Exact executable hash/PID/start/profile,
+headed/sandbox/direct-proxy checks не ослаблены. 27 process/controller tests PASS
+из package QA directory. Первая команда тестов ошибочно была вызвана из repo root
+и получила import errors; она не считается проверкой, корректный запуск указан выше.
+
+Свежий technical delivery05: original exec87415/CLI PID312919, candidate02
+immutable, source observer88548421a1 с отдельным SHA inventory. Это явно source-QA
+проверка с собранным продуктом, не новый frozen whole trial. Collector PASS,
+exit0, два browser roots подтверждены, observed processes отсутствуют; отдельно
+проверено отсутствие всех candidate executables в /proc. Public model replies
+не усечены. Normal own-Save cleanup SUCCEEDED/package_closed/logged_out=true,
+unsaved_changes_discarded=false. Source inventory после завершения неизменен.
+Private technical-summary SHA256
+`bf0b61491e4d111941d17fefa6dd8e4353e9ac481f58f666feb18321a46f6ee5`.
+Lock освобождён после проверки, original holder exit0. Полный J21 и пара trials
+ещё не выполнены. Goal/accepted readiness не повышены.
+
 ### Actual CLI delivery: технический прогон — 2026-10-02
 
 Candidate02 / ee5184a606, normal standalone run, openai/gpt-6.1-sol/low,
