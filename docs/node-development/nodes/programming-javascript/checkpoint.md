@@ -2,6 +2,19 @@
 
 ## Текущее состояние
 
+**Пауза по прямому указанию пользователя, 2026-10-02.** Последний сохранённый
+прогресс: candidate03/reader03/pins03 готовы (docs9825deac58, code88548421a1).
+После сборки выполнено только чтение existing oracle transport и старого fidelity
+report для выбора J21-проверки; новый технический или автономный прогон не запускался.
+Способ remaining worst-case CLI J21 ещё не выбран; scripted provider не считать
+реальной моделью или автономной попыткой. Продолжить с блока candidate03 ниже:
+full-source/apply/output J21, затем две независимые Code/declared CLI trials.
+На паузе /proc проверен: candidate executables отсутствуют; acceptance_lease=null,
+acceptance.lock/registry.lock отсутствуют. Собственных живых handles нет.
+Untracked acceleration-review.md и файлы child worktree сохранены, не добавлены
+в коммиты. Новые live-действия — только после возобновления пользователем.
+
+
 Назначение модели обновлено пользователем 2026-10-02: все будущие автономные
 CLI-попытки JavaScript выполняются на **`openai/gpt-6.1-sol`, variant `low`**.
 Launcher, общая writer-проверка и actual SQLite model gate адаптированы
