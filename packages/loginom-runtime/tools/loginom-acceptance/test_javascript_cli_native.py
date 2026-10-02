@@ -35,10 +35,10 @@ class JavascriptNativeArtifactsTests(unittest.TestCase):
             runtime_revision=self.pin['revision'],action_manifest_sha256='a'*64,
             account='jsteach',loginom_url='http://logi-test-plan.bg.local/app/',
             target=dict(profile_id='profile-fixture',loginom_build='7.4.2',platform='linux',browser='chromium'))
-        self.attempt=self.runtime/'generations/1/chats/cli-fixture/attempts/12345678-1234-1234-1234-123456789abc'
+        self.attempt=self.runtime/'generations/1/chats/d075ae511a5df78fe3dff2391e93a2a3d842221a9529ba9153a6b0439dc87f20/attempts/12345678-1234-1234-1234-123456789abc'
         self.prepare=dict(prepared=True,sessionId='runtime-fixture',loginomUrl=self.expected['loginom_url']+'?testable=true',
             knowledge=dict(session_manifest=dict(
-            clientRevision=self.pin['revision'],actionManifestDigest='a'*64)))
+            actionManifestDigest='a'*64)))
         self.events=[dict(type='tool_use',part=dict(id='prepare-part',sessionID='cli-fixture',tool='loginom_dock_prepare',
             state=dict(status='completed',input=dict(intent='new_draft'),metadata=dict(generation=1),
                 output=json.dumps(self.prepare))))]
@@ -89,7 +89,7 @@ for await(const command of reader){
   metadata.targetIdentity=e.target;
   await record({event:'workspace_prepared',state:{status:'READY'}});
   await writeFile(spec.attempt+'/session.json',JSON.stringify({sessionId:e.runtime_session_id,
-    clientRevision:e.runtime_revision,clientSourceManifest:spec.runtime_pin.manifest,
+    clientRevision:e.runtime_revision,clientSourceManifest:spec.runtime_pin.manifest,actionManifestDigest:e.action_manifest_sha256,
     profile:spec.attempt+'/browser-profile',artifacts:spec.attempt+'/artifacts',
     resultProfile:'user-v1',mode:'executor-replay',loginomUrl:e.loginom_url+'?testable=true',workspaceReady:true,targetIdentity:e.target}),{mode:0o600});
   console.log(browser.pid);
@@ -199,6 +199,27 @@ reader.close();process.stdin.pause();process.stdin.destroy();
         result=self.freeze()
         self.assertFalse(result['passed'],result)
         self.assertIn('cli_native_public_attempt_identity',result['failures'])
+
+    def test_wrong_chat_hash_cannot_supply_own_session(self):
+        self.attempt=self.runtime/'generations/1/chats' / ('0'*64) / 'attempts/12345678-1234-1234-1234-123456789abc'
+        self.producer();self.close_producer()
+        result=self.freeze()
+        self.assertFalse(result['passed'],result)
+        self.assertIn('cli_native_exact_new_attempt_required',result['failures'])
+
+    def test_private_revision_and_manifest_remain_authoritative_without_public_revision(self):
+        for field in ('clientRevision','actionManifestDigest'):
+            with self.subTest(field=field):
+                self.producer();self.close_producer()
+                path=self.attempt/'session.json';value=json.loads(path.read_text());value[field]='0'*64
+                path.write_text(json.dumps(value))
+                result=self.freeze()
+                self.assertFalse(result['passed'],result)
+                self.assertIn('cli_native_metadata_source_prepare_binding',result['failures'])
+                self.close_fixture();self.process=None;self.watch=None;self.child_fd=None
+                # Each mutation owns a separate new attempt rather than retrying
+                # a collector whose failed seal is permanent.
+                self.attempt=self.attempt.with_name('abcdefab-1234-1234-1234-123456789abc')
 
     def test_normal_receipt_cannot_be_replaced_by_special_or_unbound_cleanup(self):
         self.producer();self.close_producer()

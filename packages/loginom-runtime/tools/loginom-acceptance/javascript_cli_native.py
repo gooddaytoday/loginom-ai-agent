@@ -64,13 +64,14 @@ class NativeJournalWatch:
                         or not re.fullmatch(r'[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}',parts[5])):
                     raise ValueError('cli_native_attempt_layout')
                 if parts[3]=='readiness':continue
+                if not re.fullmatch(r'[0-9a-f]{64}',parts[3]):raise ValueError('cli_native_chat_hash_layout')
                 attempt=path.parent
                 if str(attempt) in self.before:raise ValueError('cli_native_preexisting_attempt')
                 if (attempt.resolve()!=attempt or attempt.stat().st_uid!=os.getuid()
                         or attempt.stat().st_mode & 0o077):raise ValueError('cli_native_private_attempt')
                 journal=attempt/'execution-events.jsonl'
                 if not journal.exists():continue
-                self.observe_file(journal,browser,dict(generation=int(parts[1]),cli_session_id=parts[3]))
+                self.observe_file(journal,browser,dict(generation=int(parts[1]),chat_hash=parts[3]))
         except (OSError,ValueError,KeyError,UnicodeError):
             self.failures.add('cli_native_watch_observation_unconfirmed')
             raise
@@ -122,8 +123,10 @@ class NativeJournalWatch:
                     or cli_session!=expected['cli_session_id'] or type(generation) is not int
                     or prepare.get('sessionId')!=expected['runtime_session_id']):
                 raise ValueError('cli_native_public_attempt_identity')
+            # HostPort.acquire hashes the backend Session ID, without generation.
+            chat_hash=hashlib.sha256(cli_session.encode('utf-8')).hexdigest()
             selected=[(Path(path),row) for path,row in self.files.items()
-                if row['identity']==dict(generation=generation,cli_session_id=cli_session)]
+                if row['identity']==dict(generation=generation,chat_hash=chat_hash)]
             if len(selected)!=1:raise ValueError('cli_native_exact_new_attempt_required')
             journal,row=selected[0]
             attempt=journal.parent
@@ -145,6 +148,7 @@ class NativeJournalWatch:
             pins=prepare['knowledge']['session_manifest']
             if (runtime_pin['revision']!=expected['runtime_revision']
                     or metadata.get('clientRevision')!=runtime_pin['revision']
+                    or metadata.get('actionManifestDigest')!=expected['action_manifest_sha256']
                     or metadata.get('clientSourceManifest')!=runtime_pin['manifest']
                     or metadata.get('sessionId')!=expected['runtime_session_id']
                     or metadata.get('profile')!=str(attempt/'browser-profile')
@@ -154,7 +158,7 @@ class NativeJournalWatch:
                     or not loginom_runtime_url_matches(prepare.get('loginomUrl'),expected['loginom_url'])
                     or metadata.get('workspaceReady') is not True
                     or metadata.get('targetIdentity')!=expected['target']
-                    or pins.get('clientRevision')!=runtime_pin['revision']
+                    or 'clientRevision' in pins and pins['clientRevision']!=runtime_pin['revision']
                     or pins.get('actionManifestDigest')!=expected['action_manifest_sha256']):
                 raise ValueError('cli_native_metadata_source_prepare_binding')
             content=journal.read_bytes()

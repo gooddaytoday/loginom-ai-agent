@@ -26,7 +26,7 @@ class JavascriptAdmissionTests(unittest.TestCase):
             artifacts.append(dict(artifact_id='artifact-'+str(index),name=name,bytes=snapshot['bytes'],sha256=snapshot['sha256'],
                 upload=dict(grant_id='grant-'+str(index),directory='/jsteach',destination='/jsteach/'+name,overwrite='reject')))
         self.result = dict(prepared=True,result_version='user-v1',sessionId='runtime-session',loginomUrl=self.expected['loginom_url'],
-            workspace=self.workspace,input_artifacts=artifacts,knowledge=dict(session_manifest=dict(clientRevision='b'*64,actionManifestDigest='a'*64)))
+            workspace=self.workspace,input_artifacts=artifacts,knowledge=dict(session_manifest=dict(actionManifestDigest='a'*64)))
         self.part = self.fixture.tool
         self.part['tool'] = 'loginom_dock_prepare'
         self.part['state']['metadata']['generation'] = 1
