@@ -13,7 +13,10 @@
 сохраняются; same-task review на Astra/medium не меняется. До новой приёмки
 согласовать launcher и строгие проверки фактической модели с этим назначением;
 прежние результаты тестов не доказывают такую адаптацию.
-Подготовительный статус: **discovery_required**; часть runtime уже реализована.
+Текущий статус: **completion_audit**. Реализация и автономная CLI-пара завершены
+на child/candidate15; [итог фазы6](completion-phase6.md), [аудит всего плана](completion-audit.md).
+Ниже сохранены требования и исторические результаты отдельных этапов.
+Прежние статусы discovery/development не назначают повтор уже выполненных работ.
 Component ID: `component.programming.JavaScript`.
 Runtime type: `programming.javascript`; mode: `script`. В ветке `node-javascript`
 они описаны в схемах, general apply handler source зарегистрирован на161353dadef6
@@ -1228,29 +1231,19 @@ oracle и CLI-приёмку; ядро не считается «всем JavaSc
 
 ## Точка продолжения
 
-Начать с [текущей сводки и указаний](checkpoint.md), сверить docs/code HEAD,
-затем выполнить **B — публичный configure existing code-table** по разделу
-порядка продолжения. Последнее подтверждение — managed write → Code Next →
-Done → новый публичный source-read (`managed-code-next-01`); оно не является
-текущим FAIL и не требует ещё одного повторного source-read ради прогресса.
-Нужны продуктовые settlement после Next/Done и композиция apply lifecycle.
+Продолжить [аудит завершения](completion-audit.md) с обязательного остатка:
+G1–G7, J01–J27, фазы0–6 и named deliverables. Pair13 принят на одних immutable
+candidate15/reader15; оба пакета/браузера и original holder завершены, lease свободен.
+Точные доказательства — [completion фазы6](completion-phase6.md).
+Новых браузеров ради повторения принятой пары не назначать.
 
-До фиксации Execute/read провести ранние private 6×4 и bounded Stop/cancel
-пробы. G1/G3/G5/G6 имеют конкретный остаток в discovery; G4/G7 feasibility
-переиспользуется. `ready_for_development` выставляется по решениям 0B,
-`ready_for_first_review` — по реализации фаз 1–4, G1–G7 и source/direct J,
-`ready_for_acceptance` — после ревью/сборки и candidate gates. Непроверенные
-обязательные требования не закрываются документальной правкой.
+Canonical docs/checkpoint находятся в ветке `javascript`, продуктовый source —
+в `node-javascript`. Проверять актуальные файлы и адресные evidence; исторические
+«открыто» не заменяют проверку текущего состояния. После аудита согласовать
+card/registry/discovery и итоговый completion. Handler ещё не интегрирован
+в основной checkout; acceptance не означает merge/push/release.
 
-Канонический checkpoint — ветка `javascript`, продуктовый worktree —
-`node-javascript`; fixtures/oracle, продуктовая база, стенд, Linux x64,
-headed и правила памяти/изоляции сохранены. Внешний TestCafe остаётся `not_run`
-и не блокирует обучение. Модели, бюджеты и scope менять не требуется.
-
-В основной задаче исполнение уже назначено. Эта доработка плана не создаёт
-новую Goal и не возобновляет/не меняет состояние другой задачи. При продолжении
-владелец существующей Goal использует обновлённый план до первого ревью, без
-самоназначенного token_budget. Обычные правки и проверки в согласованном scope
-не требуют повторного разрешения. На границе результата/фазы, при блокере,
-неизвестном эффекте и остановке обновить краткую сводку; при реальном блокере
-указать недостающее условие, owner и безопасный следующий шаг.
+Фиксированные scope v1, fixtures/oracle, продуктовая база, назначенный стенд,
+Linux x64, обычный headed, модели/лимиты и правила памяти/изоляции сохранены.
+Внешний TestCafe остаётся not_run по принятому scope. Цель активна до полного
+доказанного выполнения требований; новую Goal и token_budget не создавать.

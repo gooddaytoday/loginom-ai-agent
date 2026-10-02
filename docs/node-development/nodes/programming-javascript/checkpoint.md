@@ -14,12 +14,18 @@ FIFO exit; процесс отсутствует, FIFO удалён. Общий 
 acceptance.lock отсутствует, оба .writer отсутствуют. Новые браузеры не нужны
 для фиксации этого результата. Прежние failed trials остаются FAIL.
 
-**Следующий шаг — полный requirement-by-requirement completion audit:** сверить
+**Следующий шаг — [аудит завершения](completion-audit.md):** продолжить сверку
 G1–G7, J01–J27, фазы0–6 и named deliverables с текущими исходниками и конкретными
 evidence; затем согласовать plan/discovery/card/registry/completion. Старые
 формулировки «открыто» ниже — исторические срезы, не новое назначение повторов.
 Pair PASS не означает автоматическое закрытие всей матрицы. Goal активна;
 merge/push/integration/release не выполнялись и не назначены этим результатом.
+
+Read-only completion audit01 повторно сверил12 native/cold файлов пары,
+18 actual SQLite tool outputs J21,10 fixtures и неизменный J27 persistence source.
+Actual JS card17510 wire bytes (<20000), knowledge7.4.2/Linux, no truncation.
+Normal CLI last-confirmed-own-Save → guarded native Close/logout source проверен.
+Полный остаток аудита и report SHA — в completion-audit; registry пока не повышен.
 
 ### Предыдущая точка: Code13 выполнялся
 
