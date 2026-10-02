@@ -2,6 +2,44 @@
 
 ## Текущее состояние
 
+**Pair12 начата — 2026-10-02 20:34 UTC.** Child
+`3e4cd56eaaad168a498096e7494ed3e09ccf18fc` добавляет приватную диагностику
+shutdown без изменения критериев закрытия. Runtime пишет в session directory
+`resource-close.jsonl`: drain/client/bridge/bridge_ack/browser_server/browser/
+profile/complete, только fixed stage/status/time. Supervisor пишет
+`runtime-close-<pid>-<uuid>.json` в runtime state directory: allowlisted request
+error, closed_ack и реальный exit code/signal. Режим0600; raw reply/error text,
+credentials/страницы не сохраняются; отказ записи не меняет cleanup outcome.
+Snapshot admitted requests берётся синхронно до первого await, чтобы close не
+ждал сам себя. Это диагностика, не доказанный fix причины Declared11.
+
+12 runtime tests и23 Host/IPC tests PASS, typecheck PASS, provenance5045 PASS.
+Проверены отказ ACK, ошибка/тайм-аут IPC, ненулевой exit, невыходящий дочерний
+процесс, отсутствие утечки raw error и недоступный diagnostic path. Fresh
+native outcome нужен отдельно. Прежние failed trials сохраняются.
+
+Candidate13 `0.0.0-dev-202610022032`, sourceTree
+`d099512db02542539c35d31eda736f7e368842b9a9f15bc7e9dc3c9108ff8e22`,
+manifest `feca9ee51900ba0d067f13d16e4e6411e31ceb93b7e3a56308979ea83417708e`,
+archive `82f806562885c394e4a873200c3fefb3acb066f14c1bafa7179323752d2c37d1`.
+Build original exec71579/exit0, roundtrip PASS; sourceDirty=true — development,
+не release. Reader13
+`e9563df5b2b6ea8f6e24badbcc427e6d89e6833989a7ca18db99a2de4bd30b3c`,
+bundle pins `f9831cc0d843c58fd1833cd1d2f2ff907ddb7e52e7fe5a8050dabe990b884d22`.
+Freeze exec62515/exit0, candidate5442/QA971, help и оба path preflight PASS.
+Client revision/knowledge1.2 прежние; source runtime/Host содержат диагностику.
+
+Original holder832047/startTicks22404823, private
+`f-cli-pair-12-control.json`/`f-cli-pair-12-control.fifo`/
+`f-cli-pair-12-events.jsonl`. Declared12 writer832481 запущен; новый профиль и
+уникальный path, ordinary headed/GPT-6.1 Sol low/30min. Original holder/trials
+сохранить до whole pair. Следующий шаг — наблюдать Declared12; при успехе
+manual source review → original audit → cold → release → Code12 → whole pair.
+При отказе проверить новые private close records; не снимать guard и не
+повторять неизвестные эффекты. J21/final completion ещё открыты.
+
+### Предшествующий отказ pair11
+
 **Pair11 завершена неполной — Declared11 cleanup FAIL, 2026-10-02 20:26 UTC.**
 Original writer806513 завершился exit1: `LOGINOM_HOST_CLEANUP_FAILED`;
 collector отказал `cli_process_original_clean_exit_required` и
