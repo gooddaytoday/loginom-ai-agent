@@ -260,6 +260,16 @@ proof of program equivalence or cryptographic reviewer authentication.
         program_equivalence_proved=False,reviewer_cryptographically_authenticated=False)
 
 
+def cold_audit_expectations(account,path):
+    # ExecutionJournal applies the production redactor, whose URL parser emits
+    # a root slash. Pin those persisted bytes, not the browser's location.origin.
+    return dict(account=account,package_path=path,
+        journal=dict(session_id='javascript-g2',runtime_revision='operator-source',
+            target=dict(origin='http://logi-test-plan.bg.local/',loginom_build='7.4.2')),
+        preparation_target=dict(profile_id='javascript-ubuntu',loginom_build='7.4.2',platform='linux',browser='chromium'),
+        preparation_session_id='javascript-cold')
+
+
 def verify_cli_prompt_snapshot(projection,prompt):
     # run.ts formats each positional argument before resolveRunInput.
     # This controller supplies exactly one argument and no piped stdin.
@@ -422,11 +432,7 @@ class JavascriptCliAcceptance:
                     or any(report.get('cleanup',{}).get(key) is not True for key in ('package_closed','logged_out','browser_closed'))
                     or report.get('cleanup',{}).get('failure')):
                 raise ValueError('javascript_acceptance_cold_summary_original_process_cleanup')
-            expected=dict(account=self.expected['account'],package_path=self.baseline['package_path'],
-                journal=dict(session_id='javascript-g2',runtime_revision='operator-source',
-                    target=dict(origin='http://logi-test-plan.bg.local',loginom_build='7.4.2')),
-                preparation_target=dict(profile_id='javascript-ubuntu',loginom_build='7.4.2',platform='linux',browser='chromium'),
-                preparation_session_id='javascript-cold')
+            expected=cold_audit_expectations(self.expected['account'],self.baseline['package_path'])
             stages['cold']=require_proof(verify_javascript_cold(report,native,self.baseline,expected,self.output_columns,self.rows),
                 'javascript_acceptance_saved_source_settings_guid_graph_full_output')
             self.writer.lease.revalidate()
