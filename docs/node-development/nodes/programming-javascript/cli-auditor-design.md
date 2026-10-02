@@ -106,6 +106,9 @@ special supervised technical startup не заменяет normal model run. Ш�
 завершение backend/host/runtime и браузера само не доказывает закрытие пакета
 и Loginom logout. Их собственные native evidence и process termination должны
 иметь отдельный проверенный путь до запуска Sol-приёмки; этот слой пока открыт.
+`managed-resources-close.mjs` уже проверяет реальный bridge result перед success
+resource ACK; absent/rejected/false result или retained leases не подтверждают
+shutdown. Actual IPC/socket/profile tests не являются native package/logout proof.
 
 `javascript_cli_persistence.py` реализует только normal-worker last Save/dirty-state
 binding. Выбранный JS Execute должен иметь public/native node binding; финальный Save
@@ -194,3 +197,46 @@ owner/deadline/sequence/source/settings/mapping/value/type/NULL/row/schema/fresh
 их hashes и команды записываются в checkpoint. Это повторный анализ имеющихся
 наблюдений, не новый live run. Свежая product/candidate headed-проверка и две
 Sol/low CLI попытки следуют после предусмотренного same-task F review.
+
+## Предложение штатного CLI package teardown
+
+**Предложено, ещё не утверждено и не реализовано.** Это отдельное изменение
+обычного standalone CLI lifecycle, а не включение special acceptance флага.
+Для JS-приёмки необходимы подтверждённые собственные package/session closure
+до независимого cold reader; нынешний product закрывает только ресурсы.
+
+Рекомендуемый вариант — host-owned `closeSavedPackageOnShutdown:boolean`,
+включённый только standalone `run`, отключённый для validation/readiness и
+Desktop. Boolean идёт по private Host→runtime start, не в public MCP/model API;
+caller не передаёт Loginom owner или package path. Bridge сохраняет **последний**
+подтверждённый собственный Save/path/operation независимо от порядка Map keys.
+На shutdown после drain проверяет отсутствие active/unsettled work и вызывает
+существующий `makePackageCleanupCode` в исходном authenticated context.
+Native guard заново подтверждает document/preparation session/account/path,
+один собственный package, не-running и fresh `IsPackageModified:false`, затем
+ровно один guarded native Close и собственный UI logout. Ни automatic Save,
+ни discard, Stop, foreign-session close, второй CDP context не добавляются.
+
+Нормальный receipt `saved-package-cleanup.json` и event
+`managed_saved_package_cleanup` отдельно связывают последние Save ID/path,
+native close/logout outcome и actual actor/runtime/candidate pins. Они не
+называются special `package-cleanup.json`/`isolated_package_cleanup`. Unprepared
+runtime без workspace может пропустить package step, но это не acceptance PASS.
+Owned workspace без confirmed Save, dirty/foreign/ambiguous state или refusal
+даёт BLOCKED cleanup и ошибку ресурса; неизвестный эффект не повторяется.
+Приёмочный аудитор требует SUCCEEDED native receipt плюс отдельно clean Host,
+runtime/browser process termination и сохранённый cold readback.
+
+Альтернатива — отдельная private lifecycle операция собственных Host/runtime,
+которую `standalone-run` вызывает после terminal модели и до Host close. Она
+использует тот же internally derived last Save и native guards, не доступна
+модели, не принимает scripts/foreign identities. Resource close остаётся
+самостоятельным шагом. Вариант требует дополнительной private маршрутизации и
+receipt binding; даёт явную границу terminal→package cleanup→resource close.
+
+Оба варианта сохраняют обычную автономную модельную попытку: controller не
+подменяет инструментальные вызовы/код/вычисления, teardown идёт только после
+её terminal. Native cleanup, failure→retained profile, scalar settings unchanged,
+compiled headed candidate и независимый path-only cold проверяются отдельно.
+Выбор этих двух product lifecycle вариантов нужен до новых API/политики;
+текущая source JS implementation и resource ACK fix от него не зависят.

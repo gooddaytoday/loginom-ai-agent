@@ -939,7 +939,10 @@ Historical captures и actual reader multi-chunk unit seam не заменяют
 Общий closed-source chunk audit на **1c846a7c2f21** применяется к configuration/read/cold;
 финальные9/9/9 PASS и actual historical cold32KiB/1024LF/3×8 fragments/full6×4
 проверены. [Границы](checkpoint.md#фаза-4-единый-closed-source-chunk-audit-и-native32kib-cold--2026-10-02).
-Normal CLI package/logout/process cleanup ещё открыт; special `acceptanceCleanupPackage`
+Managed resource ACK исправлен на **797927a5c709**,28 runtime/25 client/3 Host
+checks PASS; package/logout facts этим не доказаны.
+[Checkpoint](checkpoint.md#фаза-4-managed-resource-close-ack--2026-10-02).
+Normal CLI package/logout cleanup ещё открыт; special `acceptanceCleanupPackage`
 receipt не является обычным CLI контрактом. [Checkpoint](checkpoint.md#фаза-4-late-cli-output-read-delivery-binding--2026-10-02).
 `javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
 он должен связать native проверки с фактическими standalone CLI evidence

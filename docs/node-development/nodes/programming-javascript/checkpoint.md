@@ -5,7 +5,7 @@
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
 standalone CLI transport/bundle/admission/public-node/Save binding. Child
-**1c846a7c2f218183b3f548c81f5e4c746c0ffc2b** tracked clean; registration на161353
+**797927a5c709d60f36510b151a63e63c2392fbd4** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 первоначальных адресных test methods PASS; усиленная configuration/output
 regression9PASS теперь включает62 non-noop native mutations.
@@ -20,7 +20,9 @@ Compact public-node binding дополнительно17PASS на actual runtime
 receipts/defaults и реальной SQLite. Last Save/dirty-state binding дополнительно19PASS;
 cold source/state/Execute/full6×4 отдельно9PASS на immutable captures,
 включая32KiB/1024LF и3×8 native chunks;
-cleanup и итоговая связка ещё не реализованы, fresh standalone Save не запускался.
+Native package/logout cleanup и итоговая связка ещё не реализованы.
+Resource close ACK исправлен на797927:28 runtime/25 client/3 Host tests PASS;
+fresh standalone Save не запускался.
 Late model-output-read delivery binding дополнительно11PASS; native source/fresh
 Execute/full6×4/restoration/workflow-return audit дополнительно9PASS. Обычный CLI не принимает `acceptanceCleanupPackage`:
 нужен проверенный собственный teardown без подстановки special acceptance receipt.
@@ -49,6 +51,47 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: managed resource close ACK — 2026-10-02
+
+Child **797927a5c709d60f36510b151a63e63c2392fbd4** исправляет обнаруженную
+границу `src/managed-entry.mjs`: общий `managed-resources-close.mjs` требует
+fulfilled bridge reply с `browser_transport_closed:true`,
+`browser_process_terminated:true`, `clipboard_leases_retained:0` перед success ACK.
+Rejected/absent/false bridge result — `LOGINOM_RUNTIME_CLEANUP_FAILED`;
+outer browser handles и private profile не удаляются этой функцией после такого
+отказа. Forced owner shutdown/exit не превращает этот результат в PASS.
+Pending admitted requests по-прежнему drained до closure, entry close one-flight.
+Ошибки client/outer handles остаются cleanup failure; startup без созданного
+bridge сохраняет normal cleanup route. Новый module входит в recursive `src`
+copy staging; assembled candidate ещё не создавался и не проверялся.
+
+9 адресных checks используют actual Node IPC/live sockets/private profiles;
+bridge ACK fixtures — unit boundary inputs, не Loginom/browser evidence.
+Два actual managed-entry child processes проверяют unstarted close и invalid
+start→acknowledged close→clean0/no signal. С final start-input regression это
+28PASS actualexit0 (original/terminald7bde8). Upstream managed shutdown/package
+cleanup/native bridge guards25PASS (original1e2e09/terminal3f9d33); Host process
+ACK+exit/disconnect3PASS (originalc914ff/terminal439f88), actualexit0.
+Из child runtime: `<pinned Node24.19.0> --test test/managed-entry-close.test.mjs
+ test/managed-resources-close.test.mjs test/start-input.test.mjs`; из runtime/client:
+`<pinned Node> --test test/managed-shutdown.test.mjs test/package-cleanup.test.mjs
+ test/package-cleanup-bridge.test.mjs`; из loginom-host: `LOGINOM_AI_AGENT_TEST_NODE=
+<pinned Node> <pinned Bun1.3.14> test test/process.test.ts`.
+Failed addressed01 actualexit1 сохранён: test ожидал supervisor handshake code,
+а actual `validateStartInput` возвращает `LOGINOM_START_INVALID`; исправлен test,
+runtime error contract не менялся. Private receipt
+`f-managed-entry-close-validation-v1.json` SHA256
+`45e665c97196c003b8caf2dd9309e307103a525e0442edb2087320111c2652fa`
+фиксирует source/upstream/log hashes и все actual exits, включая failed01.
+
+Normal CLI native package/logout по-прежнему открыт: этот fix подтверждает только
+ресурсный ACK. Special `acceptanceCleanupPackage` product не включает.
+В [дизайне](cli-auditor-design.md#предложение-штатного-cli-package-teardown)
+подготовлены два конкретных normal teardown варианта с existing native guards.
+Новая product политика пока не реализована и не утверждена. Далее нужны этот
+путь, cleanup auditor и итоговая composition; F same-task и fresh headed остаются
+pending. Browser/candidate/CLI не запускались, lease450 closed_verified сохраняется.
 
 ### Фаза 4: единый closed-source chunk audit и native32KiB cold — 2026-10-02
 
