@@ -91,9 +91,28 @@ manifestSHA идентичен reader08. Candidate не пересобиралс
 `f-cli-pair-04.py` устанавливает `sys.dont_write_bytecode=True` до imports и
 проверяет readonly QA при старте и непосредственно перед каждой CLI-попыткой.
 Запуск только `PYTHONDONTWRITEBYTECODE=1 python3 -B ...`; caches frozen reader
-не являются разрешённым evidence. Original holder **exec80463**, fresh
-`f-cli-autonomous-code-04`; после writer — review/audit/cold/release, затем
-independent declared/pair. Не закрывать holder/lease до cleanup.
+не являются разрешённым evidence.
+
+**Code04 collector/native origin PASS, writer audit FAIL на метаданных review.**
+Вручную записанный `reviewed_at` содержал microseconds/+00:00 вместо контрактного
+millisecond Z; `verified_source_review` вызвал `cli_cleanup_native_timestamp`
+до configuration/cleanup stages. Это ошибка оператора, не runtime или модели.
+Original writer-audit/source-review неизменны. Отдельный corrected-format
+metadata preflight PASS; readonly native diagnostics admission/configuration/
+executions/full6×4/delivery/Save/Close/time binding PASS, без повышения trial.
+Code04 Save`sales-save`/Close/logout1→0/no discard, cleanupSHA
+`f4b6c834bb2e580c3487fefe0acc6d9aaa4cda4d279dfc55a004401e4d66f05d`.
+17:26:58Z fresh process/`.writer` absence, lease released/lock archived;
+после этого original holderexec80463 EOFexit0. Cold не запускался.
+
+**Текущий holder exec16020, `f-cli-pair-05.py`, start/code отправлен.**
+Fresh `f-cli-autonomous-code-05`; тот же candidate08/readonly reader08b.
+Driver05 сначала вызывает `verified_source_review` отдельно, включая exact bytes,
+assignment, anchors и время после writer, затем final writer audit. Review timestamps
+писать только `.isoformat(timespec='milliseconds').replace('+00:00','Z')`.
+Контроллер сохранять до review/audit/cold/release; после Code — declared/pair.
+Оба operator metadata дефекта имеют preflight до permanent trial audit; не
+менять frozen QA или runtime ради их обхода.
 Candidate08 на11c2aa87cd0a92804f8558dfa38002e7483b5e41:
 manifest`962687564e3b7ffe94f738bdcab8a7a820ba1abad72d0001932b44cb95b658d4`,
 sourceTree`572fbbf5fcbdf934c9c0fd4e91667abf6a1da1c82a273c9335fc2f5091a70b66`,
