@@ -465,3 +465,37 @@ clientSourceManifest, сверенные с byte pin exact candidate. Public act
 и private action digest обязательны; дополнительный public clientRevision, если
 появится, обязан совпасть. До trials runtime/catalog pins закрепляются отдельно;
 local source catalog не заменяет manifest, фактически полученный с сервера.
+
+
+### Actual autonomous writer: уточнение границ QA, 2026-10-02
+
+Code01 подтверждает штатный путь new Code → Execute/full6×4 → Save → native
+Close/logout. Whole trial остаётся FAIL на исходном аудите prompt; readonly
+диагностика сохранённых данных не повышает его результат.
+
+- Original raw prompt по-прежнему связан с launch и независимым review.
+  SQLite text сверяется с точным преобразованием одного positional argument
+  из `packages/agent/src/cli/cmd/run.ts`: при ASCII space добавить внешние `"`,
+  внутренние `"` экранировать. Controller не передаёт piped stdin. Не принимать
+  произвольную альтернативу raw/quoted и не менять продуктовый CLI ради QA.
+- New source admission допускает только доказанный переход null → native GUID:
+  admitted/create → exact mutation dispatch → configured receipt с теми же
+  document/workflow/operation/ui_epoch/deadline/source policy. Закрытые source
+  reads принадлежат этому GUID. Existing owner guards сохраняются.
+- Rendered Save labels следуют точному ECMAScript whitespace/comma преобразованию
+  test-ID. Их согласованность не заменяет отдельную проверку native GUID graph.
+- Discovery telemetry `scrolls` содержит длину предыдущей trace, включая
+  readiness/size записи. Проверяются её точный индекс, bounded scroll sequence,
+  identity/context/bytes и текущий предел96 итераций runtime.
+- Input gate доказывает исходные CSV bytes, доставку с обратной проверкой,
+  фактические настройки импорта, свежий native process и GUID edge до JS.
+  Необязательное formatted preview остаётся **output_data_verified=false**.
+  Для этого переиспользуется отдельный source/execution auditor; прежний точный
+  importer-output auditor не ослабляется. Business JS output по-прежнему требует
+  доставленные модели все6×4 точных типизированных значения.
+- Private upload timeline связывается с единственным успешным public delivery
+  по exact upload_operation_id; его native записи должны быть внутри времени
+  исходного public submit/terminal. Отдельного public upload call не требуется.
+
+Следующая приёмка выполняется на новом frozen candidate/QA в свежих профилях.
+Ни этот разбор, ни source tests не заменяют original writer/cold/pair PASS.

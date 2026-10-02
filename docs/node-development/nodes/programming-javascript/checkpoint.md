@@ -10,16 +10,33 @@ exec29412 exit0/PASS, actual SQLite binding18calls PASS, source32768/1024/8chunk
 Save`checkpoint-j21-final`; `.writer`/native processes отсутствовали перед release,
 lease read07 освобождён, original holder завершён exit0.
 
-**Первая автономная попытка Code запущена** через private `f-cli-pair-01.py`,
-original Python holder **exec71758**. В него отправлено
-`{"action":"start","mode":"code"}`; directory `f-cli-autonomous-code-01`.
-Контроллер держит original CLI/capture/NativeJournalWatch и lease
-`javascript-cli-autonomous-code-01`; не завершать holder, не запускать другой
-браузер. Модель получает ровно business task.md + sales.csv из manifest, без
-oracle/готового кода. После writer — независимое чтение `authored-source.js` и
-source-review.json по `review-assignment.json`, затем команды audit/cold/release.
-Далее в том же Python holder declared и pair. Только successful trials повышают
-готовность; восстановление failed run не превращает его в PASS.
+**Автономная Code01 завершилась, whole writer FAIL; cold не запускался.**
+Private `f-cli-autonomous-code-01`: collector exit0/PASS, original NativeJournalWatch
+PASS. Модель написала778bytes/16LF source570d990a…; ручной full-source review
+подтвердил цикл по входным строкам, расчёт cents/status и отсутствие готовых ответов.
+Первый whole audit отказал `javascript_acceptance_original_user_prompt_snapshot`:
+`run.ts` заключает единственный positional prompt с пробелами во внешние кавычки;
+SQLite содержит297bytes вместо raw295. Исходный FAIL не переопределять.
+
+Дополнительная readonly диагностика выявила реальные расхождения QA: create
+admission имеет node_id=null до native GUID binding/configured receipt; rendered
+Save graph заменяет ECMAScript whitespace на `_` и удаляет запятые; discovery
+`scrolls` равен индексу trace перед discovered, при96 итерациях; private upload
+имеет public parent delivery, не отдельный model tool call. Input preview импортера
+по умолчанию не даёт точных чисел: отдельный аудит bytes/config/fresh execution
+не утверждает output_data_verified; full exact JS6×4 остаётся обязательным.
+Исправления child `eef529cd2b`: readonly semantic diagnostics всех этапов PASS,
+original trial по-прежнему FAIL. Адресные/negative tests exec1024:59PASS+1SKIP;
+после добавления upload timeline guard7/7 повторно PASS (exec36838). Diff-check и
+canonical docs validator PASS. Следующий шаг — build/freeze candidate07 и fresh pair02.
+
+Code01 native Close/logout SUCCEEDED, packages1→0/no discard, Save`sales-save`;
+cleanupSHA`f8dfb1d8dd5543b229c9ffcd7abec9b19f81e0a40cc7e11c671c3dedecb9783b`.
+Fresh `/proc`/`.writer` отсутствие подтверждено2026-10-02T16:51:37Z;
+lease`javascript-cli-autonomous-code-01` released, lock archived, original
+holderexec71758 завершён EOF exit0. `retirement.json` сохраняет scope failed-run
+cleanup, не успешную приёмку. Новый прогон — fresh pair02/profile roots,
+новый согласованный candidate/reader; Code01 не восстанавливать до PASS.
 
 Whole audit исправлен на29068cc7fd (original/redacted hashes и JSON blocks),
 f5a94febf1 (actual hashed Host path/private runtime pin),861a64e40b (attachment
