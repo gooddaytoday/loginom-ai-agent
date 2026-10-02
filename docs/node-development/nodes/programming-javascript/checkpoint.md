@@ -2,6 +2,43 @@
 
 ## Текущее состояние
 
+**Pair12 неполная; отказ Code12 локализован, source fix d967265b5a.**
+Declared12 original whole PASS/released сохранён, Code12 collector exit1/FAIL,
+`cli_process_original_clean_exit_required`/`cli_process_profile_guard_retained`.
+Native Save/Close/logout SUCCEEDED1→0/no discard для
+`/jsteach/JavaScript-code-f623e768-c264-4da5-b0e2-5f6f932decb4.lgp`.
+Cleanup SHA `55863af2b1715a1f956dcb0c9a06b2aa02e92170c1ffceb7fc7c77e8fae15fdd`,
+collection SHA `90ba13f59b979266c7b258a2f9f780b98c434a77ae8daef85fb9bbc5c2af7cd1`.
+Native session `2b2cf13b-8acd-4f49-b416-25a2db7d2db1`.
+
+Новая диагностика: readiness PID845403 завершил все resource stages и дал
+closed_ack=true, но не вышел, поэтому supervisor через5s получил SIGKILL.
+Task runtime845862 дал ACK/exit0. Тайм-аут native package cleanup не наблюдался.
+20:49:09.468Z повторно подтверждено отсутствие всех24 original PID/startTicks,
+lease освобождён/lock архивирован, `.writer` оставлен как failed evidence.
+После этого idle holder832047 завершён; pair не реконструировать.
+
+На pinned Node24.19.0 проверен internal/child_process: disconnect откладывается,
+если channel.buffering ждёт остаток сообщения. Actual managed-entry test на
+реальном duplex JSON IPC воспроизвёл ACK+невыход при частичном следующем кадре
+(до fix timeout, exit1 test). Это подтверждённый класс дефекта; наличие именно
+частичного кадра в original live Code12 не записывалось и не утверждается.
+Child **d967265b5a** после flush terminal reply явно вызывает прежний checked
+stop, не ожидая только disconnect. Admitted drain/cleanup rejection/exit1 и
+supervisor ACK+actual exit остаются. SIGTERM wrappers не передают имя сигнала
+как exit code.14 targeted tests PASS, provenance5045 PASS; live fix не проверен.
+
+Candidate14 build original exec38818 ещё наблюдать до terminal результата;
+version `0.0.0-dev-202610022051`. Frozen candidate13/reader13 не менять.
+Подготовленный, но НЕ запускавшийся `f-cli-j21-read-08.py` пока ссылается на13:
+до запуска адаптировать к новому14/reader14, после freeze. Следующий полезный
+live — технический J21 full32KiB/1024LF/source chunks и cleanup на новом
+candidate, затем fresh whole pair13 с двумя независимыми заданиями.
+Это не замена автономной приёмки; original Declared12 PASS не переносить.
+Сейчас browser/acceptance slot свободен, сборка — единственная активная работа.
+
+### Предшествующая pair12
+
 **Pair12: Declared12 original whole PASS/released; Code12 выполняется.**
 Original holder832047/startTicks22404823 жив и хранит original trials.
 Declared writer832481/cold841138 завершились штатно, collector/native origin,

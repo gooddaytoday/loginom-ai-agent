@@ -1,16 +1,14 @@
 # JavaScript
 
-Текущий этап — **фаза6, автономная CLI-приёмка**, candidate13/reader13 из
-child **3e4cd56eaa**, knowledge1.2. Добавлена приватная диагностика resource
-shutdown/ACK; критерии успешного закрытия сохранены. Runtime12/Host23 tests,
-typecheck, provenance5045, build/roundtrip/freeze и reader preflight PASS.
+Текущий этап — **фаза6, автономная CLI-приёмка**. Declared12 whole PASS;
+Code12 collector FAIL: readiness-runtime после успешного cleanup и ACK не вышел
+и был завершён supervisor через5s. Task runtime/пакет закрылись штатно.
 
-**Declared12 original whole PASS/released:** авторский код, полный результат,
-сохранение и независимое открытие/выполнение/cleanup проверены. Code12 запущен
-на том же candidate/reader в original holder, ordinary headed. До успешного
-Code и whole pair итоговая приёмка открыта. Предыдущий cleanup FAIL сохранён;
-в этом прогоне оба runtime ACK/exit0 подтверждены, причина старого отказа
-исправленной не объявляется.
+В **d967265b5a** исправлен воспроизведённый на реальном Node IPC класс зависания:
+terminal ACK теперь сопровождается checked stop без ожидания только события
+disconnect.14 адресных tests и provenance5045 PASS; свежая live ещё требуется.
+Candidate14 собирается. Далее — обновлённый технический J21 и новая полная пара.
+Failed результаты сохранены, старые individual PASS не заменяют новую пару.
 Точные pins, процессы и порядок продолжения — в
 [checkpoint](checkpoint.md#текущее-состояние).
 Integration, push и release не выполнялись; accepted registry остаётся открытым.
