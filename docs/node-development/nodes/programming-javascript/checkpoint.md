@@ -2,6 +2,14 @@
 
 ## Текущее состояние
 
+Финальный docs commit: `247d13c695`. Штатный `package.py` завершился PASS:
+1300 файлов, исходная и восстановленная документация валидны. Архив снимка
+этого commit: `~/Backups/loginom-node-development/20261003-011619-agent-8b7ea122-dock-43dad2db-hsceyh7x/20261003-011619-agent-8b7ea122-dock-43dad2db.zip`,
+SHA256 `1fa101145be8af5b132e97281a49e28ab4365c72fc46102e21c28557225f4782`.
+Это документационный архив, не release bundle; его исторические имена source
+snapshot не подменяют текущий candidate/source SHA. Original historical ZIP
+отдельно не перепроверялся (`original_archive_verified=false`).
+
 **План v1 выполнен; candidate15 принят.**
 [Итог](completion.md), [полная G1–G7/J01–J27/фазы0–6 матрица](completion-audit.md),
 [original pair13](completion-phase6.md). Последний source child6f6a66eb62,
