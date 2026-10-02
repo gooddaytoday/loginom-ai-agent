@@ -1,17 +1,18 @@
 # JavaScript
 
-Текущий этап — **фаза6, автономная CLI-приёмка**, candidate15/reader15.
-**J21 read09 PASS:** actual CLI/SQLite delivery18 calls, полный32KiB исходник
-в8chunks/1024LF, digest, fresh execution и6×4 cells подтверждены. Native
-Save/Close/logout, оба runtime ACK/exit0 и process absence проверены.
+**Автономная CLI-приёмка pair13 — PASS** на candidate15/reader15:
+два режима code/declared, independent cold source/settings/graph/fresh Execute
+и полный результат6×4; штатное закрытие пакетов, logout и завершение процессов.
+[Итог этапа и точные доказательства](completion-phase6.md).
+
+J21 read09 на этих bytes также PASS: actual CLI/SQLite delivery18 calls,
+полный32KiB исходник в8chunks/1024LF, digest, fresh execution и6×4 cells.
 Прежние cleanup FAIL сохранены; их точная live-причина не доказана.
 
-**Declared13 whole PASS/released**: fresh writer и independent cold приняты.
-Code13 выполняется на тех же bytes в original holder, ordinary headed.
-До Code13 PASS и итогового pair audit приёмка остаётся открытой.
-Точные pins, процессы и порядок продолжения — в
-[checkpoint](checkpoint.md#текущее-состояние).
-Integration, push и release не выполнялись; accepted registry остаётся открытым.
+Остался **полный аудит завершения плана** и согласование итоговой документации
+и реестра. Все ресурсы pair13 освобождены; original holder завершён после
+final pair audit. Integration, push и release не выполнялись.
+[Текущий checkpoint](checkpoint.md#текущее-состояние).
 
 Далее сохранены этапы реализации с их исходными границами проверки; для
 продолжения использовать только текущую сводку checkpoint.

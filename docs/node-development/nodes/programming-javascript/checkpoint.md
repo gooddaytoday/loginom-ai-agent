@@ -2,6 +2,27 @@
 
 ## Текущее состояние
 
+**Фаза 6: pair13 PASS; обе попытки и ресурсы завершены — 2026-10-02 21:40 UTC.**
+Code13 прошёл ручную проверку всего исходника, original writer audit и
+independent cold/whole trial. Вместе с Declared13 final pair audit подтверждает
+две независимые normal CLI Sol/low попытки на одних immutable candidate15/reader15.
+[Итог этапа, точные SHA и пределы](completion-phase6.md).
+
+Оба штатных Save/Close/logout и independent cold cleanup подтверждены.
+Original holder901704 сохранил обе terminal trial до pair audit, затем получил
+FIFO exit; процесс отсутствует, FIFO удалён. Общий acceptance lease свободен,
+acceptance.lock отсутствует, оба .writer отсутствуют. Новые браузеры не нужны
+для фиксации этого результата. Прежние failed trials остаются FAIL.
+
+**Следующий шаг — полный requirement-by-requirement completion audit:** сверить
+G1–G7, J01–J27, фазы0–6 и named deliverables с текущими исходниками и конкретными
+evidence; затем согласовать plan/discovery/card/registry/completion. Старые
+формулировки «открыто» ниже — исторические срезы, не новое назначение повторов.
+Pair PASS не означает автоматическое закрытие всей матрицы. Goal активна;
+merge/push/integration/release не выполнялись и не назначены этим результатом.
+
+### Предыдущая точка: Code13 выполнялся
+
 **Pair13: Declared13 original whole PASS/released; Code13 выполняется.**
 Original holder901704/startTicks22673967 жив и хранит terminal trial.
 Declared writer902200/cold910391 завершились штатно; original collector/native,
