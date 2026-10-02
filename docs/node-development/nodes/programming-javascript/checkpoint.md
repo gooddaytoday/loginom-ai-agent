@@ -2,6 +2,18 @@
 
 ## Текущее состояние
 
+**Pair10: Declared10 original whole PASS/released; Code10 запущен.**
+Original holder750503 остаётся жив и хранит terminal trial. Declared writer751564,
+cold759304, session `ses_f01dd0697ffe60wAfEbPOSlXf2`; оба collector/whole audits
+PASS, normal Save/Close/logout и release подтверждены. Package
+`/jsteach/JavaScript-declared-4eb61cb2-f582-4110-b162-aa19ffc46cfb.lgp`.
+Source546bytes SHA `e7eec954e56c5ce0b110cda5f027772fd833f64af70fd6863d98201fae4db769`;
+ручной full-source review сохранён до cold; writer execution
+`1790970114369-b582dr3lg4m:1080:3`/`:4`. Trial SHA
+`e5d8d400e8db767495ed2d2fe07ac8ddf9b82ec69f24de36d2e5332d2bf48a43`.
+Code10 — новая автономная попытка в том же holder, не продолжение Declared.
+Не закрывать original holder до Code review/audit/cold/release и final pair.
+
 **Возобновление после восстановления связи — pair10, 2026-10-02 19:41 UTC.**
 Текущий original holder PID750503/startTicks22085221, private
 `f-cli-pair-10-control.json`; команды через `f-cli-pair-10-control.fifo`,
