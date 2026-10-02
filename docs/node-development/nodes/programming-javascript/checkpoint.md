@@ -29,10 +29,12 @@ filesystem proof, actual generic reader imports/native launch ещё не вып
 Наe5e8c99286 manual campaign lease и whole writer/trial/pair composition
 реализованы как операторский API; источник дополнен SQLite revalidation
 на1a8d236b76. Same-task Astra/medium F завершён наe02e8fd41f. Текущий шаг —
-fresh ordinary headed candidate/J01/J21/J27 и две GPT-6.1 Sol / low CLI trials. Общая цель
-не достигнута и не сужается. Candidate собран и заморожен; CLI help и OAuth
-запущены, новых Loginom browser/model trials не было;
-lease450 closed_verified, preparation lease reserved_active, acceptance_lease=null,
+fresh ordinary headed J01/J21/J27 и две GPT-6.1 Sol / low CLI trials. Общая цель
+не достигнута и не сужается. OAuth и каталог gpt-6.1-sol подтверждены; новый
+candidate02 собран после исправления cold import. Headed CLI setup02 закончился
+LOGINOM_RUNTIME_START_FAILED; диагностика выявила timeout сервиса знаний.
+Model trials не запускались;
+preparation lease с f-oauth-profile-01 closed_verified/reserved_active, acceptance_lease=null,
 все собственные test handles terminal. Дополнительных OpenViking checks/errors
 не было. Untracked acceleration-review не включать.
 
@@ -93,6 +95,71 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Продолжение: OAuth подтверждён, cold import исправлен, setup пока не завершён — 2026-10-02
+
+Original OAuth exec83926 завершился exit0, terminal811d0d: Login successful.
+`f-oauth-profile-01/data/auth.json`: type oauth, оба токена присутствуют,
+срок не истёк на момент проверки, mode0600; `.writer` освобождён.
+Compiled `models openai` exec93736/terminal070f36 exit0 содержит
+`openai/gpt-6.1-sol`. Это catalog/auth proof, не успешный model inference.
+Private `f-oauth-ready-01.json` сохранён и прочитан обратно, без токенов.
+Пользователь указал приватный файл с ключом сервиса знаний; ключ доступен,
+передаётся только через штатный setup stdin и не включается в git/evidence.
+
+Actual frozen generic import candidate01 обнаружил ENOENT: static discovery
+загружал business oracle из checkout docs ещё до запуска cold reader.
+Исправление **ee5184a606b84afc5d03e2676ad2f197385dfaab** переносит загрузку
+business/bridge/discovery probes в явный вызов; cold help не перечисляет
+операторские discovery IDs. Oracle не копируется в reader; hash/shape guards
+при явной business-пробе сохранены. Это исправление выполнения принятого
+контракта path-only cold, не изменение business oracle или runtime handler.
+40 адресных Node tests PASS, включая реальный изолированный import/cold help
+без docs и обязательный отказ business call без manifest;
+`f-cold-import-regression-02.log`, exec cd3291 exit0. Provenance5045 PASS,
+`f-cold-import-provenance-01.log`, exec4ddfd7 exit0.
+
+Новый immutable development candidate **0.0.0-dev-202610021247**:
+`f-standalone-candidate-02`, build exec74340/terminal401c14 exit0;
+manifest SHA256 `dcf9b4f590298b537984023faeea031649423d55248c5896b7331447df3fcb48`.
+Полный QA freeze `f-cli-reader-02` содержит968 файлов; candidate inventory и
+cold `--help` проверены actualexit0. Reader manifest SHA256
+`f091924097129188fc87d378e1f335af9e6791a59cad20b357fa5911c26b346e`.
+Private pins `f-standalone-candidate-02-pins.json`, SHA256
+`2587cc4bc8c3496a3a652aac72ba884962289c179a53d13d9821782e96de9047`.
+Original freeze exec71136/terminal75184a exit0. SourceDirty=true из-за
+сохранённых untracked файлов; tracked child source clean. Candidate01 не
+исправлялся на месте, его первоначальный import failure сохраняется.
+
+Штатный compiled setup02 выполнен с `--no-headless`, профиль OAuth01,
+exact назначенный URL/jsteach/пустой пароль и приватный ключ через stdin.
+Original outer exec69131, childPID186803, terminal a86dc6: child exit1,
+`LOGINOM_RUNTIME_START_FAILED`; receipt `f-cli-setup-02-result.json`.
+Validation прошла до pending save; readiness runtime стартовал, но не завершился.
+В pending connection сохранены exact URL и `urlSource=explicit`, generation1;
+это не PASS J27: отдельный успешный restart/status ещё впереди.
+Пакеты не открывались. После terminal собственных profile browser/runtime
+процессов не обнаружено; preparation lease closed_verified, active_exec=null,
+acceptance_lease=null. Pending connection оставлен для штатного продолжения;
+не запускать status/setup без учёта возможного повторного readiness/browser.
+
+Read-only diagnostics01–05 не меняли candidate и не запускали браузер.
+MCP initialize иногда проходит, дальнейший request получает fetch failed /
+UND_ERR_CONNECT_TIMEOUT к mcp.loginom.ai:443; прямой HTTP-клиент также получил
+TimeoutError. HTTP(S) proxy127.0.0.1:10808 и10809 не дали рабочего запроса;
+один curl без ключа напрямую получил401, что не доказывает рабочую MCP-сессию.
+Не объявлять ключ неверным или каталог отсутствующим: до такой проверки не дошли.
+Agent OpenViking find/read в этом ходе были успешны; отдельная неисправность
+наблюдается на продуктовой конечной точке сервиса знаний.
+Следующий шаг: восстановить устойчивую связь compiled runtime с сервисом знаний,
+затем fresh headed setup/J27 и candidate J01/J21; далее две автономные попытки.
+Accepted/readiness/цель не повышены.
+
+Перед setup прежний пустой file registry.lock проверен: own UID, нет open FD
+держателей и /proc/locks; registry owner — эта задача, чужих live agents нет.
+Файл сохранён приватно как f-legacy-registry-lock-20261002. Запись own lease
+выполнена под каноническим атомарным mkdir registry.lock, затем lock освобождён.
+Новые ключи, raw logs и untracked acceleration-review не коммитить.
 
 ### После F: собранный CLI и подготовка OAuth — 2026-10-02
 
