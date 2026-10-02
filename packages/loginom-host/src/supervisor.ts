@@ -1,7 +1,7 @@
 import { fork } from "node:child_process"
 import { randomUUID } from "node:crypto"
-import { mkdir } from "node:fs/promises"
-import { isAbsolute } from "node:path"
+import { mkdir, writeFile } from "node:fs/promises"
+import { isAbsolute, join } from "node:path"
 
 export type Launch = {
   node: string
@@ -149,13 +149,25 @@ export async function supervise(input: Launch) {
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
+      const started = new Date().toISOString()
       // Native guarded package close/logout precedes resource close in this mode.
       // This shutdown allowance does not extend an admitted operation deadline.
-      const reply = await request("close", undefined, input.closeSavedPackageOnShutdown === true ? 45_000 : 5000)
-        .catch(() => undefined)
+      const response = await request("close", undefined, input.closeSavedPackageOnShutdown === true ? 45_000 : 5000)
+        .then((result) => ({ result, error: null }), (error: unknown) => ({ result: undefined,
+          error: error instanceof Error && ["LOGINOM_RUNTIME_TIMEOUT", "LOGINOM_RUNTIME_DISCONNECTED",
+            "LOGINOM_RUNTIME_CLEANUP_FAILED"].includes(error.message) ? error.message : "LOGINOM_RUNTIME_FAILED" }))
+      const reply = response.result
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
       try {
         const outcome = await exited
+        // Private transport evidence, not a cleanup receipt. Never include the
+        // remote reply or exception text; they may contain sensitive values.
+        await writeFile(join(input.stateDir, `runtime-close-${child.pid}-${randomUUID()}.json`), JSON.stringify({
+          version: 1, pid: child.pid, started_at: started, completed_at: new Date().toISOString(),
+          request_error: response.error,
+          closed_ack: !!reply && typeof reply === "object" && "closed" in reply && reply.closed === true,
+          exit_code: outcome.code, exit_signal: outcome.signal,
+        }) + "\n", { mode: 0o600, flag: "wx" }).catch(() => undefined)
         if (
           !reply ||
           typeof reply !== "object" ||
