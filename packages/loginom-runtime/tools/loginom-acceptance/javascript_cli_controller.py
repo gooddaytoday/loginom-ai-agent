@@ -1,8 +1,8 @@
 """Original Linux launch handles for normal standalone and path-only cold work.
 
-The caller drains stdout/stderr through the existing redactor before writing
-evidence. This controller never exports those streams or signals processes. Its
-receipts are scoped launch/process facts, not a whole JavaScript acceptance PASS.
+The collector drains stdout/stderr through the existing redactor before writing
+evidence and controls only this original CLI root through its PID-fd on expiry.
+Launch/process receipts are not a whole JavaScript acceptance PASS.
 """
 import copy
 import json
@@ -94,6 +94,29 @@ class JavascriptProcessController:
             native_package_cleanup_verified=False,runtime_ack_verified=False,model_delivery_verified=False,
             cold_persistence_verified=False,cli_acceptance_verified=False)
         return copy.deepcopy(self.result)
+
+    def collect(self,capture,*,cleanup_wait_ms=90000):
+        """Use this original handle; source capture cannot replace native proof."""
+        from javascript_cli_capture import collect_cli_process
+        return collect_cli_process(self,capture,cleanup_wait_ms=cleanup_wait_ms)
+
+    def create_capture(self,directory,worker):
+        """Pin the redactor/Node to this candidate, credentials to this profile."""
+        if (self.result is not None or self.kind!='cli' or self.candidate is None
+                or self.launch.get('transport')!='normal_standalone_run'
+                or self.launch.get('profile')!=str(self.owner.profile)):
+            raise ValueError('cli_capture_original_factory_required')
+        from javascript_cli_capture import RedactedCliCapture,known_cli_secrets
+        candidate,pins=self.candidate
+        if not verify_cli_candidate(candidate,pins)['passed']:raise ValueError('cli_capture_candidate_unverified')
+        directory=absolute_directory(directory)
+        if any(directory.is_relative_to(path) or path.is_relative_to(directory)
+                for path in (candidate,self.owner.profile,Path(self.launch['directory']))):
+            raise ValueError('cli_capture_evidence_isolation')
+        redactor=candidate/'resources/loginom/runtime/client/lib/redact.mjs'
+        return RedactedCliCapture(directory,node=self.node,worker=worker,
+            redactor=dict(path=str(redactor),sha256=file_sha256(redactor)),
+            known_values=known_cli_secrets(self.owner.profile))
 
     @classmethod
     def launch_cli(cls,candidate,pins,profile,directory,files,prompt,*,environment):
