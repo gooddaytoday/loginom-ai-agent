@@ -28,8 +28,13 @@ const state = {
 const requests = new Set()
 const send = (message, disconnect = false) => {
   if (process.connected)
-    process.send(message, () => {
-      if (disconnect && process.connected) process.disconnect()
+    process.send(message, (error) => {
+      if (!disconnect) return
+      if (!error && process.connected) process.disconnect()
+      // Node may postpone 'disconnect' while an incomplete later IPC frame is
+      // buffered. The reply is flushed and admitted work/resources are already
+      // drained; use the same checked stop path without waiting for that frame.
+      stop(error ? 1 : 0)
     })
 }
 function close() {
@@ -38,14 +43,14 @@ function close() {
   state.closing = closeManagedResources(state, requests)
   return state.closing
 }
-const stop = () => {
+const stop = (exitCode = 0) => {
   void close().then(
-    () => process.exit(0),
+    () => process.exit(exitCode),
     () => process.exit(1),
   )
 }
-process.on("disconnect", stop)
-process.on("SIGTERM", stop)
+process.on("disconnect", () => stop())
+process.on("SIGTERM", () => stop())
 process.on("message", (message) => {
   const request = handle(message)
   requests.add(request)
