@@ -12,6 +12,7 @@
 - Native Windows/macOS resources and acceptance belong to their separate [runbooks](../../docs/testing/loginom-ai-agent/README.md). Linux results do not certify those platforms.
 
 - Managed shutdown rejects new work, aborts the active call, drains accepted requests and closes resources before acknowledging. Propagate resource cleanup failures; do not acknowledge before cleanup or treat forced process exit as proof of browser cleanup.
+- `src/managed-resources-close.mjs` checks the bridge close result before the private managed close ACK: transport and browser process must both be confirmed closed, with zero retained clipboard leases. A rejected, absent or unconfirmed bridge result raises `LOGINOM_RUNTIME_CLEANUP_FAILED` and leaves the outer browser handles/profile available for recovery; a later forced exit cannot promote this result. These resource facts do not prove package close or Loginom logout.
 
 - On startup error, clean up resources but keep the private IPC channel open until the owner receives an acknowledged close. Exiting earlier masks the original error as unconfirmed cleanup. Owner disconnect still closes and exits.
 

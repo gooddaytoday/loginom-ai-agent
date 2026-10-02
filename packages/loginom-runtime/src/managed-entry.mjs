@@ -2,9 +2,10 @@ import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile } from "node:fs/promises"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
+import { closeManagedResources } from "./managed-resources-close.mjs"
 import { loginBrowser, checkConnection, loginomAddress } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts } from "../client/lib/artifacts.mjs"
@@ -34,16 +35,7 @@ const send = (message, disconnect = false) => {
 function close() {
   if (state.closing) return state.closing
   state.controller?.abort()
-  state.closing = (async () => {
-    await Promise.allSettled([...requests])
-    const results = []
-    for (const handle of [state.client, state.bridge, state.browserServer, state.browser]) {
-      results.push(...(await Promise.allSettled([Promise.resolve().then(() => handle?.close())])))
-    }
-    if (state.browserProfile)
-      results.push(...(await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])))
-    if (results.some((result) => result.status === "rejected")) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
-  })()
+  state.closing = closeManagedResources(state, requests)
   return state.closing
 }
 const stop = () => {
