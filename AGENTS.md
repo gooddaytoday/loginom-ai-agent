@@ -1,11 +1,10 @@
 ## Node development
 
-Для обработки узлов читать [RUNBOOK](docs/node-development/RUNBOOK.md).
-База — закреплённый SHA ветки `loginom`. PR открывать в `loginom`.
-Цель — принятый узел. Новые проверки, барьеры и сервисы добавлять только с согласия владельца.
-Блокер дольше 30 минут — остановиться и написать владельцу в задаче Paperclip.
-Состояние хранить в задаче; checkpoint — не больше 20 строк.
-Ветка `lab-preparation` в `loginom-swarm` заморожена. Слияние и выпуск — отдельная команда владельца.
+Для разработки обработчиков читать [RUNBOOK](docs/node-development/RUNBOOK.md) и подплан узла.
+Базовый SHA и целевая ветка PR задаются назначением. Цель — принятый узел.
+Новые критерии приёмки и изменения общих контрактов согласовывать с владельцем.
+Checkpoint — не больше 20 строк: SHA, результат, ограничения и следующий шаг.
+Слияние и выпуск — отдельная команда владельца.
 
 - To regenerate the legacy JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit `src/generated` or `src/generated-effect` directly.

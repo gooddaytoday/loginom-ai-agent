@@ -30,7 +30,7 @@
 
 - Runtime shutdown succeeds only with a `closed: true` acknowledgement and exit code 0 without a signal. A killed or disconnected child is not successful cleanup; repeated close preserves the original outcome.
 
-- The Linux build also emits a versioned tar.gz and .sha256 beside the payload, verifies the extracted archive manifest, and refuses to overwrite existing archive/checksum files. Include build scripts in package typecheck.
+- By default the Linux build also emits a versioned tar.gz and .sha256 beside the payload, verifies the extracted archive manifest, and refuses to overwrite existing archive/checksum files. `--no-archive` produces only the verified development payload; it skips compression and archive roundtrip without changing manifest verification or source identity. Include build scripts in package typecheck.
 
 - A successful runtime reply can retain active asynchronous work. Keep its journal records durable but permit the same run to poll while `activeWork` is true. Clear that run's records only when its runtime reports no unsettled work. In strict mode, losing the owner or receiving inactive uncertainty still moves retained records to recovery. Advisory mode drops that lock and, on the next acquire, replaces a runtime that cannot continue. Never acquire a second run for the same chat while the first owns it; unrelated runs cannot reconcile its records.
 

@@ -33,3 +33,4 @@ logs/
 *.bun-build
 tsconfig.tsbuildinfo
 /.local/project-memory/
+.multica-node/
