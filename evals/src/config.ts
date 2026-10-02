@@ -61,8 +61,8 @@ export function loadConfig(argv: string[], env: Env = process.env) {
       positiveMin: positive("EVAL_CALIBRATION_POSITIVE_MIN", env.EVAL_CALIBRATION_POSITIVE_MIN, 90),
       negativeMax: positive("EVAL_CALIBRATION_NEGATIVE_MAX", env.EVAL_CALIBRATION_NEGATIVE_MAX, 40),
     },
-    profileDir: path.join(evalsRoot, ".profile", "agent"),
-    resultsDir: path.join(evalsRoot, "results"),
+    profileDir: path.resolve(evalsRoot, env.EVAL_PROFILE_DIR ?? ".profile/agent"),
+    resultsDir: path.resolve(evalsRoot, env.EVAL_RESULTS_DIR ?? "results"),
     loginom: {
       url: env.LOGINOM_URL ?? "http://localhost/app/",
       username: dryRun ? "user" : env.LOGINOM_USERNAME ?? "user",
