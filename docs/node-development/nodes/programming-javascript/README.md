@@ -1,20 +1,15 @@
 # JavaScript
 
-Текущий этап — **фаза6, автономная CLI-приёмка**, candidate11/reader11 из
-child **f2a0cdd991**, knowledge1.2. Контракт declared проверен:60 адресных tests,
-полный client3446PASS+10SKIP, build/roundtrip/freeze PASS. Соединение с сервисом
-знаний восстановлено; actual initialize/list/catalog SHA проверены.
+Текущий этап — **фаза6, автономная CLI-приёмка**, candidate12/reader12 из
+child **562cc826a7**, knowledge1.2. Исправлен независимый QA для штатного
+pre-upload delivery resume:13 адресных tests PASS, связанные67PASS/3SKIP,
+provenance5045 PASS. Build/roundtrip/freeze и reader preflight PASS.
 
-**Declared10 original writer+cold whole PASS**, normal cleanup/release подтверждены.
-Code10 завершился exit0, source/configuration/fresh executions/full6×4 проверены,
-но whole writer audit отказал на import binding после штатного pre-upload
-`delivery_resume`: QA ещё не учитывает этот public result и повторную preparation
-после подтверждённого checkpoint без загрузки. Original FAIL сохранён; cold Code10
-не запускался. Native Save/Close/logout подтверждены, процессы и слот освобождены.
-Следующий шаг — адресное исправление аудитора с проверками отрицательных подмен,
-затем новый immutable QA/candidate и свежая пара. Подробности и точные SHA —
-[checkpoint](checkpoint.md#текущее-состояние). Declared08/Code07 сохраняют свои
-отдельные scoped PASS; они не заменяют полную пару одного кандидата.
+Начата свежая **pair11**: Declared11, затем Code11 в original holder и обычном
+headed-браузере. До обоих whole PASS и итогового pair audit приёмка открыта.
+Original Code10 FAIL сохранён; Declared10 individual PASS не заменяет пару.
+Точные pins, процессы и порядок продолжения — в
+[checkpoint](checkpoint.md#текущее-состояние).
 Integration, push и release не выполнялись; accepted registry остаётся открытым.
 
 Далее сохранены этапы реализации с их исходными границами проверки; для

@@ -2,6 +2,44 @@
 
 ## Текущее состояние
 
+**Pair11 начата — 2026-10-02 20:18 UTC.** Child
+`562cc826a750dc025c143032065ae504f0fb07e8` исправляет независимый QA для
+pre-upload checkpoint/resume: same-owner/artifact/path/bytes, явный public
+resume после подтверждённого отказа до upload, один upload/completed и
+сохранённая download verification. Actual Code10 используется только как
+диагностический regression fixture; его original FAIL не переписан.
+13 адресных tests PASS; связанные70 — 67PASS/3SKIP; provenance5045 PASS.
+Устаревшие transform hashes сверены с родителями f2a0cdd991/11c2aa87cd/eef529cd2b
+и обновлены без изменения upstream source-map. Продуктовый handler не менялся.
+
+Candidate12 `0.0.0-dev-202610022015`, build original exec12471/exit0,
+roundtrip PASS. Manifest
+`b7b4169950eee71117c55f8b14ecc3c907741bcce3491a4693a7fb59aaaf418d`,
+sourceTree `c742a62b914fbfa10ca4d75e58a48fb967aaa06fb42ea1163a742d8e07299349`,
+archive `91e25a9a8e5c56081e9a5b09296236d3c927fdd027a812563f6f9bb9fa5a56f5`.
+Reader12 `921d08d688078bdcb875041fd4917d68934c5f2400de733b242ec93cbd5eeb6b`;
+bundle pins `caf7f647367b6367cdce89d290435b5c97338eb8a91cd84c60db57da32c8900a`.
+Freeze original exec76332/exit0: candidate5442/QA971 files, help и оба path
+preflight PASS. SourceDirty=true отражает сохранённые untracked материалы;
+это development candidate, не release. Runtime client revision и knowledge1.2
+совпадают с candidate11. Файлы candidate12/reader12 не изменять.
+
+Повторное соединение с mcp.loginom.ai: actual candidate11 Node/default transport,
+list15/catalog pin PASS, original exec21859/exit0, private recheck19.
+Это проверка продуктового сервиса, не диагностика памяти плагина.
+
+Original pair11 holder PID805601/startTicks22305717; private
+`f-cli-pair-11-control.json`, FIFO `f-cli-pair-11-control.fifo`, события
+`f-cli-pair-11-events.jsonl`. Declared11 writer806513 запущен, затем ожидаются
+manual full-source review → writer audit → cold → release → Code11 → pair audit.
+Сохранить original holder и объекты trials до whole pair; новое ожидание не
+разрешает повторный запуск. Применяются ordinary headed, GPT-6.1 Sol/low,
+30min writer/10min cold, fresh profiles и уникальные package paths.
+Следующий шаг — наблюдать живой Declared11; после результата действовать через
+его original holder. Технический J21 scope и финальная фаза6 ещё открыты.
+
+### История pair10 и предшествующих попыток
+
 **Pair10 завершена неполной — Code10 writer-аудит FAIL, 2026-10-02 19:56 UTC.**
 Declared10 original whole PASS/released сохранён. Code10 original collector и
 native origin PASS/exit0; manual full-source review778bytes/16LF принят.
