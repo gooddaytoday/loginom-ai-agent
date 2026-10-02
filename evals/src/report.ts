@@ -183,6 +183,7 @@ export function renderReport(summary: RunSummary) {
     `- pass_rate: ${pct(m.pass_rate)} (оценено ${m.pass_evaluated_count ?? m.scored_count})`,
     `- oracle_pass_rate: ${pct(m.oracle_pass_rate ?? null)} (проверено ${m.oracle_checked_count ?? 0})`,
     `- infra_error: ${m.infra_error_count ?? 0}, harness_error: ${m.harness_error_count ?? 0}, judge_error: ${m.judge_error_count ?? 0}`,
+    `- environment_cleanup: ошибок ${m.environment_cleanup_error_count ?? 0}, проверено ${m.environment_cleanup_checked_count ?? 0}`,
     `- failure_kinds: ${Object.entries(m.failure_kinds).map(([kind, count]) => `${kind}=${count}`).join(", ") || "—"}`,
     `- tool_calls: ${m.tool_calls}, tool_errors: ${m.tool_errors}, memory_tool_calls: ${m.memory_tool_calls}${m.memory_tool_calls > 0 ? " **(агент писал в память Dock)**" : ""}`,
     `- total_cost: ${m.total_cost}, total_duration: ${Math.round(m.total_duration_ms / 60000)} мин`,
@@ -198,22 +199,22 @@ export function renderReport(summary: RunSummary) {
     "",
     "## Попытки",
     "",
-    "| Задача | # | Статус | Код | failure_kind | score | pass | oracle | Время | Стоимость | Судья |",
-    "|---|---|---|---|---|---|---|---|---|---|---|",
+    "| Задача | # | Статус | Код | failure_kind | score | pass | oracle | Время | Стоимость | Судья | Cleanup |",
+    "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ...summary.tasks.flatMap((task) =>
       task.attempts.map(
         (item) =>
-          `| ${task.id} | ${item.attempt} | ${item.status} | ${item.exit_code ?? "—"} | ${item.failure_kind ?? "—"} | ${item.score ?? "—"} | ${item.pass === null ? "—" : item.pass ? "✓" : "✗"} | ${item.oracle_pass === undefined || item.oracle_pass === null ? "—" : item.oracle_pass ? "✓" : `✗ ${cell(item.oracle_error ?? "")}`} | ${Math.round(item.duration_ms / 1000)}s | ${item.cost.toFixed(4)} | ${cell(item.judge_summary ?? item.judge_status)} |`,
+          `| ${task.id} | ${item.attempt} | ${item.status} | ${item.exit_code ?? "—"} | ${item.failure_kind ?? "—"} | ${item.score ?? "—"} | ${item.pass === null ? "—" : item.pass ? "✓" : "✗"} | ${item.oracle_pass === undefined || item.oracle_pass === null ? "—" : item.oracle_pass ? "✓" : `✗ ${cell(item.oracle_error ?? "")}`} | ${Math.round(item.duration_ms / 1000)}s | ${item.cost.toFixed(4)} | ${cell(item.judge_summary ?? item.judge_status)} | ${item.environment_cleanup?.status === "confirmed" ? "confirmed" : item.environment_cleanup?.status === "failed" ? "failed" : "не проверялось"} |`,
       ),
     ),
   ]
   const failures = summary.tasks.flatMap((task) =>
     task.attempts
-      .filter((item) => item.status !== "completed")
+      .filter((item) => item.status !== "completed" || item.environment_cleanup?.status === "failed")
       .map((item) => {
         const names = [...item.errors.map(cell), item.harness_error ? cell(item.harness_error) : ""].filter(Boolean).join(", ") || "без событий error"
         const stderr = (item.stderr_head ?? "").split(/\r?\n/).find((line) => line.trim())?.slice(0, 200)
-        return `- ${task.id}#${item.attempt}: ${item.status}${item.failure_kind ? ` (${item.failure_kind})` : ""} — ${names}${stderr ? ` — stderr: ${cell(stderr)}` : ""}`
+        return `- ${task.id}#${item.attempt}: ${item.status}${item.failure_kind ? ` (${item.failure_kind})` : ""} — ${names}${stderr ? ` — stderr: ${cell(stderr)}` : ""}${item.environment_cleanup?.status === "failed" ? ` — cleanup failed — ${cell(item.environment_cleanup.error ?? "unconfirmed")}` : ""}`
       }),
   )
   const leftovers =
