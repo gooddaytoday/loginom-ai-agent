@@ -84,7 +84,13 @@ async function executeRun(config: EvalConfig) {
             result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error: describe(error) }
             return { stop: describe(error) }
           })
-        await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2))
+        await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2)).catch(async () => {
+          const error = "Attempt result persistence failed; measured outcome retained in summary"
+          result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error }
+          state.stopped = error
+          await Bun.write(path.join(out, "result.persistence-failure.json"), JSON.stringify(result, null, 2)).catch(() => {})
+        })
+        if (state.stopped) break outer
         if ("stop" in after) { state.stopped = after.stop ?? "Environment cleanup failed"; break outer }
         if (result.status === "interrupted") state.interruptedCleanup = { recovered: after.recovered }
       }
@@ -316,6 +322,7 @@ export async function afterAttempt(config: EvalConfig, command: AgentCommand, re
     evidence.processes = (await Bun.file(path.join(outDir, "cleanup.json")).json()).processes as ProcessCleanup
     if (evidence.processes?.status !== "confirmed") throw Error(evidence.processes?.error ?? "Process cleanup unconfirmed")
     evidence.stages.push({ stage: "processes", status: "confirmed" })
+    if (result.environment_cleanup?.status === "failed") throw Error(result.environment_cleanup.error ?? "Attempt persistence failed")
     await archiveDiagnostics(config.profileDir, evidence.processes.runtimeDirectories, outDir,
       [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""])
     evidence.stages.push({ stage: "diagnostics", status: "confirmed" })

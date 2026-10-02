@@ -57,3 +57,26 @@ subreaper launcher на каждый запуск: он запускает то�
 Linux prctl, без зависимостей/установки/systemd и без изменений продукта. Это
 устраняет потерю ancestry на double-fork; argv match не становится kill authority.
 Реализация и отрицательная проверка чужого helper ещё не завершены. Goal active.
+
+
+## Checkpoint native control, 2026-10-02 11:59 UTC
+
+На установленном CLI readiness probe-v5 подтвердил browser/helpers cleanup.
+Полная suite: 201 pass, typecheck/diff-check pass (60545b22a).
+Native run 20261002-114527-60545b22a-dirty: control no_artifact (exit 0,
+Session ses_f03909bcdffeJF4g8TDRlKbveI, 49 с), cleanup confirmed; следующий
+Session ses_f038fb46effepQ87RGxQqK6Fgq создал пакет group-sum-qty (232 с,
+completed). После completed короткая profile-idle проверка отказала; честный
+completed сохранён, run stopped/exit 1, lease/runtime/evidence сохранены.
+Приёмка ещё НЕ закрыта. Измеренный control содержал реальный browser prepare,
+workspace read и отказ одного tool; AMBIGUOUS из события автоматически не влияет
+на бюджет/повтор и не считается восстановленным продуктовым дефектом.
+
+Дополнительный TDD: transient owner в коротком waitProfileIdle, два пустых
+финальных scan с origin ledger/subreaper receipts, relevant /proc EACCES,
+management timeout, readiness failure для no_artifact/failed/timeout/completed,
+rejudge preservation, отказ записи run/result с сохранением measured outcome
+в summary и остановкой до второго case. Отказ result пишет дополнительный
+result.persistence-failure.json, если основной путь недоступен.
+Следующее: полная suite, безопасное reconciliation только собственного lease
+первого control, повтор native control и адресные budget/low-liquidity.

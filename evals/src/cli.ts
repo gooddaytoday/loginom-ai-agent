@@ -168,7 +168,10 @@ export async function runAgent(input: {
     failureKind: failureKind({ exitCode, errors: parsed.errors, errorTexts: parsed.errorTexts, stderr }),
     stderrHead: stderr.split("\n").slice(0, 20).join("\n"),
   }
-  await Bun.write(path.join(input.outDir, "run.json"), JSON.stringify(run, null, 2))
+  await Bun.write(path.join(input.outDir, "run.json"), JSON.stringify(run, null, 2)).catch(() => {
+    run.processCleanup.status = "failed"
+    run.processCleanup.error ??= "Agent run evidence persistence failed"
+  })
   return run
 }
 export type AgentRun = Awaited<ReturnType<typeof runAgent>>

@@ -454,3 +454,31 @@ test("pruneRuntimeAttempts: не следует симлинку самого ru
   expect(await pruneRuntimeAttempts(profile)).toBe(0)
   expect(await Bun.file(evidence).text()).toBe("foreign")
 })
+
+
+test("management: timeout подтверждает завершение launcher и detached потомка", async () => {
+  const context = await fakeProfile()
+  const pidFile = path.join(context.profileDir, "timeout-child.pid")
+  const result = await management({ ...context.command, env: { ...context.command.env,
+    EVAL_FAKE_ORPHAN_PID_FILE: pidFile, EVAL_FAKE_DETACHED_CHILD: "1", EVAL_FAKE_EXIT_DELAY_MS: "2000" } },
+    ["loginom", "status", "--format", "json"], undefined, 500)
+  expect(result.timedOut).toBe(true)
+  expect(result.processCleanup.status).toBe("confirmed")
+  expect(result.processCleanup.verification?.map((pass) => pass.owned_remaining)).toEqual([0, 0])
+  const pid = Number(await Bun.file(pidFile).text())
+  const state = (await Bun.$`ps -o stat= -p ${pid}`.quiet().nothrow()).text().trim()
+  expect(state === "" || state.startsWith("Z")).toBe(true)
+})
+
+
+test("waitProfileIdle: повторно проверяет короткое окно после ухода временного owner", async () => {
+  const profile = await mkdtemp(path.join(os.tmpdir(), "evals-idle-transition-"))
+  const child = spawn(process.execPath, ["-e", "console.log('ready'); setTimeout(() => process.exit(0), 200)"], {
+    env: { PATH: process.env.PATH ?? "", LOGINOM_AI_AGENT_CLI_PROFILE: profile }, stdio: ["ignore", "pipe", "ignore"],
+  })
+  const exited = new Promise((resolve) => child.once("exit", resolve))
+  try {
+    await new Promise((resolve) => child.stdout!.once("data", resolve))
+    expect(await waitProfileIdle(profile, 1000)).toBe(true)
+  } finally { child.kill("SIGKILL"); await exited }
+})

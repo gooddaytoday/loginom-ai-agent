@@ -370,3 +370,44 @@ test("runAgent: отказ записи process evidence сохраняет из
   expect(await Bun.file(`${out}.process-group`).exists()).toBe(true)
   expect((await Bun.file(path.join(out, "run.json")).json()).sessionId).toBe(run.sessionId)
 })
+
+
+test("runAgent: отказ релевантного /proc сохраняет исход и останавливает cleanup", async () => {
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-proc-denied-"))
+  const command = fakeCommand()
+  const pending = runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_EXIT_DELAY_MS: "700" } },
+    taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: out, outDir: out, timeoutMs: 10_000 })
+  await Bun.sleep(150)
+  const child = spawn(process.execPath, ["-e", `
+    process.title = 'chrome-private'
+    const { dlopen, ptr } = await import('bun:ffi')
+    const lib = dlopen('libc.so.6', { prctl: { args: ['i32', 'u64', 'u64', 'u64', 'u64'], returns: 'i32' } })
+    const name = Buffer.from('chrome-private\\0')
+    lib.symbols.prctl(15, BigInt(ptr(name)), 0, 0, 0)
+    lib.symbols.prctl(4, 0, 0, 0, 0)
+    console.log('ready'); setInterval(() => {}, 1000)
+  `], { detached: true, stdio: ["ignore", "pipe", "ignore"], cwd: os.tmpdir() })
+  const exited = new Promise((resolve) => child.once("exit", resolve))
+  try {
+    await new Promise((resolve) => child.stdout!.once("data", resolve))
+    const run = await pending
+    expect(run.exitCode).toBe(0)
+    expect(run.sessionId).toBe("ses_fixture03")
+    expect(run.processCleanup.status).toBe("failed")
+    expect(run.processCleanup.error).toContain("Cannot inspect process identity")
+    expect(child.exitCode).toBeNull()
+  } finally { child.kill("SIGKILL"); await exited }
+})
+
+test("runAgent: отказ записи run evidence сохраняет измеренный исход", async () => {
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-proof-write-"))
+  await mkdir(path.join(out, "run.json"))
+  const command = fakeCommand()
+  const run = await runAgent({ command, taskId: "default", model: "fake/model", prompt: "test", files: [],
+    workdir: out, outDir: out, profileDir: out, timeoutMs: 10_000 })
+  expect(run.exitCode).toBe(0)
+  expect(run.sessionId).toBe("ses_fixture03")
+  expect(run.processCleanup.status).toBe("failed")
+})
+
+
