@@ -96,6 +96,18 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
 
+### Соединение повторно проверено успешно — 2026-10-02
+
+По запросу пользователя выполнен один readonly preflight через actual bundled
+Node/default SDK/connectRemote candidate02, без изменения TLS/каталога.
+`f-setup-default-transport-recheck-13.json`: connected=true, pinned=true;
+initialize, список15 инструментов и чтение/проверка SHA закреплённого каталога
+прошли. Compatibility: Loginom7.4.2/Linux/Chromium/ru.
+Original exec80345, terminale73050, exit0. Браузер и model inference не запускались.
+Предыдущий network blocker в этой проверке не воспроизведён; это не доказательство
+длительной стабильности и не PASS setup/J01/J21/J27. Следующий шаг основного
+плана — учтённый fresh headed setup с сохранённым pending connection.
+
 ### Blocked audit: третий последовательный ход — 2026-10-02
 
 Повтор actual bundled Node/default SDK/connectRemote без proxy overrides/TLS
