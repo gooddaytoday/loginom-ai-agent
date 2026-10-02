@@ -2,6 +2,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { Product, productChannel } from "@loginom-ai-agent/product"
 import { cliProfile } from "@loginom-ai-agent/product/cli-profile"
+import { cliCapabilities } from "@loginom-ai-agent/product/cli-capabilities"
 import { InstallationChannel, InstallationVersion } from "@loginom-ai-agent/core/installation/version"
 import { withStandaloneCancellation } from "./standalone-cancellation"
 import { acquireProfile, profileEnvironment } from "./profile"
@@ -11,12 +12,16 @@ export async function standalone(
   execute: (args: string[], paths: ReturnType<typeof cliProfile>) => Promise<void>,
 ) {
   const options = args.slice(0, args.indexOf("--") < 0 ? args.length : args.indexOf("--"))
+  if (args.length === 1 && args[0] === "--capabilities") {
+    process.stdout.write(JSON.stringify({ capabilities: cliCapabilities(process.platform, process.arch) }) + "\n")
+    return
+  }
   if (options.includes("--help") || options.includes("-h")) {
     process.stdout.write(
       `${Product.name} CLI\n\nUsage: ${Product.cliExecutable} [options] [command]\n\n` +
         "Commands: run, providers (auth), models, loginom setup/check/status/cancel-pending/recover\n" +
         "Without a command: interactive TUI\n\n" +
-        "Options: --headless, --no-headless, --help, --version\n" +
+        "Options: --headless, --no-headless, --help, --version, --capabilities\n" +
         "Management: --format json; setup --stdin-json; recover --acknowledge [id...]\n" +
         "Profile: LOGINOM_AI_AGENT_CLI_PROFILE (absolute path)\n",
     )
@@ -42,6 +47,8 @@ async function executeProfile(
   const channel = productChannel(
     process.env.LOGINOM_AI_AGENT_CHANNEL ?? (InstallationChannel === "local" ? "dev" : InstallationChannel),
   )
+  if (process.env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR && process.env.LOGINOM_AI_AGENT_AUTH_CONTENT)
+    throw new Error("SHARED_AUTH_CONTENT_CONFLICT")
   const profile = await acquireProfile(
     cliProfile({
       channel,

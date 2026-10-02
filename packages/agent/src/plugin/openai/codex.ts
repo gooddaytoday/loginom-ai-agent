@@ -1,6 +1,7 @@
 import type { Hooks, PluginInput } from "@loginom-ai-agent/plugin"
 import { InstallationVersion } from "@loginom-ai-agent/core/installation/version"
 import { OAUTH_DUMMY_KEY } from "../../auth"
+import { SharedAuth } from "../../auth/shared"
 import os from "os"
 import { setTimeout as sleep } from "node:timers/promises"
 import { createServer } from "http"
@@ -148,7 +149,7 @@ async function exchangeCodeForTokens(code: string, redirectUri: string, pkce: Pk
   return response.json()
 }
 
-async function refreshAccessToken(refreshToken: string, issuer = ISSUER): Promise<TokenResponse> {
+async function refreshAccessToken(refreshToken: string, issuer = ISSUER, shared = false): Promise<TokenResponse> {
   const response = await fetch(`${issuer}/oauth/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -157,11 +158,18 @@ async function refreshAccessToken(refreshToken: string, issuer = ISSUER): Promis
       refresh_token: refreshToken,
       client_id: CLIENT_ID,
     }).toString(),
+    ...(shared && { signal: AbortSignal.timeout(30_000) }),
   })
   if (!response.ok) {
+    if (shared) throw new Error(`SHARED_AUTH_REFRESH_FAILED_HTTP_${response.status}`)
     throw await oauthResponseError(response, "Token refresh failed")
   }
-  return response.json()
+  if (!shared) return response.json()
+  try {
+    return await response.json()
+  } catch {
+    throw new Error("SHARED_AUTH_REFRESH_RESPONSE_INVALID")
+  }
 }
 
 // Kept as a named export for plugin.codex tests; delegates to the shared branded page.
@@ -345,6 +353,7 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
       provider: "openai",
       async loader(getAuth) {
         const auth = await getAuth()
+        if (SharedAuth.directory() && auth?.type !== "oauth") throw new Error("SHARED_AUTH_OAUTH_REQUIRED")
         const websocketFetch = options.experimentalWebSockets
           ? OpenAIWebSocketPool.createWebSocketFetch({ httpFetch: fetch })
           : undefined
@@ -377,12 +386,35 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
             }
 
             const currentAuth = await getAuth()
+            if (SharedAuth.directory() && currentAuth?.type !== "oauth") throw new Error("SHARED_AUTH_OAUTH_REQUIRED")
             if (currentAuth.type !== "oauth")
               return websocketFetch ? websocketFetch(requestInput, init) : fetch(requestInput, init)
 
             const authWithAccount = currentAuth as typeof currentAuth & { accountId?: string }
 
-            if (!currentAuth.access || currentAuth.expires < Date.now()) {
+            const shared = SharedAuth.directory()
+            if (shared) {
+              const refreshed = await SharedAuth.refresh(
+                shared,
+                "openai",
+                async (latest) => {
+                  const tokens = await refreshAccessToken(latest.refresh, issuer, true)
+                  const accountId = extractAccountId(tokens) || latest.accountId
+                  return {
+                    type: "oauth",
+                    refresh: tokens.refresh_token,
+                    access: tokens.access_token,
+                    expires: Date.now() + (tokens.expires_in ?? 3600) * 1000,
+                    ...(accountId && { accountId }),
+                  }
+                },
+                init?.signal ?? undefined,
+              )
+              currentAuth.access = refreshed.access
+              authWithAccount.accountId = refreshed.accountId
+            }
+
+            if (!shared && (!currentAuth.access || currentAuth.expires < Date.now())) {
               if (!refreshPromise) {
                 refreshPromise = refreshAccessToken(currentAuth.refresh, issuer)
                   .then(async (tokens) => {
