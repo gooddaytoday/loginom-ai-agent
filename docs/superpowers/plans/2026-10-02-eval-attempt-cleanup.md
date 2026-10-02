@@ -255,3 +255,110 @@ Typecheck/diff-check pass. Полный gate запущен, native приёмк
 (/tmp/eval-subreaper-acceptance/full-validation-v3.log); bun typecheck и
 git diff --check pass. Далее свежий private bootstrap и оба обязательных native
 прогона; прежние failed guards/evidence остаются без удаления.
+
+
+## Private native checkpoint — a2bf34b77
+
+Свежий bootstrap private profile subreaper-6bbb4e3b-d31c-4095-a425-08151ecb673b
+прошёл setup и два status с confirmed process proof и двумя пустыми passes;
+validation binding и removed-validation manifest проверены. Для изоляции скопирована
+авторизация provider приватно (0600), без DB/Session/browser profile. Первый run
+20261002-150507-a2bf34b77-dirty сохранил два failed/provider: новый профиль не
+содержал cached models.json, а standalone отключает models fetch. Session/tool/token
+не возникли; оба cleanup confirmed. Это не положительная control-приёмка.
+
+Read-only исследование подтвердило отсутствие gpt-6-sol в новом cached catalog.
+Точно скопированы текущие cache/models.json и config/loginom-ai-agent.json;
+источник/hash/read-back совпали. Модель и variant не менялись. Models probe
+подтвердил openai/gpt-6-sol. Его следующий status отказал на непросмотренном
+коротком browser argv (Unexplained browser/helper PID 388242). Strict binding
+не ослаблялся; failed proof/runtime оставлены. Все записанные own/unknown birth
+identities затем отсутствовали в двух свежих passes, profile idle, writer absent;
+по exact owner/inode снят только собственный private lease.
+
+Следующий probe отказал до dispatch на сохранённой process-group регистрации.
+Его собственный lease (PID 393414, starttime 29133534, nonce
+90d8b3ab-f15e-44e5-aa34-18bf284b4839) и старая регистрация 388069 сняты отдельно
+после двух свежих пустых process/profile passes и повторного inode/content check.
+Никакие процессы не сигналились, failed proof и runtime не удалялись.
+Подробности guard-/registration-reconciliation.json сохранены рядом с receipt.
+Повторный private readiness прошёл confirmed; run 20261002-151442-a2bf34b77-dirty
+начат с прежним model/variant и budgets. Первый кейс уже exit 0/no_artifact,
+новая Session ses_f02d0f972ffeShxtMLWBZDG7sU, process cleanup confirmed.
+Положительный control и адресные кейсы пока не завершены; goal active.
+
+
+Control 20261002-151442-a2bf34b77-dirty завершён exit 0: no_artifact (47297 мс)
+→ completed (231738 мс), оба environment_cleanup confirmed. Независимая проверка
+фактического package/Unit.xml/CSV и трёх completed node_wait receipts pass:
+3 nodes / 2 links / Item gdSum Qty / A=15 B=25. Audit в host PID namespace
+проверил 6 receipts / 122 identities / 16 proof/archive files, новые Session/runtime,
+archive→ready→dispatch, hashes и отсутствие secrets/own live processes.
+Первый внешний audit сначала исполнялся в отдельном sandbox PID namespace;
+он повторён на host и снова pass. Отсутствие host PID в sandbox не считается
+доказательством завершения. Все ручные reconciliation выполнялись на host.
+
+Адресный run 20261002-152124-a2bf34b77-dirty (обычные budgets/model/judge)
+сохранил budget no_artifact, exit 0, 124868 мс, cleanup confirmed;
+low-liquidity no_artifact, exit 0, 128785 мс, cleanup failed на 26 новых native
+identities без recorded origin (первый PID 422542). Эти процессы не сигналились.
+Run exit 1/stopped_reason, quality total/scored/oracle=2, score/pass/oracle=0;
+infra/harness/judge errors=0. Это успешная отрицательная проверка strict stop,
+но не полная положительная адресная приёмка.
+
+Первое ручное reconciliation отказало пока recorded identity ещё была жива;
+guard/registration/runtime не изменялись. После их естественного завершения
+host /proc read и два свежих process/profile passes подтвердили отсутствие всех
+saved own/unknown birth identities и owner, writer absent. Own execution journals
+архивированы с redaction/hash/read-back в low-liquidity/1/manual-reconciliation
+до возможного нового recovery acknowledgement. По exact owner/inode/content
+сняты только свои lease/registration. Failed result/cleanup не переписаны;
+старые runtime оставлены. Начат свежий адресный run с теми же model/variant,
+1800000 мс и judge; goal active до его приёмки и закрытия docs.
+
+
+## Итоговый checkpoint — goal критерии выполнены
+
+Code freeze a2bf34b77: 228 pass / 0 fail / 990 assertions / 297.87 с,
+bun typecheck и git diff --check pass. Продуктовый runtime/установленный CLI
+не менялись и не пересобирались; собственные кодовые изменения только evals/.
+Пользовательские system-bugs/ repository-week changes сохранены отдельно.
+
+Control 20261002-151442-a2bf34b77-dirty exit 0: no_artifact → completed;
+оба cleanup confirmed. Независимые graph/data/execution checks pass:
+3 nodes/2 edges, Item/gdSum Qty, A=15/B=25; три разные completed execution IDs
+относятся точно к трём node GUIDs пакета, import 3 rows/group 2 rows.
+Host process/archive audit 6 receipts/122 identities/16 files/4 manifests pass.
+
+Итоговый адресный run 20261002-153657-a2bf34b77-dirty exit 0, stopped_reason=null:
+budget no_artifact, 139975 мс, 15 calls/8 errors, tokens 42568/1404/305;
+low-liquidity no_artifact, 150552 мс, 14 calls/7 errors, tokens 65988/767/307.
+Оба exit 0/timeout=false, cleanup confirmed; обычные 1800000 мс,
+openai/gpt-6-sol/default, codex-cli 0.157.0/gpt-6-astra/high без замены.
+Quality total/scored/oracle=2, excluded=0, score/pass/oracle=0;
+cleanup checked=2/errors=0, infra/harness/judge=0. В каждом очищенном execution
+archive 11 AMBIGUOUS mentions. Новый Session/runtime/birth identities,
+archive→ready→dispatch, отсутствие own live processes/secret leakage и все
+hashes/read-back проверены на host; audit 6/122/16/4 pass.
+
+Private profile после runs idle; successful lease/registration/writer отсутствуют.
+Auth bytes неизменны, четыре итоговых/control Session rows сохранены в DB,
+исторические failed runtime dirs и own journal остались. Source gate summary,
+versions/pins, host audits, package/durability verification, sanitized bootstrap
+receipts и воспроизводимые control tasks/hash inventory сохранены в gitignored
+results/cleanup-native-acceptance-20261002/. Сырые logs и секреты не коммитятся.
+
+Canonical spec, README, item 9 и отчёт 2026-10-02-evals-cleanup-acceptance.md
+обновлены; simplification plan criteria завершены. Это не новый quality baseline.
+Старые failed попытки/guards не переписаны. Unknown default guard и failed first
+private-bootstrap guard сохранены. Arbitrary external CLI handoff не атомарен;
+proc proof ограничен наблюдаемым namespace/launcher. Same-Session AMBIGUOUS,
+серверный rollback/session release и дополнительный cold-readback остаются
+неподтверждёнными/открытыми в указанном scope. Далее только docs gate/commit
+и завершение существующего goal; обязательной реализации/приёмки больше нет.
+
+Документационный gate: bun typecheck и git diff --check pass. Native audits
+сохраняют фактический host PID namespace и confirmed installed-pin match
+каждого CLI/browser binding. SHA-256 установленных binary/Node/Chromium/manifest/
+lock повторно совпали после обоих итоговых runs. Все обязательные критерии
+реализации, приёмки и документации выполнены; goal готов к complete.

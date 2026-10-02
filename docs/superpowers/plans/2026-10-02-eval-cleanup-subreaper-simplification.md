@@ -423,19 +423,19 @@ source-правки только по обнаруженным регресси�
 **Файлы:** отдельный отчёт в `docs/testing/loginom-ai-agent/reports/`,
 результаты — gitignored `evals/results/`, checkpoint.
 
-- [ ] Выбрать фактический установленный CLI из текущей конфигурации. Сохранить
+- [x] Выбрать фактический установленный CLI из текущей конфигурации. Сохранить
   realpath/version, SHA-256 бинарника, source commit, bundle/runtime/browser
   версии и хеши; model/variant, задачи и фактические budgets. Не печатать `.env`
   или auth. Ранее выбран 0.1.17-prod/openai/gpt-6-sol/default; это reference,
   окончательные значения подтверждаются свежим preflight.
-- [ ] Перед запуском исключить параллельный ручной CLI/Desktop на private profile.
+- [x] Перед запуском исключить параллельный ручной CLI/Desktop на private profile.
   При существующем failed guard не удалять его по числовому PID. Сначала
   прочитать конкретное evidence и проверить неизменность owner/inode и два
   пустых process/profile passes; reconciliation документировать отдельно,
   не переписывать failed попытку как confirmed.
-- [ ] Выполнить readiness probe через тот же supervisor, включая adopted helpers.
+- [x] Выполнить readiness probe через тот же supervisor, включая adopted helpers.
   Только после confirmed proof переходить к кейсам.
-- [ ] Создать отдельный acceptance tasks directory: первый кейс выполняет
+- [x] Создать отдельный acceptance tasks directory: первый кейс выполняет
   browser prepare/workspace read и явно завершает работу без сохранения пакета;
   второй — исходный `group-sum-qty`. Сохранить prompts/task hashes. Запустить
   одним прогоном, без уменьшения обычного бюджета:
@@ -446,14 +446,14 @@ source-правки только по обнаруженным регресси�
 
   `--skip-judge` здесь проверяет lifecycle и пакет; не объявлять такой запуск
   полноценной оценкой качества или новым baseline.
-- [ ] Подтвердить первый `no_artifact`/exit 0 и confirmed cleanup; второй
+- [x] Подтвердить первый `no_artifact`/exit 0 и confirmed cleanup; второй
   completed, независимую проверку пакета/данных и confirmed cleanup. Для
   `group-sum-qty` проверить expected A=15, B=25 по исходному task/reference,
   структуру графа и выполнение; наличие `.lgp` само по себе недостаточно.
-- [ ] Проверить разные CLI/launcher birth identities, Session ID и runtime
+- [x] Проверить разные CLI/launcher birth identities, Session ID и runtime
   directories; process proof предыдущего кейса и archive/readiness предшествуют
   dispatch следующего. Два passes пусты; own alive processes не остаются.
-- [ ] Адресный run внешних кейсов с обычными task budgets и текущей моделью:
+- [x] Адресный run внешних кейсов с обычными task budgets и текущей моделью:
 
   ```bash
   bun run src/run.ts --tasks /home/kiselev/git/agent-validation/sources/analytic-evals --only budget-variance-by-category,low-liquidity-companies --label subreaper-addressed
@@ -462,7 +462,7 @@ source-правки только по обнаруженным регресси�
   Текущий `--only` принимает список через запятую. Не менять task budgets,
   model/variant или продукт ради получения успешного пакета.
   Сохранить честные исходы обоих кейсов и доказательства local cleanup.
-- [ ] Если cleanup отказал, проверить сохранение результата/summary/report,
+- [x] Если cleanup отказал, проверить сохранение результата/summary/report,
   exit 1 и отсутствие второго dispatch. Это успешная отрицательная проверка,
   но не замена требуемой положительной приёмки control → completed.
 
@@ -471,13 +471,13 @@ source-правки только по обнаруженным регресси�
 **Файлы:** owning spec, `evals/README.md`, remaining-work пункт 9,
 исходный checkpoint и новый отчёт приёмки.
 
-- [ ] Описать одну модель происхождения и сохранившиеся проверки identity/binding;
+- [x] Описать одну модель происхождения и сохранившиеся проверки identity/binding;
   удалить описание admission через live-session, не удаляя PGID/SID evidence.
-- [ ] В пункте 9 разделить: защита перехода eval реализована и проверена;
+- [x] В пункте 9 разделить: защита перехода eval реализована и проверена;
   восстановление AMBIGUOUS внутри прежней Session остаётся дефектом продукта.
-- [ ] В checkpoint указать коммиты, тесты, native run IDs, verified package,
+- [x] В checkpoint указать коммиты, тесты, native run IDs, verified package,
   версии/хеши, исходы budget/low-liquidity и реальные ограничения стенда.
-- [ ] Повторить full gate, если native-приёмка потребовала новых правок.
+- [x] Повторить full gate, если native-приёмка потребовала новых правок.
   Goal завершается только после всех критериев, включая Linux-приёмку;
   зелёная suite без native evidence недостаточна.
 
