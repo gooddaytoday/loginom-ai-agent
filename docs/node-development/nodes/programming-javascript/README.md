@@ -1,10 +1,18 @@
 # JavaScript
 
 Устойчивый ID: `component.programming.JavaScript`. Slug: `programming-javascript`.
-Исторического номера подплана нет. Runtime type `programming.javascript`
-зарегистрирован в source ветки `node-javascript` на **161353dadef6** для7.4.2
-с general lifecycle-v5. Compiled candidate и CLI ещё не проверены; accepted
-registry readiness не повышена.
+
+Актуально2026-10-02: продуктовый handler зарегистрирован, same-task F review
+завершён, candidate07/reader07 собраны на `eef529cd2b`. OAuth/setup J27,
+compiled Host и model delivery J01/J21 проверены в областях, перечисленных в
+[checkpoint](checkpoint.md#текущее-состояние). Normal CLI Save → own native
+Close/logout подтверждены. Code01 завершился whole-audit FAIL, безопасно закрыт;
+исправления аудитора проверены отдельно и не повышают эту попытку до PASS.
+Идёт новая автономная Code02 в ordinary headed CLI; далее независимые cold и
+declared. Итоговая writer/cold/pair приёмка и accepted registry ещё открыты.
+
+Далее сохранены этапы реализации с их исходными границами проверки; для
+продолжения использовать только текущую сводку checkpoint.
 
 На child **7855b9bf11cb** реализованы независимые Python configuration/output
 аудиторы:40 адресных test methods,2 native captures и48 non-noop mutations PASS.
