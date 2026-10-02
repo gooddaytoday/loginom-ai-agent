@@ -4,7 +4,7 @@ import { repoRoot, type EvalConfig } from "./config"
 import type { AgentCommand } from "./cli"
 import { EvalFailure } from "./fail"
 import { groupProcesses } from "./process-group"
-import { superviseProcess } from "./process-supervisor"
+import { superviseProcess, writerIdentity, type WriterIdentity } from "./process-supervisor"
 
 type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean }
 
@@ -31,12 +31,14 @@ export function parseView(text: string): View | undefined {
 }
 
 // Guard снимаем только когда ни один процесс не ссылается на профиль (Chromium держит путь в argv).
-export async function releaseStaleWriter(profileDir: string) {
+export async function releaseStaleWriter(profileDir: string, expected?: WriterIdentity | null) {
   const writer = path.join(profileDir, ".writer")
   const busy = await profileProcesses(profileDir)
   if (busy.trim()) throw new EvalFailure(`Профиль ${profileDir} занят процессами:\n${busy.trim()}`, 2)
-  await rm(`${profileDir}.process-group`, { force: true })
   if (!(await exists(writer))) return false
+  if (expected !== undefined && JSON.stringify(await writerIdentity(profileDir)) !== JSON.stringify(expected))
+    throw new EvalFailure("Writer identity changed before release", 1)
+  await rm(`${profileDir}.process-group`, { force: true })
   await rm(writer, { recursive: true, force: true })
   return true
 }
