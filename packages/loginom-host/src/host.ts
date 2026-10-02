@@ -161,6 +161,9 @@ export async function createLoginomHost(options: {
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
       return inputs.admit(`${generation}:${chat}`, userMessage, files, `/${current.connection.username}`)
     },
+    hasRuntime(generation: number, chat: string) {
+      return generations.get(generation)?.children.has(chat) === true
+    },
     async runtime(generation: number, chat: string) {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")

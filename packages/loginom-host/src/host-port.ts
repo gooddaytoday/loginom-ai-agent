@@ -2,6 +2,23 @@ import { createHash, randomUUID } from "node:crypto"
 import type { createLoginomHost } from "./host"
 import type { InputFile } from "./inputs"
 import { hostError } from "./errors"
+
+// Справка и диагностика остаются на скрытом readiness, пока окно чата не открыто.
+const readinessTools = new Set([
+  "find",
+  "search",
+  "read",
+  "grep",
+  "glob",
+  "list",
+  "tree",
+  "dock_diagnostics",
+  "dock_action_describe",
+  "dock_workspace_observe",
+  "dock_node_read",
+  "dock_operation_inspect",
+])
+
 export type HostPort = {
   postMessage(value: unknown): void
   on(event: "message", listener: (event: { data: unknown }) => void): void
@@ -119,6 +136,10 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           return
         }
         if (data.method === "interrupt") {
+          if (!service.hasRuntime(run.lease.generation, run.chat)) {
+            reply({ id: data.id, result: true })
+            return
+          }
           const runtime = await service.runtime(run.lease.generation, run.chat)
           await runtime.request("interrupt")
           reply({ id: data.id, result: true })
@@ -133,13 +154,17 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         )
           throw new Error("LOGINOM_CALL_INVALID")
         const recovery = { id: undefined as string | undefined }
+        const target =
+          service.hasRuntime(run.lease.generation, run.chat) || !readinessTools.has(input.name)
+            ? run.chat
+            : "readiness"
         try {
           // A dead runtime is replaced before admission. Past the relaunch limit this
           // is a known refusal, not an uncertain dispatch.
-          await service.runtime(run.lease.generation, run.chat)
+          await service.runtime(run.lease.generation, target)
           recovery.id = await service.journal.begin(run.chat, run.lease.generation)
           run.active.add(recovery.id)
-          const runtime = await service.runtime(run.lease.generation, run.chat)
+          const runtime = await service.runtime(run.lease.generation, target)
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
           const result = await runtime.request("call", {
             name: input.name,
