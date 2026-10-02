@@ -84,9 +84,9 @@ Fresh ordinary headed J01/J21/J27 и две Sol/low CLI попытки оста�
 ready_for_acceptance не повышен. [Текущий вход](checkpoint.md#после-f-собранный-cli-и-подготовка-oauth--2026-10-02).
 
 OAuth подтверждён; после исправления cold import на **ee5184a606** собран
-candidate02 и проверен изолированный cold help. Headed setup пока завершился
-`LOGINOM_RUNTIME_START_FAILED`: диагностирован timeout сервиса знаний;
-J01/J21/J27 и model trials открыты. [Точка продолжения](checkpoint.md#продолжение-oauth-подтверждён-cold-import-исправлен-setup-пока-не-завершён--2026-10-02).
+candidate02 и проверен изолированный cold help. После восстановления связи
+headed setup/restart прошли: J27 PASS. Compiled Host prepare/describe/Save/own
+Close/logout проверены; backend model delivery J01/J21 и model trials открыты. [Точка продолжения](checkpoint.md#продолжение-oauth-подтверждён-cold-import-исправлен-setup-пока-не-завершён--2026-10-02).
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·

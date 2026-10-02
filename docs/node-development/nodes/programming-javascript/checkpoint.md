@@ -31,12 +31,13 @@ filesystem proof, actual generic reader imports/native launch ещё не вып
 на1a8d236b76. Same-task Astra/medium F завершён наe02e8fd41f. Текущий шаг —
 fresh ordinary headed J01/J21/J27 и две GPT-6.1 Sol / low CLI trials. Общая цель
 не достигнута и не сужается. OAuth и каталог gpt-6.1-sol подтверждены; новый
-candidate02 собран после исправления cold import. Headed CLI setup02 закончился
-LOGINOM_RUNTIME_START_FAILED; диагностика выявила timeout сервиса знаний.
-Model trials не запускались;
-preparation lease с f-oauth-profile-01 closed_verified/reserved_active, acceptance_lease=null,
-все собственные test handles terminal. Дополнительных OpenViking checks/errors
-не было. Untracked acceleration-review не включать.
+candidate02 собран после исправления cold import. Связь восстановилась: setup03
+и отдельный restart/status03 прошли, J27 подтверждён. Actual compiled Host
+prepare/describe/Save/normal Close/logout выполнены на fresh headed profiles;
+J01/J21 knowledge и размеры ответов проверены на Host-границе, backend model
+delivery пока не доказана. Model trials не запускались. Preparation lease с
+f-knowledge-host-02 closed_verified/reserved_active, acceptance_lease=null,
+все собственные handles terminal. Untracked acceleration-review не включать.
 
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы native-аудиторы фазы 4, standalone CLI evidence binding и общая
@@ -95,6 +96,68 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Fresh compiled setup, J27 и knowledge/normal cleanup — 2026-10-02
+
+На том же immutable candidate02 **ee5184a606 / 0.0.0-dev-202610021247**
+штатный `loginom setup --stdin-json --format json --no-headless` завершён
+exit0/ready. Original exec90025/terminal0687bb, childPID264170, generation2.
+Отдельный новый CLI process `loginom status --format json --no-headless`
+exec5758/terminal8cd924, childPID266139 завершён exit0/ready с теми же exact
+URL `http://logi-test-plan.bg.local/app/`, account jsteach, пустым паролем.
+Приватный `f-j27-candidate-02.json`, SHA256
+`fe8fddd525e8a2935779574a6af2588b2fb186444d9ee936577361fc89c6e314`:
+J27 PASS в области compiled setup/restart target persistence. Guard освобождён,
+native candidate processes отсутствуют. Setup не открывал пакеты.
+
+В fresh private root `f-knowledge-host-01` выполнен actual compiled Node Host
+через штатный private IPC, headless=false, с копией своей Linux connection
+configuration. Никаких чужих профилей/секретов не использовано. Три actual
+`dock_action_describe`: JS, JS+Text Import, Save. Original exec87564,
+terminal5ac040 exit0, штатный close ACK и Host exit0. Пакеты не открывались.
+Private `f-candidate-knowledge-01-result.json` и `...-audit.json`:
+JS1.1.0 knowledge SHA256
+`9a4b79833948e2441a0594131708c530fb5da739cd2eea1ebb8787221dfb122d`
+совпал с asset candidate. JS wire13547/text12763; mixed wire18866/text17614;
+JSON-wrapped размеры13521/18840 также в46000. Полная JS card <20000.
+Проверены schema, scalar Data API, validated_for7.4.2 и candidate apply available.
+
+В `f-knowledge-host-02` отдельный ordinary headed compiled Host выполнил
+public new_draft prepare → JS describe → Save checkpoint по новому уникальному
+пути `/jsteach/JS-Knowledge-04e1c7c8-8c44-4a1d-87bd-16d0f730769a.lgp`.
+Original exec88934/terminal909dbd exit0; HostPID277363, actual Host exit0.
+Prepare наблюдал7.4.2/Linux/jsteach/собственный document. Полный prepare
+wire25170/text24094; JS describe wire13611/text12825 — budgets PASS.
+В runtime URL добавлен штатный `?testable=true` функцией loginomAddress;
+origin/path и сохранённый CLI URL остаются назначенными. Первоначальная
+operator audit exact-query assertion отказала; исправлена по этой проверенной
+нормализации, без изменения product или фактического результата.
+
+Первый parser оператора ошибочно склеил три JSON text blocks Save. Original
+ошибка сохранена в result: Unexpected non-whitespace character after JSON.
+Каждый блок затем прочитан отдельно: SUCCEEDED / own save operation ID /
+exact path / modified=false. Save **не повторялся**. В исходный живой IPC
+отправлен штатный close. Runtime `saved-package-cleanup.json` подтверждает
+policy last_confirmed_own_save, ту же session/document/path/Save ID,
+package_closed=true, logged_out=true, packages_before1/after0,
+unsaved_changes_discarded=false, status SUCCEEDED. Затем close ACK, Host exit0
+и отсутствие candidate browser/runtime процессов. Это реальная проверка
+normal runtime cleanup через compiled Host; не автономная CLI-приёмка.
+В будущих operator probes разбирать каждый text JSON block отдельно,
+не склеивать подтверждение Save с dirty-state/outcome supplements.
+
+`f-candidate-prepare-02-audit.json` PASS после независимой сверки full receipts;
+raw result SHA256 `13b80d0a02a4949cb0277bd62547c0b01d87e9031252e50e3bd680001c7f0de8`.
+Все приватные receipts сохранены; ключи/raw runtime logs в git не добавлены.
+Preparation lease closed_verified, active_exec=null; acceptance slot не занят.
+
+Следующая граница — actual backend/model delivery J01/J21 (включая отсутствие
+truncation, full source/output paths), затем две независимые Sol6.1/low CLI
+попытки по30 минут с whole auditor и cold. Host IPC не выдавать за вызовы
+модели или backend metadata.truncated=false. Существующие source/live bounds
+сохраняются, но технический пустой пакет не доказывает аналитическую задачу JS.
+Network blocker на этих прогонах снят; новых TLS/proxy настроек не внедрено.
+Readiness/accepted registry/полная Goal не повышены.
 
 ### Соединение повторно проверено успешно — 2026-10-02
 
