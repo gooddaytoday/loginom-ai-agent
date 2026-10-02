@@ -67,6 +67,9 @@ class JavascriptProcessController:
         self.reader_freeze = None
         self.native_watch = None
         self.cold_inputs = None
+        self.lease = None
+        self.capture = None
+        self.collection = None
         self.launch = {}
         self.verify_executable(process.pid,executable)
         self.sample()
@@ -83,6 +86,7 @@ class JavascriptProcessController:
             raise
 
     def _sample(self):
+        if self.lease is not None:self.lease.revalidate()
         members = self.owner.observe()
         for row in members:
             try:
@@ -138,13 +142,21 @@ class JavascriptProcessController:
 
     def collect(self,capture,*,cleanup_wait_ms=90000):
         """Use this original handle; source capture cannot replace native proof."""
+        from javascript_cli_capture import RedactedCliCapture
+        if not isinstance(capture,RedactedCliCapture) or capture.mode!=self.kind:
+            raise ValueError('cli_capture_original_collect_contract')
+        # The low-level constructor is also used for inert process fixtures.
+        # Candidate factories already bind their capture before collection.
+        if self.capture is None and self.candidate is None:self.capture=capture
+        if capture is not self.capture:raise ValueError('cli_controller_original_capture_required')
         from javascript_cli_capture import collect_cli_process,collect_cold_process
         collector=collect_cli_process if self.kind=='cli' else collect_cold_process
-        return collector(self,capture,cleanup_wait_ms=cleanup_wait_ms)
+        self.collection=collector(self,capture,cleanup_wait_ms=cleanup_wait_ms)
+        return copy.deepcopy(self.collection)
 
     def create_capture(self,directory,worker):
         """Pin the redactor/Node to this candidate, credentials to this profile."""
-        if (self.result is not None or self.kind!='cli' or self.candidate is None
+        if (self.result is not None or self.capture is not None or self.kind!='cli' or self.candidate is None
                 or self.launch.get('transport')!='normal_standalone_run'
                 or self.launch.get('profile')!=str(self.owner.profile)):
             raise ValueError('cli_capture_original_factory_required')
@@ -156,9 +168,10 @@ class JavascriptProcessController:
                 for path in (candidate,self.owner.profile,Path(self.launch['directory']))):
             raise ValueError('cli_capture_evidence_isolation')
         redactor=candidate/'resources/loginom/runtime/client/lib/redact.mjs'
-        return RedactedCliCapture(directory,node=self.node,worker=worker,
+        self.capture=RedactedCliCapture(directory,node=self.node,worker=worker,
             redactor=dict(path=str(redactor),sha256=file_sha256(redactor)),
             known_values=known_cli_secrets(self.owner.profile))
+        return self.capture
 
     def freeze_native(self,events,expected):
         if self.kind!='cli' or self.candidate is None or self.native_watch is None:
@@ -169,7 +182,7 @@ class JavascriptProcessController:
         return self.native_watch.freeze(events,expected,managed_runtime_pin(candidate/'resources/loginom/runtime/client'))
 
     def create_cold_capture(self,directory,worker):
-        if (self.result is not None or self.kind!='cold' or self.candidate is None
+        if (self.result is not None or self.capture is not None or self.kind!='cold' or self.candidate is None
                 or self.cold_inputs is None or self.reader_freeze is None
                 or self.launch.get('transport')!='separate_path_only_reader'):
             raise ValueError('cold_capture_original_factory_required')
@@ -187,12 +200,13 @@ class JavascriptProcessController:
             raise ValueError('cold_capture_configuration_changed')
         private=json.loads(config.read_text())
         redactor=candidate/'resources/loginom/runtime/client/lib/redact.mjs'
-        return RedactedCliCapture(directory,node=self.node,worker=worker,
+        self.capture=RedactedCliCapture(directory,node=self.node,worker=worker,
             redactor=dict(path=str(redactor),sha256=file_sha256(redactor)),known_values=[private['password']],
             mode='cold',expected_report=str(Path(self.launch['evidence'])/'report.json'))
+        return self.capture
 
     @classmethod
-    def launch_cli(cls,candidate,pins,profile,directory,files,prompt,*,environment):
+    def launch_cli(cls,candidate,pins,profile,directory,files,prompt,*,environment,lease=None):
         """Build the ordinary product argv; no source transport or tool injection."""
         candidate,profile,directory = map(absolute_directory,(candidate,profile,directory))
         if not verify_cli_candidate(candidate,pins)['passed']:raise ValueError('cli_controller_candidate_unverified')
@@ -222,6 +236,9 @@ class JavascriptProcessController:
         submitted_at = time.time_ns()//1000000
         from javascript_cli_native import NativeJournalWatch,attempt_directories
         before=attempt_directories(profile)
+        from javascript_cli_lease import JavascriptAcceptanceLease
+        if not isinstance(lease,JavascriptAcceptanceLease):raise ValueError('cli_controller_original_host_lease_required')
+        lease.admit('cli',profile,pins)
         process = subprocess.Popen(argv,cwd=directory,env={**environment,'LOGINOM_AI_AGENT_CLI_PROFILE':str(profile)},
             stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
         try:
@@ -238,6 +255,7 @@ class JavascriptProcessController:
             files=[dict(name=path.name,bytes=item['bytes'],sha256=item['sha256']) for path,item in zip(attachments,files)],
             prompt_sha256=value_digest(prompt),model='openai/gpt-6-sol',variant='low',headed=True,transport='normal_standalone_run')
         controller.native_watch=NativeJournalWatch(controller,before)
+        controller.lease=lease
         return controller
 
     @classmethod
@@ -289,6 +307,9 @@ class JavascriptProcessController:
         browser = dict(path=str(resource/manifest['browser']),sha256=pins['browser_sha256'])
         argv = [node['path'],str(entry),'--config',str(config),'--profile',str(profile),
             '--browser',browser['path'],'--evidence',str(evidence),'--package',native['package_path']]
+        from javascript_cli_lease import JavascriptAcceptanceLease
+        if not isinstance(writer.lease,JavascriptAcceptanceLease):raise ValueError('cli_controller_original_host_lease_required')
+        writer.lease.admit('cold',profile,pins)
         submitted_at = time.time_ns()//1000000
         process = subprocess.Popen(argv,cwd=evidence.parent,env=environment,stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
@@ -299,6 +320,7 @@ class JavascriptProcessController:
         controller.candidate = (candidate,copy.deepcopy(pins))
         controller.reader_freeze = copy.deepcopy(reader)
         controller.cold_inputs = cold_inputs
+        controller.lease=writer.lease
         controller.launch = dict(candidate=str(candidate),profile=str(profile),evidence=str(evidence),
             package_path=native['package_path'],writer_pid=writer.process.pid,reader=copy.deepcopy(reader),
             inputs=copy.deepcopy(cold_inputs),

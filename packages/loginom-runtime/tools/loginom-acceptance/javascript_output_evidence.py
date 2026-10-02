@@ -30,34 +30,58 @@ def verify_javascript_output(events, request, expected_columns, expected_rows, *
                     raise ValueError('javascript_oracle_string')
                 if column['type'] == 'integer' and (type(cell) is not int or not -(2**63) <= cell < 2**63):
                     raise ValueError('javascript_oracle_integer')
-        operation = javascript_operation(events,request,expected_target=expected_target,expected_origin=expected_origin)
-        phases = operation['phases']
-        identities = []
-        final_observations = final_mutations = None
-        for start,end in [('materialization_start','materialization_execute'),('finish','read')]:
-            steps = {r.get('step') for r in operation['rows'][phases[start]['start']+1:phases[end]['end']]
-                if r.get('internal_provenance') == 'client_node_procedure_v1'}
-            observations = [(n,s) for n,s in operation['sequence']['observations'] if n in steps]
-            mutations = [(n,a,o) for n,a,o in operation['sequence']['mutations'] if n in steps]
-            proof = verify_execution_observations(observations,mutations,operation['node'],launch_mode='graph')
-            failures.extend(proof['failures'])
-            identity = proof['execution_id']
-            execution = phases['materialization_execute' if start == 'materialization_start' else 'execute']['value']
-            if (not identity or execution.get('execution_id') != identity or execution.get('status') != 'completed'
-                    or execution.get('owner_verified') is not True or phases[start]['value'].get('execution_id') != identity
-                    or phases[start]['value'].get('execution_started') is not True):
-                failures.append('javascript_native_execution_binding:'+start)
-            identities.append(identity)
-            final_observations, final_mutations = observations, mutations
-        materialization_id, execution_id = identities
-        if not execution_id or execution_id == materialization_id:
-            failures.append('javascript_two_fresh_executions')
-        failures.extend(javascript_business_table(operation,request,expected_columns,expected_rows,final_observations,final_mutations,execution_id))
+        groups=javascript_execution_groups(events,request,expected_target=expected_target,expected_origin=expected_origin)
+        failures.extend(groups['failures'])
+        materialization_id,execution_id=groups['materialization_id'],groups['execution_id']
+        failures.extend(javascript_business_table(groups['operation'],request,expected_columns,expected_rows,
+            groups['observations'],groups['mutations'],execution_id))
     except (KeyError,IndexError,TypeError,AttributeError,ValueError) as error:
         failures.append(str(error) if isinstance(error,ValueError) else 'javascript_output_malformed')
     return dict(passed=not failures,failures=sorted(set(failures)),execution_id=execution_id,
         materialization_execution_id=materialization_id,scope='fresh_native_javascript_full_integer_string_table',
         journal_authenticated=False,native_bytes_verified=False,package_persistence_verified=False,cli_verified=False)
+
+
+def verify_javascript_executions(events,request,*,expected_target=None,expected_origin=None):
+    """Fresh source executions even when the model later requests a full read."""
+    failures=[]
+    execution_id=materialization_id=None
+    try:
+        groups=javascript_execution_groups(events,request,expected_target=expected_target,expected_origin=expected_origin)
+        failures.extend(groups['failures'])
+        materialization_id,execution_id=groups['materialization_id'],groups['execution_id']
+    except (KeyError,IndexError,TypeError,AttributeError,ValueError) as error:
+        failures.append(str(error) if isinstance(error,ValueError) else 'javascript_execution_malformed')
+    return dict(passed=not failures,failures=sorted(set(failures)),execution_id=execution_id,
+        materialization_execution_id=materialization_id,scope='two_owned_fresh_javascript_execution_groups',
+        business_output_verified=False,package_persistence_verified=False,cli_verified=False)
+
+
+def javascript_execution_groups(events,request,*,expected_target=None,expected_origin=None):
+    operation=javascript_operation(events,request,expected_target=expected_target,expected_origin=expected_origin)
+    phases=operation['phases']
+    failures=[]
+    identities=[]
+    final_observations=final_mutations=None
+    for start,end in [('materialization_start','materialization_execute'),('finish','read')]:
+        steps={r.get('step') for r in operation['rows'][phases[start]['start']+1:phases[end]['end']]
+            if r.get('internal_provenance')=='client_node_procedure_v1'}
+        observations=[(n,s) for n,s in operation['sequence']['observations'] if n in steps]
+        mutations=[(n,a,o) for n,a,o in operation['sequence']['mutations'] if n in steps]
+        proof=verify_execution_observations(observations,mutations,operation['node'],launch_mode='graph')
+        failures.extend(proof['failures'])
+        identity=proof['execution_id']
+        execution=phases['materialization_execute' if start=='materialization_start' else 'execute']['value']
+        if (not identity or execution.get('execution_id')!=identity or execution.get('status')!='completed'
+                or execution.get('owner_verified') is not True or phases[start]['value'].get('execution_id')!=identity
+                or phases[start]['value'].get('execution_started') is not True):
+            failures.append('javascript_native_execution_binding:'+start)
+        identities.append(identity)
+        final_observations,final_mutations=observations,mutations
+    materialization_id,execution_id=identities
+    if not execution_id or execution_id==materialization_id:failures.append('javascript_two_fresh_executions')
+    return dict(operation=operation,failures=failures,materialization_id=materialization_id,execution_id=execution_id,
+        observations=final_observations,mutations=final_mutations)
 
 
 def javascript_business_table(operation,request,expected_columns,expected_rows,observations,mutations,execution_id):
