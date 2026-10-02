@@ -452,3 +452,16 @@ raw digest с новым read-only SQLite projection, sanitized digest с соб
 
 Это исправление существующей приёмки в согласованном плане. Повторная очистка
 старой SQLite полезна для regression, но не заменяет новый original live capture.
+
+
+### Actual Host identity и public catalog pins — 2026-10-02
+
+Native collector использует SHA256(backend SessionID) для `chats/<hash>` по
+HostPort.acquire; generation проверяет отдельно. Строка SessionID вместо hash
+в unit fixture не соответствует standalone Host. Public session_manifest —
+каталог actions/selectors и compatibility; он не обещает clientRevision.
+Источник runtime identity — private own session.json clientRevision и полный
+clientSourceManifest, сверенные с byte pin exact candidate. Public action digest
+и private action digest обязательны; дополнительный public clientRevision, если
+появится, обязан совпасть. До trials runtime/catalog pins закрепляются отдельно;
+local source catalog не заменяет manifest, фактически полученный с сервера.

@@ -2,25 +2,22 @@
 
 ## Текущее состояние
 
-**Работа возобновлена пользователем, 2026-10-02.** Candidate03/reader03
-проверены реальным GPT-6.1 Sol / low в обычном headed CLI: технический J21
-read04 доставил весь исходник 32768 UTF-8 bytes / 1024 LF lines / 8 chunks,
-выполнил существующий узел с сохранением настроек, прочитал полные 6×4 и
-завершил Save → native Close → logout. Это техническая проверка, не одна из
-двух автономных Code/declared trials. Original collector PASS; независимая
-SQLite-проверка исходника/24 ячеек PASS. Общая CLI/SQLite сверка первоначально
-FAIL (`cli_terminal_tool_coverage`): очистка двух составных Save-ответов меняла
-текст и повреждала JSON. Исправление QA проходит адресные проверки; требуется
-новый committed candidate/reader и свежий headed-прогон, старый FAIL не повышать.
-
-Read04 безопасно завершён: own final Save `save-js-final-01`,
-`saved-package-cleanup.json` SHA256
-`52fecbd54643d04f47169957b64f21c88e8c12f33228bce4b01b4e25556503a5`,
-package_closed/logged_out=true, packages1→0, discard=false; `.writer` отсутствует,
-/proc candidate executables отсутствуют. Lease read04 освобождён до завершения
-original holder exec84785 (exit0); acceptance_lease=null, locks отсутствуют.
-Следующий шаг — завершить regression нового original/redacted binding,
-заморозить новые QA/candidate, затем свежий J21 и две независимые CLI trials.
+**Работа возобновлена пользователем, 2026-10-02.** Fresh technical J21
+read05 на candidate04/reader04 полностью подтвердил corrected original capture,
+SQLite binding (18 tools), full source32768bytes/1024LF/8chunks, typed6×4,
+Save/Close/logout. Код `29068cc7fd`; первая ошибка read04 сохранена как FAIL.
+Дополнительно исправлены несоответствия native auditor реальному Host:
+SHA256(SessionID) в пути чата и clientRevision в private session metadata,
+а не обязательное поле public knowledge. Код `f5a94febf1`,27 tests PASS.
+Candidate05/reader05 собраны и закреплены; runtime/browser побайтно совпадают
+с candidate04. Текущий original exec84698 — technical J21 read06 на candidate05,
+lease `javascript-cli-j21-read-06` занят до проверки cleanup. Не запускать
+другой браузер до terminal/Save/Close/logout/process verification и освобождения.
+После J21 — подготовленный private `f-cli-pair-01.py` для двух независимых
+автономных Code/declared trials; он ещё не запускался. Source review выполняется
+оператором после model writer и до отдельного cold reader, original objects
+держатся в одном Python holder для pair auditor. Каталог берётся из реально
+закреплённого remote manifest17764f…; обе Save revisions2, не local source catalog1.
 Untracked acceleration-review.md и файлы child worktree не добавлять.
 
 
@@ -118,6 +115,50 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Fresh corrected CLI delivery и следующий candidate — 2026-10-02
+
+`f-cli-j21-read-05`, candidate04/reader04, original exec78390 / CLI PID413407:
+collector exit0/PASS; `captured_events` исполнился из exact frozen QA при живом
+original holder; actual SQLite binding18tools PASS, decoded calls18.
+`delivery-audit.json` independently PASS:8 chunks,32768bytes,1024LF, unchanged
+source85acd23d…, settings_preserved=true, full6×4/all24 cells, knowledge9a4b7983…,
+no truncated. Session `ses_f02a921f2ffeGgZo6O032BnHX6`; existing apply
+`apply-js-check-01`, execution`1790956738652-djwz19e7f9e:1230:2`.
+Final Save`save-js-check-02`; cleanup digest
+`f7e5a6111a94a23e33c7b51f9cad480b91454428023d91cf0883782086074430`,
+SUCCEEDED/package_closed/logged_out, packages1→0/no discard. `.writer` и native
+candidate processes отсутствуют; lease released до original holder exit0.
+Это **technical J21**, не автономный business trial и не cold persistence proof.
+
+В подготовке whole trial source `f5a94febf1` исправляет два проверенных расхождения:
+HostPort хранит chat в SHA256(backend SessionID), а не самом ID; public catalog
+pins не содержат обязательного clientRevision. Native watcher теперь проверяет
+именно hash пути и private session.json clientRevision/full source manifest против
+независимого byte algorithm по candidate. Private actionManifestDigest и public
+manifest pin также обязательны. Если public clientRevision всё же есть, он должен
+совпасть. 27 адресных tests PASS; ранее private native composition10PASS.
+Никаких product runtime changes или разрешения чужого session этим не сделано.
+
+Candidate04: source29068cc7fd, version0.0.0-dev-202610021556,
+manifest4ec0cf594965cfc0245f1502a39f57d24b21df5c7171b3613e04d4aed9224301;
+reader87c03f1901d7831048b58dc2d137d76718ff09d3ea9870b92ad24c4090848109,
+pins20cf685d5d3220489ea09e29eca27d3e305f1009c8595cb2bf41b1bf9bbe2696.
+Candidate05: sourcef5a94febf1f541942b9e973a546dbffb738ba237,
+version0.0.0-dev-202610021604;
+manifest`b37c1e3428c0f2fb35a0bac566c599a8091e9f63f796a98cc2b7a5b0dc0cf899`,
+source tree`9b0c8db2d24235d2ba90835b3f519f6c8710045af5bd1cc203b73d4379c3a3a9`,
+reader`06e15f7b6b5bb318c09560c35a6c8ccfb0d5a2bbc0d2adcc362d4dc2b07b2dd7`,
+pins`dd32d6c6398565c51119d8a80eb1f8731675afee34ed864d113b006808ea3db7`.
+Build originalexec19254 exit0, archive roundtrip verified; inventory5441 и full
+committed QA968 verified, cold entry actual bundled Node --help exit0.
+Изменились только CLI binary/build metadata; resources/runtime/Host Node/browser
+совпадают с candidate04. Fresh read06 всё равно запущен на exact candidate05.
+`f-cli-pair-01-runtime-pins.json` выводит client revision из candidate bytes,
+remote catalog закреплён штатным `pinActionCatalog`, обе Save revisions2.
+Local repository source catalog имеет другие hashes/revision1; его нельзя
+выдавать за фактически доставленный remote catalog. Ошибка предположения замечена
+до старта autonomous writer и не изменила trial inputs/oracle.
 
 ### Technical maximum-source CLI J21 и устранение ошибки аудитора — 2026-10-02
 
