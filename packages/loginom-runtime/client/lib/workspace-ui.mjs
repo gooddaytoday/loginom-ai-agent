@@ -456,6 +456,14 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&typeof label==='string'&&label.length>0&&label.length<=240
           &&tid===stem+label.replace(/\s/g,'_').replace(/,/g,''))controlTid=stem;
       }
+      // A native-bound process caption may contain the node's name, including
+      // "JavaScript". Only its data suffix is exempt: editor/name/id/link and
+      // secret guards still apply, and the row only exposes process actions.
+      const process=processCells.get(state.ids.get(element))??processExpanders.get(state.ids.get(element));
+      const processStem=processBase+'colProcess_';
+      if(process&&!element.isContentEditable&&!element.closest('[contenteditable="true"]')
+        &&(element.tagName==='TD'&&tid===processStem+process.path
+          ||processExpanders.has(state.ids.get(element))&&tid===processStem+process.path+';TreeExpander'))controlTid=processStem;
       return [element.getAttribute('name')??'',element.getAttribute('id')??'',controlTid].join(' ');
     };
     const dangerous = element => sensitive(element) || !!element.closest('a[href],iframe,object,embed')

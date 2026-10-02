@@ -4435,6 +4435,41 @@ test('scrolled process window offers native-bound rows without claiming complete
  assert.ok(row?.allowed_actions.includes('right_click'));assert.equal(row.process_row.record_index,4);
 });
 
+test('native process captions containing code tokens remain process controls, not editors',async()=>{
+ for(const prefix of ['ConsoleForm','MF;ConsoleForm'])for(const name of ['Расчёт продаж JavaScript','python','script','codeeditor']){
+  const f=scrolledProcessWindowFixture(prefix),path='Root>'+name.replace(/\s/g,'_');
+  for(const [cell,column] of [[f.id,'colId_'],[f.cell,'colProcess_'],[f.progress,'colProgress_']])cell.attrs['data-tid']=prefix+';ProgressForm;'+column+path;
+  f.cell.ownText=name;
+  const expander=f.page.add('img',f.cell.attrs['data-tid']+';TreeExpander','',{x:44,y:442,width:12,height:18},f.cell);
+  expander.attrs.class='x-tree-expander';
+  const s=await f.page.observe(),row=s.ui.elements.find(e=>e.process_row),toggle=s.ui.elements.find(e=>e.process_expander);
+  assert.ok(row?.allowed_actions.includes('right_click'),name);assert.deepEqual(clone(toggle.allowed_actions),['click']);
+  assert.ok(!row.allowed_actions.includes('fill'));assert.ok(!row.allowed_actions.includes('double_click'));
+  const result=await f.page.act({verb:'right_click',ref:row.ref},s);
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ }
+});
+
+test('process caption exemption retains native binding, editor, name, link and secret guards',async()=>{
+ for(const mode of ['name','id','editor','href','secret','wrong_tag','editable','foreign_record','foreign_view','duplicate']){
+  const f=scrolledProcessWindowFixture(),stem='ConsoleForm;ProgressForm;';
+  f.cell.ownText='Расчёт продаж JavaScript';
+  f.cell.attrs['data-tid']=stem+'colProcess_Root>Расчёт_продаж_JavaScript';f.id.attrs['data-tid']=stem+'colId_Root>Расчёт_продаж_JavaScript';f.progress.attrs['data-tid']=stem+'colProgress_Root>Расчёт_продаж_JavaScript';
+  if(mode==='name')f.cell.attrs.name='javascript-editor';
+  if(mode==='id')f.cell.attrs.id='script-editor';
+  if(mode==='editor')f.rows[0].attrs.class+=' CodeMirror';
+  if(mode==='href'){f.cell.tagName='A';f.cell.attrs.href='javascript:void(0)';}
+  if(mode==='secret')f.cell.attrs.name='private_key';
+  if(mode==='wrong_tag')f.cell.tagName='INPUT';
+  if(mode==='editable')f.cell.attrs.contenteditable='true';
+  if(mode==='foreign_record')f.rows[1].attrs['data-recordid']='foreign';
+  if(mode==='foreign_view')f.rows[0].attrs['data-boundview']='foreign';
+  if(mode==='duplicate')f.page.add('td',f.cell.attrs['data-tid'],'JavaScript',undefined,f.rows[0]);
+  const s=await f.page.observe(),row=s.ui.elements.find(e=>e.tid===f.cell.attrs['data-tid']);
+  assert.ok(!row?.allowed_actions.includes('right_click'),mode);assert.equal(f.page.events.length,0);
+ }
+});
+
 test('scrolled process window refuses detached, foreign and clipped row bindings',async()=>{
  const changes=[f=>{f.store.getAt=()=>({...f.model});},f=>{f.rows[1].attrs['data-recordid']='foreign';},
   f=>{f.rows[1].attrs['data-boundview']='foreign';},f=>{f.rows[1].attrs['data-recordindex']='3';},
