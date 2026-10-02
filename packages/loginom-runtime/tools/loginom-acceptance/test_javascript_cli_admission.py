@@ -71,6 +71,16 @@ class JavascriptAdmissionTests(unittest.TestCase):
             with self.subTest(name=name):
                 with self.assertRaises(ValueError):host_artifact_name(1,'own-session','user',0,name)
 
+    def test_private_testable_url_form_is_exact_and_never_rewritten(self):
+        self.result['loginomUrl']=self.expected['loginom_url']+'?testable=true'
+        self.synchronize()
+        self.assertTrue(self.audit()['passed'])
+        self.assertEqual(json.loads(self.part['state']['output'])['loginomUrl'],self.result['loginomUrl'])
+        for suffix in ('?testable=false','?testable=true&extra=1','?testable=%74rue','#testable=true'):
+            self.result['loginomUrl']=self.expected['loginom_url']+suffix
+            self.synchronize()
+            with self.subTest(suffix=suffix):self.assert_refused('cli_admission_owned_draft')
+
     def test_coherent_host_generation_change_and_plain_source_filename_refuse(self):
         self.part['state']['metadata']['generation'] = 2
         self.synchronize()
