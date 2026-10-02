@@ -1,3 +1,4 @@
+import {retainCrossTableReadPolicy} from './crosstable-schema.mjs';
 // A reread is built from a completed local node receipt, never caller-provided
 // formulas or arbitrary browser/node identities. Its runtime uses the same gate.
 export const NODE_READ_MODE='read_existing_output';
@@ -35,7 +36,8 @@ export function buildNodeReadRequest(args,source){
  // A verified local configuration retains the full mapping even when the
  // original operation requested no preview. Fresh execution and table-schema
  // comparison remain mandatory in the read driver; callers cannot supply this.
- const retained=retainedMappingSchemas(node,args.source_operation_id);
+ const crossPolicy=retainCrossTableReadPolicy(source,args.source_operation_id);
+ const retained=request.target.type==='transform.cross_table'?[]:retainedMappingSchemas(node,args.source_operation_id);
  const schemas=[...previews,...retained.filter(p=>!previews.some(s=>s.port===p.port))];
  need(schemas?.length>0,'Invalid parameters.source_operation_id: the source operation has no verified table output');
  const ports=args.read?.ports??schemas.map(p=>p.port);
@@ -45,7 +47,7 @@ export function buildNodeReadRequest(args,source){
  return {operation_id:args.operation_id,contract_revision:request.contract_revision,
   document_id:node.node.document_id,workflow_ref:structuredClone(request.workflow_ref),
   target:{kind:'existing',type:request.target.type,label:request.target.label,ref:structuredClone(node.node)},inputs:[],
-  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,schemas:structuredClone(schemas.filter(p=>ports.includes(p.port)))},
+  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,schemas:structuredClone(schemas.filter(p=>ports.includes(p.port))),...(crossPolicy?{cross_table_policy:crossPolicy}:{})},
   mappings:[],finish:'execute',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
 }
@@ -55,9 +57,14 @@ export function nodeReadHandler(handler){
    need(mode===NODE_READ_MODE&&request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0
     &&request.finish==='execute'&&request.read.coverage!== 'full'&&handler.fileOutput!==true,
     'Existing-output reads cannot create nodes, configure ports or export files');
-   need(parameters&&Object.keys(parameters).length===2&&typeof parameters.source_operation_id==='string'
+   need(parameters&&Object.keys(parameters).every(k=>['source_operation_id','schemas','cross_table_policy'].includes(k))&&Object.keys(parameters).length===(parameters.cross_table_policy?3:2)&&typeof parameters.source_operation_id==='string'
     &&Array.isArray(parameters.schemas)&&parameters.schemas.length===request.read.ports.length&&parameters.schemas.length>0,
     'Verified local output schemas required');
+   if(parameters.cross_table_policy)need(request.target.type==='transform.cross_table'
+    &&parameters.cross_table_policy.kind==='crosstable_sliding'
+    &&parameters.cross_table_policy.configuration?.category_mode==='sliding'
+    &&['document_id','workflow_id','node_id'].every(k=>parameters.cross_table_policy.node?.[k]===request.target.ref[k]),
+    'Internal CrossTable read policy owner differs');
    for(const port of request.read.ports){
     const matches=parameters.schemas.filter(s=>s.port===port);
     need(matches.length===1&&Array.isArray(matches[0].schema)&&matches[0].schema.length>0,
