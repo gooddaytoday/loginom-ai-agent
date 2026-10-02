@@ -94,8 +94,12 @@ Chromium может заменить argv за десятки миллисеку
 Каждый CLI запускается отдельным Linux subreaper (Bun FFI, libc `prctl`), который
 сохраняет наблюдаемую ancestry при double-fork helpers и закрывается последним.
 Одноразовая команда передаётся через частный capsule и удаляется до dispatch;
-авторизация setup передаётся только stdin. Наблюдённые parent/session/subreaper
-origins и два финальных прохода сохраняются в процессном доказательстве. Перед
+авторизация setup передаётся только stdin. Единственный ledger связывает identity, origin и admission pending/allowed/refused.
+Origins — launcher, проверенный CLI, parent либо subreaper. PGID/SID сохраняются
+для аудита и свежих проверок, но не присваивают процесс. Наблюдённые origins и
+два финальных прохода сохраняются в процессном доказательстве. После browser
+binding обычный интервал возвращается к 100 мс; новое окно запуска требует
+ускоренного наблюдения тем же observer. Перед
 сигналом identity и участники группы проверяются заново. Legacy numeric PGID,
 имя процесса, одиночный argv/cwd match не разрешают kill. Неизвестный owner,
 unreadable relevant identity, changed identity или непроверенный browser/helper
