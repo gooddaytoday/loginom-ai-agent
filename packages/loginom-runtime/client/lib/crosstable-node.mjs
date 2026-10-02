@@ -12,6 +12,15 @@ export function createCrossTableNodeSupport(config){return createTabularTransfor
  configurationObservation:{condition:'owned CrossTable configuration',readCrossTable:true,ready:s=>s.wizard?.stage==='crosstable'&&s.node_crosstable?.verified===true},
  async configure(channel,p,context){
   const changed=await configureCrossTable(channel,p,context);if(context.request.finish==='close')return changed;
+  return advanceCrossTableConfiguration(channel,changed);
+ },
+ materializedSchema:materializeCrossTableOutput,
+});}
+
+// CrossTable output fields are materialized only by Execute. A new inline
+// mapping has no rows: its absence is not a verified inventory. Preserve native
+// wizard/node ownership, advance with Next, and attest schema after execution.
+export async function advanceCrossTableConfiguration(channel,changed){
   const root=changed.configuration.node_context.tid;
   const next=async(initial,expected)=>channel.perform({condition:'validate CrossTable and advance',initialObservation:initial,
    ready:s=>s.wizard?.status==='observed',identity:()=>changed.configuration.node_context,
@@ -22,15 +31,13 @@ export function createCrossTableNodeSupport(config){return createTabularTransfor
   await next(before,['output_mapping','done']);
   let destination=await channel.observe({condition:'CrossTable validated destination',ready:s=>['output_mapping','done'].includes(s.wizard?.stage)});
   if(destination.wizard.stage==='output_mapping'){
-   destination=await channel.observe({condition:'owned CrossTable inline output inventory',readMappings:true,
-    ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
-   need(['document_id','workflow_id','node_id'].every(k=>destination.node_mapping.node_context[k]===changed.configuration.node_context[k]),'inline output owner differs');
+   need(destination.prepared_node_context?.verified===true
+    &&['document_id','workflow_id','node_id'].every(k=>destination.prepared_node_context[k]===changed.configuration.node_context[k])
+    &&destination.wizard.root_tid===root&&destination.wizard.title==='Кросс-таблица','inline output owner differs');
    // Native CrossTable generates/synchronizes these fields on execution. No
    // guessed source inventory, mapping override or premature schema comparison.
    await next(destination,'done');
   }
   const done=await channel.observe({condition:'CrossTable accepted by native Next',ready:s=>s.wizard?.stage==='done'});
   return {...changed,validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
- },
- materializedSchema:materializeCrossTableOutput,
-});}
+}
