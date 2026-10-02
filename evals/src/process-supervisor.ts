@@ -30,7 +30,8 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
   }
 }
 
-async function processView(pid: number): Promise<ProcessView | undefined> {
+async function processView(pid: number, required = true, owners: ProcessIdentity[] = []): Promise<ProcessView | undefined> {
+  let relevant = required
   try {
     const directory = `/proc/${pid}`
     const owner = await stat(directory)
@@ -38,22 +39,27 @@ async function processView(pid: number): Promise<ProcessView | undefined> {
     const raw = await readFile(path.join(directory, "stat"), "utf8")
     const fields = raw.slice(raw.lastIndexOf(")") + 2).split(" ")
     if (["Z", "X"].includes(fields[0] ?? "")) return undefined
+    const name = raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(")"))
+    relevant ||= /^(?:loginom-ai-|chrome|chromium)/.test(name) || owners.some((owner) =>
+      owner.pid === pid || owner.pid === Number(fields[1]) || owner.group === Number(fields[2]) && owner.session === Number(fields[3]))
+    const args = (await readFile(path.join(directory, "cmdline"), "utf8")).split("\0").filter(Boolean)
+    relevant ||= args.some((arg) => /(?:node-host\.mjs|standalone\.ts|loginom-ai-agent-cli)$/.test(arg))
     const executable = await readlink(path.join(directory, "exe"))
     const info = await stat(path.join(directory, "exe"))
     return { pid, uid: owner.uid, starttime: fields[19]!, parent: Number(fields[1]),
       group: Number(fields[2]), session: Number(fields[3]), executable, device: info.dev, inode: info.ino,
-      name: raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(")")),
-      args: (await readFile(path.join(directory, "cmdline"), "utf8")).split("\0").filter(Boolean),
+      name, args,
       cwd: await readlink(path.join(directory, "cwd")) }
   } catch (error) {
     if (gone(error)) return undefined
+    if (!relevant && ["EACCES", "EPERM"].includes((error as NodeJS.ErrnoException).code ?? "")) return undefined
     throw Error(`Cannot inspect process identity PID ${pid}`)
   }
 }
 
-async function snapshot() {
+async function snapshot(owners: ProcessIdentity[] = []) {
   return (await Promise.all((await readdir("/proc")).filter((name) => /^\d+$/.test(name))
-    .map((pid) => processView(Number(pid))))).filter((entry) => entry !== undefined)
+    .map((pid) => processView(Number(pid), false, owners)))).filter((entry) => entry !== undefined)
 }
 
 function identity(view: ProcessView): ProcessIdentity {
@@ -136,7 +142,7 @@ export async function superviseProcess(input: {
   if (marker) await writeFile(marker, String(proc.pid), { flag: "wx", mode: 0o600 }).catch((error) => { cleanup.error = `Registration failed: ${message(error)}` })
   let scanning = Promise.resolve(), stopped = false, timedOut = false, interrupted = false
   const scan = async () => {
-    const live = await snapshot()
+    const live = await snapshot([...ledger.values()])
     const directories = profile ? await runtimeDirectories(profile) : []
     cleanup.runtimeDirectories = directories.filter((directory) => !oldDirectories.has(directory))
     // Walk repeated levels from the same snapshot; do not infer an unseen parent.
