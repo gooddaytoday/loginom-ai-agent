@@ -6,12 +6,15 @@ JavaScript, use a historical Hermes envelope, or certify complete CLI acceptance
 import copy
 import hashlib
 import json
+import re
+from datetime import datetime
+from artifact_delivery_evidence import preupload_delivery_restarts
 from javascript_cli_evidence import terminal_tool,value_digest
 from javascript_cli_candidate import hexadecimal
 
 
 LOCAL_RECEIPT_TOOLS = {'loginom_'+name for name in ('dock_prepare','dock_action_run','dock_action_describe',
-    'dock_artifact_deliver','dock_artifact_delivery_status','dock_node_apply','dock_node_wait','dock_node_status',
+    'dock_artifact_deliver','dock_artifact_delivery_status','dock_artifact_delivery_resume','dock_node_apply','dock_node_wait','dock_node_status',
     'dock_node_resume','dock_node_read','dock_node_cancel','dock_node_stop','dock_operation_inspect')}
 
 
@@ -42,6 +45,56 @@ def cli_public_calls(events):
                 raise ValueError('cli_node_public_receipt_shape')
         calls.append(dict(part=part,result=result))
     return sorted(calls,key=lambda c:(c['part']['state']['time']['end'],c['part']['state']['time']['start'],c['part']['id']))
+
+
+def verify_preupload_public_resumes(calls, operation_id, restarts, expected):
+    """Require the observed no-upload refusal before each same-operation resume."""
+    used = set()
+    for start,checkpoint,restarted in restarts:
+        checkpoint_time = datetime.fromisoformat(checkpoint['recorded_at'].replace('Z','+00:00')).timestamp()*1000
+        restart_time = datetime.fromisoformat(restarted['recorded_at'].replace('Z','+00:00')).timestamp()*1000
+        resumes = [c for c in calls if c['part']['tool'] == 'loginom_dock_artifact_delivery_resume'
+            and c['part']['state']['input'].get('operation_id') == operation_id
+            and c['part']['state']['time']['start'] <= restart_time <= c['part']['state']['time']['end']]
+        if len(resumes) != 1:raise ValueError('cli_node_delivery_public_resume_missing')
+        part = resumes[0]['part']
+        args,time = part['state']['input'],part['state']['time']
+        resume_id = args.get('resume_id')
+        if (part['sessionID'] != expected['cli_session_id'] or part['state']['status'] != 'completed'
+                or set(args) != {'operation_id','resume_id','budget_ms'}
+                or not isinstance(resume_id,str) or not re.fullmatch('[A-Za-z0-9_.:-]{1,80}',resume_id) or resume_id in used
+                or type(args['budget_ms']) is not int or not 1000 <= args['budget_ms'] <= 1800000
+                or not checkpoint_time <= time['start']
+                or not time['start']+args['budget_ms'] <= restarted['deadline_at'] <= time['end']+args['budget_ms']):
+            raise ValueError('cli_node_delivery_public_resume_binding')
+        used.add(resume_id)
+        refusals = []
+        for call in calls:
+            previous = call['part']
+            if (previous['tool'] not in ('loginom_dock_artifact_deliver','loginom_dock_artifact_delivery_status',
+                    'loginom_dock_artifact_delivery_resume') or previous['sessionID'] != expected['cli_session_id']
+                    or previous['state']['input'].get('operation_id') != operation_id
+                    or not checkpoint_time <= previous['state']['time']['end'] <= time['start']):continue
+            value = call['result']
+            if value is None and previous['state']['status'] == 'error':
+                try:value = json.loads(previous['state']['error'])
+                except (ValueError,TypeError):continue
+            if not isinstance(value,dict):continue
+            output = value.get('output',{})
+            if (value.get('operation_id') == operation_id and value.get('state') == 'settled'
+                    and value.get('status') == 'AMBIGUOUS' and value.get('cleanup_complete') is True
+                    and output.get('upload_submitted_or_unknown') is False
+                    and output.get('inspection_required') is False and output.get('cleanup_complete') is True
+                    and output.get('upload_operation_id') == operation_id+':upload'
+                    and output.get('next_step',{}).get('tool') == 'dock_artifact_delivery_resume'
+                    and output['next_step'].get('original_operation_id') == operation_id):refusals.append(value)
+        if not refusals:raise ValueError('cli_node_delivery_public_preupload_checkpoint')
+        originals = [c for c in calls if c['part']['tool'] == 'loginom_dock_artifact_deliver'
+            and c['part']['sessionID'] == expected['cli_session_id']
+            and c['part']['state']['input'].get('operation_id') == operation_id
+            and c['part']['state']['input'].get('artifact_id') == start['artifact_id']
+            and c['part']['state']['time']['start'] <= checkpoint_time]
+        if not originals:raise ValueError('cli_node_delivery_original_request_missing')
 
 
 def expanded_cli_node(request, workflow, uploads):
@@ -197,14 +250,17 @@ def verify_cli_node_binding(events, native_events, operation_id, expected, *, so
                     for continuation in continuations:
                         flow = continuation['workflow_ref']
                         references[(continuation['document_id'],flow['workflow_id'])] = flow
-            if part['tool'] in ('loginom_dock_artifact_deliver','loginom_dock_artifact_delivery_status') and result.get('state') == 'settled':
+            if part['tool'] in ('loginom_dock_artifact_deliver','loginom_dock_artifact_delivery_status','loginom_dock_artifact_delivery_resume') and result.get('state') == 'settled':
                 output = result.get('output',{})
                 if output.get('status') == 'SUCCEEDED' and output.get('upload_completion_verified') is True and output.get('cleanup_complete') is True:
                     complete = [r for r in native_events[:admissions[0][0]] if r.get('phase') == 'artifact_delivery_completed' and r.get('operation_id') == result.get('operation_id')]
                     starts = [r for r in native_events[:admissions[0][0]] if r.get('phase') == 'artifact_delivery_prepared' and r.get('operation_id') == result.get('operation_id')]
-                    if (len(complete) != 1 or len(starts) != 1 or not native_identity(complete[0],expected)
-                            or not native_identity(starts[0],expected) or value_digest(complete[0].get('result')) != value_digest(output)):
+                    restarts = preupload_delivery_restarts(native_events[:admissions[0][0]],result.get('operation_id'))
+                    if (len(complete) != 1 or len(starts) != 1+len(restarts) or not native_identity(complete[0],expected)
+                            or any(not native_identity(start,expected) for start in starts)
+                            or value_digest(complete[0].get('result')) != value_digest(output)):
                         raise ValueError('cli_node_delivery_path_receipt')
+                    verify_preupload_public_resumes(calls,result['operation_id'],restarts,expected)
                     uploads[output['upload_operation_id']] = dict(artifact_id=starts[0]['artifact_id'],destination=output['destination'])
         checkpoint,outcome = checkpoints[0][1]['result'],ends[0][1]['outcome']
         if (checkpoint.get('status') != 'SUCCEEDED' or checkpoint.get('operation_id') != operation_id
