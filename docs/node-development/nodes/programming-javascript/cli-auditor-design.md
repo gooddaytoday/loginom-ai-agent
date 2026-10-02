@@ -432,3 +432,23 @@ model check и общий writer auditor требуют **openai/gpt-6.1-sol / l
 Старая модель в user или assistant metadata отвергается.68 адресных tests
 и provenance5045 PASS; это source проверка, actual candidate/live ещё впереди.
 [Scope и receipt](checkpoint.md#f-same-task-source-review-и-модель-общего-аудитора--2026-10-02).
+
+
+### Original и redacted CLI delivery — 2026-10-02
+
+Live J21 read04 выявил различие исходной SQLite terminal projection и очищенного
+CLI stdout: составной Save содержит несколько JSON text blocks. Обрабатывать
+их regex как единый текст нельзя — теряются кавычки; hash очищенного ответа
+также не обязан совпадать с raw SQLite. QA collector до очистки вычисляет только
+SHA256 безопасной terminal projection, после очистки — SHA256 всего публичного
+события. Зарезервированное `_capture_terminal` создаёт только original collector;
+producer не может его передать. Whole acceptance требует эту привязку для
+каждого tool event и неизменные original capture files. Metadata auditor сверяет
+raw digest с новым read-only SQLite projection, sanitized digest с событием,
+оставляя строгие identity/deadline/truncation guards. Без binding прежняя точная
+сверка остаётся доступна изолированным unit audits; whole acceptance её не
+принимает. JSON sequence чистится структурно, known secrets собираются сразу
+из всех блоков. Секреты и исходный stdout никогда не сохраняются.
+
+Это исправление существующей приёмки в согласованном плане. Повторная очистка
+старой SQLite полезна для regression, но не заменяет новый original live capture.

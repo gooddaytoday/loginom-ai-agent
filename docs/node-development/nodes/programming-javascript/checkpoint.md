@@ -2,17 +2,26 @@
 
 ## Текущее состояние
 
-**Пауза по прямому указанию пользователя, 2026-10-02.** Последний сохранённый
-прогресс: candidate03/reader03/pins03 готовы (docs9825deac58, code88548421a1).
-После сборки выполнено только чтение existing oracle transport и старого fidelity
-report для выбора J21-проверки; новый технический или автономный прогон не запускался.
-Способ remaining worst-case CLI J21 ещё не выбран; scripted provider не считать
-реальной моделью или автономной попыткой. Продолжить с блока candidate03 ниже:
-full-source/apply/output J21, затем две независимые Code/declared CLI trials.
-На паузе /proc проверен: candidate executables отсутствуют; acceptance_lease=null,
-acceptance.lock/registry.lock отсутствуют. Собственных живых handles нет.
-Untracked acceleration-review.md и файлы child worktree сохранены, не добавлены
-в коммиты. Новые live-действия — только после возобновления пользователем.
+**Работа возобновлена пользователем, 2026-10-02.** Candidate03/reader03
+проверены реальным GPT-6.1 Sol / low в обычном headed CLI: технический J21
+read04 доставил весь исходник 32768 UTF-8 bytes / 1024 LF lines / 8 chunks,
+выполнил существующий узел с сохранением настроек, прочитал полные 6×4 и
+завершил Save → native Close → logout. Это техническая проверка, не одна из
+двух автономных Code/declared trials. Original collector PASS; независимая
+SQLite-проверка исходника/24 ячеек PASS. Общая CLI/SQLite сверка первоначально
+FAIL (`cli_terminal_tool_coverage`): очистка двух составных Save-ответов меняла
+текст и повреждала JSON. Исправление QA проходит адресные проверки; требуется
+новый committed candidate/reader и свежий headed-прогон, старый FAIL не повышать.
+
+Read04 безопасно завершён: own final Save `save-js-final-01`,
+`saved-package-cleanup.json` SHA256
+`52fecbd54643d04f47169957b64f21c88e8c12f33228bce4b01b4e25556503a5`,
+package_closed/logged_out=true, packages1→0, discard=false; `.writer` отсутствует,
+/proc candidate executables отсутствуют. Lease read04 освобождён до завершения
+original holder exec84785 (exit0); acceptance_lease=null, locks отсутствуют.
+Следующий шаг — завершить regression нового original/redacted binding,
+заморозить новые QA/candidate, затем свежий J21 и две независимые CLI trials.
+Untracked acceleration-review.md и файлы child worktree не добавлять.
 
 
 Назначение модели обновлено пользователем 2026-10-02: все будущие автономные
@@ -109,6 +118,61 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Technical maximum-source CLI J21 и устранение ошибки аудитора — 2026-10-02
+
+Private base: `~/.local/state/loginom-ai-agent/node-development/campaigns/javascript-20260926-ubuntu/`.
+На candidate03 фиксированный fidelity writer подготовил `f-j21-fixture-01`:
+32768 bytes / 1024 LF lines, SHA256
+`85acd23df49eed604fafc875942e6f8a75a26d1f9f65bab90ac71f3ce886f16e`;
+полный результат6×4, Save/Close/logout подтверждены. Модели переданы только
+путь собственного пакета и подтверждённый GUID существующего узла, не код и
+не ожидаемые значения. Поэтому эта проверка не доказывает автономное нахождение
+GUID через workspace observer: observer возвращает UI label/TID, а публичному
+existing node contract нужен GUID и native graph binding.
+
+Сохранённые неуспешные попытки:
+
+- `f-cli-j21-read-01`: модель использовала label вместо GUID; контекст отказал
+  без эффекта, Save отсутствовал. Native cleanup правильно отказал с
+  CONFIRMED_SAVE_REQUIRED. Разрешённый headed admin recovery закрыл только
+  собственный пакет/сеанс `jsteach:4509`, подтвердил отсутствие, logout и
+  завершение процессов (`f-j21-admin-recovery-01.jsonl`, `recovery.json`).
+  Original `.writer` сохранён, профиль не переиспользовать; прогон FAIL.
+- `f-cli-j21-read-02`: ошибочное указание оператора `schema_mode:preserve`
+  исправлено моделью после REQUEST_REJECTED на пустые parameters. Но ранний
+  checkpoint с новым путём изменил navigation до первого node binding;
+  packageContinuations отфильтровал ещё не привязанный workflow. Apply отказал
+  до эффекта (`Prepared workflow navigation changed`). Собственный Save/Close/
+  logout подтверждены, но чтения source/результата не было. Это открытая граница
+  early Save/new-path continuation, не успешный JavaScript trial.
+- `f-cli-j21-read-03`: readiness LOGINOM_CONNECTION_NOT_READY, модель и пакет не
+  запускались. Причина не установлена. Следующая default MCP catalog проверка14
+  успешно получила15 tools/7.4.2; это не доказательство причины предыдущего сбоя.
+
+`f-cli-j21-read-04`: actual CLI PID379264, session
+`ses_f02bcc7b2ffeRtZKHbFgKm1mPu`, original collector exec84785 exit0/PASS.
+Same-path initial Save, existing apply parameters{}, fresh Execute,
+context/source8chunks/context, final Save/Close/logout. 19 completed tools,
+metadata.truncated=false. `delivery-audit.json`: source digest/32768/1024,
+8 непрерывных4096-byte chunks и все24 typed cells PASS; knowledge digest
+`9a4b79833948e2441a0594131708c530fb5da739cd2eea1ebb8787221dfb122d`.
+Максимум flattened text25023bytes/5lines; отдельная оценка wrapped flattened
+text26139bytes не является замером полного исходного MCP structuredContent.
+`model-delivery-binding.json` сохраняет первоначальный FAIL: только два
+составных Save output отличаются по digest/bytes после redaction; их JSON
+повреждён текстовой очисткой. SQLite/receipt/effect не подменять этим FAIL.
+
+QA исправление `29068cc7fd` связывает digest исходной terminal projection из приватной
+pipe с digest очищенного события; сырые ответы/секреты на диск не пишет,
+поддельное reserved binding от producer отвергает. Строгая сверка исходного
+hash с SQLite, владельца, сроков, truncated, original capture/controller и
+неизменности frozen evidence сохраняется. Несколько JSON text blocks сначала
+очищаются как структуры, затем сериализуются. Offline regression на собственных
+read04 данных (`f-j21-redaction-regression-01`) разбирает19 calls и проходит
+SQLite delivery audit; это реконструкция для проверки кода, не original capture
+и не новый live PASS. Адресный набор:104 PASS,2 SKIP (private native fixtures
+не переданы этому запуску), actual exit0. Две автономные trials ещё не начаты.
 
 ### Candidate03 и согласованный QA freeze готовы — 2026-10-02
 
