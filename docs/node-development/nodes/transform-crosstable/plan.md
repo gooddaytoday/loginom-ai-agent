@@ -40,7 +40,7 @@
 | Коммит | Источник | Содержание |
 |---|---|---|
 | `bb9fcc066` | cherry-pick `eed1ddbbb` | Бюджет готовности Host при старте; без него LAB-7 упал с `LOGINOM_HOST_TIMEOUT` |
-| `05dc61f23` | cherry-pick `ccfe5cddf` | Сохранение адреса стенда при перезапуске (draft [PR №24](https://github.com/gooddaytoday/loginom-ai-agent/pull/24)) |
+| `05dc61f23` | cherry-pick `ccfe5cddf` | Сохранение адреса стенда при перезапуске ([PR №24](https://github.com/gooddaytoday/loginom-ai-agent/pull/24) закрыт без слияния, исправление перенесено сюда) |
 | `ebbf5c7cd` | файлы из `ccfe5cddf`, линия `9e0a2c5a0` | `.husky/pre-push` с режимом `LOGINOM_NODE_WORKFLOW=cli`; `build-cli.ts --no-archive`, `cli-source-snapshot.ts`, `verify-cli-candidate.ts`, `packages/core/package.json`, `bun.lock`; `scripts/node-acceptance/cold-check.mjs`, `diagnostic-session.mjs` с тестом; `RUNBOOK.md`, документы процесса, раздел «Node development» корневого `AGENTS.md` |
 
 Этот подплан добавлен следующим коммитом. Исполнитель проверяет, что эти изменения входят в исходный SHA; если их нет — Blocked.
@@ -120,7 +120,7 @@
 |---|---|
 | Runtime базы | Обработчика CrossTable нет; зарегистрированы 14 других типов (`packages/loginom-runtime/client/lib/node-contracts.mjs:7-22`) |
 | Реестр базы | `plan_status: discovery_required`, `handler: null`, `queue_class: backlog`, шесть отрицательных слоёв готовности (`docs/node-development/registry.json:5028-5084`) |
-| Прежняя реализация | PR №15 (merge `bacebd569`) и №17 (`9b17e7dd9`) слиты в `loginom` 2026-09-30; сейчас `loginom` снова на `a8ad59766`, revert-коммита нет. Код — в `origin/crosstable-status` (`b9657a65d`) и линии `multica`. Принятая голова `f0b38a68` (LOG-36 PASS, 1390 с). Пилот Multica LAB-9 PASS на `ccfe5cddf` (617 и 653 с) проверял ту же прежнюю реализацию. На новую реализацию эти PASS не переносятся |
+| Прежняя реализация | PR №15 (merge `bacebd569`) и №17 (`9b17e7dd9`) слиты в `loginom` 2026-09-30; сейчас `loginom` снова на `a8ad59766`, revert-коммита нет. Код — в `origin/crosstable-status` (`b9657a65d`); ветки `multica` и `preserve-stand-url` удалены 2026-10-02. Принятая голова `f0b38a68` (LOG-36 PASS, 1390 с). Пилот Multica LAB-9 PASS на `ccfe5cddf` (617 и 653 с) проверял ту же прежнюю реализацию. На новую реализацию эти PASS не переносятся |
 | Обвязка Multica | `accept.py`: модель из конфигурации, 7200 с, вложения `task.md` и все файлы `acceptance/data/`, затем `cold-check.mjs` из проверяемого checkout. PASS требует `cli_exit=0`, `oracle_exit=0`, oracle PASS, отсутствия timeout, `package_closed` и `logged_out`. Модель запускается в bwrap: окружение очищено, `HOME` — каталог попытки, `LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG=1`. Из рабочих путей монтируются только кандидат, скрипты обвязки, каталог попытки и файл OAuth, поэтому `AGENTS.md` и `~/.claude` модели не видны |
 | E2E | `e2e-tests@486caef44`: 43 сценария, из них 41 активный и 2 `skip` (`sliding_uniq_values.ts:110` и `:116`, второй — карантин issue 753); метка `:toreview` — это не приёмка |
 | Справка | [Кросс-таблица](https://help.loginom.ru/userguide/processors/transformation/cross-table.html) = `loginom-help@bc499e4b:data/processors/transformation/cross-table.md` |
