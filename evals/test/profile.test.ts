@@ -5,7 +5,7 @@ import os from "node:os"
 import { spawn } from "node:child_process"
 import { loadConfig, repoRoot } from "../src/config"
 import { agentCommand } from "../src/cli"
-import { agentConfigJson, assertAuth, ensureProfile, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "../src/profile"
+import { agentConfigJson, assertAuth, ensureProfile, management, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "../src/profile"
 import { EvalFailure } from "../src/fail"
 
 const stateFile = async (view: object) => {
@@ -20,6 +20,26 @@ const fakeProfile = async (env: Record<string, string> = {}) => {
   const command = agentCommand(config)
   return { config, command: { ...command, env: { ...command.env, ...env } }, profileDir }
 }
+
+test("management: закрывает собственный detached host и сохраняет ready", async () => {
+  const context = await fakeProfile()
+  const pidFile = path.join(context.profileDir, "management-child.pid")
+  try {
+    const result = await management({ ...context.command, env: { ...context.command.env,
+      EVAL_FAKE_ORPHAN_PID_FILE: pidFile, EVAL_FAKE_DETACHED_CHILD: "1", EVAL_FAKE_EXIT_DELAY_MS: "600" } },
+      ["loginom", "status", "--format", "json"])
+    const pid = Number(await Bun.file(pidFile).text())
+    const state = (await Bun.$`ps -o stat= -p ${pid}`.quiet().nothrow()).text().trim()
+    expect(result.exitCode).toBe(0)
+    expect(JSON.parse(result.stdout).state).toBe("ready")
+    expect(state === "" || state.startsWith("Z")).toBe(true)
+    expect(result.processCleanup.status).toBe("confirmed")
+  } finally {
+    if (await Bun.file(pidFile).exists()) {
+      try { process.kill(Number(await Bun.file(pidFile).text()), "SIGKILL") } catch {}
+    }
+  }
+}, 15_000)
 
 test("releaseStaleWriter: живой host в зарегистрированной группе сохраняет guard", async () => {
   const profile = await mkdtemp(path.join(os.tmpdir(), "evals-group-"))

@@ -4,6 +4,7 @@ import { repoRoot, type EvalConfig } from "./config"
 import type { AgentCommand } from "./cli"
 import { EvalFailure } from "./fail"
 import { groupProcesses } from "./process-group"
+import { superviseProcess } from "./process-supervisor"
 
 type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean }
 
@@ -14,18 +15,11 @@ const exists = (file: string) =>
   )
 
 export async function management(command: AgentCommand, args: string[], stdin?: string, timeoutMs = 120_000) {
-  const proc = Bun.spawn([...command.cmd, ...args], {
-    cwd: command.cwd,
-    env: command.env,
-    stdin: stdin === undefined ? "ignore" : new Blob([stdin]),
-    stdout: "pipe",
-    stderr: "pipe",
-  })
-  const timer = setTimeout(() => proc.kill("SIGKILL"), timeoutMs)
-  const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()])
-  const exitCode = await proc.exited
-  clearTimeout(timer)
-  return { exitCode, stdout, stderr }
+  const result = await superviseProcess({ cmd: [...command.cmd, ...args], cwd: command.cwd,
+    env: command.env, profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs })
+  if (result.processCleanup.status !== "confirmed")
+    throw new EvalFailure(`Management cleanup failed: ${result.processCleanup.error ?? "unconfirmed"}`, 1)
+  return result
 }
 
 export function parseView(text: string): View | undefined {
