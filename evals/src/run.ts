@@ -6,7 +6,7 @@ import { agentInputsHash, buildAgentPrompt, loadTasks, rubricHash, taskTimeoutMs
 import { agentCommand, runAgent, type AgentCommand } from "./cli"
 import { cleanupArtifact, fetchArtifact, listStorage, parseArtifactSource, type ArtifactSource } from "./artifact"
 import { preflight } from "./preflight"
-import { assertAuth, ensureProfile, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
+import { assertAuth, ensureProfile, managementRuntimeDirectories, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
 import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { archiveDiagnostics } from "./diagnostics"
 import type { ProcessCleanup } from "./process-supervisor"
@@ -301,6 +301,7 @@ async function prepareProfile(config: EvalConfig, command: AgentCommand) {
   await ensureProfile(config, command)
   await assertAuth(config, command)
   await recoverIfNeeded(command, 2)
+  await pruneRuntimeAttempts(config.profileDir, await managementRuntimeDirectories(command))
 }
 
 export async function afterAttempt(config: EvalConfig, command: AgentCommand, result: AttemptResult, outDir?: string) {
@@ -319,7 +320,7 @@ export async function afterAttempt(config: EvalConfig, command: AgentCommand, re
     const recovery = await recoverIfNeeded(command, 1)
     result.profile_recovered = released || recovery.recovered
     evidence.stages.push({ stage: "ready", status: "confirmed" })
-    await pruneRuntimeAttempts(config.profileDir)
+    await pruneRuntimeAttempts(config.profileDir, [...evidence.processes.runtimeDirectories, ...await managementRuntimeDirectories(command)])
     evidence.stages.push({ stage: "pruning", status: "confirmed" })
     result.environment_cleanup = { status: "confirmed", evidence: "cleanup.json", error: null }
     return { recovered: result.profile_recovered }
