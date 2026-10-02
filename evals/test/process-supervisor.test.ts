@@ -74,7 +74,7 @@ test("supervisor: потеря argv не стирает уже доказанн�
   const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-browser-lifecycle-bundle-"))
   await cp(Bun.which("node")!, path.join(bundle, "chrome"), { dereference: true })
   const script = path.join(bundle, "browser.mjs")
-  await Bun.write(script, "process.on('SIGTERM',()=>{}); setTimeout(()=>{process.title=''},400); setInterval(()=>{},1000)")
+  await Bun.write(script, "process.on('SIGTERM',()=>{}); setTimeout(()=>{process.title=''},40); setInterval(()=>{},1000)")
   await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
   const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: out })
   const pidFile = path.join(out, "browser.pid")

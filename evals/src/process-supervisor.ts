@@ -46,11 +46,10 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
     const name = raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(")"))
     relevant ||= /^(?:loginom-ai-|chrome|chromium)/.test(name) || owners.some((owner) =>
       owner.pid === pid || owner.pid === Number(fields[1]) || owner.group === Number(fields[2]) && owner.session === Number(fields[3]))
-    const initialArgs = (await readFile(path.join(directory, "cmdline"), "utf8")).split("\0").filter(Boolean)
-    relevant ||= initialArgs.some((arg) => /(?:node-host\.mjs|standalone\.ts|loginom-ai-agent-cli)$/.test(arg))
     const executable = await readlink(path.join(directory, "exe"))
     const info = await stat(path.join(directory, "exe"))
     const args = (await readFile(path.join(directory, "cmdline"), "utf8")).split("\0").filter(Boolean)
+    relevant ||= args.some((arg) => /(?:node-host\.mjs|standalone\.ts|loginom-ai-agent-cli)$/.test(arg))
     const finalExecutable = await stat(path.join(directory, "exe"))
     const finalRaw = await readFile(path.join(directory, "stat"), "utf8")
     const final = finalRaw.slice(finalRaw.lastIndexOf(")") + 2).split(" ")
@@ -297,7 +296,14 @@ export async function superviseProcess(input: {
     return scanning
   }
   await checkedScan()
-  const poll = setInterval(() => { if (!stopped) void checkedScan() }, 100)
+  // Browser launch argv can be replaced within tens of milliseconds. Sample
+  // the admission window faster; do not enqueue stale scans when /proc is slow.
+  let pollPending = false
+  const poll = setInterval(() => {
+    if (stopped || pollPending) return
+    pollPending = true
+    void checkedScan().finally(() => { pollPending = false })
+  }, browser ? 10 : 100)
   const signalOwned = async (signal: NodeJS.Signals) => {
     await checkedScan()
     for (const saved of ledger.values()) {
@@ -351,7 +357,6 @@ export async function superviseProcess(input: {
   await checkedScan()
   if (!cleanup.error) cleanup.status = "confirmed"
   if (cleanup.status !== "confirmed") cleanup.status = "failed"
-  if (marker && cleanup.status === "confirmed") await rm(marker, { force: true })
   await Promise.race([streams, Bun.sleep(1000).then(() => {
     if (!proc.stdout!.readableEnded || !proc.stderr!.readableEnded) {
       cleanup.capture_complete = false
@@ -368,8 +373,13 @@ export async function superviseProcess(input: {
     exitCode: cliExitCode ?? proc.exitCode ?? -1, timedOut, interrupted, startedAt, durationMs: Date.now() - startedAt,
     processCleanup: cleanup }
   if (input.outDir) {
-    await Bun.write(path.join(input.outDir, "process-cleanup.json"), JSON.stringify(cleanup, null, 2))
+    await Bun.write(path.join(input.outDir, "process-cleanup.json"), JSON.stringify(cleanup, null, 2)).catch(() => {
+      cleanup.status = "failed"; cleanup.error ??= "Process evidence persistence failed"
+    })
   }
+  if (marker && cleanup.status === "confirmed") await rm(marker, { force: true }).catch(() => {
+    cleanup.status = "failed"; cleanup.error ??= "Process registration release failed"
+  })
   await rm(path.join(capsule, "command.json"), { force: true })
   if (cleanup.status === "confirmed") await rm(capsule, { recursive: true, force: true })
   return result
