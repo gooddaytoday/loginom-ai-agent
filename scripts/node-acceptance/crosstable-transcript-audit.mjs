@@ -32,9 +32,14 @@ export function auditCrossTableTranscript(events){
  need(nodes.every(n=>n.document_id===nodes[0].document_id&&n.workflow_id===nodes[0].workflow_id),'foreign report workflow');
  const sources=created.map(c=>{need(c.input.inputs?.length===1&&c.input.inputs[0].input===0,'initial source edge missing');return c.input.inputs[0].source;});
  need(sources.every(s=>['document_id','workflow_id','node_id'].every(k=>s[k]===sources[0][k])),'reports have different imports');
- const signature=input=>input.source?JSON.stringify(input.source):typeof input.settings?.source?.source_path==='string'?input.settings.source.source_path:null;
+ const signature=input=>{
+  const p=input.parameters,path=p?.settings?.source?.source_path;
+  return p?.source||typeof path==='string'?JSON.stringify({source:p.source?{
+   artifact_id:p.source.artifact_id,upload_operation_id:p.source.upload_operation_id}:null,path:path??null}):null;
+ };
  const updates=applies.filter(c=>c.input.target?.type==='imports.text'&&c.input.target.kind==='existing'
-  &&c.input.target.ref?.node_id===sources[0].node_id&&signature(c.input)&&succeeded(settled(c)));
+  &&['document_id','workflow_id','node_id'].every(k=>c.input.target.ref?.[k]===sources[0][k])
+  &&signature(c.input)&&succeeded(settled(c)));
  need(updates.length>0,'successful input source replacement missing');
  const update=updates.at(-1),boundary=settled(update).index;
  const originalImport=applies.find(c=>c.input.target?.type==='imports.text'&&succeeded(settled(c))&&settled(c).result.node?.node_id===sources[0].node_id);
