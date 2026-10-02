@@ -118,6 +118,21 @@ PID/start/UID/boot, session/known descendants, actual exit0 и guard absence;
 controller binding всех известных own runtime/browser identities; escaped до
 first observation descendants этим observer не подтверждены. Никаких signal/kill
 операций в collector нет, first terminal failure сохраняется.
+На9b8e40b418 `JavascriptProcessController` создаёт actual original standalone
+Popen с обычным Sol/low/headed argv, сохраняя original30-minute ceiling, file bytes,
+candidate before/after и OS executable/entry identities. Detached browser от
+Playwright обнаруживается отдельно по exact pinned executable и own user-data-dir;
+его session и известные PID/start сохраняются после root exit. Headed/sandbox/
+direct policy, inode/ctime и observation failures проверяются без raw argv export.
+Cold factory повторно читает own writer SQLite и original delivery, требует
+last-native-Save/Close/logout plus original process finish, затем запускает только
+exact-path reader в отдельном fresh profile с10-minute ceiling и frozen file pins.
+Process-only или чужой serialized receipt такого запуска не разрешает.
+Source tests15/9/11 и Host25+6 не являются candidate factory/native live proof.
+До F остаются redacted stream/native capture, lease/deadline/cancellation loop и
+complete cold imports freeze к candidate runtime; whole auditor всё ещё открыт.
+CLI Node Host передаёт explicit visibility и в preflightHeadless наab721a703e;
+Desktop direct-host default сохранён, cleanup flag от visibility независим.
 `managed-resources-close.mjs` уже проверяет реальный bridge result перед success
 resource ACK; absent/rejected/false result или retained leases не подтверждают
 shutdown. Actual IPC/socket/profile tests не являются native package/logout proof.

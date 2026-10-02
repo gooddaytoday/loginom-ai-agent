@@ -9,8 +9,11 @@ private host-owned boolean только standalone `run`, путь и Save ID в
 Прежнее ожидание выбора снято этим поручением; повторное согласование не требуется.
 Private routing/normal receipt реализованы на49dcfa0d99; retired failure сохранён
 наff8b2c62a1. Normal cleanup binding наeb051d9b77/948bc6ad8d и Linux process
-observer наec73da6a73 проверены отдельно. Текущий шаг — связать observer с actual
-standalone/cold controller и завершить whole composition, затем same-task F и fresh ordinary
+observer наec73da6a73 проверены отдельно. Controller source на9b8e40b418 теперь
+связывает original CLI/cold launch handles, detached own-profile browser и native
+Close gate; CLI preflight headed наab721a703e. Текущий шаг — подключить безопасный
+сбор redacted evidence и freeze cold reader к candidate runtime, завершить whole
+composition, затем same-task F и fresh ordinary
 headed candidate/Sol trials. Общая цель не достигнута и не сужается. На старте
 этого шага child797927 tracked clean, browser/candidate/CLI не запускались,
 lease450 closed_verified, прежние own test handles terminal. Дополнительных
@@ -19,7 +22,7 @@ OpenViking checks/errors не было. Untracked acceleration-review не вк�
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
 standalone CLI transport/bundle/admission/public-node/Save binding. Child
-**948bc6ad8d63a027ac87eb251e1ea5ec18ab9ed8** tracked clean; registration на161353
+**9b8e40b418e1defe8dbeb07f305f5fd240c32eea** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 первоначальных адресных test methods PASS; усиленная configuration/output
 regression9PASS теперь включает62 non-noop native mutations.
@@ -34,8 +37,9 @@ Compact public-node binding дополнительно17PASS на actual runtime
 receipts/defaults и реальной SQLite. Last Save/dirty-state binding дополнительно19PASS;
 cold source/state/Execute/full6×4 отдельно9PASS на immutable captures,
 включая32KiB/1024LF и3×8 native chunks;
-Normal CLI package/logout source route и отдельный normal receipt auditor реализованы;
-fresh native/process-controller proof и итоговая связка ещё открыты.
+Normal CLI package/logout source route, normal receipt auditor и original
+launch/process controller реализованы. Source/controller tests не являются
+fresh native/controller proof; итоговая связка ещё открыта.
 Resource close ACK исправлен на797927:28 runtime/25 client/3 Host tests PASS;
 fresh standalone Save не запускался.
 Late model-output-read delivery binding дополнительно11PASS; native source/fresh
@@ -66,6 +70,81 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: original CLI/cold controller и headed preflight — 2026-10-02
+
+Child **ab721a703e8a834f634755f1691f7eb9c573b8f2** передаёт существующий
+explicit CLI `headless` также в private shared-host `preflightHeadless`.
+Readiness и connection check обычного CLI теперь тоже headed при обычном запуске;
+package cleanup policy от visibility не зависит. Direct Desktop host сохраняет
+свой прежний default. Actual compiled Node Host/IPC: six policy×visibility cases
+сверяют все three startup routes; отдельная direct-host проверка сохраняет Desktop
+default. Host groups25PASS/224expects и Node Host6PASS/25expects в отдельных
+original processes, Host и Agent `bun typecheck` actualexit0. Combined command
+с четырьмя файлами дал20PASS/1FAIL: `Unexpected reading file` при подготовке второго
+compiled-host fixture. Этот original failure сохранён, отдельные owning commands
+завершились0; причина ошибки Bun не объявляется установленной.
+
+Child **9b8e40b418e1defe8dbeb07f305f5fd240c32eea** добавляет
+`javascript_cli_controller.py`. Normal factory сверяет candidate до/после,
+исходные file bytes и чистую task directory, отсутствие writer guard/bundle
+override, графическую сессию; строит обычный Sol/low `run --no-headless` argv.
+Держит actual `Popen(start_new_session=True)` и original30-minute ceiling,
+проверяет live executable и Node Host/managed-runtime entry identities.
+Cold factory допускает только этот writer, повторно читает own SQLite, сверяет
+full delivery по original files/30 minutes, последний native Save/Close/logout и
+original process finish; Close timestamps обязаны лежать внутри original attempt.
+Использует отдельный exact-path reader, новый пустой profile/evidence и600000ms
+от своего запуска; source/settings/oracle параметров в cold argv нет.
+
+Linux observer теперь независимо находит detached browser по exact executable,
+SHA/inode и собственному `--user-data-dir` внутри owner profile. Его OS session
+и известные PID/start сохраняются после reparenting; headless/no-sandbox/отсутствие
+direct proxy flag или stale browser отказывают. Live inode digest кэшируется только
+при неизменных inode/size/mtime/ctime и внешнем pin, без повторного чтения всего
+Chromium каждые несколько десятков ms. На Ubuntu argv сначала связывает own
+profile: non-dumpable foreign same-UID service не требует чтения exe; ошибка
+чтения own identity сохраняется до финального отказа. Sandboxed typed children
+наблюдаются по browser session/PID/start, без заявления полного proof для
+неизвестных detached descendants. Collector не посылает signals, не replay'ит
+работу и не превращает позднюю уборку в первоначальный PASS. При setup error
+factory сохраняет actual handle для owner в `JavascriptLaunchUnconfirmed`.
+
+Также исправлен verified actual staging path knowledge:
+`resources/loginom/runtime/client/lib/javascript-knowledge.mjs`; прежний
+`resources/loginom/client/lib` был ошибкой partial auditor/fixtures, а не product.
+Обязателен actual `runtime/src/managed-entry.mjs`. Physical candidate11PASS,
+включая coherent legacy-layout refusal; controller15PASS на actual Python
+Popen/PID-fd/detached-process fixtures, observer regression9PASS. Первый controller
+command failed на foreign `/proc/.../exe` и оставшихся старых fixture paths;
+исправления и original receipts сохранены. Fixtures не представляют Chromium,
+compiled CLI или модель. Runtime ACK/native/model/cold/whole acceptance flags
+controller остаются false. Source provenance5045actualexit0.
+
+Приватный validation receipt:
+`campaigns/javascript-20260926-ubuntu/f-cli-controller-validation-v1.json`, SHA256
+`5d5dd74e9c966c12b7e90edb5430a95c5a444bdfe1a35228eda16097a6502986`.
+Он связывает9 source files, оба commits,18 original test/log receipts и actual
+terminal exits. Финальные команды — из package directories с Node24.19.0/Bun1.3.14:
+`bun test test/saved-package-shutdown.test.ts test/host.test.ts test/host-port.test.ts`
+(baf3a5→ccd0a8,25PASS), отдельно `bun test test/node-host.test.ts`
+(fcf0f6→8462c1,6PASS); Python discover patterns `test_javascript_cli_controller.py`
+(f43278→012d19,15PASS), `test_javascript_cli_processes.py` (d517ed,9PASS),
+`test_javascript_cli_candidate.py` (4ba6c2,11PASS).
+Host typecheck d767c3 и Agent c553fe→db98cc завершились0;
+provenance cc9220 —5045. Failed original controller45a3f5,
+candidate ca8801 и combined Host0ee3f7→aeb893 не стираются.
+
+Browser/candidate/model/live lease в этой итерации не запускались и не менялись;
+own test handles terminal. OpenViking Experience find/read успешно дали
+`ubuntu_headed_browser_execution.md`; health/doctor не вызывались, memory error нет.
+`acceleration-review.md` не добавлен. Следующий шаг — безопасный capture очищенных
+stdout/stderr/native journals, freeze всех cold dependencies с imports к candidate
+runtime, затем `javascript_node_acceptance.py` whole composition. Эти factory APIs
+пока не запускались на product candidate; не заменяют controller capture loop,
+native journal authenticity, lease и bounded deadline/cancellation orchestration.
+Same-task F → fresh headed candidate/J01/J21/J27 → two normal Sol/low trials остаются
+в прежнем порядке; accepted registry14 не меняется.
 
 ### Фаза 4: retained shutdown failure, normal receipt и Linux observer — 2026-10-02
 

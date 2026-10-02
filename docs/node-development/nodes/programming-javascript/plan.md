@@ -953,6 +953,12 @@ Normal receipt auditor eb051/948bc —13PASS, Linux original process observer
 ec73da —9PASS. Их scope ограничен binding и фактическими test processes;
 native whole CLI proof и controller composition ещё открыты.
 [Checkpoint](checkpoint.md#фаза-4-retained-shutdown-failure-normal-receipt-и-linux-observer--2026-10-02).
+Controller source добавлен на **9b8e40b418e1**; CLI headed preflight —ab721a703e.
+Original handles/detached own-profile browser/cold native gate проверены
+controller15/observer9/candidate11/Host25+6 tests, typechecks/provenance PASS.
+Это source/process fixtures, не actual candidate/native CLI proof. До общего
+аудитора подключить redacted capture/deadline orchestration и freeze complete cold
+dependencies с imports к candidate runtime. [Checkpoint](checkpoint.md#фаза-4-original-clicold-controller-и-headed-preflight--2026-10-02).
 `javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
 он должен связать native проверки с фактическими standalone CLI evidence
 model/input/candidate/Save/cold/cleanup до ready_for_acceptance.

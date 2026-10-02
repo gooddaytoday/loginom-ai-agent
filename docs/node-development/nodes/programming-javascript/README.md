@@ -43,6 +43,10 @@ Retired failure сохранён наff8b2; normal receipt binding eb051/948bc (
 Linux Popen/session observer ec73da (9PASS) реализованы с явными scope limits.
 Whole CLI/controller/native fresh evidence пока не подтверждены.
 [Checkpoint](checkpoint.md#фаза-4-retained-shutdown-failure-normal-receipt-и-linux-observer--2026-10-02).
+CLI headed preflight наab721a703e и original CLI/cold launch controller на9b8e40b418
+проверены source/actual-process tests15+9+11/Host25+6, typechecks/provenance PASS.
+Actual candidate factory/capture loop и whole auditor ещё не выполнены.
+[Текущий шаг и границы](checkpoint.md#фаза-4-original-clicold-controller-и-headed-preflight--2026-10-02).
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·

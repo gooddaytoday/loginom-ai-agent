@@ -11,6 +11,12 @@ Linux по принадлежащему `Session.Version.IsWindows=false`; ди�
 Исходные отчёты и журналы находятся в приватной кампании; подтверждённые SHA,
 ревизии операторов и границы каждой попытки перечислены в [checkpoint](checkpoint.md).
 
+Фаза4 source на9b8e40b418: original CLI/cold launch controller и detached-browser
+ownership; ab721a703e сохраняет headed для CLI preflight. Controller15/observer9/
+candidate11/Host25+6 tests/typechecks/provenance PASS, без нового браузера/модели.
+Safe redacted capture/cold freeze/whole auditor и fresh candidate/CLI остаются
+открытыми. [Текущий checkpoint](checkpoint.md#фаза-4-original-clicold-controller-и-headed-preflight--2026-10-02).
+
 Исходная сводка обновлена по [acceleration review](acceleration-review.md) на docs
 `13a02e8be2` / code `7b8e19bee0`; позже выполнен B-live на code `f8ceebcac9`.
 Решение 0B доказывает осуществимость/выбирает контракт; последняя колонка
