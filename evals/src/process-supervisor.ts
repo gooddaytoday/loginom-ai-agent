@@ -67,6 +67,18 @@ function identity(view: ProcessView): ProcessIdentity {
     group: view.group, session: view.session, executable: view.executable, device: view.device, inode: view.inode }
 }
 
+/** The syscall uses a PID only after a fresh birth/executable/group check.
+ * A persisted numeric PGID never authorizes signaling its current members.
+ */
+export async function signalProcess(saved: ProcessIdentity, signal: NodeJS.Signals) {
+  const current = await processView(saved.pid)
+  if (!current) return
+  if (key(current) !== key(saved) || current.uid !== saved.uid || current.device !== saved.device ||
+    current.inode !== saved.inode || current.group !== saved.group || current.session !== saved.session)
+    throw Error(`Process identity changed PID ${saved.pid}`)
+  try { process.kill(current.pid, signal) } catch (error) { if (!gone(error)) throw error }
+}
+
 async function runtimeDirectories(profile: string): Promise<string[]> {
   const walk = async (directory: string): Promise<string[]> => {
     const entries = await readdir(directory, { withFileTypes: true }).catch((error) => {
@@ -192,12 +204,8 @@ export async function superviseProcess(input: {
     await checkedScan()
     for (const saved of ledger.values()) {
       try {
-        const current = await processView(saved.pid)
-        if (!current) continue
-        if (key(current) !== key(saved) || current.uid !== saved.uid || current.device !== saved.device || current.inode !== saved.inode)
-          throw Error(`Process identity changed PID ${saved.pid}`)
         // Individual signals avoid signaling a recycled PGID or an unknown member.
-        process.kill(current.pid, signal)
+        await signalProcess(saved, signal)
       } catch (error) { if (!gone(error)) cleanup.error ??= message(error) }
     }
   }
