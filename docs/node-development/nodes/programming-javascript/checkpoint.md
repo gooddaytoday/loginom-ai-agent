@@ -2,6 +2,28 @@
 
 ## Текущее состояние
 
+Блокер продолжения на2026-10-02: ожидается явный выбор нового normal CLI
+package teardown из [подготовленного дизайна](cli-auditor-design.md#предложение-штатного-cli-package-teardown).
+Async вопрос уже задан, ответа пока нет; не повторять его автоматически.
+Рекомендован automatic own last-confirmed-Save shutdown; альтернативный вариант
+— отдельный private lifecycle step после model terminal. Обычный Host/runtime
+package-close route отсутствует: повторная сверка `node-entry.ts:management`,
+`host-port.ts`, `host.ts:launch`, `standalone-run.ts:finally`, `bridge.mjs:close`
+подтвердила только special acceptance cleanup, который normal CLI не получает.
+Вопрос относится к новому поведению общего CLI, а не к уже принятому JS context
+контракту. [Brainstorming](/home/george/.agents/skills/brainstorming/SKILL.md)
+явно требует согласования до новой реализации: «until you have presented a
+ design and the user has approved it». Все ранее согласованные source fixes
+завершены и проверены; новый lifecycle не начинать по истечению времени или
+предвыбранному варианту. Это третья последовательная Goal-итерация с тем же
+препятствием; две последние итерации после source797927 — no_progress, не verified
+wait. Триггер возобновления — явный выбор/одобрение normal CLI teardown дизайна.
+После него fresh blocked audit начинается заново; дальше normal cleanup/auditor/
+composition, same-task F и fresh ordinary headed candidate/Sol trials. Общая
+цель не достигнута и не сужается. Исходники не менялись; новый browser/candidate/
+CLI/lease не запускался, прежние own test handles terminal. Дополнительных
+OpenViking checks/errors не было. Untracked acceleration-review не включать.
+
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
 standalone CLI transport/bundle/admission/public-node/Save binding. Child
