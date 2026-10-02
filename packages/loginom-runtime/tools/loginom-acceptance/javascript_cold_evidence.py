@@ -5,10 +5,9 @@ original process termination. This module never certifies those or whole CLI.
 """
 import copy
 import csv
-import hashlib
 import io
-from datetime import datetime
 from javascript_cli_evidence import value_digest
+from javascript_source_evidence import epoch,source_identity,verify_closed_source_read
 from javascript_cli_persistence import owned_package_path
 from import_execution_evidence import verify_execution_observations
 from import_output_evidence import verify_table_output_observations
@@ -17,16 +16,6 @@ from node_procedure_evidence import verify_internal_sequence
 
 OWNER_KEYS = ('document_id','workflow_id','node_id')
 READ_PHASES = ('source_open_dispatch','source_open_settled','source_discard_dispatch','source_discard_settled','source_delivery_verified')
-
-
-def epoch(text):
-    return int(datetime.fromisoformat(text.replace('Z','+00:00')).timestamp()*1000)
-
-
-def source_identity(source):
-    text = source.decode('utf-8')
-    if '\r' in text or '\x00' in text or not source or len(source) > 32768:raise ValueError('cold_source_contract')
-    return dict(source_sha256=hashlib.sha256(source).hexdigest(),source_utf8_bytes=len(source),source_lf_lines=text.count('\n')+1)
 
 
 def graph_meaning(graph,node):
@@ -276,38 +265,21 @@ def verify_javascript_cold(report,events,writer,expected,columns,expected_rows):
         if not sequence['passed'] or not proof['passed'] or proof['execution_id'] != execution_id:
             raise ValueError('cold_native_execute_procedure')
         deliveries = [(i,r) for i,r in enumerate(events) if r.get('phase') == 'source_delivery_verified']
-        offset = 0
+        reads = {}
+        for i,row in deliveries:
+            if (row.get('admission_id') != admission['admission_id'] or type(row.get('read_id')) is not int or row['read_id'] <= 0):
+                raise ValueError('cold_source_chunk_identity')
+            reads.setdefault(row['read_id'],[]).append((i,row))
         groups = []
         previous = preparations[0][0]
-        for i,r in deliveries:
-            receipt = r['receipt']
-            if (value_digest(r.get('owner')) != value_digest(admission['owner']) or r.get('admission_id') != admission['admission_id']
-                    or r.get('deadline') != ceiling or any(receipt.get(k) != v for k,v in metadata.items())
-                    or any(type(receipt.get(k)) is not int for k in ('source_utf8_bytes','source_lf_lines'))
-                    or type(r.get('read_id')) is not int or r['read_id'] <= 0
-                    or type(receipt.get('offset_utf8_bytes')) is not int or receipt['offset_utf8_bytes'] != offset
-                    or type(receipt.get('chunk_utf8_bytes')) is not int or not 0 < receipt['chunk_utf8_bytes'] <= 4096):
-                raise ValueError('cold_source_chunk_identity')
-            count = receipt['chunk_utf8_bytes']
-            chunk = source[offset:offset+count]
-            if len(chunk) != count or hashlib.sha256(chunk).hexdigest() != receipt.get('chunk_sha256'):raise ValueError('cold_source_chunk_bytes')
-            lifecycle = []
-            for phase in READ_PHASES:
-                found = [(j,v) for j,v in enumerate(events) if v.get('phase') == phase and v.get('read_id') == r['read_id']]
-                if (len(found) != 1 or found[0][0] <= previous or value_digest(found[0][1].get('owner')) != value_digest(admission['owner'])
-                        or found[0][1].get('admission_id') != admission['admission_id'] or found[0][1].get('deadline') != ceiling):
-                    raise ValueError('cold_source_read_lifecycle')
-                lifecycle.append(found[0][0])
-            if lifecycle != sorted(lifecycle):raise ValueError('cold_source_read_order')
-            previous = i
-            offset += count
-            if receipt.get('cursor_sha256') is None:
-                if offset != len(source):raise ValueError('cold_source_incomplete')
-                groups.append((lifecycle[0],i));offset = 0
-            elif (offset >= len(source) or not isinstance(receipt['cursor_sha256'],str) or len(receipt['cursor_sha256']) != 64
-                    or any(c not in '0123456789abcdef' for c in receipt['cursor_sha256'])):
-                raise ValueError('cold_source_cursor')
-        if (offset or len(groups) != 3 or not groups[0][1] < admissions[0] < groups[1][0] <= groups[1][1] < admissions[1]
+        for read_id in reads:
+            closed = [(i,r) for i,r in enumerate(events) if r.get('phase') in READ_PHASES and r.get('read_id') == read_id]
+            if any(r.get('admission_id') != admission['admission_id'] for i,r in closed):
+                raise ValueError('cold_source_read_lifecycle')
+            start,end = verify_closed_source_read(closed,source,metadata,admission['owner'],ceiling)
+            if start <= previous:raise ValueError('cold_source_read_order')
+            groups.append((start,end));previous = end
+        if (len(groups) != 3 or not groups[0][1] < admissions[0] < groups[1][0] <= groups[1][1] < admissions[1]
                 or not admissions[1] < groups[2][0] <= groups[2][1] < launches[0][0]):
             raise ValueError('cold_three_fresh_source_checks')
         mapping_rows = [(i,r) for i,r in enumerate(events) if r.get('phase') == 'port_mapping_observed']

@@ -6,6 +6,7 @@ The expected source and columns must be independently supplied by the operator.
 import hashlib
 import json
 from node_procedure_evidence import verify_internal_sequence
+from javascript_source_evidence import source_identity,verify_closed_source_read
 
 
 EXECUTE_PHASES = ('source', 'workflow', 'target', 'input_mapping', 'open',
@@ -94,6 +95,8 @@ def verify_javascript_configuration(events, request, expected_source, input_colu
     try:
         source_sha = hashlib.sha256(expected_source).hexdigest()
         text = expected_source.decode('utf-8')
+        metadata = source_identity(expected_source)
+        if metadata['source_lf_lines'] > 1024:raise ValueError('javascript_source_contract')
         if '\r' in text or '\x00' in text or len(expected_source) > 32768:
             raise ValueError('javascript_source_contract')
         operation = javascript_operation(events, request,expected_target=expected_target,expected_origin=expected_origin)
@@ -169,37 +172,27 @@ def verify_javascript_configuration(events, request, expected_source, input_colu
             and r.get('owner', {}).get('operation_id') == request['operation_id']]
         if not deliveries:
             raise ValueError('javascript_source_delivery_missing')
-        previous = position
-        offset = 0
+        groups = {}
         for index,row in deliveries:
-            receipt = row['receipt']
-            if (tuple(row.get(k) for k in ('session_id','runtime_revision','target')) != operation['identity']
-                    or any(row.get('owner', {}).get(k) != node[k] for k in OWNER_KEYS)
-                    or receipt.get('source_sha256') != source_sha or receipt.get('source_utf8_bytes') != len(expected_source)
-                    or receipt.get('source_lf_lines') != (text.count('\n')+1 if text else 0)
-                    or receipt.get('offset_utf8_bytes') != offset or type(receipt.get('chunk_utf8_bytes')) is not int
-                    or not 0 <= receipt['chunk_utf8_bytes'] <= 4096):
+            key = row.get('admission_id'),row.get('read_id')
+            if (not isinstance(key[0],str) or not key[0] or type(key[1]) is not int or key[1] <= 0):
                 raise ValueError('javascript_source_delivery_identity')
-            chunk = expected_source[offset:offset+receipt['chunk_utf8_bytes']]
-            if len(chunk) != receipt['chunk_utf8_bytes'] or hashlib.sha256(chunk).hexdigest() != receipt.get('chunk_sha256'):
-                raise ValueError('javascript_source_chunk')
-            if offset == 0:
-                interval = all_rows[previous+1:index]
-                opens = [r for r in interval if r.get('phase') == 'source_open_settled' and r.get('owner') == row.get('owner')]
-                closes = [r for r in interval if r.get('phase') == 'source_discard_settled' and r.get('owner') == row.get('owner')]
-                if (len(opens) != 1 or len(closes) != 1 or interval.index(opens[0]) >= interval.index(closes[0])
-                        or any(r.get('admission_id') != row.get('admission_id') or r.get('read_id') != row.get('read_id') for r in opens+closes)):
-                    raise ValueError('javascript_source_read_cleanup')
-            offset += receipt['chunk_utf8_bytes']
-            if receipt.get('cursor_sha256') is None:
-                if offset != len(expected_source):
-                    raise ValueError('javascript_source_incomplete')
-                offset = 0
-                previous = index
-            elif offset >= len(expected_source) or not receipt['chunk_utf8_bytes']:
-                raise ValueError('javascript_source_cursor')
-        if deliveries[-1][1]['receipt'].get('cursor_sha256') is not None:
-            raise ValueError('javascript_source_incomplete')
+            groups.setdefault(key,[]).append((index,row))
+        previous = position
+        for (admission_id,read_id) in groups:
+            admissions = [r['receipt'] for r in all_rows if r.get('phase') == 'javascript_source_admitted'
+                and r['receipt'].get('admission_id') == admission_id and r['receipt'].get('owner',{}).get('operation_id') == request['operation_id']]
+            if len(admissions) != 1:raise ValueError('javascript_source_admission_identity')
+            admission = admissions[0]
+            if (any(admission['owner'].get(k) != node[k] for k in OWNER_KEYS) or admission.get('deadline') != next(r['deadline_at'] for r in operation['rows'] if r.get('phase') == 'node_apply_prepared')):
+                raise ValueError('javascript_source_admission_owner_deadline')
+            closed = [(i,r) for i,r in enumerate(all_rows) if r.get('phase') in ('source_open_dispatch','source_open_settled',
+                'source_discard_dispatch','source_discard_settled','source_delivery_verified') and r.get('admission_id') == admission_id and r.get('read_id') == read_id]
+            if any(tuple(r.get(k) for k in ('session_id','runtime_revision','target')) != operation['identity'] for i,r in closed):
+                raise ValueError('javascript_source_delivery_identity')
+            start,end = verify_closed_source_read(closed,expected_source,metadata,admission['owner'],admission['deadline'])
+            if start <= previous:raise ValueError('javascript_source_read_order')
+            previous = end
         finish = phases['node_finish']['value']
         if (finish.get('wizard_commit_verified') is not True or finish.get('settings_preserved') is not True
                 or finish.get('source_sha256') != source_sha or finish.get('source_utf8_bytes') != len(expected_source)

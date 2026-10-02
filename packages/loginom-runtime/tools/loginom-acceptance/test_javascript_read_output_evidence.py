@@ -11,7 +11,8 @@ import shutil
 import subprocess
 import unittest
 from javascript_configuration_evidence import javascript_operation
-from javascript_read_output_evidence import verify_javascript_read_output,verify_closed_source_read
+from javascript_read_output_evidence import verify_javascript_read_output
+from javascript_source_evidence import verify_closed_source_read
 
 
 CHUNK_PRODUCER = r'''

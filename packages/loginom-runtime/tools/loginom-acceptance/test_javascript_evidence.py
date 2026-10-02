@@ -141,7 +141,10 @@ class JavascriptNativeRegressionTests(unittest.TestCase):
 
     def test_configuration_mutations_are_nonnoop_and_refused(self):
         for name,original,request,source,inputs,oracle in self.cases():
-            for case in ('owner','source_digest','source_chunk','source_cursor','source_close','settings','settings_digest','coherent_settings','mapping','phase','admission','session'):
+            baseline = verify_javascript_configuration(original,request,source,inputs,oracle['schema'])
+            self.assertTrue(baseline['passed'],baseline)
+            for case in ('owner','source_digest','source_chunk','source_cursor','source_close','source_open_dispatch','source_discard_dispatch',
+                    'source_step','source_read_id','source_deadline','source_epoch','source_admission','settings','settings_digest','coherent_settings','mapping','phase','admission','session'):
                 events = copy.deepcopy(original)
                 rows = [r for r in events if r.get('operation_id') == request['operation_id']]
                 phase = lambda n:next(r['receipt']['value'] for r in rows if r.get('phase') == 'node_phase_completed' and r['receipt']['phase'] == n)
@@ -154,6 +157,12 @@ class JavascriptNativeRegressionTests(unittest.TestCase):
                     if case == 'source_chunk':delivery['receipt']['chunk_sha256'] = '0'*64
                     if case == 'source_cursor':delivery['receipt']['cursor_sha256'] = '0'*64
                     if case == 'source_close':next(r for r in after_commit if r.get('phase') == 'source_discard_settled' and r.get('owner') == delivery['owner'])['phase'] = 'missing_discard'
+                    if case in ('source_open_dispatch','source_discard_dispatch'):next(r for r in after_commit if r.get('phase') == case and r.get('owner') == delivery['owner'])['phase'] = 'missing_dispatch'
+                    if case == 'source_step':delivery['step'] += 1
+                    if case == 'source_read_id':delivery['read_id'] += 1
+                    if case == 'source_deadline':delivery['deadline'] += 1
+                    if case == 'source_epoch':delivery['owner']['ui_epoch'] += 1
+                    if case == 'source_admission':delivery['admission_id'] = 'foreign'
                 if case in ('settings','settings_digest'):
                     r = next(r for r in rows if r.get('phase') == 'javascript_managed_source_settings_observed')
                     if case == 'settings':r['settings']['generation'] = not r['settings']['generation']
