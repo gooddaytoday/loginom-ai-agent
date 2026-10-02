@@ -26,23 +26,27 @@ filesystem proof, actual generic reader imports/native launch ещё не вып
 75 source/process tests PASS, fresh native CLI этим не подтверждён.
 Наb3878d0bd1 technical cold collection сохраняет original10-minute ceiling;
 исправлены new evidence directory, assignment preflight и release dependency freeze.
-Текущий шаг — связать campaign lease и завершить whole
-composition, затем same-task F и fresh ordinary
-headed candidate/GPT-6.1 Sol / low trials. Общая цель не достигнута и не сужается. На старте
-этого шага child797927 tracked clean, browser/candidate/CLI не запускались,
-lease450 closed_verified, прежние own test handles terminal. Дополнительных
-OpenViking checks/errors не было. Untracked acceleration-review не включать.
+Наe5e8c99286 manual campaign lease и whole writer/trial/pair composition
+реализованы как операторский API; источник дополнен SQLite revalidation
+на1a8d236b76. Текущий шаг — один same-task Astra/medium F, затем fresh ordinary
+headed candidate/J01/J21/J27 и две GPT-6.1 Sol / low CLI trials. Общая цель
+не достигнута и не сужается. Новые browser/candidate/CLI не запускались;
+lease450 closed_verified, preparation lease reserved_active, acceptance_lease=null,
+все собственные test handles terminal. Дополнительных OpenViking checks/errors
+не было. Untracked acceleration-review не включать.
 
 Актуальная граница на 2026-10-02: source product registration завершён;
-реализованы два независимых native-аудитора фазы 4 и частичные проверки
-standalone CLI transport/bundle/admission/public-node/Save binding. Child
-**b3878d0bd165df2b7e559b8010ce061a68bce307** tracked clean; registration на161353
+реализованы native-аудиторы фазы 4, standalone CLI evidence binding и общая
+writer/trial/pair composition. Child
+**1a8d236b76281b9c9dd17eabcf03cf142f9728d3** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 первоначальных адресных test methods PASS; усиленная configuration/output
 regression9PASS теперь включает62 non-noop native mutations.
-Итоговый `javascript_node_acceptance.py` ещё TO_IMPLEMENT: подготовить связку
-с фактическими standalone CLI model/input/candidate/Save/cold/cleanup evidence
-до ready_for_acceptance. [Дизайн и границы](cli-auditor-design.md).
+Итоговый `javascript_node_acceptance.py` реализован: original controllers/captures,
+manual lease, model/input/candidate/Save/cold/cleanup связаны в одном API.
+Source validation93PASS/provenance5045 и дополнительная SQLite regression23PASS
+не заменяют fresh compiled trials. `ready_for_acceptance` не повышен.
+[Дизайн и границы](cli-auditor-design.md#общая-композиция-и-manual-host-lease--2026-10-02).
 Новые CLI evidence/candidate модули прошли23 теста на физических SQLite/filesystem
 fixtures, actualexit0; никаких compiled CLI/browser runs в этой итерации нет.
 Admission дополнительно11PASS; CLI metadata binding13PASS; native regression9PASS
@@ -53,7 +57,7 @@ cold source/state/Execute/full6×4 отдельно9PASS на immutable captures
 включая32KiB/1024LF и3×8 native chunks;
 Normal CLI package/logout source route, normal receipt auditor и original
 launch/process controller реализованы. Source/controller tests не являются
-fresh native/controller proof; итоговая связка ещё открыта.
+fresh native/controller proof; итоговая standalone CLI-приёмка ещё открыта.
 Resource close ACK исправлен на797927:28 runtime/25 client/3 Host tests PASS;
 fresh standalone Save не запускался.
 Late model-output-read delivery binding дополнительно11PASS; native source/fresh
@@ -67,8 +71,13 @@ ordinary headed/independent audits/negative/cleanup. Lease450 closed_verified,
 active_exec=null, процессов/browser/tests нет. J02 public input подтверждён.
 После завершения исходников фазы 4 — один **same-task Astra/medium review**,
 затем candidate/J01/J21/J27 и GPT-6.1 Sol / low CLI.
-Последний подтверждённый task model gpt-6.1-sol/high; async запрос переключения этой же
-задачи pending, F review не выполнен. Product release/accepted registry не повышены.
+Пользователь ответил «готово» на запрос переключить эту же задачу на
+gpt-6-astra/medium. Подтверждение получено, вопрос не pending и не повторяется.
+Но latest actual turn_context 2026-10-02T11:52:02.980Z всё ещё
+gpt-6.1-sol/xhigh, turn_id=01a0fc2f-ea85-70f3-b490-8b30c93ed1d4.
+Предварительную source-проверку не засчитывать как F. Текущий ход завершается
+после сохранения прогресса; на следующем ходе один раз проверить фактическую
+модель и выполнить F под Astra/medium. Product release/accepted registry не повышены.
 Natural insufficient-primary/Done errors not_observed — явная граница coverage;
 original J25 requirements сверены, не новый hard gate и не false PASS.
 Следующий текст сохраняет
@@ -84,6 +93,67 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: общая CLI-композиция и manual lease — 2026-10-02
+
+Child **e5e8c99286744bb4e08e325291211fb98ddb677a** добавляет операторский
+`JavascriptCliAcceptance` и readonly `JavascriptAcceptanceLease`. Lease связывает
+manual registry/atomic lock с живым original outer Python holder до Popen;
+каждый собственный CLI/cold profile допускается один раз. Registry/lock release
+не автоматизирован и не объявляется частью whole PASS. Own preparation lease
+допустим только при closed_verified browser и active_exec_session=null;
+busy account/foreign overlapping profiles/changed holder отказывают.
+
+Writer audit связывает exact candidate/QA freeze, actual knowledge export,
+original filtered capture, own SQLite OAuth Sol/low/prompt/input admission,
+public operation intervals и immutable native journal. Last authored Done →
+preserve Execute поддержан; baseline GUID graph берётся из actual completed
+node_target_checkpoint, не из rendered Save. Две fresh Execute и full6×4
+обязательны: default5 preview не проходит, later full read принимается только
+при actual model public read/native binding. Actual import bytes/configuration/
+execution и native import→JS edge проверяются отдельно. Last Save/dirty state,
+normal Close/logout и original process absence открывают separate path-only cold.
+Cold/whole pair принимают original terminal objects и повторно читают evidence;
+serialized PASS, controller-only business read и special cleanup receipt не подходят.
+
+Отдельно обязателен private разбор полного фактически авторского source после
+writer terminal и до первого audit/cold: пять source-bound checks подтверждают
+алгоритм и отсутствие подставленных ответов. Это операторская проверка,
+не вывод семантики из authorship/hash/regex. Review не передаётся модели/cold argv.
+Exact format/API и границы описаны в
+[дизайне](cli-auditor-design.md#независимый-разбор-фактически-авторского-кода).
+Outer Python запускать из complete frozen QA с **python3 -B -u**, иначе imports
+создадут __pycache__ и нарушат strict inventory. Exact private bootstrap invocation
+закрепить перед actual trials; actual factories ещё не проверены.
+
+Final source validation: composer10, lease/controller/CLI capture/cold capture59,
+native13, execution/configuration11 — **93 addressed test methods PASS**;
+provenance **5045PASS**, original final handles actualexit0. Ранние baseline/header
+и inert capture fixture ошибки исправлены; failed logs сохранены. Неверный cwd
+первого legacy provenance invocation не принят; штатная migration команда прошла.
+Private receipt `f-cli-composition-validation-v1.json`, SHA256
+**35cacc9bac7c4f317c4eeac5d50d00ab03fd9e03f0542a938ab0bbb59f16b9e0**,
+связывает8 committed sources и16 original logs/handles. Это source/process/native
+regression, не свежая compiled whole acceptance.
+
+### Подготовительная проверка перед F — 2026-10-02
+
+До фактического переключения текущего хода предварительная проверка не нашла
+top-level import cycles; guarded normal Close остаётся на существующем пути.
+Найден пропуск финальной pair revalidation: SQLite projection первого writer
+повторно не читалась. Исправление **1a8d236b76281b9c9dd17eabcf03cf142f9728d3**
+сверяет её с original writer cleanup projection для каждой попытки.
+Composer10/CLI evidence13 — **23PASS**, actualexit0, terminal chunk03987d;
+это повторная адресная regression, не23 новых независимых методов и не live proof.
+Private receipt `f-preparation-sqlite-revalidation-v1.json`, SHA256
+**2a0088c4eac3c900c98550d709645d64f61fc3f67a7f5c5bedbcbd5ebe35c51b**,
+проверен read-back; содержит source/log pins, original handle и фактическую
+модель текущего хода. Formal same-task Astra/medium F ещё не выполнен.
+Реестр ресурсов не менялся. Затем F → fresh immutable candidate/ordinary headed
+J01/J21/J27 → две независимые30-minute Sol/low CLI попытки Code/declared с cold.
+
+Следующие разделы сохраняют предыдущие source-срезы и их прежние следующие шаги;
+для продолжения использовать текущую сводку выше.
 
 ### Фаза 4: technical cold collection и вход reader — 2026-10-02
 

@@ -35,6 +35,15 @@ evidence target, committed product release в freeze v2. Host registry толь�
 Actual factory/live не запускались; до F остаются lease/whole composition.
 [Checkpoint](checkpoint.md#фаза-4-technical-cold-collection-и-вход-reader--2026-10-02).
 
+Последняя source-граница **e5e8c99286/1a8d236b76**: manual lease/original holder
+и whole writer/trial/pair API реализованы; source review полного авторского кода
+обязателен отдельно от authorship/hash. Final pair перечитывает own SQLite
+projection.93 addressed tests/provenance5045 и дополнительная пересекающаяся
+regression23PASS. Новые candidate/browser/CLI не запускались, actual factory/
+whole acceptance не доказаны. Пользователь подтвердил Astra/medium; formal F
+следует на следующем ходе с фактически выбранной моделью.
+[Актуальный checkpoint](checkpoint.md#фаза-4-общая-cli-композиция-и-manual-lease--2026-10-02).
+
 Исходная сводка обновлена по [acceleration review](acceleration-review.md) на docs
 `13a02e8be2` / code `7b8e19bee0`; позже выполнен B-live на code `f8ceebcac9`.
 Решение 0B доказывает осуществимость/выбирает контракт; последняя колонка

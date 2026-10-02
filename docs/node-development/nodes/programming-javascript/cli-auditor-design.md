@@ -38,12 +38,14 @@ Table после единственного Add: только свой port/view
 масок и действий во время ожидания. Лимит остальных ожиданий остаётся 15000 ms.
 Нативный журнал не переписывается и не нормализуется под старый аудитор.
 
-`javascript_node_acceptance.py` объединит эти проверки с фактическими candidate,
-model/variant, доставкой входных файлов, Save/cold и cleanup evidence. Его
-окончательный транспорт определяется реальными standalone CLI записями,
-а не историческим Hermes envelope. До реализации этой проверки узел не получает
-`ready_for_acceptance`. Проверки конфигурации/выхода сами по себе не доказывают
-автономность модели, отсутствие hardcode, persistence или готовность продукта.
+`javascript_node_acceptance.py` реализован в child на **e5e8c9928674** как
+операторский API общей writer/trial/pair композиции. Использует реальные standalone
+CLI records и original controller/capture objects, не принимает serialized PASS.
+Связывает candidate/knowledge, OAuth Sol/low, original prompt/file snapshots,
+native import/source/Execute/full output, last Save/Close/logout и separate cold.
+До fresh compiled candidate trials это source implementation, не CLI acceptance.
+`ready_for_acceptance`/accepted registry не повышены. Configuration/output helpers
+сами по себе не доказывают автономность, отсутствие hardcode или persistence.
 
 ## Входная проверка standalone CLI
 
@@ -321,3 +323,102 @@ compiled headed candidate и независимый path-only cold провер�
 resource ACK fix сохраняются. Native cleanup имеет собственный bounded shutdown
 budget: private runtime close 45000 ms и outer Host close 60000 ms в новом режиме;
 это не продление model/node operation deadlines и не повтор неизвестного эффекта.
+
+
+## Общая композиция и manual host lease — 2026-10-02
+
+Source **e5e8c99286744bb4e08e325291211fb98ddb677a** добавляет
+`JavascriptCliAcceptance`. `audit_writer()` читает только original factory
+collection, rechecks closed capture inode/bytes/SHA и pinned worker/redactor/Node,
+first prepare/native metadata/append journal, actual own SQLite OAuth model/variant
+and file snapshots. Public compact request/reply связываются с native operations.
+Model-authored Done → preserve Execute поддерживается; current code берётся из
+последнего успешного public source-bearing operation для того же owned node.
+Configuration и две fresh execution groups обязательны даже при later full read.
+Полный6×4 может поступить из apply с explicit full read либо actual model
+`dock_node_read`; controller-only full read и default5 preview не принимаются.
+
+Input bytes/delivery/import/configuration/fresh execution связываются с actual
+GUID edge import output0 → JavaScript input0. Native writer GUID graph берётся из
+completed `node_target_checkpoint.target_state.final_graph`, не из rendered Save
+graph и не из отсутствующего в normal managed runtime operator-only boundary.
+Last Save/dirty/native Close/logout сверяются отдельно, вместе с model/tool/native
+time order и original process absence. Source/settings/mappings/graph baseline
+остаётся private в объекте. `launch_cold()` вызывает existing path-only factory
+после всех writer checks. `finish(cold,capture)` сопоставляет original separate
+Node PID/profile, frozen entry/candidate/QA, exact own report/journal/summary,
+preserved source/settings/GUID graph, fresh Execute/full6×4 и cleanup/processes.
+`verify_javascript_cli_pair([code,declared])` принимает два original terminal
+объекта с одинаковым candidate/freeze, четырьмя disjoint profiles/processes и
+разными CLI/runtime sessions, save paths и lease IDs. Native/capture/cold evidence
+повторно читаются; ни один partial receipt сам не становится whole PASS.
+На **1a8d236b76** final pair также перечитывает actual own SQLite projection
+каждого writer и сравнивает её с original cleanup projection. Изменение после
+первого trial не скрывается за сохранённым промежуточным verdict.
+
+### Независимый разбор фактически авторского кода
+
+Пункт2 фазы6 требует не только authorship, но и отсутствие подставленных ответов.
+Поэтому **после actual writer terminal, до первого audit_writer/cold**, оператор
+полностью читает actual model source и сохраняет private review artifact вне
+model directory/profile/candidate/frozen QA. Не использовать regex как
+доказательство семантики и не выдавать hash за доказательство алгоритма.
+
+`source_review={path:ABS,sha256:SHA}` у constructor связывает физический private
+JSON format `javascript-cli-source-review-v1`: owner_task_id, cli_session_id,
+candidate_manifest_sha256, schema_mode, prompt_sha256 (raw UTF-8),
+input={filename,bytes,sha256}, source_sha256/source_utf8_bytes, reviewed_at,
+decision=`VERIFIED`, checks. Пять checks — input_rows, row_values, net_cents,
+status, no_injected_answers — содержат reason, inclusive source_lines=[first,last]
+и source_excerpt_sha256 точных LF/UTF-8 строк без trim. Последний check охватывает
+весь source. Reason должен описывать фактически прочитанный алгоритм, NULL/order
+rules и отсутствие готовой таблицы ответов. Schema отдельно проверяет native
+configuration audit. Отсутствующий/другой review не даёт acceptance; его presence
+не является mathematical program-equivalence proof или authentication reviewer.
+Source-only fixture review проверяет format/byte binding, не бизнес-истинность.
+
+### Привязка manual registry к original holder
+
+`JavascriptAcceptanceLease` только читает существующий manual host registry;
+не создаёт dispatcher, queue, stale-lock recovery или automatic release. В
+`host-resources.json.acceptance_lease` вручную закрепляются lease_id, owner_task_id,
+campaign_id=`javascript-20260926-ubuntu`, node_id=`component.programming.JavaScript`,
+account=`jsteach`, worktree, cli_profile, cold_profile, candidate_manifest_sha256
+и status reserved_active/running/cold_reading/cleanup_pending. Existing own
+preparation lease допустим только при browser_status=closed_verified и
+active_exec_session=null; busy same account или overlapping foreign profiles
+отказывают. registry_owner должен совпадать.
+
+Под existing atomic acceptance.lock original outer controller сохраняет private
+owner.json с lease_id, owner_task_id, campaign_id и holder: actual Linux pid,
+parent_pid, process_group, session, start_ticks, uid, boot_id. Gate создаётся
+**тем же живым outer process до Popen**, проверяет own UID/private canonical
+paths, immutable lock metadata inode/SHA и live holder. Каждый CLI/cold profile
+потребляется один раз до запуска; failed admission остаётся отказом. Lease/lock
+удерживаются до независимого native/process cleanup. Gate не выводит cleanup
+из статуса реестра и не снимает чужие/устаревшие locks. Release выполняет owner
+по manual workflow; whole verdict не объявляет host_lease_release verified.
+
+### Запуск операторского API
+
+После F и candidate build выполнить complete QA freeze. Python controller/API
+должен импортироваться из этого frozen QA root, а worker — быть exact
+`javascript-cli-redact-worker.mjs` из него. Запускать original outer Python
+с `python3 -B -u`/`PYTHONDONTWRITEBYTECODE=1`, чтобы import не создавал
+untracked __pycache__ в strict frozen inventory. Cold Node argv по-прежнему
+только config/profile/browser/evidence/package; код, oracle и review туда не
+передаются. Exact private campaign bootstrap invocation и original handles
+записать до actual trials. Это API, не новый пользовательский CLI transport.
+
+Source validation: composer10, lease/controller/CLI capture/cold capture59,
+native13 и execution/configuration regression11 —93 addressed test methods PASS;
+provenance5045. Private receipt `f-cli-composition-validation-v1.json`, SHA256
+`35cacc9bac7c4f317c4eeac5d50d00ab03fd9e03f0542a938ab0bbb59f16b9e0`.
+Actual compiled writer/cold factories, fresh headed native cleanup и final
+CLI trials этим не подтверждены.
+Дополнительная SQLite regression composer10/CLI evidence13 —23PASS,
+actualexit0; методы пересекаются с основной source validation. Private receipt
+`f-preparation-sqlite-revalidation-v1.json`, SHA256
+`2a0088c4eac3c900c98550d709645d64f61fc3f67a7f5c5bedbcbd5ebe35c51b`.
+Эта подготовительная source-проверка не засчитана как formal same-task F:
+пользователь подтвердил Astra/medium, текущий незавершённый ход ещё Sol/xhigh.

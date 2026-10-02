@@ -9,7 +9,7 @@ registry readiness не повышена.
 На child **7855b9bf11cb** реализованы независимые Python configuration/output
 аудиторы:40 адресных test methods,2 native captures и48 non-noop mutations PASS.
 [Границы и команды](checkpoint.md#фаза-4-configurationoutput-auditors--2026-10-02),
-[дизайн](cli-auditor-design.md). Итоговый standalone CLI acceptance auditor,
+[дизайн](cli-auditor-design.md). Итоговая standalone CLI-приёмка,
 same-task F review и candidate/CLI остаются открытыми; это не новый live run.
 Child **8d3eb30f1a4f** добавляет partial CLI evidence/bundle проверки:
 23 SQLite/filesystem tests PASS, actualexit0. [Границы и следующий шаг](checkpoint.md#фаза-4-standalone-cli-transportbundle--2026-10-02).
@@ -69,6 +69,16 @@ operator mkdir/assignment, freeze v2 включает committed release и candi
 75 source/process tests/provenance5045 PASS, actual factory/browser не запускались.
 [Следующий шаг](checkpoint.md#фаза-4-technical-cold-collection-и-вход-reader--2026-10-02)
 — campaign lease и whole composition, затем F/fresh candidate/CLI.
+
+Актуальный source **e5e8c99286** реализует manual lease и общую original
+writer/trial/pair CLI-композицию; **1a8d236b76** добавляет повторную SQLite сверку
+в финальной pair. 93 адресных source/process/native regression tests и
+provenance5045 PASS; дополнительная SQLite regression23PASS пересекается с ними.
+Обязателен независимый разбор полного авторского кода перед cold, отдельно
+от authorship/hash. [Текущая точка продолжения](checkpoint.md#фаза-4-общая-cli-композиция-и-manual-lease--2026-10-02).
+Пользователь подтвердил переключение на Astra/medium, текущий ход ещё Sol/xhigh;
+formal same-task F и fresh ordinary headed candidate/две Sol/low CLI остаются
+открытыми. Ни новый live run, ни ready_for_acceptance этим не подтверждены.
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·

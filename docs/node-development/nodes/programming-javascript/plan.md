@@ -988,13 +988,24 @@ product release и candidate Node/browser pins.75 source/process tests/provenanc
 PASS. Actual reader/factory остаётся fresh candidate проверкой после F;
 до whole composition требуется campaign lease.
 [Checkpoint](checkpoint.md#фаза-4-technical-cold-collection-и-вход-reader--2026-10-02).
-`javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
-он должен связать native проверки с фактическими standalone CLI evidence
-model/input/candidate/Save/cold/cleanup до ready_for_acceptance.
+На **e5e8c99286** `javascript_node_acceptance.py` и manual lease gate реализованы
+как операторский API: original writer/trial/pair controllers и native проверки
+связаны с standalone model/input/candidate/Save/cold/cleanup. На **1a8d236b76**
+final pair дополнительно перечитывает original SQLite projections.
+93 source/process/native regression tests/provenance5045 и дополнительная23-test
+SQLite regression PASS; это не actual compiled CLI acceptance.
+После writer terminal до первого audit/cold независимо прочитать весь authored
+source и закрепить private source-bound review отсутствия подставленных ответов;
+authorship/hash сами этого не доказывают. Exact format в
+[дизайне](cli-auditor-design.md#независимый-разбор-фактически-авторского-кода).
+Controller/API импортировать из complete frozen QA с **python3 -B -u**,
+не создавая __pycache__; manual lease holder должен жить до own cleanup.
+Fresh factories/whole verdict/ready_for_acceptance остаются открытыми.
 Взять структуру разделения configuration/output из
 `tools/loginom-acceptance/calculator_*` и требования точности из `collapse/*`;
-старый Hermes transport не запускать. Точный CLI/driver invocation нового
-аудитора вписать в checkpoint до ready_for_acceptance.
+старый Hermes transport не запускать. Точный private bootstrap/CLI/driver invocation
+API вписать в checkpoint до actual trials; новый пользовательский CLI transport
+для этого не нужен.
 
 Oracle читает реальные source/options/ports/mappings и typed values независимо
 от handler. Подготовить нативные typed fixtures по `typed-cases.json`, сохранить
