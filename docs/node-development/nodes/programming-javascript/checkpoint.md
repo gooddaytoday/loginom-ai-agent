@@ -199,6 +199,25 @@ Fresh Code07 → полный source review → audit → cold → whole PASS �
 original holder. До подтверждённой очистки holder/lease не закрывать.
 Новые attempts используют candidate10+reader10; старые failures не повышать.
 
+**Code07 original whole trial PASS; declared07 стартует в том же holder29365.**
+WriterPID598790, session`ses_f023c6abfffeBNA9JNueFkRG20`, source772bytes/16LF
+`70dd8fbd449a002918d820a6db32fa2f2c0b227415967d3e37a21f5e23f1d8d3`.
+После независимого полного чтения reviewSHA
+`43abc330782f7f03c06c7c23365ec2e09734fb054888de07afbb8155e8c09546`;
+writer-auditSHA`129f75f0cd604a88064e942d5e52cb13b96a93552bfe44425355c468ac7a923f`.
+Own saved `/jsteach/JavaScript-code-f16c7562-57ad-4215-8c69-7dd2ecadf373.lgp`.
+ColdPID606075/collectorPASS, fresh execution`1790964141965-bxeqp75xfzo:759:1`,
+full source/settings/mappings/GUID graph/6×4/cleanup PASS. Original trialSHA
+`d61819d54bfbaafb545a0240e09f5513fba72960729e8ba7c180f05cb3a09d7f`,
+cold reportSHA`5aad7c77b5476ebb843dd2922b7c3711caa03d5c734b1585f48fcd5697e9e282`.
+Normal writer Save/Close/logout и cold Close/logout/browser close PASS;
+original release command подтвердил trials=1, lease/lock освобождены. Trial
+object сохранён в holder для финальной pair revalidation. Отправлен start/declared;
+следующий шаг после collection/native PASS — независимо прочитать новый полный
+source, создать mode-specific review, audit/cold/release/pair. Code заново
+не запускать. Pair/accepted до результата declared остаются открытыми.
+
+
 Driver05 preflights operator review до permanent audit. Review timestamps:
 `.isoformat(timespec='milliseconds').replace('+00:00','Z')`; Python `-B` и
 PYTHONDONTWRITEBYTECODE=1 обязательны для frozen QA. Не менять frozen QA/runtime.
