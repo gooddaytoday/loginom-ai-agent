@@ -85,6 +85,7 @@ test("supervisor: потеря argv не стирает уже доказанн�
       outDir: out, profileDir: out, timeoutMs: 30_000 })
     expect(run.processCleanup.status).toBe("confirmed")
     expect(run.sessionId).toBe("ses_fixture03")
+    expect(run.processCleanup.browserBindings?.length).toBeGreaterThan(0)
   } finally {
     if (await Bun.file(pidFile).exists()) { try { process.kill(Number(await Bun.file(pidFile).text()), "SIGKILL") } catch {} }
   }

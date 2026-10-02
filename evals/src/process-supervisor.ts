@@ -12,6 +12,8 @@ export type ProcessCleanup = {
   status: "confirmed" | "failed" | "not_run"; error: string | null
   processes: ProcessIdentity[]; unknownProcesses?: ProcessIdentity[]; runtimeDirectories: string[]; writer: WriterIdentity | null
   capture_complete: boolean
+  browserBindings?: { process: ProcessIdentity; runtimeDirectory: string; observed_at: string }[]
+  bindingRefusals?: { process: ProcessIdentity; has_data_dir: boolean; data_inside_profile: boolean; new_runtime_match: boolean; executable_match: boolean; ancestry_match: boolean }[]
 }
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
@@ -196,7 +198,13 @@ export async function superviseProcess(input: {
       const dataDir = (entry: ProcessView) => entry.args.find((arg) => arg.startsWith("--user-data-dir="))?.slice(16)
       const bound = (entry: ProcessView) => entry.device === browser.device && entry.inode === browser.inode &&
         cleanup.runtimeDirectories.some((directory) => dataDir(entry) === path.join(directory, "browser-profile"))
-      native.filter((entry) => ledger.has(key(entry)) && bound(entry)).forEach((entry) => boundBrowsers.add(key(entry)))
+      native.filter((entry) => ledger.has(key(entry)) && bound(entry)).forEach((entry) => {
+        if (!boundBrowsers.has(key(entry))) {
+          cleanup.browserBindings ??= []
+          cleanup.browserBindings.push({ process: identity(entry), runtimeDirectory: path.dirname(dataDir(entry)!), observed_at: new Date().toISOString() })
+        }
+        boundBrowsers.add(key(entry))
+      })
       const browserAncestor = (entry: ProcessView) => {
         let parent = parents.get(key(entry))
         const visited = new Set<string>()
@@ -213,6 +221,12 @@ export async function superviseProcess(input: {
           // Chromium may clear argv while exiting. Birth-bound authority survives
           // that observation; every signal still rechecks executable/UID/starttime.
           if (data ? !bound(entry) : !boundBrowsers.has(key(entry)) && !browserAncestor(entry)) {
+            if (!denied.has(key(entry))) {
+              cleanup.bindingRefusals ??= []
+              cleanup.bindingRefusals.push({ process: identity(entry), has_data_dir: Boolean(data), data_inside_profile: Boolean(data && inside(data, profile!)),
+                new_runtime_match: cleanup.runtimeDirectories.some((directory) => data === path.join(directory, "browser-profile")),
+                executable_match: entry.device === browser.device && entry.inode === browser.inode, ancestry_match: browserAncestor(entry) })
+            }
             denied.add(key(entry)); cleanup.error ??= `Browser binding differs PID ${entry.pid}`
           }
           continue
