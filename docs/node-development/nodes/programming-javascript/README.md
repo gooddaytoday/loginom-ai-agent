@@ -63,6 +63,13 @@ private metadata/source pins и неизменным append-only journal; cold g
 Следующий шаг — technical cold capture/campaign lease/whole composition.
 [Границы](checkpoint.md#фаза-4-original-cli-native-artifacts--2026-10-02).
 
+На **b3878d0bd1** technical cold collector разделяет summary/model events и
+сохраняет original10-minute ceiling; factory подготовка согласована с actual
+operator mkdir/assignment, freeze v2 включает committed release и candidate pins.
+75 source/process tests/provenance5045 PASS, actual factory/browser не запускались.
+[Следующий шаг](checkpoint.md#фаза-4-technical-cold-collection-и-вход-reader--2026-10-02)
+— campaign lease и whole composition, затем F/fresh candidate/CLI.
+
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·
 [реестр](../../registry.json) ·

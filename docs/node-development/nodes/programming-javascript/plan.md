@@ -974,6 +974,13 @@ append-only journal; before-cold file revalidation сохраняет отказ
 75 source/process tests/provenance5045 PASS. Это не fresh CLI/native proof;
 до whole composition остаются technical cold collection и campaign lease.
 [Checkpoint](checkpoint.md#фаза-4-original-cli-native-artifacts--2026-10-02).
+На **b3878d0bd1** technical cold capture сохраняет original10-minute deadline,
+exact own summary и candidate redactor. До запуска проверяется private adjacent
+assignment; evidence создаёт сам operator. Freeze v2 включает committed sibling
+product release и candidate Node/browser pins.75 source/process tests/provenance5045
+PASS. Actual reader/factory остаётся fresh candidate проверкой после F;
+до whole composition требуется campaign lease.
+[Checkpoint](checkpoint.md#фаза-4-technical-cold-collection-и-вход-reader--2026-10-02).
 `javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
 он должен связать native проверки с фактическими standalone CLI evidence
 model/input/candidate/Save/cold/cleanup до ready_for_acceptance.

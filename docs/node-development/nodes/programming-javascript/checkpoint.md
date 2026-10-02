@@ -17,7 +17,9 @@ Close gate; CLI preflight headed наab721a703e. Наc664f40c61 source collector
 filesystem proof, actual generic reader imports/native launch ещё не выполнены.
 На15c0fb4f3c native artifacts связаны с original observed CLI attempt;
 75 source/process tests PASS, fresh native CLI этим не подтверждён.
-Текущий шаг — связать campaign lease и technical cold collection, завершить whole
+Наb3878d0bd1 technical cold collection сохраняет original10-minute ceiling;
+исправлены new evidence directory, assignment preflight и release dependency freeze.
+Текущий шаг — связать campaign lease и завершить whole
 composition, затем same-task F и fresh ordinary
 headed candidate/Sol trials. Общая цель не достигнута и не сужается. На старте
 этого шага child797927 tracked clean, browser/candidate/CLI не запускались,
@@ -27,7 +29,7 @@ OpenViking checks/errors не было. Untracked acceleration-review не вк�
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
 standalone CLI transport/bundle/admission/public-node/Save binding. Child
-**15c0fb4f3c03f4af5d265153cb43811593fe3d9f** tracked clean; registration на161353
+**b3878d0bd165df2b7e559b8010ce061a68bce307** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 первоначальных адресных test methods PASS; усиленная configuration/output
 regression9PASS теперь включает62 non-noop native mutations.
@@ -75,6 +77,44 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: technical cold collection и вход reader — 2026-10-02
+
+На child **b3878d0bd165df2b7e559b8010ce061a68bce307** cold collector использует
+тот же bounded private redactor/pipe/deadline loop, но explicit cold mode.
+Принимает ровно одну техническую сводку с exact own `report.json`, сохраняет
+`cold-summary.jsonl`, не принимает CLI model events/произвольные fields/PASS.
+Secrets/hidden content очищаются до записи. Capture status не утверждает native
+cleanup/persistence. Original10-minute ceiling, own PID-fd SIGINT/bounded grace,
+forced-recovery refusal и sticky terminal failure сохраняются.
+
+Source inspection actual generic operator подтвердил два preparation mismatch:
+он сам выполняет non-recursive mkdir evidence и читает соседний product release.
+Cold factory теперь требует новый отсутствующий target под private parent,
+использует parent как cwd и не создаёт evidence заранее. Проверяет private config
+и обязательный adjacent `assignment.json`, exact campaign/account/profile;
+фиксирует hashes и повторяет проверку после exit. Cold capture связан с ними,
+candidate redactor/Node и isolated capture directory.
+
+Reader freeze v2 дополнительно копирует exact committed
+`packages/product/loginom-release.json` в правильное sibling место. Его Git blob,
+bytes/SHA и Node/browser/version Linux pins сверяются с candidate; dirty/missing/
+changed release отказывает. Остальной committed QA inventory/runtime overlays
+сохранён. Actual external Node inert-loader test читает release по той же
+relative URL, что production operator. Generic reader/browser factory не запускался.
+
+Final из child `packages/loginom-runtime`: cold capture12, freeze13,
+CLI capture22, controller15, native13 — **75PASS**, actualexit0. Ранний fixture
+SyntaxError исправлен, failed log сохранён; первая capture discovery случайно
+включила imported test class, final отдельные suites его не дублируют.
+Migration provenance5045 и diff check PASS. Private receipt
+`f-cli-cold-collection-validation-v1.json`, SHA256
+**b1b16a749d44772bf327c6832dc877482726c3d09e2c62964137e67d1e266149**,
+связывает6 sources и10 original logs/handles. Реальный host registry прочитан:
+preparation lease reserved_active принадлежит этой задаче, browser450
+closed_verified/active_exec_session=null, acceptance_lease=null; реестр не менялся.
+Следующий шаг — campaign lease и whole auditor composition. F, fresh immutable
+candidate/ordinary headed J01/J21/J27 и две Sol-low CLI остаются открытыми.
 
 ### Фаза 4: original CLI native artifacts — 2026-10-02
 

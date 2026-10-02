@@ -166,6 +166,13 @@ inode/bytes/SHA, timestamps и последний cleanup event; перед cold
 Production URL разрешён только в точных plain/testable формах, raw data сохранены.
 75 source/process tests/provenance5045 PASS; actual native CLI ещё впереди.
 До F остаются technical cold collection, campaign lease и whole composition.
+Наb3878d0bd1 explicit technical cold mode сохраняет одну redacted summary отдельно
+от CLI events; тот же original-process loop удерживает10-minute ceiling/отказы.
+Cold factory не создаёт operator evidence заранее, проверяет adjacent private
+assignment/campaign/profile/account и config hashes до/после. Freeze v2 включает
+committed sibling product release с exact Git/source/Node/browser pins.
+75 actual Node/Linux/filesystem source tests/provenance5045 PASS; generic operator
+и actual factory/live остаются после F. До F остаются lease/whole composition.
 CLI Node Host передаёт explicit visibility и в preflightHeadless наab721a703e;
 Desktop direct-host default сохранён, cleanup flag от visibility независим.
 `managed-resources-close.mjs` уже проверяет реальный bridge result перед success

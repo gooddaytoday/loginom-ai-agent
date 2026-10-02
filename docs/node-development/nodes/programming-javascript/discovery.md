@@ -28,6 +28,13 @@ plain/testable URL стенда по фактическому production normali
 Close/logout/CLI не подтверждены; technical cold collection/lease/whole composition
 остаются открытыми. [Checkpoint](checkpoint.md#фаза-4-original-cli-native-artifacts--2026-10-02).
 
+Technical cold capture и preparation fixes наb3878d0bd1 проверены75 tests:
+original10-minute collection, exact summary, adjacent assignment, новый отсутствующий
+evidence target, committed product release в freeze v2. Host registry только
+прочитан: own preparation reserved_active/browser closed_verified, CLI slot свободен.
+Actual factory/live не запускались; до F остаются lease/whole composition.
+[Checkpoint](checkpoint.md#фаза-4-technical-cold-collection-и-вход-reader--2026-10-02).
+
 Исходная сводка обновлена по [acceleration review](acceleration-review.md) на docs
 `13a02e8be2` / code `7b8e19bee0`; позже выполнен B-live на code `f8ceebcac9`.
 Решение 0B доказывает осуществимость/выбирает контракт; последняя колонка
