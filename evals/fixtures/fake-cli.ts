@@ -3,9 +3,19 @@ import { spawn } from "node:child_process"
 
 const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
+const transition = process.env.EVAL_TASK_ID?.match(/^a-(process|archive|ready)-(no-artifact|failed|timeout|completed)$/)
 
 if (process.env.EVAL_FAKE_ARGS_FILE) await Bun.write(process.env.EVAL_FAKE_ARGS_FILE, JSON.stringify(Bun.argv.slice(2)))
 if (command === "run" && process.env.EVAL_TASK_ID === "a-cleanup-failure") process.env.EVAL_FAKE_CHANGED_WRITER = "1"
+if (command === "run" && transition) {
+  if (transition[1] === "process") process.env.EVAL_FAKE_CHANGED_WRITER = "1"
+  if (transition[1] === "archive" || transition[1] === "ready") {
+    process.env.EVAL_FAKE_RUNTIME_EVENTS = transition[1] === "archive" ? "invalid journal\n" : '{"phase":"AMBIGUOUS"}\n'
+    await Bun.write(path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, "fixture-cleanup-state.json"),
+      JSON.stringify(transition[1] === "archive" ? { state: "ready", hasApiKey: true, recoveries: ["pending"] } : { state: "unconfigured" }))
+  }
+  if (transition[2] === "timeout") process.env.EVAL_FAKE_HANG_AFTER_EVENTS = "1"
+}
 
 if (process.env.EVAL_FAKE_CHANGED_WRITER) {
   const writer = path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, ".writer", "owner")
@@ -33,7 +43,7 @@ if (command === "run" && process.env.EVAL_FAKE_BROWSER_BUNDLE) {
 if (process.env.EVAL_FAKE_ORPHAN_PID_FILE) {
   const delayed = process.env.EVAL_FAKE_CHILD_DELAY_MS
   const child = spawn(process.execPath, ["-e", delayed
-    ? `process.on('SIGTERM', () => {}); process.stdout.write('ready'); setTimeout(() => process.exit(0), ${Number(delayed)})`
+    ? `process.on('SIGINT', () => {}); process.on('SIGTERM', () => {}); process.stdout.write('ready'); setTimeout(() => process.exit(0), ${Number(delayed)})`
     : "setInterval(() => {}, 1000)"], {
     detached: process.env.EVAL_FAKE_DETACHED_CHILD === "1",
     env: { PATH: process.env.PATH ?? "" }, stdio: ["ignore", "pipe", "ignore"],
@@ -49,7 +59,8 @@ if (command === "loginom") {
     process.exit(3)
   }
   // Management-команды: состояние читается из файла, recover снимает recoveries.
-  const stateFile = process.env.EVAL_FAKE_STATE_FILE
+  const transitionState = path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, "fixture-cleanup-state.json")
+  const stateFile = process.env.EVAL_FAKE_STATE_FILE ?? (await Bun.file(transitionState).exists() ? transitionState : undefined)
   const view = stateFile
     ? ((await Bun.file(stateFile).json()) as Record<string, unknown>)
     : { state: "ready", hasApiKey: true, revision: 1, generation: 1 }
@@ -72,7 +83,8 @@ if (command === "loginom") {
 }
 
 if (process.env.EVAL_FAKE_SLEEP_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_SLEEP_MS))
-const id = process.env.EVAL_TASK_ID ?? "default"
+const id = transition ? ({ failed: "transition-failed", completed: "group-sum-qty" }[transition[2]!] ?? "default")
+  : process.env.EVAL_TASK_ID?.match(/^a-exit[23]$/) ? "stop-case" : process.env.EVAL_TASK_ID ?? "default"
 const events = Bun.file(path.join(fixtures, `${id}.jsonl`))
 const chosen = (await events.exists()) ? events : Bun.file(path.join(fixtures, "default.jsonl"))
 process.stdout.write(await chosen.text())
@@ -83,4 +95,4 @@ if (process.env.EVAL_FAKE_HANG_AFTER_EVENTS) {
 const exit = Bun.file(path.join(fixtures, `${id}.exit`))
 const stderr = Bun.file(path.join(fixtures, `${id}.stderr`))
 if (await stderr.exists()) process.stderr.write(await stderr.text())
-process.exit((await exit.exists()) ? Number((await exit.text()).trim()) : 0)
+process.exit(process.env.EVAL_TASK_ID === "a-exit3" ? 3 : (await exit.exists()) ? Number((await exit.text()).trim()) : 0)

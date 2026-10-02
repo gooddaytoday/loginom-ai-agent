@@ -7,16 +7,17 @@ import { agentCommand, runAgent } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
 import { signalProcess, type ProcessIdentity } from "../src/process-supervisor"
 
-test("signalProcess: PID с другим starttime не получает сигнал", async () => {
+test("signalProcess: другая birth или executable identity не разрешает сигнал", async () => {
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { detached: true, stdio: "ignore" })
   const exited = new Promise((resolve) => child.once("exit", resolve))
   try {
     const pid = child.pid!
     const fields = (await readFile(`/proc/${pid}/stat`, "utf8")).split(") ")[1]!.split(" ")
     const info = await stat(`/proc/${pid}/exe`)
-    const identity: ProcessIdentity = { pid, starttime: "different-birth", uid: process.getuid!(), parent: Number(fields[1]),
+    const identity: ProcessIdentity = { pid, starttime: fields[19]!, uid: process.getuid!(), parent: Number(fields[1]),
       group: Number(fields[2]), session: Number(fields[3]), device: info.dev, inode: info.ino, executable: await readlink(`/proc/${pid}/exe`) }
-    await expect(signalProcess(identity, "SIGKILL")).rejects.toThrow("identity changed")
+    for (const changed of [{ ...identity, starttime: "different-birth" }, { ...identity, inode: identity.inode + 1 }])
+      await expect(signalProcess(changed, "SIGKILL")).rejects.toThrow("identity changed")
     expect(child.exitCode).toBeNull()
     process.kill(pid, 0)
   } finally { child.kill("SIGKILL"); await exited }

@@ -332,10 +332,10 @@ management(command: AgentCommand, args: string[], stdin?: string, timeoutMs?: nu
 **Вход:** измеренный exit/timeout/abort. **Выход:** неизменный measured outcome
 и отдельный `ProcessCleanup` с двумя финальными passes.
 
-- [ ] Проверить существующие реальные timeout/abort и management timeout тесты.
+- [x] Проверить существующие реальные timeout/abort и management timeout тесты.
   Недостающий сценарий добавить одним красным циклом: CLI exit 0, helper
   игнорирует INT/TERM, launcher жив до завершения helper.
-- [ ] Проверить исход отдельно от cleanup:
+- [x] Проверить исход отдельно от cleanup:
 
   ```ts
   expect(run.timedOut).toBe(true)
@@ -348,14 +348,14 @@ management(command: AgentCommand, args: string[], stdin?: string, timeoutMs?: nu
 
   Для сохранённого CLI exit 0 с долгим cleanup отдельный тест требует
   `timedOut === false`: cleanup не расходует бюджет уже завершившегося CLI.
-- [ ] Свести timeout/abort/ordinary exit/error к одной последовательности
+- [x] Свести timeout/abort/ordinary exit/error к одной последовательности
   signals и verification с одним deadline. Каждый сигнал делает свежий
   identity/group pass и выбирает только `allowed` записи.
-- [ ] Проверить mismatch starttime, executable identity, relevant read failure
+- [x] Проверить mismatch starttime, executable identity, relevant read failure
   и замену writer. Не отправлять signal отказанному PID, сохранять guard/evidence.
-- [ ] Сохранить накопленный capture при отказе записи proof/run; принудительное
+- [x] Сохранить накопленный capture при отказе записи proof/run; принудительное
   закрытие pipe — `capture_complete: false`, никогда не proof process exit.
-- [ ] Прогнать `cli.test.ts`, `profile.test.ts`, `process-supervisor.test.ts`,
+- [x] Прогнать `cli.test.ts`, `profile.test.ts`, `process-supervisor.test.ts`,
   `bun typecheck`; commit зелёный срез.
 
 ### 5. Переход профиля и stop не разрастаются
@@ -365,9 +365,9 @@ management(command: AgentCommand, args: string[], stdin?: string, timeoutMs?: nu
 **Вход:** confirmed process proof и measured result. **Выход:** confirmed
 environment cleanup либо stop с прежним качественным исходом.
 
-- [ ] Прогнать existing archive-before-ack, exact writer и targeted pruning
+- [x] Прогнать existing archive-before-ack, exact writer и targeted pruning
   tests. Новый код нужен только для обнаруженного тестом нарушения.
-- [ ] По одному проверить отказ process cleanup, архива и readiness для
+- [x] По одному проверить отказ process cleanup, архива и readiness для
   `no_artifact`, `failed`, `timeout`, `completed`. Сквозные assertions:
 
   ```ts
@@ -380,21 +380,21 @@ environment cleanup либо stop с прежним качественным и�
 
   Каждый тест задаёт один `originalStatus` настоящей fake-CLI фикстурой либо
   исходом budget; не копировать production классификацию в тест.
-- [ ] Проверить тот же порядок на exit 2/3 и исключениях сохранения файлов.
+- [x] Проверить тот же порядок на exit 2/3 и исключениях сохранения файлов.
   Отдельно проверить, что archive failure оставляет журнал и pending recovery
   неизменными, а не только возвращает ошибку.
-- [ ] Сохранить один pipeline в `afterAttempt`; не добавлять альтернативный
+- [x] Сохранить один pipeline в `afterAttempt`; не добавлять альтернативный
   recovery controller для AMBIGUOUS. Idle wait остаётся bounded и завершается
   двумя проверками; кратковременный процесс может исчезнуть внутри установленного
   окна, но после его окончания uncertainty означает stop.
-- [ ] Прогнать profile/run/diagnostics tests и commit только требуемые правки.
+- [x] Прогнать profile/run/diagnostics tests и commit только требуемые правки.
 
 ### 6. Совместимость и полный gate
 
 **Файлы:** существующие report/rejudge/lease/diagnostics tests;
 source-правки только по обнаруженным регрессиям.
 
-- [ ] Проверить legacy без `environment_cleanup`, пересудейство с failed cleanup,
+- [x] Проверить legacy без `environment_cleanup`, пересудейство с failed cleanup,
   независимые counters и прежнюю классификацию `infra_error`:
 
   ```ts
@@ -405,9 +405,9 @@ source-правки только по обнаруженным регресси�
 
   Конкретный fixture для counters содержит одну failed проверенную попытку
   и одну историческую без поля; quality assertions берутся из исходного fixture.
-- [ ] Проверить evidence/архив на seeded secrets и наличие manifest/SHA-256,
+- [x] Проверить evidence/архив на seeded secrets и наличие manifest/SHA-256,
   отсутствие auth/config/browser-profile файлов. Отказ read-back запрещает prune.
-- [ ] Полный gate из `evals/`:
+- [x] Полный gate из `evals/`:
 
   ```bash
   bun test
@@ -415,7 +415,7 @@ source-правки только по обнаруженным регресси�
   git diff --check
   ```
 
-- [ ] Зафиксировать числа тестов и SHA. Повторять gate после новых изменений,
+- [x] Зафиксировать числа тестов и SHA. Повторять gate после новых изменений,
   а не объявлять ранее зелёную suite доказательством новой реализации.
 
 ### 7. Linux-приёмка на неизменном установленном CLI

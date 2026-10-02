@@ -409,3 +409,31 @@ test("runAgent: отказ записи run evidence сохраняет изме
   expect(run.sessionId).toBe("ses_fixture03")
   expect(run.processCleanup.status).toBe("failed")
 })
+
+test("runAgent: launcher жив до завершения helper, игнорирующего мягкие сигналы", async () => {
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-launcher-order-"))
+  const command = fakeCommand()
+  const pidFile = path.join(out, "helper.pid")
+  const pending = runAgent({ command: { ...command, env: { ...command.env,
+    EVAL_FAKE_ORPHAN_PID_FILE: pidFile, EVAL_FAKE_DETACHED_CHILD: "1", EVAL_FAKE_CHILD_DELAY_MS: "20000",
+    EVAL_FAKE_EXIT_DELAY_MS: "100" } }, taskId: "default", model: "fake/model", prompt: "test", files: [],
+    workdir: out, outDir: out, profileDir: out, timeoutMs: 2000 })
+  let observed = 0
+  for (const _ of Array.from({ length: 80 })) {
+    await Bun.sleep(100)
+    if (!(await Bun.file(pidFile).exists())) continue
+    const pid = Number(await Bun.file(pidFile).text())
+    const fields = await Bun.file(`/proc/${pid}/stat`).text().catch(() => "")
+    if (!fields || /^[ZX] /.test(fields.slice(fields.lastIndexOf(")") + 2))) break
+    const launcher = Number(await Bun.file(`${out}.process-group`).text())
+    process.kill(launcher, 0)
+    observed++
+  }
+  const run = await pending
+  expect(observed).toBeGreaterThan(10)
+  expect(run.timedOut).toBe(false)
+  expect(run.exitCode).toBe(0)
+  expect(run.processCleanup.status).toBe("confirmed")
+  expect(run.processCleanup.verification).toHaveLength(2)
+  expect(run.processCleanup.verification?.every((pass) => pass.owned_remaining === 0)).toBe(true)
+}, 15_000)

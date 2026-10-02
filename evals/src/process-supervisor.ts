@@ -63,7 +63,10 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
   try {
     const directory = `/proc/${pid}`
     const owner = await stat(directory)
-    if (owner.uid !== process.getuid?.()) return undefined
+    if (owner.uid !== process.getuid?.()) {
+      if (required || owners.some((entry) => entry.pid === pid)) throw Error("Process UID changed")
+      return undefined
+    }
     const raw = await readFile(path.join(directory, "stat"), "utf8")
     const fields = raw.slice(raw.lastIndexOf(")") + 2).split(" ")
     if (["Z", "X"].includes(fields[0] ?? "")) return undefined
@@ -214,7 +217,14 @@ export async function superviseProcess(input: {
     if (!raw || raw === lastReceipt) return
     const observed = root ? await processView(root.pid) : undefined
     if (!root || !observed || !sameIdentity(observed, root)) throw Error("Launcher receipt lacks verified live identity")
-    const state = JSON.parse(raw) as { nonce: string; pid: number; ready: boolean; cli_pid: number | null; exit_code: number | null; error: string | null }
+    const state = (() => {
+      try { return JSON.parse(raw) as { nonce: string; pid: number; ready: boolean; cli_pid: number | null; exit_code: number | null; error: string | null } }
+      catch { throw Error("Launcher receipt invalid") }
+    })()
+    if (!state || typeof state.ready !== "boolean" ||
+      state.cli_pid !== null && (!Number.isSafeInteger(state.cli_pid) || state.cli_pid <= 0) ||
+      state.exit_code !== null && !Number.isSafeInteger(state.exit_code) ||
+      state.error !== null && typeof state.error !== "string") throw Error("Launcher receipt invalid")
     if (state.nonce !== nonce || state.pid !== proc.pid) throw Error("Launcher receipt identity differs")
     lastReceipt = raw
     reaperReady = state.ready
@@ -223,7 +233,10 @@ export async function superviseProcess(input: {
     if (state.error) cleanup.error ??= "Launcher admission failed"
     if (state.exit_code !== null && Number.isSafeInteger(state.exit_code)) { cliExitCode = state.exit_code; finish() }
   }
-  if (input.stdin !== undefined) proc.stdin!.end(input.stdin)
+  if (input.stdin !== undefined) {
+    proc.stdin!.on("error", () => { cleanup.error ??= "Command stdin delivery failed" })
+    proc.stdin!.end(input.stdin)
+  }
   const stdout: Uint8Array[] = [], stderr: Uint8Array[] = []
   for (const [index, stream] of [proc.stdout!, proc.stderr!].entries()) {
     stream.on("data", (chunk: Buffer) => {
@@ -238,7 +251,10 @@ export async function superviseProcess(input: {
     stream.once("end", resolve)
     stream.once("error", () => { cleanup.capture_complete = false; resolve() })
   })))
-  const root = proc.pid ? await processView(proc.pid) : undefined
+  const root = proc.pid ? await processView(proc.pid).catch(() => {
+    cleanup.error ??= "Launcher identity unavailable after dispatch"
+    return undefined
+  }) : undefined
   const track = (entry: ProcessIdentity, via: ProcessOrigin["via"], parent?: ProcessIdentity) => {
     const tracked = ledger.get(key(entry)) ?? { process: identity(entry), admission: "allowed" as const }
     if (tracked.foreign) {
@@ -251,12 +267,20 @@ export async function superviseProcess(input: {
   if (root) track(root, "launcher")
   if (registration) {
     await registration.writeFile(String(proc.pid ?? "unidentified")).catch(() => { cleanup.error = "Process registration write failed" })
-    await registration.close()
+    await registration.close().catch(() => { cleanup.error ??= "Process registration close failed" })
   }
   let scanning = Promise.resolve(), stopped = false, timedOut = false, interrupted = false
   let lastOwn: ProcessIdentity[] = []
   const scan = async () => {
     const live = await snapshot([...ledger.values()].filter((entry) => entry.origin).map((entry) => entry.process))
+    for (const entry of ledger.values()) {
+      if (!entry.origin) continue
+      const current = live.find((candidate) => candidate.pid === entry.process.pid)
+      if (current && !sameIdentity(current, entry.process)) {
+        entry.admission = "refused"
+        cleanup.error ??= `Process identity changed PID ${entry.process.pid}`
+      }
+    }
     const directories = profile ? await runtimeDirectories(profile) : []
     cleanup.runtimeDirectories = directories.filter((directory) => !oldDirectories.has(directory))
     // Only a fresh live parent chain or kernel adoption proves provenance.
@@ -358,16 +382,17 @@ export async function superviseProcess(input: {
     return lastOwn
   }
   const checkedScan = () => {
+    let confirmed = false
     scanning = scanning.then(async () => {
       const started = Date.now()
-      try { await readReceipt(); await scan() }
+      try { await readReceipt(); await scan(); confirmed = true }
       finally {
         cleanup.observations ??= { count: 0, max_duration_ms: 0 }
         cleanup.observations.count++
         cleanup.observations.max_duration_ms = Math.max(cleanup.observations.max_duration_ms, Date.now() - started)
       }
     }).catch((error) => { cleanup.error ??= message(error) })
-    return scanning
+    return scanning.then(() => confirmed)
   }
   await checkedScan()
   // Browser launch argv can be replaced within tens of milliseconds. Sample
@@ -390,14 +415,21 @@ export async function superviseProcess(input: {
     })
   }, 10)
   const signalOwned = async (signal: NodeJS.Signals) => {
-    await checkedScan()
-    for (const tracked of ledger.values()) {
+    // A fresh full pass before each syscall checks membership as well as birth.
+    // Newly admitted descendants are handled by the next shutdown pass.
+    const candidates = [...ledger.keys()]
+    for (const candidate of candidates) {
+      if (Date.now() >= deadline) { cleanup.error ??= "Process cleanup deadline exceeded"; return }
+      if (!await checkedScan()) return
+      const tracked = ledger.get(candidate)!
       const saved = tracked.process
       if (tracked.admission !== "allowed" || !tracked.origin || root && key(saved) === key(root)) continue
       try {
         // Individual signals avoid signaling a recycled PGID or an unknown member.
         await signalProcess(saved, signal)
-      } catch (error) { if (!gone(error)) cleanup.error ??= message(error) }
+      } catch (error) {
+        if (!gone(error)) { tracked.admission = "refused"; cleanup.error ??= message(error) }
+      }
     }
   }
   let budgetEnded: () => void = () => {}
@@ -416,25 +448,24 @@ export async function superviseProcess(input: {
   }
   await signalOwned("SIGTERM")
   const remaining = async () => {
-    await checkedScan()
-    return (await Promise.all([...ledger.values()].filter((entry) => entry.origin && entry.admission === "allowed").map((entry) => entry.process).filter((entry) => !root || key(entry) !== key(root)).map(async (saved) => {
-      try {
-        const current = await processView(saved.pid)
-        if (current && key(current) !== key(saved)) throw Error(`Process identity changed PID ${saved.pid}`)
-        return current
-      } catch (error) { cleanup.error ??= message(error); return saved }
-    }))).filter((entry) => entry !== undefined)
+    // A failed pass is not an empty proof. Refuse the transition without
+    // waiting on a stale snapshot or signaling identities we cannot inspect.
+    if (!await checkedScan()) return []
+    return lastOwn.filter((entry) => (!root || key(entry) !== key(root)) && ledger.get(key(entry))?.admission === "allowed")
   }
   const soft = Math.min(deadline, Date.now() + 5_000)
   while ((await remaining()).length && Date.now() < soft) await Bun.sleep(100)
   if ((await remaining()).length) await signalOwned("SIGKILL")
   while ((await remaining()).length && Date.now() < deadline) await Bun.sleep(100)
   if ((await remaining()).length) cleanup.error ??= "Owned processes did not terminate"
+  await checkedScan()
   if (root) await signalProcess(identity(root), "SIGTERM").catch((error) => { cleanup.error ??= message(error) })
   const launcherDeadline = Math.min(deadline, Date.now() + 5_000)
   while (proc.exitCode === null && proc.signalCode === null && Date.now() < launcherDeadline) await Bun.sleep(100)
-  if (root && proc.exitCode === null && proc.signalCode === null)
+  if (root && proc.exitCode === null && proc.signalCode === null) {
+    await checkedScan()
     await signalProcess(identity(root), "SIGKILL").catch((error) => { cleanup.error ??= message(error) })
+  }
   stopped = true
   clearInterval(poll)
   await scanning
@@ -457,7 +488,7 @@ export async function superviseProcess(input: {
   await writing
   for (const file of files) {
     await file.sync().catch(() => { cleanup.error ??= "Output capture sync failed"; cleanup.capture_complete = false })
-    await file.close()
+    await file.close().catch(() => { cleanup.error ??= "Output capture close failed"; cleanup.capture_complete = false })
   }
   if (cleanup.error) cleanup.status = "failed"
   const result = { stdout: Buffer.concat(stdout).toString("utf8"), stderr: Buffer.concat(stderr).toString("utf8"),
@@ -468,10 +499,14 @@ export async function superviseProcess(input: {
       cleanup.status = "failed"; cleanup.error ??= "Process evidence persistence failed"
     })
   }
+  await rm(path.join(capsule, "command.json"), { force: true }).catch(() => {
+    cleanup.status = "failed"; cleanup.error ??= "Private command transport release failed"
+  })
+  if (cleanup.status === "confirmed") await rm(capsule, { recursive: true, force: true }).catch(() => {
+    cleanup.status = "failed"; cleanup.error ??= "Launcher transport release failed"
+  })
   if (marker && cleanup.status === "confirmed") await rm(marker, { force: true }).catch(() => {
     cleanup.status = "failed"; cleanup.error ??= "Process registration release failed"
   })
-  await rm(path.join(capsule, "command.json"), { force: true })
-  if (cleanup.status === "confirmed") await rm(capsule, { recursive: true, force: true })
   return result
 }
