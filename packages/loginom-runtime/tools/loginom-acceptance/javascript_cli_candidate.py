@@ -84,7 +84,8 @@ def verify_cli_candidate(root, expected):
         file_count = len(actual)
         required = ('bin/loginom-ai-agent-cli','resources/loginom/host/node-host.mjs',
             'resources/loginom/resource-manifest.json','resources/loginom/bin/node',
-            'resources/loginom/client/lib/javascript-knowledge.mjs')
+            'resources/loginom/runtime/src/managed-entry.mjs',
+            'resources/loginom/runtime/client/lib/javascript-knowledge.mjs')
         if any(name not in actual for name in required):
             raise ValueError('cli_candidate_required_payload')
         resource = json.loads((root/'resources/loginom/resource-manifest.json').read_text())
@@ -112,7 +113,7 @@ def verify_cli_candidate(root, expected):
         if resource['node'] not in seen or resource['browser'] not in seen:
             raise ValueError('cli_candidate_resource_executables_missing')
         for name,pin in [(resource['node'],'node_sha256'),(resource['browser'],'browser_sha256'),
-                ('client/lib/javascript-knowledge.mjs','javascript_knowledge_source_sha256')]:
+                ('runtime/client/lib/javascript-knowledge.mjs','javascript_knowledge_source_sha256')]:
             if actual['resources/loginom/'+name]['sha256'] != expected[pin]:
                 raise ValueError('cli_candidate_runtime_or_knowledge_pin:'+pin)
     except (OSError,KeyError,TypeError,AttributeError,ValueError,RuntimeError) as error:

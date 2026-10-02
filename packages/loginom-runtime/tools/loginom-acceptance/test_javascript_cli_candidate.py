@@ -24,7 +24,8 @@ class JavascriptCandidateTests(unittest.TestCase):
             'resources/loginom/host/node-host.mjs':b'host fixture',
             'resources/loginom/bin/node':b'non-executable node fixture',
             'resources/loginom/browsers/chrome':b'non-executable browser fixture',
-            'resources/loginom/client/lib/javascript-knowledge.mjs':b'knowledge module fixture',
+            'resources/loginom/runtime/src/managed-entry.mjs':b'managed runtime fixture',
+            'resources/loginom/runtime/client/lib/javascript-knowledge.mjs':b'knowledge module fixture',
         }
         for name,content in self.payload.items():
             path = self.root/name
@@ -39,7 +40,7 @@ class JavascriptCandidateTests(unittest.TestCase):
         self.expected = dict(source_commit='a'*40,source_tree_sha256='b'*64,version='fixture-1',node_version='24.19.0',
             node_sha256=digest(self.payload['resources/loginom/bin/node']),
             browser_sha256=digest(self.payload['resources/loginom/browsers/chrome']),
-            javascript_knowledge_source_sha256=digest(self.payload['resources/loginom/client/lib/javascript-knowledge.mjs']))
+            javascript_knowledge_source_sha256=digest(self.payload['resources/loginom/runtime/client/lib/javascript-knowledge.mjs']))
         self.records = [dict(path=name,sha256=digest(content),mode=0o640) for name,content in self.payload.items()]
         self.repin()
 
@@ -68,7 +69,7 @@ class JavascriptCandidateTests(unittest.TestCase):
     def test_full_inventory_dirty_source_allowed_without_execution_claim(self):
         proof = self.proof()
         self.assertTrue(proof['passed'],proof)
-        self.assertEqual(proof['files_verified'],6)
+        self.assertEqual(proof['files_verified'],7)
         for name in ('candidate_execution_verified','model_delivery_verified','cli_acceptance_verified'):
             self.assertIs(proof[name],False)
 
@@ -121,7 +122,7 @@ class JavascriptCandidateTests(unittest.TestCase):
             with self.subTest(name=name):self.assert_refused('cli_candidate_inventory_shape')
 
     def test_required_payload_and_independent_runtime_knowledge_pins(self):
-        path = self.root/'resources/loginom/client/lib/javascript-knowledge.mjs'
+        path = self.root/'resources/loginom/runtime/client/lib/javascript-knowledge.mjs'
         content = path.read_bytes()
         record = self.records.pop()
         resource_record = self.resource['files'].pop()
@@ -138,6 +139,17 @@ class JavascriptCandidateTests(unittest.TestCase):
             self.expected[pin] = '0'*64
             with self.subTest(pin=pin):self.assert_refused('cli_candidate_runtime_or_knowledge_pin:'+pin)
             self.expected[pin] = previous
+
+    def test_coherent_legacy_knowledge_layout_does_not_match_actual_staging(self):
+        old = 'resources/loginom/runtime/client/lib/javascript-knowledge.mjs'
+        wrong = 'resources/loginom/client/lib/javascript-knowledge.mjs'
+        path = self.root/wrong;path.parent.mkdir(parents=True)
+        (self.root/old).rename(path)
+        self.records = [dict(r,path=wrong) if r['path'] == old else r for r in self.records]
+        self.resource['files'] = [dict(r,path=wrong.removeprefix('resources/loginom/'))
+            if r['path'] == old.removeprefix('resources/loginom/') else r for r in self.resource['files']]
+        self.repin()
+        self.assert_refused('cli_candidate_required_payload')
 
     def test_resource_shape_binding_directory_and_executable_presence_refuse(self):
         original = copy.deepcopy(self.resource)
@@ -157,8 +169,8 @@ class JavascriptCandidateTests(unittest.TestCase):
             with self.subTest(case=case):self.assert_refused()
 
     def test_contained_file_and_directory_symlinks_pass_with_exact_link_inventory(self):
-        links = [('resources/loginom/client/linked.mjs','lib/javascript-knowledge.mjs',False),
-            ('resources/loginom/client/linked-directory','lib',True)]
+        links = [('resources/loginom/runtime/client/linked.mjs','lib/javascript-knowledge.mjs',False),
+            ('resources/loginom/runtime/client/linked-directory','lib',True)]
         for name,target,directory in links:
             path = self.root/name
             path.symlink_to(target,target_is_directory=directory)
@@ -173,11 +185,11 @@ class JavascriptCandidateTests(unittest.TestCase):
         self.assert_refused('cli_candidate_payload_mismatch')
 
     def test_resource_link_to_outer_bundle_and_external_link_refuse(self):
-        path = self.root/'resources/loginom/client/link'
-        path.symlink_to('../../../bin/loginom-ai-agent-cli')
+        path = self.root/'resources/loginom/runtime/client/link'
+        path.symlink_to('../../../../bin/loginom-ai-agent-cli')
         value = digest(path.read_bytes())
-        self.records.append(dict(path='resources/loginom/client/link',sha256=value,mode=0o777,link=os.readlink(path)))
-        self.resource['files'].append(dict(path='client/link',sha256=value,link=os.readlink(path)))
+        self.records.append(dict(path='resources/loginom/runtime/client/link',sha256=value,mode=0o777,link=os.readlink(path)))
+        self.resource['files'].append(dict(path='runtime/client/link',sha256=value,link=os.readlink(path)))
         self.repin()
         self.assert_refused('cli_candidate_resource_path_escape')
         path.unlink()
