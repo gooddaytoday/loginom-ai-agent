@@ -6,6 +6,27 @@ const fixtures = path.join(import.meta.dir, "fake")
 
 if (process.env.EVAL_FAKE_ARGS_FILE) await Bun.write(process.env.EVAL_FAKE_ARGS_FILE, JSON.stringify(Bun.argv.slice(2)))
 
+if (process.env.EVAL_FAKE_CHANGED_WRITER) {
+  const writer = path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, ".writer", "owner")
+  await Bun.write(writer, "original")
+  await Bun.sleep(300)
+  await Bun.write(writer, "replacement")
+  await Bun.sleep(300)
+}
+
+if (process.env.EVAL_FAKE_ORPHAN_PID_FILE) {
+  const delayed = process.env.EVAL_FAKE_CHILD_DELAY_MS
+  const child = spawn(process.execPath, ["-e", delayed
+    ? `process.on('SIGTERM', () => {}); process.stdout.write('ready'); setTimeout(() => process.exit(0), ${Number(delayed)})`
+    : "setInterval(() => {}, 1000)"], {
+    detached: process.env.EVAL_FAKE_DETACHED_CHILD === "1",
+    env: { PATH: process.env.PATH ?? "" }, stdio: ["ignore", "pipe", "ignore"],
+  })
+  if (delayed) await new Promise((resolve) => child.stdout!.once("data", resolve))
+  await Bun.write(process.env.EVAL_FAKE_ORPHAN_PID_FILE, String(child.pid))
+}
+if (process.env.EVAL_FAKE_EXIT_DELAY_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_EXIT_DELAY_MS))
+
 if (command === "loginom") {
   if (process.env.EVAL_FAKE_ENFORCE_WRITER && await Bun.file(path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, ".writer", "owner")).exists()) {
     process.stderr.write("PROFILE_BUSY\n")
@@ -35,18 +56,6 @@ if (command === "loginom") {
 }
 
 if (process.env.EVAL_FAKE_SLEEP_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_SLEEP_MS))
-if (process.env.EVAL_FAKE_ORPHAN_PID_FILE) {
-  const delayed = process.env.EVAL_FAKE_CHILD_DELAY_MS
-  const child = spawn(process.execPath, ["-e", delayed
-    ? `process.on('SIGTERM', () => {}); process.stdout.write('ready'); setTimeout(() => process.exit(0), ${Number(delayed)})`
-    : "setInterval(() => {}, 1000)"], {
-    detached: process.env.EVAL_FAKE_DETACHED_CHILD === "1",
-    env: { PATH: process.env.PATH ?? "" }, stdio: ["ignore", "pipe", "ignore"],
-  })
-  if (delayed) await new Promise((resolve) => child.stdout!.once("data", resolve))
-  await Bun.write(process.env.EVAL_FAKE_ORPHAN_PID_FILE, String(child.pid))
-}
-if (process.env.EVAL_FAKE_EXIT_DELAY_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_EXIT_DELAY_MS))
 const id = process.env.EVAL_TASK_ID ?? "default"
 const events = Bun.file(path.join(fixtures, `${id}.jsonl`))
 const chosen = (await events.exists()) ? events : Bun.file(path.join(fixtures, "default.jsonl"))

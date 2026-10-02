@@ -153,6 +153,22 @@ test("runAgent: явно передаёт выбранный reasoning variant",
   expect(args.slice(args.indexOf("--variant"), args.indexOf("--variant") + 2)).toEqual(["--variant", "low"])
 })
 
+test("runAgent: changed writer даёт failed cleanup без потери no_artifact и telemetry", async () => {
+  const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-changed-writer-"))
+  const command = fakeCommand()
+  const run = await runAgent({ command: { ...command, env: { ...command.env,
+    LOGINOM_AI_AGENT_CLI_PROFILE: outDir, EVAL_FAKE_CHANGED_WRITER: "1" } },
+    taskId: "default", model: "fake/model", prompt: "test", files: [],
+    workdir: outDir, timeoutMs: 30_000, outDir, profileDir: outDir })
+  expect(run.exitCode).toBe(0)
+  expect(run.sessionId).toBe("ses_fixture03")
+  expect(run.tokens.input).toBe(400)
+  expect(run.processCleanup.status).toBe("failed")
+  expect(run.processCleanup.error).toContain("Writer identity changed")
+  expect(await Bun.file(path.join(outDir, ".writer", "owner")).text()).toBe("replacement")
+  expect(await Bun.file(`${outDir}.process-group`).exists()).toBe(true)
+})
+
 test("runAgent: код выхода 1 и failureKind=tool из фикстуры", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-run-"))
   const run = await runAgent({
