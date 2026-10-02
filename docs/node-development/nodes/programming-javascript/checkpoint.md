@@ -2,20 +2,30 @@
 
 ## Текущее состояние
 
-Оперативная точка **2026-10-02, pair08**: original holder **exec32766**,
-private `f-cli-pair-08.py`: Declared08 original whole trial PASS/released;
-Code08 запускается в ordinary headed на том же candidate. Candidate11/reader11 на child **f2a0cdd991**, knowledge1.2. Контракт
-Declared исправлен после собственного CLI-отказа; source60/full3446+10SKIP PASS,
-build/roundtrip/freeze PASS. Code07 на предыдущем candidate имеет original whole
-PASS, Declared07 failed/очищен; эта неполная пара не заменяет pair08.
+Оперативная точка **2026-10-02, pair09**: candidate11/reader11 на child
+**f2a0cdd991**, knowledge1.2, без новой сборки. Private `f-cli-pair-09.py`
+держит original controllers/trials в одном процессе; команды через приватный FIFO,
+PID/startTicks/bootId и пути — `f-cli-pair-09-control.json` в каталоге кампании.
+Состояние читать из `f-cli-pair-09-events.jsonl`; при переподключении не создавать
+второй holder. Python `-B`, readonly reader, обычный headed; лимиты30/10 минут.
+Порядок: Declared → ручной source review/audit/cold/release, затем Code →
+review/audit/cold/release → pair; только после release обоих — команда exit.
+Приватный control transport отделён от терминала Codex, продукт/QA не менялись.
 
-Порядок pair08: Declared → полный ручной source review → audit → cold → release;
-затем Code → review/audit/cold/release → pair в том же original holder. Лимиты
-30/10 минут, неизменные fixtures и приватный oracle. Прочитать новые outputs
-exec32766; **не закрывать holder/lease до подтверждённого cleanup**. При успехе
-обоих оформить phase6 completion/card/registry; merge/push/release не назначены.
-Точные pins candidate11 и архив предыдущих итераций ниже. Старые строки
-«следующий шаг» относятся к своему датированному результату.
+Pair08 не завершена: Declared08 original whole trial PASS/released сохранён,
+Code08 дошёл только до prepare, без Save/collector/whole audit; original
+holder638899/exec32766 больше не существует. Доказательства не реконструировать
+для повышения до PASS. При admin recovery сначала наблюдался собственный
+`jsteach:4587/Package1`; последующее наблюдение показало отсутствие сеанса/пакета.
+Кто и каким действием их закрыл, журнал не подтверждает. Повторных Close не было.
+Admin logout/browser close и отсутствие собственных процессов подтверждены;
+19:01:25.780Z leaseCode08 освобождён, `.writer` сохранён, профиль не переиспользовать.
+Private recovery SHA `25cf02de22dbfb2e6800024fd46aa2767c676d0a8e352af1a4edd23c0420dd5a`;
+`f-cli-autonomous-code-08/retirement.json` фиксирует только retired incomplete.
+
+При original pair PASS оформить phase6 completion/card/registry;
+merge/push/release не назначены. Точные pins candidate11 и архив ниже.
+Старые строки «следующий шаг» относятся к своему датированному результату.
 
 ### Протокол итераций CLI — 2026-10-02
 
