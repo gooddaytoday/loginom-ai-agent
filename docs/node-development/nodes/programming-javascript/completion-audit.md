@@ -153,6 +153,64 @@ parameters/knowledge. Поэтому old Done proofs сохраняют знач
 preflight16 и Declared13 candidate/live (см. предыдущие разделы); не заявляется
 свежая проверка всех типов через candidate15.
 
+## Профиль движка, подготовка и source regression — 2026-10-02
+
+`engine-profile.json`: все30 referenced report bytes заново сверены с SHA.
+Сохранены исходные категории:14 observed_pass,6 native refusal,3 own native
+failure,7 characterization. Это30 наблюдений, не30 успешных executions и не
+полная ECMAScript conformance. Среди отдельно наблюдённых возможностей:
+trim/кириллические lower/upper, globalThis, async declaration; ??/optional
+chaining/lookbehind/BigInt/top-level await имеют свои отдельные отказы.
+
+Текущий `describeJavascriptKnowledge('7.4.2')` возвращает1.2.0; оба его source
+example SHA совпали с source SHA уже проверенных public `e-public-knowledge-*`.
+Report/journal обоих example runs и cleanup перепроверены. Новый build7.4.3
+действительно отвергнут текущей функцией. Примеры1.2.0 не изменены относительно
+1.0.0; новые рекомендации declared columns/column names не добавили скрытых
+непроверенных исполняемых snippets. Current semantic hash совпал с CLI delivery.
+
+Исходный пользовательский справочник в Git:51570bytes, SHA256
+`c9c2d44d4dc4cf34b8f21a98504cf9f6acfc70cac510c36fe2725e7c0d7c2d16`.
+Он сохранён отдельно от runtime knowledge. По `sources.json` сверены16 product
+Git blobs закреплённой базы и19 e2e файлов закреплённой ревизии. Семь LGP —
+Git LFS: проверены SHA/size pointer и реальные локальные bytes, а не hash текста
+указателя.26 official references остаются источниками исследования; web заново
+не перечитывался, TestCafe по-прежнему not_run.
+
+Приватные исторические квитанции `.local/project-memory/rollouts/20260926.2/`
+прочитаны: actual Codex metadata, capture22 messages/one commit, root exact
+read-back+semantic find, без ручного remember/write; upgrade сохранил state и
+предыдущий runtime. Это выполненный допуск Ubuntu и проверка полного цикла,
+не тест текущего соединения. Bootstrap/health повторно не выполнялись.
+
+Evidence06 SHA256
+`0cced666ac9d59ce63293a105fc71c16bf7e2c26767ef9c63e63a4db4fb1c505`;
+research provenance07 SHA256
+`e327d61ba56af152e17444e9dec99e073c7ccd3330716091debb6c09e0551b33`.
+Оба файла находятся в приватном campaign root с именами
+`completion-audit-evidence-06.json`, `completion-research-provenance-07.json`.
+
+Текущий source получил адресную перепроверку remaining caps/redaction/source
+admission/read/public projection/product registration/response budgets и
+generic UI/calculator regression из owning client package:
+
+```sh
+"$LOGINOM_NODE" --test test/javascript-parameters.test.mjs test/javascript-source-admission.test.mjs test/javascript-source-read.test.mjs test/javascript-source-public.test.mjs test/javascript-product-registration.test.mjs test/user-response-budget.test.mjs test/workspace-ui.test.mjs test/calculator-context.test.mjs test/calculator-parameters.test.mjs test/calculator-procedure.test.mjs test/calculator-readback.test.mjs
+```
+
+Actual exit0,518PASS/0FAIL/0SKIP. Это адресный source suite, не повтор всего
+client и не новый live run. `completion-source-regression-tests-07.log` SHA256
+`5059e7a9b1dd971b29db46e1c11380d9aba3204769ceb60edcb21096deba09e8`.
+Полный suite и owning TS typechecks предыдущих code batches остаются своими
+историческими проверками; после них TS в этом аудите не менялся.
+
+Штатный provenance verifier с `--map docs/migration/source-map.json --root .
+--transforms docs/migration/source-transforms.json` из child root:5045PASS,
+actual exit0. Log08 SHA256
+`91918370d54b6ee97714cadcf7b78d7415dd2e72bcc39b22a9cb47cf1fc4056a`.
+Первый вызов log07 не содержал обязательных аргументов и завершился exit2 до
+проверки; он сохранён и не считается PASS.
+
 ## Обязательный остаток аудита
 
 «Проверить» ниже означает оценить сохранённые доказательства и текущий код,
@@ -162,7 +220,7 @@ preflight16 и Declared13 candidate/live (см. предыдущие разде�
 
 | Группа требований | Что ещё требуется подтвердить в итоговом аудите |
 | --- | --- |
-| 0A, исследование, named artifacts | Источники Help/E2E/reference, Ubuntu memory admission/capture/read-back, assignment/base/toolchain и hashes; без повторного bootstrap/health |
+| 0A, исследование, named artifacts | Reference/source inventory/engine/examples/historical memory cycle проверены выше; при итоговом сведении зафиксировать assignment/base/toolchain и реальные платформенные границы |
 | G1/J22 | Own identity/editor/navigation/assistant inventory и границы observed absence; new/existing пути |
 | G2/G3/J09/J10/J14 | Основные Done/Close/new/existing и manual proofs сверены; в итоговой матрице объединить с C/D/CLI и сохранёнными границами смены schema/mapping |
 | G4/J05/J23 | Empty, LF/Unicode/quotes/URL/tabs, exact editor/cold, caps+1, redaction полного source и chunks, owner/cursor/digest и отказ без мутации |

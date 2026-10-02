@@ -53,6 +53,15 @@ column-types/declared/parameters/knowledge. Следующий шаг — 0A/nam
 engine/examples, remaining caps/redaction/oracle/regression tests и итоговая
 G/J матрица. Общая Goal ещё не завершена; registry пока без повышения.
 
+Completion audit06/07:30 engine report hashes и оба неизменных current1.2.0
+knowledge examples сверены; build fence проверен. Reference51570bytes exact,
+16product+19e2e historical source files (7LFS) verified; historical Ubuntu memory
+full-cycle/upgrade receipts прочитаны без routine health. Current source regression
+518PASS/0FAIL/0SKIP, actualexit0; provenance5045PASS. Первый verifier invocation
+без required args exit2 сохранён, исправленный command08 прошёл. Следующий шаг —
+финальная G1–G7/J01–J27 матрица с оставшимися конкретными evidence (J24, empty input,
+oracle negatives), затем согласованная card/registry/discovery/completion.
+
 ### Предыдущая точка: Code13 выполнялся
 
 **Pair13: Declared13 original whole PASS/released; Code13 выполняется.**
