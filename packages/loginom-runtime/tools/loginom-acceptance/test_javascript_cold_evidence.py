@@ -1,7 +1,7 @@
 """Opt-in immutable native cold regression; no browser/model or supplied JS eval.
 
 Writer snapshots here are historical baseline data, not new standalone writer
-admission proof. All eight input files are pinned and read without modification.
+admission proof. All twelve input files are pinned and read without modification.
 """
 import copy
 import hashlib
@@ -24,6 +24,10 @@ CAPTURE_SHA256 = {
     'd-public-declared-save-05/execution-events.jsonl':'954faeb75bf7b410041fc2c79d587b9300aec027c861092752f04baa0ae73187',
     'd-public-declared-cold-01/report.json':'72d054b400a30d6e1ad2de9abbb2f415f42d21f4faffa0a9782194c56b1934ab',
     'd-public-declared-cold-01/execution-events.jsonl':'78ab131d7330b9a8bc2b09ac0f5399a437b7d0c3db7d8f4f0166d7352f465cd0',
+    'e-long-source-writer-01/report.json':'09c72dd5e79b68be974014a67e0840821b2af998ecb93f144adfd6cfd0e33ddc',
+    'e-long-source-writer-01/execution-events.jsonl':'5bb07639d934871fead5e441132f14a8091ff80c3ceee52e3493f4c397ac2b3d',
+    'e-long-source-cold-02/report.json':'c1067ee8ebbc9b7a2ecb2ef969f54641ea4be2a3f6ee4c1ffa799c6bb1d97434',
+    'e-long-source-cold-02/execution-events.jsonl':'2bc340ece45bea2b644282e18cf1f1128192b590a322d7583720c6f70bf26ecd',
 }
 
 
@@ -33,7 +37,8 @@ class JavascriptColdEvidenceTests(unittest.TestCase):
         root = Path(os.environ['LOGINOM_JAVASCRIPT_AUDIT_EVIDENCE_ROOT'])
         oracle = json.loads((Path(__file__).resolve().parents[4]/'docs/node-development/nodes/programming-javascript/fixtures/operator-only/expected.json').read_text())
         for writer_name,key,cold_name in [('c-public-code-save-01','public_code','c-public-code-cold-01'),
-                ('d-public-declared-save-05','public_declared','d-public-declared-cold-01')]:
+                ('d-public-declared-save-05','public_declared','d-public-declared-cold-01'),
+                ('e-long-source-writer-01','public_code','e-long-source-cold-02')]:
             captures = {}
             for name in (writer_name,cold_name):
                 for file in ('report.json','execution-events.jsonl'):
@@ -73,6 +78,30 @@ class JavascriptColdEvidenceTests(unittest.TestCase):
                 self.assertNotIn(proof['execution_id'],case[3]['execution_ids'])
                 for key in ('writer_lifecycle_verified','journal_authenticated','launch_arguments_verified','source_freeze_verified','process_termination_verified','cli_acceptance_verified'):
                     self.assertIs(proof[key],False)
+
+    def test_actual_native_32kib_1024_lf_source_requires_each_fragment_closed(self):
+        original = next(c for c in self.cases() if c[0] == 'e-long-source-cold-02')
+        self.assertEqual(len(original[3]['source']),32768)
+        self.assertEqual(original[3]['source'].count(b'\n')+1,1024)
+        self.assertTrue(self.audit(original)['passed'],self.audit(original))
+        deliveries = [r for r in original[2] if r.get('phase') == 'source_delivery_verified']
+        self.assertEqual(len(deliveries),24)
+        self.assertEqual({r['read_id'] for r in deliveries},{1,2,3})
+        for mutation in ('missing_second_close','duplicate_step','second_cursor','second_chunk','second_offset','owner','foreign_admission','group_order'):
+            case = copy.deepcopy(original)
+            events = case[2]
+            second = next(r for r in events if r.get('phase') == 'source_delivery_verified' and r['read_id'] == 1 and r['step'] == 2)
+            if mutation == 'missing_second_close':events.remove(next(r for r in events if r.get('phase') == 'source_discard_settled' and r['read_id'] == 1 and r['step'] == 2))
+            if mutation == 'duplicate_step':second['step'] = 1
+            if mutation == 'second_cursor':second['receipt']['cursor_sha256'] = None
+            if mutation == 'second_chunk':second['receipt']['chunk_sha256'] = '0'*64
+            if mutation == 'second_offset':second['receipt']['offset_utf8_bytes'] += 1
+            if mutation == 'owner':second['owner']['node_id'] = 'foreign'
+            if mutation == 'foreign_admission':second['admission_id'] = 'foreign'
+            if mutation == 'group_order':second['read_id'] = 2
+            with self.subTest(mutation=mutation):
+                self.assertNotEqual(case,original)
+                self.assertFalse(self.audit(case)['passed'],self.audit(case))
 
     def test_original_table_sequence_strict_default_and_explicit_cold_ceiling(self):
         for case in self.cases():
