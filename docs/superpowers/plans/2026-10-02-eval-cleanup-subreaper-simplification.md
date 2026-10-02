@@ -298,11 +298,11 @@ management(command: AgentCommand, args: string[], stdin?: string, timeoutMs?: nu
 `fixtures/fake-browser.ts`. **Вход:** origin ledger, pinned bundle и новые runtime.
 **Выход:** `pending/allowed/refused` у той же записи ledger и отдельный binding receipt.
 
-- [ ] Сначала прогнать existing tests чужого browser profile, неизвестного
+- [x] Сначала прогнать existing tests чужого browser profile, неизвестного
   helper и утраты argv после binding. Затем добавить по одному недостающему
   поведению: известный adopted helper с binding; тот же helper без binding;
   точный executable с чужим profile; новое противоречащее profile после binding.
-- [ ] Основные assertions для положительного и отрицательного сценариев:
+- [x] Основные assertions для положительного и отрицательного сценариев:
 
   ```ts
   expect(run.processCleanup.browserBindings?.length).toBeGreaterThan(0)
@@ -316,13 +316,13 @@ management(command: AgentCommand, args: string[], stdin?: string, timeoutMs?: nu
   `foreign` создаётся самим тестом как отдельный реальный process; finally
   закрывает только этого fixture после проверки. Supervisor не получает права
   завершить его через совпадение executable или группы.
-- [ ] Перенести разрешения из разрозненных Set/Map в одну запись ledger.
+- [x] Перенести разрешения из разрозненных Set/Map в одну запись ledger.
   Не удалять pinned browser/runtime/argv проверки. Не считать каждый adopted
   native process корневым браузером и не считать его автоматически helper.
-- [ ] Сохранить наблюдение binding до замены argv: один цикл без queued scans,
+- [x] Сохранить наблюдение binding до замены argv: один цикл без queued scans,
   обычные 100 мс и ускоренное окно Chromium. Отдельным тестом закрепить
   короткое окно argv, используя настоящий child с `process.title`.
-- [ ] Проверить неизвестный helper и relevant `/proc` EACCES: failed cleanup,
+- [x] Проверить неизвестный helper и relevant `/proc` EACCES: failed cleanup,
   foreign process жив, исход/guards сохранены. Прогнать процессный набор и commit.
 
 ### 4. Один shutdown и достоверное evidence

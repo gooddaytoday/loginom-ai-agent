@@ -54,17 +54,25 @@ test("supervisor: происхождение без точного browser profi
   await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
   const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: out })
   const pidFile = path.join(out, "browser.pid")
+  const helperFile = path.join(out, "helper.pid")
+  let run: Awaited<ReturnType<typeof runAgent>> | undefined
   try {
-    const run = await runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
-      EVAL_FAKE_BROWSER_PID_FILE: pidFile, EVAL_FAKE_BROWSER_DATA_DIR: "/tmp/foreign-browser-profile" } },
+    run = await runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+      EVAL_FAKE_BROWSER_PID_FILE: pidFile, EVAL_FAKE_BROWSER_DATA_DIR: "/tmp/foreign-browser-profile", EVAL_FAKE_BROWSER_HELPER_PID_FILE: helperFile, EVAL_FAKE_BROWSER_HELPER_DETACHED: "1" } },
       taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: out,
       outDir: out, profileDir: out, timeoutMs: 30_000 })
     expect(run.processCleanup.status).toBe("failed")
     const pid = Number(await Bun.file(pidFile).text())
     expect((await Bun.$`ps -o stat= -p ${pid}`.quiet().nothrow()).text().trim()).not.toMatch(/^$|^Z/)
+    const helper = Number(await Bun.file(helperFile).text())
+    expect(run.processCleanup.admissions?.find((entry) => entry.pid === helper)?.status).not.toBe("allowed")
+    process.kill(helper, 0)
   } finally {
-    if (await Bun.file(pidFile).exists()) {
-      try { process.kill(Number(await Bun.file(pidFile).text()), "SIGKILL") } catch {}
+    for (const file of [pidFile, helperFile]) {
+      if (!(await Bun.file(file).exists())) continue
+      const pid = Number(await Bun.file(file).text())
+      const saved = run?.processCleanup.processes.find((entry) => entry.pid === pid)
+      if (saved) await signalProcess(saved, "SIGKILL")
     }
   }
 }, 20_000)
@@ -86,6 +94,7 @@ test("supervisor: потеря argv не стирает уже доказанн�
     expect(run.processCleanup.status).toBe("confirmed")
     expect(run.sessionId).toBe("ses_fixture03")
     expect(run.processCleanup.browserBindings?.length).toBeGreaterThan(0)
+    expect(run.processCleanup.polling?.map((entry) => entry.interval_ms)).toContain(100)
   } finally {
     if (await Bun.file(pidFile).exists()) { try { process.kill(Number(await Bun.file(pidFile).text()), "SIGKILL") } catch {} }
   }
@@ -131,6 +140,7 @@ test("supervisor: double-fork helper с новым SID имеет доказан
     expect(run.processCleanup.origins?.map((entry) => entry.via)).not.toContain("live_session")
     expect(run.processCleanup.origins?.some((entry) => entry.via === "subreaper")).toBe(true)
     const pid = Number(await Bun.file(helperFile).text())
+    expect(run.processCleanup.admissions?.find((entry) => entry.pid === pid)?.status).toBe("allowed")
     const saved = run.processCleanup.processes.find((entry) => entry.pid === pid)!
     expect(saved.starttime).toBeTruthy()
     const raw = await readFile(`/proc/${pid}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
@@ -142,4 +152,54 @@ test("supervisor: double-fork helper с новым SID имеет доказан
   } finally {
     if (await Bun.file(helperFile).exists()) { try { process.kill(Number(await Bun.file(helperFile).text()), "SIGKILL") } catch {} }
   }
+}, 20_000)
+
+
+test("supervisor: новый противоречащий profile после binding запрещает сигнал", async () => {
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-browser-rebinding-"))
+  const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-browser-rebinding-bundle-"))
+  await cp(Bun.which("node")!, path.join(bundle, "chrome"), { dereference: true })
+  const script = path.join(bundle, "browser.mjs")
+  await Bun.write(script, "process.on('SIGTERM',()=>{}); setTimeout(()=>{process.title='--user-data-dir=/tmp/foreign-profile'},300); setInterval(()=>{},1000)")
+  await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
+  const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: out })
+  const pidFile = path.join(out, "browser.pid")
+  let run: Awaited<ReturnType<typeof runAgent>> | undefined
+  try {
+    run = await runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+      EVAL_FAKE_BROWSER_PID_FILE: pidFile, EVAL_FAKE_BROWSER_SCRIPT: script } }, taskId: "default", model: "fake/model",
+      prompt: "test", files: [], workdir: out, outDir: out, profileDir: out, timeoutMs: 30_000 })
+    const pid = Number(await Bun.file(pidFile).text())
+    expect(run.processCleanup.browserBindings?.length).toBeGreaterThan(0)
+    expect(run.processCleanup.status).toBe("failed")
+    expect(run.processCleanup.admissions?.find((entry) => entry.pid === pid)?.status).toBe("refused")
+    process.kill(pid, 0)
+  } finally {
+    if (await Bun.file(pidFile).exists()) {
+      const pid = Number(await Bun.file(pidFile).text())
+      const saved = run?.processCleanup.processes.find((entry) => entry.pid === pid)
+      if (saved) await signalProcess(saved, "SIGKILL")
+    }
+  }
+}, 20_000)
+
+
+test("supervisor: новый чужой Chromium с другим profile остаётся живым", async () => {
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-foreign-browser-"))
+  const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-foreign-browser-bundle-"))
+  await Bun.build({ entrypoints: [path.join(evalsRoot, "fixtures/fake-browser.ts")], compile: { outfile: path.join(bundle, "chrome") } })
+  await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
+  const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: out })
+  const pending = runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+    EVAL_FAKE_BROWSER_PID_FILE: path.join(out, "browser.pid") } }, taskId: "default", model: "fake/model", prompt: "test",
+    files: [], workdir: out, outDir: out, profileDir: out, timeoutMs: 30_000 })
+  await Bun.sleep(300)
+  const foreign = spawn(path.join(bundle, "chrome"), ["--user-data-dir=/tmp/other-browser-profile"], { detached: true, stdio: "ignore" })
+  const exited = new Promise((resolve) => foreign.once("exit", resolve))
+  try {
+    const run = await pending
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(foreign.exitCode).toBeNull()
+    process.kill(foreign.pid!, 0)
+  } finally { foreign.kill("SIGKILL"); await exited }
 }, 20_000)
