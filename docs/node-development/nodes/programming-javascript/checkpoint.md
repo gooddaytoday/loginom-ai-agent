@@ -96,6 +96,31 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
 
+### Blocked audit: третий последовательный ход — 2026-10-02
+
+Повтор actual bundled Node/default SDK/connectRemote без proxy overrides/TLS
+изменений завершён: original exec42280, terminal21317b, wrapper exit0;
+`f-setup-default-transport-recheck-12.json` сообщает connected=false,
+pinned=false, fetch failed / UND_ERR_CONNECT_TIMEOUT к mcp.loginom.ai:443.
+Wrapper exit0 не является PASS подключения. Предыдущий ход дал диагностический
+progress, но тот же network/catalog blocker сохраняется третий ход подряд.
+
+Манифесты candidate02 и reader02 совпадают с сохранёнными SHA256; own lease
+closed_verified, active_exec_session=null, acceptance_lease=null. Новых Loginom
+процессов этот ход не запускал; diagnostic handle terminal. Source/candidate
+не менялись, новый build не требуется по имеющимся данным.
+
+Blocked audit выполнен: исходная цель не достигнута; setup/J27, candidate
+J01/J21, обе автономные Code/declared CLI попытки и cold/cleanup остаются
+обязательными и непроверенными. Обход транспорта, подмена каталога, TLS downgrade,
+снятие hash guards или новые одинаковые попытки не дадут требуемого доказательства.
+Независимая подготовка candidate/OAuth/frozen QA завершена; продолжение требует
+изменения внешнего состояния — устойчивого соединения реального runtime с
+назначенным сервисом знаний. Goal перевести в blocked, не complete/paused.
+После возобновления начать с одного readonly catalog preflight на candidate02;
+лишь после успеха — учтённый fresh headed setup с сохранённым pending connection.
+Секреты брать из уже разрешённых private источников, не запрашивать повторно.
+
 ### Повторная сетевая проверка candidate02 — 2026-10-02
 
 Предыдущий goal turn классифицирован как progress: OAuth/cold import/build
