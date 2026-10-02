@@ -5,7 +5,7 @@ No Loginom/browser/model run or process cleanup is represented by these fixtures
 import copy
 from datetime import datetime, timezone
 import unittest
-from javascript_cli_cleanup import verify_cli_package_cleanup
+from javascript_cli_cleanup import native_time,verify_cli_package_cleanup
 from javascript_cli_evidence import value_digest
 import test_javascript_cli_persistence
 
@@ -127,6 +127,10 @@ class JavascriptCliCleanupTests(unittest.TestCase):
     def test_missing_reason_is_not_a_native_success_receipt(self):
         del self.receipt['reason'];self.sync_receipt()
         self.assertIn('cli_cleanup_owned_native_close_logout',self.audit()['failures'])
+
+    def test_native_time_preserves_integer_millisecond_boundaries(self):
+        for value in (1,1349,1790921887001,1790921887123,1790921887999):
+            with self.subTest(value=value):self.assertEqual(native_time(stamp(value)),value)
 
 
 if __name__ == '__main__':unittest.main()

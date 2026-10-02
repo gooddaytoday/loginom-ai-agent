@@ -14,7 +14,8 @@ from javascript_cli_persistence import verify_cli_last_save
 def native_time(value):
     if not isinstance(value,str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z',value):
         raise ValueError('cli_cleanup_native_timestamp')
-    return int(datetime.strptime(value,'%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc).timestamp()*1000)
+    delta = datetime.strptime(value,'%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)-datetime(1970,1,1,tzinfo=timezone.utc)
+    return delta.days*86400000+delta.seconds*1000+delta.microseconds//1000
 
 
 def verify_cli_package_cleanup(events,native_events,source_operation_id,final_path,revisions,expected,receipt,projection):
