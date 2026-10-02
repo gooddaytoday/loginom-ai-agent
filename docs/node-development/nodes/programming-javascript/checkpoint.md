@@ -74,11 +74,26 @@ process row/expander; name/id/editor/link/secret/owner guards сохранены
 exec10535 actualexit0:402/402 PASS, diff-check PASS. Следующий шаг —
 новый candidate08/reader08 и fresh pair03. Candidate07 immutable не менять.
 
-**Текущий original holder: exec86258, `f-cli-pair-03.py`.** В него отправлен
-start/code для fresh `f-cli-autonomous-code-03`; только business task+sales.csv,
-Sol6.1/low/30min, ordinary headed. Не закрывать original controller и не
-освобождать lease до собственного cleanup. После writer — independent full-source
-review, audit, cold, release; затем declared и pair в том же holder.
+**Code03 native CLI завершён exit0/PASS, whole QA отказал.**
+Контроллер был запущен без `-B`/PYTHONDONTWRITEBYTECODE; import замороженных
+Python-модулей создал29 writable `__pycache__/*.pyc` в reader08. Именно эти файлы
+дали `javascript_acceptance_frozen_qa:cli_reader_private_readonly_file` до
+создания trial/source-review. Не ослаблять freeze guard, не удалять cache и не
+превращать исходный Code03 в whole PASS. Candidate08/его продуктовые bytes
+не менялись. Source-review/cold/declared в этом holder не запускались.
+Native Save`save-sales`/Close/logout SUCCEEDED1→0/no discard;
+cleanupSHA`e83371377602c60f595edf0254613ab227b4c45dc00f038002befa6c83286ddc`.
+17:18:06Z fresh process/`.writer` absence, lease released/lock archived;
+затем holderexec86258 EOFexit0. `retirement.json` сохраняет границы.
+
+Создан **reader08b** из тех же committed QA/candidate bytes (exec79885),
+manifestSHA идентичен reader08. Candidate не пересобирался. Новый private
+`f-cli-pair-04.py` устанавливает `sys.dont_write_bytecode=True` до imports и
+проверяет readonly QA при старте и непосредственно перед каждой CLI-попыткой.
+Запуск только `PYTHONDONTWRITEBYTECODE=1 python3 -B ...`; caches frozen reader
+не являются разрешённым evidence. Original holder **exec80463**, fresh
+`f-cli-autonomous-code-04`; после writer — review/audit/cold/release, затем
+independent declared/pair. Не закрывать holder/lease до cleanup.
 Candidate08 на11c2aa87cd0a92804f8558dfa38002e7483b5e41:
 manifest`962687564e3b7ffe94f738bdcab8a7a820ba1abad72d0001932b44cb95b658d4`,
 sourceTree`572fbbf5fcbdf934c9c0fd4e91667abf6a1da1c82a273c9335fc2f5091a70b66`,
