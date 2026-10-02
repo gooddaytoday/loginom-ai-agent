@@ -97,6 +97,40 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
 
+### Actual CLI delivery: технический прогон — 2026-10-02
+
+Candidate02 / ee5184a606, normal standalone run, openai/gpt-6.1-sol/low,
+ordinary headed. Private `f-cli-delivery-03`, original exec97057, CLI PID299513,
+exit0; original collector сохранён. Модель сама вызвала prepare → JS describe →
+JS+TextImport describe → Save и получила четыре completed tool replies с
+`metadata.truncated=false`. Размеры redacted text replies:24532/12825/21880/2293
+bytes. Финальный ответ модели воспроизвёл JS knowledge1.1.0, Data API и оба
+schema modes. Это фактическая доставка через backend/model, не Host-only probe.
+
+Save `js-delivery-save-001`, путь
+`/jsteach/JS-CLI-Delivery-f1e6573d-07a6-49af-a060-1295841496dd.lgp`.
+Normal last_confirmed_own_save cleanup: SUCCEEDED, package_closed/logged_out=true,
+unsaved_changes_discarded=false, packages1→0. Все наблюдавшиеся PID завершились;
+отдельная проверка /proc не нашла процессов candidate. Acceptance lock освобождён
+после проверки; исходный holder завершён exit0. Ни один аналитический trial
+Code/declared этим не заменяется; full-source/output J21 остаётся открытым.
+
+**Общий collector FAIL сохранён:** cli_process_owned_browser_not_observed.
+Процессы Chrome наблюдались как потомки, но проверка exact user-data-dir ownership
+не связала их с профилем. Причина пока не установлена; не ослаблять guard и не
+повышать результат задним числом. Следующий шаг — установить реальный argv/profile
+binding в fresh technical run и исправить только подтверждённую причину аудитора,
+затем продолжить J21 и две автономные попытки. Private technical-summary.json SHA256
+`77a83604ca7c43fbb154fbd6078e5c38ce22389d3a9429c366e84fb6f8302301`.
+
+Предшествующие technical delivery01/02 не дошли до Loginom: оператор скопировал
+credentials/connection в fresh profile без обязательного cli-profile.json.
+Delivery02 сохранил exact PROFILE_FORMAT_INVALID/exit1; доставка01 потеряла
+stderr при exception оригинального launcher, поэтому ей не приписывается exact
+причина. Исправлена только подготовка третьего профиля по profile.ts: вместе с
+own auth/config скопирован CLI format marker; старые DB/history не переносились.
+Все эти попытки DEBUG_ONLY, не часть пары Code/declared. Secrets в git отсутствуют.
+
 ### Fresh compiled setup, J27 и knowledge/normal cleanup — 2026-10-02
 
 На том же immutable candidate02 **ee5184a606 / 0.0.0-dev-202610021247**
