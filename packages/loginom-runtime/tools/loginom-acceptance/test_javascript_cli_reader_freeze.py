@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import unittest
 from javascript_cli_candidate import file_sha256
-from javascript_cli_reader_freeze import ENTRY,QA,freeze_cold_reader,verify_cold_reader
+from javascript_cli_reader_freeze import ENTRY,QA,RELEASE,RELEASE_FILE,freeze_cold_reader,verify_cold_reader
 
 
 class JavascriptReaderFreezeTests(unittest.TestCase):
@@ -28,12 +28,17 @@ class JavascriptReaderFreezeTests(unittest.TestCase):
             "import {version} from '../../client/lib/frozen-reader-fixture.mjs';\n"
             "import {readFile} from 'node:fs/promises';\n"
             "export async function fixtureIdentity(){const {dynamic}=await import('./nested/dynamic.mjs');"
-            "return {version,dynamic,data:JSON.parse(await readFile(new URL('./data.json',import.meta.url),'utf8'))};}\n")
+            "return {version,dynamic,data:JSON.parse(await readFile(new URL('./data.json',import.meta.url),'utf8')),"
+            "release:JSON.parse(await readFile(new URL('../../../product/loginom-release.json',import.meta.url),'utf8')).nodeVersion};}\n")
         (self.qa/'nested').mkdir()
         (self.qa/'nested/dynamic.mjs').write_text("export const dynamic='frozen dynamic helper';\n")
         (self.qa/'data.json').write_text('{"fixture":"frozen data"}\n')
         checkout=self.source/'packages/loginom-runtime/client/lib/frozen-reader-fixture.mjs'
         checkout.parent.mkdir(parents=True);checkout.write_text("export const version='checkout';\n")
+        self.release=self.source/RELEASE;self.release.parent.mkdir(parents=True)
+        self.release.write_text(json.dumps(dict(protocol=1,target='linux-x64',
+            nodeVersion=self.fixture.expected['node_version'],nodeSha256=self.fixture.expected['node_sha256'],
+            browserSha256=self.fixture.expected['browser_sha256'])))
         self.git('init','--quiet')
         self.git('add','packages')
         self.git('-c','user.name=QA fixture','-c','user.email=qa@example.invalid','-c','commit.gpgSign=false',
@@ -70,7 +75,8 @@ class JavascriptReaderFreezeTests(unittest.TestCase):
         self.assertEqual(proof['entry'],str(self.output/ENTRY))
         manifest=json.loads((self.output/'reader-manifest.json').read_text())
         self.assertEqual(manifest['source_commit'],self.commit)
-        self.assertEqual(len(manifest['files']),4)
+        self.assertEqual(len(manifest['files']),5)
+        self.assertEqual((self.output/RELEASE_FILE).read_bytes(),self.release.read_bytes())
         self.assertNotIn('untracked-private',json.dumps(manifest))
         self.assertEqual(os.readlink(self.output/'runtime/client'),
             str(self.fixture.root/'resources/loginom/runtime/client'))
@@ -87,7 +93,7 @@ class JavascriptReaderFreezeTests(unittest.TestCase):
             check=False,timeout=10)
         self.assertEqual(result.returncode,0,result.stderr.decode())
         self.assertEqual(json.loads(result.stdout),dict(version='candidate',dynamic='frozen dynamic helper',
-            data=dict(fixture='frozen data')))
+            data=dict(fixture='frozen data'),release='24.19.0'))
         self.assertTrue(self.proof(reader)['passed'])
 
     def test_qa_dirty_or_wrong_commit_refuses_before_freeze(self):
@@ -108,6 +114,33 @@ class JavascriptReaderFreezeTests(unittest.TestCase):
         self.fixture.expected['source_commit']=self.commit
         self.fixture.metadata['sourceCommit']=self.commit;self.fixture.repin()
         with self.assertRaisesRegex(ValueError,'source_tree_shape'):self.freeze()
+
+    def test_release_dirty_or_wrong_candidate_refuses(self):
+        original=self.release.read_bytes()
+        self.release.write_bytes(original+b' ')
+        with self.assertRaisesRegex(ValueError,'exact_committed_qa'):self.freeze()
+        self.release.write_bytes(original)
+        changed=json.loads(original);changed['browserSha256']='c'*64
+        self.release.write_text(json.dumps(changed))
+        self.git('add',RELEASE)
+        self.git('-c','user.name=QA fixture','-c','user.email=qa@example.invalid','-c','commit.gpgSign=false',
+            'commit','--quiet','-m','fixture: mismatched release')
+        self.fixture.expected['source_commit']=self.git('rev-parse','HEAD').strip()
+        self.fixture.metadata['sourceCommit']=self.fixture.expected['source_commit'];self.fixture.repin()
+        with self.assertRaisesRegex(ValueError,'release_candidate_pins'):self.freeze()
+
+    def test_missing_committed_release_refuses_before_any_launch(self):
+        self.git('rm',RELEASE)
+        self.git('-c','user.name=QA fixture','-c','user.email=qa@example.invalid','-c','commit.gpgSign=false',
+            'commit','--quiet','-m','fixture: missing release')
+        self.fixture.expected['source_commit']=self.git('rev-parse','HEAD').strip()
+        self.fixture.metadata['sourceCommit']=self.fixture.expected['source_commit'];self.fixture.repin()
+        with self.assertRaisesRegex(ValueError,'release_missing'):self.freeze()
+
+    def test_frozen_release_cannot_change_independently(self):
+        reader=self.freeze();path=self.output/RELEASE_FILE
+        self.rewrite(path,path.read_bytes()+b' ')
+        self.assertIn('cli_reader_qa_payload_changed',self.proof(reader)['failures'])
 
     def test_existing_or_overlapping_output_never_overwritten(self):
         sentinel=self.output/'sentinel';sentinel.write_text('existing')

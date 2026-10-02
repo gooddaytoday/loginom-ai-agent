@@ -26,7 +26,7 @@ function withoutBinary(value,depth=0) {
     Object.entries(value).map(([key,item])=>[key,withoutBinary(item,depth+1)]));
   return value;
 }
-let redactor,closed=false,privateKey=false;
+let redactor,mode,closed=false,privateKey=false;
 const counts={event:0,error:0,omitted:0};
 
 async function reply(value) {
@@ -39,11 +39,13 @@ async function dispatch(message) {
       ||await realpath(module.path)!==module.path||!/^[a-f0-9]{64}$/.test(module.sha256)
       ||createHash('sha256').update(await readFile(module.path)).digest('hex')!==module.sha256
       ||!Array.isArray(message.known_values)||message.known_values.length>128
+      ||!['cli','cold'].includes(message.mode??'cli')
       ||message.known_values.some(value=>typeof value!=='string'||Buffer.byteLength(value,'utf8')>16384))
       throw Error('cli_capture_redactor_initialization');
     const {createRedactor}=await import(pathToFileURL(module.path));
     if(typeof createRedactor!=='function')throw Error('cli_capture_redactor_export');
     redactor=createRedactor(message.known_values);
+    mode=message.mode??'cli';
     await reply({kind:'ready',version:1});return;
   }
   if(message.kind==='close') {
@@ -74,6 +76,19 @@ async function dispatch(message) {
   let value;
   try{value=JSON.parse(message.line);}catch{return omit('stdout_invalid_json');}
   if(hidden(value)||hidden(value?.part))return omit('non_public_stdout',true);
+  if(mode==='cold') {
+    if(!value||typeof value!=='object'||Array.isArray(value)
+      ||Object.keys(value).sort().join(',')!=='cleanup,report,status,work_stage'
+      ||!['OBSERVED','FAILED','CLEANUP_UNCONFIRMED','EVIDENCE_UNCONFIRMED'].includes(value.status)
+      ||typeof value.work_stage!=='string'||typeof value.report!=='string'
+      ||!value.cleanup||typeof value.cleanup!=='object'||Array.isArray(value.cleanup))
+      return omit('cold_unknown_summary');
+    let cleaned;
+    try{cleaned=redactor.redact(withoutBinary(value));}
+    catch{return omit('redaction_failed');}
+    if(cleaned?.type==='redaction_failure')return omit('redaction_failed');
+    counts.event++;await reply({kind:'event',value:cleaned});return;
+  }
   if(!value||typeof value!=='object'||Array.isArray(value)||!visible.has(value.type))
     return omit('stdout_unknown_event');
   let cleaned;

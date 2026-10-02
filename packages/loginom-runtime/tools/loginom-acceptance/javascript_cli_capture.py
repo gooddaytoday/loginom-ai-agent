@@ -45,7 +45,14 @@ def known_cli_secrets(profile):
 
 
 class RedactedCliCapture:
-    def __init__(self,directory,*,node,worker,redactor,known_values):
+    def __init__(self,directory,*,node,worker,redactor,known_values,mode='cli',expected_report=None):
+        if (mode not in ('cli','cold') or (mode=='cli' and expected_report is not None)
+                or (mode=='cold' and (not isinstance(expected_report,str)
+                    or not Path(expected_report).is_absolute() or Path(expected_report).resolve()!=Path(expected_report)
+                    or Path(expected_report).name!='report.json'))):
+            raise ValueError('cli_capture_stream_mode')
+        self.mode,self.expected_report=mode,expected_report
+        self.output_file='events.jsonl' if mode=='cli' else 'cold-summary.jsonl'
         self.directory=absolute_directory(directory)
         if self.directory.stat().st_uid!=os.getuid() or self.directory.stat().st_mode & 0o077:
             raise ValueError('cli_capture_private_directory_required')
@@ -69,9 +76,9 @@ class RedactedCliCapture:
         self.streams={}
         self.file_identities={}
         try:
-            reply=self.exchange(dict(kind='initialize',module=redactor,known_values=known_values))
+            reply=self.exchange(dict(kind='initialize',module=redactor,known_values=known_values,mode=mode))
             if reply!={'kind':'ready','version':1}:raise ValueError('cli_capture_worker_ready_required')
-            for name in ('events.jsonl','stderr.txt','capture-omissions.jsonl'):
+            for name in (self.output_file,'stderr.txt','capture-omissions.jsonl'):
                 descriptor=os.open(self.directory/name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
                 self.streams[name]=os.fdopen(descriptor,'w',encoding='utf-8')
                 stat=os.fstat(self.streams[name].fileno())
@@ -131,14 +138,16 @@ class RedactedCliCapture:
             self.omit(source,'redaction_transport_unconfirmed');return
         kind=reply.get('kind')
         if kind=='event' and source=='stdout' and isinstance(reply.get('value'),dict):
+            if self.mode=='cold' and (self.counts[kind]!=0 or reply['value'].get('report')!=self.expected_report):
+                self.omit(source,'cold_duplicate_or_foreign_report');return
             self.counts[kind]+=1
-            self.streams['events.jsonl'].write(json.dumps(reply['value'],ensure_ascii=False,allow_nan=False)+'\n')
-            self.streams['events.jsonl'].flush();return
+            self.streams[self.output_file].write(json.dumps(reply['value'],ensure_ascii=False,allow_nan=False)+'\n')
+            self.streams[self.output_file].flush();return
         if kind=='error' and source=='stderr' and isinstance(reply.get('line'),str):
             self.counts[kind]+=1
             self.streams['stderr.txt'].write(reply['line']+'\n');self.streams['stderr.txt'].flush();return
         if kind=='omitted' and reply.get('reason') in ('stdout_invalid_json','stdout_unknown_event',
-                'non_public_stdout','non_public_stderr','redaction_failed') and type(reply.get('expected')) is bool:
+                'non_public_stdout','non_public_stderr','redaction_failed','cold_unknown_summary') and type(reply.get('expected')) is bool:
             self.counts[kind]+=1
             self.omit(source,reply['reason'],expected=reply['expected']);return
         self.failures.add('cli_capture_worker_untrusted_reply')
@@ -176,6 +185,7 @@ class RedactedCliCapture:
     def finish(self):
         if self.result is not None:return copy.deepcopy(self.result)
         for source in self.buffers:self.end(source)
+        if self.mode=='cold' and self.counts['event']!=1:self.failures.add('cold_capture_exact_summary_required')
         try:
             if self.transport_failed:raise ValueError('cli_capture_worker_transport_failed')
             reply=self.exchange(dict(kind='close'))
@@ -205,15 +215,29 @@ class RedactedCliCapture:
         except (OSError,ValueError):self.failures.add('cli_capture_final_integrity_unconfirmed')
         self.result=dict(version=1,passed=not self.failures,failures=sorted(self.failures),counts=copy.deepcopy(self.counts),
             worker_returncode=self.worker.returncode,files=files,sources=copy.deepcopy(self.pins),
-            scope='bounded_filtered_redacted_stream_capture',
+            scope='bounded_filtered_redacted_stream_capture',mode=self.mode,
             native_journal_authenticated=False,model_delivery_verified=False,cli_acceptance_verified=False)
         return copy.deepcopy(self.result)
 
 
 def collect_cli_process(controller,capture,*,cleanup_wait_ms=90000):
+    if (not isinstance(controller,JavascriptProcessController) or not isinstance(capture,RedactedCliCapture)
+            or controller.kind!='cli' or capture.mode!='cli'):
+        raise ValueError('cli_capture_original_collect_contract')
+    return collect_original_process(controller,capture,cleanup_wait_ms=cleanup_wait_ms)
+
+
+def collect_cold_process(controller,capture,*,cleanup_wait_ms=90000):
+    if (not isinstance(controller,JavascriptProcessController) or not isinstance(capture,RedactedCliCapture)
+            or controller.kind!='cold' or capture.mode!='cold'):
+        raise ValueError('cold_capture_original_collect_contract')
+    return collect_original_process(controller,capture,cleanup_wait_ms=cleanup_wait_ms)
+
+
+def collect_original_process(controller,capture,*,cleanup_wait_ms):
     """Drain original streams; deadline SIGINT, then bounded own-root recovery."""
     if (not isinstance(controller,JavascriptProcessController) or not isinstance(capture,RedactedCliCapture)
-            or controller.kind!='cli' or type(cleanup_wait_ms) is not int or not 0<cleanup_wait_ms<=90000
+            or controller.kind!=capture.mode or type(cleanup_wait_ms) is not int or not 0<cleanup_wait_ms<=90000
             or controller.result is not None or capture.result is not None
             or any(stream is None for stream in (controller.process.stdout,controller.process.stderr))):
         raise ValueError('cli_capture_original_collect_contract')
@@ -292,4 +316,4 @@ def collect_cli_process(controller,capture,*,cleanup_wait_ms=90000):
     return dict(version=1,passed=not failed,failures=sorted(failed),process=process,capture=streams,control=control,
         original_deadline_expired=expired,forced_root_termination=forced,
         scope='original_handle_bounded_deadline_and_redacted_streams',native_cleanup_verified=False,
-        model_delivery_verified=False,cli_acceptance_verified=False)
+        model_delivery_verified=False,cold_persistence_verified=False,cli_acceptance_verified=False)
