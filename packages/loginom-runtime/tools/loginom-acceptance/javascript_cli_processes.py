@@ -139,7 +139,7 @@ class LinuxProcessOwner:
 def owned_browser(row,profile,browser,previous=None):
     """Exact executable + own user-data-dir, read only; never export argv."""
     try:
-        arguments = Path('/proc',str(row['pid']),'cmdline').read_bytes().decode('utf-8').split('\0')
+        arguments = browser_arguments(Path('/proc',str(row['pid']),'cmdline').read_bytes(),browser['path'])
         # Only the original browser root has the launch policy. Sandboxed
         # renderer/utility children may deny exe access and are tracked instead
         # by this root's owned session and observed PID/start identity.
@@ -161,3 +161,22 @@ def owned_browser(row,profile,browser,previous=None):
             sandbox_enabled=not any(arg == '--no-sandbox' or arg.startswith('--no-sandbox=') for arg in arguments),
             direct_proxy='--no-proxy-server' in arguments)
     except (FileNotFoundError,ProcessLookupError):return None
+
+
+def browser_arguments(raw,executable):
+    """Chromium rewrites Linux argv into one space-joined process title.
+
+    Only accept its unambiguous root launch grammar. Do not shell-unquote or
+    guess boundaries in a profile containing spaces; original NUL argv still
+    supports those paths. Executable/PID/profile verification remains separate.
+    """
+    arguments=raw.decode('utf-8').rstrip('\0').split('\0')
+    if len(arguments)!=1:return arguments
+    prefix=str(Path(executable).resolve())+' '
+    if not arguments[0].startswith(prefix):return []
+    tail=arguments[0][len(prefix):]
+    if any(char in tail for char in ('"',"'",'\\','\t','\r','\n')):return []
+    tokens=tail.split(' ')
+    if not tokens or tokens[-1]!='about:blank' or any(not token.startswith('--') for token in tokens[:-1]):
+        return []
+    return [prefix[:-1],*tokens]
