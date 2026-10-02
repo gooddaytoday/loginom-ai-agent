@@ -5,10 +5,12 @@ child **3e4cd56eaa**, knowledge1.2. Добавлена приватная диа
 shutdown/ACK; критерии успешного закрытия сохранены. Runtime12/Host23 tests,
 typecheck, provenance5045, build/roundtrip/freeze и reader preflight PASS.
 
-**Pair12 начата:** Declared12, затем Code12 через original holder, обычный
-headed-браузер. Предыдущий Declared11 завершился cleanup FAIL после native
-Save/Close/logout; причина пока не установлена. Новая диагностика должна
-локализовать этап при повторном отказе. Failed evidence сохранены.
+**Declared12 original whole PASS/released:** авторский код, полный результат,
+сохранение и независимое открытие/выполнение/cleanup проверены. Code12 запущен
+на том же candidate/reader в original holder, ordinary headed. До успешного
+Code и whole pair итоговая приёмка открыта. Предыдущий cleanup FAIL сохранён;
+в этом прогоне оба runtime ACK/exit0 подтверждены, причина старого отказа
+исправленной не объявляется.
 Точные pins, процессы и порядок продолжения — в
 [checkpoint](checkpoint.md#текущее-состояние).
 Integration, push и release не выполнялись; accepted registry остаётся открытым.

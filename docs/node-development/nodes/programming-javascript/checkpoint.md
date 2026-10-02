@@ -2,6 +2,32 @@
 
 ## Текущее состояние
 
+**Pair12: Declared12 original whole PASS/released; Code12 выполняется.**
+Original holder832047/startTicks22404823 жив и хранит original trials.
+Declared writer832481/cold841138 завершились штатно, collector/native origin,
+manual full-source review, whole writer и cold/trial audits PASS. Source546bytes
+`e7eec954e56c5ce0b110cda5f027772fd833f64af70fd6863d98201fae4db769`
+прочитан полностью: цикл по входу/один Append/четыре поля, вычисление суммы,
+trim/lowercase и классификация знака, без готовых ответов или AssignColumns.
+CLI session `ses_f01ac8383ffe40hoxbi8CESPLt`, package
+`/jsteach/JavaScript-declared-55f7fbf4-ee50-4592-bba3-5056f8400f84.lgp`.
+Original trial SHA
+`feeeae8af14cd1f2af41b9b980115d30bab1986c2c288fd29d01831256144e40`.
+Native Save/Close/logout и отсутствие profile guard/processes подтверждены;
+original release выполнен. Новая shutdown диагностика показывает оба ACK и
+exit0; причина прежнего Declared11 отказа не установлена и исправленной не
+объявляется. Original FAIL остаётся неизменным.
+
+**Code12 writer845331** запущен в том же holder на candidate13/reader13,
+с новым профилем/уникальным path и самостоятельным заданием Code. Ordinary
+headed, GPT-6.1 Sol low, прежние30min/10min. Следующий шаг — наблюдать этот
+original writer, full-source review → audit → cold → release → whole pair.
+Не закрывать holder до сохранения pair audit; не объединять trials из разных
+holders. После пары остаются актуализация J21 и requirement-by-requirement
+completion по всему исходному плану. Frozen bytes не менять.
+
+### Подготовка pair12
+
 **Pair12 начата — 2026-10-02 20:34 UTC.** Child
 `3e4cd56eaaad168a498096e7494ed3e09ccf18fc` добавляет приватную диагностику
 shutdown без изменения критериев закрытия. Runtime пишет в session directory
