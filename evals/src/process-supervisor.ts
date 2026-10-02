@@ -1,6 +1,7 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
-import { lstat, open, readdir, readFile, readlink, realpath, stat, writeFile, rm } from "node:fs/promises"
+import os from "node:os"
+import { lstat, mkdtemp, open, readdir, readFile, readlink, realpath, stat, writeFile, rm } from "node:fs/promises"
 
 export type ProcessIdentity = {
   pid: number; starttime: string; uid: number; parent: number; group: number; session: number
@@ -12,6 +13,7 @@ export type ProcessCleanup = {
   status: "confirmed" | "failed" | "not_run"; error: string | null
   processes: ProcessIdentity[]; unknownProcesses?: ProcessIdentity[]; runtimeDirectories: string[]; writer: WriterIdentity | null
   capture_complete: boolean
+  launcher?: { kind: "linux_subreaper"; pid: number; cli_pid: number | null; ready: boolean }
   browserBindings?: { process: ProcessIdentity; runtimeDirectory: string; observed_at: string }[]
   bindingRefusals?: { process: ProcessIdentity; has_data_dir: boolean; data_inside_profile: boolean; new_runtime_match: boolean; executable_match: boolean; ancestry_match: boolean }[]
 }
@@ -32,7 +34,7 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
   }
 }
 
-async function processView(pid: number, required = true, owners: ProcessIdentity[] = []): Promise<ProcessView | undefined> {
+async function processView(pid: number, required = true, owners: ProcessIdentity[] = [], retries = 2): Promise<ProcessView | undefined> {
   let relevant = required
   try {
     const directory = `/proc/${pid}`
@@ -44,14 +46,22 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
     const name = raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(")"))
     relevant ||= /^(?:loginom-ai-|chrome|chromium)/.test(name) || owners.some((owner) =>
       owner.pid === pid || owner.pid === Number(fields[1]) || owner.group === Number(fields[2]) && owner.session === Number(fields[3]))
-    const args = (await readFile(path.join(directory, "cmdline"), "utf8")).split("\0").filter(Boolean)
-    relevant ||= args.some((arg) => /(?:node-host\.mjs|standalone\.ts|loginom-ai-agent-cli)$/.test(arg))
+    const initialArgs = (await readFile(path.join(directory, "cmdline"), "utf8")).split("\0").filter(Boolean)
+    relevant ||= initialArgs.some((arg) => /(?:node-host\.mjs|standalone\.ts|loginom-ai-agent-cli)$/.test(arg))
     const executable = await readlink(path.join(directory, "exe"))
     const info = await stat(path.join(directory, "exe"))
+    const args = (await readFile(path.join(directory, "cmdline"), "utf8")).split("\0").filter(Boolean)
+    const finalExecutable = await stat(path.join(directory, "exe"))
     const finalRaw = await readFile(path.join(directory, "stat"), "utf8")
     const final = finalRaw.slice(finalRaw.lastIndexOf(")") + 2).split(" ")
     if (["Z", "X"].includes(final[0] ?? "")) return undefined
     if (final[19] !== fields[19]) throw Error("Process birth changed during read")
+    // /proc files are separate observations. Avoid recording pre-exec argv with
+    // a post-exec executable, or a PGID sampled before detached spawn settles.
+    if (finalExecutable.dev !== info.dev || finalExecutable.ino !== info.ino || final[2] !== fields[2] || final[3] !== fields[3]) {
+      if (retries) return processView(pid, relevant, owners, retries - 1)
+      throw Error("Process identity did not settle during read")
+    }
     return { pid, uid: owner.uid, starttime: fields[19]!, parent: Number(fields[1]),
       group: Number(fields[2]), session: Number(fields[3]), executable, device: info.dev, inode: info.ino,
       name, args,
@@ -144,12 +154,36 @@ export async function superviseProcess(input: {
   const files = input.outDir ? await Promise.all(["events.jsonl", "stderr.txt"]
     .map((name) => open(path.join(input.outDir!, name), "w", 0o600))) : []
   let writing = Promise.resolve()
-  const proc = spawn(input.cmd[0]!, input.cmd.slice(1), { cwd: input.cwd, env: input.env,
+  const capsule = await mkdtemp(path.join(os.tmpdir(), "evals-launcher-"))
+  const nonce = crypto.randomUUID()
+  await writeFile(path.join(capsule, "command.json"), JSON.stringify({ cmd: input.cmd, cwd: input.cwd, nonce }), { mode: 0o600 })
+  const proc = spawn(process.execPath, [path.join(import.meta.dir, "process-launcher.ts"), capsule], { cwd: input.cwd, env: input.env,
     detached: true, stdio: [input.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"] })
+  let cliExitCode: number | undefined, cliPid: number | undefined, reaperReady = false
+  cleanup.launcher = { kind: "linux_subreaper", pid: proc.pid ?? -1, cli_pid: null, ready: false }
+  let finish = () => {}
   const exited = new Promise<void>((resolve) => {
-    proc.once("exit", () => resolve())
+    finish = resolve
+    proc.once("exit", () => {
+      if (cliExitCode === undefined) cleanup.error ??= "Launcher ended without CLI exit receipt"
+      resolve()
+    })
     proc.once("error", (error) => { cleanup.error = `Spawn failed: ${message(error)}`; resolve() })
   })
+  const readReceipt = async () => {
+    const raw = await readFile(path.join(capsule, "state.json"), "utf8").catch((error) => {
+      if (gone(error)) return undefined
+      throw Error("Launcher receipt unreadable")
+    })
+    if (!raw) return
+    const state = JSON.parse(raw) as { nonce: string; pid: number; ready: boolean; cli_pid: number | null; exit_code: number | null; error: string | null }
+    if (state.nonce !== nonce || state.pid !== proc.pid) throw Error("Launcher receipt identity differs")
+    reaperReady = state.ready
+    cleanup.launcher!.ready = state.ready
+    if (state.cli_pid !== null) { cliPid = state.cli_pid; cleanup.launcher!.cli_pid = state.cli_pid }
+    if (state.error) cleanup.error ??= "Launcher admission failed"
+    if (state.exit_code !== null && Number.isSafeInteger(state.exit_code)) { cliExitCode = state.exit_code; finish() }
+  }
   if (input.stdin !== undefined) proc.stdin!.end(input.stdin)
   const stdout: Uint8Array[] = [], stderr: Uint8Array[] = []
   for (const [index, stream] of [proc.stdout!, proc.stderr!].entries()) {
@@ -233,7 +267,10 @@ export async function superviseProcess(input: {
         if (ledger.has(key(entry))) {
           // Chromium may clear argv while exiting. Birth-bound authority survives
           // that observation; every signal still rechecks executable/UID/starttime.
-          if (data ? !bound(entry) : !boundBrowsers.has(key(entry)) && !browserAncestor(entry)) {
+          const adopted = reaperReady && root && entry.parent === root.pid && entry.pid !== cliPid &&
+            live.some((candidate) => key(candidate) === key(root)) && boundBrowsers.size > 0 &&
+            (entry.device !== browser.device || entry.inode !== browser.inode || entry.args.some((arg) => arg.startsWith("--type=")))
+          if (data ? !bound(entry) : !boundBrowsers.has(key(entry)) && !browserAncestor(entry) && !adopted) {
             if (!denied.has(key(entry))) {
               cleanup.bindingRefusals ??= []
               cleanup.bindingRefusals.push({ process: identity(entry), has_data_dir: Boolean(data), data_inside_profile: Boolean(data && inside(data, profile!)),
@@ -256,7 +293,7 @@ export async function superviseProcess(input: {
     return live.filter((entry) => ledger.has(key(entry)))
   }
   const checkedScan = () => {
-    scanning = scanning.then(async () => { await scan() }).catch((error) => { cleanup.error ??= message(error) })
+    scanning = scanning.then(async () => { await readReceipt(); await scan() }).catch((error) => { cleanup.error ??= message(error) })
     return scanning
   }
   await checkedScan()
@@ -264,7 +301,7 @@ export async function superviseProcess(input: {
   const signalOwned = async (signal: NodeJS.Signals) => {
     await checkedScan()
     for (const saved of ledger.values()) {
-      if (denied.has(key(saved))) continue
+      if (denied.has(key(saved)) || root && key(saved) === key(root)) continue
       try {
         // Individual signals avoid signaling a recycled PGID or an unknown member.
         await signalProcess(saved, signal)
@@ -288,7 +325,7 @@ export async function superviseProcess(input: {
   await signalOwned("SIGTERM")
   const remaining = async () => {
     await checkedScan()
-    return (await Promise.all([...ledger.values()].filter((entry) => !denied.has(key(entry))).map(async (saved) => {
+    return (await Promise.all([...ledger.values()].filter((entry) => !denied.has(key(entry)) && (!root || key(entry) !== key(root))).map(async (saved) => {
       try {
         const current = await processView(saved.pid)
         if (current && key(current) !== key(saved)) throw Error(`Process identity changed PID ${saved.pid}`)
@@ -301,6 +338,11 @@ export async function superviseProcess(input: {
   if ((await remaining()).length) await signalOwned("SIGKILL")
   while ((await remaining()).length && Date.now() < deadline) await Bun.sleep(100)
   if ((await remaining()).length) cleanup.error ??= "Owned processes did not terminate"
+  if (root) await signalProcess(identity(root), "SIGTERM").catch((error) => { cleanup.error ??= message(error) })
+  const launcherDeadline = Math.min(deadline, Date.now() + 5_000)
+  while (proc.exitCode === null && proc.signalCode === null && Date.now() < launcherDeadline) await Bun.sleep(100)
+  if (root && proc.exitCode === null && proc.signalCode === null)
+    await signalProcess(identity(root), "SIGKILL").catch((error) => { cleanup.error ??= message(error) })
   stopped = true
   clearInterval(poll)
   await scanning
@@ -323,10 +365,12 @@ export async function superviseProcess(input: {
   }
   if (cleanup.error) cleanup.status = "failed"
   const result = { stdout: Buffer.concat(stdout).toString("utf8"), stderr: Buffer.concat(stderr).toString("utf8"),
-    exitCode: proc.exitCode ?? -1, timedOut, interrupted, startedAt, durationMs: Date.now() - startedAt,
+    exitCode: cliExitCode ?? proc.exitCode ?? -1, timedOut, interrupted, startedAt, durationMs: Date.now() - startedAt,
     processCleanup: cleanup }
   if (input.outDir) {
     await Bun.write(path.join(input.outDir, "process-cleanup.json"), JSON.stringify(cleanup, null, 2))
   }
+  await rm(path.join(capsule, "command.json"), { force: true })
+  if (cleanup.status === "confirmed") await rm(capsule, { recursive: true, force: true })
   return result
 }

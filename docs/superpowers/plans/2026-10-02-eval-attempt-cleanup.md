@@ -41,3 +41,19 @@ native helper, недоступный посторонний /proc и отказ
 Установленный CLI выбран из текущей конфигурации: 0.1.17-prod,
 openai/gpt-6-sol, variant default, обычный бюджет 900000 мс. Он не менялся.
 Пользовательские system-bugs.md/repository-week.md не включались в коммиты.
+
+Native checkpoint: 198 tests/typecheck/diff-check pass. Readiness probes
+20261002-104121-d16624d12-dirty и 20261002-105029-f46160d7e-dirty остановлены
+до dispatch кейсов. Два последующих адресных status дали положительные browser
+bindings, но не смогли доказать происхождение chrome_crashpad_handler: double-fork,
+собственный SID, усыновление системным reaper PID 1327 до первого 100-мс scan.
+Неизвестные helpers не завершались; все наблюдённые процессы затем исчезли сами.
+Guard reconciliation сохраняет evidence и выполняется после двух пустых проверок
+PID/starttime и профиля; runtime исходных probes остаётся сохранённым.
+
+Для выполнения исходного proof-of-origin контракта требуется выделенный Linux
+subreaper launcher на каждый запуск: он запускает только выбранный CLI и держит
+родительскую границу до финальной проверки. Использовать встроенный Bun FFI и
+Linux prctl, без зависимостей/установки/systemd и без изменений продукта. Это
+устраняет потерю ancestry на double-fork; argv match не становится kill authority.
+Реализация и отрицательная проверка чужого helper ещё не завершены. Goal active.
