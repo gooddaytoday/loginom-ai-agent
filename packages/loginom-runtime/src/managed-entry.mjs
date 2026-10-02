@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { mkdir, mkdtemp, readFile } from "node:fs/promises"
+import { appendFileSync } from "node:fs"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { closeManagedResources } from "./managed-resources-close.mjs"
@@ -26,11 +27,21 @@ const state = {
   inputs: new Map(),
 }
 const requests = new Set()
+const terminalTrace = (stage) => {
+  if (!state.session?.directory) return
+  try {
+    appendFileSync(join(state.session.directory, "terminal-close.jsonl"),
+      JSON.stringify({ version: 1, stage, recorded_at: new Date().toISOString() }) + "\n", { mode: 0o600 })
+  } catch { /* Diagnostics cannot change the checked shutdown result. */ }
+}
 const send = (message, disconnect = false) => {
+  if (disconnect) terminalTrace("reply_sending")
   if (process.connected)
     process.send(message, (error) => {
       if (!disconnect) return
+      terminalTrace(error ? "reply_failed" : "reply_flushed")
       if (!error && process.connected) process.disconnect()
+      terminalTrace("disconnect_returned")
       // Node may postpone 'disconnect' while an incomplete later IPC frame is
       // buffered. The reply is flushed and admitted work/resources are already
       // drained; use the same checked stop path without waiting for that frame.
@@ -44,11 +55,13 @@ function close() {
   return state.closing
 }
 const stop = (exitCode = 0) => {
+  terminalTrace("stop_requested")
   void close().then(
-    () => process.exit(exitCode),
-    () => process.exit(1),
+    () => { terminalTrace("exit_requested"); process.exit(exitCode) },
+    () => { terminalTrace("cleanup_rejected"); process.exit(1) },
   )
 }
+process.on("exit", () => terminalTrace("exit_event"))
 process.on("disconnect", () => stop())
 process.on("SIGTERM", () => stop())
 process.on("message", (message) => {
