@@ -68,11 +68,27 @@ shell argument. Исправленный scan точных argv подтверд
 Это retired failure, не нормальный cleanup или PASS. `retirement.json` хранит
 точный порядок; cold/declared не запускались.
 
-Исправление child: узкое исключение только для data suffix native-bound
+Исправление child `11c2aa87cd`: узкое исключение только для data suffix native-bound
 process row/expander; name/id/editor/link/secret/owner guards сохранены.
 10 адресных UI tests PASS; полный workspace-ui + process/navigation набор
 exec10535 actualexit0:402/402 PASS, diff-check PASS. Следующий шаг —
 новый candidate08/reader08 и fresh pair03. Candidate07 immutable не менять.
+
+**Текущий original holder: exec86258, `f-cli-pair-03.py`.** В него отправлен
+start/code для fresh `f-cli-autonomous-code-03`; только business task+sales.csv,
+Sol6.1/low/30min, ordinary headed. Не закрывать original controller и не
+освобождать lease до собственного cleanup. После writer — independent full-source
+review, audit, cold, release; затем declared и pair в том же holder.
+Candidate08 на11c2aa87cd0a92804f8558dfa38002e7483b5e41:
+manifest`962687564e3b7ffe94f738bdcab8a7a820ba1abad72d0001932b44cb95b658d4`,
+sourceTree`572fbbf5fcbdf934c9c0fd4e91667abf6a1da1c82a273c9335fc2f5091a70b66`,
+version0.0.0-dev-202610021709, reader
+`f9d8b635804bcd18a737d9a75255be8a00e647001ae2677a154c122ce7e474e0`,
+pinsSHA`748ffe2d34120527a99ef1df4c2a466be53d4dfd025820d2c8178f9b535be5ab`.
+Buildexec39396 exit0/roundtrip PASS; freezeexec79688:5441candidate/969QAfiles,
+cold--help0. New actual clientRevision271files
+`2f302dbdfad20c3cdd21eaa1fb5f932780d56dbaf42bf4ad77387a9cb97b4cf8`;
+remote catalog17764f…/Save2 остаётся отдельно pinned и сверяется actual writer.
 
 Whole audit исправлен на29068cc7fd (original/redacted hashes и JSON blocks),
 f5a94febf1 (actual hashed Host path/private runtime pin),861a64e40b (attachment
