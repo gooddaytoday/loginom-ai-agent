@@ -105,7 +105,9 @@ Controller-only read и совпавшие metadata без этих фактов
 special supervised technical startup не заменяет normal model run. Штатное
 завершение backend/host/runtime и браузера само не доказывает закрытие пакета
 и Loginom logout. Их собственные native evidence и process termination должны
-иметь отдельный проверенный путь до запуска Sol-приёмки; этот слой пока открыт.
+иметь отдельный проверенный путь до запуска Sol-приёмки. Source route подключён
+на49dcfa0d99 через private normal boolean и отдельный receipt/event; fresh native
+proof, cleanup auditor/process binding остаются открытыми.
 `managed-resources-close.mjs` уже проверяет реальный bridge result перед success
 resource ACK; absent/rejected/false result или retained leases не подтверждают
 shutdown. Actual IPC/socket/profile tests не являются native package/logout proof.
@@ -200,12 +202,12 @@ Sol/low CLI попытки следуют после предусмотренн�
 
 ## Предложение штатного CLI package teardown
 
-**Предложено, ещё не утверждено и не реализовано.** Это отдельное изменение
+**Принято пользователем 2026-10-02; source реализован на49dcfa0d99.** Это отдельное изменение
 обычного standalone CLI lifecycle, а не включение special acceptance флага.
 Для JS-приёмки необходимы подтверждённые собственные package/session closure
 до независимого cold reader; нынешний product закрывает только ресурсы.
 
-Рекомендуемый вариант — host-owned `closeSavedPackageOnShutdown:boolean`,
+Принятый вариант — host-owned `closeSavedPackageOnShutdown:boolean`,
 включённый только standalone `run`, отключённый для validation/readiness и
 Desktop. Boolean идёт по private Host→runtime start, не в public MCP/model API;
 caller не передаёт Loginom owner или package path. Bridge сохраняет **последний**
@@ -238,5 +240,9 @@ receipt binding; даёт явную границу terminal→package cleanup�
 подменяет инструментальные вызовы/код/вычисления, teardown идёт только после
 её terminal. Native cleanup, failure→retained profile, scalar settings unchanged,
 compiled headed candidate и независимый path-only cold проверяются отдельно.
-Выбор этих двух product lifecycle вариантов нужен до новых API/политики;
-текущая source JS implementation и resource ACK fix от него не зависят.
+Пользователь поручил подключить существующий механизм к обычному CLI после
+представления вариантов; реализуем рекомендованный automatic shutdown.
+Альтернативный private step не нужен. Текущая source JS implementation и
+resource ACK fix сохраняются. Native cleanup имеет собственный bounded shutdown
+budget: private runtime close 45000 ms и outer Host close 60000 ms в новом режиме;
+это не продление model/node operation deadlines и не повтор неизвестного эффекта.

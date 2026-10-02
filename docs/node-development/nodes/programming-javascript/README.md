@@ -35,8 +35,10 @@ actual cold32KiB/1024LF содержит3×8 fragments и полный6×4.
 [Checkpoint](checkpoint.md#фаза-4-единый-closed-source-chunk-audit-и-native32kib-cold--2026-10-02).
 На **797927a5c709** устранён success resource ACK при unconfirmed bridge result:
 28 runtime/25 client/3 Host checks PASS. [Границы](checkpoint.md#фаза-4-managed-resource-close-ack--2026-10-02).
-Normal CLI package/logout cleanup ещё открыт; special supervised
-cleanup не подставляется вместо обычного CLI. [Checkpoint](checkpoint.md#фаза-4-late-cli-output-read-delivery-binding--2026-10-02).
+Normal CLI package shutdown подключён на **49dcfa0d99b7**, source/private IPC
+checks и Host/Agent typecheck PASS; fresh native cleanup и независимый аудитор
+ещё открыты. Special supervised cleanup не подставляется вместо обычного CLI.
+[Checkpoint](checkpoint.md#фаза-4-штатный-cli-package-shutdown--2026-10-02).
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·

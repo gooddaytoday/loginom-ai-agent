@@ -262,4 +262,8 @@ Source product registry child161353dadef6 подключает общий handle
 старых исторических rows до global PASS и не compiled candidate/CLI. Next —
 один same-task Astra/medium review; current model gpt-6.1-sol/high, переключение
 запрошено. Natural insufficient-primary/Done refusals not_observed, TestCafe not_run.
+Normal CLI package shutdown source на49dcfa0d99: native Close/logout по last
+confirmed own Save до browser closure; runtime30/Client25/Host13/actual CLI
+preflight3/typechecks PASS. Fresh Loginom/native cleanup/candidate/model здесь
+не проверены. [Checkpoint](checkpoint.md#фаза-4-штатный-cli-package-shutdown--2026-10-02).
 Canonical accepted registry пока14, product branch не merged/released.

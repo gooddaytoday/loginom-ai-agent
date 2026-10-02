@@ -2,32 +2,22 @@
 
 ## Текущее состояние
 
-Блокер продолжения на2026-10-02: ожидается явный выбор нового normal CLI
-package teardown из [подготовленного дизайна](cli-auditor-design.md#предложение-штатного-cli-package-teardown).
-Async вопрос уже задан, ответа пока нет; не повторять его автоматически.
-Рекомендован automatic own last-confirmed-Save shutdown; альтернативный вариант
-— отдельный private lifecycle step после model terminal. Обычный Host/runtime
-package-close route отсутствует: повторная сверка `node-entry.ts:management`,
-`host-port.ts`, `host.ts:launch`, `standalone-run.ts:finally`, `bridge.mjs:close`
-подтвердила только special acceptance cleanup, который normal CLI не получает.
-Вопрос относится к новому поведению общего CLI, а не к уже принятому JS context
-контракту. [Brainstorming](/home/george/.agents/skills/brainstorming/SKILL.md)
-явно требует согласования до новой реализации: «until you have presented a
- design and the user has approved it». Все ранее согласованные source fixes
-завершены и проверены; новый lifecycle не начинать по истечению времени или
-предвыбранному варианту. Это третья последовательная Goal-итерация с тем же
-препятствием; две последние итерации после source797927 — no_progress, не verified
-wait. Триггер возобновления — явный выбор/одобрение normal CLI teardown дизайна.
-После него fresh blocked audit начинается заново; дальше normal cleanup/auditor/
-composition, same-task F и fresh ordinary headed candidate/Sol trials. Общая
-цель не достигнута и не сужается. Исходники не менялись; новый browser/candidate/
-CLI/lease не запускался, прежние own test handles terminal. Дополнительных
+На2026-10-02 пользователь прямо поручил подключить существующий guarded native
+Close к обычному CLI и продолжить общую цель. Принят automatic own
+last-confirmed-Save shutdown из [дизайна](cli-auditor-design.md#предложение-штатного-cli-package-teardown):
+private host-owned boolean только standalone `run`, путь и Save ID выводит runtime.
+Прежнее ожидание выбора снято этим поручением; повторное согласование не требуется.
+Private routing/normal receipt реализованы и проверены на child49dcfa0d99.
+Текущий шаг — cleanup auditor/composition, затем same-task F и fresh ordinary
+headed candidate/Sol trials. Общая цель не достигнута и не сужается. На старте
+этого шага child797927 tracked clean, browser/candidate/CLI не запускались,
+lease450 closed_verified, прежние own test handles terminal. Дополнительных
 OpenViking checks/errors не было. Untracked acceleration-review не включать.
 
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
 standalone CLI transport/bundle/admission/public-node/Save binding. Child
-**797927a5c709d60f36510b151a63e63c2392fbd4** tracked clean; registration на161353
+**49dcfa0d99b773f43d01289801c146d0fb052bf7** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 первоначальных адресных test methods PASS; усиленная configuration/output
 regression9PASS теперь включает62 non-noop native mutations.
@@ -42,7 +32,8 @@ Compact public-node binding дополнительно17PASS на actual runtime
 receipts/defaults и реальной SQLite. Last Save/dirty-state binding дополнительно19PASS;
 cold source/state/Execute/full6×4 отдельно9PASS на immutable captures,
 включая32KiB/1024LF и3×8 native chunks;
-Native package/logout cleanup и итоговая связка ещё не реализованы.
+Normal CLI package/logout source route реализован; fresh native проверка,
+независимый cleanup auditor и итоговая связка ещё открыты.
 Resource close ACK исправлен на797927:28 runtime/25 client/3 Host tests PASS;
 fresh standalone Save не запускался.
 Late model-output-read delivery binding дополнительно11PASS; native source/fresh
@@ -73,6 +64,59 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: штатный CLI package shutdown — 2026-10-02
+
+Child **49dcfa0d99b773f43d01289801c146d0fb052bf7** подключает существующий
+`makePackageCleanupCode` к обычному standalone `run` через private
+`closeSavedPackageOnShutdown:boolean`. Desktop/TUI/management не включают его;
+Host явно выключает для validation/readiness, runtime повторно проверяет boolean
+и отказывает сочетанию со special acceptance path. Путь/Save ID выбирает bridge
+из последней distinct SUCCEEDED `dock_action_run` Save, при совпадении request/
+outcome action/operation ID; inspect и retry прежней квитанции не меняют выбор.
+Повторный Save того же path обновляет последний operation; document должен
+совпадать с prepared owner. Native account/path/inventory/running/fresh dirty
+guards и `ClosePackage(node,false,true)` не изменены. Ни Save/discard/Stop,
+ни второй контекст не добавлены. Отдельные `saved-package-cleanup.json` и
+`managed_saved_package_cleanup` содержат policy/path/Save ID и bound native receipt.
+Prepared без Save/refusal блокирует браузер и ресурсный ACK; unprepared skip
+не является acceptance PASS. Runtime close45000/outer Host close60000 ms только
+нового режима оставляют operation deadlines неизменными. ACK/clean0/no signal
+по-прежнему обязательны; failure сохраняет profile guard.
+
+Runtime30/Client25/Host13/actual CLI preflight3 PASS actualexit0, Host и Agent
+`bun typecheck` PASS. В Client wrapper дополнительно23 inner bridge scenarios
+(внешние services/action executor — fixtures, production bridge/code constructor/
+parser настоящие); это не Loginom/browser/model proof. Host строит actual Node
+entry и проверяет IPC→shared Host→task/readiness/validation, default/false/true,
+изоляцию model args/env, terminal ACK/exit0 и completion5250 ms после старых5 sec.
+Actual standalone entry проверяет run=true/TUI=false/management absent и guard
+release на preflight, без backend/model/browser. Native helper unit checks
+сохраняют dirty/running/foreign/prompt refusal. Existing managed resource ACK tests
+не превращают forced shutdown в подтверждённый native cleanup.
+
+Из child runtime: `<pinned Node24.19.0> --test test/start-input.test.mjs
+test/managed-entry-close.test.mjs test/managed-resources-close.test.mjs`;
+из runtime/client: `<pinned Node> --test test/package-cleanup.test.mjs
+test/package-cleanup-bridge.test.mjs test/managed-shutdown.test.mjs`;
+из loginom-host: `LOGINOM_AI_AGENT_TEST_NODE=<pinned Node> <pinned Bun1.3.14>
+test test/node-host.test.ts test/saved-package-shutdown.test.ts test/process.test.ts`;
+из agent: с тем же env/Bun `test test/cli/standalone-saved-package-policy.test.ts`.
+Typecheck — тот же Bun из package cwd. Private receipt
+`f-normal-cli-package-shutdown-validation-v1.json` SHA256
+`3825810f11820f9b0c6fc56c6e63cff98ae01501f5e8fa0d129eab5017a7f117`
+связывает16 changed source files/unchanged native helper/logs/original handles/
+actual exits. First Client01 failed1: fixture не объявлял inspect tool; исправлен
+actual executorTools. CLI policy01 failed1: fixture View без url/username/folder
+и неверное ожидание management headless; исправлены тестовые данные. Эти неудачи
+сохранены, product контракты не ослаблены. Final runtime35acb6 actual0;
+Client4365fd→e643e5 actual0; Hostf03803→98b45c actual0;
+CLI0f9467→ef7bc6 actual0; typechecks d15988/67074d→8f0e16/689a89→1d1fc4 actual0.
+
+Свежий headed Loginom/candidate/Sol не запускался, old captures не переписаны.
+Следующий шаг — independent normal cleanup receipt/process binding и whole
+composition; после source завершения обязательный same-task Astra/medium F,
+затем fresh ordinary headed candidate J01/J21/J27 и две independent Sol/low CLI.
 
 ### Фаза 4: managed resource close ACK — 2026-10-02
 

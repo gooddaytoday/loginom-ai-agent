@@ -942,8 +942,12 @@ Historical captures и actual reader multi-chunk unit seam не заменяют
 Managed resource ACK исправлен на **797927a5c709**,28 runtime/25 client/3 Host
 checks PASS; package/logout facts этим не доказаны.
 [Checkpoint](checkpoint.md#фаза-4-managed-resource-close-ack--2026-10-02).
-Normal CLI package/logout cleanup ещё открыт; special `acceptanceCleanupPackage`
-receipt не является обычным CLI контрактом. [Checkpoint](checkpoint.md#фаза-4-late-cli-output-read-delivery-binding--2026-10-02).
+Normal CLI shutdown подключён на **49dcfa0d99b7**: private owner boolean только
+`run`, internally selected latest own Save, штатный native Close/logout до browser,
+separate normal receipt; runtime30/Client25/Host13/CLI preflight3 и package typechecks
+PASS. Это source/IPC проверки; fresh native proof и independent cleanup auditor
+ещё впереди. Special `acceptanceCleanupPackage` receipt не является обычным CLI
+контрактом. [Checkpoint](checkpoint.md#фаза-4-штатный-cli-package-shutdown--2026-10-02).
 `javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
 он должен связать native проверки с фактическими standalone CLI evidence
 model/input/candidate/Save/cold/cleanup до ready_for_acceptance.
