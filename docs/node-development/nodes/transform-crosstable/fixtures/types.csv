@@ -1,0 +1,4 @@
+RowID,Region,Category,Amount,Flag,When
+z,North,A,2.0,true,2026-01-02
+a,North,A,4.0,false,2026-01-01
+?,North,A,?,?,?

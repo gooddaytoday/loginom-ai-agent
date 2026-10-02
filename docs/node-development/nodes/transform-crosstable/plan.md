@@ -1,11 +1,11 @@
 # Подплан 15: «Кросс-таблица» — исполнимое назначение для Multica
 
 
-Статус: `discovery_required`. Исполнитель: Тест-Манки #1, 2026-10-02.
+Статус: `ready_for_development`. Исполнитель: Тест-Манки #1, 2026-10-02.
 Component ID: `component.transform.CrossTable`. Proposed runtime type: `transform.cross_table`, mode: `pivot`.
 Назначенная база и цель PR: `cross-table`, исходный SHA `5f772aea9de6414a19feb6ecc109a196c9e92453`.
-Платформа: Linux x64; Loginom: живое значение `bg.app.Version=7.4.2`; отдельные сборка/редакция `not_checked`.
-Живые наблюдения: версия, палитра, основные настройки, fixed/sliding, повторное выполнение, NULL и точный размер файлов подтверждены; подробности и границы — `discovery.md`. Матрица этапа 0 незакрыта; приёмка новой реализации: `not_checked`.
+Платформа: Linux x64; Loginom: живое значение `bg.app.Version=7.4.2`; редакция Enterprise; отдельный build номер интерфейсом не подтверждён.
+Живые наблюдения: версия, палитра, основные настройки, fixed/sliding, повторное выполнение, NULL и точный размер файлов подтверждены; подробности и границы — `discovery.md`. Контракт этапа 0 для ограниченного ядра закрыт; неподтверждённые варианты явно исключены в discovery. Приёмка новой реализации: `not_checked`.
 
 Редакция 3 от 2026-10-02. Перепроверено по коду `loginom@a8ad59766`, регламенту `docs/node-development/`, эксплуатационной обвязке Multica (`swarm/ops/loginom-multica`, ветка `swarm`), прежней реализации (PR №15, №17, пилоты LAB-7…9), E2E `e2e-tests@486caef44` и справке Loginom.
 
@@ -85,7 +85,7 @@ Component ID: `component.transform.CrossTable`. Proposed runtime type: `transfor
 |---|---|
 | Узел | `component.transform.CrossTable`, slug `transform-crosstable`, исторический номер 15 |
 | Исходный SHA | вершина ветки задания после W0; Генератор фиксирует его в карточке |
-| Runtime type и режим | `transform.cross_table` / `pivot` — предложение до конца этапа 0 |
+| Runtime type и режим | `transform.cross_table` / `pivot` — закреплено живым этапом 0 |
 | Стенд | `http://logi-test-plan.bg.local/app/?testable=true` из конфигов ролей. Адрес сохраняется только клиентом с `ccfe5cddf` (W0) |
 | Аккаунты | пара worker/reviewer от Генератора (`provision-accounts.py`); обе записи `account_state=ready`, один стенд |
 | Модель приёмки | `openai/gpt-6.1-sol`, вариант `low`, из конфигурации обвязки (`operator.json`: `model`, `variant`). Каталог моделей подставляет обвязка (`model_cache_file`), id в нём подтверждён. Упоминания `openai/gpt-6-sol` в регламенте базы устарели |
@@ -522,3 +522,14 @@ Oracle должен независимо строить сводку по тро
 - Lost reply после переключения режима, настройки факта, Finish или Execute: сначала сверить тот же owner/режим/квитанцию, без повторного добавления колонки или запуска при неизвестном эффекте.
 - Отмена вложенного редактора, Done без Execute, Close, stale ref и changed document: не применять черновик к чужому узлу; исходные данные и посторонний граф не меняются.
 - Аудитор обязан отклонять подмену функции, перестановку связи категория→поле, отсутствующую категорию, неправильную NULL-семантику и старый execution, даже если итоговая общая сумма совпала.
+
+
+Дополнение этапа 0 (2026-10-02): typed numeric/string/boolean/datetime,
+StdDev n−1, резерв/усечение Sliding, имена/коллизии, target.label,
+прокрутка, точные bytes и сохранение с независимым cold reopen подтверждены
+в discovery.md. Переменные наблюдены только в статическом состоянии;
+variant и bindings не входят в этап 1, не выдаются за PASS этапов 2/3.
+До кода обработчика сохранены acceptance/oracle.py, expected.json,
+initial.json и task.md. Два expected выхода рассчитаны из версии CSV,
+а не скопированы из native результатов. Статус ready_for_development
+относится к согласованному ограниченному ядру, не к приёмке реализации.

@@ -267,5 +267,63 @@
     ],
     "schema_status": "live_integer_confirmation",
     "use": "stage0 integer aggregate matrix; integer literals, not decimal text"
+  },
+  {
+    "file": "categories.csv",
+    "bytes": 158,
+    "sha256": "0cb133678336cca432cb0b06bd390416b0bb211b8a2650c85295db44ae11f31d",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "live_integer_source_confirmation",
+    "use": "stage0 global Sliding limit above cardinality"
+  },
+  {
+    "file": "names.csv",
+    "bytes": 180,
+    "sha256": "aee13d386dd87470c51d34b556c3551ff3f2a04d2148874b83ff884d70e97ac4",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "live_integer_source_confirmation",
+    "use": "stage0 unique names: punctuation, Cyrillic, empty, space, NULL"
+  },
+  {
+    "file": "types.csv",
+    "bytes": 116,
+    "sha256": "5183c8185b6fe4c362813d1e69eba0734557e6f29f9af00a2971e57fb72c5322",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Flag",
+      "When"
+    ],
+    "schema_status": "live_available_functions_confirmation",
+    "use": "stage0 string/real/boolean/datetime native defaults and aggregate result matrix"
   }
 ]

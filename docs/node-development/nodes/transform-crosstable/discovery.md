@@ -2,9 +2,10 @@
 
 Стенд из задания, Loginom 7.4.2, собственный worker. Runtime: чистый
 `5f772aea9de6414a19feb6ecc109a196c9e92453`, установленная обвязка не изменялась.
-Это исследование интерфейса, не приёмка нового обработчика. Числа ниже прочитаны
-из загруженного native Table в его обычном формате отображения; точность полного
-независимого oracle здесь не проверена. Исходные fixtures находятся рядом.
+Это исследование интерфейса, не приёмка нового обработчика. Ранние числа прочитаны
+из загруженного native Table в обычном формате; точные чтения отдельно отмечены
+ниже. Независимый cold oracle подтвердил сохранённый исследовательский пакет.
+Это не приёмка нового обработчика. Исходные fixtures находятся рядом.
 
 ## Восстановление и lifecycle
 
@@ -126,12 +127,11 @@ Wide файл скачан штатным download (у splitbutton сначал�
 совпадает с fixture. Обнаруженные неоднозначные file inputs не использовались:
 upload привязан к единственной активной форме собственного каталога.
 
-## Что ещё не подтверждено
+## Границы наблюдения
 
-Прочие типы/агрегаты, оба лимита,
-коллизии/транслитерация имён и ширина, переменные, persistence
-после нового открытия. Матрица этапа 0 пока незакрыта. Oracle/expected/task и
-новый обработчик ещё не готовы; статус ready_for_development не выставлен.
+Числовое ядро этапа 1 закреплено ниже; старые ранние гипотезы не означают
+готовность других типов, variable bindings или альтернативных разделителей
+для реализации. Этапы 2/3 требуют собственной приёмки.
 
 Дополнение: новый профиль открыл сохранённый пакет с прежними GUID импорта и
 CrossTable. Source patch штатным каналом изменил импорт на many-fields; после
@@ -212,3 +212,111 @@ Sliding с одной категорией A, минимумом 3 и общим
 центр широкого ValueControl не менял значение, InputEl закрыт DisplayEl.
 Эти диагностические отказы сохранены, последующее native readback подтвердило
 Sliding=true и минимум 3; первоначальные clicks не считались успешной настройкой.
+
+Общий Sliding limit=1 при минимуме 3 сократил схему до одной группы A
+(12 полей). После source patch на восемь категорий A…H тот же узел без
+перенастройки успешно выполнился (`:452:19`), но сохранил только A:
+Sum=2, Count=1, StdDev=0. Остальные категории отброшены; native ошибка
+выполнения не появилась. Limit — верхняя граница групп, включая резерв;
+это реальное усечение данных. Этап 1 ограничен подтверждённым limit=0,
+min_values=0, а иной запрос должен получить отказ до мутации.
+
+UniqueValueNames=true, Sliding, limit=0/min=0: `names.csv` дал 89 уникальных
+полей (Region + 8 категорий × 11 функций), полные определения прочитаны
+каноническим Table format reader по 12 страницам; диалог отменён без изменения
+форматов. NULL использует `NullGroup_Amount_Sum`; empty — `Amount_Sum`;
+space — `__Amount_Sum`. `A_1` → `A_1_Amount_Sum`, `A-1` →
+`A_1_Amount_Sum_1`; `Privet` → `Privet_Amount_Sum`, `Привет` →
+`Privet_Amount_Sum_1`. Литерал `null` — `null_Amount_Sum`. Нативные метки
+сохраняют исходную категорию. Коллизии транслитерации получили суффиксы,
+категории не слились. Порядок materialized mapping записан как наблюдение,
+а не правило сортировки. Этот режим не входит в этап 1.
+
+W2 дополнен живыми файлами 900/1536/3072 байта. Native Size равен точному
+размеру, id=FilePath; view.getRecord(row) совпадает с записью FileStore.
+Отображение: `900`, `1,536`, `3,072`. Все эти файлы — в собственном каталоге.
+
+Матрица доступности на `types.csv`: string (DataType=5) и boolean (1)
+имеют маску 1934, умолчание Count=2: Count/Min/Max/UniqueCount/NullCount/
+First/Last. Datetime (2) — 1982, Count по умолчанию; дополнительно Avg и
+StdDev. Real (3) — 2047, Sum по умолчанию. Для continuous Amount кнопка
+Columns disabled=true, Rows и Facts enabled; ограничение discrete относится
+к колонкам. Результирующие типы/значения проверены в следующей попытке (ниже).
+
+Попытка 1645 завершена в 17:57:46Z с каноническими package_closed=true,
+logged_out=true, unsaved_changes_discarded=true. Ошибка ожидания угаданной
+метки Amount(+3) произошла до движения мыши; actual label был RowID(+3).
+Нативный мастер упорядочил выбранные факты по порядку входных полей;
+после перемещения следует явно задать требуемый порядок Up/Down и проверить его.
+Исходный uncertainty marker и отрицательный результат оставлены.
+
+В 1800 после initial SaveCheckpoint/open_package первый begin_wizard
+нормализовал DOM breadcrumbs `Package1` → `stage0_20261002_1800`.
+Исходная квитанция AMBIGUOUS не переписана. Read-only сверка нормализованного
+пути подтвердила тот же prepared document/workflow, package и GUID импорта.
+Выполнена только каноническая отмена собственного мастера: draft_discarded=true,
+settings_applied=false; затем canonical cleanup package_closed/logged_out=true
+в 18:03:13Z. Старые попытки и saved файлы оставлены. Следующее исследование
+готовится через новое открытие сохранённого bootstrap в новом профиле;
+установленная обвязка и общие контракты не изменены.
+
+
+Попытка 1804 после отдельного ready открыла saved bootstrap в свежем профиле.
+Нормализованный путь подтверждён до begin_wizard; канонические import/link/create/
+configure/Execute отработали без восстановления настроек по guessed breadcrumbs.
+Матрица `types.csv` прочитана штатным Table reader: все 35 полей, одна строка,
+sample_complete=true, numbers_verified=true, ни одной precision limitation.
+Один NULL в каждой колонке: Count=3, UniqueCount=2, NullCount=1. Amount:
+Sum=6, Min=2, Max=4, Avg=3, StdDev=1.4142135623730951, SumSq=20,
+First=2, Last=NULL. String: Min=a, Max=z, First=z, Last=NULL; Boolean:
+Min=false, Max=true, First=true, Last=NULL. Datetime: Min=2026-01-01,
+Max=2026-01-02, Avg=2026-01-01T12:00:00.000, StdDev=0.7071067811865476
+(real, дни), First=2026-01-02, Last=NULL. Count/UniqueCount/NullCount —
+integer; Min/Max/First/Last сохраняют тип факта, Avg real для числа и datetime
+для datetime. First/Last включают NULL и порядок исходных записей.
+Точный числовой readback не меняет статус приёмки обработчика.
+
+Канонический returnFromOutputTable вернул тот же prepared node в его graph;
+GUID-bound target rename применил `Исследование CrossTable · types` с receipt
+SUCCEEDED и проверенным readback. Контракт target.label подтверждён без
+угадывания auto label. Cleanup 1804 в 18:18:30Z: package_closed=true,
+logged_out=true, unsaved_changes_discarded=true. Bootstrap и предыдущие файлы
+сохранены; текущий исследовательский граф не выдаётся за persisted результат.
+
+
+Отдельная попытка 1820: сохранённый пакет 1553 открыт в новом браузерном
+профиле, тот же CrossTable GUID; свежая execution без повторной настройки.
+Независимый Python grouping исходного `replace.csv` зафиксировал ожидаемые
+21 поле и 2 строки до запуска штатного cold-check. Полное точное чтение
+совпало по именам/меткам/типам и всем ячейкам, result=PASS,
+settingsReapplied=false, cleanup package_closed/logged_out=true. Сохранённая
+fixed конфигурация содержит NULL/A/D/Other: D была захвачена последней
+настройкой в исходной исследовательской попытке. Это не доказательство
+сохранения исходной B после перенастройки и не автономный CLI PASS.
+
+В 1830 новое открытие и мастер подтвердили сохранённые GroupFunctions
+Amount=29, Quantity=1, Category NullGroup/OtherGroup=true, минимум=0,
+Sliding=false, UniqueNames=false, Separator=|, Limit=0. Edition нативного
+клиента `bg.app.PlatformEdition=Enterprise`, Version=7.4.2; отдельный build
+номер не объявляется, если не показан этим интерфейсом. Dropdown разделителя
+содержит ровно `.`, `|`, `->`, `Пробел` (value один пробел). Каждый вариант
+выбран через GUI и прочитан, затем возвращён |; канонический Close отменил
+черновик (settings_applied=false, draft_discarded=true). Изменение выходных
+меток с прочими разделителями остаётся вне этапа 1.
+
+В сохранённом сценарии без подключённых пользовательских переменных каждый
+VariableControl имеет value=null и isVisible(true)=false, SwitchButton
+pressed=false/hidden; статический ValueControl видим. Это наблюдённое
+статическое состояние, а не проверка привязки переменной. Управляющие
+переменные и variant-агрегаты не подтверждены для реализации и остаются
+отдельными этапами 3/2; их запросы этап 1 отвергает до мутации.
+
+Этап 0 закрывает контракт ограниченного ядра: numeric integer/real facts
+sum/min/max/avg, один discrete string column dimension, discrete row keys,
+fixed/sliding с limit=0, min=0, separator=|, UniqueNames=false, без output
+переопределений и переменных. Остальная семантика описана наблюдением либо
+явной границей; дополнительная реализация не выводится по аналогии.
+Версионированный независимый oracle/expected/initial и business task созданы
+до обработчика. Контракт runtime `transform.cross_table`, mode `pivot`.
+
+Cleanup 1830 в 18:27:05Z: package_closed/logged_out=true, unsaved_changes_discarded=false. Сохранённый исследовательский пакет не изменён.

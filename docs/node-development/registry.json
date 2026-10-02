@@ -5079,9 +5079,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения.",
+      "next_action": "Реализовать ограниченное numeric ядро этапа 1 и W1–W3 по подтверждённому discovery; выполнить автономную и независимую приёмку.",
       "plan": "nodes/transform-crosstable/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "ready_for_development"
     },
     {
       "component_id": "component.transform.EnrichData",
