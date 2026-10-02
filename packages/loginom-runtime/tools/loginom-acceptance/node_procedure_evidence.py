@@ -247,25 +247,38 @@ def bound_port_open(action, outcome, state):
         ('direction','port','opening_operation_id','document_id','workflow_id','node_id','verified'))
 
 
-def bound_output_settlement(rows, row, samples, observations, mutations):
+def bound_output_settlement(rows, row, samples, observations, mutations, *, cold_read_ceiling=None):
     """One acknowledged Table Add may settle within its admitted node deadline."""
     readiness = row.get('readiness', {})
     admissions = [r for r in rows if r.get('phase') == 'node_apply_prepared']
-    if (len(admissions) != 1 or not observations or not mutations
+    if (not observations or not mutations
             or readiness.get('condition') != 'new Table card bound to output'
             or readiness.get('required_samples') != 2):
         return False
     current_index = rows.index(row)
     phase_starts = [r for r in rows[:current_index] if r.get('phase') == 'node_phase_prepared']
-    if (not phase_starts or phase_starts[-1].get('receipt', {}).get('phase') != 'read'
-            or readiness.get('deadline') != phase_starts[-1]['receipt'].get('deadline')):
-        return False
+    if cold_read_ceiling is None:
+        if (len(admissions) != 1 or not phase_starts or phase_starts[-1].get('receipt', {}).get('phase') != 'read'
+                or readiness.get('deadline') != phase_starts[-1]['receipt'].get('deadline')):
+            return False
+        ceiling = admissions[0].get('deadline_at')
+        budget = admissions[0].get('request', {}).get('budgets', {}).get('total_ms')
+    else:
+        # The separate technical cold process has no node.apply admission.
+        # Caller binds this ceiling to its original launch/report and owner;
+        # never synthesize an apply/phase row in the immutable journal.
+        if (admissions or phase_starts or not isinstance(cold_read_ceiling,dict)
+                or set(cold_read_ceiling) != {'operation_id','node','deadline_at','total_ms'} or not isinstance(cold_read_ceiling['node'],dict)
+                or cold_read_ceiling['operation_id'] != row.get('operation_id')
+                or any(observations[-1][1].get('prepared_node_context', {}).get(k) != cold_read_ceiling['node'].get(k)
+                    or not cold_read_ceiling['node'].get(k) for k in ('document_id','workflow_id','node_id'))):
+            return False
+        ceiling,budget = cold_read_ceiling['deadline_at'],cold_read_ceiling['total_ms']
     deadline = readiness.get('deadline')
     timeout = readiness.get('timeout_ms')
     port = readiness.get('settle_output_port')
-    budget = admissions[0].get('request', {}).get('budgets', {}).get('total_ms')
-    if (type(deadline) is not int or type(admissions[0].get('deadline_at')) is not int
-            or not 0 < deadline <= admissions[0]['deadline_at'] or type(budget) is not int or not 0 < budget
+    if (type(deadline) is not int or type(ceiling) is not int
+            or not 0 < deadline <= ceiling or type(budget) is not int or not 0 < budget
             or type(timeout) not in (int, float) or not 0 < timeout <= budget
             or not isinstance(port, str) or not port or len(samples) < 2):
         return False
@@ -317,7 +330,7 @@ def bound_output_settlement(rows, row, samples, observations, mutations):
     return True
 
 
-def verify_internal_sequence(events, operation_id, *, max_steps=96):
+def verify_internal_sequence(events, operation_id, *, max_steps=96, cold_read_ceiling=None):
     rows = [r for r in events if r.get('operation_id') == operation_id]
     failures, observations, mutations = [], [], []
     current = pending = None
@@ -375,7 +388,7 @@ def verify_internal_sequence(events, operation_id, *, max_steps=96):
             if semantic and required_samples not in (1, 2):
                 failures.append('invalid_readiness_policy'); required_samples = 2
             settlement = ('settle_output_port' in row.get('readiness', {})
-                and bound_output_settlement(rows, row, samples, observations, mutations))
+                and bound_output_settlement(rows, row, samples, observations, mutations,cold_read_ceiling=cold_read_ceiling))
             if 'settle_output_port' in row.get('readiness', {}) and not settlement:
                 failures.append('unbound_output_settlement')
             sample_limit = 4096 if settlement else 80
