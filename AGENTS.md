@@ -1,10 +1,10 @@
-## Node development — актуально 2026-09-24
+## Node development
 
-Для разработки обработчиков узлов сначала прочитать [канонический регламент](docs/node-development/README.md).
-Он определяет orchestration/single/plan-authoring, принятые модели, изоляцию и CLI-приёмку.
-Для новых обработчиков продуктовая база — явно закреплённый SHA ветки `loginom`
-в loginom-ai-agent. Прежние Hermes/Dock node workflows — исторические источники.
-Документация сама не запускает очередь; слияние и выпуск требуют отдельной команды.
+Для разработки обработчиков читать [RUNBOOK](docs/node-development/RUNBOOK.md) и подплан узла.
+Базовый SHA и целевая ветка PR задаются назначением. Цель — принятый узел.
+Новые критерии приёмки и изменения общих контрактов согласовывать с владельцем.
+Checkpoint — не больше 20 строк: SHA, результат, ограничения и следующий шаг.
+Слияние и выпуск — отдельная команда владельца.
 
 - To regenerate the legacy JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit `src/generated` or `src/generated-effect` directly.

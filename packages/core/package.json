@@ -58,7 +58,11 @@
     "@parcel/watcher-win32-arm64": "2.5.1",
     "@parcel/watcher-win32-x64": "2.5.1",
     "@loginom-ai-agent/http-recorder": "workspace:*",
-    "drizzle-kit": "catalog:"
+    "drizzle-kit": "catalog:",
+    "@types/mime-types": "3.0.1",
+    "@typescript/native-preview": "catalog:",
+    "@loginom-ai-agent/sdk": "workspace:*",
+    "prettier": "3.6.2"
   },
   "dependencies": {
     "@ai-sdk/alibaba": "1.0.17",

@@ -2,13 +2,14 @@ import { $ } from "bun"
 import { buildPhase } from "./build-phase"
 import { createHash } from "node:crypto"
 import { createReadStream } from "node:fs"
-import { link, lstat, mkdir, mkdtemp, readFile, readlink, rename, rm } from "node:fs/promises"
+import { link, lstat, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises"
 import { dirname, isAbsolute, join, resolve } from "node:path"
 import { stageResources } from "./stage-resources"
 import { buildNodeHost } from "./build-node-host"
 import { buildCliInstaller } from "./build-cli-installer"
 import { collectBuildNotices } from "./collect-build-notices"
 import { writeCliManifest, verifyCliManifest } from "../src/cli-manifest"
+import { cliSourceSnapshot } from "./cli-source-snapshot"
 import release from "../../product/loginom-release.json"
 import bunNotice from "../licenses/bun/source.json"
 import bunNativeNotices from "../licenses/bun/native/sources.json"
@@ -16,7 +17,10 @@ import webkitSource from "../licenses/bun/webkit-source.json"
 import chromiumNotice from "../licenses/chromium/source.json"
 
 const repo = resolve(import.meta.dir, "../../..")
-const destination = process.argv[2]
+const args = process.argv.slice(2)
+const destination = args[0]
+const noArchive = args.slice(1).includes("--no-archive")
+if (args.slice(1).some((arg) => arg !== "--no-archive")) throw new Error("Unknown build option")
 if (!destination || !isAbsolute(destination)) throw new Error("Provide a new absolute artifact directory")
 if (await Bun.file(join(destination, "cli-manifest.json")).exists()) throw new Error("Artifact already exists")
 await lstat(destination).then(
@@ -41,7 +45,7 @@ const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
 if (process.platform === "win32" && (!systemRoot || !isAbsolute(systemRoot)))
   throw Error("LOGINOM_ARCHIVER_UNAVAILABLE")
 const archiver = process.platform === "win32" ? join(systemRoot!, "System32/tar.exe") : "/usr/bin/tar"
-const source = await snapshot()
+const source = await cliSourceSnapshot(repo)
 const work = await mkdtemp(join(dirname(destination), ".cli-build-"))
 try {
   await $`${process.execPath} script/build.ts --standalone --single --skip-install`
@@ -126,7 +130,7 @@ try {
       "Runtime, Node, Dock and browser notices are described in resources/loginom/THIRD_PARTY_NOTICES.md.\n",
   )
 
-  if (JSON.stringify(source) !== JSON.stringify(await buildPhase("cli-source-snapshot", snapshot)))
+  if (JSON.stringify(source) !== JSON.stringify(await buildPhase("cli-source-snapshot", () => cliSourceSnapshot(repo))))
     throw new Error("LOGINOM_SOURCE_CHANGED_DURING_BUILD")
   const pkg = await Bun.file(join(artifact, "package.json")).json()
   await buildPhase("cli-manifest", () =>
@@ -148,91 +152,69 @@ try {
   await buildPhase("cli-manifest-verify", () =>
     verifyCliManifest(artifact, { platform: process.platform, arch: process.arch, version: pkg.version }),
   )
-  if (typeof pkg.version !== "string" || !/^[a-zA-Z0-9.+-]+$/.test(pkg.version))
-    throw new Error("LOGINOM_ARCHIVE_VERSION_INVALID")
-  const name = `loginom-ai-agent-cli-${pkg.version}-${process.platform}-${process.arch}.${process.platform === "win32" ? "zip" : "tar.gz"}`
-  const archive = join(dirname(destination), name)
-  const checksum = archive + ".sha256"
-  const creation =
-    process.platform === "linux"
-      ? ["--sort=name", "--mtime=@0", "--owner=0", "--group=0", "--numeric-owner", "-czf"]
-      : process.platform === "win32"
-        ? ["-a", "-cf"]
-        : ["-czf"]
-  await buildPhase("cli-archive", () => $`${archiver} ${creation} ${join(work, name)} -C ${artifact} .`)
-  const sha256 = await buildPhase("cli-archive-sha256", async () => {
-    const hash = createHash("sha256")
-    for await (const chunk of createReadStream(join(work, name))) hash.update(chunk)
-    return hash.digest("hex")
-  })
-  await Bun.write(join(work, name + ".sha256"), `${sha256}  ${name}\n`)
-  const extracted = join(work, "archive-check")
-  await mkdir(extracted)
-  // The manifest includes modes; the build caller's private umask must not rewrite them.
-  const extraction =
-    process.platform === "linux" ? ["--same-permissions", "-xzf"] : process.platform === "win32" ? ["-xf"] : ["-xpf"]
-  await buildPhase("cli-roundtrip-extract", async () => {
-    if (process.platform === "win32") await $`${archiver} ${extraction} ${join(work, name)} -C ${extracted}`
-    if (process.platform !== "win32")
-      await $`/bin/sh -c ${'umask 077; exec "$@"'} -- ${archiver} ${extraction} ${join(work, name)} -C ${extracted}`
-  })
-  await buildPhase("cli-roundtrip-verify", () =>
-    verifyCliManifest(extracted, { platform: process.platform, arch: process.arch, version: pkg.version }),
-  )
-  if (process.platform === "darwin") {
-    await buildPhase(
-      "cli-roundtrip-signature",
-      () => $`/usr/bin/codesign --verify --strict ${join(extracted, "bin/loginom-ai-agent-cli")}`,
-    )
-    await buildPhase(
-      "cli-roundtrip-keychain",
-      () => $`/usr/bin/codesign --verify --strict ${join(extracted, "resources/loginom/bin/loginom-keychain")}`,
-    )
-  }
-  // Exclusive hard links publish complete files without replacing an earlier candidate.
-  const published: string[] = []
-  try {
-    await link(join(work, name), archive)
-    published.push(archive)
-    await link(join(work, name + ".sha256"), checksum)
-    published.push(checksum)
+  if (noArchive) {
     await rename(artifact, destination)
-  } catch (error) {
-    await Promise.all(published.map((path) => rm(path)))
-    throw error
+    console.log(
+      JSON.stringify({ artifact: destination, archive: null, checksum: null, version: pkg.version, ...source }),
+    )
+  } else {
+    if (typeof pkg.version !== "string" || !/^[a-zA-Z0-9.+-]+$/.test(pkg.version))
+      throw new Error("LOGINOM_ARCHIVE_VERSION_INVALID")
+    const name = `loginom-ai-agent-cli-${pkg.version}-${process.platform}-${process.arch}.${process.platform === "win32" ? "zip" : "tar.gz"}`
+    const archive = join(dirname(destination), name)
+    const checksum = archive + ".sha256"
+    const creation =
+      process.platform === "linux"
+        ? ["--sort=name", "--mtime=@0", "--owner=0", "--group=0", "--numeric-owner", "-czf"]
+        : process.platform === "win32"
+          ? ["-a", "-cf"]
+          : ["-czf"]
+    await buildPhase("cli-archive", () => $`${archiver} ${creation} ${join(work, name)} -C ${artifact} .`)
+    const sha256 = await buildPhase("cli-archive-sha256", async () => {
+      const hash = createHash("sha256")
+      for await (const chunk of createReadStream(join(work, name))) hash.update(chunk)
+      return hash.digest("hex")
+    })
+    await Bun.write(join(work, name + ".sha256"), `${sha256}  ${name}\n`)
+    const extracted = join(work, "archive-check")
+    await mkdir(extracted)
+    // The manifest includes modes; the build caller's private umask must not rewrite them.
+    const extraction =
+      process.platform === "linux" ? ["--same-permissions", "-xzf"] : process.platform === "win32" ? ["-xf"] : ["-xpf"]
+    await buildPhase("cli-roundtrip-extract", async () => {
+      if (process.platform === "win32") await $`${archiver} ${extraction} ${join(work, name)} -C ${extracted}`
+      if (process.platform !== "win32")
+        await $`/bin/sh -c ${'umask 077; exec "$@"'} -- ${archiver} ${extraction} ${join(work, name)} -C ${extracted}`
+    })
+    await buildPhase("cli-roundtrip-verify", () =>
+      verifyCliManifest(extracted, { platform: process.platform, arch: process.arch, version: pkg.version }),
+    )
+    if (process.platform === "darwin") {
+      await buildPhase(
+        "cli-roundtrip-signature",
+        () => $`/usr/bin/codesign --verify --strict ${join(extracted, "bin/loginom-ai-agent-cli")}`,
+      )
+      await buildPhase(
+        "cli-roundtrip-keychain",
+        () => $`/usr/bin/codesign --verify --strict ${join(extracted, "resources/loginom/bin/loginom-keychain")}`,
+      )
+    }
+    // Exclusive hard links publish complete files without replacing an earlier candidate.
+    const published: string[] = []
+    try {
+      await link(join(work, name), archive)
+      published.push(archive)
+      await link(join(work, name + ".sha256"), checksum)
+      published.push(checksum)
+      await rename(artifact, destination)
+    } catch (error) {
+      await Promise.all(published.map((path) => rm(path)))
+      throw error
+    }
+    console.log(JSON.stringify({ artifact: destination, archive, checksum, sha256, version: pkg.version, ...source }))
   }
-  console.log(JSON.stringify({ artifact: destination, archive, checksum, sha256, version: pkg.version, ...source }))
 } finally {
   await rm(work, { recursive: true, force: true })
-}
-
-async function snapshot() {
-  const paths = [
-    ...new Set(
-      (await $`git ls-files --cached --others --exclude-standard -z`.cwd(repo).text()).split("\0").filter(Boolean),
-    ),
-  ].sort()
-  const hash = createHash("sha256")
-  for (const path of paths) {
-    const stat = await lstat(join(repo, path)).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === "ENOENT") return undefined
-      throw error
-    })
-    hash.update(path).update("\0")
-    if (!stat) {
-      hash.update("deleted\0")
-      continue
-    }
-    hash.update(String(stat.mode)).update("\0")
-    hash
-      .update(stat.isSymbolicLink() ? await readlink(join(repo, path)) : await readFile(join(repo, path)))
-      .update("\0")
-  }
-  return {
-    sourceCommit: (await $`git rev-parse HEAD`.cwd(repo).text()).trim(),
-    sourceTreeSha256: hash.digest("hex"),
-    sourceDirty: !!(await $`git status --porcelain`.cwd(repo).text()).trim(),
-  }
 }
 
 function verifiedText(contents: Buffer, expected: string, error: string) {
