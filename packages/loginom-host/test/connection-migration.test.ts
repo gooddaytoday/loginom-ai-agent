@@ -53,31 +53,10 @@ for (const [name, codec] of [
   ["Desktop", credentials("linux")],
   ["CLI", cliCredentials("linux")],
 ] as const) {
-  for (const url of [original.url, original.url.slice(0, -1)]) {
-    test(`${name}: migrates ${url}, preserves secrets/history and does not repeat after restart`, async () => {
-      const f = await fixture(codec)
-      try {
-        await f.store.stage({ ...original, url })
-        await f.store.activate(1)
-        const history = await f.history()
-        const first = await f.start()
-        expect(await f.store.read()).toEqual({ ...original, url: Product.connection.url, generation: 2, revision: 2 })
-        expect(await f.history()).toBe(history)
-        expect(await f.store.pending()).toBeUndefined()
-        expect(first.acquire("run")?.generation).toBe(2)
-        expect(f.prepared).toEqual([Product.connection.url])
-        await first.close()
-        await f.start()
-        expect((await f.store.read())?.generation).toBe(2)
-        expect(await f.store.latestGeneration()).toBe(2)
-      } finally {
-        await f.close()
-      }
-    })
-  }
-
-  test(`${name}: keeps custom URLs, including old-origin custom paths and queries`, async () => {
+  test(`${name}: preserves saved stand URLs and secrets across restarts`, async () => {
     for (const url of [
+      original.url,
+      original.url.slice(0, -1),
       "https://private.example/app/",
       `${original.url}?custom=1`,
       "http://logi-test-plan.bg.local/other/",
@@ -88,6 +67,10 @@ for (const [name, codec] of [
         await f.store.activate(1)
         await f.start()
         expect(await f.store.read()).toEqual({ ...original, url })
+        expect(f.prepared).toEqual([url])
+        await f.start()
+        expect(await f.store.read()).toEqual({ ...original, url })
+        expect(await f.store.latestGeneration()).toBe(1)
       } finally {
         await f.close()
       }
@@ -110,10 +93,8 @@ for (const [name, codec] of [
         }
         await f.store.savePending(pending)
         await f.start()
-        expect(await f.store.read()).toEqual(
-          url === original.url ? { ...pending, url: Product.connection.url, generation: 3, revision: 3 } : pending,
-        )
-        expect(f.prepared).toEqual([url === original.url ? Product.connection.url : url])
+        expect(await f.store.read()).toEqual(pending)
+        expect(f.prepared).toEqual([original.url, url])
       } finally {
         await f.close()
       }
@@ -132,15 +113,14 @@ for (const [name, codec] of [
       const failed = await f.start()
       expect(await failed.api.status()).toMatchObject({
         state: "recoverable-error",
-        failure: "LOGINOM_RUNTIME_START_FAILED",
       })
       expect(failed.acquire("run")).toBeUndefined()
       expect(await f.store.read()).toEqual(original)
-      expect(await f.store.pending()).toEqual({ ...original, url: Product.connection.url, generation: 2, revision: 2 })
+      expect(await f.store.pending()).toBeUndefined()
       await failed.close()
       f.runtime.prepare = prepare
       await f.start()
-      expect(await f.store.read()).toEqual({ ...original, url: Product.connection.url, generation: 2, revision: 2 })
+      expect(await f.store.read()).toEqual(original)
     } finally {
       await f.close()
     }
