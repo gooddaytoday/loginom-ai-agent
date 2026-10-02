@@ -144,3 +144,36 @@ Chromium с другим profile не завершается. Короткое �
 Typecheck и diff-check pass. Native ещё не запускался. Следующий срез — один
 shutdown, свежий group/identity pass перед каждым сигналом и сохранение capture
 при всех post-dispatch отказах. Goal active.
+
+
+## Срезы 4–6 simplification: один shutdown и полный gate
+
+Убран второй процессный обход в remaining: shutdown использует свежий snapshot
+того же observer. Перед каждым индивидуальным сигналом выполняются полный pass
+и birth/executable/group проверка адресата. Mismatch меняет admission на refused.
+Read failure не выдаётся за пустой proof; shutdown не ожидает stale snapshot.
+Launcher закрывается последним; реальный helper игнорирует INT/TERM, наблюдатель
+подтвердил жизнь launcher до его SIGKILL. Законченный CLI остаётся exit 0 без
+timeout, два финальных passes пусты. Capture/registration/transport ошибки после
+dispatch сохраняют измеренный исход и делают cleanup failed.
+
+Вместо тестов с присвоенным status создана сквозная матрица process/archive/ready
+× no_artifact/failed/timeout/completed: настоящий fake CLI, настоящий budget,
+main exit 1, исход/telemetry/run/result/summary/report сохранены, b-next не начат.
+Archive failure сохраняет invalid journal и pending recovery. Отдельные exit 2/3
+выполняют confirmed cleanup до stop. Legacy/rejudge/counters/infra classification,
+secrets redaction и manifest/SHA/read-back остаются зелёными.
+
+Полный текущий gate: 225 pass / 0 fail; точное число assertions и длительность
+см. /tmp/eval-cleanup-native-20261002/full-simplified-v1.log. Typecheck и
+diff-check pass. Предыдущий one-shutdown run застал stale-wait regression и
+завершился двумя failures; он не используется как итоговое доказательство.
+Матрица v1 застала fixture failed без telemetry; добавлен отдельный static
+failed fixture с step_finish, затем полный gate проверил всю текущую матрицу.
+Установленный CLI по свежему agentInfo неизменен: 0.1.17, source
+5588651a291c59f53d1c14941d5ba768071a0018, binary SHA256
+272d135abc9ee9bb7219c7ee8a498cb048581ee2209d450f869b7caee1fbd873,
+model openai/gpt-6-sol/default, обычный бюджет 900000 мс.
+Далее exact reconciliation своего failed lease, readiness через тот же supervisor,
+control → group-sum-qty с независимым исполнением, budget/low-liquidity с обычными
+budgets. Native критерии остаются открытыми; goal active.

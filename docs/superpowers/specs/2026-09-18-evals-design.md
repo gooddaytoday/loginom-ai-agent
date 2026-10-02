@@ -83,7 +83,7 @@ error: string | null}`. Отсутствие поля в историческо�
 попыткам, включая interrupted. Cleanup не меняет status, score, pass,
 oracle_pass, failure_kind и знаменатели качества. Пересудейство сохраняет его.
 
-`runAgent` и management используют общий supervisor Linux PGID + `/proc` без
+`runAgent` и management используют общий supervisor Linux subreaper + `/proc` без
 новых зависимостей. Собственный процесс определяется по UID, PID/starttime,
 PPID, PGID/SID и наблюдённому происхождению. Chromium дополнительно требует
 точного executable выбранного bundle и нового собственного browser-profile.

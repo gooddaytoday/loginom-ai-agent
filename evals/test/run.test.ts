@@ -406,29 +406,6 @@ test("runAttempt: отсутствие артефакта проваливает
 })
 
 
-for (const status of ["no_artifact", "failed", "timeout", "completed"] as const) {
-  test(`afterAttempt: отказ ready сохраняет ${status} и измеренную telemetry`, async () => {
-    const profileDir = await mkdtemp(path.join(os.tmpdir(), "evals-readiness-profile-"))
-    const runDir = await mkdtemp(path.join(os.tmpdir(), "evals-readiness-run-"))
-    const config = { ...loadConfig(["--dry-run"], {}), profileDir, dryRun: false }
-    const command = agentCommand(config)
-    const task = (await loadTasks(config.tasksDir, ["calc-data-double"]))[0]!
-    const run = await runAttempt({ config, command, task: { ...task, id: "default" },
-      source: { kind: "dir", dir: path.join(evalsRoot, "fixtures/storage") }, attempt: 1, runId: "ready",
-      runDir, signal: new AbortController().signal, profileRecovered: false, skipJudge: true })
-    const state = path.join(profileDir, "view.json")
-    await Bun.write(state, JSON.stringify({ state: "unconfigured" }))
-    const result = { ...run.result, status }
-    const after = await afterAttempt(config, { ...command, env: { ...command.env, EVAL_FAKE_STATE_FILE: state } },
-      result, path.join(runDir, "default/1"))
-    expect(after).toHaveProperty("stop")
-    expect(result.status).toBe(status)
-    expect(result.session_id).toBe(run.result.session_id)
-    expect(result.tokens).toEqual(run.result.tokens)
-    expect(result.environment_cleanup?.status).toBe("failed")
-  })
-}
-
 test("main: отказ записи result сохраняет summary и запрещает второй кейс", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "evals-pipeline-"))
   const profile = path.join(directory, "profile")
