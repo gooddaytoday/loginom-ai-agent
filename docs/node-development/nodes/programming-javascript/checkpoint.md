@@ -2,6 +2,23 @@
 
 ## Текущее состояние
 
+Оперативная точка **2026-10-02, pair08**: original holder **exec32766**,
+private `f-cli-pair-08.py`: Declared08 writerPID639971 exit0/whole writer PASS;
+coldPID647223 выполняется в ordinary headed. Candidate11/reader11 на child **f2a0cdd991**, knowledge1.2. Контракт
+Declared исправлен после собственного CLI-отказа; source60/full3446+10SKIP PASS,
+build/roundtrip/freeze PASS. Code07 на предыдущем candidate имеет original whole
+PASS, Declared07 failed/очищен; эта неполная пара не заменяет pair08.
+
+Порядок pair08: Declared → полный ручной source review → audit → cold → release;
+затем Code → review/audit/cold/release → pair в том же original holder. Лимиты
+30/10 минут, неизменные fixtures и приватный oracle. Прочитать новые outputs
+exec32766; **не закрывать holder/lease до подтверждённого cleanup**. При успехе
+обоих оформить phase6 completion/card/registry; merge/push/release не назначены.
+Точные pins candidate11 и архив предыдущих итераций ниже. Старые строки
+«следующий шаг» относятся к своему датированному результату.
+
+### Протокол итераций CLI — 2026-10-02
+
 **Работа возобновлена пользователем, 2026-10-02.** Candidate06/reader06
 (code861a64e40b) immutable, technical J21 read07 завершён: original collector
 exec29412 exit0/PASS, actual SQLite binding18calls PASS, source32768/1024/8chunks
@@ -193,7 +210,7 @@ sourceTree`888a5aaebc84bfdccbc0b42c24cd999cedc75c1d5fbd8fdb90bc43680e7e2076`,
 reader10`c0fd3b73f730bb1e1da69f961e23909945647c6dbade3ea3573bef4386a1182f`,
 pinsSHA`822da3eff8c6d6829cf7b5e71a8dd759da628a1d19ffb0c03b5e065e561dd764`,
 archive`0d34a313c1522d57493988248a34acf06c81c43287ad9eeef1937ca7b5907f21`.
-**Текущий original holderexec29365 — private driver `f-cli-pair-07.py`.**
+**Архив original holderexec29365 — private driver `f-cli-pair-07.py`.**
 Fresh Code07 → полный source review → audit → cold → whole PASS → release;
 затем independent declared07 → review/audit/cold/release → pair в том же
 original holder. До подтверждённой очистки holder/lease не закрывать.
@@ -273,6 +290,20 @@ remote catalog17764f…/Save2 остаётся отдельно pinned. Private 
 после whole PASS start/code → review/audit/cold/release → pair в этом holder.
 При успехе обоих — фаза6 completion/card/registry/checkpoint без integration,
 merge/push/release. Не закрывать original holder до подтверждения cleanup.
+
+Declared08 current: первый JS request `js-sales` сразу принят с корректными
+Integer/Непрерывный и String/Дискретный, без retries/extra prompt. Original
+writer collector/native/whole audit PASS, session`ses_f0225b8d9ffeDGrCGPje90ShaF`.
+Полностью вручную прочитан source548bytes/10LF
+`fd7d36b3dd99193817c5003dceffded5a849ed3686ec5c5667cee62c88036400`:
+цикл по входу, формула/статус, no AssignColumns/no injected answers;
+reviewSHA`a9da7b7ccdeb08c66a2ecf643a1616f9cd92c7a375806d9d5865c0f5c3be2d26`.
+Writer auditSHA`f0dbaf7b5eb420d26096b03ced39470d4f0c87a450c626b7a07403455a766631`;
+executions`1790965358489-cenlolmr53q:1076:3` и`:4`.
+Own saved `/jsteach/JavaScript-declared-62aa0c39-0ccf-44f8-800a-2ef9985cf753.lgp`;
+normal Save/Close/logout PASS. Cold factory вернул originalPID647223, collector
+ещё выполняется. Ждать результат exec32766; при whole PASS release и start/code.
+
 
 
 
