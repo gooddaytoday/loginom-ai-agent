@@ -114,7 +114,7 @@ cache; затем применены UUID. Этот журнал не серти
 
 ## W2: наблюдённый формат размера
 
-Native FileStorage record, привязанный к текущей grid: `FileName`, `FullFilePath`,
+Native FileStorage record, привязанный к текущей grid: `FileName`, `FilePath`,
 `Type=0`, `Size` — точное целое число байт. Видимая Size-ячейка на этом стенде:
 1023 → `1,023`, 1024 → `1,024`, 1025 → `1,025`, 1937 → `1,937`,
 1048576 → `1,048,576`. Wide fixture: 1702 → `1,702`.
@@ -128,7 +128,29 @@ upload привязан к единственной активной форме 
 
 ## Что ещё не подтверждено
 
-Несколько row keys, integer и прочие типы/агрегаты, stddev divisor, оба лимита,
-коллизии/транслитерация имён, поля вне viewport и ширина, переменные, persistence
+Integer и прочие типы/агрегаты, stddev divisor, оба лимита,
+коллизии/транслитерация имён и ширина, переменные, persistence
 после нового открытия. Матрица этапа 0 пока незакрыта. Oracle/expected/task и
 новый обработчик ещё не готовы; статус ready_for_development не выставлен.
+
+Дополнение: новый профиль открыл сохранённый пакет с прежними GUID импорта и
+CrossTable. Source patch штатным каналом изменил импорт на many-fields; после
+завершения mapping/Done получена свежая owner-verified execution. Source patch
+требует явно типизировать новые поля (Unused00…Unused31), иначе отказывает.
+После отказа черновик закрыт канонически, draft_discarded=true; исходные
+параметры не считались применёнными.
+
+В CrossTable поле Unused31 изначально лежало ниже viewport. Wheel единственного
+view tableview-2843 переместил y=0 → 163, поле оказалось видимым и добавлено
+в строки; после обратного Wheel и bounded read y=0 на том же view. Роли:
+Region Order=0, Unused31 Order=1. Результат: North/x с Amount 40/10/30/20,
+Quantity=2; South/x с Amount=7, Quantity=1. Существующий output mapping
+сохранил прежний порядок и добавил новый Unused31 в конец. Поэтому порядок
+ролей и порядок материализованных полей нельзя считать одним и тем же.
+
+Точный W2 binding дополнительно подтверждён: grid classname
+`bg.filedialog.FileStore`; view.getRecord(row) — cached model текущего store,
+view.getNode(record) === row, view DOM содержит эту строку, grid.el.dom совпадает
+с наблюдённым контейнером. Для wide: id и FilePath совпадают с точным полным
+путём, FileName совпадает с видимой ячейкой, Type=0, Size=1702. FullFilePath
+отсутствует; правильное имя native свойства — FilePath.
