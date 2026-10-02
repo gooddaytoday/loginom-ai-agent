@@ -924,6 +924,12 @@ native GUID persistence и cleanup этим не доказаны. Следую�
 два Save из старого calculator сценария и model reopen не вводятся как gate.
 [Границы и оставшиеся связи](checkpoint.md#фаза-4-compact-public-node--native-binding--2026-10-02).
 [Save scope и reproducible tests](checkpoint.md#фаза-4-последний-cli-save-и-dirty-state--2026-10-02).
+Cold source/state/native Execute/full6×4 evidence реализованы на **e7865eea0cc8**:
+8PASS на8 SHA-pinned historical capture files, affected native9/procedure21PASS,
+все actualexit0. Default procedure contract строгий; technical cold reader
+использует явно связанный original process ceiling без synthetic admission.
+Это scoped evidence: writer/authenticated launch/process termination/whole CLI
+ещё не доказаны. [Checkpoint и следующий слой](checkpoint.md#фаза-4-независимые-cold-sourcestateexecutefull-table--2026-10-02).
 `javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
 он должен связать native проверки с фактическими standalone CLI evidence
 model/input/candidate/Save/cold/cleanup до ready_for_acceptance.

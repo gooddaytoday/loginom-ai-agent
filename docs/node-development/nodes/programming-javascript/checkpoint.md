@@ -5,7 +5,7 @@
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
 standalone CLI transport/bundle/admission/public-node/Save binding. Child
-**fa631186fd75fb812eda6f6a2aa49dc91b63f02b** tracked clean; registration на161353
+**e7865eea0cc8043e2d012f009b6f14e17a9cbe2a** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 адресных test methods PASS, в том числе48 non-noop native mutations.
 Итоговый `javascript_node_acceptance.py` ещё TO_IMPLEMENT: подготовить связку
@@ -17,7 +17,8 @@ Admission дополнительно11PASS; CLI metadata binding13PASS; native r
 на неизменённых captures и явно отдельной тестовой проекции production header.
 Compact public-node binding дополнительно17PASS на actual runtime-produced
 receipts/defaults и реальной SQLite. Last Save/dirty-state binding дополнительно19PASS;
-cold/cleanup ещё не объединены, fresh standalone Save не запускался.
+cold source/state/Execute/full6×4 отдельно8PASS на immutable captures;
+cleanup и итоговая связка ещё не реализованы, fresh standalone Save не запускался.
 JS general lifecycle-v5/driver/knowledge в product registry только7.4.2/nonempty
 origin, actual bridge redactor. Addressed65, full client3442PASS+10SKIP,
 operator18583PASS, provenance5045 actualexit0. Existing Done/Close447/448 и
@@ -43,6 +44,51 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: независимые cold source/state/Execute/full Table — 2026-10-02
+
+Child **e7865eea0cc8043e2d012f009b6f14e17a9cbe2a** добавляет
+`javascript_cold_evidence.py` и8 test methods. Проверяются actual сохранённые
+UTF-8/LF bytes и три полностью завершённых source-read, preserve admission,
+settings digest, native mappings/physical port GUIDs, полный GUID/indexed-port
+graph с positions/links, один свежий Execute другого процесса и все typed
+ячейки6×4 с NULL/order/type/precision по независимому oracle. До Execute
+Code cache может быть пустым, declared — configured/source_pending;
+после него обязателен полный reciprocal mapping. `ConnectedRecord:null`
+нормализуется только по существующему правилу managed settings; non-null
+и остальные настройки сохраняются. Native observations подтверждают stand/build/owner.
+
+Для technical cold path-only reader без `node.apply` общий procedure auditor
+получает явно переданный original10-minute ceiling только для Table settlement.
+Строгий default не меняется; synthetic admission/read rows не добавляются.
+`open_package` по actual workspace contract возвращает `created_draft:false`,
+`ownership_verified:false`; принадлежность здесь проверена по externally pinned
+account/path и сохранённому node GUID при новых document/workflow IDs.
+
+Два исторических writer/cold pairs закреплены8 literal SHA256. Они проверяют
+форму реальных native evidence, но не сертифицируют старых writers по новому
+generic protocol. Scope flags writer lifecycle/journal authentication/launch argv/
+source freeze/process termination/whole CLI остаются false. Table proof заканчивается
+на последней native data page; restoration и cleanup требуют отдельной проверки.
+
+Из child `packages/loginom-runtime` выполнены `python3 -m unittest discover
+-s tools/loginom-acceptance -p <pattern> -v`:
+`test_javascript_cold_evidence.py`8PASS, `test_javascript_evidence.py`9PASS,
+`test_node_procedure_evidence.py`21PASS, все actualexit0. Для первых двух задан
+`LOGINOM_JAVASCRIPT_AUDIT_EVIDENCE_ROOT` на прежнюю private campaign. Cold
+addressed04 originalb724af/terminal774b30 log SHA256
+`f3da4fca6dcad0b28670ed8112a222a19852a9bfc76a221d264977472ea8fdd5`.
+Private receipt `f-javascript-cold-evidence-validation-v1.json` SHA256
+`5e28bc5e9c3fc17e7bf9574c5dd043bcaa463acaff64b258d45a888b0c303373`
+фиксирует source/test hashes,8 captures, actual exits и все прежние failed logs.
+Failed01 выявил неверное требование fresh-draft ownership для reopen; failed02 —
+недостаточную отдельную привязку report execution owner к native node, исправленную
+в аудиторe. Failures сохранены, журналы не переписаны.
+
+Fresh headed browser/candidate/CLI не запускались. Следующее — normal own
+package/logout/browser/process cleanup binding, поздний model full output-read
+и итоговая composition. Затем обязательный same-task Astra/medium F review,
+fresh candidate/J01/J21/J27 и два Sol CLI trials. Goal active; readiness не повышена.
 
 ### Фаза 4: последний CLI Save и dirty-state — 2026-10-02
 

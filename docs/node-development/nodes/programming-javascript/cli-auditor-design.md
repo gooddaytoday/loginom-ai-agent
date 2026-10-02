@@ -105,6 +105,26 @@ settings/mappings, GUID graph и fresh полный результат с writer
 закрытия writer. Ни runtime-produced unit fixtures, ни старый immutable trace
 не заменяют свежую headed candidate/CLI проверку.
 
+Cold evidence связывается с фактическим отдельным path-only technical reader,
+без фиксированных writer source revisions и6×2 oracle. Его original10-minute
+process deadline и owner задают внешний ceiling только для bounded Table-card
+settlement: у этого reader нет `node.apply` admission. По умолчанию procedure
+auditor по-прежнему требует original apply/read phase; journal rows не добавляются
+и не переписываются. Наблюдения Table проверяются до restoration отдельно от
+последующего cleanup: format/filter controls, native pages и все typed клетки
+должны совпасть с независимым6×4 oracle. Fresh group связывается с отдельной
+подтверждённой Execute procedure и actual terminal, не с общим status отчёта.
+
+Writer baseline содержит actual source, native settings digest, обе mappings,
+GUID/indexed-port graph и execution identities. Сравнение нормализует только
+document/workflow/DOM epoch, wizard prefix и уже принятый `ConnectedRecord:null`
+как отсутствие; любое non-null значение и остальные настройки сохраняются.
+Первые cold output caches могут быть пустыми для code или configured/source_pending
+для declared; после Execute требуется полный reciprocal mapping. Caller отдельно
+связывает baseline с writer lifecycle/Save, исходники reader с freeze и реальный
+launch argv/процессы с controller evidence. Cold report/journal helper сам не
+выставляет whole CLI, model authorship, authenticated journal или process PASS.
+
 Native admission связывается с фактическим standalone Host, без Codex/Hermes
 ticket envelope. `packages/loginom-host/src/host.ts` передаёт в `inputStore`
 chat `${generation}:${cliSessionID}` и исходный user message ID. `inputs.ts`

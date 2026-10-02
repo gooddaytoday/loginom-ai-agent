@@ -22,6 +22,10 @@ runtime-produced fixtures и SQLite. [Checkpoint](checkpoint.md#фаза-4-compa
 runtime-produced receipts/advice и SQLite, плюс immutable headed Save trace.
 [Границы](checkpoint.md#фаза-4-последний-cli-save-и-dirty-state--2026-10-02).
 Fresh CLI Save/cold/cleanup и итоговая CLI-приёмка остаются открытыми.
+На **e7865eea0cc8** cold source/settings/mappings/GUID graph/fresh Execute/full6×4
+audit прошёл8 tests на закреплённых исторических captures; affected native9 и
+procedure21PASS. [Scope и оставшиеся связи](checkpoint.md#фаза-4-независимые-cold-sourcestateexecutefull-table--2026-10-02).
+Это проверка аудитора, fresh browser/CLI и process cleanup ещё впереди.
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·
