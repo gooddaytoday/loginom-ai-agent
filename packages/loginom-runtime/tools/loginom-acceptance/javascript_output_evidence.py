@@ -52,53 +52,60 @@ def verify_javascript_output(events, request, expected_columns, expected_rows, *
         materialization_id, execution_id = identities
         if not execution_id or execution_id == materialization_id:
             failures.append('javascript_two_fresh_executions')
-        checkpoint = operation['result']
-        marker = '__JAVASCRIPT_INDEPENDENT_ORACLE_NULL__'
-        if any(marker in row for row in expected_rows):
-            raise ValueError('javascript_oracle_null_marker_collision')
-        stream = io.StringIO(newline='')
-        writer = csv.writer(stream,delimiter=';',lineterminator='\n')
-        writer.writerow([c['name'] for c in expected_columns])
-        writer.writerows([[marker if v is None else v for v in row] for row in expected_rows])
-        columns = [dict(c,label=c.get('label',c['name']),used=True) for c in expected_columns]
-        comparison = {**request, 'target':{**request['target'],'kind':'existing'},'mappings':[],
-            'parameters':dict(settings=dict(source=dict(encoding='UTF-8',rows_to_skip=0,first_line_as_title=True),
-                format=dict(delimiter=';',text_qualifier='"',decimal_separator='.',null_marker=marker),columns=columns))}
-        failures.extend(verify_table_output_observations(final_observations,final_mutations,comparison,
-            stream.getvalue().encode('utf-8'),checkpoint,execution_id))
-        output = checkpoint['output']
-        if (output != phases['read']['value'] or output.get('verified') is not True
-                or output.get('status') != 'complete' or checkpoint.get('execution', {}).get('execution_id') != execution_id):
-            failures.append('javascript_output_checkpoint_binding')
-        port = output['ports'][0]
-        if (port.get('fresh') is not True or port.get('sample_complete') is not True
-                or port.get('row_count') != len(expected_rows) or port.get('sample_rows') != len(expected_rows)
-                or len(port.get('schema', [])) != len(expected_columns)):
-            failures.append('javascript_output_full_schema')
-        for i,column in enumerate(expected_columns):
-            schema = port['schema'][i]
-            if type(schema.get('index')) is not int or schema['index'] != i or any(schema.get(k) != column.get(k,column['name'] if k == 'label' else None) for k in ('name','label','type')):
-                failures.append('javascript_output_schema:'+str(i))
-        for i,row in enumerate(expected_rows):
-            if len(port['sample'][i]) != len(expected_columns):
-                raise ValueError('javascript_typed_row_width')
-            for j,(value,column) in enumerate(zip(row,expected_columns)):
-                cell = port['sample'][i][j]
-                if cell.get('type') != column['type'] or cell.get('is_null') is not (value is None):
-                    failures.append('javascript_typed_null_or_type:'+str(i)+':'+str(j))
-                if value is None:
-                    if cell.get('value') is not None:
-                        failures.append('javascript_typed_null_value:'+str(i)+':'+str(j))
-                    continue
-                representation, precision = ('decimal_integer','exact_integer') if column['type'] == 'integer' else ('cached_display_text','display_text')
-                wanted = str(value) if column['type'] == 'integer' else value
-                if (cell.get('value') != wanted or cell.get('representation') != representation or cell.get('precision') != precision):
-                    failures.append('javascript_typed_exact_value:'+str(i)+':'+str(j))
+        failures.extend(javascript_business_table(operation,request,expected_columns,expected_rows,final_observations,final_mutations,execution_id))
     except (KeyError,IndexError,TypeError,AttributeError,ValueError) as error:
         failures.append(str(error) if isinstance(error,ValueError) else 'javascript_output_malformed')
     return dict(passed=not failures,failures=sorted(set(failures)),execution_id=execution_id,
         materialization_execution_id=materialization_id,scope='fresh_native_javascript_full_integer_string_table',
         journal_authenticated=False,native_bytes_verified=False,package_persistence_verified=False,cli_verified=False)
+
+
+def javascript_business_table(operation,request,expected_columns,expected_rows,observations,mutations,execution_id):
+    failures = []
+    checkpoint = operation['result']
+    phases = operation['phases']
+    marker = '__JAVASCRIPT_INDEPENDENT_ORACLE_NULL__'
+    if any(marker in row for row in expected_rows):
+        raise ValueError('javascript_oracle_null_marker_collision')
+    stream = io.StringIO(newline='')
+    writer = csv.writer(stream,delimiter=';',lineterminator='\n')
+    writer.writerow([c['name'] for c in expected_columns])
+    writer.writerows([[marker if v is None else v for v in row] for row in expected_rows])
+    columns = [dict(c,label=c.get('label',c['name']),used=True) for c in expected_columns]
+    comparison = {**request, 'target':{**request['target'],'kind':'existing'},'mappings':[],
+        'parameters':dict(settings=dict(source=dict(encoding='UTF-8',rows_to_skip=0,first_line_as_title=True),
+            format=dict(delimiter=';',text_qualifier='"',decimal_separator='.',null_marker=marker),columns=columns))}
+    failures.extend(verify_table_output_observations(observations,mutations,comparison,
+        stream.getvalue().encode('utf-8'),checkpoint,execution_id))
+    output = checkpoint['output']
+    if (output != phases['read']['value'] or output.get('verified') is not True
+            or output.get('status') != 'complete' or checkpoint.get('execution', {}).get('execution_id') != execution_id):
+        failures.append('javascript_output_checkpoint_binding')
+    port = output['ports'][0]
+    if (port.get('fresh') is not True or port.get('sample_complete') is not True
+            or port.get('row_count') != len(expected_rows) or port.get('sample_rows') != len(expected_rows)
+            or len(port.get('schema', [])) != len(expected_columns)):
+        failures.append('javascript_output_full_schema')
+    for i,column in enumerate(expected_columns):
+        schema = port['schema'][i]
+        if type(schema.get('index')) is not int or schema['index'] != i or any(schema.get(k) != column.get(k,column['name'] if k == 'label' else None) for k in ('name','label','type')):
+            failures.append('javascript_output_schema:'+str(i))
+    for i,row in enumerate(expected_rows):
+        if len(port['sample'][i]) != len(expected_columns):
+            raise ValueError('javascript_typed_row_width')
+        for j,(value,column) in enumerate(zip(row,expected_columns)):
+            cell = port['sample'][i][j]
+            if cell.get('type') != column['type'] or cell.get('is_null') is not (value is None):
+                failures.append('javascript_typed_null_or_type:'+str(i)+':'+str(j))
+            if value is None:
+                if cell.get('value') is not None:
+                    failures.append('javascript_typed_null_value:'+str(i)+':'+str(j))
+                continue
+            representation, precision = ('decimal_integer','exact_integer') if column['type'] == 'integer' else ('cached_display_text','display_text')
+            wanted = str(value) if column['type'] == 'integer' else value
+            if (cell.get('value') != wanted or cell.get('representation') != representation or cell.get('precision') != precision):
+                failures.append('javascript_typed_exact_value:'+str(i)+':'+str(j))
+    return failures
 
 
 if __name__ == '__main__':
