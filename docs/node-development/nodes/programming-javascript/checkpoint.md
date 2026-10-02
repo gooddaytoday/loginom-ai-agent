@@ -105,14 +105,25 @@ Code04 Save`sales-save`/Close/logout1→0/no discard, cleanupSHA
 17:26:58Z fresh process/`.writer` absence, lease released/lock archived;
 после этого original holderexec80463 EOFexit0. Cold не запускался.
 
-**Текущий holder exec16020, `f-cli-pair-05.py`, start/code отправлен.**
-Fresh `f-cli-autonomous-code-05`; тот же candidate08/readonly reader08b.
-Driver05 сначала вызывает `verified_source_review` отдельно, включая exact bytes,
-assignment, anchors и время после writer, затем final writer audit. Review timestamps
-писать только `.isoformat(timespec='milliseconds').replace('+00:00','Z')`.
-Контроллер сохранять до review/audit/cold/release; после Code — declared/pair.
-Оба operator metadata дефекта имеют preflight до permanent trial audit; не
-менять frozen QA или runtime ради их обхода.
+**Текущий holder exec16020, `f-cli-pair-05.py`: Code05 writer PASS.**
+Original writerPID551847/collector exit0/native origin PASS; immutable reader08b
+без cache writes. Полный model-source778bytes/16LF570d990a… независимо прочитан;
+review metadata preflight PASS, затем original whole writer audit PASS.
+`writer-audit.json` SHA
+`79896104163e49c64832911628ff1ce42f418544681c3325a47453cce1c7ec64`:
+lease/candidate/native/admission/public apply/source-review/config/executions/
+full typed6×4/last Save+Close/logout PASS. Source/output`sales-js`, import
+`sales-import`, upload`sales-upload:upload`; execution IDs
+`1790962105993-r1qx8hjalk:1062:3` и`:4`.
+Package`/jsteach/JavaScript-code-8c191b79-42ae-41cd-bc8d-7d4a1736f1d0.lgp`;
+cleanupSHA`61556e3227211d6f44046eddb5b0043eff3977ac4245b6dacf18e08ea84f71c0`.
+**В holder отправлена cold-команда; ждать actual cold result по exec16020.**
+Не закрывать controller/lease; только после whole trial PASS — release, затем
+start/declared → full-source review → audit → cold → release → pair в том же
+holder. Пока cold persistence/whole CLI pair не подтверждены.
+Driver05 preflights operator review до permanent audit. Review timestamps:
+`.isoformat(timespec='milliseconds').replace('+00:00','Z')`; Python `-B` и
+PYTHONDONTWRITEBYTECODE=1 обязательны для frozen QA. Не менять frozen QA/runtime.
 Candidate08 на11c2aa87cd0a92804f8558dfa38002e7483b5e41:
 manifest`962687564e3b7ffe94f738bdcab8a7a820ba1abad72d0001932b44cb95b658d4`,
 sourceTree`572fbbf5fcbdf934c9c0fd4e91667abf6a1da1c82a273c9335fc2f5091a70b66`,
