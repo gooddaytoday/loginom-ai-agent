@@ -27,8 +27,10 @@ audit прошёл8 tests на закреплённых исторических
 procedure21PASS. [Scope и оставшиеся связи](checkpoint.md#фаза-4-независимые-cold-sourcestateexecutefull-table--2026-10-02).
 Это проверка аудитора, fresh browser/CLI и process cleanup ещё впереди.
 На **3b02439bee96** late model `dock_node_read` public/native/source binding
-прошёл11 tests, node17 и Save19 regression PASS. Native business/read-restoration
-и normal CLI package/logout/process cleanup ещё открыты; special supervised
+прошёл11 tests, node17 и Save19 regression PASS. На **5326767d6278** native
+late source/Execute/full6×4/restoration/workflow-return audit прошёл9 tests,
+affected configuration/output9 и public read11PASS. [Границы](checkpoint.md#фаза-4-native-late-read-sourceexecutefull-table--2026-10-02).
+Normal CLI package/logout/process cleanup ещё открыт; special supervised
 cleanup не подставляется вместо обычного CLI. [Checkpoint](checkpoint.md#фаза-4-late-cli-output-read-delivery-binding--2026-10-02).
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·

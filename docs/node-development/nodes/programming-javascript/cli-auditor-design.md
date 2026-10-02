@@ -89,9 +89,15 @@ Late output-read binding реализован отдельным явным ре
 `verify_cli_node_binding(..., source_operation_id=<original JS Execute>)`.
 Он проверяет actual `dock_node_read` compact expansion, retained source/schema/
 verified phase receipts, fresh execution identity и public/native checkpoint
-и cell equality; ordinary apply default остаётся строгим. Для полной бизнес-проверки
-позднего чтения ещё требуются его собственные native source/admission/Execute/Table
-и format restoration/workflow-return receipts с независимым6×4 oracle.
+и cell equality; ordinary apply default остаётся строгим. Native слой реализован
+в `javascript_read_output_evidence.py`:6 точных фаз, externally derived parent
+source/settings/node, четыре полных owned closed source-read группы и две preserve
+admissions, новый Execute, Table/restoration/workflow-return с независимым6×4 oracle.
+Каждый UTF-8 chunk требует собственного reader step/open/discard; четвёртая группа
+свежести идёт после dispatch ACK до actual Execute. Semantic retained schema
+не содержит наблюдаемый Table `header_tid`, который отдельно связывает Table audit.
+Исторический parent baseline не сертифицирует нынешний writer lifecycle. Итоговый
+аудитор должен объединить native proof с отдельным public CLI read binding.
 Controller-only read и совпавшие metadata без этих фактов не дают acceptance PASS.
 
 Обычный standalone CLI не принимает `acceptanceCleanupPackage`, как закреплено

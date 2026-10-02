@@ -5,7 +5,7 @@
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
 standalone CLI transport/bundle/admission/public-node/Save binding. Child
-**3b02439bee96037c89760d07f22938f3426f6c89** tracked clean; registration на161353
+**5326767d6278a957c98a6e462dde83d6a3684403** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 адресных test methods PASS, в том числе48 non-noop native mutations.
 Итоговый `javascript_node_acceptance.py` ещё TO_IMPLEMENT: подготовить связку
@@ -19,8 +19,8 @@ Compact public-node binding дополнительно17PASS на actual runtime
 receipts/defaults и реальной SQLite. Last Save/dirty-state binding дополнительно19PASS;
 cold source/state/Execute/full6×4 отдельно8PASS на immutable captures;
 cleanup и итоговая связка ещё не реализованы, fresh standalone Save не запускался.
-Late model-output-read delivery binding дополнительно11PASS; его native business
-oracle audit ещё открыт. Обычный CLI не принимает `acceptanceCleanupPackage`:
+Late model-output-read delivery binding дополнительно11PASS; native source/fresh
+Execute/full6×4/restoration/workflow-return audit дополнительно9PASS. Обычный CLI не принимает `acceptanceCleanupPackage`:
 нужен проверенный собственный teardown без подстановки special acceptance receipt.
 JS general lifecycle-v5/driver/knowledge в product registry только7.4.2/nonempty
 origin, actual bridge redactor. Addressed65, full client3442PASS+10SKIP,
@@ -47,6 +47,47 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: native late-read source/Execute/full Table — 2026-10-02
+
+Child **5326767d6278a957c98a6e462dde83d6a3684403** добавляет
+`javascript_read_output_evidence.py`. Явный6-phase `read_existing_output` проверяет
+retained writer source/node/settings/execution baseline, две preserve admissions,
+четыре полных source-read группы, новый native Execute и полный6×4 oracle с
+NULL/type/order/exact numbers. Общая Table-проверка связывает format controls,
+все реальные data pages, восстановление формата и owned workflow return.
+Default13-phase script/configuration остаётся строгим; read не меняет настройки.
+Только наблюдаемый UI `header_tid` убирается при сравнении semantic retained schema;
+его связь с нативной таблицей отдельно проверяет Table audit.
+
+Actual source-reader открывает и закрывает редактор для **каждого** UTF-8 chunk.
+Аудитор проверяет отдельный step/open/read/discard cycle каждого chunk, cursor,
+offset/digest/полноту, владельца и original deadline. Четвёртая полная source
+проверка идёт после dispatch journal ACK, но **до** actual graph Execute;
+после исполнения новый source-read этим протоколом не заявлен.
+
+Addressed03 originalfc401b/terminalbbce2a,9 test methods PASS, actualexit0:
+два SHA-pinned historical Code/declared journals из следующего раздела,
+68 non-noop native mutations; отдельная actual runtime-reader unit проверка
+многофрагментного Unicode с8 подменами. Unit adapter seam передаёт bytes,
+не является native browser evidence длинного кода. External production header
+projection проверяет форму/stand-origin и не заменяет fresh candidate.
+Affected configuration/output9 и public read binding11PASS, actualexit0.
+Команда из child `packages/loginom-runtime`: `LOGINOM_NODE=<pinned Node24.19.0>
+LOGINOM_JAVASCRIPT_AUDIT_EVIDENCE_ROOT=<private campaign> python3 -m unittest
+discover -s tools/loginom-acceptance -p test_javascript_read_output_evidence.py -v`;
+regressions с patterns `test_javascript_evidence.py` и `test_javascript_cli_read_binding.py`.
+Private receipt `f-javascript-read-output-validation-v1.json` SHA256
+`2c9c30b650dc78cd277fffbad099085b0e965fa34878fba238eb3affd8ee9860`
+фиксирует source/producers/captures/log hashes и original/terminal actual exits.
+
+Helper не сертифицирует parent lifecycle, authenticated journal, model delivery,
+persistence/cleanup/whole CLI. Native read audit нужно связать с отдельным public
+CLI read binding в итоговом аудиторе. Fresh browser/candidate/CLI не запускались,
+новых leases нет. Обнаружен аналогичный multi-chunk gap в cold source audit;
+следующий шаг — исправить и проверить его на уже сохранённом32KiB native capture,
+затем normal own package/logout/process cleanup и итоговая composition.
+Same-task F review, fresh ordinary headed candidate и Sol trials ещё впереди.
 
 ### Фаза 4: late CLI output-read delivery binding — 2026-10-02
 

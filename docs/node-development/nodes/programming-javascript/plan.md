@@ -932,8 +932,11 @@ Cold source/state/native Execute/full6×4 evidence реализованы на *
 ещё не доказаны. [Checkpoint и следующий слой](checkpoint.md#фаза-4-независимые-cold-sourcestateexecutefull-table--2026-10-02).
 Late `dock_node_read` delivery binding реализован на **3b02439bee96**:
 11PASS с actual compact/read-contract producers и SQLite, node17/Save19 regression
-PASS. Его native source/Execute/Table/business6×4/restoration аудит и normal CLI
-package/logout/process cleanup ещё открыты; special `acceptanceCleanupPackage`
+PASS. Native source/Execute/Table/business6×4/restoration/workflow-return аудит
+реализован на **5326767d6278**:9PASS, affected native9/public read11PASS.
+Historical captures и actual reader multi-chunk unit seam не заменяют fresh CLI.
+[Scope и следующий шаг](checkpoint.md#фаза-4-native-late-read-sourceexecutefull-table--2026-10-02).
+Normal CLI package/logout/process cleanup ещё открыт; special `acceptanceCleanupPackage`
 receipt не является обычным CLI контрактом. [Checkpoint](checkpoint.md#фаза-4-late-cli-output-read-delivery-binding--2026-10-02).
 `javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
 он должен связать native проверки с фактическими standalone CLI evidence
