@@ -6,7 +6,10 @@ const owner={verified:true,document_id:'doc',workflow_id:'wf',node_id:'cross',ti
 function fixture(fault){
  let stage='crosstable';const calls=[];
  const changed={configuration:{node_context:owner},verified:true};
- const state=()=>({wizard:{status:'observed',stage,root_tid:root,title:'Кросс-таблица'},
+ // Captured native stage titles differ: the inline mapping page uses its own
+ // heading even though its prepared GUID and wizard root remain the same.
+ const state=()=>({wizard:{status:'observed',stage,root_tid:root,
+  title:stage==='output_mapping'?'Настройка соответствия между столбцами':'Кросс-таблица'},
   prepared_node_context:fault==='owner'&&stage==='output_mapping'?{...owner,node_id:'foreign'}:owner,
   node_crosstable:{verified:true,dialogs:[]},node_mapping:{verified:false,reason:'mapping_render_bound'},
   ui:{elements:[{tid:root+';btnNext',ref:'next',allowed_actions:['wizard_step']}]}});

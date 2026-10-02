@@ -33,7 +33,7 @@ export async function advanceCrossTableConfiguration(channel,changed){
   if(destination.wizard.stage==='output_mapping'){
    need(destination.prepared_node_context?.verified===true
     &&['document_id','workflow_id','node_id'].every(k=>destination.prepared_node_context[k]===changed.configuration.node_context[k])
-    &&destination.wizard.root_tid===root&&destination.wizard.title==='Кросс-таблица','inline output owner differs');
+    &&destination.wizard.root_tid===root&&destination.wizard.title==='Настройка соответствия между столбцами','inline output owner differs');
    // Native CrossTable generates/synchronizes these fields on execution. No
    // guessed source inventory, mapping override or premature schema comparison.
    await next(destination,'done');

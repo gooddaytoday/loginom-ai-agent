@@ -947,7 +947,7 @@
     },
     "crosstable-handler": {
       "path": "../../packages/loginom-runtime/client/lib/crosstable-node.mjs",
-      "sha256": "767a55a6e6ba234071362bc55930d7e3c77496f72647872a90c51fd9dca14031",
+      "sha256": "6a597ccfe9466ea94dbe3e192d5ac7b2b6f49a419b6f5e8a9db54d21191d8568",
       "kind": "source",
       "availability": "retained_document",
       "source_commit": null,
