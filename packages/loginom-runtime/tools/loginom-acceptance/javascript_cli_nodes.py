@@ -86,7 +86,53 @@ def compact_port_facts(port):
     return value
 
 
-def verify_cli_node_binding(events, native_events, operation_id, expected):
+def expanded_cli_read(args,request,checkpoint,source_id):
+    if (set(args)-{'operation_id','source_operation_id','read'} or args.get('source_operation_id') != source_id
+            or request['target']['type'] != 'programming.javascript' or request['finish'] != 'execute'
+            or checkpoint.get('execution',{}).get('status') != 'completed'):
+        raise ValueError('cli_node_read_source_contract')
+    readback = checkpoint['configuration']['readback']
+    node = checkpoint['node']
+    receipts = readback['receipt_ids']
+    names = ('finish','output_mapping','node_finish','materialization_execute','execute')
+    if (checkpoint['configuration'].get('status') != 'applied' or readback.get('kind') != 'javascript'
+            or readback.get('scope') != 'observed_after_verified_finish' or readback.get('values_are') != 'independent_owned_source_readback'
+            or readback.get('schema_mode') not in ('code','declared') or readback.get('settings_preserved') is not True
+            or readback.get('wizard_commit_verified') is not True or readback.get('execution_effects',{}).get('explicit_execute_requested') is not True
+            or 'internal_execution_started' not in readback['execution_effects'] or readback['execution_effects']['internal_execution_started'] is not None
+            or any(readback.get('node',{}).get(k) != node[k] for k in ('document_id','workflow_id','node_id'))
+            or len(set(receipts)) != len(receipts) or any(source_id+':'+name not in receipts for name in names)
+            or any(len([p for p in checkpoint['phases'] if p.get('receipt_id') == rid
+                and rid == source_id+':'+p.get('phase','') and p.get('status') == 'verified']) != 1 for rid in receipts)):
+        raise ValueError('cli_node_read_retained_configuration')
+    mapping = readback['output_mapping']
+    fields = mapping['fields']
+    if (type(mapping.get('port')) is not int or mapping['port'] != 0 or 'output_mappings' in readback or not fields
+            or len({f['name'] for f in fields}) != len(fields)
+            or any(type(f.get('index')) is not int or f['index'] != i
+                or any(not isinstance(f.get(k),str) for k in ('name','label','type','data_kind','source_name'))
+                or 'excluded' in f and type(f['excluded']) is not bool for i,f in enumerate(fields))):
+        raise ValueError('cli_node_read_retained_mapping')
+    schema = [{k:f[k] for k in ('name','label','type','data_kind')} | dict(index=i)
+        for i,f in enumerate(f for f in fields if f.get('excluded') is not True)]
+    source = readback['source']
+    if (set(source) != {'sha256','utf8_bytes','lf_lines'} or not hexadecimal(source['sha256'],64)
+            or type(source['utf8_bytes']) is not int or not 0 <= source['utf8_bytes'] <= 32768
+            or type(source['lf_lines']) is not int or not 1 <= source['lf_lines'] <= 1024 or not schema):
+        raise ValueError('cli_node_read_retained_source')
+    read = dict(ports=[0],sample_rows=10,require_exact_numbers=False) | args.get('read',{})
+    if (set(read) != {'ports','sample_rows','require_exact_numbers'} or read['ports'] != [0] or type(read['ports'][0]) is not int
+            or type(read['sample_rows']) is not int or not 0 <= read['sample_rows'] <= 100
+            or type(read['require_exact_numbers']) is not bool):
+        raise ValueError('cli_node_read_compact_arguments')
+    return dict(operation_id=args['operation_id'],contract_revision=request['contract_revision'],document_id=node['document_id'],
+        workflow_ref=request['workflow_ref'],target=dict(kind='existing',type=request['target']['type'],label=request['target']['label'],ref=node),
+        inputs=[],mode='read_existing_output',parameters=dict(source_operation_id=source_id,schemas=[dict(port=0,schema=schema)],
+            javascript_source=dict(source_sha256=source['sha256'],source_utf8_bytes=source['utf8_bytes'],source_lf_lines=source['lf_lines'])),
+        mappings=[],finish='execute',read=read,budgets=dict(configure_ms=600000,execute_ms=600000,total_ms=600000))
+
+
+def verify_cli_node_binding(events, native_events, operation_id, expected, *, source_operation_id=None):
     failures = []
     source_sha = None
     try:
@@ -95,11 +141,15 @@ def verify_cli_node_binding(events, native_events, operation_id, expected):
                 or any(not hexadecimal(expected.get(k),64) for k in ('runtime_revision','action_manifest_sha256'))):
             raise ValueError('cli_node_external_identity_pin')
         calls = cli_public_calls(events)
+        reading = source_operation_id is not None
+        if reading and (not isinstance(source_operation_id,str) or not source_operation_id or source_operation_id == operation_id):
+            raise ValueError('cli_node_read_source_operation_pin')
         if any(c['part']['tool'] == 'loginom_dock_node_resume' and c['part']['state']['input'].get('operation_id') == operation_id for c in calls):
             raise ValueError('cli_node_resume_requires_reconciliation_audit')
-        selected = [c for c in calls if c['part']['tool'] in ('loginom_dock_node_apply','loginom_dock_node_wait','loginom_dock_node_status')
+        first_tool = 'loginom_dock_node_read' if reading else 'loginom_dock_node_apply'
+        selected = [c for c in calls if c['part']['tool'] in (first_tool,'loginom_dock_node_wait','loginom_dock_node_status')
             and c['part']['state']['input'].get('operation_id') == operation_id]
-        if not selected or selected[0]['part']['tool'] != 'loginom_dock_node_apply':
+        if not selected or selected[0]['part']['tool'] != first_tool:
             raise ValueError('cli_node_original_apply_missing')
         admissions = [(i,r) for i,r in enumerate(native_events) if r.get('operation_id') == operation_id and r.get('phase') == 'node_apply_prepared']
         checkpoints = [(i,r) for i,r in enumerate(native_events) if r.get('operation_id') == operation_id and r.get('phase') == 'node_checkpoint']
@@ -110,6 +160,18 @@ def verify_cli_node_binding(events, native_events, operation_id, expected):
         if any(not native_identity(r,expected) for r in rows):
             raise ValueError('cli_node_native_runtime_pin')
         native = admissions[0][1]['request']
+        prior = None
+        if reading:
+            proof = verify_cli_node_binding(events,native_events,source_operation_id,expected)
+            if not proof['passed']:raise ValueError('cli_node_read_source_binding_unverified')
+            source_ends = [(i,r) for i,r in enumerate(native_events) if r.get('operation_id') == source_operation_id and r.get('phase') == 'completed']
+            if len(source_ends) != 1 or source_ends[0][0] >= admissions[0][0]:raise ValueError('cli_node_read_source_order')
+            source_request = next(r['request'] for r in native_events if r.get('operation_id') == source_operation_id and r.get('phase') == 'node_apply_prepared')
+            prior = source_ends[0][1]['outcome']['output']
+            if (prior['execution']['execution_id'] == checkpoints[0][1]['result'].get('execution',{}).get('execution_id')
+                    or any(c['part']['state']['time']['end'] > selected[0]['part']['state']['time']['start'] for c in calls
+                        if c['result'] and c['result'].get('operation_id') == source_operation_id and c['result'].get('state') == 'settled')):
+                raise ValueError('cli_node_read_source_order_or_freshness')
         references,uploads = {},{}
         for call in calls:
             if call is selected[0]:break
@@ -151,13 +213,23 @@ def verify_cli_node_binding(events, native_events, operation_id, expected):
                 or outcome.get('action_key') != 'node.apply' or value_digest(outcome.get('output')) != value_digest(checkpoint)
                 or outcome.get('cleanup_complete') is not True or outcome.get('error') is not None):
             raise ValueError('cli_node_checkpoint_outcome_binding')
+        if reading:
+            delivered_source = checkpoint.get('output',{}).get('javascript_source',{})
+            if (checkpoint.get('configuration',{}).get('status') != 'not_requested'
+                    or delivered_source.get('source_operation_id') != source_operation_id
+                    or any(delivered_source.get(k) != v for k,v in native['parameters']['javascript_source'].items())
+                    or not hexadecimal(delivered_source.get('settings_sha256'),64)):
+                raise ValueError('cli_node_read_output_source_binding')
         settled = False
         for call in selected:
             part,result = call['part'],call['result']
             args = part['state']['input']
             if part['sessionID'] != expected['cli_session_id'] or part['state']['status'] != 'completed':
                 raise ValueError('cli_node_public_call_owner_or_error')
-            if part['tool'] == 'loginom_dock_node_apply':
+            if reading and part['tool'] == first_tool:
+                if value_digest(expanded_cli_read(args,source_request,prior,source_operation_id)) != value_digest(native):
+                    raise ValueError('cli_node_read_compact_expansion_changed')
+            elif part['tool'] == 'loginom_dock_node_apply':
                 ref = references.get((args.get('document_id'),args.get('workflow_ref',{}).get('workflow_id')))
                 if ref is None or value_digest(expanded_cli_node(args,ref,uploads)) != value_digest(native):
                     raise ValueError('cli_node_compact_expansion_changed')
@@ -186,5 +258,6 @@ def verify_cli_node_binding(events, native_events, operation_id, expected):
     except (KeyError,IndexError,TypeError,AttributeError,ValueError) as error:
         failures.append(str(error) if isinstance(error,ValueError) else 'cli_node_binding_malformed')
     return dict(passed=not failures,failures=sorted(set(failures)),operation_id=operation_id,public_source_sha256=source_sha,
-        scope='one_compact_standalone_node_to_native_checkpoint_binding',public_port_delivery_verified=not failures,model_code_semantics_verified=False,
+        scope='compact_standalone_output_read_to_retained_source_and_native_checkpoint_binding' if source_operation_id is not None
+            else 'one_compact_standalone_node_to_native_checkpoint_binding',public_port_delivery_verified=not failures,model_code_semantics_verified=False,
         input_upload_verified=False,business_output_verified=False,persistence_verified=False,cli_acceptance_verified=False)
