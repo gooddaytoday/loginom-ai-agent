@@ -217,6 +217,41 @@ object сохранён в holder для финальной pair revalidation. �
 source, создать mode-specific review, audit/cold/release/pair. Code заново
 не запускать. Pair/accepted до результата declared остаются открытыми.
 
+**Declared07 failed и безопасно retired; pair07 не принята.** WriterPID609274,
+session`ses_f0235f294ffeLycgrxQ3R71mLD`; import выполнен, три JS requests
+`js-sales`, `js-sales-v2`, `js-sales-v3` получили pre-effect NOT_APPLIED по
+`Managed JavaScript declared column parameters unsupported`. Integer передан
+с Дискретный/Неопределенное вместо обязательного для writer Непрерывный.
+Published/local schema допускали все3 data kinds и1000 columns, native managed
+writer — default kind/64. Knowledge1.1 не раскрывал этого ограничения.
+Затем попытка поиска `grep` получила CLI_PERMISSION_REJECTED, writer exit1;
+права не расширялись и обход отказа не выполнялся. Normal shutdown BLOCKED
+CONFIRMED_SAVE_REQUIRED, `.writer` сохранён; trial/source review/cold не созданы.
+
+Separate ordinary headed admin recoveryexec22382: own `jsteach:4572/Package1`
+сопоставлен по assigned account, времени original managed launch/последнему
+import и single lease; package не выполнялся. Package1 закрыт через Dispatcher
+с явным отказом от несохранённого тестового импорта, затем только session4572;
+Refresh показал отсутствие обоих. Admin logout/browserclose actualexit0.
+RecoverySHA`1578099f82c96531c24417d349af044794d5e8858a650d0a8dbc25824d531024`.
+18:13:25Z fresh exact-argv scan (оба trial profiles+admin profile) пуст,
+lease released/lock archived, `.writer` retained/never reuse; originalholder29365
+затем EOFexit0. Code07 original whole PASS не отменяется, но пары на этом
+candidate нет. Foreign и исторические sessions не закрывались.
+
+Текущая доработка child: единые immutable declared types/default kinds/limit64
+для published schema, local preflight и managed editor; конкретный
+`parameters.columns[i].data_kind`/expected-kind в user-v1 error до мутации.
+Knowledge1.2 добавляет правило в compact limitations и full declared_columns;
+1.0/1.1 identities сохраняются. Никакие native UI guards не ослаблены.
+Адресный набор60PASS включает actual MCP budget fixture. Full client suite
+exec2948 actualexit0:3456tests=3446PASS+10SKIP,0FAIL (165.476s), private
+`f-declared-contract-client-tests-01.log`. Child `f2a0cdd991` committed;
+собирается candidate11. До actual build/roundtrip/freeze новый model run
+не начинать. Следующая pair08 должна быть новой для обоих modes на одном
+candidate; старые source/result/recovery proofs не переписывать.
+
+
 
 Driver05 preflights operator review до permanent audit. Review timestamps:
 `.isoformat(timespec='milliseconds').replace('+00:00','Z')`; Python `-B` и

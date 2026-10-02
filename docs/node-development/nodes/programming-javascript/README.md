@@ -3,17 +3,18 @@
 Устойчивый ID: `component.programming.JavaScript`. Slug: `programming-javascript`.
 
 Актуально2026-10-02: продуктовый handler зарегистрирован в отдельной ветке
-`node-javascript`, same-task F review завершён. OAuth/setup J27, compiled Host
-и model delivery J01/J21 проверены в областях, перечисленных в
-[checkpoint](checkpoint.md#текущее-состояние). Normal CLI Save → own native
-Close/logout подтверждены. На candidate09 (`1f66cef4c2`) Code06 writer прошёл
-whole writer audit; independent ordinary headed cold-read/Execute/full6×4 и
-cleanup наблюдены. Whole trial отказал из-за формата URL в ожидании аудитора;
-исправление QA проверяется на неизменном capture и не повышает старый FAIL.
-Code01–05 и их исходные отказы/отдельные cleanup proofs сохранены.
-Далее fresh CLI/cold Code и declared на новом закреплённом candidate после
-адресных проверок. Итоговая pair и accepted registry открыты; интеграция и
-релиз отдельно не выполнялись.
+`node-javascript`, same-task F review завершён. На candidate10 (`5a2d960a42`)
+**Code07 прошёл original whole CLI + independent headed cold acceptance**:
+source/settings/mappings/GUID graph, fresh Execute/full6×4 и normal cleanup.
+[Точные pins и исходные результаты](checkpoint.md#текущее-состояние).
+Declared07 выявил расхождение published/local schema с ограничениями managed
+writer для data_kind/числа колонок; запросы отклонены до создания JS узла.
+Попытка завершилась CLI_PERMISSION_REJECTED при поиске через grep; права не
+расширялись. Остаточный тестовый импорт очищен отдельно через собственный
+admin recovery, это не normal cleanup PASS. Исправление контракта/knowledge1.2
+проходит адресные и полные проверки. Далее fresh pair на новом candidate;
+Code07 сохраняет свой отдельный PASS, общая pair и accepted registry открыты.
+Интеграция, push и релиз не выполнялись.
 
 Далее сохранены этапы реализации с их исходными границами проверки; для
 продолжения использовать только текущую сводку checkpoint.
