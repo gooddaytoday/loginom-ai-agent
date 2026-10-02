@@ -354,6 +354,24 @@ test("runAttempt: failed cleanup сохраняет исход no_artifact и з
   }
 })
 
+test("runAttempt: исключение записи cleanup не стирает уже измеренный no_artifact", async () => {
+  const runDir = await mkdtemp(path.join(os.tmpdir(), "evals-cleanup-write-"))
+  const config = loadConfig(["--dry-run"], {})
+  const task = (await loadTasks(config.tasksDir, ["calc-data-double"]))[0]!
+  const out = path.join(runDir, task.id, "1")
+  await mkdir(path.join(out, "cleanup.json"), { recursive: true })
+  const run = await runAttempt({ config, command: agentCommand(config),
+    source: { kind: "dir", dir: path.join(evalsRoot, "fixtures/storage") }, task,
+    attempt: 1, runId: "write-error", runDir, signal: new AbortController().signal, profileRecovered: false, skipJudge: false })
+  expect(run.result.status).toBe("no_artifact")
+  expect(run.result.tokens.input).toBe(400)
+  expect(run.result.session_id).toBe("ses_fixture03")
+  expect(run.result.environment_cleanup?.status).toBe("failed")
+  expect(run.stop).toBe(true)
+  expect(await Bun.file(path.join(out, "run.json")).exists()).toBe(true)
+  expect(await Bun.file(path.join(out, "result.json")).json()).toEqual(run.result)
+})
+
 test("main: summary фиксирует переданный variant и эффективный лимит задачи", async () => {
   const tasksDir = await mkdtemp(path.join(os.tmpdir(), "evals-metadata-"))
   let runDir: string | undefined

@@ -167,15 +167,15 @@ export async function runAttempt(input: {
   judge?: JudgeSettings
 }): Promise<{ result: AttemptResult; stop: boolean }> {
   const base = emptyResult(input.task.id, input.attempt, input.profileRecovered)
-  return attemptBody(input, base).catch((error: unknown) => ({
-    result: {
-      ...base,
-      status: "harness_error" as const,
-      judge_status: "skipped" as const,
-      harness_error: describe(error),
-    },
-    stop: false,
-  }))
+  return attemptBody(input, base).catch(async (error: unknown) => {
+    const measured = base.exit_code !== null
+    const result: AttemptResult = measured
+      ? { ...base, environment_cleanup: { status: "failed", evidence: "cleanup.json", error: describe(error) } }
+      : { ...base, status: "harness_error", judge_status: "skipped", harness_error: describe(error) }
+    await Bun.write(path.join(input.runDir, input.task.id, String(input.attempt), "result.json"), JSON.stringify(result, null, 2))
+      .catch(() => { console.error("Не удалось сохранить attempt result; исход сохранится в summary") })
+    return { result, stop: measured }
+  })
 }
 
 async function attemptBody(input: Parameters<typeof runAttempt>[0], base: AttemptResult): Promise<{ result: AttemptResult; stop: boolean }> {
@@ -210,6 +210,10 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     signal: input.signal,
   })
   const early = statusFor(run, false)
+  // This measured checkpoint survives failures in artifact/judge/evidence persistence.
+  Object.assign(base, { status: early.status, exit_code: run.exitCode, timed_out: run.timedOut, interrupted: run.interrupted,
+    duration_ms: run.durationMs, cost: run.cost, tokens: run.tokens, counters: run.counters,
+    session_id: run.sessionId ?? null, errors: run.errors, stderr_head: run.stderrHead })
   const fetched =
     early.status === "interrupted" || early.status === "harness_error" || early.status === "infra_error"
       ? undefined
@@ -290,6 +294,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
         ? `CLI exit ${run.exitCode}: ${firstNonEmptyLine(run.stderrHead) ?? run.errors.join(", ") ?? "—"}`
         : null),
   }
+  Object.assign(base, result)
   await Bun.write(path.join(outDir, "cleanup.json"), JSON.stringify({ processes: run.processCleanup }, null, 2))
   await Bun.write(path.join(outDir, "result.json"), JSON.stringify(result, null, 2))
   return { result, stop: stop || run.processCleanup.status === "failed" }
