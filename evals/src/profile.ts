@@ -5,6 +5,7 @@ import type { AgentCommand } from "./cli"
 import { EvalFailure } from "./fail"
 import { groupProcesses } from "./process-group"
 import { superviseProcess, writerIdentity, type WriterIdentity } from "./process-supervisor"
+import { archiveDiagnostics } from "./diagnostics"
 
 type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean }
 
@@ -15,10 +16,17 @@ const exists = (file: string) =>
   )
 
 export async function management(command: AgentCommand, args: string[], stdin?: string, timeoutMs = 120_000) {
+  const out = command.cleanupDir ? path.join(command.cleanupDir, `${Date.now()}-${crypto.randomUUID()}`) : undefined
+  if (out) await mkdir(out, { recursive: true, mode: 0o700 })
   const result = await superviseProcess({ cmd: [...command.cmd, ...args], cwd: command.cwd,
     env: command.env, profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs })
+  if (out) await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ command: args.slice(0, 2), processes: result.processCleanup }, null, 2))
   if (result.processCleanup.status !== "confirmed")
     throw new EvalFailure(`Management cleanup failed: ${result.processCleanup.error ?? "unconfirmed"}`, 1)
+  if (out && command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
+    await archiveDiagnostics(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.runtimeDirectories, out, command.cleanupSecrets)
+  if (command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
+    await releaseStaleWriter(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.writer)
   return result
 }
 

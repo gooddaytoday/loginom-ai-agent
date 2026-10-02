@@ -59,6 +59,21 @@ test("releaseStaleWriter: живой host в зарегистрированно�
   }
 })
 
+test("management: сохраняет отдельное процессное доказательство без private stdin", async () => {
+  const context = await fakeProfile()
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-management-evidence-"))
+  const command = { ...context.command, cleanupDir: out }
+  const result = await management(command, ["loginom", "setup", "--stdin-json", "--format", "json"], '{"password":"private-password"}')
+  const { readdir } = await import("node:fs/promises")
+  const directories = await readdir(out)
+  expect(directories).toHaveLength(1)
+  const evidence = await Bun.file(path.join(out, directories[0]!, "cleanup.json")).text()
+  expect(JSON.parse(evidence).processes.status).toBe("confirmed")
+  expect(evidence).not.toContain("private-password")
+  expect(evidence).not.toContain("stdin")
+  expect(result.exitCode).toBe(0)
+})
+
 for (const key of ["LOGINOM_AI_AGENT_CLI_PROFILE", "LOGINOM_AI_AGENT_CLI_ROOT"]) {
   test(`releaseStaleWriter: живой env-only owner ${key} без регистрации сохраняет guard`, async () => {
     const profile = await mkdtemp(path.join(os.tmpdir(), "evals-env-owner-"))
