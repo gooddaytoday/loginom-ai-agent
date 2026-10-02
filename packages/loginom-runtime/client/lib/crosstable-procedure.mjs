@@ -2,6 +2,8 @@ import {resolveCrossTableParameters,CROSSTABLE_FUNCTIONS} from './crosstable-par
 const need=(v,m)=>{if(!v)throw Error('CrossTable: '+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const owner=(a,b)=>['document_id','workflow_id','node_id'].every(k=>a?.[k]===b?.[k]);
+export const crossTableRoleRemovalOrder=fields=>fields.filter(f=>f.disposition>0)
+ .sort((a,b)=>b.disposition-a.disposition||b.order-a.order);
 export function bindCrossTableInput(native,mapping){
  need(native?.verified===true&&native.inventory_complete===true&&mapping?.verified===true&&mapping.inventory_complete===true
   &&mapping.node_context?.input_port?.port===0&&owner(native.node_context,mapping.node_context),'verified input mapping owner required');
@@ -88,7 +90,9 @@ export async function configureCrossTable(channel,p,{inputMapping}){
   await gesture(s,'select supported separator',base+';CrossTabWizard;pedDisplayNameSeparator;ValueControl;boundlist;|');
  }
  // Replace roles completely, then order them after native auto-insertion.
- for(const old of [...baseline.input_fields.filter(f=>f.disposition>0)]){
+ // Native deletion retains the other records' Order. Remove each role from
+ // its tail so the complete inventory remains dense after every gesture.
+ for(const old of crossTableRoleRemovalOrder(baseline.input_fields)){
   s=await select(old.index,'used');const cell=s.ui.elements.find(e=>e.crosstable_field?.record_id===old.record_id&&e.allowed_actions.includes('press'));
   need(cell,'selected used record absent');await channel.perform({condition:'clear prior CrossTable role',initialObservation:s,ready,
    identity:()=>({record_id:old.record_id,index:old.index}),resolve:()=>({verb:'press',ref:cell.ref,key:'Delete'})});

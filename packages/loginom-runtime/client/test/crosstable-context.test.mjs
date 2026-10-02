@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {readCrossTableBrowser,readCrossTableContext} from '../lib/crosstable-context.mjs';
+import {crossTableRoleRemovalOrder} from '../lib/crosstable-procedure.mjs';
 function fixture(){
  const base='MF;TF-1;WizrdMCF;CrossTabWizard;',elements=new Map(),components=new Map();
  const root={checkVisibility:()=>true,contains:()=>true};elements.set(base.slice(0,-1),[root]);
@@ -38,4 +39,19 @@ test('node context is checked on both sides of the native observation',async()=>
  const page={evaluate:async()=>({verified:true})};
  assert.equal((await readCrossTableContext(page,binding,async()=>node,()=>{})).verified,true);
  assert.equal((await readCrossTableContext(page,binding,async()=>++n===1?node:{...node,node_id:'other'},()=>{})).verified,false);
+});
+test('complete replacement keeps native role orders dense when deletion retains other ordinals',()=>{
+ const f=fixture();
+ const extra=structuredClone(f.records[2]);extra.internalId='r3';extra.data.Index=3;extra.data.DisplayName='Quantity';f.records.push(extra);
+ f.records[0].data.Disposition=2;f.records[1].data.Disposition=1;
+ f.records[2].data.Disposition=3;f.records[2].data.Order=0;
+ f.records[3].data.Disposition=3;f.records[3].data.Order=1;
+ const baseline=f.evaluate();assert.equal(baseline.verified,true);
+ // Removing the first fact leaves the remaining fact at Order=1.
+ f.records[2].data.Disposition=0;assert.equal(f.evaluate().reason,'crosstable_role_order');f.records[2].data.Disposition=3;
+ for(const old of crossTableRoleRemovalOrder(baseline.input_fields)){
+  f.records.find(r=>r.internalId===old.record_id).data.Disposition=0;
+  assert.equal(f.evaluate().verified,true);
+ }
+ assert.ok(f.evaluate().input_fields.every(field=>field.disposition===0));
 });
