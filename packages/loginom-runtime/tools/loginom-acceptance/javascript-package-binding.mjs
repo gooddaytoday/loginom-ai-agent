@@ -22,8 +22,13 @@ export function javascriptPackageBindingRequest({prepared, account, savedPath}) 
 }
 
 export function requireJavascriptSavedPackagePath(path) {
+  const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+  // Fixed operator probes and autonomous CLI assignments use different names.
+  // Syntax admits neither ownership nor substitution: the prepared/native
+  // package must still equal the exact path authorized by the writer's Save.
   if (typeof path !== 'string'
-    || !/^\/jsteach\/js-g2-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/JavaScript-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.lgp$/.test(path))
+    || !new RegExp('^/jsteach/(?:js-g2-'+uuid+'/JavaScript-|JavaScript-(?:code|declared)-)'+uuid+'\\.lgp$').test(path)
+    || /[\r\n]/.test(path))
     throw Error('Exact owned saved JavaScript package required');
   return path;
 }

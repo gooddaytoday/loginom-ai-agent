@@ -48,6 +48,14 @@ def cold_launch_inputs(config,profile,evidence,account):
         (('config',config),('assignment',assignment))}
 
 
+def verify_cold_package_path(entry,node,path,environment):
+    """Exercise the frozen reader's own admission without any browser launch."""
+    result=subprocess.run([node['path'],str(entry),'--check-package',path],env=environment,
+        stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=30)
+    if result.returncode!=0 or result.stdout!=b'javascript_cold_package_path_admitted\n':
+        raise ValueError('cli_controller_cold_package_path_preflight')
+
+
 class JavascriptProcessController:
     def __init__(self,process,profile,*,executable,browser,kind,node=None,source_entries=()):
         if kind not in ('cli','cold'):raise ValueError('cli_controller_kind')
@@ -67,6 +75,7 @@ class JavascriptProcessController:
         self.reader_freeze = None
         self.native_watch = None
         self.cold_inputs = None
+        self.failed_cold_launch = None
         self.lease = None
         self.capture = None
         self.collection = None
@@ -305,6 +314,7 @@ class JavascriptProcessController:
         manifest = json.loads((resource/'resource-manifest.json').read_text())
         node = dict(path=str(resource/manifest['node']),sha256=pins['node_sha256'])
         browser = dict(path=str(resource/manifest['browser']),sha256=pins['browser_sha256'])
+        verify_cold_package_path(entry,node,native['package_path'],environment)
         argv = [node['path'],str(entry),'--config',str(config),'--profile',str(profile),
             '--browser',browser['path'],'--evidence',str(evidence),'--package',native['package_path']]
         from javascript_cli_lease import JavascriptAcceptanceLease
@@ -315,7 +325,11 @@ class JavascriptProcessController:
             stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
         try:controller = cls(process,profile,executable=node,browser=browser,kind='cold',node=node,
             source_entries=(('cold_reader',entry),))
-        except Exception:raise JavascriptLaunchUnconfirmed(process) from None
+        except Exception as error:
+            # Retain the original handle on its writer even if a caller's generic
+            # error handler drops the exception. Never retry or kill it here.
+            writer.failed_cold_launch=JavascriptLaunchUnconfirmed(process)
+            raise writer.failed_cold_launch from error
         controller.submitted_at,controller.deadline_at = submitted_at,submitted_at+600000
         controller.candidate = (candidate,copy.deepcopy(pins))
         controller.reader_freeze = copy.deepcopy(reader)

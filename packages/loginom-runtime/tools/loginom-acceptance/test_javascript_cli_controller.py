@@ -7,7 +7,26 @@ import sys
 import tempfile
 import unittest
 from javascript_cli_candidate import file_sha256
-from javascript_cli_controller import JavascriptProcessController,JavascriptLaunchUnconfirmed
+from javascript_cli_controller import JavascriptProcessController,JavascriptLaunchUnconfirmed,verify_cold_package_path
+
+
+@unittest.skipUnless(os.environ.get('LOGINOM_NODE'),'actual pinned Node loader required')
+class JavascriptColdEntryPreflightTests(unittest.TestCase):
+    def test_actual_entry_admits_both_assignments_without_display_or_browser_inputs(self):
+        environment={k:v for k,v in os.environ.items() if k not in ('DISPLAY','WAYLAND_DISPLAY')}
+        entry=Path(__file__).with_name('javascript-persistence-read-live.mjs')
+        node=dict(path=os.environ['LOGINOM_NODE'])
+        for mode in ('code','declared'):
+            path='/jsteach/JavaScript-'+mode+'-8c191b79-42ae-41cd-bc8d-7d4a1736f1d0.lgp'
+            verify_cold_package_path(entry,node,path,environment)
+        for path in ('/other/JavaScript-code-8c191b79-42ae-41cd-bc8d-7d4a1736f1d0.lgp','/jsteach/arbitrary.lgp'):
+            with self.assertRaisesRegex(ValueError,'cold_package_path_preflight'):
+                verify_cold_package_path(entry,node,path,environment)
+        result=subprocess.run([node['path'],str(entry),'--check-package',
+            '/jsteach/JavaScript-code-8c191b79-42ae-41cd-bc8d-7d4a1736f1d0.lgp',
+            '--source','not-admitted'],env=environment,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn(b'Exact package preflight arguments required',result.stderr)
 
 
 @unittest.skipUnless(sys.platform == 'linux','actual Linux /proc and PID-fds required')

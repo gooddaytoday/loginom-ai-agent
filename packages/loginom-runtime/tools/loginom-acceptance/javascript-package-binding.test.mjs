@@ -1,10 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {bindJavascriptPackage, javascriptPackageBindingRequest, observeJavascriptPackageBinding} from './javascript-package-binding.mjs';
+import {bindJavascriptPackage, javascriptPackageBindingRequest, observeJavascriptPackageBinding, requireJavascriptSavedPackagePath} from './javascript-package-binding.mjs';
 import {readJavascriptSavedDirtyState, verifyJavascriptSavedDirtyState} from './javascript-persistence-dirty-state.mjs';
 
 const path = '/jsteach/js-g2-9150c962-ad60-4cd4-a13e-bcba89b982d8/JavaScript-9150c962-ad60-4cd4-a13e-bcba89b982d8.lgp';
+for (const mode of ['code', 'declared']) test('autonomous '+mode+' path retains exact prepared/native binding', async () => {
+  const savedPath = '/jsteach/JavaScript-'+mode+'-8c191b79-42ae-41cd-bc8d-7d4a1736f1d0.lgp';
+  assert.equal(requireJavascriptSavedPackagePath(savedPath), savedPath);
+  const f = fixture();
+  f.prepared.package_ref.path = savedPath;
+  f.packageNode.PackageFileName = savedPath;
+  const owner = await bindJavascriptPackage({page:f.page, prepared:f.prepared, account:'jsteach', savedPath});
+  assert.equal(owner.packageNode, f.packageNode);
+  const request = javascriptPackageBindingRequest({prepared:f.prepared, account:'jsteach', savedPath});
+  f.packageNode.PackageFileName = savedPath.replace('8c191b79', '8c191b78');
+  await assert.rejects(() => f.page.evaluate(observeJavascriptPackageBinding, request), /JavaScript package/);
+  assert.throws(() => javascriptPackageBindingRequest({prepared:f.prepared, account:'jsteach', savedPath:path}), /saved JavaScript package/);
+  for (const invalid of [savedPath+'\n', savedPath+'\r', savedPath+'/..', savedPath.replace('/jsteach/', '/other/'),
+    savedPath.replace('/JavaScript-', '/../JavaScript-'), savedPath.replace(mode, 'foreign'), savedPath.replace('.lgp', '.LGP')])
+    assert.throws(() => requireJavascriptSavedPackagePath(invalid), /saved JavaScript package/);
+});
 export function fixture(saved = true) {
   const document = {};
   const prepared = {status: 'READY', document_id: 'doc', workflow_ref: {workflow_id: 'workflow', prefix: 'MF;TF-1', tab_tid: 'tab'},
