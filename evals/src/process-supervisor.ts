@@ -46,6 +46,10 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
     relevant ||= args.some((arg) => /(?:node-host\.mjs|standalone\.ts|loginom-ai-agent-cli)$/.test(arg))
     const executable = await readlink(path.join(directory, "exe"))
     const info = await stat(path.join(directory, "exe"))
+    const finalRaw = await readFile(path.join(directory, "stat"), "utf8")
+    const final = finalRaw.slice(finalRaw.lastIndexOf(")") + 2).split(" ")
+    if (["Z", "X"].includes(final[0] ?? "")) return undefined
+    if (final[19] !== fields[19]) throw Error("Process birth changed during read")
     return { pid, uid: owner.uid, starttime: fields[19]!, parent: Number(fields[1]),
       group: Number(fields[2]), session: Number(fields[3]), executable, device: info.dev, inode: info.ino,
       name, args,
@@ -206,7 +210,9 @@ export async function superviseProcess(input: {
         if (existing.has(key(entry))) continue
         const data = dataDir(entry)
         if (ledger.has(key(entry))) {
-          if (data ? !bound(entry) : !browserAncestor(entry)) {
+          // Chromium may clear argv while exiting. Birth-bound authority survives
+          // that observation; every signal still rechecks executable/UID/starttime.
+          if (data ? !bound(entry) : !boundBrowsers.has(key(entry)) && !browserAncestor(entry)) {
             denied.add(key(entry)); cleanup.error ??= `Browser binding differs PID ${entry.pid}`
           }
           continue

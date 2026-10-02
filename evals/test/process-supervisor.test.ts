@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { spawn } from "node:child_process"
-import { mkdtemp, readFile, readlink, stat } from "node:fs/promises"
+import { cp, mkdtemp, readFile, readlink, stat } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
 import { agentCommand, runAgent } from "../src/cli"
@@ -66,5 +66,26 @@ test("supervisor: происхождение без точного browser profi
     if (await Bun.file(pidFile).exists()) {
       try { process.kill(Number(await Bun.file(pidFile).text()), "SIGKILL") } catch {}
     }
+  }
+}, 20_000)
+
+test("supervisor: потеря argv не стирает уже доказанную browser birth binding", async () => {
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-browser-lifecycle-"))
+  const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-browser-lifecycle-bundle-"))
+  await cp(Bun.which("node")!, path.join(bundle, "chrome"), { dereference: true })
+  const script = path.join(bundle, "browser.mjs")
+  await Bun.write(script, "process.on('SIGTERM',()=>{}); setTimeout(()=>{process.title=''},400); setInterval(()=>{},1000)")
+  await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
+  const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: out })
+  const pidFile = path.join(out, "browser.pid")
+  try {
+    const run = await runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+      EVAL_FAKE_BROWSER_PID_FILE: pidFile, EVAL_FAKE_BROWSER_SCRIPT: script } },
+      taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: out,
+      outDir: out, profileDir: out, timeoutMs: 30_000 })
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.sessionId).toBe("ses_fixture03")
+  } finally {
+    if (await Bun.file(pidFile).exists()) { try { process.kill(Number(await Bun.file(pidFile).text()), "SIGKILL") } catch {} }
   }
 }, 20_000)
