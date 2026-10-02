@@ -1,9 +1,7 @@
 import path from "node:path"
-import { spawn } from "node:child_process"
-import { rm, writeFile } from "node:fs/promises"
 import type { EvalConfig } from "./config"
 import { evalsRoot, repoRoot } from "./config"
-import { signalGroup, stopGroup } from "./process-group"
+import { superviseProcess } from "./process-supervisor"
 
 const saveActions = new Set(["package.save_as", "package.save_checkpoint"])
 const nodeTools = new Set(["loginom_dock_node_apply", "loginom_dock_node_resume", "loginom_dock_node_wait"])
@@ -149,83 +147,24 @@ export async function runAgent(input: {
     "--",
     input.prompt,
   ]
-  const started = Date.now()
-  if (input.signal?.aborted) {
-    const parsed = parseEvents("")
-    const run = {
-      exitCode: -1,
-      timedOut: false,
-      interrupted: true,
-      startedAt: started,
-      durationMs: Date.now() - started,
-      ...parsed,
-      failureKind: "cancelled" as const,
-      stderrHead: "",
-    }
-    await Bun.write(path.join(input.outDir, "run.json"), JSON.stringify(run, null, 2))
-    return run
-  }
-  const proc = spawn(input.command.cmd[0]!, [...input.command.cmd.slice(1), ...args], {
-    cwd: input.command.cwd,
+  const processRun = await superviseProcess({
+    cmd: [...input.command.cmd, ...args], cwd: input.command.cwd,
     env: { ...input.command.env, EVAL_TASK_ID: input.taskId },
-    detached: true,
-    stdio: ["ignore", "pipe", "pipe"],
+    profileDir: input.profileDir, outDir: input.outDir,
+    timeoutMs: input.timeoutMs, signal: input.signal,
   })
-  const exited = new Promise<number>((resolve, reject) => {
-    proc.once("error", reject)
-    proc.once("exit", (code) => resolve(code ?? -1))
-  })
-  const registered = input.profileDir && proc.pid
-    ? writeFile(`${input.profileDir}.process-group`, String(proc.pid), { flag: "wx", mode: 0o600 }).then(() => `${input.profileDir}.process-group`)
-    : Promise.resolve(undefined)
-  // Host не содержит путь профиля в argv. Его завершение доказываем по группе CLI.
-  const cleaned = Promise.all([exited, registered]).finally(async () => {
-    if (proc.pid) await stopGroup(proc.pid)
-    const marker = await registered.catch(() => undefined)
-    if (marker) await rm(marker, { force: true })
-  })
-  const stop = { timedOut: false, interrupted: false, terminating: false }
-  // SIGINT даёт CLI шанс на штатный cleanup (host, Chromium, .writer); SIGKILL — страховка.
-  const terminate = () => {
-    if (stop.terminating) return
-    stop.terminating = true
-    if (!proc.pid) return
-    signalGroup(proc.pid, "SIGINT")
-    const hard = setTimeout(() => { if (proc.pid) signalGroup(proc.pid, "SIGKILL") }, 30_000)
-    void cleaned.then(() => clearTimeout(hard), () => clearTimeout(hard))
-  }
-  const timer = setTimeout(() => {
-    stop.timedOut = true
-    terminate()
-  }, input.timeoutMs)
-  void exited.then(() => clearTimeout(timer), () => clearTimeout(timer))
-  const onAbort = () => {
-    stop.interrupted = true
-    terminate()
-  }
-  input.signal?.addEventListener("abort", onAbort, { once: true })
-  const captured = await Promise.all([
-    capture(proc.stdout!, path.join(input.outDir, "events.jsonl")),
-    capture(proc.stderr!, path.join(input.outDir, "stderr.txt")),
-    cleaned,
-  ]).catch(async (error: unknown) => {
-    if (proc.pid) await stopGroup(proc.pid)
-    await cleaned.catch(() => undefined)
-    throw error
-  }).finally(() => {
-    clearTimeout(timer)
-    input.signal?.removeEventListener("abort", onAbort)
-  })
-  const [stdout, stderr] = captured
-  const exitCode = proc.exitCode ?? -1
+  const stdout = processRun.stdout
+  const stderr = processRun.stderr
+  const exitCode = processRun.exitCode
   const parsed = parseEvents(stdout)
   const run = {
     exitCode,
-    timedOut: stop.timedOut,
-    interrupted: stop.interrupted,
-    startedAt: started,
-    durationMs: Date.now() - started,
+    timedOut: processRun.timedOut,
+    interrupted: processRun.interrupted,
+    startedAt: processRun.startedAt,
+    durationMs: processRun.durationMs,
     ...parsed,
+    processCleanup: processRun.processCleanup,
     failureKind: failureKind({ exitCode, errors: parsed.errors, errorTexts: parsed.errorTexts, stderr }),
     stderrHead: stderr.split("\n").slice(0, 20).join("\n"),
   }
@@ -233,27 +172,6 @@ export async function runAgent(input: {
   return run
 }
 export type AgentRun = Awaited<ReturnType<typeof runAgent>>
-
-// Пишем поток на диск по мере поступления: после SIGKILL накопленные события не теряются.
-async function capture(stream: AsyncIterable<Uint8Array>, file: string) {
-  const writer = Bun.file(file).writer()
-  const decoder = new TextDecoder()
-  const chunks: string[] = []
-  for await (const chunk of stream) {
-    const text = decoder.decode(chunk, { stream: true })
-    writer.write(text)
-    await writer.flush()
-    chunks.push(text)
-  }
-  const rest = decoder.decode()
-  if (rest) {
-    writer.write(rest)
-    await writer.flush()
-    chunks.push(rest)
-  }
-  await writer.end()
-  return chunks.join("")
-}
 
 function parseJson(text: string): unknown {
   try {

@@ -1,4 +1,5 @@
 import path from "node:path"
+import { spawn } from "node:child_process"
 
 const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
@@ -36,14 +37,16 @@ if (command === "loginom") {
 if (process.env.EVAL_FAKE_SLEEP_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_SLEEP_MS))
 if (process.env.EVAL_FAKE_ORPHAN_PID_FILE) {
   const delayed = process.env.EVAL_FAKE_CHILD_DELAY_MS
-  const child = Bun.spawn([process.execPath, "-e", delayed
+  const child = spawn(process.execPath, ["-e", delayed
     ? `process.on('SIGTERM', () => {}); process.stdout.write('ready'); setTimeout(() => process.exit(0), ${Number(delayed)})`
     : "setInterval(() => {}, 1000)"], {
-    env: { PATH: process.env.PATH ?? "" }, stdin: "ignore", stdout: "pipe", stderr: "ignore",
+    detached: process.env.EVAL_FAKE_DETACHED_CHILD === "1",
+    env: { PATH: process.env.PATH ?? "" }, stdio: ["ignore", "pipe", "ignore"],
   })
-  if (delayed) await child.stdout.getReader().read()
+  if (delayed) await new Promise((resolve) => child.stdout!.once("data", resolve))
   await Bun.write(process.env.EVAL_FAKE_ORPHAN_PID_FILE, String(child.pid))
 }
+if (process.env.EVAL_FAKE_EXIT_DELAY_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_EXIT_DELAY_MS))
 const id = process.env.EVAL_TASK_ID ?? "default"
 const events = Bun.file(path.join(fixtures, `${id}.jsonl`))
 const chosen = (await events.exists()) ? events : Bun.file(path.join(fixtures, "default.jsonl"))
