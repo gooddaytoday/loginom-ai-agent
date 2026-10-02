@@ -56,6 +56,13 @@ whole composition остаются открытыми. [Scope и следующ�
 Native journal/lease/cold collection/whole auditor и actual candidate/live proof
 остаётся выполнить. [Точка продолжения](checkpoint.md#фаза-4-complete-qa-freeze-к-candidate-runtime--2026-10-02).
 
+На **15c0fb4f3c** native artifacts связываются с original observed CLI attempt,
+private metadata/source pins и неизменным append-only journal; cold gate повторяет
+сверку файлов. Production testable URL принят без изменения raw evidence.
+75 source/process tests и provenance5045 PASS; fresh native CLI не запускался.
+Следующий шаг — technical cold capture/campaign lease/whole composition.
+[Границы](checkpoint.md#фаза-4-original-cli-native-artifacts--2026-10-02).
+
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·
 [реестр](../../registry.json) ·

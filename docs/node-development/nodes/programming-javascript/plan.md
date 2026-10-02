@@ -968,6 +968,12 @@ Before/after factory guard реализован; generic reader imports/actual f
 проверяются на fresh candidate после F. До whole composition связать fresh native
 journal/lease orchestration и technical cold collection с original10-minute ceiling.
 [Текущий checkpoint](checkpoint.md#фаза-4-complete-qa-freeze-к-candidate-runtime--2026-10-02).
+Original CLI native artifacts на **15c0fb4f3c** связываются с observed new attempt,
+managed executable/entry/cwd/public prepare, private metadata/source pins и
+append-only journal; before-cold file revalidation сохраняет отказ после изменения.
+75 source/process tests/provenance5045 PASS. Это не fresh CLI/native proof;
+до whole composition остаются technical cold collection и campaign lease.
+[Checkpoint](checkpoint.md#фаза-4-original-cli-native-artifacts--2026-10-02).
 `javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
 он должен связать native проверки с фактическими standalone CLI evidence
 model/input/candidate/Save/cold/cleanup до ready_for_acceptance.

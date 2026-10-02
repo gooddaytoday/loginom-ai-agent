@@ -15,7 +15,9 @@ Close gate; CLI preflight headed наab721a703e. Наc664f40c61 source collector
 собирает filtered/redacted CLI streams и удерживает original deadline failure.
 На17c994f042 полный committed QA freeze связан с runtime candidate; это source/
 filesystem proof, actual generic reader imports/native launch ещё не выполнены.
-Текущий шаг — связать native journal, campaign lease и technical cold collection, завершить whole
+На15c0fb4f3c native artifacts связаны с original observed CLI attempt;
+75 source/process tests PASS, fresh native CLI этим не подтверждён.
+Текущий шаг — связать campaign lease и technical cold collection, завершить whole
 composition, затем same-task F и fresh ordinary
 headed candidate/Sol trials. Общая цель не достигнута и не сужается. На старте
 этого шага child797927 tracked clean, browser/candidate/CLI не запускались,
@@ -25,7 +27,7 @@ OpenViking checks/errors не было. Untracked acceleration-review не вк�
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
 standalone CLI transport/bundle/admission/public-node/Save binding. Child
-**17c994f0427f2ac092e426bd9a38de535f43e21c** tracked clean; registration на161353
+**15c0fb4f3c03f4af5d265153cb43811593fe3d9f** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 первоначальных адресных test methods PASS; усиленная configuration/output
 regression9PASS теперь включает62 non-noop native mutations.
@@ -73,6 +75,39 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: original CLI native artifacts — 2026-10-02
+
+На child **15c0fb4f3c03f4af5d265153cb43811593fe3d9f** `NativeJournalWatch`
+связывает новый managed attempt с наблюдённым own-profile browser, original
+managed Node executable/entry/cwd и первым успешным public prepare. До запуска
+сохраняется inventory attempts; существующий attempt, замена/усечение журнала,
+чужой profile/generation/session, несовпадение source pin или private metadata
+отказывают. Append reads ограничены наблюдённым размером. После original terminal
+process фиксируются inode/bytes/SHA журнала, session metadata и normal
+`saved-package-cleanup.json`; проверяются полный journal, timestamps, pins и
+последний normal cleanup event. Перед cold gate сверяются эти же файлы; отказ
+после изменения остаётся даже после восстановления bytes. Это наблюдаемая
+process/profile/path принадлежность, не доказательство эксклюзивного same-UID writer.
+Close/logout semantics остаются проверкой отдельного normal cleanup auditor.
+
+Исправлен source-backed URL mismatch: production `loginomAddress` добавляет
+`?testable=true`. Аудитор разрешает только точные plain/testable формы заданного
+стенда; raw public/native/SQLite данные и их digests не переписываются.
+Parity tests вызывают реальные production `createRuntimeSourcePin`,
+`loginomAddress` и `createExecutionJournal` под pinned Node24.19.0. Linux fixtures
+запускают только собственные Node-процессы, без настоящего Chromium/CLI/модели.
+
+Final из child `packages/loginom-runtime`: native13, controller15, capture22,
+admission12, delivery13 — **75PASS**, все original final handles actualexit0.
+Ранний fixture timeout исправлен закрытием собственного stdin; failed log сохранён.
+Migration provenance **5045PASS**, diff check PASS. Private receipt
+`f-cli-native-artifacts-validation-v1.json`, SHA256
+**702564b19baefc22b264a8e7ddbb0723069d4243bf74bde816b838f3654c0e26**,
+связывает6 source hashes, original final handles/logs и ошибочные provenance
+invocations до корректного запуска. Browser/candidate/live CLI не запускались;
+lease450 остаётся closed_verified. Следующий шаг — technical cold capture и
+campaign lease/whole composition, затем same-task F и fresh headed candidate/CLI.
 
 ### Фаза 4: complete QA freeze к candidate runtime — 2026-10-02
 

@@ -157,6 +157,15 @@ Source10 Git/filesystem/actual external Node inert-loader tests и15/22 regressi
 timeout прекращает повторные RPC ожидания на следующих строках; hung worker
 отказывает окончательно. До F остаются fresh native journal ownership,
 campaign lease/technical cold collection и whole composition.
+На15c0fb4f3c `NativeJournalWatch` наблюдает новый own managed attempt и append
+journal, связывает его с actual process/profile/public prepare/source metadata.
+После terminal исходного controller фиксирует private normal artifacts
+inode/bytes/SHA, timestamps и последний cleanup event; перед cold повторяет сверку.
+Изменение, alias, old attempt или незавершённый процесс отказывают, отказ sticky.
+Это observed origin binding, без exclusive-writer claim и без Close/logout PASS.
+Production URL разрешён только в точных plain/testable формах, raw data сохранены.
+75 source/process tests/provenance5045 PASS; actual native CLI ещё впереди.
+До F остаются technical cold collection, campaign lease и whole composition.
 CLI Node Host передаёт explicit visibility и в preflightHeadless наab721a703e;
 Desktop direct-host default сохранён, cleanup flag от visibility независим.
 `managed-resources-close.mjs` уже проверяет реальный bridge result перед success

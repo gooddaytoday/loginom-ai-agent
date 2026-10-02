@@ -22,6 +22,12 @@ fixtures, controller15/capture22 PASS; generic cold dependency loading и actual
 factory/native proof ещё не выполнены.
 [Текущий checkpoint](checkpoint.md#фаза-4-filtered-cli-capture-и-original-deadline--2026-10-02).
 
+На15c0fb4f3c original CLI native-artifact ownership/source/append integrity
+проверены75 source/process tests, provenance5045 PASS. Допущены только точные
+plain/testable URL стенда по фактическому production normalizer. Fresh native
+Close/logout/CLI не подтверждены; technical cold collection/lease/whole composition
+остаются открытыми. [Checkpoint](checkpoint.md#фаза-4-original-cli-native-artifacts--2026-10-02).
+
 Исходная сводка обновлена по [acceleration review](acceleration-review.md) на docs
 `13a02e8be2` / code `7b8e19bee0`; позже выполнен B-live на code `f8ceebcac9`.
 Решение 0B доказывает осуществимость/выбирает контракт; последняя колонка
