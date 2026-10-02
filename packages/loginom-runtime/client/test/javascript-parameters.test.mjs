@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 import {javascriptParametersSchema} from '../lib/node-api.mjs';
 import {validateJavascriptParameters} from '../lib/javascript-parameters.mjs';
+import {validateJavascriptDeclaredPrimitiveColumns} from '../lib/javascript-managed-declared.mjs';
+import {compactNodeRequestFailure} from '../lib/user-results.mjs';
 
 const source='import {InputTable, OutputTable} from "builtIn/Data";\nOutputTable.AssignColumns([]);';
-const column={name:'ObservedID',label:'Идентификатор',type:'integer',data_kind:'Дискретный',usage:'Выходное'};
+const column={name:'ObservedID',label:'Идентификатор',type:'integer',data_kind:'Непрерывный',usage:'Выходное'};
 const request=(kind='new')=>({target:{kind},inputs:kind==='new'?[{input:0}]:[],mappings:[],
   finish:'execute',read:{ports:[0]}});
 const checked=(parameters,kind='new')=>{
@@ -18,6 +20,40 @@ test('new code and declared requests pass the same published and local parameter
     {source_text:source,schema_mode:'declared',columns:[column]}])
     assert.equal(checked(parameters),parameters);
   assert.equal(checked({source_text:'',schema_mode:'code'}).source_text,'');
+});
+
+test('published schema, local preflight and actual writer agree on every scalar kind and 64-column bound',()=>{
+  for(const [type,kind] of [['integer','Непрерывный'],['real','Непрерывный'],['datetime','Непрерывный'],
+    ['string','Дискретный'],['boolean','Дискретный']]){
+    const columns=[{...column,type,data_kind:kind}];
+    assert.doesNotThrow(()=>checked({source_text:source,schema_mode:'declared',columns}));
+    assert.doesNotThrow(()=>validateJavascriptDeclaredPrimitiveColumns(columns));
+    for(const data_kind of ['Неопределенное','Непрерывный','Дискретный'].filter(value=>value!==kind)){
+      const parameters={source_text:source,schema_mode:'declared',columns:[{...column,type,data_kind}]};
+      for(const validate of [()=>validateActionParameters(javascriptParametersSchema,parameters),
+        ()=>validateJavascriptParameters(parameters,'script',request())]){
+        assert.throws(validate,error=>{
+          assert.match(error.message,/Invalid parameters.columns\[0\].data_kind:/);
+          assert.ok(error.message.includes(kind));
+          const reply=compactNodeRequestFailure({status:'NOT_APPLIED',effect_possible:false,error:{message:error.message}},
+            {operation_id:'rejected'});
+          assert.equal(reply.error.parameter_path,'columns[0].data_kind');
+          assert.equal(reply.effect_possible,false);
+          return true;
+        });
+      }
+      assert.throws(()=>validateJavascriptDeclaredPrimitiveColumns(parameters.columns));
+    }
+  }
+  for(const count of [64,65]){
+    const columns=Array.from({length:count},(_,index)=>({...column,name:'F'+index}));
+    for(const validate of [()=>validateActionParameters(javascriptParametersSchema,{columns}),
+      ()=>validateJavascriptParameters({source_text:source,schema_mode:'declared',columns},'script',request()),
+      ()=>validateJavascriptDeclaredPrimitiveColumns(columns)]){
+      if(count===64)assert.doesNotThrow(validate);
+      if(count===65)assert.throws(validate);
+    }
+  }
 });
 
 test('existing empty patch preserves source and explicit replacement requires its full-read digest',()=>{
