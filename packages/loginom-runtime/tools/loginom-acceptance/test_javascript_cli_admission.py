@@ -2,6 +2,10 @@
 import copy
 import hashlib
 import json
+import os
+from pathlib import Path
+import subprocess
+import tempfile
 import unittest
 import test_javascript_cli_evidence
 from javascript_cli_admission import host_artifact_name,verify_cli_admission
@@ -19,7 +23,7 @@ class JavascriptAdmissionTests(unittest.TestCase):
             reason=None,session_id='runtime-session',operation_id='prepare',target=copy.deepcopy(self.expected['target']),
             loginom_account='jsteach',document_id='document',workflow_ref=dict(tab_tid='own-tab',prefix='MF;own',workflow_id='workflow',navigation_path=['own']),
             package_ref=dict(persisted=False,path=None),preserved_workflows=[])
-        prefix = hashlib.sha256(json.dumps(['1:own-session','user'],separators=(',',':')).encode()).hexdigest()
+        prefix = hashlib.sha256(json.dumps(['1:f168fb52b5a888ebed5287a9d0c477c655730ec68674d041202f553e38bb6926','user'],separators=(',',':')).encode()).hexdigest()
         artifacts = []
         for index,snapshot in enumerate(self.fixture.projection()['files']):
             name = prefix+'-'+str(index)+'-'+snapshot['filename']
@@ -61,7 +65,7 @@ class JavascriptAdmissionTests(unittest.TestCase):
             self.assertIs(proof[key],False)
 
     def test_host_name_uses_basename_and_utf16_slice_without_python_codepoint_substitution(self):
-        prefix = hashlib.sha256(b'["1:own-session","user"]').hexdigest()+'-0-'
+        prefix = hashlib.sha256(b'["1:f168fb52b5a888ebed5287a9d0c477c655730ec68674d041202f553e38bb6926","user"]').hexdigest()+'-0-'
         self.assertEqual(host_artifact_name(1,'own-session','user',0,'folder\\sales.csv'),prefix+'sales.csv')
         self.assertEqual(host_artifact_name(1,'own-session','user',0,'a'*121),prefix+'a'*120)
         # JS slice(-120) may leave a lone low surrogate at the boundary.
@@ -70,6 +74,34 @@ class JavascriptAdmissionTests(unittest.TestCase):
         for name in ('','..','a/.','a/\x00bad'):
             with self.subTest(name=name):
                 with self.assertRaises(ValueError):host_artifact_name(1,'own-session','user',0,name)
+
+    @unittest.skipUnless(os.environ.get('LOGINOM_BUN'),'pinned Bun for actual TypeScript HostPort required')
+    def test_artifact_identity_matches_actual_host_port_and_input_store(self):
+        root=Path(__file__).resolve().parents[3]/'loginom-host/src'
+        script="""
+import {MessageChannel} from 'node:worker_threads';
+const {loginomHostPort}=await import(process.argv[2]+'/host-port.ts');
+const {inputStore}=await import(process.argv[2]+'/inputs.ts');
+const {transport}=await import(process.argv[2]+'/transport.ts');
+const channel=new MessageChannel();
+function port(raw){return {on(event,listener){raw.on(event,event==='message'?data=>listener({data}):listener)},start(){raw.start()},postMessage(value){raw.postMessage(value)}}}
+const client=transport(port(channel.port2));
+const service={recoveries:new Map(),acquire(){return {generation:7,release(){},holdRecovery(){}}},
+ async retireRuntime(){},resetRestarts(){},journal:{pending(){return []},async settle(){}},
+ async inputs(generation,chat,message,files){return inputStore(process.argv[3]).admit(`${generation}:${chat}`,message,files,'/jsteach')},
+ async runtime(){return {async request(method,input){if(method!=='admit')throw Error('unexpected request');return input.files}}}};
+const close=loginomHostPort(port(channel.port1),service);
+await client.request('acquire',{session:'actual-session',run:'own-run'});
+const result=await client.request('admit',{run:'own-run',userMessage:'actual-message',files:[{name:'sales.csv',data:'eA=='}]});
+console.log(JSON.stringify(result.map(file=>file.name)));
+await client.request('release',{run:'own-run'});client.close();channel.port1.close();channel.port2.close();
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            script_path=Path(directory)/'check.ts';script_path.write_text(script)
+            result=subprocess.run([os.environ['LOGINOM_BUN'],str(script_path),str(root),str(Path(directory)/'inputs')],
+                stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=15)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(json.loads(result.stdout),[host_artifact_name(7,'actual-session','actual-message',0,'sales.csv')])
 
     def test_private_testable_url_form_is_exact_and_never_rewritten(self):
         self.result['loginomUrl']=self.expected['loginom_url']+'?testable=true'
