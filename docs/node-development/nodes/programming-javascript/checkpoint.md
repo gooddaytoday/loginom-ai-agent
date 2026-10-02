@@ -26,6 +26,16 @@ SHA `b404b5ee2afc3809e54a322190007fc6d10a21a725c87ca2b069789faa76fd62`. Wrapper 
 Память плагина OpenViking отдельно не диагностировалась: это ошибка продуктового
 подключения к сервису знаний, не подтверждение сбоя MCP плагина текущего чата.
 
+Повторный bounded preflight следующего Goal-хода (2026-10-02T19:09:10Z)
+через те же immutable Node/SDK: original exec46224, actual wrapper exit0,
+`f-setup-default-transport-recheck-16.json`, SHA
+`cf1a77efce9278dc0aaffb2dc893f9d652feac97dec1bdd5c0b49980de251c09`.
+connected=false/pinned=false, UND_ERR_CONNECT_TIMEOUT к mcp.loginom.ai:443.
+Это второй последовательный ход с тем же blocker после возобновления;
+новый browser/CLI не запущен. Свежий exact-argv scan подтвердил отсутствие
+own profiles Code08/Declared09/readiness01; acceptance slot свободен.
+Отдельные original trial PASS Code07/Declared08 сохранены; общей pair PASS нет.
+
 **Следующий шаг:** после восстановления полного default-transport catalog
 preflight — новая пара10 на тех же candidate11/reader11, новые profiles/paths.
 Не пересобирать продукт без причины. Private pair09 controller использовал
