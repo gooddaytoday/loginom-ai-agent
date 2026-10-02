@@ -2,33 +2,31 @@
 
 ## Текущее состояние
 
-**Работа возобновлена пользователем, 2026-10-02.** Fresh technical J21
-read05 на candidate04/reader04 полностью подтвердил corrected original capture,
-SQLite binding (18 tools), full source32768bytes/1024LF/8chunks, typed6×4,
-Save/Close/logout. Код `29068cc7fd`; первая ошибка read04 сохранена как FAIL.
-Дополнительно исправлены несоответствия native auditor реальному Host:
-SHA256(SessionID) в пути чата и clientRevision в private session metadata,
-а не обязательное поле public knowledge. Код `f5a94febf1`,27 tests PASS.
-Candidate05/reader05 собраны и закреплены; runtime/browser побайтно совпадают
-с candidate04. Technical J21 read06 на candidate05 (exec84698) завершён: collector/SQLite18calls,
-source32768/1024/8chunks и typed6×4 PASS; final Save/Close/logout проверены,
-cleanup digest842425dfccbf12ac7eef82085cd7123b2ffd61be53618742990cb3201c0d5bd7.
-Lease освобождён, original holder exit0, `.writer`/native processes отсутствуют.
-Дополнительная привязка attachment name к hashed Host chat исправлена на861a64e40b:
-13 tests PASS, включая реальный HostPort+inputStore, и actual read05 names совпали.
-Candidate06/reader06 готовы, buildexec67788 exit0 / freeze18990 exit0.
-Сейчас technical J21 read07 на exact candidate06: original exec29412,
-lease `javascript-cli-j21-read-07`; держать до подтверждённого cleanup.
-Private pair controller `f-cli-pair-01.py` запущен только в ready/idle (exec71758),
-writer/browser/lease он ещё не создавал. После cleanup read07 отправить ему
-`{"action":"start","mode":"code"}`; затем независимый source review, audit, cold,
-release, declared, pair. Не терять оригинальные objects Python holder.
-После J21 — подготовленный private `f-cli-pair-01.py` для двух независимых
-автономных Code/declared trials; он ещё не запускался. Source review выполняется
-оператором после model writer и до отдельного cold reader, original objects
-держатся в одном Python holder для pair auditor. Каталог берётся из реально
-закреплённого remote manifest17764f…; обе Save revisions2, не local source catalog1.
-Untracked acceleration-review.md и файлы child worktree не добавлять.
+**Работа возобновлена пользователем, 2026-10-02.** Candidate06/reader06
+(code861a64e40b) immutable, technical J21 read07 завершён: original collector
+exec29412 exit0/PASS, actual SQLite binding18calls PASS, source32768/1024/8chunks
+и typed6×4 PASS, final Save/Close/logout подтверждены. Cleanup digest
+`0d020ac0b0d09c03b062e52aad4391112ae0ed3645a86c69d151ce466bae51da`,
+Save`checkpoint-j21-final`; `.writer`/native processes отсутствовали перед release,
+lease read07 освобождён, original holder завершён exit0.
+
+**Первая автономная попытка Code запущена** через private `f-cli-pair-01.py`,
+original Python holder **exec71758**. В него отправлено
+`{"action":"start","mode":"code"}`; directory `f-cli-autonomous-code-01`.
+Контроллер держит original CLI/capture/NativeJournalWatch и lease
+`javascript-cli-autonomous-code-01`; не завершать holder, не запускать другой
+браузер. Модель получает ровно business task.md + sales.csv из manifest, без
+oracle/готового кода. После writer — независимое чтение `authored-source.js` и
+source-review.json по `review-assignment.json`, затем команды audit/cold/release.
+Далее в том же Python holder declared и pair. Только successful trials повышают
+готовность; восстановление failed run не превращает его в PASS.
+
+Whole audit исправлен на29068cc7fd (original/redacted hashes и JSON blocks),
+f5a94febf1 (actual hashed Host path/private runtime pin),861a64e40b (attachment
+identity через тот же hashed chat). Тесты и live boundary proof ниже.
+Remote pinned catalog17764f…: Save revisions2/2; local source catalog1 не
+использовать как фактический контракт. Untracked acceleration-review.md и
+файлы child worktree не добавлять. Цель активна, автономная пара ещё не завершена.
 
 
 Назначение модели обновлено пользователем 2026-10-02: все будущие автономные
