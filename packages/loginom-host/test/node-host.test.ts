@@ -54,6 +54,28 @@ test("a non-boolean recovery mode is rejected before the host starts", async () 
   ).rejects.toThrow("LOGINOM_HANDSHAKE_INVALID")
 }, 15_000)
 
+test("saved-connection readiness can finish after the former 30s startup deadline", async () => {
+  const entry = join(fixture.directory, "slow-readiness.mjs")
+  await writeFile(
+    entry,
+    `
+    process.on('message', m => {
+      if (m.method === 'start') setTimeout(() => process.send({id:m.id,result:{protocol:1,ready:true,pid:process.pid}}), 31_000);
+      if (m.method === 'close') process.send({id:m.id,result:{closed:true}}, () => process.exit(0));
+    });
+  `,
+  )
+  const host = await launchNodeHost({
+    node: fixture.node,
+    entry,
+    root: fixture.directory,
+    resources: fixture.directory,
+    headless: true,
+  })
+  await host.close()
+  expect(await host.exited).toEqual({ code: 0, signal: null })
+}, 40_000)
+
 test.each(["ack-without-exit", "disconnect-without-exit", "bad-ack"])(
   "host shutdown is bounded and never accepts incomplete cleanup: %s",
   async (mode) => {
