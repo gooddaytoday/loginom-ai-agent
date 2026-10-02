@@ -119,6 +119,40 @@ Private `completion-diagnostics-current-tests-04.log` SHA256
 Сводка10 cases `completion-audit-evidence-04.json` SHA256
 `b624a8feac6f168a46d2e5b5476c3e0b4921cf80778d98400d52acbe953d7080`.
 
+## Done/Close, source и context — 2026-10-02
+
+Сверены16 original independent receipts с текущими raw report/journal bytes,
+наблюдаемым headed/status/cleanup: general configuration2, new Done2,
+context baseline2/reordered2/renamed2, source-policy2, long writer/cold2,
+bound source1 и empty declared source1. Для большинства receipts в checkpoint
+есть полный hash; у renamed v7 прежний receipt hash сокращён, но полные
+report/journal SHA закреплены. В новой ведомости это различие отмечено явно.
+`completion-audit-evidence-05.json` SHA256
+`9208136dfc47f6ce5ae42378821de939ebb23a2ddf611c26220e50c90c3b4c22`.
+
+| Требование | Проверенное содержание original proof | Граница |
+| --- | --- | --- |
+| G2/J14 existing | General Done→Close→NEW preserve Execute обоих modes, source/settings/graph, same-ID zero-event retry, full6×4 | Done: explicit=false/internal=null, not_requested/not_refreshed. Close только свой draft; отсутствие внутреннего Verify не доказано |
+| G2/J14 new | Standalone new Done обоих modes, собственный input0 link/source/settings и последующий preserve Execute/full6×4 | Code v4 auditor усилен после live, declared v4 закреплён до live; история не переписана |
+| G4/J05 | Bound32768bytes/1024LF source и empty declared, полное source-read равенство | Empty source не используется как доказательство fresh бизнес-выхода |
+| G4/G7/J23 | Long public writer Save и path-only cold: exact source/settings, fresh Execute/full6×4 | Отдельные source revisions writer060a/cold6531, не одна подменённая ревизия. Native LGP byte proof этих runs отсутствует |
+| J19 | Current source/ports/mappings, inert label/comment data, reordered input и renamed CustomerNow; default pending refusal→NEW explicit opt-in→correction→fresh result | Fixed operator не доказывает устойчивость автономной модели к инструкциям в данных |
+| J26 | По8 public preflight refusals new/existing, source-bound output reread,3 distinct own executions, no-effect same-ID retry | Saved unsupported source/drift/unknown effects проверялись source tests, не live injection; sandbox не заявляется |
+
+Текущий `javascript-context-read.mjs` прочитан: opt-in строго boolean;
+configured-only output требует отдельного native witness, возвращает
+schema_state=source_pending, configured_inventory_verified=true,
+native_reciprocity_verified=false. Без explicit true действует строгий путь.
+`git diff 9bc52b9468 HEAD` для этого модуля пустой: actual renamed live proofs
+относятся к тем же bytes контекстного reader.
+
+Сравнение JS runtime files между new Done source `fecbc9f44d` и current HEAD
+показало поздние изменения только declared column-types/managed-declared/
+parameters/knowledge. Поэтому old Done proofs сохраняют значение для lifecycle,
+а актуальный declared column contract дополнительно опирается на текущий
+preflight16 и Declared13 candidate/live (см. предыдущие разделы); не заявляется
+свежая проверка всех типов через candidate15.
+
 ## Обязательный остаток аудита
 
 «Проверить» ниже означает оценить сохранённые доказательства и текущий код,
@@ -130,11 +164,11 @@ Private `completion-diagnostics-current-tests-04.log` SHA256
 | --- | --- |
 | 0A, исследование, named artifacts | Источники Help/E2E/reference, Ubuntu memory admission/capture/read-back, assignment/base/toolchain и hashes; без повторного bootstrap/health |
 | G1/J22 | Own identity/editor/navigation/assistant inventory и границы observed absence; new/existing пути |
-| G2/G3/J09/J10/J14 | Переходы Next/Done/Close, materialization, mapping/manual/required/autosync, сохранение свойств и графа; new/existing обоих modes |
+| G2/G3/J09/J10/J14 | Основные Done/Close/new/existing и manual proofs сверены; в итоговой матрице объединить с C/D/CLI и сохранёнными границами смены schema/mapping |
 | G4/J05/J23 | Empty, LF/Unicode/quotes/URL/tabs, exact editor/cold, caps+1, redaction полного source и chunks, owner/cursor/digest и отказ без мутации |
 | G5/J02/J06/J07/J08/J11/J20/J24 | Полный вход, scalar/NULL/Date/safe-int64,0/1/N, freshness/upstream, named access/columns,30 engine observations и все exact knowledge examples; сохранить explicit outside-safe/Date limits |
 | G6/J12/J13/J25 | Основные live paths и текущие адресные guards сверены выше; при итоговом сведении сохранить scope lost-reply и not_observed natural cases, не назначать их автоматически повторно |
-| J19/J26 | Current context и source_pending opt-in без ложного executed output; module policy effective source, source drift и отсутствие sandbox claims |
+| J19/J26 | Context/source-policy proofs сверены выше; сохранить различие fixed operator и actual model resistance, source-only drift guards и отсутствия sandbox claims |
 | J16/J17, фазы4–5 | Independent oracle mutations, смежные node/editor/deny regressions, применимые tests/typechecks/provenance; source changes после F и их адресные проверки |
 | Итоговые документы | Current plan/card/discovery/registry/completion должны различать candidate acceptance и integration/release; основной checkout всё ещё имеет14 handlers |
 

@@ -44,6 +44,15 @@ loss; unknown browser receipt не replay, natural insufficient-primary/Done
 not_observed. Следующий остаток: lifecycle Done/Close, source/context/module,
 engine/named artifacts и итоговое согласование registry/card/discovery.
 
+Completion audit05:16 original lifecycle/context/module/source proofs сверены
+с неизменными raw report/journal и native cleanup. Existing/new Done обоих modes,
+Close/preserve Execute, source_pending explicit opt-in, source-policy/read и
+long-source writer/cold сохранены со своими границами. Context reader bytes
+совпадают с9bc live source; поздние JS изменения после new Done относятся к
+column-types/declared/parameters/knowledge. Следующий шаг — 0A/named artifacts,
+engine/examples, remaining caps/redaction/oracle/regression tests и итоговая
+G/J матрица. Общая Goal ещё не завершена; registry пока без повышения.
+
 ### Предыдущая точка: Code13 выполнялся
 
 **Pair13: Declared13 original whole PASS/released; Code13 выполняется.**
