@@ -930,6 +930,11 @@ Cold source/state/native Execute/full6×4 evidence реализованы на *
 использует явно связанный original process ceiling без synthetic admission.
 Это scoped evidence: writer/authenticated launch/process termination/whole CLI
 ещё не доказаны. [Checkpoint и следующий слой](checkpoint.md#фаза-4-независимые-cold-sourcestateexecutefull-table--2026-10-02).
+Late `dock_node_read` delivery binding реализован на **3b02439bee96**:
+11PASS с actual compact/read-contract producers и SQLite, node17/Save19 regression
+PASS. Его native source/Execute/Table/business6×4/restoration аудит и normal CLI
+package/logout/process cleanup ещё открыты; special `acceptanceCleanupPackage`
+receipt не является обычным CLI контрактом. [Checkpoint](checkpoint.md#фаза-4-late-cli-output-read-delivery-binding--2026-10-02).
 `javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
 он должен связать native проверки с фактическими standalone CLI evidence
 model/input/candidate/Save/cold/cleanup до ready_for_acceptance.

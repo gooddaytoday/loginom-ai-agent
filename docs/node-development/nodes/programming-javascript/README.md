@@ -26,6 +26,10 @@ Fresh CLI Save/cold/cleanup и итоговая CLI-приёмка остают�
 audit прошёл8 tests на закреплённых исторических captures; affected native9 и
 procedure21PASS. [Scope и оставшиеся связи](checkpoint.md#фаза-4-независимые-cold-sourcestateexecutefull-table--2026-10-02).
 Это проверка аудитора, fresh browser/CLI и process cleanup ещё впереди.
+На **3b02439bee96** late model `dock_node_read` public/native/source binding
+прошёл11 tests, node17 и Save19 regression PASS. Native business/read-restoration
+и normal CLI package/logout/process cleanup ещё открыты; special supervised
+cleanup не подставляется вместо обычного CLI. [Checkpoint](checkpoint.md#фаза-4-late-cli-output-read-delivery-binding--2026-10-02).
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·

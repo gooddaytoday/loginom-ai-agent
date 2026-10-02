@@ -5,7 +5,7 @@
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
 standalone CLI transport/bundle/admission/public-node/Save binding. Child
-**e7865eea0cc8043e2d012f009b6f14e17a9cbe2a** tracked clean; registration на161353
+**3b02439bee96037c89760d07f22938f3426f6c89** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 адресных test methods PASS, в том числе48 non-noop native mutations.
 Итоговый `javascript_node_acceptance.py` ещё TO_IMPLEMENT: подготовить связку
@@ -19,6 +19,9 @@ Compact public-node binding дополнительно17PASS на actual runtime
 receipts/defaults и реальной SQLite. Last Save/dirty-state binding дополнительно19PASS;
 cold source/state/Execute/full6×4 отдельно8PASS на immutable captures;
 cleanup и итоговая связка ещё не реализованы, fresh standalone Save не запускался.
+Late model-output-read delivery binding дополнительно11PASS; его native business
+oracle audit ещё открыт. Обычный CLI не принимает `acceptanceCleanupPackage`:
+нужен проверенный собственный teardown без подстановки special acceptance receipt.
 JS general lifecycle-v5/driver/knowledge в product registry только7.4.2/nonempty
 origin, actual bridge redactor. Addressed65, full client3442PASS+10SKIP,
 operator18583PASS, provenance5045 actualexit0. Existing Done/Close447/448 и
@@ -27,7 +30,7 @@ ordinary headed/independent audits/negative/cleanup. Lease450 closed_verified,
 active_exec=null, процессов/browser/tests нет. J02 public input подтверждён.
 После завершения исходников фазы 4 — один **same-task Astra/medium review**,
 затем candidate/J01/J21/J27 и Sol CLI.
-Actual current task model gpt-6.1-sol/high; async запрос переключения этой же
+Последний подтверждённый task model gpt-6.1-sol/high; async запрос переключения этой же
 задачи pending, F review не выполнен. Product release/accepted registry не повышены.
 Natural insufficient-primary/Done errors not_observed — явная граница coverage;
 original J25 requirements сверены, не новый hard gate и не false PASS.
@@ -44,6 +47,42 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: late CLI output-read delivery binding — 2026-10-02
+
+Child **3b02439bee96037c89760d07f22938f3426f6c89** расширяет
+`javascript_cli_nodes.py` явно переданным `source_operation_id`; default apply
+contract остаётся прежним. Проверяются исходный public/native JS Execute,
+предшествующее terminal completion, retained source/schema/verified phase IDs,
+точное compact `dock_node_read` expansion с host-owned600000ms, existing own node,
+новый execution ID, native/public checkpoint/typed-cell equality и delivered
+`output.javascript_source` binding. SAME-ID read redelivery имеет один admission.
+Controller-only read не заменяет model tool delivery. Resume требует отдельного
+reconciliation, business/native execution/format/restoration audit ещё открыт;
+helper выставляет только public binding, whole acceptance false.
+
+11 новых test methods используют настоящие `expandNodeRead`, `buildNodeReadRequest`,
+`compactNodeResult` и физическую SQLite. Проверены defaults/declared, altered
+args/budgets/source/schema/owner/metadata/NULL/type/complete flags, stale/order,
+missing/duplicate receipts. Addressed04 original17685b/terminal46a267 actualexit0,
+11PASS; owning-node17/Save19 regression actualexit0. Из child
+`packages/loginom-runtime`: `LOGINOM_NODE=<pinned Node24.19.0> python3 -m unittest
+discover -s tools/loginom-acceptance -p test_javascript_cli_read_binding.py -v`;
+regressions с patterns `test_javascript_cli_nodes.py` и `test_javascript_cli_persistence.py`,
+для Save задан прежний `LOGINOM_JS_SAVE_CAPTURE` Code Save journal.
+Private receipt `f-javascript-cli-read-binding-validation-v1.json` SHA256
+`c0fa600e4580c8ac347798d229308f500157b7529ccd5aeaec95dc2fdb0992fb`
+содержит source/producers/log hashes и original/terminal actualexit0 всех3 проверок.
+Browser/model/candidate не запускались; новых leases нет.
+
+Сверка cleanup route: canonical `workflow/acceptance-cli.md` прямо исключает
+`acceptanceCleanupPackage` из обычного CLI. `host.ts:launch` его не передаёт;
+`standalone-run.ts` завершает backend/host, а `managed-entry.mjs` отвечает closed
+после закрытия ресурсов. Это не заменяет собственные native package/logout facts.
+`isolated_package_cleanup` специального `supervise(...)` не присваивать normal
+worker. Следующее — independent business/source/native audit позднего read и
+проверенный normal CLI package/logout/process teardown, затем итоговая composition.
+Same-task F, fresh ordinary headed candidate/J01/J21/J27 и два Sol trials впереди.
 
 ### Фаза 4: независимые cold source/state/Execute/full Table — 2026-10-02
 
@@ -83,7 +122,7 @@ Private receipt `f-javascript-cold-evidence-validation-v1.json` SHA256
 фиксирует source/test hashes,8 captures, actual exits и все прежние failed logs.
 Failed01 выявил неверное требование fresh-draft ownership для reopen; failed02 —
 недостаточную отдельную привязку report execution owner к native node, исправленную
-в аудиторe. Failures сохранены, журналы не переписаны.
+в аудиторе. Failures сохранены, журналы не переписаны.
 
 Fresh headed browser/candidate/CLI не запускались. Следующее — normal own
 package/logout/browser/process cleanup binding, поздний model full output-read

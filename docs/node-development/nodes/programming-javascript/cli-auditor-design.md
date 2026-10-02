@@ -85,6 +85,22 @@ retry без повторного native admission. Resume/multiple terminal out
 result может быть прочитан поздним `dock_node_read`; сам default apply preview
 на5 строк не является полным6-row proof и не заменяется controller-only read.
 
+Late output-read binding реализован отдельным явным режимом
+`verify_cli_node_binding(..., source_operation_id=<original JS Execute>)`.
+Он проверяет actual `dock_node_read` compact expansion, retained source/schema/
+verified phase receipts, fresh execution identity и public/native checkpoint
+и cell equality; ordinary apply default остаётся строгим. Для полной бизнес-проверки
+позднего чтения ещё требуются его собственные native source/admission/Execute/Table
+и format restoration/workflow-return receipts с независимым6×4 oracle.
+Controller-only read и совпавшие metadata без этих фактов не дают acceptance PASS.
+
+Обычный standalone CLI не принимает `acceptanceCleanupPackage`, как закреплено
+в [регламенте](../../workflow/acceptance-cli.md). `host.ts` не передаёт этот флаг;
+special supervised technical startup не заменяет normal model run. Штатное
+завершение backend/host/runtime и браузера само не доказывает закрытие пакета
+и Loginom logout. Их собственные native evidence и process termination должны
+иметь отдельный проверенный путь до запуска Sol-приёмки; этот слой пока открыт.
+
 `javascript_cli_persistence.py` реализует только normal-worker last Save/dirty-state
 binding. Выбранный JS Execute должен иметь public/native node binding; финальный Save
 идёт после него по externally allocated own path с pinned action revisions.
