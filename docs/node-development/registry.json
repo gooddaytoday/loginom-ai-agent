@@ -945,6 +945,16 @@
       "source_sha256": "959637abddd0952e3a802894f60826a8d7f2626eab220be7a2c24d6fb80b75a8",
       "provenance_id": "source-9d25d9064b0d",
       "document_adaptation": "Navigation adapted; original checks and runtime pins remain historical."
+    },
+    "javascript-v1-candidate15": {
+      "path": "nodes/programming-javascript/completion.md",
+      "sha256": "99fbcbca49cc4073f8222c081e8f6ccb7a92c5c45b9dea0351017f7023199d6e",
+      "kind": "candidate_acceptance",
+      "availability": "retained_document",
+      "source_commit": "6f6a66eb62c78ab2e8b10cd1bd7f38bcf931d8d6",
+      "runtime": "0.0.0-dev-202610022103",
+      "platform": "Ubuntu x64 / Loginom7.4.2 Linux / headed Chromium",
+      "scope": "Accepted child candidate, original code/declared CLI pair13; not integrated or released. Detailed G/J scope in completion-audit."
     }
   },
   "nodes": [
@@ -4635,10 +4645,12 @@
       "queue_class": "backlog",
       "handler": null,
       "card": "nodes/programming-javascript/README.md",
-      "initial_scope": "Ограниченный детерминированный табличный пример: вход, вычисленные поля, выход и ошибка исполнения.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "initial_scope": "Synchronous builtIn/Data, один input/output0, code/declared, new/existing, exact source/context, Execute/read, Save/cold и guarded normal CLI Close.",
+      "scope_basis": "verified_candidate_v1",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Принят child candidate15; в текущий основной checkout handler ещё не интегрирован.",
+        "Loginom7.4.2/Linux, Ubuntu x64/headed; source32KiB/1024LF, declared64 columns.",
+        "Нет full int64/UTC Date/async/FS/Fetch/external modules/multiports; детали в completion-audit."
       ],
       "prerequisites": [
         "accepted_base",
@@ -4650,14 +4662,13 @@
       "historical_subplan": null,
       "help_reference": {
         "historical_source_path": "data/processors/programming/java-script/README.md",
-        "review_status": "detailed_mode_review_required"
+        "review_status": "reviewed_for_v1_7_4_2_linux"
       },
       "readiness": {
         "implementation": {
-          "status": "not_implemented",
+          "status": "implemented_in_candidate_not_integrated",
           "evidence": [
-            "runtime-registry",
-            "historical-roadmap"
+            "javascript-v1-candidate15"
           ]
         },
         "historical_acceptance": {
@@ -4665,14 +4676,18 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
-          "evidence": [],
-          "standalone_status": "not_revalidated"
+          "status": "candidate_validated",
+          "standalone_status": "accepted_code_and_declared",
+          "evidence": [
+            "javascript-v1-candidate15"
+          ]
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
-          "evidence": [],
-          "historical_scope_preserved": false
+          "status": "accepted_candidate_v1",
+          "evidence": [
+            "javascript-v1-candidate15"
+          ],
+          "historical_scope_preserved": true
         },
         "integration": {
           "status": "not_integrated",
@@ -4683,9 +4698,19 @@
           "evidence": []
         }
       },
-      "next_action": "Завершить live discovery по [подплану JavaScript](nodes/programming-javascript/plan.md) на назначенном стенде, затем реализовать согласованный scope; handler и CLI-приёмка ещё не выполнены.",
+      "next_action": "Отдельно назначить интеграцию принятого child source; повторная разработка/CLI-приёмка и следующий узел автоматически не назначаются.",
       "plan": "nodes/programming-javascript/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "accepted_candidate",
+      "candidate_handler": {
+        "type": "programming.javascript",
+        "modes": [
+          "script"
+        ],
+        "source_commit": "6f6a66eb62c78ab2e8b10cd1bd7f38bcf931d8d6",
+        "manifest_sha256": "93f4ae54483433b6de17b98eca43c885b722cd917eeb4c1e877f32ad9947455b",
+        "status": "accepted_unmerged"
+      },
+      "readiness_scope": "candidate15 in node-javascript; handler/queue_class describe current checkout inventory"
     },
     {
       "component_id": "component.programming.Python",

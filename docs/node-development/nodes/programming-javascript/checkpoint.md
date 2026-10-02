@@ -2,65 +2,23 @@
 
 ## Текущее состояние
 
-**Фаза 6: pair13 PASS; обе попытки и ресурсы завершены — 2026-10-02 21:40 UTC.**
-Code13 прошёл ручную проверку всего исходника, original writer audit и
-independent cold/whole trial. Вместе с Declared13 final pair audit подтверждает
-две независимые normal CLI Sol/low попытки на одних immutable candidate15/reader15.
-[Итог этапа, точные SHA и пределы](completion-phase6.md).
+**План v1 выполнен; candidate15 принят.**
+[Итог](completion.md), [полная G1–G7/J01–J27/фазы0–6 матрица](completion-audit.md),
+[original pair13](completion-phase6.md). Последний source child6f6a66eb62,
+immutable manifest93f4ae54/reader4b2e4bb9. Обе normal CLI Sol6.1/low попытки и
+независимые cold PASS; J21 actual32KiB delivery PASS. Full authored sources
+прочитаны; final pair audit выполнен над original terminal objects до exit holder.
 
-Оба штатных Save/Close/logout и independent cold cleanup подтверждены.
-Original holder901704 сохранил обе terminal trial до pair audit, затем получил
-FIFO exit; процесс отсутствует, FIFO удалён. Общий acceptance lease свободен,
-acceptance.lock отсутствует, оба .writer отсутствуют. Новые браузеры не нужны
-для фиксации этого результата. Прежние failed trials остаются FAIL.
+Completion evidence01–08 дополнительно сверяют текущие файлы/SQLite,
+historical native proofs/oracles/knowledge/memory receipts и происхождение
+исследования. Current addressed tests115+518PASS (не суммировать с прежними
+перекрывающимися suites), provenance5045PASS. Все ограничения явно сохранены.
 
-**Следующий шаг — [аудит завершения](completion-audit.md):** продолжить сверку
-G1–G7, J01–J27, фазы0–6 и named deliverables с текущими исходниками и конкретными
-evidence; затем согласовать plan/discovery/card/registry/completion. Старые
-формулировки «открыто» ниже — исторические срезы, не новое назначение повторов.
-Pair PASS не означает автоматическое закрытие всей матрицы. Goal активна;
-merge/push/integration/release не выполнялись и не назначены этим результатом.
-
-Read-only completion audit01 повторно сверил12 native/cold файлов пары,
-18 actual SQLite tool outputs J21,10 fixtures и неизменный J27 persistence source.
-Actual JS card17510 wire bytes (<20000), knowledge7.4.2/Linux, no truncation.
-Normal CLI last-confirmed-own-Save → guarded native Close/logout source проверен.
-Полный остаток аудита и report SHA — в completion-audit; registry пока не повышен.
-
-Completion audit02: повторно разобраны16 historical public scalar/cardinality
-reports с original oracle и native input payloads; все16 исходных requests
-допущены текущим pure parameter/module preflight. Outside-safe остаётся
-characterization, Date без epoch/timezone. Audit03 сверил8 прежних proofs:
-manual/Required2, freshness4, UI inventory2; original bytes/cleanup согласованы.
-Границы, hashes и оставшиеся проверки — в completion-audit. Это не fresh live
-и не закрытие всей Goal; следующий шаг — remaining lifecycle/diagnostics/
-source/context/module/oracle tests и полнота 0A/named artifacts.
-
-Completion audit04:10 original diagnostics/recovery cases и все10 repaired
-full6×4 outputs повторно сверены по исходным report/journal/oracle/receipt SHA.
-Текущие continuation/Done/error/details/policy guards:115PASS/0FAIL, actual exit0.
-Подтверждены bounded parse/throw/Stop/local cancel/retained-worker caller reply
-loss; unknown browser receipt не replay, natural insufficient-primary/Done
-not_observed. Следующий остаток: lifecycle Done/Close, source/context/module,
-engine/named artifacts и итоговое согласование registry/card/discovery.
-
-Completion audit05:16 original lifecycle/context/module/source proofs сверены
-с неизменными raw report/journal и native cleanup. Existing/new Done обоих modes,
-Close/preserve Execute, source_pending explicit opt-in, source-policy/read и
-long-source writer/cold сохранены со своими границами. Context reader bytes
-совпадают с9bc live source; поздние JS изменения после new Done относятся к
-column-types/declared/parameters/knowledge. Следующий шаг — 0A/named artifacts,
-engine/examples, remaining caps/redaction/oracle/regression tests и итоговая
-G/J матрица. Общая Goal ещё не завершена; registry пока без повышения.
-
-Completion audit06/07:30 engine report hashes и оба неизменных current1.2.0
-knowledge examples сверены; build fence проверен. Reference51570bytes exact,
-16product+19e2e historical source files (7LFS) verified; historical Ubuntu memory
-full-cycle/upgrade receipts прочитаны без routine health. Current source regression
-518PASS/0FAIL/0SKIP, actualexit0; provenance5045PASS. Первый verifier invocation
-без required args exit2 сохранён, исправленный command08 прошёл. Следующий шаг —
-финальная G1–G7/J01–J27 матрица с оставшимися конкретными evidence (J24, empty input,
-oracle negatives), затем согласованная card/registry/discovery/completion.
+Ресурсы приёмки освобождены: acceptance lease=null, acceptance.lock/.writer
+отсутствуют, original holder901704/FIFO завершены. Новых browser runs нет.
+Код не слит в основной checkout, push/release/installed update не выполнялись.
+Следующий этап возможен только по отдельному назначению интеграции. История ниже
+сохранена; старые «следующие шаги» не являются текущим указанием повторять работу.
 
 ### Предыдущая точка: Code13 выполнялся
 

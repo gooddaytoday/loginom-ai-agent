@@ -1,18 +1,20 @@
 # JavaScript
 
-**Автономная CLI-приёмка pair13 — PASS** на candidate15/reader15:
-два режима code/declared, independent cold source/settings/graph/fresh Execute
-и полный результат6×4; штатное закрытие пакетов, logout и завершение процессов.
-[Итог этапа и точные доказательства](completion-phase6.md).
+**Обучение ядра v1 завершено; candidate15 принят.**
+Реализован JS handler code/declared/new/existing и штатное закрытие собственного
+пакета обычным CLI по подтверждённому Save. Две автономные Sol6.1/low попытки
+прошли полный oracle6×4, Save и независимый cold Execute/cleanup.
 
-J21 read09 на этих bytes также PASS: actual CLI/SQLite delivery18 calls,
-полный32KiB исходник в8chunks/1024LF, digest, fresh execution и6×4 cells.
-Прежние cleanup FAIL сохранены; их точная live-причина не доказана.
+[Итог](completion.md) · [матрица G/J и доказательства](completion-audit.md) ·
+[CLI-пара и pins](completion-phase6.md).
 
-Остался **полный аудит завершения плана** и согласование итоговой документации
-и реестра. Все ресурсы pair13 освобождены; original holder завершён после
-final pair audit. Integration, push и release не выполнялись.
-[Текущий checkpoint](checkpoint.md#текущее-состояние).
+Проверено на Loginom7.4.2/Linux, Ubuntu x64, обычный headed Chromium.
+Scope: synchronous builtIn/Data, один input/output0; Date без UTC/epoch и
+Integer без общей гарантии int64. Остальные ограничения — в итоговом аудите.
+
+**Не интегрировано и не выпущено:** код в `node-javascript`, source6f6a66eb62;
+canonical docs в `javascript`. Установленный клиент не заменялся. Все ресурсы
+приёмки освобождены. Дальнейшая интеграция требует отдельного назначения.
 
 Далее сохранены этапы реализации с их исходными границами проверки; для
 продолжения использовать только текущую сводку checkpoint.

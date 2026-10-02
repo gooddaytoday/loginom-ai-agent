@@ -1,7 +1,8 @@
 # JavaScript: аудит завершения плана
 
-Статус: **выполняется**. Этот документ не объявляет завершение Goal или принятие
-всей матрицы по одному CLI PASS. Проверяемый source:
+Статус: **проверки завершены в согласованном scope v1**. Итог опирается на
+матрицу ниже, текущий код, actual candidate CLI и отдельные source/live proofs;
+один CLI PASS не подменяет остальные требования. Проверяемый source:
 `6f6a66eb62c78ab2e8b10cd1bd7f38bcf931d8d6` в `node-javascript`;
 canonical docs — ветка `javascript`. Исходные требования: [plan](plan.md),
 G1–G7, J01–J27, фазы0–6, [постоянные указания](checkpoint.md#указания-пользователя).
@@ -211,26 +212,86 @@ actual exit0. Log08 SHA256
 Первый вызов log07 не содержал обязательных аргументов и завершился exit2 до
 проверки; он сохранён и не считается PASS.
 
-## Обязательный остаток аудита
+## Последние адресные проверки
 
-«Проверить» ниже означает оценить сохранённые доказательства и текущий код,
-а не автоматически заново запустить browser/test. Результаты истории искать
-адресно по J-матрице и checkpoint; повтор нужен только при пробеле или
-изменённом контракте. Не считать все исторические «открыто» актуальными.
+Evidence08:5 fixed AssignColumns cases (control/Cyrillic/space/leading-digit/
+Unicode DisplayName), Code+declared empty-input, исходные logs независимых
+configuration/output auditors. Пустой input в обоих случаях дал0 rows с полной
+output schema. Сверены report/journal/receipt bytes,5 name mappings и48 non-noop
+oracle mutation tests. Старый общий Python discover exit130 не считается PASS.
+`completion-audit-evidence-08.json` SHA256
+`d6d8ac389cfda79ad5b5bb11ea79c203838cb1d933fca1e4cdf11dab9a4b0c26`.
 
-| Группа требований | Что ещё требуется подтвердить в итоговом аудите |
+## Итоговая матрица требований
+
+Статус «подтверждено» относится к первоначальному scope ядра и указанному пути
+доказательства. Candidate CLI проверяет две бизнес-задачи, а не каждую строку
+матрицы; fixed public/source proofs сохраняют свои версии и ограничения.
+Исторические report paths/hashes перечислены в evidence01–08 и checkpoint;
+исполняемые auditors не подменялись model verdict или суммой столбца.
+
+| ID | Итог / доказательство | Граница |
+| --- | --- | --- |
+| J01 | Подтверждено: current knowledge1.2.0, build fence, J21 SQLite18 и pair13 actual delivery | Только7.4.2/Linux; источник reference не равен автоматически прочитанной модели справке |
+| J02 | Подтверждено: C/D independent6×5 до JS, native typed inputs audit02, pair13 input admission/upload/import/output binding | CLI получает только закреплённый CSV; типы не угадываются по preview |
+| J03 | Подтверждено: Code13 original whole/cold/pair PASS | Один вход/output0, synchronous builtIn/Data |
+| J04 | Подтверждено: Declared13 original whole/cold/pair PASS | Current type/kind/64-column contract, schema из мастера |
+| J05 | Подтверждено: empty/bound public source, long writer/cold/J21, current source admission/read tests |32KiB/1024LF; CR/NUL/cap overflow отвергаются, не обрезаются |
+| J06 | Подтверждено: public native-input/typed-output scalar2 modes, private native roundtrip; audit02 | Date civil/milliseconds, без UTC/epoch; не все scalar cases заново выполнены candidate15 |
+| J07 | Подтверждено: safe-range exact; outside-safe characterization и честные ограничения | Нет общей гарантии int64 |
+| J08 | Подтверждено:0/1/N/native cardinality, Code/declared empty input, сохранённая схема | Нет large-table acceptance |
+| J09 | Подтверждено: manual/autosync/Required preservation; неподдержанные schema/mapping изменения явно отвергаются до мутации | Source Required=true/target=false проверен; изменение target Required не входит в разрешённый edit |
+| J10 | Подтверждено: existing edits/context/lifecycle/repair, preserved GUID/graph и candidate J21 existing | Existing {} сохраняет; пустой source — явная замена |
+| J11 | Подтверждено: changed/reordered4 proofs, полные input/output и новые execution IDs | Fixed upstream variants, не произвольное внешнее изменение |
+| J12 | Подтверждено: current preflight guards, Code/declared native parse/throw и repair | Applied source после throw не называется rollback |
+| J13 | Подтверждено: Stop/cancel/retained wait/caller reply loss;115 current tests и original traces | Unknown browser gesture/worker loss fail-closed, cross-process resume отсутствует |
+| J14 | Подтверждено: general existing Done/Close2 и new Done2; same-ID zero events/preserve Execute | Done не обещает fresh output или отсутствия внутреннего Verify |
+| J15 | Подтверждено: оба pair13 Save/path-only cold source/settings/mapping/graph/full result | Сохранён именно последний source; отдельное открытие без ремонта |
+| J16 | Подтверждено: independent configuration/output/native/source/cold audits и non-noop mutations; actual pair composition | Hash/exit0 сами не являются аналитическим oracle; interrupted discover не засчитан |
+| J17 | Подтверждено: current generic UI deny/calculator/product registry/source regressions518PASS | Не повторная аналитическая приёмка всех соседних узлов |
+| J18 | Подтверждено: две independent original Sol6.1/low CLI попытки30min на одном candidate15 | Без technical solution/oracle/model workspace injection; не DEBUG_ONLY |
+| J19 | Подтверждено: current source/technical names/mappings, reordered/renamed proofs, strict default и explicit source_pending opt-in | Fixed data/instruction isolation, не статистическая гарантия сопротивления модели инъекциям |
+| J20 | Подтверждено:30 observations и оба exact текущих knowledge examples + business primitives | Не полный ES/Data API; async declaration не равна async execution support |
+| J21 | Подтверждено: current budget tests и actual candidate15 SQLite18,32KiB/8chunks/full result/no truncation | JS card17510wire<20000; весь response≤46000 и effective Agent limits |
+| J22 | Подтверждено scoped inventory: два openings Code/declared, помощник не вызывался | Наблюдаемые страницы, не global absence/FullType |
+| J23 | Подтверждено: exact editor readback, Unicode/LF/tabs/URL/bound writer/cold/J21 | Cold source прочитан целиком; не hash экранированного XML вместо source |
+| J24 | Подтверждено:5 fixed public AssignColumns actual names/display/schema/readback, current knowledge guidance | Общий normalization/AddColumn/empty/collision не заявлен |
+| J25 | Подтверждено: owned bounded native diagnostics/позиция либо отсутствие, details по политике и cleanup | Natural insufficient-primary/Done not_observed, не новый обязательный gate |
+| J26 | Подтверждено: current parser/effective source guards,8public refusals×2 и source-bound reread | Static Data scope, unsupported modules refusal; не sandbox |
+| J27 | Подтверждено: compiled setup/restart candidate02, unchanged persistence source, actual explicit profiles candidate15 | Не переписана legacy migration; назначенный origin/path сохранён |
+
+| Gate / фаза | Авторитетные подтверждения |
 | --- | --- |
-| 0A, исследование, named artifacts | Reference/source inventory/engine/examples/historical memory cycle проверены выше; при итоговом сведении зафиксировать assignment/base/toolchain и реальные платформенные границы |
-| G1/J22 | Own identity/editor/navigation/assistant inventory и границы observed absence; new/existing пути |
-| G2/G3/J09/J10/J14 | Основные Done/Close/new/existing и manual proofs сверены; в итоговой матрице объединить с C/D/CLI и сохранёнными границами смены schema/mapping |
-| G4/J05/J23 | Empty, LF/Unicode/quotes/URL/tabs, exact editor/cold, caps+1, redaction полного source и chunks, owner/cursor/digest и отказ без мутации |
-| G5/J02/J06/J07/J08/J11/J20/J24 | Полный вход, scalar/NULL/Date/safe-int64,0/1/N, freshness/upstream, named access/columns,30 engine observations и все exact knowledge examples; сохранить explicit outside-safe/Date limits |
-| G6/J12/J13/J25 | Основные live paths и текущие адресные guards сверены выше; при итоговом сведении сохранить scope lost-reply и not_observed natural cases, не назначать их автоматически повторно |
-| J19/J26 | Context/source-policy proofs сверены выше; сохранить различие fixed operator и actual model resistance, source-only drift guards и отсутствия sandbox claims |
-| J16/J17, фазы4–5 | Independent oracle mutations, смежные node/editor/deny regressions, применимые tests/typechecks/provenance; source changes после F и их адресные проверки |
-| Итоговые документы | Current plan/card/discovery/registry/completion должны различать candidate acceptance и integration/release; основной checkout всё ещё имеет14 handlers |
+| G1 /0A–0B | Own native GUID/icon/editor/visible UI/J22, actual7.4.2/Linux; Ubuntu assignment/product base/toolchain, historical memory full-cycle receipts, candidate manifest/freeze/launch guards |
+| G2 | Execution-effects design, owned stage/ACK/settlement tests, general new/existing Done/Close, Stop/cancel, candidate explicit fresh executions; internal effect uncertainty сохранена |
+| G3 | Native source→target→physical mapping witnesses, Code/declared C/D и pair13, manual preservation/refusal, correct native declared types/DefaultUsageType |
+| G4 | Exact managed input/readback/source digests, source-read/redaction/cursor tests, public bounds, independent cold и J21 model delivery |
+| G5 | Pinned scalar/native/civil/int64/cardinality/named oracles и30 engine cases с разделением PASS/characterization/refusal |
+| G6 | Diagnostics/recovery audit04, current115 tests, original Stop/cancel/lost-reply traces, unknown effect fail-closed |
+| G7 | Original latest Save/native dirty guards, long source writer/cold, оба normal CLI path-only cold trials и own cleanup |
+| Фаза1 | Публичные схемы/parameters/module policy/context/source/knowledge, product registration на7.4.2, actual describe/prepare delivery |
+| Фаза2 | Узкий owned editor, exact source/empty/bounds/focus/foreign guards и current source regressions |
+| Фаза3 | General lifecycle/new/existing/mappings/executions/diagnostics/recovery выше; shared runtime, без второго UI interpreter |
+| Фаза4 | Independent oracles/typed fixtures, source/config/output/cold/model/native binding, meaningful negatives, оба original trial objects до final pair |
+| Фаза5 | Same-task F e02e8fd41f; addressed fixes/source tests, immutable candidate15/frozen reader15, current provenance5045; TS typechecks сохранены в owning source validation receipts |
+| Фаза6 | [completion-phase6](completion-phase6.md): обе модели/inputs/source/build/knowledge, all6×4, Save/cold, normal cleanup и final pair PASS |
 
-Registry пока не повышен. До сверки остатка не устанавливать whole accepted
-и не завершать Goal. Расширения раздела «Следующие расширения узла» требуют
-отдельного назначения; TestCafe not_run по принятому плану. Merge/push/release
-не входят в текущую приёмку и не выполнялись.
+## Deliverables и исключения
+
+Исследование процесса/кода/предусловий/Help/E2E — `research.md`,
+`e2e-coverage.md`, `sources.json`, `review-verification.md`; original prompt
+перенесён неизменным в `references/`. Profile/snippets/typed cases/fixtures/oracle,
+execution effects и предметные designs связаны из плана. Адресные tests и
+source provenance проверены; SDK/HttpApi generation не требовалась: соответствующий
+публичный Protocol не менялся. TestCafe not_run — принятое требование, не пробел.
+
+Исходники находятся в child `node-javascript`, docs — `javascript`.
+Product base `a8ad59766dbdb4f2da0b54367a755ce00891dd71` сохранён; завершённый
+rebase/Cursor3f35c5f232 не повторён. Необходимая Ubuntu адаптация и normal CLI
+Close включены в проверенный candidate. Scope expansions требуют отдельного
+назначения. Push/merge/release/установка не являются следствием acceptance.
+
+Финальный комплект должен связать эту матрицу с card/registry/discovery и
+completion. Основной checkout имеет14 зарегистрированных handlers; child
+candidate содержит JavaScript. Поэтому registry сохраняет checkout inventory,
+а candidate acceptance записывается отдельно с source/manifest/evidence.
