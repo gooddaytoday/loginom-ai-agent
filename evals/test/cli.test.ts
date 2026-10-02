@@ -117,6 +117,31 @@ test("runAgent: fake CLI — события на диске, квитанция,
   expect(run.durationMs).toBeGreaterThanOrEqual(0)
 })
 
+test("runAgent: no_artifact закрывает наблюдённого detached потомка и сохраняет исход", async () => {
+  const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-detached-"))
+  const command = fakeCommand()
+  const pidFile = path.join(outDir, "child.pid")
+  try {
+    const run = await runAgent({ command: { ...command, env: { ...command.env,
+      EVAL_FAKE_ORPHAN_PID_FILE: pidFile, EVAL_FAKE_DETACHED_CHILD: "1", EVAL_FAKE_EXIT_DELAY_MS: "600" } },
+      taskId: "default", model: "fake/model", prompt: "test", files: [],
+      workdir: outDir, timeoutMs: 30_000, outDir })
+    const pid = Number(await Bun.file(pidFile).text())
+    const state = (await Bun.$`ps -o stat= -p ${pid}`.quiet().nothrow()).text().trim()
+    expect(run.exitCode).toBe(0)
+    expect(run.sessionId).toBe("ses_fixture03")
+    expect(run.tokens.input).toBe(400)
+    expect(run.saveReceipts).toEqual([])
+    expect(state === "" || state.startsWith("Z")).toBe(true)
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.processCleanup.processes.some((entry) => entry.pid === pid)).toBe(true)
+  } finally {
+    if (await Bun.file(pidFile).exists()) {
+      try { process.kill(Number(await Bun.file(pidFile).text()), "SIGKILL") } catch {}
+    }
+  }
+}, 15_000)
+
 test("runAgent: явно передаёт выбранный reasoning variant", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-variant-"))
   const command = fakeCommand()
