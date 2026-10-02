@@ -20,8 +20,8 @@ function fixture(id='engine-literal-trim'){
 }
 
 test('isolated catalog has immutable-by-copy sources, exact hashes and an independent input-text oracle',()=>{
- assert.equal(new Set(javascriptDiscoveryIds).size,javascriptDiscoveryIds.length);
- for(const id of javascriptDiscoveryIds){
+ assert.equal(new Set(javascriptDiscoveryIds()).size,javascriptDiscoveryIds().length);
+ for(const id of javascriptDiscoveryIds()){
   const p=javascriptDiscoveryProbe(id);
   assert.equal(p.source_sha256,createHash('sha256').update(p.source).digest('hex'));
   assert.equal(p.schema_mode,id.startsWith('p1-business-declared-')||id.startsWith('declared-')?'declared':'code');assert.equal(p.build,'7.4.2');assert.ok(p.schema.every(c=>c.type));
@@ -217,7 +217,7 @@ test('empty input keeps the exact named-access source and has a distinct fixed e
 });
 
 test('fixed declared counterparts keep body, schema and independent values while removing only AssignColumns',()=>{
- for(const id of javascriptDiscoveryIds.filter(id=>id.startsWith('declared-')&&id!=='declared-g5-native-cardinality-empty')){
+ for(const id of javascriptDiscoveryIds().filter(id=>id.startsWith('declared-')&&id!=='declared-g5-native-cardinality-empty')){
   const d=javascriptDiscoveryProbe(id),c=javascriptDiscoveryProbe(id.slice('declared-'.length));
   assert.equal(d.source,c.source.split('\n').filter((_,index)=>index!==1).join('\n'));
   assert.deepEqual(d.schema,c.schema);assert.deepEqual(d.expected,c.expected);
