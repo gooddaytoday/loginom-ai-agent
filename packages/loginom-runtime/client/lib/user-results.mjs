@@ -54,7 +54,7 @@ export function compactNodeResult(result) {
   const outcome = result.outcome, node = outcome?.output, data = node?.output;
   const output = data ? pick(data, ['status', 'evidence_ref', 'execution_id', 'no_output_requested']) : {};
   if (data?.ports) output.ports = data.ports.map(port => {
-    const value = pick(port, ['port', 'port_guid', 'fresh', 'execution_id', 'schema', 'row_count', 'sample', 'sample_rows', 'sample_complete', 'precision', 'table', 'exact_table', 'read_coverage', 'read_consistency', 'cell_precision', 'binding', 'limitations']);
+    const value = pick(port, ['port', 'port_guid', 'fresh', 'execution_id', 'category_fields', 'schema', 'row_count', 'sample', 'sample_rows', 'sample_complete', 'precision', 'table', 'exact_table', 'read_coverage', 'read_consistency', 'cell_precision', 'binding', 'limitations']);
     value.schema = value.schema.map(column => pick(column, ['index', 'name', 'label', 'type', 'data_kind']));
     value.sample = value.sample.map(row => row.map(cell => {
       const compact = pick(cell, ['type', 'value', 'decimal', 'representation', 'display_text', 'precision', 'is_null', 'timezone', 'cell_type', 'native']);
@@ -139,6 +139,11 @@ CSV по умолчанию: UTF-8, запятая, header=names, bom=false, LF,
 автоматически: для неё нужны overwrite=replace и явный destination.
 Построй граф и параметры по заданию. Доступные обработчики и режимы перечислены
 в knowledge.node_types; профиль ограничен Loginom 7.4.2.
+Кросс-таблица (transform.cross_table, pivot) строит строки × категории × агрегаты
+числовых фактов. После смены источника повторно выполняй и читай тот же узел
+через dock_node_read с исходным source_operation_id; Sliding возвращает новую
+схему и актуальное соответствие категории/факта/функции полю. Настройка узла
+для обновления категорий не требуется. Fixed сохраняет начальный состав.
 Все новые числовые показатели отчёта вычисляй в узлах сценария и читай их выход.
 Если показателя нет в выходе, добавь вычисление; не досчитывай средние, суммы или
 проценты в тексте ответа по просмотренной таблице. Округление лишь оформляет результат.
@@ -207,6 +212,6 @@ export function compactKnowledgeBundle(description) {
     version: 'user-v1', session_manifest: description.session_manifest,
     actions: description.actions.map(action => pick(action, ['action_key', 'revision', 'description', 'input_schema', 'effect'])),
     node_types: description.node_types.map(node => pick(node, ['type', 'contract_revision', 'cache_key', 'candidate_node_apply_available',
-      'candidate_apply_tool', 'configuration_handler', 'modes', 'limitations'])),
+      'candidate_apply_tool', 'configuration_handler', 'semantics', 'modes', 'limitations'])),
   };
 }

@@ -133,7 +133,15 @@ const duplicatesConfigurationReadback=object({kind:values('duplicates'),scope:va
  input_mapping:object({port:{type:'integer',const:0},fields:boundedFields(object({name:str,source_name:str}))}),
  output_mapping:object({port:{type:'integer',const:0},fields:boundedFields(object({name:str,label:str,type:str,source_name:str}))}),
  package_persistence_verified:{type:'boolean',const:false}});
-const configurationReadback={anyOf:[exportConfigurationReadback,collapseConfigurationReadback,missingValuesConfigurationReadback,dateTimeConfigurationReadback,replacementConfigurationReadback,importConfigurationReadback,calculatorConfigurationReadback,groupingConfigurationReadback,sortingConfigurationReadback,reformConfigurationReadback,filterConfigurationReadback,joinConfigurationReadback,unionConfigurationReadback,duplicatesConfigurationReadback]};
+const crossTableCategoryField=object({category:nullable(str),category_kind:values('null','other','value'),fact:str,function:values('sum','min','max','avg'),field:str,label:str,type:str});
+const crossTableConfigurationReadback=object({kind:values('crosstable'),scope:values('observed_before_verified_finish'),values_are:values('observed_ui_values'),node:ref,
+ receipt_ids:{...array(str),minItems:5,maxItems:7},mode:values('pivot'),category_mode:values('fixed','sliding'),
+ row_keys:{...array(object({name:str,label:str,type:str,order:integer})),minItems:1,maxItems:128},column:object({name:str,label:str,type:str}),
+ facts:{...array(object({name:str,label:str,type:values('integer','real'),order:integer,functions:{...array(values('sum','min','max','avg')),minItems:1,maxItems:4}})),minItems:1,maxItems:128},
+ options:object({separator:{const:'|'},unique_names:{const:false},limit:{const:0},min_values:{const:0},include_null:bool,include_other:bool}),
+ output_scope:values('not_materialized','observed_after_verified_execution'),execution_id:nullable(str),category_fields:array(crossTableCategoryField),
+ package_persistence_verified:{const:false}});
+const configurationReadback={anyOf:[crossTableConfigurationReadback,exportConfigurationReadback,collapseConfigurationReadback,missingValuesConfigurationReadback,dateTimeConfigurationReadback,replacementConfigurationReadback,importConfigurationReadback,calculatorConfigurationReadback,groupingConfigurationReadback,sortingConfigurationReadback,reformConfigurationReadback,filterConfigurationReadback,joinConfigurationReadback,unionConfigurationReadback,duplicatesConfigurationReadback]};
 export const nodeApplyResultSchema=object({operation_id:str,status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),
  effect_possible:bool,phases:array(receipt),node:nullable(ref),execution,output,
  package_saved:{type:'boolean',const:false},cleanup_complete:bool,warnings:array(str),

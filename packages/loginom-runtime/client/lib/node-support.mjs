@@ -1,3 +1,4 @@
+import {createCrossTableNodeSupport} from './crosstable-node.mjs';
 import {createReplacementNodeSupport} from './replacement-node.mjs';
 import {createDuplicatesNodeSupport} from './duplicates-node.mjs';
 import {createDateTimeNodeSupport} from './date-time-node.mjs';
@@ -18,8 +19,8 @@ import {createNodeReadDrivers} from './node-read-driver.mjs';
 // Candidate implementations share one lifecycle, gate and browser. Dispatch by
 // the already validated request; never infer a handler from the current UI.
 export function createCandidateNodeSupport(config) {
- const exports=createTextExportNodeSupport(config),collapse=createCollapseNodeSupport(config),missingValues=createMissingValuesNodeSupport(config),dateTime=createDateTimeNodeSupport(config),duplicates=createDuplicatesNodeSupport(config),replacement=createReplacementNodeSupport(config),union=createUnionNodeSupport(config),join=createJoinNodeSupport(config),filter=createFilterNodeSupport(config),imports=createTextImportNodeSupport(config),calculator=createCalculatorNodeSupport(config),grouping=createGroupingNodeSupport(config),sorting=createSortingNodeSupport(config),reform=createReformNodeSupport(config);
- const nodeApplyHandlers=new Map([...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers]);
+ const crosstable=createCrossTableNodeSupport(config),exports=createTextExportNodeSupport(config),collapse=createCollapseNodeSupport(config),missingValues=createMissingValuesNodeSupport(config),dateTime=createDateTimeNodeSupport(config),duplicates=createDuplicatesNodeSupport(config),replacement=createReplacementNodeSupport(config),union=createUnionNodeSupport(config),join=createJoinNodeSupport(config),filter=createFilterNodeSupport(config),imports=createTextImportNodeSupport(config),calculator=createCalculatorNodeSupport(config),grouping=createGroupingNodeSupport(config),sorting=createSortingNodeSupport(config),reform=createReformNodeSupport(config);
+ const nodeApplyHandlers=new Map([...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
   if(options.operation.parameters?.mode===NODE_READ_MODE)return createNodeReadDrivers(options,config);
@@ -36,6 +37,7 @@ export function createCandidateNodeSupport(config) {
   if(type==='transform.replace_columns')return replacement.nodeApplyDriverFactory(options);
   if(type==='transform.sorting')return sorting.nodeApplyDriverFactory(options);
   if(type==='transform.group_data')return grouping.nodeApplyDriverFactory(options);
+  if(type==='transform.cross_table')return crosstable.nodeApplyDriverFactory(options);
   if(type==='transform.calculator')return calculator.nodeApplyDriverFactory(options);
   throw Error('No candidate driver for '+type);
  }};

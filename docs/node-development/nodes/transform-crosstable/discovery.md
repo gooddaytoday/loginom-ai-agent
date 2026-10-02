@@ -320,3 +320,5 @@ fixed/sliding с limit=0, min=0, separator=|, UniqueNames=false, без output
 до обработчика. Контракт runtime `transform.cross_table`, mode `pivot`.
 
 Cleanup 1830 в 18:27:05Z: package_closed/logged_out=true, unsaved_changes_discarded=false. Сохранённый исследовательский пакет не изменён.
+
+Дополнительная проверка 1850: native F3 FColumnInfosStore не содержит DataKind, cachedProps пуст. Вид данных подтверждается только полным собственным редактором выходного порта и отрисованной таблицей определений. Cancel неизменённого редактора подтвердил settings_applied=false, но деактивировал тот же upstream port GUID (active true→false). После Cancel тело узла заменяется; повторное связывание с refreshReplacedBody=true восстановило наблюдение. Preflight обязан сохранять этот эффект в журнале и не выдавать отказ как effect_possible=false. Канонический cleanup этой попытки подтвердил закрытие пакета и выход без сброса изменений.
