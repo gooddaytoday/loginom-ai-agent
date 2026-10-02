@@ -122,6 +122,12 @@ def read_cli_session(profile, session_id):
         connection.close()
 
 
+def loginom_runtime_url_matches(actual,expected):
+    # Private loginomAddress adds this one query flag. Keep raw public/native
+    # data intact; no other origin, path, query or userinfo is interchangeable.
+    return expected=='http://logi-test-plan.bg.local/app/' and actual in (expected,expected+'?testable=true')
+
+
 def verify_cli_delivery(events, projection, expected_files, *, submitted_at, deadline_at, directory):
     failures = []
     unique = {}

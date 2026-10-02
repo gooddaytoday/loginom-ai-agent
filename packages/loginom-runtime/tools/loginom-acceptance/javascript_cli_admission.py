@@ -5,7 +5,7 @@ current Host naming contract, not historical Codex/Hermes artifact tickets.
 """
 import hashlib
 import json
-from javascript_cli_evidence import verify_cli_delivery
+from javascript_cli_evidence import loginom_runtime_url_matches,verify_cli_delivery
 from javascript_cli_candidate import hexadecimal
 
 
@@ -47,7 +47,8 @@ def verify_cli_admission(events, projection, expected_files, native_events, expe
         generation = part['state']['metadata']['generation']
         if (type(generation) is not int or generation < 1 or set(args)-{'operation_id','intent','timeout_ms'}
                 or args.get('intent','new_draft') != 'new_draft'
-                or result.get('result_version') != 'user-v1' or result.get('loginomUrl') != expected['loginom_url']
+                or result.get('result_version') != 'user-v1'
+                or not loginom_runtime_url_matches(result.get('loginomUrl'),expected['loginom_url'])
                 or workspace.get('status') != 'READY' or workspace.get('authenticated') is not True
                 or workspace.get('created_draft') is not True or workspace.get('ownership_verified') is not True
                 or workspace.get('target_verified') is not True or workspace.get('reason') is not None

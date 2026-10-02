@@ -39,6 +39,7 @@ class JavascriptProcessController:
         self.result = None
         self.candidate = None
         self.reader_freeze = None
+        self.native_watch = None
         self.launch = {}
         self.verify_executable(process.pid,executable)
         self.sample()
@@ -64,8 +65,10 @@ class JavascriptProcessController:
                 self.verify_executable(row['pid'],self.node)
                 current = linux_process(row['pid'])
                 if current is None or current['start_ticks'] != row['start_ticks']:continue
-                for name in names:self.bindings[(name,row['pid'],row['start_ticks'])] = dict(role=name,**row)
+                cwd=str(Path('/proc',str(row['pid']),'cwd').resolve(strict=True))
+                for name in names:self.bindings[(name,row['pid'],row['start_ticks'])] = dict(role=name,cwd=cwd,**row)
             except (FileNotFoundError,ProcessLookupError):continue
+        if self.native_watch is not None:self.native_watch.sample()
         return copy.deepcopy(members)
 
     def finish(self):
@@ -94,6 +97,7 @@ class JavascriptProcessController:
             processes=process,source_process_bindings=sorted(self.bindings.values(),key=lambda r:(r['role'],r['pid'],r['start_ticks'])),
             native_package_cleanup_verified=False,runtime_ack_verified=False,model_delivery_verified=False,
             cold_persistence_verified=False,cli_acceptance_verified=False)
+        if self.failures and self.native_watch is not None:self.native_watch.close()
         return copy.deepcopy(self.result)
 
     def collect(self,capture,*,cleanup_wait_ms=90000):
@@ -118,6 +122,14 @@ class JavascriptProcessController:
         return RedactedCliCapture(directory,node=self.node,worker=worker,
             redactor=dict(path=str(redactor),sha256=file_sha256(redactor)),
             known_values=known_cli_secrets(self.owner.profile))
+
+    def freeze_native(self,events,expected):
+        if self.kind!='cli' or self.candidate is None or self.native_watch is None:
+            raise ValueError('cli_native_original_factory_required')
+        from javascript_cli_native import managed_runtime_pin
+        candidate,pins=self.candidate
+        if not verify_cli_candidate(candidate,pins)['passed']:raise ValueError('cli_native_candidate_unverified')
+        return self.native_watch.freeze(events,expected,managed_runtime_pin(candidate/'resources/loginom/runtime/client'))
 
     @classmethod
     def launch_cli(cls,candidate,pins,profile,directory,files,prompt,*,environment):
@@ -148,6 +160,8 @@ class JavascriptProcessController:
             '--variant','low','--dir',str(directory),*[part for path in attachments for part in ('--file',str(path))],
             '--',prompt]
         submitted_at = time.time_ns()//1000000
+        from javascript_cli_native import NativeJournalWatch,attempt_directories
+        before=attempt_directories(profile)
         process = subprocess.Popen(argv,cwd=directory,env={**environment,'LOGINOM_AI_AGENT_CLI_PROFILE':str(profile)},
             stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
         try:
@@ -163,6 +177,7 @@ class JavascriptProcessController:
         controller.launch = dict(candidate=str(candidate),profile=str(profile),directory=str(directory),
             files=[dict(name=path.name,bytes=item['bytes'],sha256=item['sha256']) for path,item in zip(attachments,files)],
             prompt_sha256=value_digest(prompt),model='openai/gpt-6-sol',variant='low',headed=True,transport='normal_standalone_run')
+        controller.native_watch=NativeJournalWatch(controller,before)
         return controller
 
     @classmethod
@@ -172,6 +187,12 @@ class JavascriptProcessController:
                 or writer.launch.get('transport') != 'normal_standalone_run'
                 or writer.launch.get('profile') != str(writer.owner.profile)):
             raise ValueError('cli_controller_original_writer_required')
+        if (writer.native_watch is None or writer.native_watch.result is None
+                or not writer.native_watch.result['passed'] or writer.native_watch.sealed is None
+                or not writer.native_watch.revalidate()
+                or value_digest(writer.native_watch.sealed['events'])!=value_digest(cleanup['native_events'])
+                or value_digest(writer.native_watch.sealed['receipt'])!=value_digest(cleanup['receipt'])):
+            raise ValueError('cli_controller_sealed_original_native_artifacts_required')
         projection = read_cli_session(writer.owner.profile,cleanup['expected']['cli_session_id'])
         if value_digest(projection) != value_digest(cleanup['projection']):
             raise ValueError('cli_controller_original_writer_sqlite_required')
