@@ -8,6 +8,8 @@ import { cleanupArtifact, fetchArtifact, listStorage, parseArtifactSource, type 
 import { preflight } from "./preflight"
 import { assertAuth, ensureProfile, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
 import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
+import { archiveDiagnostics } from "./diagnostics"
+import type { ProcessCleanup } from "./process-supervisor"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
 export async function main(argv: string[]) {
@@ -291,18 +293,35 @@ async function prepareProfile(config: EvalConfig, command: AgentCommand) {
   await pruneRuntimeAttempts(config.profileDir)
 }
 
-export async function afterAttempt(config: EvalConfig, command: AgentCommand, result: AttemptResult) {
-  if (result.timed_out || result.interrupted) {
-    if (!(await waitProfileIdle(config.profileDir)))
-      return { stop: `Процессы профиля ${config.profileDir} не завершились за 60 с` }
+export async function afterAttempt(config: EvalConfig, command: AgentCommand, result: AttemptResult, outDir?: string) {
+  const evidence: { processes?: ProcessCleanup; stages: { stage: string; status: string }[] } = { stages: [] }
+  try {
+    if (!outDir) throw Error("Attempt cleanup evidence directory required")
+    evidence.processes = (await Bun.file(path.join(outDir, "cleanup.json")).json()).processes as ProcessCleanup
+    if (evidence.processes?.status !== "confirmed") throw Error(evidence.processes?.error ?? "Process cleanup unconfirmed")
+    evidence.stages.push({ stage: "processes", status: "confirmed" })
+    await archiveDiagnostics(config.profileDir, evidence.processes.runtimeDirectories, outDir,
+      [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""])
+    evidence.stages.push({ stage: "diagnostics", status: "confirmed" })
+    if (!(await waitProfileIdle(config.profileDir, 1_000))) throw Error("Profile still has process owners")
+    const released = await releaseStaleWriter(config.profileDir, evidence.processes.writer)
+    evidence.stages.push({ stage: "writer", status: "confirmed" })
+    const recovery = await recoverIfNeeded(command, 1)
+    result.profile_recovered = released || recovery.recovered
+    evidence.stages.push({ stage: "ready", status: "confirmed" })
+    await pruneRuntimeAttempts(config.profileDir)
+    evidence.stages.push({ stage: "pruning", status: "confirmed" })
+    result.environment_cleanup = { status: "confirmed", evidence: "cleanup.json", error: null }
+    return { recovered: result.profile_recovered }
+  } catch (error) {
+    result.environment_cleanup = { status: "failed", evidence: outDir ? "cleanup.json" : null, error: describe(error) }
+    return { stop: describe(error) }
+  } finally {
+    if (outDir) {
+      await Bun.write(path.join(outDir, "cleanup.json"), JSON.stringify({ ...evidence, result: result.environment_cleanup }, null, 2))
+      await Bun.write(path.join(outDir, "result.json"), JSON.stringify(result, null, 2))
+    }
   }
-  const released = result.exit_code !== 0 || result.timed_out || result.interrupted
-    ? await releaseStaleWriter(config.profileDir)
-    : false
-  const recovery = await recoverIfNeeded(command, 1)
-  result.profile_recovered = released || recovery.recovered
-  await pruneRuntimeAttempts(config.profileDir)
-  return { recovered: result.profile_recovered }
 }
 
 export function installSigint(controller: AbortController) {

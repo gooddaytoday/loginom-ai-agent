@@ -28,7 +28,9 @@ export async function archiveDiagnostics(profile: string, directories: string[],
     try {
       const current = await handle.stat()
       if (current.dev !== info.dev || current.ino !== info.ino) throw Error("Execution journal identity changed")
-      const records: unknown[] = (await handle.readFile("utf8")).split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line))
+      const records: unknown[] = (await handle.readFile("utf8")).split("\n").filter((line) => line.trim()).map((line) => {
+        try { return JSON.parse(line) } catch { throw Error("Invalid execution journal record") }
+      })
       records.forEach((record) => prime(record, known))
       return { source: path.join(relative, "execution-events.jsonl"), records }
     } finally { await handle.close() }

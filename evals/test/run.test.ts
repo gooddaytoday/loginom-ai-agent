@@ -252,19 +252,18 @@ test("runAttempt: стартовый timeout host сохраняется без 
 test("afterAttempt: exit 1 со stale writer восстанавливает профиль до следующей попытки", async () => {
   const profileDir = await mkdtemp(path.join(os.tmpdir(), "evals-stale-"))
   const runDir = await mkdtemp(path.join(os.tmpdir(), "evals-stale-run-"))
-  const config = { ...loadConfig(["--dry-run"], {}), profileDir }
+  const config = { ...loadConfig(["--dry-run"], {}), profileDir, dryRun: false }
   const command = agentCommand(config)
   const [task] = await loadTasks(config.tasksDir, ["group-sum-qty"])
   try {
-    const { result } = await runAttempt({ config, command,
+    const { result } = await runAttempt({ config, command: { ...command, env: { ...command.env, EVAL_FAKE_RUNTIME_EVENTS: JSON.stringify({ phase: "AMBIGUOUS" }) + "\n", EVAL_FAKE_STALE_WRITER: "1" } },
       source: { kind: "dir", dir: "/nonexistent/infra" }, task: { ...task!, id: "host-timeout" },
       attempt: 1, runId: "infra", runDir, signal: new AbortController().signal,
       profileRecovered: false, skipJudge: false })
-    await mkdir(path.join(profileDir, ".writer"))
-    await Bun.write(path.join(profileDir, ".writer", "owner"), "stale")
-    const diagnostic = path.join(profileDir, "loginom", "runtime", "generations", "1", "chats", "old", "attempts", "one", "execution-events.jsonl")
-    await Bun.write(diagnostic, "diagnostic")
-    const recovery = await afterAttempt(config, { ...command, env: { ...command.env, EVAL_FAKE_ENFORCE_WRITER: "1" } }, result)
+    const out = path.join(runDir, "host-timeout/1")
+    const receipt = await Bun.file(path.join(out, "cleanup.json")).json()
+    const diagnostic = path.join(receipt.processes.runtimeDirectories[0], "execution-events.jsonl")
+    const recovery = await afterAttempt(config, { ...command, env: { ...command.env, EVAL_FAKE_ENFORCE_WRITER: "1" } }, result, out)
     expect(recovery).toMatchObject({ recovered: true })
     expect(result.profile_recovered).toBe(true)
     expect(await Bun.file(path.join(profileDir, ".writer", "owner")).exists()).toBe(false)
@@ -273,6 +272,30 @@ test("afterAttempt: exit 1 со stale writer восстанавливает пр
     await rm(profileDir, { recursive: true, force: true })
     await rm(runDir, { recursive: true, force: true })
   }
+})
+
+test("afterAttempt: отказ архива сохраняет no_artifact, journals и recovery acknowledgement", async () => {
+  const runDir = await mkdtemp(path.join(os.tmpdir(), "evals-archive-failure-"))
+  const profileDir = await mkdtemp(path.join(os.tmpdir(), "evals-archive-profile-"))
+  const config = { ...loadConfig(["--dry-run"], {}), profileDir, dryRun: false }
+  const command = agentCommand(config)
+  const state = path.join(profileDir, "state.json")
+  await Bun.write(state, JSON.stringify({ state: "ready", recoveries: ["pending-operation"] }))
+  const task = (await loadTasks(config.tasksDir, ["group-sum-qty"]))[0]!
+  const { result } = await runAttempt({ config,
+    command: { ...command, env: { ...command.env, EVAL_FAKE_RUNTIME_EVENTS: "invalid secret-password journal" } },
+    source: { kind: "dir", dir: path.join(evalsRoot, "fixtures/storage") }, task: { ...task, id: "default" },
+    attempt: 1, runId: "archive-failure", runDir, signal: new AbortController().signal, profileRecovered: false, skipJudge: false })
+  const out = path.join(runDir, "default/1")
+  const receipt = await Bun.file(path.join(out, "cleanup.json")).json()
+  const after = await afterAttempt(config, { ...command, env: { ...command.env, EVAL_FAKE_STATE_FILE: state } }, result, out)
+  expect(after).toHaveProperty("stop")
+  expect(result.status).toBe("no_artifact")
+  expect(result.tokens.input).toBe(400)
+  expect(result.environment_cleanup?.status).toBe("failed")
+  expect(result.environment_cleanup?.error).not.toContain("secret-password")
+  expect((await Bun.file(state).json()).recoveries).toEqual(["pending-operation"])
+  expect(await Bun.file(path.join(receipt.processes.runtimeDirectories[0], "execution-events.jsonl")).exists()).toBe(true)
 })
 
 test("runAttempt: failed cleanup сохраняет исход no_artifact и запрещает продолжение", async () => {
