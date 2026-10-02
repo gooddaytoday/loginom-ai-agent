@@ -2,6 +2,45 @@
 
 ## Текущее состояние
 
+**J21 read08 collector FAIL; live shutdown ещё не исправлен.**
+CLI862330 завершился exit1, original collector отказал clean-exit/profile-guard;
+model-delivery binding и итоговый J21 audit не запускались, PASS не заявлен.
+На candidate14 оба runtime (readiness862357/task862825) прошли resource complete
+и дали closed_ack=true, затем были остановлены supervisor через5s/SIGKILL.
+Это опровергает достаточность d967265b5a для live-причины. Partial-frame unit
+reproduction валидно, но неизвестно, был ли этот механизм в live вообще.
+Native Save`save-js-after-01`/Close/logout SUCCEEDED1→0/no discard:
+`/jsteach/js-g2-543e7601-cfce-47d3-8a52-baf8b2912da3/JavaScript-d2c72707-4659-44c4-adf8-b7551899cae8.lgp`.
+Cleanup SHA `7259388c14163dd3a7038b4f199edb3da3b6d00b620d03326c4739856b8f20bf`,
+collection SHA `5f260f3b4cf8ebcffe8954fe816b90901eae1749d51ef41886705706f64d7bc8`.
+21:02:44.614Z подтверждено отсутствие всех24 original PID/startTicks,
+lease освобождён, lock архивирован, `.writer` сохранён. Original holder862180
+получил exit через собственный FIFO после этих проверок; не реконструировать.
+
+Child **6f6a66eb62** добавляет private terminal-close.jsonl в session directory:
+reply_sending/reply_flushed|failed/disconnect_returned/stop_requested/
+exit_requested|cleanup_rejected/exit_event. Только fixed stages/time,0600,
+ошибки записи не меняют cleanup; нет raw exception/credentials/страниц.
+14 адресных tests/provenance5045 PASS. Существующие startup-less tests не
+воспроизводят live, поэтому свежая диагностика обязательна.
+
+**Следующий шаг:** дождаться build candidate15 (original exec57776,
+version0.0.0-dev-202610022103), затем короткий actual compiled headed
+`loginom status --no-headless --format json` в новом приватном профиле с
+разрешённым connection seed, без модели/пакетных операций. Сохранить original
+process/lease и новые resource/supervisor/terminal records; при необходимости
+наблюдать pending exit непосредственно. Проверить, доходит ли send callback до
+stop/process.exit или блокируется exit listener/Node teardown. Сначала
+локализовать фактическую причину, не увеличивать тайм-ауты без обоснования.
+
+Private `f-cli-pair-13.py` и runtime-pins подготовлены, но НЕ запускались:
+они пока ссылаются наcandidate14/reader14; не запускать после смены candidate
+без новой согласованной заморозки. J21 read08 и обе неуспешные пары immutable.
+Browser/acceptance slot сейчас свободен; текущая активная работа — сборка.
+После подтверждённого fix нужны fresh J21 и whole pair, затем полный completion.
+
+### Предшествующий запуск J21 read08
+
 **Технический J21 read08 запущен — 2026-10-02 20:53 UTC.**
 Candidate14/reader14 immutable, child
 `d967265b5a37f58afe6ee57d4d478113d0928174`; version0.0.0-dev-202610022051.
