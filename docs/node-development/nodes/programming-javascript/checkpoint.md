@@ -2,6 +2,43 @@
 
 ## Текущее состояние
 
+**J21 read09 запущен — 2026-10-02 21:10 UTC.** Две короткие actual
+compiled `loginom status --no-headless --format json` проверки на candidate15
+дали ready/exit0, own headed browser policy и process absence PASS, guard
+отсутствует, leases released. Private readiness-diagnostic02/03, originals
+exec80366/20407; process receipts SHA
+`6c9440a7943c421f6f9cb6cc05b71a1b6c323f43c066f01aba1c820e95d42c14` /
+`23ec545c99b11113804dc5e1f71322d8f736a1608bb066ab8cb39395d301cd2d`.
+Диагностика02 показала reply_flushed→stop→exit_requested→exit_event и actual
+exit0. Это подтверждает короткий readiness путь, не объясняет long-run FAIL.
+
+Candidate15/reader15 immutable, source
+`6f6a66eb62c78ab2e8b10cd1bd7f38bcf931d8d6`, version0.0.0-dev-202610022103.
+Manifest `93f4ae54483433b6de17b98eca43c885b722cd917eeb4c1e877f32ad9947455b`,
+sourceTree `f024604bcb5d78d1e0a7f43e03e907a0a6ec16c3ba06096dec6f98904282d637`,
+reader `4b2e4bb9f9bcc89d181e18bad3df9a7cc298e039297c0dd904d43cf18fbcc5b9`,
+bundle pins `0390878e14b45b020905a41d99ae70b5e25a38879043fb467b708ae2e5aae213`.
+Freeze original exec49211/exit0: candidate5442/QA971, help/оба path preflight PASS.
+
+Технический J21 read09 original holder889029/startTicks22620713, CLI889139,
+ordinary headed, fresh profile, -B; private `f-cli-j21-read-09-control.json`,
+`f-cli-j21-read-09-events.jsonl`. Driver SHA
+`0f685210b7316df1cedba4810402cd1b5f8b4ddffdde1bdc58d5065cd6844074`.
+FIFO `f-cli-j21-read-09-control.fifo` создастся после collection; holder остаётся
+жив до ручной проверки/освобождения lease и команды exit. DEBUG_ONLY full32KiB
+source delivery + saved existing execution, не autonomous.
+
+**Следующий шаг:** наблюдать этот original run. При FAIL сначала новые
+terminal-close/resource-close/supervisor records; при collector PASS выполнить
+`python3 -B f-j21-audit.py f-cli-j21-read-09` из private campaign, проверить
+source32KiB/1024LF/8chunks/digest и all6×4, original SQLite delivery binding,
+native Save/Close/logout, fresh process absence/.writer, затем release.
+После подтверждённого shutdown/J21 — адаптировать незапускавшийся pair13 driver
+к актуальному candidate15/reader15 и выполнить fresh whole pair. J21 read08 и
+прежние failed trials остаются FAIL; никакого accepted/merge/release пока нет.
+
+### Предшествующая диагностика
+
 **J21 read08 collector FAIL; live shutdown ещё не исправлен.**
 CLI862330 завершился exit1, original collector отказал clean-exit/profile-guard;
 model-delivery binding и итоговый J21 audit не запускались, PASS не заявлен.
