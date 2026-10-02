@@ -16,6 +16,7 @@ export async function createLoginomHost(options: {
   codec: CredentialCodec
   environment?: NodeJS.ProcessEnv
   headless?: boolean
+  preflightHeadless?: boolean
   strictRecovery?: boolean
   closeSavedPackageOnShutdown?: boolean
 }) {
@@ -80,7 +81,9 @@ export async function createLoginomHost(options: {
         chat,
         connection,
         validation,
-        headless: validation || options.headless === true,
+        // CLI applies its explicit browser policy to validation too; Desktop
+        // retains quiet validation while Help readiness stays browser-free.
+        headless: validation ? (options.preflightHeadless ?? true) : options.headless === true,
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
         environment,
         endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
