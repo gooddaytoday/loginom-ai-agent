@@ -438,6 +438,9 @@ def verify_javascript_cli_pair(trials):
                 raise ValueError('javascript_acceptance_terminal_result_changed')
             captured_events(trial.writer,trial.capture,trial.reader)
             captured_events(trial.cold,trial.cold_capture,trial.reader)
+            projection=read_cli_session(trial.writer.owner.profile,trial.expected['cli_session_id'])
+            if value_digest(projection)!=value_digest(trial.cleanup['projection']):
+                raise ValueError('javascript_acceptance_terminal_sqlite_projection_changed')
             if not trial.writer.native_watch.revalidate():raise ValueError('javascript_acceptance_terminal_native_changed')
             for record in trial.result['files']:
                 _,current=private_bytes(record['path'])
