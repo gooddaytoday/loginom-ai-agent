@@ -229,5 +229,43 @@
       "Quantity"
     ],
     "schema_status": "awaiting_live_confirmation"
+  },
+  {
+    "file": "fixtures/numeric.csv",
+    "bytes": 190,
+    "sha256": "ee4890db902599283bb352e9fe1f3ad9bfb243c619b4873012e419d3b1a5b8ce",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "live_real_confirmation",
+    "use": "stage0 real stddev divisor; decimal literals are unsuitable for integer parsing"
+  },
+  {
+    "file": "numeric-integer.csv",
+    "bytes": 158,
+    "sha256": "37d23b009a132b9e85b95ae0428cb44b3e05719173e2be9c1711be9eeeff34b1",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "live_integer_confirmation",
+    "use": "stage0 integer aggregate matrix; integer literals, not decimal text"
   }
 ]
