@@ -7,8 +7,10 @@ Close к обычному CLI и продолжить общую цель. Пр�
 last-confirmed-Save shutdown из [дизайна](cli-auditor-design.md#предложение-штатного-cli-package-teardown):
 private host-owned boolean только standalone `run`, путь и Save ID выводит runtime.
 Прежнее ожидание выбора снято этим поручением; повторное согласование не требуется.
-Private routing/normal receipt реализованы и проверены на child49dcfa0d99.
-Текущий шаг — cleanup auditor/composition, затем same-task F и fresh ordinary
+Private routing/normal receipt реализованы на49dcfa0d99; retired failure сохранён
+наff8b2c62a1. Normal cleanup binding наeb051d9b77/948bc6ad8d и Linux process
+observer наec73da6a73 проверены отдельно. Текущий шаг — связать observer с actual
+standalone/cold controller и завершить whole composition, затем same-task F и fresh ordinary
 headed candidate/Sol trials. Общая цель не достигнута и не сужается. На старте
 этого шага child797927 tracked clean, browser/candidate/CLI не запускались,
 lease450 closed_verified, прежние own test handles terminal. Дополнительных
@@ -17,7 +19,7 @@ OpenViking checks/errors не было. Untracked acceleration-review не вк�
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
 standalone CLI transport/bundle/admission/public-node/Save binding. Child
-**49dcfa0d99b773f43d01289801c146d0fb052bf7** tracked clean; registration на161353
+**948bc6ad8d63a027ac87eb251e1ea5ec18ab9ed8** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 первоначальных адресных test methods PASS; усиленная configuration/output
 regression9PASS теперь включает62 non-noop native mutations.
@@ -32,8 +34,8 @@ Compact public-node binding дополнительно17PASS на actual runtime
 receipts/defaults и реальной SQLite. Last Save/dirty-state binding дополнительно19PASS;
 cold source/state/Execute/full6×4 отдельно9PASS на immutable captures,
 включая32KiB/1024LF и3×8 native chunks;
-Normal CLI package/logout source route реализован; fresh native проверка,
-независимый cleanup auditor и итоговая связка ещё открыты.
+Normal CLI package/logout source route и отдельный normal receipt auditor реализованы;
+fresh native/process-controller proof и итоговая связка ещё открыты.
 Resource close ACK исправлен на797927:28 runtime/25 client/3 Host tests PASS;
 fresh standalone Save не запускался.
 Late model-output-read delivery binding дополнительно11PASS; native source/fresh
@@ -64,6 +66,69 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: retained shutdown failure, normal receipt и Linux observer — 2026-10-02
+
+Child **ff8b2c62a1cdfff1b2c215ef631406d38976b57f** сохраняет cleanup failure
+retired runtime и exit без запрошенного close до final Host shutdown в новом
+normal policy. Deleting child/replacement success не стирает прежний refusal;
+CLI guard не освобождается при таком final failure. False/default policy
+сохраняет прежнее advisory поведение. Actual Host/Node IPC7 policy checks +
+existing Host/host-port regression:21PASS actualexit0 (original3ed3b3→fa806f).
+Host typecheck02 actual0 original62d5cc; Agent typecheck03 actual0
+original37f643→fb9e4a. Дополнительно updated mapped bridge/wrapper/support hashes
+с original base/source-map сохранены. Provenance01 actual1 обнаружил единственный
+stale transform `node_procedure_evidence.py` от уже committed e7865eea0c cold
+ceiling, не новую source mutation. Его documented hash/reason обновлены;
+provenance02 actual0/5045 (original924569). Raw неудача сохранена.
+
+**eb051d9b77321c054da432b223c386ef9bd47b19** добавляет
+`javascript_cli_cleanup.verify_cli_package_cleanup`: сам вызывает strict last
+Save binding, требует единственный final normal journal event и точно тот же
+receipt, own session/document/account/path/runtime/catalog/target, SUCCEEDED,
+native Close/logout, counts1→0, no discard, policy/last Save ID. Actual SQLite
+assistant terminal и public tool end/dirty read должны предшествовать Close,
+native timestamps упорядочены. Isolated receipt и unprepared skip refused.
+**948bc6ad8d63a027ac87eb251e1ea5ec18ab9ed8** сохраняет exact integer ms без
+float conversion; required reason:null не заменяется отсутствующим ключом.
+Final13 tests PASS actual0 (originalbfd700), реальные compact Save/advice
+producers и SQLite, native cleanup данные synthetic. Helper явно не сертифицирует
+journal authenticity, process/cold/whole CLI. Это не новая live проверка.
+
+**ec73da6a738a73fe131136f096d7fa1a3990ce2a** добавляет read-only
+`javascript_cli_processes.LinuxProcessOwner` для original controller `Popen`
+со fresh own session (`start_new_session=True`), canonical private profile,
+UID/boot/PID/start ticks. Наблюдает session members и известных descendants
+по `/proc`; finish требует original actual exit0, их отсутствия и removed
+profile guard. Nonterminal/nonzero/forced exit, surviving child, observed session
+escape и retained guard refused. First terminal result immutable, поздний kill
+не повышает failed attempt до PASS. Collector не убивает процессы. Actual Linux
+Popen/PID-fd tests9PASS actual0 (originald84f2d). Fixtures — отдельные Python
+processes, не CLI candidate/Chromium. Unknown descendants, ушедшие из session
+до первого observation, этим не доказаны; runtime ACK/native/candidate/whole CLI
+также не выводятся из process absence. Нужно привязать наблюдение к actual
+standalone/cold launch и всем известным owned browser/runtime identities.
+
+Команды из child runtime: `LOGINOM_NODE=<pinned Node24.19.0> python3 -m unittest
+discover -s tools/loginom-acceptance -p test_javascript_cli_cleanup.py -v` и
+`python3 -m unittest discover -s tools/loginom-acceptance
+-p test_javascript_cli_processes.py -v`. Host: `LOGINOM_AI_AGENT_TEST_NODE=<Node>
+<Bun1.3.14> test test/saved-package-shutdown.test.ts test/host.test.ts
+test/host-port.test.ts`; typechecks тот же Bun в Host/Agent package cwd.
+Provenance из child script/migration: `python3 verify_sources.py --map
+<child>/docs/migration/source-map.json --root <child> --transforms
+<child>/docs/migration/source-transforms.json`.
+Private receipt `f-normal-cli-cleanup-process-validation-v1.json` SHA256
+`4abf17fedc443e00f82d7e2a7497e748d8ff612bfcb9c4297be8796e8b1f9295`
+связывает source commits/files/log hashes/original handles/actual exits.
+Timestamp final receipt v2 SHA256
+`9d91af38c6fc9abcbfc294a137a4881b9c944563ac921da7836a3de40b70fbbd`
+(`f-normal-cli-cleanup-process-validation-v2.json`) ссылается на v1, final source
+и13PASS03. Первые cleanup11/12PASS также сохранены; это не повтор live evidence.
+Все own exec handles terminal. Новый browser/CLI/candidate/lease не запускался;
+lease450 остаётся closed_verified, active_exec=null. Registry14, F/candidate/
+Sol остаются открытыми. Следующий шаг — actual controller process/native closure
+binding и whole `javascript_node_acceptance.py`; затем same-task F по плану.
 
 ### Фаза 4: штатный CLI package shutdown — 2026-10-02
 
@@ -6344,6 +6409,7 @@ child design-файлы оставлены без изменения.
 | Продолжать общую цель, браузер «как обычно» (29.09 07:47) | Текущее постоянное правило: обычный headed без `--x11-no-focus`; поздний флаг оператора сам не меняет поручение |
 | Доработать план по acceleration review (29.09) | Выполнена правка plan/discovery/card и этой сводки; реализация B затем выполнена по отдельному указанию продолжать цель |
 | Уточнение перед B-live (29.09, текущая задача) | `ad92ddbf8c` — канонический план; rebase/клик не повторять, память дополнительно проверять только при ошибке; обычный headed без X11-флага, untracked `acceleration-review.md` не коммитить |
+| Подключить существующий native Close к обычному CLI и продолжить цель (02.10) | Принят private automatic shutdown по last confirmed own Save; source49dcfa/ff8b2, без повторного согласования. Строгие guards сохранены, special acceptance не используется. Fresh live остаётся после completion исходников/аудиторов и same-task F |
 
 Общие правила: стенд только `http://logi-test-plan.bg.local/app/`, Loginom 7.4.2,
 один owner и fresh profile на новый browser process; при ошибке памяти —

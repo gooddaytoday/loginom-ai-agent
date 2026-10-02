@@ -107,7 +107,17 @@ special supervised technical startup не заменяет normal model run. Ш�
 и Loginom logout. Их собственные native evidence и process termination должны
 иметь отдельный проверенный путь до запуска Sol-приёмки. Source route подключён
 на49dcfa0d99 через private normal boolean и отдельный receipt/event; fresh native
-proof, cleanup auditor/process binding остаются открытыми.
+proof и whole controller binding остаются открытыми. `javascript_cli_cleanup.py`
+наeb051/948bc сам сверяет последний own Save и final normal native receipt/event,
+owner/pins/guards и actual SQLite model terminal→dirty/tool/native time order;
+13 tests используют actual compact Save/advice producers/SQLite и synthetic
+close data. Он не выводит process cleanup или whole acceptance из SUCCEEDED.
+`LinuxProcessOwner` наec73da наблюдает original fresh-session Popen и `/proc`
+PID/start/UID/boot, session/known descendants, actual exit0 и guard absence;
+9 actual process tests не являются CLI/browser/candidate evidence. Нужна
+controller binding всех известных own runtime/browser identities; escaped до
+first observation descendants этим observer не подтверждены. Никаких signal/kill
+операций в collector нет, first terminal failure сохраняется.
 `managed-resources-close.mjs` уже проверяет реальный bridge result перед success
 resource ACK; absent/rejected/false result или retained leases не подтверждают
 shutdown. Actual IPC/socket/profile tests не являются native package/logout proof.

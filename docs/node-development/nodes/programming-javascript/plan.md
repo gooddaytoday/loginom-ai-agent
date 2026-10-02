@@ -948,6 +948,11 @@ separate normal receipt; runtime30/Client25/Host13/CLI preflight3 и package typ
 PASS. Это source/IPC проверки; fresh native proof и independent cleanup auditor
 ещё впереди. Special `acceptanceCleanupPackage` receipt не является обычным CLI
 контрактом. [Checkpoint](checkpoint.md#фаза-4-штатный-cli-package-shutdown--2026-10-02).
+Наff8b2 сохранён отказ retired runtime; Host21/typechecks/provenance5045 PASS.
+Normal receipt auditor eb051/948bc —13PASS, Linux original process observer
+ec73da —9PASS. Их scope ограничен binding и фактическими test processes;
+native whole CLI proof и controller composition ещё открыты.
+[Checkpoint](checkpoint.md#фаза-4-retained-shutdown-failure-normal-receipt-и-linux-observer--2026-10-02).
 `javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
 он должен связать native проверки с фактическими standalone CLI evidence
 model/input/candidate/Save/cold/cleanup до ready_for_acceptance.

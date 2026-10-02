@@ -39,6 +39,10 @@ Normal CLI package shutdown подключён на **49dcfa0d99b7**, source/pri
 checks и Host/Agent typecheck PASS; fresh native cleanup и независимый аудитор
 ещё открыты. Special supervised cleanup не подставляется вместо обычного CLI.
 [Checkpoint](checkpoint.md#фаза-4-штатный-cli-package-shutdown--2026-10-02).
+Retired failure сохранён наff8b2; normal receipt binding eb051/948bc (13PASS) и
+Linux Popen/session observer ec73da (9PASS) реализованы с явными scope limits.
+Whole CLI/controller/native fresh evidence пока не подтверждены.
+[Checkpoint](checkpoint.md#фаза-4-retained-shutdown-failure-normal-receipt-и-linux-observer--2026-10-02).
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·

@@ -266,4 +266,8 @@ Normal CLI package shutdown source на49dcfa0d99: native Close/logout по last
 confirmed own Save до browser closure; runtime30/Client25/Host13/actual CLI
 preflight3/typechecks PASS. Fresh Loginom/native cleanup/candidate/model здесь
 не проверены. [Checkpoint](checkpoint.md#фаза-4-штатный-cli-package-shutdown--2026-10-02).
+Наff8b2 normal final shutdown сохраняет retired/unsolicited-exit failures;
+Host21/typechecks/provenance5045 PASS. Normal native receipt audit eb051/948bc
+проверен13 tests, Linux original Popen observer ec73da —9 actual process tests;
+full controller/CLI/candidate proof не заявлен.
 Canonical accepted registry пока14, product branch не merged/released.
