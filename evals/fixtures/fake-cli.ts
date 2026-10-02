@@ -23,7 +23,7 @@ if (command === "run" && process.env.EVAL_FAKE_RUNTIME_EVENTS) {
 if (command === "run" && process.env.EVAL_FAKE_BROWSER_BUNDLE) {
   const directory = path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, "loginom/runtime/generations/1/chats/fake/attempts", crypto.randomUUID())
   await Bun.write(path.join(directory, "execution-events.jsonl"), JSON.stringify({ phase: "AMBIGUOUS" }) + "\n")
-  const child = spawn(path.join(process.env.EVAL_FAKE_BROWSER_BUNDLE, "chrome"), [`--user-data-dir=${directory}/browser-profile`],
+  const child = spawn(path.join(process.env.EVAL_FAKE_BROWSER_BUNDLE, "chrome"), [`--user-data-dir=${process.env.EVAL_FAKE_BROWSER_DATA_DIR ?? `${directory}/browser-profile`}`],
     { detached: true, stdio: "ignore", env: { PATH: process.env.PATH ?? "" } })
   await Bun.write(process.env.EVAL_FAKE_BROWSER_PID_FILE!, String(child.pid))
   await Bun.sleep(900)

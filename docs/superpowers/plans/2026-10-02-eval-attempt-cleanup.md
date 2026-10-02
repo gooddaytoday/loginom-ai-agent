@@ -23,3 +23,21 @@ Goal: сохранить неуспешный исход AMBIGUOUS и допус
 Исходная проверка: 176 eval tests pass, typecheck и diff-check pass.
 Новые native проверки ещё не выполнены. Systemd/cgroup отклонены пользователем
 как новая зависимость; использовать только существующие Linux /proc/PGID.
+
+## Checkpoint 2026-10-02, реализация продолжается
+
+Ветка evals, commits 2a4688485–002aa3c96. Реализованы отдельные cleanup
+счётчики и вывод отчёта, fail-stop конвейер с сохранением измеренного исхода,
+эксклюзивный sibling harness lease, общий agent/management supervisor,
+непрерывная запись CLI capture, проверка PID/starttime перед сигналом,
+writer receipt и очищенный журнал с SHA-256/read-back до acknowledge/prune.
+Проверены реальными дочерними процессами detached descendant, timeout с
+отказом ownership (31 с с сохранением telemetry), подмена writer, неизвестный
+native helper, недоступный посторонний /proc и отказ архива до recovery.
+
+Остаются: усиление native binding/helper ancestry; строго адресный pruning
+архивированных каталогов; все отрицательные lifecycle сценарии, rejudge,
+полная suite и native acceptance. Новый baseline не проводился. Goal active.
+Установленный CLI выбран из текущей конфигурации: 0.1.17-prod,
+openai/gpt-6-sol, variant default, обычный бюджет 900000 мс. Он не менялся.
+Пользовательские system-bugs.md/repository-week.md не включались в коммиты.
