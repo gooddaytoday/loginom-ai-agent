@@ -8,8 +8,9 @@ compiled Host и model delivery J01/J21 проверены в областях, 
 [checkpoint](checkpoint.md#текущее-состояние). Normal CLI Save → own native
 Close/logout подтверждены. Code01 завершился whole-audit FAIL, безопасно закрыт;
 исправления аудитора проверены отдельно и не повышают эту попытку до PASS.
-Идёт новая автономная Code02 в ordinary headed CLI; далее независимые cold и
-declared. Итоговая writer/cold/pair приёмка и accepted registry ещё открыты.
+Code02 в ordinary headed CLI выявил runtime false refusal строки процессов с
+`JavaScript` в подписи; failed trial очищен отдельно, исправление проверяется.
+Далее fresh CLI/cold Code и declared. Итоговая pair и accepted registry открыты.
 
 Далее сохранены этапы реализации с их исходными границами проверки; для
 продолжения использовать только текущую сводку checkpoint.

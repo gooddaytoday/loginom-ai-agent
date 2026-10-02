@@ -38,19 +38,41 @@ holderexec71758 завершён EOF exit0. `retirement.json` сохраняет
 cleanup, не успешную приёмку. Новый прогон — fresh pair02/profile roots,
 новый согласованный candidate/reader; Code01 не восстанавливать до PASS.
 
-**Текущий live holder: exec42006, `f-cli-pair-02.py`.** Candidate07/reader07
-на source`eef529cd2b804c0c3636f97aae1e4dbec2e9e25a`, version0.0.0-dev-202610021654.
-Manifest`fee12749e56fbac5a3253669c91ebefd640e2ae883bedc591605db26645cd575`,
-sourceTree`d1d35a0d0db7088d2ef101b3bae2ad78870f7d1dbd912d774d5fbbd692f58b1f`,
-reader`6cde939edc0483ea850ff03f8b94efe719fe47b7ea87e939e53ee15d2f9e01b4`,
-pinsSHA`5a260e24092ee8892948dc43ce66bf44ecd442381fa77c7c71e2088414c3adec`.
-Buildexec49746 exit0/roundtrip PASS, freezeexec47717:5441candidate files/
-969QAfiles, bundled cold--help exit0. Runtime client4100files byte-identical06;
-J21 read07 сохраняет старую candidate06 scope, не новый live PASS07.
-В holder отправлен start/code для `f-cli-autonomous-code-02`, обычный headed,
-Sol6.1/low/30min/только task+CSV. Не завершать original holder или менять lease
-до подтверждённого собственного cleanup. После writer: full-source review,
-audit, cold, release; затем independent declared и pair в этом же holder.
+**Code02 завершён FAIL и безопасно retired.** Candidate07/reader07 на
+`eef529cd2b804c0c3636f97aae1e4dbec2e9e25a`, manifest
+`fee12749e56fbac5a3253669c91ebefd640e2ae883bedc591605db26645cd575`, reader
+`6cde939edc0483ea850ff03f8b94efe719fe47b7ea87e939e53ee15d2f9e01b4`.
+Buildexec49746 exit0/roundtrip PASS; freezeexec47717:5441candidate/969QAfiles,
+help0. Original writerPID502163/holderexec42006, ordinary headed/sandbox/direct
+proxy подтверждены original process observations; модель не завершила бизнес-задачу.
+
+Native `calculate-sales-js` получил AMBIGUOUS/materialization_execute:
+`Bound process scroll owner unavailable`. Native child3.1/record1349 был
+completed/error=false и owner node752b2c61-509e-4399-8b38-fd224db9dead,
+но строка `Расчёт_продаж_JavaScript` имела allowed_actions=[] при visible/enabled/
+point_observed. `workspace-ui.mjs:dangerous` ошибочно применяет script-token regex
+к caption suffix process data-tid. Скролл не требовался (grid scroll=null), и
+reveal правильно не смог найти scroll owner. Это реальный runtime false refusal,
+не случайный пользовательский клик и не ошибка аудита. Повтор Execute запрещён.
+
+Collector Code02 exit1/FAIL (`original_clean_exit`, retained `.writer`);
+normal cleanupBLOCKED/CLEANUP_OR_OPERATION_UNCONFIRMED, Save отсутствовал.
+Отдельный admin headed recoveryexec69943 закрыл **только Package1/jsteach:4550**
+без сохранения, затем сеанс; Refresh подтвердил отсутствие. Admin logout и
+browser closeexit0. Raw recoverySHA
+`61d5eb6f13263946158144b7ff85ffca886fa5e6121de6a2afd2bcb1da6b9aea`.
+17:07:15Z fresh process absence, lease released/lock archived; `.writer` сохранён,
+профиль не переиспользовать. Holderexec42006 завершён EOF после admin cleanup,
+но до final lease release: первая проверка `/proc` ложно сопоставила собственный
+shell argument. Исправленный scan точных argv подтвердил отсутствие процессов.
+Это retired failure, не нормальный cleanup или PASS. `retirement.json` хранит
+точный порядок; cold/declared не запускались.
+
+Исправление child: узкое исключение только для data suffix native-bound
+process row/expander; name/id/editor/link/secret/owner guards сохранены.
+10 адресных UI tests PASS; полный workspace-ui + process/navigation набор
+exec10535 actualexit0:402/402 PASS, diff-check PASS. Следующий шаг —
+новый candidate08/reader08 и fresh pair03. Candidate07 immutable не менять.
 
 Whole audit исправлен на29068cc7fd (original/redacted hashes и JSON blocks),
 f5a94febf1 (actual hashed Host path/private runtime pin),861a64e40b (attachment
