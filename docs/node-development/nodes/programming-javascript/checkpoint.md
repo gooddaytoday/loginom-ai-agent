@@ -185,7 +185,19 @@ journalSHA`fe9d5617bc5f118a4d2ba3349cdddaf65ad68c08cce02473ad6b1440fa789b73`.
 Child `5a2d960a42` фиксирует canonical cold URL. Actual Code06 native regression +
 existing Code/declared/32KiB cold negatives + whole composition:22tests PASS,
 exec88980 actualexit0 (79.219s). Runtime/handler без изменений. Buildexec58314
-создаёт candidate10; после actual exit/roundtrip и fresh freeze — pair07.
+создал candidate10, actualexit0/roundtrip PASS. Freezeexec48763 actualexit0:
+5441candidate/970QAfiles, help и оба package preflights PASS.
+Source`5a2d960a42a1b375ce8d588e22d945cc2096c02f`, version0.0.0-dev-202610021755;
+manifest`04967df95c2a86119804f35377a913a1a65a40d32aeeb1f3a61359dcb74fa38f`,
+sourceTree`888a5aaebc84bfdccbc0b42c24cd999cedc75c1d5fbd8fdb90bc43680e7e2076`,
+reader10`c0fd3b73f730bb1e1da69f961e23909945647c6dbade3ea3573bef4386a1182f`,
+pinsSHA`822da3eff8c6d6829cf7b5e71a8dd759da628a1d19ffb0c03b5e065e561dd764`,
+archive`0d34a313c1522d57493988248a34acf06c81c43287ad9eeef1937ca7b5907f21`.
+**Текущий original holderexec29365 — private driver `f-cli-pair-07.py`.**
+Fresh Code07 → полный source review → audit → cold → whole PASS → release;
+затем independent declared07 → review/audit/cold/release → pair в том же
+original holder. До подтверждённой очистки holder/lease не закрывать.
+Новые attempts используют candidate10+reader10; старые failures не повышать.
 
 Driver05 preflights operator review до permanent audit. Review timestamps:
 `.isoformat(timespec='milliseconds').replace('+00:00','Z')`; Python `-B` и
