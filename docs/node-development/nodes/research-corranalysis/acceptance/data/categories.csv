@@ -1,0 +1,5 @@
+row_id,category,ordinal,measurement,category_copy,category_reverse
+1,a,1,1,a,c
+2,a,1,2,a,c
+3,b,2,2,b,b
+4,c,3,4,c,a

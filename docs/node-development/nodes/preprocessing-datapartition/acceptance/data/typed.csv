@@ -1,0 +1,5 @@
+RowID,Category,Text,Real,Flag,Date,test_set
+1,?,,1.25,true,2024-01-01,source
+2,NULL,NULL,-2.5,false,2024-01-02,source
+3,,кириллица,?,?,?,source
+4,A,,0,true,2024-01-01,source

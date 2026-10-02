@@ -1,0 +1,285 @@
+{
+  "format": "documentation-planning-v1-proposed",
+  "node": "preprocessing-datapartition",
+  "base_sha": "9b17e7dd947c016395e8e32e439ca775b1cbe780",
+  "status": "OFFLINE_ONLY_NOT_NODE_PASS",
+  "inputs": [
+    {
+      "file": "data/base.csv",
+      "rows": 12,
+      "fields": [
+        "RowID",
+        "Group",
+        "Value"
+      ],
+      "sha256": "10ee55a1b11489d38ac47afa259495153df135459a6b953df4b30d64c4b3e047"
+    },
+    {
+      "file": "data/bias.csv",
+      "rows": 8,
+      "fields": [
+        "RowID",
+        "Category",
+        "Value"
+      ],
+      "sha256": "2ec615462684b974943079180fad3ca81153e95f7cdfcb3930e4752110917822"
+    },
+    {
+      "file": "data/changed.csv",
+      "rows": 12,
+      "fields": [
+        "RowID",
+        "Group",
+        "Value"
+      ],
+      "sha256": "9030084f27bfd76111d8e16c1783365f12cce55a15910a8c431323555fe2163a"
+    },
+    {
+      "file": "data/empty.csv",
+      "rows": 0,
+      "fields": [
+        "RowID",
+        "Group",
+        "Value"
+      ],
+      "sha256": "e76c08a9110272f2b2b24302dfb63739a2b8d0110796546f23d2d48b6e2e84f9"
+    },
+    {
+      "file": "data/schema-added.csv",
+      "rows": 12,
+      "fields": [
+        "RowID",
+        "Group",
+        "Value",
+        "Flag",
+        "Real",
+        "Text"
+      ],
+      "sha256": "b20bbcc7638a2e475862ffae9aa42c5c2422951b362e9509ca82bf71356016e3"
+    },
+    {
+      "file": "data/schema-metadata.csv",
+      "rows": 12,
+      "fields": [
+        "RowID",
+        "Group",
+        "Value"
+      ],
+      "sha256": "10ee55a1b11489d38ac47afa259495153df135459a6b953df4b30d64c4b3e047"
+    },
+    {
+      "file": "data/strata.csv",
+      "rows": 12,
+      "fields": [
+        "RowID",
+        "Group",
+        "Subgroup",
+        "Value"
+      ],
+      "sha256": "f7bbe3cba86db0799daf2b7f1d6e611f385721e3efd5ea2a347836345c2ad7f8"
+    },
+    {
+      "file": "data/tiny.csv",
+      "rows": 1,
+      "fields": [
+        "RowID",
+        "Group",
+        "Value"
+      ],
+      "sha256": "2a5f6fd9eb33aa017b4eac5708969dd1301db5a940fdbb6ad4ee570c8e8f0580"
+    },
+    {
+      "file": "data/typed.csv",
+      "rows": 4,
+      "fields": [
+        "RowID",
+        "Category",
+        "Text",
+        "Real",
+        "Flag",
+        "Date",
+        "test_set"
+      ],
+      "sha256": "bbf7a9477de72c814dd75d7033270c019b903cb4c194df79c988fbfa9945c0f5"
+    },
+    {
+      "file": "data/uneven.csv",
+      "rows": 7,
+      "fields": [
+        "RowID",
+        "Group",
+        "Value"
+      ],
+      "sha256": "0ef0b8791a470e0b37d937cf8c3c7e19b23a70e88298e47aa5eaf7ac73edb56d"
+    }
+  ],
+  "fixed_counts": {
+    "six_three": {
+      "training": 6,
+      "test": 3,
+      "combined": 9
+    },
+    "percent_50_25_n12": {
+      "training": 6,
+      "test": 3,
+      "combined": 9
+    },
+    "nine_nine_training_priority": {
+      "training": 9,
+      "test": 3
+    },
+    "nine_nine_test_priority": {
+      "training": 3,
+      "test": 9
+    }
+  },
+  "test_position_n12_test3": {
+    "start": [
+      "1",
+      "2",
+      "3"
+    ],
+    "end": [
+      "10",
+      "11",
+      "12"
+    ]
+  },
+  "source_strata": {
+    "Group": [
+      {
+        "key": [
+          "A"
+        ],
+        "count": 5
+      },
+      {
+        "key": [
+          "B"
+        ],
+        "count": 3
+      },
+      {
+        "key": [
+          "C"
+        ],
+        "count": 2
+      },
+      {
+        "key": [
+          null
+        ],
+        "count": 1
+      },
+      {
+        "key": [
+          "NULL"
+        ],
+        "count": 1
+      }
+    ],
+    "Group_Subgroup": [
+      {
+        "key": [
+          "A",
+          "X"
+        ],
+        "count": 3
+      },
+      {
+        "key": [
+          "A",
+          "Y"
+        ],
+        "count": 2
+      },
+      {
+        "key": [
+          "B",
+          "Y"
+        ],
+        "count": 2
+      },
+      {
+        "key": [
+          "B",
+          "X"
+        ],
+        "count": 1
+      },
+      {
+        "key": [
+          "C",
+          "X"
+        ],
+        "count": 1
+      },
+      {
+        "key": [
+          "C",
+          "Y"
+        ],
+        "count": 1
+      },
+      {
+        "key": [
+          null,
+          "X"
+        ],
+        "count": 1
+      },
+      {
+        "key": [
+          "NULL",
+          "Y"
+        ],
+        "count": 1
+      }
+    ]
+  },
+  "bias_replication_hypothesis": {
+    "source": [
+      {
+        "key": [
+          "A"
+        ],
+        "count": 4
+      },
+      {
+        "key": [
+          "B"
+        ],
+        "count": 2
+      },
+      {
+        "key": [
+          null
+        ],
+        "count": 2
+      }
+    ],
+    "factor_two_A": {
+      "A": 8,
+      "B": 2,
+      "typed_null": 2
+    }
+  },
+  "sequential_block_hypothesis": {
+    "take2_skip1_ids_n12": [
+      "1",
+      "2",
+      "4",
+      "5",
+      "7",
+      "8",
+      "10",
+      "11"
+    ]
+  },
+  "row_policy": "exact payload per occurrence; selection IDs of random methods are not invented",
+  "rounding_hypotheses_n7_25percent": {
+    "floor": 1,
+    "nearest": 2,
+    "ceil": 2
+  }
+}

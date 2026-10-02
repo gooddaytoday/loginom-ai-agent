@@ -1,0 +1,514 @@
+{
+  "format": "documentation-planning-v1-proposed",
+  "node": "preprocessing-elimoutlier",
+  "base_sha": "9b17e7dd947c016395e8e32e439ca775b1cbe780",
+  "status": "OFFLINE_ONLY_NOT_NODE_PASS",
+  "inputs": [
+    {
+      "file": "data/all-null.csv",
+      "rows": 3,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "f26ea7fda358a62f2c5d2c3f0bb63295bb138898c1fcf93276ca06d7aa0b23b2"
+    },
+    {
+      "file": "data/boundary-sd.csv",
+      "rows": 4,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "0f7ec7c0c8f47fc88caa7c9679919528f25a12f6641e43be2756a0d69777093d"
+    },
+    {
+      "file": "data/boundary.csv",
+      "rows": 32,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "b24a0d7ac05fabeb2232914f4714899bfba762e81b7020fe3145edb8708fbcad"
+    },
+    {
+      "file": "data/constant.csv",
+      "rows": 5,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "88333445eece15d1e859e22f6aa42e108b94d60305d584a7dd9e1aa4f16940da"
+    },
+    {
+      "file": "data/denominator.csv",
+      "rows": 4,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "e7c1e85636018dcd897e8eaa659e1b58c8407899316fe65efeea340b1dfacf5c"
+    },
+    {
+      "file": "data/empty.csv",
+      "rows": 0,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "c4b891cf266a44227d1016ff1d674c48d9973ddf24a6dbbd9b2836f4fc617072"
+    },
+    {
+      "file": "data/iqr-symmetric.csv",
+      "rows": 32,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "ed64e33f1dee74dd2c6f36c56f822cc467b2ec881059c3e481626a47a6feb001"
+    },
+    {
+      "file": "data/most-likely-bin.csv",
+      "rows": 11,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "186fc25e005551fb16e5c1d67660119cd796ea60dce2424775dcd60e7a34c6bb"
+    },
+    {
+      "file": "data/most-likely-equal-bins.csv",
+      "rows": 9,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "dd258753e2ee3eb932736931086ece2e95e73a0d47d37d07511ce736b8b1952f"
+    },
+    {
+      "file": "data/most-likely-tie.csv",
+      "rows": 7,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "62bd5ca8f7e81f21c50021cc9e2bc0ecf0cd26346b22682e38333acc31f28815"
+    },
+    {
+      "file": "data/multi.csv",
+      "rows": 28,
+      "fields": [
+        "RowID",
+        "X",
+        "Y",
+        "Payload"
+      ],
+      "sha256": "69529f8a8624b98c8b39aa05717c6ab2b6e34d3a9683d77b60d127afe7414620"
+    },
+    {
+      "file": "data/nulls.csv",
+      "rows": 6,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "5175abf4c94095a926d274bcb2825e2d6bb58039e37d4bb43d5772e5df059daf"
+    },
+    {
+      "file": "data/population.csv",
+      "rows": 27,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "d47fed852afbc4f99f77d3692d661d80df6c5122d798a7ce685fd31fd1bd6b09"
+    },
+    {
+      "file": "data/quartiles-even.csv",
+      "rows": 6,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "fe811a44fea7733601894ac441c99c79ce2e75169cc1c6da2039bc7ef1a1f4f9"
+    },
+    {
+      "file": "data/quartiles.csv",
+      "rows": 5,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "992d0a124195f5177f0406be5a99e31a4a56589be8806d47ff924afb157a179e"
+    },
+    {
+      "file": "data/sigma-symmetric.csv",
+      "rows": 28,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "a598234bf22acc5304da009cb5d116331c3926b280392781112532f7602ec86c"
+    },
+    {
+      "file": "data/singleton.csv",
+      "rows": 1,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "376c77f11524185766868b47d5a8c0f82320334d41051ac09f1b3348b4e1c9eb"
+    },
+    {
+      "file": "data/types.csv",
+      "rows": 6,
+      "fields": [
+        "RowID",
+        "Integer",
+        "Real",
+        "Date",
+        "String",
+        "Boolean"
+      ],
+      "sha256": "d013ebdc1e7c9313b681b187023541c83b1cf346688618498e1e725e0886213f"
+    }
+  ],
+  "method_matrix": {
+    "expansion": "cartesian product of axes, one case for each tuple",
+    "axes": {
+      "criterion": [
+        "stddev",
+        "iqr"
+      ],
+      "method": [
+        "keep",
+        "delete",
+        "mean",
+        "median",
+        "most_likely",
+        "constant",
+        "clip"
+      ],
+      "type": [
+        "boolean",
+        "datetime",
+        "real",
+        "integer",
+        "string"
+      ],
+      "data_kind": [
+        "discrete",
+        "continuous"
+      ],
+      "ordered": [
+        false,
+        true
+      ]
+    },
+    "count": 280
+  },
+  "both_class_matrix": {
+    "expansion": "cartesian product of axes, both actions independently configured",
+    "axes": {
+      "criterion": [
+        "stddev",
+        "iqr"
+      ],
+      "outlier_method": [
+        "keep",
+        "delete",
+        "mean",
+        "median",
+        "most_likely",
+        "constant",
+        "clip"
+      ],
+      "extreme_method": [
+        "keep",
+        "delete",
+        "mean",
+        "median",
+        "most_likely",
+        "constant",
+        "clip"
+      ],
+      "type": [
+        "boolean",
+        "datetime",
+        "real",
+        "integer",
+        "string"
+      ],
+      "data_kind": [
+        "discrete",
+        "continuous"
+      ],
+      "ordered": [
+        false,
+        true
+      ]
+    },
+    "count": 1960
+  },
+  "documentation_allowed_types_by_column": {
+    "keep": [
+      [
+        "boolean",
+        "datetime",
+        "real",
+        "integer",
+        "string"
+      ],
+      [
+        "datetime",
+        "real",
+        "integer"
+      ],
+      [
+        "boolean",
+        "datetime",
+        "real",
+        "integer",
+        "string"
+      ],
+      [
+        "datetime",
+        "real",
+        "integer"
+      ]
+    ],
+    "delete": [
+      [
+        "boolean",
+        "datetime",
+        "real",
+        "integer",
+        "string"
+      ],
+      [
+        "datetime",
+        "real",
+        "integer"
+      ],
+      [],
+      []
+    ],
+    "mean": [
+      [
+        "datetime"
+      ],
+      [
+        "datetime",
+        "real",
+        "integer"
+      ],
+      [
+        "datetime"
+      ],
+      [
+        "datetime",
+        "real",
+        "integer"
+      ]
+    ],
+    "median": [
+      [
+        "datetime",
+        "real",
+        "integer"
+      ],
+      [
+        "datetime",
+        "real",
+        "integer"
+      ],
+      [
+        "datetime",
+        "real",
+        "integer"
+      ],
+      [
+        "datetime",
+        "real",
+        "integer"
+      ]
+    ],
+    "most_likely": [
+      [
+        "boolean",
+        "datetime",
+        "real",
+        "integer",
+        "string"
+      ],
+      [
+        "datetime",
+        "real",
+        "integer"
+      ],
+      [
+        "boolean",
+        "datetime",
+        "real",
+        "integer",
+        "string"
+      ],
+      [
+        "datetime",
+        "real",
+        "integer"
+      ]
+    ],
+    "constant": [
+      [
+        "boolean",
+        "datetime",
+        "real",
+        "integer",
+        "string"
+      ],
+      [
+        "datetime",
+        "real",
+        "integer"
+      ],
+      [
+        "boolean",
+        "datetime",
+        "real",
+        "integer",
+        "string"
+      ],
+      []
+    ],
+    "clip": [
+      [
+        "boolean",
+        "datetime",
+        "real",
+        "integer",
+        "string"
+      ],
+      [
+        "datetime",
+        "real",
+        "integer"
+      ],
+      [
+        "boolean",
+        "datetime",
+        "real",
+        "integer",
+        "string"
+      ],
+      [
+        "datetime",
+        "real",
+        "integer"
+      ]
+    ]
+  },
+  "column_order": [
+    "unordered/discrete",
+    "unordered/continuous",
+    "ordered/discrete",
+    "ordered/continuous"
+  ],
+  "documentation_conflict": "ordered boolean/string delete: prose says ordered has no effect; table empty. Explicit unresolved outcome until implementation resolves.",
+  "criterion_note": "method availability is not proof of category detection mathematics; unsupported combinations need explicit rejection",
+  "numeric_baselines": {
+    "stddev": {
+      "fixture": "data/sigma-symmetric.csv",
+      "outlier_multiplier": 0.25,
+      "extreme_multiplier": 1.5
+    },
+    "iqr": {
+      "fixture": "data/iqr-symmetric.csv",
+      "outlier_multiplier": 1.5,
+      "extreme_multiplier": 3
+    }
+  },
+  "typed_matrix_fixture": "data/types.csv",
+  "edges": [
+    {
+      "id": "sigma-denominator",
+      "fixtures": [
+        "data/denominator.csv"
+      ],
+      "check": "n versus n−1; k1.6 classification",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "strict-boundary",
+      "fixtures": [
+        "data/boundary-sd.csv",
+        "data/boundary.csv"
+      ],
+      "check": "equal/below/above fences, strict/inclusive",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "quartiles-center",
+      "fixtures": [
+        "data/quartiles.csv",
+        "data/quartiles-even.csv"
+      ],
+      "check": "median halves versus interpolation; median-centered versus Tukey fences",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "replacement-population",
+      "fixtures": [
+        "data/population.csv"
+      ],
+      "check": "all-column versus cleaned mean/median; separate actions17/29",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "modal-interval",
+      "fixtures": [
+        "data/most-likely-bin.csv",
+        "data/most-likely-tie.csv",
+        "data/most-likely-equal-bins.csv"
+      ],
+      "check": "Sturges rounding, bins/endpoints/ties; independent interval midpoint, not numeric mode",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "multi-fields-disabled",
+      "fixtures": [
+        "data/multi.csv"
+      ],
+      "check": "different actions on X/Y, overlap memberships, disabled Y, delete union and original payload",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "degenerate-null",
+      "fixtures": [
+        "data/nulls.csv",
+        "data/all-null.csv",
+        "data/empty.csv",
+        "data/singleton.csv",
+        "data/constant.csv"
+      ],
+      "check": "NULL population, empty schema, zero variance and n<2 outcomes",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "types-order",
+      "fixtures": [
+        "data/types.csv"
+      ],
+      "check": "all allowed and forbidden method/type/kind/order tuples; exact typed replacements",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "dynamic-recovery-save",
+      "fixtures": [
+        "data/multi.csv"
+      ],
+      "check": "same graph/S, value/width/same-width metadata mutation, explicit failure recovery, independent cold",
+      "execution": "NOT_RUN"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
   [switch]$Child,
-  [string]$BunPath
+  [string]$BunPath = "bun"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,7 +28,7 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hoste
 $name = 'loginom-' + [Guid]::NewGuid().ToString('N').Substring(0, 10)
 $stage = New-Item -ItemType Directory -Path (Join-Path $env:PUBLIC $name)
 $bun = Join-Path $stage.FullName 'bun.exe'
-Copy-Item -LiteralPath (Get-Command bun -CommandType Application).Source -Destination $bun
+Copy-Item -LiteralPath (Get-Command -Name $BunPath -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source -Destination $bun
 # Bundle the actual test and its product sources into the public staging folder.
 # The standard user must not gain access to the runner's private checkout/token.
 & $bun build (Join-Path $repo 'packages/agent/test/cli/profile-windows.test.ts') --target bun --outfile (Join-Path $stage.FullName 'profile-windows.test.js')

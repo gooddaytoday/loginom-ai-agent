@@ -1,0 +1,36 @@
+{
+  "base_sliding": {
+    "file": "base.csv",
+    "categories": ["<...>", "A", "B", "C"],
+    "rows": {
+      "North": { "<...>": [null, null], "A": [15, 2], "B": [null, 1], "C": [null, null] },
+      "South": { "<...>": [4, 1], "A": [null, null], "B": [7, 1], "C": [8, 1] }
+    }
+  },
+  "changed_sliding": {
+    "file": "changed.csv",
+    "categories": ["A", "B", "D"],
+    "rows": {
+      "North": { "A": [10, 1], "B": [null, null], "D": [12, 1] },
+      "South": { "A": [null, null], "B": [7, 1], "D": [4, 1] }
+    }
+  },
+  "changed_fixed": {
+    "file": "changed.csv",
+    "categories": ["<...>", "A", "B", "C", "<Прочее>"],
+    "rows": {
+      "North": { "<...>": [null, null], "A": [10, 1], "B": [null, null], "C": [null, null], "<Прочее>": [12, 1] },
+      "South": { "<...>": [null, null], "A": [null, null], "B": [7, 1], "C": [null, null], "<Прочее>": [4, 1] }
+    }
+  },
+  "base_amount_statistics": {
+    "file": "base.csv",
+    "values": {
+      "North/A": [15, 5, 10, 7.5],
+      "North/B": [null, null, null, null],
+      "South/<...>": [4, 4, 4, 4],
+      "South/B": [7, 7, 7, 7],
+      "South/C": [8, 8, 8, 8]
+    }
+  }
+}

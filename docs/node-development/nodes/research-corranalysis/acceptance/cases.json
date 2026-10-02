@@ -1,0 +1,560 @@
+{
+  "format": "documentation-planning-v1-proposed",
+  "node": "research-corranalysis",
+  "base_sha": "9b17e7dd947c016395e8e32e439ca775b1cbe780",
+  "status": "OFFLINE_ONLY_NOT_NODE_PASS",
+  "inputs": [
+    {
+      "file": "data/analytic.csv",
+      "rows": 6,
+      "fields": [
+        "row_id",
+        "x",
+        "positive",
+        "negative",
+        "square",
+        "tie_x",
+        "tie_y"
+      ],
+      "sha256": "7bf2abf1b80e071092cac367ade89881f878ab979df0c2ef3dbe96155c614569"
+    },
+    {
+      "file": "data/categories.csv",
+      "rows": 4,
+      "fields": [
+        "row_id",
+        "category",
+        "ordinal",
+        "measurement",
+        "category_copy",
+        "category_reverse"
+      ],
+      "sha256": "1b1a6166d68f824b4a6d149abba1fb6160162208ad1cc71f3fd31d2725a3983b"
+    },
+    {
+      "file": "data/ccf-ties.csv",
+      "rows": 5,
+      "fields": [
+        "row_id",
+        "signal",
+        "paired"
+      ],
+      "sha256": "a1f7ed444d26716b7bd7a4a4fbea49f0abdcfd49410c4e900e55499d8ae03c1a"
+    },
+    {
+      "file": "data/degenerate.csv",
+      "rows": 3,
+      "fields": [
+        "row_id",
+        "x",
+        "constant",
+        "all_null"
+      ],
+      "sha256": "79e86ad655a78a604796025dfaf977898f721f4abac5fe0f391e7b9d1fc72419"
+    },
+    {
+      "file": "data/empty.csv",
+      "rows": 0,
+      "fields": [
+        "row_id",
+        "x",
+        "y"
+      ],
+      "sha256": "60b0cb61877aed7c24f4bd4c26422f542eda0db2f5a8ddc43fa4b678c5c17486"
+    },
+    {
+      "file": "data/lag.csv",
+      "rows": 8,
+      "fields": [
+        "row_id",
+        "signal",
+        "delayed",
+        "inverted",
+        "periodic",
+        "periodic_negative"
+      ],
+      "sha256": "27a834b61055e765c19958b38018542bc45275cf06b76725dc65d1d8db674956"
+    },
+    {
+      "file": "data/nulls.csv",
+      "rows": 5,
+      "fields": [
+        "row_id",
+        "x",
+        "y",
+        "z"
+      ],
+      "sha256": "dcb4ec745e0d4b34dcb6eb8306d836e4eccfa2e81174d6d9c5f91735c02c6d34"
+    },
+    {
+      "file": "data/one.csv",
+      "rows": 1,
+      "fields": [
+        "row_id",
+        "x",
+        "y"
+      ],
+      "sha256": "2a04544fbf640b37aa96c4275102c5e5676b4381618f49732cbe546acb4a62b1"
+    },
+    {
+      "file": "data/scaled.csv",
+      "rows": 6,
+      "fields": [
+        "row_id",
+        "x",
+        "positive",
+        "negative",
+        "square",
+        "tie_x",
+        "tie_y"
+      ],
+      "sha256": "50c1908dc40d6fc7d68616565bb11963188d609fd308af94f785f4bb8009d591"
+    },
+    {
+      "file": "data/two.csv",
+      "rows": 2,
+      "fields": [
+        "row_id",
+        "x",
+        "y"
+      ],
+      "sha256": "92dac11e4f65f06d4b7d72e8f2a88db4d75d9f7f8f23095665af8aa022e7798b"
+    },
+    {
+      "file": "data/types.csv",
+      "rows": 4,
+      "fields": [
+        "row_id",
+        "integer_value",
+        "real_value",
+        "date_value",
+        "boolean_value",
+        "text_value",
+        "empty_text",
+        "unicode_text"
+      ],
+      "sha256": "706c8f2f8742c9af49c7c20cb44730137827422f537c0160ef49eea0f37b2b71"
+    }
+  ],
+  "nonempty_masks": [
+    {
+      "id": "mask-01",
+      "coefficients": {
+        "pearson": true,
+        "spearman": false,
+        "kendall_tau_b": false,
+        "cross_correlation": false
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 5,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    },
+    {
+      "id": "mask-02",
+      "coefficients": {
+        "pearson": false,
+        "spearman": true,
+        "kendall_tau_b": false,
+        "cross_correlation": false
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 5,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    },
+    {
+      "id": "mask-03",
+      "coefficients": {
+        "pearson": true,
+        "spearman": true,
+        "kendall_tau_b": false,
+        "cross_correlation": false
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 6,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    },
+    {
+      "id": "mask-04",
+      "coefficients": {
+        "pearson": false,
+        "spearman": false,
+        "kendall_tau_b": true,
+        "cross_correlation": false
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 5,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    },
+    {
+      "id": "mask-05",
+      "coefficients": {
+        "pearson": true,
+        "spearman": false,
+        "kendall_tau_b": true,
+        "cross_correlation": false
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 6,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    },
+    {
+      "id": "mask-06",
+      "coefficients": {
+        "pearson": false,
+        "spearman": true,
+        "kendall_tau_b": true,
+        "cross_correlation": false
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 6,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    },
+    {
+      "id": "mask-07",
+      "coefficients": {
+        "pearson": true,
+        "spearman": true,
+        "kendall_tau_b": true,
+        "cross_correlation": false
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 7,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    },
+    {
+      "id": "mask-08",
+      "coefficients": {
+        "pearson": false,
+        "spearman": false,
+        "kendall_tau_b": false,
+        "cross_correlation": true
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 6,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    },
+    {
+      "id": "mask-09",
+      "coefficients": {
+        "pearson": true,
+        "spearman": false,
+        "kendall_tau_b": false,
+        "cross_correlation": true
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 7,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    },
+    {
+      "id": "mask-10",
+      "coefficients": {
+        "pearson": false,
+        "spearman": true,
+        "kendall_tau_b": false,
+        "cross_correlation": true
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 7,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    },
+    {
+      "id": "mask-11",
+      "coefficients": {
+        "pearson": true,
+        "spearman": true,
+        "kendall_tau_b": false,
+        "cross_correlation": true
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 8,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    },
+    {
+      "id": "mask-12",
+      "coefficients": {
+        "pearson": false,
+        "spearman": false,
+        "kendall_tau_b": true,
+        "cross_correlation": true
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 7,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    },
+    {
+      "id": "mask-13",
+      "coefficients": {
+        "pearson": true,
+        "spearman": false,
+        "kendall_tau_b": true,
+        "cross_correlation": true
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 8,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    },
+    {
+      "id": "mask-14",
+      "coefficients": {
+        "pearson": false,
+        "spearman": true,
+        "kendall_tau_b": true,
+        "cross_correlation": true
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 8,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    },
+    {
+      "id": "mask-15",
+      "coefficients": {
+        "pearson": true,
+        "spearman": true,
+        "kendall_tau_b": true,
+        "cross_correlation": true
+      },
+      "fixture": "data/analytic.csv",
+      "left_fields": [
+        "x",
+        "tie_x"
+      ],
+      "right_fields": [
+        "positive",
+        "square",
+        "tie_y",
+        "x"
+      ],
+      "pair_count": 8,
+      "output_column_count": 9,
+      "native_names_types_order": "to be frozen during implementation, not guessed"
+    }
+  ],
+  "zero_mask": {
+    "coefficients": {
+      "pearson": false,
+      "spearman": false,
+      "kendall_tau_b": false,
+      "cross_correlation": false
+    },
+    "api_outcome": "validation error before side effect; native zero separate"
+  },
+  "edges": [
+    {
+      "id": "all-pairs",
+      "fixtures": [
+        "data/analytic.csv"
+      ],
+      "check": "6×6 full analytical matrix, intersections, self/reverse pairs, selection order and duplicate labels",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "scale-monotonic-ties",
+      "fixtures": [
+        "data/analytic.csv",
+        "data/scaled.csv"
+      ],
+      "check": "P/S/K anchors, nonlinear monotonic and tied mean ranks, tau-b not tau-a",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "categories-types",
+      "fixtures": [
+        "data/categories.csv",
+        "data/types.csv"
+      ],
+      "check": "ASCII dense ordinal for Pearson-text; Unicode/case and type/kind outcomes per coefficient",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "null-policies",
+      "fixtures": [
+        "data/nulls.csv"
+      ],
+      "check": "pairwise versus global listwise; CCF time-position treatment separately",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "degenerate",
+      "fixtures": [
+        "data/degenerate.csv",
+        "data/empty.csv",
+        "data/one.csv",
+        "data/two.csv"
+      ],
+      "check": "undefined, all-null, n0/n1/n2; exact schema and refusal/null policy",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "ccf",
+      "fixtures": [
+        "data/lag.csv",
+        "data/ccf-ties.csv",
+        "data/scaled.csv"
+      ],
+      "check": "signed max magnitude; swap sign convention, range, energy/centering/overlap normalization and tied extremum",
+      "execution": "NOT_RUN"
+    },
+    {
+      "id": "schema-save-recovery",
+      "fixtures": [
+        "data/analytic.csv"
+      ],
+      "check": "15 transitions, same source operation after values/width/label/kind changes, error repair and cold",
+      "execution": "NOT_RUN"
+    }
+  ]
+}

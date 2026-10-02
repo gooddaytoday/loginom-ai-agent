@@ -32,7 +32,8 @@
   "common_limitations": [
     "Публичный preview: по умолчанию 10 строк, максимум 100 и ограничения объёма/числа ячеек; выборка не доказывает полноту.",
     "dock_node_read связан с завершённой квитанцией и заново выполняет узел; это не универсальное безопасное восстановление.",
-    "Без нового живого прогона не повышать статус для свежей ревизии исходников, runtime или клиента."
+    "Без нового живого прогона не повышать статус для свежей ревизии исходников, runtime или клиента.",
+    "Причину отказа мастера сразу возвращают только Калькулятор для выражений и Текстовый импорт для поля файла. У остальных узлов отказ шага или завершения мастера приходит без текста причины."
   ],
   "prerequisite_definitions": {
     "accepted_base": "Зафиксированный базовый commit активного loginom-ai-agent; не наследовать неслитую ветку другого узла автоматически.",
@@ -89,13 +90,13 @@
     },
     "runtime-registry": {
       "path": "../../packages/loginom-runtime/client/lib/node-support.mjs",
-      "sha256": "ad4e46a95b88681128bd25b6628b78ebe2014a8f1be1ba576d9b3077e3757352",
+      "sha256": "2d8cc3db1f064e055066e8c9a0d89382ceb642f4d5bd7128a58d69258d37a43a",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
+      "source_commit": null,
       "runtime": null,
       "platform": null,
-      "scope": "Статически зарегистрированы 14 обработчиков; код не исполнялся."
+      "scope": "Статически зарегистрированы 15 обработчиков в текущем worktree; код узла проверен адресными тестами, автономная приёмка ожидается."
     },
     "migration-map": {
       "path": "../../docs/migration/source-map.json",
@@ -944,6 +945,36 @@
       "source_sha256": "959637abddd0952e3a802894f60826a8d7f2626eab220be7a2c24d6fb80b75a8",
       "provenance_id": "source-9d25d9064b0d",
       "document_adaptation": "Navigation adapted; original checks and runtime pins remain historical."
+    },
+    "crosstable-standalone-20260930": {
+      "path": "nodes/transform-crosstable/plan.md",
+      "sha256": "dad34e1f08e743662b2821aed2a5471f4acbe38ec5e3ab9f89f42be1e5b2077f",
+      "kind": "acceptance",
+      "availability": "retained_document",
+      "source_commit": "f0b38a68f89b9327a6bec9d38e458faa101b4b41",
+      "runtime": "standalone CLI 0.0.0-dev-202609300934 / reviewer 0.0.0-dev-202609301113",
+      "platform": {
+        "client": "Linux standalone CLI",
+        "loginom": "7.4.2/Linux"
+      },
+      "scope": "Серверная standalone CLI-приёмка LOG-29 и независимая матрица LOG-36: Fixed/Sliding, оба P2, публичное повторное чтение, persistence/cold, граф и cleanup; ограничения перечислены в подплане.",
+      "raw_evidence": "external_report_reviewed_not_rerun",
+      "verified_date": "2026-09-30"
+    },
+    "crosstable-merge-20260930": {
+      "path": "nodes/transform-crosstable/plan.md",
+      "sha256": "dad34e1f08e743662b2821aed2a5471f4acbe38ec5e3ab9f89f42be1e5b2077f",
+      "kind": "integration",
+      "availability": "retained_document",
+      "source_commit": "bacebd5696f040c6e49aa37881cf12335d512cf7",
+      "runtime": "standalone CLI 0.0.0-dev-202609300934 / reviewer 0.0.0-dev-202609301113",
+      "platform": {
+        "client": "Linux standalone CLI",
+        "loginom": "7.4.2/Linux"
+      },
+      "scope": "PR #15 слит в loginom 30.09.2026; код runtime и node-acceptance в принятом объёме совпадает с проверенным SHA. Выпуск не подтверждён.",
+      "raw_evidence": "external_report_reviewed_not_rerun",
+      "verified_date": "2026-09-30"
     }
   },
   "nodes": [
@@ -4408,11 +4439,12 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
-      "initial_scope": "Один наблюдённый режим разделения обучающей/тестовой выборки с явными размерами и всеми тремя выходами.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "card": "nodes/preprocessing-datapartition/README.md",
+      "initial_scope": "Все пять методов; строки/проценты, приоритет/положение test, seed, strata/bias, три выхода и повторное чтение/save/cold.",
+      "scope_basis": "documentation_full_scope",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку.",
+        "Подплан по документации завершён; точные native defaults/schema и неописанные математические правила требуют фиксации при реализации, живых проверок этого этапа нет."
       ],
       "prerequisites": [
         "accepted_base",
@@ -4422,7 +4454,9 @@
       "historical_subplan": null,
       "help_reference": {
         "historical_source_path": "data/processors/preprocessing/partitioning.md",
-        "review_status": "detailed_mode_review_required"
+        "review_status": "documentation_reviewed",
+        "url": "https://help.loginom.ru/userguide/processors/preprocessing/partitioning.html",
+        "review_date": "2026-10-01"
       },
       "readiness": {
         "implementation": {
@@ -4455,7 +4489,11 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Документальный подплан готов: [plan.md](nodes/preprocessing-datapartition/plan.md). Реализация по отдельному поручению; детали версии уточняются в разработке без новой planning-задачи.",
+      "plan": "nodes/preprocessing-datapartition/plan.md",
+      "planning_status": "documentation_complete",
+      "plan_status": "discovery_required",
+      "plan_basis": "documentation_no_live"
     },
     {
       "component_id": "component.preprocessing.Elimoutlier",
@@ -4464,11 +4502,12 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
-      "initial_scope": "Один наблюдённый метод порогов и явные параметры; обработанные данные, выбросы и экстремальные значения.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "card": "nodes/preprocessing-elimoutlier/README.md",
+      "initial_scope": "SD/IQR, все семь actions отдельно для outliers/extremes, все типы/виды/ordered и несколько полей; три выхода, source mutation/save/cold.",
+      "scope_basis": "documentation_full_scope",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку.",
+        "Подплан по документации завершён; точные native defaults/schema и неописанные математические правила требуют фиксации при реализации, живых проверок этого этапа нет."
       ],
       "prerequisites": [
         "accepted_base",
@@ -4478,7 +4517,9 @@
       "historical_subplan": null,
       "help_reference": {
         "historical_source_path": "data/processors/preprocessing/eliminate-outliers.md",
-        "review_status": "detailed_mode_review_required"
+        "review_status": "documentation_reviewed",
+        "url": "https://help.loginom.ru/userguide/processors/preprocessing/eliminate-outliers.html",
+        "review_date": "2026-10-01"
       },
       "readiness": {
         "implementation": {
@@ -4511,7 +4552,11 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Документальный подплан готов: [plan.md](nodes/preprocessing-elimoutlier/plan.md). Реализация по отдельному поручению; детали версии уточняются в разработке без новой planning-задачи.",
+      "plan": "nodes/preprocessing-elimoutlier/plan.md",
+      "planning_status": "documentation_complete",
+      "plan_status": "discovery_required",
+      "plan_basis": "documentation_no_live"
     },
     {
       "component_id": "component.preprocessing.Sampling",
@@ -4804,11 +4849,12 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
-      "initial_scope": "Коэффициент Пирсона для нескольких выбранных числовых полей; явная обработка констант и пропусков.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "card": "nodes/research-corranalysis/README.md",
+      "initial_scope": "Пирсон/Спирмен/Кендалл tau-b/экстремум CCF с лагом, все 15 непустых комбинаций, два набора полей, динамическая схема, NULL/categories/save/cold.",
+      "scope_basis": "documentation_full_scope",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку.",
+        "Подплан по документации завершён; точные native defaults/schema и неописанные математические правила требуют фиксации при реализации, живых проверок этого этапа нет."
       ],
       "prerequisites": [
         "accepted_base",
@@ -4818,7 +4864,9 @@
       "historical_subplan": null,
       "help_reference": {
         "historical_source_path": "data/processors/scrutiny/correlation-analysis.md",
-        "review_status": "detailed_mode_review_required"
+        "review_status": "documentation_reviewed",
+        "url": "https://help.loginom.ru/userguide/processors/scrutiny/correlation-analysis.html",
+        "review_date": "2026-10-01"
       },
       "readiness": {
         "implementation": {
@@ -4851,7 +4899,11 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Документальный подплан готов: [plan.md](nodes/research-corranalysis/plan.md). Реализация по отдельному поручению; детали версии уточняются в разработке без новой planning-задачи.",
+      "plan": "nodes/research-corranalysis/plan.md",
+      "planning_status": "documentation_complete",
+      "plan_status": "discovery_required",
+      "plan_basis": "documentation_no_live"
     },
     {
       "component_id": "component.research.FactorAnalysis",
@@ -5029,13 +5081,22 @@
       "name": "Кросс-таблица",
       "slug": "transform-crosstable",
       "legacy_subplan": "15",
-      "queue_class": "backlog",
-      "handler": null,
+      "queue_class": "implemented",
+      "handler": {
+        "type": "transform.cross_table",
+        "modes": [
+          "pivot"
+        ],
+        "source": "../../packages/loginom-runtime/client/lib/crosstable-node.mjs",
+        "parameters_source": "../../packages/loginom-runtime/client/lib/crosstable-parameters.mjs"
+      },
       "card": "nodes/transform-crosstable/README.md",
       "initial_scope": "Сохранить подплан 15: фиксированные и скользящие колонки, агрегаты и изменение схемы; календарные поля можно задать в CSV.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "scope_basis": "loginom_7_4_2_live_discovery_and_candidate_source_tests",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Серверная CLI-приёмка и независимый PASS LOG-36 на f0b38a68f89b9327a6bec9d38e458faa101b4b41 закрывают обязательный Fixed/Sliding/P2 scope. Installed Desktop/Mac/Windows, unknown-effect resume/cancel, большие CSV и дополнительные исследовательские крайние случаи отдельно не сертифицированы; выпуск не подтверждён.",
+        "Скользящий режим меняет схему при новом Execute; технические C_n имена относятся только к свежему результату.",
+        "По решению владельца fixed сохраняет все категории источника при настройке, новые значения идут в «Прочие»; явное подмножество отклоняется контрактом."
       ],
       "prerequisites": [
         "accepted_base",
@@ -5050,38 +5111,55 @@
       },
       "readiness": {
         "implementation": {
-          "status": "not_implemented",
+          "status": "implemented",
           "evidence": [
             "runtime-registry",
-            "historical-roadmap"
-          ]
+            "crosstable-standalone-20260930"
+          ],
+          "note": "Fixed/Sliding реализованы; оба P2 исправлены и подтверждены серверной CLI-приёмкой и независимой проверкой на f0b38a68f89b9327a6bec9d38e458faa101b4b41."
         },
         "historical_acceptance": {
-          "status": "not_accepted",
-          "evidence": []
+          "status": "accepted_scoped",
+          "evidence": [
+            "crosstable-standalone-20260930"
+          ],
+          "source_commit": "f0b38a68f89b9327a6bec9d38e458faa101b4b41",
+          "note": "Принят только обязательный серверный Fixed/Sliding/P2 scope LOG-29/LOG-36; полная матрица и оставшиеся ограничения — в подплане."
         },
         "client_technical_validation": {
-          "status": "not_validated",
-          "evidence": [],
-          "standalone_status": "not_revalidated"
+          "status": "validated_standalone_cli",
+          "evidence": [
+            "crosstable-standalone-20260930"
+          ],
+          "standalone_status": "validated",
+          "source_commit": "f0b38a68f89b9327a6bec9d38e458faa101b4b41",
+          "note": "Принят только обязательный серверный Fixed/Sliding/P2 scope LOG-29/LOG-36; полная матрица и оставшиеся ограничения — в подплане."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
-          "evidence": [],
-          "historical_scope_preserved": false
+          "status": "accepted_scoped_standalone",
+          "evidence": [
+            "crosstable-standalone-20260930"
+          ],
+          "historical_scope_preserved": false,
+          "source_commit": "f0b38a68f89b9327a6bec9d38e458faa101b4b41",
+          "note": "Принят только обязательный серверный Fixed/Sliding/P2 scope LOG-29/LOG-36; полная матрица и оставшиеся ограничения — в подплане."
         },
         "integration": {
-          "status": "not_integrated",
-          "evidence": []
+          "status": "present_in_source",
+          "evidence": [
+            "crosstable-merge-20260930"
+          ],
+          "source_commit": "bacebd5696f040c6e49aa37881cf12335d512cf7",
+          "note": "PR #15 слит в loginom 30.09.2026; проверенный runtime и скрипты node-acceptance не менялись после принятого SHA."
         },
         "release": {
           "status": "not_released",
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения.",
+      "next_action": "Сопровождать принятые Fixed/Sliding режимы; расширение scope и приёмка установленных клиентов — отдельные назначения. Выпуск не подтверждён.",
       "plan": "nodes/transform-crosstable/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "accepted"
     },
     {
       "component_id": "component.transform.EnrichData",

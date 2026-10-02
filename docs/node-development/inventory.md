@@ -2,7 +2,7 @@
 
 Сформирован из [registry.json](registry.json). Не редактировать сводные числа вручную.
 
-Исторический каталог: **78** компонентов. Обработчики: **14**; обычный остаток: **61**; условный резерв: **3**.
+Исторический каталог: **78** компонентов. Обработчики: **15**; обычный остаток: **60**; условный резерв: **3**.
 
 Реализация и историческая приёмка не равны повторной аналитической приёмке текущего CLI. Старые номера 01/02 — инфраструктура, а не дополнительные типы узлов.
 
@@ -24,10 +24,11 @@
 | 14 | [Заполнение пропусков](nodes/missing-values/README.md) | `preprocessing.data_recovery` / impute | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
 | 16 | [Свёртка столбцов](nodes/collapse-columns/README.md) | `transform.collapse_columns` / unpivot | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
 | 17 | [Текстовый экспорт](nodes/text-export/README.md) | `exports.text` / delimited | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
+| 15 | [Кросс-таблица](nodes/transform-crosstable/README.md) | `transform.cross_table` / pivot | accepted_scoped | validated_standalone_cli; аналитика: accepted_scoped_standalone |
 
 ## Компоненты без полного обработчика
 
-Список не является разрешённой очередью. При назначении применяется [создание подплана](workflow/new-node-plan.md). [Подплан Кросс-таблицы](nodes/transform-crosstable/plan.md) требует исследования; остальные карточки roadmap не заменяют самостоятельный подплан.
+Список не является разрешённой очередью. При назначении применяется [создание подплана](workflow/new-node-plan.md). Карточки roadmap не заменяют самостоятельный подплан.
 
 | Component ID | Узел | Категория | Следующее действие |
 | --- | --- | --- | --- |
@@ -68,18 +69,17 @@
 | `component.integration.SqlScript` | SQL-скрипт | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.preprocessing.Binning` | Квантование | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.preprocessing.CoarseClasses` | Конечные классы | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
-| `component.preprocessing.DataPartition` | Разбиение на множества | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
-| `component.preprocessing.Elimoutlier` | Редактирование выбросов | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
+| `component.preprocessing.DataPartition` | Разбиение на множества | backlog | Документальный подплан готов: [plan.md](nodes/preprocessing-datapartition/plan.md). Реализация по отдельному поручению; детали версии уточняются в разработке без новой planning-задачи. |
+| `component.preprocessing.Elimoutlier` | Редактирование выбросов | backlog | Документальный подплан готов: [plan.md](nodes/preprocessing-elimoutlier/plan.md). Реализация по отдельному поручению; детали версии уточняются в разработке без новой planning-задачи. |
 | `component.preprocessing.Sampling` | Сэмплинг | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.preprocessing.Smoothing` | Сглаживание | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.programming.JavaScript` | JavaScript | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.programming.Python` | Python | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.research.AutoCorrelation` | Автокорреляция | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
-| `component.research.CorrAnalysis` | Корреляционный анализ | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
+| `component.research.CorrAnalysis` | Корреляционный анализ | backlog | Документальный подплан готов: [plan.md](nodes/research-corranalysis/plan.md). Реализация по отдельному поручению; детали версии уточняются в разработке без новой planning-задачи. |
 | `component.research.FactorAnalysis` | Факторный анализ | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.research.Quality` | Качество данных | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.transform.ColUnionData` | Соединение (таблицы по позиции) | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
-| `component.transform.CrossTable` | Кросс-таблица | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.transform.EnrichData` | Дополнение данных | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.transform.SlidingWindow` | Скользящее окно | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.transform.UngroupData` | Разгруппировка | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |

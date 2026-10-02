@@ -5,6 +5,7 @@ import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepare
 import {readTableOutputPages} from './table-output-pages.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
+import {resolveCrossTableOutputSchema} from './crosstable-output.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const verified=value=>({verified:true,cleanup_complete:true,effect_possible:false,...value});
 
@@ -44,18 +45,20 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild}){
     'Fresh owned execution required for reread');
    const ports=[];let restoration,returned;
    for(const port of read.ports){
-    const schema=operation.parameters.parameters.schemas.find(s=>s.port===port)?.schema;
-    need(schema,'Retained output schema missing');
+    const retained=operation.parameters.parameters.schemas.find(s=>s.port===port);
+    need(retained?.schema,'Retained output schema missing');
     const table=await openNewOutputTable(channel,port);
+    need(!retained.port_guid||retained.port_guid===table.port_guid,'Output port identity changed since the source operation');
     const format=read.require_exact_numbers?await configureTablePrecision(channel,table.table):null;
-    let data;
+    let data,dynamic;
     try{
      const settings=await prepareTableRead(channel,table.table);
      const raw=await readTableOutputPages(channel,table.table,{sampleRows:read.sample_rows});
-     data=decodeTableOutput(raw,{formatProof:format,readSettings:settings,expectedColumns:alignReadSchema(raw.columns,schema),requireExactNumbers:read.require_exact_numbers});
+     dynamic=resolveReadOutputSchema(raw.columns,retained,operation.parameters.target.type);
+     data=decodeTableOutput(raw,{formatProof:format,readSettings:settings,expectedColumns:dynamic.fields,requireExactNumbers:read.require_exact_numbers});
     }finally{if(format)restoration=await restoreTablePrecision(channel,format);}
     returned=await returnFromOutputTable(channel,table.table);
-    ports.push({port,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data});
+    ports.push({port,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data,...(dynamic.category_mapping?{category_mapping:dynamic.category_mapping,dynamic_schema:retained.dynamic_schema}:{})});
    }
    return verified({effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',
     execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports,
@@ -65,4 +68,25 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild}){
   // stay blocked; this route never restarts an uncertain execution automatically.
   verifyContinuation:async()=>false,
  };
+}
+
+// Only the original, verified Sliding receipt permits a fresh generated schema.
+// Static outputs keep their exact identity check; row keys and fact types remain
+// fixed even when category ordinals are reused by Loginom.
+export function resolveReadOutputSchema(actual,retained,nodeType){
+ const dynamic=retained.dynamic_schema;
+ if(!dynamic)return {fields:alignReadSchema(actual,retained.schema)};
+ need(nodeType==='transform.cross_table'&&dynamic.kind==='crosstable_sliding'
+  &&dynamic.parameters?.columns?.mode==='sliding','Unsupported dynamic output schema');
+ const result=resolveCrossTableOutputSchema(dynamic.configuration,dynamic.parameters,actual);
+ need(new Set(actual.map(field=>field.name)).size===actual.length
+  &&actual.every((field,index)=>field.index===index),'Output field indices or names differ');
+ const rowCount=dynamic.parameters.rows.length;
+ alignReadSchema(actual.slice(0,rowCount),retained.schema.slice(0,rowCount));
+ for(const field of actual.slice(rowCount)){
+  const suffix=field.name.replace(/^C_[0-9]+_/, '');
+  const prior=retained.schema.filter(item=>item.name.replace(/^C_[0-9]+_/, '')===suffix);
+  need(prior.length>0&&prior.every(item=>item.type===field.type),'CrossTable fact type changed since the source operation');
+ }
+ return result;
 }

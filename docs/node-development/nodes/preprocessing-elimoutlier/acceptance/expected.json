@@ -1,0 +1,704 @@
+{
+  "format": "documentation-planning-v1-proposed",
+  "node": "preprocessing-elimoutlier",
+  "base_sha": "9b17e7dd947c016395e8e32e439ca775b1cbe780",
+  "status": "OFFLINE_ONLY_NOT_NODE_PASS",
+  "inputs": [
+    {
+      "file": "data/all-null.csv",
+      "rows": 3,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "f26ea7fda358a62f2c5d2c3f0bb63295bb138898c1fcf93276ca06d7aa0b23b2"
+    },
+    {
+      "file": "data/boundary-sd.csv",
+      "rows": 4,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "0f7ec7c0c8f47fc88caa7c9679919528f25a12f6641e43be2756a0d69777093d"
+    },
+    {
+      "file": "data/boundary.csv",
+      "rows": 32,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "b24a0d7ac05fabeb2232914f4714899bfba762e81b7020fe3145edb8708fbcad"
+    },
+    {
+      "file": "data/constant.csv",
+      "rows": 5,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "88333445eece15d1e859e22f6aa42e108b94d60305d584a7dd9e1aa4f16940da"
+    },
+    {
+      "file": "data/denominator.csv",
+      "rows": 4,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "e7c1e85636018dcd897e8eaa659e1b58c8407899316fe65efeea340b1dfacf5c"
+    },
+    {
+      "file": "data/empty.csv",
+      "rows": 0,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "c4b891cf266a44227d1016ff1d674c48d9973ddf24a6dbbd9b2836f4fc617072"
+    },
+    {
+      "file": "data/iqr-symmetric.csv",
+      "rows": 32,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "ed64e33f1dee74dd2c6f36c56f822cc467b2ec881059c3e481626a47a6feb001"
+    },
+    {
+      "file": "data/most-likely-bin.csv",
+      "rows": 11,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "186fc25e005551fb16e5c1d67660119cd796ea60dce2424775dcd60e7a34c6bb"
+    },
+    {
+      "file": "data/most-likely-equal-bins.csv",
+      "rows": 9,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "dd258753e2ee3eb932736931086ece2e95e73a0d47d37d07511ce736b8b1952f"
+    },
+    {
+      "file": "data/most-likely-tie.csv",
+      "rows": 7,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "62bd5ca8f7e81f21c50021cc9e2bc0ecf0cd26346b22682e38333acc31f28815"
+    },
+    {
+      "file": "data/multi.csv",
+      "rows": 28,
+      "fields": [
+        "RowID",
+        "X",
+        "Y",
+        "Payload"
+      ],
+      "sha256": "69529f8a8624b98c8b39aa05717c6ab2b6e34d3a9683d77b60d127afe7414620"
+    },
+    {
+      "file": "data/nulls.csv",
+      "rows": 6,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "5175abf4c94095a926d274bcb2825e2d6bb58039e37d4bb43d5772e5df059daf"
+    },
+    {
+      "file": "data/population.csv",
+      "rows": 27,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "d47fed852afbc4f99f77d3692d661d80df6c5122d798a7ce685fd31fd1bd6b09"
+    },
+    {
+      "file": "data/quartiles-even.csv",
+      "rows": 6,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "fe811a44fea7733601894ac441c99c79ce2e75169cc1c6da2039bc7ef1a1f4f9"
+    },
+    {
+      "file": "data/quartiles.csv",
+      "rows": 5,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "992d0a124195f5177f0406be5a99e31a4a56589be8806d47ff924afb157a179e"
+    },
+    {
+      "file": "data/sigma-symmetric.csv",
+      "rows": 28,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "a598234bf22acc5304da009cb5d116331c3926b280392781112532f7602ec86c"
+    },
+    {
+      "file": "data/singleton.csv",
+      "rows": 1,
+      "fields": [
+        "RowID",
+        "Value"
+      ],
+      "sha256": "376c77f11524185766868b47d5a8c0f82320334d41051ac09f1b3348b4e1c9eb"
+    },
+    {
+      "file": "data/types.csv",
+      "rows": 6,
+      "fields": [
+        "RowID",
+        "Integer",
+        "Real",
+        "Date",
+        "String",
+        "Boolean"
+      ],
+      "sha256": "d013ebdc1e7c9313b681b187023541c83b1cf346688618498e1e725e0886213f"
+    }
+  ],
+  "independent_statistics": {
+    "all-null.csv": {
+      "n": 0,
+      "sum_exact": "0",
+      "mean_exact": null,
+      "median_exact": null,
+      "centered_ss_exact": null,
+      "sigma_population": null,
+      "sigma_sample": null,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          null,
+          null
+        ],
+        "linear_p_n_minus_1": [
+          null,
+          null
+        ]
+      }
+    },
+    "boundary-sd.csv": {
+      "n": 4,
+      "sum_exact": "0",
+      "mean_exact": "0",
+      "median_exact": "0",
+      "centered_ss_exact": "4",
+      "sigma_population": 1.0,
+      "sigma_sample": 1.1547005383792515,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          "-1",
+          "1"
+        ],
+        "linear_p_n_minus_1": [
+          "-1",
+          "1"
+        ]
+      }
+    },
+    "boundary.csv": {
+      "n": 32,
+      "sum_exact": "0",
+      "mean_exact": "0",
+      "median_exact": "0",
+      "centered_ss_exact": "896",
+      "sigma_population": 5.291502622129181,
+      "sigma_sample": 5.376172040257976,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          "-2",
+          "2"
+        ],
+        "linear_p_n_minus_1": [
+          "-2",
+          "2"
+        ]
+      }
+    },
+    "constant.csv": {
+      "n": 5,
+      "sum_exact": "35",
+      "mean_exact": "7",
+      "median_exact": "7",
+      "centered_ss_exact": "0",
+      "sigma_population": 0.0,
+      "sigma_sample": 0.0,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          "7",
+          "7"
+        ],
+        "linear_p_n_minus_1": [
+          "7",
+          "7"
+        ]
+      }
+    },
+    "denominator.csv": {
+      "n": 4,
+      "sum_exact": "1",
+      "mean_exact": "1/4",
+      "median_exact": "0",
+      "centered_ss_exact": "3/4",
+      "sigma_population": 0.4330127018922193,
+      "sigma_sample": 0.5,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          "0",
+          "1/2"
+        ],
+        "linear_p_n_minus_1": [
+          "0",
+          "1/4"
+        ]
+      }
+    },
+    "empty.csv": {
+      "n": 0,
+      "sum_exact": "0",
+      "mean_exact": null,
+      "median_exact": null,
+      "centered_ss_exact": null,
+      "sigma_population": null,
+      "sigma_sample": null,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          null,
+          null
+        ],
+        "linear_p_n_minus_1": [
+          null,
+          null
+        ]
+      }
+    },
+    "iqr-symmetric.csv": {
+      "n": 32,
+      "sum_exact": "0",
+      "mean_exact": "0",
+      "median_exact": "0",
+      "centered_ss_exact": "20264",
+      "sigma_population": 25.16445906432324,
+      "sigma_sample": 25.56711597648117,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          "-2",
+          "2"
+        ],
+        "linear_p_n_minus_1": [
+          "-2",
+          "2"
+        ]
+      }
+    },
+    "most-likely-bin.csv": {
+      "n": 11,
+      "sum_exact": "133",
+      "mean_exact": "133/11",
+      "median_exact": "2",
+      "centered_ss_exact": "95160/11",
+      "sigma_population": 28.043649566198326,
+      "sigma_sample": 29.412427800011837,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          "0",
+          "9"
+        ],
+        "linear_p_n_minus_1": [
+          "0",
+          "17/2"
+        ]
+      }
+    },
+    "most-likely-equal-bins.csv": {
+      "n": 9,
+      "sum_exact": "99",
+      "mean_exact": "11",
+      "median_exact": "11",
+      "centered_ss_exact": "606",
+      "sigma_population": 8.205689083394114,
+      "sigma_sample": 8.703447592764606,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          "3/2",
+          "41/2"
+        ],
+        "linear_p_n_minus_1": [
+          "2",
+          "20"
+        ]
+      }
+    },
+    "most-likely-tie.csv": {
+      "n": 7,
+      "sum_exact": "130",
+      "mean_exact": "130/7",
+      "median_exact": "8",
+      "centered_ss_exact": "54850/7",
+      "sigma_population": 33.457252653229624,
+      "sigma_sample": 36.137963154449935,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          "1",
+          "10"
+        ],
+        "linear_p_n_minus_1": [
+          "3/2",
+          "19/2"
+        ]
+      }
+    },
+    "nulls.csv": {
+      "n": 5,
+      "sum_exact": "110",
+      "mean_exact": "22",
+      "median_exact": "0",
+      "centered_ss_exact": "7680",
+      "sigma_population": 39.191835884530846,
+      "sigma_sample": 43.81780460041329,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          "0",
+          "55"
+        ],
+        "linear_p_n_minus_1": [
+          "0",
+          "10"
+        ]
+      }
+    },
+    "population.csv": {
+      "n": 27,
+      "sum_exact": "110",
+      "mean_exact": "110/27",
+      "median_exact": "0",
+      "centered_ss_exact": "260600/27",
+      "sigma_population": 18.907035582370693,
+      "sigma_sample": 19.267201956305726,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          "0",
+          "0"
+        ],
+        "linear_p_n_minus_1": [
+          "0",
+          "0"
+        ]
+      }
+    },
+    "quartiles-even.csv": {
+      "n": 6,
+      "sum_exact": "122",
+      "mean_exact": "61/3",
+      "median_exact": "11/2",
+      "centered_ss_exact": "14716/3",
+      "sigma_population": 28.592928418676454,
+      "sigma_sample": 31.321983760079224,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          "1",
+          "30"
+        ],
+        "linear_p_n_minus_1": [
+          "5/4",
+          "99/4"
+        ]
+      }
+    },
+    "quartiles.csv": {
+      "n": 5,
+      "sum_exact": "42",
+      "mean_exact": "42/5",
+      "median_exact": "2",
+      "centered_ss_exact": "3166/5",
+      "sigma_population": 11.253443917308159,
+      "sigma_sample": 12.581732790041283,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          "1/2",
+          "39/2"
+        ],
+        "linear_p_n_minus_1": [
+          "1",
+          "9"
+        ]
+      }
+    },
+    "sigma-symmetric.csv": {
+      "n": 28,
+      "sum_exact": "0",
+      "mean_exact": "0",
+      "median_exact": "0",
+      "centered_ss_exact": "20200",
+      "sigma_population": 26.859422395661664,
+      "sigma_sample": 27.352296944647048,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          "0",
+          "0"
+        ],
+        "linear_p_n_minus_1": [
+          "0",
+          "0"
+        ]
+      }
+    },
+    "singleton.csv": {
+      "n": 1,
+      "sum_exact": "7",
+      "mean_exact": "7",
+      "median_exact": "7",
+      "centered_ss_exact": "0",
+      "sigma_population": 0.0,
+      "sigma_sample": null,
+      "quartile_hypotheses_not_native": {
+        "median_of_halves_exclude_middle": [
+          null,
+          null
+        ],
+        "linear_p_n_minus_1": [
+          "7",
+          "7"
+        ]
+      }
+    }
+  },
+  "sd_symmetric_classification_hypothesis": {
+    "ordinary_anomaly_ids": [
+      "25",
+      "26"
+    ],
+    "extreme_ids": [
+      "27",
+      "28"
+    ],
+    "assumptions": "original population, absolute mean distance, k0.25/k1.5; exclusive classes for this candidate only",
+    "processed_keep_count": 28,
+    "processed_delete_both_count": 24,
+    "mean_median_replacement": 0,
+    "constant_example": 17
+  },
+  "iqr_symmetric_classification_hypothesis": {
+    "ordinary_anomaly_ids": [
+      "29",
+      "30"
+    ],
+    "extreme_ids": [
+      "31",
+      "32"
+    ],
+    "assumptions": "median0,Q1−2,Q3+2; median-centered strict k1.5/k3; exclusive classes for this candidate only"
+  },
+  "denominator_control": {
+    "value": "1",
+    "k": "8/5",
+    "mean": "1/4",
+    "population_threshold_squared": "12/25",
+    "sample_threshold_squared": "16/25",
+    "distance_squared": "9/16",
+    "population_detects": true,
+    "sample_detects": false
+  },
+  "modal_interval_hypotheses": {
+    "most-likely-bin.csv": {
+      "status": "HYPOTHESIS_NOT_NATIVE",
+      "assumptions": "equal-width, left-closed/right-open except last; original non-NULL population",
+      "raw_sturges_bins": 4.457423714725307,
+      "candidates": [
+        {
+          "rounding": "floor",
+          "bins": 4,
+          "histogram": [
+            10,
+            0,
+            0,
+            1
+          ],
+          "winners": [
+            0
+          ],
+          "width_exact": "25",
+          "midpoint_candidates_exact": [
+            "25/2"
+          ]
+        },
+        {
+          "rounding": "nearest",
+          "bins": 4,
+          "histogram": [
+            10,
+            0,
+            0,
+            1
+          ],
+          "winners": [
+            0
+          ],
+          "width_exact": "25",
+          "midpoint_candidates_exact": [
+            "25/2"
+          ]
+        },
+        {
+          "rounding": "ceil",
+          "bins": 5,
+          "histogram": [
+            10,
+            0,
+            0,
+            0,
+            1
+          ],
+          "winners": [
+            0
+          ],
+          "width_exact": "20",
+          "midpoint_candidates_exact": [
+            "10"
+          ]
+        }
+      ]
+    },
+    "most-likely-tie.csv": {
+      "status": "HYPOTHESIS_NOT_NATIVE",
+      "assumptions": "equal-width, left-closed/right-open except last; original non-NULL population",
+      "raw_sturges_bins": 3.8057254928473325,
+      "candidates": [
+        {
+          "rounding": "floor",
+          "bins": 3,
+          "histogram": [
+            6,
+            0,
+            1
+          ],
+          "winners": [
+            0
+          ],
+          "width_exact": "100/3",
+          "midpoint_candidates_exact": [
+            "50/3"
+          ]
+        },
+        {
+          "rounding": "nearest",
+          "bins": 4,
+          "histogram": [
+            6,
+            0,
+            0,
+            1
+          ],
+          "winners": [
+            0
+          ],
+          "width_exact": "25",
+          "midpoint_candidates_exact": [
+            "25/2"
+          ]
+        },
+        {
+          "rounding": "ceil",
+          "bins": 4,
+          "histogram": [
+            6,
+            0,
+            0,
+            1
+          ],
+          "winners": [
+            0
+          ],
+          "width_exact": "25",
+          "midpoint_candidates_exact": [
+            "25/2"
+          ]
+        }
+      ]
+    },
+    "most-likely-equal-bins.csv": {
+      "status": "HYPOTHESIS_NOT_NATIVE",
+      "assumptions": "equal-width, left-closed/right-open except last; original non-NULL population",
+      "raw_sturges_bins": 4.168085131338558,
+      "candidates": [
+        {
+          "rounding": "floor",
+          "bins": 4,
+          "histogram": [
+            3,
+            1,
+            2,
+            3
+          ],
+          "winners": [
+            0,
+            3
+          ],
+          "width_exact": "11/2",
+          "midpoint_candidates_exact": [
+            "11/4",
+            "77/4"
+          ]
+        },
+        {
+          "rounding": "nearest",
+          "bins": 4,
+          "histogram": [
+            3,
+            1,
+            2,
+            3
+          ],
+          "winners": [
+            0,
+            3
+          ],
+          "width_exact": "11/2",
+          "midpoint_candidates_exact": [
+            "11/4",
+            "77/4"
+          ]
+        },
+        {
+          "rounding": "ceil",
+          "bins": 5,
+          "histogram": [
+            3,
+            0,
+            3,
+            0,
+            3
+          ],
+          "winners": [
+            0,
+            2,
+            4
+          ],
+          "width_exact": "22/5",
+          "midpoint_candidates_exact": [
+            "11/5",
+            "11",
+            "99/5"
+          ]
+        }
+      ]
+    }
+  },
+  "warning": "statistics/candidates are independent arithmetic, not native schema/output or a handler PASS; freeze native rule before final oracle"
+}

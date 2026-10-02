@@ -31,7 +31,10 @@ export function buildNodeReadRequest(args,source){
  need(outcome?.status==='SUCCEEDED'&&outcome.cleanup_complete===true&&node?.cleanup_complete===true
   &&node.execution?.status==='completed'&&node.node&&request?.target?.type!=='exports.text',
   'Invalid parameters.source_operation_id: a completed local table node operation with confirmed cleanup is required');
- const previews=node.output?.ports?.map(p=>({port:p.port,schema:p.schema}))??[];
+ const previews=node.output?.ports?.map(p=>({port:p.port,schema:p.schema,
+  ...(p.port_guid?{port_guid:p.port_guid}:{}),
+  ...(request.target.type==='transform.cross_table'&&request.parameters?.columns?.mode==='sliding'
+   &&p.dynamic_schema?.kind==='crosstable_sliding'?{dynamic_schema:structuredClone(p.dynamic_schema)}:{})}))??[];
  // A verified local configuration retains the full mapping even when the
  // original operation requested no preview. Fresh execution and table-schema
  // comparison remain mandatory in the read driver; callers cannot supply this.
