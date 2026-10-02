@@ -96,9 +96,11 @@ async function runtimeDirectories(profile: string): Promise<string[]> {
 }
 
 async function browserIdentity(cmd: string[], env: Record<string, string>) {
-  if (cmd.some((arg) => arg.endsWith("/fixtures/fake-cli.ts"))) return undefined
+  const fake = cmd.some((arg) => arg.endsWith("/fixtures/fake-cli.ts"))
+  if (fake && !env.EVAL_FAKE_BROWSER_BUNDLE) return undefined
   const binary = await realpath(Bun.which(cmd[0]!) ?? cmd[0]!)
-  const resources = env.LOGINOM_AI_AGENT_CLI_BUNDLE ?? path.join(path.dirname(path.dirname(binary)), "resources", "loginom")
+  const resources = (fake ? env.EVAL_FAKE_BROWSER_BUNDLE : undefined) ?? env.LOGINOM_AI_AGENT_CLI_BUNDLE ??
+    path.join(path.dirname(path.dirname(binary)), "resources", "loginom")
   const manifest = await Bun.file(path.join(resources, "resource-manifest.json")).json() as { browser?: unknown }
   if (typeof manifest.browser !== "string" || path.isAbsolute(manifest.browser)) throw Error("Browser manifest identity unavailable")
   const executable = await realpath(path.join(resources, manifest.browser))

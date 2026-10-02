@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test"
 import { spawn } from "node:child_process"
-import { readFile, readlink, stat } from "node:fs/promises"
+import { mkdtemp, readFile, readlink, stat } from "node:fs/promises"
+import path from "node:path"
+import os from "node:os"
+import { agentCommand, runAgent } from "../src/cli"
+import { evalsRoot, loadConfig } from "../src/config"
 import { signalProcess, type ProcessIdentity } from "../src/process-supervisor"
 
 test("signalProcess: PID с другим starttime не получает сигнал", async () => {
@@ -17,3 +21,28 @@ test("signalProcess: PID с другим starttime не получает сиг�
     process.kill(pid, 0)
   } finally { child.kill("SIGKILL"); await exited }
 })
+
+test("supervisor: собственный detached browser закрыт, неизвестный helper остаётся и блокирует продолжение", async () => {
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-browser-proof-"))
+  const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-browser-bundle-"))
+  await Bun.build({ entrypoints: [path.join(evalsRoot, "fixtures/fake-browser.ts")], compile: { outfile: path.join(bundle, "chrome") } })
+  await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
+  const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: out })
+  const pidFile = path.join(out, "browser.pid")
+  const pending = runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+    EVAL_FAKE_BROWSER_PID_FILE: pidFile } }, taskId: "default", model: "fake/model", prompt: "test", files: [],
+    workdir: out, outDir: out, profileDir: out, timeoutMs: 30_000 })
+  await Bun.sleep(300)
+  const unknown = spawn(path.join(bundle, "chrome"), ["--type=unknown-helper"], { detached: true, stdio: "ignore" })
+  const exited = new Promise((resolve) => unknown.once("exit", resolve))
+  try {
+    const run = await pending
+    expect(run.exitCode).toBe(0)
+    expect(run.processCleanup.status).toBe("failed")
+    expect(run.processCleanup.error).toContain("Unexplained browser/helper")
+    expect(unknown.exitCode).toBeNull()
+    const pid = Number(await Bun.file(pidFile).text())
+    const state = (await Bun.$`ps -o stat= -p ${pid}`.quiet().nothrow()).text().trim()
+    expect(state === "" || state.startsWith("Z")).toBe(true)
+  } finally { unknown.kill("SIGKILL"); await exited }
+}, 20_000)
