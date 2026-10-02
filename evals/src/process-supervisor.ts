@@ -128,6 +128,7 @@ export async function superviseProcess(input: {
   const parents = new Map<string, string>()
   const boundBrowsers = new Set<string>()
   const denied = new Set<string>()
+  const unknown = new Map<string, ProcessIdentity>()
   const cleanup: ProcessCleanup = { status: "not_run", error: null, processes: [], runtimeDirectories: [], writer: null, capture_complete: true }
   const profile = input.profileDir ? await realpath(input.profileDir) : undefined
   const baseline = await snapshot()
@@ -205,6 +206,18 @@ export async function superviseProcess(input: {
         }
         boundBrowsers.add(key(entry))
       })
+      // Session membership can only be inherited by fork. Require the bound
+      // session leader to be alive with its observed birth/executable identity;
+      // a historical SID/PGID cannot admit a newly observed orphan.
+      const leaders = native.filter((entry) => boundBrowsers.has(key(entry)) && entry.pid === entry.session &&
+        ledger.get(key(entry))?.inode === entry.inode && ledger.get(key(entry))?.device === entry.device)
+      live.filter((entry) => !existing.has(key(entry)) && !ledger.has(key(entry))).forEach((entry) => {
+        const leader = leaders.find((candidate) => entry.session === candidate.session && entry.uid === candidate.uid &&
+          BigInt(entry.starttime) >= BigInt(candidate.starttime))
+        if (!leader) return
+        ledger.set(key(entry), identity(entry))
+        parents.set(key(entry), key(leader))
+      })
       const browserAncestor = (entry: ProcessView) => {
         let parent = parents.get(key(entry))
         const visited = new Set<string>()
@@ -227,17 +240,18 @@ export async function superviseProcess(input: {
                 new_runtime_match: cleanup.runtimeDirectories.some((directory) => data === path.join(directory, "browser-profile")),
                 executable_match: entry.device === browser.device && entry.inode === browser.inode, ancestry_match: browserAncestor(entry) })
             }
-            denied.add(key(entry)); cleanup.error ??= `Browser binding differs PID ${entry.pid}`
+            denied.add(key(entry)); unknown.set(key(entry), identity(entry)); cleanup.error ??= `Browser binding differs PID ${entry.pid}`
           }
           continue
         }
         const foreign = data && !inside(data, profile!)
         const foreignParent = live.some((parent) => parent.pid === entry.parent && dataDir(parent) && !inside(dataDir(parent)!, profile!))
         if (!foreign && !foreignParent) {
-          denied.add(key(entry)); cleanup.error ??= `Unexplained browser/helper PID ${entry.pid}`
+          denied.add(key(entry)); unknown.set(key(entry), identity(entry)); cleanup.error ??= `Unexplained browser/helper PID ${entry.pid}`
         }
       }
-      cleanup.unknownProcesses = native.filter((entry) => denied.has(key(entry))).map(identity)
+      cleanup.unknownProcesses = [...unknown.values()]
+      cleanup.processes = [...ledger.values()]
     }
     return live.filter((entry) => ledger.has(key(entry)))
   }
