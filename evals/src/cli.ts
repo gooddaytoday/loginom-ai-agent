@@ -117,7 +117,7 @@ export function agentCommand(config: EvalConfig, env: Record<string, string | un
   if (config.agent.cliMode === "binary") return { cmd: [config.agent.cliBin ?? "loginom-ai-agent-cli"], cwd: evalsRoot, env: isolated }
   return { cmd: ["bun", path.join(evalsRoot, "fixtures", "fake-cli.ts")], cwd: evalsRoot, env: isolated }
 }
-export type AgentCommand = ReturnType<typeof agentCommand>
+export type AgentCommand = ReturnType<typeof agentCommand> & { cleanupDir?: string; cleanupSecrets?: string[] }
 
 export async function runAgent(input: {
   command: AgentCommand
