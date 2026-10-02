@@ -36,6 +36,22 @@ connected=false/pinned=false, UND_ERR_CONNECT_TIMEOUT к mcp.loginom.ai:443.
 own profiles Code08/Declared09/readiness01; acceptance slot свободен.
 Отдельные original trial PASS Code07/Declared08 сохранены; общей pair PASS нет.
 
+**Blocked audit — третий последовательный Goal-ход**, 2026-10-02T19:10:03Z.
+Original exec66230 завершён, wrapper exit0; actual bundled Node/default SDK
+`f-setup-default-transport-recheck-17.json` сообщает connected=false/pinned=false,
+fetch failed / UND_ERR_CONNECT_TIMEOUT к mcp.loginom.ai:443. SHA
+`cf1a77efce9278dc0aaffb2dc893f9d652feac97dec1bdd5c0b49980de251c09`.
+Тот же blocker подтверждён во всех трёх текущих ходах (rechecks15–17).
+Манифест candidate11 совпадает с закреплённым hash; own exact-argv processes
+отсутствуют, acceptance lease=null. Live/model в этих двух повторных ходах
+не запускались. Полная цель не достигнута: обязательная пара на одном candidate
+с original writer/cold/pair evidence и phase6 completion/card/registry открыта.
+Без внешнего восстановления сети/сервиса дальнейшая приёмка невозможна;
+локальный каталог, другой endpoint, ослабление pins и повышение отдельных PASS
+до pair не допускаются. Goal переводится в blocked, не paused/complete.
+Owner продолжения — координатор этой задачи; trigger — восстановленное полное
+чтение каталога по штатному транспорту и возобновление пользователем.
+
 **Следующий шаг:** после восстановления полного default-transport catalog
 preflight — новая пара10 на тех же candidate11/reader11, новые profiles/paths.
 Не пересобирать продукт без причины. Private pair09 controller использовал
