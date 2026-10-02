@@ -97,6 +97,34 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
 
+### Candidate03 и согласованный QA freeze готовы — 2026-10-02
+
+После live-проверенного observer fix собран **candidate03**:
+source88548421a1963a2cef729607ebf27c7fd63f5c24,
+version0.0.0-dev-202610021417. Original build exec61631/terminal2d8cd7 exit0.
+Manifest SHA256 `a59a9a3acdc3a76749ca23084ac5dbb3c716ef44d481894edd23c64736a331d6`;
+source tree `4c197518e49c91a130d0f76b310ee0ff242448e06e92dbcb7d4ba844bfb08632`.
+Archive SHA256 `72ea13c03bb9ed2481e4e336655fac3d8feb8e25bcc903424276deb348f6c92d`;
+упаковка/распаковка и full manifest verification прошли.
+sourceDirty=true отражает сохранённые untracked docs/cache; tracked source clean.
+Никакой установленный клиент не заменён, release не выполнялся.
+
+Private `f-standalone-candidate-03-pins.json` SHA256
+`2240fbdf8c3290304c8f4781996c6bebeda89357afefd7944158fda34e9e3077`.
+Independent integrity5441 files PASS. Полный committed QA968 files заморожен
+в `f-cli-reader-03`, manifest SHA256
+`527f4824fb370b0ce6f966596c1bfe962e119998a1b8931ec5403cb4bc96bbd1`;
+все runtime links ведут только в candidate03. Freeze/check exec50892 exit0;
+actual cold-reader --help на bundled Node exit0, внешняя docs oracle не нужна.
+Предыдущие candidate02/reader02 не изменены и относятся к прежним evidence.
+
+Использовать candidate03/reader03/pins03 для следующих проверок. Остаток:
+actual CLI J21 full-source/apply/output, включая boundary source chunks,
+затем две независимые Code/declared trials с whole auditor/cold. Успешная
+техническая доставка knowledge/cleanup на candidate02 не закрывает этот остаток.
+Новых model/browser runs в этой build-итерации нет. Все build/freeze handles
+terminal, acceptance slot свободен, Goal остаётся активной.
+
 ### Linux browser observer исправлен и проверен live — 2026-10-02
 
 Следующий шаг теперь: собрать новый candidate с QA на88548421a1 и freeze reader,
