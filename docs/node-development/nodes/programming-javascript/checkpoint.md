@@ -2,6 +2,48 @@
 
 ## Текущее состояние
 
+**Pair10 завершена неполной — Code10 writer-аудит FAIL, 2026-10-02 19:56 UTC.**
+Declared10 original whole PASS/released сохранён. Code10 original collector и
+native origin PASS/exit0; manual full-source review778bytes/16LF принят.
+Source `570d990aac95e65571bed6238225b039af92b058e117614fc776388b9c9c7460`,
+session `ses_f01d65aa4ffeihNJeEK5PnXjeq`, writer762535. Whole audit прошёл lease,
+candidate/native/admission/public execute/source review/configuration/2 executions/
+full typed business output, но отказал на import binding:
+`javascript_acceptance_import_public_binding:cli_node_compact_expansion_changed`.
+Cold не запускался; original writer-audit не переписывать.
+
+Подтверждённое QA-упущение: `javascript_cli_nodes.py` не включает
+`dock_artifact_delivery_resume` в public receipt decoder/selector, а delivery
+witness ожидает ровно один `artifact_delivery_prepared`. `javascript_node_acceptance.py`
+не учитывает resume в delivered_input/parent intervals. Shared
+`artifact_delivery_evidence.py` знает post-upload resume, но phase-order не
+покрывает pre-upload checkpoint→повторная preparation. Actual Code10: первый
+prepared → preupload_checkpoint(upload_started=false, own document) → штатный
+public resume с тем же operation_id/new resume_id → второй prepared того же
+artifact/destination/bytes/SHA → одна upload receipt → один completed/bytes verify.
+Модель получила это продолжение от runtime, оператор не давал подсказки.
+Original FAIL сохраняется; не удалять промежуточные события из audit input.
+
+Code10 native Save`save-sales`/Close/logout SUCCEEDED1→0/no discard;
+package `/jsteach/JavaScript-code-ed51551b-4eff-4def-bd1d-b9e56a9d6f64.lgp`,
+cleanup SHA `b10ae36cf3566c68249186a8e0197c5f3892c927b16e31f6563ab82906d52cf5`.
+19:56:42.898Z original observed PID/startTicks absence, `.writer` absent,
+lease released/lock archived, затем holder750503 завершён SIGTERM после
+терминального аудита; это завершение idle operator, не forced CLI termination.
+`f-cli-autonomous-code-10/retirement.json`; controller не переиспользовать.
+
+**Следующий шаг:** узко исправить независимые QA binding/phase проверки для
+подтверждённого pre-upload resume. Обязательны same-artifact/bytes/path/owner,
+согласованный public original→resume, checkpoint до единственной загрузки,
+один completed и сохранённые native download/verification guards. Проверить
+actual Code10 diagnostic и отрицательные подмены (owner/path/bytes, checkpoint,
+ранняя/двойная загрузка, неверный resume); не повышать original trial до PASS.
+После committed QA — новый согласованный freeze/candidate и fresh pair11.
+Продуктовый JS handler/права/лимиты из-за этого не менять. Технический J21 read07
+на candidate06 остаётся scoped evidence; перед final completion адресно проверить
+применимость к актуальному candidate/knowledge1.2, при затронутом пути обновить.
+Все обязательные фазы/матрица остаются; автоматического accepted/merge/release нет.
+
 **Pair10: Declared10 original whole PASS/released; Code10 запущен.**
 Original holder750503 остаётся жив и хранит terminal trial. Declared writer751564,
 cold759304, session `ses_f01dd0697ffe60wAfEbPOSlXf2`; оба collector/whole audits

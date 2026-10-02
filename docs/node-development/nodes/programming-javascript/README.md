@@ -1,19 +1,20 @@
 # JavaScript
 
 Текущий этап — **фаза6, автономная CLI-приёмка**, candidate11/reader11 из
-child **f2a0cdd991**, knowledge1.2. Исправленный контракт declared проверен:
-60 адресных tests, полный client3446PASS+10SKIP, build/roundtrip/freeze PASS.
-Declared08 имеет original writer+independent cold whole PASS и normal cleanup;
-Code07 на предыдущем candidate имеет отдельный whole PASS. Эти результаты
-не составляют принятую пару. Code08 прерван до Save, retired incomplete;
-Declared09 остановлен до модельных вызовов из-за LOGINOM_HOST_TIMEOUT.
-Все собственные процессы завершены, acceptance slot освобождён.
+child **f2a0cdd991**, knowledge1.2. Контракт declared проверен:60 адресных tests,
+полный client3446PASS+10SKIP, build/roundtrip/freeze PASS. Соединение с сервисом
+знаний восстановлено; actual initialize/list/catalog SHA проверены.
 
-Текущий блокер — default-transport чтение закреплённого каталога сервиса знаний:
-initialize/list прошли, последующее чтение завершилось UND_ERR_CONNECT_TIMEOUT.
-Свежий compiled headed status показывает recoverable-error. Исходники и candidate
-из-за сетевого отказа не менялись. Следующий запуск — fresh pair10 после полного
-catalog preflight, на тех же immutable bytes; [точные evidence и продолжение](checkpoint.md#текущее-состояние).
+**Declared10 original writer+cold whole PASS**, normal cleanup/release подтверждены.
+Code10 завершился exit0, source/configuration/fresh executions/full6×4 проверены,
+но whole writer audit отказал на import binding после штатного pre-upload
+`delivery_resume`: QA ещё не учитывает этот public result и повторную preparation
+после подтверждённого checkpoint без загрузки. Original FAIL сохранён; cold Code10
+не запускался. Native Save/Close/logout подтверждены, процессы и слот освобождены.
+Следующий шаг — адресное исправление аудитора с проверками отрицательных подмен,
+затем новый immutable QA/candidate и свежая пара. Подробности и точные SHA —
+[checkpoint](checkpoint.md#текущее-состояние). Declared08/Code07 сохраняют свои
+отдельные scoped PASS; они не заменяют полную пару одного кандидата.
 Integration, push и release не выполнялись; accepted registry остаётся открытым.
 
 Далее сохранены этапы реализации с их исходными границами проверки; для
