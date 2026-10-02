@@ -3,28 +3,28 @@ import {createHash} from 'node:crypto';
 import {javascriptBusinessProbes} from './javascript-business-probes.mjs';
 import {javascriptMaterializationObservation} from './javascript-materialization-observation.mjs';
 
-const base=javascriptBusinessProbes().find(probe=>probe.id==='p1-business-code-base');
-if(base.source_sha256!=='1bc0f8123e1c2a6f1924ee69e0e9373d720e4ea301f4f928d347535e06b61ec3')
-  throw Error('G3 business source pin differs');
-const snapshot='function snapshot() {\n'
-  +'  if (OutputTable.ColumnCount !== 5) throw Error("JS_BRIDGE_COLUMN_COUNT");\n'
-  +'  return [0,1,2,3,4].map(function(index) {\n'
-  +'    var column=OutputTable.GetColumn(index);\n'
-  +'    if (column.Index !== index || typeof column.Name !== "string" || typeof column.DisplayName !== "string"'
-  +' || column.Name.length > 128 || column.DisplayName.length > 128 || typeof column.DataType !== "number")'
-  +' throw Error("JS_BRIDGE_METADATA_SHAPE");\n'
-  +'    return {index:column.Index,name:column.Name,display_name:column.DisplayName,data_type:column.DataType};\n'
-  +'  });\n}\nvar before=snapshot();\n';
-const source=base.source.replace('{Name:"Status",DataType:DataType.String}]);',
-  '{Name:"Status",DataType:DataType.String},{Name:"__JS_Metadata",DataType:DataType.String}]);')
-  .replace('for (var row=0;',snapshot+'for (var row=0;')
-  .replace('  OutputTable.Set("Status",net<0?"возврат":net===0?"ноль":"продажа");\n',
-    '  OutputTable.Set("Status",net<0?"возврат":net===0?"ноль":"продажа");\n'
-    +'  var metadata=JSON.stringify({version:1,probe_id:"g3-code-business-bridge",column_count:5,row:row,before:before,after:snapshot()});\n'
-    +'  if (metadata.length > 4096) throw Error("JS_BRIDGE_JSON_BOUND");\n'
-    +'  OutputTable.Set(4,metadata);\n');
-
 export function javascriptBridgeProbe() {
+  const base=javascriptBusinessProbes().find(probe=>probe.id==='p1-business-code-base');
+  if(base.source_sha256!=='1bc0f8123e1c2a6f1924ee69e0e9373d720e4ea301f4f928d347535e06b61ec3')
+    throw Error('G3 business source pin differs');
+  const snapshot='function snapshot() {\n'
+    +'  if (OutputTable.ColumnCount !== 5) throw Error("JS_BRIDGE_COLUMN_COUNT");\n'
+    +'  return [0,1,2,3,4].map(function(index) {\n'
+    +'    var column=OutputTable.GetColumn(index);\n'
+    +'    if (column.Index !== index || typeof column.Name !== "string" || typeof column.DisplayName !== "string"'
+    +' || column.Name.length > 128 || column.DisplayName.length > 128 || typeof column.DataType !== "number")'
+    +' throw Error("JS_BRIDGE_METADATA_SHAPE");\n'
+    +'    return {index:column.Index,name:column.Name,display_name:column.DisplayName,data_type:column.DataType};\n'
+    +'  });\n}\nvar before=snapshot();\n';
+  const source=base.source.replace('{Name:"Status",DataType:DataType.String}]);',
+    '{Name:"Status",DataType:DataType.String},{Name:"__JS_Metadata",DataType:DataType.String}]);')
+    .replace('for (var row=0;',snapshot+'for (var row=0;')
+    .replace('  OutputTable.Set("Status",net<0?"возврат":net===0?"ноль":"продажа");\n',
+      '  OutputTable.Set("Status",net<0?"возврат":net===0?"ноль":"продажа");\n'
+      +'  var metadata=JSON.stringify({version:1,probe_id:"g3-code-business-bridge",column_count:5,row:row,before:before,after:snapshot()});\n'
+      +'  if (metadata.length > 4096) throw Error("JS_BRIDGE_JSON_BOUND");\n'
+      +'  OutputTable.Set(4,metadata);\n');
+
   return {...structuredClone(base),id:'g3-code-business-bridge',scope:'G3-bridge',source,
     source_sha256:createHash('sha256').update(source,'utf8').digest('hex'),
     schema:[...structuredClone(base.schema),{name:'__JS_Metadata',label:'__JS_Metadata',type:'string'}],

@@ -33,108 +33,112 @@ const typed=(id,type,expressions,values,note)=>({id,scope:'G5',source:source(typ
   schema:column({String:'string',Boolean:'boolean',Integer:'integer',Float:'real',DateTime:'datetime'}[type]),
   expected:values===null?null:values.map(value=>[value]),note,expectation:values===null?'characterization':'fixed'});
 
-const codeProbes=[
-  ...javascriptColumnNameProbes,
-  ...knowledgeProbes,
-  ...javascriptEngineProbes.map(p=>({...p,id:'engine-'+p.id,schema:column('string'),
-    expected:p.expected?.map(v=>[v])??null,expectation:p.expectedError?'diagnostic':'fixed'})),
-  {...inputTextProbe('Customer'),id:'engine-input-text',schema:column('string'),expectation:'fixed',
-    // Independent literals from pinned sales.csv, including preserved padding.
-    expected:[['["Alpha","  alpha  ","  ALPHA  "]'],['["BETA","beta","BETA"]'],
-      ['["Alpha","alpha","ALPHA"]'],['["Гамма","гамма","ГАММА"]'],['["Ёж","ёж","ЁЖ"]'],['["delta","delta","DELTA"]']]},
-  {id:'g5-native-real',scope:'G5',native_input_fixture:'real',
-    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
-      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Float}]);\n'
-      +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
-    schema:[{name:'Value',label:'Value',type:'real'}],expected:[[null],[0],[-1.25],[10.125]],expectation:'fixed'},
-  {id:'g5-native-civil-datetime',scope:'G5',native_input_fixture:'civil-datetime',
-    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
-      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.DateTime}]);\n'
-      +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
-    schema:[{name:'Value',label:'Value',type:'datetime'}],
-    expected:[[null],['2024-02-29T23:59:59.123'],['2026-03-29T01:59:59.999']],expectation:'fixed'},
-  {id:'g5-native-cardinality-keep2',scope:'G5',native_input_fixture:'cardinality-keep2',
-    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
-      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
-      +'for (let row=0;row<InputTable.RowCount;row++) {\n  const value=InputTable.Get(row,"Value");\n  if (value === 2) { OutputTable.Append(); OutputTable.Set("Value",value); }\n}\n',
-    schema:[{name:'Value',label:'Value',type:'integer'}],expected:[['2']],expectation:'fixed'},
-  {id:'g5-native-cardinality-odd',scope:'G5',native_input_fixture:'cardinality-odd',
-    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
-      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
-      +'for (let row=0;row<InputTable.RowCount;row++) {\n  const value=InputTable.Get(row,"Value");\n  if (value % 2 === 1) { OutputTable.Append(); OutputTable.Set("Value",value); }\n}\n',
-    schema:[{name:'Value',label:'Value',type:'integer'}],expected:[['1'],['3']],expectation:'fixed'},
-  {id:'g5-native-cardinality-duplicate',scope:'G5',native_input_fixture:'cardinality-duplicate',
-    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
-      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
-      +'for (let row=0;row<InputTable.RowCount;row++) {\n  const value=InputTable.Get(row,"Value");\n  OutputTable.Append(); OutputTable.Set("Value",value);\n  OutputTable.Append(); OutputTable.Set("Value",value);\n}\n',
-    schema:[{name:'Value',label:'Value',type:'integer'}],expected:[['1'],['1'],['2'],['2'],['3'],['3']],expectation:'fixed'},
-  {id:'declared-g5-native-cardinality-empty',scope:'G5',native_input_fixture:'cardinality-empty',schema_mode:'declared',
-    source:'import {InputTable,OutputTable} from "builtIn/Data";\n// UI-declared Value Integer; deliberately emit no rows.\n',
-    schema:[{name:'Value',label:'Value',type:'integer'}],expected:[],expectation:'fixed'},
-  {id:'g5-native-integer-outside-safe',scope:'G5',native_input_fixture:'integer-outside-safe',
-    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
-      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
-      +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
-    schema:[{name:'Value',label:'Value',type:'integer'}],expected:null,expectation:'characterization',
-    note:'Bounded native int64 input and typed output observation; never promises exact outside-safe identity or arithmetic.'},
-  {id:'g5-native-integer-safe',scope:'G5',native_input_fixture:'integer-safe',
-    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
-      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
-      +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
-    schema:[{name:'Value',label:'Value',type:'integer'}],expected:[[null], ["-9007199254740991"], ["0"], ["9007199254740991"]],expectation:'fixed'},
-  {id:'g5-native-string',scope:'G5',native_input_fixture:'string',
-    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
-      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.String}]);\n'
-      +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
-    schema:[{name:'Value',label:'Value',type:'string'}],expected:[[null], [""], ["null"], ["NULL"], ["0"], ["false"], ["Привет, Ёж 😀"], ["quote\"\\slash\nline"]],expectation:'fixed'},
-  {id:'g5-native-boolean',scope:'G5',native_input_fixture:'boolean',
-    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
-      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Boolean}]);\n'
-      +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
-    schema:[{name:'Value',label:'Value',type:'boolean'}],expected:[[null],[false],[true]],expectation:'fixed'},
-  typed('g5-null-empty','String',['null','""','"null"','"0"','"false"'],[null,'','null','0','false']),
-  typed('g5-undefined','String',['undefined'],null,'Unknown bridge semantics; record typed output or owned failure without choosing an expected value after observation.'),
-  typed('g5-boolean','Boolean',['null','false','true'],[null,false,true]),
-  typed('g5-real','Float',['null','0','-1.25','10.125'],[null,0,-1.25,10.125]),
-  typed('g5-one-output','Integer',['7'],['7']),
-  typed('g5-safe-integer','Integer',['-9007199254740991','0','9007199254740991'],['-9007199254740991','0','9007199254740991']),
-  typed('g5-outside-safe','Integer',['Number("9007199254740993")'],null,'Characterization only; does not test native input int64 transport or promise exact arithmetic.'),
-  ...[['fraction','1.75'],['string','"42"'],['nan','NaN'],['positive-infinity','Infinity'],['negative-infinity','-Infinity']]
-    .map(([id,value])=>typed('g5-integer-'+id,'Integer',[value],null,'Integer coercion is unknown; independent isolated case, never alter the safe-integer oracle.')),
-  typed('g5-date-civil','DateTime',['null','new Date(2024, 1, 29, 23, 59, 59, 123)'],[null,'2024-02-29T23:59:59.123'],
-    'Constructed civil JS Date to native output only; not native input roundtrip or native serial-byte proof.'),
-  {id:'g5-named-access',scope:'G5',source:source('Integer','for(let i=0;i<InputTable.RowCount;i++){OutputTable.Append();OutputTable.Set("Result",InputTable.Get(i,"RowID"));}'),
-    schema:column('integer'),expected:[['1'],['2'],['3'],['4'],['5'],['6']],expectation:'fixed'},
-  {id:'g5-empty-input',scope:'G5',input_variant:'empty',
-    source:source('Integer','for(let i=0;i<InputTable.RowCount;i++){OutputTable.Append();OutputTable.Set("Result",InputTable.Get(i,"RowID"));}'),
-    schema:column('integer'),expected:[],expectation:'fixed'},
-  {id:'g5-name-case',scope:'G5',source:source('Integer','OutputTable.Append();OutputTable.Set("Result",InputTable.Get(0,"rowid"));'),
-    schema:column('integer'),expected:null,expectation:'characterization',note:'Named-access case sensitivity is unknown.'},
-  {id:'g5-empty-output',scope:'G5',source:source('Integer','// Deliberately append no rows.'),
-    schema:column('integer'),expected:[],expectation:'fixed'},
-  ...javascriptBusinessProbes(),
-  {...javascriptBusinessProbes().find(probe=>probe.id==='p1-business-code-base'),
-    id:'c0-code-materialization',scope:'C0-materialization'},
-  javascriptBridgeProbe(),
-  javascriptStopProbe(),
-].map(p=>({...p,schema_mode:p.schema_mode??'code',build:'7.4.2',source_sha256:hash(p.source),status:'not_run'}));
+function discoveryProbes() {
+  const codeProbes=[
+    ...javascriptColumnNameProbes,
+    ...knowledgeProbes,
+    ...javascriptEngineProbes.map(p=>({...p,id:'engine-'+p.id,schema:column('string'),
+      expected:p.expected?.map(v=>[v])??null,expectation:p.expectedError?'diagnostic':'fixed'})),
+    {...inputTextProbe('Customer'),id:'engine-input-text',schema:column('string'),expectation:'fixed',
+      // Independent literals from pinned sales.csv, including preserved padding.
+      expected:[['["Alpha","  alpha  ","  ALPHA  "]'],['["BETA","beta","BETA"]'],
+        ['["Alpha","alpha","ALPHA"]'],['["Гамма","гамма","ГАММА"]'],['["Ёж","ёж","ЁЖ"]'],['["delta","delta","DELTA"]']]},
+    {id:'g5-native-real',scope:'G5',native_input_fixture:'real',
+      source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+        +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Float}]);\n'
+        +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
+      schema:[{name:'Value',label:'Value',type:'real'}],expected:[[null],[0],[-1.25],[10.125]],expectation:'fixed'},
+    {id:'g5-native-civil-datetime',scope:'G5',native_input_fixture:'civil-datetime',
+      source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+        +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.DateTime}]);\n'
+        +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
+      schema:[{name:'Value',label:'Value',type:'datetime'}],
+      expected:[[null],['2024-02-29T23:59:59.123'],['2026-03-29T01:59:59.999']],expectation:'fixed'},
+    {id:'g5-native-cardinality-keep2',scope:'G5',native_input_fixture:'cardinality-keep2',
+      source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+        +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
+        +'for (let row=0;row<InputTable.RowCount;row++) {\n  const value=InputTable.Get(row,"Value");\n  if (value === 2) { OutputTable.Append(); OutputTable.Set("Value",value); }\n}\n',
+      schema:[{name:'Value',label:'Value',type:'integer'}],expected:[['2']],expectation:'fixed'},
+    {id:'g5-native-cardinality-odd',scope:'G5',native_input_fixture:'cardinality-odd',
+      source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+        +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
+        +'for (let row=0;row<InputTable.RowCount;row++) {\n  const value=InputTable.Get(row,"Value");\n  if (value % 2 === 1) { OutputTable.Append(); OutputTable.Set("Value",value); }\n}\n',
+      schema:[{name:'Value',label:'Value',type:'integer'}],expected:[['1'],['3']],expectation:'fixed'},
+    {id:'g5-native-cardinality-duplicate',scope:'G5',native_input_fixture:'cardinality-duplicate',
+      source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+        +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
+        +'for (let row=0;row<InputTable.RowCount;row++) {\n  const value=InputTable.Get(row,"Value");\n  OutputTable.Append(); OutputTable.Set("Value",value);\n  OutputTable.Append(); OutputTable.Set("Value",value);\n}\n',
+      schema:[{name:'Value',label:'Value',type:'integer'}],expected:[['1'],['1'],['2'],['2'],['3'],['3']],expectation:'fixed'},
+    {id:'declared-g5-native-cardinality-empty',scope:'G5',native_input_fixture:'cardinality-empty',schema_mode:'declared',
+      source:'import {InputTable,OutputTable} from "builtIn/Data";\n// UI-declared Value Integer; deliberately emit no rows.\n',
+      schema:[{name:'Value',label:'Value',type:'integer'}],expected:[],expectation:'fixed'},
+    {id:'g5-native-integer-outside-safe',scope:'G5',native_input_fixture:'integer-outside-safe',
+      source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+        +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
+        +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
+      schema:[{name:'Value',label:'Value',type:'integer'}],expected:null,expectation:'characterization',
+      note:'Bounded native int64 input and typed output observation; never promises exact outside-safe identity or arithmetic.'},
+    {id:'g5-native-integer-safe',scope:'G5',native_input_fixture:'integer-safe',
+      source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+        +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
+        +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
+      schema:[{name:'Value',label:'Value',type:'integer'}],expected:[[null], ["-9007199254740991"], ["0"], ["9007199254740991"]],expectation:'fixed'},
+    {id:'g5-native-string',scope:'G5',native_input_fixture:'string',
+      source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+        +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.String}]);\n'
+        +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
+      schema:[{name:'Value',label:'Value',type:'string'}],expected:[[null], [""], ["null"], ["NULL"], ["0"], ["false"], ["Привет, Ёж 😀"], ["quote\"\\slash\nline"]],expectation:'fixed'},
+    {id:'g5-native-boolean',scope:'G5',native_input_fixture:'boolean',
+      source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+        +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Boolean}]);\n'
+        +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
+      schema:[{name:'Value',label:'Value',type:'boolean'}],expected:[[null],[false],[true]],expectation:'fixed'},
+    typed('g5-null-empty','String',['null','""','"null"','"0"','"false"'],[null,'','null','0','false']),
+    typed('g5-undefined','String',['undefined'],null,'Unknown bridge semantics; record typed output or owned failure without choosing an expected value after observation.'),
+    typed('g5-boolean','Boolean',['null','false','true'],[null,false,true]),
+    typed('g5-real','Float',['null','0','-1.25','10.125'],[null,0,-1.25,10.125]),
+    typed('g5-one-output','Integer',['7'],['7']),
+    typed('g5-safe-integer','Integer',['-9007199254740991','0','9007199254740991'],['-9007199254740991','0','9007199254740991']),
+    typed('g5-outside-safe','Integer',['Number("9007199254740993")'],null,'Characterization only; does not test native input int64 transport or promise exact arithmetic.'),
+    ...[['fraction','1.75'],['string','"42"'],['nan','NaN'],['positive-infinity','Infinity'],['negative-infinity','-Infinity']]
+      .map(([id,value])=>typed('g5-integer-'+id,'Integer',[value],null,'Integer coercion is unknown; independent isolated case, never alter the safe-integer oracle.')),
+    typed('g5-date-civil','DateTime',['null','new Date(2024, 1, 29, 23, 59, 59, 123)'],[null,'2024-02-29T23:59:59.123'],
+      'Constructed civil JS Date to native output only; not native input roundtrip or native serial-byte proof.'),
+    {id:'g5-named-access',scope:'G5',source:source('Integer','for(let i=0;i<InputTable.RowCount;i++){OutputTable.Append();OutputTable.Set("Result",InputTable.Get(i,"RowID"));}'),
+      schema:column('integer'),expected:[['1'],['2'],['3'],['4'],['5'],['6']],expectation:'fixed'},
+    {id:'g5-empty-input',scope:'G5',input_variant:'empty',
+      source:source('Integer','for(let i=0;i<InputTable.RowCount;i++){OutputTable.Append();OutputTable.Set("Result",InputTable.Get(i,"RowID"));}'),
+      schema:column('integer'),expected:[],expectation:'fixed'},
+    {id:'g5-name-case',scope:'G5',source:source('Integer','OutputTable.Append();OutputTable.Set("Result",InputTable.Get(0,"rowid"));'),
+      schema:column('integer'),expected:null,expectation:'characterization',note:'Named-access case sensitivity is unknown.'},
+    {id:'g5-empty-output',scope:'G5',source:source('Integer','// Deliberately append no rows.'),
+      schema:column('integer'),expected:[],expectation:'fixed'},
+    ...javascriptBusinessProbes(),
+    {...javascriptBusinessProbes().find(probe=>probe.id==='p1-business-code-base'),
+      id:'c0-code-materialization',scope:'C0-materialization'},
+    javascriptBridgeProbe(),
+    javascriptStopProbe(),
+  ].map(p=>({...p,schema_mode:p.schema_mode??'code',build:'7.4.2',source_sha256:hash(p.source),status:'not_run'}));
 
-// Operator-only declared counterparts: the authored body and expected values
-// stay identical; schema creation belongs to the native wizard.
-const declaredIds=new Set(['g5-native-integer-outside-safe','g5-native-civil-datetime','g5-native-integer-safe','g5-native-string','g5-native-boolean','g5-native-real','g5-null-empty','g5-boolean','g5-real','g5-safe-integer',
-  'g5-date-civil','g5-named-access','g5-empty-output','g5-one-output','g5-empty-input']);
-const probes=[...codeProbes,...codeProbes.filter(probe=>declaredIds.has(probe.id)).map(probe=>{
-  const lines=probe.source.split('\n');
-  need(lines[1].startsWith('OutputTable.AssignColumns(')&&lines[1].endsWith(');'),
-    'Declared fixed source schema statement unavailable');
-  const body=lines.filter((_,index)=>index!==1).join('\n');
-  return {...probe,id:'declared-'+probe.id,schema_mode:'declared',source:body,source_sha256:hash(body)};
-})];
+  // Operator-only declared counterparts: the authored body and expected values
+  // stay identical; schema creation belongs to the native wizard.
+  const declaredIds=new Set(['g5-native-integer-outside-safe','g5-native-civil-datetime','g5-native-integer-safe','g5-native-string','g5-native-boolean','g5-native-real','g5-null-empty','g5-boolean','g5-real','g5-safe-integer',
+    'g5-date-civil','g5-named-access','g5-empty-output','g5-one-output','g5-empty-input']);
+  const probes=[...codeProbes,...codeProbes.filter(probe=>declaredIds.has(probe.id)).map(probe=>{
+    const lines=probe.source.split('\n');
+    need(lines[1].startsWith('OutputTable.AssignColumns(')&&lines[1].endsWith(');'),
+      'Declared fixed source schema statement unavailable');
+    const body=lines.filter((_,index)=>index!==1).join('\n');
+    return {...probe,id:'declared-'+probe.id,schema_mode:'declared',source:body,source_sha256:hash(body)};
+  })];
 
-export const javascriptDiscoveryIds=Object.freeze(probes.map(p=>p.id));
+  return probes;
+}
+
+export function javascriptDiscoveryIds(){return Object.freeze(discoveryProbes().map(p=>p.id));}
 
 export function javascriptDiscoveryProbe(id){
-  const matches=probes.filter(p=>p.id===id);
+  const matches=discoveryProbes().filter(p=>p.id===id);
   need(matches.length===1,'Unknown isolated discovery probe');
   return structuredClone(matches[0]);
 }

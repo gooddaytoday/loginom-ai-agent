@@ -3,17 +3,6 @@
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 
-const root=new URL('../../../../docs/node-development/nodes/programming-javascript/fixtures/',import.meta.url);
-const manifest=JSON.parse(readFileSync(new URL('manifest.json',root),'utf8'));
-const bytes=readFileSync(new URL('operator-only/expected.json',root));
-const pin=manifest.files.find(file=>file.path==='operator-only/expected.json');
-if(!pin||pin.bytes!==bytes.length||pin.sha256!==createHash('sha256').update(bytes).digest('hex'))
-  throw Error('JavaScript business oracle fixture pin differs');
-const oracle=JSON.parse(bytes.toString('utf8'));
-if(oracle.kind!=='independent_business_oracle_specification'||oracle.status!=='authored_not_live_validated'
-  ||oracle.schema?.length!==4||oracle.ordered_rows?.length!==6||oracle.numeric_tolerance!==0)
-  throw Error('JavaScript business oracle shape differs');
-
 const prefix='import {InputTable,OutputTable,DataType} from "builtIn/Data";\n';
 const columns='OutputTable.AssignColumns([{Name:"RowID",DataType:DataType.Integer},'
   +'{Name:"CustomerKey",DataType:DataType.String},{Name:"NetCents",DataType:DataType.Integer},'
@@ -33,6 +22,18 @@ const body='for (var row=0;row<InputTable.RowCount;row++) {\n'
   +'}\n';
 
 export function javascriptBusinessProbes() {
+  // Cold readers import the operator graph without loading business oracles.
+  const root=new URL('../../../../docs/node-development/nodes/programming-javascript/fixtures/',import.meta.url);
+  const manifest=JSON.parse(readFileSync(new URL('manifest.json',root),'utf8'));
+  const bytes=readFileSync(new URL('operator-only/expected.json',root));
+  const pin=manifest.files.find(file=>file.path==='operator-only/expected.json');
+  if(!pin||pin.bytes!==bytes.length||pin.sha256!==createHash('sha256').update(bytes).digest('hex'))
+    throw Error('JavaScript business oracle fixture pin differs');
+  const oracle=JSON.parse(bytes.toString('utf8'));
+  if(oracle.kind!=='independent_business_oracle_specification'||oracle.status!=='authored_not_live_validated'
+    ||oracle.schema?.length!==4||oracle.ordered_rows?.length!==6||oracle.numeric_tolerance!==0)
+    throw Error('JavaScript business oracle shape differs');
+
   return ['code','declared'].flatMap(schema_mode=>['base','changed','reordered'].map(input_variant=>{
     const source=prefix+(schema_mode==='code'?columns:'')+body;
     const rows=structuredClone(oracle.ordered_rows);
