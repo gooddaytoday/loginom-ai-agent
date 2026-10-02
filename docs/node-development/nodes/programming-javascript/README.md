@@ -5,9 +5,11 @@ child **562cc826a7**, knowledge1.2. Исправлен независимый QA
 pre-upload delivery resume:13 адресных tests PASS, связанные67PASS/3SKIP,
 provenance5045 PASS. Build/roundtrip/freeze и reader preflight PASS.
 
-Начата свежая **pair11**: Declared11, затем Code11 в original holder и обычном
-headed-браузере. До обоих whole PASS и итогового pair audit приёмка открыта.
-Original Code10 FAIL сохранён; Declared10 individual PASS не заменяет пару.
+**Pair11 неполная:** Declared11 завершился с `LOGINOM_HOST_CLEANUP_FAILED`
+после подтверждённых Save/Close/logout; original collector FAIL сохранён.
+Cold и Code11 не запускались. Все наблюдённые процессы завершились, слот
+освобождён, профиль с guard оставлен как evidence. Следующий шаг — локализация
+private shutdown/ACK отказа; guards закрытия не ослаблять.
 Точные pins, процессы и порядок продолжения — в
 [checkpoint](checkpoint.md#текущее-состояние).
 Integration, push и release не выполнялись; accepted registry остаётся открытым.

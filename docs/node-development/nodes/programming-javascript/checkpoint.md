@@ -2,6 +2,37 @@
 
 ## Текущее состояние
 
+**Pair11 завершена неполной — Declared11 cleanup FAIL, 2026-10-02 20:26 UTC.**
+Original writer806513 завершился exit1: `LOGINOM_HOST_CLEANUP_FAILED`;
+collector отказал `cli_process_original_clean_exit_required` и
+`cli_process_profile_guard_retained`. Cold и Code11 не запускались.
+Сохранённый native cleanup отдельно подтверждает Save`save-sales`,
+Close1→0/logout/no discard для
+`/jsteach/JavaScript-declared-95ccd6bf-017b-4f7e-b346-d809f909e421.lgp`.
+Cleanup SHA `fcb4719f82db2f8f351138f9e5684fa594587428bd920c2005b84fa883b96579`,
+collection SHA `d0442fa0732c64aa8a6be79f86cba7f833ab578f74017586b9be9558bebd5a9c`.
+Native session `1c6b8a99-5111-4830-aae0-ea5ea80bd262`, CLI session
+`ses_f01bb535fffetwA3b0yr34nw4C`. Original capture/SQLite содержат завершённые
+import-sales/js-sales и Save, но whole model/business audit не выполнялся:
+collector отказал раньше. Утверждать whole PASS запрещено.
+
+20:26:00.497Z подтверждено отсутствие всех24 original PID/startTicks;
+package cleanup проверен по assignment, lease освобождён и lock архивирован.
+`.writer` сохранён как failure evidence, профиль не переиспользовать.
+Idle holder805601 после этого завершён SIGTERM; CLI к этому моменту уже
+самостоятельно завершился. Private `f-cli-autonomous-declared-11/retirement.json`.
+Ни память, ни новый случайный клик причиной отказа не объявляются.
+
+**Следующий шаг:** локализовать private resource shutdown/ACK отказ после
+успешного native Close. В текущих sources node-client/supervisor сворачивают
+request/exit failures в общий cleanup error, stderr дочерних процессов ignore;
+точного этапа по сохранённым данным пока не установлено. Не ослаблять guards,
+не снимать profile guard и не повышать результат по одному Close. Нужна адресная
+диагностика причины, затем подходящие tests и новая fresh pair; candidate12/
+reader12 сохраняются immutable. Фаза6 и техническая актуализация J21 открыты.
+
+### Предшествующая подготовка pair11
+
 **Pair11 начата — 2026-10-02 20:18 UTC.** Child
 `562cc826a750dc025c143032065ae504f0fb07e8` исправляет независимый QA для
 pre-upload checkpoint/resume: same-owner/artifact/path/bytes, явный public
