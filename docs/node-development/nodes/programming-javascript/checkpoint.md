@@ -96,6 +96,37 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
 
+### Повторная сетевая проверка candidate02 — 2026-10-02
+
+Предыдущий goal turn классифицирован как progress: OAuth/cold import/build
+изменили подтверждённое состояние. Этот ход уточнил условие блокировки,
+не запускал Loginom и не менял source/candidate/настройки TLS.
+Private `f-setup-stage-diagnostic-06.json`: Python HTTPS + назначенный ключ,
+TLS/initialize/tools-list200 за0.39s, execfd6ecd exit0. Неверный ключ и полная
+недоступность сервиса этим опровергаются; стабильность Node не доказана.
+Actual candidate Node + SDK recheck07 снова получил connect timeout,
+original exec56768/terminal7fd022. Адрес DNS одинаковый62.113.108.18.
+Отдельные GET с TLS1.2 и явными X25519/P-256/P-384 были быстрыми, но полные
+MCP diagnostics08/09 с этими настройками всё равно отказали. Гипотеза TLS groups
+**не подтверждена**; её не считать исправлением, в продукт не переносить.
+
+Diagnostic11 использовал actual candidate default TLS/SDK/connectRemote и
+ограниченную strace только connect/getsockopt/getpeername, без network payloads.
+Получены initialize и15 tool names; pinActionCatalog завершился fetch failed /
+UND_ERR_CONNECT_TIMEOUT. Trace подтверждает SO_ERROR=0 послеTCPconnect к
+назначенному62.113.108.18:443 примерно за15–30ms; этого недостаточно для
+объявления конкретной причины дальнейшего TLS/transport timeout.
+Original exec62894/terminalaeaa6d exit0 относится к диагностическому wrapper,
+а не к успешному каталогу: `pinned=false` в
+`f-setup-default-transport-diagnostic-11.json`. Ни certificate validation,
+ни pin, ни original startup deadlines не ослаблены. Все diagnostic handles terminal.
+
+Сохраняется тот же внешний gate: устойчивый initialize/list/read закреплённого
+каталога через реальный bundled transport. До него J01/J21/J27/model trials
+открыты; не обходить сеть подменой клиента/каталога и не повышать readiness.
+Второй последовательный goal turn с этим блокером; пока есть новая диагностика,
+статус blocked не выставлялся. Agent memory error не наблюдался.
+
 ### Продолжение: OAuth подтверждён, cold import исправлен, setup пока не завершён — 2026-10-02
 
 Original OAuth exec83926 завершился exit0, terminal811d0d: Login successful.
