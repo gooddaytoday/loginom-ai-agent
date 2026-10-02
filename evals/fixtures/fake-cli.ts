@@ -60,6 +60,10 @@ const id = process.env.EVAL_TASK_ID ?? "default"
 const events = Bun.file(path.join(fixtures, `${id}.jsonl`))
 const chosen = (await events.exists()) ? events : Bun.file(path.join(fixtures, "default.jsonl"))
 process.stdout.write(await chosen.text())
+if (process.env.EVAL_FAKE_HANG_AFTER_EVENTS) {
+  process.on("SIGINT", () => {})
+  await Bun.sleep(120_000)
+}
 const exit = Bun.file(path.join(fixtures, `${id}.exit`))
 const stderr = Bun.file(path.join(fixtures, `${id}.stderr`))
 if (await stderr.exists()) process.stderr.write(await stderr.text())

@@ -169,6 +169,23 @@ test("runAgent: changed writer даёт failed cleanup без потери no_ar
   expect(await Bun.file(`${outDir}.process-group`).exists()).toBe(true)
 })
 
+test("runAgent: timeout с отказом ownership ограничен и сохраняет уже полученную телеметрию", async () => {
+  const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-timeout-proof-"))
+  const command = agentCommand(loadConfig(["--dry-run"], {}))
+  const run = await runAgent({ command: { ...command, env: { ...command.env,
+    LOGINOM_AI_AGENT_CLI_PROFILE: outDir, EVAL_FAKE_CHANGED_WRITER: "1", EVAL_FAKE_HANG_AFTER_EVENTS: "1" } },
+    taskId: "default", model: "fake/model", prompt: "test", files: [],
+    workdir: outDir, timeoutMs: 1_000, outDir, profileDir: outDir })
+  expect(run.timedOut).toBe(true)
+  expect(run.sessionId).toBe("ses_fixture03")
+  expect(run.tokens.input).toBe(400)
+  expect(run.processCleanup.status).toBe("failed")
+  expect(run.processCleanup.processes.every((entry) => {
+    try { process.kill(entry.pid, 0); return false } catch { return true }
+  })).toBe(true)
+  expect(run.durationMs).toBeLessThan(60_000)
+}, 65_000)
+
 test("runAgent: код выхода 1 и failureKind=tool из фикстуры", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-run-"))
   const run = await runAgent({
