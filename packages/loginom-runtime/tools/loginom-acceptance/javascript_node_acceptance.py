@@ -92,7 +92,10 @@ def captured_events(controller,capture,reader):
     content=files[capture.output_file]
     if not content or not content.endswith(b'\n'):
         raise ValueError('javascript_acceptance_complete_capture_required')
-    return [json.loads(line) for line in content.splitlines()]
+    events=[json.loads(line) for line in content.splitlines()]
+    if controller.kind=='cli' and any(event.get('type')=='tool_use' and '_capture_terminal' not in event for event in events):
+        raise ValueError('javascript_acceptance_original_terminal_binding_required')
+    return events
 
 
 def successful_applies(native):

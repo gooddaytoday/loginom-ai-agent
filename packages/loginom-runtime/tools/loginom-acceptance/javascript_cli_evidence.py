@@ -162,6 +162,7 @@ def verify_cli_delivery(events, projection, expected_files, *, submitted_at, dea
             raise ValueError('cli_input_snapshot_identity')
         if not events:
             raise ValueError('cli_public_events_missing')
+        stored_by_id={tool['id']:tool for tool in projection['tools']}
         previous_timestamp = submitted_at
         for event in events:
             if (event.get('type') not in ('tool_use','text','step_start','step_finish','error')
@@ -182,6 +183,16 @@ def verify_cli_delivery(events, projection, expected_files, *, submitted_at, dea
             if event['type'] != 'tool_use':
                 continue
             tool = terminal_tool(part)
+            if '_capture_terminal' in event:
+                binding=event['_capture_terminal']
+                stored=stored_by_id.get(tool['id'])
+                if (not isinstance(binding,dict) or set(binding)!=
+                        {'version','original_sha256','redacted_event_sha256'} or binding['version']!=1
+                        or binding['redacted_event_sha256']!=value_digest({k:v for k,v in event.items() if k!='_capture_terminal'})
+                        or stored is None or binding['original_sha256']!=value_digest(stored)
+                        or any(tool[k]!=stored[k] for k in ('id','message_id','session_id','call_id','tool','status','time','truncated'))):
+                    raise ValueError('cli_original_redacted_binding')
+                tool=stored
             if tool['session_id'] != projection['session_id']:
                 raise ValueError('cli_public_tool_owner')
             assistant = assistants[tool['message_id']]

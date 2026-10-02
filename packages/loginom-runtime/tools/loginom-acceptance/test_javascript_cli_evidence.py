@@ -3,11 +3,12 @@ import base64
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
-from javascript_cli_evidence import read_cli_session, verify_cli_delivery
+from javascript_cli_evidence import read_cli_session, verify_cli_delivery, terminal_tool, value_digest
 
 
 class StandaloneJavascriptEvidenceTests(unittest.TestCase):
@@ -74,6 +75,53 @@ class StandaloneJavascriptEvidenceTests(unittest.TestCase):
             self.assertNotIn(secret,rendered)
         for field in ('oauth_transport_verified','native_admission_verified','candidate_verified','knowledge_verified','package_persistence_verified','cleanup_verified','cli_acceptance_verified'):
             self.assertIs(proof[field],False)
+
+    @unittest.skipUnless(os.environ.get('LOGINOM_NODE'),'pinned Node required')
+    def test_actual_worker_capture_binds_redacted_receipts_to_physical_sqlite(self):
+        from javascript_cli_capture import RedactedCliCapture
+        from javascript_cli_candidate import file_sha256
+        from javascript_cli_nodes import cli_public_calls
+        documents=[dict(status='SUCCEEDED',action_key='package.save_checkpoint',operation_id='save-1'),
+            dict(kind='dock_saved_package_state',modified=False,password='fixture-secret')]
+        tool=copy.deepcopy(self.tool)
+        tool['tool']='loginom_dock_action_run'
+        tool['state']['input']={'password':'fixture-secret'}
+        tool['state']['output']='\n\n'.join(json.dumps(x,indent=2) for x in documents)
+        self.connection.execute('update part set data=? where id=?',(json.dumps(tool),'tool'));self.connection.commit()
+        events=copy.deepcopy(self.events);events[1]['part']=tool
+        directory=self.profile/'capture';directory.mkdir(mode=0o700)
+        def pin(path):return dict(path=str(path),sha256=file_sha256(path))
+        with_cleanup=RedactedCliCapture(directory,node=pin(Path(os.environ['LOGINOM_NODE']).resolve()),
+            worker=pin(Path(__file__).with_name('javascript-cli-redact-worker.mjs').resolve()),
+            redactor=pin(Path(__file__).resolve().parents[2]/'client/lib/redact.mjs'),known_values=['fixture-secret'])
+        self.addCleanup(with_cleanup.finish)
+        for event in events:with_cleanup.push('stdout',(json.dumps(event)+'\n').encode())
+        self.assertTrue(with_cleanup.finish()['passed'])
+        text=(directory/'events.jsonl').read_text()
+        self.assertNotIn('fixture-secret',text)
+        captured=[json.loads(line) for line in text.splitlines()]
+        self.assertTrue(self.audit(events=captured)['passed'])
+        self.assertEqual(cli_public_calls(captured)[0]['result'],documents[0])
+        captured[1]['part']['state']['output']='{}'
+        self.assertFalse(self.audit(events=captured)['passed'])
+
+    def test_original_and_redacted_binding_preserves_strict_sqlite_comparison(self):
+        events=copy.deepcopy(self.events)
+        original=value_digest(terminal_tool(events[1]['part']))
+        events[1]['part']['state']['output']='Public [redacted] preparation'
+        self.assertFalse(self.audit(events=events)['passed'])
+        events[1]['_capture_terminal']=dict(version=1,original_sha256=original,
+            redacted_event_sha256=value_digest(events[1]))
+        self.assertTrue(self.audit(events=events)['passed'])
+        for case in ('redacted_output','original_digest','redacted_digest','timestamp','extra_field','db_output'):
+            altered=copy.deepcopy(events);projection=self.projection()
+            if case=='redacted_output':altered[1]['part']['state']['output']='forged'
+            if case=='original_digest':altered[1]['_capture_terminal']['original_sha256']='0'*64
+            if case=='redacted_digest':altered[1]['_capture_terminal']['redacted_event_sha256']='0'*64
+            if case=='timestamp':altered[1]['timestamp']+=1
+            if case=='extra_field':altered[1]['_capture_terminal']['payload']='forged'
+            if case=='db_output':projection['tools'][0]['output_sha256']='0'*64
+            with self.subTest(case=case):self.assertFalse(self.audit(events=altered,projection=projection)['passed'])
 
     def test_other_session_never_supplies_own_model_or_parts(self):
         self.connection.execute('insert into session values(?,?,?)',('foreign','foreign',None))
