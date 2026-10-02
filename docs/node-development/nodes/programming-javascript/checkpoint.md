@@ -38,6 +38,20 @@ holderexec71758 завершён EOF exit0. `retirement.json` сохраняет
 cleanup, не успешную приёмку. Новый прогон — fresh pair02/profile roots,
 новый согласованный candidate/reader; Code01 не восстанавливать до PASS.
 
+**Текущий live holder: exec42006, `f-cli-pair-02.py`.** Candidate07/reader07
+на source`eef529cd2b804c0c3636f97aae1e4dbec2e9e25a`, version0.0.0-dev-202610021654.
+Manifest`fee12749e56fbac5a3253669c91ebefd640e2ae883bedc591605db26645cd575`,
+sourceTree`d1d35a0d0db7088d2ef101b3bae2ad78870f7d1dbd912d774d5fbbd692f58b1f`,
+reader`6cde939edc0483ea850ff03f8b94efe719fe47b7ea87e939e53ee15d2f9e01b4`,
+pinsSHA`5a260e24092ee8892948dc43ce66bf44ecd442381fa77c7c71e2088414c3adec`.
+Buildexec49746 exit0/roundtrip PASS, freezeexec47717:5441candidate files/
+969QAfiles, bundled cold--help exit0. Runtime client4100files byte-identical06;
+J21 read07 сохраняет старую candidate06 scope, не новый live PASS07.
+В holder отправлен start/code для `f-cli-autonomous-code-02`, обычный headed,
+Sol6.1/low/30min/только task+CSV. Не завершать original holder или менять lease
+до подтверждённого собственного cleanup. После writer: full-source review,
+audit, cold, release; затем independent declared и pair в этом же holder.
+
 Whole audit исправлен на29068cc7fd (original/redacted hashes и JSON blocks),
 f5a94febf1 (actual hashed Host path/private runtime pin),861a64e40b (attachment
 identity через тот же hashed chat). Тесты и live boundary proof ниже.
