@@ -251,6 +251,30 @@ exec2948 actualexit0:3456tests=3446PASS+10SKIP,0FAIL (165.476s), private
 не начинать. Следующая pair08 должна быть новой для обоих modes на одном
 candidate; старые source/result/recovery proofs не переписывать.
 
+**Текущий holderexec32766 — `f-cli-pair-08.py`, candidate11/reader11.**
+В pair08 порядок Declared → Code: сначала адресно проверяется найденный
+контрактный дефект, затем независимый Code на тех же immutable bytes. Оба
+исходных задания/CSV/path-only cold, лимиты30/10минут и original object pair
+неизменны. Старый Code07 PASS не подставляется за новое испытание.
+Buildexec3573 actualexit0/roundtrip PASS; freezeexec3026 actualexit0:
+5442candidate/970QAfiles, bundled --help и оба package preflights PASS.
+Candidate source`f2a0cdd9914981530fcda2d5394af1029408fe81`,
+version0.0.0-dev-202610021820, manifest
+`a4649fb3c094c58761e9597544fe573fbb01f816dee3762d7c0e26e960a29951`,
+sourceTree`15ca592fb534f73c2d7789da14b116355e7a16c8ea68760097283eb7199518df`,
+reader11`aa4a202a2990ff836076468fc8f59a93e393c64bd142c1f62a393e6272356784`,
+bundle pins`6808a6154e84fde73aa7eed4efbae13cb9418e75ebe74c65275dd1a293894315`,
+archive`e9a609f69ba504bdf74642054f99038917aaf7cff020ba36a6843ea80a81bfe1`.
+Новый actual clientRevision
+`5de72bd14d1b22ddef8c74e9dfddd546e37431f8a4fd2206d07909050fc16cbf`;
+remote catalog17764f…/Save2 остаётся отдельно pinned. Private runtime pins08
+пересчитаны по candidate11, не скопированы со старого runtime.
+Далее original start/declared → полный source review → audit → cold → release;
+после whole PASS start/code → review/audit/cold/release → pair в этом holder.
+При успехе обоих — фаза6 completion/card/registry/checkpoint без integration,
+merge/push/release. Не закрывать original holder до подтверждения cleanup.
+
+
 
 
 Driver05 preflights operator review до permanent audit. Review timestamps:
