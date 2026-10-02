@@ -145,7 +145,7 @@ def verify_cli_delivery(events, projection, expected_files, *, submitted_at, dea
         if len({m['message_id'] for m in models}) != len(models):
             raise ValueError('cli_actual_message_identity')
         for model in models:
-            if (model.get('provider_id') != 'openai' or model.get('model_id') != 'gpt-6-sol'
+            if (model.get('provider_id') != 'openai' or model.get('model_id') != 'gpt-6.1-sol'
                     or model.get('variant') != 'low' or model.get('error_present') is not False
                     or model['role'] == 'assistant' and model.get('parent_id') not in users
                     or type(model.get('time',{}).get('created')) is not int

@@ -31,8 +31,8 @@ class StandaloneJavascriptEvidenceTests(unittest.TestCase):
             create table part(id text primary key,message_id text,session_id text,data text);
         ''')
         self.connection.execute('insert into session values(?,?,?)',(self.session,str(self.directory),None))
-        user = dict(role='user',model=dict(providerID='openai',modelID='gpt-6-sol',variant='low'),time=dict(created=1000))
-        assistant = dict(role='assistant',providerID='openai',modelID='gpt-6-sol',variant='low',
+        user = dict(role='user',model=dict(providerID='openai',modelID='gpt-6.1-sol',variant='low'),time=dict(created=1000))
+        assistant = dict(role='assistant',providerID='openai',modelID='gpt-6.1-sol',variant='low',
             parentID='user',time=dict(created=1100,completed=1400))
         for identifier,info in [('user',user),('assistant',assistant)]:
             self.connection.execute('insert into message values(?,?,?,?)',(identifier,self.session,info['time']['created'],json.dumps(info)))
@@ -133,6 +133,22 @@ class StandaloneJavascriptEvidenceTests(unittest.TestCase):
             expected[0][key] = value
             with self.subTest(key=key):self.assertFalse(self.audit(expected=expected)['passed'])
         self.assertFalse(self.audit(expected=self.expected[:1])['passed'])
+
+    def test_previous_sol_model_in_actual_sqlite_cannot_supply_current_acceptance(self):
+        originals={identifier:json.loads(value) for identifier,value in
+            self.connection.execute('select id,data from message')}
+        for changed in [('user',),('assistant',),('user','assistant')]:
+            for identifier,original in originals.items():
+                value=copy.deepcopy(original)
+                if identifier in changed:
+                    model=value['model'] if identifier=='user' else value
+                    model['modelID']='gpt-6-sol'
+                self.connection.execute('update message set data=? where id=?',(json.dumps(value),identifier))
+            self.connection.commit()
+            with self.subTest(changed=changed):
+                proof=self.audit()
+                self.assertFalse(proof['passed'],proof)
+                self.assertIn('cli_actual_model_variant_or_deadline',proof['failures'])
 
     def test_missing_foreign_hidden_truncated_or_changed_events_refuse(self):
         for case in ('missing','foreign_session','wrong_call','wrong_message','hidden','hidden_part','truncated','changed_output','wrong_input','late_tool','event_order','before_assistant','after_assistant','future_tool'):

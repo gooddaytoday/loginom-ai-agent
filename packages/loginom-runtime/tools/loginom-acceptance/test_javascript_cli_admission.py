@@ -156,7 +156,7 @@ class JavascriptAdmissionTests(unittest.TestCase):
         self.assert_refused('cli_admission_public_runtime_pins')
         self.result['knowledge']['session_manifest']['clientRevision'] = 'b'*64
         self.synchronize()
-        info = dict(role='user',model=dict(providerID='openai',modelID='gpt-6-sol',variant='low'),time=dict(created=1001))
+        info = dict(role='user',model=dict(providerID='openai',modelID='gpt-6.1-sol',variant='low'),time=dict(created=1001))
         self.fixture.connection.execute('insert into message values(?,?,?,?)',('extra-user','own-session',1001,json.dumps(info)))
         self.fixture.connection.commit()
         self.assert_refused('cli_admission_single_original_user')
