@@ -275,6 +275,29 @@ test("afterAttempt: exit 1 со stale writer восстанавливает пр
   }
 })
 
+test("runAttempt: failed cleanup сохраняет исход no_artifact и запрещает продолжение", async () => {
+  const profileDir = await mkdtemp(path.join(os.tmpdir(), "evals-failed-cleanup-"))
+  const runDir = await mkdtemp(path.join(os.tmpdir(), "evals-failed-cleanup-run-"))
+  const config = { ...loadConfig(["--dry-run"], {}), profileDir, dryRun: false }
+  const command = agentCommand(config)
+  const [task] = await loadTasks(config.tasksDir, ["group-sum-qty"])
+  try {
+    const { result, stop } = await runAttempt({ config, command: { ...command, env: { ...command.env,
+      EVAL_FAKE_CHANGED_WRITER: "1" } }, source: { kind: "dir", dir: path.join(evalsRoot, "fixtures", "storage") },
+      task: { ...task!, id: "default" }, attempt: 1, runId: "cleanup", runDir,
+      signal: new AbortController().signal, profileRecovered: false, skipJudge: false })
+    expect(result).toMatchObject({ status: "no_artifact", exit_code: 0, session_id: "ses_fixture03",
+      tokens: { input: 400 }, score: 0, pass: false,
+      environment_cleanup: { status: "failed" } })
+    expect(stop).toBe(true)
+    expect(await Bun.file(path.join(runDir, "default", "1", "result.json")).json()).toMatchObject(result)
+  } finally {
+    await rm(profileDir, { recursive: true, force: true })
+    await rm(`${profileDir}.process-group`, { force: true })
+    await rm(runDir, { recursive: true, force: true })
+  }
+})
+
 test("main: summary фиксирует переданный variant и эффективный лимит задачи", async () => {
   const tasksDir = await mkdtemp(path.join(os.tmpdir(), "evals-metadata-"))
   let runDir: string | undefined

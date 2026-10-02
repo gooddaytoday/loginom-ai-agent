@@ -188,7 +188,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     taskId: task.id,
     model: config.agent.model,
     variant: config.agent.variant,
-    profileDir: config.dryRun || config.agent.cliMode === "fake" ? undefined : config.profileDir,
+    profileDir: config.dryRun ? undefined : config.profileDir,
     prompt,
     files,
     workdir,
@@ -262,6 +262,10 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     artifact_origin: artifact?.origin ?? null,
     artifact_ambiguous: artifact?.ambiguous ?? [],
     cleanup_error: cleanupError,
+    environment_cleanup: {
+      status: run.processCleanup.status === "failed" ? "failed" : "not_run",
+      evidence: "cleanup.json", error: run.processCleanup.error,
+    },
     action_manifest_sha256: run.actionManifestSha256 ?? null,
     skill_revision: run.skillRevision ?? null,
     session_id: run.sessionId ?? null,
@@ -273,8 +277,9 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
         ? `CLI exit ${run.exitCode}: ${firstNonEmptyLine(run.stderrHead) ?? run.errors.join(", ") ?? "—"}`
         : null),
   }
+  await Bun.write(path.join(outDir, "cleanup.json"), JSON.stringify({ processes: run.processCleanup }, null, 2))
   await Bun.write(path.join(outDir, "result.json"), JSON.stringify(result, null, 2))
-  return { result, stop }
+  return { result, stop: stop || run.processCleanup.status === "failed" }
 }
 
 async function prepareProfile(config: EvalConfig, command: AgentCommand) {
