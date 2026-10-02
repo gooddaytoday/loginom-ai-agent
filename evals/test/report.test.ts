@@ -185,6 +185,17 @@ test("renderReport: метрики, задачи, попытки, отказы �
   expect(report).toContain("Остатки в хранилище")
 })
 
+test("renderReport: cleanup отдельно, включая completed failure и старую непроверенную попытку", () => {
+  const attempts = [attempt({ environment_cleanup: { status: "failed", error: "archive failed", evidence: "cleanup.json" } }),
+    attempt({ attempt: 2 })]
+  const report = renderReport({ ...summary(), metrics: aggregate(attempts, false),
+    tasks: [{ id: "t", metrics: aggregateTask(attempts, false), attempts }] })
+  expect(report).toContain("environment_cleanup: ошибок 1, проверено 1")
+  expect(report).toContain("| Cleanup |")
+  expect(report).toContain("не проверялось")
+  expect(report).toContain("cleanup failed — archive failed")
+})
+
 test("renderReport: отдельно показывает инфраструктуру, полноту судейства и проверку oracle", () => {
   const attempts = [attempt({ oracle_pass: false, oracle_error: "Колонки не совпали", pass: false })]
   const report = renderReport({ ...summary(), metrics: aggregate(attempts, false), tasks: [{ id: "t", metrics: aggregateTask(attempts, false), attempts }] })
