@@ -1,20 +1,20 @@
 # JavaScript
 
-Устойчивый ID: `component.programming.JavaScript`. Slug: `programming-javascript`.
+Текущий этап — **фаза6, автономная CLI-приёмка**, candidate11/reader11 из
+child **f2a0cdd991**, knowledge1.2. Исправленный контракт declared проверен:
+60 адресных tests, полный client3446PASS+10SKIP, build/roundtrip/freeze PASS.
+Declared08 имеет original writer+independent cold whole PASS и normal cleanup;
+Code07 на предыдущем candidate имеет отдельный whole PASS. Эти результаты
+не составляют принятую пару. Code08 прерван до Save, retired incomplete;
+Declared09 остановлен до модельных вызовов из-за LOGINOM_HOST_TIMEOUT.
+Все собственные процессы завершены, acceptance slot освобождён.
 
-Актуально2026-10-02: продуктовый handler зарегистрирован в отдельной ветке
-`node-javascript`, same-task F review завершён. На candidate10 (`5a2d960a42`)
-**Code07 прошёл original whole CLI + independent headed cold acceptance**:
-source/settings/mappings/GUID graph, fresh Execute/full6×4 и normal cleanup.
-[Точные pins и исходные результаты](checkpoint.md#текущее-состояние).
-Declared07 выявил расхождение published/local schema с ограничениями managed
-writer для data_kind/числа колонок; запросы отклонены до создания JS узла.
-Попытка завершилась CLI_PERMISSION_REJECTED при поиске через grep; права не
-расширялись. Остаточный тестовый импорт очищен отдельно через собственный
-admin recovery, это не normal cleanup PASS. Исправление контракта/knowledge1.2
-проходит адресные и полные проверки. Далее fresh pair на новом candidate;
-Code07 сохраняет свой отдельный PASS, общая pair и accepted registry открыты.
-Интеграция, push и релиз не выполнялись.
+Текущий блокер — default-transport чтение закреплённого каталога сервиса знаний:
+initialize/list прошли, последующее чтение завершилось UND_ERR_CONNECT_TIMEOUT.
+Свежий compiled headed status показывает recoverable-error. Исходники и candidate
+из-за сетевого отказа не менялись. Следующий запуск — fresh pair10 после полного
+catalog preflight, на тех же immutable bytes; [точные evidence и продолжение](checkpoint.md#текущее-состояние).
+Integration, push и release не выполнялись; accepted registry остаётся открытым.
 
 Далее сохранены этапы реализации с их исходными границами проверки; для
 продолжения использовать только текущую сводку checkpoint.

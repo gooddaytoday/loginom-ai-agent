@@ -2,15 +2,41 @@
 
 ## Текущее состояние
 
-Оперативная точка **2026-10-02, pair09**: candidate11/reader11 на child
-**f2a0cdd991**, knowledge1.2, без новой сборки. Private `f-cli-pair-09.py`
-держит original controllers/trials в одном процессе; команды через приватный FIFO,
-PID/startTicks/bootId и пути — `f-cli-pair-09-control.json` в каталоге кампании.
-Состояние читать из `f-cli-pair-09-events.jsonl`; при переподключении не создавать
-второй holder. Python `-B`, readonly reader, обычный headed; лимиты30/10 минут.
+Оперативная точка **2026-10-02, 19:07 UTC**: candidate11/reader11 на child
+**f2a0cdd991**, knowledge1.2, остаются immutable. Новая пара пока не принята.
+Свежий Declared09 завершился **до модельных вызовов** с LOGINOM_HOST_TIMEOUT;
+collector exit1/FAIL, `.writer` сохранён. Только readiness browser, пакетные
+операции не допущены. После завершения всех original observed PID/startTicks
+lease освобождён19:04:12.623Z, затем завершён исходный holder696937.
+Original collection SHA `324ebe2efee90cd5ccd28cc2b8e42de7f7994faee5a71b6ad51e2819452b49ea`;
+private `f-cli-autonomous-declared-09/retirement.json`. Профиль не переиспользовать.
+
+Отдельный compiled `loginom status --no-headless --format json` в fresh
+`f-cli-readiness-diagnostic-01` завершился exit0 за27.277s, но состояние
+**recoverable-error**, не ready. Exact URL/jsteach сохранены; package operations
+не допущены, own processes отсутствуют, guard отсутствует. Это диагностика,
+не успешная приёмка. Product checkKnowledge дал LOGINOM_KNOWLEDGE_UNAVAILABLE;
+HTTP-пробы через системный proxy и напрямую истекли по15s.
+Final readonly actual bundled Node/default SDK/connectRemote candidate11
+`f-setup-default-transport-recheck-15.json`:
+connected=true/list15tools, **pinned=false**, fetch failed /
+**UND_ERR_CONNECT_TIMEOUT к mcp.loginom.ai:443** на чтении закреплённого каталога.
+SHA `b404b5ee2afc3809e54a322190007fc6d10a21a725c87ca2b069789faa76fd62`. Wrapper exit0 не означает PASS.
+Ключ неверным не объявляется; TLS/proxy/pins и исходники продукта не менялись.
+Память плагина OpenViking отдельно не диагностировалась: это ошибка продуктового
+подключения к сервису знаний, не подтверждение сбоя MCP плагина текущего чата.
+
+**Следующий шаг:** после восстановления полного default-transport catalog
+preflight — новая пара10 на тех же candidate11/reader11, новые profiles/paths.
+Не пересобирать продукт без причины. Private pair09 controller использовал
+приватный FIFO и один original process, сохраняющий controllers/trials независимо
+от терминала Codex; transport ready был проверен, fault collector сохранён.
+Для pair10 адаптировать имена private `f-cli-pair-09.py`/runtime pins/control,
+зафиксировать PID/startTicks/bootId; не воскрешать объекты завершённого holder.
 Порядок: Declared → ручной source review/audit/cold/release, затем Code →
-review/audit/cold/release → pair; только после release обоих — команда exit.
-Приватный control transport отделён от терминала Codex, продукт/QA не менялись.
+review/audit/cold/release → pair; после release обоих — exit. Python `-B`,
+readonly reader, обычный headed, лимиты30/10 минут. Слот сейчас свободен;
+собственных живых runtime/browser/holder процессов нет.
 
 Pair08 не завершена: Declared08 original whole trial PASS/released сохранён,
 Code08 дошёл только до prepare, без Save/collector/whole audit; original
