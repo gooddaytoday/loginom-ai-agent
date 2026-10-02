@@ -105,7 +105,7 @@ Code04 Save`sales-save`/Close/logout1→0/no discard, cleanupSHA
 17:26:58Z fresh process/`.writer` absence, lease released/lock archived;
 после этого original holderexec80463 EOFexit0. Cold не запускался.
 
-**Текущий holder exec16020, `f-cli-pair-05.py`: Code05 writer PASS.**
+**Code05 writer PASS; cold launch не подтверждён, попытка безопасно завершена.**
 Original writerPID551847/collector exit0/native origin PASS; immutable reader08b
 без cache writes. Полный model-source778bytes/16LF570d990a… независимо прочитан;
 review metadata preflight PASS, затем original whole writer audit PASS.
@@ -117,10 +117,45 @@ full typed6×4/last Save+Close/logout PASS. Source/output`sales-js`, import
 `1790962105993-r1qx8hjalk:1062:3` и`:4`.
 Package`/jsteach/JavaScript-code-8c191b79-42ae-41cd-bc8d-7d4a1736f1d0.lgp`;
 cleanupSHA`61556e3227211d6f44046eddb5b0043eff3977ac4245b6dacf18e08ea84f71c0`.
-**В holder отправлена cold-команда; ждать actual cold result по exec16020.**
-Не закрывать controller/lease; только после whole trial PASS — release, затем
-start/declared → full-source review → audit → cold → release → pair в том же
-holder. Пока cold persistence/whole CLI pair не подтверждены.
+Cold factory вернул `JavascriptLaunchUnconfirmed` до получения controller;
+original cold exit/stderr не сохранены, whole trial не повышается до PASS.
+Независимый вызов exact frozen `requireJavascriptSavedPackagePath` подтвердил
+отказ назначанного CLI пути: прежний regex допускал только G2 nested layout.
+Release/Node/browser/Playwright pins совпали; cold-profile пуст, cold-evidence
+не создан. Чтение оставшихся pipe4/5 holder дало0bytes и не считается capture
+cold процесса. 17:40:28Z fresh exact-argv process scan/`.writer` absence,
+original writer native Close/logout proof подтверждены, lease released/lock
+archived (`retirement.json`); затем original exec16020 EOFexit0. Saved package
+сохранён, unsaved discard не выполнялся. Code05 writer PASS остаётся отдельным
+результатом, Code05 cold/whole pair PASS отсутствуют.
+
+**Следующий candidate09 — child `1f66cef4c2`.** Узкая QA-правка допускает
+старый G2 layout и назначаемые `/jsteach/JavaScript-{code,declared}-UUID.lgp`;
+точная prepared/native owner/path binding неизменна. Frozen entry имеет отдельный
+read-only `--check-package EXACT` без credentials/profile/browser; factory
+вызывает его до cold lease/Popen, не передаёт source/oracle/settings. При отказе
+создания controller writer удерживает original failed Popen, причина исключения
+сохраняется; автоматического retry/kill нет. 177 Node tests и29 Python tests
+PASS (actual pinned Node, без DISPLAY для entry preflight), diff-check PASS.
+Первая новая UI test assertion ошибочно ожидала sync exception от async fixture;
+исправлена на awaited reject, затем все177 PASS. Runtime handler не менялся.
+Buildexec94393 actualexit0/roundtrip PASS, archive
+`9aca653fea3deb886f541bd549605d761c637689cd90d78211f93add11becc8d`.
+Candidate09 source`1f66cef4c22dc1122336d76efeb5d56f76e4261d`,
+version0.0.0-dev-202610021742, manifest
+`32206a511ed9af37b65bc8e6980051a78683741b925f61321bc69337d687977d`,
+sourceTree`b2963c4c738b320c22b05471f4618cfd3d4a6a5946dcae90e57a189cd57d1056`.
+Freezeexec61437 actualexit0:5441candidate/969QAfiles; reader09
+`a3bbe1c1bc4b24189bf2e167b98ff07fc8d0df12bdca91bff4f39bac6c36118c`,
+bundle pins`ee9347886917014cfc0141ada6297f92ac2d12b0be906a8186192db67244e844`.
+Bundled cold --help и --check-package обоих CLI modes exit0. Private driver06
+удерживает failed-launch exception/handle, повторяет cold-entry preflight перед
+первой попыткой и frozen inventory перед каждым writer. Actual runtime/catalog
+pins прежние, candidate manifest обновлён. Holderexec64989 запускает pair06;
+следовать original start/review/audit/cold/release для Code, затем declared,
+после обоих whole trial PASS — pair. Не закрывать holder/lease до cleanup.
+Failed attempts/immutable candidate08+reader08b не менять.
+
 Driver05 preflights operator review до permanent audit. Review timestamps:
 `.isoformat(timespec='milliseconds').replace('+00:00','Z')`; Python `-B` и
 PYTHONDONTWRITEBYTECODE=1 обязательны для frozen QA. Не менять frozen QA/runtime.
