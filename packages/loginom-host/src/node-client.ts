@@ -12,6 +12,7 @@ export async function launchNodeHost(input: {
   headless: boolean
   environment?: NodeJS.ProcessEnv
   strictRecovery?: boolean
+  closeSavedPackageOnShutdown?: boolean
 }) {
   if (![input.node, input.entry, input.root, input.resources].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
@@ -70,6 +71,9 @@ export async function launchNodeHost(input: {
         resources: input.resources,
         headless: input.headless,
         ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
+        ...(input.closeSavedPackageOnShutdown !== undefined
+          ? { closeSavedPackageOnShutdown: input.closeSavedPackageOnShutdown }
+          : {}),
       },
       30_000,
     )
@@ -102,7 +106,9 @@ export async function launchNodeHost(input: {
     close() {
       if (state.closing) return state.closing
       state.closing = (async () => {
-        const result = await client.request("close", {}, 30_000).catch(() => undefined)
+        const result = await client
+          .request("close", {}, input.closeSavedPackageOnShutdown === true ? 60_000 : 30_000)
+          .catch(() => undefined)
         // An acknowledgement alone does not prove exit. Bound a stuck host while
         // retaining a failed cleanup result so the caller keeps its profile guard.
         const timer = setTimeout(() => child.kill("SIGKILL"), 5000)

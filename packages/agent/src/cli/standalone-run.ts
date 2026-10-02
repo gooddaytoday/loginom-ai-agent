@@ -55,6 +55,7 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     headless,
     environment: process.env,
     strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
+    closeSavedPackageOnShutdown: mode === "run",
   })
   const cleanup: { dispose?: () => Promise<void>; detach?: () => void } = {}
   try {

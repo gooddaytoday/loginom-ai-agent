@@ -54,6 +54,19 @@ test("a non-boolean recovery mode is rejected before the host starts", async () 
   ).rejects.toThrow("LOGINOM_HANDSHAKE_INVALID")
 }, 15_000)
 
+test("a non-boolean saved-package cleanup policy is rejected before the host starts", async () => {
+  await expect(
+    launchNodeHost({
+      node: fixture.node,
+      entry: fixture.entry,
+      root: join(fixture.directory, "bad-cleanup"),
+      resources: join(fixture.directory, "absent-runtime"),
+      headless: false,
+      closeSavedPackageOnShutdown: "true" as unknown as boolean,
+    }),
+  ).rejects.toThrow("LOGINOM_HANDSHAKE_INVALID")
+}, 15_000)
+
 test.each(["ack-without-exit", "disconnect-without-exit", "bad-ack"])(
   "host shutdown is bounded and never accepts incomplete cleanup: %s",
   async (mode) => {

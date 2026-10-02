@@ -20,6 +20,8 @@ export type Launch = {
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.
   acceptanceCleanupPackage?: string
+  // Private owner policy. The runtime derives the path from its confirmed Save.
+  closeSavedPackageOnShutdown?: boolean
 }
 
 export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = process.platform) {
@@ -147,7 +149,10 @@ export async function supervise(input: Launch) {
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
-      const reply = await request("close", undefined, 5000).catch(() => undefined)
+      // Native guarded package close/logout precedes resource close in this mode.
+      // This shutdown allowance does not extend an admitted operation deadline.
+      const reply = await request("close", undefined, input.closeSavedPackageOnShutdown === true ? 45_000 : 5000)
+        .catch(() => undefined)
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
       try {
         const outcome = await exited

@@ -89,6 +89,9 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
 }
 
 export async function createBridge(config, session, { browserTransport: managedBrowserTransport } = {}) {
+  if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
+      || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
+    throw Error('Invalid private saved-package cleanup policy');
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
   const userWorkflows = createUserWorkflowBindings();
@@ -131,6 +134,8 @@ export async function createBridge(config, session, { browserTransport: managedB
   const browserGate = createSerialGate();
   const heldLeases = new Set();
   const savedPackages = new Map();
+  const confirmedSaves = new Set();
+  let lastSavedPackage = null;
   let closing, shutdownStarted = false;
   const skill = createSkillLoader({ directory: session.directory, transport: skillTransport(config) });
   let clipboardUncertain = false;
@@ -357,6 +362,16 @@ export async function createBridge(config, session, { browserTransport: managedB
             await logResult(request.params.name,outcome);
             if (outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
                 && outcome.output?.package_ref?.path) savedPackages.set(outcome.output.package_ref.path, outcome.operation_id);
+            // Inspecting/retrying an older receipt is not a new Save. Keep the
+            // latest confirmed mutation, including another Save to the same path.
+            if (request.params.name === 'dock_action_run' && outcome.status === 'SUCCEEDED'
+                && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
+                && args.action_key === outcome.action_key && args.operation_id === outcome.operation_id
+                && outcome.output?.package_ref?.path && !confirmedSaves.has(outcome.operation_id)) {
+              confirmedSaves.add(outcome.operation_id);
+              lastSavedPackage = {path:outcome.output.package_ref.path, operation_id:outcome.operation_id,
+                document_id:session.metadata.workspacePreparation?.state?.document_id};
+            }
             if (userProfile && outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key))
               for (const continuation of outcome.output?.workflow_continuations ?? []) userWorkflows.remember(continuation);
             const reply = actionReply(userProfile?compactActionResult(outcome):outcome, { observe: request.params.name === 'dock_workspace_observe', userProfile });
@@ -449,7 +464,10 @@ export async function createBridge(config, session, { browserTransport: managedB
       hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
       closing ??= (async () => {
-        if (config.acceptanceCleanupPackage) {
+        if (config.acceptanceCleanupPackage || config.closeSavedPackageOnShutdown === true) {
+          const normalCleanup = config.closeSavedPackageOnShutdown === true;
+          const packagePath = normalCleanup ? lastSavedPackage?.path : config.acceptanceCleanupPackage;
+          const saveOperationId = normalCleanup ? lastSavedPackage?.operation_id : savedPackages.get(packagePath);
           let cleanup;
           const prepared = session.metadata.workspacePreparation;
           if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
@@ -458,7 +476,9 @@ export async function createBridge(config, session, { browserTransport: managedB
               // Refuse unsettled background node jobs before waiting on the
               // browser gate. Shutdown never cancels them to force a close.
               actionRuntime.assertPreparationAllowed();
-              if (session.metadata.workspaceReady !== true || !savedPackages.has(config.acceptanceCleanupPackage)) {
+              if (clipboardUncertain || heldLeases.size) throw Error('Unsettled clipboard work');
+              if (session.metadata.workspaceReady !== true || !packagePath || !saveOperationId
+                  || normalCleanup && lastSavedPackage.document_id !== prepared.state?.document_id) {
                 cleanup = {status:'BLOCKED', reason:'CONFIRMED_SAVE_REQUIRED'};
               } else cleanup = await browserGate(async () => {
                 actionRuntime.assertPreparationAllowed();
@@ -467,7 +487,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                   // Managed runtimes have no replay login account; the cleanup
                   // binds to the account observed at workspace preparation.
                   tabTid:prepared.state.workflow_ref.tab_tid, account:prepared.state.loginom_account??config.replayLoginUser,
-                  packagePath:config.acceptanceCleanupPackage, loginomUrl:config.loginomUrl,
+                  packagePath, loginomUrl:config.loginomUrl,
                   loginomBuild:session.metadata.targetIdentity.loginom_build,
                 };
                 const response = await browser.callTool({name:'browser_run_code_unsafe', arguments:{code:makePackageCleanupCode(cleanupOptions)}}, undefined, {timeout:30000});
@@ -476,9 +496,10 @@ export async function createBridge(config, session, { browserTransport: managedB
             } catch { cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'}; }
           }
           cleanup = {...cleanup, session_id:session.metadata.sessionId,
-            save_operation_id:savedPackages.get(config.acceptanceCleanupPackage) ?? null};
-          await writeFile(join(session.directory,'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
-          await recordExecution({event:'isolated_package_cleanup', cleanup});
+            save_operation_id:saveOperationId ?? null,
+            ...(normalCleanup ? {package_path:packagePath ?? null, policy:'last_confirmed_own_save'} : {})};
+          await writeFile(join(session.directory,normalCleanup?'saved-package-cleanup.json':'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
+          await recordExecution({event:normalCleanup?'managed_saved_package_cleanup':'isolated_package_cleanup', cleanup});
           if (!['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) return {
             browser_transport_closed:false, browser_process_terminated:false, clipboard_leases_retained:heldLeases.size,
             package_cleanup:cleanup,
