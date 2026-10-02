@@ -1,6 +1,6 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
-import { lstat, readdir, readFile, readlink, realpath, stat, writeFile, rm } from "node:fs/promises"
+import { lstat, open, readdir, readFile, readlink, realpath, stat, writeFile, rm } from "node:fs/promises"
 
 export type ProcessIdentity = {
   pid: number; starttime: string; uid: number; parent: number; group: number; session: number
@@ -106,6 +106,9 @@ export async function superviseProcess(input: {
   const browser = profile ? await browserIdentity(input.cmd, input.env) : undefined
   if (input.signal?.aborted) return { stdout: "", stderr: "", exitCode: -1, timedOut: false, interrupted: true,
     startedAt, durationMs: 0, processCleanup: cleanup }
+  const files = input.outDir ? await Promise.all(["events.jsonl", "stderr.txt"]
+    .map((name) => open(path.join(input.outDir!, name), "w", 0o600))) : []
+  let writing = Promise.resolve()
   const proc = spawn(input.cmd[0]!, input.cmd.slice(1), { cwd: input.cwd, env: input.env,
     detached: true, stdio: [input.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"] })
   const exited = new Promise<void>((resolve) => {
@@ -114,8 +117,14 @@ export async function superviseProcess(input: {
   })
   if (input.stdin !== undefined) proc.stdin!.end(input.stdin)
   const stdout: Uint8Array[] = [], stderr: Uint8Array[] = []
-  proc.stdout!.on("data", (chunk: Buffer) => stdout.push(chunk))
-  proc.stderr!.on("data", (chunk: Buffer) => stderr.push(chunk))
+  for (const [index, stream] of [proc.stdout!, proc.stderr!].entries()) {
+    stream.on("data", (chunk: Buffer) => {
+      (index === 0 ? stdout : stderr).push(chunk)
+      if (files[index]) writing = writing.then(async () => { await files[index]!.write(chunk) }).catch(() => {
+        cleanup.capture_complete = false; cleanup.error ??= "Output capture write failed"
+      })
+    })
+  }
   const streams = Promise.all([proc.stdout!, proc.stderr!].map((stream) => new Promise<void>((resolve) => {
     stream.once("close", resolve)
     stream.once("end", resolve)
@@ -224,12 +233,16 @@ export async function superviseProcess(input: {
       proc.stdout!.destroy(); proc.stderr!.destroy()
     }
   })])
+  await writing
+  for (const file of files) {
+    await file.sync().catch(() => { cleanup.error ??= "Output capture sync failed"; cleanup.capture_complete = false })
+    await file.close()
+  }
+  if (cleanup.error) cleanup.status = "failed"
   const result = { stdout: Buffer.concat(stdout).toString("utf8"), stderr: Buffer.concat(stderr).toString("utf8"),
     exitCode: proc.exitCode ?? -1, timedOut, interrupted, startedAt, durationMs: Date.now() - startedAt,
     processCleanup: cleanup }
   if (input.outDir) {
-    await Bun.write(path.join(input.outDir, "events.jsonl"), result.stdout)
-    await Bun.write(path.join(input.outDir, "stderr.txt"), result.stderr)
     await Bun.write(path.join(input.outDir, "process-cleanup.json"), JSON.stringify(cleanup, null, 2))
   }
   return result
