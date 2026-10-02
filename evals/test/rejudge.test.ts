@@ -44,10 +44,18 @@ test("--judge-only: пересуживает попытки с артефакт�
     const dry = await main(["--dry-run", "--repeat", "1"])
     runDir = dry.runDir
     const runId = path.basename(dry.runDir!)
+    const originalSummary = await Bun.file(path.join(dry.runDir!, "summary.json")).json() as RunSummary
+    originalSummary.tasks.forEach((task) => task.attempts.forEach((attempt) => {
+      attempt.environment_cleanup = { status: "failed", evidence: "cleanup.json", error: "preserved cleanup refusal" }
+    }))
+    await Bun.write(path.join(dry.runDir!, "summary.json"), JSON.stringify(originalSummary))
     const result = await main(["--judge-only", runId])
     expect(result.code).toBe(0)
     const summary = (await Bun.file(path.join(dry.runDir!, "summary.json")).json()) as RunSummary
     expect(summary.judge?.model).toBe("fake")
+    expect(summary.tasks.flatMap((task) => task.attempts).every((attempt) =>
+      attempt.environment_cleanup?.error === "preserved cleanup refusal")).toBe(true)
+    expect(summary.metrics.environment_cleanup_error_count).toBe(3)
     const byTask = Object.fromEntries(summary.tasks.map((task) => [task.id, task]))
     expect(byTask["group-sum-qty"]!.attempts[0]).toMatchObject({ status: "completed", score: 100, judge_status: "scored" })
     expect(byTask["calc-data-double"]!.attempts[0]).toMatchObject({ status: "no_artifact", score: 0, judge_status: "no_artifact" })

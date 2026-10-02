@@ -125,6 +125,9 @@ test("supervisor: double-fork helper с новым SID имеет доказан
       taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: out,
       outDir: out, profileDir: out, timeoutMs: 30_000 })
     expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.processCleanup.verification).toHaveLength(2)
+    expect(run.processCleanup.verification?.map((pass) => pass.owned_remaining)).toEqual([0, 0])
+    expect(run.processCleanup.origins?.some((entry) => entry.via === "subreaper")).toBe(true)
     const pid = Number(await Bun.file(helperFile).text())
     const state = (await Bun.$`ps -o stat= -p ${pid}`.quiet().nothrow()).text().trim()
     expect(state === "" || state.startsWith("Z")).toBe(true)

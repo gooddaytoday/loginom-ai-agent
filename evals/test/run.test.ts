@@ -404,3 +404,69 @@ test("runAttempt: отсутствие артефакта проваливает
     expect(result).toMatchObject({ status: "no_artifact", oracle_pass: false, pass: false })
   } finally { await rm(runDir, { recursive: true, force: true }) }
 })
+
+
+for (const status of ["no_artifact", "failed", "timeout", "completed"] as const) {
+  test(`afterAttempt: отказ ready сохраняет ${status} и измеренную telemetry`, async () => {
+    const profileDir = await mkdtemp(path.join(os.tmpdir(), "evals-readiness-profile-"))
+    const runDir = await mkdtemp(path.join(os.tmpdir(), "evals-readiness-run-"))
+    const config = { ...loadConfig(["--dry-run"], {}), profileDir, dryRun: false }
+    const command = agentCommand(config)
+    const task = (await loadTasks(config.tasksDir, ["calc-data-double"]))[0]!
+    const run = await runAttempt({ config, command, task: { ...task, id: "default" },
+      source: { kind: "dir", dir: path.join(evalsRoot, "fixtures/storage") }, attempt: 1, runId: "ready",
+      runDir, signal: new AbortController().signal, profileRecovered: false, skipJudge: true })
+    const state = path.join(profileDir, "view.json")
+    await Bun.write(state, JSON.stringify({ state: "unconfigured" }))
+    const result = { ...run.result, status }
+    const after = await afterAttempt(config, { ...command, env: { ...command.env, EVAL_FAKE_STATE_FILE: state } },
+      result, path.join(runDir, "default/1"))
+    expect(after).toHaveProperty("stop")
+    expect(result.status).toBe(status)
+    expect(result.session_id).toBe(run.result.session_id)
+    expect(result.tokens).toEqual(run.result.tokens)
+    expect(result.environment_cleanup?.status).toBe("failed")
+  })
+}
+
+test("main: отказ записи result сохраняет summary и запрещает второй кейс", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-pipeline-"))
+  const profile = path.join(directory, "profile")
+  const tasks = path.join(directory, "tasks")
+  const server = Bun.serve({ port: 0, fetch: () => Response.json({ status: "ok", result: { revision: "fixture" } }) })
+  try {
+    for (const id of ["a-result-write-failure", "b-next"]) {
+      await cp(path.join(evalsRoot, "tasks/calc-data-double"), path.join(tasks, id), { recursive: true })
+      const file = path.join(tasks, id, "task.json")
+      await Bun.write(file, JSON.stringify({ ...await Bun.file(file).json(), id }))
+    }
+    const env = { EVAL_CLI_MODE: "fake", EVAL_AGENT_MODEL: "fake/model", EVAL_PROFILE_DIR: profile,
+      EVAL_RESULTS_DIR: path.join(directory, "results"), EVAL_WORKSPACE_ROOT: path.join(directory, "workspace"),
+      EVAL_ARTIFACT_SOURCE: `dir:${path.join(evalsRoot, "fixtures/storage")}`, LOGINOM_DOCK_API_KEY: "fixture-key",
+      LOGINOM_URL: `http://127.0.0.1:${server.port}`, LOGINOM_DOCK_BASE_URL: `http://127.0.0.1:${server.port}`,
+      EVAL_AGENT_PROVIDER_ID: "fake", EVAL_AGENT_PROVIDER_BASE_URL: "http://fixture", EVAL_AGENT_PROVIDER_API_KEY: "fixture-provider",
+      EVAL_AGENT_PROVIDER_MODEL_ID: "model" }
+    expect(loadConfig(["--skip-judge"], env).profileDir).toBe(profile)
+    const pending = main(["--skip-judge", "--tasks", tasks], env)
+    let folders: string[] = []
+    for (const _ of Array.from({ length: 100 })) {
+      folders = await readdir(path.join(directory, "results")).catch(() => [])
+      if (folders.length) break
+      await Bun.sleep(10)
+    }
+    expect(folders).toHaveLength(1)
+    await mkdir(path.join(directory, "results", folders[0]!, "a-result-write-failure/1/result.json"), { recursive: true })
+    const run = await pending
+    expect(run.code).toBe(1)
+    const summary = await Bun.file(path.join(run.runDir, "summary.json")).json() as RunSummary
+    expect(summary.stopped_reason).not.toBeNull()
+    expect(summary.tasks[0]!.attempts[0]).toMatchObject({ status: "no_artifact", session_id: "ses_fixture03",
+      environment_cleanup: { status: "failed" }, tokens: { input: 400 } })
+    expect(summary.tasks[1]!.attempts).toEqual([])
+    expect(summary.metrics.total).toBe(1)
+    expect(summary.metrics.environment_cleanup_error_count).toBe(1)
+    expect(await Bun.file(path.join(run.runDir, "report.md")).exists()).toBe(true)
+    expect(await Bun.file(path.join(`${profile}.harness-lease`, "owner.json")).exists()).toBe(true)
+  } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
+})
+

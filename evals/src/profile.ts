@@ -68,9 +68,11 @@ export async function releaseStaleWriter(profileDir: string, expected?: WriterId
 
 export async function waitProfileIdle(profileDir: string, timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs
+  let empty = 0
   while (Date.now() < deadline) {
-    if (!(await profileProcesses(profileDir)).trim()) return true
-    await Bun.sleep(Math.min(2_000, Math.max(0, deadline - Date.now())))
+    empty = (await profileProcesses(profileDir)).trim() ? 0 : empty + 1
+    if (empty === 2) return true
+    await Bun.sleep(Math.min(100, Math.max(0, deadline - Date.now())))
   }
   return false
 }

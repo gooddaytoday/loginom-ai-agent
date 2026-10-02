@@ -87,7 +87,15 @@ oracle_pass, failure_kind и знаменатели качества. Перес
 новых зависимостей. Собственный процесс определяется по UID, PID/starttime,
 PPID, PGID/SID и наблюдённому происхождению. Chromium дополнительно требует
 точного executable выбранного bundle и нового собственного browser-profile.
-До запуска сохраняется baseline; scanner работает каждые 100 мс. Перед
+До запуска сохраняется baseline; scanner работает не реже чем каждые 100 мс.
+Окно запуска Chromium опрашивается каждые 10 мс без очереди устаревших scans:
+Chromium может заменить argv за десятки миллисекунд. Exact binding сохраняется
+как birth-bound receipt, полные argv/environment в доказательства не входят.
+Каждый CLI запускается отдельным Linux subreaper (Bun FFI, libc `prctl`), который
+сохраняет наблюдаемую ancestry при double-fork helpers и закрывается последним.
+Одноразовая команда передаётся через частный capsule и удаляется до dispatch;
+авторизация setup передаётся только stdin. Наблюдённые parent/session/subreaper
+origins и два финальных прохода сохраняются в процессном доказательстве. Перед
 сигналом identity и участники группы проверяются заново. Legacy numeric PGID,
 имя процесса, одиночный argv/cwd match не разрешают kill. Неизвестный owner,
 unreadable relevant identity, changed identity или непроверенный browser/helper

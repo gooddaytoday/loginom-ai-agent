@@ -13,6 +13,8 @@ export type ProcessCleanup = {
   status: "confirmed" | "failed" | "not_run"; error: string | null
   processes: ProcessIdentity[]; unknownProcesses?: ProcessIdentity[]; runtimeDirectories: string[]; writer: WriterIdentity | null
   capture_complete: boolean
+  verification?: { observed_at: string; owned_remaining: number }[]
+  origins?: { pid: number; starttime: string; via: "launcher" | "parent" | "live_session" | "subreaper"; parent_pid: number | null; parent_starttime: string | null; observed_at: string }[]
   launcher?: { kind: "linux_subreaper"; pid: number; cli_pid: number | null; ready: boolean }
   browserBindings?: { process: ProcessIdentity; runtimeDirectory: string; observed_at: string }[]
   bindingRefusals?: { process: ProcessIdentity; has_data_dir: boolean; data_inside_profile: boolean; new_runtime_match: boolean; executable_match: boolean; ancestry_match: boolean }[]
@@ -57,7 +59,7 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
     if (final[19] !== fields[19]) throw Error("Process birth changed during read")
     // /proc files are separate observations. Avoid recording pre-exec argv with
     // a post-exec executable, or a PGID sampled before detached spawn settles.
-    if (finalExecutable.dev !== info.dev || finalExecutable.ino !== info.ino || final[2] !== fields[2] || final[3] !== fields[3]) {
+    if (finalExecutable.dev !== info.dev || finalExecutable.ino !== info.ino || final[1] !== fields[1] || final[2] !== fields[2] || final[3] !== fields[3]) {
       if (retries) return processView(pid, relevant, owners, retries - 1)
       throw Error("Process identity did not settle during read")
     }
@@ -199,12 +201,18 @@ export async function superviseProcess(input: {
     stream.once("error", () => { cleanup.capture_complete = false; resolve() })
   })))
   const root = proc.pid ? await processView(proc.pid) : undefined
-  if (root) ledger.set(key(root), identity(root))
+  const origin = (entry: ProcessIdentity, via: NonNullable<ProcessCleanup["origins"]>[number]["via"], parent?: ProcessIdentity) => {
+    cleanup.origins ??= []
+    cleanup.origins.push({ pid: entry.pid, starttime: entry.starttime, via, parent_pid: parent?.pid ?? null,
+      parent_starttime: parent?.starttime ?? null, observed_at: new Date().toISOString() })
+  }
+  if (root) { ledger.set(key(root), identity(root)); origin(root, "launcher") }
   if (registration) {
     await registration.writeFile(String(proc.pid ?? "unidentified")).catch(() => { cleanup.error = "Process registration write failed" })
     await registration.close()
   }
   let scanning = Promise.resolve(), stopped = false, timedOut = false, interrupted = false
+  let lastOwn: ProcessIdentity[] = []
   const scan = async () => {
     const live = await snapshot([...ledger.values()])
     const directories = profile ? await runtimeDirectories(profile) : []
@@ -212,13 +220,14 @@ export async function superviseProcess(input: {
     // Walk repeated levels from the same snapshot; do not infer an unseen parent.
     for (let pass = 0; pass < live.length; pass++) {
       const added = live.filter((entry) => !existing.has(key(entry)) && !ledger.has(key(entry)) && (
-        root && entry.group === root.group && entry.session === root.session ||
+        root && live.some((candidate) => key(candidate) === key(root)) && entry.group === root.group && entry.session === root.session ||
         live.some((parent) => parent.pid === entry.parent && ledger.has(key(parent)))))
       if (!added.length) break
       added.forEach((entry) => {
         ledger.set(key(entry), identity(entry))
         const parent = live.find((candidate) => candidate.pid === entry.parent && ledger.has(key(candidate)))
         if (parent) parents.set(key(entry), key(parent))
+        origin(entry, parent?.pid === root?.pid && entry.pid !== cliPid && reaperReady ? "subreaper" : parent ? "parent" : "live_session", parent ?? root)
       })
     }
     if (profile && root && live.some((entry) => key(entry) === key(root))) {
@@ -250,6 +259,7 @@ export async function superviseProcess(input: {
         if (!leader) return
         ledger.set(key(entry), identity(entry))
         parents.set(key(entry), key(leader))
+        origin(entry, "live_session", leader)
       })
       const browserAncestor = (entry: ProcessView) => {
         let parent = parents.get(key(entry))
@@ -278,18 +288,22 @@ export async function superviseProcess(input: {
             }
             denied.add(key(entry)); unknown.set(key(entry), identity(entry)); cleanup.error ??= `Browser binding differs PID ${entry.pid}`
           }
+          if (!denied.has(key(entry))) unknown.delete(key(entry))
           continue
         }
         const foreign = data && !inside(data, profile!)
         const foreignParent = live.some((parent) => parent.pid === entry.parent && dataDir(parent) && !inside(dataDir(parent)!, profile!))
         if (!foreign && !foreignParent) {
-          denied.add(key(entry)); unknown.set(key(entry), identity(entry)); cleanup.error ??= `Unexplained browser/helper PID ${entry.pid}`
+          // A double-fork can be sampled between exit and kernel adoption.
+          // It has no signal authority until a later snapshot proves origin.
+          unknown.set(key(entry), identity(entry))
         }
       }
       cleanup.unknownProcesses = [...unknown.values()]
       cleanup.processes = [...ledger.values()]
     }
-    return live.filter((entry) => ledger.has(key(entry)))
+    lastOwn = live.filter((entry) => ledger.has(key(entry))).map(identity)
+    return lastOwn
   }
   const checkedScan = () => {
     scanning = scanning.then(async () => { await readReceipt(); await scan() }).catch((error) => { cleanup.error ??= message(error) })
@@ -352,9 +366,14 @@ export async function superviseProcess(input: {
   stopped = true
   clearInterval(poll)
   await scanning
-  await checkedScan()
-  await Bun.sleep(100)
-  await checkedScan()
+  cleanup.verification = []
+  for (const pass of [0, 1]) {
+    if (pass) await Bun.sleep(100)
+    await checkedScan()
+    cleanup.verification.push({ observed_at: new Date().toISOString(), owned_remaining: lastOwn.length })
+    if (lastOwn.length) cleanup.error ??= "Owned process remains at final verification"
+  }
+  if (unknown.size) cleanup.error ??= `Unexplained browser/helper PID ${unknown.values().next().value!.pid}`
   if (!cleanup.error) cleanup.status = "confirmed"
   if (cleanup.status !== "confirmed") cleanup.status = "failed"
   await Promise.race([streams, Bun.sleep(1000).then(() => {
