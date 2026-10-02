@@ -7,7 +7,8 @@ Code12 collector FAIL: readiness-runtime после успешного cleanup �
 В **d967265b5a** исправлен воспроизведённый на реальном Node IPC класс зависания:
 terminal ACK теперь сопровождается checked stop без ожидания только события
 disconnect.14 адресных tests и provenance5045 PASS; свежая live ещё требуется.
-Candidate14 собирается. Далее — обновлённый технический J21 и новая полная пара.
+Candidate14/reader14 собраны и проверены; технический J21 read08 запущен
+в ordinary headed. После него требуется новая полная автономная пара.
 Failed результаты сохранены, старые individual PASS не заменяют новую пару.
 Точные pins, процессы и порядок продолжения — в
 [checkpoint](checkpoint.md#текущее-состояние).

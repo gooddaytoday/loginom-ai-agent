@@ -2,6 +2,36 @@
 
 ## Текущее состояние
 
+**Технический J21 read08 запущен — 2026-10-02 20:53 UTC.**
+Candidate14/reader14 immutable, child
+`d967265b5a37f58afe6ee57d4d478113d0928174`; version0.0.0-dev-202610022051.
+Build original exec38818/exit0/roundtrip PASS; freeze exec97125/exit0,
+candidate5442/QA971 files, help/обе path проверки PASS. SourceDirty=true
+отражает сохранённые untracked материалы; release не заявлен.
+Manifest `8d336c63d90f6cc88315ac26dd1e328aa6c3e1e72ca20f6e5e2755ae8f1c699c`,
+sourceTree `0000e53c46357e260826b2da4a967900b988c12bf1416f5427b627056c3113aa`,
+archive `82d8cb44d87ca408548aa5d46eccc71460c702abb15a47673848d64fcdbb2a0d`,
+reader `405576e753e2d973cc116a0fdc8230e6f2d770548be6cf9cd7a47dab5aa9c3b6`,
+bundle pins `4dd1c104b47301134092d31e059889fee39656249bcb646e70a73da5ab510e51`.
+
+J21 original holder862180/startTicks22518564, CLI862330. Private
+`f-cli-j21-read-08-control.json`, events `f-cli-j21-read-08-events.jsonl`,
+script `f-cli-j21-read-08.py` SHA
+`c5fceddd5d3936901759685b08f33c906e8f2d489b48e88bb16923a5774b2916`.
+Script adapted к14 и -B/sys.dont_write_bytecode до imports. Ordinary headed,
+техническое задание исходной проверенной fixture, DEBUG_ONLY, не autonomous.
+Original controller сохранён; после collection/model-delivery-binding держится
+через `f-cli-j21-read-08-control.fifo` (создаётся только после работы).
+
+Следующий шаг — наблюдать original CLI; после terminal collection проверить
+actual source delivery через `f-j21-audit.py f-cli-j21-read-08`, соответствие
+source32KiB/1024LF/8chunks/full6×4, native Save/Close/logout, новые shutdown
+records, original process absence и .writer. Только затем освобождать lease,
+завершать holder командой exit. После J21 — fresh pair13 на этих же bytes,
+не переносить Declared12 individual PASS. Весь completion ещё не доказан.
+
+### Диагноз и исправление перед J21
+
 **Pair12 неполная; отказ Code12 локализован, source fix d967265b5a.**
 Declared12 original whole PASS/released сохранён, Code12 collector exit1/FAIL,
 `cli_process_original_clean_exit_required`/`cli_process_profile_guard_retained`.
