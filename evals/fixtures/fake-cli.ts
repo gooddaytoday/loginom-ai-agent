@@ -13,6 +13,12 @@ if (process.env.EVAL_FAKE_CHANGED_WRITER) {
   await Bun.write(writer, "replacement")
   await Bun.sleep(300)
 }
+if (command === "run" && process.env.EVAL_FAKE_RUNTIME_EVENTS) {
+  const directory = path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, "loginom/runtime/generations/1/chats/fake/attempts", crypto.randomUUID())
+  await Bun.write(path.join(directory, "execution-events.jsonl"), process.env.EVAL_FAKE_RUNTIME_EVENTS)
+  if (process.env.EVAL_FAKE_STALE_WRITER) await Bun.write(path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, ".writer/owner"), "own-writer")
+  await Bun.sleep(400)
+}
 
 if (process.env.EVAL_FAKE_ORPHAN_PID_FILE) {
   const delayed = process.env.EVAL_FAKE_CHILD_DELAY_MS
