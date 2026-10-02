@@ -167,46 +167,55 @@ export async function superviseProcess(input: {
   await checkedScan()
   const poll = setInterval(() => { if (!stopped) void checkedScan() }, 100)
   const signalOwned = async (signal: NodeJS.Signals) => {
-    const live = await scan()
-    for (const entry of live) {
-      const current = await processView(entry.pid)
-      if (!current) continue
-      const saved = ledger.get(key(current))
-      if (!saved || current.uid !== saved.uid || current.device !== saved.device || current.inode !== saved.inode) throw Error(`Process identity changed PID ${entry.pid}`)
-      // Individual signals avoid signaling a recycled PGID or an unknown member.
-      try { process.kill(current.pid, signal) } catch (error) { if (!gone(error)) throw error }
+    await checkedScan()
+    for (const saved of ledger.values()) {
+      try {
+        const current = await processView(saved.pid)
+        if (!current) continue
+        if (key(current) !== key(saved) || current.uid !== saved.uid || current.device !== saved.device || current.inode !== saved.inode)
+          throw Error(`Process identity changed PID ${saved.pid}`)
+        // Individual signals avoid signaling a recycled PGID or an unknown member.
+        process.kill(current.pid, signal)
+      } catch (error) { if (!gone(error)) cleanup.error ??= message(error) }
     }
   }
-  let hard: ReturnType<typeof setTimeout> | undefined
-  const terminate = () => {
-    if (hard) return
-    void signalOwned("SIGINT").catch((error) => { cleanup.error ??= message(error) })
-    hard = setTimeout(() => {
-      void signalOwned("SIGKILL").catch((error) => { cleanup.error ??= message(error) })
-    }, 30_000)
-  }
-  const timer = setTimeout(() => { timedOut = true; terminate() }, input.timeoutMs)
-  const abort = () => { interrupted = true; terminate() }
+  let budgetEnded: () => void = () => {}
+  const budget = new Promise<void>((resolve) => { budgetEnded = resolve })
+  const timer = setTimeout(() => { timedOut = true; budgetEnded() }, input.timeoutMs)
+  const abort = () => { interrupted = true; budgetEnded() }
   input.signal?.addEventListener("abort", abort, { once: true })
-  await exited
+  if (input.signal?.aborted) abort()
+  await Promise.race([exited, budget])
   clearTimeout(timer)
-  if (hard) clearTimeout(hard)
   input.signal?.removeEventListener("abort", abort)
+  const deadline = Date.now() + 60_000
+  if (timedOut || interrupted) {
+    await signalOwned("SIGINT")
+    await Promise.race([exited, Bun.sleep(30_000)])
+  }
+  await signalOwned("SIGTERM")
+  const remaining = async () => {
+    await checkedScan()
+    return (await Promise.all([...ledger.values()].map(async (saved) => {
+      try {
+        const current = await processView(saved.pid)
+        if (current && key(current) !== key(saved)) throw Error(`Process identity changed PID ${saved.pid}`)
+        return current
+      } catch (error) { cleanup.error ??= message(error); return saved }
+    }))).filter((entry) => entry !== undefined)
+  }
+  const soft = Math.min(deadline, Date.now() + 5_000)
+  while ((await remaining()).length && Date.now() < soft) await Bun.sleep(100)
+  if ((await remaining()).length) await signalOwned("SIGKILL")
+  while ((await remaining()).length && Date.now() < deadline) await Bun.sleep(100)
+  if ((await remaining()).length) cleanup.error ??= "Owned processes did not terminate"
   stopped = true
   clearInterval(poll)
   await scanning
-  const deadline = Date.now() + 60_000
-  try {
-    await signalOwned("SIGTERM")
-    const soft = Date.now() + 5_000
-    while ((await scan()).length && Date.now() < soft) await Bun.sleep(100)
-    if ((await scan()).length) await signalOwned("SIGKILL")
-    while ((await scan()).length && Date.now() < deadline) await Bun.sleep(100)
-    if ((await scan()).length) throw Error("Owned processes did not terminate")
-    await Bun.sleep(100)
-    if ((await scan()).length) throw Error("Owned process remains after verification")
-    if (!cleanup.error) cleanup.status = "confirmed"
-  } catch (error) { cleanup.error ??= message(error) }
+  await checkedScan()
+  await Bun.sleep(100)
+  await checkedScan()
+  if (!cleanup.error) cleanup.status = "confirmed"
   if (cleanup.status !== "confirmed") cleanup.status = "failed"
   if (marker && cleanup.status === "confirmed") await rm(marker, { force: true })
   await Promise.race([streams, Bun.sleep(1000).then(() => {
