@@ -45,8 +45,12 @@ Whole CLI/controller/native fresh evidence пока не подтвержден�
 [Checkpoint](checkpoint.md#фаза-4-retained-shutdown-failure-normal-receipt-и-linux-observer--2026-10-02).
 CLI headed preflight наab721a703e и original CLI/cold launch controller на9b8e40b418
 проверены source/actual-process tests15+9+11/Host25+6, typechecks/provenance PASS.
-Actual candidate factory/capture loop и whole auditor ещё не выполнены.
+Actual candidate factory/live proof и whole auditor ещё не выполнены.
 [Текущий шаг и границы](checkpoint.md#фаза-4-original-clicold-controller-и-headed-preflight--2026-10-02).
+На **c664f40c61** source collector фильтрует/redact'ит CLI streams до записи,
+сохраняет original deadline/forced-exit failure и связывает secrets с own profile.
+Capture21/controller15/observer9 PASS, provenance5045; native journal/cold freeze/
+whole composition остаются открытыми. [Scope и следующий шаг](checkpoint.md#фаза-4-filtered-cli-capture-и-original-deadline--2026-10-02).
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·

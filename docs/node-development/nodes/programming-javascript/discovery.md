@@ -14,8 +14,10 @@ Linux по принадлежащему `Session.Version.IsWindows=false`; ди�
 Фаза4 source на9b8e40b418: original CLI/cold launch controller и detached-browser
 ownership; ab721a703e сохраняет headed для CLI preflight. Controller15/observer9/
 candidate11/Host25+6 tests/typechecks/provenance PASS, без нового браузера/модели.
-Safe redacted capture/cold freeze/whole auditor и fresh candidate/CLI остаются
-открытыми. [Текущий checkpoint](checkpoint.md#фаза-4-original-clicold-controller-и-headed-preflight--2026-10-02).
+Safe filtered/redacted CLI capture/original deadline наc664f40c61 проверены
+21/15/9 actual Node/Linux process tests, provenance5045 PASS. Native journal
+binding/cold freeze/whole auditor и fresh candidate/CLI остаются открытыми.
+[Текущий checkpoint](checkpoint.md#фаза-4-filtered-cli-capture-и-original-deadline--2026-10-02).
 
 Исходная сводка обновлена по [acceleration review](acceleration-review.md) на docs
 `13a02e8be2` / code `7b8e19bee0`; позже выполнен B-live на code `f8ceebcac9`.

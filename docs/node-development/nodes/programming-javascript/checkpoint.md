@@ -11,8 +11,9 @@ Private routing/normal receipt реализованы на49dcfa0d99; retired fa
 наff8b2c62a1. Normal cleanup binding наeb051d9b77/948bc6ad8d и Linux process
 observer наec73da6a73 проверены отдельно. Controller source на9b8e40b418 теперь
 связывает original CLI/cold launch handles, detached own-profile browser и native
-Close gate; CLI preflight headed наab721a703e. Текущий шаг — подключить безопасный
-сбор redacted evidence и freeze cold reader к candidate runtime, завершить whole
+Close gate; CLI preflight headed наab721a703e. Наc664f40c61 source collector
+собирает filtered/redacted CLI streams и удерживает original deadline failure.
+Текущий шаг — связать native journal и freeze cold reader к candidate runtime, завершить whole
 composition, затем same-task F и fresh ordinary
 headed candidate/Sol trials. Общая цель не достигнута и не сужается. На старте
 этого шага child797927 tracked clean, browser/candidate/CLI не запускались,
@@ -22,7 +23,7 @@ OpenViking checks/errors не было. Untracked acceleration-review не вк�
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
 standalone CLI transport/bundle/admission/public-node/Save binding. Child
-**9b8e40b418e1defe8dbeb07f305f5fd240c32eea** tracked clean; registration на161353
+**c664f40c6154d05ace228fddeeef7c67560288b2** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 первоначальных адресных test methods PASS; усиленная configuration/output
 regression9PASS теперь включает62 non-noop native mutations.
@@ -70,6 +71,59 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: filtered CLI capture и original deadline — 2026-10-02
+
+Child **c664f40c6154d05ace228fddeeef7c67560288b2** добавляет
+`javascript-cli-redact-worker.mjs` и `javascript_cli_capture.py`;
+original controller вызывает их через `create_capture`/`collect`.
+Factory связывает Node и canonical redactor с проверенным candidate, секреты —
+только с private credential files своего Linux CLI profile; evidence directory
+отдельна от candidate/profile/model task. Known values передаются по private
+pipe, в argv и receipt их нет. Worker до записи фильтрует non-public events,
+вложенное reasoning/system/developer в JSON strings и binary data URIs,
+затем вызывает существующий `createRedactor`. Multiline PEM stderr не раскрывает
+body; незакрытый block отказывает. Files создаются exclusively с0600; full
+public UTF-8/code/LF/schema/NULL/type/order сохраняются. Invalid/oversized lines,
+worker failure, неподтверждённый Close ACK или source/file identity drift
+сохраняют отказ, сырого предварительного spool нет.
+
+Collector держит original `Popen` и PID-fd только своего root, наблюдает
+own runtime/browser через прежний read-only observer и не меняет deadline.
+По original expiry посылает SIGINT, даёт bounded cleanup grace до90000ms,
+при необходимости SIGTERM только этому root. Forced exit или поздний чистый
+exit не повышают результат: capture/deadline failures входят в first immutable
+controller finish и закрывают cold launch gate. Process groups и чужие сеансы
+не завершаются. Live child/inherited pipes после root exit дают отказ;
+collector закрывает свои pipe handles и отдельно дожидается redactor.
+Обычные факты native Close/logout этим слоем не доказаны.
+
+Проверено из child `packages/loginom-runtime`:
+
+```sh
+LOGINOM_NODE=/home/george/.local/state/loginom-ai-agent/node-development/toolchains/node-v24.19.0-linux-x64/bin/node python3 -m unittest discover -s tools/loginom-acceptance -p test_javascript_cli_capture.py -v
+LOGINOM_NODE=/home/george/.local/state/loginom-ai-agent/node-development/toolchains/node-v24.19.0-linux-x64/bin/node python3 -m unittest discover -s tools/loginom-acceptance -p test_javascript_cli_controller.py -v
+python3 -m unittest discover -s tools/loginom-acceptance -p test_javascript_cli_processes.py -v
+```
+
+Final original processes:21/15/9 PASS, actualexit0. Это actual pinned Node
+redactor и Python/Linux producer/PID-fd fixtures; они не являются CLI/model/
+Chromium runs. Из child root `python3 script/migration/verify_sources.py --map
+docs/migration/source-map.json --root . --transforms
+docs/migration/source-transforms.json` —5045 PASS, actualexit0; diff check PASS.
+Initial capture01 failed на ошибочном string вместо `Path`; capture03 выявил
+nested reasoning в serialized JSON string. Исправлены обе причины, final05 PASS;
+все original failed/intermediate logs сохранены. Provenance01 ошибочно указал
+несуществующий путь verifier и завершился2; owning script во02 завершился0.
+
+Private receipt `f-cli-capture-validation-v1.json` в прежней кампании,
+SHA256 **0ce3f782be4994af78470def295b46bd0c20b46fde6e5ca1101f39a363100a5f**,
+содержит source hashes и original exec/terminal handles для9 logs.
+Native journal authentication, complete cold dependency freeze, whole
+`javascript_node_acceptance.py`, same-task F и fresh headed candidate/две Sol
+CLI trials остаются открытыми. `javascript_node_acceptance.py` по-прежнему
+TO_IMPLEMENT; model/cleanup/whole flags partial helpers false. Новых browser,
+candidate или model launches нет, lease450 не менялся; accepted registry прежний.
 
 ### Фаза 4: original CLI/cold controller и headed preflight — 2026-10-02
 

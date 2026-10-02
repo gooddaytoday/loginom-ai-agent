@@ -116,8 +116,8 @@ close data. Он не выводит process cleanup или whole acceptance и�
 PID/start/UID/boot, session/known descendants, actual exit0 и guard absence;
 9 actual process tests не являются CLI/browser/candidate evidence. Нужна
 controller binding всех известных own runtime/browser identities; escaped до
-first observation descendants этим observer не подтверждены. Никаких signal/kill
-операций в collector нет, first terminal failure сохраняется.
+first observation descendants этим observer не подтверждены. Observer не
+посылает signals; first terminal failure сохраняется.
 На9b8e40b418 `JavascriptProcessController` создаёт actual original standalone
 Popen с обычным Sol/low/headed argv, сохраняя original30-minute ceiling, file bytes,
 candidate before/after и OS executable/entry identities. Detached browser от
@@ -129,8 +129,22 @@ last-native-Save/Close/logout plus original process finish, затем запу�
 exact-path reader в отдельном fresh profile с10-minute ceiling и frozen file pins.
 Process-only или чужой serialized receipt такого запуска не разрешает.
 Source tests15/9/11 и Host25+6 не являются candidate factory/native live proof.
-До F остаются redacted stream/native capture, lease/deadline/cancellation loop и
-complete cold imports freeze к candidate runtime; whole auditor всё ещё открыт.
+Наc664f40c61 original controller `create_capture` выводит Node/redactor из
+своего проверенного candidate и credential values из own private Linux profile.
+`collect` получает actual controller/capture objects; raw stdout/stderr не
+пишутся в предварительный файл. Worker через private pipe фильтрует hidden
+content/binary, включая вложенный JSON и multiline PEM, и применяет существующий
+canonical redactor до записи0600 evidence. Complete public payload сохраняется;
+invalid/oversized/unredactable/unknown lines отказывают, never silently truncate.
+Финал сверяет source/file identity/hash и clean redactor ACK/exit.
+Expiry original30-minute ceiling вызывает SIGINT только original PID-fd root,
+bounded cleanup grace до90000ms и при необходимости own-root SIGTERM.
+Неизменный исходный deadline и отказ остаются в controller finish даже после
+clean exit; поздняя уборка не открывает cold gate. Live inherited pipe/child
+после root exit — отказ, не process PASS. Source21/15/9 tests/provenance5045
+не являются compiled candidate/model/native proof.
+До F остаются authenticated native journal, campaign lease orchestration,
+complete cold imports freeze к candidate runtime и whole composition.
 CLI Node Host передаёт explicit visibility и в preflightHeadless наab721a703e;
 Desktop direct-host default сохранён, cleanup flag от visibility независим.
 `managed-resources-close.mjs` уже проверяет реальный bridge result перед success
