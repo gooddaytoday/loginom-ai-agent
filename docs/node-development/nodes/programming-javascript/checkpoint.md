@@ -2,6 +2,17 @@
 
 ## Текущее состояние
 
+**Связь повторно проверена успешно — 2026-10-02T19:40:11Z.**
+По просьбе пользователя actual bundled Node/default SDK candidate11 получил
+список15 инструментов, прочитал закреплённый каталог и проверил SHA:
+connected=true/pinned=true, compatibility7.4.2/Linux/Chromium/ru.
+Original exec91697/exit0; private `f-setup-default-transport-recheck-18.json`,
+SHA `4eba5d85e71ebb9268d1c03a3322d9840f1790690eef18f89d0a36548b0a7405`.
+Ниже сохранён прежний blocked audit; его сетевой blocker в этой проверке
+не воспроизведён. Это не новая CLI-приёмка и не гарантия длительной стабильности.
+Браузеры/модель не запускались, настройки/кандидат не менялись.
+Следующий шаг основного плана — fresh pair10 на candidate11/reader11.
+
 Оперативная точка **2026-10-02, 19:07 UTC**: candidate11/reader11 на child
 **f2a0cdd991**, knowledge1.2, остаются immutable. Новая пара пока не принята.
 Свежий Declared09 завершился **до модельных вызовов** с LOGINOM_HOST_TIMEOUT;
