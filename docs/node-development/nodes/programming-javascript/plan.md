@@ -6,6 +6,13 @@
 [регламент](../../README.md) · [реестр](../../registry.json).
 
 Дата: 2026-09-26; порядок продолжения обновлён 2026-09-29 по acceleration review.
+Модель автономной CLI-приёмки обновлена пользователем 2026-10-02:
+**`openai/gpt-6.1-sol`, variant `low`** во всех будущих попытках этого узла.
+Это назначение заменяет прежнюю модель для JavaScript, включая
+модель из общего CLI-регламента. Две независимые попытки и лимит30 минут
+сохраняются; same-task review на Astra/medium не меняется. До новой приёмки
+согласовать launcher и строгие проверки фактической модели с этим назначением;
+прежние результаты тестов не доказывают такую адаптацию.
 Подготовительный статус: **discovery_required**; часть runtime уже реализована.
 Component ID: `component.programming.JavaScript`.
 Runtime type: `programming.javascript`; mode: `script`. В ветке `node-javascript`
@@ -270,7 +277,7 @@ native cancelled за 6,612 секунды, отдельный local cancel, sho
   защиту очередного live-шага нельзя откладывать до E.
 - **F — фазы 5–6:** один проход ревью и исправления, immutable standalone
   candidate, J01/J21 delivery и J27, затем две независимые последовательные
-  CLI-попытки code/declared на Sol low по 30 минут. Обе — только
+  CLI-попытки code/declared на GPT-6.1 Sol / low по 30 минут. Обе — только
   `http://logi-test-plan.bg.local/app/`. Source/direct J01/J21 нужны до ревью,
   candidate-часть — после сборки; J18 не является gate разработки.
 
@@ -447,7 +454,7 @@ Baseline раздела 12 обзора — ориентир, не обещан�
    process; private runtime/browser probes их не заменяют.
 6. Для приёмки понадобится самостоятельный CLI candidate и собственный OAuth
    profile; Desktop auth и shell proxy автоматически не засчитывать.
-   Нужную модель проверить как `openai/gpt-6-sol`, variant `low`.
+   Нужную модель проверить как `openai/gpt-6.1-sol`, variant `low`.
 
 **Проверка выхода 0A:** заполненное assignment, действительные receipts
 изолированных ресурсов/памяти, explicit base/source/pins, подтверждённый build
@@ -1081,7 +1088,7 @@ oracle и candidate зафиксированы; собственный OAuth/pro
 
 Выполнять по [CLI-регламенту](../../workflow/acceptance-cli.md), не копировать
 старые Hermes launchers из исторических аудиторов. Модель:
-**`openai/gpt-6-sol`, `low`**, существующая ChatGPT OAuth-подписка.
+**`openai/gpt-6.1-sol`, `low`**, существующая ChatGPT OAuth-подписка.
 Использовать один общий host acceptance slot и атомарный `acceptance.lock`;
 локальная single campaign не создаёт второй слот.
 
@@ -1144,7 +1151,7 @@ SHA/отчёты и пределы — в [текущей сводке checkpoin
 | J15 persistence | Save/new open/execute | Последний source/options/schema и те же результаты | Saved artifact + cold audit | private code/declared/usage writer–cold–bytes6×2; isolated public C/D writer+Save/independent private cold6×4 приняты; candidate/CLI открыты |
 | J16 oracle integrity | Преднамеренные подмены | Каждая подмена отклоняется | Oracle negative report | runtime/source: частные persistence oracle negatives и actual independent public Code scalar auditor12/12 и declared scalar auditor18/18 mutation refusals; полный business/candidate/CLI auditor открыт |
 | J17 UI regression | Общий deny и соседний calculator | Generic code запрещён, прежние узлы работают | Адресные source tests | runtime/source: guards и смежные regression tests; итоговая проверка с JS handler открыта |
-| J18 autonomy | Две Sol low попытки | Без технических подсказок, полный заявленный scope | Sessions/events/completion | не проверено: две независимые CLI-попытки только в фазе 6 |
+| J18 autonomy | Две GPT-6.1 Sol / low попытки | Без технических подсказок, полный заявленный scope | Sessions/events/completion | не проверено: две независимые CLI-попытки только в фазе 6 |
 | J19 context | Изменённые поля/старый код, label/comment с текстом инструкции | Используется текущее наблюдение; содержимое данных не меняет задачу | Context/source identities + tool evidence | current context runtime наb0ecbeaadf: Code403/declared404 before/after source/comment/manual label, обе полные mappings и exact user-v1 envelope приняты2/2, independent audit/negative64/64 каждый/cleanup. Compact bridge/guidance23e8488e29 прошёл actual MCP/addressed61+full3179/10SKIP. Reordered input/old source Code410/Declared411 на9c93 принят2/2, audit v3/negative80/80 каждый/cleanup. Technical-name freshness Code441/declared442 на9bc52b9468 принят2/2: default refusal/cleanup → NEW explicit allow_configured_output=true → honest source_pending/old source/current CustomerNow → correction из public Name → corrected Execute/full6×4/1950/final default materialized context/cleanup. Full client3419/10SKIP/operator18502PASS; independent v7 audit/119 negatives каждого (Code post-live strengthening после failed v5 negative, declared pre-pin). Pending output не считается выполненным. Actual model/candidate/CLI остаются отдельными gates; [context design](context-delivery-design.md) |
 | J20 engine profile | Business/API primitives и все v1 knowledge examples на 7.4.2 | Нужные возможности подтверждены; дополнительные features явно not_checked | Build/ОС, snippet hashes, профиль | private30/30 observations сохранены; все два exact knowledge1.0 examples Code401/declared402 наbc649 прошли public apply/2 fresh Execute/full6×2/user-v1/source audit и negative32/32 каждый/cleanup; required API текущего asset/business отделён в engine-profile.required_runtime_subset; полный ES/Data API не заявлен, candidate/CLI delivery открыта |
 | J21 response budgets | Prepare/describe (включая multi-type), apply/output/source chunks с worst-case source | Соблюдены оба бюджета; нет backend truncation, readback summary или потери полного результата | Source/direct проверка до ревью, candidate/CLI delivery после сборки | source/direct8bca1b00aa: final46000/JS-card20000/default50KiB2000 fence, lossless JS configuration и pending prepare bundle; addressed76/full client3188+10SKIP/operator45, actual MCP fixture (simulated target), worst source chunks/full batch refusal и recorded live replies8/8 приняты. Effective limits/metadata.truncated/candidate/CLI открыты; [budget design](response-budget-design.md) |

@@ -2,6 +2,13 @@
 
 ## Текущее состояние
 
+Назначение модели обновлено пользователем 2026-10-02: все будущие автономные
+CLI-попытки JavaScript выполняются на **`openai/gpt-6.1-sol`, variant `low`**.
+Перед приёмкой адаптировать launcher, строгую проверку фактической модели и
+адресные тесты; прежние PASS не подтверждают эту адаптацию. Исторические
+metadata/source/model-list evidence не переписывать. Две независимые попытки
+по30 минут и same-task Astra/medium review сохраняются.
+
 На2026-10-02 пользователь прямо поручил подключить существующий guarded native
 Close к обычному CLI и продолжить общую цель. Принят automatic own
 last-confirmed-Save shutdown из [дизайна](cli-auditor-design.md#предложение-штатного-cli-package-teardown):
@@ -21,7 +28,7 @@ filesystem proof, actual generic reader imports/native launch ещё не вып
 исправлены new evidence directory, assignment preflight и release dependency freeze.
 Текущий шаг — связать campaign lease и завершить whole
 composition, затем same-task F и fresh ordinary
-headed candidate/Sol trials. Общая цель не достигнута и не сужается. На старте
+headed candidate/GPT-6.1 Sol / low trials. Общая цель не достигнута и не сужается. На старте
 этого шага child797927 tracked clean, browser/candidate/CLI не запускались,
 lease450 closed_verified, прежние own test handles terminal. Дополнительных
 OpenViking checks/errors не было. Untracked acceleration-review не включать.
@@ -59,7 +66,7 @@ standalone new Done449/450/preserve Execute/full6×4/1950 приняты2/2 ка
 ordinary headed/independent audits/negative/cleanup. Lease450 closed_verified,
 active_exec=null, процессов/browser/tests нет. J02 public input подтверждён.
 После завершения исходников фазы 4 — один **same-task Astra/medium review**,
-затем candidate/J01/J21/J27 и Sol CLI.
+затем candidate/J01/J21/J27 и GPT-6.1 Sol / low CLI.
 Последний подтверждённый task model gpt-6.1-sol/high; async запрос переключения этой же
 задачи pending, F review не выполнен. Product release/accepted registry не повышены.
 Natural insufficient-primary/Done errors not_observed — явная граница coverage;
@@ -114,7 +121,7 @@ Migration provenance5045 и diff check PASS. Private receipt
 preparation lease reserved_active принадлежит этой задаче, browser450
 closed_verified/active_exec_session=null, acceptance_lease=null; реестр не менялся.
 Следующий шаг — campaign lease и whole auditor composition. F, fresh immutable
-candidate/ordinary headed J01/J21/J27 и две Sol-low CLI остаются открытыми.
+candidate/ordinary headed J01/J21/J27 и две GPT-6.1 Sol / low CLI остаются открытыми.
 
 ### Фаза 4: original CLI native artifacts — 2026-10-02
 
@@ -193,7 +200,7 @@ Migration provenance5045 PASS и diff check PASS. Private receipt
 orchestration, technical cold process collection с original10-minute ceiling,
 whole composition `javascript_node_acceptance.py`. Затем same-task F и fresh
 immutable candidate: actual generic reader dependency loading и ordinary headed
-J01/J21/J27/две независимые Sol-low CLI trials. TO_IMPLEMENT/accepted registry
+J01/J21/J27/две независимые GPT-6.1 Sol / low CLI trials. TO_IMPLEMENT/accepted registry
 пока не повышать. Browser/candidate/model launches и memory errors в этом шаге
 отсутствовали; lease450 не менялся, собственные test processes terminal.
 
@@ -245,7 +252,7 @@ Private receipt `f-cli-capture-validation-v1.json` в прежней кампа�
 SHA256 **0ce3f782be4994af78470def295b46bd0c20b46fde6e5ca1101f39a363100a5f**,
 содержит source hashes и original exec/terminal handles для9 logs.
 Native journal authentication, complete cold dependency freeze, whole
-`javascript_node_acceptance.py`, same-task F и fresh headed candidate/две Sol
+`javascript_node_acceptance.py`, same-task F и fresh headed candidate/две GPT-6.1 Sol / low
 CLI trials остаются открытыми. `javascript_node_acceptance.py` по-прежнему
 TO_IMPLEMENT; model/cleanup/whole flags partial helpers false. Новых browser,
 candidate или model launches нет, lease450 не менялся; accepted registry прежний.
@@ -267,7 +274,7 @@ compiled-host fixture. Этот original failure сохранён, отдель�
 Child **9b8e40b418e1defe8dbeb07f305f5fd240c32eea** добавляет
 `javascript_cli_controller.py`. Normal factory сверяет candidate до/после,
 исходные file bytes и чистую task directory, отсутствие writer guard/bundle
-override, графическую сессию; строит обычный Sol/low `run --no-headless` argv.
+override, графическую сессию; строит обычный headed `run --no-headless` argv.
 Держит actual `Popen(start_new_session=True)` и original30-minute ceiling,
 проверяет live executable и Node Host/managed-runtime entry identities.
 Cold factory допускает только этот writer, повторно читает own SQLite, сверяет
@@ -322,7 +329,7 @@ stdout/stderr/native journals, freeze всех cold dependencies с imports к c
 runtime, затем `javascript_node_acceptance.py` whole composition. Эти factory APIs
 пока не запускались на product candidate; не заменяют controller capture loop,
 native journal authenticity, lease и bounded deadline/cancellation orchestration.
-Same-task F → fresh headed candidate/J01/J21/J27 → two normal Sol/low trials остаются
+Same-task F → fresh headed candidate/J01/J21/J27 → two normal GPT-6.1 Sol / low trials остаются
 в прежнем порядке; accepted registry14 не меняется.
 
 ### Фаза 4: retained shutdown failure, normal receipt и Linux observer — 2026-10-02
@@ -385,7 +392,7 @@ Timestamp final receipt v2 SHA256
 и13PASS03. Первые cleanup11/12PASS также сохранены; это не повтор live evidence.
 Все own exec handles terminal. Новый browser/CLI/candidate/lease не запускался;
 lease450 остаётся closed_verified, active_exec=null. Registry14, F/candidate/
-Sol остаются открытыми. Следующий шаг — actual controller process/native closure
+GPT-6.1 Sol / low остаются открытыми. Следующий шаг — actual controller process/native closure
 binding и whole `javascript_node_acceptance.py`; затем same-task F по плану.
 
 ### Фаза 4: штатный CLI package shutdown — 2026-10-02
@@ -436,10 +443,10 @@ actual executorTools. CLI policy01 failed1: fixture View без url/username/fol
 Client4365fd→e643e5 actual0; Hostf03803→98b45c actual0;
 CLI0f9467→ef7bc6 actual0; typechecks d15988/67074d→8f0e16/689a89→1d1fc4 actual0.
 
-Свежий headed Loginom/candidate/Sol не запускался, old captures не переписаны.
+Свежий headed Loginom/candidate/CLI не запускался, old captures не переписаны.
 Следующий шаг — independent normal cleanup receipt/process binding и whole
 composition; после source завершения обязательный same-task Astra/medium F,
-затем fresh ordinary headed candidate J01/J21/J27 и две independent Sol/low CLI.
+затем fresh ordinary headed candidate J01/J21/J27 и две independent GPT-6.1 Sol / low CLI.
 
 ### Фаза 4: managed resource close ACK — 2026-10-02
 
@@ -519,7 +526,7 @@ SHA256; всего в cold tests12 pins. Actual cold содержит32768 UTF-8
 
 Следующий слой — normal own package/logout/process cleanup и итоговый
 `javascript_node_acceptance.py`, затем same-task Astra/medium F и fresh ordinary
-headed candidate/J01/J21/J27, два Sol trials. Обычный CLI не получает special
+headed candidate/J01/J21/J27, два GPT-6.1 Sol / low trials. Обычный CLI не получает special
 `acceptanceCleanupPackage`. Runtime resource close ACK не доказывает native
 package/logout; verified saved identity/dirty-state и browser ownership обязательны.
 Фактический `managed-entry.mjs:close` дополнительно не проверяет boolean поля
@@ -565,7 +572,7 @@ CLI read binding в итоговом аудиторе. Fresh browser/candidate/C
 новых leases нет. Обнаружен аналогичный multi-chunk gap в cold source audit;
 следующий шаг — исправить и проверить его на уже сохранённом32KiB native capture,
 затем normal own package/logout/process cleanup и итоговая composition.
-Same-task F review, fresh ordinary headed candidate и Sol trials ещё впереди.
+Same-task F review, fresh ordinary headed candidate и GPT-6.1 Sol / low trials ещё впереди.
 
 ### Фаза 4: late CLI output-read delivery binding — 2026-10-02
 
@@ -601,7 +608,7 @@ Browser/model/candidate не запускались; новых leases нет.
 `isolated_package_cleanup` специального `supervise(...)` не присваивать normal
 worker. Следующее — independent business/source/native audit позднего read и
 проверенный normal CLI package/logout/process teardown, затем итоговая composition.
-Same-task F, fresh ordinary headed candidate/J01/J21/J27 и два Sol trials впереди.
+Same-task F, fresh ordinary headed candidate/J01/J21/J27 и два GPT-6.1 Sol / low trials впереди.
 
 Адресный source-backed baseline для следующего native read audit:
 `e-source-policy-code-01` journal SHA256
@@ -660,7 +667,7 @@ Failed01 выявил неверное требование fresh-draft ownershi
 Fresh headed browser/candidate/CLI не запускались. Следующее — normal own
 package/logout/browser/process cleanup binding, поздний model full output-read
 и итоговая composition. Затем обязательный same-task Astra/medium F review,
-fresh candidate/J01/J21/J27 и два Sol CLI trials. Goal active; readiness не повышена.
+fresh candidate/J01/J21/J27 и два GPT-6.1 Sol / low CLI trials. Goal active; readiness не повышена.
 
 ### Фаза 4: последний CLI Save и dirty-state — 2026-10-02
 
@@ -848,7 +855,7 @@ Source receipt `f-javascript-cli-admission-validation-v1.json`, SHA256
 Никаких моделей, candidate или headed browser в этой итерации не запускалось;
 исходный old default и исходные captures сохранены. Остаток тот же: итоговый
 `javascript_node_acceptance.py` с actual node/source/delivery/import/Save/cold/
-cleanup и candidate-use binding, затем F/candidate/fresh headed/Sol CLI.
+cleanup и candidate-use binding, затем F/candidate/fresh headed/GPT-6.1 Sol / low CLI.
 
 ### Фаза 4: standalone CLI transport/bundle — 2026-10-02
 
@@ -856,7 +863,7 @@ Child **8d3eb30f1a4fded7fddb9f0070bef495848adfd9** добавляет
 `javascript_cli_evidence.py`, `javascript_cli_candidate.py` и два адресных
 test modules. Первый читает только собственную settled fresh root session из
 SQLite `mode=ro`/`query_only`, восстанавливает фактические v1 identities,
-проверяет OAuth configuration, модели OpenAI Sol/low и исходные30 минут.
+проверяет OAuth configuration, model metadata прежнего назначения и исходные30 минут.
 File snapshots сравниваются по точным UTF-8 bytes/hash/name/count. Терминальные
 tool parts CLI сопоставляются с SQLite по IDs/callIDs/input/output/time digests;
 идентичный повтор доставки допустим, изменённый refused. Публичные provider/cancel
@@ -951,7 +958,7 @@ python3 tools/loginom-acceptance/javascript_output_evidence.py --journal JOURNAL
 
 Код/expected columns/rows операторской проверки не добавлены в model-input.
 Source449/450 взят из исходного собственного fixed request и сверён с прежним
-immutable oracle pin. Проверка не доказывает авторство Sol; ни journal authenticity,
+immutable oracle pin. Проверка не доказывает авторство модели; ни journal authenticity,
 ни Save/cold, ни candidate/CLI эти частичные аудиторы не повышают до PASS.
 CLI fixture не создавался, браузер в этой итерации не запускался; это повторный
 анализ прежних ordinary headed native журналов. New-target product route требует
@@ -1302,7 +1309,7 @@ fixture не передавал observed build; JS knowledge корректно 
 files preserved. Следующий шаг **один same-task gpt-6-astra/medium review** по
 полной реализации ядра/исходным G/J требованиям и фактическим границам coverage,
 не новое исследование всей истории. Затем один раунд confirmed live fixes,
-immutable standalone candidate/J01/J21/J27 и две Sol/low/30min CLI попытки.
+immutable standalone candidate/J01/J21/J27 и две GPT-6.1 Sol / low /30min CLI попытки.
 
 Current actual task model gpt-6.1-sol/high (turn_context19:34:30.268Z); async
 configuration question pending. Пока переключение этой же задачи на Astra/medium
@@ -1354,7 +1361,7 @@ negative714edb3864e98db1eb5d35c013200341ac6e2383971e91605e664a3a40dad445
 
 Следующее — product registration общего lifecycle-v5/knowledge/driver, affected
 source tests/provenance; затем один same-task Astra/medium F review, immutable
-candidate/J01/J21/J27 и две Sol/low/30min CLI попытки. Натуральные редкие Done/
+candidate/J01/J21/J27 и две GPT-6.1 Sol / low /30min CLI попытки. Натуральные редкие Done/
 insufficient-primary errors not_observed, это явная граница coverage, не PASS.
 Текущий task model gpt-6.1-sol/high; async запрос пользователю переключить эту же
 задачу на gpt-6-astra/medium отправлен, ответа пока нет. Не подменять ревью
@@ -1474,7 +1481,7 @@ provenance5045 actualexit0; prior failures сохранены. Declared/code new
 **Следующее:** адресная сверка remaining обязательных source/direct E требований
 с original ad92ddbf8c (не перечитывать весь план), затем F: one same-task
 Astra/medium review, product registration, immutable standalone candidate/J01/
-J21/J27 и две independent Sol/low/30min попытки. Natural insufficient-primary/
+J21/J27 и две independent GPT-6.1 Sol / low /30min попытки. Natural insufficient-primary/
 Done-refusal examples не получены, пользовательский вопрос pending; отсутствие
 не выдавать за PASS и не выдумывать native failures. Original J25 требует
 preflight/native parse/sync throw, conditional details rule проверяется отдельно;
@@ -2312,7 +2319,7 @@ Code counterparts приведены в записи ниже. Failed412 и ег
 source→physical contract и соответствующая knowledge; private T96 — гипотезы,
 не public acceptance. Далее J26 module policy, J23 cold именно long source,
 Done refusal/technical details, J19 actual model resistance, F review/registration/
-candidate/J01/J21 actual effective limits/J27/two autonomous Sol low CLI attempts.
+candidate/J01/J21 actual effective limits/J27/two autonomous GPT-6.1 Sol / low CLI attempts.
 Цель не завершена; никаких merge/push/rebase в этом шаге не было.
 
 ### E/J24: public column-name cases5/5 и knowledge1.1 source/direct приняты — 2026-10-01
@@ -2645,7 +2652,7 @@ Registry411 closed_verified/active exec null; ни browser, ни live process
 без helper invocation/engine switch/source edits/Done/Save/explicit Execute.
 Source/helper/cases/oracle сначала зафиксировать. Current G1 FullType и assistant/
 engine presence ещё не доказаны. Далее J24/J26/cold long source/Done refusal,
-один F review/fix, product registration/candidate/J27 и две Sol low CLI attempts.
+один F review/fix, product registration/candidate/J27 и две GPT-6.1 Sol / low CLI attempts.
 
 ### E/J19: reordered405 отказал до context; recovery407 завершён — 2026-10-01
 
@@ -2929,7 +2936,7 @@ native declared schema и var/let loops. Sales Code/declared6×4 дополни�
 композиция существующих source/port/graph readers и bounded actual public reply.
 Дизайн записан, runtime API ещё не добавлен, live/context/model resistance PASS
 нет. После реализации остаются J22/J24/J26/cold long source/Done refusal,
-один F review/fix, immutable candidate и два sequential Sol low CLI modes.
+один F review/fix, immutable candidate и два sequential GPT-6.1 Sol / low CLI modes.
 
 ### E/J20: Code knowledge v1 example принят — 2026-09-30
 
@@ -3380,7 +3387,7 @@ registry392 closed_verified, active exec/evidence/kind=null.
 
 **Далее:** public local cancel/same-ID/lost-reply recovery (J13), затем remaining
 Required=true и J19/J20/J22/J24/module/source-direct budgets, один F review/fix
-round, immutable candidate/J27/delivery и две sequential headed CLI30m Sol low.
+round, immutable candidate/J27/delivery и две sequential headed CLI30m GPT-6.1 Sol / low.
 Повторять принятые parse/throw/C/D persistence cases без затронувшего изменения
 не нужно. Fresh393 завершён и reconciled выше. Не расширять конечный цикл более60s и не
 повторять неизвестные Stop/Execute/Close. Общая Goal active и незавершённая.
@@ -6667,6 +6674,7 @@ child design-файлы оставлены без изменения.
 | Продолжать общую цель, браузер «как обычно» (29.09 07:47) | Текущее постоянное правило: обычный headed без `--x11-no-focus`; поздний флаг оператора сам не меняет поручение |
 | Доработать план по acceleration review (29.09) | Выполнена правка plan/discovery/card и этой сводки; реализация B затем выполнена по отдельному указанию продолжать цель |
 | Уточнение перед B-live (29.09, текущая задача) | `ad92ddbf8c` — канонический план; rebase/клик не повторять, память дополнительно проверять только при ошибке; обычный headed без X11-флага, untracked `acceleration-review.md` не коммитить |
+| Заменить модель CLI-приёмки JavaScript на GPT-6.1 Sol / low и закоммитить план (02.10) | Постоянное назначение: `openai/gpt-6.1-sol`, variant `low`; заменить прежнее назначение во всех будущих попытках JavaScript. Launcher/model auditor/tests адаптировать до запуска; исторические результаты сохранять. Astra/medium review и лимит30 минут не меняются |
 | Подключить существующий native Close к обычному CLI и продолжить цель (02.10) | Принят private automatic shutdown по last confirmed own Save; source49dcfa/ff8b2, без повторного согласования. Строгие guards сохранены, special acceptance не используется. Fresh live остаётся после completion исходников/аудиторов и same-task F |
 
 Общие правила: стенд только `http://logi-test-plan.bg.local/app/`, Loginom 7.4.2,
@@ -16320,8 +16328,8 @@ Root повторил 30 операторских тестов: PASS, прове
 ### Отдельное предусловие CLI model catalog — 2026-09-27
 
 Read-only сверка product/models.json: у provider openai есть gpt-5.6-sol и
-gpt-6-astra, но нет требуемого планом gpt-6-sol. Это снимок build-time, не
-результат authenticated OAuth model-list; доступность gpt-6-sol пока не
+gpt-6-astra, но нет требуемого на тот момент планом gpt-6-sol. Это снимок build-time, не
+результат authenticated OAuth model-list; доступность прежней модели gpt-6-sol тогда не
 проверена. До CLI-приёмки проверить реальный разрешённый каталог и точное
 разрешение model ID. Не подменять модель автоматически и не выдавать проверку
 другой моделью за prescribed acceptance. JS discovery может продолжаться.
@@ -17220,7 +17228,7 @@ CLI dependency preparation завершена закреплённым Bun по 
 пользовательский вход. Название метода `headless` относится к device-code flow,
 браузер в этом процессе не запускается. Это source preflight, не compiled
 candidate и не CLI-приёмка. До приёмки нужны собственный candidate и проверка
-OpenAI OAuth/доступности Sol по регламенту.
+OpenAI OAuth/доступности GPT-6.1 Sol / low по актуальному назначению плана.
 
 ## История подготовки до нового адаптера
 

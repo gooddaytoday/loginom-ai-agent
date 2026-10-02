@@ -5,6 +5,14 @@
 Решение `allow_configured_output: true` остаётся отдельным контрактом чтения
 контекста и не превращает `source_pending` в доказательство исполнения.
 
+Для будущей автономной приёмки пользователь 2026-10-02 назначил
+**`openai/gpt-6.1-sol`, variant `low`**. Launcher, SQLite/model delivery checks
+и их адресные тесты должны использовать эту точную модель до нового запуска.
+Ни прежние source tests, ни исторические model metadata не подтверждают
+адаптацию; их исходные значения и evidence сохраняются. Silent fallback
+на прежнюю модель не допускается. Две попытки по30 минут и Astra/medium review
+остаются по плану.
+
 ## Разделение проверок
 
 `javascript_configuration_evidence.py` проверяет admitted request, порядок
@@ -48,7 +56,7 @@ Reasoning, system/developer, auth secrets, бинарные вложения и 
 не сохраняются и не печатаются. Этот модуль не экспортирует базу.
 
 Очищенные CLI `events.jsonl` сопоставляются с metadata собственной сессии:
-фактические OpenAI Sol/low, terminal tool IDs/callIDs/messageIDs/status/time,
+фактические OpenAI GPT-6.1 Sol / low, terminal tool IDs/callIDs/messageIDs/status/time,
 input/output digests, полнота завершённых вызовов, отсутствие truncation и
 соблюдение исходных30 минут. Повтор идентичного terminal event допускается
 как повтор доставки; изменённый terminal part с тем же ID refused. Все события
@@ -105,7 +113,7 @@ Controller-only read и совпавшие metadata без этих фактов
 special supervised technical startup не заменяет normal model run. Штатное
 завершение backend/host/runtime и браузера само не доказывает закрытие пакета
 и Loginom logout. Их собственные native evidence и process termination должны
-иметь отдельный проверенный путь до запуска Sol-приёмки. Source route подключён
+иметь отдельный проверенный путь до запуска GPT-6.1 Sol / low приёмки. Source route подключён
 на49dcfa0d99 через private normal boolean и отдельный receipt/event; fresh native
 proof и whole controller binding остаются открытыми. `javascript_cli_cleanup.py`
 наeb051/948bc сам сверяет последний own Save и final normal native receipt/event,
@@ -119,7 +127,7 @@ controller binding всех известных own runtime/browser identities; e
 first observation descendants этим observer не подтверждены. Observer не
 посылает signals; first terminal failure сохраняется.
 На9b8e40b418 `JavascriptProcessController` создаёт actual original standalone
-Popen с обычным Sol/low/headed argv, сохраняя original30-minute ceiling, file bytes,
+Popen с обычным headed argv, сохраняя original30-minute ceiling, file bytes,
 candidate before/after и OS executable/entry identities. Detached browser от
 Playwright обнаруживается отдельно по exact pinned executable и own user-data-dir;
 его session и известные PID/start сохраняются после root exit. Headed/sandbox/
@@ -265,7 +273,7 @@ owner/deadline/sequence/source/settings/mapping/value/type/NULL/row/schema/fresh
 неизменённые headed-журналы Code449/declared450 используются дополнительно;
 их hashes и команды записываются в checkpoint. Это повторный анализ имеющихся
 наблюдений, не новый live run. Свежая product/candidate headed-проверка и две
-Sol/low CLI попытки следуют после предусмотренного same-task F review.
+GPT-6.1 Sol / low CLI попытки следуют после предусмотренного same-task F review.
 
 ## Предложение штатного CLI package teardown
 
