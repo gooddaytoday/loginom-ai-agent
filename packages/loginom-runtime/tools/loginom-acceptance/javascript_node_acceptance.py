@@ -266,7 +266,7 @@ class JavascriptCliAcceptance:
             if (not isinstance(writer,JavascriptProcessController) or writer.kind!='cli' or writer.candidate is None
                     or writer.launch.get('transport')!='normal_standalone_run'
                     or writer.launch.get('profile')!=str(writer.owner.profile)
-                    or writer.launch.get('headed') is not True or writer.launch.get('model')!='openai/gpt-6-sol'
+                    or writer.launch.get('headed') is not True or writer.launch.get('model')!='openai/gpt-6.1-sol'
                     or writer.launch.get('variant')!='low' or writer.launch.get('prompt_sha256')!=value_digest(self.prompt)
                     or self.expected.get('schema_mode') not in ('code','declared')):
                 raise ValueError('javascript_acceptance_original_normal_sol_low_writer')

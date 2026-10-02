@@ -230,7 +230,7 @@ class JavascriptProcessController:
         executable_pin = dict(path=str(executable),sha256=file_sha256(executable))
         node = dict(path=str(resource/manifest['node']),sha256=pins['node_sha256'])
         browser = dict(path=str(resource/manifest['browser']),sha256=pins['browser_sha256'])
-        argv = [str(executable),'run','--no-headless','--format','json','--model','openai/gpt-6-sol',
+        argv = [str(executable),'run','--no-headless','--format','json','--model','openai/gpt-6.1-sol',
             '--variant','low','--dir',str(directory),*[part for path in attachments for part in ('--file',str(path))],
             '--',prompt]
         submitted_at = time.time_ns()//1000000
@@ -253,7 +253,7 @@ class JavascriptProcessController:
         controller.candidate = (candidate,copy.deepcopy(pins))
         controller.launch = dict(candidate=str(candidate),profile=str(profile),directory=str(directory),
             files=[dict(name=path.name,bytes=item['bytes'],sha256=item['sha256']) for path,item in zip(attachments,files)],
-            prompt_sha256=value_digest(prompt),model='openai/gpt-6-sol',variant='low',headed=True,transport='normal_standalone_run')
+            prompt_sha256=value_digest(prompt),model='openai/gpt-6.1-sol',variant='low',headed=True,transport='normal_standalone_run')
         controller.native_watch=NativeJournalWatch(controller,before)
         controller.lease=lease
         return controller
