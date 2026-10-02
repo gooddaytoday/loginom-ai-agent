@@ -309,18 +309,22 @@ export async function superviseProcess(input: {
       if (writer && cleanup.writer && JSON.stringify(writer) !== JSON.stringify(cleanup.writer)) cleanup.error ??= "Writer identity changed"
     }
     if (browser) {
-      const native = live.filter((entry) => entry.device === browser.device && entry.inode === browser.inode || inside(entry.executable, browser.directory))
       const dataDir = (entry: ProcessView) => entry.args.find((arg) => arg.startsWith("--user-data-dir="))?.slice(16)
-      const browserAncestor = (entry: ProcessEntry) => {
+      const browserAncestor = (entry: ProcessEntry, requireBinding = true) => {
         let parent = entry.origin?.parent
         const visited = new Set<string>()
         while (parent && !visited.has(parent)) {
           const candidate = ledger.get(parent)
-          if (candidate?.binding) return true
+          if (candidate?.binding || !requireBinding && candidate &&
+            (candidate.process.device === browser.device && candidate.process.inode === browser.inode || inside(candidate.process.executable, browser.directory))) return true
           visited.add(parent); parent = candidate?.origin?.parent
         }
         return false
       }
+      // A browser child cannot evade helper admission by executing outside the
+      // bundle. The same recorded parent chain identifies it before binding.
+      const native = live.filter((entry) => entry.device === browser.device && entry.inode === browser.inode ||
+        inside(entry.executable, browser.directory) || ledger.has(key(entry)) && browserAncestor(ledger.get(key(entry))!, false))
       // Establish exact root bindings first. Helpers cannot supply a missing
       // root proof, even when the kernel has adopted them to our launcher.
       for (const current of native) {
