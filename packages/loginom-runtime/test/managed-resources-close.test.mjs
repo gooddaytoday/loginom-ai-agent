@@ -2,7 +2,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
 import { once } from "node:events"
-import { stat } from "node:fs/promises"
+import { readFile, stat } from "node:fs/promises"
 
 // Actual Node IPC, live sockets and a private profile; bridge ACKs are boundary
 // inputs only. No browser/Loginom/package-cleanup proof is asserted here.
@@ -15,13 +15,14 @@ import {once} from 'node:events';
 const {closeManagedResources}=await import(process.argv[1]);
 const scenario=process.argv[2],calls=[];
 const profile=await mkdtemp(join(tmpdir(),'loginom-resource-close-'));
+const diagnostic=await mkdtemp(join(tmpdir(),'loginom-resource-diagnostic-'));
 await writeFile(join(profile,'owned-profile'),'private unit data');
 const server=createServer(),browser=createServer();
 server.listen(0,'127.0.0.1');await once(server,'listening');
 browser.listen(0,'127.0.0.1');await once(browser,'listening');
 const pending=Promise.withResolvers();
 const closeSocket=handle=>new Promise((resolve,reject)=>handle.close(error=>error?reject(error):resolve()));
-const state={browserProfile:profile,
+const state={browserProfile:profile,session:{directory:scenario==='diagnostic-unwritable'?join(profile,'owned-profile'):diagnostic},
   client:{async close(){calls.push('client');if(scenario==='client-reject')throw Error('private injected failure');}},
   browserServer:{async close(){calls.push('server');if(scenario==='server-reject')throw Error('private injected failure');await closeSocket(server);}},
   browser:{async close(){calls.push('browser');await closeSocket(browser);}}
@@ -37,20 +38,22 @@ let closing;
 process.on('message',message=>{
   if(message==='release'){pending.resolve();return;}
   if(message==='close'){
-    closing??=closeManagedResources(state,new Set([pending.promise]));
+    const requests=new Set([pending.promise]);
+    closing??=closeManagedResources(state,requests);
+    requests.add(new Promise(()=>{})); // The close request is registered after invocation.
     process.send({kind:'closing',calls:[...calls]});
     void closing.then(()=>process.send({kind:'result',closed:true,calls,server:server.listening,browser:browser.listening}),
       error=>process.send({kind:'result',error:error.message,calls,server:server.listening,browser:browser.listening}));
   }
   if(message==='dispose')void (async()=>{
     if(server.listening)await closeSocket(server);if(browser.listening)await closeSocket(browser);
-    await rm(profile,{recursive:true,force:true});process.disconnect();
+    await rm(profile,{recursive:true,force:true});await rm(diagnostic,{recursive:true,force:true});process.disconnect();
   })();
 });
-process.send({kind:'ready',profile});
+process.send({kind:'ready',profile,diagnostic});
 `
 
-for (const scenario of ["success", "transport-false", "process-false", "retained", "missing", "reject", "client-reject", "server-reject", "unprepared"]) {
+for (const scenario of ["success", "transport-false", "process-false", "retained", "missing", "reject", "client-reject", "server-reject", "unprepared", "diagnostic-unwritable"]) {
   test(`managed resource close drains admitted work and checks bridge ACK: ${scenario}`, async (t) => {
     const child = spawn(process.execPath, ["--input-type=module", "-e", CHILD,
       new URL("../src/managed-resources-close.mjs", import.meta.url).href, scenario],
@@ -72,11 +75,11 @@ for (const scenario of ["success", "transport-false", "process-false", "retained
     child.send("release")
     const actual = await result
     assert.equal(actual.kind, "result")
-    if (["success", "unprepared"].includes(scenario)) {
+    if (["success", "unprepared", "diagnostic-unwritable"].includes(scenario)) {
       assert.equal(actual.closed, true)
       assert.equal(actual.server, false)
       assert.equal(actual.browser, false)
-      assert.deepEqual(actual.calls, scenario === "success" ? ["client", "bridge", "server", "browser"] : ["client", "server", "browser"])
+      assert.deepEqual(actual.calls, scenario !== "unprepared" ? ["client", "bridge", "server", "browser"] : ["client", "server", "browser"])
       await assert.rejects(stat(ready.profile), { code: "ENOENT" })
     } else {
       assert.equal(actual.error, "LOGINOM_RUNTIME_CLEANUP_FAILED")
@@ -91,6 +94,17 @@ for (const scenario of ["success", "transport-false", "process-false", "retained
         assert.equal(actual.browser, false)
         assert.deepEqual(actual.calls, ["client", "bridge", "server", "browser"])
       }
+    }
+    if (scenario !== "diagnostic-unwritable") {
+      const file = ready.diagnostic + "/resource-close.jsonl"
+      const records = (await readFile(file, "utf8")).trim().split("\n").map((line) => JSON.parse(line))
+      assert.equal((await stat(file)).mode & 0o777, 0o600)
+      assert.equal(JSON.stringify(records).includes("private injected failure"), false)
+      for (const row of records) assert.deepEqual(Object.keys(row).sort(), ["recorded_at", "stage", "status", "version"])
+      const last = records.at(-1)
+      const blocked = ["transport-false", "process-false", "retained", "missing", "reject"].includes(scenario)
+      assert.equal(last.stage, blocked ? "bridge_ack" : "complete")
+      assert.equal(last.status, ["success", "unprepared"].includes(scenario) ? "fulfilled" : "rejected")
     }
     const exited = once(child, "exit", { signal: AbortSignal.timeout(5000) })
     child.send("dispose")
