@@ -1,10 +1,10 @@
 import path from "node:path"
-import { mkdir, rm, stat } from "node:fs/promises"
+import { mkdir, readdir, rm, rmdir, stat } from "node:fs/promises"
 import { repoRoot, type EvalConfig } from "./config"
 import type { AgentCommand } from "./cli"
 import { EvalFailure } from "./fail"
 import { groupProcesses } from "./process-group"
-import { superviseProcess, writerIdentity, type WriterIdentity } from "./process-supervisor"
+import { superviseProcess, writerIdentity, type ProcessCleanup, type WriterIdentity } from "./process-supervisor"
 import { archiveDiagnostics } from "./diagnostics"
 
 type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean }
@@ -28,6 +28,21 @@ export async function management(command: AgentCommand, args: string[], stdin?: 
   if (command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
     await releaseStaleWriter(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.writer)
   return result
+}
+
+export async function managementRuntimeDirectories(command: AgentCommand) {
+  if (!command.cleanupDir) return []
+  const directories = await readdir(command.cleanupDir).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return []
+    throw error
+  })
+  return (await Promise.all(directories.map(async (directory) => {
+    const receipt = (await Bun.file(path.join(command.cleanupDir!, directory, "cleanup.json")).json()).processes as ProcessCleanup
+    if (receipt.status !== "confirmed") throw Error("Management process cleanup unconfirmed")
+    if (!(await Bun.file(path.join(command.cleanupDir!, directory, "diagnostics/manifest.json")).exists()))
+      throw Error("Management diagnostic archive missing")
+    return receipt.runtimeDirectories
+  }))).flat()
 }
 
 export function parseView(text: string): View | undefined {
@@ -246,8 +261,8 @@ export async function resetProfile(config: EvalConfig) {
 }
 
 // Вызывается после recovery и копирования артефактов; долговечные stores лежат вне attempts.
-export async function pruneRuntimeAttempts(profileDir: string) {
-  const { lstat, readdir } = await import("node:fs/promises")
+export async function pruneRuntimeAttempts(profileDir: string, owned?: string[]) {
+  const { lstat, realpath } = await import("node:fs/promises")
   const entries = (directory: string) =>
     readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT") return []
@@ -257,7 +272,25 @@ export async function pruneRuntimeAttempts(profileDir: string) {
     throw new EvalFailure("Нельзя очистить runtime attempts: pending recovery", 2)
   if (await exists(path.join(profileDir, "loginom", "connection", "pending.json")))
     throw new EvalFailure("Нельзя очистить runtime attempts: pending connection", 2)
-  await releaseStaleWriter(profileDir)
+  await releaseStaleWriter(profileDir, owned ? null : undefined)
+  if (owned) {
+    const canonical = await realpath(profileDir)
+    for (const directory of [...new Set(owned)]) {
+      if (!/^loginom\/runtime\/generations\/[^/]+\/chats\/[^/]+\/attempts\/[^/]+$/.test(path.relative(canonical, directory)))
+        throw Error("Pruning ownership path differs")
+      const actual = await realpath(directory).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return undefined
+        throw error
+      })
+      if (!actual) continue
+      if (actual !== directory) throw Error("Pruning runtime path identity differs")
+      await rm(directory, { recursive: true })
+      await rmdir(path.dirname(directory)).catch((error: NodeJS.ErrnoException) => {
+        if (!["ENOTEMPTY", "ENOENT"].includes(error.code ?? "")) throw error
+      })
+    }
+    return owned.length
+  }
   const directoryInfo = (directory: string) =>
     lstat(directory).catch((error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT") return undefined

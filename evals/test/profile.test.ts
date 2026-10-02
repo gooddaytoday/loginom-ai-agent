@@ -378,6 +378,18 @@ test("pruneRuntimeAttempts: очищает завершённые runtime и rea
   for (const file of retained) expect(await Bun.file(file).text()).toBe("retain")
 })
 
+test("pruneRuntimeAttempts: адресная очистка не удаляет неархивированный старый runtime", async () => {
+  const profile = await mkdtemp(path.join(os.tmpdir(), "evals-targeted-prune-"))
+  const parent = path.join(profile, "loginom/runtime/generations/1/chats/chat/attempts")
+  const owned = path.join(parent, "owned")
+  const old = path.join(parent, "old")
+  await Bun.write(path.join(owned, "execution-events.jsonl"), "archived")
+  await Bun.write(path.join(old, "execution-events.jsonl"), "unarchived")
+  expect(await pruneRuntimeAttempts(profile, [owned])).toBe(1)
+  expect(await Bun.file(path.join(owned, "execution-events.jsonl")).exists()).toBe(false)
+  expect(await Bun.file(path.join(old, "execution-events.jsonl")).text()).toBe("unarchived")
+})
+
 test("pruneRuntimeAttempts: pending recovery сохраняет attempts для расследования", async () => {
   const profile = await mkdtemp(path.join(os.tmpdir(), "evals-profile-prune-"))
   const attempt = path.join(profile, "loginom", "runtime", "generations", "1", "chats", "chat", "attempts", "attempt")
