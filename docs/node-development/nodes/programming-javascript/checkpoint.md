@@ -4,8 +4,8 @@
 
 Назначение модели обновлено пользователем 2026-10-02: все будущие автономные
 CLI-попытки JavaScript выполняются на **`openai/gpt-6.1-sol`, variant `low`**.
-Перед приёмкой адаптировать launcher, строгую проверку фактической модели и
-адресные тесты; прежние PASS не подтверждают эту адаптацию. Исторические
+Launcher, общая writer-проверка и actual SQLite model gate адаптированы
+наe02e8fd41f;68 адресных tests PASS. Прежние PASS не подменяют эту проверку. Исторические
 metadata/source/model-list evidence не переписывать. Две независимые попытки
 по30 минут и same-task Astra/medium review сохраняются.
 
@@ -28,9 +28,10 @@ filesystem proof, actual generic reader imports/native launch ещё не вып
 исправлены new evidence directory, assignment preflight и release dependency freeze.
 Наe5e8c99286 manual campaign lease и whole writer/trial/pair composition
 реализованы как операторский API; источник дополнен SQLite revalidation
-на1a8d236b76. Текущий шаг — один same-task Astra/medium F, затем fresh ordinary
-headed candidate/J01/J21/J27 и две GPT-6.1 Sol / low CLI trials. Общая цель
-не достигнута и не сужается. Новые browser/candidate/CLI не запускались;
+на1a8d236b76. Same-task Astra/medium F завершён наe02e8fd41f. Текущий шаг —
+fresh ordinary headed candidate/J01/J21/J27 и две GPT-6.1 Sol / low CLI trials. Общая цель
+не достигнута и не сужается. Candidate собран и заморожен; CLI help и OAuth
+запущены, новых Loginom browser/model trials не было;
 lease450 closed_verified, preparation lease reserved_active, acceptance_lease=null,
 все собственные test handles terminal. Дополнительных OpenViking checks/errors
 не было. Untracked acceleration-review не включать.
@@ -38,7 +39,7 @@ lease450 closed_verified, preparation lease reserved_active, acceptance_lease=nu
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы native-аудиторы фазы 4, standalone CLI evidence binding и общая
 writer/trial/pair composition. Child
-**1a8d236b76281b9c9dd17eabcf03cf142f9728d3** tracked clean; registration на161353
+**e02e8fd41fdec89fc8813a8c7a9ea9ab399ba17f** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 первоначальных адресных test methods PASS; усиленная configuration/output
 regression9PASS теперь включает62 non-noop native mutations.
@@ -71,13 +72,12 @@ ordinary headed/independent audits/negative/cleanup. Lease450 closed_verified,
 active_exec=null, процессов/browser/tests нет. J02 public input подтверждён.
 После завершения исходников фазы 4 — один **same-task Astra/medium review**,
 затем candidate/J01/J21/J27 и GPT-6.1 Sol / low CLI.
-Пользователь ответил «готово» на запрос переключить эту же задачу на
-gpt-6-astra/medium. Подтверждение получено, вопрос не pending и не повторяется.
-Но latest actual turn_context 2026-10-02T11:52:02.980Z всё ещё
-gpt-6.1-sol/xhigh, turn_id=01a0fc2f-ea85-70f3-b490-8b30c93ed1d4.
-Предварительную source-проверку не засчитывать как F. Текущий ход завершается
-после сохранения прогресса; на следующем ходе один раз проверить фактическую
-модель и выполнить F под Astra/medium. Product release/accepted registry не повышены.
+Новый ход 2026-10-02T12:00:12.653Z действительно gpt-6-astra/medium,
+turn_id=01a0fc7c-7f47-76c3-9d55-4bbafd3c378d. Один same-task F source review
+выполнен; найденное назначение старой модели исправлено наe02e8fd41f.
+Пользователь дополнительно подтвердил gpt-6.1-sol для общего аудитора.
+Это ожидаемая модель CLI evidence; F-review выполнен Astra/medium.
+Product release/accepted registry не повышены; fresh compiled/live gates открыты.
 Natural insufficient-primary/Done errors not_observed — явная граница coverage;
 original J25 requirements сверены, не новый hard gate и не false PASS.
 Следующий текст сохраняет
@@ -93,6 +93,40 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### После F: собранный CLI и подготовка OAuth — 2026-10-02
+
+Из child **e02e8fd41fdec89fc8813a8c7a9ea9ab399ba17f** собран standalone
+**0.0.0-dev-202610021209** в private campaign `f-standalone-candidate-01`.
+Build/manifest/archive roundtrip завершились actualexit0, original handle4157,
+terminal2e827d; log `f-standalone-build-01.log`.
+Archive SHA256 `218b212bb361661c5fb16a2b6c9b850146079e0f51ac476e70e1d7b7a3d3c74c`;
+manifest SHA256 `7f897658a728e2ec8fa621a880a4af64feda886de80e9e285b87eabc873f4164`.
+Source tree SHA256 `bc0bbeda87dfdd05e5a1b66d4027155d51060a2161752a75f5c349fb081ff0f7`.
+Tracked source clean, `sourceDirty=true` из-за сохранённых untracked файлов;
+это development candidate, не clean release. Не удалять чужие файлы ради clean.
+Полный freeze `f-cli-reader-01`: 5441 candidate files и967 QA files проверены;
+freeze manifest SHA256 `27f28306487d74722745ca9badb9cd3cc748f69a7b00604ecfcb5bee73d209ba`.
+Private pins `f-standalone-candidate-01-pins.json`, SHA256
+`f1579d10233d888c8703aac98e3ffe519376f0d0f86620fe87f56386fbae0f79`.
+Factory/native/cold proof не следует из успешной файловой проверки.
+
+Compiled `--help` завершён exit0. `models openai` в отдельном пустом профиле
+завершился child exit1 без каталога; это не доказывает отсутствие gpt-6.1-sol.
+Private summary `f-candidate-model-catalog-01.json`; model inference не было.
+Пользователь выбрал OpenAI OAuth без автоматического открытия браузера.
+Запущен штатный compiled `providers login --provider openai --method
+"ChatGPT Pro/Plus (headless)"` в отдельном `f-oauth-profile-01` и пустом cwd
+`f-oauth-workspace-01`, original exec83926. Получен device-code challenge;
+на момент записи процесс ждёт подтверждения владельца аккаунта.
+Коды и токены в документацию не записывать. Перед продолжением проверить
+терминальный результат этого original handle и credential metadata без токенов.
+Прокси применён только к OAuth CLI через HTTP(S)_PROXY; браузер не запускался.
+
+OpenAI OAuth отвечает за модель. Отдельный `apiKey` сервиса Loginom, требуемый
+штатным CLI setup, в `loginom-private.json` отсутствует; OAuth не объявлять
+заменой этого поля. Loginom live gates J01/J21/J27 и обе автономные попытки
+остаются открытыми. Registry/lease не менялись; Loginom браузеров нет.
 
 ### Фаза 4: общая CLI-композиция и manual lease — 2026-10-02
 
@@ -135,6 +169,30 @@ Private receipt `f-cli-composition-validation-v1.json`, SHA256
 **35cacc9bac7c4f317c4eeac5d50d00ab03fd9e03f0542a938ab0bbb59f16b9e0**,
 связывает8 committed sources и16 original logs/handles. Это source/process/native
 regression, не свежая compiled whole acceptance.
+
+### F: same-task source review и модель общего аудитора — 2026-10-02
+
+Ревью выполнено в этой же задаче на фактически подтверждённом
+**gpt-6-astra/medium**, без отдельного контекста/субагента. Проверены границы
+normal CLI private shutdown/last own Save, JS product registration/lifecycle,
+строгого context default и explicit source_pending, original controller/capture/
+native/SQLite binding, manual lease/cold isolation, full output/source review
+и final pair revalidation. Это source integration review, не fresh native PASS.
+
+Найден P1: launcher, SQLite model gate и общий writer auditor всё ещё принимали
+прежний gpt-6-sol. В **e02e8fd41fdec89fc8813a8c7a9ea9ab399ba17f** все три пути
+требуют **openai/gpt-6.1-sol / low**. Positive fixtures обновлены; новый тест
+меняет реальную SQLite user/assistant metadata на старую модель по отдельности
+и вместе и подтверждает отказ. Исторические native/model evidence не переписаны.
+Evidence/admission/public nodes/controller/composer — **68PASS**, original
+session89999/terminal00098b/actualexit0. Provenance5045PASS, diff check PASS.
+
+Private `f-astra-review-v1.json`, SHA256
+**aeebccb8404c958241a7a1c6cf79a9c52263ff1d93d95388dbdbe06b356bd342**,
+содержит scope, finding/fix, source/log pins и actual model metadata.
+Source review завершён; whole acceptance/ready_for_acceptance пока false.
+Следующий этап — новый immutable standalone candidate, complete QA freeze,
+обычный headed J01/J21/J27 и две независимые Sol/low CLI попытки с cold.
 
 ### Подготовительная проверка перед F — 2026-10-02
 

@@ -76,9 +76,12 @@ writer/trial/pair CLI-композицию; **1a8d236b76** добавляет п
 provenance5045 PASS; дополнительная SQLite regression23PASS пересекается с ними.
 Обязателен независимый разбор полного авторского кода перед cold, отдельно
 от authorship/hash. [Текущая точка продолжения](checkpoint.md#фаза-4-общая-cli-композиция-и-manual-lease--2026-10-02).
-Пользователь подтвердил переключение на Astra/medium, текущий ход ещё Sol/xhigh;
-formal same-task F и fresh ordinary headed candidate/две Sol/low CLI остаются
-открытыми. Ни новый live run, ни ready_for_acceptance этим не подтверждены.
+Same-task F завершён на фактическом Astra/medium; найденное расхождение модели
+исправлено в **e02e8fd41f**: launcher и оба аудитора требуют gpt-6.1-sol/low.
+68 адресных tests/provenance5045 PASS. Candidate 0.0.0-dev-202610021209
+собран и полностью заморожен; начат OpenAI device-code OAuth в отдельном профиле.
+Fresh ordinary headed J01/J21/J27 и две Sol/low CLI попытки остаются открытыми;
+ready_for_acceptance не повышен. [Текущий вход](checkpoint.md#после-f-собранный-cli-и-подготовка-oauth--2026-10-02).
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·

@@ -39,9 +39,10 @@ Actual factory/live не запускались; до F остаются lease/w
 и whole writer/trial/pair API реализованы; source review полного авторского кода
 обязателен отдельно от authorship/hash. Final pair перечитывает own SQLite
 projection.93 addressed tests/provenance5045 и дополнительная пересекающаяся
-regression23PASS. Новые candidate/browser/CLI не запускались, actual factory/
-whole acceptance не доказаны. Пользователь подтвердил Astra/medium; formal F
-следует на следующем ходе с фактически выбранной моделью.
+regression23PASS. Candidate теперь собран и заморожен (см. checkpoint);
+actual factory/native/whole acceptance не доказаны. Same-task Astra/medium F выполнен наe02e8fd41f;
+старое назначение модели заменено в launcher/общем auditor/SQLite gate на
+openai/gpt-6.1-sol / low.68 адресных tests/provenance5045 PASS. Далее OAuth и live.
 [Актуальный checkpoint](checkpoint.md#фаза-4-общая-cli-композиция-и-manual-lease--2026-10-02).
 
 Исходная сводка обновлена по [acceleration review](acceleration-review.md) на docs

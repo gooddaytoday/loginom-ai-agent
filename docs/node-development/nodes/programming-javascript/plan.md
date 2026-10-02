@@ -1074,6 +1074,12 @@ Help/E2E служат источниками для сопоставления �
 в той же задаче, затем один раунд исправлений подтверждённых live-дефектов
 и адресная перепроверка. Это не независимое контекстное ревью.
 
+Same-task source review выполнен 2026-10-02 на фактическом gpt-6-astra/medium;
+найденный P1 назначения старой модели исправлен в **e02e8fd41f**. Launcher,
+общий writer auditor и actual SQLite gate требуют openai/gpt-6.1-sol / low;
+68 адресных tests и provenance5045 PASS. Это не candidate/native acceptance.
+[Scope и evidence F](checkpoint.md#f-same-task-source-review-и-модель-общего-аудитора--2026-10-02).
+
 **ready_for_first_review / завершение development Goal:** 0B и фазы 1–4
 выполнены, G1–G7 подтверждены реализацией, source/direct-runtime часть J01/J21,
 J02–J17/J19/J20/J23–J26 проходят, J22 проверен или доказанно неприменим.

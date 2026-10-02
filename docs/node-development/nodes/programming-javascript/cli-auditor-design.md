@@ -422,3 +422,13 @@ actualexit0; методы пересекаются с основной source va
 `2a0088c4eac3c900c98550d709645d64f61fc3f67a7f5c5bedbcbd5ebe35c51b`.
 Эта подготовительная source-проверка не засчитана как formal same-task F:
 пользователь подтвердил Astra/medium, текущий незавершённый ход ещё Sol/xhigh.
+
+
+## F source review — 2026-10-02
+
+Same-task review выполнен на фактическом Astra/medium. На **e02e8fd41f**
+исправлено расхождение назначения: normal launch argv/receipt, actual SQLite
+model check и общий writer auditor требуют **openai/gpt-6.1-sol / low**.
+Старая модель в user или assistant metadata отвергается.68 адресных tests
+и provenance5045 PASS; это source проверка, actual candidate/live ещё впереди.
+[Scope и receipt](checkpoint.md#f-same-task-source-review-и-модель-общего-аудитора--2026-10-02).
