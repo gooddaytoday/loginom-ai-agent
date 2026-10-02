@@ -117,6 +117,19 @@ test("runAgent: fake CLI — события на диске, квитанция,
   expect(run.durationMs).toBeGreaterThanOrEqual(0)
 })
 
+test("runAgent: события сохраняются на диск до окончания бюджета", async () => {
+  const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-live-capture-"))
+  const command = fakeCommand()
+  const controller = new AbortController()
+  const pending = runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_HANG_AFTER_EVENTS: "1" } },
+    taskId: "default", model: "fake/model", prompt: "test", files: [],
+    workdir: outDir, timeoutMs: 30_000, outDir, signal: controller.signal })
+  try {
+    await Bun.sleep(400)
+    expect(await Bun.file(path.join(outDir, "events.jsonl")).text()).toContain("ses_fixture03")
+  } finally { controller.abort(); await pending }
+}, 35_000)
+
 test("runAgent: no_artifact закрывает наблюдённого detached потомка и сохраняет исход", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-detached-"))
   const command = fakeCommand()
