@@ -13,7 +13,9 @@ observer наec73da6a73 проверены отдельно. Controller source �
 связывает original CLI/cold launch handles, detached own-profile browser и native
 Close gate; CLI preflight headed наab721a703e. Наc664f40c61 source collector
 собирает filtered/redacted CLI streams и удерживает original deadline failure.
-Текущий шаг — связать native journal и freeze cold reader к candidate runtime, завершить whole
+На17c994f042 полный committed QA freeze связан с runtime candidate; это source/
+filesystem proof, actual generic reader imports/native launch ещё не выполнены.
+Текущий шаг — связать native journal, campaign lease и technical cold collection, завершить whole
 composition, затем same-task F и fresh ordinary
 headed candidate/Sol trials. Общая цель не достигнута и не сужается. На старте
 этого шага child797927 tracked clean, browser/candidate/CLI не запускались,
@@ -23,7 +25,7 @@ OpenViking checks/errors не было. Untracked acceleration-review не вк�
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
 standalone CLI transport/bundle/admission/public-node/Save binding. Child
-**c664f40c6154d05ace228fddeeef7c67560288b2** tracked clean; registration на161353
+**17c994f0427f2ac092e426bd9a38de535f43e21c** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 первоначальных адресных test methods PASS; усиленная configuration/output
 regression9PASS теперь включает62 non-noop native mutations.
@@ -71,6 +73,54 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: complete QA freeze к candidate runtime — 2026-10-02
+
+Child **17c994f0427f2ac092e426bd9a38de535f43e21c** реализует
+`javascript_cli_reader_freeze.py`. Freezer требует exact candidate pins и
+соответствующий HEAD, отсутствие tracked QA diff, новый isolated private root.
+Копирует весь committed `tools/loginom-acceptance` из проверенных Git blobs,
+включая динамические helpers/data, без untracked caches/evidence; файлы0400.
+Не копирует checkout runtime: явные overlay links `client/src/executor/examples`
+ведут только в verified candidate runtime. Manifest связывает Git source,
+весь QA inventory и candidate manifest; его SHA закрепляется отдельно.
+Verifier до/после сверяет bytes/Git blob hashes, inventory, private readonly
+files, отсутствие aliases и неизменные exact links/candidate.
+
+Cold factory теперь требует этот complete freeze descriptor вместо произвольного
+flat file list; связывает exact `javascript-persistence-read-live.mjs` с original
+Node process, отдельным profile/evidence и проверяет freeze после actual exit.
+Аргументы reader по-прежнему только technical config/profile/browser/evidence/
+exact saved package path; source/settings/expected и X11 flag не передаются.
+Factory gate original writer/SQLite/native Close/logout сохраняется. Actual
+factory и generic cold operator imports не запускались: этот слой не объявляет
+native journal, cold persistence или whole CLI подтверждёнными.
+
+Capture дополнительно сохраняет sticky transport failure: после первого bounded
+redactor timeout следующие строки не повторяют RPC ожидание. Только own private
+redactor при необходимости завершается forced; отказ/Close ACK остаются false.
+Проверка реального SIGSTOP worker подтверждает отсутствие повторных задержек.
+
+Из child `packages/loginom-runtime` выполнен `LOGINOM_NODE=` с прежним pinned
+Node24.19.0, `python3 -m unittest discover -s tools/loginom-acceptance -p
+test_javascript_cli_reader_freeze.py -v`:10PASS; controller regression15PASS;
+capture regression final22PASS. Все original handles actualexit0, intermediate
+capture21PASS сохранён. Freeze tests используют physical Git/candidate fixtures
+с неисполняемыми CLI/Node/browser payloads; отдельный actual external pinned Node
+loader читает inert fixture entry и проверяет static/dynamic/data resolution
+из candidate overlay вместо checkout. Это не запуск compiled candidate/Loginom.
+Migration provenance5045 PASS и diff check PASS. Private receipt
+`f-cli-reader-freeze-validation-v1.json`, SHA256
+**7e9e47a68d7d3561e854586f1b0a9091beea315cd2df54f92b069f52fe2180e7**,
+содержит source hashes и original handles для5 logs; final47 addressed methods.
+
+Дальше: authenticated fresh native journal/path ownership и campaign lease
+orchestration, technical cold process collection с original10-minute ceiling,
+whole composition `javascript_node_acceptance.py`. Затем same-task F и fresh
+immutable candidate: actual generic reader dependency loading и ordinary headed
+J01/J21/J27/две независимые Sol-low CLI trials. TO_IMPLEMENT/accepted registry
+пока не повышать. Browser/candidate/model launches и memory errors в этом шаге
+отсутствовали; lease450 не менялся, собственные test processes terminal.
 
 ### Фаза 4: filtered CLI capture и original deadline — 2026-10-02
 

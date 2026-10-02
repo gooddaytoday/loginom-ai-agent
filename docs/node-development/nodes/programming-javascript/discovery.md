@@ -16,7 +16,10 @@ ownership; ab721a703e сохраняет headed для CLI preflight. Controller
 candidate11/Host25+6 tests/typechecks/provenance PASS, без нового браузера/модели.
 Safe filtered/redacted CLI capture/original deadline наc664f40c61 проверены
 21/15/9 actual Node/Linux process tests, provenance5045 PASS. Native journal
-binding/cold freeze/whole auditor и fresh candidate/CLI остаются открытыми.
+binding/whole auditor и fresh candidate/CLI остаются открытыми. На17c994f042
+committed QA freeze/candidate runtime overlay проверены10 Git/filesystem/Node
+fixtures, controller15/capture22 PASS; generic cold dependency loading и actual
+factory/native proof ещё не выполнены.
 [Текущий checkpoint](checkpoint.md#фаза-4-filtered-cli-capture-и-original-deadline--2026-10-02).
 
 Исходная сводка обновлена по [acceleration review](acceleration-review.md) на docs

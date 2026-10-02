@@ -145,6 +145,18 @@ clean exit; поздняя уборка не открывает cold gate. Live 
 не являются compiled candidate/model/native proof.
 До F остаются authenticated native journal, campaign lease orchestration,
 complete cold imports freeze к candidate runtime и whole composition.
+На17c994f042 source freeze копирует весь committed QA tree из проверенных Git
+blobs matching candidate source SHA; untracked files/checkout runtime не копирует.
+Private readonly files и separately pinned manifest содержат complete QA inventory;
+overlay `client/src/executor/examples` связан только с exact candidate resources.
+Cold factory требует этот descriptor и повторяет integrity check после exit,
+наблюдает original Node entry identity, не принимает flat file-list receipt.
+Source10 Git/filesystem/actual external Node inert-loader tests и15/22 regressions
+не являются generic cold imports/compiled candidate execution proof; эта проверка
+входит в fresh candidate после F. На том же source capture после первого transport
+timeout прекращает повторные RPC ожидания на следующих строках; hung worker
+отказывает окончательно. До F остаются fresh native journal ownership,
+campaign lease/technical cold collection и whole composition.
 CLI Node Host передаёт explicit visibility и в preflightHeadless наab721a703e;
 Desktop direct-host default сохранён, cleanup flag от visibility независим.
 `managed-resources-close.mjs` уже проверяет реальный bridge result перед success

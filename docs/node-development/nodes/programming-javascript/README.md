@@ -51,6 +51,10 @@ Actual candidate factory/live proof и whole auditor ещё не выполне�
 сохраняет original deadline/forced-exit failure и связывает secrets с own profile.
 Capture21/controller15/observer9 PASS, provenance5045; native journal/cold freeze/
 whole composition остаются открытыми. [Scope и следующий шаг](checkpoint.md#фаза-4-filtered-cli-capture-и-original-deadline--2026-10-02).
+На **17c994f042** whole committed QA freeze и candidate runtime overlay проверены
+10 filesystem/Git/actual Node loader fixtures; controller15/capture22 PASS.
+Native journal/lease/cold collection/whole auditor и actual candidate/live proof
+остаётся выполнить. [Точка продолжения](checkpoint.md#фаза-4-complete-qa-freeze-к-candidate-runtime--2026-10-02).
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·

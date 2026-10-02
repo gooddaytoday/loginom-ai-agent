@@ -962,6 +962,12 @@ controller15/observer9/candidate11/Host25+6 tests, typechecks/provenance PASS.
 отказы захвата/expiry/forced exit сохраняются в original controller.
 До общего аудитора связать native journal и freeze complete cold dependencies
 с imports к candidate runtime. [Checkpoint](checkpoint.md#фаза-4-filtered-cli-capture-и-original-deadline--2026-10-02).
+Committed complete QA freeze/candidate overlay на **17c994f042** проверены
+10 Git/filesystem/actual Node loader fixtures, controller15/capture22 PASS.
+Before/after factory guard реализован; generic reader imports/actual factory
+проверяются на fresh candidate после F. До whole composition связать fresh native
+journal/lease orchestration и technical cold collection с original10-minute ceiling.
+[Текущий checkpoint](checkpoint.md#фаза-4-complete-qa-freeze-к-candidate-runtime--2026-10-02).
 `javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
 он должен связать native проверки с фактическими standalone CLI evidence
 model/input/candidate/Save/cold/cleanup до ready_for_acceptance.
