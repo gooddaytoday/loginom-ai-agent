@@ -6,6 +6,7 @@ Launch/process receipts are not a whole JavaScript acceptance PASS.
 """
 import copy
 import json
+import os
 from pathlib import Path
 import subprocess
 import time
@@ -20,6 +21,31 @@ def absolute_directory(value):
     if not path.is_absolute() or path.resolve() != path or not path.is_dir():
         raise ValueError('cli_controller_canonical_directory_required')
     return path
+
+
+def cold_launch_inputs(config,profile,evidence,account):
+    """The operator creates evidence and requires an adjacent assignment."""
+    config,profile,evidence=Path(config),absolute_directory(profile),Path(evidence)
+    assignment=config.with_name('assignment.json')
+    for path in (config,assignment):
+        if (not path.is_absolute() or path.resolve()!=path or not path.is_file() or path.is_symlink()
+                or path.stat().st_uid!=os.getuid() or path.stat().st_mode & 0o077):
+            raise ValueError('cli_controller_cold_private_configuration')
+    if (not evidence.is_absolute() or evidence.resolve()!=evidence or evidence.exists() or evidence.is_symlink()
+            or not evidence.parent.is_dir() or evidence.parent.resolve()!=evidence.parent
+            or evidence.parent.stat().st_uid!=os.getuid() or evidence.parent.stat().st_mode & 0o077
+            or profile.stat().st_uid!=os.getuid() or profile.stat().st_mode & 0o077 or list(profile.iterdir())
+            or profile.is_relative_to(evidence) or evidence.is_relative_to(profile)):
+        raise ValueError('cli_controller_cold_new_evidence_and_profile')
+    private=json.loads(config.read_text())
+    assigned=json.loads(assignment.read_text())
+    if (account!='jsteach' or private.get('url')!='http://logi-test-plan.bg.local/app/'
+            or private.get('username')!=account or not isinstance(private.get('password'),str)
+            or assigned.get('campaign_id')!='javascript-20260926-ubuntu'
+            or assigned.get('profile')!=str(profile)):
+        raise ValueError('cli_controller_cold_target_account_assignment')
+    return {name:dict(path=str(path),sha256=file_sha256(path)) for name,path in
+        (('config',config),('assignment',assignment))}
 
 
 class JavascriptProcessController:
@@ -40,6 +66,7 @@ class JavascriptProcessController:
         self.candidate = None
         self.reader_freeze = None
         self.native_watch = None
+        self.cold_inputs = None
         self.launch = {}
         self.verify_executable(process.pid,executable)
         self.sample()
@@ -91,6 +118,15 @@ class JavascriptProcessController:
             from javascript_cli_reader_freeze import verify_cold_reader
             if self.candidate is None or not verify_cold_reader(self.reader_freeze,*self.candidate)['passed']:
                 self.failures.add('cli_controller_cold_reader_freeze_changed_after_launch')
+        if self.cold_inputs is not None:
+            for pin in self.cold_inputs.values():
+                try:
+                    path=Path(pin['path'])
+                    if (path.resolve()!=path or not path.is_file() or path.is_symlink()
+                            or path.stat().st_uid!=os.getuid() or path.stat().st_mode & 0o077
+                            or file_sha256(path)!=pin['sha256']):
+                        self.failures.add('cli_controller_cold_inputs_changed_after_launch')
+                except OSError:self.failures.add('cli_controller_cold_inputs_changed_after_launch')
         self.result = dict(version=1,passed=not self.failures,failures=sorted(self.failures),kind=self.kind,
             scope='original_launch_executable_and_owned_linux_processes',submitted_at=self.submitted_at,
             deadline_at=self.deadline_at,finished_at=time.time_ns()//1000000,launch=copy.deepcopy(self.launch),
@@ -102,8 +138,9 @@ class JavascriptProcessController:
 
     def collect(self,capture,*,cleanup_wait_ms=90000):
         """Use this original handle; source capture cannot replace native proof."""
-        from javascript_cli_capture import collect_cli_process
-        return collect_cli_process(self,capture,cleanup_wait_ms=cleanup_wait_ms)
+        from javascript_cli_capture import collect_cli_process,collect_cold_process
+        collector=collect_cli_process if self.kind=='cli' else collect_cold_process
+        return collector(self,capture,cleanup_wait_ms=cleanup_wait_ms)
 
     def create_capture(self,directory,worker):
         """Pin the redactor/Node to this candidate, credentials to this profile."""
@@ -130,6 +167,29 @@ class JavascriptProcessController:
         candidate,pins=self.candidate
         if not verify_cli_candidate(candidate,pins)['passed']:raise ValueError('cli_native_candidate_unverified')
         return self.native_watch.freeze(events,expected,managed_runtime_pin(candidate/'resources/loginom/runtime/client'))
+
+    def create_cold_capture(self,directory,worker):
+        if (self.result is not None or self.kind!='cold' or self.candidate is None
+                or self.cold_inputs is None or self.reader_freeze is None
+                or self.launch.get('transport')!='separate_path_only_reader'):
+            raise ValueError('cold_capture_original_factory_required')
+        from javascript_cli_capture import RedactedCliCapture
+        from javascript_cli_reader_freeze import verify_cold_reader
+        candidate,pins=self.candidate
+        if not verify_cold_reader(self.reader_freeze,candidate,pins)['passed']:
+            raise ValueError('cold_capture_reader_or_candidate_unverified')
+        directory=absolute_directory(directory)
+        if any(directory.is_relative_to(path) or path.is_relative_to(directory) for path in
+                (candidate,self.owner.profile,Path(self.reader_freeze['root']),Path(self.launch['evidence']))):
+            raise ValueError('cold_capture_evidence_isolation')
+        config=Path(self.cold_inputs['config']['path'])
+        if config.resolve()!=config or file_sha256(config)!=self.cold_inputs['config']['sha256']:
+            raise ValueError('cold_capture_configuration_changed')
+        private=json.loads(config.read_text())
+        redactor=candidate/'resources/loginom/runtime/client/lib/redact.mjs'
+        return RedactedCliCapture(directory,node=self.node,worker=worker,
+            redactor=dict(path=str(redactor),sha256=file_sha256(redactor)),known_values=[private['password']],
+            mode='cold',expected_report=str(Path(self.launch['evidence'])/'report.json'))
 
     @classmethod
     def launch_cli(cls,candidate,pins,profile,directory,files,prompt,*,environment):
@@ -208,12 +268,9 @@ class JavascriptProcessController:
             raise ValueError('cli_controller_native_cleanup_outside_original_attempt')
         candidate,pins = writer.candidate
         if not verify_cli_candidate(candidate,pins)['passed']:raise ValueError('cli_controller_candidate_unverified')
-        config,profile,evidence = Path(config),absolute_directory(profile),absolute_directory(evidence)
-        if (not config.is_absolute() or config.resolve() != config or not config.is_file()
-                or config.is_symlink() or config.stat().st_mode & 0o077
-                or list(profile.iterdir()) or list(evidence.iterdir())
-                or profile.is_relative_to(evidence) or evidence.is_relative_to(profile)
-                or any(path.is_relative_to(parent) or parent.is_relative_to(path) for path in (profile,evidence)
+        config,profile,evidence = Path(config),absolute_directory(profile),Path(evidence)
+        cold_inputs=cold_launch_inputs(config,profile,evidence,cleanup['expected']['account'])
+        if (any(path.is_relative_to(parent) or parent.is_relative_to(path) for path in (profile,evidence,config.parent)
                     for parent in (candidate,writer.owner.profile))):
             raise ValueError('cli_controller_cold_isolation')
         from javascript_cli_reader_freeze import verify_cold_reader
@@ -224,9 +281,6 @@ class JavascriptProcessController:
         if any(reader_root.is_relative_to(parent) or parent.is_relative_to(reader_root)
                 for parent in (profile,evidence,writer.owner.profile,Path(writer.launch['directory']))):
             raise ValueError('cli_controller_cold_reader_isolation')
-        private = json.loads(config.read_text())
-        if private.get('url') != 'http://logi-test-plan.bg.local/app/' or private.get('username') != cleanup['expected']['account']:
-            raise ValueError('cli_controller_cold_target_or_account')
         if not (environment.get('DISPLAY') or environment.get('WAYLAND_DISPLAY')):
             raise ValueError('cli_controller_graphical_session_required')
         resource = candidate/'resources/loginom'
@@ -236,7 +290,7 @@ class JavascriptProcessController:
         argv = [node['path'],str(entry),'--config',str(config),'--profile',str(profile),
             '--browser',browser['path'],'--evidence',str(evidence),'--package',native['package_path']]
         submitted_at = time.time_ns()//1000000
-        process = subprocess.Popen(argv,cwd=evidence,env=environment,stdin=subprocess.DEVNULL,
+        process = subprocess.Popen(argv,cwd=evidence.parent,env=environment,stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
         try:controller = cls(process,profile,executable=node,browser=browser,kind='cold',node=node,
             source_entries=(('cold_reader',entry),))
@@ -244,8 +298,10 @@ class JavascriptProcessController:
         controller.submitted_at,controller.deadline_at = submitted_at,submitted_at+600000
         controller.candidate = (candidate,copy.deepcopy(pins))
         controller.reader_freeze = copy.deepcopy(reader)
+        controller.cold_inputs = cold_inputs
         controller.launch = dict(candidate=str(candidate),profile=str(profile),evidence=str(evidence),
             package_path=native['package_path'],writer_pid=writer.process.pid,reader=copy.deepcopy(reader),
+            inputs=copy.deepcopy(cold_inputs),
             headed=True,transport='separate_path_only_reader')
         return controller
 
