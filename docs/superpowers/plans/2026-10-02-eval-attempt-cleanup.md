@@ -80,3 +80,36 @@ rejudge preservation, отказ записи run/result с сохранение
 result.persistence-failure.json, если основной путь недоступен.
 Следующее: полная suite, безопасное reconciliation только собственного lease
 первого control, повтор native control и адресные budget/low-liquidity.
+
+
+## Checkpoint перехода на упрощение, 2026-10-02
+
+Продолжение предыдущего goal — прогресс: готовая реализация сохранена коммитами
+580d94ae3, 60545b22a, 1960aa511, 55904e191, 66d706eea. На HEAD 66d706eea
+полный неизменный gate: 212 pass / 0 fail, 728 assertions, 141.38 с
+(`/tmp/eval-cleanup-native-20261002/full-tests-final-v3.log`); typecheck и
+`git diff --check` прошли. Предыдущий v2 full-run пересёк red-срез redaction и
+не используется как доказательство итогового HEAD. Живой native run
+20261002-114527-60545b22a-dirty завершён; его failed cleanup не переоценивается.
+Положительная Linux-приёмка и адресные budget/low-liquidity ещё открыты.
+Failed harness lease этого собственного run остаётся; до повторной native
+приёмки необходимо документированное exact-identity reconciliation. Повтор
+native пока не запускался. Установленный CLI и продуктовый runtime не менялись.
+
+Новый согласованный план: [subreaper simplification](2026-10-02-eval-cleanup-subreaper-simplification.md).
+Сопоставление: lease, writer NOFOLLOW/identity, bounded idle, archive-before-ack,
+SHA/read-back/redaction, сохранение measured outcome при persistence failure,
+report counters и rejudge уже реализованы. Их не переписывать. В supervisor
+ещё есть два альтернативных admission по group/SID и раздельные ledger/parents/
+boundBrowsers/denied/unknown; они заменяются одним origin/admission ledger.
+Launcher уже выделен, но CLI не обозначен отдельным origin, receipt проверяется
+только nonce/PID; нужно закрепить CLI/fresh launcher identity. Один observer
+работает без накопления poll scans, но всегда 10 мс при выбранном browser;
+после proof запуска требуется возврат к обычному интервалу и новое ускоренное
+окно для следующего runtime. Exact root browser binding остаётся обязательным.
+
+Незавершённые README/item9 правки сохранены. Пользовательские system-bugs.md,
+repository-week.md и новый план сохранены без отката/переустановки дерева.
+Следующее: existing process/CLI/profile gate; origin Red→Green; один admission
+ledger и observer; lifecycle/failure matrix; полный gate; readiness probe,
+control→проверенный выполнением пакет, затем два адресных case без budget override.
