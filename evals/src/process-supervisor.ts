@@ -10,7 +10,7 @@ type ProcessView = ProcessIdentity & { args: string[]; cwd: string; name: string
 export type WriterIdentity = { device: number; inode: number; owner: string }
 export type ProcessCleanup = {
   status: "confirmed" | "failed" | "not_run"; error: string | null
-  processes: ProcessIdentity[]; runtimeDirectories: string[]; writer: WriterIdentity | null
+  processes: ProcessIdentity[]; unknownProcesses?: ProcessIdentity[]; runtimeDirectories: string[]; writer: WriterIdentity | null
   capture_complete: boolean
 }
 
@@ -119,6 +119,9 @@ export async function superviseProcess(input: {
   if (process.platform !== "linux") throw Error("Process ownership supervision requires Linux /proc")
   const startedAt = Date.now()
   const ledger = new Map<string, ProcessIdentity>()
+  const parents = new Map<string, string>()
+  const boundBrowsers = new Set<string>()
+  const denied = new Set<string>()
   const cleanup: ProcessCleanup = { status: "not_run", error: null, processes: [], runtimeDirectories: [], writer: null, capture_complete: true }
   const profile = input.profileDir ? await realpath(input.profileDir) : undefined
   const baseline = await snapshot()
@@ -172,28 +175,50 @@ export async function superviseProcess(input: {
         root && entry.group === root.group && entry.session === root.session ||
         live.some((parent) => parent.pid === entry.parent && ledger.has(key(parent)))))
       if (!added.length) break
-      added.forEach((entry) => ledger.set(key(entry), identity(entry)))
+      added.forEach((entry) => {
+        ledger.set(key(entry), identity(entry))
+        const parent = live.find((candidate) => candidate.pid === entry.parent && ledger.has(key(candidate)))
+        if (parent) parents.set(key(entry), key(parent))
+      })
     }
     if (profile && root && live.some((entry) => key(entry) === key(root))) {
       const writer = await writerIdentity(profile)
       if (writer && !cleanup.writer) cleanup.writer = writer
-      if (writer && cleanup.writer && JSON.stringify(writer) !== JSON.stringify(cleanup.writer)) throw Error("Writer identity changed")
-    }
-    if (browser) {
-      const native = live.filter((entry) => entry.device === browser.device && entry.inode === browser.inode || inside(entry.executable, browser.directory))
-      for (const entry of native) {
-        if (existing.has(key(entry))) continue
-        const data = entry.args.find((arg) => arg.startsWith("--user-data-dir="))?.slice("--user-data-dir=".length)
-        const own = data && cleanup.runtimeDirectories.some((directory) => data === path.join(directory, "browser-profile"))
-        if (ledger.has(key(entry)) && data && (!own || entry.device !== browser.device || entry.inode !== browser.inode)) throw Error(`Browser binding differs PID ${entry.pid}`)
-        if (!ledger.has(key(entry))) {
-          const foreign = data && !inside(data, profile!)
-          const foreignParent = live.some((parent) => parent.pid === entry.parent && parent.args.some((arg) => arg.startsWith("--user-data-dir=") && !inside(arg.slice(16), profile!)))
-          if (!foreign && !foreignParent) throw Error(`Unexplained browser/helper PID ${entry.pid}`)
-        }
-      }
+      if (writer && cleanup.writer && JSON.stringify(writer) !== JSON.stringify(cleanup.writer)) cleanup.error ??= "Writer identity changed"
     }
     cleanup.processes = [...ledger.values()]
+    if (browser) {
+      const native = live.filter((entry) => entry.device === browser.device && entry.inode === browser.inode || inside(entry.executable, browser.directory))
+      const dataDir = (entry: ProcessView) => entry.args.find((arg) => arg.startsWith("--user-data-dir="))?.slice(16)
+      const bound = (entry: ProcessView) => entry.device === browser.device && entry.inode === browser.inode &&
+        cleanup.runtimeDirectories.some((directory) => dataDir(entry) === path.join(directory, "browser-profile"))
+      native.filter((entry) => ledger.has(key(entry)) && bound(entry)).forEach((entry) => boundBrowsers.add(key(entry)))
+      const browserAncestor = (entry: ProcessView) => {
+        let parent = parents.get(key(entry))
+        const visited = new Set<string>()
+        while (parent && !visited.has(parent)) {
+          if (boundBrowsers.has(parent)) return true
+          visited.add(parent); parent = parents.get(parent)
+        }
+        return false
+      }
+      for (const entry of native) {
+        if (existing.has(key(entry))) continue
+        const data = dataDir(entry)
+        if (ledger.has(key(entry))) {
+          if (data ? !bound(entry) : !browserAncestor(entry)) {
+            denied.add(key(entry)); cleanup.error ??= `Browser binding differs PID ${entry.pid}`
+          }
+          continue
+        }
+        const foreign = data && !inside(data, profile!)
+        const foreignParent = live.some((parent) => parent.pid === entry.parent && dataDir(parent) && !inside(dataDir(parent)!, profile!))
+        if (!foreign && !foreignParent) {
+          denied.add(key(entry)); cleanup.error ??= `Unexplained browser/helper PID ${entry.pid}`
+        }
+      }
+      cleanup.unknownProcesses = native.filter((entry) => denied.has(key(entry))).map(identity)
+    }
     return live.filter((entry) => ledger.has(key(entry)))
   }
   const checkedScan = () => {
@@ -205,6 +230,7 @@ export async function superviseProcess(input: {
   const signalOwned = async (signal: NodeJS.Signals) => {
     await checkedScan()
     for (const saved of ledger.values()) {
+      if (denied.has(key(saved))) continue
       try {
         // Individual signals avoid signaling a recycled PGID or an unknown member.
         await signalProcess(saved, signal)
@@ -228,7 +254,7 @@ export async function superviseProcess(input: {
   await signalOwned("SIGTERM")
   const remaining = async () => {
     await checkedScan()
-    return (await Promise.all([...ledger.values()].map(async (saved) => {
+    return (await Promise.all([...ledger.values()].filter((entry) => !denied.has(key(entry))).map(async (saved) => {
       try {
         const current = await processView(saved.pid)
         if (current && key(current) !== key(saved)) throw Error(`Process identity changed PID ${saved.pid}`)

@@ -46,3 +46,25 @@ test("supervisor: собственный detached browser закрыт, неиз
     expect(state === "" || state.startsWith("Z")).toBe(true)
   } finally { unknown.kill("SIGKILL"); await exited }
 }, 20_000)
+
+test("supervisor: происхождение без точного browser profile не разрешает сигнал браузеру", async () => {
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-browser-binding-"))
+  const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-browser-binding-bundle-"))
+  await Bun.build({ entrypoints: [path.join(evalsRoot, "fixtures/fake-browser.ts")], compile: { outfile: path.join(bundle, "chrome") } })
+  await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
+  const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: out })
+  const pidFile = path.join(out, "browser.pid")
+  try {
+    const run = await runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+      EVAL_FAKE_BROWSER_PID_FILE: pidFile, EVAL_FAKE_BROWSER_DATA_DIR: "/tmp/foreign-browser-profile" } },
+      taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: out,
+      outDir: out, profileDir: out, timeoutMs: 30_000 })
+    expect(run.processCleanup.status).toBe("failed")
+    const pid = Number(await Bun.file(pidFile).text())
+    expect((await Bun.$`ps -o stat= -p ${pid}`.quiet().nothrow()).text().trim()).not.toMatch(/^$|^Z/)
+  } finally {
+    if (await Bun.file(pidFile).exists()) {
+      try { process.kill(Number(await Bun.file(pidFile).text()), "SIGKILL") } catch {}
+    }
+  }
+}, 20_000)
