@@ -2,6 +2,30 @@
 
 ## Текущее состояние
 
+**Pair13: Declared13 original whole PASS/released; Code13 выполняется.**
+Original holder901704/startTicks22673967 жив и хранит terminal trial.
+Declared writer902200/cold910391 завершились штатно; original collector/native,
+manual full-source review, writer audit и cold/whole trial PASS. Полный source
+546bytes прочитан: входной цикл, один Append, расчёт из Qty/UnitPriceCents/
+DiscountPct, trim/lowercase и знак; никаких готовых ответов или AssignColumns.
+Source SHA `e7eec954e56c5ce0b110cda5f027772fd833f64af70fd6863d98201fae4db769`.
+Session `ses_f01836adbffeSJA5Jr4KKvbX4h`, package
+`/jsteach/JavaScript-declared-1f404942-53a5-4014-9fa0-973fb9d0df77.lgp`.
+Original trial SHA
+`5fce1e25344fa8cc97e735789625f67843a2a13511239f5376384443da8d782c`.
+Native Save/Close/logout и process absence/.writer absent подтверждены;
+original release завершён. Прежние failed trials не пересматривались.
+
+**Code13 writer913402** запущен в этом же original holder, candidate15/reader15,
+fresh profile/path, ordinary headed/GPT-6.1 Sol low/30min. Следующий шаг —
+наблюдать Code13, manual full-source review → original writer audit → cold →
+release → whole pair. Не завершать holder до final pair audit и не объединять
+individual PASS разных holders. J21 read09 на этих bytes уже PASS (ниже).
+После успешной пары остаётся requirement-by-requirement completion, актуальная
+card/registry/plan/discovery сводка; merge/push/release не разрешены автоматически.
+
+### Предшествующая подготовка pair13
+
 **J21 read09 PASS/released; pair13 Declared запущен — 2026-10-02 21:19 UTC.**
 Actual candidate15 CLI original collector exit0/PASS, original SQLite/model
 binding18 calls PASS. Independent payload audit подтвердил исходник32768bytes/

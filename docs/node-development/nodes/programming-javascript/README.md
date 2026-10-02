@@ -6,8 +6,9 @@
 Save/Close/logout, оба runtime ACK/exit0 и process absence проверены.
 Прежние cleanup FAIL сохранены; их точная live-причина не доказана.
 
-**Pair13 начата:** Declared13, затем Code13 в original holder, ordinary headed.
-До обоих whole PASS и итогового аудита приёмка остаётся открытой.
+**Declared13 whole PASS/released**: fresh writer и independent cold приняты.
+Code13 выполняется на тех же bytes в original holder, ordinary headed.
+До Code13 PASS и итогового pair audit приёмка остаётся открытой.
 Точные pins, процессы и порядок продолжения — в
 [checkpoint](checkpoint.md#текущее-состояние).
 Integration, push и release не выполнялись; accepted registry остаётся открытым.
