@@ -38,7 +38,7 @@ class JavascriptProcessController:
         self.failures = set()
         self.result = None
         self.candidate = None
-        self.reader_files = None
+        self.reader_freeze = None
         self.launch = {}
         self.verify_executable(process.pid,executable)
         self.sample()
@@ -82,11 +82,12 @@ class JavascriptProcessController:
             observed = {row['role'] for row in self.bindings.values()}
             if self.kind == 'cli' and not {'node_host','managed_runtime'} <= observed:
                 self.failures.add('cli_controller_required_runtime_process_not_observed')
-        if self.reader_files is not None:
-            try:unchanged = all(path.is_file() and file_sha256(path) == digest for path,digest in self.reader_files)
-            except OSError:unchanged = False
-            if not unchanged:
-                self.failures.add('cli_controller_cold_reader_changed_after_launch')
+            if self.kind == 'cold' and 'cold_reader' not in observed:
+                self.failures.add('cli_controller_cold_reader_process_not_observed')
+        if self.reader_freeze is not None:
+            from javascript_cli_reader_freeze import verify_cold_reader
+            if self.candidate is None or not verify_cold_reader(self.reader_freeze,*self.candidate)['passed']:
+                self.failures.add('cli_controller_cold_reader_freeze_changed_after_launch')
         self.result = dict(version=1,passed=not self.failures,failures=sorted(self.failures),kind=self.kind,
             scope='original_launch_executable_and_owned_linux_processes',submitted_at=self.submitted_at,
             deadline_at=self.deadline_at,finished_at=time.time_ns()//1000000,launch=copy.deepcopy(self.launch),
@@ -165,7 +166,7 @@ class JavascriptProcessController:
         return controller
 
     @classmethod
-    def launch_cold(cls,writer,cleanup,reader_files,config,profile,evidence,*,environment):
+    def launch_cold(cls,writer,cleanup,reader,config,profile,evidence,*,environment):
         """Gate the separate exact-path reader on original writer and native Close."""
         if (not isinstance(writer,cls) or writer.kind != 'cli' or writer.candidate is None
                 or writer.launch.get('transport') != 'normal_standalone_run'
@@ -194,13 +195,14 @@ class JavascriptProcessController:
                 or any(path.is_relative_to(parent) or parent.is_relative_to(path) for path in (profile,evidence)
                     for parent in (candidate,writer.owner.profile))):
             raise ValueError('cli_controller_cold_isolation')
-        frozen = [(Path(item['path']),item['sha256']) for item in reader_files]
-        if (not frozen or len({path for path,digest in frozen}) != len(frozen)
-                or any(not path.is_absolute() or path.resolve() != path or not path.is_file() or path.is_symlink()
-                    or file_sha256(path) != digest for path,digest in frozen)):
-            raise ValueError('cli_controller_frozen_cold_reader_required')
-        entry = frozen[0][0]
-        if entry.name != 'javascript-persistence-read-live.mjs':raise ValueError('cli_controller_path_only_reader')
+        from javascript_cli_reader_freeze import verify_cold_reader
+        frozen=verify_cold_reader(reader,candidate,pins)
+        if not frozen['passed']:raise ValueError('cli_controller_complete_frozen_cold_reader_required')
+        entry=Path(frozen['entry'])
+        reader_root=Path(reader['root'])
+        if any(reader_root.is_relative_to(parent) or parent.is_relative_to(reader_root)
+                for parent in (profile,evidence,writer.owner.profile,Path(writer.launch['directory']))):
+            raise ValueError('cli_controller_cold_reader_isolation')
         private = json.loads(config.read_text())
         if private.get('url') != 'http://logi-test-plan.bg.local/app/' or private.get('username') != cleanup['expected']['account']:
             raise ValueError('cli_controller_cold_target_or_account')
@@ -215,13 +217,15 @@ class JavascriptProcessController:
         submitted_at = time.time_ns()//1000000
         process = subprocess.Popen(argv,cwd=evidence,env=environment,stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
-        try:controller = cls(process,profile,executable=node,browser=browser,kind='cold')
+        try:controller = cls(process,profile,executable=node,browser=browser,kind='cold',node=node,
+            source_entries=(('cold_reader',entry),))
         except Exception:raise JavascriptLaunchUnconfirmed(process) from None
         controller.submitted_at,controller.deadline_at = submitted_at,submitted_at+600000
         controller.candidate = (candidate,copy.deepcopy(pins))
-        controller.reader_files = frozen
+        controller.reader_freeze = copy.deepcopy(reader)
         controller.launch = dict(candidate=str(candidate),profile=str(profile),evidence=str(evidence),
-            package_path=native['package_path'],writer_pid=writer.process.pid,headed=True,transport='separate_path_only_reader')
+            package_path=native['package_path'],writer_pid=writer.process.pid,reader=copy.deepcopy(reader),
+            headed=True,transport='separate_path_only_reader')
         return controller
 
 

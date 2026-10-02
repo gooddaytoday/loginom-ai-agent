@@ -65,6 +65,7 @@ class RedactedCliCapture:
         self.counts=dict(event=0,error=0,omitted=0)
         self.failures=set()
         self.result=None
+        self.transport_failed=False
         self.streams={}
         self.file_identities={}
         try:
@@ -117,12 +118,15 @@ class RedactedCliCapture:
 
     def line(self,source,value):
         if self.result is not None:raise ValueError('cli_capture_already_terminal')
+        if self.transport_failed:
+            self.omit(source,'redaction_transport_unconfirmed');return
         try:
             text=value.decode('utf-8').removesuffix('\r')
         except UnicodeError:
             self.omit(source,'invalid_utf8');return
         try:reply=self.exchange(dict(kind=source,line=text))
         except (OSError,ValueError,UnicodeError):
+            self.transport_failed=True
             self.failures.add('cli_capture_redaction_transport_unconfirmed')
             self.omit(source,'redaction_transport_unconfirmed');return
         kind=reply.get('kind')
@@ -173,6 +177,7 @@ class RedactedCliCapture:
         if self.result is not None:return copy.deepcopy(self.result)
         for source in self.buffers:self.end(source)
         try:
+            if self.transport_failed:raise ValueError('cli_capture_worker_transport_failed')
             reply=self.exchange(dict(kind='close'))
             if reply!=dict(kind='closed',version=1,counts=self.counts,private_key_block_closed=True):
                 self.failures.add('cli_capture_worker_close_ack_unconfirmed')
