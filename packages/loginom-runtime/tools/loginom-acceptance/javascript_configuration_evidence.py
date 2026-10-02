@@ -12,16 +12,17 @@ EXECUTE_PHASES = ('source', 'workflow', 'target', 'input_mapping', 'open',
     'configure', 'node_finish', 'materialization_start', 'materialization_execute',
     'output_mapping', 'finish', 'execute', 'read')
 OWNER_KEYS = ('document_id', 'workflow_id', 'node_id')
+READ_PHASES = ('source','workflow','target','finish','execute','read')
 
 
-def javascript_operation(events, request, *, expected_target=None, expected_origin=None):
+def javascript_operation(events, request, *, expected_target=None, expected_origin=None, reading=False):
     operation = request['operation_id']
     rows = [r for r in events if r.get('operation_id') == operation]
     admissions = [r for r in rows if r.get('phase') == 'node_apply_prepared']
     checkpoints = [r['result'] for r in rows if r.get('phase') == 'node_checkpoint']
     if (request.get('target', {}).get('type') != 'programming.javascript'
-            or request.get('mode') != 'script' or request.get('finish') != 'execute'
-            or request.get('parameters', {}).get('schema_mode') not in ('code', 'declared')
+            or type(reading) is not bool or request.get('mode') != ('read_existing_output' if reading else 'script') or request.get('finish') != 'execute'
+            or not reading and request.get('parameters', {}).get('schema_mode') not in ('code', 'declared')
             or len(admissions) != 1 or admissions[0].get('request') != request
             or len(checkpoints) != 1 or checkpoints[0].get('status') != 'SUCCEEDED'
             or checkpoints[0].get('operation_id') != operation
@@ -60,11 +61,12 @@ def javascript_operation(events, request, *, expected_target=None, expected_orig
         raise ValueError('javascript_observed_owner')
     starts = [r['receipt']['phase'] for r in rows if r.get('phase') == 'node_phase_prepared']
     ends = [r['receipt']['phase'] for r in rows if r.get('phase') == 'node_phase_completed']
-    if starts != list(EXECUTE_PHASES) or ends != list(EXECUTE_PHASES):
+    inventory = READ_PHASES if reading else EXECUTE_PHASES
+    if starts != list(inventory) or ends != list(inventory):
         raise ValueError('javascript_phase_inventory')
     phases = {}
     previous = -1
-    for name in EXECUTE_PHASES:
+    for name in inventory:
         start = next(i for i,r in enumerate(rows) if r.get('phase') == 'node_phase_prepared' and r['receipt']['phase'] == name)
         end = next(i for i,r in enumerate(rows) if r.get('phase') == 'node_phase_completed' and r['receipt']['phase'] == name)
         receipt = rows[end]['receipt']
