@@ -90,6 +90,7 @@ async function dispatch(message: unknown) {
         root: input.root,
         resources: input.resources,
         headless: input.headless,
+        preflightHeadless: input.headless,
         strictRecovery: "strictRecovery" in input && input.strictRecovery === true,
         closeSavedPackageOnShutdown: "closeSavedPackageOnShutdown" in input && input.closeSavedPackageOnShutdown === true,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),

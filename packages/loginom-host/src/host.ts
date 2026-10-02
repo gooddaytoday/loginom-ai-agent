@@ -14,6 +14,7 @@ export async function createLoginomHost(options: {
   codec: CredentialCodec
   environment?: NodeJS.ProcessEnv
   headless?: boolean
+  preflightHeadless?: boolean
   strictRecovery?: boolean
   closeSavedPackageOnShutdown?: boolean
 }) {
@@ -74,7 +75,9 @@ export async function createLoginomHost(options: {
       chat,
       connection,
       validation,
-      headless: validation || chat === "readiness" || options.headless === true,
+      // CLI Node Host supplies its explicit launch policy for preflight too;
+      // the direct Desktop host retains its existing quiet preflight default.
+      headless: validation || chat === "readiness" ? (options.preflightHeadless ?? true) : options.headless === true,
       closeSavedPackageOnShutdown: !validation && chat !== "readiness" && options.closeSavedPackageOnShutdown === true,
       environment,
       endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,

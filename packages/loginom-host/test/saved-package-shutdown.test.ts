@@ -28,14 +28,25 @@ async function configuredRuntime(directory: string, source: string) {
   await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test/mcp" }))
   await Bun.write(join(resources, "runtime/src/managed-entry.mjs"), source)
   const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
-  await store.stage({ generation: 1, revision: 1, url: "http://example.test/app", username: "user", password: "", apiKey: "fixture" })
+  await store.stage({
+    generation: 1,
+    revision: 1,
+    url: "http://example.test/app",
+    username: "user",
+    password: "",
+    apiKey: "fixture",
+  })
   await store.activate(1)
   return { root, resources }
 }
 
-test.each([false, true])("retired runtime cleanup failure survives only the new strict shutdown policy: %s", async (policy) => {
-  const directory = await mkdtemp(join(fixture.directory, "retired-"))
-  const configured = await configuredRuntime(directory, `
+test.each([false, true])(
+  "retired runtime cleanup failure survives only the new strict shutdown policy: %s",
+  async (policy) => {
+    const directory = await mkdtemp(join(fixture.directory, "retired-"))
+    const configured = await configuredRuntime(
+      directory,
+      `
     import {existsSync,writeFileSync} from 'node:fs';
     let chat;
     process.on('message', m=>{
@@ -47,29 +58,44 @@ test.each([false, true])("retired runtime cleanup failure survives only the new 
         process.send({id:m.id,result:{closed:!failed}},()=>process.disconnect());
       }
     });
-  `)
-  const host = await createLoginomHost({ ...configured, codec: cliCredentials(process.platform, configured), environment: {}, closeSavedPackageOnShutdown: policy })
-  try {
-    await host.settled()
-    await host.runtime(1, "chat")
-    host.markRuntimeStale("chat")
-    await host.retireRuntime("chat")
-    await host.runtime(1, "chat")
-    if (policy) await expect(host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
-    if (!policy) await host.close()
-  } finally {
-    await host.close().catch(() => undefined)
-  }
-})
+  `,
+    )
+    const host = await createLoginomHost({
+      ...configured,
+      codec: cliCredentials(process.platform, configured),
+      environment: {},
+      closeSavedPackageOnShutdown: policy,
+    })
+    try {
+      await host.settled()
+      await host.runtime(1, "chat")
+      host.markRuntimeStale("chat")
+      await host.retireRuntime("chat")
+      await host.runtime(1, "chat")
+      if (policy) await expect(host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      if (!policy) await host.close()
+    } finally {
+      await host.close().catch(() => undefined)
+    }
+  },
+)
 
 test("a runtime exit without requested closure cannot certify normal CLI shutdown", async () => {
   const directory = await mkdtemp(join(fixture.directory, "lost-"))
-  const configured = await configuredRuntime(directory, `process.on('message',m=>{
+  const configured = await configuredRuntime(
+    directory,
+    `process.on('message',m=>{
     if(m.operation==='start')process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
     if(m.operation==='close')process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
     if(m.operation==='exit')process.send({id:m.id,result:{exit:true}},()=>process.disconnect());
-  });`)
-  const host = await createLoginomHost({ ...configured, codec: cliCredentials(process.platform, configured), environment: {}, closeSavedPackageOnShutdown: true })
+  });`,
+  )
+  const host = await createLoginomHost({
+    ...configured,
+    codec: cliCredentials(process.platform, configured),
+    environment: {},
+    closeSavedPackageOnShutdown: true,
+  })
   try {
     await host.settled()
     const runtime = await host.runtime(1, "chat")
@@ -81,22 +107,26 @@ test("a runtime exit without requested closure cannot certify normal CLI shutdow
   }
 })
 
-test.each([undefined, false, true])("private Host policy reaches only a task runtime: %s", async (policy) => {
-  const directory = await mkdtemp(join(fixture.directory, "profile-"))
-  const resources = join(directory, "resources")
-  const root = join(directory, "profile")
-  await mkdir(join(resources, "bin"), { recursive: true })
-  await mkdir(join(resources, "runtime/src"), { recursive: true })
-  await symlink(fixture.node, join(resources, "bin/node"))
-  await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test/mcp" }))
-  // Real compiled Host and real Node IPC; the external browser runtime is a
-  // controlled boundary. This proves routing, not package closure in Loginom.
-  await Bun.write(join(resources, "runtime/src/managed-entry.mjs"), `
+test.each([undefined, false, true].flatMap((policy) => [false, true].map((headless) => ({ policy, headless }))))(
+  "private CLI policies reach task and preflight runtimes: %j",
+  async (input) => {
+    const directory = await mkdtemp(join(fixture.directory, "profile-"))
+    const resources = join(directory, "resources")
+    const root = join(directory, "profile")
+    await mkdir(join(resources, "bin"), { recursive: true })
+    await mkdir(join(resources, "runtime/src"), { recursive: true })
+    await symlink(fixture.node, join(resources, "bin/node"))
+    await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test/mcp" }))
+    // Real compiled Host and real Node IPC; the external browser runtime is a
+    // controlled boundary. This proves routing, not package closure in Loginom.
+    await Bun.write(
+      join(resources, "runtime/src/managed-entry.mjs"),
+      `
     import {appendFileSync} from 'node:fs';
     process.on('message', m => {
       if(m.operation==='start') {
         appendFileSync(${JSON.stringify(join(directory, "starts.jsonl"))}, JSON.stringify({
-          validation:m.input.validation===true,chat:m.input.chat,
+          validation:m.input.validation===true,chat:m.input.chat,headless:m.input.headless,
           closeSavedPackageOnShutdown:m.input.closeSavedPackageOnShutdown,
           acceptancePath:m.input.acceptanceCleanupPackage??null,
           environmentPolicy:process.env.LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE??null
@@ -109,49 +139,127 @@ test.each([undefined, false, true])("private Host policy reaches only a task run
       if(m.operation==='interrupt') process.send({id:m.id,result:{interrupted:true}});
       if(m.operation==='close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
     });
-  `)
-  const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
-  await store.stage({ generation: 1, revision: 1, url: "http://example.test/app", username: "user", password: "", apiKey: "fixture" })
-  await store.activate(1)
-  const host = await launchNodeHost({
-    node: fixture.node, entry: fixture.entry, root, resources, headless: false,
-    closeSavedPackageOnShutdown: policy,
-    environment: { ...process.env, LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE: "hostile-path" },
+  `,
+    )
+    const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
+    await store.stage({
+      generation: 1,
+      revision: 1,
+      url: "http://example.test/app",
+      username: "user",
+      password: "",
+      apiKey: "fixture",
+    })
+    await store.activate(1)
+    const host = await launchNodeHost({
+      node: fixture.node,
+      entry: fixture.entry,
+      root,
+      resources,
+      headless: input.headless,
+      closeSavedPackageOnShutdown: input.policy,
+      environment: { ...process.env, LOGINOM_AI_AGENT_CLOSE_SAVED_PACKAGE: "hostile-path" },
+    })
+    try {
+      expect(
+        await host.request("connection.check", {
+          revision: 1,
+          url: "http://example.test/app",
+          username: "user",
+          password: { operation: "preserve" },
+          apiKey: { operation: "preserve" },
+        }),
+      ).toMatchObject({ validationId: expect.any(String), expiresAt: expect.any(Number) })
+      expect(await host.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
+      expect(
+        await host.request("call", {
+          run: "one",
+          userMessage: "original",
+          name: "dock_prepare",
+          args: { closeSavedPackageOnShutdown: !input.policy, acceptanceCleanupPackage: "/foreign/package.lgp" },
+        }),
+      ).toEqual({ ok: true })
+      await host.request("release", { run: "one" })
+    } finally {
+      await host.close()
+    }
+    expect(await host.exited).toEqual({ code: 0, signal: null })
+    const starts = (await readFile(join(directory, "starts.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+    expect(starts).toHaveLength(3)
+    expect(starts.every((value) => value.headless === input.headless)).toBe(true)
+    expect(
+      starts
+        .filter((value) => value.validation || value.chat === "readiness")
+        .every((value) => value.closeSavedPackageOnShutdown === false),
+    ).toBe(true)
+    expect(starts.find((value) => !value.validation && value.chat !== "readiness").closeSavedPackageOnShutdown).toBe(
+      input.policy === true,
+    )
+    expect(starts.every((value) => value.acceptancePath === null && value.environmentPolicy === null)).toBe(true)
+  },
+  15_000,
+)
+
+test("direct Desktop host retains quiet readiness with a headed task", async () => {
+  const directory = await mkdtemp(join(fixture.directory, "desktop-preflight-"))
+  const configured = await configuredRuntime(
+    directory,
+    `
+    import {appendFileSync} from 'node:fs';
+    process.on('message',m=>{
+      if(m.operation==='start') {
+        appendFileSync(${JSON.stringify(join(directory, "starts.jsonl"))},JSON.stringify({chat:m.input.chat,headless:m.input.headless})+'\\n');
+        process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
+      }
+      if(m.operation==='close')process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+    });
+  `,
+  )
+  const host = await createLoginomHost({
+    ...configured,
+    codec: cliCredentials(process.platform, configured),
+    environment: {},
+    headless: false,
   })
   try {
-    expect(await host.request("connection.check", {
-      revision: 1, url: "http://example.test/app", username: "user",
-      password: { operation: "preserve" }, apiKey: { operation: "preserve" },
-    })).toMatchObject({ validationId: expect.any(String), expiresAt: expect.any(Number) })
-    expect(await host.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
-    expect(await host.request("call", {
-      run: "one", userMessage: "original", name: "dock_prepare",
-      args: { closeSavedPackageOnShutdown: !policy, acceptanceCleanupPackage: "/foreign/package.lgp" },
-    })).toEqual({ ok: true })
-    await host.request("release", { run: "one" })
+    await host.settled()
+    await host.runtime(1, "chat")
   } finally {
     await host.close()
   }
-  expect(await host.exited).toEqual({ code: 0, signal: null })
-  const starts = (await readFile(join(directory, "starts.jsonl"), "utf8")).trim().split("\n")
-    .map((line) => JSON.parse(line))
-  expect(starts).toHaveLength(3)
-  expect(starts.filter((value) => value.validation || value.chat === "readiness")
-    .every((value) => value.closeSavedPackageOnShutdown === false)).toBe(true)
-  expect(starts.find((value) => !value.validation && value.chat !== "readiness").closeSavedPackageOnShutdown).toBe(policy === true)
-  expect(starts.every((value) => value.acceptancePath === null && value.environmentPolicy === null)).toBe(true)
-}, 15_000)
+  expect(
+    (await readFile(join(directory, "starts.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line)),
+  ).toEqual([
+    { chat: "readiness", headless: true },
+    { chat: "chat", headless: false },
+  ])
+})
 
 test("normal guarded cleanup can acknowledge after the old five-second resource budget", async () => {
   const directory = await mkdtemp(join(fixture.directory, "close-"))
   const entry = join(directory, "runtime.mjs")
-  await Bun.write(entry, `process.on('message', m=>{
+  await Bun.write(
+    entry,
+    `process.on('message', m=>{
     if(m.operation==='start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
     if(m.operation==='close') setTimeout(()=>process.send({id:m.id,result:{closed:true}},()=>process.disconnect()),5250);
-  });`)
+  });`,
+  )
   const runtime = await supervise({
-    node: fixture.node, entry, resources: directory, stateDir: directory, generation: 1, chat: "chat",
-    endpoint: "https://example.test/mcp", connection: { url: "http://example.test/app", username: "user", password: "", apiKey: "fixture" },
+    node: fixture.node,
+    entry,
+    resources: directory,
+    stateDir: directory,
+    generation: 1,
+    chat: "chat",
+    endpoint: "https://example.test/mcp",
+    connection: { url: "http://example.test/app", username: "user", password: "", apiKey: "fixture" },
     closeSavedPackageOnShutdown: true,
   })
   const first = runtime.close()
