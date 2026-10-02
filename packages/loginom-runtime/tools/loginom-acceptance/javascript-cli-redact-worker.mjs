@@ -26,6 +26,37 @@ function withoutBinary(value,depth=0) {
     Object.entries(value).map(([key,item])=>[key,withoutBinary(item,depth+1)]));
   return value;
 }
+// MCP flattens multiple text blocks as JSON documents separated by blank
+// lines. Redact those as objects: text regexes can otherwise break JSON quotes.
+function outputDocuments(text) {
+  if(typeof text!=='string')return null;
+  const documents=[];
+  let start=0,depth=0,quoted=false,escaped=false;
+  for(let index=0;index<text.length;index++) {
+    const char=text[index];
+    if(depth===0) {
+      if(/\s/.test(char))continue;
+      if(char!=='{'&&char!=='[')return null;
+      start=index;depth=1;continue;
+    }
+    if(quoted) {
+      if(escaped)escaped=false;
+      else if(char==='\\')escaped=true;
+      else if(char==='"')quoted=false;
+      continue;
+    }
+    if(char==='"')quoted=true;
+    else if(char==='{'||char==='[')depth++;
+    else if(char==='}'||char===']') {
+      depth--;
+      if(depth===0) {
+        try{documents.push(JSON.parse(text.slice(start,index+1)));}
+        catch{return null;}
+      }
+    }
+  }
+  return depth===0&&documents.length>1 ? documents : null;
+}
 let redactor,mode,closed=false,privateKey=false;
 const counts={event:0,error:0,omitted:0};
 
@@ -91,10 +122,16 @@ async function dispatch(message) {
   }
   if(!value||typeof value!=='object'||Array.isArray(value)||!visible.has(value.type))
     return omit('stdout_unknown_event');
+  const documents=value.type==='tool_use' ? outputDocuments(value.part?.state?.output) : null;
+  if(documents)value.part.state.output=documents;
   let cleaned;
   try{cleaned=redactor.redact(withoutBinary(value));}
   catch{return omit('redaction_failed');}
   if(cleaned?.type==='redaction_failure')return omit('redaction_failed');
+  if(documents) {
+    if(!Array.isArray(cleaned.part?.state?.output))return omit('redaction_failed');
+    cleaned.part.state.output=cleaned.part.state.output.map(document=>JSON.stringify(document)).join('\n\n');
+  }
   counts.event++;await reply({kind:'event',value:cleaned});
 }
 

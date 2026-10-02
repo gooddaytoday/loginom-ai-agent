@@ -14,6 +14,7 @@ import time
 from javascript_cli_candidate import file_sha256
 from javascript_cli_controller import JavascriptProcessController,absolute_directory
 from javascript_cli_processes import linux_process
+from javascript_cli_evidence import terminal_tool,value_digest
 
 
 def known_cli_secrets(profile):
@@ -131,6 +132,16 @@ class RedactedCliCapture:
             text=value.decode('utf-8').removesuffix('\r')
         except UnicodeError:
             self.omit(source,'invalid_utf8');return
+        original=None
+        if self.mode=='cli' and source=='stdout':
+            try:
+                event=json.loads(text)
+                if isinstance(event,dict) and '_capture_terminal' in event:
+                    raise ValueError('reserved_capture_binding')
+                if isinstance(event,dict) and event.get('type')=='tool_use':
+                    original=value_digest(terminal_tool(event['part']))
+            except (KeyError,TypeError,ValueError):
+                self.omit(source,'invalid_terminal_or_reserved_binding');return
         try:reply=self.exchange(dict(kind=source,line=text))
         except (OSError,ValueError,UnicodeError):
             self.transport_failed=True
@@ -140,6 +151,13 @@ class RedactedCliCapture:
         if kind=='event' and source=='stdout' and isinstance(reply.get('value'),dict):
             if self.mode=='cold' and (self.counts[kind]!=0 or reply['value'].get('report')!=self.expected_report):
                 self.omit(source,'cold_duplicate_or_foreign_report');return
+            if self.mode=='cli' and reply['value'].get('type')=='tool_use':
+                if original is None:
+                    self.omit(source,'terminal_binding_missing');return
+                # Only digests cross the private pipe boundary. The original
+                # response (including credentials) is never written to disk.
+                reply['value']['_capture_terminal']=dict(version=1,original_sha256=original,
+                    redacted_event_sha256=value_digest(reply['value']))
             self.counts[kind]+=1
             self.streams[self.output_file].write(json.dumps(reply['value'],ensure_ascii=False,allow_nan=False)+'\n')
             self.streams[self.output_file].flush();return

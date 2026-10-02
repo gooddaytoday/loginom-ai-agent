@@ -11,6 +11,7 @@ import unittest
 from javascript_cli_candidate import file_sha256
 from javascript_cli_capture import RedactedCliCapture,known_cli_secrets,collect_cli_process
 from javascript_cli_controller import JavascriptProcessController
+from javascript_cli_evidence import terminal_tool,value_digest
 
 
 @unittest.skipUnless(sys.platform=='linux' and os.environ.get('LOGINOM_NODE'),
@@ -51,7 +52,7 @@ class JavascriptCaptureTests(unittest.TestCase):
 
     def event(self,value=None):
         return dict(type='tool_use',timestamp=1234,sessionID='ses-fixture',part=dict(
-            id='part-fixture',type='tool',tool='dock_node_read',state=dict(status='completed',
+            id='part-fixture',messageID='message-fixture',sessionID='ses-fixture',callID='call-fixture',type='tool',tool='dock_node_read',state=dict(status='completed',time=dict(start=1000,end=1200),
                 input=dict(node_operation_id='op-fixture'),output=json.dumps(value or {},ensure_ascii=False))))
 
     def emit(self,value):self.capture.push('stdout',(json.dumps(value,ensure_ascii=False)+'\n').encode())
@@ -87,6 +88,32 @@ class JavascriptCaptureTests(unittest.TestCase):
             self.assertNotIn(fragment,text)
         self.assertIn('[redacted]',text)
         for path in self.directory.iterdir():self.assertEqual(path.stat().st_mode & 0o777,0o600)
+
+    def test_multiple_receipt_documents_stay_parseable_and_original_hash_bound(self):
+        self.start(['fixture-secret'])
+        original=self.event()
+        documents=[dict(status='SUCCEEDED',action_key='package.save_checkpoint',value='Ёж'),
+            dict(kind='dock_saved_package_state',password='fixture-secret',modified=False),
+            dict(nested=dict(text='brace } and quote " and slash \\'),source='line1\n\nline2')]
+        original['part']['state']['output']='\n\n'.join(json.dumps(value,ensure_ascii=False,indent=2) for value in documents)
+        self.emit(original)
+        self.assertTrue(self.capture.finish()['passed'])
+        event=self.events()[0]
+        binding=event.pop('_capture_terminal')
+        self.assertEqual(binding['original_sha256'],value_digest(terminal_tool(original['part'])))
+        self.assertEqual(binding['redacted_event_sha256'],value_digest(event))
+        blocks=[json.loads(value) for value in event['part']['state']['output'].split('\n\n')]
+        self.assertEqual(blocks[0],documents[0])
+        self.assertEqual(blocks[1]['password'],'[redacted]')
+        self.assertEqual(blocks[2],documents[2])
+        self.assertNotIn('fixture-secret',(self.directory/'events.jsonl').read_text())
+
+    def test_producer_cannot_inject_original_binding(self):
+        self.start()
+        event=self.event();event['_capture_terminal']=dict(version=1,original_sha256='0'*64)
+        self.emit(event)
+        self.assertFalse(self.capture.finish()['passed'])
+        self.assertEqual(self.events(),[])
 
     def test_nonpublic_events_are_omitted_without_raw_spool(self):
         self.start()
