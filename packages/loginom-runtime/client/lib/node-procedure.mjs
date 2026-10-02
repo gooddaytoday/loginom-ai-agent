@@ -266,10 +266,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(joinMenus.length>1)throw Error('Join link menu is ambiguous');
         const missingValuesDialogs=readMissingValues&&wizard?.stage==='missing_values'?(roots.output.ui?.elements??[]).filter(e=>e.tid==='msgbox'):[];
         if(missingValuesDialogs.length>1)throw Error('Missing values dialog is ambiguous');
+        const crossTableEditors=readCrossTable&&wizard?.stage==='crosstable'?(roots.output.ui?.elements??[]).filter(e=>
+          ['ColumnEditDialog','FactorEditDialog'].some(name=>e.tid===wizard.root_tid+';'+name)):[];
+        if(crossTableEditors.length>1)throw Error('CrossTable editor is ambiguous');
         const rolePortal=wizard?.stage==='input_mapping'&&portals[0]?.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist'?portals[0].ref:undefined;
         const produceMenus=readMappings&&wizard?.stage==='output_mapping'?(roots.output.ui?.elements??[]).filter(e=>e.tid===wizard.root_tid+';DerivedDataSourceMappingEngineOutputPortWizard;btnProduceType;mn'||e.tid===wizard.root_tid+';DerivedDataSourceOutputSocketWizard;btnProduceType;mn'):[];
         if(produceMenus.length>1)throw Error('Derived output policy menu is ambiguous');
-        const root = missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
+        const root = crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
         if (observationNow() >= deadline) break;
         result = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
           ...boundOptions,
