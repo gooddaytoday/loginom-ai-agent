@@ -10,9 +10,19 @@ Save/Close/logout. Код `29068cc7fd`; первая ошибка read04 сох�
 SHA256(SessionID) в пути чата и clientRevision в private session metadata,
 а не обязательное поле public knowledge. Код `f5a94febf1`,27 tests PASS.
 Candidate05/reader05 собраны и закреплены; runtime/browser побайтно совпадают
-с candidate04. Текущий original exec84698 — technical J21 read06 на candidate05,
-lease `javascript-cli-j21-read-06` занят до проверки cleanup. Не запускать
-другой браузер до terminal/Save/Close/logout/process verification и освобождения.
+с candidate04. Technical J21 read06 на candidate05 (exec84698) завершён: collector/SQLite18calls,
+source32768/1024/8chunks и typed6×4 PASS; final Save/Close/logout проверены,
+cleanup digest842425dfccbf12ac7eef82085cd7123b2ffd61be53618742990cb3201c0d5bd7.
+Lease освобождён, original holder exit0, `.writer`/native processes отсутствуют.
+Дополнительная привязка attachment name к hashed Host chat исправлена на861a64e40b:
+13 tests PASS, включая реальный HostPort+inputStore, и actual read05 names совпали.
+Candidate06/reader06 готовы, buildexec67788 exit0 / freeze18990 exit0.
+Сейчас technical J21 read07 на exact candidate06: original exec29412,
+lease `javascript-cli-j21-read-07`; держать до подтверждённого cleanup.
+Private pair controller `f-cli-pair-01.py` запущен только в ready/idle (exec71758),
+writer/browser/lease он ещё не создавал. После cleanup read07 отправить ему
+`{"action":"start","mode":"code"}`; затем независимый source review, audit, cold,
+release, declared, pair. Не терять оригинальные objects Python holder.
 После J21 — подготовленный private `f-cli-pair-01.py` для двух независимых
 автономных Code/declared trials; он ещё не запускался. Source review выполняется
 оператором после model writer и до отдельного cold reader, original objects
@@ -17951,3 +17961,40 @@ dispatch с CLI_START_FAILED. Диагностика import обнаружила
 зависимость https-proxy-agent; это ещё не дефект продукта. Запущена установка
 по lockfile закреплённым Bun с `--frozen-lockfile --ignore-scripts`. Guard
 этого профиля сохранён до адресной проверки cleanup; browser не запускался.
+
+
+### Actual attachment identity — 2026-10-02
+
+На `861a64e40b` QA `host_artifact_name` учитывает, что createLoginomHost.inputs
+получает от HostPort уже SHA256(SessionID): batch prefix строится из
+`[generation + ":" + chat_hash, userMessageID]`, не raw SessionID. Тест запускает
+реальные TypeScript HostPort/inputStore/transport через pinned Bun и физические
+files/MessageChannel;13 tests actualexit0. Source helper отдельно совпал с
+actual admitted attachment из read05. Runtime/handler не менялся. Candidate06
+и новый reader нужны для exact committed QA provenance, старые captures не
+переписываются. Live read06 на candidate05 сохранил original PASS18calls/full
+source8chunks/6×4 и normal cleanup; session`ses_f029f9519ffezzHLZg9Fq5dpHH`.
+
+
+### Candidate06 и текущие original holders — 2026-10-02
+
+Code`861a64e40bc674fe3ee8c784e98fd07a0afd6fda`,
+version0.0.0-dev-202610021616;
+manifest`8b81931cd39d5e70c677a822996a04248837d106b495fcca423ae5a1ac0434a0`,
+source tree`a230098e4836219cdc7b076bb23116a09462f3c03a36201285707134bc6da931`,
+reader`34a29b7c30e01a66d169d608ca7b47ee35b46c16a106ec45a44b37ca146754e4`,
+pins`6d87d463206305c13b5988d185fe53f1b6052dd4e0fd0f65486acf39f03dbb69`.
+Candidate inventory5441/full committed QA968 PASS, reader --help с bundled
+Node exit0, build/archive roundtrip PASS. Pins и frozen directories — private
+base `f-standalone-candidate-06`, `f-cli-reader-06`.
+
+Current read07 — новый ordinary headed technical J21 на этих immutable bytes.
+Previous read05/06 scoped PASS сохраняются, не превращаются в business trials.
+`f-cli-pair-01.py` — private operator composition существующих QA API; перед
+launch сверяет fixtures manifest, передаёт ровно CSV+одно mode-задание и обычный
+business prompt с уникальным own package path. Python держит original controllers,
+NativeJournalWatch, capture и оба terminal trial objects; public/source/cold/pair
+проверки выполняются из reader06. Runtime pin879a78… рассчитан по271 candidate
+client files и совпал с actual session metadata; remote action manifest17764f…
+получен штатным pinned catalog reader, Save revisions2/2. Собственный source-review
+файл ожидается после writer, до cold; никакого auto-VERIFIED review не создаётся.
