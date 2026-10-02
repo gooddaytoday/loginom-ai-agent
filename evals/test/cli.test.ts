@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import { mkdtemp } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
+import { spawn } from "node:child_process"
 import { agentCommand, failureKind, parseEvents, runAgent } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
 
@@ -164,6 +165,24 @@ test("runAgent: явно передаёт выбранный reasoning variant",
     workdir: outDir, timeoutMs: 30_000, outDir, profileDir: outDir })
   const args = await Bun.file(argsFile).json()
   expect(args.slice(args.indexOf("--variant"), args.indexOf("--variant") + 2)).toEqual(["--variant", "low"])
+})
+
+test("runAgent: недоступный /proc постороннего процесса не мешает cleanup", async () => {
+  const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-proc-foreign-"))
+  const child = spawn(process.execPath, ["-e", `
+    const { dlopen } = await import('bun:ffi')
+    const lib = dlopen('libc.so.6', { prctl: { args: ['i32', 'u64', 'u64', 'u64', 'u64'], returns: 'i32' } })
+    lib.symbols.prctl(4, 0, 0, 0, 0)
+    console.log('ready'); setInterval(() => {}, 1000)
+  `], { detached: true, stdio: ["ignore", "pipe", "ignore"], cwd: os.tmpdir() })
+  const exited = new Promise((resolve) => child.once("exit", resolve))
+  try {
+    await new Promise((resolve) => child.stdout!.once("data", resolve))
+    const run = await runAgent({ command: fakeCommand(), taskId: "default", model: "fake/model", prompt: "test",
+      files: [], workdir: outDir, timeoutMs: 30_000, outDir })
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(child.exitCode).toBeNull()
+  } finally { child.kill("SIGKILL"); await exited }
 })
 
 test("runAgent: changed writer даёт failed cleanup без потери no_artifact и telemetry", async () => {
