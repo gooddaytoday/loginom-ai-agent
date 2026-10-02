@@ -28,7 +28,8 @@ export function readCrossTableBrowser(prefix){
   if(d?.DataType===0&&d.DisplayName===''&&[1,2,3].includes(d.Disposition)){service.push({record_id:id,placeholder:true});continue;}
   if(!types[d?.DataType]||typeof d.DisplayName!=='string'||d.DisplayName.length>256
    ||![1,2].includes(d.DataKind)||![0,1,2,3].includes(d.Disposition)||typeof d.IsCountCase!=='boolean'
-   ||!Number.isSafeInteger(d.Index)||d.Index<0||indices.has(d.Index)||!Number.isSafeInteger(d.Order)||d.Order<0
+   ||!Number.isSafeInteger(d.Index)||d.Index<0||indices.has(d.Index)||!Number.isSafeInteger(d.Order)
+   ||d.Order<0&&(d.Disposition!==0||d.Order!==-1)
    ||!Number.isSafeInteger(d.GroupFunctions)||d.GroupFunctions<0||d.GroupFunctions>2047
    ||!Number.isSafeInteger(d.AvailableAggregationTypes)||d.AvailableAggregationTypes<0||d.AvailableAggregationTypes>2047
    ||typeof d.NullGroup!=='boolean'||typeof d.OtherGroup!=='boolean'

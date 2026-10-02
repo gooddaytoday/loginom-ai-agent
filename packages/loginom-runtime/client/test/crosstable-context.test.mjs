@@ -55,3 +55,10 @@ test('complete replacement keeps native role orders dense when deletion retains 
  }
  assert.ok(f.evaluate().input_fields.every(field=>field.disposition===0));
 });
+test('native removed role sentinel is accepted only for an unused record',()=>{
+ const f=fixture();f.records[2].data.Order=-1;f.records[2].data.GroupFunctions=1;
+ const removed=f.evaluate();assert.equal(removed.verified,true);
+ assert.equal(removed.input_fields[2].disposition,0);assert.equal(removed.input_fields[2].order,-1);
+ for(const role of [1,2,3]){f.records[2].data.Disposition=role;assert.equal(f.evaluate().verified,false);}
+ f.records[2].data.Disposition=0;f.records[2].data.Order=-2;assert.equal(f.evaluate().verified,false);
+});
