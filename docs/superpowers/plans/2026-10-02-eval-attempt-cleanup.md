@@ -113,3 +113,18 @@ repository-week.md и новый план сохранены без отката
 Следующее: existing process/CLI/profile gate; origin Red→Green; один admission
 ledger и observer; lifecycle/failure matrix; полный gate; readiness probe,
 control→проверенный выполнением пакет, затем два адресных case без budget override.
+
+
+## Срез 2 simplification: один origin ledger
+
+Исходный process/CLI/profile gate: 71 pass, 226 assertions (107.12 с).
+Red: double-fork не имел origin `cli`. Green после удаления обеих admission
+веток PGID/SID: process 6 pass / 21 assertions; CLI/profile 65 pass / 207
+assertions; typecheck pass. Provenance хранится вместе с process identity,
+parent Map удалён; origins — launcher/cli/parent/subreaper. Selected CLI executable
+зафиксирован до dispatch; изменение receipt требует свежей проверки identity
+живого launcher. Double-fork helper проверяется после cleanup по PID/starttime,
+не одному числовому PID. Browser binding и отказ неизвестному helper сохранены.
+Следующий срез — перенести разрешения/bindings/pending unknown из отдельных
+Set/Map в тот же ledger, сохранить быстрый binding window и обычный интервал.
+Native ещё не перезапускался; goal active.

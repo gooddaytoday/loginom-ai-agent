@@ -127,10 +127,18 @@ test("supervisor: double-fork helper с новым SID имеет доказан
     expect(run.processCleanup.status).toBe("confirmed")
     expect(run.processCleanup.verification).toHaveLength(2)
     expect(run.processCleanup.verification?.map((pass) => pass.owned_remaining)).toEqual([0, 0])
+    expect(run.processCleanup.origins?.some((entry) => entry.pid === run.processCleanup.launcher?.cli_pid && entry.via === "cli")).toBe(true)
+    expect(run.processCleanup.origins?.map((entry) => entry.via)).not.toContain("live_session")
     expect(run.processCleanup.origins?.some((entry) => entry.via === "subreaper")).toBe(true)
     const pid = Number(await Bun.file(helperFile).text())
-    const state = (await Bun.$`ps -o stat= -p ${pid}`.quiet().nothrow()).text().trim()
-    expect(state === "" || state.startsWith("Z")).toBe(true)
+    const saved = run.processCleanup.processes.find((entry) => entry.pid === pid)!
+    expect(saved.starttime).toBeTruthy()
+    const raw = await readFile(`/proc/${pid}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined
+      throw error
+    })
+    const fields = raw?.slice(raw.lastIndexOf(")") + 2).split(" ")
+    expect(!fields || fields[19] !== saved.starttime || ["Z", "X"].includes(fields[0]!)).toBe(true)
   } finally {
     if (await Bun.file(helperFile).exists()) { try { process.kill(Number(await Bun.file(helperFile).text()), "SIGKILL") } catch {} }
   }
