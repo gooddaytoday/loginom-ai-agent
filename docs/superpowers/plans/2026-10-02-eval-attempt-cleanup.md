@@ -128,3 +128,19 @@ parent Map удалён; origins — launcher/cli/parent/subreaper. Selected CLI
 Следующий срез — перенести разрешения/bindings/pending unknown из отдельных
 Set/Map в тот же ledger, сохранить быстрый binding window и обычный интервал.
 Native ещё не перезапускался; goal active.
+
+
+## Срез 3 simplification: одна запись admission и browser binding
+
+Ledger объединяет происхождение, process identity, pending/allowed/refused,
+точный browser binding и foreign classification. Отдельные permission/binding/
+unknown Map/Set удалены. Adoption без binding не разрешает сигнал; противоречащее
+новое profile после binding вызывает отказ и оставляет fixture живым. Чужой
+Chromium с другим profile не завершается. Короткое окно argv (process.title
+через 40 мс) сохраняет binding; observer ускорен до первого proof и возвращается
+к 100 мс, без queued polls, с числом и максимальной длительностью scan в evidence.
+Процессный набор: 8 pass / 30 assertions / 35.58 с; CLI/profile: 65 pass /
+207 assertions / 80.08 с. Relevant EACCES и unknown helper остаются fail-stop.
+Typecheck и diff-check pass. Native ещё не запускался. Следующий срез — один
+shutdown, свежий group/identity pass перед каждым сигналом и сохранение capture
+при всех post-dispatch отказах. Goal active.

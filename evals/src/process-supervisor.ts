@@ -10,7 +10,10 @@ export type ProcessIdentity = {
 }
 type ProcessView = ProcessIdentity & { args: string[]; cwd: string; name: string }
 type ProcessOrigin = { via: "launcher" | "cli" | "parent" | "subreaper"; parent?: string; observed_at: string }
-type ProcessEntry = { process: ProcessIdentity; origin: ProcessOrigin }
+type ProcessEntry = {
+  process: ProcessIdentity; origin?: ProcessOrigin; admission: "pending" | "allowed" | "refused"
+  binding?: { runtimeDirectory: string; observed_at: string }; helper?: boolean; foreign?: boolean
+}
 export type WriterIdentity = { device: number; inode: number; owner: string }
 export type ProcessCleanup = {
   status: "confirmed" | "failed" | "not_run"; error: string | null
@@ -18,6 +21,9 @@ export type ProcessCleanup = {
   capture_complete: boolean
   verification?: { observed_at: string; owned_remaining: number }[]
   origins?: { pid: number; starttime: string; via: ProcessOrigin["via"]; parent_pid: number | null; parent_starttime: string | null; observed_at: string }[]
+  observations?: { count: number; max_duration_ms: number }
+  polling?: { interval_ms: number; observed_at: string }[]
+  admissions?: { pid: number; starttime: string; status: ProcessEntry["admission"] }[]
   selectedCli?: { executable: string; device: number; inode: number }
   launcher?: { kind: "linux_subreaper"; pid: number; cli_pid: number | null; ready: boolean }
   browserBindings?: { process: ProcessIdentity; runtimeDirectory: string; observed_at: string }[]
@@ -143,7 +149,16 @@ async function browserIdentity(cmd: string[], env: Record<string, string>) {
   const executable = await realpath(path.join(resources, manifest.browser))
   if (!inside(executable, await realpath(resources))) throw Error("Browser executable escapes bundle")
   const info = await stat(executable)
-  return { executable, device: info.dev, inode: info.ino, directory: path.dirname(executable) }
+  const directory = path.dirname(executable)
+  const helpers = await Promise.all(["chrome_crashpad_handler"].map(async (name) => {
+    const file = path.join(directory, name)
+    const helper = await stat(file).catch((error) => { if (gone(error)) return undefined; throw error })
+    if (!helper) return undefined
+    const actual = await realpath(file)
+    if (!inside(actual, await realpath(resources))) throw Error("Browser helper escapes bundle")
+    return { executable: actual, device: helper.dev, inode: helper.ino }
+  }))
+  return { executable, device: info.dev, inode: info.ino, directory, helpers: helpers.filter((entry) => entry !== undefined), fake }
 }
 
 /** Own ancestry is captured before reparent/setsid; argv is never a kill authority.
@@ -156,9 +171,6 @@ export async function superviseProcess(input: {
   if (process.platform !== "linux") throw Error("Process ownership supervision requires Linux /proc")
   const startedAt = Date.now()
   const ledger = new Map<string, ProcessEntry>()
-  const boundBrowsers = new Set<string>()
-  const denied = new Set<string>()
-  const unknown = new Map<string, ProcessIdentity>()
   const cleanup: ProcessCleanup = { status: "not_run", error: null, processes: [], runtimeDirectories: [], writer: null, capture_complete: true }
   const profile = input.profileDir ? await realpath(input.profileDir) : undefined
   const baseline = await snapshot()
@@ -228,8 +240,13 @@ export async function superviseProcess(input: {
   })))
   const root = proc.pid ? await processView(proc.pid) : undefined
   const track = (entry: ProcessIdentity, via: ProcessOrigin["via"], parent?: ProcessIdentity) => {
-    ledger.set(key(entry), { process: identity(entry), origin: { via, parent: parent ? key(parent) : undefined,
-      observed_at: new Date().toISOString() } })
+    const tracked = ledger.get(key(entry)) ?? { process: identity(entry), admission: "allowed" as const }
+    if (tracked.foreign) {
+      tracked.foreign = false; tracked.admission = "refused"
+      cleanup.error ??= `Browser binding differs PID ${entry.pid}`
+    }
+    tracked.origin = { via, parent: parent ? key(parent) : undefined, observed_at: new Date().toISOString() }
+    ledger.set(key(entry), tracked)
   }
   if (root) track(root, "launcher")
   if (registration) {
@@ -239,114 +256,144 @@ export async function superviseProcess(input: {
   let scanning = Promise.resolve(), stopped = false, timedOut = false, interrupted = false
   let lastOwn: ProcessIdentity[] = []
   const scan = async () => {
-    const live = await snapshot([...ledger.values()].map((entry) => entry.process))
+    const live = await snapshot([...ledger.values()].filter((entry) => entry.origin).map((entry) => entry.process))
     const directories = profile ? await runtimeDirectories(profile) : []
     cleanup.runtimeDirectories = directories.filter((directory) => !oldDirectories.has(directory))
     // Only a fresh live parent chain or kernel adoption proves provenance.
     // Group/session numbers are evidence, never a second admission algorithm.
     for (let pass = 0; pass < live.length; pass++) {
-      const added = live.filter((entry) => !existing.has(key(entry)) && !ledger.has(key(entry)) &&
-        live.some((parent) => parent.pid === entry.parent && ledger.has(key(parent)) &&
+      const added = live.filter((entry) => !existing.has(key(entry)) && !ledger.get(key(entry))?.origin &&
+        live.some((parent) => parent.pid === entry.parent && ledger.get(key(parent))?.origin &&
           sameIdentity(parent, ledger.get(key(parent))!.process) && (parent.pid !== root?.pid || reaperReady)))
       if (!added.length) break
       added.forEach((entry) => {
-        const parent = live.find((candidate) => candidate.pid === entry.parent && ledger.has(key(candidate)))!
+        const parent = live.find((candidate) => candidate.pid === entry.parent && ledger.get(key(candidate))?.origin)!
         const via = entry.pid === cliPid && parent.pid === root?.pid ? "cli" : parent.pid === root?.pid ? "subreaper" : "parent"
-        if (via === "cli" && (entry.device !== cliInfo.dev || entry.inode !== cliInfo.ino)) {
-          denied.add(key(entry)); cleanup.error ??= `CLI executable identity differs PID ${entry.pid}`
-        }
         track(entry, via, parent)
+        if (via === "cli" && (entry.device !== cliInfo.dev || entry.inode !== cliInfo.ino)) {
+          ledger.get(key(entry))!.admission = "refused"; cleanup.error ??= `CLI executable identity differs PID ${entry.pid}`
+        }
       })
     }
     const cli = live.find((entry) => entry.pid === cliPid && entry.parent === root?.pid && ledger.has(key(entry)))
-    if (cli && cli.device === cliInfo.dev && cli.inode === cliInfo.ino && ledger.get(key(cli))!.origin.via !== "cli") {
-      ledger.get(key(cli))!.origin.via = "cli"
+    if (cli && cli.device === cliInfo.dev && cli.inode === cliInfo.ino && ledger.get(key(cli))!.origin!.via !== "cli") {
+      ledger.get(key(cli))!.origin!.via = "cli"
     }
     if (profile && root && live.some((entry) => key(entry) === key(root))) {
       const writer = await writerIdentity(profile)
       if (writer && !cleanup.writer) cleanup.writer = writer
       if (writer && cleanup.writer && JSON.stringify(writer) !== JSON.stringify(cleanup.writer)) cleanup.error ??= "Writer identity changed"
     }
-    cleanup.processes = [...ledger.values()].map((entry) => entry.process)
     if (browser) {
       const native = live.filter((entry) => entry.device === browser.device && entry.inode === browser.inode || inside(entry.executable, browser.directory))
       const dataDir = (entry: ProcessView) => entry.args.find((arg) => arg.startsWith("--user-data-dir="))?.slice(16)
-      const bound = (entry: ProcessView) => entry.device === browser.device && entry.inode === browser.inode &&
-        cleanup.runtimeDirectories.some((directory) => dataDir(entry) === path.join(directory, "browser-profile"))
-      native.filter((entry) => ledger.has(key(entry)) && bound(entry)).forEach((entry) => {
-        if (!boundBrowsers.has(key(entry))) {
-          cleanup.browserBindings ??= []
-          cleanup.browserBindings.push({ process: identity(entry), runtimeDirectory: path.dirname(dataDir(entry)!), observed_at: new Date().toISOString() })
-        }
-        boundBrowsers.add(key(entry))
-      })
-      const browserAncestor = (entry: ProcessView) => {
-        let parent = ledger.get(key(entry))?.origin.parent
+      const browserAncestor = (entry: ProcessEntry) => {
+        let parent = entry.origin?.parent
         const visited = new Set<string>()
         while (parent && !visited.has(parent)) {
-          if (boundBrowsers.has(parent)) return true
-          visited.add(parent); parent = ledger.get(parent)?.origin.parent
+          const candidate = ledger.get(parent)
+          if (candidate?.binding) return true
+          visited.add(parent); parent = candidate?.origin?.parent
         }
         return false
       }
-      for (const entry of native) {
-        if (existing.has(key(entry))) continue
-        const data = dataDir(entry)
-        if (ledger.has(key(entry))) {
-          // Chromium may clear argv while exiting. Birth-bound authority survives
-          // that observation; every signal still rechecks executable/UID/starttime.
-          const adopted = reaperReady && root && entry.parent === root.pid && entry.pid !== cliPid &&
-            live.some((candidate) => key(candidate) === key(root)) && boundBrowsers.size > 0 &&
-            (entry.device !== browser.device || entry.inode !== browser.inode || entry.args.some((arg) => arg.startsWith("--type=")))
-          if (data ? !bound(entry) : !boundBrowsers.has(key(entry)) && !browserAncestor(entry) && !adopted) {
-            if (!denied.has(key(entry))) {
-              cleanup.bindingRefusals ??= []
-              cleanup.bindingRefusals.push({ process: identity(entry), has_data_dir: Boolean(data), data_inside_profile: Boolean(data && inside(data, profile!)),
-                new_runtime_match: cleanup.runtimeDirectories.some((directory) => data === path.join(directory, "browser-profile")),
-                executable_match: entry.device === browser.device && entry.inode === browser.inode, ancestry_match: browserAncestor(entry) })
-            }
-            denied.add(key(entry)); unknown.set(key(entry), identity(entry)); cleanup.error ??= `Browser binding differs PID ${entry.pid}`
-          }
-          if (!denied.has(key(entry))) unknown.delete(key(entry))
+      // Establish exact root bindings first. Helpers cannot supply a missing
+      // root proof, even when the kernel has adopted them to our launcher.
+      for (const current of native) {
+        if (existing.has(key(current))) continue
+        const entry = ledger.get(key(current)) ?? { process: identity(current), admission: "pending" as const }
+        ledger.set(key(current), entry)
+        if (!sameIdentity(current, entry.process)) {
+          entry.admission = "refused"; cleanup.error ??= `Process identity changed PID ${current.pid}`
           continue
         }
-        const foreign = data && !inside(data, profile!)
-        const foreignParent = live.some((parent) => parent.pid === entry.parent && dataDir(parent) && !inside(dataDir(parent)!, profile!))
-        if (!foreign && !foreignParent) {
-          // A double-fork can be sampled between exit and kernel adoption.
-          // It has no signal authority until a later snapshot proves origin.
-          unknown.set(key(entry), identity(entry))
+        const data = dataDir(current)
+        const runtime = cleanup.runtimeDirectories.find((directory) => data === path.join(directory, "browser-profile"))
+        const mainExecutable = current.device === browser.device && current.inode === browser.inode
+        const type = current.args.find((arg) => arg.startsWith("--type="))?.slice(7)
+        const knownType = type && ["zygote", "gpu-process", "utility", "renderer", "broker", ...(browser.fake ? ["parent", "helper"] : [])].includes(type)
+        const knownExecutable = browser.helpers.some((helper) => current.device === helper.device && current.inode === helper.inode)
+        if (!entry.origin) {
+          const parent = live.find((candidate) => candidate.pid === current.parent)
+          const parentData = parent ? dataDir(parent) : undefined
+          entry.foreign ||= Boolean(data && !inside(data, profile!) || parentData && !inside(parentData, profile!))
+          entry.admission = entry.foreign ? "refused" : "pending"
+          continue
         }
+        if (entry.admission === "refused") continue
+        if (entry.foreign || entry.binding && data && data !== path.join(entry.binding.runtimeDirectory, "browser-profile") || data && (!runtime || !mainExecutable) || mainExecutable && type && !knownType || !mainExecutable && !knownExecutable) {
+          entry.admission = "refused"
+          cleanup.bindingRefusals ??= []
+          cleanup.bindingRefusals.push({ process: identity(current), has_data_dir: Boolean(data), data_inside_profile: Boolean(data && inside(data, profile!)),
+            new_runtime_match: Boolean(runtime), executable_match: mainExecutable, ancestry_match: browserAncestor(entry) })
+          cleanup.error ??= `Browser binding differs PID ${current.pid}`
+          continue
+        }
+        if (mainExecutable && !type && runtime) {
+          entry.binding ??= { runtimeDirectory: runtime, observed_at: new Date().toISOString() }
+          entry.admission = "allowed"
+          continue
+        }
+        entry.helper ||= Boolean(knownExecutable || knownType || mainExecutable && browserAncestor(entry))
+        entry.admission = entry.binding || entry.helper && [...ledger.values()].some((candidate) => candidate.binding && candidate.origin)
+          ? "allowed" : "pending"
       }
-      cleanup.unknownProcesses = [...unknown.values()]
-      cleanup.processes = [...ledger.values()].map((entry) => entry.process)
+      // Binding may appear later than a helper in the same snapshot.
+      for (const entry of ledger.values()) {
+        if (entry.origin && entry.admission === "pending" && entry.helper &&
+          [...ledger.values()].some((candidate) => candidate.binding && candidate.origin)) entry.admission = "allowed"
+      }
     }
-    cleanup.origins = [...ledger.values()].map((entry) => {
-      const parent = ledger.get(entry.origin.parent ?? "")?.process
-      return { pid: entry.process.pid, starttime: entry.process.starttime, via: entry.origin.via,
-        parent_pid: parent?.pid ?? null, parent_starttime: parent?.starttime ?? null, observed_at: entry.origin.observed_at }
+    const owned = [...ledger.values()].filter((entry) => entry.origin)
+    cleanup.processes = owned.map((entry) => entry.process)
+    cleanup.unknownProcesses = [...ledger.values()].filter((entry) => !entry.foreign && entry.admission !== "allowed").map((entry) => entry.process)
+    cleanup.browserBindings = owned.filter((entry) => entry.binding).map((entry) => ({ process: entry.process, ...entry.binding! }))
+    cleanup.admissions = [...ledger.values()].map((entry) => ({ pid: entry.process.pid, starttime: entry.process.starttime, status: entry.admission }))
+    cleanup.origins = owned.map((entry) => {
+      const parent = ledger.get(entry.origin!.parent ?? "")?.process
+      return { pid: entry.process.pid, starttime: entry.process.starttime, via: entry.origin!.via,
+        parent_pid: parent?.pid ?? null, parent_starttime: parent?.starttime ?? null, observed_at: entry.origin!.observed_at }
     })
-    lastOwn = live.filter((entry) => ledger.has(key(entry))).map(identity)
+    lastOwn = live.filter((entry) => ledger.get(key(entry))?.origin).map(identity)
     return lastOwn
   }
   const checkedScan = () => {
-    scanning = scanning.then(async () => { await readReceipt(); await scan() }).catch((error) => { cleanup.error ??= message(error) })
+    scanning = scanning.then(async () => {
+      const started = Date.now()
+      try { await readReceipt(); await scan() }
+      finally {
+        cleanup.observations ??= { count: 0, max_duration_ms: 0 }
+        cleanup.observations.count++
+        cleanup.observations.max_duration_ms = Math.max(cleanup.observations.max_duration_ms, Date.now() - started)
+      }
+    }).catch((error) => { cleanup.error ??= message(error) })
     return scanning
   }
   await checkedScan()
   // Browser launch argv can be replaced within tens of milliseconds. Sample
   // the admission window faster; do not enqueue stale scans when /proc is slow.
-  let pollPending = false
+  let pollPending = false, nextPoll = 0
   const poll = setInterval(() => {
-    if (stopped || pollPending) return
+    if (stopped || pollPending || Date.now() < nextPoll) return
     pollPending = true
-    void checkedScan().finally(() => { pollPending = false })
+    const started = Date.now()
+    void checkedScan().finally(() => {
+      const fast = ![...ledger.values()].some((entry) => entry.origin?.via === "cli") ||
+        browser && (!cleanup.browserBindings?.length || cleanup.runtimeDirectories.some((directory) =>
+          !cleanup.browserBindings?.some((binding) => binding.runtimeDirectory === directory)) || cleanup.unknownProcesses?.length)
+      const interval = fast ? 10 : 100
+      cleanup.polling ??= []
+      if (cleanup.polling.at(-1)?.interval_ms !== interval)
+        cleanup.polling.push({ interval_ms: interval, observed_at: new Date().toISOString() })
+      nextPoll = started + interval
+      pollPending = false
+    })
   }, 10)
   const signalOwned = async (signal: NodeJS.Signals) => {
     await checkedScan()
     for (const tracked of ledger.values()) {
       const saved = tracked.process
-      if (denied.has(key(saved)) || root && key(saved) === key(root)) continue
+      if (tracked.admission !== "allowed" || !tracked.origin || root && key(saved) === key(root)) continue
       try {
         // Individual signals avoid signaling a recycled PGID or an unknown member.
         await signalProcess(saved, signal)
@@ -370,7 +417,7 @@ export async function superviseProcess(input: {
   await signalOwned("SIGTERM")
   const remaining = async () => {
     await checkedScan()
-    return (await Promise.all([...ledger.values()].map((entry) => entry.process).filter((entry) => !denied.has(key(entry)) && (!root || key(entry) !== key(root))).map(async (saved) => {
+    return (await Promise.all([...ledger.values()].filter((entry) => entry.origin && entry.admission === "allowed").map((entry) => entry.process).filter((entry) => !root || key(entry) !== key(root)).map(async (saved) => {
       try {
         const current = await processView(saved.pid)
         if (current && key(current) !== key(saved)) throw Error(`Process identity changed PID ${saved.pid}`)
@@ -398,7 +445,7 @@ export async function superviseProcess(input: {
     cleanup.verification.push({ observed_at: new Date().toISOString(), owned_remaining: lastOwn.length })
     if (lastOwn.length) cleanup.error ??= "Owned process remains at final verification"
   }
-  if (unknown.size) cleanup.error ??= `Unexplained browser/helper PID ${unknown.values().next().value!.pid}`
+  if (cleanup.unknownProcesses?.length) cleanup.error ??= `Unexplained browser/helper PID ${cleanup.unknownProcesses[0]!.pid}`
   if (!cleanup.error) cleanup.status = "confirmed"
   if (cleanup.status !== "confirmed") cleanup.status = "failed"
   await Promise.race([streams, Bun.sleep(1000).then(() => {
