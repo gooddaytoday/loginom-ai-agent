@@ -6,7 +6,7 @@
 Native Save/Close/logout подтверждён отдельно, но не даёт whole PASS.
 
 В **6f6a66eb62** добавлена приватная диагностика send callback/stop/process.exit;
-14 адресных tests и provenance5045 PASS. Candidate15 собирается для короткой
+14 адресных tests и provenance5045 PASS. Candidate15 собран для короткой
 headed readiness-диагностики. Затем нужны fresh J21 и полная автономная пара.
 Failed результаты сохранены; Declared12 individual PASS остаётся отдельным.
 Точные pins, процессы и порядок продолжения — в

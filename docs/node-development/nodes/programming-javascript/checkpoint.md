@@ -24,8 +24,11 @@ exit_requested|cleanup_rejected/exit_event. Только fixed stages/time,0600,
 14 адресных tests/provenance5045 PASS. Существующие startup-less tests не
 воспроизводят live, поэтому свежая диагностика обязательна.
 
-**Следующий шаг:** дождаться build candidate15 (original exec57776,
-version0.0.0-dev-202610022103), затем короткий actual compiled headed
+Candidate15 build original exec57776/exit0/roundtrip PASS, version
+0.0.0-dev-202610022103, source6f6a66eb62; private
+`f-standalone-candidate-15-build.json` содержит manifest/sourceTree pins.
+Archive SHA `3001c4984284f8e7de7a70cad0b6b514489fb8991c5b06e551b93b8fc8743fdd`.
+**Следующий шаг:** короткий actual compiled headed
 `loginom status --no-headless --format json` в новом приватном профиле с
 разрешённым connection seed, без модели/пакетных операций. Сохранить original
 process/lease и новые resource/supervisor/terminal records; при необходимости
@@ -36,7 +39,7 @@ stop/process.exit или блокируется exit listener/Node teardown. С�
 Private `f-cli-pair-13.py` и runtime-pins подготовлены, но НЕ запускались:
 они пока ссылаются наcandidate14/reader14; не запускать после смены candidate
 без новой согласованной заморозки. J21 read08 и обе неуспешные пары immutable.
-Browser/acceptance slot сейчас свободен; текущая активная работа — сборка.
+Browser/acceptance slot сейчас свободен; сборка завершена.
 После подтверждённого fix нужны fresh J21 и whole pair, затем полный completion.
 
 ### Предшествующий запуск J21 read08
