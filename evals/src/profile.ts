@@ -278,7 +278,7 @@ export async function pruneRuntimeAttempts(profileDir: string, owned?: string[])
   if (owned) {
     const canonical = await realpath(profileDir)
     for (const directory of [...new Set(owned)]) {
-      if (!/^loginom\/runtime\/generations\/[^/]+\/chats\/[^/]+\/attempts\/[^/]+$/.test(path.relative(canonical, directory)))
+      if (!/^loginom\/(runtime|validation)\/generations\/[^/]+\/chats\/[^/]+\/attempts\/[^/]+$/.test(path.relative(canonical, directory)))
         throw Error("Pruning ownership path differs")
       const actual = await realpath(directory).catch((error: NodeJS.ErrnoException) => {
         if (error.code === "ENOENT") return undefined

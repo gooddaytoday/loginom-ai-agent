@@ -116,6 +116,13 @@ Stale writer удаляется только после process proof и про�
 Перед acknowledge/pruning сохраняются redacted execution-events только из
 собственных runtime-каталогов, перечень и SHA256 файлов. Auth/config/browser
 profile не архивируются. Ошибка архива запрещает prune и следующий кейс.
+Проверка подключения использует тот же формат attempts в namespace `validation`;
+точный binding требует нового наблюдённого каталога и того же origin/executable.
+Наблюдённые пути сохраняются в receipt после удаления validation chat продуктом.
+Validation не создаёт execution journal; его уже удалённый временный каталог
+отмечается в manifest `removed_validation_directories`. Исчезновение обычного
+`runtime` до архива остаётся ошибкой. Pruning принимает только точные собственные
+attempts обоих namespaces, не долговечные настройки или профиль браузера целиком.
 Подробности сохраняются в `cleanup.json`. Partial capture явно обозначается;
 закрытие pipe не доказывает завершение процесса. Исходные events/run/result
 сохраняются даже при ошибке cleanup; она не превращает no_artifact/failed/timeout

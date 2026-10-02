@@ -138,7 +138,8 @@ async function runtimeDirectories(profile: string): Promise<string[]> {
       return walk(file)
     }))).flat()
   }
-  return walk(path.join(profile, "loginom", "runtime"))
+  return (await Promise.all(["runtime", "validation"].map((namespace) =>
+    walk(path.join(profile, "loginom", namespace))))).flat()
 }
 
 async function browserIdentity(cmd: string[], env: Record<string, string>) {
@@ -282,7 +283,10 @@ export async function superviseProcess(input: {
       }
     }
     const directories = profile ? await runtimeDirectories(profile) : []
-    cleanup.runtimeDirectories = directories.filter((directory) => !oldDirectories.has(directory))
+    // Validation deletes its temporary directory after closing the browser.
+    // Keep observed paths as birth-bound evidence after that product cleanup.
+    cleanup.runtimeDirectories = [...new Set([...cleanup.runtimeDirectories,
+      ...directories.filter((directory) => !oldDirectories.has(directory))])]
     // Only a fresh live parent chain or kernel adoption proves provenance.
     // Group/session numbers are evidence, never a second admission algorithm.
     for (let pass = 0; pass < live.length; pass++) {

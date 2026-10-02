@@ -1,5 +1,6 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
+import { mkdir, rm } from "node:fs/promises"
 
 const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
@@ -31,13 +32,17 @@ if (command === "run" && process.env.EVAL_FAKE_RUNTIME_EVENTS) {
   await Bun.sleep(400)
 }
 if (command === "run" && process.env.EVAL_FAKE_BROWSER_BUNDLE) {
-  const directory = path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, "loginom/runtime/generations/1/chats/fake/attempts", crypto.randomUUID())
-  await Bun.write(path.join(directory, "execution-events.jsonl"), JSON.stringify({ phase: "AMBIGUOUS" }) + "\n")
+  const validation = process.env.EVAL_FAKE_VALIDATION === "1"
+  const directory = path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, `loginom/${validation ? "validation" : "runtime"}/generations/1/chats/fake/attempts`, crypto.randomUUID())
+  if (validation) await mkdir(directory, { recursive: true })
+  if (!validation) await Bun.write(path.join(directory, "execution-events.jsonl"), JSON.stringify({ phase: "AMBIGUOUS" }) + "\n")
   const child = spawn(path.join(process.env.EVAL_FAKE_BROWSER_BUNDLE, "chrome"), [...(process.env.EVAL_FAKE_BROWSER_SCRIPT ? [process.env.EVAL_FAKE_BROWSER_SCRIPT] : []), `--user-data-dir=${process.env.EVAL_FAKE_BROWSER_DATA_DIR ?? `${directory}/browser-profile`}`],
     { detached: true, stdio: "ignore", env: { PATH: process.env.PATH ?? "", EVAL_FAKE_BROWSER_CLEAR_TITLE: process.env.EVAL_FAKE_BROWSER_CLEAR_TITLE ?? "",
       EVAL_FAKE_BROWSER_HELPER_PID_FILE: process.env.EVAL_FAKE_BROWSER_HELPER_PID_FILE ?? "", EVAL_FAKE_BROWSER_HELPER_DETACHED: process.env.EVAL_FAKE_BROWSER_HELPER_DETACHED ?? "" } })
   await Bun.write(process.env.EVAL_FAKE_BROWSER_PID_FILE!, String(child.pid))
-  await Bun.sleep(900)
+  await Bun.sleep(400)
+  if (validation) await rm(directory, { recursive: true })
+  await Bun.sleep(500)
 }
 
 if (process.env.EVAL_FAKE_ORPHAN_PID_FILE) {
