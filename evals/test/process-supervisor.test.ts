@@ -204,3 +204,35 @@ test("supervisor: новый чужой Chromium с другим profile ост�
     process.kill(foreign.pid!, 0)
   } finally { foreign.kill("SIGKILL"); await exited }
 }, 20_000)
+
+test("supervisor: неизвестный потомок браузера вне bundle остаётся живым и запрещает переход", async () => {
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-browser-external-helper-"))
+  const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-browser-external-helper-bundle-"))
+  await cp(Bun.which("node")!, path.join(bundle, "chrome"), { dereference: true })
+  const script = path.join(bundle, "browser.mjs")
+  await Bun.write(script, `import { spawn } from 'node:child_process'; import { writeFile } from 'node:fs/promises';
+    const child=spawn(${JSON.stringify(process.execPath)},['-e',"process.on('SIGTERM',()=>{});setInterval(()=>{},1000)"],{stdio:'ignore'});
+    await writeFile(process.env.EVAL_FAKE_BROWSER_HELPER_PID_FILE,String(child.pid));
+    process.on('SIGTERM',()=>{});setInterval(()=>{},1000)`)
+  await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
+  const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: out })
+  const helperFile = path.join(out, "helper.pid")
+  let run: Awaited<ReturnType<typeof runAgent>> | undefined
+  try {
+    run = await runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+      EVAL_FAKE_BROWSER_PID_FILE: path.join(out, "browser.pid"), EVAL_FAKE_BROWSER_SCRIPT: script,
+      EVAL_FAKE_BROWSER_HELPER_PID_FILE: helperFile } }, taskId: "default", model: "fake/model", prompt: "test", files: [],
+      workdir: out, outDir: out, profileDir: out, timeoutMs: 30_000 })
+    const pid = Number(await Bun.file(helperFile).text())
+    expect(run.processCleanup.status).toBe("failed")
+    expect(run.exitCode).toBe(0)
+    expect(run.processCleanup.admissions?.find((entry) => entry.pid === pid)?.status).toBe("refused")
+    process.kill(pid, 0)
+  } finally {
+    if (await Bun.file(helperFile).exists()) {
+      const pid = Number(await Bun.file(helperFile).text())
+      const saved = run?.processCleanup.processes.find((entry) => entry.pid === pid)
+      if (saved) await signalProcess(saved, "SIGKILL")
+    }
+  }
+}, 20_000)

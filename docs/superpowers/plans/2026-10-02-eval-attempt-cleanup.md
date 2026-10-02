@@ -177,3 +177,44 @@ model openai/gpt-6-sol/default, обычный бюджет 900000 мс.
 Далее exact reconciliation своего failed lease, readiness через тот же supervisor,
 control → group-sum-qty с независимым исполнением, budget/low-liquidity с обычными
 budgets. Native критерии остаются открытыми; goal active.
+
+
+## Native checkpoint и последний negative-срез
+
+HEAD cf1fc6a0d: control 20261002-134647-cf1fc6a0d-dirty завершился exit 0,
+no_artifact → completed; оба environment_cleanup confirmed. Пакет group-sum-qty
+и настоящий CSV независимо проверены: три узла, две связи, Item/gdSum Qty,
+две строки A=15/B=25. Исходные node_wait receipts подтверждают completed
+исполнения импорта, группировки и экспорта. Audit проверил новые Session/launcher/
+runtime identities, archive→ready→следующий dispatch, hashes всех архивов,
+отсутствие оставшихся own identities и секретов в 16 proof/archive файлах.
+Адресный run 20261002-135921-cf1fc6a0d-dirty: budget no_artifact, 155350 мс;
+low-liquidity no_artifact, 133159 мс; оба exit 0, timeout=false, cleanup confirmed;
+обычные task budgets 1800000 мс, модель неизменна. Score/oracle=0 сохраняются
+в метриках; живой судья настроен, но для отсутствующего пакета не вызывается.
+
+Дополнительный cold-open временно восстановленного файла показал readonly-документ;
+попытка исполнения отказала до мутации. Причина readonly не установлена: это не
+доказательство оставшейся серверной Session. Cold readback не прошёл и не
+подменяет подтверждение исходного исполнения/CSV положительного control.
+Reader процессы подтверждённо закрыты; его leases reconciliation выполнялось
+по exact identity и двум пустым passes, журналы сохранены. Временно восстановлен
+только собственный eval-пакет для QA; после проверки он удалён, local artifact
+сохранён. Продукт и auth/settings/DB не менялись.
+
+Последний аудит выявил unknown browser descendant вне browser directory,
+который обходил helper admission как generic CLI descendant. Red тест подтвердил
+ложный confirmed cleanup и завершение неизвестного helper. Минимальная правка
+использует тот же recorded parent chain для отнесения потомка к browser admission
+независимо от расположения executable; неизвестный executable теперь refused,
+fixture жив, исход exit 0 сохранён. Green 1 pass / 3 assertions. Полный gate
+повторяется; после него повторить native control/addressed на итоговом code SHA.
+Goal active, приёмка cf1fc6a0d остаётся честным историческим доказательством.
+
+
+Последний negative-срез: полный gate 226 pass / 0 fail, 981 assertions,
+284.27 с (/tmp/eval-subreaper-acceptance/full-final-v2.log); typecheck и diff-check
+pass. Новых источников ownership нет: browserAncestor используется для admission
+уже доказанного потомка; PID/parent provenance остаётся прежним единым ledger.
+Далее свежие native readiness/control/addressed на этом code SHA, без cold reader
+вне обязательного контракта и без изменений установленного продукта.
