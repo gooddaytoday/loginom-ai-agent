@@ -125,13 +125,62 @@ Dock-skill/образа Loginom — предупреждение об окруж
 docker exec loginom-server-7.4.2-test sh -c 'rm -f /workdir/UserStorage/user/eval-<run-id>-*'
 ```
 
-CLI запускается в отдельной группе процессов; `.writer` снимается только после
-её завершения. После копирования результатов и recovery очищаются диагностические
-`runtime/generations/*/chats/*/attempts` (включая readiness), сохраняя авторизацию,
-БД и долговечные stores. Pending recovery/connection, живая группа, владельцы
-профиля по Linux `/proc` и симлинки защищены от удаления. Неопределённый orphan
-host блокирует cleanup; незарегистрированные процессы не завершаются.
-Сбой cleanup останавливает дальнейшие попытки с объяснением.
+Перед запуском management/агента harness берёт эксклюзивный sibling lease
+`<profile>.harness-lease`. Профиль должен быть частным Linux eval-профилем без
+параллельного ручного CLI/Desktop. `EVAL_PROFILE_DIR` и `EVAL_RESULTS_DIR` задают
+отдельные каталоги; по умолчанию `.profile/agent` и `results`. Lease защищает от
+второго harness; атомарный handoff с произвольным внешним CLI не обеспечивается.
+
+Каждый agent/setup/status/recover получает отдельный Linux subreaper launcher.
+Один ledger хранит identity, происхождение launcher/cli/parent/subreaper,
+admission pending/allowed/refused и browser binding. PGID/SID сохраняются для
+проверок и аудита; принадлежность подтверждается живой цепочкой родителей или
+усыновлением этим launcher. Launcher завершается последним.
+
+Общий supervisor опрашивает `/proc` каждые 100 мс и сохраняет UID/PID/starttime,
+наблюдённое происхождение, executable и PGID/SID. Окно запуска опрашивается каждые
+10 мс до browser binding, после него интервал возвращается к 100 мс; новое окно
+ускоряет тот же observer. Устаревшие scans не накапливаются. Detached Chromium требует
+точного executable выбранного bundle и точного browser-profile нового runtime.
+Перед каждым сигналом identity проверяется снова; числовой PGID, EOF и код 0
+сами по себе не доказывают завершение. Timeout/Ctrl+C сохраняют 30 с SIGINT,
+затем SIGTERM 5 с и SIGKILL; подтверждение ограничено 60 с и двумя проходами.
+Неизвестный helper/owner, недоступный релевантный `/proc` и подмена writer
+запрещают переход; посторонние процессы не завершаются.
+
+До recovery acknowledgement и pruning execution journals собственных runtime
+сохраняются в `<attempt>/diagnostics/` с redaction, manifest, SHA-256 и read-back.
+Auth/config/browser profile в архив не входят. Отдельные management receipts и
+архивы лежат в `preparation/` и `<attempt>/management/`. Только после этого
+снимается неизменившийся stale `.writer` и проверяется `ready`. Pruning удаляет
+только архивированные каталоги, сохраняя прежние runtime, авторизацию, БД и
+долговечные stores. Ошибка архива сохраняет исходные журналы.
+Connection validation использует namespace `loginom/validation` с теми же exact
+binding/origin проверками. Продукт удаляет validation chat без execution journal;
+наблюдённый путь остаётся в receipt и `removed_validation_directories` manifest.
+Исчезновение обычного runtime до архива запрещает продолжение.
+
+`environment_cleanup` показывает `confirmed`, `failed` или `not_run`, ссылка
+`evidence` ведёт к `cleanup.json`. Отсутствующее историческое поле означает «не
+проверялось». `cleanup_error` относится только к удалению storage-артефакта.
+Cleanup не меняет `no_artifact`/`failed`/`timeout`/`completed`, telemetry и метрики
+качества; пересудейство сохраняет его. Отчёт показывает число проверенных
+попыток и ошибок отдельно. Принудительное закрытие capture обозначается
+`capture_complete: false` и не подтверждает завершение процесса.
+
+При отказе записываются результат и summary/report с `stopped_reason`, прогон
+завершается кодом 1 без следующего кейса. Guard, ownership evidence и runtime
+сохраняются для расследования; stale harness lease автоматически не отбирается.
+После подтверждённой очистки следующий кейс получает новый CLI/Session/runtime.
+AMBIGUOUS не вызывает раннего прерывания или автоматического повтора и остаётся
+открытым дефектом продукта внутри прежней сессии. Локальная очистка не доказывает
+отмену операции на сервере Loginom; серверные остатки требуют адресной очистки
+либо изолированного стенда.
+
+Linux-приёмка и независимые PID-аудиты должны использовать один PID namespace:
+отсутствие host PID в sandbox не доказывает завершение. Проверенный контроль
+перехода и честные адресные результаты описаны в
+[отчёте приёмки](../docs/testing/loginom-ai-agent/reports/2026-10-02-evals-cleanup-acceptance.md).
 
 ## Ориентир шума
 

@@ -134,6 +134,16 @@ Confirmed означает только локальное завершение 
 доказательство rollback или освобождения серверной сессии Loginom. `/proc`
 ledger ограничен наблюдаемой моделью launcher; сомнение приводит к stop.
 Harness lease не даёт атомарного handoff с неподчиняющимся внешним CLI.
+Независимые process audits выполняются в том же PID namespace, что launcher:
+отсутствие host PID в отдельном sandbox namespace не является process proof.
+
+Приёмка защиты перехода завершена 2026-10-02 на harness `a2bf34b77` и неизменном
+установленном CLI 0.1.17: 228 tests pass, typecheck/diff-check pass; control
+no_artifact → completed с проверенными A=15/B=25, адресные budget/low-liquidity
+no_artifact с confirmed cleanup и прежними quality scores=0. Подробные pins,
+процессные/архивные доказательства и пределы — в
+[отчёте приёмки](../../testing/loginom-ai-agent/reports/2026-10-02-evals-cleanup-acceptance.md).
+Восстановление AMBIGUOUS внутри прежней Session этим контрактом не реализовано.
 
 ### Уточнение контракта стабилизации — 2026-10-01
 
