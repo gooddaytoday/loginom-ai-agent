@@ -482,3 +482,21 @@ test("waitProfileIdle: повторно проверяет короткое ок
     expect(await waitProfileIdle(profile, 1000)).toBe(true)
   } finally { child.kill("SIGKILL"); await exited }
 })
+
+
+test("releaseStaleWriter: guard без owner не признаётся отсутствующим", async () => {
+  const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-incomplete-"))
+  await mkdir(path.join(profile, ".writer"))
+  await expect(releaseStaleWriter(profile, null)).rejects.toThrow("Writer owner unavailable")
+  expect((await stat(path.join(profile, ".writer"))).isDirectory()).toBe(true)
+})
+
+
+test("writerIdentity: symlink owner не читает конфигурацию в process proof", async () => {
+  const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-link-"))
+  await mkdir(path.join(profile, ".writer"))
+  const authorization = path.join(profile, "auth.json")
+  await Bun.write(authorization, "private-authorization-token")
+  await symlink(authorization, path.join(profile, ".writer/owner"))
+  await expect(writerIdentity(profile)).rejects.toThrow("Writer owner")
+})
