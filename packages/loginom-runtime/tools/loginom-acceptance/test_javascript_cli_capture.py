@@ -6,6 +6,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from javascript_cli_candidate import file_sha256
 from javascript_cli_capture import RedactedCliCapture,known_cli_secrets,collect_cli_process
@@ -167,6 +168,21 @@ class JavascriptCaptureTests(unittest.TestCase):
         self.assertFalse(result['passed'],result)
         self.assertIn('cli_capture_redaction_transport_unconfirmed',result['failures'])
         self.assertIn('cli_capture_worker_unclean_exit',result['failures'])
+        self.assertEqual(self.events(),[])
+
+    def test_hung_worker_consumes_only_first_bounded_reply_wait(self):
+        self.start()
+        descriptor=os.pidfd_open(self.capture.worker.pid)
+        try:signal.pidfd_send_signal(descriptor,signal.SIGSTOP)
+        finally:os.close(descriptor)
+        self.emit(self.event())
+        self.assertTrue(self.capture.transport_failed)
+        started=time.monotonic()
+        for index in range(3):self.emit(self.event())
+        self.assertLess(time.monotonic()-started,1)
+        result=self.capture.finish()
+        self.assertFalse(result['passed'],result)
+        self.assertIn('cli_capture_worker_forced_exit',result['failures'])
         self.assertEqual(self.events(),[])
 
     def test_pins_and_canonical_paths_checked_before_worker_launch(self):
