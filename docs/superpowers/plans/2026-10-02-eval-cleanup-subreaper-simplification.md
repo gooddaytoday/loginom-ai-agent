@@ -250,17 +250,17 @@ management(command: AgentCommand, args: string[], stdin?: string, timeoutMs?: nu
 
 **Файлы:** owning spec, исходный checkpoint, `test/process-supervisor.test.ts`.
 
-- [ ] Прочитать свежий checkpoint/diff; выписать уже зелёные тесты и незакрытые
+- [x] Прочитать свежий checkpoint/diff; выписать уже зелёные тесты и незакрытые
   native критерии. Продуктовые/user changes не включать в этот срез.
-- [ ] Уточнить spec: origin только launcher/CLI/parent/subreaper; PGID/SID —
+- [x] Уточнить spec: origin только launcher/CLI/parent/subreaper; PGID/SID —
   evidence и проверки; точный browser profile остаётся обязательным.
-- [ ] Запустить существующие процессные и профильные тесты:
+- [x] Запустить существующие процессные и профильные тесты:
 
   ```bash
   bun test test/process-supervisor.test.ts test/cli.test.ts test/profile.test.ts
   ```
 
-- [ ] Если исходная проверка красная, сначала документировать и устранить
+- [x] Если исходная проверка красная, сначала документировать и устранить
   конкретный отказ отдельным TDD-срезом. Не совмещать неизвестную регрессию
   с удалением ownership веток.
 
@@ -271,7 +271,7 @@ management(command: AgentCommand, args: string[], stdin?: string, timeoutMs?: nu
 **Вход:** launcher/CLI receipt и snapshot. **Выход:** ledger с доказанным origin;
 ни одна запись не присваивается через PGID/SID.
 
-- [ ] Усилить existing double-fork тест через публичный `runAgent`:
+- [x] Усилить existing double-fork тест через публичный `runAgent`:
 
   ```ts
   expect(run.processCleanup.status).toBe("confirmed")
@@ -285,11 +285,11 @@ management(command: AgentCommand, args: string[], stdin?: string, timeoutMs?: nu
   Добавить отдельным циклом вариант helper с новым SID и выходом промежуточного
   родителя до scan. Проверить его завершение и origin `subreaper`; post-cleanup
   проверка PID использует сохранённый starttime, не один числовой PID.
-- [ ] Запустить целевой тест, подтвердить отказ нового origin-контракта.
-- [ ] Свести запись provenance к одному ledger. Удалить обе ветки присвоения
+- [x] Запустить целевой тест, подтвердить отказ нового origin-контракта.
+- [x] Свести запись provenance к одному ledger. Удалить обе ветки присвоения
   через совпадение live launcher group/session и через живого browser SID leader.
   Оставить свежие parent/subreaper проверки и pinned CLI receipt.
-- [ ] Прогнать весь `test/process-supervisor.test.ts`, затем `cli.test.ts` и
+- [x] Прогнать весь `test/process-supervisor.test.ts`, затем `cli.test.ts` и
   `profile.test.ts`; commit только после зелёного результата.
 
 ### 3. Browser binding остаётся обязательным

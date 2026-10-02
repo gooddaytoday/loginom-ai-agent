@@ -9,13 +9,16 @@ export type ProcessIdentity = {
   executable: string; device: number; inode: number
 }
 type ProcessView = ProcessIdentity & { args: string[]; cwd: string; name: string }
+type ProcessOrigin = { via: "launcher" | "cli" | "parent" | "subreaper"; parent?: string; observed_at: string }
+type ProcessEntry = { process: ProcessIdentity; origin: ProcessOrigin }
 export type WriterIdentity = { device: number; inode: number; owner: string }
 export type ProcessCleanup = {
   status: "confirmed" | "failed" | "not_run"; error: string | null
   processes: ProcessIdentity[]; unknownProcesses?: ProcessIdentity[]; runtimeDirectories: string[]; writer: WriterIdentity | null
   capture_complete: boolean
   verification?: { observed_at: string; owned_remaining: number }[]
-  origins?: { pid: number; starttime: string; via: "launcher" | "parent" | "live_session" | "subreaper"; parent_pid: number | null; parent_starttime: string | null; observed_at: string }[]
+  origins?: { pid: number; starttime: string; via: ProcessOrigin["via"]; parent_pid: number | null; parent_starttime: string | null; observed_at: string }[]
+  selectedCli?: { executable: string; device: number; inode: number }
   launcher?: { kind: "linux_subreaper"; pid: number; cli_pid: number | null; ready: boolean }
   browserBindings?: { process: ProcessIdentity; runtimeDirectory: string; observed_at: string }[]
   bindingRefusals?: { process: ProcessIdentity; has_data_dir: boolean; data_inside_profile: boolean; new_runtime_match: boolean; executable_match: boolean; ancestry_match: boolean }[]
@@ -92,9 +95,14 @@ async function snapshot(owners: ProcessIdentity[] = []) {
     .map((pid) => processView(Number(pid), false, owners)))).filter((entry) => entry !== undefined)
 }
 
-function identity(view: ProcessView): ProcessIdentity {
+function identity(view: ProcessIdentity): ProcessIdentity {
   return { pid: view.pid, starttime: view.starttime, uid: view.uid, parent: view.parent,
     group: view.group, session: view.session, executable: view.executable, device: view.device, inode: view.inode }
+}
+
+function sameIdentity(current: ProcessIdentity, saved: ProcessIdentity) {
+  return key(current) === key(saved) && current.uid === saved.uid && current.device === saved.device &&
+    current.inode === saved.inode && current.group === saved.group && current.session === saved.session
 }
 
 /** The syscall uses a PID only after a fresh birth/executable/group check.
@@ -103,8 +111,7 @@ function identity(view: ProcessView): ProcessIdentity {
 export async function signalProcess(saved: ProcessIdentity, signal: NodeJS.Signals) {
   const current = await processView(saved.pid)
   if (!current) return
-  if (key(current) !== key(saved) || current.uid !== saved.uid || current.device !== saved.device ||
-    current.inode !== saved.inode || current.group !== saved.group || current.session !== saved.session)
+  if (!sameIdentity(current, saved))
     throw Error(`Process identity changed PID ${saved.pid}`)
   try { process.kill(current.pid, signal) } catch (error) { if (!gone(error)) throw error }
 }
@@ -148,8 +155,7 @@ export async function superviseProcess(input: {
 }) {
   if (process.platform !== "linux") throw Error("Process ownership supervision requires Linux /proc")
   const startedAt = Date.now()
-  const ledger = new Map<string, ProcessIdentity>()
-  const parents = new Map<string, string>()
+  const ledger = new Map<string, ProcessEntry>()
   const boundBrowsers = new Set<string>()
   const denied = new Set<string>()
   const unknown = new Map<string, ProcessIdentity>()
@@ -159,6 +165,9 @@ export async function superviseProcess(input: {
   const existing = new Set(baseline.map(key))
   const oldDirectories = new Set(profile ? await runtimeDirectories(profile) : [])
   const browser = profile ? await browserIdentity(input.cmd, input.env) : undefined
+  const cliExecutable = await realpath(Bun.which(input.cmd[0]!) ?? input.cmd[0]!)
+  const cliInfo = await stat(cliExecutable)
+  cleanup.selectedCli = { executable: cliExecutable, device: cliInfo.dev, inode: cliInfo.ino }
   if (input.signal?.aborted) return { stdout: "", stderr: "", exitCode: -1, timedOut: false, interrupted: true,
     startedAt, durationMs: 0, processCleanup: cleanup }
   const marker = input.profileDir ? `${input.profileDir}.process-group` : undefined
@@ -184,14 +193,18 @@ export async function superviseProcess(input: {
     })
     proc.once("error", (error) => { cleanup.error = `Spawn failed: ${message(error)}`; resolve() })
   })
+  let lastReceipt: string | undefined
   const readReceipt = async () => {
     const raw = await readFile(path.join(capsule, "state.json"), "utf8").catch((error) => {
       if (gone(error)) return undefined
       throw Error("Launcher receipt unreadable")
     })
-    if (!raw) return
+    if (!raw || raw === lastReceipt) return
+    const observed = root ? await processView(root.pid) : undefined
+    if (!root || !observed || !sameIdentity(observed, root)) throw Error("Launcher receipt lacks verified live identity")
     const state = JSON.parse(raw) as { nonce: string; pid: number; ready: boolean; cli_pid: number | null; exit_code: number | null; error: string | null }
     if (state.nonce !== nonce || state.pid !== proc.pid) throw Error("Launcher receipt identity differs")
+    lastReceipt = raw
     reaperReady = state.ready
     cleanup.launcher!.ready = state.ready
     if (state.cli_pid !== null) { cliPid = state.cli_pid; cleanup.launcher!.cli_pid = state.cli_pid }
@@ -214,12 +227,11 @@ export async function superviseProcess(input: {
     stream.once("error", () => { cleanup.capture_complete = false; resolve() })
   })))
   const root = proc.pid ? await processView(proc.pid) : undefined
-  const origin = (entry: ProcessIdentity, via: NonNullable<ProcessCleanup["origins"]>[number]["via"], parent?: ProcessIdentity) => {
-    cleanup.origins ??= []
-    cleanup.origins.push({ pid: entry.pid, starttime: entry.starttime, via, parent_pid: parent?.pid ?? null,
-      parent_starttime: parent?.starttime ?? null, observed_at: new Date().toISOString() })
+  const track = (entry: ProcessIdentity, via: ProcessOrigin["via"], parent?: ProcessIdentity) => {
+    ledger.set(key(entry), { process: identity(entry), origin: { via, parent: parent ? key(parent) : undefined,
+      observed_at: new Date().toISOString() } })
   }
-  if (root) { ledger.set(key(root), identity(root)); origin(root, "launcher") }
+  if (root) track(root, "launcher")
   if (registration) {
     await registration.writeFile(String(proc.pid ?? "unidentified")).catch(() => { cleanup.error = "Process registration write failed" })
     await registration.close()
@@ -227,28 +239,35 @@ export async function superviseProcess(input: {
   let scanning = Promise.resolve(), stopped = false, timedOut = false, interrupted = false
   let lastOwn: ProcessIdentity[] = []
   const scan = async () => {
-    const live = await snapshot([...ledger.values()])
+    const live = await snapshot([...ledger.values()].map((entry) => entry.process))
     const directories = profile ? await runtimeDirectories(profile) : []
     cleanup.runtimeDirectories = directories.filter((directory) => !oldDirectories.has(directory))
-    // Walk repeated levels from the same snapshot; do not infer an unseen parent.
+    // Only a fresh live parent chain or kernel adoption proves provenance.
+    // Group/session numbers are evidence, never a second admission algorithm.
     for (let pass = 0; pass < live.length; pass++) {
-      const added = live.filter((entry) => !existing.has(key(entry)) && !ledger.has(key(entry)) && (
-        root && live.some((candidate) => key(candidate) === key(root)) && entry.group === root.group && entry.session === root.session ||
-        live.some((parent) => parent.pid === entry.parent && ledger.has(key(parent)))))
+      const added = live.filter((entry) => !existing.has(key(entry)) && !ledger.has(key(entry)) &&
+        live.some((parent) => parent.pid === entry.parent && ledger.has(key(parent)) &&
+          sameIdentity(parent, ledger.get(key(parent))!.process) && (parent.pid !== root?.pid || reaperReady)))
       if (!added.length) break
       added.forEach((entry) => {
-        ledger.set(key(entry), identity(entry))
-        const parent = live.find((candidate) => candidate.pid === entry.parent && ledger.has(key(candidate)))
-        if (parent) parents.set(key(entry), key(parent))
-        origin(entry, parent?.pid === root?.pid && entry.pid !== cliPid && reaperReady ? "subreaper" : parent ? "parent" : "live_session", parent ?? root)
+        const parent = live.find((candidate) => candidate.pid === entry.parent && ledger.has(key(candidate)))!
+        const via = entry.pid === cliPid && parent.pid === root?.pid ? "cli" : parent.pid === root?.pid ? "subreaper" : "parent"
+        if (via === "cli" && (entry.device !== cliInfo.dev || entry.inode !== cliInfo.ino)) {
+          denied.add(key(entry)); cleanup.error ??= `CLI executable identity differs PID ${entry.pid}`
+        }
+        track(entry, via, parent)
       })
+    }
+    const cli = live.find((entry) => entry.pid === cliPid && entry.parent === root?.pid && ledger.has(key(entry)))
+    if (cli && cli.device === cliInfo.dev && cli.inode === cliInfo.ino && ledger.get(key(cli))!.origin.via !== "cli") {
+      ledger.get(key(cli))!.origin.via = "cli"
     }
     if (profile && root && live.some((entry) => key(entry) === key(root))) {
       const writer = await writerIdentity(profile)
       if (writer && !cleanup.writer) cleanup.writer = writer
       if (writer && cleanup.writer && JSON.stringify(writer) !== JSON.stringify(cleanup.writer)) cleanup.error ??= "Writer identity changed"
     }
-    cleanup.processes = [...ledger.values()]
+    cleanup.processes = [...ledger.values()].map((entry) => entry.process)
     if (browser) {
       const native = live.filter((entry) => entry.device === browser.device && entry.inode === browser.inode || inside(entry.executable, browser.directory))
       const dataDir = (entry: ProcessView) => entry.args.find((arg) => arg.startsWith("--user-data-dir="))?.slice(16)
@@ -261,25 +280,12 @@ export async function superviseProcess(input: {
         }
         boundBrowsers.add(key(entry))
       })
-      // Session membership can only be inherited by fork. Require the bound
-      // session leader to be alive with its observed birth/executable identity;
-      // a historical SID/PGID cannot admit a newly observed orphan.
-      const leaders = native.filter((entry) => boundBrowsers.has(key(entry)) && entry.pid === entry.session &&
-        ledger.get(key(entry))?.inode === entry.inode && ledger.get(key(entry))?.device === entry.device)
-      live.filter((entry) => !existing.has(key(entry)) && !ledger.has(key(entry))).forEach((entry) => {
-        const leader = leaders.find((candidate) => entry.session === candidate.session && entry.uid === candidate.uid &&
-          BigInt(entry.starttime) >= BigInt(candidate.starttime))
-        if (!leader) return
-        ledger.set(key(entry), identity(entry))
-        parents.set(key(entry), key(leader))
-        origin(entry, "live_session", leader)
-      })
       const browserAncestor = (entry: ProcessView) => {
-        let parent = parents.get(key(entry))
+        let parent = ledger.get(key(entry))?.origin.parent
         const visited = new Set<string>()
         while (parent && !visited.has(parent)) {
           if (boundBrowsers.has(parent)) return true
-          visited.add(parent); parent = parents.get(parent)
+          visited.add(parent); parent = ledger.get(parent)?.origin.parent
         }
         return false
       }
@@ -313,8 +319,13 @@ export async function superviseProcess(input: {
         }
       }
       cleanup.unknownProcesses = [...unknown.values()]
-      cleanup.processes = [...ledger.values()]
+      cleanup.processes = [...ledger.values()].map((entry) => entry.process)
     }
+    cleanup.origins = [...ledger.values()].map((entry) => {
+      const parent = ledger.get(entry.origin.parent ?? "")?.process
+      return { pid: entry.process.pid, starttime: entry.process.starttime, via: entry.origin.via,
+        parent_pid: parent?.pid ?? null, parent_starttime: parent?.starttime ?? null, observed_at: entry.origin.observed_at }
+    })
     lastOwn = live.filter((entry) => ledger.has(key(entry))).map(identity)
     return lastOwn
   }
@@ -330,10 +341,11 @@ export async function superviseProcess(input: {
     if (stopped || pollPending) return
     pollPending = true
     void checkedScan().finally(() => { pollPending = false })
-  }, browser ? 10 : 100)
+  }, 10)
   const signalOwned = async (signal: NodeJS.Signals) => {
     await checkedScan()
-    for (const saved of ledger.values()) {
+    for (const tracked of ledger.values()) {
+      const saved = tracked.process
       if (denied.has(key(saved)) || root && key(saved) === key(root)) continue
       try {
         // Individual signals avoid signaling a recycled PGID or an unknown member.
@@ -358,7 +370,7 @@ export async function superviseProcess(input: {
   await signalOwned("SIGTERM")
   const remaining = async () => {
     await checkedScan()
-    return (await Promise.all([...ledger.values()].filter((entry) => !denied.has(key(entry)) && (!root || key(entry) !== key(root))).map(async (saved) => {
+    return (await Promise.all([...ledger.values()].map((entry) => entry.process).filter((entry) => !denied.has(key(entry)) && (!root || key(entry) !== key(root))).map(async (saved) => {
       try {
         const current = await processView(saved.pid)
         if (current && key(current) !== key(saved)) throw Error(`Process identity changed PID ${saved.pid}`)
