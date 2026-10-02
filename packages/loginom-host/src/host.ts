@@ -39,15 +39,28 @@ export async function createLoginomHost(options: {
   const lost = new Set<string>()
   const stale = new Set<string>()
   const startupCleanup = { failed: false }
+  const shutdown = { failed: false }
   type Runtime = Awaited<ReturnType<typeof supervise>>
   function retain(generation: { children: Map<string, Promise<Runtime>> }, chat: string, child: Promise<Runtime>) {
     const tracked = child.then((runtime) => {
+      const closing: { requested: boolean; promise?: Promise<void> } = { requested: false }
       void runtime.exited.then(() => {
+        if (options.closeSavedPackageOnShutdown === true && !closing.requested) shutdown.failed = true
         if (generation.children.get(chat) !== tracked) return
         lost.add(chat)
         generation.children.delete(chat)
       })
-      return runtime
+      return {
+        ...runtime,
+        close() {
+          closing.requested = true
+          closing.promise ??= runtime.close().catch((error: unknown) => {
+            if (options.closeSavedPackageOnShutdown === true) shutdown.failed = true
+            throw error
+          })
+          return closing.promise
+        },
+      }
     })
     generation.children.set(chat, tracked)
     tracked.catch(() => {
@@ -184,7 +197,9 @@ export async function createLoginomHost(options: {
     ...service,
     async close() {
       await service.close()
-      if (startupCleanup.failed) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      // Startup failures and retired or unexpectedly exited children retain
+      // cleanup uncertainty even if a later runtime succeeds.
+      if (startupCleanup.failed || shutdown.failed) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
     },
     api: {
       ...service.api,
