@@ -66,6 +66,56 @@ Dock (OpenViking):
 
 ## Статусы, оценка и метрики
 
+### Изоляция неудачной попытки — 2026-10-02
+
+Код реализации ограничен `evals/`. Неудачная `AMBIGUOUS`-операция не
+восстанавливается внутри продуктового runtime и не объявляется отменённой или
+успешной. Обычный бюджет попытки неизменен; раннего прерывания и автоматического
+повтора по AMBIGUOUS нет. Следующий кейс допускается только после подтверждённого
+завершения локальных процессов предыдущей попытки и подготовки eval-профиля.
+
+`AttemptResult.environment_cleanup` — необязательный совместимый объект:
+`{status: "confirmed" | "failed" | "not_run", evidence: string | null,
+error: string | null}`. Отсутствие поля в историческом отчёте означает «не
+проверялось». `cleanup_error` сохраняет прежний смысл ошибки удаления storage
+артефакта. `environment_cleanup_error_count` и
+`environment_cleanup_checked_count` считаются независимо от качества, по всем
+попыткам, включая interrupted. Cleanup не меняет status, score, pass,
+oracle_pass, failure_kind и знаменатели качества. Пересудейство сохраняет его.
+
+`runAgent` и management используют общий supervisor Linux PGID + `/proc` без
+новых зависимостей. Собственный процесс определяется по UID, PID/starttime,
+PPID, PGID/SID и наблюдённому происхождению. Chromium дополнительно требует
+точного executable выбранного bundle и нового собственного browser-profile.
+До запуска сохраняется baseline; scanner работает каждые 100 мс. Перед
+сигналом identity и участники группы проверяются заново. Legacy numeric PGID,
+имя процесса, одиночный argv/cwd match не разрешают kill. Неизвестный owner,
+unreadable relevant identity, changed identity или непроверенный browser/helper
+означают failed cleanup, без завершения чужих процессов. Linux private
+eval-profile не используется одновременно ручным CLI/Desktop.
+
+На timeout/abort SIGINT grace остаётся 30 с, затем SIGTERM 5 с и SIGKILL;
+подтверждение cleanup ограничено 60 с. Два пустых прохода через 100 мс
+подтверждают отсутствие наблюдённых own процессов и релевантных blockers.
+Отдельный эксклюзивный harness lease не занимает продуктовый `.writer`.
+Stale writer удаляется только после process proof и проверки неизменных inode
+и owner. Все setup/status/recover также должны завершиться подтверждённо.
+
+Перед acknowledge/pruning сохраняются redacted execution-events только из
+собственных runtime-каталогов, перечень и SHA256 файлов. Auth/config/browser
+profile не архивируются. Ошибка архива запрещает prune и следующий кейс.
+Подробности сохраняются в `cleanup.json`. Partial capture явно обозначается;
+закрытие pipe не доказывает завершение процесса. Исходные events/run/result
+сохраняются даже при ошибке cleanup; она не превращает no_artifact/failed/timeout
+в infra_error или пустой harness_error. Cleanup выполняется также перед stop
+по exit 2/3. Failed cleanup пишет result, summary/report и stopped_reason,
+возвращает код 1 и не запускает следующий кейс. Guard/ledger/runtime остаются.
+
+Confirmed означает только локальное завершение и готовность профиля. Это не
+доказательство rollback или освобождения серверной сессии Loginom. `/proc`
+ledger ограничен наблюдаемой моделью launcher; сомнение приводит к stop.
+Harness lease не даёт атомарного handoff с неподчиняющимся внешним CLI.
+
 ### Уточнение контракта стабилизации — 2026-10-01
 
 Следующие правила уточняют прежний MVP-контракт и имеют приоритет над его

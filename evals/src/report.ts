@@ -5,6 +5,12 @@ export type Status = "completed" | "failed" | "timeout" | "interrupted" | "no_ar
 export type JudgeStatus = "scored" | "no_artifact" | "skipped" | "error"
 export type FailureKind = "permission" | "recovery" | "cancelled" | "provider" | "tool" | "other"
 
+export type EnvironmentCleanup = {
+  status: "confirmed" | "failed" | "not_run"
+  evidence: string | null
+  error: string | null
+}
+
 export function statusFor(
   run: {
     exitCode: number | null; timedOut: boolean; interrupted: boolean
@@ -49,6 +55,7 @@ export type AttemptResult = {
   artifact_origin: string | null
   artifact_ambiguous: string[]
   cleanup_error: string | null
+  environment_cleanup?: EnvironmentCleanup
   action_manifest_sha256: string | null
   skill_revision?: string | null
   session_id: string | null
@@ -74,6 +81,8 @@ export function aggregate(attempts: AttemptResult[], skipJudge: boolean) {
   const sum = (pick: (item: AttemptResult) => number) => spent.reduce((acc, item) => acc + pick(item), 0)
   return {
     total,
+    environment_cleanup_error_count: attempts.filter((item) => item.environment_cleanup?.status === "failed").length,
+    environment_cleanup_checked_count: attempts.filter((item) => ["failed", "confirmed"].includes(item.environment_cleanup?.status ?? "")).length,
     completed: completed.length,
     completion_rate: total ? round(completed.length / total, 3) : null,
     mean_score: skipJudge ? null : mean(scoresOf(scored)),
