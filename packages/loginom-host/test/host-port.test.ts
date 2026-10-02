@@ -710,3 +710,107 @@ test("the next turn keeps a runtime that still has active work", async () => {
     await rm(directory, { recursive: true, force: true })
   }
 }, 15000)
+
+test("help and diagnostics stay on readiness until the chat window is open", async () => {
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
+  const directory = await mkdtemp(join(tmpdir(), "loginom-readiness-tools-"))
+  const resources = join(directory, "resources")
+  const launches = join(directory, "launches.jsonl")
+  const calls = join(directory, "calls.jsonl")
+  await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await mkdir(join(resources, "bin"))
+  await symlink(node, join(resources, "bin/node"))
+  await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
+  await Bun.write(
+    join(resources, "runtime/src/managed-entry.mjs"),
+    `
+    import { appendFileSync } from 'node:fs';
+    let chat;
+    process.on('message', m => {
+      if (m.operation === 'start') {
+        chat = m.input.chat;
+        appendFileSync(${JSON.stringify(launches)}, JSON.stringify({ pid: process.pid, chat }) + '\\n');
+        process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat,ready:true}});
+        return;
+      }
+      if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'interrupt') {
+        appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ chat, name: 'interrupt' }) + '\\n');
+        process.send({id:m.id,result:true});
+        return;
+      }
+      if (m.operation !== 'call') return;
+      appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ chat, name: m.input.name }) + '\\n');
+      process.send({id:m.id,result:{result:{name:m.input.name},recoveryPending:false,activeWork:false}});
+    });
+  `,
+  )
+  const root = join(directory, "profile")
+  const store = connectionStore(join(root, "connection"), credentials("linux"))
+  await store.stage({
+    generation: 1,
+    revision: 1,
+    url: "http://example.test",
+    username: "user",
+    apiKey: "fixture",
+    password: "",
+  })
+  await store.activate(1)
+  const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
+  const requests = new EventEmitter()
+  const replies = new EventEmitter()
+  const port = loginomHostPort(
+    {
+      postMessage: (value) => replies.emit("message", { data: value }),
+      on: requests.on.bind(requests),
+      start() {},
+    },
+    host,
+  )
+  const client = transport({
+    postMessage: (value) => requests.emit("message", { data: value }),
+    on: replies.on.bind(replies),
+    start() {},
+  })
+  const call = (name: string) => client.request("call", { run: "one", name, args: {}, userMessage: "original" })
+  const chatStarts = async () => {
+    const chat = createHash("sha256").update("chat").digest("hex")
+    return (await readFile(launches, "utf8"))
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { pid: number; chat: string })
+      .filter((item) => item.chat === chat)
+  }
+  try {
+    await host.settled()
+    expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
+    expect(await call("find")).toEqual({ name: "find" })
+    expect(await call("dock_diagnostics")).toEqual({ name: "dock_diagnostics" })
+    expect(await client.request("interrupt", { run: "one" })).toBe(true)
+    expect(await chatStarts()).toEqual([])
+    expect(await call("dock_prepare")).toEqual({ name: "dock_prepare" })
+    const opened = await chatStarts()
+    expect(opened).toHaveLength(1)
+    expect(await call("dock_action_describe")).toEqual({ name: "dock_action_describe" })
+    expect(await chatStarts()).toEqual(opened)
+    const chat = createHash("sha256").update("chat").digest("hex")
+    expect(
+      (await readFile(calls, "utf8"))
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as { chat: string; name: string }),
+    ).toEqual([
+      { chat: "readiness", name: "find" },
+      { chat: "readiness", name: "dock_diagnostics" },
+      { chat, name: "dock_prepare" },
+      { chat, name: "dock_action_describe" },
+    ])
+  } finally {
+    client.close()
+    await port.close()
+    await host.close()
+    await rm(directory, { recursive: true, force: true })
+  }
+}, 15000)
