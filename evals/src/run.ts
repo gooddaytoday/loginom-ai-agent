@@ -10,10 +10,11 @@ import { assertAuth, ensureProfile, pruneRuntimeAttempts, recoverIfNeeded, relea
 import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { archiveDiagnostics } from "./diagnostics"
 import type { ProcessCleanup } from "./process-supervisor"
+import { acquireHarnessLease } from "./lease"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
-export async function main(argv: string[]) {
-  const config = loadConfig(argv)
+export async function main(argv: string[], env: Record<string, string | undefined> = process.env) {
+  const config = loadConfig(argv, env)
   if (config.judgeOnly !== undefined) {
     const { rejudge } = await import("./rejudge")
     return rejudge(config, config.judgeOnly)
@@ -22,18 +23,25 @@ export async function main(argv: string[]) {
     const { calibrate } = await import("./calibrate")
     return calibrate(config)
   }
+  const lease = config.dryRun ? undefined : await acquireHarnessLease(config.profileDir)
+  const result = await executeRun(config)
+  if (result.code === 0) await lease?.release()
+  return result
+}
+
+async function executeRun(config: EvalConfig) {
   const tasks = await loadTasks(config.tasksDir, config.only)
   const source = parseArtifactSource(config.artifactSource, config.loginom)
   const environment = await preflight(config, source)
-  const command = agentCommand(config)
   const controller = new AbortController()
   installSigint(controller)
-  if (!config.dryRun) await prepareProfile(config, command)
   const startedAt = new Date()
   const runId = `${stamp(startedAt)}-${environment.git?.sha ?? "nogit"}${environment.git?.dirty ? "-dirty" : ""}`
   const runDir = path.join(config.resultsDir, runId)
   await mkdir(runDir, { recursive: true })
   await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2))
+  const command: AgentCommand = { ...agentCommand(config), cleanupDir: path.join(runDir, "preparation"),
+    cleanupSecrets: [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""] }
   const judge = config.skipJudge ? null : await judgeInfo(config)
   const settings: JudgeSettings | undefined = judge
     ? {
@@ -49,10 +57,11 @@ export async function main(argv: string[]) {
     stopped: null,
     interruptedCleanup: null,
   }
+  if (!config.dryRun) await prepareProfile(config, command).catch((error) => { state.stopped = describe(error) })
   // Round-robin: сбой окружения размазывается по задачам, Ctrl+C после первого круга оставляет полное покрытие.
   outer: for (const attempt of Array.from({ length: config.repeat }, (_, index) => index + 1)) {
     for (const task of tasks) {
-      if (controller.signal.aborted) break outer
+      if (controller.signal.aborted || state.stopped) break outer
       const { result, stop } = await runAttempt({
         config,
         command,
@@ -68,18 +77,20 @@ export async function main(argv: string[]) {
       })
       attempts.push(result)
       console.error(`[${task.id}#${attempt}] ${result.status} score=${result.score ?? "—"} ${Math.round(result.duration_ms / 1000)}s`)
-      if (result.status === "harness_error" && stop) {
-        state.stopped = result.harness_error ?? "harness_error"
-        break outer
-      }
       if (!config.dryRun) {
-        const after = await afterAttempt(config, command, result).catch((error: unknown) => ({ stop: describe(error) }))
-        if ("stop" in after) {
-          state.stopped = after.stop ?? "harness_error"
-          break outer
-        }
-        await Bun.write(path.join(runDir, task.id, String(attempt), "result.json"), JSON.stringify(result, null, 2))
+        const out = path.join(runDir, task.id, String(attempt))
+        const after = await afterAttempt(config, { ...command, cleanupDir: path.join(out, "management") }, result, out)
+          .catch((error: unknown) => {
+            result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error: describe(error) }
+            return { stop: describe(error) }
+          })
+        await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2))
+        if ("stop" in after) { state.stopped = after.stop ?? "Environment cleanup failed"; break outer }
         if (result.status === "interrupted") state.interruptedCleanup = { recovered: after.recovered }
+      }
+      if (result.environment_cleanup?.status === "failed" || result.status === "harness_error" && stop) {
+        state.stopped = result.environment_cleanup?.error ?? result.harness_error ?? "harness_error"
+        break outer
       }
       if (result.status === "interrupted") break outer
     }
@@ -286,11 +297,10 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
 
 async function prepareProfile(config: EvalConfig, command: AgentCommand) {
   if (config.resetProfile) await resetProfile(config)
-  await releaseStaleWriter(config.profileDir)
+  await releaseStaleWriter(config.profileDir, null)
   await ensureProfile(config, command)
   await assertAuth(config, command)
   await recoverIfNeeded(command, 2)
-  await pruneRuntimeAttempts(config.profileDir)
 }
 
 export async function afterAttempt(config: EvalConfig, command: AgentCommand, result: AttemptResult, outDir?: string) {

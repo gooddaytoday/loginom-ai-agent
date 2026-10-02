@@ -5,6 +5,7 @@ const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
 
 if (process.env.EVAL_FAKE_ARGS_FILE) await Bun.write(process.env.EVAL_FAKE_ARGS_FILE, JSON.stringify(Bun.argv.slice(2)))
+if (command === "run" && process.env.EVAL_TASK_ID === "a-cleanup-failure") process.env.EVAL_FAKE_CHANGED_WRITER = "1"
 
 if (process.env.EVAL_FAKE_CHANGED_WRITER) {
   const writer = path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, ".writer", "owner")
