@@ -7,6 +7,7 @@ import { loadConfig, repoRoot } from "../src/config"
 import { agentCommand } from "../src/cli"
 import { agentConfigJson, assertAuth, ensureProfile, management, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "../src/profile"
 import { EvalFailure } from "../src/fail"
+import { writerIdentity } from "../src/process-supervisor"
 
 const stateFile = async (view: object) => {
   const file = path.join(await mkdtemp(path.join(os.tmpdir(), "evals-state-")), "view.json")
@@ -214,6 +215,16 @@ test("releaseStaleWriter: снимает .writer без процессов, бе
   await writeFile(path.join(profile, ".writer", "nonce"), "x")
   expect(await releaseStaleWriter(profile)).toBe(true)
   expect(await stat(path.join(profile, ".writer")).catch(() => undefined)).toBeUndefined()
+})
+
+test("releaseStaleWriter: receipt не разрешает удалять заменённый owner", async () => {
+  const profile = await mkdtemp(path.join(os.tmpdir(), "evals-writer-receipt-"))
+  await mkdir(path.join(profile, ".writer"))
+  await Bun.write(path.join(profile, ".writer", "owner"), "observed")
+  const receipt = await writerIdentity(profile)
+  await Bun.write(path.join(profile, ".writer", "owner"), "foreign")
+  await expect(releaseStaleWriter(profile, receipt)).rejects.toThrow("identity changed")
+  expect(await Bun.file(path.join(profile, ".writer", "owner")).text()).toBe("foreign")
 })
 
 test("releaseStaleWriter: путь с regex-метасимволами снимает .writer", async () => {
