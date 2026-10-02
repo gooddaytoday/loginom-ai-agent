@@ -2,15 +2,18 @@
 
 Устойчивый ID: `component.programming.JavaScript`. Slug: `programming-javascript`.
 
-Актуально2026-10-02: продуктовый handler зарегистрирован, same-task F review
-завершён, candidate07/reader07 собраны на `eef529cd2b`. OAuth/setup J27,
-compiled Host и model delivery J01/J21 проверены в областях, перечисленных в
+Актуально2026-10-02: продуктовый handler зарегистрирован в отдельной ветке
+`node-javascript`, same-task F review завершён. OAuth/setup J27, compiled Host
+и model delivery J01/J21 проверены в областях, перечисленных в
 [checkpoint](checkpoint.md#текущее-состояние). Normal CLI Save → own native
-Close/logout подтверждены. Code01 завершился whole-audit FAIL, безопасно закрыт;
-исправления аудитора проверены отдельно и не повышают эту попытку до PASS.
-Code02 в ordinary headed CLI выявил runtime false refusal строки процессов с
-`JavaScript` в подписи; failed trial очищен отдельно, исправление проверяется.
-Далее fresh CLI/cold Code и declared. Итоговая pair и accepted registry открыты.
+Close/logout подтверждены. На candidate09 (`1f66cef4c2`) Code06 writer прошёл
+whole writer audit; independent ordinary headed cold-read/Execute/full6×4 и
+cleanup наблюдены. Whole trial отказал из-за формата URL в ожидании аудитора;
+исправление QA проверяется на неизменном capture и не повышает старый FAIL.
+Code01–05 и их исходные отказы/отдельные cleanup proofs сохранены.
+Далее fresh CLI/cold Code и declared на новом закреплённом candidate после
+адресных проверок. Итоговая pair и accepted registry открыты; интеграция и
+релиз отдельно не выполнялись.
 
 Далее сохранены этапы реализации с их исходными границами проверки; для
 продолжения использовать только текущую сводку checkpoint.

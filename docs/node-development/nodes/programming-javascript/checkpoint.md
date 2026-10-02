@@ -156,6 +156,37 @@ pins прежние, candidate manifest обновлён. Holderexec64989 зап
 после обоих whole trial PASS — pair. Не закрывать holder/lease до cleanup.
 Failed attempts/immutable candidate08+reader08b не менять.
 
+**Code06: writer и cold collector PASS; whole trial FAIL метаданных cold.**
+WriterPID577889 exit0/collector/native origin PASS; новый source-review
+`49f26e80f62158142704a36455de760af3337e98567d7074a8c69c5d7c000f7b`
+после полного ручного чтения778bytes/16LF, assignment/session
+`ses_f02482004ffeYKGzPiJhl7e56N`; codeSHA570d990a… тот же вычислительный алгоритм,
+без injected answers. Whole writer audit PASS:
+`ca3c9cd357d86959f990234a3df768006c2e048d8ee25c1c15411c518340cefa`.
+Own package `/jsteach/JavaScript-code-dfe810c1-db56-4076-91e5-b7b5610a5e0e.lgp`;
+executions `1790963095482-8m5b1w9net:1066:3` и`:4`; typed6×4, schema,
+Save/Close/logout подтверждены. Frozen cold factory успешно вернул original
+controller585526; ordinary headed cold завершён OBSERVED/collectorPASS,
+независимые full source/settings/mappings/graph/new Execute/output наблюдены,
+Close/logout/browser close подтверждены. Original whole trial FAIL
+`cold_journal_owner_pin`: composition ожидала URL без `/`, штатный redactor
+записал канонический `http://logi-test-plan.bg.local/`. Это несовместимость QA;
+original trial-audit и raw captures не менялись. Readonly diagnostic с правильным
+external URL pin прошёл весь `verify_javascript_cold` (execution
+`1790963382319-j3rnswhp14k:758:1`), но не является original whole PASS.
+Cold reportSHA`37ce0f84a9a3ea583095183cc9b546059278a2e638f7a6612399b70f1d69f62d`,
+journalSHA`fe9d5617bc5f118a4d2ba3349cdddaf65ad68c08cce02473ad6b1440fa789b73`.
+17:54:00Z fresh exact-argv/.writer absence, writer cleanupSHA
+`9a5e2b4f64f13d5d772f35deaad2f19b19d6e12e1b9558584d91f6b398ec4fdc`
+и cold report/collector PASS: lease released/lock archived; originalexec64989
+затем EOFexit0. Нет unsaved discard. Далее source QA expectation исправляется
+через общий helper, используемый whole composition и immutable Code06 regression;
+проверки foreign/noncanonical URL, session/runtime/build остаются строгими.
+Child `5a2d960a42` фиксирует canonical cold URL. Actual Code06 native regression +
+existing Code/declared/32KiB cold negatives + whole composition:22tests PASS,
+exec88980 actualexit0 (79.219s). Runtime/handler без изменений. Buildexec58314
+создаёт candidate10; после actual exit/roundtrip и fresh freeze — pair07.
+
 Driver05 preflights operator review до permanent audit. Review timestamps:
 `.isoformat(timespec='milliseconds').replace('+00:00','Z')`; Python `-B` и
 PYTHONDONTWRITEBYTECODE=1 обязательны для frozen QA. Не менять frozen QA/runtime.
