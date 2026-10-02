@@ -269,6 +269,18 @@ test("runAgent: регистрирует активную группу проф�
   expect(await Bun.file(marker).exists()).toBe(false)
 })
 
+test("runAgent: занятая process registration запрещает dispatch CLI", async () => {
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-registration-"))
+  const command = fakeCommand()
+  const args = path.join(out, "called.json")
+  await Bun.write(`${out}.process-group`, "foreign-marker")
+  await expect(runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_ARGS_FILE: args } },
+    taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: out,
+    outDir: out, profileDir: out, timeoutMs: 30_000 })).rejects.toThrow("Registration unavailable")
+  expect(await Bun.file(args).exists()).toBe(false)
+  expect(await Bun.file(`${out}.process-group`).text()).toBe("foreign-marker")
+})
+
 test("runAgent: таймаут останавливает процесс и помечает timedOut", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-run-"))
   const command = fakeCommand()

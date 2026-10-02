@@ -102,6 +102,7 @@ export async function superviseProcess(input: {
   cmd: string[]; cwd: string; env: Record<string, string>; timeoutMs: number
   profileDir?: string; outDir?: string; stdin?: string; signal?: AbortSignal
 }) {
+  if (process.platform !== "linux") throw Error("Process ownership supervision requires Linux /proc")
   const startedAt = Date.now()
   const ledger = new Map<string, ProcessIdentity>()
   const cleanup: ProcessCleanup = { status: "not_run", error: null, processes: [], runtimeDirectories: [], writer: null, capture_complete: true }
@@ -112,6 +113,10 @@ export async function superviseProcess(input: {
   const browser = profile ? await browserIdentity(input.cmd, input.env) : undefined
   if (input.signal?.aborted) return { stdout: "", stderr: "", exitCode: -1, timedOut: false, interrupted: true,
     startedAt, durationMs: 0, processCleanup: cleanup }
+  const marker = input.profileDir ? `${input.profileDir}.process-group` : undefined
+  const registration = marker ? await open(marker, "wx", 0o600).catch(() => {
+    throw Error("Registration unavailable before dispatch")
+  }) : undefined
   const files = input.outDir ? await Promise.all(["events.jsonl", "stderr.txt"]
     .map((name) => open(path.join(input.outDir!, name), "w", 0o600))) : []
   let writing = Promise.resolve()
@@ -138,8 +143,10 @@ export async function superviseProcess(input: {
   })))
   const root = proc.pid ? await processView(proc.pid) : undefined
   if (root) ledger.set(key(root), identity(root))
-  const marker = input.profileDir && proc.pid ? `${input.profileDir}.process-group` : undefined
-  if (marker) await writeFile(marker, String(proc.pid), { flag: "wx", mode: 0o600 }).catch((error) => { cleanup.error = `Registration failed: ${message(error)}` })
+  if (registration) {
+    await registration.writeFile(String(proc.pid ?? "unidentified")).catch(() => { cleanup.error = "Process registration write failed" })
+    await registration.close()
+  }
   let scanning = Promise.resolve(), stopped = false, timedOut = false, interrupted = false
   const scan = async () => {
     const live = await snapshot([...ledger.values()])
