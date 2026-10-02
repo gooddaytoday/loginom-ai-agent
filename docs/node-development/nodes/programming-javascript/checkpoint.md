@@ -2,6 +2,38 @@
 
 ## Текущее состояние
 
+**J21 read09 PASS/released; pair13 Declared запущен — 2026-10-02 21:19 UTC.**
+Actual candidate15 CLI original collector exit0/PASS, original SQLite/model
+binding18 calls PASS. Independent payload audit подтвердил исходник32768bytes/
+1024LF/8chunks, complete cursor/digest
+`85acd23df49eed604fafc875942e6f8a75a26d1f9f65bab90ac71f3ce886f16e`,
+без truncation/readback summary, full typed6×4, settings preserved и fresh
+execution `1790975445620-zf1am8n7ex:1242:2`. Session
+`ses_f018bb162ffeTVv8275fH8lecn`, delivered knowledge hash
+`86506db742980407b41de7c042edcd622d4809b339141b2065e936f5803049c0`.
+Audit SHA `65c4343abd4fd093076af5c16c44289a45b22bea1c3d5851dd0928684a2a28f6`,
+collection `38850adc83a402797ccd6ca344966535ff0422936fb6becc93845cce6cf1356d`,
+model binding `1d6b2252e7174439588cbb4b9442612bf48a1c2434153756ab85a57b957d4c0c`.
+Native Save/Close/logout SUCCEEDED/no discard, cleanup SHA
+`b4ccd2f05dce357280caf0801bb0d482996c510f5cc2910690e7b6c665f6662e`.
+Оба runtime ACK/exit0, fresh original PID/startTicks absence и .writer absent
+проверены;21:18:29.948Z lease released, original holder получил FIFO exit.
+`f-cli-j21-read-09/release.json`. Это technical delivery proof, не autonomous.
+Failed read08 не изменён; точная live-причина прежних shutdown отказов не доказана.
+
+**Pair13** на immutable candidate15/reader15 (pins ниже), original holder
+PID901704/startTicks22673967. Private `f-cli-pair-13-control.json`,
+`f-cli-pair-13-events.jsonl`, `f-cli-pair-13-control.fifo`; driver SHA
+`b6be70066ec455e5f00e46a2e7af1a5a49ee58e11d48a74603e54f02e2f706e9`.
+**Declared13 writer902200** живой fresh ordinary headed run; затем Code13.
+Model GPT-6.1 Sol low,30min/10min, original trials сохранять до pair audit.
+Следующий шаг — наблюдать Declared13, manual full-source review → original
+writer audit → cold → release, затем Code13 и whole pair. После пары — полный
+requirement-by-requirement completion и согласованная card/registry/plan сводка,
+без merge/push/release. Новые результаты не переносить на failed trials.
+
+### Подготовка и запуск J21 read09
+
 **J21 read09 запущен — 2026-10-02 21:10 UTC.** Две короткие actual
 compiled `loginom status --no-headless --format json` проверки на candidate15
 дали ready/exit0, own headed browser policy и process absence PASS, guard

@@ -1,14 +1,13 @@
 # JavaScript
 
-Текущий этап — **фаза6, автономная CLI-приёмка**. Live shutdown остаётся
-неисправленным: J21 read08 на candidate14 получил cleanup FAIL; оба runtime
-после resource complete/ACK не вышли и были остановлены supervisor.
-Native Save/Close/logout подтверждён отдельно, но не даёт whole PASS.
+Текущий этап — **фаза6, автономная CLI-приёмка**, candidate15/reader15.
+**J21 read09 PASS:** actual CLI/SQLite delivery18 calls, полный32KiB исходник
+в8chunks/1024LF, digest, fresh execution и6×4 cells подтверждены. Native
+Save/Close/logout, оба runtime ACK/exit0 и process absence проверены.
+Прежние cleanup FAIL сохранены; их точная live-причина не доказана.
 
-В **6f6a66eb62** добавлена приватная диагностика send callback/stop/process.exit;
-14 адресных tests и provenance5045 PASS. Candidate15/reader15 закреплены; две короткие headed readiness-проверки
-дали ready/exit0. J21 read09 запущен на этих bytes; затем нужна полная автономная пара.
-Failed результаты сохранены; Declared12 individual PASS остаётся отдельным.
+**Pair13 начата:** Declared13, затем Code13 в original holder, ordinary headed.
+До обоих whole PASS и итогового аудита приёмка остаётся открытой.
 Точные pins, процессы и порядок продолжения — в
 [checkpoint](checkpoint.md#текущее-состояние).
 Integration, push и release не выполнялись; accepted registry остаётся открытым.
