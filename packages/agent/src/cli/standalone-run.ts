@@ -62,6 +62,7 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     headless,
     environment: process.env,
     strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
+    closeSavedPackageOnShutdown: mode === "run",
   }).catch((error: unknown) => {
     if (!(error instanceof NodeHostStartupError) || !error.cleanupConfirmed)
       throw new Error("LOGINOM_HOST_CLEANUP_FAILED", { cause: error })

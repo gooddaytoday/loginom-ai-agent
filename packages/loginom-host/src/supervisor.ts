@@ -20,6 +20,8 @@ export type Launch = {
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.
   acceptanceCleanupPackage?: string
+  // Private owner policy. The runtime derives the path from its confirmed Save.
+  closeSavedPackageOnShutdown?: boolean
 }
 
 type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment">
@@ -104,6 +106,7 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
     { ...input, environment: undefined, protocol: 1 },
     input.validation ? 210_000 : 120_000,
     signal,
+    input.closeSavedPackageOnShutdown === true ? 45_000 : 5000,
   )
   const ready = runtime.ready
   if (
@@ -143,7 +146,13 @@ export async function superviseKnowledge(input: KnowledgeLaunch, signal?: AbortS
   return { ...runtime, ready }
 }
 
-async function superviseProcess(input: ProcessLaunch, start: unknown, timeout = 120_000, signal?: AbortSignal) {
+async function superviseProcess(
+  input: ProcessLaunch,
+  start: unknown,
+  timeout = 120_000,
+  signal?: AbortSignal,
+  closeTimeout = 5000,
+) {
   signal?.throwIfAborted()
   if (![input.node, input.entry, input.stateDir].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   await mkdir(input.stateDir, { recursive: true, mode: 0o700 })
@@ -209,7 +218,10 @@ async function superviseProcess(input: ProcessLaunch, start: unknown, timeout = 
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
-      const reply = await request("close", undefined, 5000).catch(() => undefined)
+      // Native guarded package close/logout precedes resource close in this mode.
+      // This shutdown allowance does not extend an admitted operation deadline.
+      const reply = await request("close", undefined, closeTimeout)
+        .catch(() => undefined)
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
       try {
         const outcome = await exited

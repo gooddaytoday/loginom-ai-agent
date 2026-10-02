@@ -17,6 +17,7 @@ export async function createLoginomHost(options: {
   environment?: NodeJS.ProcessEnv
   headless?: boolean
   strictRecovery?: boolean
+  closeSavedPackageOnShutdown?: boolean
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
@@ -67,6 +68,7 @@ export async function createLoginomHost(options: {
         connection,
         validation,
         headless: validation || options.headless === true,
+        closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
         environment,
         endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
         actionManifestUri: manifest.actionManifestUri,
