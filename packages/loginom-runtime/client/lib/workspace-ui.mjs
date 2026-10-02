@@ -2720,9 +2720,29 @@ function readRenderedInputMapping(observation) {
       const storageEntry=storageRow ? {row_ref:refOf(storageRow),selected:storageRow.classList.contains('x-grid-item-selected'),
         kind:storageTypes.length===1 && textOf(storageTypes[0],true)==='Папка' ? 'folder':'unknown'} : null;
       if(storageEntry&&storageEntry.kind!=='folder') {
-        const sizes=[...storageRow.querySelectorAll('[data-tid]')].filter(e=>getTid(e)===tid.replace(';colName_',';colSize_')&&e.closest('.x-grid-item')===storageRow&&!sensitive(e));
-        const raw=sizes.length===1?sizes[0].textContent.replace(/[\s\u00a0\u202f]/g,''):'';
-        if(/^\d+$/.test(raw)&&Number.isSafeInteger(Number(raw)))storageEntry.bytes=Number(raw);
+        // Loginom 7.4.2 renders 1702 bytes as "1,702". Display text is not
+        // byte identity: use the cached file record bound to this exact row.
+        const gridTid=tid.split(';colName_')[0]+';pnlFileStorage';
+        const grid=storageRow.closest('[data-tid='+JSON.stringify(gridTid)+']');
+        const component=grid&&globalThis.Ext?.getCmp?.(grid.id);
+        const view=component?.getView?.(),store=component?.getStore?.();
+        if(grid&&document.querySelectorAll('[data-tid='+JSON.stringify(gridTid)+']').length===1
+          &&component?.el?.dom===grid&&grid.contains(view?.el?.dom)
+          &&view.el.dom.contains(storageRow)&&store?.$className==='bg.filedialog.FileStore'
+          &&!store.isBufferedStore&&store.isLoading?.()===false
+          &&Number.isSafeInteger(store.getCount?.())&&store.getCount()<=10000) {
+          const record=view.getRecord?.(storageRow),data=record?.data;
+          const records=store.getRange?.();
+          if(record?.isModel===true&&Array.isArray(records)&&records.length===store.getCount()&&records.includes(record)
+            &&view.getNode?.(record)===storageRow&&data?.Type===0
+            &&data.FileName===textOf(element,true)&&typeof data.FilePath==='string'
+            &&data.id===data.FilePath&&data.FilePath.startsWith('/')
+            &&data.FilePath.endsWith('/'+data.FileName)
+            &&Number.isSafeInteger(data.Size)&&data.Size>=0) {
+            storageEntry.bytes=data.Size;
+            storageEntry.bytes_source='native_file_store';
+          }
+        }
       }
       return { ref: refOf(element), tid, identity, kind, role, label:label || (combo?.kind==='picker' && combo.field.scope==='import_column'
         ? 'Открыть список: '+(combo.field.name==='type'?'Тип данных':'Вид данных'):''), scope: scopeOf(element), ...fieldValue,
