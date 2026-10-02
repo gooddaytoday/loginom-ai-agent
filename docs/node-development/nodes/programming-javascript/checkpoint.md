@@ -84,6 +84,20 @@ worker. Следующее — independent business/source/native audit позд
 проверенный normal CLI package/logout/process teardown, затем итоговая composition.
 Same-task F, fresh ordinary headed candidate/J01/J21/J27 и два Sol trials впереди.
 
+Адресный source-backed baseline для следующего native read audit:
+`e-source-policy-code-01` journal SHA256
+`39dbd8876b786047963e4883a67d2c3677b2cfaa091dae933c7341edac3bc9e0`,
+`e-source-policy-declared-01` journal SHA256
+`c08ac6551169fb11d575fddecdcf639692c76b701bf7b0ed3c8daafc545e0db0`.
+В каждом один actual `mode:read_existing_output` с6 фазами
+`source/workflow/target/finish/execute/read`, `sample_rows:100`, exact true,
+native complete6×4. Source delivery/admission/effect rows связываются через
+`owner.operation_id` или `receipt.owner.operation_id`, не только root
+`operation_id`: actual Code имеет4 delivery cycles,2 admission и1 dispatch/returned.
+Source параметры содержат retained `source_operation_id/schemas/javascript_source`;
+output также settings digest/policy и собственные format_restoration/workflow_return.
+Не подгонять этот6-phase read под13-phase script/configuration или3-cycle cold audit.
+
 ### Фаза 4: независимые cold source/state/Execute/full Table — 2026-10-02
 
 Child **e7865eea0cc8043e2d012f009b6f14e17a9cbe2a** добавляет
