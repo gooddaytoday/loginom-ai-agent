@@ -1,6 +1,7 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
 import os from "node:os"
+import { constants } from "node:fs"
 import { lstat, mkdtemp, open, readdir, readFile, readlink, realpath, stat, writeFile, rm } from "node:fs/promises"
 
 export type ProcessIdentity = {
@@ -26,14 +27,26 @@ const key = (process: ProcessIdentity) => `${process.pid}:${process.starttime}`
 const inside = (file: string, root: string) => file === root || file.startsWith(root + path.sep)
 
 export async function writerIdentity(profile: string): Promise<WriterIdentity | null> {
-  try {
-    const info = await lstat(path.join(profile, ".writer"))
-    if (!info.isDirectory() || info.isSymbolicLink()) throw Error("Writer is not a private directory")
-    return { device: info.dev, inode: info.ino, owner: await readFile(path.join(profile, ".writer", "owner"), "utf8") }
-  } catch (error) {
-    if (gone(error)) return null
+  const directory = path.join(profile, ".writer")
+  const info = await lstat(directory).catch((error) => {
+    if (gone(error)) return undefined
     throw error
-  }
+  })
+  if (!info) return null
+  if (!info.isDirectory() || info.isSymbolicLink()) throw Error("Writer is not a private directory")
+  const file = await open(path.join(directory, "owner"), constants.O_RDONLY | constants.O_NOFOLLOW)
+    .catch(() => { throw Error("Writer owner unavailable") })
+  try {
+    const ownerInfo = await file.stat()
+    if (!ownerInfo.isFile()) throw Error("Writer owner is not a private file")
+    const owner = await file.readFile("utf8")
+    const current = await lstat(directory)
+    const currentOwner = await lstat(path.join(directory, "owner"))
+    if (current.dev !== info.dev || current.ino !== info.ino || current.isSymbolicLink() ||
+      currentOwner.dev !== ownerInfo.dev || currentOwner.ino !== ownerInfo.ino || currentOwner.isSymbolicLink())
+      throw Error("Writer owner identity changed during read")
+    return { device: info.dev, inode: info.ino, owner }
+  } finally { await file.close() }
 }
 
 async function processView(pid: number, required = true, owners: ProcessIdentity[] = [], retries = 2): Promise<ProcessView | undefined> {

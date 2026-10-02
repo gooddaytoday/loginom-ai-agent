@@ -469,4 +469,3 @@ test("main: отказ записи result сохраняет summary и зап�
     expect(await Bun.file(path.join(`${profile}.harness-lease`, "owner.json")).exists()).toBe(true)
   } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
 })
-

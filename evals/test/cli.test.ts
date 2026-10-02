@@ -409,5 +409,3 @@ test("runAgent: отказ записи run evidence сохраняет изме
   expect(run.sessionId).toBe("ses_fixture03")
   expect(run.processCleanup.status).toBe("failed")
 })
-
-
