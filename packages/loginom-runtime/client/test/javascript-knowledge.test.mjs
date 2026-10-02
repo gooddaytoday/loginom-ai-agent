@@ -18,7 +18,7 @@ import {previewWireSize} from '../lib/user-preview-budget.mjs';
 test('7.4.2 knowledge contains only exact headed probes and rejects another observed build',async()=>{
   const knowledge=describeJavascriptKnowledge('7.4.2');
   assert.equal(knowledge.knowledge_sha256,JAVASCRIPT_KNOWLEDGE_SHA256);
-  assert.equal(JAVASCRIPT_CARD_LIMITATIONS.length,8);
+  assert.equal(JAVASCRIPT_CARD_LIMITATIONS.length,9);
   assert.deepEqual(knowledge.limitations,JAVASCRIPT_CARD_LIMITATIONS);
   assert.equal(knowledge.validated_for.server_os,'Linux');
   assert.equal(knowledge.validated_for.source_prompt_sha256,
@@ -37,7 +37,7 @@ test('7.4.2 knowledge contains only exact headed probes and rejects another obse
 });
 
 test('knowledge1.1 keeps historical1.0 identity and delivers only observed Name guidance',()=>{
-  const current=describeJavascriptKnowledge('7.4.2'),legacy=describeJavascriptKnowledge('7.4.2','1.0.0');
+  const current=describeJavascriptKnowledge('7.4.2','1.1.0'),legacy=describeJavascriptKnowledge('7.4.2','1.0.0');
   assert.equal(current.version,'1.1.0');assert.equal(legacy.version,'1.0.0');
   assert.equal(legacy.knowledge_sha256,'4a8a2d6e712fc56d039d1e595361dde9afb7e16eb7f3b8fd1959d5f5908bc2ef');
   assert.notEqual(current.knowledge_sha256,legacy.knowledge_sha256);
@@ -53,6 +53,20 @@ test('knowledge1.1 keeps historical1.0 identity and delivers only observed Name 
   current.column_names.observed_pairs[1].actual_name='changed';
   assert.equal(describeJavascriptKnowledge('7.4.2').column_names.observed_pairs[1].actual_name,'Summa');
   assert.throws(()=>describeJavascriptKnowledge('7.4.2','9.9.9'),/Unsupported/);
+});
+
+test('knowledge1.2 delivers the exact declared writer contract without rewriting1.1',()=>{
+  const current=describeJavascriptKnowledge('7.4.2'),previous=describeJavascriptKnowledge('7.4.2','1.1.0');
+  assert.equal(current.version,'1.2.0');
+  assert.equal(previous.knowledge_sha256,'9a4b79833948e2441a0594131708c530fb5da739cd2eea1ebb8787221dfb122d');
+  assert.equal(previous.declared_columns,undefined);
+  assert.deepEqual(current.limitations.slice(0,8),previous.limitations);
+  assert.match(current.limitations.at(-1),/integer\/real\/datetime data_kind=Непрерывный/);
+  assert.equal(current.declared_columns.max_columns,64);
+  assert.deepEqual(current.declared_columns.default_data_kind,
+    {boolean:'Дискретный',datetime:'Непрерывный',real:'Непрерывный',integer:'Непрерывный',string:'Дискретный'});
+  current.declared_columns.default_data_kind.integer='changed';
+  assert.equal(describeJavascriptKnowledge('7.4.2').declared_columns.default_data_kind.integer,'Непрерывный');
 });
 
 test('knowledge module is included in the client revision and mutation changes its pin',async()=>{
@@ -88,7 +102,7 @@ test('JavaScript card delivers pinned compact rules and on-demand Data API only 
   assert.deepEqual(card.limitations,JAVASCRIPT_CARD_LIMITATIONS);
   assert.equal(card.javascript_knowledge.scalar_data_api.import,'import {InputTable,OutputTable,DataType} from "builtIn/Data";');
   assert.equal(card.javascript_knowledge.validated_for.loginom_build,'7.4.2');
-  assert.equal(card.javascript_knowledge.version,'1.1.0');
+  assert.equal(card.javascript_knowledge.version,'1.2.0');
   assert.equal(card.javascript_knowledge.column_names.method,'AssignColumns');
   const compact=compactKnowledgeBundle({session_manifest:{},actions:[],node_types:[card]}).node_types[0];
   assert.deepEqual(compact.limitations,JAVASCRIPT_CARD_LIMITATIONS);

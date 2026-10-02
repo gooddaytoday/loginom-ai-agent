@@ -1,4 +1,5 @@
 import {DATE_TIME_OPERATIONS} from './date-time-parameters.mjs';
+import {JAVASCRIPT_DECLARED_TYPES,JAVASCRIPT_DECLARED_COLUMN_LIMIT} from './javascript-column-types.mjs';
 import {NODE_POSITION_MIN} from './node-contracts.mjs';
 import {validateActionParameters} from './action-catalog.mjs';
 import {nodeJobResultSchema,deliveryJobResultSchema} from './node-result-schema.mjs';
@@ -34,9 +35,10 @@ export const javascriptParametersSchema=object({source_text:{type:'string',maxLe
  description:'Full LF JavaScript source. New node requires it; existing omission preserves saved source, while an empty string replaces it. UTF-8 bytes <=32768, LF lines <=1024, no CR/NUL; local validation enforces the byte bound.'},
  expected_source_sha256:{...text(64),minLength:64,pattern:'^[a-f0-9]{64}$',description:'Required only when replacing an existing source; use the digest from a complete owned source read.'},
  schema_mode:choice('declared','code'),
- columns:array(object({name:fieldName,label:text(120),type:choice('integer','real','string','boolean','datetime'),
-  data_kind:choice('Неопределенное','Непрерывный','Дискретный'),
-  usage:choice('Не задано','Активное','Выходное','Группа','Показатель','Транзакция','Элемент')}),1000,1)},[]);
+ columns:{...array({oneOf:Object.entries(JAVASCRIPT_DECLARED_TYPES).map(([type,definition])=>object({
+  name:fieldName,label:text(120),type:{type:'string',const:type},data_kind:choice(definition.kind),
+  usage:choice('Не задано','Активное','Выходное','Группа','Показатель','Транзакция','Элемент')}))},JAVASCRIPT_DECLARED_COLUMN_LIMIT,1),
+  description:'Declared schema only: 1–64 ordered columns. Use the default data_kind for each type: integer/real/datetime Непрерывный; string/boolean Дискретный. Non-default kinds are unsupported by this writer. Supply all five fields; usage Не задано preserves the default role.'}},[]);
 export const groupingFieldSchema=object({kind:choice('input_field'),name:fieldName});
 export const groupingMeasureSchema=object({field:groupingFieldSchema,function:choice('sum','count','avg','min','max'),name:fieldName,label:text(120)});
 export const groupingParametersSchema=object({group_by:array(groupingFieldSchema,128,1),measures:array(groupingMeasureSchema,256,1)},[]);

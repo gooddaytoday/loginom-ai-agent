@@ -76,7 +76,8 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   assert.notEqual(prepared.isError,true);assert.equal(full.prepared,true);assert.equal(full.knowledge.version,'user-v1');
   assert.ok(full.knowledge.node_types.some(node=>node.type==='programming.javascript'));assert.equal(full.knowledge.reused,undefined);
   const preparedJs=full.knowledge.node_types.find(node=>node.type==='programming.javascript');
-  assert.match(preparedJs.limitations.at(-1),/ASCII Name.*DisplayName.*schema\/readback/);
+  assert.match(preparedJs.limitations.at(-2),/ASCII Name.*DisplayName.*schema\/readback/);
+  assert.match(preparedJs.limitations.at(-1),/integer\/real\/datetime data_kind=Непрерывный/);
   assert.ok(size(prepared)<=46000);assert.equal(typeof full.instructions,'string');
   const reused=await call('dock_prepare');assert.equal(parse(reused).knowledge.reused,true);
   assert.equal(parse(reused).instructions,undefined);assert.ok(size(reused)<=46000);
@@ -86,7 +87,7 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   assert.notEqual(single.isError,true);assert.ok(size(single)<=20000);
   const js=parse(single).node_types[0];assert.deepEqual(js.parameter_schema,javascriptParametersSchema);
   assert.equal(js.javascript_knowledge.validated_for.loginom_build,'7.4.2');assert.equal(js.javascript_knowledge.examples.length,2);
-  assert.equal(js.javascript_knowledge.version,'1.1.0');
+  assert.equal(js.javascript_knowledge.version,'1.2.0');
   assert.equal(js.knowledge_sha256,preparedJs.knowledge_sha256);
   assert.deepEqual(js.javascript_knowledge.column_names.observed_pairs.map(pair=>[pair.requested_name,pair.actual_name,pair.display_name]),
     [['Value','Value','Value'],['Сумма','Summa','Value'],['Value Total','Value_Total','Value'],['1Value','_1Value','Value'],['Value','Value','Сумма ё']]);

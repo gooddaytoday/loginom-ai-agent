@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {JAVASCRIPT_DECLARED_TYPES,JAVASCRIPT_DECLARED_COLUMN_LIMIT} from './javascript-column-types.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {makeJavascriptManagedPageCode} from './javascript-managed-page.mjs';
 import {readJavascriptSchema} from './javascript-schema-browser.mjs';
@@ -11,24 +12,18 @@ import {waitJavascriptColumnEditor,verifyJavascriptColumnEditor,fillJavascriptCo
 const need=(value,message)=>{if(!value)throw Error(message);};
 const usages={'Не задано':0,'Активное':3,'Выходное':4,'Группа':6,'Показатель':7,'Транзакция':8,'Элемент':9};
 
-const primitiveTypes={boolean:{value:1,label:'Логический',kind:'Дискретный'},
-  datetime:{value:2,label:'Дата/Время',kind:'Непрерывный'},
-  real:{value:3,label:'Вещественный',kind:'Непрерывный'},
-  integer:{value:4,label:'Целый',kind:'Непрерывный'},
-  string:{value:5,label:'Строковый',kind:'Дискретный'}};
-
 // Only default data kinds are supported. Each native picker must independently
 // confirm its value and exact label before the owned selection gesture.
 export function validateJavascriptDeclaredPrimitiveColumns(columns) {
-  need(Array.isArray(columns)&&columns.length>0&&columns.length<=64,
+  need(Array.isArray(columns)&&columns.length>0&&columns.length<=JAVASCRIPT_DECLARED_COLUMN_LIMIT,
     'Managed JavaScript declared column coverage unavailable');
   need(columns.every(column=>column&&Object.keys(column).length===5
     &&['name','label','type','data_kind','usage'].every(key=>Object.hasOwn(column,key))
     &&typeof column.name==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(column.name)
     &&typeof column.label==='string'&&column.label.length>0&&column.label.length<=120
     &&column.label.isWellFormed()&&!/[\x00-\x1f\x7f]/.test(column.label)
-    &&Object.hasOwn(primitiveTypes,column.type)
-    &&column.data_kind===primitiveTypes[column.type].kind
+    &&Object.hasOwn(JAVASCRIPT_DECLARED_TYPES,column.type)
+    &&column.data_kind===JAVASCRIPT_DECLARED_TYPES[column.type].kind
     &&Object.hasOwn(usages,column.usage))
     &&new Set(columns.map(column=>column.name.toLowerCase())).size===columns.length,
   'Managed JavaScript declared column parameters unsupported');
@@ -162,7 +157,7 @@ export function makeJavascriptManagedDeclaredCode(task) {
     +functions.map(fn=>'const '+fn.name+'='+fn.toString()+';').join('')
     +'return ('+runManagedJavascriptDeclaredStep.toString()+')(page,'+JSON.stringify(task)+','
     +inspectManagedJavascriptDeclaredContext.toString()+',observeJavascriptColumnEditor,{'
-    +functions.map(fn=>fn.name).join(',')+'},'+readJavascriptSchema.toString()+','+JSON.stringify(primitiveTypes)+');}';
+    +functions.map(fn=>fn.name).join(',')+'},'+readJavascriptSchema.toString()+','+JSON.stringify(JAVASCRIPT_DECLARED_TYPES)+');}';
 }
 
 export async function dispatchManagedJavascriptDeclared({task,columns,execute,record,receiptOptions}) {

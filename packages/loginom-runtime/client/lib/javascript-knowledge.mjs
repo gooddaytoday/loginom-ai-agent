@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {JAVASCRIPT_DECLARED_TYPES,JAVASCRIPT_DECLARED_COLUMN_LIMIT} from './javascript-column-types.mjs';
 
 // This is a versioned, inert knowledge asset. A future JavaScript handler may
 // publish it only after checking the observed Loginom build before any effect.
@@ -58,7 +59,7 @@ const knowledge=Object.freeze({
 
 // Preserve the exact 1.0 asset and its two already accepted example identities.
 // New guidance changes the default asset/cache identity without rewriting history.
-const current=Object.freeze({...knowledge,version:'1.1.0',
+const previous=Object.freeze({...knowledge,version:'1.1.0',
   limitations:Object.freeze([...knowledge.limitations,
     'Для нового кода предпочитать ASCII Name; пользовательскую Unicode-метку задавать в DisplayName. После Execute брать фактические имена из schema/readback, не угадывать нормализацию.']),
   column_names:Object.freeze({
@@ -80,12 +81,22 @@ const current=Object.freeze({...knowledge,version:'1.1.0',
   }),
 });
 
+const current=Object.freeze({...previous,version:'1.2.0',
+  limitations:Object.freeze([...previous.limitations,
+    'schema_mode=declared: 1–64 columns с name,label,type,data_kind,usage. Для integer/real/datetime data_kind=Непрерывный, для string/boolean — Дискретный; иной вид не поддержан writer. usage=Не задано оставляет стандартную роль. Код заполняет объявленную схему без AssignColumns.']),
+  declared_columns:Object.freeze({max_columns:JAVASCRIPT_DECLARED_COLUMN_LIMIT,
+    default_data_kind:Object.freeze(Object.fromEntries(Object.entries(JAVASCRIPT_DECLARED_TYPES).map(([type,value])=>[type,value.kind]))),
+    required_fields:Object.freeze(['name','label','type','data_kind','usage']),
+    scope:'Existing managed column writer contract; selecting a non-default data kind is unsupported.',
+  }),
+});
+
 export const JAVASCRIPT_KNOWLEDGE_SHA256=createHash('sha256').update(JSON.stringify(current)).digest('hex');
 export const JAVASCRIPT_CARD_LIMITATIONS=current.limitations;
 
 export function describeJavascriptKnowledge(observedBuild,version=current.version) {
   if(observedBuild!==knowledge.validated_for.loginom_build)throw Error('JavaScript knowledge is not validated for observed Loginom build');
-  const selected=version===knowledge.version?knowledge:version===current.version?current:null;
+  const selected=version===knowledge.version?knowledge:version===previous.version?previous:version===current.version?current:null;
   if(!selected)throw Error('Unsupported JavaScript knowledge version');
   return structuredClone({...selected,knowledge_sha256:createHash('sha256').update(JSON.stringify(selected)).digest('hex')});
 }

@@ -1,8 +1,7 @@
 import {inspectJavascriptModulePolicy} from './javascript-module-policy.mjs';
+import {JAVASCRIPT_DECLARED_TYPES,JAVASCRIPT_DECLARED_COLUMN_LIMIT} from './javascript-column-types.mjs';
 
 const namePattern=/^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
-const scalarTypes=new Set(['integer','real','string','boolean','datetime']);
-const dataKinds=new Set(['Неопределенное','Непрерывный','Дискретный']);
 const usages=new Set(['Не задано','Активное','Выходное','Группа','Показатель','Транзакция','Элемент']);
 const need=(ok,path)=>{if(!ok)throw Error('Invalid parameters.'+path);};
 const shape=(value,keys,path)=>{
@@ -45,7 +44,7 @@ export function validateJavascriptParameters(parameters,mode,request) {
   if(parameters.schema_mode==='code')need(!hasColumns,'columns');
   if(request.target.kind==='new'&&parameters.schema_mode==='declared')need(hasColumns,'columns');
   if(!hasColumns)return parameters;
-  need(Array.isArray(parameters.columns)&&parameters.columns.length>0&&parameters.columns.length<=1000,'columns');
+  need(Array.isArray(parameters.columns)&&parameters.columns.length>0&&parameters.columns.length<=JAVASCRIPT_DECLARED_COLUMN_LIMIT,'columns');
   const names=new Set();
   parameters.columns.forEach((column,index)=>{
     const path='columns['+index+']';
@@ -55,8 +54,9 @@ export function validateJavascriptParameters(parameters,mode,request) {
     names.add(column.name.toLowerCase());
     need(typeof column.label==='string'&&column.label.length>0&&column.label.length<=120
       &&column.label.isWellFormed()&&!/[\x00-\x1f\x7f]/.test(column.label),path+'.label');
-    need(scalarTypes.has(column.type),path+'.type');
-    need(dataKinds.has(column.data_kind),path+'.data_kind');
+    need(Object.hasOwn(JAVASCRIPT_DECLARED_TYPES,column.type),path+'.type');
+    need(column.data_kind===JAVASCRIPT_DECLARED_TYPES[column.type].kind,
+      path+'.data_kind: expected '+JAVASCRIPT_DECLARED_TYPES[column.type].kind+' for '+column.type);
     need(usages.has(column.usage),path+'.usage');
   });
   return parameters;
