@@ -1,5 +1,13 @@
 # JavaScript: рабочее исследование на Loginom 7.4.2
 
+Текущий итог: **scope v1 реализован и candidate15 принят**.
+G1–G7 и J01–J27 сведены с текущими доказательствами в
+[completion audit](completion-audit.md); [итог](completion.md).
+Ниже сохранены исторические наблюдения и решения исследования. Их прежние
+статусы «открыто» не являются текущим назначением повторных работ.
+
+## Историческая сводка исследования
+
 Статус на 2026-10-01: **`discovery_required`**. Это сводка прямых наблюдений
 фазы 0B [подплана](plan.md), а не допуск публичного обработчика или автономной
 CLI-приёмки. Стенд — `http://logi-test-plan.bg.local/app/`, Loginom Enterprise
@@ -11,11 +19,55 @@ Linux по принадлежащему `Session.Version.IsWindows=false`; ди�
 Исходные отчёты и журналы находятся в приватной кампании; подтверждённые SHA,
 ревизии операторов и границы каждой попытки перечислены в [checkpoint](checkpoint.md).
 
+Фаза4 source на9b8e40b418: original CLI/cold launch controller и detached-browser
+ownership; ab721a703e сохраняет headed для CLI preflight. Controller15/observer9/
+candidate11/Host25+6 tests/typechecks/provenance PASS, без нового браузера/модели.
+Safe filtered/redacted CLI capture/original deadline наc664f40c61 проверены
+21/15/9 actual Node/Linux process tests, provenance5045 PASS. Native journal
+binding/whole auditor и fresh candidate/CLI остаются открытыми. На17c994f042
+committed QA freeze/candidate runtime overlay проверены10 Git/filesystem/Node
+fixtures, controller15/capture22 PASS; generic cold dependency loading и actual
+factory/native proof ещё не выполнены.
+[Текущий checkpoint](checkpoint.md#фаза-4-filtered-cli-capture-и-original-deadline--2026-10-02).
+
+На15c0fb4f3c original CLI native-artifact ownership/source/append integrity
+проверены75 source/process tests, provenance5045 PASS. Допущены только точные
+plain/testable URL стенда по фактическому production normalizer. Fresh native
+Close/logout/CLI не подтверждены; technical cold collection/lease/whole composition
+остаются открытыми. [Checkpoint](checkpoint.md#фаза-4-original-cli-native-artifacts--2026-10-02).
+
+Technical cold capture и preparation fixes наb3878d0bd1 проверены75 tests:
+original10-minute collection, exact summary, adjacent assignment, новый отсутствующий
+evidence target, committed product release в freeze v2. Host registry только
+прочитан: own preparation reserved_active/browser closed_verified, CLI slot свободен.
+Actual factory/live не запускались; до F остаются lease/whole composition.
+[Checkpoint](checkpoint.md#фаза-4-technical-cold-collection-и-вход-reader--2026-10-02).
+
+Последняя source-граница **e5e8c99286/1a8d236b76**: manual lease/original holder
+и whole writer/trial/pair API реализованы; source review полного авторского кода
+обязателен отдельно от authorship/hash. Final pair перечитывает own SQLite
+projection.93 addressed tests/provenance5045 и дополнительная пересекающаяся
+regression23PASS. Candidate теперь собран и заморожен (см. checkpoint);
+actual factory/native/whole acceptance не доказаны. Same-task Astra/medium F выполнен наe02e8fd41f;
+старое назначение модели заменено в launcher/общем auditor/SQLite gate на
+openai/gpt-6.1-sol / low.68 адресных tests/provenance5045 PASS. Далее OAuth и live.
+[Актуальный checkpoint](checkpoint.md#фаза-4-общая-cli-композиция-и-manual-lease--2026-10-02).
+
 Исходная сводка обновлена по [acceleration review](acceleration-review.md) на docs
 `13a02e8be2` / code `7b8e19bee0`; позже выполнен B-live на code `f8ceebcac9`.
 Решение 0B доказывает осуществимость/выбирает контракт; последняя колонка
 остаётся проверкой реализации и приёмки. Непроверенные пункты в ней не возвращают
 закрытое решение исследования в начало.
+
+Общий Done/Close lifecycle-v5 на **73a8e9df31** проверен fresh ordinary headed
+Code447/declared4482/2: public Done→Close→NEW preserve Execute, exact same-ID
+retry zero events, full source/settings/graph, full6×4/1950 и default materialized
+context. Independent v2 audit/36 non-noop negatives каждого и cleanup приняты.
+Done не обещает fresh output; explicit=false/internal=null. Эти trials используют
+existing saved nodes, новый generic Done покрыт source tests; product registration,
+review/candidate/CLI остаются открыты. [Границы и hashes](checkpoint.md#текущее-состояние),
+[design](configuration-lifecycle-design.md). Failed444 и verified recovery не
+превращены в PASS.
 
 Public C run05 на `97098322a1` подтвердил все13 phases, две owned completed
 Execute, полные native mappings и owned Views/full typed UI6×4. Независимый
@@ -237,3 +289,27 @@ source/settings/schema/complete graph и cleanup/process absence провере�
 Pre-live independent v5 audit PASS2/2, meaningful mutations47/47 refused в каждом.
 Точные reports/receipts/hashes — в checkpoint. Это частичное закрытие G6/J12/J25;
 live Done refusal/Stop/lost reply/same-ID/candidate/CLI открыты.
+
+## Граница перед F review — 2026-10-01
+
+General lifecycle-v5 существующих Code447/declared448 Done/Close и new standalone
+Done Code449/declared450 принят2/2 каждый: ordinary headed/full source/settings/
+exact-ID zero events/NEW preserve Execute/full6×4/1950/independent audit+negatives/
+cleanup. J02 public full input6×5/whitespace/types/order подтверждён actual C/D
+writer receipts; runtime/profile limits и редкие natural errors — в checkpoint.
+
+Source product registry child161353dadef6 подключает общий handler/driver/knowledge
+и bridge redactor без fixed trials; addressed65, client3442PASS+10SKIP, operator
+18583PASS и provenance5045 actualexit0. Это source/direct boundary, не повышение
+старых исторических rows до global PASS и не compiled candidate/CLI. Next —
+один same-task Astra/medium review; current model gpt-6.1-sol/high, переключение
+запрошено. Natural insufficient-primary/Done refusals not_observed, TestCafe not_run.
+Normal CLI package shutdown source на49dcfa0d99: native Close/logout по last
+confirmed own Save до browser closure; runtime30/Client25/Host13/actual CLI
+preflight3/typechecks PASS. Fresh Loginom/native cleanup/candidate/model здесь
+не проверены. [Checkpoint](checkpoint.md#фаза-4-штатный-cli-package-shutdown--2026-10-02).
+Наff8b2 normal final shutdown сохраняет retired/unsolicited-exit failures;
+Host21/typechecks/provenance5045 PASS. Normal native receipt audit eb051/948bc
+проверен13 tests, Linux original Popen observer ec73da —9 actual process tests;
+full controller/CLI/candidate proof не заявлен.
+Canonical accepted registry пока14, product branch не merged/released.
