@@ -30,6 +30,7 @@ export async function createLoginomHost(options: {
   const restarts = new Map<string, number>()
   const lost = new Set<string>()
   const stale = new Set<string>()
+  const shutdown = { failed: false }
   type Runtime = Awaited<ReturnType<typeof supervise>>
   function retain(
     generation: { children: Map<string, Promise<Runtime>> },
@@ -37,12 +38,24 @@ export async function createLoginomHost(options: {
     child: Promise<Runtime>,
   ) {
     const tracked = child.then((runtime) => {
+      const closing: { requested: boolean; promise?: Promise<void> } = { requested: false }
       void runtime.exited.then(() => {
+        if (options.closeSavedPackageOnShutdown === true && !closing.requested) shutdown.failed = true
         if (generation.children.get(chat) !== tracked) return
         lost.add(chat)
         generation.children.delete(chat)
       })
-      return runtime
+      return {
+        ...runtime,
+        close() {
+          closing.requested = true
+          closing.promise ??= runtime.close().catch((error: unknown) => {
+            if (options.closeSavedPackageOnShutdown === true) shutdown.failed = true
+            throw error
+          })
+          return closing.promise
+        },
+      }
     })
     generation.children.set(chat, tracked)
     tracked.catch(() => {
@@ -118,6 +131,12 @@ export async function createLoginomHost(options: {
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
   return {
     ...service,
+    async close() {
+      await service.close()
+      // A retired or unexpectedly exited child may have left its server-side
+      // package open. A later successful runtime cannot erase that uncertainty.
+      if (shutdown.failed) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    },
     api: {
       ...service.api,
       async acknowledgeRecovery(input: Parameters<typeof service.api.acknowledgeRecovery>[0]) {

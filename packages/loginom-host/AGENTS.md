@@ -30,6 +30,7 @@
 
 - Runtime shutdown succeeds only with a `closed: true` acknowledgement and exit code 0 without a signal. A killed or disconnected child is not successful cleanup; repeated close preserves the original outcome.
 - Ordinary standalone `run` enables private `closeSavedPackageOnShutdown`; Desktop, TUI, management, connection validation and readiness do not. Forward the boolean through private Node Host/start only; never take a package path or owner from a model or environment. Runtime derives its latest confirmed own Save and performs guarded package Close/logout before browser close. In this mode allow 45000 ms for runtime close and 60000 ms for outer Host close; keep operation deadlines and confirmed ACK/clean-exit requirements unchanged. A native refusal fails cleanup and retains the CLI profile guard.
+- In that policy, remember cleanup failures of retired chat runtimes and exits without a requested close until final Host shutdown. Removing a child from the active map or succeeding in a replacement runtime cannot erase unconfirmed package/resource closure. Keep ordinary advisory recovery behavior when the policy is disabled.
 
 - The Linux build also emits a versioned tar.gz and .sha256 beside the payload, verifies the extracted archive manifest, and refuses to overwrite existing archive/checksum files. Include build scripts in package typecheck.
 

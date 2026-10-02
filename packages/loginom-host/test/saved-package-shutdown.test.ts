@@ -7,6 +7,7 @@ import { launchNodeHost } from "../src/node-client"
 import { connectionStore } from "../src/connection/connection-store"
 import { cliCredentials } from "../src/connection/cli-credentials"
 import { supervise } from "../src/supervisor"
+import { createLoginomHost } from "../src/host"
 
 const fixture = { directory: "", entry: "", node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? "" }
 beforeAll(async () => {
@@ -16,6 +17,68 @@ beforeAll(async () => {
 })
 afterAll(async () => {
   await rm(fixture.directory, { recursive: true, force: true })
+})
+
+async function configuredRuntime(directory: string, source: string) {
+  const resources = join(directory, "resources")
+  const root = join(directory, "profile")
+  await mkdir(join(resources, "bin"), { recursive: true })
+  await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await symlink(fixture.node, join(resources, "bin/node"))
+  await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test/mcp" }))
+  await Bun.write(join(resources, "runtime/src/managed-entry.mjs"), source)
+  const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
+  await store.stage({ generation: 1, revision: 1, url: "http://example.test/app", username: "user", password: "", apiKey: "fixture" })
+  await store.activate(1)
+  return { root, resources }
+}
+
+test.each([false, true])("retired runtime cleanup failure survives only the new strict shutdown policy: %s", async (policy) => {
+  const directory = await mkdtemp(join(fixture.directory, "retired-"))
+  const configured = await configuredRuntime(directory, `
+    import {existsSync,writeFileSync} from 'node:fs';
+    let chat;
+    process.on('message', m=>{
+      if(m.operation==='start') {chat=m.input.chat;process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat,ready:true}});}
+      if(m.operation==='close') {
+        const marker=${JSON.stringify(join(directory, "retired"))};
+        const failed=chat==='chat'&&!existsSync(marker);
+        if(failed)writeFileSync(marker,'retired failure');
+        process.send({id:m.id,result:{closed:!failed}},()=>process.disconnect());
+      }
+    });
+  `)
+  const host = await createLoginomHost({ ...configured, codec: cliCredentials(process.platform, configured), environment: {}, closeSavedPackageOnShutdown: policy })
+  try {
+    await host.settled()
+    await host.runtime(1, "chat")
+    host.markRuntimeStale("chat")
+    await host.retireRuntime("chat")
+    await host.runtime(1, "chat")
+    if (policy) await expect(host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    if (!policy) await host.close()
+  } finally {
+    await host.close().catch(() => undefined)
+  }
+})
+
+test("a runtime exit without requested closure cannot certify normal CLI shutdown", async () => {
+  const directory = await mkdtemp(join(fixture.directory, "lost-"))
+  const configured = await configuredRuntime(directory, `process.on('message',m=>{
+    if(m.operation==='start')process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
+    if(m.operation==='close')process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+    if(m.operation==='exit')process.send({id:m.id,result:{exit:true}},()=>process.disconnect());
+  });`)
+  const host = await createLoginomHost({ ...configured, codec: cliCredentials(process.platform, configured), environment: {}, closeSavedPackageOnShutdown: true })
+  try {
+    await host.settled()
+    const runtime = await host.runtime(1, "chat")
+    await runtime.request("exit")
+    expect(await runtime.exited).toEqual({ code: 0, signal: null })
+    await expect(host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
+  } finally {
+    await host.close().catch(() => undefined)
+  }
 })
 
 test.each([undefined, false, true])("private Host policy reaches only a task runtime: %s", async (policy) => {

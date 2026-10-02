@@ -6,8 +6,8 @@
   },
   "packages/loginom-runtime/client/lib/bridge.mjs": {
     "baseHash": "c56450b8f4db74c4ccfbf3162d1a7d6dc7422bab3ac35704f7d45923282630c3",
-    "hash": "67e68a506b494a9df1cb91ce74303577ec01c52f4eabb5cb4930c16d7ce7820d",
-    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Record committed transformations after 3e19818b6f: fc3798f0ac fix(runtime): bypass proxies in Loginom Chromium; 0c513c445a feat(javascript): expose owned source reading through node API; 23e8488e29 fix(javascript): publish context in compact MCP bridge; 8bca1b00aa fix(loginom-runtime): bound complete user tool replies. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance. Register general JavaScript lifecycle-v5 only for the validated 7.4.2 target/origin, route its ordinary driver without operator hooks and pass the bridge redactor with known secrets; default registry-only callers use the standard sanitizer. Source provenance does not certify candidate or CLI acceptance."
+    "hash": "f3d74c44e574ebac616d003c28778fb1d63d38fdd61dc19664f3695bc9a90b66",
+    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Record committed transformations after 3e19818b6f: fc3798f0ac fix(runtime): bypass proxies in Loginom Chromium; 0c513c445a feat(javascript): expose owned source reading through node API; 23e8488e29 fix(javascript): publish context in compact MCP bridge; 8bca1b00aa fix(loginom-runtime): bound complete user tool replies. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance. Register general JavaScript lifecycle-v5 only for the validated 7.4.2 target/origin, route its ordinary driver without operator hooks and pass the bridge redactor with known secrets; default registry-only callers use the standard sanitizer. Source provenance does not certify candidate or CLI acceptance. Normal standalone CLI shutdown uses a separate private owner boolean and derives the last distinct confirmed own Save; retain native guarded close/logout and keep normal receipt/event separate from isolated acceptance. This records source bytes, not fresh Loginom or whole CLI acceptance."
   },
   "packages/loginom-runtime/client/lib/executor.mjs": {
     "baseHash": "df21720858bb89bb40d6c4fe46620728b1d6e86b0d9d7aafa4992c8f2cf93a6e",
@@ -2251,12 +2251,22 @@
   },
   "packages/loginom-runtime/tools/loginom-acceptance/node_procedure_evidence.py": {
     "baseHash": "d6a2417ef57cf6bb1bc4c118505d62a369f536935d1744fc11216417748e7c58",
-    "hash": "71e0bbdaaf65c7f52ce52c570b364fc97fc5ea381c517e3a06ceaecc4505dbe9",
-    "reason": "Audit only the existing owned native Table settlement after a single acknowledged Add, bounded to the admitted read/node deadline; keep ordinary observation readiness at 15000ms and validate owner/port/cards/masks in every sample. This records transformed audit source, not product or CLI acceptance."
+    "hash": "8a62354d408103cb5f82d64b5f52294066eb036152729d54b7e5b875d2c05bce",
+    "reason": "Audit only the existing owned native Table settlement after a single acknowledged Add, bounded to the admitted read/node deadline; keep ordinary observation readiness at 15000ms and validate owner/port/cards/masks in every sample. This records transformed audit source, not product or CLI acceptance. Record the already committed e7865eea0c cold_read_ceiling route: separate path-only technical cold reader supplies its original operation/node/deadline/total ceiling, rejects synthetic apply/phase admissions, and leaves ordinary default admission validation strict. Its historical native and addressed tests are recorded in the JavaScript checkpoint; provenance alone does not prove behavior."
   },
   "packages/loginom-runtime/tools/loginom-acceptance/import_execution_evidence.py": {
     "baseHash": "4819cce760e1c94647a2af259c4f45339471e9159ebd94f32b6eef153d12f19b",
     "hash": "6422ecad4f11438effaec18fffbfeceb0fc0f8b1fb2a712c98caa7aa8718759c",
     "reason": "Audit the two observed native process console namespaces, ConsoleForm and MF;ConsoleForm, while retaining exact grid/ref/scroll receipt and native process history checks. This records transformed audit source, not product or CLI acceptance."
+  },
+  "packages/loginom-runtime/client/test/package-cleanup-bridge.test.mjs": {
+    "baseHash": "6f116bc22e7cdec293a099aacbf8aa308ec976ee08c4a48c9dd0ac43a88f6026",
+    "hash": "6ae5c1643d6cfd1ea8b368d8523452a9d5d7f32cb0487be7a035baba5c0219c5",
+    "reason": "Exercise ordinary and isolated package cleanup separately through the real production bridge with controlled external-service/action boundaries; cover latest same-path Save, older retry/inspect, native refusal and identity/discard guards. These fixtures are not live Loginom evidence."
+  },
+  "packages/loginom-runtime/client/test/support/package-cleanup-bridge.mjs": {
+    "baseHash": "f2e051aa0b71c34f3f8a704bb8944506026f10ba0414189bb921f7277da215bd",
+    "hash": "d967dfab41cb8a10a519e00f9004bdb18dae031d8219d137860adbe94dd127a2",
+    "reason": "Exercise ordinary and isolated package cleanup separately through the real production bridge with controlled external-service/action boundaries; cover latest same-path Save, older retry/inspect, native refusal and identity/discard guards. These fixtures are not live Loginom evidence."
   }
 }
