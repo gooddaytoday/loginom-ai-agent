@@ -2,6 +2,15 @@
 
 ## Текущее состояние
 
+**Возобновление после восстановления связи — pair10, 2026-10-02 19:41 UTC.**
+Текущий original holder PID750503/startTicks22085221, private
+`f-cli-pair-10-control.json`; команды через `f-cli-pair-10-control.fifo`,
+статус `f-cli-pair-10-events.jsonl`. Frozen candidate11/reader11 preflight PASS,
+source f2a0cdd991 прежний; Declared10 запущен в ordinary headed. Сохранять
+original holder/trials до writer/cold/release обоих режимов и final pair;
+не создавать второй запуск по тайм-ауту наблюдения. Затем Code10 на тех же
+bytes, новых profiles/path. Предыдущие blocked/failed записи ниже исторические.
+
 **Связь повторно проверена успешно — 2026-10-02T19:40:11Z.**
 По просьбе пользователя actual bundled Node/default SDK candidate11 получил
 список15 инструментов, прочитал закреплённый каталог и проверил SHA:
