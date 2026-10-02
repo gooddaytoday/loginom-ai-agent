@@ -277,6 +277,9 @@ while True:time.sleep(.01)
         self.assertIs(result['native_cleanup_verified'],False)
         self.assertIs(result['cli_acceptance_verified'],False)
         self.assertEqual(result['control'],[])
+        self.assertIs(controller.capture,self.capture)
+        result['passed']=False
+        self.assertTrue(controller.collection['passed'])
 
     def test_deadline_sigint_clean_exit_still_refuses_original_trial(self):
         controller=self.producer('deadline');controller.deadline_at=controller.submitted_at+1000

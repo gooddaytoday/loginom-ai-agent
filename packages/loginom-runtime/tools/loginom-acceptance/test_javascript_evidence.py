@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import unittest
 from javascript_configuration_evidence import verify_javascript_configuration
-from javascript_output_evidence import verify_javascript_output
+from javascript_output_evidence import verify_javascript_output,verify_javascript_executions
 from node_procedure_evidence import bound_output_settlement, digest
 
 
@@ -104,6 +104,29 @@ class JavascriptNativeRegressionTests(unittest.TestCase):
             authored = next(r['request']['parameters']['source_text'] for r in events
                 if r.get('operation_id') == report['public_new_done']['operation_id'] and r.get('phase') == 'node_apply_prepared').encode('utf-8')
             yield name,events,request,authored,inputs,oracle
+
+    def test_fresh_source_executions_do_not_promote_five_row_preview_to_full_output(self):
+        for name,events,original,source,inputs,oracle in self.cases():
+            request=copy.deepcopy(original)
+            request['read']=dict(ports=[0],sample_rows=5,require_exact_numbers=False)
+            rows=copy.deepcopy(events)
+            for row in rows:
+                if row.get('operation_id')==request['operation_id'] and row.get('phase')=='node_apply_prepared':
+                    row['request']=copy.deepcopy(request)
+            with self.subTest(name=name):
+                proof=verify_javascript_executions(rows,request)
+                self.assertTrue(proof['passed'],proof)
+                self.assertNotEqual(proof['execution_id'],proof['materialization_execution_id'])
+                self.assertIs(proof['business_output_verified'],False)
+                self.assertFalse(verify_javascript_output(rows,request,oracle['schema'],oracle['ordered_rows'])['passed'])
+
+    def test_source_execution_refuses_changed_native_terminal_binding(self):
+        for name,events,request,source,inputs,oracle in self.cases():
+            rows=copy.deepcopy(events)
+            terminal=next(r for r in rows if r.get('operation_id')==request['operation_id']
+                and r.get('phase')=='node_phase_completed' and r['receipt']['phase']=='execute')
+            terminal['receipt']['value']['execution_id']='foreign'
+            with self.subTest(name=name):self.assertFalse(verify_javascript_executions(rows,request)['passed'])
 
     def test_product_profile_header_projection_requires_external_target_and_observed_origin(self):
         # Only the copied header representation changes; this is not a new live journal.
