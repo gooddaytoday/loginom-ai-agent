@@ -90,3 +90,24 @@ test("supervisor: потеря argv не стирает уже доказанн�
     if (await Bun.file(pidFile).exists()) { try { process.kill(Number(await Bun.file(pidFile).text()), "SIGKILL") } catch {} }
   }
 }, 20_000)
+
+test("supervisor: helper в свежей доказанной browser session не теряется после reparent", async () => {
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-browser-session-"))
+  const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-browser-session-bundle-"))
+  await Bun.build({ entrypoints: [path.join(evalsRoot, "fixtures/fake-browser.ts")], compile: { outfile: path.join(bundle, "chrome") } })
+  await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
+  const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: out })
+  const helperFile = path.join(out, "helper.pid")
+  try {
+    const run = await runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+      EVAL_FAKE_BROWSER_PID_FILE: path.join(out, "browser.pid"), EVAL_FAKE_BROWSER_HELPER_PID_FILE: helperFile } },
+      taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: out,
+      outDir: out, profileDir: out, timeoutMs: 30_000 })
+    expect(run.processCleanup.status).toBe("confirmed")
+    const pid = Number(await Bun.file(helperFile).text())
+    const state = (await Bun.$`ps -o stat= -p ${pid}`.quiet().nothrow()).text().trim()
+    expect(state === "" || state.startsWith("Z")).toBe(true)
+  } finally {
+    if (await Bun.file(helperFile).exists()) { try { process.kill(Number(await Bun.file(helperFile).text()), "SIGKILL") } catch {} }
+  }
+}, 20_000)
