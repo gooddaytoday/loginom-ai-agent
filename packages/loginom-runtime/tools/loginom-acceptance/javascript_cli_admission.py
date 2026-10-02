@@ -13,7 +13,9 @@ def host_artifact_name(generation, session_id, message_id, index, filename):
     name = filename.replace('\\','/').rstrip('/').rsplit('/',1)[-1]
     if not name or name in ('.','..') or any(ord(c) < 32 or ord(c) == 127 for c in name):
         raise ValueError('cli_admission_filename')
-    identity = json.dumps([str(generation)+':'+session_id,message_id],ensure_ascii=False,separators=(',',':'))
+    # HostPort.acquire supplies a hashed chat ID to createLoginomHost.inputs.
+    chat=hashlib.sha256(session_id.encode('utf-8')).hexdigest()
+    identity = json.dumps([str(generation)+':'+chat,message_id],ensure_ascii=False,separators=(',',':'))
     prefix = hashlib.sha256(identity.encode()).hexdigest()
     suffix = name.encode('utf-16-le',errors='surrogatepass')[-240:].decode('utf-16-le',errors='surrogatepass')
     return prefix+'-'+str(index)+'-'+suffix
