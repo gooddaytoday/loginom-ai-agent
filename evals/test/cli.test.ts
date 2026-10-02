@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdtemp } from "node:fs/promises"
+import { mkdir, mkdtemp } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { spawn } from "node:child_process"
@@ -355,4 +355,18 @@ test("runAgent: завершившийся CLI не становится timeout
     workdir: outDir, timeoutMs: 500, outDir })
   expect(run.exitCode).toBe(0)
   expect(run.timedOut).toBe(false)
+})
+
+
+test("runAgent: отказ записи process evidence сохраняет измеренный исход и guard", async () => {
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-proof-write-"))
+  await mkdir(path.join(out, "process-cleanup.json"))
+  const command = fakeCommand()
+  const run = await runAgent({ command, taskId: "default", model: "fake/model", prompt: "test", files: [],
+    workdir: out, outDir: out, profileDir: out, timeoutMs: 10_000 })
+  expect(run.exitCode).toBe(0)
+  expect(run.sessionId).toBe("ses_fixture03")
+  expect(run.processCleanup.status).toBe("failed")
+  expect(await Bun.file(`${out}.process-group`).exists()).toBe(true)
+  expect((await Bun.file(path.join(out, "run.json")).json()).sessionId).toBe(run.sessionId)
 })
