@@ -2288,7 +2288,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/control-condition/README.md",
       "initial_scope": "Одна ветвящая проверка над явно заданным значением с наблюдаемым запуском только выбранной ветви.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -2336,7 +2336,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/control-condition/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.control.ExecNode",
@@ -2345,7 +2347,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/control-execnode/README.md",
       "initial_scope": "Производный узел выполнения одного допустимого базового компонента с явными зависимостями и портами.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -2392,7 +2394,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/control-execnode/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.control.Loop",
@@ -2401,7 +2405,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/control-loop/README.md",
       "initial_scope": "Ограниченный счётный цикл с наблюдаемым числом итераций, границами состояния и штатной остановкой.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -2449,7 +2453,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/control-loop/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.control.ReferenceNode",
@@ -2458,7 +2464,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/control-referencenode/README.md",
       "initial_scope": "Ссылка на один разрешённый базовый компонент с проверкой источника настроек, портов и собственного выполнения.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -2505,7 +2511,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/control-referencenode/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.control.SuperNode",
@@ -2514,7 +2522,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/control-supernode/README.md",
       "initial_scope": "Подмодель с небольшим внутренним графом и явным отображением граничных портов; вход/выход из вложенного workflow.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -2562,7 +2570,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/control-supernode/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.dataMining.Arimax",
@@ -2571,7 +2581,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/datamining-arimax/README.md",
       "initial_scope": "Один базовый временной прогноз с ограниченными порядками и горизонтом; таблицы прогноза/коэффициентов и переменные сводки. Сезонность, внешние факторы, остатки и интервалы — по отдельно заявленным опциям.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -2621,7 +2631,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/datamining-arimax/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.dataMining.AssnRules",
@@ -2630,7 +2642,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/datamining-assnrules/README.md",
       "initial_scope": "Небольшие подготовленные транзакции и ограниченный набор порогов; точные правила, поддержка и достоверность.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -2679,7 +2691,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/datamining-assnrules/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.dataMining.Clope",
@@ -2688,7 +2702,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/datamining-clope/README.md",
       "initial_scope": "Подготовленные транзакции и одна наблюдённая настройка кластеризации; состав кластеров и результат применения.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -2737,7 +2751,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/datamining-clope/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.dataMining.Clustering",
@@ -2746,7 +2762,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/datamining-clustering/README.md",
       "initial_scope": "Один наблюдённый алгоритм на чистых числовых данных с заданным числом кластеров и чтением всех выходов.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -2794,7 +2810,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/datamining-clustering/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.dataMining.EmClust",
@@ -2803,7 +2821,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/datamining-emclust/README.md",
       "initial_scope": "Одна наблюдённая настройка EM на ограниченных данных; принадлежности/вероятности и сохранённая модель.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -2851,7 +2869,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/datamining-emclust/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.dataMining.LinRegression",
@@ -2860,7 +2880,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/datamining-linregression/README.md",
       "initial_scope": "Простой закон на чистых самостоятельных данных: роли полей, обучение, коэффициенты и прогноз новых строк.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -2909,7 +2929,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/datamining-linregression/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.dataMining.LogRegression",
@@ -2918,7 +2940,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/datamining-logregression/README.md",
       "initial_scope": "Бинарная цель без весов: обучение, соответствие классов, вероятность и явный порог решения.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -2967,7 +2989,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/datamining-logregression/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.dataMining.NeuralnetClass",
@@ -2976,7 +3000,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/datamining-neuralnetclass/README.md",
       "initial_scope": "Одна небольшая сеть для бинарной классификации; явные классы, вероятности/решения и применение модели.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3024,7 +3048,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/datamining-neuralnetclass/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.dataMining.NeuralnetReg",
@@ -3033,7 +3059,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/datamining-neuralnetreg/README.md",
       "initial_scope": "Одна небольшая сеть для регрессии на чистом самостоятельном наборе; фиксируемые настройки обучения и прогноз.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3081,7 +3107,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/datamining-neuralnetreg/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.dataMining.Sonn",
@@ -3090,7 +3118,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/datamining-sonn/README.md",
       "initial_scope": "Небольшая самоорганизующаяся сеть в одном наблюдённом режиме; применение модели и проверяемые инварианты.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3138,7 +3166,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/datamining-sonn/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.exports.DataBase",
@@ -3147,7 +3177,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/exports-database/README.md",
       "initial_scope": "Одна СУБД: запись в выделенную тестовую таблицу в одном явном режиме, с определённым поведением повторного запуска.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3196,7 +3226,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/exports-database/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.exports.Excel",
@@ -3205,7 +3237,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/exports-excel/README.md",
       "initial_scope": "Экспорт одной таблицы в новый xlsx, явные лист и путь; проверить типы ячеек и полный небольшой лист.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3253,7 +3285,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/exports-excel/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.exports.Kafka",
@@ -3262,7 +3296,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/exports-kafka/README.md",
       "initial_scope": "Отправка ограниченного набора сообщений в выделенный topic; явные ключ/значение и наблюдаемый результат доставки.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3310,7 +3344,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/exports-kafka/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.exports.Lgd",
@@ -3319,7 +3355,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/exports-lgd/README.md",
       "initial_scope": "Экспорт одной таблицы в LGD в выбранном штатном режиме сжатия с сохранением свойств полей.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3367,7 +3403,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/exports-lgd/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.exports.Tableau",
@@ -3376,7 +3414,7 @@
       "legacy_subplan": null,
       "queue_class": "conditional_reserve",
       "handler": null,
-      "card": null,
+      "card": "nodes/exports-tableau/README.md",
       "initial_scope": "Условный первый объём после допуска: локальный Extract-файл выбранного поддержанного формата; без публикации на Tableau Server.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3425,7 +3463,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/exports-tableau/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.exports.Warehouse",
@@ -3434,7 +3474,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/exports-warehouse/README.md",
       "initial_scope": "Один поддержанный режим выгрузки в выделенный объект Deductor Warehouse с проверкой сохранённых записей.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3483,7 +3523,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/exports-warehouse/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.exports.Xml",
@@ -3492,7 +3534,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/exports-xml/README.md",
       "initial_scope": "Экспорт подготовленных данных в новый XML с явной схемой, кодировкой и путём.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3540,7 +3582,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/exports-xml/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.imports.DataBase",
@@ -3549,7 +3593,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/imports-database/README.md",
       "initial_scope": "Одна поддержанная СУБД и выделенное подключение: чтение таблицы или параметризованного SELECT.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3598,7 +3642,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/imports-database/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.imports.Excel",
@@ -3607,7 +3653,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/imports-excel/README.md",
       "initial_scope": "Импорт xlsx: один явно выбранный лист и диапазон, заголовки, типы и пропуски; без расширения на xls или макросы.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3655,7 +3701,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/imports-excel/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.imports.Kafka",
@@ -3664,7 +3712,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/imports-kafka/README.md",
       "initial_scope": "Чтение из выделенного тестового topic с ограниченным набором сообщений и явной политикой позиции чтения.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3712,7 +3760,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/imports-kafka/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.imports.Lgd",
@@ -3721,7 +3771,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/imports-lgd/README.md",
       "initial_scope": "Импорт самостоятельного LGD с подтверждёнными полями, видами, типами, Null и значениями; повреждённый файл даёт отказ.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3769,7 +3819,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/imports-lgd/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.imports.OneCRequest",
@@ -3778,7 +3830,7 @@
       "legacy_subplan": null,
       "queue_class": "conditional_reserve",
       "handler": null,
-      "card": null,
+      "card": "nodes/imports-onecrequest/README.md",
       "initial_scope": "Условный первый объём после появления компонента: один читающий запрос к выделенной базе 1 С через его собственный тип подключения.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3827,7 +3879,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/imports-onecrequest/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.imports.Warehouse",
@@ -3836,7 +3890,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/imports-warehouse/README.md",
       "initial_scope": "Одна доступная схема Deductor Warehouse: чтение выбранных измерений/фактов из выделенного источника.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3885,7 +3939,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/imports-warehouse/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.imports.Xml",
@@ -3894,7 +3950,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/imports-xml/README.md",
       "initial_scope": "Импорт самостоятельного XML по поддержанной схеме: повторяющиеся записи, типы и пространства имён.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3942,7 +3998,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/imports-xml/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.integration.DataToXml",
@@ -3951,7 +4009,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/integration-datatoxml/README.md",
       "initial_scope": "Формирование ограниченного XML из подготовленных данных по явной структуре и пространствам имён.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -3999,7 +4057,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/integration-datatoxml/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.integration.ExecCmd",
@@ -4008,7 +4068,7 @@
       "legacy_subplan": null,
       "queue_class": "conditional_reserve",
       "handler": null,
-      "card": null,
+      "card": "nodes/integration-execcmd/README.md",
       "initial_scope": "Условный первый объём после допуска: штатное выполнение безопасной тестовой программы самим серверным компонентом и проверка результата.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4056,7 +4116,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/integration-execcmd/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.integration.ExtractXml",
@@ -4065,7 +4127,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/integration-extractxml/README.md",
       "initial_scope": "Разбор ограниченного XML по явной схеме/структуре: элементы, атрибуты, повторения и пространства имён.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4113,7 +4175,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/integration-extractxml/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.integration.RestRequest",
@@ -4122,7 +4186,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/integration-restrequest/README.md",
       "initial_scope": "Чтение контролируемого HTTP-сервиса по ограниченным входным строкам, параметры запроса и все результаты/ошибки.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4171,7 +4235,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/integration-restrequest/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.integration.SoapRequest",
@@ -4180,7 +4246,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/integration-soaprequest/README.md",
       "initial_scope": "Один метод контролируемого SOAP-сервиса с фиксированным WSDL, параметрами и проверяемым ответом.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4228,7 +4294,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/integration-soaprequest/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.integration.SqlScript",
@@ -4237,7 +4305,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/integration-sqlscript/README.md",
       "initial_scope": "Одна СУБД: ограниченный скрипт над выделенными данными, параметры и явно выбранная транзакция.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4285,7 +4353,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/integration-sqlscript/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.preprocessing.Binning",
@@ -4294,7 +4364,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/preprocessing-binning/README.md",
       "initial_scope": "Один ограниченный режим интервалов; явные границы или выбранный алгоритм расчёта с сохранением полученных диапазонов.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4342,7 +4412,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/preprocessing-binning/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.preprocessing.CoarseClasses",
@@ -4351,7 +4423,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/preprocessing-coarseclasses/README.md",
       "initial_scope": "Один бинарный пример: роли полей, разбиение признака, WoE/IV и применение сохранённых классов.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4399,7 +4471,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/preprocessing-coarseclasses/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.preprocessing.DataPartition",
@@ -4408,7 +4482,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/preprocessing-datapartition/README.md",
       "initial_scope": "Один наблюдённый режим разделения обучающей/тестовой выборки с явными размерами и всеми тремя выходами.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4455,7 +4529,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/preprocessing-datapartition/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.preprocessing.Elimoutlier",
@@ -4464,7 +4540,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/preprocessing-elimoutlier/README.md",
       "initial_scope": "Один наблюдённый метод порогов и явные параметры; обработанные данные, выбросы и экстремальные значения.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4511,7 +4587,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/preprocessing-elimoutlier/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.preprocessing.Sampling",
@@ -4520,7 +4598,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/preprocessing-sampling/README.md",
       "initial_scope": "Два отдельных детерминированных метода: Последовательный и Отбор со смещением; размер и параметры каждого заданы отдельно. Случайные/стратифицированные режимы — последующие расширения.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4567,7 +4645,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/preprocessing-sampling/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.preprocessing.Smoothing",
@@ -4576,7 +4656,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/preprocessing-smoothing/README.md",
       "initial_scope": "Один штатный метод сглаживания на известном упорядоченном ряду с явными параметрами.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4624,7 +4704,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/preprocessing-smoothing/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.programming.JavaScript",
@@ -4633,7 +4715,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/programming-javascript/README.md",
       "initial_scope": "Ограниченный детерминированный табличный пример: вход, вычисленные поля, выход и ошибка исполнения.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4681,7 +4763,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/programming-javascript/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.programming.Python",
@@ -4690,7 +4774,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/programming-python/README.md",
       "initial_scope": "Ограниченный табличный пример в разрешённом отдельном Python-процессе на сервере; без установки библиотек по ходу работы.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4738,7 +4822,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/programming-python/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.research.AutoCorrelation",
@@ -4747,7 +4833,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/research-autocorrelation/README.md",
       "initial_scope": "Обычная автокорреляция известного числового ряда для ограниченного набора лагов; частная отдельно.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4795,7 +4881,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/research-autocorrelation/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.research.CorrAnalysis",
@@ -4804,7 +4892,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/research-corranalysis/README.md",
       "initial_scope": "Коэффициент Пирсона для нескольких выбранных числовых полей; явная обработка констант и пропусков.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4851,7 +4939,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/research-corranalysis/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.research.FactorAnalysis",
@@ -4860,7 +4950,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/research-factoranalysis/README.md",
       "initial_scope": "Один наблюдённый метод, фиксированное число факторов и ограниченная настройка вращения.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4908,7 +4998,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/research-factoranalysis/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.research.Quality",
@@ -4917,7 +5009,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/research-quality/README.md",
       "initial_scope": "Настройка реально добавляемого узла «Качество данных» и проверка смысла всех пяти табличных выходов; точный метод определить после discovery.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4965,7 +5057,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/research-quality/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.transform.ColUnionData",
@@ -4974,7 +5068,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/transform-coluniondata/README.md",
       "initial_scope": "Две таблицы: соединение колонок по позиции строки, включая разные длины и пустой вход; переменные позднее.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5022,7 +5116,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/transform-coluniondata/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.transform.CrossTable",
@@ -5090,7 +5186,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/transform-enrichdata/README.md",
       "initial_scope": "Основная таблица и до двух справочников: ключи каждого входа, префиксы и левое дополнение.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5138,7 +5234,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/transform-enrichdata/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.transform.SlidingWindow",
@@ -5147,7 +5245,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/transform-slidingwindow/README.md",
       "initial_scope": "Заданные лаги и ограниченный горизонт на явно упорядоченном ряду с обеими согласованными политиками краёв.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5195,7 +5293,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/transform-slidingwindow/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.transform.UngroupData",
@@ -5204,7 +5304,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/transform-ungroupdata/README.md",
       "initial_scope": "Два входа: распределение групповых итогов по явно заданным опорным долям.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5252,7 +5352,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/transform-ungroupdata/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.trees.CalculatorTree",
@@ -5261,7 +5363,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/trees-calculatortree/README.md",
       "initial_scope": "Ограниченные выражения для выбранных узлов дерева с сохранением остальной структуры; без произвольного расширения языка.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5308,7 +5410,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/trees-calculatortree/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.trees.DataToTree",
@@ -5317,7 +5421,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/trees-datatotree/README.md",
       "initial_scope": "Плоская таблица в ограниченную структуру дерева с явно заданными уровнями и порядком.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5365,7 +5469,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/trees-datatotree/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.trees.JSONToTree",
@@ -5374,7 +5480,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/trees-jsontotree/README.md",
       "initial_scope": "Один документ JSON ограниченной вложенности: объекты, массивы, скалярные значения и Null в типизированное дерево.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5421,7 +5527,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/trees-jsontotree/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.trees.JoindataTree",
@@ -5430,7 +5538,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/trees-joindatatree/README.md",
       "initial_scope": "Два дерева: один наблюдённый штатный режим слияния по явно выбранным ключам/путям.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5478,7 +5586,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/trees-joindatatree/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.trees.TreeToData",
@@ -5487,7 +5597,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/trees-treetodata/README.md",
       "initial_scope": "Выбранная ветвь дерева в таблицу: повторяющиеся записи, путь к полям и политика отсутствующих значений.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5535,7 +5645,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/trees-treetodata/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.trees.TreeToJSON",
@@ -5544,7 +5656,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/trees-treetojson/README.md",
       "initial_scope": "Самостоятельное типизированное дерево в JSON с явной семантикой структуры и сохранением типов.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5591,7 +5703,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/trees-treetojson/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.trees.UnionTree",
@@ -5600,7 +5714,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/trees-uniontree/README.md",
       "initial_scope": "Два самостоятельных дерева совместимой структуры: явное объединение и сохранение кратностей.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5648,7 +5762,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/trees-uniontree/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.variables.Calculator",
@@ -5657,7 +5773,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/variables-calculator/README.md",
       "initial_scope": "Ограниченные выражения над типизированными переменными и явные выходные имена.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5704,7 +5820,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/variables-calculator/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.variables.ColunionDataVar",
@@ -5713,7 +5831,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/variables-coluniondatavar/README.md",
       "initial_scope": "Два набора переменных с явным разрешением одинаковых имён и проверкой типов/значений.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5761,7 +5879,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/variables-coluniondatavar/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.variables.DataToVar",
@@ -5770,7 +5890,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/variables-datatovar/README.md",
       "initial_scope": "Выбранные значения небольшой таблицы в типизированные переменные с явной политикой строк и имён.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5818,7 +5938,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/variables-datatovar/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.variables.Replace",
@@ -5827,7 +5949,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/variables-replace/README.md",
       "initial_scope": "Внутренняя таблица правил для выбранных переменных с явной политикой отсутствующего соответствия.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5874,7 +5996,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/variables-replace/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.variables.VarToData",
@@ -5883,7 +6007,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/variables-vartodata/README.md",
       "initial_scope": "Самостоятельный набор типизированных переменных в таблицу с заданными полями и порядком.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -5931,7 +6055,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "plan": "nodes/variables-vartodata/plan.md",
+      "plan_status": "discovery_required"
     }
   ]
 }

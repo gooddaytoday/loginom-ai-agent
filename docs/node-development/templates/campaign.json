@@ -8,25 +8,25 @@
   "auto_continue_authorized_queue": true,
   "base": {
     "repository": "loginom-ai-agent",
-    "branch": "loginom",
+    "branch": null,
     "commit": null
   },
   "models": {
     "developer": {
-      "model": "gpt-6-astra",
-      "effort": "medium"
+      "model": null,
+      "effort": null
     },
     "review": {
-      "model": "gpt-6-astra",
-      "effort": "medium"
+      "model": null,
+      "effort": null
     },
     "acceptance": {
-      "model": "openai/gpt-6-sol",
-      "variant": "low",
+      "model": null,
+      "variant": null,
       "credential_source": "existing-chatgpt-oauth"
     }
   },
-  "acceptance_timeout_seconds": 1800,
+  "acceptance_timeout_seconds": 7200,
   "memory": {
     "status": "not_enrolled",
     "root": "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-ai-agent/memories",
@@ -48,5 +48,7 @@
   },
   "dispatches": [],
   "events": [],
-  "updated_at": null
+  "updated_at": null,
+  "usage": "Legacy snapshot template, not a Multica scheduler. Use parallel-execution.json and workflow/multica-parallel.md; native issues are execution state.",
+  "deprecated_for_multica": true
 }

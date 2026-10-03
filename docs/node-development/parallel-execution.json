@@ -1,0 +1,4121 @@
+{
+  "schema_version": 1,
+  "status": "proposal_not_deployed",
+  "source_commit": "5f772aea9de6414a19feb6ecc109a196c9e92453",
+  "multica_source_commit": "b2561aad61055dd9937fc08f6497846b1458d018",
+  "operations_source_commit": "f55d1f4afb52ca3490d22d4858cd8b2bb76ebe91",
+  "profiles": [
+    {
+      "id": "legacy-development",
+      "generator": 1,
+      "worker": 4,
+      "reviewer": 2,
+      "daemon_capacity": 7,
+      "card_wip": 6,
+      "model_slots": 1,
+      "requires_shared_oauth": false
+    },
+    {
+      "id": "shared-oauth-pilot",
+      "generator": 1,
+      "worker": 2,
+      "reviewer": 2,
+      "daemon_capacity": 5,
+      "card_wip": 2,
+      "model_slots": 2,
+      "requires_shared_oauth": true
+    },
+    {
+      "id": "balanced",
+      "generator": 1,
+      "worker": 4,
+      "reviewer": 2,
+      "daemon_capacity": 7,
+      "card_wip": 6,
+      "model_slots": 2,
+      "requires_shared_oauth": true
+    },
+    {
+      "id": "expanded",
+      "generator": 1,
+      "worker": 6,
+      "reviewer": 2,
+      "daemon_capacity": 9,
+      "card_wip": 8,
+      "model_slots": 2,
+      "requires_shared_oauth": true
+    }
+  ],
+  "lanes": [
+    {
+      "id": "F00",
+      "title": "Общие возможности runtime",
+      "description": "Отдельные владельцы контрактов; независимые fixtures параллельны, одинаковые общие участки изменяются в согласованном окне."
+    },
+    {
+      "id": "L01",
+      "title": "Выражения и настройки строк",
+      "description": "После oracle-tabular: отдельные s1 maintenance; затем date-time:s2, field-parameters:s2, calculator:s2. Остальные s2/s3 выбираются по собственным prerequisites."
+    },
+    {
+      "id": "L02",
+      "title": "Табличные соединения и форма таблицы",
+      "description": "После oracle-tabular: transform-enrichdata:s1, transform-slidingwindow:s1, transform-coluniondata:s1 либо один из s1 maintenance; далее join:s2/union:s2/grouping:s2 независимы между узлами."
+    },
+    {
+      "id": "L03",
+      "title": "Кросс-таблица и её узкие общие изменения",
+      "description": "CrossTable уже разрабатывается по сообщению владельца от 2026-10-02; сверить stage/SHA существующей карточки, не запускать повторно. Собственный владелец W1–W3; oracle-crosstable + W2/file-artifacts, затем dynamic-schema и transform-crosstable:s1. s2 ждёт полного oracle-tabular и variant-values, s3 — typed-variables."
+    },
+    {
+      "id": "L04",
+      "title": "Локальные файлы и форматы",
+      "description": "После oracle-tabular + file-artifacts: imports-excel:s1 и imports-lgd:s1 независимо; текстовые s1 maintenance. Экспорт ждёт external-effects; LGD — проверенный независимый reader."
+    },
+    {
+      "id": "L05",
+      "title": "Переменные",
+      "description": "После typed-variables: любой s1. VarToData и DataToVar не являются предпосылками друг друга; fixtures портов подготовлены заранее."
+    },
+    {
+      "id": "L06",
+      "title": "Деревья",
+      "description": "После typed-trees: DataToTree:s1, TreeToData:s1, JSONToTree:s1 и другие s1 независимы. Прямой prepared tree fixture исключает цепочку JSONToTree→все остальные→TreeToJSON."
+    },
+    {
+      "id": "L07",
+      "title": "Исследование и необучаемая предобработка",
+      "description": "Quality:s1 допустим сразу как source discovery. После oracle-tabular: CorrAnalysis:s1, Sampling:s1, DataPartition:s1 и PCA:s1 независимы. Sampling recommended_after не блокирует DataPartition."
+    },
+    {
+      "id": "L08",
+      "title": "Обучаемая предобработка и неконтролируемые модели",
+      "description": "После training + oracle-tabular: Binning:s1, Clustering:s1, AssnRules:s1 или Clope:s1. Ни один из этих узлов не должен ждать другого; shared train lifecycle один."
+    },
+    {
+      "id": "L09",
+      "title": "Регрессии, нейросети и временной ряд",
+      "description": "После training + typed-variables + oracle-tabular: LinRegression:s1 как простой пилот, но LogRegression/ARIMAX/Neural s1 могут начинаться независимо с готовыми train/holdout fixtures."
+    },
+    {
+      "id": "L10",
+      "title": "Вложенные сценарии и управление",
+      "description": "ReferenceNode:s1 ждёт только oracle-tabular. SuperNode:s1 — минимальный nested 1→1. Condition:s1 — control-flow. ExecNode:s1 — derived-components. Loop:s1 — control-flow + derived-components."
+    },
+    {
+      "id": "L11",
+      "title": "Базы данных и Warehouse",
+      "description": "После connections на конкретном принятом провайдере: imports-database:s1; экспорт/SqlScript дополнительно ждут external-effects, SqlScript — typed-variables. 1C и Warehouse имеют отдельные environment gates."
+    },
+    {
+      "id": "L12",
+      "title": "XML и HTTP-сервисы",
+      "description": "После connections для XSD/REST/SOAP и требуемых file/effects capabilities: независимые s1. REST не ждёт SOAP/XML, XML import не ждёт XML export."
+    },
+    {
+      "id": "L13",
+      "title": "Серверный код, процессы и специальные источники",
+      "description": "JavaScript уже разрабатывается по сообщению владельца от 2026-10-02; текущий stage и общие prerequisites сверить с существующей карточкой. JavaScript:s1 после programming; Python:s1 дополнительно typed-variables. ExecCmd после typed-variables + external-effects, Kafka после своего connection/effects, Tableau historical-only требует отдельного discovery среды."
+    }
+  ],
+  "resources": [
+    {
+      "id": "shared-oracle",
+      "title": "Общий verifier и схема expected",
+      "phase": "development",
+      "scope": "Один владелец изменяемых общих функций cold-check; fixtures и отдельные readers вне этого окна независимы",
+      "capacity": 1,
+      "applies_when": "always"
+    },
+    {
+      "id": "shared-table-shell",
+      "title": "Общая табличная оболочка и schema policy",
+      "phase": "development",
+      "scope": "calculator-node, node-read и общие table-output helpers; границы функций закрепляет Генератор",
+      "capacity": 1,
+      "applies_when": "always"
+    },
+    {
+      "id": "shared-ui-graph",
+      "title": "Общие refs, UI-навигация и границы графов",
+      "phase": "development",
+      "scope": "Общие функции workspace-ui/node-target/node-workflow-activation",
+      "capacity": 1,
+      "applies_when": "always"
+    },
+    {
+      "id": "shared-port-contract",
+      "title": "Контракт типизированных портов",
+      "phase": "development",
+      "scope": "Общие схемы и wire-формы переменных/деревьев",
+      "capacity": 1,
+      "applies_when": "always"
+    },
+    {
+      "id": "shared-files",
+      "title": "Общая доставка и идентичность файла",
+      "phase": "development",
+      "scope": "artifact-delivery/discovery и parser размера в workspace-ui; W2 принадлежит CrossTable",
+      "capacity": 1,
+      "applies_when": "always"
+    },
+    {
+      "id": "shared-execution",
+      "title": "Общие execution/recovery/train переходы",
+      "phase": "development",
+      "scope": "Изменяемые общие функции executor/node-apply/node-execution; узловые observers независимы",
+      "capacity": 1,
+      "applies_when": "always"
+    },
+    {
+      "id": "shared-connections",
+      "title": "Общий контракт подключения",
+      "phase": "development",
+      "scope": "Общие refs/readback подключений, конкретные провайдеры принимаются отдельно",
+      "capacity": 1,
+      "applies_when": "always"
+    },
+    {
+      "id": "shared-code-editor",
+      "title": "Общий lifecycle редактора кода",
+      "phase": "development",
+      "scope": "Общий редактор JS/Python; отдельные программы и fixtures параллельны",
+      "capacity": 1,
+      "applies_when": "always"
+    },
+    {
+      "id": "runtime-registration",
+      "title": "Публичная схема и регистрация обработчиков",
+      "phase": "integration",
+      "scope": "Окно согласования node-api/contracts/support/procedure/user-workflow/user-results; не блокирует всю разработку",
+      "capacity": 1,
+      "applies_when": "always"
+    },
+    {
+      "id": "readiness-publication",
+      "title": "Публикация готовности и карт",
+      "phase": "integration",
+      "scope": "registry, coverage-map, parallel-execution и генерируемые обзоры; только подтверждённые поля своего scope",
+      "capacity": 1,
+      "applies_when": "always"
+    },
+    {
+      "id": "base-branch",
+      "title": "Включение результатов в ветку задания",
+      "phase": "integration",
+      "scope": "Один результат за раз на актуальном base; merge только по отдельной команде владельца",
+      "capacity": 1,
+      "applies_when": "always"
+    },
+    {
+      "id": "legacy-oauth",
+      "title": "Модель: общая OAuth-авторизация без shared-oauth-v1",
+      "phase": "model",
+      "scope": "Одна попытка на логическую credential во всей кампании; локальный flock не координирует копии на разных host",
+      "capacity": 1,
+      "applies_when": "legacy_oauth"
+    },
+    {
+      "id": "oracle-profile",
+      "title": "Oracle: собственный профиль и output",
+      "phase": "oracle",
+      "scope": "Один владелец конкретного browser profile/output; независимые пары допускают параллельное чтение",
+      "capacity": 1,
+      "applies_when": "always"
+    }
+  ],
+  "stages": [
+    {
+      "stage_id": "text-import:s1",
+      "lane": "L04",
+      "card_group": "text-import",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "text-import:s2",
+      "lane": "L04",
+      "card_group": "text-import",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "text-import:s3",
+      "lane": "L04",
+      "card_group": "text-import",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "text-import:s4",
+      "lane": "L04",
+      "card_group": "text-import",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "calculator:s1",
+      "lane": "L01",
+      "card_group": "calculator",
+      "development_locks": [
+        "shared-table-shell"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA. Calculator handler и общая оболочка находятся в calculator-node.mjs; заранее согласовать изменяемые функции с W1/Variant."
+    },
+    {
+      "stage_id": "calculator:s2",
+      "lane": "L01",
+      "card_group": "calculator",
+      "development_locks": [
+        "shared-table-shell"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA. Calculator handler и общая оболочка находятся в calculator-node.mjs; заранее согласовать изменяемые функции с W1/Variant."
+    },
+    {
+      "stage_id": "calculator:s3",
+      "lane": "L01",
+      "card_group": "calculator",
+      "development_locks": [
+        "shared-table-shell"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA. Calculator handler и общая оболочка находятся в calculator-node.mjs; заранее согласовать изменяемые функции с W1/Variant."
+    },
+    {
+      "stage_id": "calculator:s4",
+      "lane": "L01",
+      "card_group": "calculator",
+      "development_locks": [
+        "shared-table-shell"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA. Calculator handler и общая оболочка находятся в calculator-node.mjs; заранее согласовать изменяемые функции с W1/Variant."
+    },
+    {
+      "stage_id": "field-parameters:s1",
+      "lane": "L01",
+      "card_group": "field-parameters",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "field-parameters:s2",
+      "lane": "L01",
+      "card_group": "field-parameters",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "field-parameters:s3",
+      "lane": "L01",
+      "card_group": "field-parameters",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "row-filter:s1",
+      "lane": "L01",
+      "card_group": "row-filter",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "row-filter:s2",
+      "lane": "L01",
+      "card_group": "row-filter",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "row-filter:s3",
+      "lane": "L01",
+      "card_group": "row-filter",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "grouping:s1",
+      "lane": "L02",
+      "card_group": "grouping",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "grouping:s2",
+      "lane": "L02",
+      "card_group": "grouping",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "grouping:s3",
+      "lane": "L02",
+      "card_group": "grouping",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "sorting:s1",
+      "lane": "L01",
+      "card_group": "sorting",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "sorting:s2",
+      "lane": "L01",
+      "card_group": "sorting",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "sorting:s3",
+      "lane": "L01",
+      "card_group": "sorting",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "join:s1",
+      "lane": "L02",
+      "card_group": "join",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "join:s2",
+      "lane": "L02",
+      "card_group": "join",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "join:s3",
+      "lane": "L02",
+      "card_group": "join",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "union:s1",
+      "lane": "L02",
+      "card_group": "union",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "union:s2",
+      "lane": "L02",
+      "card_group": "union",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "replacement:s1",
+      "lane": "L01",
+      "card_group": "replacement",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "replacement:s2",
+      "lane": "L01",
+      "card_group": "replacement",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "replacement:s3",
+      "lane": "L01",
+      "card_group": "replacement",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "duplicates:s1",
+      "lane": "L01",
+      "card_group": "duplicates",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "duplicates:s2",
+      "lane": "L01",
+      "card_group": "duplicates",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "duplicates:s3",
+      "lane": "L01",
+      "card_group": "duplicates",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "date-time:s1",
+      "lane": "L01",
+      "card_group": "date-time",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "date-time:s2",
+      "lane": "L01",
+      "card_group": "date-time",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "date-time:s3",
+      "lane": "L01",
+      "card_group": "date-time",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "missing-values:s1",
+      "lane": "L01",
+      "card_group": "missing-values",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "missing-values:s2",
+      "lane": "L01",
+      "card_group": "missing-values",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "missing-values:s3",
+      "lane": "L01",
+      "card_group": "missing-values",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "collapse-columns:s1",
+      "lane": "L02",
+      "card_group": "collapse-columns",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "collapse-columns:s2",
+      "lane": "L02",
+      "card_group": "collapse-columns",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "text-export:s1",
+      "lane": "L04",
+      "card_group": "text-export",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "text-export:s2",
+      "lane": "L04",
+      "card_group": "text-export",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "text-export:s3",
+      "lane": "L04",
+      "card_group": "text-export",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-condition:s1",
+      "lane": "L10",
+      "card_group": "control-condition",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-condition:s2",
+      "lane": "L10",
+      "card_group": "control-condition",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-condition:s3",
+      "lane": "L10",
+      "card_group": "control-condition",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-execnode:s1",
+      "lane": "L10",
+      "card_group": "control-execnode",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-execnode:s2",
+      "lane": "L10",
+      "card_group": "control-execnode",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-execnode:s3",
+      "lane": "L10",
+      "card_group": "control-execnode",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-loop:s1",
+      "lane": "L10",
+      "card_group": "control-loop",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-loop:s2",
+      "lane": "L10",
+      "card_group": "control-loop",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-loop:s3",
+      "lane": "L10",
+      "card_group": "control-loop",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-loop:s4",
+      "lane": "L10",
+      "card_group": "control-loop",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-referencenode:s1",
+      "lane": "L10",
+      "card_group": "control-referencenode",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-referencenode:s2",
+      "lane": "L10",
+      "card_group": "control-referencenode",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-supernode:s1",
+      "lane": "L10",
+      "card_group": "control-supernode",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-supernode:s2",
+      "lane": "L10",
+      "card_group": "control-supernode",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "control-supernode:s3",
+      "lane": "L10",
+      "card_group": "control-supernode",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-arimax:s1",
+      "lane": "L09",
+      "card_group": "datamining-arimax",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-arimax:s2",
+      "lane": "L09",
+      "card_group": "datamining-arimax",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-arimax:s3",
+      "lane": "L09",
+      "card_group": "datamining-arimax",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-assnrules:s1",
+      "lane": "L08",
+      "card_group": "datamining-assnrules",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-assnrules:s2",
+      "lane": "L08",
+      "card_group": "datamining-assnrules",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-clope:s1",
+      "lane": "L08",
+      "card_group": "datamining-clope",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-clope:s2",
+      "lane": "L08",
+      "card_group": "datamining-clope",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-clustering:s1",
+      "lane": "L08",
+      "card_group": "datamining-clustering",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-clustering:s2",
+      "lane": "L08",
+      "card_group": "datamining-clustering",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-emclust:s1",
+      "lane": "L08",
+      "card_group": "datamining-emclust",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-emclust:s2",
+      "lane": "L08",
+      "card_group": "datamining-emclust",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-linregression:s1",
+      "lane": "L09",
+      "card_group": "datamining-linregression",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-linregression:s2",
+      "lane": "L09",
+      "card_group": "datamining-linregression",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-linregression:s3",
+      "lane": "L09",
+      "card_group": "datamining-linregression",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-linregression:s4",
+      "lane": "L09",
+      "card_group": "datamining-linregression",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-logregression:s1",
+      "lane": "L09",
+      "card_group": "datamining-logregression",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-logregression:s2",
+      "lane": "L09",
+      "card_group": "datamining-logregression",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-logregression:s3",
+      "lane": "L09",
+      "card_group": "datamining-logregression",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-logregression:s4",
+      "lane": "L09",
+      "card_group": "datamining-logregression",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-neuralnetclass:s1",
+      "lane": "L09",
+      "card_group": "datamining-neuralnetclass",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-neuralnetclass:s2",
+      "lane": "L09",
+      "card_group": "datamining-neuralnetclass",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-neuralnetclass:s3",
+      "lane": "L09",
+      "card_group": "datamining-neuralnetclass",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-neuralnetclass:s4",
+      "lane": "L09",
+      "card_group": "datamining-neuralnetclass",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-neuralnetreg:s1",
+      "lane": "L09",
+      "card_group": "datamining-neuralnetreg",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-neuralnetreg:s2",
+      "lane": "L09",
+      "card_group": "datamining-neuralnetreg",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-neuralnetreg:s3",
+      "lane": "L09",
+      "card_group": "datamining-neuralnetreg",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-neuralnetreg:s4",
+      "lane": "L09",
+      "card_group": "datamining-neuralnetreg",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-sonn:s1",
+      "lane": "L08",
+      "card_group": "datamining-sonn",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-sonn:s2",
+      "lane": "L08",
+      "card_group": "datamining-sonn",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "datamining-sonn:s3",
+      "lane": "L08",
+      "card_group": "datamining-sonn",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "exports-database:s1",
+      "lane": "L11",
+      "card_group": "exports-database",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "exports-database:s2",
+      "lane": "L11",
+      "card_group": "exports-database",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "exports-excel:s1",
+      "lane": "L04",
+      "card_group": "exports-excel",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "exports-excel:s2",
+      "lane": "L04",
+      "card_group": "exports-excel",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "exports-kafka:s1",
+      "lane": "L13",
+      "card_group": "exports-kafka",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "exports-kafka:s2",
+      "lane": "L13",
+      "card_group": "exports-kafka",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "exports-lgd:s1",
+      "lane": "L04",
+      "card_group": "exports-lgd",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "exports-lgd:s2",
+      "lane": "L04",
+      "card_group": "exports-lgd",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "exports-tableau:s1",
+      "lane": "L13",
+      "card_group": "exports-tableau",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "exports-tableau:s2",
+      "lane": "L13",
+      "card_group": "exports-tableau",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "exports-warehouse:s1",
+      "lane": "L11",
+      "card_group": "exports-warehouse",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "exports-warehouse:s2",
+      "lane": "L11",
+      "card_group": "exports-warehouse",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "exports-xml:s1",
+      "lane": "L12",
+      "card_group": "exports-xml",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "exports-xml:s2",
+      "lane": "L12",
+      "card_group": "exports-xml",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "imports-database:s1",
+      "lane": "L11",
+      "card_group": "imports-database",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "imports-database:s2",
+      "lane": "L11",
+      "card_group": "imports-database",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "imports-excel:s1",
+      "lane": "L04",
+      "card_group": "imports-excel",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "imports-excel:s2",
+      "lane": "L04",
+      "card_group": "imports-excel",
+      "development_locks": [
+        "shared-table-shell"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA. Новая разрешённая динамическая policy требует собственного discovery и владельца; CrossTable PASS её не разрешает."
+    },
+    {
+      "stage_id": "imports-kafka:s1",
+      "lane": "L13",
+      "card_group": "imports-kafka",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "imports-kafka:s2",
+      "lane": "L13",
+      "card_group": "imports-kafka",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "imports-lgd:s1",
+      "lane": "L04",
+      "card_group": "imports-lgd",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "imports-lgd:s2",
+      "lane": "L04",
+      "card_group": "imports-lgd",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "imports-onecrequest:s1",
+      "lane": "L11",
+      "card_group": "imports-onecrequest",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "imports-onecrequest:s2",
+      "lane": "L11",
+      "card_group": "imports-onecrequest",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "imports-warehouse:s1",
+      "lane": "L11",
+      "card_group": "imports-warehouse",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "imports-warehouse:s2",
+      "lane": "L11",
+      "card_group": "imports-warehouse",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "imports-xml:s1",
+      "lane": "L12",
+      "card_group": "imports-xml",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "imports-xml:s2",
+      "lane": "L12",
+      "card_group": "imports-xml",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-datatoxml:s1",
+      "lane": "L12",
+      "card_group": "integration-datatoxml",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-datatoxml:s2",
+      "lane": "L12",
+      "card_group": "integration-datatoxml",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-execcmd:s1",
+      "lane": "L13",
+      "card_group": "integration-execcmd",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-execcmd:s2",
+      "lane": "L13",
+      "card_group": "integration-execcmd",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-extractxml:s1",
+      "lane": "L12",
+      "card_group": "integration-extractxml",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-extractxml:s2",
+      "lane": "L12",
+      "card_group": "integration-extractxml",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-restrequest:s1",
+      "lane": "L12",
+      "card_group": "integration-restrequest",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-restrequest:s2",
+      "lane": "L12",
+      "card_group": "integration-restrequest",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-restrequest:s3",
+      "lane": "L12",
+      "card_group": "integration-restrequest",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-soaprequest:s1",
+      "lane": "L12",
+      "card_group": "integration-soaprequest",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-soaprequest:s2",
+      "lane": "L12",
+      "card_group": "integration-soaprequest",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-soaprequest:s3",
+      "lane": "L12",
+      "card_group": "integration-soaprequest",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-sqlscript:s1",
+      "lane": "L11",
+      "card_group": "integration-sqlscript",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-sqlscript:s2",
+      "lane": "L11",
+      "card_group": "integration-sqlscript",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "integration-sqlscript:s3",
+      "lane": "L11",
+      "card_group": "integration-sqlscript",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "preprocessing-binning:s1",
+      "lane": "L08",
+      "card_group": "preprocessing-binning",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "preprocessing-binning:s2",
+      "lane": "L08",
+      "card_group": "preprocessing-binning",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "preprocessing-coarseclasses:s1",
+      "lane": "L08",
+      "card_group": "preprocessing-coarseclasses",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "preprocessing-coarseclasses:s2",
+      "lane": "L08",
+      "card_group": "preprocessing-coarseclasses",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "preprocessing-coarseclasses:s3",
+      "lane": "L08",
+      "card_group": "preprocessing-coarseclasses",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "preprocessing-datapartition:s1",
+      "lane": "L07",
+      "card_group": "preprocessing-datapartition",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "preprocessing-datapartition:s2",
+      "lane": "L07",
+      "card_group": "preprocessing-datapartition",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "preprocessing-elimoutlier:s1",
+      "lane": "L07",
+      "card_group": "preprocessing-elimoutlier",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "preprocessing-elimoutlier:s2",
+      "lane": "L07",
+      "card_group": "preprocessing-elimoutlier",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "preprocessing-sampling:s1",
+      "lane": "L07",
+      "card_group": "preprocessing-sampling",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "preprocessing-sampling:s2",
+      "lane": "L07",
+      "card_group": "preprocessing-sampling",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "preprocessing-smoothing:s1",
+      "lane": "L07",
+      "card_group": "preprocessing-smoothing",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "preprocessing-smoothing:s2",
+      "lane": "L07",
+      "card_group": "preprocessing-smoothing",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "programming-javascript:s1",
+      "lane": "L13",
+      "card_group": "programming-javascript",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Владелец сообщил 2026-10-02: JavaScript уже разрабатывается. Точный stage/SHA не проверен; продолжать существующее назначение, не создавать дубликат. Общие изменения сверить с CrossTable и владельцем oracle. Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "programming-javascript:s2",
+      "lane": "L13",
+      "card_group": "programming-javascript",
+      "development_locks": [
+        "shared-table-shell"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Владелец сообщил 2026-10-02: JavaScript уже разрабатывается. Точный stage/SHA не проверен; продолжать существующее назначение, не создавать дубликат. Общие изменения сверить с CrossTable и владельцем oracle. Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA. Новая разрешённая динамическая policy требует собственного discovery и владельца; CrossTable PASS её не разрешает."
+    },
+    {
+      "stage_id": "programming-javascript:s3",
+      "lane": "L13",
+      "card_group": "programming-javascript",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Владелец сообщил 2026-10-02: JavaScript уже разрабатывается. Точный stage/SHA не проверен; продолжать существующее назначение, не создавать дубликат. Общие изменения сверить с CrossTable и владельцем oracle. Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "programming-javascript:s4",
+      "lane": "L13",
+      "card_group": "programming-javascript",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Владелец сообщил 2026-10-02: JavaScript уже разрабатывается. Точный stage/SHA не проверен; продолжать существующее назначение, не создавать дубликат. Общие изменения сверить с CrossTable и владельцем oracle. Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "programming-python:s1",
+      "lane": "L13",
+      "card_group": "programming-python",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "programming-python:s2",
+      "lane": "L13",
+      "card_group": "programming-python",
+      "development_locks": [
+        "shared-table-shell"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA. Новая разрешённая динамическая policy требует собственного discovery и владельца; CrossTable PASS её не разрешает."
+    },
+    {
+      "stage_id": "programming-python:s3",
+      "lane": "L13",
+      "card_group": "programming-python",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "programming-python:s4",
+      "lane": "L13",
+      "card_group": "programming-python",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "research-autocorrelation:s1",
+      "lane": "L07",
+      "card_group": "research-autocorrelation",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "research-autocorrelation:s2",
+      "lane": "L07",
+      "card_group": "research-autocorrelation",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "research-corranalysis:s1",
+      "lane": "L07",
+      "card_group": "research-corranalysis",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Следующее независимое направление после двух уже идущих узлов: сейчас допустима подготовка исследования/ожиданий; реализация и приёмка требуют принятого foundation:oracle-tabular. Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "research-corranalysis:s2",
+      "lane": "L07",
+      "card_group": "research-corranalysis",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "research-corranalysis:s3",
+      "lane": "L07",
+      "card_group": "research-corranalysis",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "research-factoranalysis:s1",
+      "lane": "L07",
+      "card_group": "research-factoranalysis",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "research-factoranalysis:s2",
+      "lane": "L07",
+      "card_group": "research-factoranalysis",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "research-factoranalysis:s3",
+      "lane": "L07",
+      "card_group": "research-factoranalysis",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "research-quality:s1",
+      "lane": "L07",
+      "card_group": "research-quality",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [],
+      "oracle_locks": [],
+      "note": "Только исследование identity/источника семантики, без handler/model verdict; model/oracle ресурсы этой фазе не нужны. Доступность исторической среды не блокирует другие узлы."
+    },
+    {
+      "stage_id": "research-quality:s2",
+      "lane": "L07",
+      "card_group": "research-quality",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "transform-coluniondata:s1",
+      "lane": "L02",
+      "card_group": "transform-coluniondata",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "transform-coluniondata:s2",
+      "lane": "L02",
+      "card_group": "transform-coluniondata",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "transform-crosstable:s1",
+      "lane": "L03",
+      "card_group": "crosstable-core",
+      "development_locks": [
+        "shared-oracle",
+        "shared-files",
+        "shared-table-shell"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Владелец сообщил 2026-10-02: CrossTable уже разрабатывается. Продолжать существующую карточку; фактические stage/SHA сверить, не назначать повторно и не считать все этапы принятыми. Одна карточка crosstable-core. W3, W2 и W1 — последовательные контрольные точки своего владельца; ресурсы освобождаются по готовности соответствующей правки, не удерживаются до конца карточки."
+    },
+    {
+      "stage_id": "transform-crosstable:s2",
+      "lane": "L03",
+      "card_group": "transform-crosstable",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Владелец сообщил 2026-10-02: CrossTable уже разрабатывается. Продолжать существующую карточку; фактические stage/SHA сверить, не назначать повторно и не считать все этапы принятыми. Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "transform-crosstable:s3",
+      "lane": "L03",
+      "card_group": "transform-crosstable",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Владелец сообщил 2026-10-02: CrossTable уже разрабатывается. Продолжать существующую карточку; фактические stage/SHA сверить, не назначать повторно и не считать все этапы принятыми. Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "transform-enrichdata:s1",
+      "lane": "L02",
+      "card_group": "transform-enrichdata",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "transform-slidingwindow:s1",
+      "lane": "L02",
+      "card_group": "transform-slidingwindow",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "transform-ungroupdata:s1",
+      "lane": "L02",
+      "card_group": "transform-ungroupdata",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "transform-ungroupdata:s2",
+      "lane": "L02",
+      "card_group": "transform-ungroupdata",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-calculatortree:s1",
+      "lane": "L06",
+      "card_group": "trees-calculatortree",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-calculatortree:s2",
+      "lane": "L06",
+      "card_group": "trees-calculatortree",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-calculatortree:s3",
+      "lane": "L06",
+      "card_group": "trees-calculatortree",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-datatotree:s1",
+      "lane": "L06",
+      "card_group": "trees-datatotree",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-datatotree:s2",
+      "lane": "L06",
+      "card_group": "trees-datatotree",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-jsontotree:s1",
+      "lane": "L06",
+      "card_group": "trees-jsontotree",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-jsontotree:s2",
+      "lane": "L06",
+      "card_group": "trees-jsontotree",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-jsontotree:s3",
+      "lane": "L06",
+      "card_group": "trees-jsontotree",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-joindatatree:s1",
+      "lane": "L06",
+      "card_group": "trees-joindatatree",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-joindatatree:s2",
+      "lane": "L06",
+      "card_group": "trees-joindatatree",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-joindatatree:s3",
+      "lane": "L06",
+      "card_group": "trees-joindatatree",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-treetodata:s1",
+      "lane": "L06",
+      "card_group": "trees-treetodata",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-treetodata:s2",
+      "lane": "L06",
+      "card_group": "trees-treetodata",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-treetojson:s1",
+      "lane": "L06",
+      "card_group": "trees-treetojson",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-treetojson:s2",
+      "lane": "L06",
+      "card_group": "trees-treetojson",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-uniontree:s1",
+      "lane": "L06",
+      "card_group": "trees-uniontree",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-uniontree:s2",
+      "lane": "L06",
+      "card_group": "trees-uniontree",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "trees-uniontree:s3",
+      "lane": "L06",
+      "card_group": "trees-uniontree",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "variables-calculator:s1",
+      "lane": "L05",
+      "card_group": "variables-calculator",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "variables-calculator:s2",
+      "lane": "L05",
+      "card_group": "variables-calculator",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "variables-coluniondatavar:s1",
+      "lane": "L05",
+      "card_group": "variables-coluniondatavar",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "variables-coluniondatavar:s2",
+      "lane": "L05",
+      "card_group": "variables-coluniondatavar",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "variables-datatovar:s1",
+      "lane": "L05",
+      "card_group": "variables-datatovar",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "variables-datatovar:s2",
+      "lane": "L05",
+      "card_group": "variables-datatovar",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "variables-replace:s1",
+      "lane": "L05",
+      "card_group": "variables-replace",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "variables-replace:s2",
+      "lane": "L05",
+      "card_group": "variables-replace",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "variables-replace:s3",
+      "lane": "L05",
+      "card_group": "variables-replace",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "variables-vartodata:s1",
+      "lane": "L05",
+      "card_group": "variables-vartodata",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "variables-vartodata:s2",
+      "lane": "L05",
+      "card_group": "variables-vartodata",
+      "development_locks": [],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA."
+    },
+    {
+      "stage_id": "foundation:oracle-crosstable",
+      "lane": "L03",
+      "card_group": "crosstable-core",
+      "development_locks": [
+        "shared-oracle"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Владелец сообщил 2026-10-02: CrossTable уже разрабатывается. Продолжать существующую карточку; фактические stage/SHA сверить, не назначать повторно и не считать все этапы принятыми. Резервировать перечисленные общие участки только на время их изменения. Независимые fixtures и новые изолированные модули можно готовить параллельно; новый общий контракт требует владельца."
+    },
+    {
+      "stage_id": "foundation:oracle-tabular",
+      "lane": "F00",
+      "card_group": "acceptance",
+      "development_locks": [
+        "shared-oracle"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "До отдельного назначения сверить объём уже идущих CrossTable и JavaScript: эта общая работа могла войти в их карточки. Передавать только явно незанятый scope. Резервировать перечисленные общие участки только на время их изменения. Независимые fixtures и новые изолированные модули можно готовить параллельно; новый общий контракт требует владельца."
+    },
+    {
+      "stage_id": "foundation:variant-values",
+      "lane": "F00",
+      "card_group": "typed-ports",
+      "development_locks": [
+        "shared-table-shell"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Резервировать перечисленные общие участки только на время их изменения. Независимые fixtures и новые изолированные модули можно готовить параллельно; новый общий контракт требует владельца."
+    },
+    {
+      "stage_id": "foundation:typed-variables",
+      "lane": "F00",
+      "card_group": "typed-ports",
+      "development_locks": [
+        "shared-port-contract",
+        "shared-ui-graph"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Резервировать перечисленные общие участки только на время их изменения. Независимые fixtures и новые изолированные модули можно готовить параллельно; новый общий контракт требует владельца."
+    },
+    {
+      "stage_id": "foundation:typed-trees",
+      "lane": "F00",
+      "card_group": "typed-ports",
+      "development_locks": [
+        "shared-port-contract",
+        "shared-ui-graph"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Резервировать перечисленные общие участки только на время их изменения. Независимые fixtures и новые изолированные модули можно готовить параллельно; новый общий контракт требует владельца."
+    },
+    {
+      "stage_id": "foundation:dynamic-schema",
+      "lane": "L03",
+      "card_group": "crosstable-core",
+      "development_locks": [
+        "shared-table-shell"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Владелец сообщил 2026-10-02: CrossTable уже разрабатывается. Продолжать существующую карточку; фактические stage/SHA сверить, не назначать повторно и не считать все этапы принятыми. Резервировать перечисленные общие участки только на время их изменения. Независимые fixtures и новые изолированные модули можно готовить параллельно; новый общий контракт требует владельца."
+    },
+    {
+      "stage_id": "foundation:training",
+      "lane": "F00",
+      "card_group": "training",
+      "development_locks": [
+        "shared-execution"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Резервировать перечисленные общие участки только на время их изменения. Независимые fixtures и новые изолированные модули можно готовить параллельно; новый общий контракт требует владельца."
+    },
+    {
+      "stage_id": "foundation:nested",
+      "lane": "F00",
+      "card_group": "nested-workflows",
+      "development_locks": [
+        "shared-ui-graph"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Резервировать перечисленные общие участки только на время их изменения. Независимые fixtures и новые изолированные модули можно готовить параллельно; новый общий контракт требует владельца."
+    },
+    {
+      "stage_id": "foundation:control-flow",
+      "lane": "F00",
+      "card_group": "nested-workflows",
+      "development_locks": [
+        "shared-execution",
+        "shared-ui-graph"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Резервировать перечисленные общие участки только на время их изменения. Независимые fixtures и новые изолированные модули можно готовить параллельно; новый общий контракт требует владельца."
+    },
+    {
+      "stage_id": "foundation:derived-components",
+      "lane": "F00",
+      "card_group": "nested-workflows",
+      "development_locks": [
+        "shared-ui-graph"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Резервировать перечисленные общие участки только на время их изменения. Независимые fixtures и новые изолированные модули можно готовить параллельно; новый общий контракт требует владельца."
+    },
+    {
+      "stage_id": "foundation:file-artifacts",
+      "lane": "L03",
+      "card_group": "crosstable-core",
+      "development_locks": [
+        "shared-files"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Владелец сообщил 2026-10-02: CrossTable уже разрабатывается. Продолжать существующую карточку; фактические stage/SHA сверить, не назначать повторно и не считать все этапы принятыми. Резервировать перечисленные общие участки только на время их изменения. Независимые fixtures и новые изолированные модули можно готовить параллельно; новый общий контракт требует владельца."
+    },
+    {
+      "stage_id": "foundation:connections",
+      "lane": "F00",
+      "card_group": "external-systems",
+      "development_locks": [
+        "shared-connections"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Резервировать перечисленные общие участки только на время их изменения. Независимые fixtures и новые изолированные модули можно готовить параллельно; новый общий контракт требует владельца."
+    },
+    {
+      "stage_id": "foundation:external-effects",
+      "lane": "F00",
+      "card_group": "external-systems",
+      "development_locks": [
+        "shared-execution"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "Резервировать перечисленные общие участки только на время их изменения. Независимые fixtures и новые изолированные модули можно готовить параллельно; новый общий контракт требует владельца."
+    },
+    {
+      "stage_id": "foundation:programming",
+      "lane": "F00",
+      "card_group": "external-systems",
+      "development_locks": [
+        "shared-code-editor"
+      ],
+      "integration_locks": [
+        "runtime-registration",
+        "readiness-publication",
+        "base-branch"
+      ],
+      "model_locks": [
+        "legacy-oauth"
+      ],
+      "oracle_locks": [
+        "oracle-profile"
+      ],
+      "note": "До отдельного назначения сверить объём уже идущих CrossTable и JavaScript: эта общая работа могла войти в их карточки. Передавать только явно незанятый scope. Резервировать перечисленные общие участки только на время их изменения. Независимые fixtures и новые изолированные модули можно готовить параллельно; новый общий контракт требует владельца."
+    }
+  ],
+  "bundles": [
+    {
+      "id": "crosstable-core",
+      "title": "CrossTable: W1–W3 и этап 1 в одной карточке",
+      "stages": [
+        "foundation:oracle-crosstable",
+        "foundation:file-artifacts",
+        "foundation:dynamic-schema",
+        "transform-crosstable:s1"
+      ],
+      "reason": "Сохранить владельца и объём исходного назначения. Общие результаты имеют отдельные промежуточные доказательства; форматные oracle других узлов не входят в W2."
+    }
+  ]
+}
