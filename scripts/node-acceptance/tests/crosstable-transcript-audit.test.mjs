@@ -45,3 +45,17 @@ test('queued requests need successful settled wait receipts',()=>{
  xs.splice(3,0,{type:'tool_use',part:{id:'wait',tool:'loginom_dock_node_wait',state:{status:'completed',input:{operation_id:'sliding'},output:JSON.stringify(r)}}});
  assert.equal(auditCrossTableTranscript(xs).status,'PASS');
 });
+test('stage three scopes the original reports and still refuses their reconfiguration',()=>{
+ const xs=events(),reportLabels=['Fixed sales','Sliding sales'];
+ xs[1].part.state.input.target.label=reportLabels[0];
+ xs[2].part.state.input.target.label=reportLabels[1];
+ const extra={type:'tool_use',part:{id:'stage3',tool:'loginom_dock_node_apply',state:{status:'completed',
+  input:{operation_id:'stage3',target:{kind:'new',type:'transform.cross_table',label:'Variables'}},
+  output:JSON.stringify(reply('stage3','variables','v1'))}}};
+ xs.push(extra);
+ assert.equal(auditCrossTableTranscript(xs,{reportLabels}).status,'PASS');
+ assert.throws(()=>auditCrossTableTranscript(xs),/exactly two/);
+ const changed=structuredClone(extra);changed.part.id='reconfigure';changed.part.state.input={operation_id:'reconfigure',target:{kind:'existing',type:'transform.cross_table',ref:node('f')}};
+ changed.part.state.output=JSON.stringify(reply('reconfigure','f','new-f'));xs.push(changed);
+ assert.throws(()=>auditCrossTableTranscript(xs,{reportLabels}),/apply after source replacement/);
+});

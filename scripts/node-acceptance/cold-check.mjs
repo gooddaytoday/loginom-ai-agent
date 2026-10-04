@@ -216,7 +216,7 @@ try {
   await returnFromOutputTable(channel, opened.table)
   }
 
-  actual.push({node,type:target.type,execution,data});
+  actual.push({node,type:target.type,label:target.label,execution,data});
   }
   const correspondence=matchExpectedOutputs(actual,expectedOutputs);
 

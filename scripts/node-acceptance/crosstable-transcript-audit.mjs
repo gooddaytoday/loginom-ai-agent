@@ -6,7 +6,7 @@ function output(value){
  if(typeof value==='string'){try{return JSON.parse(value);}catch{return null;}}
  return value&&typeof value==='object'?value:null;
 }
-export function auditCrossTableTranscript(events){
+export function auditCrossTableTranscript(events,{reportLabels}={}){
  need(Array.isArray(events)&&events.length>0,'events required');const calls=[],replies=new Map(),seen=new Map();
  for(const [index,event] of events.entries()){
   if(event.type!=='tool_use')continue;const part=event.part;
@@ -24,7 +24,11 @@ export function auditCrossTableTranscript(events){
  const settled=call=>replies.get(call.input.operation_id)??(call.result?.state==='settled'?{index:call.index,result:call.result}:null);
  const succeeded=reply=>reply?.result.status==='SUCCEEDED'&&reply.result.cleanup_complete===true;
  for(const c of calls.filter(c=>c.tool==='loginom_dock_node_read'))need(Object.keys(c.input).every(k=>['operation_id','source_operation_id','read','budget_ms'].includes(k)),'reread input contains configuration');
- const applies=calls.filter(c=>c.tool==='loginom_dock_node_apply'),cross=applies.filter(c=>c.input.target?.type==='transform.cross_table');
+ const applies=calls.filter(c=>c.tool==='loginom_dock_node_apply'),allCross=applies.filter(c=>c.input.target?.type==='transform.cross_table');
+ if(reportLabels!==undefined)need(Array.isArray(reportLabels)&&reportLabels.length===2&&new Set(reportLabels).size===2,'two distinct baseline labels required');
+ const baseline=reportLabels?allCross.filter(c=>c.input.target.kind==='new'&&reportLabels.includes(c.input.target.label)):allCross;
+ const baselineIds=new Set(baseline.map(c=>settled(c)?.result.node?.node_id).filter(Boolean));
+ const cross=reportLabels?allCross.filter(c=>baseline.includes(c)||c.input.target.kind==='existing'&&baselineIds.has(c.input.target.ref?.node_id)):allCross;
  const created=cross.filter(c=>c.input.target.kind==='new'&&succeeded(settled(c)));
  need(created.length===2,'exactly two successful new CrossTables required');
  const nodes=created.map(c=>{const r=settled(c).result;need(r.node&&r.execution?.status==='completed','initial owned execution missing');return r.node;});
@@ -66,7 +70,7 @@ export function auditCrossTableTranscript(events){
  return {status:'PASS',phase:'cross_table_no_reconfiguration_audit',source_update_operation_id:update.input.operation_id,reports};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
- const [eventsPath,out]=process.argv.slice(2);need(eventsPath&&out,'events.jsonl and result path required');
+ const [eventsPath,out,scope]=process.argv.slice(2);need(eventsPath&&out,'events.jsonl and result path required');
  const events=(await readFile(eventsPath,'utf8')).split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line));
- const result=auditCrossTableTranscript(events);await writeFile(out,JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result));
+ const result=auditCrossTableTranscript(events,scope==='stage3'?{reportLabels:['Продажи: фиксированные категории','Продажи: актуальные категории']}:{});await writeFile(out,JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result));
 }

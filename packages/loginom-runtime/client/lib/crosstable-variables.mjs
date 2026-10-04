@@ -77,7 +77,7 @@ export async function configureLocalVariables(page,task,readNode,openPort){
    }
    if(mode==='menu'){
     const menu=m.FNodeContextMenu,roots=exact('mn').filter(visible),selected=m.FDiagram.FmxGraph.getSelectionCells();
-    if(roots.length!==1||menu?.el.dom!==roots[0]||Ext.getCmp(roots[0].id)!==menu||selected.length!==1||selected[0]!==n.FCell)fail('node menu '+JSON.stringify({roots:roots.length,native:menu?.el.dom===roots[0],component:roots.length===1&&Ext.getCmp(roots[0].id)===menu,selected:selected.length,selectedOwn:selected[0]===n.FCell}));
+    if(roots.length!==1||menu?.el.dom!==roots[0]||Ext.getCmp(roots[0].id)!==menu||selected.length!==1||selected[0]!==n.FCell&&selected[0]!==n.FLabel.FCell)fail('node menu '+JSON.stringify({roots:roots.length,native:menu?.el.dom===roots[0],component:roots.length===1&&Ext.getCmp(roots[0].id)===menu,selected:selected.length,selectedOwn:selected[0]===n.FCell}));
     const es=exact('mn;mniShowControlVariablesPort').filter(visible);
     if(es.length!==1||!roots[0].contains(es[0])||es[0].textContent!=='Показать порт управляющих переменных'||es[0].closest('.x-item-disabled,.x-menu-item-disabled'))fail('show command');
     return point(es[0]);
@@ -87,11 +87,9 @@ export async function configureLocalVariables(page,task,readNode,openPort){
    // Port drawings can be siblings of the body; search only this graph.
    const drawn=exact(dom.getAttribute('data-tid')+';Input_ControlVar').filter(e=>m.FDiagram.FmxGraph.container.contains(e)&&visible(e));
    if(drawn.length>1)fail('duplicate control drawing');
-   const graph=m.FDiagram.FmxGraph,box=dom.getBoundingClientRect(),gb=graph.container.getBoundingClientRect();let nodePoint;
-   for(const dx of [.2,.5,.8])for(const dy of [.2,.5,.8]){const x=box.x+box.width*dx,y=box.y+box.height*dy,hit=document.elementFromPoint(x,y);
-    if(hit&&(hit===dom||dom.contains(hit))&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&graph.getCellAt(x-gb.x+graph.container.scrollLeft,y-gb.y+graph.container.scrollTop)===n.FCell)nodePoint??={x,y};
-   }
-   if(!nodePoint)fail('node body native hit');return {visible:drawn.length===1,point:nodePoint};
+   const label=n.FLabel,ls=exact(dom.getAttribute('data-tid')+';Label;Label').filter(e=>m.FDiagram.FmxGraph.container.contains(e));
+   if(label?.parent!==n||label.FCell?.parent!==n.FCell||ls.length!==1||m.FDiagram.FmxGraph.view.getState(label.FCell)?.text?.node!==ls[0])fail('context label native identity');
+   return {visible:drawn.length===1,point:point(ls[0])};
   }
   const receipts=[...(p.inputPortOpenReceipts?.values()??[])].filter(r=>r.phase==='verified'&&r.operation_id===task.operation_id+':port'&&r.node_id===b.node.node_id&&r.workflow===wf&&r.wizard===m&&r.enginePort===m.FModelSocket);
   if(receipts.length!==1||card.Controller.Node.data.node.ParentNode!==receipts[0].portTree||m.FView?.el.dom!==exact(root)[0])fail('control wizard');

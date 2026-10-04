@@ -5,9 +5,10 @@ export function parseExpectedOutputs(expected){
  const multiple=Object.hasOwn(expected,'outputs');
  need(!multiple||!['columns','rows','output_node_type'].some(k=>Object.hasOwn(expected,k)),'EXPECTED_MIXED_OUTPUT_FORMS');
  const outputs=multiple?expected.outputs:[{output_node_type:expected.output_node_type,columns:expected.columns,rows:expected.rows}];
- need(Array.isArray(outputs)&&outputs.length>0&&outputs.length<=16,'EXPECTED_OUTPUTS_INVALID');
+ need(Array.isArray(outputs)&&outputs.length>0&&outputs.length<=32,'EXPECTED_OUTPUTS_INVALID');
  for(const output of outputs){
-  need(output&&Object.keys(output).sort().join(',')==='columns,output_node_type,rows'
+  need(output&&['columns,output_node_type,rows','columns,output_node_label,output_node_type,rows'].includes(Object.keys(output).sort().join(','))
+   &&(output.output_node_label===undefined||typeof output.output_node_label==='string'&&output.output_node_label.length>0)
    &&typeof output.output_node_type==='string'&&output.output_node_type.length>0
    &&Array.isArray(output.columns)&&output.columns.length>0&&output.columns.length<=1000
    &&Array.isArray(output.rows)&&output.rows.length<=100,'EXPECTED_SHAPE_INVALID');
@@ -25,6 +26,7 @@ export function parseExpectedOutputs(expected){
 export function matchesExpectedOutput(data,expected){
  if(data.row_count!==expected.rows.length||!data.sample_complete||!data.precision?.numbers_verified
   ||data.sample?.length!==expected.rows.length||data.schema?.length!==expected.columns.length)return false;
+ if(expected.columns.some((c,i)=>data.schema[i].name!==c.name||data.schema[i].label!==(c.label??c.name)||data.schema[i].type!==c.type))return false;
  const indices=new Map(data.schema.map((f,i)=>[f.name,i]));
  if(indices.size!==expected.columns.length||expected.columns.some(c=>{
   const f=data.schema[indices.get(c.name)];return !f||f.label!==(c.label??c.name)||f.type!==c.type;
@@ -67,7 +69,7 @@ export function matchExpectedOutputs(actual,outputs){
  need(actual.length===outputs.length,'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
  const used=new Set(),matches=[];
  for(const [index,want] of outputs.entries()){
-  const candidates=actual.filter(a=>a.type===want.output_node_type&&matchesExpectedOutput(a.data,want));
+  const candidates=actual.filter(a=>a.type===want.output_node_type&&(want.output_node_label===undefined||a.label===want.output_node_label)&&matchesExpectedOutput(a.data,want));
   need(candidates.length===1&&!used.has(candidates[0].node.node_id),'COLD_OUTPUT_NOT_UNIQUELY_MATCHED');
   used.add(candidates[0].node.node_id);matches.push({expected_index:index,node:candidates[0].node,execution:candidates[0].execution});
  }

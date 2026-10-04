@@ -72,3 +72,5 @@ if __name__ == "__main__":
     # The stage-two entry point appends its independently computed matrix.
     import subprocess, sys
     subprocess.run([sys.executable, str(ROOT / "stage2/generate.py")], check=True)
+
+    subprocess.run([sys.executable, str(ROOT / 'stage3/generate.py')], check=True)

@@ -48,3 +48,16 @@ test('ambiguous, reused, extra and numerically substituted reports fail',()=>{
   const a=actual('a',10);mutate(a);assert.throws(()=>matchExpectedOutputs([a],[report(10)]));
  }
 });
+
+test('ordered field composition refuses permutations even when every value and identity is preserved',()=>{
+ const a=structuredClone(actual('ordered',10));a.data.schema.reverse();a.data.sample[0].reverse();
+ assert.throws(()=>matchExpectedOutputs([a],[report(10)]));
+});
+test('stage-three labels disambiguate identical outputs only after exact schema and value verification',()=>{
+ const first={...actual('a',10),label:'First'},second={...actual('b',10),label:'Second'};
+ const wants=[{...report(10),output_node_label:'First'},{...report(10),output_node_label:'Second'}];
+ assert.deepEqual(matchExpectedOutputs([second,first],wants).map(m=>m.node.node_id),['a','b']);
+ second.data.sample[0][1].value=20;assert.throws(()=>matchExpectedOutputs([first,second],wants));
+ assert.equal(parseExpectedOutputs({package_path:'/own/p.lgp',nodes:[],outputs:Array.from({length:32},()=>report(10))}).outputs.length,32);
+ assert.throws(()=>parseExpectedOutputs({package_path:'/own/p.lgp',nodes:[],outputs:Array.from({length:33},()=>report(10))}));
+});

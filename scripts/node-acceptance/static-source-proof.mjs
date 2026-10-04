@@ -165,7 +165,8 @@ export async function verifyStaticSourceBytes({load,runtime,execute,sources,allo
    proofs.set(path,{destination:path,bytes:bytes.length,sha256,bytes_verified:true,download_completion_verified:true,provenance:'independent_server_file_download',fixture});
   }
   source.source=proofs.get(path);
-  need(JSON.stringify(source.configuration.output_mapping.fields.map(f=>pick(f,['name','label','type'])))===JSON.stringify(source.source.fixture.columns),'source fixture schema differs');
+  const observed=JSON.stringify(source.configuration.output_mapping.fields.map(f=>pick(f,['name','label','type'])));
+  need([source.source.fixture.columns,...(source.source.fixture.output_orders??[])].some(cols=>observed===JSON.stringify(cols)),'source fixture schema differs');
  }
  return proofs;
 }
