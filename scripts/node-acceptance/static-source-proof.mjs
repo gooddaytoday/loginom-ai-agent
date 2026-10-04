@@ -55,7 +55,9 @@ export async function observeStaticSources({load,graph,channelFor,account}){
    if(target.type==='transform.collapse_columns'){
     const s=await channel.observe({condition:'cold observed Collapse',readCollapse:true,ready:s=>s.node_collapse?.verified&&s.node_collapse.inventory_complete});
     const c=s.node_collapse;
-    need(c.transposed.length>0&&input.fields.every(f=>!f.excluded&&f.name===f.source_name),'unsupported Collapse mapping');
+    need(c.transposed.length>0&&c.skip_null.switch_pressed===false
+     &&[...c.information,...c.transposed].every(f=>['integer','real','string','boolean','datetime'].includes(f.type))
+     &&input.fields.every(f=>!f.excluded&&f.name===f.source_name),'unsupported Collapse mapping or variable policy');
     const configuration={kind:'collapse',values_are:'observed_ui_values',node:target.ref,mode:'unpivot',information:c.information,transposed:c.transposed,ignore_empty:c.skip_null.value,input_mapping:{port:0,autosync:input.autosync,fields:input.fields}};
     await closePreparedWizard(channel);
     const output=await mapping(channel,'output');configuration.output_mapping={port:0,autosync:output.autosync,fields:output.fields};

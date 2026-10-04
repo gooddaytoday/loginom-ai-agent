@@ -973,11 +973,7 @@
         {
           "Key": "numeric",
           "Values_Count": 8,
-          "Values_Min": {
-            "cell_type": "real",
-            "value": 1.25,
-            "bytes_le": "000000000000f43f"
-          },
+          "Values_Min": null,
           "Values_Max": {
             "cell_type": "real",
             "value": 2.75,
@@ -995,10 +991,7 @@
         {
           "Key": "text",
           "Values_Count": 8,
-          "Values_Min": {
-            "cell_type": "string",
-            "value": "a"
-          },
+          "Values_Min": null,
           "Values_Max": {
             "cell_type": "string",
             "value": "z"
@@ -1011,10 +1004,7 @@
         {
           "Key": "boolean",
           "Values_Count": 8,
-          "Values_Min": {
-            "cell_type": "boolean",
-            "value": false
-          },
+          "Values_Min": null,
           "Values_Max": {
             "cell_type": "boolean",
             "value": true
@@ -1027,10 +1017,7 @@
         {
           "Key": "datetime",
           "Values_Count": 8,
-          "Values_Min": {
-            "cell_type": "datetime",
-            "bytes_le": "00000000e078e640"
-          },
+          "Values_Min": null,
           "Values_Max": {
             "cell_type": "datetime",
             "bytes_le": "000000002079e640"
@@ -1052,6 +1039,145 @@
           "Values_NullCount": 4,
           "Values_First": null,
           "Values_Last": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Key",
+          "label": "Key",
+          "type": "string"
+        },
+        {
+          "name": "Values_Count",
+          "label": "Значения|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "Values_Min",
+          "label": "Значения|Минимум",
+          "type": "variant"
+        },
+        {
+          "name": "Values_Max",
+          "label": "Значения|Максимум",
+          "type": "variant"
+        },
+        {
+          "name": "Values_UniqueCount",
+          "label": "Значения|Кол-во уникальных",
+          "type": "integer"
+        },
+        {
+          "name": "Values_NullCount",
+          "label": "Значения|Кол-во пропусков",
+          "type": "integer"
+        },
+        {
+          "name": "Values_First",
+          "label": "Значения|Первый",
+          "type": "variant"
+        },
+        {
+          "name": "Values_Last",
+          "label": "Значения|Последний",
+          "type": "variant"
+        }
+      ],
+      "rows": [
+        {
+          "Key": "numeric",
+          "Values_Count": 2,
+          "Values_Min": {
+            "cell_type": "real",
+            "value": 1.25,
+            "bytes_le": "000000000000f43f"
+          },
+          "Values_Max": {
+            "cell_type": "real",
+            "value": 2.75,
+            "bytes_le": "0000000000000640"
+          },
+          "Values_UniqueCount": 2,
+          "Values_NullCount": 0,
+          "Values_First": {
+            "cell_type": "real",
+            "value": 1.25,
+            "bytes_le": "000000000000f43f"
+          },
+          "Values_Last": {
+            "cell_type": "real",
+            "value": 2.75,
+            "bytes_le": "0000000000000640"
+          }
+        },
+        {
+          "Key": "text",
+          "Values_Count": 2,
+          "Values_Min": {
+            "cell_type": "string",
+            "value": "a"
+          },
+          "Values_Max": {
+            "cell_type": "string",
+            "value": "z"
+          },
+          "Values_UniqueCount": 2,
+          "Values_NullCount": 0,
+          "Values_First": {
+            "cell_type": "string",
+            "value": "z"
+          },
+          "Values_Last": {
+            "cell_type": "string",
+            "value": "a"
+          }
+        },
+        {
+          "Key": "boolean",
+          "Values_Count": 2,
+          "Values_Min": {
+            "cell_type": "boolean",
+            "value": false
+          },
+          "Values_Max": {
+            "cell_type": "boolean",
+            "value": true
+          },
+          "Values_UniqueCount": 2,
+          "Values_NullCount": 0,
+          "Values_First": {
+            "cell_type": "boolean",
+            "value": true
+          },
+          "Values_Last": {
+            "cell_type": "boolean",
+            "value": false
+          }
+        },
+        {
+          "Key": "datetime",
+          "Values_Count": 2,
+          "Values_Min": {
+            "cell_type": "datetime",
+            "bytes_le": "00000000e078e640"
+          },
+          "Values_Max": {
+            "cell_type": "datetime",
+            "bytes_le": "000000002079e640"
+          },
+          "Values_UniqueCount": 2,
+          "Values_NullCount": 0,
+          "Values_First": {
+            "cell_type": "datetime",
+            "bytes_le": "00000000e078e640"
+          },
+          "Values_Last": {
+            "cell_type": "datetime",
+            "bytes_le": "000000002079e640"
+          }
         }
       ]
     }

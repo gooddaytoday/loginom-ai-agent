@@ -1,0 +1,37 @@
+Подготовленный источник содержит только исходный CSV и Collapse, без CrossTable
+и ожидаемых агрегатов. Manifest и SHA256 исходного файла — в `data/source-manifest.json`.
+Ожидания независимо строятся командой `python3 acceptance/stage2/generate.py`.
+Исходный комплект этапа 1 сохранён в `acceptance/stage1/`.
+
+Перед независимым CLI reviewer готовит этот источник в **собственном** runtime,
+после чистой сборки точного переданного SHA:
+
+```sh
+python3 scripts/node-acceptance/prepare-variant-source.py \
+  --worktree "$PWD" --config <reviewer.json> \
+  --out "$PWD/.multica-node/attempts/<new-source-attempt>"
+```
+
+Wrapper проверяет native owner, целостность и чистый SHA, выполняет отдельные
+CLI setup/status (`ready`) и сохраняет только `lab12-stage2-source-v3.lgp`
+в папке своего аккаунта. Bootstrap создаётся с conflict=fail; replace применяется
+только к этому же собственному пустому bootstrap при сохранении исходного графа.
+Существующий неизвестный пакет не заменяется. Источник worker v3 уже подготовлен;
+повторная подготовка по тому же имени должна остановиться на конфликте.
+Владение runtime/роль и конфиги не меняются ради обхода проверки native owner.
+
+После подтверждённых source-only save/cleanup запускается обычный `accept-node.sh`
+с назначенной ролью. Модель получает только бизнес-задание и исходные файлы.
+Новый результат сохраняется отдельно, источник не перезаписывается.
+Cold-check скачивает действительные исходные CSV, сверяет их bytes/SHA256,
+читает настройки с Cancel и запускает собственное исполнение. CrossTable
+configure handler не вызывается. Точное native-чтение ограничено 50×8/1 MiB,
+protocol 321; subtype и известные fixture DateTime сравниваются по байтам.
+Нативный reader сохраняет ограничения observed_local/no_server_snapshot/ABA.
+
+Variant Min включает NULL как нижнее значение, скалярный Min пропуски игнорирует.
+Два Variant-отчёта отдельно проверяют NULL/all-null и минимум/порядок real,
+string, Boolean, DateTime без пропусков. Смешанный порядок между разными
+не-NULL subtype внутри одной группы этой fixture не задаётся.
+
+До полного CLI/cold-check и независимой приёмки новый этап не считается готовым.

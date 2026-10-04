@@ -47,7 +47,7 @@ def report(rows, keys, facts, types=TYPES):
                 row[field+'_'+SUFFIX[fn]]=encode(aggregate([r[field] for r in group],fn),result_type(types[field],fn))
         values.append(row)
     return {'output_node_type':'transform.cross_table','columns':columns,'rows':values}
-def variant_report():
+def variant_report(ignore_empty=False):
     schema={'RealValue':'real','TextValue':'string','FlagValue':'boolean','WhenValue':'datetime'}
     groups=defaultdict(list)
     with (ROOT/'data/variant-source.csv').open(newline='',encoding='utf8') as f:
@@ -55,14 +55,16 @@ def variant_report():
             for field,kind in schema.items():
                 raw=row[field]
                 value=None if raw=='?' else float(raw) if kind=='real' else raw=='true' if kind=='boolean' else datetime.fromisoformat(raw) if kind=='datetime' else raw
-                groups[row['Key']].append((value,kind))
+                if value is not None or not ignore_empty: groups[row['Key']].append((value,kind))
     functions=[f for f in FUNCTIONS if f not in {'sum','avg','stddev','sum_squares'}]
     columns=[{'name':'Key','label':'Key','type':'string'}]+[{'name':'Values_'+SUFFIX[fn],'label':'Значения|'+LABELS[fn],'type':'integer' if fn in COUNTS else 'variant'} for fn in functions]
     rows=[]
     for key, items in groups.items():
         row={'Key':key};nonnull=[(v,t) for v,t in items if v is not None]
         for fn in functions:
-            value=aggregate([v for v,_ in items],fn)
+            # Native Variant orders NULL below the homogeneous non-NULL values.
+            # Its Min differs from the scalar aggregate's NULL-skipping rule.
+            value=None if fn=='min' and any(v is None for v,_ in items) else aggregate([v for v,_ in items],fn)
             kind=next((t for v,t in items if v is not None and v==value),None)
             row['Values_'+SUFFIX[fn]]=value if fn in COUNTS else encode(value,kind,True)
         rows.append(row)
@@ -104,10 +106,10 @@ def generate():
         values.append(row)
     outputs.append({'output_node_type':'transform.cross_table','columns':cols,'rows':values})
     outputs.append({'output_node_type':'transform.cross_table','columns':[{'name':'Region','label':'Region','type':'string'}],'rows':[]})
-    outputs.append(variant_report())
+    outputs.extend([variant_report(),variant_report(ignore_empty=True)])
     sources=[fixture('sales-update.csv',{'RowID':'string','Region':'string','Category':'string','Amount':'real','Quantity':'real'}),fixture('typed.csv',TYPES),fixture('empty.csv',TYPES),fixture('variant-source.csv',{'Key':'string','RealValue':'real','TextValue':'string','FlagValue':'boolean','WhenValue':'datetime'})]
     expected={'package_path':'{{PACKAGE_PATH}}','nodes':[{'type':'imports.text'},{'type':'transform.collapse_columns'},{'type':'transform.cross_table'}],'outputs':outputs,'static_sources':sources}
-    assert len(outputs)==14
+    assert len(outputs)==15
     (ROOT/'expected.json').write_text(json.dumps(expected,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
     manifest={'kind':'source_only','package_basename':'lab12-stage2-source-v3.lgp','file':sources[-1],'collapse':{'information':['Key'],'transposed':['RealValue','TextValue','FlagValue','WhenValue'],'ignore_empty':False},'derived_reports':False}
     (ROOT/'data/source-manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
