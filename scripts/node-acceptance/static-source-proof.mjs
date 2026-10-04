@@ -4,6 +4,13 @@ import {join} from 'node:path';
 const need=(v,m)=>{if(!v)throw Error('COLD_SOURCE:'+m);};
 const one=(xs,m)=>{need(xs.length===1,m);return xs[0];};
 const pick=(f,ks)=>Object.fromEntries(ks.map(k=>[k,f[k]]));
+export function verifyGeneratedCollapseMapping(mapping,schema){
+ need(mapping?.verified===true&&mapping.inventory_complete===true&&mapping.source_fields?.length===0
+  &&Array.isArray(schema)&&schema.length>0&&schema.length<=128
+  &&JSON.stringify(mapping.target_fields?.map(f=>pick(f,['name','label','type'])))===JSON.stringify(schema)
+  &&mapping.target_fields.every(f=>!f.excluded&&!f.inherited&&f.source===null),'generated Collapse schema differs');
+ return true;
+}
 
 // Read settings and cancel each wizard. No CrossTable configure handler, private
 // model receipts, supplied subtype declarations or aggregate results are used.
@@ -13,25 +20,40 @@ export async function observeStaticSources({load,graph,channelFor,account}){
  const {isTextImportSourceReady}=await load('client/lib/text-import-procedure.mjs');
  const {showMissingValuesMappingTable}=await load('client/lib/missing-values-output.mjs');
  const {crossTableConfiguration}=await load('client/lib/crosstable-procedure.mjs');
- const mapping=async(channel,direction)=>{
+ const mapping=async(channel,direction,generatedSchema)=>{
   await channel[direction==='input'?'openInputPort':'openOutputPort'](0);
   if(direction==='output')await showMissingValuesMappingTable(channel);
   const state=await channel.observe({condition:'cold readonly '+direction+' mapping',readMappings:true,
    ready:s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
   const m=state.node_mapping;
   need(m.target_fields.length>0&&m.target_fields.length<=128,'bounded complete definition required');
+  const generated=direction==='output'&&generatedSchema&&m.source_fields.length===0;
+  if(generated)verifyGeneratedCollapseMapping(m,generatedSchema);
   const fields=m.target_fields.map(f=>{
    const source=f.source??f.exclusion_source;
-   need(source&&m.source_fields.some(s=>s.record_id===source.record_id),'mapping source unverified');
-   return {...pick(f,['name','label','type','data_kind','index']),excluded:f.excluded===true,source_name:source.name};
+   need(generated||source&&m.source_fields.some(s=>s.record_id===source.record_id),'mapping source unverified');
+   return {...pick(f,['name','label','type','data_kind','index']),excluded:f.excluded===true,source_name:generated?f.name:source.name};
   });
   const closed=await closePreparedWizard(channel);need(closed.verified&&closed.settings_applied===false,'mapping cancel');
   return {port:0,autosync:m.autosync,fields,native:m};
  };
+ const selectSource=async channel=>{
+  // Existing settings controls are rendered only for the selected graph node.
+  // Bind the gesture to the independently observed GUID before opening them.
+  await channel.perform({condition:'cold select observed source node',
+   ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'
+    &&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'&&e.allowed_actions.includes('click')),
+   identity:s=>s.prepared_node_context,
+   resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'),'source graph body').ref})});
+  await channel.observe({condition:'cold active scenario title settled',
+   ready:s=>s.prepared_node_context?.surface==='graph'&&s.workflow_navigation?.status==='observed'
+    &&s.active_identity===s.workflow_navigation.path.at(-1)?.label});
+ };
  const sources={imports:[],collapses:[],crossTables:[]};
  for(const target of graph.nodes.filter(n=>['imports.text','transform.collapse_columns','transform.cross_table'].includes(n.type))){
   const channel=channelFor(target.ref,'source-settings-'+target.ref.node_id);
-  if(target.type==='imports.text'){
+  await selectSource(channel);
+  try { if(target.type==='imports.text'){
    await openPreparedWizard(channel);
    let s=await channel.observe({condition:'cold observed static import',ready:isTextImportSourceReady});
    const source=Object.fromEntries(Object.entries(s.wizard.import_source.fields).map(([k,f])=>[k,f.value]));
@@ -43,7 +65,13 @@ export async function observeStaticSources({load,graph,channelFor,account}){
     identity:()=>target.ref,resolve:s=>({verb:'wizard_step',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step')),'format Next').ref,expected_stage:'text_import_format'})});
    s=await channel.observe({condition:'cold observed CSV format',ready:s=>s.wizard?.stage==='text_import_format'
     &&['delimiter','decimal_separator','null_marker','text_qualifier'].every(k=>s.wizard.settings?.fields[k]?.status==='observed'&&!s.wizard.settings.fields[k].truncated)});
-   const format=Object.fromEntries(['delimiter','decimal_separator','null_marker','text_qualifier'].map(k=>[k,s.wizard.settings.fields[k].value]));
+   const observed=Object.fromEntries(['delimiter','decimal_separator','null_marker','text_qualifier'].map(k=>[k,s.wizard.settings.fields[k].value]));
+   // The pinned format editors expose localized option labels, as in the
+   // existing import procedure. Accept only the exact assigned CSV options.
+   const format={delimiter:observed.delimiter==='Запятая'?',':observed.delimiter,
+    decimal_separator:observed.decimal_separator==='Точка (.)'?'.':observed.decimal_separator,
+    text_qualifier:observed.text_qualifier==='Двойная кавычка (")'?'"':observed.text_qualifier,
+    null_marker:observed.null_marker};
    need(format.delimiter===','&&format.decimal_separator==='.'&&format.null_marker==='?'&&format.text_qualifier==='"','CSV parser differs');
    const closed=await closePreparedWizard(channel);need(closed.verified&&!closed.settings_applied,'import cancel');
    const output=await mapping(channel,'output');
@@ -51,6 +79,7 @@ export async function observeStaticSources({load,graph,channelFor,account}){
    sources.imports.push({node_id:target.ref.node_id,configuration:{kind:'text_import',values_are:'observed_ui_values',node:target.ref,source,format,output_mapping:{port:0,autosync:output.autosync,fields:output.fields}}});
   }else{
    const input=await mapping(channel,'input');
+   await selectSource(channel);
    await openPreparedWizard(channel);
    if(target.type==='transform.collapse_columns'){
     const s=await channel.observe({condition:'cold observed Collapse',readCollapse:true,ready:s=>s.node_collapse?.verified&&s.node_collapse.inventory_complete});
@@ -60,13 +89,24 @@ export async function observeStaticSources({load,graph,channelFor,account}){
      &&input.fields.every(f=>!f.excluded&&f.name===f.source_name),'unsupported Collapse mapping or variable policy');
     const configuration={kind:'collapse',values_are:'observed_ui_values',node:target.ref,mode:'unpivot',information:c.information,transposed:c.transposed,ignore_empty:c.skip_null.value,input_mapping:{port:0,autosync:input.autosync,fields:input.fields}};
     await closePreparedWizard(channel);
-    const output=await mapping(channel,'output');configuration.output_mapping={port:0,autosync:output.autosync,fields:output.fields};
+    const generatedSchema=[...c.information.map(f=>pick(f,['name','label','type'])),
+     {name:'Names',label:'Имена',type:'string'},{name:'DisplayNames',label:'Метки',type:'string'},
+     {name:'Values',label:'Значения',type:'variant'},{name:'DataTypes',label:'Типы данных',type:'integer'}];
+    const output=await mapping(channel,'output',generatedSchema);configuration.output_mapping={port:0,autosync:output.autosync,fields:output.fields};
     sources.collapses.push({node_id:target.ref.node_id,configuration});
    }else{
     const s=await channel.observe({condition:'cold observed CrossTable',readCrossTable:true,ready:s=>s.node_crosstable?.verified&&s.node_crosstable.inventory_complete});
     sources.crossTables.push({node_id:target.ref.node_id,configuration:crossTableConfiguration(s.node_crosstable,input.native)});
     await closePreparedWizard(channel);
    }
+  }} catch(error){
+   // A refused read must cancel its own editor before package cleanup. Do not
+   // apply settings or dismiss an unrelated dialog to make cleanup succeed.
+   const s=await channel.observe({condition:'cold source refusal editor ownership',ready:()=>true});
+   if(s.wizard?.status==='observed'&&s.prepared_node_context?.surface==='wizard'){
+    const closed=await closePreparedWizard(channel);need(closed.verified&&!closed.settings_applied,'refusal cancel');
+   }
+   throw error;
   }
  }
  return sources;
@@ -85,7 +125,12 @@ export async function verifyStaticSourceBytes({load,runtime,execute,sources,allo
  };
  const act=async(s,e,verb='click',extra={})=>{const r=await runtime.uiAct({verb,ref:e.ref,...extra},{operationId:'cold-source-nav-'+randomId(),observationId:s.observation_id});need(r.status==='SUCCEEDED'&&r.cleanup_complete,'storage navigation uncertain');};
  const ready=async(fn,predicate)=>{const deadline=Date.now()+15000;for(;;){const s=await fn();if(s&&predicate(s))return s;need(Date.now()<deadline,'storage readiness timeout');await new Promise(r=>setTimeout(r,100));}};
- const roots=()=>read({scope:'roots'});
+ const roots=async()=>{
+  // Storage navigation may finish while observation pages are being read.
+  // Restart from fresh roots only; never reuse a cursor or scoped stale ref.
+  for(let attempt=0;attempt<3;attempt++)try{return await read({scope:'roots'});}
+  catch(error){if(!String(error.message).startsWith('Workspace changed between observation pages;')||attempt===2)throw error;}
+ };
  const detail=(s,e)=>read({rootRef:e.ref,observationId:s.observation_id});
  const directory=()=>ready(async()=>{const s=await roots(),bar=s.ui.elements.find(e=>e.tid===s.workflow_ref.prefix+';NavigationBar;NavigationPanel');return bar?detail(s,bar):null;},s=>s.file_storage?.status==='observed');
  const row=async(name,parent)=>{

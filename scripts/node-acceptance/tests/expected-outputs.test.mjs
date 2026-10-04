@@ -4,6 +4,14 @@ import {parseExpectedOutputs,matchExpectedOutputs} from '../expected-outputs.mjs
 const columns=[{name:'Region',label:'Region',type:'string'},{name:'Amount',label:'A|Amount|Сумма',type:'real'}];
 const report=value=>({output_node_type:'transform.cross_table',columns,rows:[{Region:'North',Amount:value}]});
 const actual=(id,value)=>({node:{node_id:id},type:'transform.cross_table',execution:{execution_id:id},data:{schema:columns,row_count:1,sample_complete:true,precision:{numbers_verified:true},sample:[[{type:'string',is_null:false,value:'North'},{type:'real',is_null:false,value}]]}});
+test('derived scalar StdDev permits bounded binary64 rounding, other values stay exact',()=>{
+ const c=[{name:'Units_StdDev',label:'Units|Стандартное откл.',type:'real'}];
+ const expected={output_node_type:'transform.cross_table',columns:c,rows:[{Units_StdDev:2}]};
+ const a={node:{node_id:'sd'},type:'transform.cross_table',data:{schema:c,row_count:1,sample_complete:true,precision:{numbers_verified:true},sample:[[{type:'real',is_null:false,precision:'exact_native',value:'1.9999999999999998'}]]}};
+ assert.equal(matchExpectedOutputs([a],[expected]).length,1);
+ for(const value of ['1.999999','NaN','Infinity','0']){const bad=structuredClone(a);bad.data.sample[0][0].value=value;assert.throws(()=>matchExpectedOutputs([bad],[expected]));}
+ const exact=actual('sum',1.9999999999999998);assert.throws(()=>matchExpectedOutputs([exact],[report(2)]));
+});
 test('legacy and outputs[] parse while mixed, empty and duplicate schemas refuse',()=>{
  const base={package_path:'/own/package.lgp',nodes:[]};
  assert.equal(parseExpectedOutputs({...base,...report(10)}).multiple,false);
