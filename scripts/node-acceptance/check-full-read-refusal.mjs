@@ -46,7 +46,21 @@ try {
   const savedReport=await runtime.run('package.save_checkpoint',{path,conflict_policy:'fail'},{operationId:'save-diagnostic-report'});await save('report-save',savedReport);need(savedReport.status==='SUCCEEDED'&&savedReport.output.save_completed,'diagnostic report save failed');
   prepared={...prepared,package_ref:savedReport.output.package_ref};cleanupPath=path;
  }
- const corrected=await runtime.runNodeApply({...base,operation_id:'scalar-after-refusal',mode:'pivot',target:{kind:'existing',type:'transform.cross_table',ref:multi.output.node},parameters:{},inputs:[],mappings:[],read:{ports:[0],sample_rows:100,require_exact_numbers:true}});
+ // Save As changes the package breadcrumb. Rebind the saved owned workflow
+ // through standard preparation rather than editing or guessing its identity.
+ runtime.assertPreparationAllowed();
+ const reopened=await execute(makeWorkspacePrepareCode({loginomUrl:config.url,compatibility,sessionId:sid,
+  operationId:'rebind-saved-report',intent:'open_package',packagePath:cleanupPath}));
+ need(reopened.status==='READY'&&reopened.package_ref.path===cleanupPath,'saved report rebind failed');
+ prepared=reopened;
+ const {createNodeTargetBrowserAdapter}=await load('client/lib/node-target-browser.mjs');
+ const adapter=createNodeTargetBrowserAdapter({execute,origin:runtimeConfig.targetOrigin,build:'7.4.2'});
+ const graph=await adapter.observe({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},Date.now()+30000);
+ const retained=graph.nodes.filter(n=>n.ref.node_id===multi.output.node.node_id&&n.type==='transform.cross_table');
+ need(graph.complete&&graph.foreign_links.length===0&&retained.length===1,'saved report GUID changed');
+ const corrected=await runtime.runNodeApply({...base,document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,
+  operation_id:'scalar-after-refusal',mode:'pivot',target:{kind:'existing',type:'transform.cross_table',ref:retained[0].ref},
+  parameters:{},inputs:[],mappings:[],read:{ports:[0],sample_rows:100,require_exact_numbers:true}});
  await save('corrected-read',corrected);need(corrected.status==='SUCCEEDED'&&corrected.cleanup_complete,'corrected scalar read failed');
  const expected=JSON.parse(await fs.readFile(dir+'/expected.json'));
  need(corrected.output.node.node_id===multi.output.node.node_id&&corrected.output.output.ports[0].schema.length===10
