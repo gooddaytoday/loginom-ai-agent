@@ -64,7 +64,7 @@ export async function bindCollapseNative(page,args) {
    // execution may therefore run an ancestor again. Accept only the original
    // completed group or this exact, independently verified execution group.
    const tree=document.querySelector('[data-tid="ConsoleForm;ProgressForm;trpProgress;treepanel;tree"]');
-   need(tree&&a.execution.owner_verified===true,'owned ancestor execution required');
+   need(tree&&a.execution_owner_verified===true,'owned ancestor execution required');
    const store=Ext.getCmp(tree.id).getStore(),root=store.getRoot(),records=[];
    need(!store.isLoading()&&root.data.loaded===true,'ancestor execution inventory incomplete');
    const walk=ns=>{need(records.length+ns.length<=2000,'ancestor execution bound');for(const r of ns){need(!r.data.loading,'ancestor execution loading');records.push(r);walk(r.childNodes??[]);}};walk(root.childNodes);

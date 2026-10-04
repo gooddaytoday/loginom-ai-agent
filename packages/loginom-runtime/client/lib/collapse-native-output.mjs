@@ -1,6 +1,6 @@
 import {bindLoadedNativeRuntime,collectNativeRuntime,verifyLoadedNativeRuntime} from './collapse-native-runtime.mjs';
 import {createHash} from 'node:crypto';
-import {completedCrossTableCollapses,validateCrossTableNativeSources} from './crosstable-native-source.mjs';
+import {completedCrossTableCollapses,validateCrossTableNativeSources,verifyCrossTableExecutionOwner} from './crosstable-native-source.mjs';
 import {completedStaticImports,bindCollapseNative} from './collapse-native-source.mjs';
 import {decodeVariantFrame} from './variant-native-decode.mjs';
 import {readNativeVariant,cancelNativeVariant,nativeVariantStatus} from './variant-native-read.mjs';
@@ -42,6 +42,7 @@ export async function readCollapseNativeOutput(channel,read,ctx,options,config,c
  need(options.exclusiveNodeOperation?.()===true,'Exact read requires the owning executor operation lock');
  const imports=options.coldStaticSources?.imports??completedStaticImports(options.nodeHistory?.(),options.verifiedUploads?.(),ctx,options.uploadHistory?.());
  const crossSources=crossTableConfiguration?validateCrossTableNativeSources(imports,options.coldStaticSources?.collapses??completedCrossTableCollapses(options.nodeHistory?.(),ctx),crossTableConfiguration.input_fields):null;
+ if(crossSources)verifyCrossTableExecutionOwner(options.nativeExecutionProof,ctx);
  const frontends=await verifyFrontends(execute,config.targetOrigin,ctx.signal);
  const graph=s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent';
  let s=await channel.observe({condition:'exact output graph',readOutputs:true,ready:s=>graph(s)&&s.node_outputs?.verified===true});
@@ -54,7 +55,7 @@ export async function readCollapseNativeOutput(channel,read,ctx,options,config,c
  const codes={boolean:1,datetime:2,real:3,integer:4,string:5,variant:6};
  const args={document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,package_id:ctx.document_id+':'+ctx.workflow_ref.workflow_id,
   node_id:ctx.node.node_id,port_guid:port.port_guid,execution:ctx.execution,tab_tid:ctx.workflow_ref.tab_tid,prefix:ctx.workflow_ref.prefix,
-  origin:config.targetOrigin,imports,...(crossSources?{cross_table:crossSources}:{}),schema:preview.node_preview_schema.fields.map(f=>({name:f.name,label:f.label,type:codes[f.type]}))};
+  origin:config.targetOrigin,imports,...(crossSources?{cross_table:crossSources,execution_owner_verified:true}:{}),schema:preview.node_preview_schema.fields.map(f=>({name:f.name,label:f.label,type:codes[f.type]}))};
  const readId='native-'+createHash('sha256').update(operation.id+':'+ctx.execution.execution_id).digest('hex').slice(0,48);
  const loaded=await execute(`async page=>(${bindLoadedNativeRuntime.toString()})(page,${JSON.stringify({...args,binding_id:readId})},${collectNativeRuntime.toString()})`,{timeout:10000});
  const loadedRuntime=verifyLoadedNativeRuntime(loaded,{binding_id:readId,document_id:ctx.document_id});

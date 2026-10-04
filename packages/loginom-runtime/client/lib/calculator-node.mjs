@@ -271,7 +271,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     if(!read.ports.length)return verified({status:'complete',ports:[],execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id});
     if(read.coverage==='full'){
      requireValue(implementation?.nativeFullOutput===true,'Full native output is unavailable for this handler');
-     const output=await readCollapseNativeOutput(channel,read,ctx,options,{targetOrigin,targetBuild},implementation.type==='transform.cross_table'?configured:null);
+     const output=await readCollapseNativeOutput(channel,read,ctx,{...options,nativeExecutionProof:executionReceipt},{targetOrigin,targetBuild},implementation.type==='transform.cross_table'?configured:null);
      if(implementation.type==='transform.cross_table'){const materialized=implementation.materializedSchema(output.ports[0].schema,configured,{node:ctx.node,execution:ctx.execution});output.ports[0].category_fields=materialized.category_fields;}
      return output;
     }

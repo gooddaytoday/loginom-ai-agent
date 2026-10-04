@@ -109,13 +109,12 @@ try {
    const {createActionRuntime}=await load('client/lib/executor.mjs');
    const catalog=JSON.parse(await readFile(join(root,'runtime/executor/catalog/actions.json'),'utf8'));
    const selectors=JSON.parse(await readFile(join(root,'runtime/executor/catalog/selectors.json'),'utf8'));
-   const runtime=createActionRuntime({pinned:{actions:new Map(catalog.actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.selectors.map(s=>[s.symbol,s])),pins:{}},execute,onRecord:record,targetOrigin:origin,targetBuild:'7.4.2'});
+   const runtime=createActionRuntime({pinned:{actions:new Map(catalog.actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.selectors.map(s=>[s.symbol,s])),pins:{}},execute,onRecord:record,targetOrigin:origin,targetBuild:'7.4.2',allowCandidate:true});
    const account=config.workflow_profile.loginom_user;
    const before=await observeStaticSources({load,graph:{...graph,nodes:graph.nodes.filter(n=>n.type==='imports.text')},channelFor,account});
    const verified=await verifyStaticSourceBytes({load,runtime,execute,sources:before,allowed:expected.static_sources,account,origin,output:args.output});
-   prepared=await execute(makeWorkspacePrepareCode({loginomUrl:config.loginom_url,compatibility:{loginom_build:'7.4.2',platform:compatibilityPlatform,browser:'chromium'},sessionId:session,operationId:'cold-return-from-files',intent:'open_package',packagePath:saved.path}));
-   state.prepared=prepared;
-   if(prepared.status!=='READY'||prepared.package_ref.path!==saved.path)throw Error('COLD_SOURCE_RETURN_UNCONFIRMED');
+   const returned=await adapter.activateWorkflow({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},{deadline:Date.now()+30000,receipt_id:'cold-return-from-files'});
+   if(returned.status!=='SUCCEEDED'||!returned.verified||!returned.cleanup_complete)throw Error('COLD_SOURCE_RETURN_UNCONFIRMED');
    graph=await adapter.observe({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},Date.now()+30000);
    staticSources=await observeStaticSources({load,graph,channelFor,account});
    for(const source of staticSources.imports){
@@ -189,7 +188,7 @@ try {
     }
     const chain={imports:staticSources.imports.filter(s=>ancestors.has(s.node_id)),collapses:staticSources.collapses.filter(s=>ancestors.has(s.node_id))};
     const coldStaticSources=await bindColdExecutions({execute,sources:chain,ctx,ownedExecutions});
-    const read=await readCollapseNativeOutput(channel,{sample_rows:50},ctx,{execute,operation,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>true,coldStaticSources},{targetOrigin:origin,targetBuild:'7.4.2'},nativeConfiguration);
+    const read=await readCollapseNativeOutput(channel,{sample_rows:50},ctx,{execute,operation,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>true,coldStaticSources,nativeExecutionProof:execution},{targetOrigin:origin,targetBuild:'7.4.2'},nativeConfiguration);
     if(!read.cleanup_complete)throw Error('COLD_NATIVE_CLEANUP_UNCONFIRMED');
     data=read.ports[0];
    }

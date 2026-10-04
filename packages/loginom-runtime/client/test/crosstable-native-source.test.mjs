@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {completedCrossTableCollapses,validateCrossTableNativeSources} from '../lib/crosstable-native-source.mjs';
+import {completedCrossTableCollapses,validateCrossTableNativeSources,verifyCrossTableExecutionOwner} from '../lib/crosstable-native-source.mjs';
+test('exact CrossTable needs the private verified execution receipt beyond its public execution id',()=>{
+ const ctx={document_id:'own',execution:{status:'completed',execution_id:'own:1:2'}},proof={...ctx.execution,verified:true,owner_verified:true};
+ assert.equal(verifyCrossTableExecutionOwner(proof,ctx),true);
+ for(const p of [ctx.execution,{...proof,verified:false},{...proof,owner_verified:false},{...proof,status:'failed'},
+  {...proof,execution_id:'own:1:1'},{...proof,execution_id:'foreign:1:2'}])assert.throws(()=>verifyCrossTableExecutionOwner(p,ctx));
+});
 const ctx={document_id:'d',workflow_ref:{workflow_id:'w'}};
 function fixture(){
  const ref={document_id:'d',workflow_id:'w',node_id:'collapse'},fields=[{name:'Key',label:'Key',type:'string',source_name:'Key'}];

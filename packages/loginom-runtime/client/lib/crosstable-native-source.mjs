@@ -1,6 +1,11 @@
 const need=(v,m)=>{if(!v)throw Error('CrossTable exact source: '+m);};
 const owner=(a,b)=>['document_id','workflow_id','node_id'].every(k=>a?.[k]===b?.[k]);
 const schema=fields=>fields.map(f=>({name:f.name,label:f.label,type:f.type}));
+export function verifyCrossTableExecutionOwner(proof,ctx){
+ need(proof?.verified===true&&proof.owner_verified===true&&proof.status==='completed'
+  &&proof.execution_id===ctx.execution.execution_id&&proof.execution_id.startsWith(ctx.document_id+':'),'completed native execution owner proof required');
+ return true;
+}
 
 // Only the executor's private, settled history grants a Collapse ancestor.
 // Latest failed or nonexecuted changes invalidate earlier completed settings.
