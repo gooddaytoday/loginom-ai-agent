@@ -9,6 +9,8 @@ import {completedStaticImports} from './collapse-native-source.mjs';
 import {completedCrossTableCollapses,validateCrossTableNativeSources} from './crosstable-native-source.mjs';
 import {prepareCrossTableAncestorExecution} from './crosstable-ancestor-execution.mjs';
 import {withBrowserReceipt} from './executor.mjs';
+import {configureOutputAutosync} from './port-mapping-procedure.mjs';
+import {showMissingValuesMappingTable} from './missing-values-output.mjs';
 const need=(v,m)=>{if(!v)throw Error('CrossTable: '+m);};
 export function createCrossTableNodeSupport(config){return createTabularTransformNodeSupport(config,{
  nativeFullOutput:true,type:'transform.cross_table',mode:'pivot',revision:'crosstable-v3-internal-1',readback:crossTableConfigurationReadback,
@@ -29,7 +31,7 @@ export function createCrossTableNodeSupport(config){return createTabularTransfor
  configurationObservation:{condition:'owned CrossTable configuration',readCrossTable:true,ready:s=>s.wizard?.stage==='crosstable'&&s.node_crosstable?.verified===true},
  async configure(channel,p,context){
   const changed=await configureCrossTable(channel,p,context);if(context.request.finish==='close')return changed;
-  return advanceCrossTableConfiguration(channel,changed);
+  return advanceCrossTableConfiguration(channel,changed,context.request);
  },
  materializedSchema:materializeCrossTableOutput,
 });}
@@ -37,7 +39,7 @@ export function createCrossTableNodeSupport(config){return createTabularTransfor
 // CrossTable output fields are materialized only by Execute. A new inline
 // mapping has no rows: its absence is not a verified inventory. Preserve native
 // wizard/node ownership, advance with Next, and attest schema after execution.
-export async function advanceCrossTableConfiguration(channel,changed){
+export async function advanceCrossTableConfiguration(channel,changed,request){
   const root=changed.configuration.node_context.tid;
   const next=async(initial,expected)=>channel.perform({condition:'validate CrossTable and advance',initialObservation:initial,
    ready:s=>s.wizard?.status==='observed',identity:()=>changed.configuration.node_context,
@@ -50,10 +52,24 @@ export async function advanceCrossTableConfiguration(channel,changed){
   if(destination.wizard.stage==='output_mapping'){
    need(destination.prepared_node_context?.verified===true
     &&['document_id','workflow_id','node_id'].every(k=>destination.prepared_node_context[k]===changed.configuration.node_context[k])
-    &&destination.wizard.root_tid===root&&destination.wizard.title==='Настройка соответствия между столбцами','inline output owner differs');
+   &&destination.wizard.root_tid===root&&destination.wizard.title==='Настройка соответствия между столбцами','inline output owner differs');
+   // With saved autosync disabled, native Next can reject the regenerated
+   // required fields before the later materialized output edit is reachable.
+   // Apply only an explicit request to re-enable it on this existing owner.
+   // The normal option helper still proves that the rendered definition stays
+   // unchanged; execution and the final complete mapping proof remain later.
+   let inlineAutosync;
+   if(request?.target?.kind==='existing'&&request.mappings?.some(m=>m.direction==='output'&&m.port===0&&m.autosync===true)){
+    await showMissingValuesMappingTable(channel);
+    inlineAutosync=await configureOutputAutosync(channel,true);
+    destination=await channel.observe({condition:'owned CrossTable inline autosync before native validation',ready:s=>s.wizard?.stage==='output_mapping'
+     &&s.prepared_node_context?.verified===true&&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===changed.configuration.node_context[k])
+     &&s.wizard.root_tid===root&&s.wizard.title==='Настройка соответствия между столбцами'});
+   }
    // Native CrossTable generates/synchronizes these fields on execution. No
    // guessed source inventory, mapping override or premature schema comparison.
    await next(destination,'done');
+   if(inlineAutosync)changed={...changed,inline_autosync:inlineAutosync};
   }
   const done=await channel.observe({condition:'CrossTable accepted by native Next',ready:s=>s.wizard?.stage==='done'});
   return {...changed,validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
