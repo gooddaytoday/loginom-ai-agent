@@ -876,22 +876,42 @@
         },
         {
           "name": "C_1_Amount_Sum",
-          "label": "A|web|Amount|Сумма",
+          "label": "A|<...>|Amount|Сумма",
           "type": "real"
         },
         {
           "name": "C_1_Amount_Count",
-          "label": "A|web|Amount|Количество",
+          "label": "A|<...>|Amount|Количество",
           "type": "integer"
         },
         {
           "name": "C_2_Amount_Sum",
-          "label": "B|<...>|Amount|Сумма",
+          "label": "A|web|Amount|Сумма",
           "type": "real"
         },
         {
           "name": "C_2_Amount_Count",
+          "label": "A|web|Amount|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "C_3_Amount_Sum",
+          "label": "B|<...>|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_3_Amount_Count",
           "label": "B|<...>|Amount|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "C_4_Amount_Sum",
+          "label": "B|web|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_4_Amount_Count",
+          "label": "B|web|Amount|Количество",
           "type": "integer"
         }
       ],
@@ -899,10 +919,14 @@
         {
           "Region": "North",
           "Month": "Sep",
-          "C_1_Amount_Sum": 9.0,
-          "C_1_Amount_Count": 4,
-          "C_2_Amount_Sum": null,
-          "C_2_Amount_Count": null
+          "C_1_Amount_Sum": null,
+          "C_1_Amount_Count": null,
+          "C_2_Amount_Sum": 9.0,
+          "C_2_Amount_Count": 4,
+          "C_3_Amount_Sum": null,
+          "C_3_Amount_Count": null,
+          "C_4_Amount_Sum": null,
+          "C_4_Amount_Count": null
         },
         {
           "Region": null,
@@ -910,7 +934,11 @@
           "C_1_Amount_Sum": null,
           "C_1_Amount_Count": null,
           "C_2_Amount_Sum": null,
-          "C_2_Amount_Count": 1
+          "C_2_Amount_Count": null,
+          "C_3_Amount_Sum": null,
+          "C_3_Amount_Count": 1,
+          "C_4_Amount_Sum": null,
+          "C_4_Amount_Count": null
         }
       ]
     },

@@ -58,6 +58,12 @@ def pivot(rows, keys, dimensions, fact, function):
         groups.setdefault(identity, []).append(row[fact])
     return {identity: aggregate(values, function) for identity, values in groups.items()}
 
+def cartesian_categories(rows, dimensions):
+    from itertools import product
+    if not rows: return []
+    return list(product(*(sorted({row[d] for row in rows},key=lambda v: '' if v is None else v)
+                          for d in dimensions)))
+
 if __name__ == '__main__':
     import unittest
     class OracleChecks(unittest.TestCase):
@@ -81,4 +87,7 @@ if __name__ == '__main__':
             self.assertEqual(actual[(('North','Sep'),('A','web'))], 4)
             self.assertEqual(actual[((None,'Oct'),('B',None))], 1)
             self.assertNotIn((('North','Sep'),('B',None)), actual)
+            self.assertEqual(cartesian_categories(rows,['Category','Channel']),
+                             [('A',None),('A','web'),('B',None),('B','web')])
+            self.assertIsNone(aggregate([], 'count'))
     unittest.main()

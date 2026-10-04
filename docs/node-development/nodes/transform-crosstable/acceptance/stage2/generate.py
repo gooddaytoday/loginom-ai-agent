@@ -12,7 +12,7 @@ import struct
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from oracle import read, aggregate, TYPES, FUNCTIONS
+from oracle import read, aggregate, TYPES, FUNCTIONS, cartesian_categories
 
 ROOT = Path(__file__).resolve().parent.parent
 LABELS = dict(zip(FUNCTIONS, ['Сумма','Количество','Минимум','Максимум','Среднее',
@@ -88,9 +88,9 @@ def generate():
     dates=[f for f in FUNCTIONS if f not in {'sum','sum_squares'}]
     for functions in [dates[:5],dates[5:]]:outputs.append(report(rows,['Region'],[('When',functions)]))
     outputs.append(report(rows,[],[('Amount',['sum','count','avg'])]))
-    # Native category identity is the observed tuple, not a Cartesian expansion.
-    # NULL sorts before a value within a dimension. Empty key/tuple intersections remain NULL.
-    dimensions=sorted({(r['Category'],r['Channel']) for r in rows}, key=lambda t:tuple('' if v is None else v for v in t))
+    # Native categories are the Cartesian product of per-dimension values.
+    # NULL sorts first; absent key/category intersections stay NULL, including Count.
+    dimensions=cartesian_categories(rows,['Category','Channel'])
     keys=['Region','Month'];cols=[{'name':k,'label':k,'type':'string'} for k in keys]
     for i,cat in enumerate(dimensions,1):
         caption='|'.join('<...>' if v is None else v for v in cat)
