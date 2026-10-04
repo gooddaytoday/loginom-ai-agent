@@ -17,7 +17,7 @@ export function crossTableConfigurationReadback({node,phases,operation_id}){
  const field=f=>pick(f,['name','label','type','order']);
  const result={kind:'crosstable',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),
   receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:'pivot',category_mode:c.category_mode,
-  row_keys:c.row_keys.map(field),column:pick(c.column,['name','label','type']),
+  row_keys:c.row_keys.map(field),column:c.column?pick(c.column,['name','label','type']):null,columns:(c.columns??(c.column?[c.column]:[])).map(field),
   facts:c.facts.map(f=>({...field(f),functions:[...f.functions]})),options:{...c.options},
   output_scope:'not_materialized',execution_id:null,category_fields:[],package_persistence_verified:false};
  if(finished.value.mode==='execute'&&phases.some(p=>p.phase==='read')){

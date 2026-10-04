@@ -12,10 +12,36 @@ test('numeric pivot supports both modes and rejects unimplemented features befor
  assert.equal(validateCrossTableParameters(sliding,'pivot',r),sliding);
  for(const patch of [{limit:1},{min_values:1},{unique_names:true},{separator:'.'},{categories:['A']},{variables:{}},
   {row_keys:[field('Region'),field('Region')]},{category_mode:'sliding'},
-  {facts:[{field:field('Amount'),functions:['count']}]},{facts:[{field:field('Amount'),functions:['sum','sum']}]}])
+  {facts:[{field:field('Amount'),functions:['median']}]},{facts:[{field:field('Amount'),functions:['sum','sum']}]},
+  {columns:[field('Category')]},{columns:'Category',column:undefined}])
   assert.throws(()=>validateCrossTableParameters({...p,...patch},'pivot',r));
  for(const request of [{...r,inputs:[]},{...r,mappings:[{direction:'output',port:0}]},{...r,read:{ports:[1]}}])
   assert.throws(()=>validateCrossTableParameters(p,'pivot',request));
+});
+test('native typed matrix admits supported functions and refuses incompatible pairs before target mutation',()=>{
+ const common=['count','min','max','unique_count','null_count','first','last'];
+ for(const type of ['integer','real','string','boolean','datetime']){
+  const xs=structuredClone(fields);xs[2].type=type;
+  const functions=['integer','real'].includes(type)?['sum',...common,'avg','stddev','sum_squares']:
+   type==='datetime'?[...common,'avg','stddev']:common;
+  const parameters={...p,facts:[{field:field('Amount'),functions}]};
+  assert.equal(validateCrossTableParameters(parameters,'pivot',r),parameters);
+  assert.equal(resolveCrossTableParameters(parameters,xs).facts[0].type,type);
+  if(!['integer','real'].includes(type))for(const fn of ['sum','sum_squares'])
+   assert.throws(()=>resolveCrossTableParameters({...parameters,facts:[{field:field('Amount'),functions:[fn]}]},xs));
+  xs[2].available_functions=2;
+  assert.throws(()=>resolveCrossTableParameters({...parameters,facts:[{field:field('Amount'),functions:['min']}]},xs));
+ }
+});
+test('ordered dimensions replace legacy column while all roles remain distinct',()=>{
+ const xs=[...fields,{name:'Month',label:'Month',type:'string',data_kind:'Дискретный'},
+  {name:'Channel',label:'Channel',type:'string',data_kind:'Дискретный'}];
+ const parameters={...p,row_keys:[field('Region'),field('Month')],columns:[field('Channel'),field('Category')]};delete parameters.column;
+ validateCrossTableParameters(parameters,'pivot',r);
+ const plan=resolveCrossTableParameters(parameters,xs);
+ assert.deepEqual(plan.columns.map(f=>f.name),['Channel','Category']);
+ assert.deepEqual(plan.keys.map(f=>f.name),['Region','Month']);
+ assert.throws(()=>validateCrossTableParameters({...parameters,columns:[field('Region')]},'pivot',r));
 });
 test('upstream name, kind, type and label are verified rather than inferred',()=>{
  for(const mutate of [xs=>xs[1].data_kind='Непрерывный',xs=>xs[2].type='string',xs=>xs[0].data_kind='Непрерывный',

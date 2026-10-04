@@ -27,16 +27,17 @@ export const calculatorParametersSchema={...object({expressions:array(calculator
  description:'For a new calculator, inputs must contain one table connection to input 0. target.kind=new ADDS an expression and must not repeat a saved expression name. For an existing calculator, parameters:{expressions:[]} preserves every formula (use finish=execute to read output); edits address target:{kind:existing,name:saved_name} inside each expression. Analytical formulas remain your choice.'};
 export const crossTableFieldSchema={...object({kind:{...choice('input_field'),description:'Reference an existing input field.'},name:{...fieldName,description:'Exact observed technical input field name.'}}),description:'Use a field from the verified upstream schema.'};
 export const crossTableParametersSchema={...object({
- row_keys:{...array(crossTableFieldSchema,128,1),description:'Ordered discrete row grouping fields.'},
- column:{...crossTableFieldSchema,description:'One discrete string field whose values become column categories.'},
- facts:{...array(object({field:{...crossTableFieldSchema,description:'Numeric integer or real fact field.'},functions:{...array(choice('sum','min','max','avg'),4,1),description:'Complete selected aggregate set; sum of Quantity=1 counts sales.'}}),128,1),description:'Ordered numeric facts and their aggregate functions.'},
+ row_keys:{...array(crossTableFieldSchema,128),description:'Ordered discrete row grouping fields; empty creates an overall summary.'},
+ column:{...crossTableFieldSchema,description:'Legacy shorthand for one discrete column dimension; omit when columns is supplied.'},
+ columns:{...array(crossTableFieldSchema,128),description:'Ordered discrete column dimensions; empty creates one summary column group. Do not combine with column.'},
+ facts:{...array(object({field:{...crossTableFieldSchema,description:'Existing integer, real, string, Boolean or datetime fact.'},functions:{...array(choice('sum','count','min','max','avg','stddev','sum_squares','unique_count','null_count','first','last'),11,1),description:'Complete aggregate set. count includes NULL; unique_count excludes NULL; first/last include NULL in input order. Numeric: all functions; string/Boolean: count,min,max,unique_count,null_count,first,last; datetime additionally avg and stddev (days). stddev uses n-1 and is zero for one non-NULL value.'}}),128,1),description:'Ordered typed facts and native functions; incompatible functions refuse before target creation.'},
  category_mode:{...choice('fixed','sliding'),description:'fixed captures initial categories; sliding regenerates categories on each fresh execution.'},
  include_null:{...boolean,description:'Required for fixed: create a separate missing-category group; omit for sliding.'},
  include_other:{...boolean,description:'Required for fixed: new categories enter Other; omit for sliding.'},
  min_values:{const:0,description:'Reserved category count; stage one supports zero only.'},limit:{const:0,description:'No truncation: category limit is zero only.'},
  separator:{const:'|',description:'Category/fact/function label separator; stage one supports | only.'},
  unique_names:{const:false,description:'Use native positional C_n fact/function names; identify categories by their observed labels.'}
-},[]),description:'New CrossTable requires row_keys, column, facts and category_mode. fixed also requires explicit include_null/include_other. Existing parameters={} preserves supported settings; refresh output with dock_node_read instead. Variables, explicit category lists, nonzero limits and mapping overrides are unsupported.'};
+},[]),description:'New CrossTable requires row_keys, column or columns, facts and category_mode. fixed also requires explicit include_null/include_other. Existing parameters={} preserves supported settings; refresh output with dock_node_read instead. Variables, explicit category lists, nonzero limits and mapping overrides are unsupported.'};
 export const groupingFieldSchema=object({kind:choice('input_field'),name:fieldName});
 export const groupingMeasureSchema=object({field:groupingFieldSchema,function:choice('sum','count','avg','min','max'),name:fieldName,label:text(120)});
 export const groupingParametersSchema=object({group_by:array(groupingFieldSchema,128,1),measures:array(groupingMeasureSchema,256,1)},[]);

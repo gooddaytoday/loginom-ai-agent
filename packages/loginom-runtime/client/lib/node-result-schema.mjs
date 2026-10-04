@@ -133,11 +133,11 @@ const duplicatesConfigurationReadback=object({kind:values('duplicates'),scope:va
  input_mapping:object({port:{type:'integer',const:0},fields:boundedFields(object({name:str,source_name:str}))}),
  output_mapping:object({port:{type:'integer',const:0},fields:boundedFields(object({name:str,label:str,type:str,source_name:str}))}),
  package_persistence_verified:{type:'boolean',const:false}});
-const crossTableCategoryField=object({category:nullable(str),category_kind:values('null','other','value'),fact:str,function:values('sum','min','max','avg'),field:str,label:str,type:str});
+const crossTableCategoryField=object({category:nullable(str),category_kind:values('null','other','value'),fact:str,function:values('sum','count','min','max','avg','stddev','sum_squares','unique_count','null_count','first','last'),field:str,label:str,type:str,categories:array(object({dimension:str,caption:str,kind:values('null','other','value'),value:nullable(str)}))},['category','category_kind','fact','function','field','label','type']);
 const crossTableConfigurationReadback=object({kind:values('crosstable'),scope:values('observed_before_verified_finish'),values_are:values('observed_ui_values'),node:ref,
  receipt_ids:{...array(str),minItems:5,maxItems:7},mode:values('pivot'),category_mode:values('fixed','sliding'),
- row_keys:{...array(object({name:str,label:str,type:str,order:integer})),minItems:1,maxItems:128},column:object({name:str,label:str,type:str}),
- facts:{...array(object({name:str,label:str,type:values('integer','real'),order:integer,functions:{...array(values('sum','min','max','avg')),minItems:1,maxItems:4}})),minItems:1,maxItems:128},
+ row_keys:{...array(object({name:str,label:str,type:str,order:integer})),maxItems:128},column:nullable(object({name:str,label:str,type:str})),columns:{...array(object({name:str,label:str,type:str,order:integer})),maxItems:128},
+ facts:{...array(object({name:str,label:str,type:values('integer','real','string','boolean','datetime'),order:integer,functions:{...array(values('sum','count','min','max','avg','stddev','sum_squares','unique_count','null_count','first','last')),minItems:1,maxItems:11}})),minItems:1,maxItems:128},
  options:object({separator:{const:'|'},unique_names:{const:false},limit:{const:0},min_values:{const:0},include_null:bool,include_other:bool}),
  output_scope:values('not_materialized','observed_after_verified_execution'),execution_id:nullable(str),category_fields:array(crossTableCategoryField),
  package_persistence_verified:{const:false}});

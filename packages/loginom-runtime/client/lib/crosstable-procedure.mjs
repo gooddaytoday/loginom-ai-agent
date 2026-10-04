@@ -18,16 +18,17 @@ export function bindCrossTableInput(native,mapping){
 export function crossTableConfiguration(native,mapping){
  const fields=bindCrossTableInput(native,mapping),ordered=role=>fields.filter(f=>f.disposition===role).sort((a,b)=>a.order-b.order);
  const columns=ordered(1),keys=ordered(2),facts=ordered(3),o=native.options;
- need(columns.length===1&&keys.length>0&&facts.length>0&&!native.service_fields.some(f=>f.disposition>0),'one column, row keys and numeric facts required');
- const column=columns[0],mode=o.pedSlidingUniqueValues.value?'sliding':'fixed';
- need(o.pedDisplayNameSeparator.value==='|'&&o.pedUniqueValueNames.value===false&&o.pedSlidingUniqueValuesLimit.value===0&&column.min_values===0,'unsupported names, separator or limits');
- need(mode!=='sliding'||!column.include_null&&!column.include_other,'sliding retains unsupported fixed flags; request complete replacement');
+ need(columns.length<=128&&facts.length>0&&!native.service_fields.some(f=>f.disposition>0),'supported dimensions and typed facts required');
+ need(columns.every(f=>f.include_null===columns[0].include_null&&f.include_other===columns[0].include_other),'mixed per-dimension special-group policy is unsupported');
+ const column=columns[0]??null,mode=o.pedSlidingUniqueValues.value?'sliding':'fixed';
+ need(o.pedDisplayNameSeparator.value==='|'&&o.pedUniqueValueNames.value===false&&o.pedSlidingUniqueValuesLimit.value===0&&columns.every(f=>f.min_values===0),'unsupported names, separator or limits');
+ need(mode!=='sliding'||columns.every(f=>!f.include_null&&!f.include_other),'sliding retains unsupported fixed flags; request complete replacement');
  const result={verified:true,inventory_complete:true,kind:'crosstable',node_context:native.node_context,input_fields:fields,
-  category_mode:mode,column:{...column},row_keys:keys,facts:facts.map(f=>{
-   need(f.functions>0&&(f.functions&~29)===0,'only sum/min/max/avg supported');
+  category_mode:mode,column:column?{...column}:null,columns:columns.map(f=>({...f})),row_keys:keys,facts:facts.map(f=>{
+   need(f.functions>0&&(f.functions&~2047)===0&&(f.functions&~f.available_functions)===0,'unsupported fact/function mask');
    return {...f,functions:Object.entries(CROSSTABLE_FUNCTIONS).filter(([,v])=>(f.functions&v.bit)!==0).map(([fn])=>fn)};
-  }),options:{separator:'|',unique_names:false,limit:0,min_values:0,include_null:column.include_null,include_other:column.include_other}};
- resolveCrossTableParameters({row_keys:keys.map(f=>({kind:'input_field',name:f.name})),column:{kind:'input_field',name:column.name},
+  }),options:{separator:'|',unique_names:false,limit:0,min_values:0,include_null:columns.length>0&&columns.every(f=>f.include_null),include_other:columns.length>0&&columns.every(f=>f.include_other)}};
+ resolveCrossTableParameters({row_keys:keys.map(f=>({kind:'input_field',name:f.name})),columns:columns.map(f=>({kind:'input_field',name:f.name})),
   facts:result.facts.map(f=>({field:{kind:'input_field',name:f.name},functions:f.functions}))},fields);
  return result;
 }
@@ -36,7 +37,7 @@ export async function configureCrossTable(channel,p,{inputMapping}){
  const observe=condition=>channel.observe({condition,readCrossTable:true,ready});
  const initial=await observe('complete owned CrossTable inventory'),baseline=initial.node_crosstable;
  need(baseline.dialogs.length===0,'unexpected nested editor');
- need(!baseline.service_fields.some(f=>f.disposition>0),'native Count service fact is outside stage one');
+ need(!baseline.service_fields.some(f=>f.disposition>0),'native Count service fact is outside the supported fact contract');
  const fields=bindCrossTableInput(baseline,inputMapping);
  if(Object.keys(p).length===0)return {verified:true,cleanup_complete:true,effect_possible:false,
   configuration:crossTableConfiguration(baseline,inputMapping),preservation:{unchanged:true}};
@@ -98,8 +99,8 @@ export async function configureCrossTable(channel,p,{inputMapping}){
    identity:()=>({record_id:old.record_id,index:old.index}),resolve:()=>({verb:'press',ref:cell.ref,key:'Delete'})});
   s=await observe('prior role cleared');need(current(s,old.index).disposition===0,'role removal unconfirmed');
  }
- need(!baseline.service_fields.some(f=>f.disposition>0),'native Count service fact is outside stage one');
- const roles=[[1,[plan.column]],[2,plan.keys],[3,plan.facts]];
+ need(!baseline.service_fields.some(f=>f.disposition>0),'native Count service fact is outside the supported fact contract');
+ const roles=[[1,plan.columns],[2,plan.keys],[3,plan.facts]];
  for(const [role,list] of roles)for(const f of list){
   s=await select(f.index,'available');await gesture(s,'assign CrossTable role',base+';CrossTabWizard;frmMoveButtons;btnMove'+(role-1));
   s=await observe('CrossTable role assigned');need(current(s,f.index).disposition===role,'role assignment unconfirmed');
@@ -120,7 +121,8 @@ export async function configureCrossTable(channel,p,{inputMapping}){
    &&same(s.node_crosstable.selected_used,[f.record_id]),'nested editor owner differs');
  };
  const dialogValue=(state,tid)=>{const xs=state.node_crosstable.dialogs.flatMap(d=>d.controls).filter(c=>c.tid===tid);need(xs.length===1,'nested value missing: '+tid);return xs[0];};
- const column=plan.column,ct=base+';ColumnEditDialog;';
+ const ct=base+';ColumnEditDialog;';
+ for(const column of plan.columns){
  await openEditor(column,'ColumnEditDialog');
  if(dialogValue(s,ct+'fldSlidingUniqueValuesMinCount').value!==0){
   await gesture(s,'reset reserved category count',ct+'fldSlidingUniqueValuesMinCount','fill',{value:'0'},true);s=await observe('reserved count entered');
@@ -128,12 +130,15 @@ export async function configureCrossTable(channel,p,{inputMapping}){
  }
  need(dialogValue(s,ct+'fldSlidingUniqueValuesMinCount').value===0,'reserved count differs');
  await gesture(s,'apply column minimum',ct+'btnApply');s=await observe('column minimum applied');
- await setBoolean('pedSlidingUniqueValues',false);await openEditor(column,'ColumnEditDialog');
+ }
+ await setBoolean('pedSlidingUniqueValues',false);
+ for(const column of plan.columns){await openEditor(column,'ColumnEditDialog');
  for(const [key,value] of [['cbNullGroup',p.category_mode==='fixed'?p.include_null:false],['cbOtherGroup',p.category_mode==='fixed'?p.include_other:false]]){
   if(dialogValue(s,ct+key).value===value)continue;need(!dialogValue(s,ct+key).disabled,'special group disabled');
   await gesture(s,'set explicit special group',ct+key+';DisplayEl');s=await observe('special group changed');need(dialogValue(s,ct+key).value===value,'special group differs');
  }
  await gesture(s,'apply fixed special-group policy',ct+'btnApply');await observe('special-group policy applied');
+ }
  if(p.category_mode==='sliding')await setBoolean('pedSlidingUniqueValues',true);
  for(const f of plan.facts){
   const mask=f.functions.reduce((m,fn)=>m|CROSSTABLE_FUNCTIONS[fn].bit,0);s=await observe('CrossTable fact functions');
@@ -148,7 +153,7 @@ export async function configureCrossTable(channel,p,{inputMapping}){
   await gesture(s,'apply complete fact function set',base+';FactorEditDialog;btnApply');s=await observe('fact functions applied');need(current(s,f.index).functions===mask,'applied function mask differs');
  }
  const after=(await observe('final owned CrossTable configuration')).node_crosstable,c=crossTableConfiguration(after,inputMapping);
- need(same(c.row_keys.map(f=>f.name),plan.keys.map(f=>f.name))&&c.column.name===plan.column.name
+ need(same(c.row_keys.map(f=>f.name),plan.keys.map(f=>f.name))&&same(c.columns.map(f=>f.name),plan.columns.map(f=>f.name))
   &&same(c.facts.map(f=>({name:f.name,functions:f.functions})),plan.facts.map(f=>({name:f.name,functions:Object.keys(CROSSTABLE_FUNCTIONS).filter(fn=>f.functions.includes(fn))})))
   &&c.category_mode===p.category_mode,'final configuration differs');
  const identity=xs=>xs.map(f=>({index:f.index,record_id:f.record_id,name:f.name,label:f.label,type:f.type,data_kind:f.data_kind}));
