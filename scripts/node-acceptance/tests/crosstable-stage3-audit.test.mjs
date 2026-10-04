@@ -44,6 +44,12 @@ function fixture(){
 test('stage three requires intermediate actions alongside the separate cold oracle',()=>{
  const result=auditCrossTableStage3(fixture());assert.equal(result.status,'PASS');assert.equal(result.criteria.length,6);
 });
+test('a structured zero-effect request refusal in the tool error channel is still verified',()=>{
+ const xs=fixture(),state=xs.find(e=>e.part.id==='negative').part.state;
+ state.status='error';state.error=state.output;delete state.output;
+ assert.equal(auditCrossTableStage3(xs).status,'PASS');
+ state.error='transport lost';assert.throws(()=>auditCrossTableStage3(xs),/required own exclusion/);
+});
 test('static substitutions, changed variable IDs, foreign downstream and incomplete intermediate reads refuse',()=>{
  for(const damage of [r=>delete r.configuration.readback.options.variable_bindings,
   r=>r.configuration.readback.options.variable_bindings.limit.id=99,

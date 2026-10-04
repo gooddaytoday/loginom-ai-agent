@@ -17,7 +17,7 @@ export function auditCrossTableStage3(events){
   if(event.type!=='tool_use')continue;const p=event.part;
   if(!p?.state||!['completed','error'].includes(p.state.status))continue;
   const prior=seen.get(p.id);if(prior){need(JSON.stringify(prior)===JSON.stringify(p),'changed tool event');continue;}seen.set(p.id,p);
-  const result=parse(p.state.output);calls.push({index,tool:p.tool,input:p.state.input,result,error:p.state.error});
+  const result=parse(p.state.output)??parse(p.state.error);calls.push({index,tool:p.tool,input:p.state.input,result,error:p.state.error});
   if(result?.state==='settled'&&result.operation_id){
    const old=settled.get(result.operation_id);need(!old||JSON.stringify(old)===JSON.stringify(result),'conflicting settled result');settled.set(result.operation_id,result);
   }
