@@ -5,10 +5,23 @@ import {configureCrossTable} from './crosstable-procedure.mjs';
 import {materializeCrossTableOutput} from './crosstable-output.mjs';
 import {crossTableConfigurationReadback} from './crosstable-readback.mjs';
 import {crossTableParametersSchema} from './node-api.mjs';
+import {completedStaticImports} from './collapse-native-source.mjs';
+import {completedCrossTableCollapses,validateCrossTableNativeSources} from './crosstable-native-source.mjs';
+import {prepareCrossTableAncestorExecution} from './crosstable-ancestor-execution.mjs';
+import {withBrowserReceipt} from './executor.mjs';
 const need=(v,m)=>{if(!v)throw Error('CrossTable: '+m);};
 export function createCrossTableNodeSupport(config){return createTabularTransformNodeSupport(config,{
  nativeFullOutput:true,type:'transform.cross_table',mode:'pivot',revision:'crosstable-v3-internal-1',readback:crossTableConfigurationReadback,
  parameterSchema:crossTableParametersSchema,validate:validateCrossTableParameters,preflight:preflightCrossTableSource,
+ async beforeGraphExecute(options,ctx,configuration){
+  if(options.operation.parameters.read?.coverage!=='full')return;
+  const imports=completedStaticImports(options.nodeHistory?.(),options.verifiedUploads?.(),ctx,options.uploadHistory?.());
+  const sources=validateCrossTableNativeSources(imports,completedCrossTableCollapses(options.nodeHistory?.(),ctx),configuration.input_fields);
+  const graph=await options.operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline);
+  return prepareCrossTableAncestorExecution({graph,node:ctx.node,sources,operation:options.operation,execute:options.execute,record:options.onRecord,
+   targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,signal:ctx.signal,now:options.now,
+   wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...options.receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
+ },
  async beforeOpen(channel,request){
   if(request.parameters.local_variables||request.parameters.bindings||request.target.kind==='existing')
    return channel.configureCrossTableVariables(request.parameters.local_variables??[]);

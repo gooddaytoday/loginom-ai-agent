@@ -157,6 +157,14 @@ try {
         operation_id: receipt.id,
       }),
   })
+  const nativeConfiguration=staticSources?.crossTables.find(c=>c.node_id===node.node_id)?.configuration;
+  const useNative=nativeConfiguration&&expectedOutputs.some(o=>o.columns.length<=8);
+  const nativeFactWidth=nativeConfiguration?.columns.length===0?nativeConfiguration.row_keys.length+nativeConfiguration.facts.reduce((n,f)=>n+f.functions.length,0):null;
+  if(useNative&&(nativeConfiguration.facts.some(f=>f.type==='variant')||nativeFactWidth!==null&&nativeFactWidth<=8)){
+   const {prepareCrossTableAncestorExecution}=await load('client/lib/crosstable-ancestor-execution.mjs');
+   await prepareCrossTableAncestorExecution({graph,node,sources:staticSources,operation,execute,record,targetOrigin:origin,targetBuild:'7.4.2',
+    wrapMutation:(code,r)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})});
+  }
   const driver = createNodeExecutionProcedure(channel, node)
   await driver.prepare()
   await driver.launchGraph()
@@ -166,8 +174,6 @@ try {
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
   ownedExecutions.push(execution);
 
-  const nativeConfiguration=staticSources?.crossTables.find(c=>c.node_id===node.node_id)?.configuration;
-  const useNative=nativeConfiguration&&expectedOutputs.some(o=>o.columns.length<=8);
   let data;
   if(useNative){
    // Preview enforces the actual 50x8 bound; wide baseline reports retain their
