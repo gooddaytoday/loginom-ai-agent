@@ -25,6 +25,11 @@ test('cached CrossTable roles retain ordinals and never invent technical names',
  assert.equal(r.input_fields[1].index,1);assert.equal(r.input_fields[1].name,undefined);
  assert.equal(r.input_fields[2].type,'real');assert.equal(r.options.pedSlidingUniqueValues.value,false);
 });
+test('native Variant fact retains undefined data kind without granting dimension semantics',()=>{
+ const f=fixture();Object.assign(f.records[2].data,{DataType:6,DataKind:0,AvailableAggregationTypes:1934});
+ const r=f.evaluate();assert.equal(r.verified,true);assert.equal(r.input_fields[2].type,'variant');assert.equal(r.input_fields[2].data_kind,'Неопределенное');
+ f.records[2].data.DataKind=3;assert.equal(f.evaluate().verified,false);
+});
 test('foreign grid, filtered store, duplicate ordinal/label and variable state refuse',()=>{
  for(const mutate of [f=>f.components.get(f.base+'grdDataFields').el.dom={},f=>f.store.isBufferedStore=true,
   f=>f.store.getData=()=>({items:f.records,getSource:()=>({items:[]})}),f=>f.records[1].data.Index=0,

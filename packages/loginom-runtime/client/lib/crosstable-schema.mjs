@@ -1,13 +1,13 @@
 // Internal schema policy. User-facing read APIs cannot supply this object.
 const need=(v,m)=>{if(!v)throw Error('CrossTable schema: '+m);};
-const labels={sum:'Сумма',min:'Минимум',max:'Максимум',avg:'Среднее'};
-const suffixes={sum:'Sum',min:'Min',max:'Max',avg:'Avg'};
+import {CROSSTABLE_FUNCTIONS,CROSSTABLE_TYPE_MASKS,crossTableResultType} from './crosstable-parameters.mjs';
+const suffixes={sum:'Sum',count:'Count',min:'Min',max:'Max',avg:'Avg',stddev:'StdDev',sum_squares:'SumSq',unique_count:'UniqueCount',null_count:'NullCount',first:'First',last:'Last'};
 export function resolveCrossTableSchema(columns,configuration){
  need(configuration?.kind==='crosstable'&&['fixed','sliding'].includes(configuration.category_mode)
   &&configuration.options?.separator==='|'&&configuration.options.unique_names===false
   &&configuration.options.limit===0&&configuration.options.min_values===0,'verified supported configuration required');
- const keys=configuration.row_keys,facts=configuration.facts,dimension=configuration.column;
- need(Array.isArray(keys)&&keys.length>0&&Array.isArray(facts)&&facts.length>0&&dimension?.name,'complete roles required');
+ const keys=configuration.row_keys,facts=configuration.facts,dimensions=configuration.columns??(configuration.column?[configuration.column]:[]);
+ need(Array.isArray(keys)&&Array.isArray(facts)&&facts.length>0&&Array.isArray(dimensions),'complete roles required');
  need(columns.length>=keys.length&&columns.length<=1000&&new Set(columns.map(f=>f.name)).size===columns.length,'complete unique columns required');
  const keyNames=new Set(keys.map(f=>f.name)),pairs=[],categories=new Map();
  need(keyNames.size===keys.length,'duplicate row key');
@@ -16,25 +16,35 @@ export function resolveCrossTableSchema(columns,configuration){
   need(fields.length===1&&fields[0].label===key.label&&fields[0].type===key.type,'row key changed: '+key.name);
  }
  const expected=facts.flatMap(f=>f.functions.map(fn=>{
-  need(labels[fn]&&['integer','real'].includes(f.type)&&f.label&&!f.label.includes('|'),'unsupported fact/function');
-  return {field:f.name,label:f.label,function:fn,type:['sum','avg'].includes(fn)?'real':f.type};
+  need(CROSSTABLE_FUNCTIONS[fn]&&CROSSTABLE_TYPE_MASKS[f.type]
+   &&(CROSSTABLE_TYPE_MASKS[f.type]&CROSSTABLE_FUNCTIONS[fn].bit)!==0&&f.label&&!f.label.includes('|'),'unsupported fact/function');
+  return {field:f.name,label:f.label,function:fn,type:crossTableResultType(f.type,fn)};
  }));
  need(new Set(expected.map(f=>f.field+':'+f.function)).size===expected.length,'duplicate fact/function');
- const identities=new Set();
+ const identities=new Set(),multipleFacts=facts.length>1,multipleFunctions=facts.some(f=>f.functions.length>1);
  for(const [index,c] of columns.entries()){
   need(c.index===index&&typeof c.name==='string'&&typeof c.label==='string'&&c.label.length>0,'invalid column identity');
   if(keyNames.has(c.name))continue;
-  const parts=c.label.split('|');need(parts.length===3&&parts.every(p=>p.length>0),'empty or ambiguous category label');
-  const [category,fact,label]=parts;
-  const matches=expected.filter(f=>f.label===fact&&labels[f.function]===label&&f.type===c.type);
+  const parts=c.label.split('|');
+  const labelParts=parts.length-dimensions.length,showFact=multipleFacts||labelParts===2,showFunction=multipleFunctions||labelParts===2;
+  need(labelParts===(showFact?1:0)+(showFunction?1:0),'missing or redundant fact/function identity');
+  need(parts.length===dimensions.length+labelParts&&parts.every(p=>p.length>0),'empty or ambiguous category label');
+  const captions=parts.slice(0,dimensions.length),factLabel=showFact?parts[dimensions.length]:facts[0].label,
+   functionLabel=showFunction?parts.at(-1):null;
+  const matches=expected.filter(f=>f.label===factLabel&&(!showFunction||CROSSTABLE_FUNCTIONS[f.function].label===functionLabel)&&f.type===c.type);
   need(matches.length===1,'fact/function/type changed: '+c.label);const f=matches[0];
-  need(new RegExp('^C_[1-9][0-9]*_'+f.field+'_'+suffixes[f.function]+'$').test(c.name),'unconfirmed technical field: '+c.name);
-  const special=category==='<...>'?'null':category==='<Прочее>'?'other':null;
-  need(special!=='other'||configuration.category_mode==='fixed'&&configuration.options.include_other===true,'unexpected Other category');
-  need(special!=='null'||configuration.category_mode==='sliding'||configuration.options.include_null===true,'unexpected NULL category');
-  const identity=JSON.stringify([category,f.field,f.function]);need(!identities.has(identity),'duplicate category/fact/function');identities.add(identity);
-  const categoryPairs=categories.get(category)??[];categoryPairs.push(f.field+':'+f.function);categories.set(category,categoryPairs);
-  pairs.push({category:special==='null'?null:category,category_kind:special??'value',fact:f.field,function:f.function,field:c.name,label:c.label,type:c.type});
+  const categoryPrefix=dimensions.length?'C_[1-9][0-9]*':'';
+  const technical=[categoryPrefix,...(showFact?[f.field]:[]),...(showFunction?[suffixes[f.function]]:[])].filter(Boolean).join('_');
+  need(new RegExp('^'+technical+'$').test(c.name),'unconfirmed technical field: '+c.name);
+  const kinds=captions.map(category=>category==='<...>'?'null':category==='<Прочее>'?'other':'value');
+  need(kinds.every(kind=>kind!=='other'||configuration.category_mode==='fixed'&&configuration.options.include_other===true),'unexpected Other category');
+  need(kinds.every(kind=>kind!=='null'||configuration.category_mode==='sliding'||configuration.options.include_null===true),'unexpected NULL category');
+  const categoryValues=captions.map((v,i)=>kinds[i]==='null'?null:v),group=JSON.stringify(categoryValues);
+  const identity=JSON.stringify([categoryValues,f.field,f.function]);need(!identities.has(identity),'duplicate category/fact/function');identities.add(identity);
+  const categoryPairs=categories.get(group)??[];categoryPairs.push(f.field+':'+f.function);categories.set(group,categoryPairs);
+  const special=dimensions.length===1?kinds[0]:kinds.includes('other')?'other':kinds.includes('null')?'null':'value';
+  pairs.push({category:dimensions.length===1?categoryValues[0]:captions.join('|'),category_kind:special,fact:f.field,function:f.function,field:c.name,label:c.label,type:c.type,
+   ...(dimensions.length!==1?{categories:dimensions.map((d,i)=>({dimension:d.name,caption:captions[i],kind:kinds[i],value:categoryValues[i]}))}:{})});
  }
  const full=expected.map(f=>f.field+':'+f.function).sort();
  for(const list of categories.values())need(JSON.stringify(list.sort())===JSON.stringify(full),'incomplete category group');

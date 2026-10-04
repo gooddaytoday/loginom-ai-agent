@@ -280,10 +280,10 @@
     },
     "calculator-handler": {
       "path": "../../packages/loginom-runtime/client/lib/calculator-node.mjs",
-      "sha256": "7e71785fc77c131f4bee6078389a72b4fa94bb08847032171de4f1514f4990ac",
+      "sha256": "f6b89414213655228e33c77ad1de28fcd3def7273af5c0a33a49326bf2deca99",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
+      "source_commit": null,
       "runtime": null,
       "platform": null,
       "scope": "Текущий handler; статическое чтение без исполнения."
@@ -947,7 +947,7 @@
     },
     "crosstable-handler": {
       "path": "../../packages/loginom-runtime/client/lib/crosstable-node.mjs",
-      "sha256": "6a597ccfe9466ea94dbe3e192d5ac7b2b6f49a419b6f5e8a9db54d21191d8568",
+      "sha256": "90178931acced1c7a0855b6a9223c97e12eb7cd51ce7d7a73f73985ff920f716",
       "kind": "source",
       "availability": "retained_document",
       "source_commit": null,

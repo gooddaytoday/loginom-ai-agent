@@ -140,7 +140,7 @@ CSV по умолчанию: UTF-8, запятая, header=names, bom=false, LF,
 Построй граф и параметры по заданию. Доступные обработчики и режимы перечислены
 в knowledge.node_types; профиль ограничен Loginom 7.4.2.
 Кросс-таблица (transform.cross_table, pivot) строит строки × категории × агрегаты
-числовых фактов. После смены источника повторно выполняй и читай тот же узел
+поддерживаемых скалярных и Variant-фактов. После смены источника повторно выполняй и читай тот же узел
 через dock_node_read с исходным source_operation_id; Sliding возвращает новую
 схему и актуальное соответствие категории/факта/функции полю. Настройка узла
 для обновления категорий не требуется. Fixed сохраняет начальный состав.
@@ -171,6 +171,25 @@ CSV по умолчанию: UTF-8, запятая, header=names, bom=false, LF,
 Для исправления уже завершённого узла используй dock_node_apply с новым operation_id,
 target.kind=existing, выданным target.ref и inputs:[] для сохранения связей.
 Новый operation_id с target.kind=new создаёт ещё один узел.
+Для узла сохранённого исходного пакета идентификатор ref.node_id — постоянный
+GUID, не имя/label узла. Если исходные данные содержат манифест kind=source_only
+с package_basename и node_ids, он задаёт только постоянные GUID этого пакета;
+бери document_id/workflow_id из свежего dock_prepare для открытого пакета.
+Не угадывай GUID и не подставляй имя вместо него.
+Для transform.collapse_columns, служащего промежуточным источником в расширенном
+графе, допускается finish="execute" с read:{ports:[0],sample_rows:0,
+require_exact_numbers:false}; это выполняет узел без чтения промежуточной таблицы.
+Изолированный reader Collapse не читает произвольный расширенный граф.
+Точное полное чтение transform.cross_table: read.coverage="full" с
+require_exact_numbers:true. Оно доступно только для проверенной статической
+цепочки import→CrossTable или import→Collapse→CrossTable, собственного завершённого
+исполнения, подтверждённых байтов исходника и неизменных схемы/топологии/исполнения.
+Границы: 50 строк, 8 полей, 1 MiB; фиксированный readonly protocol 321, subtype
+и native DateTime проверяются клиентом. Отображаемая строка Variant не доказывает
+значение. Для более широких скалярных отчётов используй обычное точное чтение
+без coverage="full", например read:{ports:[0],sample_rows:100,
+require_exact_numbers:true}; проверяй sample_complete и полный состав схемы.
+После отказа полного native-чтения не обходи его обычным чтением Variant.
 В dock_node_apply передавай workflow_ref только как {workflow_id}, используя
 выданные document_id и workflow_id. Длинный путь навигации клиент хранит локально;
 не копируй и не восстанавливай tab_tid, prefix, navigation_path в запросе узла.

@@ -27,7 +27,7 @@ export function readCrossTableBrowser(prefix){
   if(!r?.isModel||!id||ids.has(id))return fail('crosstable_record_identity');ids.add(id);
   if(d?.DataType===0&&d.DisplayName===''&&[1,2,3].includes(d.Disposition)){service.push({record_id:id,placeholder:true});continue;}
   if(!types[d?.DataType]||typeof d.DisplayName!=='string'||d.DisplayName.length>256
-   ||![1,2].includes(d.DataKind)||![0,1,2,3].includes(d.Disposition)||typeof d.IsCountCase!=='boolean'
+   ||![0,1,2].includes(d.DataKind)||![0,1,2,3].includes(d.Disposition)||typeof d.IsCountCase!=='boolean'
    ||!Number.isSafeInteger(d.Index)||d.Index<0||indices.has(d.Index)||!Number.isSafeInteger(d.Order)
    ||d.Order<0&&(d.Disposition!==0||d.Order!==-1)
    ||!Number.isSafeInteger(d.GroupFunctions)||d.GroupFunctions<0||d.GroupFunctions>2047
@@ -35,7 +35,7 @@ export function readCrossTableBrowser(prefix){
    ||typeof d.NullGroup!=='boolean'||typeof d.OtherGroup!=='boolean'
    ||!Number.isSafeInteger(d.SlidingUniqueValuesMinCount)||d.SlidingUniqueValuesMinCount<0)return fail('crosstable_input_record');
   indices.add(d.Index);
-  const f={record_id:id,index:d.Index,label:d.DisplayName,type:types[d.DataType],data_kind:d.DataKind===2?'Дискретный':'Непрерывный',
+  const f={record_id:id,index:d.Index,label:d.DisplayName,type:types[d.DataType],data_kind:['Неопределенное','Непрерывный','Дискретный'][d.DataKind],
    disposition:d.Disposition,order:d.Order,functions:d.GroupFunctions,available_functions:d.AvailableAggregationTypes,
    include_null:d.NullGroup,include_other:d.OtherGroup,min_values:d.SlidingUniqueValuesMinCount};
   if(d.IsCountCase)service.push({...f,count:true});else fields.push(f);

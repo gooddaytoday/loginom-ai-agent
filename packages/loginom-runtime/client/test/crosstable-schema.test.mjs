@@ -61,3 +61,51 @@ test('every other component retains strict schema validation',()=>{
  for(const type of types){const s=source();s.parameters.target.type=type;assert.equal(retainCrossTableReadPolicy(s,'created'),null);
   assert.throws(()=>alignReadSchema(fields(['A','D']),fields(['A','B'])));}
 });
+test('native single result omits redundant fact/function while type identity remains exact',()=>{
+ const c={...configuration,facts:[{name:'Amount',label:'Amount',type:'real',functions:['count']}]};
+ const xs=[{index:0,name:'Region',label:'Region',type:'string'},
+  {index:1,name:'C_1',label:'A',type:'integer'}];
+ const p=resolveCrossTableSchema(xs,c).category_fields[0];
+ assert.equal(p.function,'count');assert.equal(p.fact,'Amount');assert.equal(p.category,'A');
+ for(const patch of [{type:'real'},{name:'C_1_Amount_Sum'},{label:'A|Сумма'}])
+  assert.throws(()=>resolveCrossTableSchema([xs[0],{...xs[1],...patch}],c));
+});
+test('native scalar aggregate result types distinguish counts, DateTime mean and day StdDev',()=>{
+ const facts=[{name:'Text',label:'Text',type:'string',functions:['count','first']},
+  {name:'When',label:'When',type:'datetime',functions:['avg','stddev']}];
+ const c={...configuration,facts};
+ const xs=[{index:0,name:'Region',label:'Region',type:'string'},
+  {index:1,name:'C_1_Text_Count',label:'A|Text|Количество',type:'integer'},
+  {index:2,name:'C_1_Text_First',label:'A|Text|Первый',type:'string'},
+  {index:3,name:'C_1_When_Avg',label:'A|When|Среднее',type:'datetime'},
+  {index:4,name:'C_1_When_StdDev',label:'A|When|Стандартное откл.',type:'real'}];
+ assert.equal(resolveCrossTableSchema(xs,c).category_fields.length,4);
+ for(const index of [1,2,3,4]){
+  const wrong=structuredClone(xs);wrong[index].type='boolean';assert.throws(()=>resolveCrossTableSchema(wrong,c));
+ }
+});
+
+test('several ordered dimensions use flat native C_n and retain each category identity',()=>{
+ const c={...configuration,columns:[{name:'Category',label:'Category',type:'string'},
+  {name:'Channel',label:'Channel',type:'string'}]};
+ const xs=[{index:0,name:'Region',label:'Region',type:'string'},
+  {index:1,name:'C_1_Amount_Sum',label:'A|<...>|Amount|Сумма',type:'real'},
+  {index:2,name:'C_1_Amount_Min',label:'A|<...>|Amount|Минимум',type:'real'}];
+ const fields=resolveCrossTableSchema(xs,c).category_fields;
+ assert.deepEqual(fields[0].categories,[{dimension:'Category',caption:'A',kind:'value',value:'A'},
+  {dimension:'Channel',caption:'<...>',kind:'null',value:null}]);
+ const wrong=structuredClone(xs);wrong[1].name='C_1_1_Amount_Sum';
+ assert.throws(()=>resolveCrossTableSchema(wrong,c));
+});
+
+test('observed configurations without columns or any dimensions retain explicit fact/function labels',()=>{
+ const fact={name:'Amount',label:'Amount',type:'real',functions:['sum']};
+ for(const row_keys of [configuration.row_keys,[]]){
+  const c={...configuration,column:null,columns:[],row_keys,facts:[fact]};
+  const xs=[...row_keys.map((f,index)=>({...f,index})),
+   {index:row_keys.length,name:'Amount_Sum',label:'Amount|Сумма',type:'real'}];
+  const fields=resolveCrossTableSchema(xs,c).category_fields;
+  assert.equal(fields[0].function,'sum');assert.deepEqual(fields[0].categories,[]);
+  assert.throws(()=>resolveCrossTableSchema([...xs.slice(0,-1),{...xs.at(-1),name:'C_1'}],c));
+ }
+});

@@ -1,5 +1,6 @@
 import {createHash} from 'node:crypto';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
+import {verifiedNativeReadRefusal} from './native-read-refusal.mjs';
 import {NODE_CONTRACT_REVISION, validateNodeTargetRequest} from './node-contracts.mjs';
 import {NODE_READ_MODE,nodeReadHandler} from './node-read-contract.mjs';
 
@@ -66,8 +67,8 @@ export function validateNodeApplyRequest(request, handlers) {
   }
   object(request.read, ['ports','sample_rows','require_exact_numbers',...(Object.hasOwn(request.read??{},'coverage')?['coverage']:[])]);
   requireValue(request.read.coverage===undefined||['full','sample'].includes(request.read.coverage),'Invalid output coverage');
-  if(request.read.coverage==='full')requireValue(request.target.type==='transform.collapse_columns'&&request.finish==='execute'
-    &&JSON.stringify(request.read.ports)==='[0]','Invalid parameters.read.coverage: full requires executed Collapse output 0; other handlers support sample');
+  if(request.read.coverage==='full')requireValue(['transform.collapse_columns','transform.cross_table'].includes(request.target.type)&&request.finish==='execute'
+    &&JSON.stringify(request.read.ports)==='[0]','Invalid parameters.read.coverage: full requires executed Collapse or CrossTable output 0 with static provenance; other handlers support sample');
   requireValue(Array.isArray(request.read.ports) && request.read.ports.length <= 16
     && new Set(request.read.ports).size === request.read.ports.length
     && request.read.ports.every(p=>Number.isInteger(p) && p>=0 && p<100)
@@ -182,6 +183,13 @@ export async function applyNode({request, operation, handlers, drivers, record,
       // Explicit trusted-driver proof is required: a transport exception alone
       // never clears uncertainty, even in a nominally non-mutating phase.
       const refusal=error.nodePhaseRefusal;
+      if(name==='read'&&['transform.cross_table','transform.collapse_columns'].includes(request.target.type)
+        &&operation.cleanupConfirmed===true&&!operation.transportUncertain
+        &&verifiedNativeReadRefusal(refusal,state.node,state.execution,request.read)){
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+        state.native_read_refusal=true;
+      }
       const importClosed=refusal?.proof?.closed;
       if(name==='configure'&&request.target.type==='imports.text'
         &&['text_import_binding_draft_discarded','text_import_readiness_draft_discarded'].includes(refusal?.verification)&&refusal.phase===name
@@ -352,7 +360,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
       phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
       package_saved:false,cleanup_complete:state.cleanup_complete,warnings:[],
       ...(state.verified_refusal&&state.cleanup_complete&&!state.pending&&state.node
-        ?{next_step:correctNodeRequest(request,state.node)}:{}),
+        ?{next_step:state.native_read_refusal?{tool:'dock_node_apply',original_operation_id:operation.id,
+          instruction:'Full native reading was refused by the unchanged 50x8 limit. The owned Preview is closed, workflow restored and execution retained. No operation remains unresolved; saving or another action is allowed. Do not recreate or reconfigure the node. For a scalar report use a NEW operation_id with the SAME existing target, parameters:{}, inputs:[], mappings:[], finish:"execute" and read:{ports:[0],sample_rows:100,require_exact_numbers:true} without full coverage. This does not authorize ordinary reading of Variant values.'}:correctNodeRequest(request,state.node)}:{}),
       ...(state.correctable_import_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
         instruction:'The import wizard draft was discarded and the SAME node is back in the graph. '+(state.correctable_import_request==='readiness'
           ?'The wizard did not reach an expected state, so no setting was saved. Submit a NEW operation_id with the SAME settings and target:'

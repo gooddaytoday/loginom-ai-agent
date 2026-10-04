@@ -23,7 +23,7 @@ export interface PortMapping {
 export interface NodeApplyRequest<T extends NodeType, P> extends NodeTargetRequest<T> {
   operation_id: string; contract_revision: string; mode: string; parameters: P;
   mappings: PortMapping[]; finish: 'done' | 'execute' | 'close';
-  read: {ports: number[]; sample_rows: number; require_exact_numbers: boolean; coverage?: 'sample' | (T extends 'transform.collapse_columns' ? 'full' : never)};
+  read: {ports: number[]; sample_rows: number; require_exact_numbers: boolean; coverage?: 'sample' | (T extends 'transform.collapse_columns' | 'transform.cross_table' ? 'full' : never)};
   budgets: {configure_ms: number; execute_ms: number; total_ms: number};
 }
 export interface NodeHandler<T extends NodeType, P> {
@@ -264,9 +264,10 @@ export interface CollapseConfigurationReadback {
   output_mapping: GroupingConfigurationReadback['output_mapping'];
 }
 
+export type CrossTableFunction='sum'|'count'|'min'|'max'|'avg'|'stddev'|'sum_squares'|'unique_count'|'null_count'|'first'|'last';
 export interface CrossTableParameters {
- row_keys: ConfiguredInputField[]; column: ConfiguredInputField;
- facts: {field: ConfiguredInputField; functions: ('sum'|'min'|'max'|'avg')[]}[];
+ row_keys: ConfiguredInputField[]; column?: ConfiguredInputField; columns?: ConfiguredInputField[];
+ facts: {field: ConfiguredInputField; functions: CrossTableFunction[]}[];
  category_mode: 'fixed'|'sliding'; include_null?: boolean; include_other?: boolean;
  min_values?: 0; limit?: 0; separator?: '|'; unique_names?: false;
 }
@@ -274,10 +275,10 @@ export interface ConfiguredInputField {kind:'input_field'; name:string}
 export interface CrossTableConfigurationReadback {
  kind:'crosstable'; scope:'observed_before_verified_finish'; values_are:'observed_ui_values'; node:NodeRef;
  receipt_ids:string[]; mode:'pivot'; category_mode:'fixed'|'sliding';
- row_keys:{name:string;label:string;type:string;order:number}[]; column:{name:string;label:string;type:string};
- facts:{name:string;label:string;type:'integer'|'real';order:number;functions:('sum'|'min'|'max'|'avg')[]}[];
+ row_keys:{name:string;label:string;type:string;order:number}[]; column:{name:string;label:string;type:string}|null; columns:{name:string;label:string;type:string;order:number}[];
+ facts:{name:string;label:string;type:'integer'|'real'|'string'|'boolean'|'datetime'|'variant';order:number;functions:CrossTableFunction[]}[];
  options:{separator:'|';unique_names:false;limit:0;min_values:0;include_null:boolean;include_other:boolean};
  output_scope:'not_materialized'|'observed_after_verified_execution'; execution_id:string|null;
- category_fields:{category:string|null;category_kind:'null'|'other'|'value';fact:string;function:'sum'|'min'|'max'|'avg';field:string;label:string;type:string}[];
+ category_fields:{category:string|null;category_kind:'null'|'other'|'value';fact:string;function:CrossTableFunction;field:string;label:string;type:string;categories?:{dimension:string;caption:string;kind:'null'|'other'|'value';value:string|null}[]}[];
  package_persistence_verified:false;
 }
