@@ -1065,7 +1065,7 @@
         {
           "name": "RowID",
           "label": "RowID",
-          "type": "integer"
+          "type": "string"
         },
         {
           "name": "Region",

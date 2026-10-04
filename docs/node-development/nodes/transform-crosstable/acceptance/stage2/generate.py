@@ -105,7 +105,7 @@ def generate():
     outputs.append({'output_node_type':'transform.cross_table','columns':cols,'rows':values})
     outputs.append({'output_node_type':'transform.cross_table','columns':[{'name':'Region','label':'Region','type':'string'}],'rows':[]})
     outputs.append(variant_report())
-    sources=[fixture('sales-update.csv',{'RowID':'integer','Region':'string','Category':'string','Amount':'real','Quantity':'real'}),fixture('typed.csv',TYPES),fixture('empty.csv',TYPES),fixture('variant-source.csv',{'Key':'string','RealValue':'real','TextValue':'string','FlagValue':'boolean','WhenValue':'datetime'})]
+    sources=[fixture('sales-update.csv',{'RowID':'string','Region':'string','Category':'string','Amount':'real','Quantity':'real'}),fixture('typed.csv',TYPES),fixture('empty.csv',TYPES),fixture('variant-source.csv',{'Key':'string','RealValue':'real','TextValue':'string','FlagValue':'boolean','WhenValue':'datetime'})]
     expected={'package_path':'{{PACKAGE_PATH}}','nodes':[{'type':'imports.text'},{'type':'transform.collapse_columns'},{'type':'transform.cross_table'}],'outputs':outputs,'static_sources':sources}
     assert len(outputs)==14
     (ROOT/'expected.json').write_text(json.dumps(expected,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
