@@ -39,7 +39,7 @@ const { createNodeExecutionProcedure } = await load("client/lib/node-execution-p
 const { createExecutionJournal } = await load("client/lib/execution-journal.mjs")
 const { withBrowserReceipt } = await load("client/lib/executor.mjs")
 const { makePackageCleanupCode } = await load("client/lib/package-cleanup.mjs")
-const { openNewOutputTable, configureTablePrecision, prepareTableRead, restoreTablePrecision, returnFromOutputTable } =
+const { openNewOutputTable, configureTablePrecision, prepareTableRead, returnFromOutputTable } =
   await load("client/lib/node-output-procedure.mjs")
 const { readTableOutputPages } = await load("client/lib/table-output-pages.mjs")
 const { decodeTableOutput } = await load("client/lib/table-output-values.mjs")
@@ -197,23 +197,22 @@ try {
   if(!data){
   const opened = await openNewOutputTable(channel, 0)
   const precision = await configureTablePrecision(channel, opened.table)
-  data = await (async () => {
-    try {
-      const readSettings = await prepareTableRead(channel, opened.table)
-      const raw = await readTableOutputPages(channel, opened.table, {
-        sampleRows: Math.max(10, ...expectedOutputs.map(o=>o.rows.length)),
-      })
-      const observedColumns=precision.fields.map(f=>({name:f.key,label:f.label,type:f.type}));
-      return decodeTableOutput(raw, {
-        formatProof: precision,
-        readSettings,
-        expectedColumns: observedColumns,
-        requireExactNumbers: true,
-      })
-    } finally {
-      await restoreTablePrecision(channel, precision)
-    }
-  })()
+  const readSettings = await prepareTableRead(channel, opened.table)
+  const raw = await readTableOutputPages(channel, opened.table, {
+    sampleRows: Math.max(10, ...expectedOutputs.map(o=>o.rows.length)),
+  })
+  const observedColumns=precision.fields.map(f=>({name:f.key,label:f.label,type:f.type}));
+  data = decodeTableOutput(raw, {
+    formatProof: precision,
+    readSettings,
+    expectedColumns: observedColumns,
+    requireExactNumbers: true,
+  })
+  // This reader created this temporary visualizer with openNewOutputTable.
+  // Its formats are never saved: the verified owned-package cleanup below
+  // discards every temporary view. Rewriting every field's original format
+  // here duplicated the expensive precision protocol and timed out wide reports.
+  // Exact mask application/readback and value decoding remain mandatory.
   await returnFromOutputTable(channel, opened.table)
   }
 

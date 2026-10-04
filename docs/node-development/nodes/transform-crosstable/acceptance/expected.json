@@ -410,7 +410,7 @@
           "Amount_Min": 1.0,
           "Amount_Max": 5.0,
           "Amount_Avg": 3.0,
-          "Amount_StdDev": 2.0
+          "Amount_StdDev": 1.9999999999999998
         },
         {
           "Region": null,
@@ -523,7 +523,7 @@
           "Units_Min": 1,
           "Units_Max": 5,
           "Units_Avg": 3.0,
-          "Units_StdDev": 2.0
+          "Units_StdDev": 1.9999999999999998
         },
         {
           "Region": null,
@@ -773,7 +773,7 @@
             "cell_type": "datetime",
             "bytes_le": "000000002079e640"
           },
-          "When_StdDev": 2.0
+          "When_StdDev": 2.0000000298023224
         },
         {
           "Region": null,

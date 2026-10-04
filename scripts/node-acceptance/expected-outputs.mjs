@@ -61,11 +61,6 @@ function matchesCell(cell,column,want){
   if(typeof value!=='string'||!Number.isFinite(Number(value)))return false;
   value=Number(value);
  }
- // Independent sample-variance arithmetic and Loginom's binary64 algorithm
- // may round StdDev on adjacent representable values. Keep this allowance
- // confined to that derived scalar; sums, counts and Variant remain exact.
- if(column.type==='real'&&column.name.endsWith('_StdDev')&&typeof value==='number'&&typeof want==='number'
-  &&Number.isFinite(value)&&Number.isFinite(want)&&Math.abs(value-want)<=2*Number.EPSILON*Math.abs(want))return true;
  return Object.is(value,want)||value===want;
 }
 export function matchExpectedOutputs(actual,outputs){

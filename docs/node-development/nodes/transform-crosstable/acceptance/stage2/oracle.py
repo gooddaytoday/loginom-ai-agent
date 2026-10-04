@@ -48,7 +48,11 @@ def aggregate(values, function):
     mean = sum(numbers)/len(numbers)
     if function == 'avg': return origin+timedelta(days=mean) if date else mean
     if function == 'stddev':
-        return math.sqrt(sum((v-mean)**2 for v in numbers)/(len(numbers)-1)) if len(numbers)>1 else 0.0
+        # Loginom evaluates the sample correction after the binary64 raw
+        # second moment. This order matters for large OADate serials. Derive
+        # both moments from CSV values; no recorded aggregate or tolerance.
+        count = len(numbers)
+        return math.sqrt((sum(v*v for v in numbers)/count-mean*mean)*count/(count-1)) if count>1 else 0.0
     raise ValueError(function)
 
 def pivot(rows, keys, dimensions, fact, function):
@@ -70,7 +74,7 @@ if __name__ == '__main__':
         def test_numeric_and_null(self):
             values = [1, 3, 5, None]
             self.assertEqual([aggregate(values, f) for f in FUNCTIONS],
-                             [9, 4, 1, 5, 3, 2, 35, 3, 1, 1, None])
+                             [9, 4, 1, 5, 3, math.sqrt((35/3-9)*3/2), 35, 3, 1, 1, None])
             self.assertEqual([aggregate([None], f) for f in FUNCTIONS],
                              [None, 1, None, None, None, None, None, 0, 1, None, None])
             self.assertTrue(all(aggregate([], f) is None for f in FUNCTIONS))
@@ -80,7 +84,10 @@ if __name__ == '__main__':
             self.assertEqual(aggregate([True, False, None], 'min'), False)
             dates = [datetime(2026,1,d) for d in [1,3,5]] + [None]
             self.assertEqual(aggregate(dates, 'avg'), datetime(2026,1,3))
-            self.assertEqual(aggregate(dates, 'stddev'), 2)
+            serials=[(v-datetime(1899,12,30)).days for v in dates if v is not None]
+            raw_moment=sum(v*v for v in serials)/3
+            self.assertEqual(aggregate(dates, 'stddev'), math.sqrt((raw_moment-(sum(serials)/3)**2)*3/2))
+            self.assertNotEqual(aggregate(dates, 'stddev'), 2)
         def test_dimensions(self):
             rows = read(Path(__file__).with_name('typed.csv'))
             actual = pivot(rows, ['Region','Month'], ['Category','Channel'], 'Amount', 'count')
