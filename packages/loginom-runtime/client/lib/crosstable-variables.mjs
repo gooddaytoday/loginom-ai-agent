@@ -66,12 +66,15 @@ export async function configureLocalVariables(page,task,readNode,openPort){
   if(location.origin!==task.origin||a?.Version!==task.build||p?.document!==document||p.id!==b.document_id||rs.length!==1)fail('document/workflow');
   const wf=rs[0].nodeTargetWorkflowNode,root=b.workflow_ref.prefix+';WizrdMCF',gridTid=root+';TuneVariablesMappingWizard;grdTargetColumns';
   const point=e=>{const box=e.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);if(!visible(e)||box.width<=0||box.height<=0||x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))fail('rendered hit');return {x,y};};
-  if(['graph','menu','graph_finished'].includes(mode)){
+  if(['graph','menu','graph_finished','leave_hover'].includes(mode)){
    if(!(m instanceof a.ModelForm)||card.Controller.Node.data.node!==wf||m.FDiagram?.FmxGraph?.container!==exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram')[0])fail('graph');
    const ns=m.FDiagram.FNodes.FCollection.filter(n=>n.FGuid===b.node.node_id);if(ns.length!==1||ns[0].FLocked||ns[0].FIconCls!=='bg-vendor-icon-crosstab')fail('node');
    const n=ns[0],dom=m.FDiagram.FmxGraph.view.getState(n.FCell)?.shape?.node;
    if(!dom||!m.FDiagram.FmxGraph.container.contains(dom))fail('node drawing');
    if(mode==='graph_finished')return {graph:true};
+   if(mode==='leave_hover'){const label=n.FLabel,ls=exact(dom.getAttribute('data-tid')+';Label;Label').filter(e=>m.FDiagram.FmxGraph.container.contains(e));
+    if(label?.parent!==n||label.FCell?.parent!==n.FCell||ls.length!==1||m.FDiagram.FmxGraph.view.getState(label.FCell)?.text?.node!==ls[0])fail('owned hover dismissal label');return point(ls[0]);
+   }
    if(mode==='menu'){
     const menu=m.FNodeContextMenu,roots=exact('mn').filter(visible),selected=m.FDiagram.FmxGraph.getSelectionCells();
     if(roots.length!==1||menu?.el.dom!==roots[0]||Ext.getCmp(roots[0].id)!==menu||selected.length!==1||selected[0]!==n.FCell)fail('node menu '+JSON.stringify({roots:roots.length,native:menu?.el.dom===roots[0],component:roots.length===1&&Ext.getCmp(roots[0].id)===menu,selected:selected.length,selectedOwn:selected[0]===n.FCell}));
@@ -130,7 +133,9 @@ export async function configureLocalVariables(page,task,readNode,openPort){
  },{task,mode,extra});
  try{
   const before=await readNode(page,b);if(!before.verified||before.surface!=='graph'||before.locked)throw Error('Owned unlocked CrossTable graph required');
-  const graph=await inspect('graph');if(!graph.visible){effect=true;await page.mouse.click(graph.point.x,graph.point.y,{button:'right'});await at('mn;mniShowControlVariablesPort').waitFor({state:'visible',timeout:remaining()});const point=await inspect('menu');await page.mouse.click(point.x,point.y);}
+  const leave=await inspect('leave_hover');await page.mouse.move(leave.x,leave.y);
+  let graph;while(remaining()>0){try{graph=await inspect('graph');break;}catch(error){if(!String(error.message).includes('node body native hit'))throw error;await page.waitForTimeout(Math.min(100,remaining()));}}
+  if(!graph.visible){effect=true;await page.mouse.click(graph.point.x,graph.point.y,{button:'right'});await at('mn;mniShowControlVariablesPort').waitFor({state:'visible',timeout:remaining()});const point=await inspect('menu');await page.mouse.click(point.x,point.y);}
   const opened=await openPort(page,{...task,operation_id:task.operation_id+':port',direction:'input',kind:'control',port:0},readNode);
   effect ||= opened.effect_possible;if(opened.status!=='SUCCEEDED')throw Error(opened.error);
   let values=await inspect('inventory');const baseline=structuredClone(values),changed=[];
