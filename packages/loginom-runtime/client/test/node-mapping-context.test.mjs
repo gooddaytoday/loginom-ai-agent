@@ -69,6 +69,15 @@ test('separate output wizard distinguishes excluded source identity from an acti
  assert.equal(r.target_fields[0].excluded,false);assert.equal(r.target_fields[0].source.record_id,'s0');
  assert.equal(r.target_fields[0].inherited,false);
 });
+test('native empty source NBSP is accepted only for a verified absent connection',()=>{
+ const f=excludedFixture(),cell=f.all.find(e=>e.tid===f.base+'colSourceDisplayName_B');
+ cell.textContent='\u00a0';assert.equal(f.read().verified,true);
+ for(const text of [' ','\n','other']){cell.textContent=text;assert.equal(f.read().verified,false);}
+ const active=fixture();active.all.find(e=>e.tid===active.base+'colSourceDisplayName_Out0').textContent='\u00a0';
+ assert.equal(active.read().verified,false);
+ const label=excludedFixture();label.all.find(e=>e.tid===label.base+'colDisplayName_B').textContent='\u00a0';
+ assert.equal(label.read().verified,false);
+});
 test('unloaded derived sources retain excluded inventory but cannot prove source identity',()=>{
  const f=excludedFixture();f.source.splice(0);
  for(const t of f.target)Object.assign(t.data,{ConnectedRecord:null,SourceDisplayName:null,SourceDataType:null});

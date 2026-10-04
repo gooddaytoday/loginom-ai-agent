@@ -123,7 +123,11 @@ export function readMappingBrowser(prefix) {
     for(const [key,value] of (links?[['colDisplayName_',target.data.DisplayName]]:[['colName_',target.data.Name],['colDisplayName_',target.data.DisplayName],
       ['colSourceDisplayName_',target.data.ConnectedRecord?.data.DisplayName??'']])) {
       const cells=exact(base+key+target.data.Name).filter(c=>row.contains(c));
-      if(cells.length!==1||cells[0].textContent!==value)return fail('mapping_render_value');
+      // Ext renders an unconnected source cell as one NBSP. This is a
+      // placeholder for a verified absent link, not whitespace in a label.
+      const emptySource=key==='colSourceDisplayName_'&&target.data.ConnectedRecord==null
+        &&value===''&&cells[0]?.textContent==='\u00a0';
+      if(cells.length!==1||cells[0].textContent!==value&&!emptySource)return fail('mapping_render_value');
     }
     rendered.add(index);
   }
