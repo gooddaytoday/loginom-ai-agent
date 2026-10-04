@@ -5,6 +5,7 @@ export const NODE_CONTRACT_REVISION = '1.0.0';
 // Zoom cannot reveal that footprint at the canvas's zero-scroll boundary.
 export const NODE_POSITION_MIN = 64;
 const definitions = [
+  ['transform.cross_table','Кросс-таблица','crosstab',1,1,false,['pivot'],'processors/transformation/cross-table.html'],
   ['research.duplicates', 'Дубликаты и противоречия', 'duplicates', 1, 1, false, ['mark'], 'processors/scrutiny/duplicates.md'],
   ['preprocessing.data_recovery', 'Заполнение пропусков', 'datarecovery', 1, 1, false, ['impute'], 'processors/preprocessing/imputation.md'],
   ['exports.text', 'Текстовый файл', 'exporttextfile', 1, 0, false, ['delimited'], 'integration/export/txt-csv.md'],
@@ -24,7 +25,7 @@ const freeze = value => { if (value && typeof value === 'object') { Object.value
 export const NODE_TYPES = freeze(Object.fromEntries(definitions.map(([type, title, icon, inputs, outputs, additional, modes, help]) => [type, {
   type, title, palette_group: type === 'exports.text' ? 'Экспорт' : type === 'research.duplicates' ? 'Исследование' : type === 'preprocessing.data_recovery' ? 'Предобработка' : type === 'imports.text' ? 'Импорт' : 'Трансформация', icon_class: 'bg-vendor-icon-' + icon, contract_revision: NODE_CONTRACT_REVISION,
   tabular_inputs: inputs, tabular_outputs: outputs, additional_tabular_inputs: additional, modes,
-  semantics: type === 'transform.join_data' ? 'Join two tables by keys; not positional Соединение.'
+  semantics: type === 'transform.cross_table' ? 'Pivot summary: row keys × column categories × numeric fact aggregates. fixed preserves captured categories with optional NULL/Other groups; sliding changes categories after source updates. Reread the SAME node with dock_node_read and its original source_operation_id; never reconfigure to refresh categories.' : type === 'transform.join_data' ? 'Join two tables by keys; not positional Соединение.'
     : type === 'transform.union_data' ? 'Append rows, preserving duplicates; not UNION DISTINCT.' : type === 'research.duplicates' ? 'Mark all copies and contradictions; retain all rows. Filtering Duplicate=false removes every member of a duplicate group. Unassigned fields are preserved and ignored. No automatic deduplication or conflict resolution.' : title,
   graph_handler: 'node_target_v1', graph_handler_status: 'internal_candidate', configuration_handler: null,
   configuration_status: type==='exports.text'?'candidate_in_subplan_17':'planned_in_subplans_03_to_10',

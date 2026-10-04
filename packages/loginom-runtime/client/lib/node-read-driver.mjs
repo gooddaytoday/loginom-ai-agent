@@ -1,3 +1,4 @@
+import {resolveCrossTableSchema} from './crosstable-schema.mjs';
 import {createNodeProcedure} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
@@ -52,7 +53,17 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild}){
     try{
      const settings=await prepareTableRead(channel,table.table);
      const raw=await readTableOutputPages(channel,table.table,{sampleRows:read.sample_rows});
-     data=decodeTableOutput(raw,{formatProof:format,readSettings:settings,expectedColumns:alignReadSchema(raw.columns,schema),requireExactNumbers:read.require_exact_numbers});
+     const policy=operation.parameters.parameters.cross_table_policy;
+     let materialized;
+     if(policy){
+      need(operation.parameters.target.type==='transform.cross_table'&&policy.kind==='crosstable_sliding'
+       &&policy.configuration.category_mode==='sliding'&&port===0&&table.port_guid===policy.port_guid
+       &&ctx.execution.execution_id!==policy.source_execution_id
+       &&['document_id','workflow_id','node_id'].every(k=>policy.node[k]===ctx.node[k]),'CrossTable reread owner/port differs');
+      materialized=resolveCrossTableSchema(raw.columns,policy.configuration);
+     }
+     data=decodeTableOutput(raw,{formatProof:format,readSettings:settings,expectedColumns:materialized?.columns??alignReadSchema(raw.columns,schema),requireExactNumbers:read.require_exact_numbers});
+     if(materialized)data.category_fields=materialized.category_fields;
     }finally{if(format)restoration=await restoreTablePrecision(channel,format);}
     returned=await returnFromOutputTable(channel,table.table);
     ports.push({port,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data});

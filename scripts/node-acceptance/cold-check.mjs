@@ -1,3 +1,4 @@
+import {parseExpectedOutputs,matchExpectedOutputs} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
 import { readFile, mkdir, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
@@ -47,10 +48,7 @@ const loginPassword = config.workflow_profile?.password ?? ""
 if (config.workflow_profile?.passwordless_login === true && loginPassword !== "") throw Error("TEST_PASSWORD_UNAVAILABLE")
 if (config.workflow_profile?.passwordless_login !== true && loginPassword === "") throw Error("TEST_PASSWORD_UNAVAILABLE")
 const expected = JSON.parse(await readFile(args.expected, "utf8"))
-if (typeof expected.package_path !== "string" || !expected.package_path.endsWith(".lgp"))
-  throw Error("EXPECTED_PACKAGE_PATH_REQUIRED")
-if (!Array.isArray(expected.nodes) || !expected.output_node_type || !Array.isArray(expected.columns) || !Array.isArray(expected.rows))
-  throw Error("EXPECTED_SHAPE_INVALID")
+const {multiple,outputs:expectedOutputs}=parseExpectedOutputs(expected)
 
 const saved = await loadSaved(args.saved)
 if (saved.path !== expected.package_path) throw Error("PACKAGE_PATH_MISMATCH")
@@ -76,7 +74,7 @@ const { context } = await loginBrowser({
 })
 const page = context.pages()[0]
 const execute = (code) => new Function("page", `return (${code})(page)`)(page)
-const state = { prepared: undefined, closed: false }
+const state = { prepared: undefined, closed: false, cleanupAttempted: false }
 try {
   const prepared = await execute(
     makeWorkspacePrepareCode({
@@ -107,16 +105,15 @@ try {
     if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
 
-  const matches = graph.nodes.filter((node) => {
-    if (node.type !== expected.output_node_type) return false
-    if (saved.node && node.ref.node_id !== saved.node) return false
-    return true
-  })
-  if (matches.length !== 1) throw Error("COLD_OUTPUT_NODE_NOT_UNIQUE")
-  const node = matches[0].ref
+  const types=new Set(expectedOutputs.map(o=>o.output_node_type));
+  const matches=graph.nodes.filter(n=>types.has(n.type)&& (multiple||!saved.node||n.ref.node_id===saved.node));
+  if(matches.length!==expectedOutputs.length)throw Error("COLD_EXTRA_OR_MISSING_OUTPUT_NODE");
+  const actual=[];
+  for(const [outputIndex,target] of matches.entries()){
+  const node=target.ref;
 
   const operation = {
-    id: "cold-read-expected",
+    id: "cold-read-expected-"+outputIndex,
     action: { action_key: "acceptance.cold_read", revision: "1" },
     deadline: Date.now() + 540_000,
   }
@@ -150,21 +147,13 @@ try {
     try {
       const readSettings = await prepareTableRead(channel, opened.table)
       const raw = await readTableOutputPages(channel, opened.table, {
-        sampleRows: Math.max(10, expected.rows.length),
+        sampleRows: Math.max(10, ...expectedOutputs.map(o=>o.rows.length)),
       })
-      const expectedColumns = new Map(
-        expected.columns.map((column) => [column.name, { name: column.name, label: column.label ?? column.name, type: column.type }]),
-      )
-      if (
-        raw.columns.length !== expected.columns.length ||
-        new Set(raw.columns.map((column) => column.name)).size !== expected.columns.length ||
-        raw.columns.some((column) => !expectedColumns.has(column.name))
-      )
-        throw Error("COLD_COLUMN_SET_CHANGED")
+      const observedColumns=precision.fields.map(f=>({name:f.key,label:f.label,type:f.type}));
       return decodeTableOutput(raw, {
         formatProof: precision,
         readSettings,
-        expectedColumns: raw.columns.map((column) => expectedColumns.get(column.name)),
+        expectedColumns: observedColumns,
         requireExactNumbers: true,
       })
     } finally {
@@ -173,26 +162,13 @@ try {
   })()
   await returnFromOutputTable(channel, opened.table)
 
-  if (data.row_count !== expected.rows.length || !data.sample_complete || !data.precision.numbers_verified)
-    throw Error("COLD_VALUES_MISMATCH")
-  const schema = data.schema
-  const actualRows = data.sample.map((row) => {
-    const object = Object.create(null)
-    for (const column of expected.columns) {
-      const cell = row[schema.findIndex((item) => item.name === column.name)]
-      object[column.name] = cell.value === null ? null : column.type === "real" || column.type === "integer" ? Number(cell.value) : cell.value
-    }
-    return object
-  })
-  const unused = actualRows.slice()
-  for (const want of expected.rows) {
-    const index = unused.findIndex((row) => expected.columns.every((column) => row[column.name] === want[column.name]))
-    if (index < 0) throw Error("COLD_VALUES_MISMATCH")
-    unused.splice(index, 1)
+  actual.push({node,type:target.type,execution,data});
   }
+  const correspondence=matchExpectedOutputs(actual,expectedOutputs);
 
   // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.
   // Cleanup проверяет точное владение пакетом/аккаунтом перед discard.
+  state.cleanupAttempted=true;
   const cleanup = await execute(
     makePackageCleanupCode({
       sessionId: session,
@@ -214,9 +190,8 @@ try {
     status: "PASS",
     phase: "independent_cold_reopen_readback",
     path: saved.path,
-    node,
-    execution,
-    output: { ports: [data] },
+    ...(multiple?{outputs:actual.map(a=>({node:a.node,execution:a.execution,output:{ports:[a.data]}})),correspondence}
+      :{node:actual[0].node,execution:actual[0].execution,output:{ports:[actual[0].data]}}),
     settingsReapplied: false,
     cleanup: {
       package_closed: cleanup.package_closed === true,
@@ -236,7 +211,7 @@ try {
     }),
   )
 } finally {
-  if (!state.closed && state.prepared?.status === "READY" && state.prepared.package_ref?.path === saved.path) {
+  if (!state.closed && !state.cleanupAttempted && state.prepared?.status === "READY" && state.prepared.package_ref?.path === saved.path) {
     await execute(
       makePackageCleanupCode({
         sessionId: session,

@@ -198,6 +198,13 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     }
     enter(ctx);requireValue(configured,'Configured calculator missing');
     if(implementation?.configureAllOutputs){multipleOutputs=await implementation.configureAllOutputs(channel,configured,operation.nodeApply.request.parameters,mappings,finishWizard);return multipleOutputs;}
+    // CrossTable generates its output only on Execute. This internal hook is
+    // restricted to that component; all existing handlers keep strict mappings.
+    if(implementation?.type==='transform.cross_table'&&implementation.materializedSchema){
+     requireValue(mappings.length===0,'CrossTable does not permit output mapping overrides');
+     return verified({deferred_schema:true,node_context:configured.node_context,
+      scope:'schema_not_materialized_before_execution',settings_applied:false});
+    }
     const outputRecoveryGraph=!implementation?await graphForInput():null;
     await channel.openOutputPort(0);
     const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
@@ -272,7 +279,10 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     try {
       readSettings=await prepareTableRead(channel,table.table);
       const raw=await readTableOutputPages(channel,table.table,{sampleRows:read.sample_rows});
-      data=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:columns,requireExactNumbers:read.require_exact_numbers});
+      const materialized=implementation?.type==='transform.cross_table'&&implementation.materializedSchema
+       ?implementation.materializedSchema(raw.columns,configured,{node:ctx.node,execution:ctx.execution}):null;
+      data=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:materialized?.columns??columns,requireExactNumbers:read.require_exact_numbers});
+      if(materialized)data.category_fields=materialized.category_fields;
     } finally { if(formatProof)formatRestoration=await restoreTablePrecision(channel,formatProof); }
     const returned=await returnFromOutputTable(channel,table.table);
     return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,

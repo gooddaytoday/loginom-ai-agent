@@ -240,7 +240,7 @@ test('separate output wizard without graph finish is rejected before any phase',
  const f=separateFixture();delete f.drivers.finishGraph;await assert.rejects(f.run(),/graph finish driver/);assert.deepEqual(f.calls,[]);assert.deepEqual(f.records,[]);
 });
 
-for(const verification of ['reform_mapped_preflight_completed','missing_values_preflight_completed'])test('completed read-only validation '+verification+' rejects with clean settings and requires explicit resume',async()=>{
+for(const verification of ['reform_mapped_preflight_completed','missing_values_preflight_completed','crosstable_preflight_completed'])test('completed read-only validation '+verification+' rejects with clean settings and requires explicit resume',async()=>{
  const f=fixture();f.drivers.prepareTarget=async()=>{
   f.calls.push('target');const e=Error('Reform output name collision');
   e.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:true,cleanup_complete:true,
@@ -251,7 +251,7 @@ for(const verification of ['reform_mapped_preflight_completed','missing_values_p
  const count=f.calls.length;await assert.rejects(f.run(),/Explicit inspected resume/);assert.equal(f.calls.length,count);
  assert.equal(f.records.filter(e=>e.phase==='node_phase_refused').length,1);
 });
-for(const verification of ['reform_mapped_preflight_completed','missing_values_preflight_completed'])test('incomplete or unacknowledged refusal '+verification+' retains uncertainty',async()=>{
+for(const verification of ['reform_mapped_preflight_completed','missing_values_preflight_completed','crosstable_preflight_completed'])test('incomplete or unacknowledged refusal '+verification+' retains uncertainty',async()=>{
  for(const fail of ['cleanup_complete','settings_unchanged','verification','journal']){
   const f=fixture({failJournal:fail==='journal'?'node_phase_refused':undefined});f.drivers.prepareTarget=async()=>{
    const e=Error('Invalid patch');e.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:true,cleanup_complete:true,

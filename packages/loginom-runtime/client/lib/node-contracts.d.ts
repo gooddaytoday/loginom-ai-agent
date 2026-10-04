@@ -1,7 +1,7 @@
 /** Shared 02/03 contract. Runtime publication of node.apply belongs to 03. */
 export type NodeType = 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
   | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.sorting'
-  | 'transform.join_data' | 'transform.union_data';
+  | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table';
 export interface WorkflowRef { workflow_id: string; tab_tid: string; prefix: string; navigation_path: {tid: string; label: string}[] }
 export interface NodeRef { document_id: string; workflow_id: string; node_id: string }
 export interface Position { x: number; y: number }
@@ -35,7 +35,7 @@ export interface NodeHandler<T extends NodeType, P> {
   configure(context: NodeProcedureContext, parameters: P): Promise<VerifiedNodePhase>;
   /** Pure projection of accepted receipts; never executes or rereads the UI. */
   configurationReadback?(context: {node: NodeRef; operation_id: string;
-    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback;
+    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback;
 }
 export interface VerifiedNodePhase { verified: true; cleanup_complete: true; effect_possible: boolean }
 export interface NodeProcedureContext {
@@ -52,7 +52,7 @@ export interface NodeApplyResult {
   execution: NodeExecution; output: NodeOutput;
   /** A local node checkpoint never proves that the package was saved. */
   package_saved: false; cleanup_complete: boolean; warnings: string[];
-  configuration?: {status: 'applied' | 'discarded'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback};
+  configuration?: {status: 'applied' | 'discarded'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback};
   checkpoint_kind?: 'local_node_checkpoint' | 'local_node_cancellation' | 'local_node_stopped' | 'local_node_failed';
   persisted_package_verified?: false; pending_phase?: PhaseName | null; error?: NodeError;
 }
@@ -262,4 +262,22 @@ export interface CollapseConfigurationReadback {
   ignore_empty: boolean;
   input_mapping: GroupingConfigurationReadback['input_mapping'];
   output_mapping: GroupingConfigurationReadback['output_mapping'];
+}
+
+export interface CrossTableParameters {
+ row_keys: ConfiguredInputField[]; column: ConfiguredInputField;
+ facts: {field: ConfiguredInputField; functions: ('sum'|'min'|'max'|'avg')[]}[];
+ category_mode: 'fixed'|'sliding'; include_null?: boolean; include_other?: boolean;
+ min_values?: 0; limit?: 0; separator?: '|'; unique_names?: false;
+}
+export interface ConfiguredInputField {kind:'input_field'; name:string}
+export interface CrossTableConfigurationReadback {
+ kind:'crosstable'; scope:'observed_before_verified_finish'; values_are:'observed_ui_values'; node:NodeRef;
+ receipt_ids:string[]; mode:'pivot'; category_mode:'fixed'|'sliding';
+ row_keys:{name:string;label:string;type:string;order:number}[]; column:{name:string;label:string;type:string};
+ facts:{name:string;label:string;type:'integer'|'real';order:number;functions:('sum'|'min'|'max'|'avg')[]}[];
+ options:{separator:'|';unique_names:false;limit:0;min_values:0;include_null:boolean;include_other:boolean};
+ output_scope:'not_materialized'|'observed_after_verified_execution'; execution_id:string|null;
+ category_fields:{category:string|null;category_kind:'null'|'other'|'value';fact:string;function:'sum'|'min'|'max'|'avg';field:string;label:string;type:string}[];
+ package_persistence_verified:false;
 }

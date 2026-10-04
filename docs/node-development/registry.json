@@ -89,7 +89,7 @@
     },
     "runtime-registry": {
       "path": "../../packages/loginom-runtime/client/lib/node-support.mjs",
-      "sha256": "ad4e46a95b88681128bd25b6628b78ebe2014a8f1be1ba576d9b3077e3757352",
+      "sha256": "3ec2a882b897f24208af37eaedc7376db1f2ff7b9b24ca9cf0810b01fafab9a9",
       "kind": "source",
       "availability": "retained_document",
       "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
@@ -280,7 +280,7 @@
     },
     "calculator-handler": {
       "path": "../../packages/loginom-runtime/client/lib/calculator-node.mjs",
-      "sha256": "bc0606ee6d2b969e776aed56036e75418a2230db4ac1b100b1fadb00d8415577",
+      "sha256": "7e71785fc77c131f4bee6078389a72b4fa94bb08847032171de4f1514f4990ac",
       "kind": "source",
       "availability": "retained_document",
       "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
@@ -944,6 +944,32 @@
       "source_sha256": "959637abddd0952e3a802894f60826a8d7f2626eab220be7a2c24d6fb80b75a8",
       "provenance_id": "source-9d25d9064b0d",
       "document_adaptation": "Navigation adapted; original checks and runtime pins remain historical."
+    },
+    "crosstable-handler": {
+      "path": "../../packages/loginom-runtime/client/lib/crosstable-node.mjs",
+      "sha256": "6a597ccfe9466ea94dbe3e192d5ac7b2b6f49a419b6f5e8a9db54d21191d8568",
+      "kind": "source",
+      "availability": "retained_document",
+      "source_commit": null,
+      "runtime": "7.4.2",
+      "platform": {
+        "client": "Linux",
+        "loginom": "7.4.2/Enterprise"
+      },
+      "scope": "Ограниченный этап 1; автономная приёмка ещё не выполнена."
+    },
+    "crosstable-discovery": {
+      "path": "nodes/transform-crosstable/discovery.md",
+      "sha256": "549618be70ef97c289e7f9c048fa84dcf16422ef05614b6d3be15a08c1d50cef",
+      "kind": "document",
+      "availability": "retained_document",
+      "source_commit": null,
+      "runtime": "7.4.2",
+      "platform": {
+        "client": "Linux",
+        "loginom": "7.4.2/Enterprise"
+      },
+      "scope": "Ограниченный этап 1; автономная приёмка ещё не выполнена."
     }
   },
   "nodes": [
@@ -5029,13 +5055,22 @@
       "name": "Кросс-таблица",
       "slug": "transform-crosstable",
       "legacy_subplan": "15",
-      "queue_class": "backlog",
-      "handler": null,
+      "queue_class": "implemented",
+      "handler": {
+        "type": "transform.cross_table",
+        "modes": [
+          "pivot"
+        ],
+        "source": "../../packages/loginom-runtime/client/lib/crosstable-node.mjs",
+        "parameters_source": "../../packages/loginom-runtime/client/lib/crosstable-parameters.mjs"
+      },
       "card": "nodes/transform-crosstable/README.md",
       "initial_scope": "Сохранить подплан 15: фиксированные и скользящие колонки, агрегаты и изменение схемы; календарные поля можно задать в CSV.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "scope_basis": "live_discovery_and_numeric_stage_one_contract",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Этап 1: дискретная строковая колонка, дискретные ключи строк, integer/real факты sum/min/max/avg; число записей через сумму Quantity=1.",
+        "Fixed/Sliding: separator=|, unique_names=false, min_values=0, limit=0; переменные, прочие агрегаты и variant остаются этапам 2–3.",
+        "Регистрация и локальные проверки не означают успешную автономную или независимую приёмку."
       ],
       "prerequisites": [
         "accepted_base",
@@ -5050,10 +5085,11 @@
       },
       "readiness": {
         "implementation": {
-          "status": "not_implemented",
+          "status": "implemented",
           "evidence": [
             "runtime-registry",
-            "historical-roadmap"
+            "crosstable-handler",
+            "crosstable-discovery"
           ]
         },
         "historical_acceptance": {
@@ -5079,9 +5115,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения.",
+      "next_action": "Реализовать ограниченное numeric ядро этапа 1 и W1–W3 по подтверждённому discovery; выполнить автономную и независимую приёмку.",
       "plan": "nodes/transform-crosstable/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "ready_for_development"
     },
     {
       "component_id": "component.transform.EnrichData",
