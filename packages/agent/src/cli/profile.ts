@@ -81,6 +81,8 @@ export async function acquireProfile(root: string, channel: keyof typeof Product
 
 export function profileEnvironment(paths: ReturnType<typeof profilePaths>, env: NodeJS.ProcessEnv) {
   const result = { ...env }
+  if (result.LOGINOM_AI_AGENT_SHARED_AUTH_DIR && result.LOGINOM_AI_AGENT_AUTH_CONTENT)
+    throw new Error("SHARED_AUTH_CONTENT_CONFLICT")
   // Inherited Desktop/sidecar settings must not redirect CLI writes or supply its auth.
   delete result.LOGINOM_AI_AGENT_AUTH_CONTENT
   delete result.LOGINOM_AI_AGENT_CONFIG
