@@ -271,7 +271,7 @@ export interface CrossTableParameters {
  category_mode: 'fixed'|'sliding'; include_null?: boolean; include_other?: boolean;
  local_variables?:{name:string;type:'integer'|'boolean'|'string';value:number|boolean|string}[];
  bindings?:{limit?:{variable:string};unique_names?:{variable:string};separator?:{variable:string}};
- min_values?: number; limit?: number; separator?: '|'|'.'|'_'|'-'|' '; unique_names?: boolean;
+ min_values?: number; limit?: number; separator?: '|'|'.'|'->'|' '; unique_names?: boolean;
 }
 export interface ConfiguredInputField {kind:'input_field'; name:string}
 export interface CrossTableConfigurationReadback {

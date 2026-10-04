@@ -77,3 +77,13 @@ test('local bindings reject conflicting static values, wrong types and undeclare
  }
  assert.doesNotThrow(()=>validateCrossTableParameters({local_variables:[{name:'Limit',type:'integer',value:0}]},'pivot',{...r,target:{kind:'existing'},inputs:[]}));
 });
+test('native separator admission follows the four observed choices for literals and bindings',()=>{
+ for(const separator of ['|','.','->',' ']){
+  assert.doesNotThrow(()=>validateCrossTableParameters({...p,separator},'pivot',r));
+  assert.doesNotThrow(()=>validateCrossTableParameters({...p,local_variables:[{name:'Separator',type:'string',value:separator}],bindings:{separator:{variable:'Separator'}}},'pivot',r));
+ }
+ for(const separator of ['_','-','bad']){
+  assert.throws(()=>validateCrossTableParameters({...p,separator},'pivot',r));
+  assert.throws(()=>validateCrossTableParameters({...p,local_variables:[{name:'Separator',type:'string',value:separator}],bindings:{separator:{variable:'Separator'}}},'pivot',r));
+ }
+});

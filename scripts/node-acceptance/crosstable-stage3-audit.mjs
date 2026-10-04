@@ -51,6 +51,13 @@ export function auditCrossTableStage3(events){
  need(values.every(([,name,, ,value])=>parameters(changed).local_variables?.some(v=>v.name===name&&v.value===value)), 'all three defaults changed through the public request');
  evidence.push({criterion:'three_bound_variables',node:controlled.node,operations:[controlled.input.operation_id,changed.input.operation_id]});
 
+ const reserve=created('Резерв категорий'),reserveHistory=history(reserve);
+ const arrow=reserveHistory.find(c=>readback(c)?.options?.separator==='->'),space=reserveHistory.find(c=>arrow&&c.index>arrow.index&&readback(c)?.options?.separator===' ');
+ const restored=reserveHistory.find(c=>space&&c.index>space.index&&readback(c)?.options?.separator==='|');
+ need(arrow&&space&&restored,'arrow, space and restored pipe separators on the same reserve report');
+ need([arrow,space,restored].every(c=>JSON.stringify(names(c))===JSON.stringify(names(reserve))),'separator changes preserve ordered field names');
+ evidence.push({criterion:'four_native_separators',node:reserve.node,operations:[reserve.input.operation_id,arrow.input.operation_id,space.input.operation_id,restored.input.operation_id,changed.input.operation_id]});
+
  const boundary=created('Граница исключения'),boundaryHistory=history(boundary);
  const own=boundaryHistory.find(c=>readback(c)?.output_mapping?.source_fields?.length===5&&readback(c).output_mapping.source_fields.every(f=>f.required===true));
  need(own,'complete native Required=true own output');

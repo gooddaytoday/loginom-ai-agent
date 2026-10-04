@@ -76,7 +76,10 @@ try:
     if not passed:raise RuntimeError('SOURCE_PREPARATION_FAILED')
     from source_manifest import actor_source_manifest
     actor=actor_source_manifest(read_private(attempt/'source-manifest.json'),fixture,login['username'])
-    write_private(source/'actor-source.json',actor)
+    # Role-specific identities are private preparation evidence. Keep them
+    # outside data/: accept-node attaches every file there, and the complete
+    # stage-three task must fit the unchanged eight-attachment admission cap.
+    write_private(source.parent/'actor-source.json',actor)
     write_private(attempt/'preparation.json',dict(status='PASS',source_sha=manifest['metadata']['sourceCommit'],role=config['role'],owner=owner,ops=ops_identity(),result=result,exit=code))
     print(json.dumps(dict(status='PASS',source_sha=manifest['metadata']['sourceCommit'],phase='source_only_preparation')))
 except Exception as error:

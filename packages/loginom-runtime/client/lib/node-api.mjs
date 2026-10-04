@@ -35,7 +35,7 @@ export const crossTableParametersSchema={...object({
  include_null:{...boolean,description:'Required for fixed: create a separate missing-category group; omit for sliding.'},
  include_other:{...boolean,description:'Required for fixed: new categories enter Other; omit for sliding.'},
  min_values:{...integer(0,1000),description:'Minimum category slots per column dimension, including empty reserved slots; independent of limit.'},limit:{...integer(0,1000),description:'Maximum category values; zero is unlimited. A positive limit can truncate reserved slots.'},
- separator:{...choice('|','.','_','-',' '),description:'Native category/fact/function label separator; labels preserve meaningful whitespace.'},
+ separator:{...choice('|','.','->',' '),description:'Native category/fact/function label separator; labels preserve meaningful whitespace.'},
  unique_names:{...boolean,description:'Use native category-derived names with transliteration and collision suffixes. Read observed names; never guess them.'},
  local_variables:{...array(object({name:fieldName,type:choice('integer','boolean','string'),value:{anyOf:[integer(0,1000),boolean,text(120)]}}),3),description:'Create or update up to three local control-port default values. Existing names retain their IDs and types. Only local variables are supported; other local values are preserved.'},
  bindings:{...object({limit:object({variable:fieldName}),unique_names:object({variable:fieldName}),separator:object({variable:fieldName})},[]),description:'Bind schema settings to exact local variable names. New bindings need local_variables declarations; never supply the same static setting. Existing parameters containing only local_variables/bindings preserve roles and change actual variable values.'}

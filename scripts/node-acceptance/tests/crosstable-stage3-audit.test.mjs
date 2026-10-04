@@ -18,6 +18,8 @@ function fixture(){
  create('variables','Управляемая схема',{options:{variable_bindings:bindings(false)}},standard.slice(0,3));
  edit('changed','variables',{options:{variable_bindings:bindings(true)}},['Region','A_Amount_Sum','A_Amount_Count','B_Amount_Sum','B_Amount_Count'],
   {parameters:{local_variables:[{name:'Limit',value:0},{name:'Names',value:true},{name:'Separator',value:'.'}]}});
+ create('reserve','Резерв категорий',{options:{separator:'|'}},standard);
+ for(const [id,separator] of [['arrow','->'],['space',' '],['pipe','|']])edit(id,'reserve',{options:{separator}},standard);
  create('boundary','Граница исключения',{},standard);
  const sources=standard.map((name,record_id)=>({name,record_id,required:true}));
  edit('boundary-map','boundary',{output_mapping:{source_fields:sources}},standard);
@@ -40,7 +42,7 @@ function fixture(){
  return events;
 }
 test('stage three requires intermediate actions alongside the separate cold oracle',()=>{
- const result=auditCrossTableStage3(fixture());assert.equal(result.status,'PASS');assert.equal(result.criteria.length,5);
+ const result=auditCrossTableStage3(fixture());assert.equal(result.status,'PASS');assert.equal(result.criteria.length,6);
 });
 test('static substitutions, changed variable IDs, foreign downstream and incomplete intermediate reads refuse',()=>{
  for(const damage of [r=>delete r.configuration.readback.options.variable_bindings,
@@ -54,6 +56,7 @@ test('static substitutions, changed variable IDs, foreign downstream and incompl
 });
 test('unknown exclusion effects and fake autosync or input reorder evidence refuse',()=>{
  for(const [id,damage] of [['negative',r=>r.effect_possible=true],['negative',r=>r.error.message='Other validation failure'],
+  ['space',r=>r.configuration.readback.options.separator='_'],
   ['on',r=>r.configuration.readback.output_mapping.autosync=false],['reorder',r=>r.output.ports[0].schema.reverse()],
   ['output-edit',r=>r.configuration.readback.output_mapping.target_fields[1].source.name='C_2_Amount_Sum']]){
   const xs=fixture(),p=xs.find(e=>e.part.id===id).part.state,r=JSON.parse(p.output);damage(r);p.output=JSON.stringify(r);assert.throws(()=>auditCrossTableStage3(xs));

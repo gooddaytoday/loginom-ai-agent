@@ -19,7 +19,7 @@ export function validateCrossTableParameters(p,mode,r){
  for(const [key,ref] of Object.entries(p.bindings??{})){
   const v=variables.find(v=>v.name===ref.variable);
   need(r.target.kind==='existing'||v,'new bindings require declared local values');
-  if(v)need(v.type===({limit:'integer',unique_names:'boolean',separator:'string'}[key])&&(key!=='separator'||['|','.','_','-',' '].includes(v.value)),'local binding type/value differs');
+  if(v)need(v.type===({limit:'integer',unique_names:'boolean',separator:'string'}[key])&&(key!=='separator'||['|','.','->',' '].includes(v.value)),'local binding type/value differs');
  }
  need(!preserved||r.target.kind==='existing','new node requires complete roles, facts and category_mode');
  if(!preserved){
@@ -38,7 +38,7 @@ export function validateCrossTableParameters(p,mode,r){
   if(crossTableDimensions(p).length===0)need(!p.include_null&&!p.include_other,'special groups require a column dimension');
   need(Number.isSafeInteger(p.min_values??0)&&(p.min_values??0)>=0&&(p.min_values??0)<=1000,'min_values must be an integer from 0 to 1000');
   need(Number.isSafeInteger(p.limit??0)&&(p.limit??0)>=0&&(p.limit??0)<=1000,'limit must be an integer from 0 to 1000');
-  need(typeof (p.separator??'|')==='string'&&['|','.','_','-',' '].includes(p.separator??'|'),'unsupported native separator');
+  need(typeof (p.separator??'|')==='string'&&['|','.','->',' '].includes(p.separator??'|'),'unsupported native separator');
   need(typeof (p.unique_names??false)==='boolean','unique_names must be boolean');
   need(r.inputs.length===1&&r.inputs[0].input===0,'complete configuration requires one explicit table input zero');
  }

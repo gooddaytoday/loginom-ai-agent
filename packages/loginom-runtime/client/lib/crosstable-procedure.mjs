@@ -21,7 +21,7 @@ export function crossTableConfiguration(native,mapping){
  need(columns.length<=128&&facts.length>0&&!native.service_fields.some(f=>f.disposition>0),'supported dimensions and typed facts required');
  need(columns.every(f=>f.include_null===columns[0].include_null&&f.include_other===columns[0].include_other),'mixed per-dimension special-group policy is unsupported');
  const column=columns[0]??null,mode=o.pedSlidingUniqueValues.value?'sliding':'fixed';
- need(['|','.','_','-',' '].includes(o.pedDisplayNameSeparator.value)&&typeof o.pedUniqueValueNames.value==='boolean'&&Number.isSafeInteger(o.pedSlidingUniqueValuesLimit.value)&&o.pedSlidingUniqueValuesLimit.value>=0,'unsupported names, separator or limits');
+ need(['|','.','->',' '].includes(o.pedDisplayNameSeparator.value)&&typeof o.pedUniqueValueNames.value==='boolean'&&Number.isSafeInteger(o.pedSlidingUniqueValuesLimit.value)&&o.pedSlidingUniqueValuesLimit.value>=0,'unsupported names, separator or limits');
  need(mode!=='sliding'||columns.every(f=>!f.include_null&&!f.include_other),'sliding retains unsupported fixed flags; request complete replacement');
  const result={verified:true,inventory_complete:true,kind:'crosstable',node_context:native.node_context,input_fields:fields,
   category_mode:mode,column:column?{...column}:null,columns:columns.map(f=>({...f})),row_keys:keys,facts:facts.map(f=>{
@@ -95,7 +95,7 @@ export async function configureCrossTable(channel,p,{inputMapping}){
  s=await observe('CrossTable separator');
  if(s.node_crosstable.options.pedDisplayNameSeparator.value!==(p.separator??'|')){
   await gesture(s,'open separator choices',base+';CrossTabWizard;pedDisplayNameSeparator;ValueControl;trg_picker');s=await observe('separator choices shown');
-  await gesture(s,'select supported separator',base+';CrossTabWizard;pedDisplayNameSeparator;ValueControl;boundlist;'+(p.separator??'|'));
+  await gesture(s,'select supported separator',base+';CrossTabWizard;pedDisplayNameSeparator;ValueControl;boundlist;'+(p.separator===' '?'Пробел':p.separator??'|'));
  }
  // Replace roles completely, then order them after native auto-insertion.
  // Native deletion retains the other records' Order. Remove each role from

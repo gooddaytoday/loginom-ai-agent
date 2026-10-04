@@ -56,6 +56,7 @@ def run(command,**kw):
                 self.assertEqual(receipt['error'],'PRIVATE_CONFIG_PERMISSIONS_INVALID')
                 self.assertEqual((attempt/'preparation.json').stat().st_mode&0o777,0o600)
                 self.assertFalse((source/'actor-source.json').exists())
+                self.assertFalse((source.parent/'actor-source.json').exists())
                 self.assertEqual((attempt/rejected).stat().st_mode&0o777,0o664)
 
 if __name__=='__main__':unittest.main()

@@ -25,7 +25,7 @@ export function resolveCrossTableSchema(columns,configuration){
   })};
  }
  need(configuration?.kind==='crosstable'&&['fixed','sliding'].includes(configuration.category_mode)
-  &&['|','.','_','-',' '].includes(configuration.options?.separator)&&typeof configuration.options.unique_names==='boolean'
+  &&['|','.','->',' '].includes(configuration.options?.separator)&&typeof configuration.options.unique_names==='boolean'
   &&Number.isSafeInteger(configuration.options.limit)&&configuration.options.limit>=0&&Number.isSafeInteger(configuration.options.min_values)&&configuration.options.min_values>=0,'verified supported configuration required');
  const keys=configuration.row_keys,facts=configuration.facts,dimensions=configuration.columns??(configuration.column?[configuration.column]:[]);
  need(Array.isArray(keys)&&Array.isArray(facts)&&facts.length>0&&Array.isArray(dimensions),'complete roles required');
