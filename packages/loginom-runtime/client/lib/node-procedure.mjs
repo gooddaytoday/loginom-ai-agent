@@ -1,4 +1,5 @@
 import {makeCrossTableContextCode} from './crosstable-context.mjs';
+import {makeCrossTableVariablesCode,makeCrossTableBindingsCode} from './crosstable-variables.mjs';
 import {makeReplacementContextCode} from './replacement-context.mjs';
 import {makeDateTimeContextCode} from './date-time-context.mjs';
 import {makeMissingValuesContextCode} from './missing-values-context.mjs';
@@ -156,7 +157,30 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       throw new Error('Node procedure is blocked by a mask or dialog');
     }
   };
+  const crossTableOwnedStep=async(verb,payload,makeCode)=>{
+    checkBudget();
+    if(!preparedNodeContext)throw Error('Prepared CrossTable owner required');
+    const step=nextStep(),id=operation.id+':n'+step,actionKey='node.crosstable.'+verb+'.internal',action={verb,...payload};
+    const signature=digest([id,action,preparedNodeContext]);snapshot=null;evidenceSnapshot=null;
+    const prepared=await entry('node_step_prepared',{step,internal_operation_id:id,action,signature});
+    if(prepared?.signature!==signature||JSON.stringify(prepared.action)!==JSON.stringify(action))throw Error('CrossTable step was not durably prepared');
+    checkBudget();
+    const deadline=operation.deadline,code=makeCode(preparedNodeContext,{...payload,origin:targetOrigin,build:targetBuild,operation_id:id,deadline});
+    const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:${JSON.stringify(verb)},effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.error?{code:'CROSSTABLE_VARIABLE_STEP_UNCONFIRMED',message:r.error}:null,trace:[]}}`;
+    let result;
+    try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:Math.max(5000,deadline-now()+5000)});}
+    catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
+    if(result.operation_id!==id||result.action_key!==actionKey){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw Error('CrossTable step receipt differs');}
+    operation.cleanupConfirmed=result.cleanup_complete===true;operation.nodeEffectPossible ||= result.effect_possible===true;
+    const completed=await entry('node_step_completed',{step,internal_operation_id:id,outcome:structuredClone(result)});
+    if(JSON.stringify(completed?.outcome)!==JSON.stringify(result))throw Error('CrossTable outcome was not durably preserved');
+    if(result.status!=='SUCCEEDED'||!operation.cleanupConfirmed||result.output?.verified!==true
+      ||!['document_id','workflow_id','node_id'].every(k=>result.output.node_context?.[k]===(k==='document_id'?preparedNodeContext.document_id:k==='workflow_id'?preparedNodeContext.workflow_ref.workflow_id:preparedNodeContext.node.node_id)))throw new NodeProcedureStepError(result);
+    return structuredClone(result.output);
+  };
   const channel = {
+    async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
+    async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
     async openOutputPort(port) {return channel.openPort('output',port);},
     async openInputPort(port) {return channel.openPort('input',port);},
     async openPort(direction,port) {

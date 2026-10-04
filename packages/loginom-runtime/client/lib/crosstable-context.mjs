@@ -47,8 +47,21 @@ export function readCrossTableBrowser(prefix){
  const options={};
  for(const key of ['pedDisplayNameSeparator','pedSlidingUniqueValues','pedSlidingUniqueValuesLimit','pedUniqueValueNames']){
   const value=component(base+key+';ValueControl'),variable=component(base+key+';VariableControl'),button=component(base+key+';SwitchButton');
-  if(!value||!variable||!button||button.pressed===true||variable.getValue?.()!=null||!value.isVisible?.(true))return fail('crosstable_variable_binding');
-  options[key]={value:value.getValue?.(),variable:null,switch_pressed:false,disabled:value.isDisabled?.()===true};
+  if(!value||!variable||!button)return fail('crosstable_variable_binding');
+  if(button.pressed===true){
+   if(key==='pedSlidingUniqueValues'||!variable.isVisible?.(true))return fail('crosstable_variable_binding');
+   const app=globalThis.bg?.app,p=globalThis.__loginomDockPreparationV1,card=app?.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),t=card?.Controller?.Node?.data?.node,m=card?.Controller?.FController;
+   const local=p?.crossTableLocalVariables?.get(t?.ParentNode?.FGuid),store=variable.getStore?.(),records=store?.getData?.()?.items;
+   if(!local||local.document_id!==p.id||local.workflow!==t.ParentNode.ParentNode||local.nodeData!==m?.FModelNode||store.isLoading?.()||!Array.isArray(records)||records.length>128)return fail('crosstable_local_variable_owner');
+   const selected=records.filter(r=>r.data.field1===variable.getValue?.());if(selected.length!==1)return fail('crosstable_selected_variable');
+   const matches=local.values.filter(v=>!v.is_null&&selected[0].data.field2===v.label+' ( '+String(v.value)+' )');
+   const type={pedSlidingUniqueValuesLimit:4,pedUniqueValueNames:1,pedDisplayNameSeparator:5}[key];
+   if(matches.length!==1||matches[0].type!==type)return fail('crosstable_variable_type_value');const v=matches[0];
+   options[key]={value:v.value,variable:{name:v.name,id:v.id,type:v.type,value:v.value,selected_proxy_equal:true},switch_pressed:true,disabled:variable.isDisabled?.()===true};
+  }else{
+   if(variable.getValue?.()!=null||!value.isVisible?.(true))return fail('crosstable_variable_binding');
+   options[key]={value:value.getValue?.(),variable:null,switch_pressed:false,disabled:value.isDisabled?.()===true};
+  }
  }
  if(typeof options.pedDisplayNameSeparator.value!=='string'||typeof options.pedSlidingUniqueValues.value!=='boolean'
   ||typeof options.pedUniqueValueNames.value!=='boolean'||!Number.isSafeInteger(options.pedSlidingUniqueValuesLimit.value)

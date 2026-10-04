@@ -68,3 +68,12 @@ test('own mandatory output exclusion refuses before drivers while downstream rem
  assert.doesNotThrow(()=>validateCrossTableParameters(p,'pivot',{...r,finish:'execute',mappings:[mapping]}));
  assert.throws(()=>validateCrossTableParameters(p,'pivot',{...r,finish:'done',mappings:[mapping]}),/fresh materialization/);
 });
+
+test('local bindings reject conflicting static values, wrong types and undeclared new variables before mutation',()=>{
+ const q={...p,local_variables:[{name:'Limit',type:'integer',value:1}],bindings:{limit:{variable:'Limit'}}};
+ assert.doesNotThrow(()=>validateCrossTableParameters(q,'pivot',r));
+ for(const mutate of [q=>q.limit=1,q=>q.local_variables[0].type='string',q=>q.local_variables[0].value=1.5,q=>q.bindings.limit.variable='Missing',q=>q.local_variables.push({...q.local_variables[0]})]){
+  const copy=structuredClone(q);mutate(copy);assert.throws(()=>validateCrossTableParameters(copy,'pivot',r));
+ }
+ assert.doesNotThrow(()=>validateCrossTableParameters({local_variables:[{name:'Limit',type:'integer',value:0}]},'pivot',{...r,target:{kind:'existing'},inputs:[]}));
+});

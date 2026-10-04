@@ -22,7 +22,8 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
  const remaining=()=>{const n=task.deadline-Date.now();if(n<=0)throw Error('Output port opening deadline');return n;};
  const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
  const inspect=mode=>page.evaluate(({task,mode})=>{
-  const direction=task.direction??'output',input=direction==='input';
+  const direction=task.direction??'output',input=direction==='input',control=task.kind==='control';
+  if(control&&(!input||task.port!==0))throw Error('Control input only');
   if(!['input','output'].includes(direction))throw Error('Invalid port direction');
   const b=task.binding,app=globalThis.bg?.app,p=globalThis.__loginomDockPreparationV1;
   const fail=m=>{throw Error(m);},exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
@@ -71,7 +72,15 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    return {deactivation:true,phase:r.phase,port_guid:r.portGuid,node_id:r.node_id};
   }
   if(mode==='lookup')return r?{phase:r.phase,port_guid:r.port.FGuid}:null;
-  const blocked=[...document.querySelectorAll('[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message')].some(e=>e.checkVisibility({checkVisibilityCSS:true}));
+  const blocked=[...document.querySelectorAll('[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message')].some(e=>{
+   if(!e.checkVisibility({checkVisibilityCSS:true}))return false;
+   const parent=e.parentElement,cmp=parent&&Ext.getCmp(parent.id),wiz=exact(b.workflow_ref.prefix+';WizrdMCF'),grid=exact(b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;grdTargetColumns');
+   const ownDisabledHeader=control&&mode==='finish'&&e.classList.contains('x-mask')&&!e.classList.contains('x-mask-msg')&&!e.textContent.trim()
+    &&parent?.getAttribute('data-tid')===b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;colTargetDelete'
+    &&cmp?.$className==='Ext.grid.column.Action'&&cmp.el.dom===parent&&cmp.disabled===true&&wiz.length===1&&wiz[0].contains(parent)
+    &&grid.length===1&&Ext.getCmp(grid[0].id).getStore().isLoading()===false;
+   return !ownDisabledHeader;
+  });
   if(blocked){if(mode==='finish')return {pending:true,reason:'port_wizard_loading'};fail('Port opening blocked');}
   if(mode==='begin') {
    if(r)fail('Port opening already reserved');
@@ -87,13 +96,14 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    const candidates=[];
    for(const list of node.FPorts){if(!Array.isArray(list.FCollection)||list.FCollection.length>100)fail('Port inventory bound');candidates.push(...list.FCollection);}
    const ports=[],graphBox=roots[0].getBoundingClientRect();
-   for(const dom of document.querySelectorAll('[data-tid^='+JSON.stringify(tid+';'+(input?'Input':'Output')+'_Data-')+']')) {
+   for(const dom of document.querySelectorAll('[data-tid^='+JSON.stringify(tid+';'+(control?'Input_ControlVar':(input?'Input':'Output')+'_Data-'))+']')) {
     // The outline keeps a cloned SVG with identical tids after closing. Only
     // the prepared graph's own port can participate in native hit binding.
     if(!roots[0].contains(dom))continue;
-    const ptid=dom.getAttribute('data-tid'),suffix=ptid.slice((tid+';'+(input?'Input':'Output')+'_Data-').length);
-    if(!/^[0-9]{1,2}$/.test(suffix))fail('Unknown output port identifier');
-    const index=Number(suffix),box=dom.getBoundingClientRect();
+    const ptid=dom.getAttribute('data-tid'),suffix=ptid.slice((tid+';'+(control?'Input_ControlVar':(input?'Input':'Output')+'_Data-')).length);
+    if(control?suffix!=='':!/^[0-9]{1,2}$/.test(suffix))fail('Unknown output port identifier');
+    const index=control?candidates.findIndex(p=>p.FCell===d.FmxGraph.view.getState(p.FCell)?.cell&&d.FmxGraph.view.getState(p.FCell)?.shape?.node===dom):Number(suffix),box=dom.getBoundingClientRect();
+    if(index<0)fail('Control port native ordinal unavailable');
     if(box.width<=0||box.height<=0||exact(ptid).filter(e=>roots[0].contains(e)).length!==1)fail('Port DOM unavailable');
     const cell=d.FmxGraph.getCellAt(box.x-graphBox.x+roots[0].scrollLeft+box.width/2,box.y-graphBox.y+roots[0].scrollTop+box.height/2);
     const matches=candidates.filter(port=>port.FCell===cell&&port.parent===node&&port.data);

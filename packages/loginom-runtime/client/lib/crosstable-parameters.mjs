@@ -11,8 +11,16 @@ const need=(v,m)=>{if(!v)throw Error('CrossTable: '+m);};
 const field=v=>v&&Object.keys(v).sort().join(',')==='kind,name'&&v.kind==='input_field'&&typeof v.name==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v.name);
 export function validateCrossTableParameters(p,mode,r){
  need(mode==='pivot','use pivot mode');
- need(p&&Object.keys(p).every(k=>['row_keys','column','columns','facts','category_mode','include_null','include_other','min_values','limit','separator','unique_names'].includes(k)),'unsupported parameters; explicit categories are unavailable');
- const preserved=Object.keys(p).length===0;
+ need(p&&Object.keys(p).every(k=>['row_keys','column','columns','facts','category_mode','include_null','include_other','min_values','limit','separator','unique_names','local_variables','bindings'].includes(k)),'unsupported parameters; explicit categories are unavailable');
+ const preserved=Object.keys(p).every(k=>['local_variables','bindings'].includes(k));
+ const variables=p.local_variables??[];
+ need(Array.isArray(variables)&&variables.length<=3&&variables.every(v=>v&&Object.keys(v).sort().join(',')==='name,type,value'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v.name)&&(['boolean','integer','string'].includes(v.type))&&(v.type==='boolean'?typeof v.value==='boolean':v.type==='integer'?Number.isSafeInteger(v.value)&&v.value>=0&&v.value<=1000:typeof v.value==='string'&&v.value.length<=120))&&new Set(variables.map(v=>v.name)).size===variables.length,'up to three typed local variables required');
+ if(p.bindings!==undefined)need(p.bindings&&Object.keys(p.bindings).length<=3&&Object.entries(p.bindings).every(([key,v])=>['limit','unique_names','separator'].includes(key)&&v&&Object.keys(v).join(',')==='variable'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v.variable)&&p[key]===undefined),'bindings require exact local variable names without a conflicting static value');
+ for(const [key,ref] of Object.entries(p.bindings??{})){
+  const v=variables.find(v=>v.name===ref.variable);
+  need(r.target.kind==='existing'||v,'new bindings require declared local values');
+  if(v)need(v.type===({limit:'integer',unique_names:'boolean',separator:'string'}[key])&&(key!=='separator'||['|','.','_','-',' '].includes(v.value)),'local binding type/value differs');
+ }
  need(!preserved||r.target.kind==='existing','new node requires complete roles, facts and category_mode');
  if(!preserved){
   need(Array.isArray(p.row_keys)&&p.row_keys.length<=128&&p.row_keys.every(field),'ordered row_keys input_field references required');

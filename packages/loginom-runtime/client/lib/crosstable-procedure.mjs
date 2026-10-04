@@ -27,7 +27,7 @@ export function crossTableConfiguration(native,mapping){
   category_mode:mode,column:column?{...column}:null,columns:columns.map(f=>({...f})),row_keys:keys,facts:facts.map(f=>{
    need(f.functions>0&&(f.functions&~2047)===0&&(f.functions&~f.available_functions)===0,'unsupported fact/function mask');
    return {...f,functions:Object.entries(CROSSTABLE_FUNCTIONS).filter(([,v])=>(f.functions&v.bit)!==0).map(([fn])=>fn)};
-  }),options:{separator:o.pedDisplayNameSeparator.value,unique_names:o.pedUniqueValueNames.value,limit:o.pedSlidingUniqueValuesLimit.value,min_values:column?.min_values??0,min_values_by_dimension:columns.map(f=>({field:f.name,value:f.min_values})),include_null:columns.length>0&&columns.every(f=>f.include_null),include_other:columns.length>0&&columns.every(f=>f.include_other)}};
+  }),options:{separator:o.pedDisplayNameSeparator.value,unique_names:o.pedUniqueValueNames.value,limit:o.pedSlidingUniqueValuesLimit.value,min_values:column?.min_values??0,min_values_by_dimension:columns.map(f=>({field:f.name,value:f.min_values})),variable_bindings:Object.fromEntries([['limit','pedSlidingUniqueValuesLimit'],['unique_names','pedUniqueValueNames'],['separator','pedDisplayNameSeparator']].filter(([,key])=>o[key].variable).map(([key,property])=>[key,o[property].variable])),include_null:columns.length>0&&columns.every(f=>f.include_null),include_other:columns.length>0&&columns.every(f=>f.include_other)}};
  resolveCrossTableParameters({row_keys:keys.map(f=>({kind:'input_field',name:f.name})),columns:columns.map(f=>({kind:'input_field',name:f.name})),
   facts:result.facts.map(f=>({field:{kind:'input_field',name:f.name},functions:f.functions}))},fields);
  return result;
@@ -39,8 +39,11 @@ export async function configureCrossTable(channel,p,{inputMapping}){
  need(baseline.dialogs.length===0,'unexpected nested editor');
  need(!baseline.service_fields.some(f=>f.disposition>0),'native Count service fact is outside the supported fact contract');
  const fields=bindCrossTableInput(baseline,inputMapping);
- if(Object.keys(p).length===0)return {verified:true,cleanup_complete:true,effect_possible:false,
-  configuration:crossTableConfiguration(baseline,inputMapping),preservation:{unchanged:true}};
+ if(Object.keys(p).every(k=>['local_variables','bindings'].includes(k))){
+  const bindings=p.bindings?await channel.bindCrossTableVariables(p.bindings):null;
+  const after=bindings?(await observe('CrossTable preserved roles with local bindings')).node_crosstable:baseline;
+  return {verified:true,cleanup_complete:true,effect_possible:bindings?.effect_possible===true,configuration:crossTableConfiguration(after,inputMapping),preservation:{roles_unchanged:true},...(bindings?{variable_bindings:bindings}:{})};
+ }
  const plan=resolveCrossTableParameters(p,fields),base=initial.wizard.root_tid;
  const oneControl=(s,tid,verb='click',input=false)=>{const xs=s.ui.elements.filter(e=>e.allowed_actions.includes(verb)
   &&(input?e.kind==='field'&&e.identity?.anchor_tid===tid:e.tid===tid));need(xs.length===1,'unique interactable control required: '+tid);return xs[0];};
@@ -73,11 +76,15 @@ export async function configureCrossTable(channel,p,{inputMapping}){
    need(next&&direction*(next.top-scroll.top)>0,'owned grid did not scroll');
   }
  };
+ const ensureStatic=async key=>{let s=await observe('CrossTable parameter binding mode');if(!s.node_crosstable.options[key].switch_pressed)return;
+  await gesture(s,'select explicit static option mode',base+';CrossTabWizard;'+key+';SwitchButton');s=await observe('CrossTable static option mode');need(!s.node_crosstable.options[key].switch_pressed,'static option mode differs');
+ };
  const setBoolean=async(key,wanted)=>{
   let s=await observe('CrossTable static boolean');if(s.node_crosstable.options[key].value===wanted)return;
   await gesture(s,'set CrossTable '+key,base+';CrossTabWizard;'+key+';ValueControl;DisplayEl');
   s=await observe('CrossTable boolean applied');need(s.node_crosstable.options[key].value===wanted,'boolean change unconfirmed');
  };
+ for(const key of ['pedUniqueValueNames','pedSlidingUniqueValuesLimit','pedDisplayNameSeparator'])await ensureStatic(key);
  await setBoolean('pedSlidingUniqueValues',true);await setBoolean('pedUniqueValueNames',p.unique_names??false);
  let s=await observe('CrossTable limits and separator');
  if(s.node_crosstable.options.pedSlidingUniqueValuesLimit.value!==(p.limit??0)){
@@ -152,10 +159,11 @@ export async function configureCrossTable(channel,p,{inputMapping}){
   }
   await gesture(s,'apply complete fact function set',base+';FactorEditDialog;btnApply');s=await observe('fact functions applied');need(current(s,f.index).functions===mask,'applied function mask differs');
  }
+ const bindings=p.bindings?await channel.bindCrossTableVariables(p.bindings):null;
  const after=(await observe('final owned CrossTable configuration')).node_crosstable,c=crossTableConfiguration(after,inputMapping);
  need(same(c.row_keys.map(f=>f.name),plan.keys.map(f=>f.name))&&same(c.columns.map(f=>f.name),plan.columns.map(f=>f.name))
   &&same(c.facts.map(f=>({name:f.name,functions:f.functions})),plan.facts.map(f=>({name:f.name,functions:Object.keys(CROSSTABLE_FUNCTIONS).filter(fn=>f.functions.includes(fn))})))
-  &&c.category_mode===p.category_mode&&c.options.separator===(p.separator??'|')&&c.options.unique_names===(p.unique_names??false)&&c.options.limit===(p.limit??0)&&c.columns.every(f=>f.min_values===(p.min_values??0)),'final configuration differs');
+  &&c.category_mode===p.category_mode&&['separator','unique_names','limit'].every(key=>p.bindings?.[key]?c.options.variable_bindings[key]?.name===p.bindings[key].variable:c.options[key]===(p[key]??({separator:'|',unique_names:false,limit:0}[key])))&&c.columns.every(f=>f.min_values===(p.min_values??0)),'final configuration differs');
  const identity=xs=>xs.map(f=>({index:f.index,record_id:f.record_id,name:f.name,label:f.label,type:f.type,data_kind:f.data_kind}));
  need(same(identity(c.input_fields),identity(fields)),'input identity changed');
  return {verified:true,cleanup_complete:true,effect_possible:true,configuration:c,preservation:{input_identity:true}};

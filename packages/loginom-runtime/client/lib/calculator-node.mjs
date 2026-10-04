@@ -201,7 +201,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     // CrossTable generates its output only on Execute. This internal hook is
     // restricted to that component; all existing handlers keep strict mappings.
     if(implementation?.type==='transform.cross_table'&&implementation.materializedSchema){
-     if(mappings.length){
+     if(mappings.length||operation.nodeApply.request.target.kind==='existing'&&operation.nodeApply.request.finish==='execute'){
       requireValue(operation.nodeApply.request.finish==='execute','CrossTable output edits require fresh execution');
       const firstFinish=await finishConfiguredGraph(channel,executionDriver,'execute',ctx.node);
       const firstExecution=await executionDriver.waitCompleted();
@@ -214,7 +214,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
       const sources=s.node_mapping.source_fields.map(f=>({...f,used:true}));
       requireValue(sources.every(f=>f.required===true),'CrossTable required source inventory changed');
       implementation.materializedSchema(sources.map((f,index)=>({...f,index})),configured,{node:ctx.node,execution:firstExecution});
-      const requested=mappings[0],changes=[];
+      const requested=mappings[0]??{direction:'output',port:0},changes=[];
       resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
       if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
       if(requested.fields||requested.changes)changes.push(await configureOutputFields(channel,requested,sources));

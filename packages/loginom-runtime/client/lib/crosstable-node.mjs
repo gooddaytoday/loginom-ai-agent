@@ -9,6 +9,10 @@ const need=(v,m)=>{if(!v)throw Error('CrossTable: '+m);};
 export function createCrossTableNodeSupport(config){return createTabularTransformNodeSupport(config,{
  nativeFullOutput:true,type:'transform.cross_table',mode:'pivot',revision:'crosstable-v3-internal-1',readback:crossTableConfigurationReadback,
  parameterSchema:crossTableParametersSchema,validate:validateCrossTableParameters,preflight:preflightCrossTableSource,
+ async beforeOpen(channel,request){
+  if(request.parameters.local_variables||request.parameters.bindings||request.target.kind==='existing')
+   return channel.configureCrossTableVariables(request.parameters.local_variables??[]);
+ },
  configurationObservation:{condition:'owned CrossTable configuration',readCrossTable:true,ready:s=>s.wizard?.stage==='crosstable'&&s.node_crosstable?.verified===true},
  async configure(channel,p,context){
   const changed=await configureCrossTable(channel,p,context);if(context.request.finish==='close')return changed;
