@@ -68,5 +68,8 @@ try:
     write_private(attempt/'preparation.json',dict(status='PASS' if passed else 'FAIL',source_sha=manifest['metadata']['sourceCommit'],role=config['role'],owner=owner,ops=ops_identity(),result=result,exit=code))
     print(json.dumps(dict(status='PASS' if passed else 'FAIL',source_sha=manifest['metadata']['sourceCommit'],phase='source_only_preparation')))
     if not passed:raise SystemExit(1)
+    from source_manifest import actor_source_manifest
+    actor=actor_source_manifest(read_private(attempt/'source-manifest.json'),fixture,login['username'])
+    write_private(source/'actor-source.json',actor)
 finally:
     os.close(lock)
