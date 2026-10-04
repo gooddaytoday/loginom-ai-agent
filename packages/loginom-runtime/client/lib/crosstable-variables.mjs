@@ -138,7 +138,9 @@ export async function configureLocalVariables(page,task,readNode,openPort){
  },{task,mode,extra});
  try{
   const before=await readNode(page,b);if(!before.verified||before.surface!=='graph'||before.locked)throw Error('Owned unlocked CrossTable graph required');
-  const leave=await inspect('leave_hover');await page.mouse.move(leave.x,leave.y);
+  // Selecting the exact native label dismisses the selected body's hover
+  // toolbar. Moving the pointer alone leaves that toolbar over the body.
+  const leave=await inspect('leave_hover');effect=true;await page.mouse.click(leave.x,leave.y);
   let graph;while(remaining()>0){try{graph=await inspect('graph');break;}catch(error){if(!String(error.message).includes('node body native hit'))throw error;await page.waitForTimeout(Math.min(100,remaining()));}}
   if(!graph.visible){phase='show_control_menu';effect=true;await page.mouse.click(graph.point.x,graph.point.y,{button:'right'});await at('mn;mniShowControlVariablesPort').waitFor({state:'visible',timeout:remaining()});const point=await inspect('menu');await page.mouse.click(point.x,point.y);}
   phase='open_control_port';
