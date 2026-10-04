@@ -57,7 +57,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible);
    if(masks.some(e=>!(e.classList.contains('bg-mask-message')&&e.getAttribute('data-tid')===b.workflow_ref.prefix
        &&e.contains(r.graph.FDiagram.FmxGraph.container))
-     &&!(e.classList.contains('x-mask')&&!e.classList.contains('x-mask-msg')&&!e.textContent.trim()
+     &&!(e.classList?.contains('x-mask')===true&&e.classList?.contains('x-mask-msg')!==true&&!e.textContent.trim()
        &&e.parentElement?.getAttribute('data-tid')==='MF')))fail('Port confirmation has an unrelated mask');
    let yes;
    for(const [name,label] of Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'})) {
@@ -75,7 +75,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   const blocked=[...document.querySelectorAll('[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message')].some(e=>{
    if(!e.checkVisibility({checkVisibilityCSS:true}))return false;
    const parent=e.parentElement,cmp=parent&&Ext.getCmp(parent.id),wiz=exact(b.workflow_ref.prefix+';WizrdMCF'),grid=exact(b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;grdTargetColumns');
-   const ownDisabledHeader=control&&mode==='finish'&&e.classList.contains('x-mask')&&!e.classList.contains('x-mask-msg')&&!e.textContent.trim()
+   const ownDisabledHeader=control&&mode==='finish'&&e.classList?.contains('x-mask')===true&&e.classList?.contains('x-mask-msg')!==true&&!e.textContent.trim()
     &&parent?.getAttribute('data-tid')===b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;colTargetDelete'
     &&cmp?.$className==='Ext.grid.column.Action'&&cmp.el.dom===parent&&cmp.disabled===true&&wiz.length===1&&wiz[0].contains(parent)
     &&grid.length===1&&Ext.getCmp(grid[0].id).getStore().isLoading()===false;
