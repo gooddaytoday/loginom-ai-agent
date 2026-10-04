@@ -17,8 +17,8 @@ class SourcePreparationFailures(unittest.TestCase):
                 root=work/'.multica-node';payload=root/'current';payload.mkdir(parents=True)
                 (payload/'cli-manifest.json').write_text(json.dumps({'metadata':{'sourceDirty':False,'sourceCommit':'1'*40,'channel':'test'}}))
                 source=work/'docs/node-development/nodes/transform-crosstable/acceptance/data';source.mkdir(parents=True)
-                for name in ('variant-source.csv','source-manifest.json'):
-                    (source/name).write_bytes((ROOT/'docs/node-development/nodes/transform-crosstable/acceptance/data'/name).read_bytes())
+                (source/'variant-source.csv').write_bytes((ROOT/'docs/node-development/nodes/transform-crosstable/acceptance/data/variant-source.csv').read_bytes())
+                (source.parent/'source-manifest.json').write_bytes((ROOT/'docs/node-development/nodes/transform-crosstable/acceptance/source-manifest.json').read_bytes())
                 config=work/'config.json';config.write_text(json.dumps({'role':'worker','loginom':{'url':'http://test.invalid','username':'worker','password':'test','api_key':'test'},'provider_auth_file':str(work/'auth')}));config.chmod(0o600)
                 (ops/'common.py').write_text('''import json,os
 from pathlib import Path

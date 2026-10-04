@@ -44,7 +44,7 @@ try:
         raise RuntimeError('COMMITTED_SOURCE_REQUIRED')
     login=config['loginom']
     source=worktree/'docs/node-development/nodes/transform-crosstable/acceptance/data'
-    fixture=json.loads((source/'source-manifest.json').read_text())
+    fixture=json.loads((source.parent/'source-manifest.json').read_text())
     name=fixture['package_basename']
     if name!='lab12-stage2-source-v3.lgp' or fixture['kind']!='source_only' or fixture['derived_reports'] is not False:
         raise RuntimeError('SOURCE_ONLY_MANIFEST_INVALID')
@@ -76,10 +76,10 @@ try:
     if not passed:raise RuntimeError('SOURCE_PREPARATION_FAILED')
     from source_manifest import actor_source_manifest
     actor=actor_source_manifest(read_private(attempt/'source-manifest.json'),fixture,login['username'])
-    # Role-specific identities are private preparation evidence. Keep them
-    # outside data/: accept-node attaches every file there, and the complete
-    # stage-three task must fit the unchanged eight-attachment admission cap.
-    write_private(source.parent/'actor-source.json',actor)
+    # Source-only identities let the model address the existing native nodes.
+    # The generic fixture manifest stays outside data/ so the unchanged
+    # eight-attachment admission cap includes all six CSVs and the task.
+    write_private(source/'actor-source.json',actor)
     write_private(attempt/'preparation.json',dict(status='PASS',source_sha=manifest['metadata']['sourceCommit'],role=config['role'],owner=owner,ops=ops_identity(),result=result,exit=code))
     print(json.dumps(dict(status='PASS',source_sha=manifest['metadata']['sourceCommit'],phase='source_only_preparation')))
 except Exception as error:

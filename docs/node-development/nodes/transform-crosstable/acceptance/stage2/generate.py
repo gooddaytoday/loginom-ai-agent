@@ -112,5 +112,5 @@ def generate():
     assert len(outputs)==15
     (ROOT/'expected.json').write_text(json.dumps(expected,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
     manifest={'kind':'source_only','package_basename':'lab12-stage2-source-v3.lgp','file':sources[-1],'collapse':{'information':['Key'],'transposed':['RealValue','TextValue','FlagValue','WhenValue'],'ignore_empty':False},'derived_reports':False}
-    (ROOT/'data/source-manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
+    (ROOT/'source-manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
 if __name__=='__main__':generate()
