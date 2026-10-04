@@ -21,13 +21,13 @@ export function crossTableConfiguration(native,mapping){
  need(columns.length<=128&&facts.length>0&&!native.service_fields.some(f=>f.disposition>0),'supported dimensions and typed facts required');
  need(columns.every(f=>f.include_null===columns[0].include_null&&f.include_other===columns[0].include_other),'mixed per-dimension special-group policy is unsupported');
  const column=columns[0]??null,mode=o.pedSlidingUniqueValues.value?'sliding':'fixed';
- need(o.pedDisplayNameSeparator.value==='|'&&o.pedUniqueValueNames.value===false&&o.pedSlidingUniqueValuesLimit.value===0&&columns.every(f=>f.min_values===0),'unsupported names, separator or limits');
+ need(['|','.','_','-',' '].includes(o.pedDisplayNameSeparator.value)&&typeof o.pedUniqueValueNames.value==='boolean'&&Number.isSafeInteger(o.pedSlidingUniqueValuesLimit.value)&&o.pedSlidingUniqueValuesLimit.value>=0,'unsupported names, separator or limits');
  need(mode!=='sliding'||columns.every(f=>!f.include_null&&!f.include_other),'sliding retains unsupported fixed flags; request complete replacement');
  const result={verified:true,inventory_complete:true,kind:'crosstable',node_context:native.node_context,input_fields:fields,
   category_mode:mode,column:column?{...column}:null,columns:columns.map(f=>({...f})),row_keys:keys,facts:facts.map(f=>{
    need(f.functions>0&&(f.functions&~2047)===0&&(f.functions&~f.available_functions)===0,'unsupported fact/function mask');
    return {...f,functions:Object.entries(CROSSTABLE_FUNCTIONS).filter(([,v])=>(f.functions&v.bit)!==0).map(([fn])=>fn)};
-  }),options:{separator:'|',unique_names:false,limit:0,min_values:0,include_null:columns.length>0&&columns.every(f=>f.include_null),include_other:columns.length>0&&columns.every(f=>f.include_other)}};
+  }),options:{separator:o.pedDisplayNameSeparator.value,unique_names:o.pedUniqueValueNames.value,limit:o.pedSlidingUniqueValuesLimit.value,min_values:column?.min_values??0,min_values_by_dimension:columns.map(f=>({field:f.name,value:f.min_values})),include_null:columns.length>0&&columns.every(f=>f.include_null),include_other:columns.length>0&&columns.every(f=>f.include_other)}};
  resolveCrossTableParameters({row_keys:keys.map(f=>({kind:'input_field',name:f.name})),columns:columns.map(f=>({kind:'input_field',name:f.name})),
   facts:result.facts.map(f=>({field:{kind:'input_field',name:f.name},functions:f.functions}))},fields);
  return result;
@@ -78,17 +78,17 @@ export async function configureCrossTable(channel,p,{inputMapping}){
   await gesture(s,'set CrossTable '+key,base+';CrossTabWizard;'+key+';ValueControl;DisplayEl');
   s=await observe('CrossTable boolean applied');need(s.node_crosstable.options[key].value===wanted,'boolean change unconfirmed');
  };
- await setBoolean('pedSlidingUniqueValues',true);await setBoolean('pedUniqueValueNames',false);
+ await setBoolean('pedSlidingUniqueValues',true);await setBoolean('pedUniqueValueNames',p.unique_names??false);
  let s=await observe('CrossTable limits and separator');
- if(s.node_crosstable.options.pedSlidingUniqueValuesLimit.value!==0){
+ if(s.node_crosstable.options.pedSlidingUniqueValuesLimit.value!==(p.limit??0)){
   const tid=base+';CrossTabWizard;pedSlidingUniqueValuesLimit;ValueControl';
-  await gesture(s,'reset global category limit',tid,'fill',{value:'0'},true);s=await observe('limit input entered');
+  await gesture(s,'set global category limit',tid,'fill',{text:String(p.limit??0)},true);s=await observe('limit input entered');
   await gesture(s,'commit global category limit',tid,'press',{key:'Tab'},true);
  }
  s=await observe('CrossTable separator');
- if(s.node_crosstable.options.pedDisplayNameSeparator.value!=='|'){
+ if(s.node_crosstable.options.pedDisplayNameSeparator.value!==(p.separator??'|')){
   await gesture(s,'open separator choices',base+';CrossTabWizard;pedDisplayNameSeparator;ValueControl;trg_picker');s=await observe('separator choices shown');
-  await gesture(s,'select supported separator',base+';CrossTabWizard;pedDisplayNameSeparator;ValueControl;boundlist;|');
+  await gesture(s,'select supported separator',base+';CrossTabWizard;pedDisplayNameSeparator;ValueControl;boundlist;'+(p.separator??'|'));
  }
  // Replace roles completely, then order them after native auto-insertion.
  // Native deletion retains the other records' Order. Remove each role from
@@ -124,11 +124,11 @@ export async function configureCrossTable(channel,p,{inputMapping}){
  const ct=base+';ColumnEditDialog;';
  for(const column of plan.columns){
  await openEditor(column,'ColumnEditDialog');
- if(dialogValue(s,ct+'fldSlidingUniqueValuesMinCount').value!==0){
-  await gesture(s,'reset reserved category count',ct+'fldSlidingUniqueValuesMinCount','fill',{value:'0'},true);s=await observe('reserved count entered');
+ if(dialogValue(s,ct+'fldSlidingUniqueValuesMinCount').value!==(p.min_values??0)){
+  await gesture(s,'reset reserved category count',ct+'fldSlidingUniqueValuesMinCount','fill',{text:String(p.min_values??0)},true);s=await observe('reserved count entered');
   await gesture(s,'commit reserved count',ct+'fldSlidingUniqueValuesMinCount','press',{key:'Tab'},true);s=await observe('reserved count committed');
  }
- need(dialogValue(s,ct+'fldSlidingUniqueValuesMinCount').value===0,'reserved count differs');
+ need(dialogValue(s,ct+'fldSlidingUniqueValuesMinCount').value===(p.min_values??0),'reserved count differs');
  await gesture(s,'apply column minimum',ct+'btnApply');s=await observe('column minimum applied');
  }
  await setBoolean('pedSlidingUniqueValues',false);
@@ -155,7 +155,7 @@ export async function configureCrossTable(channel,p,{inputMapping}){
  const after=(await observe('final owned CrossTable configuration')).node_crosstable,c=crossTableConfiguration(after,inputMapping);
  need(same(c.row_keys.map(f=>f.name),plan.keys.map(f=>f.name))&&same(c.columns.map(f=>f.name),plan.columns.map(f=>f.name))
   &&same(c.facts.map(f=>({name:f.name,functions:f.functions})),plan.facts.map(f=>({name:f.name,functions:Object.keys(CROSSTABLE_FUNCTIONS).filter(fn=>f.functions.includes(fn))})))
-  &&c.category_mode===p.category_mode,'final configuration differs');
+  &&c.category_mode===p.category_mode&&c.options.separator===(p.separator??'|')&&c.options.unique_names===(p.unique_names??false)&&c.options.limit===(p.limit??0)&&c.columns.every(f=>f.min_values===(p.min_values??0)),'final configuration differs');
  const identity=xs=>xs.map(f=>({index:f.index,record_id:f.record_id,name:f.name,label:f.label,type:f.type,data_kind:f.data_kind}));
  need(same(identity(c.input_fields),identity(fields)),'input identity changed');
  return {verified:true,cleanup_complete:true,effect_possible:true,configuration:c,preservation:{input_identity:true}};

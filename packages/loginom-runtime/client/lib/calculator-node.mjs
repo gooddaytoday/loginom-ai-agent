@@ -201,7 +201,41 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     // CrossTable generates its output only on Execute. This internal hook is
     // restricted to that component; all existing handlers keep strict mappings.
     if(implementation?.type==='transform.cross_table'&&implementation.materializedSchema){
-     requireValue(mappings.length===0,'CrossTable does not permit output mapping overrides');
+     if(mappings.length){
+      requireValue(operation.nodeApply.request.finish==='execute','CrossTable output edits require fresh execution');
+      const firstFinish=await finishConfiguredGraph(channel,executionDriver,'execute',ctx.node);
+      const firstExecution=await executionDriver.waitCompleted();
+      requireValue(firstExecution.verified===true&&firstExecution.owner_verified===true,'Owned initial materialization required');
+      await channel.openOutputPort(0);
+      const {showMissingValuesMappingTable}=await import('./missing-values-output.mjs');
+      await showMissingValuesMappingTable(channel);
+      let s=await channel.observe({condition:'owned materialized CrossTable output',readMappings:true,
+       ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true&&s.node_mapping.source_identity_verified===true});
+      const sources=s.node_mapping.source_fields.map(f=>({...f,used:true}));
+      requireValue(sources.every(f=>f.required===true),'CrossTable required source inventory changed');
+      implementation.materializedSchema(sources.map((f,index)=>({...f,index})),configured,{node:ctx.node,execution:firstExecution});
+      const requested=mappings[0],changes=[];
+      resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
+      if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
+      if(requested.fields||requested.changes)changes.push(await configureOutputFields(channel,requested,sources));
+      s=await channel.observe({condition:'CrossTable output edits before order',readMappings:true,ready:s=>s.node_mapping?.verified===true});
+      const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
+      if(resolved.fields)changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
+      s=await channel.observe({condition:'CrossTable output mapping readback',readMappings:true,ready:s=>s.node_mapping?.verified===true});
+      mapping=s.node_mapping;
+      requireValue(mapping.target_fields.length===sources.length&&mapping.target_fields.every(f=>!f.excluded&&f.source),
+       'CrossTable cannot omit mandatory output sources');
+      const definition=await readOutputDefinitionPages(channel,{expectedCount:mapping.target_fields.length});
+      requireValue(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===mapping.target_fields[i][k])),
+       'CrossTable mapping rendered definition differs');
+      const finish=await finishWizard('done',true,definition);
+      configured={...configured,output_mapping:mapping};
+      // The final Execute gets a new baseline. Both executions consume this
+      // operation's original deadline; neither is an unknown-effect retry.
+      executionDriver=createNodeExecutionProcedure(channel,ctx.node);await executionDriver.prepare();
+      return verified({effect_possible:true,node_context:configured.node_context,native_mapping:mapping,definition,changes,finish,
+       initial_materialization:{finish:firstFinish,execution:firstExecution},source_identity_verified:true});
+     }
      return verified({deferred_schema:true,node_context:configured.node_context,
       scope:'schema_not_materialized_before_execution',settings_applied:false});
     }

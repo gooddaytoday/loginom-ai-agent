@@ -34,10 +34,10 @@ export const crossTableParametersSchema={...object({
  category_mode:{...choice('fixed','sliding'),description:'fixed captures initial categories; sliding regenerates categories on each fresh execution.'},
  include_null:{...boolean,description:'Required for fixed: create a separate missing-category group; omit for sliding.'},
  include_other:{...boolean,description:'Required for fixed: new categories enter Other; omit for sliding.'},
- min_values:{const:0,description:'Reserved category count; stage one supports zero only.'},limit:{const:0,description:'No truncation: category limit is zero only.'},
- separator:{const:'|',description:'Category/fact/function label separator; stage one supports | only.'},
- unique_names:{const:false,description:'Use native positional C_n fact/function names; identify categories by their observed labels.'}
-},[]),description:'New CrossTable requires row_keys, column or columns, facts and category_mode. fixed also requires explicit include_null/include_other. Existing parameters={} preserves supported settings; refresh output with dock_node_read instead. Variables, explicit category lists, nonzero limits and mapping overrides are unsupported.'};
+ min_values:{...integer(0,1000),description:'Minimum category slots per column dimension, including empty reserved slots; independent of limit.'},limit:{...integer(0,1000),description:'Maximum category values; zero is unlimited. A positive limit can truncate reserved slots.'},
+ separator:{...choice('|','.','_','-',' '),description:'Native category/fact/function label separator; labels preserve meaningful whitespace.'},
+ unique_names:{...boolean,description:'Use native category-derived names with transliteration and collision suffixes. Read observed names; never guess them.'}
+},[]),description:'New CrossTable requires row_keys, column or columns, facts and category_mode. fixed also requires explicit include_null/include_other. Existing parameters={} preserves supported settings; refresh output with dock_node_read instead. Explicit category lists are unsupported. Output mappings require execute and exact configured_field names: rename, label, order and autosync are supported; own output fields are mandatory. Exclusion requires a separate downstream Field Parameters node.'};
 export const groupingFieldSchema=object({kind:choice('input_field'),name:fieldName});
 export const groupingMeasureSchema=object({field:groupingFieldSchema,function:choice('sum','count','avg','min','max'),name:fieldName,label:text(120)});
 export const groupingParametersSchema=object({group_by:array(groupingFieldSchema,128,1),measures:array(groupingMeasureSchema,256,1)},[]);

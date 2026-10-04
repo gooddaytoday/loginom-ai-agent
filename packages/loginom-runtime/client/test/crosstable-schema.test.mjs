@@ -20,7 +20,7 @@ test('sliding identities follow observed category labels, including a same-width
 test('complete row and fact identities survive ordering while ambiguous/truncated groups refuse',()=>{
  const good=fields(['A','B']);
  for(const mutate of [xs=>xs.pop(),xs=>xs.push({...xs[1],index:5}),xs=>xs[1].label='A|Amount',
-  xs=>xs[1].label='|Amount|Сумма',xs=>xs[1].label='A|Wrong|Сумма',xs=>xs[1].type='integer',
+xs=>xs[1].label='A|Wrong|Сумма',xs=>xs[1].type='integer',
   xs=>xs[1].name='C_1_Amount_Min',xs=>xs[0].label='Wrong',xs=>xs[0].type='integer',
   xs=>xs[3].label='A|Amount|Сумма',xs=>xs[1].index=2]){
   const copy=structuredClone(good);mutate(copy);assert.throws(()=>resolveCrossTableSchema(copy,configuration));
@@ -67,7 +67,7 @@ test('native single result omits redundant fact/function while type identity rem
   {index:1,name:'C_1',label:'A',type:'integer'}];
  const p=resolveCrossTableSchema(xs,c).category_fields[0];
  assert.equal(p.function,'count');assert.equal(p.fact,'Amount');assert.equal(p.category,'A');
- for(const patch of [{type:'real'},{name:'C_1_Amount_Sum'},{label:'A|Сумма'}])
+ for(const patch of [{type:'real'},{name:'C_1_Amount_Sum'},{label:'A|Количество',name:'C_1_CountWrong'}])
   assert.throws(()=>resolveCrossTableSchema([xs[0],{...xs[1],...patch}],c));
 });
 test('native scalar aggregate result types distinguish counts, DateTime mean and day StdDev',()=>{
@@ -108,4 +108,20 @@ test('observed configurations without columns or any dimensions retain explicit 
   assert.equal(fields[0].function,'sum');assert.deepEqual(fields[0].categories,[]);
   assert.throws(()=>resolveCrossTableSchema([...xs.slice(0,-1),{...xs.at(-1),name:'C_1'}],c));
  }
+});
+
+test('single category preserves separator characters, empty text, spaces and native collision identities',()=>{
+ const c={...configuration,options:{separator:'.',unique_names:true,limit:0,min_values:0}};
+ const captions=['',' ','A.B','Привет','Privet'];
+ const roots=['','_','A_B','Privet','Privet'];
+ const xs=[{index:0,name:'Region',label:'Region',type:'string'},...captions.flatMap((v,i)=>['sum','min'].map(fn=>({
+  name:roots[i]+(roots[i]?'_':'')+'Amount_'+(fn==='sum'?'Sum':'Min')+(i===4?'_1':''),label:v+'.Amount.'+(fn==='sum'?'Сумма':'Минимум'),type:'real'
+ }))).map((f,i)=>({...f,index:i+1}))];
+ const r=resolveCrossTableSchema(xs,c);assert.deepEqual(r.category_fields.map(f=>f.category),captions.flatMap(v=>[v,v]));
+ const wrong=structuredClone(xs);wrong[1].type='integer';assert.throws(()=>resolveCrossTableSchema(wrong,c));
+});
+test('reserved captions carry uncertainty rather than claiming an observed source category',()=>{
+ const c={...configuration,options:{...configuration.options,min_values:4,limit:1}};
+ const r=resolveCrossTableSchema(fields(['3']),c);
+ assert.equal(r.category_fields[0].reserved_possible,true);assert.equal(r.category_fields[0].category_identity_source,'observed_caption');
 });

@@ -3,9 +3,30 @@ const need=(v,m)=>{if(!v)throw Error('CrossTable schema: '+m);};
 import {CROSSTABLE_FUNCTIONS,CROSSTABLE_TYPE_MASKS,crossTableResultType} from './crosstable-parameters.mjs';
 const suffixes={sum:'Sum',count:'Count',min:'Min',max:'Max',avg:'Avg',stddev:'StdDev',sum_squares:'SumSq',unique_count:'UniqueCount',null_count:'NullCount',first:'First',last:'Last'};
 export function resolveCrossTableSchema(columns,configuration){
+ if(configuration?.output_mapping){
+  const m=configuration.output_mapping;
+  need(m.verified===true&&m.inventory_complete===true&&m.source_identity_verified===true&&m.node_context?.output_port?.port===0,
+   'verified owned output mapping required');
+  const own=configuration.node_context??configuration.node;
+  need(own&&['document_id','workflow_id','node_id'].every(k=>m.node_context[k]===own[k]),'foreign mapped output owner');
+  const sources=m.source_fields,targets=m.target_fields;
+  need(Array.isArray(sources)&&sources.every(f=>f.required===true)&&Array.isArray(targets)&&sources.length===targets.length&&columns.length===targets.length,
+   'complete required output inventory');
+  const ids=new Set();
+  for(const [i,t] of targets.entries()){
+   need(!t.excluded&&t.source&&sources.filter(s=>s.record_id===t.source.record_id&&s.name===t.source.name&&s.label===t.source.label&&s.type===t.source.type).length===1,
+    'output source identity differs');
+   need(!ids.has(t.source.record_id),'duplicate required output source');ids.add(t.source.record_id);
+   need(columns[i].index===i&&['name','label','type'].every(k=>columns[i][k]===t[k])&&t.type===t.source.type,'mapped output schema changed');
+  }
+  const canonical=resolveCrossTableSchema(sources.map((f,index)=>({...f,index})),{...configuration,output_mapping:undefined});
+  return {columns:columns.map(f=>({...f})),category_fields:canonical.category_fields.map(f=>{
+   const t=targets.find(t=>t.source.name===f.field);need(t,'required aggregate missing');return {...f,field:t.name,label:t.label};
+  })};
+ }
  need(configuration?.kind==='crosstable'&&['fixed','sliding'].includes(configuration.category_mode)
-  &&configuration.options?.separator==='|'&&configuration.options.unique_names===false
-  &&configuration.options.limit===0&&configuration.options.min_values===0,'verified supported configuration required');
+  &&['|','.','_','-',' '].includes(configuration.options?.separator)&&typeof configuration.options.unique_names==='boolean'
+  &&Number.isSafeInteger(configuration.options.limit)&&configuration.options.limit>=0&&Number.isSafeInteger(configuration.options.min_values)&&configuration.options.min_values>=0,'verified supported configuration required');
  const keys=configuration.row_keys,facts=configuration.facts,dimensions=configuration.columns??(configuration.column?[configuration.column]:[]);
  need(Array.isArray(keys)&&Array.isArray(facts)&&facts.length>0&&Array.isArray(dimensions),'complete roles required');
  need(columns.length>=keys.length&&columns.length<=1000&&new Set(columns.map(f=>f.name)).size===columns.length,'complete unique columns required');
@@ -17,7 +38,7 @@ export function resolveCrossTableSchema(columns,configuration){
  }
  const expected=facts.flatMap(f=>f.functions.map(fn=>{
   need(CROSSTABLE_FUNCTIONS[fn]&&CROSSTABLE_TYPE_MASKS[f.type]
-   &&(CROSSTABLE_TYPE_MASKS[f.type]&CROSSTABLE_FUNCTIONS[fn].bit)!==0&&f.label&&!f.label.includes('|'),'unsupported fact/function');
+   &&(CROSSTABLE_TYPE_MASKS[f.type]&CROSSTABLE_FUNCTIONS[fn].bit)!==0&&f.label&&!f.label.includes(configuration.options.separator),'unsupported fact/function');
   return {field:f.name,label:f.label,function:fn,type:crossTableResultType(f.type,fn)};
  }));
  need(new Set(expected.map(f=>f.field+':'+f.function)).size===expected.length,'duplicate fact/function');
@@ -25,17 +46,29 @@ export function resolveCrossTableSchema(columns,configuration){
  for(const [index,c] of columns.entries()){
   need(c.index===index&&typeof c.name==='string'&&typeof c.label==='string'&&c.label.length>0,'invalid column identity');
   if(keyNames.has(c.name))continue;
-  const parts=c.label.split('|');
-  const labelParts=parts.length-dimensions.length,showFact=multipleFacts||labelParts===2,showFunction=multipleFunctions||labelParts===2;
-  need(labelParts===(showFact?1:0)+(showFunction?1:0),'missing or redundant fact/function identity');
-  need(parts.length===dimensions.length+labelParts&&parts.every(p=>p.length>0),'empty or ambiguous category label');
-  const captions=parts.slice(0,dimensions.length),factLabel=showFact?parts[dimensions.length]:facts[0].label,
-   functionLabel=showFunction?parts.at(-1):null;
-  const matches=expected.filter(f=>f.label===factLabel&&(!showFunction||CROSSTABLE_FUNCTIONS[f.function].label===functionLabel)&&f.type===c.type);
-  need(matches.length===1,'fact/function/type changed: '+c.label);const f=matches[0];
-  const categoryPrefix=dimensions.length?'C_[1-9][0-9]*':'';
-  const technical=[categoryPrefix,...(showFact?[f.field]:[]),...(showFunction?[suffixes[f.function]]:[])].filter(Boolean).join('_');
-  need(new RegExp('^'+technical+'$').test(c.name),'unconfirmed technical field: '+c.name);
+  // Match the known aggregate suffix from the right. A single category can
+  // contain the separator, empty text or leading spaces; none is UI padding.
+  const separator=configuration.options.separator,candidates=[];
+  for(const showFact of [false,true])for(const showFunction of [false,true]){
+   if(multipleFacts&&!showFact||multipleFunctions&&!showFunction)continue;
+   if(configuration.options.unique_names&&(showFact!==(multipleFacts||multipleFunctions||dimensions.length===0)||showFunction!==(multipleFunctions||multipleFacts||dimensions.length===0)))continue;
+   for(const f of expected){
+    const tail=[...(showFact?[f.label]:[]),...(showFunction?[CROSSTABLE_FUNCTIONS[f.function].label]:[])].join(separator);
+    let prefix;
+    if(dimensions.length){if(tail){if(!c.label.endsWith(separator+tail))continue;prefix=c.label.slice(0,-(separator+tail).length);}else prefix=c.label;}
+    else {if(c.label!==tail)continue;prefix='';}
+    const captions=dimensions.length===1?[prefix]:dimensions.length?prefix.split(separator):[];
+    if(captions.length!==dimensions.length)continue;
+    const categoryPrefix=dimensions.length?(configuration.options.unique_names?'[A-Za-z_][A-Za-z0-9_]*':'C_[1-9][0-9]*'):'';
+    const technical=[categoryPrefix,...(showFact?[f.field]:[]),...(showFunction?[suffixes[f.function]]:[])].filter(Boolean).join('_');
+    const collision=configuration.options.unique_names?'(?:_[1-9][0-9]*)?':'';
+    const emptyPrefix=configuration.options.unique_names&&dimensions.length===1&&captions[0]===''
+     ?'|'+[...(showFact?[f.field]:[]),...(showFunction?[suffixes[f.function]]:[])].join('_'):'';
+    if(f.type===c.type&&new RegExp('^(?:'+technical+emptyPrefix+')'+collision+'$').test(c.name))candidates.push({f,captions});
+   }
+  }
+  need(candidates.length===1,'ambiguous category/fact/function/type or technical identity: '+c.label);
+  const {f,captions}=candidates[0];
   const kinds=captions.map(category=>category==='<...>'?'null':category==='<Прочее>'?'other':'value');
   need(kinds.every(kind=>kind!=='other'||configuration.category_mode==='fixed'&&configuration.options.include_other===true),'unexpected Other category');
   need(kinds.every(kind=>kind!=='null'||configuration.category_mode==='sliding'||configuration.options.include_null===true),'unexpected NULL category');
@@ -43,7 +76,7 @@ export function resolveCrossTableSchema(columns,configuration){
   const identity=JSON.stringify([categoryValues,f.field,f.function]);need(!identities.has(identity),'duplicate category/fact/function');identities.add(identity);
   const categoryPairs=categories.get(group)??[];categoryPairs.push(f.field+':'+f.function);categories.set(group,categoryPairs);
   const special=dimensions.length===1?kinds[0]:kinds.includes('other')?'other':kinds.includes('null')?'null':'value';
-  pairs.push({category:dimensions.length===1?categoryValues[0]:captions.join('|'),category_kind:special,fact:f.field,function:f.function,field:c.name,label:c.label,type:c.type,
+  pairs.push({...(configuration.options.min_values>0?{reserved_possible:true,category_identity_source:'observed_caption'}:{}),category:dimensions.length===1?categoryValues[0]:captions.join(configuration.options.separator),category_kind:special,fact:f.field,function:f.function,field:c.name,label:c.label,type:c.type,
    ...(dimensions.length!==1?{categories:dimensions.map((d,i)=>({dimension:d.name,caption:captions[i],kind:kinds[i],value:categoryValues[i]}))}:{})});
  }
  const full=expected.map(f=>f.field+':'+f.function).sort();

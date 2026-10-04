@@ -133,14 +133,18 @@ const duplicatesConfigurationReadback=object({kind:values('duplicates'),scope:va
  input_mapping:object({port:{type:'integer',const:0},fields:boundedFields(object({name:str,source_name:str}))}),
  output_mapping:object({port:{type:'integer',const:0},fields:boundedFields(object({name:str,label:str,type:str,source_name:str}))}),
  package_persistence_verified:{type:'boolean',const:false}});
-const crossTableCategoryField=object({category:nullable(str),category_kind:values('null','other','value'),fact:str,function:values('sum','count','min','max','avg','stddev','sum_squares','unique_count','null_count','first','last'),field:str,label:str,type:str,categories:array(object({dimension:str,caption:str,kind:values('null','other','value'),value:nullable(str)}))},['category','category_kind','fact','function','field','label','type']);
+const crossTableCategoryField=object({category:nullable(str),category_kind:values('null','other','value'),fact:str,function:values('sum','count','min','max','avg','stddev','sum_squares','unique_count','null_count','first','last'),field:str,label:str,type:str,categories:array(object({dimension:str,caption:str,kind:values('null','other','value'),value:nullable(str)})),reserved_possible:bool,category_identity_source:values('observed_caption')},['category','category_kind','fact','function','field','label','type']);
 const crossTableConfigurationReadback=object({kind:values('crosstable'),scope:values('observed_before_verified_finish'),values_are:values('observed_ui_values'),node:ref,
  receipt_ids:{...array(str),minItems:5,maxItems:7},mode:values('pivot'),category_mode:values('fixed','sliding'),
  row_keys:{...array(object({name:str,label:str,type:str,order:integer})),maxItems:128},column:nullable(object({name:str,label:str,type:str})),columns:{...array(object({name:str,label:str,type:str,order:integer})),maxItems:128},
  facts:{...array(object({name:str,label:str,type:values('integer','real','string','boolean','datetime','variant'),order:integer,functions:{...array(values('sum','count','min','max','avg','stddev','sum_squares','unique_count','null_count','first','last')),minItems:1,maxItems:11}})),minItems:1,maxItems:128},
- options:object({separator:{const:'|'},unique_names:{const:false},limit:{const:0},min_values:{const:0},include_null:bool,include_other:bool}),
+ options:object({separator:values('|','.','_','-',' '),unique_names:bool,limit:integer,min_values:integer,min_values_by_dimension:array(object({field:str,value:integer})),include_null:bool,include_other:bool},['separator','unique_names','limit','min_values','include_null','include_other']),
+ output_mapping:object({verified:{const:true},inventory_complete:{const:true},source_identity_verified:{const:true},autosync:bool,
+  node_context:object({...ref.properties,verified:{const:true},output_port:object({port:{const:0}})}),
+  source_fields:array(object({record_id:str,name:str,label:str,type:str,required:bool})),
+  target_fields:array(object({index:integer,name:str,label:str,type:str,excluded:bool,source:object({record_id:str,name:str,label:str,type:str})}))}),
  output_scope:values('not_materialized','observed_after_verified_execution'),execution_id:nullable(str),category_fields:array(crossTableCategoryField),
- package_persistence_verified:{const:false}});
+ package_persistence_verified:{const:false}},['kind','scope','values_are','node','receipt_ids','mode','category_mode','row_keys','column','columns','facts','options','output_scope','execution_id','category_fields','package_persistence_verified']);
 const configurationReadback={anyOf:[crossTableConfigurationReadback,exportConfigurationReadback,collapseConfigurationReadback,missingValuesConfigurationReadback,dateTimeConfigurationReadback,replacementConfigurationReadback,importConfigurationReadback,calculatorConfigurationReadback,groupingConfigurationReadback,sortingConfigurationReadback,reformConfigurationReadback,filterConfigurationReadback,joinConfigurationReadback,unionConfigurationReadback,duplicatesConfigurationReadback]};
 export const nodeApplyResultSchema=object({operation_id:str,status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),
  effect_possible:bool,phases:array(receipt),node:nullable(ref),execution,output,

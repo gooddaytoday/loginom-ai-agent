@@ -10,7 +10,8 @@ test('numeric pivot supports both modes and rejects unimplemented features befor
  assert.equal(validateCrossTableParameters(p,'pivot',r),p);assert.equal(resolveCrossTableParameters(p,fields).column.name,'Category');
  const sliding={...p,category_mode:'sliding'};delete sliding.include_null;delete sliding.include_other;
  assert.equal(validateCrossTableParameters(sliding,'pivot',r),sliding);
- for(const patch of [{limit:1},{min_values:1},{unique_names:true},{separator:'.'},{categories:['A']},{variables:{}},
+ assert.doesNotThrow(()=>validateCrossTableParameters({...sliding,min_values:4,limit:1,unique_names:true,separator:'.'},'pivot',r));
+ for(const patch of [{limit:-1},{min_values:1.5},{unique_names:'true'},{separator:'bad'},{categories:['A']},{variables:{}},
   {row_keys:[field('Region'),field('Region')]},{category_mode:'sliding'},
   {facts:[{field:field('Amount'),functions:['median']}]},{facts:[{field:field('Amount'),functions:['sum','sum']}]},
   {columns:[field('Category')]},{columns:'Category',column:undefined}])
@@ -58,4 +59,12 @@ test('native Index binds to the verified input mapping, never to a display name 
   m=>m.target_fields[0].excluded=true,m=>m.target_fields[0].type='integer',m=>m.target_fields[0].data_kind='Непрерывный']){
   const m=structuredClone(mapping);mutate(m);assert.throws(()=>bindCrossTableInput(native,m));
  }
+});
+
+test('own mandatory output exclusion refuses before drivers while downstream remains separate',()=>{
+ const mapping={direction:'output',port:0,fields:[{source:{kind:'configured_field',name:'C_1_Amount_Sum'},excluded:true}]};
+ assert.throws(()=>validateCrossTableParameters(p,'pivot',{...r,finish:'execute',mappings:[mapping]}),/required/);
+ mapping.fields[0].excluded=false;
+ assert.doesNotThrow(()=>validateCrossTableParameters(p,'pivot',{...r,finish:'execute',mappings:[mapping]}));
+ assert.throws(()=>validateCrossTableParameters(p,'pivot',{...r,finish:'done',mappings:[mapping]}),/fresh materialization/);
 });

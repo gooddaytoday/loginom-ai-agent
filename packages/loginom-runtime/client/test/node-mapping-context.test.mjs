@@ -184,3 +184,12 @@ test('standalone dataset output schema retains effective data kinds and rejects 
  const f=fixture({socket:true});f.target[0].data.DataKind=1;const r=f.read();assert.equal(r.verified,true,r.reason);assert.equal(r.mapping_wizard,'DataSetOutputSocketWizard');assert.deepEqual(Array.from(r.target_fields,f=>f.data_kind),['Непрерывный','Дискретный']);
  f.target[0].data.DataKind=99;assert.equal(f.read().verified,false);
 });
+
+test('native mapping preserves meaningful leading/trailing label whitespace and rejects trimmed renderings',()=>{
+ const f=fixture();const label=' .Amount.Сумма ';
+ f.source[0].data.DisplayName=label;f.target[0].data.DisplayName=label;f.target[0].data.SourceDisplayName=label;
+ for(const e of f.all.filter(e=>e.parent===f.rows[0]&&e.tid&&!e.tid.includes(';colName_')))e.textContent=label;
+ assert.equal(f.read().verified,true);assert.equal(f.read().target_fields[0].label,label);
+ f.all.find(e=>e.tid===f.base+'colDisplayName_Out0').textContent=label.trim();
+ assert.equal(f.read().verified,false);
+});
