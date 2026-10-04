@@ -1,9 +1,13 @@
 const need=(v,m)=>{if(!v)throw Error('PREPARED_SOURCE:'+m);};
-export function verifyPreparedSourceGraph(graph,prepared,account,fixture){
+export function verifyPreparedSourceGraph(graph,prepared,account,fixture,inactiveSystemNodes=[]){
  need(prepared.status==='READY'&&prepared.package_ref?.path==='/'+account+'/'+fixture.package_basename,'own package required');
  need(graph.complete===true&&graph.document_id===prepared.document_id
   &&graph.workflow_ref?.workflow_id===prepared.workflow_ref.workflow_id
-  &&graph.nodes?.length===2&&graph.foreign_links?.length===0&&graph.links?.length===1,'complete two-node graph required');
+  &&graph.foreign_links?.length===0&&graph.links?.length===1,'complete source graph required');
+ const system=graph.nodes.filter(n=>n.type==='bg-vendor-icon-modelvariables');
+ need(system.length<=1&&graph.nodes.length===2+system.length
+  &&inactiveSystemNodes.length===system.length&&system.every(n=>inactiveSystemNodes.some(p=>p.node_id===n.ref.node_id&&p.status===0&&p.running===false)
+   &&n.ref.document_id===prepared.document_id&&n.ref.workflow_id===prepared.workflow_ref.workflow_id),'only verified inactive system node allowed');
  const input=graph.nodes.filter(n=>n.type==='imports.text'),collapse=graph.nodes.filter(n=>n.type==='transform.collapse_columns');
  need(input.length===1&&collapse.length===1&&input[0].label==='VariantInput'&&collapse[0].label==='VariantSource','source identities differ');
  const nodes=[input[0],collapse[0]];
@@ -11,6 +15,14 @@ export function verifyPreparedSourceGraph(graph,prepared,account,fixture){
   &&nodes[0].ref.node_id!==nodes[1].ref.node_id,'source owner differs');
  const edge=graph.links[0];need(edge.source===nodes[0].ref.node_id&&edge.target===nodes[1].ref.node_id&&edge.input===0&&edge.output===0,'source link differs');
  return nodes.map(n=>n.ref);
+}
+export async function observeInactiveSystemNodes(execute,graph){
+ const ids=graph.nodes.map(n=>n.ref.node_id);
+ return execute(`async page=>page.evaluate(ids=>{
+  const nodes=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FNodes.FCollection;
+  if(!Array.isArray(nodes)||nodes.length!==ids.length||nodes.some(n=>!ids.includes(n.FGuid)))throw Error('SOURCE_NATIVE_GRAPH_CHANGED');
+  return nodes.filter(n=>n.FIconCls==='bg-vendor-icon-modelvariables').map(n=>({node_id:n.FGuid,status:n.FStatus,running:n.FRunning}));
+ },${JSON.stringify(ids)})`);
 }
 export function verifyPreparedSourceSettings(sources,nodes,fixture){
  need(sources.imports.length===1&&sources.collapses.length===1&&sources.crossTables.length===0,'source inventory differs');

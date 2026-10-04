@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import {randomUUID,createHash} from 'node:crypto';
 import {writePrivateJson} from './private-json.mjs';
-import {verifyPreparedSourceGraph,verifyPreparedSourceSettings} from './prepared-source-proof.mjs';
+import {verifyPreparedSourceGraph,verifyPreparedSourceSettings,observeInactiveSystemNodes} from './prepared-source-proof.mjs';
 import {observeStaticSources,verifyStaticSourceBytes} from './static-source-proof.mjs';
 process.umask(0o077);
 const [root,dir]=process.argv.slice(2),load=n=>import(pathToFileURL(root+'/runtime/'+n).href);
@@ -40,7 +40,7 @@ try {
   const {createNodeProcedure}=await load('client/lib/node-procedure.mjs');
   const adapter=createNodeTargetBrowserAdapter({execute,origin:runtimeConfig.targetOrigin,build:'7.4.2'});
   let graph=await adapter.observe({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},Date.now()+30000);
-  const nodes=verifyPreparedSourceGraph(graph,prepared,config.username,fixture);
+  const nodes=verifyPreparedSourceGraph(graph,prepared,config.username,fixture,await observeInactiveSystemNodes(execute,graph));
   let sequence=0;
   const channelFor=(node,id)=>createNodeProcedure({operation:{id:id+'-'+(++sequence),action:{action_key:'acceptance.source_verification',revision:'1'},deadline:Date.now()+540000},execute,record,...runtimeConfig,maxSteps:4096,
    preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},
@@ -51,7 +51,7 @@ try {
   const returned=await adapter.activateWorkflow({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},{deadline:Date.now()+30000,receipt_id:'verified-source-return'});
   need(returned.status==='SUCCEEDED'&&returned.verified&&returned.cleanup_complete,'source return unconfirmed');
   graph=await adapter.observe({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},Date.now()+30000);
-  need(JSON.stringify(verifyPreparedSourceGraph(graph,prepared,config.username,fixture))===JSON.stringify(nodes),'source graph changed');
+  need(JSON.stringify(verifyPreparedSourceGraph(graph,prepared,config.username,fixture,await observeInactiveSystemNodes(execute,graph)))===JSON.stringify(nodes),'source graph changed');
   const after=await observeStaticSources({load,graph,channelFor,account:config.username});
   const settings=verifyPreparedSourceSettings(after,nodes,fixture);
   need(JSON.stringify(beforeSettings)===JSON.stringify(settings),'source settings changed');

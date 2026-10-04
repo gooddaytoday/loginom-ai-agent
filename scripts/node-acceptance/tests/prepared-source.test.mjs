@@ -23,6 +23,9 @@ test('existing source must have exactly the owned two-node graph and fixture rol
  const nodes=verifyPreparedSourceGraph(graph,prepared,'worker',fixture);
  for(const mutate of [g=>g.complete=false,g=>g.nodes.push({...g.nodes[0]}),g=>g.nodes[1].type='transform.cross_table',g=>g.nodes[0].label='unknown',g=>g.nodes[0].ref.document_id='foreign',g=>g.links[0].output=1,g=>g.links[0].source='foreign',g=>g.foreign_links.push('foreign')]){const bad=structuredClone(graph);mutate(bad);assert.throws(()=>verifyPreparedSourceGraph(bad,prepared,'worker',fixture));}
  assert.throws(()=>verifyPreparedSourceGraph(graph,prepared,'reviewer',fixture));
+ const withSystem=structuredClone(graph);withSystem.nodes.push({type:'bg-vendor-icon-modelvariables',ref:ref('system')});
+ verifyPreparedSourceGraph(withSystem,prepared,'worker',fixture,[{node_id:'system',status:0,running:false}]);
+ for(const proof of [[],[{node_id:'foreign',status:0,running:false}],[{node_id:'system',status:1,running:false}],[{node_id:'system',status:0,running:true}]])assert.throws(()=>verifyPreparedSourceGraph(withSystem,prepared,'worker',fixture,proof));
  const sources={imports:[{node_id:'input',configuration:{output_mapping:{fields:fixture.file.columns}}}],collapses:[{node_id:'collapse',configuration:{information:[fixture.file.columns[0]],transposed:fixture.file.columns.slice(1),ignore_empty:false}}],crossTables:[]};
  verifyPreparedSourceSettings(sources,nodes,fixture);
  for(const mutate of [s=>s.imports[0].node_id='foreign',s=>s.collapses[0].configuration.ignore_empty=true,s=>s.collapses[0].configuration.transposed.reverse(),s=>s.crossTables.push({}),s=>s.imports[0].configuration.output_mapping.fields[0].type='real']){const bad=structuredClone(sources);mutate(bad);assert.throws(()=>verifyPreparedSourceSettings(bad,nodes,fixture));}
