@@ -1,5 +1,5 @@
 export const CROSSTABLE_FUNCTIONS=Object.freeze({sum:{bit:1,index:0,label:'Сумма'},count:{bit:2,index:1,label:'Количество'},min:{bit:4,index:2,label:'Минимум'},max:{bit:8,index:3,label:'Максимум'},avg:{bit:16,index:4,label:'Среднее'},stddev:{bit:32,index:5,label:'Стандартное откл.'},sum_squares:{bit:64,index:6,label:'Сумма квадратов'},unique_count:{bit:128,index:7,label:'Кол-во уникальных'},null_count:{bit:256,index:8,label:'Кол-во пропусков'},first:{bit:512,index:9,label:'Первый'},last:{bit:1024,index:10,label:'Последний'}});
-export const CROSSTABLE_TYPE_MASKS=Object.freeze({integer:2047,real:2047,string:1934,boolean:1934,datetime:1982});
+export const CROSSTABLE_TYPE_MASKS=Object.freeze({integer:2047,real:2047,string:1934,boolean:1934,datetime:1982,variant:1934});
 export const crossTableDimensions=p=>p.columns??(p.column?[p.column]:[]);
 export function crossTableResultType(type,fn){
  if(['count','unique_count','null_count'].includes(fn))return 'integer';
@@ -21,7 +21,7 @@ export function validateCrossTableParameters(p,mode,r){
   need(Array.isArray(p.facts)&&p.facts.length>0&&p.facts.length<=128,'typed facts required');
   for(const f of p.facts)need(f&&Object.keys(f).sort().join(',')==='field,functions'&&field(f.field)
    &&Array.isArray(f.functions)&&f.functions.length>0&&f.functions.length<=11
-   &&new Set(f.functions).size===f.functions.length&&f.functions.every(fn=>CROSSTABLE_FUNCTIONS[fn]),'facts require a unique supported aggregate set');
+   &&new Set(f.functions).size===f.functions.length&&f.functions.every(fn=>Object.hasOwn(CROSSTABLE_FUNCTIONS,fn)),'facts require a unique supported aggregate set');
   const names=[...p.row_keys.map(f=>f.name),...crossTableDimensions(p).map(f=>f.name),...p.facts.map(f=>f.field.name)];
   need(new Set(names.map(n=>n.toLowerCase())).size===names.length,'roles must use distinct input fields');
   need(['fixed','sliding'].includes(p.category_mode),'choose fixed or sliding category_mode');

@@ -11,6 +11,22 @@ test('legacy and outputs[] parse while mixed, empty and duplicate schemas refuse
  for(const patch of [{outputs:[]},{outputs:[report(10)],...report(10)},{outputs:[{...report(10),columns:[columns[0],columns[0]]}]},
   {outputs:[{...report(10),rows:[{Region:'North'}]}]}])assert.throws(()=>parseExpectedOutputs({...base,...patch}));
 });
+test('Variant oracle requires subtype and exact native proof, including NULL and DateTime bytes',()=>{
+ const columns=[{name:'Value',label:'Value',type:'variant'}];
+ const date={cell_type:'datetime',bytes_le:'00000000c079e640'};
+ const expected={output_node_type:'transform.cross_table',columns,rows:[{Value:date},{Value:null}]};
+ const data={schema:columns,row_count:2,sample_complete:true,precision:{numbers_verified:true},sample:[
+  [{type:'variant',cell_type:'datetime',is_null:false,value:date.bytes_le,precision:'exact_native',native:{tag:7,bytes_le:date.bytes_le,temporal_profile:'loginom-7.4.2-native-oadate',semantic_scope:'native_serial_only'}}],
+  [{type:'variant',cell_type:'null',is_null:true,value:null,precision:'exact_native',native:{tag:1}}]]};
+ const a={node:{node_id:'variant'},type:'transform.cross_table',data};
+ assert.equal(matchExpectedOutputs([a],[expected]).length,1);
+ for(const mutate of [d=>delete d.sample[0][0].cell_type,d=>delete d.sample[0][0].native,
+  d=>d.sample[0][0].native.bytes_le='0000000000000000',d=>d.sample[0][0].native.tag=8,
+  d=>d.sample[0][0].precision='display_only',d=>delete d.sample[1][0].native]){
+  const changed=structuredClone(a);mutate(changed.data);assert.throws(()=>matchExpectedOutputs([changed],[expected]));
+ }
+ assert.throws(()=>parseExpectedOutputs({package_path:'/own/p.lgp',nodes:[],outputs:[{...expected,rows:[{Value:'2026-01-01'}]}]}));
+});
 test('two outputs match by complete schema and values, regardless of labels or node order',()=>{
  const matches=matchExpectedOutputs([actual('dynamic',20),actual('fixed',10)],[report(10),report(20)]);
  assert.deepEqual(matches.map(m=>m.node.node_id),['fixed','dynamic']);

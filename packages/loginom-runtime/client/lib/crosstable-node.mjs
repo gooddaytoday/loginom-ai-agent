@@ -7,7 +7,7 @@ import {crossTableConfigurationReadback} from './crosstable-readback.mjs';
 import {crossTableParametersSchema} from './node-api.mjs';
 const need=(v,m)=>{if(!v)throw Error('CrossTable: '+m);};
 export function createCrossTableNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'transform.cross_table',mode:'pivot',revision:'crosstable-v2-internal-1',readback:crossTableConfigurationReadback,
+ nativeFullOutput:true,type:'transform.cross_table',mode:'pivot',revision:'crosstable-v2-internal-1',readback:crossTableConfigurationReadback,
  parameterSchema:crossTableParametersSchema,validate:validateCrossTableParameters,preflight:preflightCrossTableSource,
  configurationObservation:{condition:'owned CrossTable configuration',readCrossTable:true,ready:s=>s.wizard?.stage==='crosstable'&&s.node_crosstable?.verified===true},
  async configure(channel,p,context){

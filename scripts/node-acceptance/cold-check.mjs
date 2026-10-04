@@ -4,6 +4,7 @@ import { readFile, mkdir, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
+import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions} from './static-source-proof.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -76,7 +77,7 @@ const page = context.pages()[0]
 const execute = (code) => new Function("page", `return (${code})(page)`)(page)
 const state = { prepared: undefined, closed: false, cleanupAttempted: false }
 try {
-  const prepared = await execute(
+  let prepared = await execute(
     makeWorkspacePrepareCode({
       loginomUrl: page.url(),
       compatibility: { loginom_build: "7.4.2", platform: compatibilityPlatform, browser: "chromium" },
@@ -96,11 +97,34 @@ try {
 
   const origin = new URL(config.loginom_url).origin
   const adapter = createNodeTargetBrowserAdapter({ execute, origin, build: "7.4.2" })
-  const graph = await adapter.observe(
+  let graph = await adapter.observe(
     { document_id: prepared.document_id, workflow_ref: prepared.workflow_ref },
     Date.now() + 30_000,
   )
 
+  const channelFor=(node,id)=>createNodeProcedure({operation:{id,action:{action_key:'acceptance.cold_read',revision:'1'},deadline:Date.now()+540000},execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
+   preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,receipt)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:receipt.id,receipt_signature:receipt.signature,operation_id:receipt.id})});
+  let staticSources;
+  if(expected.static_sources){
+   const {createActionRuntime}=await load('client/lib/executor.mjs');
+   const catalog=JSON.parse(await readFile(join(root,'runtime/executor/catalog/actions.json'),'utf8'));
+   const selectors=JSON.parse(await readFile(join(root,'runtime/executor/catalog/selectors.json'),'utf8'));
+   const runtime=createActionRuntime({pinned:{actions:new Map(catalog.actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.selectors.map(s=>[s.symbol,s])),pins:{}},execute,onRecord:record,targetOrigin:origin,targetBuild:'7.4.2'});
+   const account=config.workflow_profile.loginom_user;
+   const before=await observeStaticSources({load,graph:{...graph,nodes:graph.nodes.filter(n=>n.type==='imports.text')},channelFor,account});
+   const verified=await verifyStaticSourceBytes({load,runtime,execute,sources:before,allowed:expected.static_sources,account,origin,output:args.output});
+   prepared=await execute(makeWorkspacePrepareCode({loginomUrl:config.loginom_url,compatibility:{loginom_build:'7.4.2',platform:compatibilityPlatform,browser:'chromium'},sessionId:session,operationId:'cold-return-from-files',intent:'open_package',packagePath:saved.path}));
+   state.prepared=prepared;
+   if(prepared.status!=='READY'||prepared.package_ref.path!==saved.path)throw Error('COLD_SOURCE_RETURN_UNCONFIRMED');
+   graph=await adapter.observe({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},Date.now()+30000);
+   staticSources=await observeStaticSources({load,graph,channelFor,account});
+   for(const source of staticSources.imports){
+    const old=before.imports.find(s=>s.node_id===source.node_id);
+    if(!old||JSON.stringify(old.configuration.source)!==JSON.stringify(source.configuration.source)||JSON.stringify(old.configuration.format)!==JSON.stringify(source.configuration.format)||JSON.stringify(old.configuration.output_mapping)!==JSON.stringify(source.configuration.output_mapping))throw Error('COLD_SOURCE_SETTINGS_CHANGED');
+    source.source=verified.get(source.configuration.source.source_path);
+    if(!source.source)throw Error('COLD_SOURCE_PROVENANCE_MISSING');
+   }
+  }
   for (const want of expected.nodes) {
     if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
@@ -108,7 +132,7 @@ try {
   const types=new Set(expectedOutputs.map(o=>o.output_node_type));
   const matches=graph.nodes.filter(n=>types.has(n.type)&& (multiple||!saved.node||n.ref.node_id===saved.node));
   if(matches.length!==expectedOutputs.length)throw Error("COLD_EXTRA_OR_MISSING_OUTPUT_NODE");
-  const actual=[];
+  const actual=[],ownedExecutions=[];
   for(const [outputIndex,target] of matches.entries()){
   const node=target.ref;
 
@@ -140,10 +164,40 @@ try {
   const execution = await driver.waitCompleted({})
   if (execution.status !== "completed" || !execution.verified || !execution.owner_verified)
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
+  ownedExecutions.push(execution);
 
+  const nativeConfiguration=staticSources?.crossTables.find(c=>c.node_id===node.node_id)?.configuration;
+  const useNative=nativeConfiguration&&expectedOutputs.some(o=>o.columns.length<=8);
+  let data;
+  if(useNative){
+   // Preview enforces the actual 50x8 bound; wide baseline reports retain their
+   // existing formatted scalar reader. No native fallback after a failed read.
+   const want=expectedOutputs.find(o=>o.columns.length<=8&&o.output_node_type===target.type&&o.columns.some(c=>c.type==='variant'));
+   const isVariant=nativeConfiguration.facts.some(f=>f.type==='variant');
+   const factWidth=nativeConfiguration.columns.length===0?nativeConfiguration.row_keys.length+nativeConfiguration.facts.reduce((n,f)=>n+f.functions.length,0):null;
+   if(isVariant||factWidth!==null&&factWidth<=8){
+    if(isVariant&&!want)throw Error('COLD_VARIANT_EXPECTATION_MISSING');
+    const {readCollapseNativeOutput}=await load('client/lib/collapse-native-output.mjs');
+    const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,execution,deadline:operation.deadline,receipt_id:operation.id};
+    const ancestors=new Set();let upstream=node.node_id;
+    for(let depth=0;depth<3;depth++){
+     const incoming=graph.links.filter(l=>l.target===upstream);
+     if(incoming.length!==1||incoming[0].input!==0||incoming[0].output!==0)throw Error('COLD_STATIC_TOPOLOGY_INVALID');
+     upstream=incoming[0].source;if(ancestors.has(upstream))throw Error('COLD_STATIC_CYCLE');ancestors.add(upstream);
+     if(staticSources.imports.some(s=>s.node_id===upstream))break;
+     if(depth!==0||!staticSources.collapses.some(s=>s.node_id===upstream))throw Error('COLD_STATIC_ANCESTOR_UNSUPPORTED');
+    }
+    const chain={imports:staticSources.imports.filter(s=>ancestors.has(s.node_id)),collapses:staticSources.collapses.filter(s=>ancestors.has(s.node_id))};
+    const coldStaticSources=await bindColdExecutions({execute,sources:chain,ctx,ownedExecutions});
+    const read=await readCollapseNativeOutput(channel,{sample_rows:50},ctx,{execute,operation,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>true,coldStaticSources},{targetOrigin:origin,targetBuild:'7.4.2'},nativeConfiguration);
+    if(!read.cleanup_complete)throw Error('COLD_NATIVE_CLEANUP_UNCONFIRMED');
+    data=read.ports[0];
+   }
+  }
+  if(!data){
   const opened = await openNewOutputTable(channel, 0)
   const precision = await configureTablePrecision(channel, opened.table)
-  const data = await (async () => {
+  data = await (async () => {
     try {
       const readSettings = await prepareTableRead(channel, opened.table)
       const raw = await readTableOutputPages(channel, opened.table, {
@@ -161,6 +215,7 @@ try {
     }
   })()
   await returnFromOutputTable(channel, opened.table)
+  }
 
   actual.push({node,type:target.type,execution,data});
   }

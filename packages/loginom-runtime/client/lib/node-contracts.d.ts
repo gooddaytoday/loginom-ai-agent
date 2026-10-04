@@ -276,7 +276,7 @@ export interface CrossTableConfigurationReadback {
  kind:'crosstable'; scope:'observed_before_verified_finish'; values_are:'observed_ui_values'; node:NodeRef;
  receipt_ids:string[]; mode:'pivot'; category_mode:'fixed'|'sliding';
  row_keys:{name:string;label:string;type:string;order:number}[]; column:{name:string;label:string;type:string}|null; columns:{name:string;label:string;type:string;order:number}[];
- facts:{name:string;label:string;type:'integer'|'real'|'string'|'boolean'|'datetime';order:number;functions:CrossTableFunction[]}[];
+ facts:{name:string;label:string;type:'integer'|'real'|'string'|'boolean'|'datetime'|'variant';order:number;functions:CrossTableFunction[]}[];
  options:{separator:'|';unique_names:false;limit:0;min_values:0;include_null:boolean;include_other:boolean};
  output_scope:'not_materialized'|'observed_after_verified_execution'; execution_id:string|null;
  category_fields:{category:string|null;category_kind:'null'|'other'|'value';fact:string;function:CrossTableFunction;field:string;label:string;type:string;categories?:{dimension:string;caption:string;kind:'null'|'other'|'value';value:string|null}[]}[];

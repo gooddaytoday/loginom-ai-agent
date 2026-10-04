@@ -66,8 +66,8 @@ export function validateNodeApplyRequest(request, handlers) {
   }
   object(request.read, ['ports','sample_rows','require_exact_numbers',...(Object.hasOwn(request.read??{},'coverage')?['coverage']:[])]);
   requireValue(request.read.coverage===undefined||['full','sample'].includes(request.read.coverage),'Invalid output coverage');
-  if(request.read.coverage==='full')requireValue(request.target.type==='transform.collapse_columns'&&request.finish==='execute'
-    &&JSON.stringify(request.read.ports)==='[0]','Invalid parameters.read.coverage: full requires executed Collapse output 0; other handlers support sample');
+  if(request.read.coverage==='full')requireValue(['transform.collapse_columns','transform.cross_table'].includes(request.target.type)&&request.finish==='execute'
+    &&JSON.stringify(request.read.ports)==='[0]','Invalid parameters.read.coverage: full requires executed Collapse or CrossTable output 0 with static provenance; other handlers support sample');
   requireValue(Array.isArray(request.read.ports) && request.read.ports.length <= 16
     && new Set(request.read.ports).size === request.read.ports.length
     && request.read.ports.every(p=>Number.isInteger(p) && p>=0 && p<100)

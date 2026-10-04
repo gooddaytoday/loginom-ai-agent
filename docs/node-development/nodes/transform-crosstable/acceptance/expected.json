@@ -5,6 +5,9 @@
       "type": "imports.text"
     },
     {
+      "type": "transform.collapse_columns"
+    },
+    {
       "type": "transform.cross_table"
     }
   ],
@@ -357,6 +360,868 @@
           "C_4_Amount_Max": 46.0,
           "C_4_Amount_Avg": 36.0,
           "C_4_Quantity_Sum": 8.0
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Amount_Sum",
+          "label": "Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "Amount_Count",
+          "label": "Amount|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "Amount_Min",
+          "label": "Amount|Минимум",
+          "type": "real"
+        },
+        {
+          "name": "Amount_Max",
+          "label": "Amount|Максимум",
+          "type": "real"
+        },
+        {
+          "name": "Amount_Avg",
+          "label": "Amount|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "Amount_StdDev",
+          "label": "Amount|Стандартное откл.",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "Amount_Sum": 9.0,
+          "Amount_Count": 4,
+          "Amount_Min": 1.0,
+          "Amount_Max": 5.0,
+          "Amount_Avg": 3.0,
+          "Amount_StdDev": 2.0
+        },
+        {
+          "Region": null,
+          "Amount_Sum": null,
+          "Amount_Count": 1,
+          "Amount_Min": null,
+          "Amount_Max": null,
+          "Amount_Avg": null,
+          "Amount_StdDev": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Amount_SumSq",
+          "label": "Amount|Сумма квадратов",
+          "type": "real"
+        },
+        {
+          "name": "Amount_UniqueCount",
+          "label": "Amount|Кол-во уникальных",
+          "type": "integer"
+        },
+        {
+          "name": "Amount_NullCount",
+          "label": "Amount|Кол-во пропусков",
+          "type": "integer"
+        },
+        {
+          "name": "Amount_First",
+          "label": "Amount|Первый",
+          "type": "real"
+        },
+        {
+          "name": "Amount_Last",
+          "label": "Amount|Последний",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "Amount_SumSq": 35.0,
+          "Amount_UniqueCount": 3,
+          "Amount_NullCount": 1,
+          "Amount_First": 1.0,
+          "Amount_Last": null
+        },
+        {
+          "Region": null,
+          "Amount_SumSq": null,
+          "Amount_UniqueCount": 0,
+          "Amount_NullCount": 1,
+          "Amount_First": null,
+          "Amount_Last": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Units_Sum",
+          "label": "Units|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "Units_Count",
+          "label": "Units|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "Units_Min",
+          "label": "Units|Минимум",
+          "type": "integer"
+        },
+        {
+          "name": "Units_Max",
+          "label": "Units|Максимум",
+          "type": "integer"
+        },
+        {
+          "name": "Units_Avg",
+          "label": "Units|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "Units_StdDev",
+          "label": "Units|Стандартное откл.",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "Units_Sum": 9,
+          "Units_Count": 4,
+          "Units_Min": 1,
+          "Units_Max": 5,
+          "Units_Avg": 3.0,
+          "Units_StdDev": 2.0
+        },
+        {
+          "Region": null,
+          "Units_Sum": null,
+          "Units_Count": 1,
+          "Units_Min": null,
+          "Units_Max": null,
+          "Units_Avg": null,
+          "Units_StdDev": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Units_SumSq",
+          "label": "Units|Сумма квадратов",
+          "type": "real"
+        },
+        {
+          "name": "Units_UniqueCount",
+          "label": "Units|Кол-во уникальных",
+          "type": "integer"
+        },
+        {
+          "name": "Units_NullCount",
+          "label": "Units|Кол-во пропусков",
+          "type": "integer"
+        },
+        {
+          "name": "Units_First",
+          "label": "Units|Первый",
+          "type": "integer"
+        },
+        {
+          "name": "Units_Last",
+          "label": "Units|Последний",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "Units_SumSq": 35,
+          "Units_UniqueCount": 3,
+          "Units_NullCount": 1,
+          "Units_First": 1,
+          "Units_Last": null
+        },
+        {
+          "Region": null,
+          "Units_SumSq": null,
+          "Units_UniqueCount": 0,
+          "Units_NullCount": 1,
+          "Units_First": null,
+          "Units_Last": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Text_Count",
+          "label": "Text|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "Text_Min",
+          "label": "Text|Минимум",
+          "type": "string"
+        },
+        {
+          "name": "Text_Max",
+          "label": "Text|Максимум",
+          "type": "string"
+        },
+        {
+          "name": "Text_UniqueCount",
+          "label": "Text|Кол-во уникальных",
+          "type": "integer"
+        },
+        {
+          "name": "Text_NullCount",
+          "label": "Text|Кол-во пропусков",
+          "type": "integer"
+        },
+        {
+          "name": "Text_First",
+          "label": "Text|Первый",
+          "type": "string"
+        },
+        {
+          "name": "Text_Last",
+          "label": "Text|Последний",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "Text_Count": 4,
+          "Text_Min": "a",
+          "Text_Max": "z",
+          "Text_UniqueCount": 2,
+          "Text_NullCount": 1,
+          "Text_First": "z",
+          "Text_Last": null
+        },
+        {
+          "Region": null,
+          "Text_Count": 1,
+          "Text_Min": null,
+          "Text_Max": null,
+          "Text_UniqueCount": 0,
+          "Text_NullCount": 1,
+          "Text_First": null,
+          "Text_Last": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Flag_Count",
+          "label": "Flag|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "Flag_Min",
+          "label": "Flag|Минимум",
+          "type": "boolean"
+        },
+        {
+          "name": "Flag_Max",
+          "label": "Flag|Максимум",
+          "type": "boolean"
+        },
+        {
+          "name": "Flag_UniqueCount",
+          "label": "Flag|Кол-во уникальных",
+          "type": "integer"
+        },
+        {
+          "name": "Flag_NullCount",
+          "label": "Flag|Кол-во пропусков",
+          "type": "integer"
+        },
+        {
+          "name": "Flag_First",
+          "label": "Flag|Первый",
+          "type": "boolean"
+        },
+        {
+          "name": "Flag_Last",
+          "label": "Flag|Последний",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "Flag_Count": 4,
+          "Flag_Min": false,
+          "Flag_Max": true,
+          "Flag_UniqueCount": 2,
+          "Flag_NullCount": 1,
+          "Flag_First": true,
+          "Flag_Last": null
+        },
+        {
+          "Region": null,
+          "Flag_Count": 1,
+          "Flag_Min": null,
+          "Flag_Max": null,
+          "Flag_UniqueCount": 0,
+          "Flag_NullCount": 1,
+          "Flag_First": null,
+          "Flag_Last": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "When_Count",
+          "label": "When|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "When_Min",
+          "label": "When|Минимум",
+          "type": "datetime"
+        },
+        {
+          "name": "When_Max",
+          "label": "When|Максимум",
+          "type": "datetime"
+        },
+        {
+          "name": "When_Avg",
+          "label": "When|Среднее",
+          "type": "datetime"
+        },
+        {
+          "name": "When_StdDev",
+          "label": "When|Стандартное откл.",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "When_Count": 4,
+          "When_Min": {
+            "cell_type": "datetime",
+            "bytes_le": "00000000e078e640"
+          },
+          "When_Max": {
+            "cell_type": "datetime",
+            "bytes_le": "000000006079e640"
+          },
+          "When_Avg": {
+            "cell_type": "datetime",
+            "bytes_le": "000000002079e640"
+          },
+          "When_StdDev": 2.0
+        },
+        {
+          "Region": null,
+          "When_Count": 1,
+          "When_Min": null,
+          "When_Max": null,
+          "When_Avg": null,
+          "When_StdDev": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "When_UniqueCount",
+          "label": "When|Кол-во уникальных",
+          "type": "integer"
+        },
+        {
+          "name": "When_NullCount",
+          "label": "When|Кол-во пропусков",
+          "type": "integer"
+        },
+        {
+          "name": "When_First",
+          "label": "When|Первый",
+          "type": "datetime"
+        },
+        {
+          "name": "When_Last",
+          "label": "When|Последний",
+          "type": "datetime"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "When_UniqueCount": 3,
+          "When_NullCount": 1,
+          "When_First": {
+            "cell_type": "datetime",
+            "bytes_le": "00000000e078e640"
+          },
+          "When_Last": null
+        },
+        {
+          "Region": null,
+          "When_UniqueCount": 0,
+          "When_NullCount": 1,
+          "When_First": null,
+          "When_Last": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Amount_Sum",
+          "label": "Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "Amount_Count",
+          "label": "Amount|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "Amount_Avg",
+          "label": "Amount|Среднее",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Amount_Sum": 9.0,
+          "Amount_Count": 5,
+          "Amount_Avg": 3.0
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Month",
+          "label": "Month",
+          "type": "string"
+        },
+        {
+          "name": "C_1_Amount_Sum",
+          "label": "A|web|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_1_Amount_Count",
+          "label": "A|web|Amount|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "C_2_Amount_Sum",
+          "label": "B|<...>|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Amount_Count",
+          "label": "B|<...>|Amount|Количество",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "Month": "Sep",
+          "C_1_Amount_Sum": 9.0,
+          "C_1_Amount_Count": 4,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": null
+        },
+        {
+          "Region": null,
+          "Month": "Oct",
+          "C_1_Amount_Sum": null,
+          "C_1_Amount_Count": null,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": 1
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        }
+      ],
+      "rows": []
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Key",
+          "label": "Key",
+          "type": "string"
+        },
+        {
+          "name": "Values_Count",
+          "label": "Значения|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "Values_Min",
+          "label": "Значения|Минимум",
+          "type": "variant"
+        },
+        {
+          "name": "Values_Max",
+          "label": "Значения|Максимум",
+          "type": "variant"
+        },
+        {
+          "name": "Values_UniqueCount",
+          "label": "Значения|Кол-во уникальных",
+          "type": "integer"
+        },
+        {
+          "name": "Values_NullCount",
+          "label": "Значения|Кол-во пропусков",
+          "type": "integer"
+        },
+        {
+          "name": "Values_First",
+          "label": "Значения|Первый",
+          "type": "variant"
+        },
+        {
+          "name": "Values_Last",
+          "label": "Значения|Последний",
+          "type": "variant"
+        }
+      ],
+      "rows": [
+        {
+          "Key": "numeric",
+          "Values_Count": 8,
+          "Values_Min": {
+            "cell_type": "real",
+            "value": 1.25,
+            "bytes_le": "000000000000f43f"
+          },
+          "Values_Max": {
+            "cell_type": "real",
+            "value": 2.75,
+            "bytes_le": "0000000000000640"
+          },
+          "Values_UniqueCount": 2,
+          "Values_NullCount": 6,
+          "Values_First": {
+            "cell_type": "real",
+            "value": 1.25,
+            "bytes_le": "000000000000f43f"
+          },
+          "Values_Last": null
+        },
+        {
+          "Key": "text",
+          "Values_Count": 8,
+          "Values_Min": {
+            "cell_type": "string",
+            "value": "a"
+          },
+          "Values_Max": {
+            "cell_type": "string",
+            "value": "z"
+          },
+          "Values_UniqueCount": 2,
+          "Values_NullCount": 6,
+          "Values_First": null,
+          "Values_Last": null
+        },
+        {
+          "Key": "boolean",
+          "Values_Count": 8,
+          "Values_Min": {
+            "cell_type": "boolean",
+            "value": false
+          },
+          "Values_Max": {
+            "cell_type": "boolean",
+            "value": true
+          },
+          "Values_UniqueCount": 2,
+          "Values_NullCount": 6,
+          "Values_First": null,
+          "Values_Last": null
+        },
+        {
+          "Key": "datetime",
+          "Values_Count": 8,
+          "Values_Min": {
+            "cell_type": "datetime",
+            "bytes_le": "00000000e078e640"
+          },
+          "Values_Max": {
+            "cell_type": "datetime",
+            "bytes_le": "000000002079e640"
+          },
+          "Values_UniqueCount": 2,
+          "Values_NullCount": 6,
+          "Values_First": null,
+          "Values_Last": {
+            "cell_type": "datetime",
+            "bytes_le": "000000002079e640"
+          }
+        },
+        {
+          "Key": "all_null",
+          "Values_Count": 4,
+          "Values_Min": null,
+          "Values_Max": null,
+          "Values_UniqueCount": 0,
+          "Values_NullCount": 4,
+          "Values_First": null,
+          "Values_Last": null
+        }
+      ]
+    }
+  ],
+  "static_sources": [
+    {
+      "name": "sales-update.csv",
+      "bytes": 1510,
+      "sha256": "038c538fc4f182e72948358ba790da85f116cd7e0c3731a4720b5e71dc29fb70",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real"
+        },
+        {
+          "name": "Quantity",
+          "label": "Quantity",
+          "type": "real"
+        }
+      ]
+    },
+    {
+      "name": "typed.csv",
+      "bytes": 225,
+      "sha256": "ec0f4a7515d1816a4a0b650fa489636cfcbd8f54984fa93c52fc1f082a5bc846",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Month",
+          "label": "Month",
+          "type": "string"
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string"
+        },
+        {
+          "name": "Channel",
+          "label": "Channel",
+          "type": "string"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real"
+        },
+        {
+          "name": "Units",
+          "label": "Units",
+          "type": "integer"
+        },
+        {
+          "name": "Text",
+          "label": "Text",
+          "type": "string"
+        },
+        {
+          "name": "Flag",
+          "label": "Flag",
+          "type": "boolean"
+        },
+        {
+          "name": "When",
+          "label": "When",
+          "type": "datetime"
+        }
+      ]
+    },
+    {
+      "name": "empty.csv",
+      "bytes": 58,
+      "sha256": "629e35f92d517137950bfee96661a67f5080907ddc36f8eda1f1aa7d3589752e",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Month",
+          "label": "Month",
+          "type": "string"
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string"
+        },
+        {
+          "name": "Channel",
+          "label": "Channel",
+          "type": "string"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real"
+        },
+        {
+          "name": "Units",
+          "label": "Units",
+          "type": "integer"
+        },
+        {
+          "name": "Text",
+          "label": "Text",
+          "type": "string"
+        },
+        {
+          "name": "Flag",
+          "label": "Flag",
+          "type": "boolean"
+        },
+        {
+          "name": "When",
+          "label": "When",
+          "type": "datetime"
+        }
+      ]
+    },
+    {
+      "name": "variant-source.csv",
+      "bytes": 216,
+      "sha256": "98ec788a49a1b1995fcf42c0bf7dacb9ae200d3a6ddfc107d650dfc81aa67493",
+      "columns": [
+        {
+          "name": "Key",
+          "label": "Key",
+          "type": "string"
+        },
+        {
+          "name": "RealValue",
+          "label": "RealValue",
+          "type": "real"
+        },
+        {
+          "name": "TextValue",
+          "label": "TextValue",
+          "type": "string"
+        },
+        {
+          "name": "FlagValue",
+          "label": "FlagValue",
+          "type": "boolean"
+        },
+        {
+          "name": "WhenValue",
+          "label": "WhenValue",
+          "type": "datetime"
         }
       ]
     }

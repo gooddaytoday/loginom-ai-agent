@@ -68,7 +68,3 @@ if __name__ == "__main__":
     # Initial checks are kept outside the model's business task and final cold oracle.
     (ROOT / "initial.json").write_text(json.dumps({"outputs": [report(base, [*initial, OTHER], True),
                 report(base, initial)]}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-    # The stage-two entry point appends its independently computed matrix.
-    import subprocess, sys
-    subprocess.run([sys.executable, str(ROOT / "stage2/generate.py")], check=True)
