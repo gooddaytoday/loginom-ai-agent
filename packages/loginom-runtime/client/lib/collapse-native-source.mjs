@@ -6,22 +6,47 @@ const need=(x,m)=>{if(!x)throw Error(m);};
 // A later failed/unfinished change invalidates an earlier successful import.
 export function completedStaticImports(history,uploads,ctx,uploadHistory) {
  need(Array.isArray(history)&&history.length<=1024,'Bounded private node history required');
- const seen=new Set(),accepted=[];
+ const seen=new Set(),accepted=[],rereads=new Map();
  for(const item of [...history].reverse()) {
   const r=item.request,n=item.outcome?.output,ref=n?.node??r?.target?.ref;
   if(!ref||ref.document_id!==ctx.document_id||ref.workflow_id!==ctx.workflow_ref.workflow_id||seen.has(ref.node_id))continue;
+  // A successful read-only reexecution has a new owned execution, but did not
+  // change import settings. Keep its identity only until the nearest preceding
+  // configuration is found. Never jump across a failed or changed import.
+  if(r?.target?.type==='imports.text'&&r.mode==='read_existing_output'){
+   const port=n?.output?.ports?.find(p=>p.port===0);
+   if(item.cleanup_confirmed!==true||item.outcome?.status!=='SUCCEEDED'||n?.status!=='SUCCEEDED'
+    ||n.cleanup_complete!==true||n.execution?.status!=='completed'||n.configuration?.status!=='not_requested'
+    ||r.target.kind!=='existing'||!['document_id','workflow_id','node_id'].every(k=>r.target.ref?.[k]===ref[k])
+    ||typeof n.execution.execution_id!=='string'||!n.execution.execution_id.startsWith(ctx.document_id+':')
+    ||r.inputs?.length!==0||r.mappings?.length!==0||r.finish!=='execute'
+    ||port?.fresh!==true||port.execution_id!==n.execution.execution_id||!Array.isArray(port.schema)
+    ||!Number.isSafeInteger(item.sequence)) {seen.add(ref.node_id);continue;}
+   const latest=rereads.get(ref.node_id);
+   if(latest&&latest.request.parameters.source_operation_id!==r.parameters.source_operation_id){seen.add(ref.node_id);continue;}
+   if(!latest)rereads.set(ref.node_id,item);
+   continue;
+  }
   seen.add(ref.node_id);
   if(r?.target?.type!=='imports.text'||item.cleanup_confirmed!==true||item.outcome.status!=='SUCCEEDED'
    ||n?.status!=='SUCCEEDED'||n.execution?.status!=='completed'||n.cleanup_complete!==true)continue;
   const c=n.configuration?.readback;
   if(c?.kind!=='text_import'||c.values_are!=='observed_ui_values'||c.source.connection!=='Локальное'
    ||JSON.stringify(c.node)!==JSON.stringify(ref))continue;
+  const reread=rereads.get(ref.node_id);
+  if(reread){
+   const output=reread.outcome.output,port=output.output.ports.find(p=>p.port===0);
+   const project=fields=>fields.filter(f=>!f.excluded).map(f=>({name:f.name,label:f.label,type:f.type}));
+   if(reread.request.parameters.source_operation_id!==r.operation_id||reread.sequence<=item.sequence
+    ||!Array.isArray(c.output_mapping?.fields)||JSON.stringify(project(port.schema))!==JSON.stringify(project(c.output_mapping.fields)))continue;
+  }
   const verified=verifyTextImportSource(r.parameters,uploads).source;
   if(c.source.source_path!==verified.destination)continue;
   need(Number.isSafeInteger(item.sequence),'Private import execution order required');
   verified.bytes_verified=true;verified.upload_completion_verified=true;
-  verified.lineage=verifyUploadLineage(verified,uploadHistory,{executionSequence:item.sequence});
-  accepted.push({node_id:ref.node_id,execution_id:n.execution.execution_id,import_operation_id:r.operation_id,
+  verified.lineage=verifyUploadLineage(verified,uploadHistory,{executionSequence:reread?.sequence??item.sequence});
+  accepted.push({node_id:ref.node_id,execution_id:(reread?.outcome.output??n).execution.execution_id,import_operation_id:r.operation_id,
+   ...(reread?{readonly_reexecution_operation_id:reread.request.operation_id}:{}),
    source:verified,configuration:c});
  }
  need(accepted.length>0,'Exact full read requires a same-session byte-verified completed local import');

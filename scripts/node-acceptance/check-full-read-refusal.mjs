@@ -39,6 +39,8 @@ try {
  const typedDelivery=await runtime.deliverArtifact({operation_id:'deliver-typed',artifact_id:typedArtifact.artifact_id,upload_grant_id:typedArtifact.upload.grant_id,budget_ms:120000});await save('typed-delivery',typedDelivery);need(typedDelivery.outcome?.status==='SUCCEEDED','typed delivery failed');
  const typedColumns=[['Region','string'],['Month','string'],['Category','string'],['Channel','string'],['Amount','real'],['Units','integer'],['Text','string'],['Flag','boolean'],['When','datetime']].map(([name,type])=>({name,label:name,type,data_kind:type==='real'?'Непрерывный':'Дискретный',used:true}));
  const typed=await runtime.runNodeApply({...activeBase,operation_id:'typed-source',mode:'delimited',target:{kind:'new',type:'imports.text',label:'TypedInput',position:{x:100,y:550}},parameters:{source:{artifact_id:typedArtifact.artifact_id,upload_operation_id:'deliver-typed:upload'},settings:{source:{source_path:typedArtifact.upload.destination,encoding:'UTF-8 (65001)',rows_to_skip:0,first_line_as_title:true},format:{delimiter:',',decimal_separator:'.',null_marker:'?',text_qualifier:'"'},columns:typedColumns}}});await save('typed-import',typed);need(typed.status==='SUCCEEDED','typed import failed');
+ const refreshed=await runtime.runNodeRead({operation_id:'typed-readonly-reexecution',source_operation_id:'typed-source',read:{ports:[0],sample_rows:100,require_exact_numbers:true},budget_ms:300000});
+ await save('source-reread',refreshed);need(refreshed.status==='SUCCEEDED'&&refreshed.cleanup_complete,'source readonly reexecution failed');
  const multi=await runtime.runNodeApply({...activeBase,operation_id:'multi',read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'},mode:'pivot',target:{kind:'new',type:'transform.cross_table',label:'Two dimensions',position:{x:700,y:300}},inputs:[{source:typed.output.node,input:0,output:0}],parameters:{row_keys:['Region','Month'].map(field),columns:['Category','Channel'].map(field),facts:[{field:field('Amount'),functions:['sum','count']}],category_mode:'sliding'}});await save('multi',multi);need(multi.status==='FAILED'&&multi.cleanup_complete===true&&multi.output.pending_phase===null&&multi.output.execution.status==='completed','full refusal did not settle with cleanup');
  runtime.assertPreparationAllowed();
  if(config.report_name){
@@ -69,7 +71,7 @@ try {
  const finalSave=await runtime.run('package.save_checkpoint',{path:cleanupPath,conflict_policy:'replace'},{operationId:'save-after-corrected-read'});
  await save('final-save',finalSave);need(finalSave.status==='SUCCEEDED'&&finalSave.output.save_completed,'second save failed');
  proof={refusal_status:multi.status,refusal_cleanup:multi.cleanup_complete,pending_phase:multi.output.pending_phase,
-  first_save_after_refusal:true,corrected_read:true,columns:10,node_id:multi.output.node.node_id,final_save:true};
+  source_readonly_reexecution:true,first_save_after_refusal:true,corrected_read:true,columns:10,node_id:multi.output.node.node_id,final_save:true};
 } catch(error) {failure=error.message;await save('failure',{error:error.message});console.log(JSON.stringify({status:'FAIL',error:error.message}));process.exitCode=1;}
 finally {
  if(prepared?.package_ref?.path===cleanupPath)try{clean=await execute(makePackageCleanupCode({sessionId:sid,documentId:prepared.document_id,account:config.username,packagePath:cleanupPath,loginomUrl:config.url,loginomBuild:'7.4.2',tabTid:prepared.workflow_ref.tab_tid,diagnosticDiscard:true}));}catch{}
