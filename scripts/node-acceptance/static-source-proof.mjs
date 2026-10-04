@@ -79,6 +79,11 @@ export async function observeStaticSources({load,graph,channelFor,account}){
    sources.imports.push({node_id:target.ref.node_id,configuration:{kind:'text_import',values_are:'observed_ui_values',node:target.ref,source,format,output_mapping:{port:0,autosync:output.autosync,fields:output.fields}}});
   }else{
    const input=await mapping(channel,'input');
+   if(target.type==='transform.cross_table'){
+    const variables=await channel.configureCrossTableVariables([]);
+    need(variables.verified&&variables.settings_changed===false&&variables.settings_applied===false&&variables.draft_discarded===true,
+     'cold variable inspection must discard its unchanged draft');
+   }
    await selectSource(channel);
    await openPreparedWizard(channel);
    if(target.type==='transform.collapse_columns'){

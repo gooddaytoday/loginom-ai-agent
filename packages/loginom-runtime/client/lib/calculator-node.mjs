@@ -103,7 +103,11 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
    async openWizard(ctx) {
     enter(ctx);executionDriver=createNodeExecutionProcedure(channel,ctx.node);await executionDriver.prepare();
     if(!implementation)configurationGraph=await graphForRejection();
-    if(implementation?.beforeOpen)preconfiguration=await implementation.beforeOpen(channel,operation.nodeApply.request);
+    if(implementation?.beforeOpen){
+     const before=await channel.observe({condition:'select owned node before internal preparation',ready:s=>s.prepared_node_context?.surface==='graph'});
+     await selectPreparedGraphNode(channel,before,'select node before internal preparation',{refreshReplacedBody:true});
+     preconfiguration=await implementation.beforeOpen(channel,operation.nodeApply.request);
+    }
     const s=await channel.observe({condition:'calculator graph before opening',ready:s=>s.prepared_node_context?.surface==='graph'});
     await selectPreparedGraphNode(channel,s,'select calculator graph node');
     await openPreparedWizard(channel);

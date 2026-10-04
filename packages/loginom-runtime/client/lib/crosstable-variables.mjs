@@ -74,7 +74,7 @@ export async function configureLocalVariables(page,task,readNode,openPort){
    if(mode==='graph_finished')return {graph:true};
    if(mode==='menu'){
     const menu=m.FNodeContextMenu,roots=exact('mn').filter(visible),selected=m.FDiagram.FmxGraph.getSelectionCells();
-    if(roots.length!==1||menu?.el.dom!==roots[0]||Ext.getCmp(roots[0].id)!==menu||selected.length!==1||selected[0]!==n.FCell)fail('node menu');
+    if(roots.length!==1||menu?.el.dom!==roots[0]||Ext.getCmp(roots[0].id)!==menu||selected.length!==1||selected[0]!==n.FCell)fail('node menu '+JSON.stringify({roots:roots.length,native:menu?.el.dom===roots[0],component:roots.length===1&&Ext.getCmp(roots[0].id)===menu,selected:selected.length,selectedOwn:selected[0]===n.FCell}));
     const es=exact('mn;mniShowControlVariablesPort').filter(visible);
     if(es.length!==1||!roots[0].contains(es[0])||es[0].textContent!=='Показать порт управляющих переменных'||es[0].closest('.x-item-disabled,.x-menu-item-disabled'))fail('show command');
     return point(es[0]);
@@ -84,7 +84,11 @@ export async function configureLocalVariables(page,task,readNode,openPort){
    // Port drawings can be siblings of the body; search only this graph.
    const drawn=exact(dom.getAttribute('data-tid')+';Input_ControlVar').filter(e=>m.FDiagram.FmxGraph.container.contains(e)&&visible(e));
    if(drawn.length>1)fail('duplicate control drawing');
-   return {visible:drawn.length===1,point:point(dom)};
+   const graph=m.FDiagram.FmxGraph,box=dom.getBoundingClientRect(),gb=graph.container.getBoundingClientRect();let nodePoint;
+   for(const dx of [.2,.5,.8])for(const dy of [.2,.5,.8]){const x=box.x+box.width*dx,y=box.y+box.height*dy,hit=document.elementFromPoint(x,y);
+    if(hit&&(hit===dom||dom.contains(hit))&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&graph.getCellAt(x-gb.x+graph.container.scrollLeft,y-gb.y+graph.container.scrollTop)===n.FCell)nodePoint??={x,y};
+   }
+   if(!nodePoint)fail('node body native hit');return {visible:drawn.length===1,point:nodePoint};
   }
   const receipts=[...(p.inputPortOpenReceipts?.values()??[])].filter(r=>r.phase==='verified'&&r.operation_id===task.operation_id+':port'&&r.node_id===b.node.node_id&&r.workflow===wf&&r.wizard===m&&r.enginePort===m.FModelSocket);
   if(receipts.length!==1||card.Controller.Node.data.node.ParentNode!==receipts[0].portTree||m.FView?.el.dom!==exact(root)[0])fail('control wizard');
@@ -104,6 +108,11 @@ export async function configureLocalVariables(page,task,readNode,openPort){
   }
   if(mode==='button'){
    const e=exact(root+';'+extra.tid).filter(visible);if(e.length!==1||!exact(root)[0].contains(e[0])||e[0].closest('.x-item-disabled,.x-btn-disabled'))fail('wizard button');return point(e[0]);
+  }
+  if(mode==='cancel_confirmation'){
+   const dialogs=[...document.querySelectorAll('[role="dialog"],.x-message-box')].filter(visible);
+   if(dialogs.length!==1||dialogs[0].innerText.replace(/\s+/g,' ').trim()!=='Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет')fail('cancel confirmation');
+   const es=exact('msgbox;tlb;yes').filter(visible);if(es.length!==1||!dialogs[0].contains(es[0])||es[0].textContent!=='Да')fail('cancel yes');return point(es[0]);
   }
   const dialogs=[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')].filter(visible),ds=exact('EditTuneVariableForm').filter(visible);
   if(ds.length!==1||dialogs.length!==1||ds[0]!==dialogs[0]||Ext.getCmp(ds[0].id)?.$className!=='bg.wizards.variables.view.EditVariableForm')fail('nested editor');
@@ -144,9 +153,19 @@ export async function configureLocalVariables(page,task,readNode,openPort){
    values=await inspect('inventory');const now=values.find(x=>x.name===v.name);if(!now||now.type!==type||now.value!==v.value||now.is_null||old&&now.id!==old.id)throw Error('Local variable readback differs');changed.push(v.name);
   }
   for(const old of baseline.filter(x=>!task.variables.some(v=>v.name===x.name)))if(JSON.stringify(values.find(v=>v.id===old.id))!==JSON.stringify(old))throw Error('Unrequested variable changed');
-  values=await inspect('retain');await click('btnDone');await page.locator('[data-tid='+JSON.stringify(root)+']').waitFor({state:'hidden',timeout:remaining()});
+  values=await inspect('retain');
+  if(task.variables.length){await click('btnDone');}
+  else{
+   await click('btnClose');
+   await page.waitForFunction(root=>!document.querySelector('[data-tid='+JSON.stringify(root)+']')?.checkVisibility({checkVisibilityCSS:true})
+    ||[...document.querySelectorAll('[role="dialog"],.x-message-box')].some(e=>e.checkVisibility({checkVisibilityCSS:true})),root,{timeout:remaining()});
+   if(await page.locator('[data-tid='+JSON.stringify(root)+']:visible').count()){
+    const point=await inspect('cancel_confirmation');await page.mouse.click(point.x,point.y);
+   }
+  }
+  await page.locator('[data-tid='+JSON.stringify(root)+']').waitFor({state:'hidden',timeout:remaining()});
   while(remaining()>0){try{await inspect('graph_finished');break;}catch{await page.waitForTimeout(Math.min(100,remaining()));}}
   const after=await readNode(page,b);if(!after.verified||after.surface!=='graph'||after.node_id!==b.node.node_id)throw Error('Control variables graph return');
-  return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:after,variables:values,changed};
+  return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:after,variables:values,changed,settings_changed:changed.length>0,settings_applied:task.variables.length>0,draft_discarded:task.variables.length===0};
  }catch(error){return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,error:String(error.message).slice(0,500)};}
 }
