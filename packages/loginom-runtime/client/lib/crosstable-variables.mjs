@@ -90,13 +90,16 @@ export async function configureLocalVariables(page,task,readNode,openPort){
    if(drawn.length===1)return {visible:true};
    // A selected node's hover toolbar can cover its center. Sample only the
    // cached native body, rejecting every toolbar, label and neighbouring cell.
-   const graph=m.FDiagram.FmxGraph,box=dom.getBoundingClientRect(),canvas=graph.container.getBoundingClientRect();
+   const graph=m.FDiagram.FmxGraph,box=dom.getBoundingClientRect(),canvas=graph.container.getBoundingClientRect();let diagnostic;
    for(const dx of [.5,.1,.9,.25,.75])for(const dy of [.5,.1,.9,.25,.75]){
     const x=box.x+box.width*dx,y=box.y+box.height*dy,hit=document.elementFromPoint(x,y);
-    if(visible(dom)&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===dom||dom.contains(hit))
-     &&hit.closest('[data-tid]')===dom&&graph.getCellAt(x-canvas.x,y-canvas.y)===n.FCell)return {visible:false,point:{x,y}};
+    const cell=graph.getCellAt(x-canvas.x,y-canvas.y),inside=!!hit&&(hit===dom||dom.contains(hit)),nativeBody=cell===n.FCell;
+    diagnostic??={visible:visible(dom),inside,nativeBody,nativeLabel:cell===n.FLabel?.FCell,
+     nestedControl:inside&&hit.closest('[data-tid]')!==dom,width:box.width,height:box.height};
+    if(visible(dom)&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&inside
+     &&hit.closest('[data-tid]')===dom&&nativeBody)return {visible:false,point:{x,y}};
    }
-   fail('node body native hit');
+   fail('node body native hit '+JSON.stringify(diagnostic));
   }
   const receipts=[...(p.inputPortOpenReceipts?.values()??[])].filter(r=>r.phase==='verified'&&r.operation_id===task.operation_id+':port'&&r.node_id===b.node.node_id&&r.workflow===wf&&r.wizard===m&&r.enginePort===m.FModelSocket);
   if(receipts.length!==1||card.Controller.Node.data.node.ParentNode!==receipts[0].portTree||m.FView?.el.dom!==exact(root)[0])fail('control wizard');
