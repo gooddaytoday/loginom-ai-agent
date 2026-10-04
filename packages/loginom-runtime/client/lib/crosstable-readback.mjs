@@ -16,7 +16,11 @@ export function crossTableConfigurationReadback({node,phases,operation_id}){
  need(mapped.value.deferred_schema===true&&owner(mapped.value.node_context)
   ||outputMapping?.verified===true&&outputMapping.inventory_complete===true&&outputMapping.source_identity_verified===true
    &&owner(outputMapping.node_context)&&outputMapping.node_context.output_port?.port===0&&mapped.value.finish?.settings_applied===true
-   &&mapped.value.initial_materialization?.execution?.verified===true&&mapped.value.initial_materialization.execution.owner_verified===true,
+   &&owner(mapped.value.initial_materialization?.finish?.node_context)
+   &&mapped.value.initial_materialization?.execution?.verified===true&&mapped.value.initial_materialization.execution.owner_verified===true
+   &&mapped.value.initial_materialization.execution.status==='completed'
+   &&typeof mapped.value.initial_materialization.execution.execution_id==='string'
+   &&mapped.value.initial_materialization.execution.execution_id.startsWith(node.document_id+':'),
   'materialized mapping or deferred schema owner');
  need(['done','execute'].includes(finished.value.mode)&&owner(finished.value.node_context),'graph finish owner');
  const field=f=>pick(f,['name','label','type','order']);

@@ -125,3 +125,19 @@ test('reserved captions carry uncertainty rather than claiming an observed sourc
  const r=resolveCrossTableSchema(fields(['3']),c);
  assert.equal(r.category_fields[0].reserved_possible,true);assert.equal(r.category_fields[0].category_identity_source,'observed_caption');
 });
+test('own renamed output retains every required source and refuses foreign or damaged lineage',()=>{
+ const source_fields=fields(['A','B']).map((f,i)=>({...f,record_id:'r'+i,required:true}));
+ const target_fields=[source_fields[3],source_fields[1],source_fields[0],source_fields[2],source_fields[4]]
+  .map((f,index)=>({index,name:f.name,label:f.label,type:f.type,excluded:false,source:{...f}}));
+ target_fields[1].name='RevenueA';target_fields[1].label='Доход A';
+ const c={...configuration,node,output_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,
+  node_context:{...node,output_port:{port:0}},source_fields,target_fields}};
+ const columns=target_fields.map(({index,name,label,type})=>({index,name,label,type}));
+ assert.equal(resolveCrossTableSchema(columns,c).category_fields.find(f=>f.field==='RevenueA').category,'A');
+ for(const damage of [m=>m.node_context.node_id='foreign',m=>m.source_fields.pop(),
+  m=>m.source_fields[0].required=false,m=>m.target_fields[1].excluded=true,
+  m=>m.target_fields[1].source.record_id='foreign',m=>m.target_fields[1].source.type='string',
+  m=>m.target_fields[1].source={...m.target_fields[0].source},m=>m.target_fields.reverse()]){
+  const copy=structuredClone(c);damage(copy.output_mapping);assert.throws(()=>resolveCrossTableSchema(columns,copy));
+ }
+});

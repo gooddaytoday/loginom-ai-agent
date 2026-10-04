@@ -54,7 +54,7 @@ export async function bindLocalVariables(page,task,readNode){
 // This internal operation owns one control-variable wizard and its nested
 // editor. Cached proxies are compared only by identity, never dereferenced.
 export async function configureLocalVariables(page,task,readNode,openPort){
- let effect=false;
+ let effect=false,phase='graph';
  const remaining=()=>{const n=task.deadline-Date.now();if(n<=0)throw Error('CrossTable variables deadline');return n;};
  const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']:visible');
  const b=task.binding,prefix=b.workflow_ref.prefix,root=prefix+';WizrdMCF',gridTid=root+';TuneVariablesMappingWizard;grdTargetColumns';
@@ -87,9 +87,16 @@ export async function configureLocalVariables(page,task,readNode,openPort){
    // Port drawings can be siblings of the body; search only this graph.
    const drawn=exact(dom.getAttribute('data-tid')+';Input_ControlVar').filter(e=>m.FDiagram.FmxGraph.container.contains(e)&&visible(e));
    if(drawn.length>1)fail('duplicate control drawing');
-   const label=n.FLabel,ls=exact(dom.getAttribute('data-tid')+';Label;Label').filter(e=>m.FDiagram.FmxGraph.container.contains(e));
-   if(label?.parent!==n||label.FCell?.parent!==n.FCell||ls.length!==1||m.FDiagram.FmxGraph.view.getState(label.FCell)?.text?.node!==ls[0])fail('context label native identity');
-   return {visible:drawn.length===1,point:point(ls[0])};
+   if(drawn.length===1)return {visible:true};
+   // A selected node's hover toolbar can cover its center. Sample only the
+   // cached native body, rejecting every toolbar, label and neighbouring cell.
+   const graph=m.FDiagram.FmxGraph,box=dom.getBoundingClientRect(),canvas=graph.container.getBoundingClientRect();
+   for(const dx of [.5,.1,.9,.25,.75])for(const dy of [.5,.1,.9,.25,.75]){
+    const x=box.x+box.width*dx,y=box.y+box.height*dy,hit=document.elementFromPoint(x,y);
+    if(visible(dom)&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&(hit===dom||dom.contains(hit))
+     &&hit.closest('[data-tid]')===dom&&graph.getCellAt(x-canvas.x,y-canvas.y)===n.FCell)return {visible:false,point:{x,y}};
+   }
+   fail('node body native hit');
   }
   const receipts=[...(p.inputPortOpenReceipts?.values()??[])].filter(r=>r.phase==='verified'&&r.operation_id===task.operation_id+':port'&&r.node_id===b.node.node_id&&r.workflow===wf&&r.wizard===m&&r.enginePort===m.FModelSocket);
   if(receipts.length!==1||card.Controller.Node.data.node.ParentNode!==receipts[0].portTree||m.FView?.el.dom!==exact(root)[0])fail('control wizard');
@@ -133,12 +140,14 @@ export async function configureLocalVariables(page,task,readNode,openPort){
   const before=await readNode(page,b);if(!before.verified||before.surface!=='graph'||before.locked)throw Error('Owned unlocked CrossTable graph required');
   const leave=await inspect('leave_hover');await page.mouse.move(leave.x,leave.y);
   let graph;while(remaining()>0){try{graph=await inspect('graph');break;}catch(error){if(!String(error.message).includes('node body native hit'))throw error;await page.waitForTimeout(Math.min(100,remaining()));}}
-  if(!graph.visible){effect=true;await page.mouse.click(graph.point.x,graph.point.y,{button:'right'});await at('mn;mniShowControlVariablesPort').waitFor({state:'visible',timeout:remaining()});const point=await inspect('menu');await page.mouse.click(point.x,point.y);}
+  if(!graph.visible){phase='show_control_menu';effect=true;await page.mouse.click(graph.point.x,graph.point.y,{button:'right'});await at('mn;mniShowControlVariablesPort').waitFor({state:'visible',timeout:remaining()});const point=await inspect('menu');await page.mouse.click(point.x,point.y);}
+  phase='open_control_port';
   const opened=await openPort(page,{...task,operation_id:task.operation_id+':port',direction:'input',kind:'control',port:0},readNode);
   effect ||= opened.effect_possible;if(opened.status!=='SUCCEEDED')throw Error(opened.error);
-  let values=await inspect('inventory');const baseline=structuredClone(values),changed=[];
+  phase='control_inventory';let values=await inspect('inventory');const baseline=structuredClone(values),changed=[];
   const click=async tid=>{const point=await inspect('button',{tid});effect=true;await page.mouse.click(point.x,point.y);};
   for(const v of task.variables){
+   phase='edit_local_variable_'+v.name;
    const type={boolean:1,integer:4,string:5}[v.type],old=values.find(x=>x.name===v.name);
    if(old&&old.type!==type)throw Error('Existing local variable type differs');
    if(old&&!old.is_null&&old.value===v.value)continue;
@@ -156,7 +165,7 @@ export async function configureLocalVariables(page,task,readNode,openPort){
    values=await inspect('inventory');const now=values.find(x=>x.name===v.name);if(!now||now.type!==type||now.value!==v.value||now.is_null||old&&now.id!==old.id)throw Error('Local variable readback differs');changed.push(v.name);
   }
   for(const old of baseline.filter(x=>!task.variables.some(v=>v.name===x.name)))if(JSON.stringify(values.find(v=>v.id===old.id))!==JSON.stringify(old))throw Error('Unrequested variable changed');
-  values=await inspect('retain');
+  phase='finish_control_port';values=await inspect('retain');
   if(task.variables.length){await click('btnDone');}
   else{
    await click('btnClose');
@@ -170,5 +179,5 @@ export async function configureLocalVariables(page,task,readNode,openPort){
   while(remaining()>0){try{await inspect('graph_finished');break;}catch{await page.waitForTimeout(Math.min(100,remaining()));}}
   const after=await readNode(page,b);if(!after.verified||after.surface!=='graph'||after.node_id!==b.node.node_id)throw Error('Control variables graph return');
   return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:after,variables:values,changed,settings_changed:changed.length>0,settings_applied:task.variables.length>0,draft_discarded:task.variables.length===0};
- }catch(error){return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,error:String(error.message).slice(0,500)};}
+ }catch(error){return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,error:(phase+': '+String(error.message)).slice(0,500)};}
 }
