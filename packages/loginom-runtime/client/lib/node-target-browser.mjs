@@ -3,7 +3,7 @@ import { withBrowserReceipt, makeCapabilityCode } from './executor.mjs';
 import { NODE_TYPES, NODE_POSITION_MIN } from './node-contracts.mjs';
 import {activatePreparedWorkflow} from './node-workflow-activation.mjs';
 import {exportPaletteScroll} from './text-export-palette.mjs';
-import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,revealNodePlacement,samePlacementGraph} from './node-placement.mjs';
+import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from './node-placement.mjs';
 
 // Read cached graph objects and rendered SVG only. Never dereference the data
 // proxy or call Loginom server methods. GUID + prepared document/workflow is the
@@ -385,7 +385,9 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
           if(occupied.some(r=>px>r.left-72&&px<r.right+96&&py>r.top-56&&py<r.bottom+72))continue;
           return position;
         }
-        throw Error('target.position: no free visible canvas position; enlarge the canvas or supply an explicit position');
+        const overflow=(${nodePlacementOverflow.toString()})(view,occupied,${NODE_POSITION_MIN},10000);
+        if(overflow)return overflow;
+        throw Error('target.position: no free visible canvas position or bounded model position; enlarge the canvas or supply an explicit position');
       })`,deadline);
     },
     async preflight(value,graph,deadline){
