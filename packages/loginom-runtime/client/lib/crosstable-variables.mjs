@@ -149,7 +149,9 @@ export async function configureLocalVariables(page,task,readNode,openPort){
   phase='open_control_port';
   const opened=await openPort(page,{...task,operation_id:task.operation_id+':port',direction:'input',kind:'control',port:0},readNode);
   effect ||= opened.effect_possible;if(opened.status!=='SUCCEEDED')throw Error(opened.error);
-  phase='control_inventory';let values=await inspect('inventory');const baseline=structuredClone(values),changed=[];
+  // Serialized helpers also run in the restricted standalone executor, which
+  // has no structuredClone global. Inventory descriptors contain scalar data.
+  phase='control_inventory';let values=await inspect('inventory');const baseline=values.map(v=>({...v})),changed=[];
   const click=async tid=>{const point=await inspect('button',{tid});effect=true;await page.mouse.click(point.x,point.y);};
   for(const v of task.variables){
    phase='edit_local_variable_'+v.name;
