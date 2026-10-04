@@ -97,8 +97,14 @@ export async function bindCollapseNative(page,args) {
   need(d.FModelNode===node.data&&!dt.FDataSourceStore.loading,'native datasource ready');
   const schema=d.FColumnInfosStore.data.items.map(r=>({name:r.data.Name,label:r.data.DisplayName,type:r.data.DataType}));
   const count=dt.FTotalRowCount;
-  need(Number.isSafeInteger(count)&&count>=0&&count<=50&&count===h.$FRowCount&&schema.length>0&&schema.length<=8,'Exact full bound is 50 rows by 8 columns');
+  need(Number.isSafeInteger(count)&&count>=0&&count===h.$FRowCount&&schema.length>0,'Verified native row count and schema required');
   need(JSON.stringify(schema)===JSON.stringify(a.schema),'native schema differs from verified Preview headers');
+  // A known capability refusal is data, not a transport exception. Ownership,
+  // provenance, execution and the complete cached schema were verified above.
+  // Do not create a native request outside the admitted 50x8 bound.
+  if(count>50||schema.length>8)return {refusal:{code:'NATIVE_FULL_BOUND_EXCEEDED'},port:0,
+   document_id:a.document_id,workflow_id:a.workflow_id,node_id:a.node_id,
+   port_guid:a.port_guid,execution:a.execution,row_count:count,schema};
   const count_loader_sources={PrepareColumnInfoAndRowCount:d.PrepareColumnInfoAndRowCount.toString(),InitOutput:d.InitOutput.toString(),DataSourceProxyRead:dt.FDataSourceStore.proxy.read.toString()};
   return {count_loader_sources,port:0,method:321,interface:116,offset:0,rows:count,columns:schema.map((_,i)=>i),row_count:count,schema,
    source:{owner:ds.$.$OW,object:ds.$.$O},document_id:a.document_id,workflow_id:a.workflow_id,package_id:a.package_id,
