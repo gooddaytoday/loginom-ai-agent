@@ -1,6 +1,10 @@
 import fs from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import {randomUUID,createHash} from 'node:crypto';
+import {writePrivateJson} from './private-json.mjs';
+import {verifyPreparedSourceGraph,verifyPreparedSourceSettings} from './prepared-source-proof.mjs';
+import {observeStaticSources,verifyStaticSourceBytes} from './static-source-proof.mjs';
+process.umask(0o077);
 const [root,dir]=process.argv.slice(2),load=n=>import(pathToFileURL(root+'/runtime/'+n).href);
 const config=JSON.parse(await fs.readFile(dir+'/config.json'));
 const {verifyResources}=await load('src/resources.mjs'),resources=await verifyResources(root);
@@ -19,16 +23,42 @@ const {context}=await loginBrowser({browserPath:resources.browserPath,profile:di
 const page=context.pages()[0];
 const execute=async code=>{const r=await new Function('page',`return (${code})(page)`)(page);await record({phase:'diagnostic_browser_return',value:r});return r;};
 const need=(v,m)=>{if(!v)throw Error(m);};
-const save=(name,r)=>fs.writeFile(dir+'/'+name+'.json',JSON.stringify(r,null,2));
-let prepared,clean;
+const save=(name,r)=>writePrivateJson(dir+'/'+name+'.json',r);
+let prepared,clean,failure;
 try {
  const compatibility={loginom_build:'7.4.2',platform:'linux',browser:'chromium'};
- prepared=await execute(makeWorkspacePrepareCode({loginomUrl:config.url,compatibility,sessionId:sid,operationId:'draft',intent:'new_draft'}));
- need(prepared.status==='READY','draft failed');
  actions.find(a=>a.action_key==='package.save_checkpoint').effect.allowed_roots=[storage];
  const artifactStore=await createArtifactStore({directory:dir+'/artifacts',sessionId:sid});
  const runtimeConfig={targetOrigin:new URL(config.url).origin,targetBuild:'7.4.2'};
  const runtime=createActionRuntime({pinned:{actions:new Map(actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.map(s=>[s.symbol,s])),pins:{}},execute,onRecord:record,...runtimeConfig,artifactStore,allowCandidate:true,...createCandidateNodeSupport(runtimeConfig)});
+ if(config.reuse_existing===true){
+  // Explicit readonly continuation. Never fall back to bootstrap or save an
+  // existing package: its actual graph, settings and CSV must prove ownership.
+  const fixture=JSON.parse(await fs.readFile(dir+'/fixture.json'));
+  prepared=await execute(makeWorkspacePrepareCode({loginomUrl:config.url,compatibility,sessionId:sid,operationId:'verify-existing-source',intent:'open_package',packagePath}));
+  const {createNodeTargetBrowserAdapter}=await load('client/lib/node-target-browser.mjs');
+  const {createNodeProcedure}=await load('client/lib/node-procedure.mjs');
+  const adapter=createNodeTargetBrowserAdapter({execute,origin:runtimeConfig.targetOrigin,build:'7.4.2'});
+  let graph=await adapter.observe({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},Date.now()+30000);
+  const nodes=verifyPreparedSourceGraph(graph,prepared,config.username,fixture);
+  let sequence=0;
+  const channelFor=(node,id)=>createNodeProcedure({operation:{id:id+'-'+(++sequence),action:{action_key:'acceptance.source_verification',revision:'1'},deadline:Date.now()+540000},execute,record,...runtimeConfig,maxSteps:4096,
+   preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},
+   wrapMutation:(code,receipt)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:sid,receipt_id:receipt.id,receipt_signature:receipt.signature,operation_id:receipt.id})});
+  const before=await observeStaticSources({load,graph,channelFor,account:config.username});
+  const beforeSettings=verifyPreparedSourceSettings(before,nodes,fixture);
+  await verifyStaticSourceBytes({load,runtime,execute,sources:before,allowed:[fixture.file],account:config.username,origin:runtimeConfig.targetOrigin,output:dir});
+  const returned=await adapter.activateWorkflow({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},{deadline:Date.now()+30000,receipt_id:'verified-source-return'});
+  need(returned.status==='SUCCEEDED'&&returned.verified&&returned.cleanup_complete,'source return unconfirmed');
+  graph=await adapter.observe({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},Date.now()+30000);
+  need(JSON.stringify(verifyPreparedSourceGraph(graph,prepared,config.username,fixture))===JSON.stringify(nodes),'source graph changed');
+  const after=await observeStaticSources({load,graph,channelFor,account:config.username});
+  const settings=verifyPreparedSourceSettings(after,nodes,fixture);
+  need(JSON.stringify(beforeSettings)===JSON.stringify(settings),'source settings changed');
+  await save('source-manifest',{kind:'source_only',csv:{bytes:fixture.file.bytes,sha256:fixture.file.sha256},sourcePackage:packagePath,nodes,...settings,existing_source_verified:true});
+ }else{
+ prepared=await execute(makeWorkspacePrepareCode({loginomUrl:config.url,compatibility,sessionId:sid,operationId:'draft',intent:'new_draft'}));
+ need(prepared.status==='READY','draft failed');
  const saved=await runtime.run('package.save_checkpoint',{path:packagePath,conflict_policy:'fail'},{operationId:'bootstrap'});await save('bootstrap',saved);
  need(saved.status==='SUCCEEDED'&&saved.output.save_completed,'bootstrap failed');
  prepared={...prepared,package_ref:saved.output.package_ref};
@@ -51,9 +81,15 @@ try {
  const sourceSave=await runtime.run('package.save_checkpoint',{path:packagePath,conflict_policy:'replace'},{operationId:'save-source'});await save('source-save',sourceSave);need(sourceSave.status==='SUCCEEDED'&&sourceSave.output.save_completed,'source-only save failed');
  await save('source-manifest',{kind:'source_only',csv:{bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')},sourcePackage:packagePath,nodes:[source.output.node,collapsed.output.node],import:source.output.configuration.readback,collapse:collapsed.output.configuration.readback});
  const closing=await execute(makePackageCleanupCode({sessionId:sid,documentId:prepared.document_id,account:config.username,packagePath,loginomUrl:config.url,loginomBuild:'7.4.2',tabTid:prepared.workflow_ref.tab_tid}));need(closing.package_closed&&closing.logged_out,'source save cleanup failed');await save('source-cleanup',closing);
- clean=closing;prepared=null;await save('result',{status:'PASS',phase:'prepared_variant_source_only',packagePath,csv:{bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')},cleanup:{package_closed:closing.package_closed,logged_out:closing.logged_out}});
-} catch(error) {await save('failure',{error:error.message});console.log(JSON.stringify({status:'FAIL',error:error.message}));process.exitCode=1;}
+ clean=closing;prepared=null;
+ }
+} catch(error) {failure=error.message;await save('failure',{error:failure});process.exitCode=1;}
 finally {
  if(prepared?.package_ref?.path===packagePath)try{clean=await execute(makePackageCleanupCode({sessionId:sid,documentId:prepared.document_id,account:config.username,packagePath,loginomUrl:config.url,loginomBuild:'7.4.2',tabTid:prepared.workflow_ref.tab_tid,diagnosticDiscard:true}));}catch{}
- await save('cleanup',clean??{package_closed:false,logged_out:false});await context.close();console.log(JSON.stringify({cleanup:clean?.status,package_closed:clean?.package_closed,logged_out:clean?.logged_out}));
+ const cleanup={package_closed:clean?.package_closed===true,logged_out:clean?.logged_out===true};
+ const passed=!failure&&cleanup.package_closed&&cleanup.logged_out;
+ await save('cleanup',clean??cleanup);
+ await save('result',{status:passed?'PASS':'FAIL',phase:'prepared_variant_source_only',packagePath,reused_existing:config.reuse_existing===true,error:failure??(passed?null:'SOURCE_CLEANUP_UNCONFIRMED'),cleanup});
+ if(!passed)process.exitCode=1;
+ await context.close();console.log(JSON.stringify({status:passed?'PASS':'FAIL',cleanup}));
 }
