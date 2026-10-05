@@ -72,7 +72,8 @@ function requireSummary(run: RunSummary) {
 
 function reliability(run: RunSummary, k: number | null) {
   const tasks = run.tasks.map((task) => {
-    const attempts = task.attempts.filter((attempt) => !["infra_error", "harness_error", "interrupted"].includes(attempt.status) && typeof attempt.pass === "boolean")
+    const attempts = task.attempts.filter((attempt) => !["infra_error", "harness_error", "interrupted"].includes(attempt.status))
+    if (attempts.some((attempt) => typeof attempt.pass !== "boolean")) return { pass1: null, passk: null }
     const successes = attempts.filter((attempt) => attempt.pass === true).length
     return {
       pass1: attempts.length ? successes / attempts.length : null,

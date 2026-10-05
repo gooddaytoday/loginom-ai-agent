@@ -99,3 +99,9 @@ test("analysis: pass^k использует выборку без возвращ
   const run = comparisonSummary([{ successes: 3, attempts: 6 }])
   expect(analyzeComparison(run, run, { k: 3 }).reliability.a.passk).toBeCloseTo(0.05, 12)
 })
+
+test("analysis: неизвестный pass не выбирает удобное подмножество попыток", () => {
+  const run = comparisonSummary([{ successes: 3, attempts: 3 }])
+  run.tasks[0]!.attempts[0]!.pass = null
+  expect(analyzeComparison(run, run).reliability.a).toEqual({ pass1: null, passk: null })
+})
