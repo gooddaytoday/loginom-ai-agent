@@ -187,3 +187,11 @@ test("analysis: oracle имеет собственный task-paired verdict", (
   expect(analyzeComparison(a,b).axes.oracle).toMatchObject({task_count:39, observed:{a:1,b:0,drop:1},verdict:"worse"})
   expect(analyzeComparison(a,b).axes.completion.verdict).toBe("indistinguishable")
 })
+
+test("analysis: structure не подменяется полным смешанным score", () => {
+  const a = comparisonSummary(Array.from({length:39}, () => ({successes:3,attempts:3})))
+  const b = structuredClone(a)
+  b.tasks.forEach((task) => task.attempts.forEach((attempt) => { attempt.structural_score = 0 }))
+  expect(analyzeComparison(a,b).axes.structure).toMatchObject({task_count:39, observed:{a:1,b:0,drop:1},verdict:"worse"})
+  expect(analyzeComparison(a,b).axes.oracle.verdict).toBe("indistinguishable")
+})
