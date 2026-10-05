@@ -1,0 +1,6 @@
+Region,Month,Category,Channel,Amount,Units,Text,Flag,When
+North,Sep,A,web,1.0,1,z,true,2026-01-01
+North,Sep,A,web,3.0,3,a,false,2026-01-03
+North,Sep,A,web,5.0,5,z,true,2026-01-05
+North,Sep,A,web,?,?,?,?,?
+?,Oct,B,?,?,?,?,?,?

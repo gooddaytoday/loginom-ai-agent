@@ -594,3 +594,34 @@ test('public node inspect/resume recovers a lost precondition refusal without re
  assert.equal(f.calls.filter(c=>c==='create').length,1);assert.equal(f.calls.filter(c=>c==='connect').length,1);
  assert.equal(f.graph.nodes.length,2);assert.equal(f.graph.links.length,1);
 });
+
+for(const fault of [null,'cleanup','foreign','execution','inbound','transport','journal'])test('native full refusal frees the runtime gate only with owned cleanup: '+fault,async()=>{
+ const f=fixture({wrapDrivers:(context,drivers)=>({...drivers,
+  finish:async mode=>({verified:true,cleanup_complete:true,mode,execution_started:mode==='execute',execution_id:mode==='execute'?'exec':null}),
+  waitExecution:async()=>({verified:true,cleanup_complete:true,status:'completed',execution_id:'exec'}),
+  readOutput:async(read,ctx)=>{
+   context.operation.cleanupConfirmed=true;
+   const binding={refusal:{code:'NATIVE_FULL_BOUND_EXCEEDED'},port:0,...ctx.node,
+    port_guid:'port',execution:structuredClone(ctx.execution),row_count:2,schema:Array.from({length:10},(_,i)=>({name:'C'+i}))};
+   const refusal={phase:'read',status:'FAILED',verification:'native_full_bound_refused',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+    proof:{binding,closed:{verified:true,cleanup_complete:true,preview_closed:true,port_guid:'port',node_context:{...ctx.node,verified:true,surface:'graph'}}}};
+   if(fault==='cleanup')refusal.proof.closed.preview_closed=false;
+   if(fault==='foreign')refusal.proof.closed.node_context.node_id='other';
+   if(fault==='execution')binding.execution.execution_id='other';
+   if(fault==='inbound')binding.schema.length=8;
+   if(fault==='transport')context.operation.transportUncertain=true;
+   const error=Error('Exact full bound is 50 rows by 8 columns');error.nodePhaseRefusal=refusal;throw error;
+  }} )});
+ f.handlers.set('transform.cross_table',{...f.handler,modes:['pivot']});
+ const p=request();p.target.type='transform.cross_table';p.mode='pivot';p.finish='execute';p.read={ports:[0],sample_rows:50,require_exact_numbers:true,coverage:'full'};
+ if(fault==='journal')f.failRecord('node_phase_refused');
+ const r=await f.runtime.runNodeApply(p);
+ assert.equal(r.status,fault?'AMBIGUOUS':'FAILED');assert.equal(r.cleanup_complete,!fault);
+ if(fault){assert.throws(()=>f.runtime.assertPreparationAllowed());await assert.rejects(f.runtime.runNodeApply({...request(),operation_id:'next'}),/pending/);}
+ else{
+  assert.match(r.output.next_step.instruction,/saving or another action is allowed/);
+  assert.equal(r.output.pending_phase,null);assert.equal((await f.runtime.inspect({operationId:'apply'})).output.state,'resolved');
+  f.runtime.assertPreparationAllowed();const next=await f.runtime.runNodeApply({...p,operation_id:'next',target:{kind:'existing',type:'transform.cross_table',ref:r.output.node},finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false}});assert.equal(next.status,'SUCCEEDED');
+  assert.ok(f.events.some(e=>e.phase==='node_phase_refused'&&e.receipt.verification==='native_full_bound_refused'));
+ }
+});

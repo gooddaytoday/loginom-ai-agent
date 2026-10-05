@@ -32,19 +32,52 @@ export async function readNativeVariant(page,b,decode,options={}) {
    const sourceProcesses=records.filter(r=>r.data.ModelNode===sourceNode.data);
    need(sourceProcesses.some(r=>String(r.data.id).startsWith(sourceParts[1]+'.')&&r.data.Status===3&&r.data.ErrorDetails==='')
     &&!sourceProcesses.some(r=>Number(String(r.data.id).split('.')[0])>Number(sourceParts[1])),'stale static source execution');
-   const graphNodes=model.FDiagram.FNodes.FCollection;
+   const graphNodes=model.FDiagram.FNodes.FCollection,graphLinks=model.FDiagram.FLinks.FCollection;
+   let graphLink,sourcePort,inputPort,chainFingerprint='';
+   if(b.static_chain){
+    const c=b.static_chain;
+    need(c.kind==='crosstable_static_1'&&node.FIconCls==='bg-vendor-icon-crosstab'&&Array.isArray(c.nodes)
+     &&[1,2].includes(c.nodes.length)&&Array.isArray(c.edges)&&c.edges.length===c.nodes.length,'bounded static CrossTable chain required');
+    need(c.nodes[0].node_id===sourceNode.FGuid&&c.nodes[0].icon==='bg-vendor-icon-importtextfile'
+     &&c.nodes[0].execution_id===b.static_source.execution_id&&new Set([...c.nodes.map(n=>n.node_id),node.FGuid]).size===c.nodes.length+1,'complete unique chain provenance');
+    if(c.nodes.length===2)need(c.nodes[1].icon==='bg-vendor-icon-columnflipping','only observed Collapse ancestor supported');
+    const targets=[...c.nodes.slice(1).map(n=>n.node_id),node.FGuid];
+    const incoming=graphLinks.filter(l=>targets.includes(l.FTargetPort?.parent?.FGuid));
+    need(incoming.length===c.edges.length&&!graphLinks.some(l=>l.FTargetPort?.parent===sourceNode),'static topology changed');
+    const edges=c.edges.map(e=>{
+     const xs=incoming.filter(l=>l.FGuid===e.guid);need(xs.length===1,'static edge changed');const l=xs[0],sp=l.FSourcePort,ip=l.FTargetPort;
+     need(sp?.parent?.FGuid===e.source&&ip?.parent?.FGuid===e.target&&sp.FGuid===e.source_port&&ip.FGuid===e.input_port
+      &&sp.parent.FPorts[1].FCollection[0]===sp&&ip.parent.FPorts[0].FCollection[0]===ip
+      &&sp.FType===1&&ip.FType===0&&[sp,ip].every(p=>p.FSubType===1&&p.FParam===0),'static port topology changed');return l;
+    });
+    for(const [i,proof] of c.nodes.entries()){
+     const ns=graphNodes.filter(n=>n.FGuid===proof.node_id);need(ns.length===1,'static ancestor changed');const n=ns[0];
+     need(n.FIconCls===proof.icon&&n.FStatus===1&&n.FRunning===false,'static ancestor inactive or replaced');
+     need(proof.execution_id.startsWith(b.document_id+':'),'foreign ancestor execution');
+     const ep=proof.execution_id.slice(b.document_id.length+1).split(':');need(ep.length===2&&ep[0]===parts[0],'ancestor execution root changed');
+     const ps=records.filter(r=>r.data.ModelNode===n.data);
+     need(ps.some(r=>String(r.data.id).startsWith(ep[1]+'.')&&r.data.Status===3&&r.data.ErrorDetails==='')
+      &&!ps.some(r=>Number(String(r.data.id).split('.')[0])>Number(ep[1])),'stale ancestor execution');
+     const target=i===c.nodes.length-1?node.FGuid:c.nodes[i+1].node_id;
+     need(c.edges.filter(e=>e.source===n.FGuid&&e.target===target).length===1,'chain is disconnected or cyclic');
+    }
+    graphLink=edges[0];sourcePort=graphLink.FSourcePort;inputPort=graphLink.FTargetPort;
+    chainFingerprint=JSON.stringify([c.nodes.map(p=>{const n=graphNodes.find(n=>n.FGuid===p.node_id);return [n.FGuid,n.FIconCls,n.FStatus,n.FRunning];}),edges.map(l=>[l.FGuid,l.FSourcePort.FGuid,l.FTargetPort.FGuid])]);
+   }else{
+
    need(graphNodes.filter(n=>n.FIconCls==='bg-vendor-icon-importtextfile').length===1
     &&graphNodes.filter(n=>n!==node&&n!==sourceNode).every(n=>n.FIconCls==='bg-vendor-icon-modelvariables'&&n.FStatus===0&&n.FRunning===false),'unknown/dynamic graph source');
    // Test IDs normalize node labels (for example spaces become underscores).
    // Bind the real native edge and its port owners, independent of display names.
-   const graphLinks=model.FDiagram.FLinks.FCollection,graphLink=graphLinks[0];
+   graphLink=graphLinks[0];
    need(graphLinks.length===1&&typeof graphLink?.FGuid==='string'&&graphLink.FGuid.length>0,'static topology changed');
-   const sourcePort=graphLink.FSourcePort,inputPort=graphLink.FTargetPort;
+   sourcePort=graphLink.FSourcePort;inputPort=graphLink.FTargetPort;
    // FPortIndex is absent after native package reopen; use collection position.
    need(sourcePort?.parent===sourceNode&&sourceNode.FPorts[1].FCollection[0]===sourcePort
     &&inputPort?.parent===node&&node.FPorts[0].FCollection[0]===inputPort
     &&sourcePort.FType===1&&inputPort.FType===0
     &&[sourcePort,inputPort].every(p=>p.FSubType===1&&p.FParam===0&&typeof p.FGuid==='string'&&p.FGuid.length>0),'static topology changed');
+   }
    need(model.FCreateDraggedNodeStarted===false&&model.FDraggingOverGraph===false&&!model.FDraggedNode,'concurrent graph interaction');
    const ownProcesses=records.filter(r=>r.data.ModelNode===node.data);
    need(ownProcesses.some(r=>String(r.data.id).startsWith(parts[1]+'.')&&r.data.Status===3&&r.data.ErrorDetails===''),'execution node owner');
@@ -69,7 +102,7 @@ export async function readNativeVariant(page,b,decode,options={}) {
    const schema=v(v(v(dc,'FColumnInfosStore'),'data'),'items').map(r=>{const d=v(r,'data');return {name:d.Name,label:d.DisplayName,type:d.DataType};});
    need(JSON.stringify(schema)===JSON.stringify(b.schema)&&schema.length<=8&&b.columns.length===schema.length,'schema');
    const count=v(dt,'FTotalRowCount');need(count===b.row_count&&count===v(helper,'$FRowCount')&&b.offset+b.rows<=count&&b.columns.every(c=>Number.isInteger(c)&&c>=0&&c<schema.length),'row/column bounds');
-   return {sourceNode,sourceData:sourceNode.data,graphLink,sourcePort,inputPort,graphFingerprint:JSON.stringify([graphLink.FGuid,sourcePort.FGuid,inputPort.FGuid]),processRoot,processFingerprint,node,port,dc,dt,ds,store,helper,cache:v(helper,'$FData'),identity,owner:v(identity,'$OW'),object:v(identity,'$O'),schema:JSON.stringify(schema),count};
+   return {chainFingerprint,sourceNode,sourceData:sourceNode.data,graphLink,sourcePort,inputPort,graphFingerprint:JSON.stringify([graphLink.FGuid,sourcePort.FGuid,inputPort.FGuid]),processRoot,processFingerprint,node,port,dc,dt,ds,store,helper,cache:v(helper,'$FData'),identity,owner:v(identity,'$OW'),object:v(identity,'$O'),schema:JSON.stringify(schema),count};
   };
   need(Object.keys(options).every(k=>['operationId','timeoutMs','requireAtomicSnapshot','maxBytes'].includes(k)),'diagnostic option allowlist');
   need(options.requireAtomicSnapshot!==true,'atomic snapshot unavailable for fixed321');

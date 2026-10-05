@@ -2625,6 +2625,43 @@ test('storage row selection reads folder type from its own visible unique cell',
   type.ownText='Текстовый файл';assert.equal((await read()).kind,'unknown');
 });
 
+test('storage byte identity uses the same cached native file record regardless of rendered size',async()=>{
+  for(const mode of ['valid','loading','foreign_grid','foreign_view','foreign_row','foreign_record','wrong_store',
+    'buffered','wrong_count','folder','wrong_name','wrong_path','wrong_id','fractional','negative','overflow','duplicate_grid']) {
+    const page=new Page(),base='MF;TF-1;FileStorageForm;',name='wide.csv';
+    const grid=page.add('div',base+'pnlFileStorage');grid.attrs.id='file-grid';grid.id='file-grid';
+    const view=page.add('div',null,'',undefined,grid),row=page.add('table',null,'',undefined,view);row.attrs.class='x-grid-item';
+    const cell=page.add('td',base+'colName_'+name,name,undefined,row);
+    page.add('td',base+'colFileType_'+name,'Текстовый файл',undefined,row);
+    const size=page.add('td',base+'colSize_'+name,'1,702',undefined,row);
+    const record={isModel:true,data:{id:'/worker/'+name,FileName:name,FilePath:'/worker/'+name,Type:0,Size:1702}};
+    const data=record.data;
+    if(mode==='folder')data.Type=1;
+    if(mode==='wrong_name')data.FileName='other.csv';
+    if(mode==='wrong_path')data.FilePath=data.id='/worker/other.csv';
+    if(mode==='wrong_id')data.id='/foreign/'+name;
+    if(mode==='fractional')data.Size=1702.5;
+    if(mode==='negative')data.Size=-1;
+    if(mode==='overflow')data.Size=Number.MAX_SAFE_INTEGER+1;
+    if(mode==='duplicate_grid')page.add('div',base+'pnlFileStorage');
+    const store={$className:mode==='wrong_store'?'Other':'bg.filedialog.FileStore',isBufferedStore:mode==='buffered',
+      isLoading:()=>mode==='loading',getCount:()=>mode==='wrong_count'?2:1,getRange:()=>mode==='foreign_record'?[]:[record]};
+    const nativeView={el:{dom:mode==='foreign_view'?page.document.body:view},
+      getRecord:()=>record,getNode:()=>mode==='foreign_row'?cell:row};
+    page.context.Ext={getCmp:id=>id==='file-grid'?{el:{dom:mode==='foreign_grid'?view:grid},getStore:()=>store,getView:()=>nativeView}:undefined};
+    const read=async()=> (await page.observe()).ui.elements.find(e=>e.tid===cell.getAttribute('data-tid')).storage_entry;
+    const entry=await read();
+    assert.equal(entry.bytes,mode==='valid'?1702:undefined,mode);
+    if(mode==='valid') {
+      assert.equal(entry.bytes_source,'native_file_store');
+      for(const bytes of [0,900,1023,1024,1025,1536,1937,3072,1048576]) {
+        data.Size=bytes;size.ownText='rounded KiB';assert.equal((await read()).bytes,bytes);
+      }
+      delete page.context.Ext;size.ownText='1702';assert.equal((await read()).bytes,undefined);
+    }
+  }
+});
+
 test('narrow storage name reads retain sibling type without issuing sibling controls', async () => {
   const page=new Page(),row=page.add('table',null);row.attrs.class='x-grid-item';
   const cell=row.append(new Element('td',{'data-tid':'MF;TF-1;FileStorageForm;colName_test'},'test'));

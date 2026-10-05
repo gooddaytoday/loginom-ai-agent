@@ -71,7 +71,9 @@ export async function launchNodeHost(input: {
         headless: input.headless,
         ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
       },
-      30_000,
+      // Startup restores the saved connection and waits for browser/MCP readiness.
+      // Use the normal bounded RPC budget; browser login alone can exceed 30s.
+      180_000,
     )
     .catch(async (error: unknown) => {
       child.kill("SIGTERM")

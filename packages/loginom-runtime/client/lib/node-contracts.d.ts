@@ -1,7 +1,7 @@
 /** Shared 02/03 contract. Runtime publication of node.apply belongs to 03. */
 export type NodeType = 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
   | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.sorting'
-  | 'transform.join_data' | 'transform.union_data';
+  | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table';
 export interface WorkflowRef { workflow_id: string; tab_tid: string; prefix: string; navigation_path: {tid: string; label: string}[] }
 export interface NodeRef { document_id: string; workflow_id: string; node_id: string }
 export interface Position { x: number; y: number }
@@ -23,7 +23,7 @@ export interface PortMapping {
 export interface NodeApplyRequest<T extends NodeType, P> extends NodeTargetRequest<T> {
   operation_id: string; contract_revision: string; mode: string; parameters: P;
   mappings: PortMapping[]; finish: 'done' | 'execute' | 'close';
-  read: {ports: number[]; sample_rows: number; require_exact_numbers: boolean; coverage?: 'sample' | (T extends 'transform.collapse_columns' ? 'full' : never)};
+  read: {ports: number[]; sample_rows: number; require_exact_numbers: boolean; coverage?: 'sample' | (T extends 'transform.collapse_columns' | 'transform.cross_table' ? 'full' : never)};
   budgets: {configure_ms: number; execute_ms: number; total_ms: number};
 }
 export interface NodeHandler<T extends NodeType, P> {
@@ -35,7 +35,7 @@ export interface NodeHandler<T extends NodeType, P> {
   configure(context: NodeProcedureContext, parameters: P): Promise<VerifiedNodePhase>;
   /** Pure projection of accepted receipts; never executes or rereads the UI. */
   configurationReadback?(context: {node: NodeRef; operation_id: string;
-    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback;
+    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback;
 }
 export interface VerifiedNodePhase { verified: true; cleanup_complete: true; effect_possible: boolean }
 export interface NodeProcedureContext {
@@ -52,7 +52,7 @@ export interface NodeApplyResult {
   execution: NodeExecution; output: NodeOutput;
   /** A local node checkpoint never proves that the package was saved. */
   package_saved: false; cleanup_complete: boolean; warnings: string[];
-  configuration?: {status: 'applied' | 'discarded'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback};
+  configuration?: {status: 'applied' | 'discarded'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback};
   checkpoint_kind?: 'local_node_checkpoint' | 'local_node_cancellation' | 'local_node_stopped' | 'local_node_failed';
   persisted_package_verified?: false; pending_phase?: PhaseName | null; error?: NodeError;
 }
@@ -262,4 +262,26 @@ export interface CollapseConfigurationReadback {
   ignore_empty: boolean;
   input_mapping: GroupingConfigurationReadback['input_mapping'];
   output_mapping: GroupingConfigurationReadback['output_mapping'];
+}
+
+export type CrossTableFunction='sum'|'count'|'min'|'max'|'avg'|'stddev'|'sum_squares'|'unique_count'|'null_count'|'first'|'last';
+export interface CrossTableParameters {
+ row_keys: ConfiguredInputField[]; column?: ConfiguredInputField; columns?: ConfiguredInputField[];
+ facts: {field: ConfiguredInputField; functions: CrossTableFunction[]}[];
+ category_mode: 'fixed'|'sliding'; include_null?: boolean; include_other?: boolean;
+ local_variables?:{name:string;type:'integer'|'boolean'|'string';value:number|boolean|string}[];
+ bindings?:{limit?:{variable:string};unique_names?:{variable:string};separator?:{variable:string}};
+ min_values?: number; limit?: number; separator?: '|'|'.'|'->'|' '; unique_names?: boolean;
+}
+export interface ConfiguredInputField {kind:'input_field'; name:string}
+export interface CrossTableConfigurationReadback {
+ kind:'crosstable'; scope:'observed_before_verified_finish'; values_are:'observed_ui_values'; node:NodeRef;
+ receipt_ids:string[]; mode:'pivot'; category_mode:'fixed'|'sliding';
+ row_keys:{name:string;label:string;type:string;order:number}[]; column:{name:string;label:string;type:string}|null; columns:{name:string;label:string;type:string;order:number}[];
+ facts:{name:string;label:string;type:'integer'|'real'|'string'|'boolean'|'datetime'|'variant';order:number;functions:CrossTableFunction[]}[];
+ options:{separator:string;unique_names:boolean;limit:number;min_values:number;min_values_by_dimension?:{field:string;value:number}[];variable_bindings?:Partial<Record<'limit'|'unique_names'|'separator',{name:string;id:number;type:number;value:number|boolean|string;selected_proxy_equal:true}>>;include_null:boolean;include_other:boolean};
+ output_scope:'not_materialized'|'observed_after_verified_execution'; execution_id:string|null;
+ output_mapping?:{verified:true;inventory_complete:true;source_identity_verified:true;autosync:boolean;node_context:NodeRef&{verified:true;output_port:{port:0}};source_fields:{record_id:string;name:string;label:string;type:string;required:boolean}[];target_fields:{index:number;name:string;label:string;type:string;excluded:boolean;source:{record_id:string;name:string;label:string;type:string}}[]};
+ category_fields:{reserved_possible?:boolean;category_identity_source?:'observed_caption';category:string|null;category_kind:'null'|'other'|'value';fact:string;function:CrossTableFunction;field:string;label:string;type:string;categories?:{dimension:string;caption:string;kind:'null'|'other'|'value';value:string|null}[]}[];
+ package_persistence_verified:false;
 }

@@ -57,22 +57,7 @@ export async function connectionService(
       return 0
     }),
   )
-  const restored = state.pending ?? state.active
-  if (restored && isLegacyDefaultUrl(restored.url) && state.phase !== "recoverable-error") {
-    // Keep old generations immutable and use the normal durable activation path.
-    // A pending user edit takes precedence over the previously active connection.
-    const migrated = {
-      ...restored,
-      url: Product.connection.url,
-      generation: state.generation + 1,
-      revision: state.revision + 1,
-    }
-    await store.savePending(migrated)
-    state.pending = migrated
-    state.generation = migrated.generation
-    state.revision = migrated.revision
-  }
-  if (state.active && !(state.pending && isLegacyDefaultUrl(state.active.url))) {
+  if (state.active) {
     state.phase = "starting"
     state.applying = runtime
       .prepare(state.active)
@@ -376,10 +361,6 @@ function settingsAddress(value: string) {
   if (!url.searchParams.has("testable")) return value
   url.searchParams.delete("testable")
   return url.href
-}
-
-function isLegacyDefaultUrl(url: string) {
-  return url === "http://logi-test-plan.bg.local/app/" || url === "http://logi-test-plan.bg.local/app"
 }
 
 function validateAddress(url: string, username: string) {

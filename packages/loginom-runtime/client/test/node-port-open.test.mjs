@@ -19,7 +19,7 @@ function fixture(direction='output') {
  }));
  const node={FGuid:'node',FCell:{},data:{},FLocked:false},port={FGuid:'port',FCell:{},FPortIndex:0,data:{},parent:node};node.FPorts=[{FCollection:[port]}];
  const graph=Object.assign(new ModelForm(),{FDiagram:{FNodes:{FCollection:[node]},FmxGraph:{container:root,
-  view:{getState:c=>({shape:{node:c===node.FCell?nodeDom:portDom}})},getCellAt:()=>port.FCell}},FPortContextMenu:{el:{dom:menu}}});
+  view:{getState:c=>({cell:c,shape:{node:c===node.FCell?nodeDom:portDom}})},getCellAt:()=>port.FCell}},FPortContextMenu:{el:{dom:menu}}});
  const workflow={},packageNode={},nodeTree=Object.assign(new ModelNodeTreeNode(),{ParentNode:workflow,FGuid:'node',FModelNode:node.data});
  const group=Object.assign(new (direction==='input'?ModelInputPortsTreeNode:ModelOutputPortsTreeNode)(),{ParentNode:nodeTree}),portTree=Object.assign(new ModelPortTreeNode(),{ParentNode:group,FIndex:0,FModelNodePort:port.data});
  const wizardTree=Object.assign(new WizardTreeNode(),{ParentNode:portTree});
@@ -166,3 +166,16 @@ test('Union third port keeps logical 2, SVG 3 and native tree 2 distinct',async(
 });
 
 test('covered port refuses opening before any mouse gesture',async()=>{const f=fixture();f.flags.foreignHit=true;const r=await f.run();assert.equal(r.status,'NOT_APPLIED');assert.equal(r.effect_possible,false);assert.deepEqual(f.gestures,[]);});
+
+test('control input identity comes from the exact cached cell ordinal, never a SVG number',async()=>{
+ const f=fixture('input');f.task.kind='control';
+ f.portDom.tid='MF;TF;Graph;Node;Input_ControlVar';f.portDom.getAttribute=()=>f.portDom.tid;
+ const dataPort={FGuid:'data',FCell:{},FPortIndex:0,data:{},parent:f.node};
+ f.node.FPorts[0].FCollection.unshift(dataPort);const prior=f.graph.FDiagram.FmxGraph.view.getState;f.graph.FDiagram.FmxGraph.view.getState=c=>c===dataPort.FCell?{cell:c,shape:{node:{}}}:prior(c);f.port.FPortIndex=1;f.portTree.FIndex=1;
+ const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.native_index,1);assert.equal(r.port,0);
+ assert.equal(f.prep.inputPortOpenReceipts.get('open').port,f.port);
+});
+test('control input opening refuses a misleading native ordinal without a gesture',async()=>{
+ const f=fixture('input');f.task.kind='control';f.portDom.tid='MF;TF;Graph;Node;Input_ControlVar';f.portDom.getAttribute=()=>f.portDom.tid;
+ f.port.FPortIndex=7;const r=await f.run();assert.equal(r.status,'NOT_APPLIED');assert.equal(f.gestures.length,0);
+});

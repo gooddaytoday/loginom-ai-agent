@@ -2,7 +2,7 @@
 
 - Connection settings and public read/status views omit the internal `testable` query parameter, including for old saved URLs. New saves remove it while preserving other parameters. Runtime adds `testable=true` privately through `loginomAddress`; private login and managed bridge preparation must use that same canonical address. Historical generations remain immutable.
 
-- Public service defaults are `https://mcp.loginom.ai/mcp` and `https://app.loginom.ai`. At startup, `connectionService` migrates only the exact old default `http://logi-test-plan.bg.local/app` (with optional trailing slash), using a fresh durable generation. Pending settings take precedence; preserve custom URLs, credentials and historical generations. Failed preparation leaves the durable pending record for the next startup. Desktop and CLI share this migration.
+- Public service defaults are `https://mcp.loginom.ai/mcp` and `https://app.loginom.ai` for unconfigured profiles only. Restore saved active and pending stand URLs exactly; the local test stand is a valid explicit choice and must never be redirected to the public service by startup migration. Preserve credentials and immutable historical generations. Desktop and CLI share this rule.
 
 - This package owns runtime supervision (`src/supervisor.ts`), private transport (`transport.ts`), the backend adapter (`adapter.ts`), original-user input admission (`inputs.ts`), and extracted connection/recovery logic (`src/connection`). `createLoginomHost` in `src/host.ts` composes these with explicit paths, credential codec, environment and browser mode. Desktop supplies Electron paths and safeStorage; the model must never become their authority.
 - `host-port.ts` owns the common request handler. Retain generation leases for all admitted call/list/admit/interrupt requests; ordinary acquire must never resume a recovery lease. In strict mode, `journal.pending()` includes uncertain dispatches, and a later successful call cannot erase an earlier one. Explicit acknowledgement requires idle leases and runtime reset; shutdown wins before journal commit.
@@ -30,7 +30,7 @@
 
 - Runtime shutdown succeeds only with a `closed: true` acknowledgement and exit code 0 without a signal. A killed or disconnected child is not successful cleanup; repeated close preserves the original outcome.
 
-- The Linux build also emits a versioned tar.gz and .sha256 beside the payload, verifies the extracted archive manifest, and refuses to overwrite existing archive/checksum files. Include build scripts in package typecheck.
+- By default the Linux build also emits a versioned tar.gz and .sha256 beside the payload, verifies the extracted archive manifest, and refuses to overwrite existing archive/checksum files. `--no-archive` produces only the verified development payload; it skips compression and archive roundtrip without changing manifest verification or source identity. Include build scripts in package typecheck.
 
 - A successful runtime reply can retain active asynchronous work. Keep its journal records durable but permit the same run to poll while `activeWork` is true. Clear that run's records only when its runtime reports no unsettled work. In strict mode, losing the owner or receiving inactive uncertainty still moves retained records to recovery. Advisory mode drops that lock and, on the next acquire, replaces a runtime that cannot continue. Never acquire a second run for the same chat while the first owns it; unrelated runs cannot reconcile its records.
 

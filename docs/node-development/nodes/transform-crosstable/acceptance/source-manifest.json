@@ -1,0 +1,49 @@
+{
+  "kind": "source_only",
+  "package_basename": "lab12-stage2-source-v3.lgp",
+  "file": {
+    "name": "variant-source.csv",
+    "bytes": 216,
+    "sha256": "98ec788a49a1b1995fcf42c0bf7dacb9ae200d3a6ddfc107d650dfc81aa67493",
+    "columns": [
+      {
+        "name": "Key",
+        "label": "Key",
+        "type": "string"
+      },
+      {
+        "name": "RealValue",
+        "label": "RealValue",
+        "type": "real"
+      },
+      {
+        "name": "TextValue",
+        "label": "TextValue",
+        "type": "string"
+      },
+      {
+        "name": "FlagValue",
+        "label": "FlagValue",
+        "type": "boolean"
+      },
+      {
+        "name": "WhenValue",
+        "label": "WhenValue",
+        "type": "datetime"
+      }
+    ]
+  },
+  "collapse": {
+    "information": [
+      "Key"
+    ],
+    "transposed": [
+      "RealValue",
+      "TextValue",
+      "FlagValue",
+      "WhenValue"
+    ],
+    "ignore_empty": false
+  },
+  "derived_reports": false
+}

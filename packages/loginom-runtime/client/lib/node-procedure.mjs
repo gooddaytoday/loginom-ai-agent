@@ -1,3 +1,5 @@
+import {makeCrossTableContextCode} from './crosstable-context.mjs';
+import {makeCrossTableVariablesCode,makeCrossTableBindingsCode} from './crosstable-variables.mjs';
 import {makeReplacementContextCode} from './replacement-context.mjs';
 import {makeDateTimeContextCode} from './date-time-context.mjs';
 import {makeMissingValuesContextCode} from './missing-values-context.mjs';
@@ -119,7 +121,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       &&filter.selection?.length===1&&filter.rows?.some(r=>r.record_id===filter.selection[0]&&codes.includes(r.operator_code))
       &&state.ui.masks?.some(m=>m.kind==='busy'&&m.ref===dialog.ref&&m.dialog_ref===dialog.ref&&m.target_tid===tid);
   };
-  const allowedNodeEditor=(dialog,state)=>allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedReformEditor(dialog,state);
+  const allowedCrossTableEditor=(dialog,state)=>{
+    const c=state.node_crosstable,name=dialog.identity?.anchor_tid?.split(';').at(-1);
+    return state.wizard?.stage==='crosstable'&&c?.verified===true&&c.selected_used?.length===1
+      &&c.input_fields.some(f=>f.record_id===c.selected_used[0]&&f.disposition===(name==='FactorEditDialog'?3:name==='ColumnEditDialog'?1:-1))
+      &&c.dialogs?.filter(d=>d.tid===dialog.identity.anchor_tid&&d.name===name).length===1
+      &&dialog.identity.anchor_tid===state.wizard.root_tid+';'+name;
+  };
+  const allowedNodeEditor=(dialog,state)=>allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedReformEditor(dialog,state);
   const assertContext = (state, allowTransient = false, tableDialog = null, rootsOnly = false, wizardConfirmation = null) => {
     if(preparedNodeContext) {
       const b=state.prepared_node_context;
@@ -148,7 +157,30 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       throw new Error('Node procedure is blocked by a mask or dialog');
     }
   };
+  const crossTableOwnedStep=async(verb,payload,makeCode)=>{
+    checkBudget();
+    if(!preparedNodeContext)throw Error('Prepared CrossTable owner required');
+    const step=nextStep(),id=operation.id+':n'+step,actionKey='node.crosstable.'+verb+'.internal',action={verb,...payload};
+    const signature=digest([id,action,preparedNodeContext]);snapshot=null;evidenceSnapshot=null;
+    const prepared=await entry('node_step_prepared',{step,internal_operation_id:id,action,signature});
+    if(prepared?.signature!==signature||JSON.stringify(prepared.action)!==JSON.stringify(action))throw Error('CrossTable step was not durably prepared');
+    checkBudget();
+    const deadline=operation.deadline,code=makeCode(preparedNodeContext,{...payload,origin:targetOrigin,build:targetBuild,operation_id:id,deadline});
+    const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:${JSON.stringify(verb)},effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.error?{code:'CROSSTABLE_VARIABLE_STEP_UNCONFIRMED',message:r.error}:null,trace:[]}}`;
+    let result;
+    try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:Math.max(5000,deadline-now()+5000)});}
+    catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
+    if(result.operation_id!==id||result.action_key!==actionKey){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw Error('CrossTable step receipt differs');}
+    operation.cleanupConfirmed=result.cleanup_complete===true;operation.nodeEffectPossible ||= result.effect_possible===true;
+    const completed=await entry('node_step_completed',{step,internal_operation_id:id,outcome:structuredClone(result)});
+    if(JSON.stringify(completed?.outcome)!==JSON.stringify(result))throw Error('CrossTable outcome was not durably preserved');
+    if(result.status!=='SUCCEEDED'||!operation.cleanupConfirmed||result.output?.verified!==true
+      ||!['document_id','workflow_id','node_id'].every(k=>result.output.node_context?.[k]===(k==='document_id'?preparedNodeContext.document_id:k==='workflow_id'?preparedNodeContext.workflow_ref.workflow_id:preparedNodeContext.node.node_id)))throw new NodeProcedureStepError(result);
+    return structuredClone(result.output);
+  };
   const channel = {
+    async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
+    async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
     async openOutputPort(port) {return channel.openPort('output',port);},
     async openInputPort(port) {return channel.openPort('input',port);},
     async openPort(direction,port) {
@@ -183,7 +215,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readOutputs = false, readMappings = false, readCalculator = false, readGrouping = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readOutputs = false, readMappings = false, readCalculator = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -194,7 +226,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
       if(tableDialog)makeNodeTableContextCode(preparedNodeContext,tableDialog.table,{row_offset:0,row_limit:0,column_offset:0,column_limit:1});
-      if ((readProcesses || readOutputs || readMappings || readCalculator || readGrouping || readDateTime || readCollapse || readMissingValues || readSorting || readReplacement || readDuplicates || readReform || readFilter || readJoin || readUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
+      if ((readProcesses || readOutputs || readMappings || readCalculator || readGrouping || readCrossTable || readDateTime || readCollapse || readMissingValues || readSorting || readReplacement || readDuplicates || readReform || readFilter || readJoin || readUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
       // A failed wait must invalidate even a previously usable observation.
       snapshot = null;
       evidenceSnapshot = null;
@@ -258,10 +290,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(joinMenus.length>1)throw Error('Join link menu is ambiguous');
         const missingValuesDialogs=readMissingValues&&wizard?.stage==='missing_values'?(roots.output.ui?.elements??[]).filter(e=>e.tid==='msgbox'):[];
         if(missingValuesDialogs.length>1)throw Error('Missing values dialog is ambiguous');
+        const crossTableEditors=readCrossTable&&wizard?.stage==='crosstable'?(roots.output.ui?.elements??[]).filter(e=>
+          ['ColumnEditDialog','FactorEditDialog'].some(name=>e.tid===wizard.root_tid+';'+name)):[];
+        if(crossTableEditors.length>1)throw Error('CrossTable editor is ambiguous');
         const rolePortal=wizard?.stage==='input_mapping'&&portals[0]?.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist'?portals[0].ref:undefined;
         const produceMenus=readMappings&&wizard?.stage==='output_mapping'?(roots.output.ui?.elements??[]).filter(e=>e.tid===wizard.root_tid+';DerivedDataSourceMappingEngineOutputPortWizard;btnProduceType;mn'||e.tid===wizard.root_tid+';DerivedDataSourceOutputSocketWizard;btnProduceType;mn'):[];
         if(produceMenus.length>1)throw Error('Derived output policy menu is ambiguous');
-        const root = missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
+        const root = crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
         if (observationNow() >= deadline) break;
         result = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
           ...boundOptions,
@@ -324,6 +359,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(readMissingValues){
           result.output.node_missing_values=await execute(makeMissingValuesContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_missing_values.node_context&&JSON.stringify(canonical(result.output.node_missing_values.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Native missing values context changed during observation');
+        }
+        // CrossTable modal ownership is attested by its native cached record,
+        // before a modal can pass the context gate or authorize any action.
+        if(readCrossTable&&result.output.wizard?.stage==='crosstable'){
+          result.output.node_crosstable=await execute(makeCrossTableContextCode(preparedNodeContext),{timeout:readTimeout()});
+          const native=result.output.node_crosstable;
+          if(native.node_context&&JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
+            throw Error('CrossTable native owner changed during observation');
         }
         try {
           assertContext(result.output, true, tableDialog, false, wizardConfirmation);
@@ -484,6 +527,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           readMappings:initialObservation?.node_mapping!==undefined,
           readCalculator:initialObservation?.node_calculator!==undefined,
           readGrouping:initialObservation?.node_grouping!==undefined,
+          readCrossTable:initialObservation?.node_crosstable!==undefined,
           readDateTime:initialObservation?.node_date_time!==undefined,
           readCollapse:initialObservation?.node_collapse!==undefined,
           readSorting:initialObservation?.node_sorting!==undefined,
