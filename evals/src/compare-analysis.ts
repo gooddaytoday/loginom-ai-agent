@@ -264,6 +264,8 @@ function stringArray(value: unknown) {
 }
 function metrics(record: Record<string,unknown>,task = false) {
   numbers(record,task ? ["attempts","completed"] : ["total","completed","tool_errors","total_cost"],0,Infinity)
-  for (const key of ["completion_rate","pass_rate","oracle_pass_rate"]) if (record[key] != null) numeric(record[key],0,1)
-  for (const key of task ? ["mean_score","min_score","max_score"] : ["mean_score","mean_score_completed"]) if (record[key] != null) numeric(record[key],0,100)
+  for (const key of ["completion_rate","pass_rate"]) if (record[key] !== null) numeric(record[key],0,1)
+  if (record.oracle_pass_rate != null) numeric(record.oracle_pass_rate,0,1)
+  for (const key of ["oracle_checked_count","pass_evaluated_count"]) if (record[key] != null) numeric(record[key],0,Infinity,true)
+  for (const key of task ? ["mean_score","min_score","max_score"] : ["mean_score","mean_score_completed"]) if (record[key] !== null) numeric(record[key],0,100)
 }

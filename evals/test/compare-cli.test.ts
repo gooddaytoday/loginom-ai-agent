@@ -43,3 +43,16 @@ test("CLI compare: malformed JSON shapes дают exit 2", async () => {
   }
  } finally { await rm(directory,{recursive:true,force:true}) }
 })
+
+test("CLI compare: отсутствующая обязательная метрика даёт data error exit 2", async () => {
+ const directory = await mkdtemp(path.join(os.tmpdir(),"evals-compare-metrics-"))
+ try {
+  await summaries(directory)
+  const raw = await Bun.file(path.join(directory,"a/summary.json")).json()
+  delete raw.metrics.mean_score
+  await Bun.write(path.join(directory,"a/summary.json"),JSON.stringify(raw))
+  const result = await runCompare(directory,["a","b"])
+  expect(result.code).toBe(2)
+  expect(result.stderr).toContain("Некорректный summary")
+ } finally { await rm(directory,{recursive:true,force:true}) }
+})
