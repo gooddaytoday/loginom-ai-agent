@@ -103,6 +103,12 @@ def check(render_view=False, source_archive=None):
             errors.append('missing or invalid plan '+n['component_id'])
         if bool(n.get('handler'))!=(n['queue_class']=='implemented'):
             errors.append('handler classification mismatch '+n['component_id'])
+        plan=ROOT/f"nodes/{n['slug']}/plan.md"
+        if plan.is_file():
+            text=plan.read_text()
+            if not re.search(r'^Статус: ',text,re.M):errors.append('plan without status '+n['slug'])
+            for number in range(7):
+                if not re.search(rf'^## {number}\. ',text,re.M):errors.append(f'plan without section {number} '+n['slug'])
         h=n.get('handler')
         if h:
             paths=h['source'] if isinstance(h['source'],list) else [h['source']]
@@ -159,6 +165,10 @@ def check(render_view=False, source_archive=None):
             if ref not in reference_ids:errors.append('unknown historical reference '+ref)
         for ref in re.findall(r'unavailable:(artifact-[0-9a-f]{16})',t):
             if ref not in artifact_ids:errors.append('unknown unavailable artifact '+ref)
+        if p.suffix=='.md' and p.is_relative_to(ROOT) and not p.is_relative_to(ROOT/'history'):
+            for line in t.splitlines():
+                if re.search(r'Hermes|Paperclip',line) and not re.search(r'истор|прежн',line,re.I):
+                    errors.append('legacy process as current '+str(p.relative_to(REPO)));break
         if re.search(r'(?:/Users/[^/]+/Git/|~/Git/)loginom-dock',t):
             errors.append('old checkout path '+str(p.relative_to(REPO)))
         if re.search(r'-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----|\bgh[pousr]_[A-Za-z0-9]{30,}|\bsk-[A-Za-z0-9_-]{32,}|\bAKIA[A-Z0-9]{16}\b',t):
