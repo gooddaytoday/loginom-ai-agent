@@ -57,7 +57,7 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
       if (task.attempts.every((attempt) => attempt.oracle_pass === true) && other.attempts.every((attempt) => attempt.oracle_pass === false)) regressions.push("oracle")
       if (task.attempts.every((attempt) => attempt.pass === true) && other.attempts.every((attempt) => attempt.pass === false)) regressions.push("pass")
     }
-    return { id: task.id, completion: rates[index]!, regressions }
+    return { id: task.id, completion: rates[index]!, oracle: { a: judgedRate(task.attempts, "oracle_pass"), b: judgedRate(other.attempts, "oracle_pass") }, structure: { a: judgedRate(task.attempts, "structural_score"), b: judgedRate(other.attempts, "structural_score") }, regressions }
   })
   const oraclePairs = a.tasks.map((task) => ({ a: task, b: b.tasks.find((other) => other.id === task.id)! }))
   const oracleKnown = oraclePairs.every((pair) => pair.a.rubric_snapshot?.version === 1 && pair.b.rubric_snapshot?.version === 1 &&
@@ -67,10 +67,16 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
   const oracleReasons = !oracleKnown ? ["snapshot_unavailable"] : !a.judge || !b.judge ? ["judge_skipped"] :
     oraclePairs.some((pair) => pair.a.rubric_snapshot?.oracle_applicable &&
       [pair.a, pair.b].some((task) => measured(task.attempts).some((attempt) => typeof attempt.oracle_pass !== "boolean"))) ? ["oracle_coverage"] : []
+  const structureRates = oraclePairs.map((pair) => ({ a: judgedRate(pair.a.attempts, "structural_score"), b: judgedRate(pair.b.attempts, "structural_score") }))
+  const structureReasons = !a.judge || !b.judge ? ["judge_skipped"] :
+    oraclePairs.some((pair) => [pair.a, pair.b].some((task) => !task.rubric_snapshot ||
+      task.rubric_snapshot.checklist.some((item) => item.axis === undefined) ||
+      !task.rubric_snapshot.checklist.some((item) => item.axis === "structure"))) ? ["structure_unclassified"] :
+    oraclePairs.some((pair) => [pair.a, pair.b].some((task) => measured(task.attempts).some((attempt) => typeof attempt.structural_score !== "number"))) ? ["structure_coverage"] : []
   return { policy, compatibility, tasks, reliability: { k: policy.k, a: reliability(a, policy.k), b: reliability(b, policy.k), reasons: [
     ...(policy.k === null ? ["k_unknown"] : []),
     ...([a, b].some((run) => { const result = reliability(run, policy.k); return result.pass1 === null || policy.k !== null && result.passk === null }) ? ["pass_coverage"] : []),
-  ] }, axes: { completion: axis(rates, policy, [a, b].some((run) => run.interrupted || run.stopped_reason || run.tasks.some((task) => task.attempts.some((attempt) => attempt.status === "interrupted"))) ? ["partial_run"] : []), oracle: axis(oracleRates, policy, oracleReasons), structure: axis([], policy, ["structure_unavailable"]) } }
+  ] }, axes: { completion: axis(rates, policy, [a, b].some((run) => run.interrupted || run.stopped_reason || run.tasks.some((task) => task.attempts.some((attempt) => attempt.status === "interrupted"))) ? ["partial_run"] : []), oracle: axis(oracleRates, policy, oracleReasons), structure: axis(structureRates, policy, structureReasons) } }
 }
 
 function completion(attempts: AttemptResult[]) {
