@@ -4,7 +4,7 @@ import { isAbsolute, join } from "node:path"
 import { randomUUID } from "node:crypto"
 import { Schema } from "effect"
 import { Loginom } from "@loginom-ai-agent/schema/loginom"
-import { supervise, superviseKnowledge } from "./supervisor"
+import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
 import { connectionService } from "./connection/connection-service"
 import { connectionStore, type ActiveConnection } from "./connection/connection-store"
 import type { CredentialCodec } from "./connection/credentials"
@@ -37,6 +37,7 @@ export async function createLoginomHost(options: {
   const restarts = new Map<string, number>()
   const lost = new Set<string>()
   const stale = new Set<string>()
+  const startupCleanup = { failed: false }
   type Runtime = Awaited<ReturnType<typeof supervise>>
   function retain(generation: { children: Map<string, Promise<Runtime>> }, chat: string, child: Promise<Runtime>) {
     const tracked = child.then((runtime) => {
@@ -72,7 +73,15 @@ export async function createLoginomHost(options: {
         actionManifestSha256: manifest.actionManifestSha256,
       },
       signal,
-    )
+    ).catch(startupFailure)
+  }
+  function startupFailure(error: unknown): never {
+    // Recoverable readiness/browser failures must not hide uncertain child cleanup.
+    if (error instanceof RuntimeStartupError && !error.cleanupConfirmed) {
+      startupCleanup.failed = true
+      throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: error })
+    }
+    throw error
   }
   const service = await connectionService(
     connectionStore(join(root, "connection"), options.codec),
@@ -93,7 +102,7 @@ export async function createLoginomHost(options: {
               environment,
             },
             signal,
-          )
+          ).catch(startupFailure)
           const cancel = () => {
             void knowledge.close().catch(() => undefined)
           }
@@ -136,7 +145,7 @@ export async function createLoginomHost(options: {
           endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
           apiKey: connection.apiKey,
           environment,
-        })
+        }).catch(startupFailure)
         const catalog = knowledge.request("list")
         const ready = catalog.then(() => undefined)
         const generation = { connection, knowledge, catalog, ready, children: new Map<string, Promise<Runtime>>() }
@@ -171,6 +180,10 @@ export async function createLoginomHost(options: {
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
   return {
     ...service,
+    async close() {
+      await service.close()
+      if (startupCleanup.failed) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    },
     api: {
       ...service.api,
       async acknowledgeRecovery(input: Parameters<typeof service.api.acknowledgeRecovery>[0]) {

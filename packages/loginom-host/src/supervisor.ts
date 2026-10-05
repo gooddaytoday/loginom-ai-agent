@@ -25,6 +25,16 @@ export type Launch = {
 type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment">
 export type KnowledgeLaunch = ProcessLaunch & Pick<Launch, "endpoint"> & { apiKey: string }
 
+export class RuntimeStartupError extends Error {
+  constructor(
+    cause: unknown,
+    readonly cleanupConfirmed: boolean,
+  ) {
+    super(cause instanceof Error ? cause.message : "LOGINOM_RUNTIME_FAILED", { cause })
+    this.name = "RuntimeStartupError"
+  }
+}
+
 export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = process.platform) {
   const env: NodeJS.ProcessEnv = {}
   const keys = [
@@ -101,8 +111,11 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
       ? !("checked" in ready) || ready.checked !== true
       : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat
   ) {
-    await runtime.close()
-    throw new Error("LOGINOM_HANDSHAKE_INVALID")
+    const cleanupConfirmed = await runtime.close().then(
+      () => true,
+      () => false,
+    )
+    throw new RuntimeStartupError(new Error("LOGINOM_HANDSHAKE_INVALID"), cleanupConfirmed)
   }
   return runtime
 }
@@ -121,8 +134,11 @@ export async function superviseKnowledge(input: KnowledgeLaunch, signal?: AbortS
   )
   const ready = runtime.ready
   if (!("started" in ready) || ready.started !== true) {
-    await runtime.close()
-    throw new Error("LOGINOM_HANDSHAKE_INVALID")
+    const cleanupConfirmed = await runtime.close().then(
+      () => true,
+      () => false,
+    )
+    throw new RuntimeStartupError(new Error("LOGINOM_HANDSHAKE_INVALID"), cleanupConfirmed)
   }
   return { ...runtime, ready }
 }
@@ -217,14 +233,8 @@ async function superviseProcess(input: ProcessLaunch, start: unknown, timeout = 
   }
   signal?.addEventListener("abort", cancel, { once: true })
   try {
-    const ready = await request("start", start, timeout).catch(async (error: Error) => {
-      await close()
-      throw signal?.aborted ? signal.reason : error
-    })
-    if (signal?.aborted) {
-      await close()
-      signal.throwIfAborted()
-    }
+    const ready = await request("start", start, timeout)
+    signal?.throwIfAborted()
     if (
       !ready ||
       typeof ready !== "object" ||
@@ -233,10 +243,16 @@ async function superviseProcess(input: ProcessLaunch, start: unknown, timeout = 
       !("generation" in ready) ||
       ready.generation !== input.generation
     ) {
-      await close()
       throw new Error("LOGINOM_HANDSHAKE_INVALID")
     }
     return { ready, request, close, exited }
+  } catch (cause) {
+    const cleanupConfirmed = await close().then(
+      () => true,
+      () => false,
+    )
+    // Cancellation may replace the request failure only after cleanup is confirmed.
+    throw new RuntimeStartupError(signal?.aborted && cleanupConfirmed ? signal.reason : cause, cleanupConfirmed)
   } finally {
     signal?.removeEventListener("abort", cancel)
   }
