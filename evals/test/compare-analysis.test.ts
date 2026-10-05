@@ -238,3 +238,33 @@ test("analysis: evaluated guards требуют совместимых лока�
  b.tasks[0]!.rubric_snapshot!.checklist[0]!.weight = 2
  expect(analyzeComparison(a,b).tasks[0]!.regressions).toEqual(["completion"])
 })
+
+test("analysis: legacy snapshot и неизвестные значения не становятся нулями", () => {
+ const run = comparisonSummary([{successes:3,attempts:3}])
+ delete run.tasks[0]!.rubric_snapshot
+ expect(analyzeComparison(run,run).axes.oracle.verdict).toBeNull()
+ expect(analyzeComparison(run,run).axes.structure.verdict).toBeNull()
+ expect(analyzeComparison(run,run).reliability.a.pass1).toBeNull()
+ expect(analyzeComparison(run,run).axes.completion.verdict).toBe("indistinguishable")
+ const fresh = comparisonSummary([{successes:3,attempts:3}])
+ fresh.tasks[0]!.attempts[0]!.oracle_pass = null
+ fresh.tasks[0]!.attempts[0]!.structural_score = null
+ const result = analyzeComparison(fresh,fresh)
+ expect(result.axes.oracle.observed).toEqual({a:1,b:1,drop:0})
+ expect(result.axes.oracle.verdict).toBeNull()
+ expect(result.axes.structure.observed).toEqual({a:1,b:1,drop:0})
+ expect(result.axes.structure.verdict).toBeNull()
+})
+test("analysis: оба judge=null разрешают только completion, partial блокирует все CI", () => {
+ const run = comparisonSummary([{successes:3,attempts:3}])
+ run.judge = null
+ const skipped = analyzeComparison(run,run)
+ expect(skipped.compatibility).toEqual([])
+ expect(skipped.axes.completion.verdict).toBe("indistinguishable")
+ expect(skipped.axes.oracle.verdict).toBeNull()
+ expect(skipped.axes.structure.verdict).toBeNull()
+ expect(skipped.reliability.a.pass1).toBeNull()
+ const fresh = comparisonSummary([{successes:3,attempts:3}])
+ fresh.interrupted = true
+ Object.values(analyzeComparison(fresh,fresh).axes).forEach((axis) => expect(axis.verdict).toBeNull())
+})
