@@ -2,6 +2,7 @@ import path from "node:path"
 import { cp } from "node:fs/promises"
 import type { EvalConfig } from "./config"
 import { EvalFailure } from "./fail"
+import { evaluationContractHash, rubricSnapshot } from "./evaluation"
 import { agentInputsHash, loadTasks, rubricHash } from "./task"
 import type { AgentRun } from "./cli"
 import { parseArtifactSource } from "./artifact"
@@ -34,6 +35,8 @@ export async function rejudge(config: EvalConfig, runId: string) {
     timeoutMs: config.judgeTimeoutMs,
     passThreshold: config.passThreshold,
   }
+  const rubric = await rubricHash(tasks)
+  const evaluationHash = evaluationContractHash({ rubric_hash: rubric, judge, pass_threshold: config.passThreshold })
   const attempts: AttemptResult[] = []
   for (const group of prev.tasks) {
     const task = tasks.find((item) => item.id === group.id)
@@ -50,6 +53,7 @@ export async function rejudge(config: EvalConfig, runId: string) {
         }
         const updated: AttemptResult = {
           ...attempt,
+          evaluation_contract_hash: evaluationHash,
           score: 0,
           pass: false,
           judge_status: "no_artifact",
@@ -77,7 +81,7 @@ export async function rejudge(config: EvalConfig, runId: string) {
         judge: settings,
         signal: controller.signal,
       }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
-      const updated: AttemptResult = { ...attempt, ...judgedFields(judged) }
+      const updated: AttemptResult = { ...attempt, ...judgedFields(judged), evaluation_contract_hash: evaluationHash }
       await Bun.write(path.join(dir, "result.json"), JSON.stringify(updated, null, 2))
       attempts.push(updated)
     }
@@ -87,12 +91,12 @@ export async function rejudge(config: EvalConfig, runId: string) {
     finished_at: new Date().toISOString(),
     interrupted: prev.interrupted || controller.signal.aborted,
     judge,
-    rubric_hash: await rubricHash(tasks),
-    config: { ...prev.config, tasks_dir: tasksDir },
+    rubric_hash: rubric,
+    config: { ...prev.config, tasks_dir: tasksDir, pass_threshold: config.passThreshold, judge_timeout_ms: config.judgeTimeoutMs },
     metrics: aggregate(attempts, false),
     tasks: prev.tasks.map((group) => {
       const own = attempts.filter((item) => item.task_id === group.id)
-      return { id: group.id, metrics: aggregateTask(own, false), attempts: own }
+      return { id: group.id, rubric_snapshot: rubricSnapshot(tasks.find((task) => task.id === group.id)!), metrics: aggregateTask(own, false), attempts: own }
     }),
   }
   await writeSummary(runDir, summary)

@@ -2,7 +2,7 @@ import path from "node:path"
 import { cp, mkdir } from "node:fs/promises"
 import { loadConfig, type EvalConfig } from "./config"
 import { EvalFailure } from "./fail"
-import { rubricSnapshot } from "./evaluation"
+import { evaluationContractHash, rubricSnapshot } from "./evaluation"
 import { agentInputsHash, buildAgentPrompt, loadTasks, rubricHash, taskTimeoutMs, type Task } from "./task"
 import { agentCommand, runAgent, type AgentCommand } from "./cli"
 import { cleanupArtifact, fetchArtifact, listStorage, parseArtifactSource, type ArtifactSource } from "./artifact"
@@ -56,6 +56,7 @@ async function executeRun(config: EvalConfig) {
     : undefined
   const inputsHash = await agentInputsHash(tasks)
   const rubric = await rubricHash(tasks)
+  const evaluationHash = evaluationContractHash({ rubric_hash: rubric, judge, pass_threshold: config.passThreshold })
   const attempts: AttemptResult[] = []
   const state: { stopped: string | null; interruptedCleanup: { recovered: boolean } | null } = {
     stopped: null,
@@ -78,6 +79,7 @@ async function executeRun(config: EvalConfig) {
         profileRecovered: false,
         judge: settings,
         skipJudge: config.skipJudge,
+        evaluationHash,
       })
       attempts.push(result)
       console.error(`[${task.id}#${attempt}] ${result.status} score=${result.score ?? "—"} ${Math.round(result.duration_ms / 1000)}s`)
@@ -175,6 +177,7 @@ export async function runAttempt(input: {
   profileRecovered: boolean
   skipJudge: boolean
   judge?: JudgeSettings
+  evaluationHash?: string
 }): Promise<{ result: AttemptResult; stop: boolean }> {
   const base = emptyResult(input.task.id, input.attempt, input.profileRecovered)
   return attemptBody(input, base).catch(async (error: unknown) => {
@@ -276,6 +279,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const result: AttemptResult = {
     ...base,
     ...judgeFields,
+    ...((judged || !skippedJudge) && input.evaluationHash ? { evaluation_contract_hash: input.evaluationHash } : {}),
     status,
     exit_code: run.exitCode,
     timed_out: run.timedOut,
