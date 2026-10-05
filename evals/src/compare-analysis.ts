@@ -15,6 +15,10 @@ export type ComparisonAnalysis = ReturnType<typeof analyzeComparison>
 export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial<ComparePolicy> = {}) {
   const policy = { margin: options.margin ?? 0.5, confidence: options.confidence ?? 0.95,
     k: options.k === undefined ? a.config.repeat === b.config.repeat ? a.config.repeat : null : options.k }
+  if (!Number.isFinite(policy.margin) || policy.margin < 0 || policy.margin >= 1 ||
+    !Number.isFinite(policy.confidence) || policy.confidence <= 0 || policy.confidence >= 1 ||
+    policy.k !== null && (!Number.isInteger(policy.k) || policy.k <= 0))
+    throw new EvalFailure("Некорректные параметры compare", 2)
   requireSummary(a)
   requireSummary(b)
   const identity: [string, unknown, unknown][] = [
