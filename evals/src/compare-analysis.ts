@@ -220,7 +220,7 @@ export function parseComparisonSummary(value: unknown): RunSummary {
       for (const key of ["score","structural_score"]) if (attempt[key] != null) numeric(attempt[key],0,100)
       for (const key of ["pass","oracle_pass"]) if (attempt[key] != null) boolean(attempt[key])
       optionalText(attempt.evaluation_contract_hash)
-      if (!["scored","no_artifact","skipped","error"].includes(String(attempt.judge_status))) invalid()
+      if (typeof attempt.judge_status !== "string" || !["scored","no_artifact","skipped","error"].includes(attempt.judge_status)) invalid()
       numeric(attempt.duration_ms,0,Infinity)
       numeric(attempt.cost,0,Infinity)
       numbers(object(attempt.tokens),["input","output","reasoning"],0,Infinity)

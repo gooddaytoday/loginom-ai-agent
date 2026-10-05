@@ -102,3 +102,14 @@ test("CLI compare: serialized enum values проверяются по типу �
   }
  } finally { await rm(directory,{recursive:true,force:true}) }
 })
+
+test("CLI compare: массив не подменяет строку judge_status", async () => {
+ const directory = await mkdtemp(path.join(os.tmpdir(),"evals-compare-enum-type-"))
+ try {
+  await summaries(directory)
+  const raw = await Bun.file(path.join(directory,"a/summary.json")).json()
+  raw.tasks[0].attempts[0].judge_status = ["scored"]
+  await Bun.write(path.join(directory,"a/summary.json"),JSON.stringify(raw))
+  expect((await runCompare(directory,["a","b"])).code).toBe(2)
+ } finally { await rm(directory,{recursive:true,force:true}) }
+})
