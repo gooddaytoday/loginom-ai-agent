@@ -7,3 +7,11 @@ test("analysis: задачи имеют равный вес при разных 
   const b = comparisonSummary([{ successes: 0, attempts: 3 }, { successes: 1, attempts: 1 }])
   expect(analyzeComparison(a, b).axes.completion.observed).toEqual({ a: 0.5, b: 0.5, drop: 0 })
 })
+
+test("analysis: инфраструктура и прерывание не снижают completion", () => {
+  const run = comparisonSummary([{ successes: 1, attempts: 4 }])
+  run.tasks[0]!.attempts[1]!.status = "infra_error"
+  run.tasks[0]!.attempts[2]!.status = "harness_error"
+  run.tasks[0]!.attempts[3]!.status = "interrupted"
+  expect(analyzeComparison(run, run).axes.completion.observed).toEqual({ a: 1, b: 1, drop: 0 })
+})
