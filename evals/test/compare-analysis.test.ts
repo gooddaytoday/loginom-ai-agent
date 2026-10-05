@@ -147,3 +147,29 @@ test("analysis: остановленный прогон сохраняет оп�
     observed: { a: 1, b: 1, drop: 0 }, interval: null, verdict: null, non_inferiority: null, reasons: ["partial_run"],
   })
 })
+
+test("analysis: направленный verdict требует достаточного числа задач", () => {
+  for (const count of [25, 39]) {
+    const a = comparisonSummary(Array.from({ length: count }, () => ({ successes: 3, attempts: 3 })))
+    const b = comparisonSummary(Array.from({ length: count }, () => ({ successes: 0, attempts: 3 })))
+    expect(analyzeComparison(a, b).axes.completion.verdict).toBe(count === 25 ? "indistinguishable" : "worse")
+    expect(analyzeComparison(b, a).axes.completion.verdict).toBe(count === 25 ? "indistinguishable" : "better")
+    expect(analyzeComparison(a, b).axes.completion.non_inferiority).toBe(count === 25 ? "inconclusive" : "rejected")
+    expect(analyzeComparison(b, a).axes.completion.non_inferiority).toBe("confirmed")
+  }
+})
+test("analysis: строгая граница verdict и включённая граница non-inferiority", () => {
+  const run = comparisonSummary(Array.from({ length: 39 }, () => ({ successes: 3, attempts: 3 })))
+  const width = Math.sqrt(2 * Math.log(6 / 0.05) / 39)
+  expect(analyzeComparison(run, run, { margin: width }).axes.completion.non_inferiority).toBe("confirmed")
+  const b = comparisonSummary(Array.from({ length: 39 }, () => ({ successes: 0, attempts: 3 })))
+  const lower = analyzeComparison(run, b).axes.completion.interval!.lower
+  expect(analyzeComparison(run, b, { margin: lower }).axes.completion.verdict).toBe("indistinguishable")
+})
+test("analysis: exclusions, reverse и unknown pass не дают локальный guard", () => {
+  const a = comparisonSummary([{ successes: 3, attempts: 3 }])
+  const b = comparisonSummary([{ successes: 0, attempts: 3 }])
+  expect(analyzeComparison(b, a).tasks[0]!.regressions).toEqual([])
+  b.tasks[0]!.attempts[0]!.status = "infra_error"
+  expect(analyzeComparison(a, b).tasks[0]!.regressions).toEqual([])
+})
