@@ -1,8 +1,8 @@
 """Versioned independent expectations, generated exclusively from input CSVs.
 
-No runtime imports and no recorded aggregate output. Native DateTime is compared
-as serial bytes of these known fixture dates, without granting calendar semantics
-to arbitrary public native-reader output.
+No runtime imports and no recorded aggregate output. Scalar DateTime uses exact
+local millisecond calendar strings. Variant DateTime retains serial bytes of known
+fixture dates without granting calendar semantics to arbitrary native output.
 """
 import csv
 import hashlib
@@ -27,6 +27,9 @@ def result_type(kind, function):
 def encode(value, kind, variant=False):
     if value is None: return None
     if kind == 'datetime':
+        if not variant:
+            if value.microsecond % 1000: raise ValueError('Fixture exceeds scalar millisecond precision')
+            return value.isoformat(timespec='milliseconds')
         serial = (value-datetime(1899,12,30)).total_seconds()/86400
         return {'cell_type':kind,'bytes_le':struct.pack('<d',serial).hex()}
     if variant:

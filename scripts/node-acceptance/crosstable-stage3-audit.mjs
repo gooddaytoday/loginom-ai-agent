@@ -7,6 +7,17 @@ const parse=v=>{if(typeof v!=='string')return v;try{return JSON.parse(v);}catch{
 const singleColumn=p=>Object.hasOwn(p,'columns')
  ?!Object.hasOwn(p,'column')&&Array.isArray(p.columns)&&p.columns.length===1?p.columns[0]:null
  :p.column;
+const reorderedSource=(r,source)=>{
+ const names=['When','Flag','Text','Units','Amount','Channel','Category','Month','Region'];
+ const types={When:'datetime',Flag:'boolean',Text:'string',Units:'integer',Amount:'real',Channel:'string',Category:'string',Month:'string',Region:'string'};
+ const p=r?.output?.ports?.[0];
+ return r?.status==='SUCCEEDED'&&r.cleanup_complete===true&&same(r.node,source)&&r.execution?.status==='completed'
+  &&typeof r.execution.execution_id==='string'&&r.execution.execution_id.length>0
+  &&r.output?.ports?.length===1&&p.port===0&&p.fresh===true&&p.execution_id===r.execution.execution_id
+  &&Number.isSafeInteger(p.row_count)&&p.row_count>=0&&p.precision?.numbers_verified===true
+  &&Array.isArray(p.schema)&&p.schema.length===names.length
+  &&p.schema.every((f,i)=>f.index===i&&f.name===names[i]&&f.label===names[i]&&f.type===types[names[i]]&&f.data_kind===(f.name==='Amount'?'Непрерывный':'Дискретный'));
+};
 const complete=r=>r?.status==='SUCCEEDED'&&r.cleanup_complete===true&&r.execution?.status==='completed'
  &&r.output?.ports?.length===1&&r.output.ports[0].fresh===true&&r.output.ports[0].execution_id===r.execution.execution_id
  &&r.output.ports[0].sample_complete===true&&r.output.ports[0].sample_rows===r.output.ports[0].row_count
@@ -95,7 +106,7 @@ export function auditCrossTableStage3(events){
  const sliding=transitionHistory.find(c=>c.index>transitions.index&&readback(c)?.category_mode==='sliding');
  const fixed=transitionHistory.find(c=>sliding&&c.index>sliding.index&&readback(c)?.category_mode==='fixed');need(sliding&&fixed,'same report fixed/sliding/fixed');
  const source=transitions.input.inputs?.[0]?.source;
- const reordered=applies.find(c=>fixed&&c.index>fixed.index&&c.input.target?.type==='imports.text'&&same(c.input.target.ref,source)&&complete(reply(c))
+ const reordered=applies.find(c=>fixed&&c.index>fixed.index&&c.input.target?.type==='imports.text'&&same(c.input.target.ref,source)&&reorderedSource(reply(c),source)
   &&JSON.stringify(reply(c).output.ports[0].schema.map(f=>f.name))===JSON.stringify(['When','Flag','Text','Units','Amount','Channel','Category','Month','Region']));
  const reapplied=transitionHistory.find(c=>reordered&&c.index>reordered.index&&parameters(c).row_keys?.[0]?.name==='Region'
   &&singleColumn(parameters(c))?.name==='Category'&&parameters(c).facts?.[0]?.field?.name==='Amount');

@@ -764,18 +764,9 @@
         {
           "Region": "North",
           "When_Count": 4,
-          "When_Min": {
-            "cell_type": "datetime",
-            "bytes_le": "00000000e078e640"
-          },
-          "When_Max": {
-            "cell_type": "datetime",
-            "bytes_le": "000000006079e640"
-          },
-          "When_Avg": {
-            "cell_type": "datetime",
-            "bytes_le": "000000002079e640"
-          },
+          "When_Min": "2026-01-01T00:00:00.000",
+          "When_Max": "2026-01-05T00:00:00.000",
+          "When_Avg": "2026-01-03T00:00:00.000",
           "When_StdDev": 2.0000000298023224
         },
         {
@@ -822,10 +813,7 @@
           "Region": "North",
           "When_UniqueCount": 3,
           "When_NullCount": 1,
-          "When_First": {
-            "cell_type": "datetime",
-            "bytes_le": "00000000e078e640"
-          },
+          "When_First": "2026-01-01T00:00:00.000",
           "When_Last": null
         },
         {

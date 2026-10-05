@@ -55,6 +55,10 @@ function matchesCell(cell,column,want){
   if(!Object.hasOwn(want,'value'))return typeof want.bytes_le==='string';
   want=want.value;
  }
+ if(type==='datetime'&&!nativeRequired){
+  if(typeof want!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(want)
+   ||cell.precision!=='millisecond'||cell.representation!=='local_datetime'||cell.timezone!=='unspecified')return false;
+ }
  let value=cell.value;
  if(type==='integer'){
   if(typeof value!=='string'||!/^[-]?[0-9]+$/.test(value))return false;

@@ -61,3 +61,15 @@ test('stage-three labels disambiguate identical outputs only after exact schema 
  assert.equal(parseExpectedOutputs({package_path:'/own/p.lgp',nodes:[],outputs:Array.from({length:32},()=>report(10))}).outputs.length,32);
  assert.throws(()=>parseExpectedOutputs({package_path:'/own/p.lgp',nodes:[],outputs:Array.from({length:33},()=>report(10))}));
 });
+
+test('scalar civil DateTime requires exact milliseconds and calendar representation; Variant stays native',()=>{
+ const columns=[{name:'When',label:'When',type:'datetime'}];
+ const want={output_node_type:'transform.cross_table',columns,rows:[{When:'2026-01-03T00:00:00.000'}]};
+ const a={node:{node_id:'date'},type:'transform.cross_table',data:{schema:columns,row_count:1,sample_complete:true,precision:{numbers_verified:true},sample:[[{type:'datetime',is_null:false,value:want.rows[0].When,precision:'millisecond',representation:'local_datetime',timezone:'unspecified'}]]}};
+ assert.equal(matchExpectedOutputs([a],[want]).length,1);
+ for(const change of [{value:'2026-01-03T00:00:00.001'},{value:'2026-01-02T00:00:00.000'},{precision:'display_only'},{timezone:'UTC'},{representation:'native_serial'},{type:'string'},{is_null:true}]){
+  const bad=structuredClone(a);Object.assign(bad.data.sample[0][0],change);assert.throws(()=>matchExpectedOutputs([bad],[want]));
+ }
+ const nativeWant=structuredClone(want);nativeWant.rows[0].When={cell_type:'datetime',bytes_le:'000000002079e640'};
+ assert.throws(()=>matchExpectedOutputs([a],[nativeWant]));
+});
