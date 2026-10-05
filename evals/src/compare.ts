@@ -119,25 +119,35 @@ export function compare(a: RunSummary, b: RunSummary, options: Partial<ComparePo
   return lines.join("\n")
 }
 
-if (import.meta.main) {
-  const [first, second] = Bun.argv.slice(2)
-  if (!first || !second) {
-    console.error("Использование: bun run src/compare.ts <run-a> <run-b>")
-    process.exit(2)
+export async function compareMain(argv: string[], env: Record<string,string|undefined> = process.env) {
+  const ids: string[] = []
+  const options: Partial<ComparePolicy> = {}
+  const seen = new Set<string>()
+  const args = argv.values()
+  for (const arg of args) {
+    if (!arg.startsWith("--")) { ids.push(arg); continue }
+    if (!["--margin","--confidence","--k"].includes(arg) || seen.has(arg)) throw new EvalFailure("Неверные аргументы compare",2)
+    seen.add(arg)
+    const value = args.next().value
+    if (value === undefined || !value.trim() || !Number.isFinite(Number(value))) throw new EvalFailure("Неверное число compare",2)
+    if (arg === "--margin") options.margin = Number(value)
+    if (arg === "--confidence") options.confidence = Number(value)
+    if (arg === "--k") options.k = Number(value)
   }
+  if (ids.length !== 2 || ids.some((id) => !id || [".",".."].includes(id) || path.basename(id) !== id))
+    throw new EvalFailure("Использование: compare <run-a> <run-b> [--margin 0.5] [--confidence 0.95] [--k 3]",2)
+  const results = path.resolve(evalsRoot,env.EVAL_RESULTS_DIR ?? "results")
   const read = async (id: string) => {
-    const file = Bun.file(path.join(evalsRoot, "results", id, "summary.json"))
-    if (!(await file.exists())) throw new EvalFailure(`Нет summary.json для прогона ${id}`, 2)
-    return (await file.json()) as RunSummary
+    const file = Bun.file(path.join(results,id,"summary.json"))
+    if (!await file.exists()) throw new EvalFailure(`Нет summary.json для прогона ${id}`,2)
+    return await file.json().catch(() => { throw new EvalFailure("Некорректный summary: JSON",2) }) as RunSummary
   }
-  Promise.all([read(first), read(second)])
-    .then(async ([a, b]) => {
-      const text = compare(a, b)
-      await Bun.write(path.join(evalsRoot, "results", `compare-${first}-vs-${second}.md`), text)
-      console.log(text)
-    })
-    .catch((error: unknown) => {
-      console.error(error instanceof Error ? error.message : String(error))
-      process.exit(error instanceof EvalFailure ? error.exitCode : 1)
-    })
+  const [a,b] = await Promise.all(ids.map(read))
+  const text = compare(a!,b!,options)
+  await Bun.write(path.join(results,`compare-${ids[0]}-vs-${ids[1]}.md`),text)
+  console.log(text)
 }
+if (import.meta.main) compareMain(Bun.argv.slice(2)).catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : String(error))
+  process.exit(error instanceof EvalFailure ? error.exitCode : 1)
+})
