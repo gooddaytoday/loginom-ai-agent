@@ -317,3 +317,12 @@ test("judgedFields: переносит отдельный structural_score, ош
   expect(judgedFields(await judgeFixture()).structural_score).toBe(100)
   expect(judgedFields({ ok: false, error: "test", attempts: 0 }).structural_score).toBeNull()
 })
+
+test("scoreVerdict: structural weights не округляются и требуют полной разметки", () => {
+ const rubric = checklist.map((item) => ({ ...item, axis: "structure" as const, weight: item.id === "a" ? 1 : 1 }))
+ expect(scoreVerdict(rubric, verdict({a:true,b:false,c:false}),70)).toMatchObject({structural_score: 100/3})
+ expect(scoreVerdict(checklist, verdict({a:true,b:true,c:true}),70)).toMatchObject({structural_score:null})
+ expect(scoreVerdict(checklist.map((item) => ({...item,axis:"result" as const})), verdict({a:true,b:true,c:true}),70)).toMatchObject({structural_score:null})
+ const partial = rubric.map((item,index) => index === 0 ? {...item,axis:undefined} : item)
+ expect(scoreVerdict(partial, verdict({a:true,b:true,c:true}),70)).toMatchObject({structural_score:null})
+})

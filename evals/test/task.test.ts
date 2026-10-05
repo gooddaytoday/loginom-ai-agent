@@ -252,3 +252,22 @@ test("loadTasks: все core рубрики явно разделяют стру
     expect(task.checklist.filter((item) => item.axis === "structure")).toHaveLength(5)
   }
 })
+
+test("rubricHash: axis меняет только рубрику, legacy отсутствие сохраняет hash", async () => {
+ const dir = await mkdtemp(path.join(os.tmpdir(), "evals-axis-hash-"))
+ try {
+  await cp(path.join(tasksDir, "group-sum-qty"), path.join(dir, "group-sum-qty"), { recursive: true })
+  const file = path.join(dir, "group-sum-qty", "task.json")
+  const raw = await Bun.file(file).json()
+  raw.checklist.forEach((item: {axis?: string}) => { delete item.axis })
+  await Bun.write(file, JSON.stringify(raw))
+  const before = await loadTasks(dir)
+  expect(before[0]!.checklist.every((item) => !Object.hasOwn(item, "axis"))).toBe(true)
+  expect(await rubricHash(before)).toBe("04b64ad12303c2fa50c1ac244432f433aff084287d6d4e28c21c5f029a11b4c0")
+  raw.checklist[0].axis = "structure"
+  await Bun.write(file, JSON.stringify(raw))
+  const after = await loadTasks(dir)
+  expect(await rubricHash(after)).not.toBe(await rubricHash(before))
+  expect(await agentInputsHash(after)).toBe(await agentInputsHash(before))
+ } finally { await rm(dir, { recursive: true, force: true }) }
+})
