@@ -18,7 +18,7 @@ Component ID: `component.programming.JavaScript`, slug `programming-javascript`.
 Обработать узел по его подплану до независимой приёмки. Объём — этап 0 подплана.
 ```
 
-Первая карточка — этап 0 отдельно; этап 1 — после решения владельца по W из раздела 2. В ветке задания должны быть RUNBOOK, подплан, инструменты приёмки и принятые зависимости, отсутствие — Blocked.
+Первая карточка — этап 0 отдельно; этап 1 — после решения владельца по W, нужным этому этапу (раздел 2). В ветке задания должны быть RUNBOOK, подплан, инструменты приёмки и принятые зависимости, отсутствие — Blocked.
 
 Разрешено: живое исследование в собственном аккаунте, комплект `acceptance/`, затем назначенный срез и согласованные W, PR и публикация доказательств.
 Не разрешено: merge и релиз; следующие этапы; общие изменения без решения владельца; изменения конфигураций обвязки.
@@ -109,6 +109,7 @@ Scope этапа 1 ограничен перечисленными требов�
 - `programming-javascript:r06` — builtIn/Calc, глобальные setTimeout/clearTimeout, atob/btoa, getLocale; Console.
 - `programming-javascript:r07` — builtIn/Fetch: Headers, Request/Response, text/json/arrayBuffer, clone/bodyUsed, redirect и AbortController.
 - `programming-javascript:r08` — builtIn/FS: чтение/запись/append, дескрипторы, metadata/директории, copy/rename/truncate/delete, flags/encodings.
+Матрица FS этапа 3 по `fileapi.md:74-355`: `appendFileSync`, `closeSync`, `copyFileSync`, `existsSync`, `fstatSync`, `ftruncateSync`, `lstatSync`, `mkdirSync`, `openSync`, `readdirSync`, `readFileSync`, `readSync`, `realpathSync`, `renameSync`, `rmdirSync`, `rmSync`, `statSync`, `truncateSync`, `unlinkSync`, `writeFileSync`, обе формы `writeSync`; отдельные случаи flags/encodings, metadata Stats/FileHandle/Dirent и ошибок missing/permission.
 Назначение после независимой приёмки предыдущего этапа и решения владельца по требуемым W; приёмочный комплект отдельный, без переноса PASS.
 ### Этап 4 — Асинхронные отказы и platform boundaries (отдельная карточка)
 
@@ -120,6 +121,8 @@ Scope этапа 1 ограничен перечисленными требов�
 Комплект `nodes/programming-javascript/acceptance/` (следующие срезы — `acceptance/stageN/`): `task.md` с `{{PACKAGE_PATH}}` на бизнес-языке, `data/` только с входами модели, `expected.json` из независимого `oracle.py` до кода/прогона. Oracle и expected модели не передаются.
 
 Формат CSV: UTF-8, заголовок, разделитель `,`, десятичный `.`, NULL-маркер `?`, пустая строка в кавычках. `values.csv`: `Id,Amount,Text,Flag,Date`, строки `1,10,hello,true,2024-02-29T00:00:00.000`, `2,20,"",false,2024-03-01T00:00:00.000`, `3,?,я,true,2024-03-02T00:00:00.000`, `4,-5,?,false,?`; типы integer/real/string/boolean/datetime. `second.csv`: `Id,Amount` = `5,2` и `6,4`; variable factor=3. Независимый код бизнес-примера умножает Amount на factor, копирует остальные поля; ожидаемые результаты вручную рассчитаны вне candidate.
+
+`data/calculation.js` — самостоятельный вход модели, не oracle: копирует Id/Text/Flag/Date, добавляет AmountScaled=Amount×коэффициент, сохраняет NULL Amount как NULL. Текст записать и byte-manifest закрепить до модельного прогона; ожидаемые значения считаются отдельно по CSV. В этапе 1 коэффициент 3 закреплён в коде; в этапе 2 берётся из типизированной входной переменной factor=3, после изменения переменной изменяется только AmountScaled.
 Размеры, число строк, SHA256, кодировка, типы, разделители и NULL фиксируются в `fixtures/manifest.json` до прогона. Доставка — проверенные `artifact_id`/`upload_operation_id`; >1 KiB поддерживается базой, одновременно не более восьми вложений.
 
 | Набор | Содержание и назначение |
@@ -129,7 +132,7 @@ Scope этапа 1 ограничен перечисленными требов�
 | `modules-network-fs` | Модули x+7, echo ledger, каждый FS метод/форма и encoding с byte expected. |
 | `errors-platform` | Syntax/runtime/rejected Promise после частичного Append, cancellation, 2^53±1, Linux Atomics. |
 
-Oracle: Python oracle по CSV не исполняет candidate JavaScript и не импортирует runtime; проверяет все клетки обоих выходов, schema/метаданные и freshness. Для Fetch/FS сверяет ledger и байты; вся матрица FS API раскрывается на этапе 0 по Help. Не импортирует runtime, отвергает старое исполнение/чужой узел/подмену значений; источники и эффекты связаны с собственной попыткой.
+Oracle: Python oracle по CSV не исполняет candidate JavaScript и не импортирует runtime; проверяет все клетки обоих выходов, schema/метаданные и freshness. Для Fetch/FS сверяет ledger и байты; матрица FS API перечислена в этапе 3 и переподтверждается на этапе 0 по Help. Не импортирует runtime, отвергает старое исполнение/чужой узел/подмену значений; источники и эффекты связаны с собственной попыткой.
 
 Ограничения `scripts/node-acceptance/expected-outputs.mjs:7-14,29-39,72-81`: до 32 таблиц, до 100 строк на выход; порядок колонок позиционный, строки сравниваются без порядка. Числа точные (`cold-check.mjs:232`, `requireExactNumbers: true`): в первом комплекте только точно представимые суммы/значения, допуск требует отдельного решения. Адресации порта одного узла, переменных и файлов в expected нет. Для нетабличного результата, внешнего ledger и нескольких портов PASS требует принятых W и дополнительного независимого аудита; подмена результата таблицей не доказывает исходный порт/эффект.
 
@@ -147,14 +150,14 @@ Oracle: Python oracle по CSV не исполняет candidate JavaScript и �
 | `programming-javascript:r05` | Три допустимых способа дают x+7; missing module и CommonJS→ES6 выявляют ограничения. Reopen из другого рабочего каталога использует путь пакета, не runtime cwd. |
 | `programming-javascript:r06` | Известные строка/дата/число проверяют Calc и кодировки UTF-8/Latin-1; отменённый timer не пишет output; locale BCP47 закреплена. Console assert/error/warn/info/log/clear проверяются отдельно в preview и с учётом уровня server log. IF/IFF и функции входных данных не объявляются доступными через Calc. |
 | `programming-javascript:r07` | Echo fixture подтверждает method/body/headers; каждый формат тела, follow/error/manual и abort имеют собственный expected. Повторное чтение consumed body даёт отказ. |
-| `programming-javascript:r08` | В собственной fixture-директории сверить bytes, metadata и итоговый список; каждый метод из матрицы ниже и обе writeSync формы имеют свой case, включая missing/permission errors. Полное покрытие не выводить из одного read/write roundtrip. |
+| `programming-javascript:r08` | В собственной fixture-директории сверить bytes, metadata и итоговый список; каждый метод FS из списка этапа 3 и обе writeSync формы имеют свой case, включая missing/permission errors. Полное покрытие не выводить из одного read/write roundtrip. |
 | `programming-javascript:r09` | Инъекция ошибки после части Append не даёт complete; rejected Promise обнаруживается по независимому marker/evidence, даже если узел активен. 2^53±1 проверяет честность точности, Linux Atomics не подменяется. |
 | Смена источника/настроек | Тот же узел, новая попытка; незапрошенные настройки сохранены, новый результат не подменён прежним |
 | Persistence | Сохранение после всех чтений; новый профиль открывает пакет, настройки/связи и результат проверены без восстановления |
 | Recovery | Неизвестный внешний эффект не повторён; причина отказа мастера прочитана; собственные эффекты подтверждены независимо |
 | Регрессия | Адресные тесты и весь `client/test`; тесты принятого W |
 
-Задание модели: Обработать values.csv предоставленным сценарием JavaScript расчёта сумм, показать результат и сведения о пропусках, изменить исходные значения в том же источнике, выполнить сценарий снова и сохранить пакет в {{PACKAGE_PATH}}.
+Задание модели: Обработать values.csv сценарием calculation.js, который умножает сумму операции на заданный коэффициент, сохраняет исходные реквизиты и пропуски, показать результат и сведения о пропусках, изменить исходные значения в том же источнике, выполнить сценарий снова и сохранить пакет в {{PACKAGE_PATH}}.
 
 PASS исполнителя: CLI, независимый cold-check в пределах поддержанного табличного среза, обязательный аудит портов/эффектов после согласованных W, вся адресная матрица этапа, `package_closed=true`, `logged_out=true`; частичный вывод/preview не даёт PASS. Ловец принимает тот же чистый опубликованный SHA. Реестр отражается только по доказательствам принятой карточки; `integration` и `release` не трогаются.
 
@@ -168,7 +171,6 @@ PASS исполнителя: CLI, независимый cold-check в пред�
 Матрица: Windows/Linux; table schema static/dynamic; 0/1/2 inputs и 1/2 outputs; data/variables API; ES6/CommonJS; Calc/global/Console; Fetch/FS. Это покрытие интерфейсов узла, не доказательство правильности всех возможных пользовательских JS-программ.
 
 Таблица A из 4 строк (id,amount,text,flag,date), независимая B из 2 строк, переменная factor=3; вручную рассчитанные amount×3 и второй агрегатный выход. Отдельные файлы ES6/CommonJS с функцией x+7, изолированные HTTP ledger/FS fixtures. Скрипт является частью business input; expected скрыты от модели.
-
 Preview выполняет код и активирует входы, поэтому file/network effects учитываются до preview. Не переписывать ошибочный пользовательский алгоритм ради PASS. Lost reply требует проверить effect ledger; Promise rejection без ошибки узла не считается успехом.
 
 ## 6. Точка продолжения
