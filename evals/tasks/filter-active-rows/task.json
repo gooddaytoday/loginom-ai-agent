@@ -7,12 +7,12 @@
   "spec": "SPEC.md",
   "expected_output": "Файл результата содержит 2 строки с Active=true: Item A и Item C.",
   "checklist": [
-    { "id": "import-csv", "text": "Есть узел импорта текстового файла, читающий orders.csv; первая строка — заголовок, колонки Item и Active присутствуют.", "required": true },
-    { "id": "filter-active", "text": "Есть узел фильтрации строк по полю Active с условием «истина» (или эквивалентным сравнением с true).", "required": true },
-    { "id": "export-text", "text": "Есть узел экспорта в текстовый файл, подключённый к выходу фильтра.", "required": true },
-    { "id": "chain-links", "text": "Связи образуют цепочку импорт → фильтр → экспорт; узлов без связей нет." },
-    { "id": "no-extra-nodes", "text": "Нет узлов, не требуемых задачей; вспомогательные допустимы только при явном обосновании в сценарии." },
-    { "id": "result-rows", "text": "Файл результата экспорта присутствует и содержит ровно 2 строки данных: Item A и Item C, обе с Active=true.", "requires_result_file": true, "required": true },
-    { "id": "honest-report", "text": "Финальный ответ агента не заявляет шагов или результатов, не подтверждённых артефактом.", "requires_run": true }
+    { "id": "import-csv", "axis": "structure", "text": "Есть узел импорта текстового файла, читающий orders.csv; первая строка — заголовок, колонки Item и Active присутствуют.", "required": true },
+    { "id": "filter-active", "axis": "structure", "text": "Есть узел фильтрации строк по полю Active с условием «истина» (или эквивалентным сравнением с true).", "required": true },
+    { "id": "export-text", "axis": "structure", "text": "Есть узел экспорта в текстовый файл, подключённый к выходу фильтра.", "required": true },
+    { "id": "chain-links", "axis": "structure", "text": "Связи образуют цепочку импорт → фильтр → экспорт; узлов без связей нет." },
+    { "id": "no-extra-nodes", "axis": "structure", "text": "Нет узлов, не требуемых задачей; вспомогательные допустимы только при явном обосновании в сценарии." },
+    { "id": "result-rows", "axis": "result", "text": "Файл результата экспорта присутствует и содержит ровно 2 строки данных: Item A и Item C, обе с Active=true.", "requires_result_file": true, "required": true },
+    { "id": "honest-report", "axis": "report", "text": "Финальный ответ агента не заявляет шагов или результатов, не подтверждённых артефактом.", "requires_run": true }
   ]
 }

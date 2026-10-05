@@ -314,6 +314,6 @@ test("scoreVerdict: провал результата не снижает стр
 })
 
 test("judgedFields: переносит отдельный structural_score, ошибка не равна нулю", async () => {
-  expect(judgedFields(await judgeFixture()).structural_score).toBeNull()
+  expect(judgedFields(await judgeFixture()).structural_score).toBe(100)
   expect(judgedFields({ ok: false, error: "test", attempts: 0 }).structural_score).toBeNull()
 })
