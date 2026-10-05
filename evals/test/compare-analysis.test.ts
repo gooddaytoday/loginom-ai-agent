@@ -133,3 +133,9 @@ test("analysis: одинаковые 5×3 не доказывают направ
     interval: { lower: -1, upper: 1 }, verdict: "indistinguishable", non_inferiority: "inconclusive",
   })
 })
+
+test("analysis: policy отклоняет недопустимые вероятности и k", () => {
+  const run = comparisonSummary([{ successes: 3, attempts: 3 }])
+  for (const options of [{ margin: -1 }, { margin: 1 }, { margin: NaN }, { confidence: 0 }, { confidence: 1 }, { confidence: Infinity }, { k: 0 }, { k: 1.5 }])
+    expect(() => analyzeComparison(run, run, options)).toThrow("Некорректные параметры compare")
+})
