@@ -362,3 +362,16 @@ proc proof ограничен наблюдаемым namespace/launcher. Same-Se
 каждого CLI/browser binding. SHA-256 установленных binary/Node/Chromium/manifest/
 lock повторно совпали после обоих итоговых runs. Все обязательные критерии
 реализации, приёмки и документации выполнены; goal готов к complete.
+
+## Исправления после review — 2026-10-05
+
+P1 воспроизведён реальным browser → быстро завершающийся shell → внешний Bun
+helper: origin subreaper, ложный confirmed cleanup и сигнал неизвестному helper.
+Red: новый process-supervisor test вернул confirmed вместо failed. Green:
+adoption при выбранном browser начинает с pending; только проверенный CLI либо
+browser/helper admission разрешает сигнал. Adopted неизвестный executable и
+его потомки проходят тот же консервативный admission вне зависимости от bundle
+и наблюдённой связи с конкретным browser. Helper остаётся живым, exit 0/Session
+и registration guard сохранены; cleanup failed. Process suite: 11 pass, 47
+assertions, 55.84 с; bun typecheck pass. Установленный продукт не изменялся.
+P2 (canonical profile lease/registration) выполняется следующим TDD-срезом.
