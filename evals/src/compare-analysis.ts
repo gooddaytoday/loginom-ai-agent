@@ -220,7 +220,7 @@ export function parseComparisonSummary(value: unknown): RunSummary {
       for (const key of ["score","structural_score"]) if (attempt[key] != null) numeric(attempt[key],0,100)
       for (const key of ["pass","oracle_pass"]) if (attempt[key] != null) boolean(attempt[key])
       optionalText(attempt.evaluation_contract_hash)
-      text(attempt.judge_status)
+      if (!["scored","no_artifact","skipped","error"].includes(String(attempt.judge_status))) invalid()
       numeric(attempt.duration_ms,0,Infinity)
       numeric(attempt.cost,0,Infinity)
       numbers(object(attempt.tokens),["input","output","reasoning"],0,Infinity)
@@ -239,7 +239,7 @@ export function parseComparisonSummary(value: unknown): RunSummary {
         ids.add(item.id as string)
         numeric(item.weight,Number.MIN_VALUE,Infinity)
         for (const key of ["required","requires_result_file","requires_run"]) boolean(item[key])
-        if (item.axis !== undefined && !["structure","result","report"].includes(String(item.axis))) invalid()
+        if (item.axis !== undefined && (typeof item.axis !== "string" || !["structure","result","report"].includes(item.axis))) invalid()
       }
     }
   }
