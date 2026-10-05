@@ -325,18 +325,18 @@ export function makeNativeOutputDownloadCode(options){
 
 // Trusted adapter only: every public reference must additionally be checked
 // against createObservationPages.assertIssued before this code is constructed.
-// This candidate covers CSV/TSV double-click downloads only; package files require
+// This candidate covers CSV/TSV/TXT double-click downloads only; package files require
 // an explicit download command instead of opening their scenario.
 export function makeArtifactDownloadCode(options) {
   const artifact=options?.artifact,snapshot=options?.snapshot;
   const matches=snapshot?.ui?.elements?.filter(item=>item.ref===options.file_ref) ?? [];
   const suffix=artifact?.name?.replace(/\s/g,'_').replace(/,/g,'');
-  if(!artifact?.upload || !/\.(?:csv|tsv)$/i.test(artifact.name) || matches.length!==1
+  if(!artifact?.upload || !/\.(?:csv|tsv|txt)$/i.test(artifact.name) || matches.length!==1
     || matches[0].label!==artifact.name || matches[0].tid!==snapshot.workflow_ref?.prefix+';FileStorageForm;colName_'+suffix)
-    throw new Error('Download requires the exact observed authorized CSV/TSV file');
+    throw new Error('Download requires the exact observed authorized CSV/TSV/TXT file');
   const shared={expected_build:options.expected_build,expected_origin:options.expected_origin};
   // Upload may have observed the folder tree. Verification owns the separately
-  // issued exact CSV/TSV ref, so its narrow reads must follow that file, not the
+  // issued exact CSV/TSV/TXT ref, so its narrow reads must follow that file, not the
   // earlier upload region. Global context/blocker guards remain in native reads.
   const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared});
   const act=makeWorkspaceUiCode({mode:'act',snapshot,action:{verb:'double_click',ref:options.file_ref},...shared},{snapshotArgument:true});
@@ -1685,6 +1685,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       internal_resume_available:operation.cleanupConfirmed===true&&!operation.nodeApply?.pending};
     if(operation.action.capability==='node.target.internal')return {recovery_options:[],next_steps:base,internal_resume_available:operation.cleanupConfirmed===true&&!operation.targetPhase?.pending};
     if(operation.action.capability==='artifact.upload') {
+      if(operation.deliveryOperationId){
+        if(operation.cleanupConfirmed && !operation.verification)base.push({tool:'dock_artifact_delivery_resume',
+          arguments:{operation_id:operation.deliveryOperationId},required_fields:['resume_id','budget_ms'],
+          requires:['confirmed_browser_completion','same_delivery_context','original_deadline'],provides:['server_copy_byte_verification']});
+        return {recovery_options:[],next_steps:base};
+      }
       if(operation.cleanupConfirmed && (!operation.verification || operation.verification.settled))base.push({
         tool:'dock_artifact_verify',arguments:{operation_id:operation.id},required_fields:['verification_id','observation_id','file_ref'],
         requires:['fresh_observed_authorized_csv_ref','confirmed_browser_completion'],provides:['server_copy_byte_verification']});
@@ -2028,7 +2034,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return outcome;
       } finally { running = false; }
     },
-    async upload({artifactId,grantId,observationId,operationId,signal,decideConflicts=false}={}) {
+    async upload({artifactId,grantId,observationId,operationId,signal,decideConflicts=false,deliveryOperationId}={}) {
       signal?.throwIfAborted();checkId(operationId);
       if(!allowCandidate || !artifactStore)throw new Error('Artifact upload is available only in an authorized candidate session');
       const artifact=artifactStore.getUploadGrant(artifactId,grantId);
@@ -2048,7 +2054,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       try {
         const lease=await artifactStore.stageUpload(artifactId);
         const operation={id:operationId,signature,uploadLease:lease,action:{action_key:'artifact.upload',revision:'1',capability:'artifact.upload'},
-          parameters:{artifact_id:artifactId,upload_grant_id:grantId,observation_id:observationId,destination:artifact.upload.destination,overwrite:artifact.upload.overwrite},
+          deliveryOperationId,parameters:{artifact_id:artifactId,upload_grant_id:grantId,observation_id:observationId,destination:artifact.upload.destination,overwrite:artifact.upload.overwrite},
           checkpoint:{workflow_ref:snapshot.workflow_ref,file_storage:snapshot.file_storage,storage_root_ref:snapshot.observation_root?.ref ?? null,artifact},deadline:now()+30000};
         try {await lease.verify();signal?.throwIfAborted();await remember(operation,'prepared');signal?.throwIfAborted();}
         catch(error){await lease.release();throw error;}
@@ -2071,7 +2077,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return structuredClone(outcome);
       } finally {running=false;}
     },
-    async verifyArtifact({operationId,verificationId,observationId,fileRef,signal,discover=false}={}) {
+    async verifyArtifact({operationId,verificationId,observationId,fileRef,signal,discover=false,onDispatched}={}) {
       signal?.throwIfAborted();checkId(operationId);checkId(verificationId);
       if(!allowCandidate || !artifactStore)throw new Error('Artifact verification is available only in a candidate session');
       const signature=fingerprint(discover?'artifact.verify.discovery':'artifact.verify',[operationId,observationId,fileRef]);
@@ -2106,12 +2112,16 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             ...(discover?{discovery:{workflow_ref:snapshot.workflow_ref,document:snapshot.dom_epoch.document,active_tab_ref:snapshot.active_tab_ref}}:{})},deadline:now()+60000};
         try {signal?.throwIfAborted();await remember(attempt,'download_prepared');signal?.throwIfAborted();}
         catch(error){await lease.release();throw error;}
+        let code;
+        try {signal?.throwIfAborted();code=buildDownload({...options,download_path:lease.path});}
+        catch(error){await lease.release();throw error;}
         operation.verification=attempt;observations.clear();
         const receipt=receiptOptions(operation,verificationId,'artifact.download',signature);
         let raw;
         try {
-          const code=buildDownload({...options,download_path:lease.path});
-          raw=await execute(withBrowserReceipt(`(${code})(page)`,receipt),{timeout:65000});
+          const dispatched=withBrowserReceipt(`(${code})(page)`,receipt);
+          onDispatched?.();
+          raw=await execute(dispatched,{timeout:65000});
         } catch {
           operation.transportUncertain=true;operation.cleanupConfirmed=false;
           attempt.outcome=failed(attempt,'BROWSER_CALL_UNCERTAIN','Inspect the original upload before any repeated download');
@@ -2120,6 +2130,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         }
         return structuredClone(await finishArtifactVerification(operation,attempt,raw));
       } finally {running=false;}
+    },
+    preflightDeliveredArtifact(artifact,snapshot) {
+      if(!/\.(?:csv|tsv|txt)$/i.test(artifact?.name??''))throw Object.assign(Error('Server-copy verification supports only admitted CSV/TSV/TXT files; no upload was submitted'),{code:'ARTIFACT_VERIFICATION_UNSUPPORTED'});
+      if(snapshot)makeArtifactDiscoveryDownloadCode({artifact,snapshot},{download:browserArtifactDownload,reveal:browserArtifactReveal});
     },
     uploadDeliveredArtifact:options=>runtime.upload({...options,decideConflicts:true}),
     verifyDeliveredArtifact:options=>runtime.verifyArtifact({...options,discover:true}),

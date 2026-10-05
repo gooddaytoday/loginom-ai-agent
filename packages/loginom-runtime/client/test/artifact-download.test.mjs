@@ -220,3 +220,9 @@ test('changed native output size refuses download before the gesture',async()=>{
  const code=makeNativeOutputDownloadCode({...f.options,artifact:{artifact_id:'output',name:'native.csv'},snapshot,file_ref:file.ref,expected_bytes:3,output_binding:{session_id:'session',node_id:'node',execution_id:'execution',directory:'/test-2',destination:'/test-2/native.csv'}});
  bytes=4;const result=await f.page.execute(code);assert.equal(result.status,'NOT_APPLIED');assert.equal(result.error.code,'DOWNLOAD_OUTPUT_SIZE_CHANGED');assert.deepEqual(f.calls,[]);
 });
+
+test('TXT download preserves exact name and destination and delegates one owned gesture',async()=>{
+ const f=fixture('transactions.txt'),r=await f.run();
+ assert.equal(r.status,'SUCCEEDED');assert.equal(r.cleanup_complete,true);
+ assert.equal(r.output.destination,'/test/transactions.txt');assert.deepEqual(f.calls,['listen','click','save']);
+});

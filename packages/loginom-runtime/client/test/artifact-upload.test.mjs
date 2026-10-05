@@ -212,3 +212,12 @@ test('delivered upload bounds precondition refreshes and refuses a different doc
   assert.deepEqual(f.counts(),{submitted:0,released:1,staged:1});
  }
 });
+
+test('delivery-owned recovery names public delivery continuation instead of hidden verification',async()=>{
+ const f=fixture(),request=await f.request();
+ await f.rt.upload({...request,deliveryOperationId:'delivery'});
+ const inspected=await f.rt.inspect({operationId:request.operationId});
+ assert.ok(!inspected.output.next_steps.some(s=>s.tool==='dock_artifact_verify'));
+ const resume=inspected.output.next_steps.find(s=>s.tool==='dock_artifact_delivery_resume');
+ assert.equal(resume.arguments.operation_id,'delivery');
+});

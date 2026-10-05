@@ -113,6 +113,8 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   };
   try {
    let upload,inspected;
+   check();job.phase='preflight';
+   runtime.preflightDeliveredArtifact(artifact);
    if(resumeId&&!preUploadResume) {
     await acknowledge(job,'artifact_delivery_resume_started',{resume_id:resumeId,upload_operation_id:job.uploadId,
       verification_started:job.verificationStarted===true,deadline_at:job.deadline});
@@ -166,10 +168,10 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     }
    }
    requireValue(s.file_storage?.directory===artifact.upload.directory,'Authorized destination mismatch');
-   check();job.phase='upload';submitted=true;effectPossible=true;job.uploadStarted=true;
+   check();runtime.preflightDeliveredArtifact(artifact,s);job.phase='upload';submitted=true;effectPossible=true;job.uploadStarted=true;
    job.binding={document:s.dom_epoch?.document,workflow_ref:s.workflow_ref,active_tab_ref:s.active_tab_ref};
    upload=await runtime.uploadDeliveredArtifact({artifactId:artifact.artifact_id,grantId:artifact.upload.grant_id,
-    observationId:s.observation_id,operationId:job.uploadId,signal});
+    observationId:s.observation_id,operationId:job.uploadId,deliveryOperationId:job.id,signal});
    await acknowledge(job,'artifact_delivery_upload_receipt',{upload});
    if(upload.status==='NOT_APPLIED'&&upload.effect_possible===false&&upload.cleanup_complete===true) {
     submitted=false;effectPossible=false;job.uploadStarted=false;
@@ -203,15 +205,16 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
      &&destination.dom_epoch?.document===job.binding.document
      &&JSON.stringify(destination.workflow_ref)===JSON.stringify(job.binding.workflow_ref)
      &&destination.active_tab_ref===job.binding.active_tab_ref,'Delivery browser context changed; no verification dispatched');
-   check();job.verificationStarted=true;
+   check();job.verificationState='preflight';
    const verification=await runtime.verifyDeliveredArtifact({operationId:job.uploadId,verificationId:job.id+':verify',
-    observationId:destination.observation_id,signal});
+    observationId:destination.observation_id,signal,onDispatched:()=>{job.verificationStarted=true;job.verificationState='dispatched';}});
    const lostVerification=verification.error?.code==='BROWSER_CALL_UNCERTAIN';
    requireValue(lostVerification||verification.status==='SUCCEEDED'&&verification.cleanup_complete===true&&verification.output?.bytes_verified===true,'Destination bytes require inspection');
    check();const final=await runtime.inspect({operationId:job.uploadId});
    if(lostVerification)await acknowledge(job,'artifact_delivery_verification_reconciled',{inspection:final});
    await finish(job,artifact,final);
   } catch(error) {
+   if(job.verificationStarted)job.verificationState='uncertain';
    // A completed navigation followed by a failed read has no unknown gesture
    // and no upload to repeat. Retain the attachment and continue the same job
    // from fresh UI in the same document; navigation receipt IDs stay monotonic.
@@ -225,8 +228,11 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     ? {code:'ARTIFACT_DESTINATION_UNAVAILABLE',message:String(error.message).slice(0,1000),
       artifact_id:artifact.artifact_id,input_artifact_admitted:true,directory:artifact.upload.directory,
       storage_entry:error.storage_entry,recovery:'Check the selected input directory and the signed-in Loginom account. The attachment was received; do not ask to attach it again.'}
-    : {code:'ARTIFACT_DELIVERY_INCOMPLETE',message:String(error.message).slice(0,1000)};
-   job.outcome={status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,upload_submitted_or_unknown:submitted,upload_operation_id:job.uploadId,inspection_required:!navigationResumable,
+    : {code:error.code==='ARTIFACT_VERIFICATION_UNSUPPORTED'?error.code:'ARTIFACT_DELIVERY_INCOMPLETE',message:String(error.message).slice(0,1000)};
+   job.outcome={status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,upload_submitted_or_unknown:submitted,upload_operation_id:job.uploadId,inspection_required:submitted||effectPossible&&!navigationResumable,
+    ...(!submitted&&!effectPossible?{cleanup_complete:true}:{}),
+    ...(submitted&&!job.verificationStarted?{next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
+      instruction:'Continue verification of the original upload with a new resume_id within its original deadline; do not upload again.'}}:{}),
     ...(navigationResumable?{cleanup_complete:true,next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
      instruction:'Continue this delivery with its original operation_id, a new resume_id and budget_ms. The admitted attachment is retained; no upload has started.'}}:{})};
   } finally {job.state='settled';active=null;}
@@ -264,8 +270,9 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    requireValue(job.uploadStarted===true||job.preUploadResume===true,'Delivery stopped before upload; inspect navigation before a new request');
    const artifact=artifactStore.getUploadGrant(job.artifact.artifact_id,job.artifact.upload.grant_id);
    requireValue(JSON.stringify(artifact)===JSON.stringify(job.artifact),'Admitted artifact changed');
+   requireValue(now()<job.deadline,'Artifact delivery deadline elapsed');
    admitResume(job.uploadId,request.resume_id,signature,{preUpload:job.preUploadResume===true,deliveryId:job.id});
-   job.deadline=now()+request.budget_ms;job.state='running';job.error=null;active=job;
+   job.deadline=Math.min(job.deadline,now()+request.budget_ms);job.state='running';job.error=null;active=job;
    const promise=run(job,artifact,signal,request.resume_id);
    job.resumeRequests.set(request.resume_id,{signature,promise});return promise;
   },
