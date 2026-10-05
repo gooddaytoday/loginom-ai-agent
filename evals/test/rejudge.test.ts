@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
 import { cp, mkdtemp, rm } from "node:fs/promises"
+import { analyzeComparison } from "../src/compare-analysis"
 import { main } from "../src/run"
 import { evalsRoot } from "../src/config"
 import type { RunSummary } from "../src/report"
@@ -289,3 +290,36 @@ test("--judge-only: no-artifact synthetic получает structure 0 и curren
   expect(saved.tasks[0]!.attempts[0]!.evaluation_contract_hash).toMatch(/^[0-9a-f]{64}$/)
  } finally { await rm(directory,{recursive:true,force:true}) }
 })
+
+test("--judge-only: сохранённая попытка сохраняет старый контракт при rubric, judge и threshold изменениях", async () => {
+ const directory = await mkdtemp(path.join(os.tmpdir(), "evals-compare-lineage-"))
+ const tasksDir = path.join(directory,"tasks")
+ const env = { EVAL_RESULTS_DIR:path.join(directory,"results"), EVAL_PROFILE_DIR:path.join(directory,"profile"), EVAL_WORKSPACE_ROOT:path.join(directory,"workspace"), EVAL_JUDGE_COMMAND:fakeJudge, JUDGE_MODEL:"fake" }
+ try {
+  await cp(path.join(evalsRoot,"tasks/group-sum-qty"),path.join(tasksDir,"group-sum-qty"),{recursive:true})
+  await cp(path.join(evalsRoot,"fixtures/storage/fixture-group-sum-qty.result.csv"),path.join(tasksDir,"group-sum-qty/oracle.csv"))
+  const dry = await main(["--dry-run","--tasks",tasksDir,"--repeat","2"],env)
+  const id = path.basename(dry.runDir!)
+  await main(["--judge-only",id],env)
+  const summaryFile = Bun.file(path.join(dry.runDir!,"summary.json"))
+  const before = await summaryFile.json() as RunSummary
+  const old = before.tasks[0]!.attempts[0]!.evaluation_contract_hash
+  const artifact = path.join(dry.runDir!,"group-sum-qty/1/artifact")
+  for (const file of await Array.fromAsync(new Bun.Glob("unpacked/Unit_*/Unit.xml").scan(artifact))) await rm(path.join(artifact,file))
+  const taskFile = Bun.file(path.join(tasksDir,"group-sum-qty/task.json"))
+  const raw = await taskFile.json()
+  raw.checklist[0].weight = 2
+  await Bun.write(taskFile,JSON.stringify(raw))
+  for (const settings of [env, {...env,JUDGE_MODEL:"fake-new"}, {...env,JUDGE_MODEL:"fake-new",EVAL_PASS_THRESHOLD:"80"}]) {
+   await main(["--judge-only",id],settings)
+   const current = await summaryFile.json() as RunSummary
+   expect(current.tasks[0]!.attempts[0]!.evaluation_contract_hash).toBe(old)
+   expect(current.tasks[0]!.attempts[1]!.evaluation_contract_hash).not.toBe(old)
+   const result = analyzeComparison(current,current)
+   expect(result.axes.completion.verdict).toBe("indistinguishable")
+   expect(result.axes.oracle.verdict).toBeNull()
+   expect(result.axes.structure.verdict).toBeNull()
+   expect(result.reliability.a.pass1).toBeNull()
+  }
+ } finally { await rm(directory,{recursive:true,force:true}) }
+}, 30_000)
