@@ -4,7 +4,7 @@
 Component ID: `component.transform.SlidingWindow`, slug `transform-slidingwindow`. Runtime type и режим: `transform.sliding_window` / `lag` — предложение до конца этапа 0.
 База назначения: ветка задания из карточки; исследованы исходники `5f772aea9`. Loginom: ожидается 7.4.2, фактическую версию записать на этапе 0; платформа исполнителя — Linux x64.
 
-Образец структуры — [подплан Кросс-таблицы](../transform-crosstable/plan.md) редакции 3, шаблон — [node-plan](../../templates/node-plan.md). Общий порядок разработки и приёмки — [RUNBOOK](../../RUNBOOK.md) и [CLI-приёмка](../../workflow/acceptance-cli.md). [Карточка](README.md) · [реестр](../../registry.json).
+Образец структуры — [подплан Кросс-таблицы](../transform-crosstable/plan.md) (редакция 4 — итог после приёмки), шаблон — [node-plan](../../templates/node-plan.md). Общий порядок разработки и приёмки — [RUNBOOK](../../RUNBOOK.md) и [CLI-приёмка](../../workflow/acceptance-cli.md). [Карточка](README.md) · [реестр](../../registry.json).
 
 ## 0. Как выполняется назначение
 
