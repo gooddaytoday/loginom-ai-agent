@@ -54,6 +54,7 @@ export async function rejudge(config: EvalConfig, runId: string) {
         const updated: AttemptResult = {
           ...attempt,
           evaluation_contract_hash: evaluationHash,
+          structural_score: task && task.checklist.every((item) => item.axis !== undefined) && task.checklist.some((item) => item.axis === "structure") ? 0 : null,
           score: 0,
           pass: false,
           judge_status: "no_artifact",
