@@ -2,7 +2,7 @@
 
 Статус: `discovery_required`. Редакция 1 от 2026-10-05, автор — подготовка подпланов в ветке `node-coverage-plans`.
 Component ID: `component.transform.SlidingWindow`, slug `transform-slidingwindow`. Runtime type и режим: `transform.sliding_window` / `lag` — предложение до конца этапа 0.
-База назначения: ветка задания из карточки; исследованы исходники `5f772aea9`. Loginom: ожидается 7.4.2, фактическую версию записать на этапе 0; платформа исполнителя — Linux x64.
+База назначения: ветка задания из карточки; исследованы исходники `loginom@dada8010e`. Loginom: ожидается 7.4.2, фактическую версию записать на этапе 0; платформа исполнителя — Linux x64.
 
 Образец структуры — [подплан Кросс-таблицы](../transform-crosstable/plan.md) (редакция 4 — итог после приёмки), шаблон — [node-plan](../../templates/node-plan.md). Общий порядок разработки и приёмки — [RUNBOOK](../../RUNBOOK.md) и [CLI-приёмка](../../workflow/acceptance-cli.md). [Карточка](README.md) · [реестр](../../registry.json).
 
@@ -60,7 +60,7 @@ Component ID: `component.transform.SlidingWindow`, slug `transform-slidingwindow
 
 | Источник | Факт | Наблюдено или гипотеза |
 |---|---|---|
-| Runtime базы | Обработчика нет; зарегистрированы 14 типов (`packages/loginom-runtime/client/lib/node-contracts.mjs:8-21`, диспетчер `node-support.mjs:26-39`) | Наблюдено в коде `5f772aea9` |
+| Runtime базы | Обработчика нет; зарегистрированы 15 типов (`packages/loginom-runtime/client/lib/node-contracts.mjs:8-22`, диспетчер `node-support.mjs:27-41`) | Наблюдено в коде `dada8010e` |
 | Реестр | `plan_status: discovery_required`, `handler: null`, все слои готовности отрицательные | Наблюдено |
 | Справка | [Скользящее окно](https://help.loginom.ru/userguide/processors/transformation/lag.html) = `loginom-help@353e506b:data/processors/transformation/lag.md`: один табличный вход и выход; глубина и горизонт задаются по каждому полю; три способа обработки неполных записей; пример с глубиной 2 и горизонтом 1 | Документировано; UI не наблюдался |
 | E2E | `e2e-tests@486caef44:tests/acceptance/wizards/sliding_window.ts` — 4 активных сценария на `testdata/wizards/sliding_window/SlidingWindow.lgp` и `Month.lgd` (12 месяцев): заголовки, «Удалять добавленные», «Оставлять», управляющая переменная | Наблюдено в коде тестов, не на стенде |
@@ -109,7 +109,7 @@ Scope:
 - новые `packages/loginom-runtime/client/lib/sliding-window-{node,parameters,procedure,context,readback}.mjs` и тесты `client/test/sliding-window-*.test.mjs`;
 - изменить `node-contracts.mjs` и `.d.ts`, `node-support.mjs`, `node-api.mjs` (enum `target.type` и `mode`, schema), `node-procedure.mjs`, `workspace-ui.mjs`, `node-result-schema.mjs`, `user-results.mjs`.
 
-Образец — Дата и время (`date-time-*.mjs`): тоже добавляет вычисляемые поля к входу. Табличная оболочка — `createTabularTransformNodeSupport` (`client/lib/calculator-node.mjs:38`). Схема выхода при неизменных окнах статична, поэтому строгая `alignReadSchema` (`client/lib/node-read-contract.mjs:71`) подходит без изменений; если этап 0 покажет иное — стоп-условие.
+Образец — Дата и время (`date-time-*.mjs`): тоже добавляет вычисляемые поля к входу. Табличная оболочка — `createTabularTransformNodeSupport` (`client/lib/calculator-node.mjs:38`). Схема выхода при неизменных окнах статична, поэтому строгая `alignReadSchema` (`client/lib/node-read-contract.mjs:78`) подходит без изменений; если этап 0 покажет иное — стоп-условие.
 
 Видимость для модели:
 
@@ -133,9 +133,9 @@ Scope:
 - `data/sales.csv` — единственный вход модели;
 - `expected.json` — из независимого `oracle.py` до обработчика.
 
-Формат входов: UTF-8, разделитель `,`, десятичный `.`, NULL-маркер `?`, заголовок в первой строке. Каждый CSV в `data/` меньше 1 KiB: в базе `5f772aea9` нет исправления доставки вложений больше 1 KiB (W2 Кросс-таблицы), поэтому файл крупнее даёт `DISCOVERY_FILE_SIZE_CHANGED`. Ограничение снимается после включения W2 в базу.
+Формат входов: UTF-8, разделитель `,`, десятичный `.`, NULL-маркер `?`, заголовок в первой строке. Подтверждение размера вложений больше 1 KiB (W2 Кросс-таблицы) входит в базу `dada8010e`; если ветка задания его не содержит — стоп-условие.
 
-`sales.csv`: `Month` (строка `2025-01`…`2026-02`, 14 записей в порядке времени), `Sales` (integer), `Price` (real, значения с шагом 0,25 — точно представимы). Без NULL и меньше 1 KiB.
+`sales.csv`: `Month` (строка `2025-01`…`2026-02`, 14 записей в порядке времени), `Sales` (integer), `Price` (real, значения с шагом 0,25 — точно представимы). Без NULL.
 
 Адресные наборы — в `fixtures/` с `manifest.json` (байты, SHA256, формат, типы, порядок строк):
 
@@ -159,8 +159,8 @@ Scope:
 
 Ограничения источников:
 
-- `cold-check.mjs` сравнивает строки без учёта порядка и проверяет набор колонок, а не их порядок (`scripts/node-acceptance/cold-check.mjs:153-192`). Значения окна в каждой строке это частично компенсируют; порядок строк и колонок проверяется адресной матрицей по readback.
-- `cold-check.mjs` читает один выходной узел заданного типа (`COLD_OUTPUT_NODE_NOT_UNIQUE`): в приёмочном пакете один узел Скользящего окна.
+- cold-check сверяет порядок, имена, метки и типы колонок, а строки — без учёта порядка; до 100 строк на выход (`scripts/node-acceptance/expected-outputs.mjs:14,29-39`). Значения окна в каждой строке это частично компенсируют; порядок строк проверяется адресной матрицей по readback.
+- Каждый ожидаемый выход должен однозначно сопоставиться одному узлу по типу и метке (`COLD_OUTPUT_NOT_UNIQUELY_MATCHED`, `expected-outputs.mjs:72-81`): в приёмочном пакете один узел Скользящего окна или разные метки.
 - E2E использует LGD-импорт, который агент не поддерживает; приёмка идёт через текстовый импорт. Ожидания E2E — снимки быстрого просмотра, а не oracle.
 
 ## 4. Проверки, приёмка и завершение
@@ -194,7 +194,7 @@ PASS исполнителя: приёмка обвязки (CLI, cold-check, `pa
 
 ## 6. Точка продолжения
 
-- **Подтверждено:** справка, E2E-сценарии и точки runtime в исходниках `5f772aea9`. Живых наблюдений нет; статус `discovery_required`.
+- **Подтверждено:** справка, E2E-сценарии и точки runtime в исходниках `dada8010e`. Живых наблюдений нет; статус `discovery_required`.
 - **Генератор:** создать карточку с текстом из раздела 0, зафиксировать SHA, подготовить пару аккаунтов.
 - **Исполнитель:** этап 0 → `discovery.md`, fixtures, приёмочный комплект → этап 1.
 - **Ловец:** независимая приёмка опубликованного SHA.
