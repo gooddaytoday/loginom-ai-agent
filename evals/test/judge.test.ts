@@ -305,3 +305,10 @@ test("judgeTask: первый отказ, второй успех → ok, attemp
     await rm(parent, { recursive: true, force: true })
   }
 })
+
+test("scoreVerdict: провал результата не снижает структурный score", () => {
+  const rubric = checklist.map((item) => ({ ...item, axis: item.id === "c" ? "result" as const : "structure" as const }))
+  expect(scoreVerdict(rubric, verdict({ a: true, b: true, c: false }), 70)).toMatchObject({
+    ok: true, score: 50, pass: false, structural_score: 100,
+  })
+})
