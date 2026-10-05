@@ -229,3 +229,17 @@ test("loadTasks: явно заданная axis сохраняется в руб
     expect((await loadTasks(dir))[0]!.checklist[0]!.axis).toBe("structure")
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
+
+test("loadTasks: неизвестная axis отклоняется", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-axis-invalid-"))
+  try {
+    await cp(path.join(tasksDir, "group-sum-qty"), path.join(dir, "group-sum-qty"), { recursive: true })
+    const file = path.join(dir, "group-sum-qty", "task.json")
+    const raw = await Bun.file(file).json()
+    for (const axis of ["guess", null, 1]) {
+      raw.checklist[0].axis = axis
+      await Bun.write(file, JSON.stringify(raw))
+      await expect(loadTasks(dir)).rejects.toThrow("axis должна быть")
+    }
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
