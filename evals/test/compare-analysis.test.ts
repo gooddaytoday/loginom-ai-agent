@@ -89,7 +89,7 @@ test("analysis: pass^3 означает все три успеха, а не хо
 
 test("analysis: неполные карты effective лимитов неизвестны", () => {
   const run = comparisonSummary([{ successes: 3, attempts: 3 }])
-  for (const limits of [{}, { other: 1000 }]) {
+  for (const limits of [{}, { other: 1000 }] as Record<string, number>[]) {
     run.config.task_timeout_ms = limits
     expect(analyzeComparison(run, run).compatibility).toContain("config.task_timeout_ms")
   }
