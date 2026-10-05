@@ -44,6 +44,20 @@ function fixture(){
 test('stage three requires intermediate actions alongside the separate cold oracle',()=>{
  const result=auditCrossTableStage3(fixture());assert.equal(result.status,'PASS');assert.equal(result.criteria.length,6);
 });
+test('reapplied roles accept the canonical single columns entry and the legacy column alias',()=>{
+ const xs=fixture(),p=xs.find(e=>e.part.id==='reapply').part.state.input.parameters;
+ p.columns=[p.column];delete p.column;
+ assert.equal(auditCrossTableStage3(xs).status,'PASS');
+});
+test('reapplied category roles reject extra dimensions, wrong fields and conflicting aliases',()=>{
+ for(const columns of [[],null,[{name:'Month'}],[{name:'Category'},{name:'Month'}]]){
+  const xs=fixture(),p=xs.find(e=>e.part.id==='reapply').part.state.input.parameters;
+  p.columns=columns;delete p.column;
+  assert.throws(()=>auditCrossTableStage3(xs),/same roles reapplied/);
+ }
+ const xs=fixture(),p=xs.find(e=>e.part.id==='reapply').part.state.input.parameters;
+ p.columns=[p.column];assert.throws(()=>auditCrossTableStage3(xs),/same roles reapplied/);
+});
 test('a structured zero-effect request refusal in the tool error channel is still verified',()=>{
  const xs=fixture(),state=xs.find(e=>e.part.id==='negative').part.state;
  state.status='error';state.error=state.output;delete state.output;

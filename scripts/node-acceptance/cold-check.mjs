@@ -5,6 +5,7 @@ import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions} from './static-source-proof.mjs'
+import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -107,17 +108,31 @@ try {
    preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,receipt)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:receipt.id,receipt_signature:receipt.signature,operation_id:receipt.id})});
   let staticSources;
   if(expected.static_sources){
+   const {readGraph}=await load('client/lib/node-target-browser.mjs');
+   const viewportHelpers=await load('client/lib/node-placement.mjs');
+   const {NODE_TYPES}=await load('client/lib/node-contracts.mjs');
+   const revealSource=async target=>{
+    const id='cold-source-reveal-'+target.ref.node_id+'-'+(++coldChannelSequence);
+    const code=makeColdSourceRevealCode({node:target.ref,type:target.type,
+     request:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},types:NODE_TYPES,
+     origin,build:'7.4.2',deadline:Date.now()+30000},{readGraph,...viewportHelpers});
+    const result=await execute(withBrowserReceipt(`(${code})(page)`,{
+     receipt_namespace:session,receipt_id:id,receipt_signature:id,operation_id:id}));
+    await record({phase:'cold_source_viewport',node:target.ref,receipt_id:id,result});
+    if(result.status!=='SUCCEEDED'||result.verified!==true||result.graph_unchanged!==true||result.fully_visible!==true||result.settings_applied!==false)
+     throw Error('COLD_SOURCE_REVEAL_UNCONFIRMED');
+   };
    const {createActionRuntime}=await load('client/lib/executor.mjs');
    const catalog=JSON.parse(await readFile(join(root,'runtime/executor/catalog/actions.json'),'utf8'));
    const selectors=JSON.parse(await readFile(join(root,'runtime/executor/catalog/selectors.json'),'utf8'));
    const runtime=createActionRuntime({pinned:{actions:new Map(catalog.actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.selectors.map(s=>[s.symbol,s])),pins:{}},execute,onRecord:record,targetOrigin:origin,targetBuild:'7.4.2',allowCandidate:true});
    const account=config.workflow_profile.loginom_user;
-   const before=await observeStaticSources({load,graph:{...graph,nodes:graph.nodes.filter(n=>n.type==='imports.text')},channelFor,account});
+   const before=await observeStaticSources({load,graph:{...graph,nodes:graph.nodes.filter(n=>n.type==='imports.text')},channelFor,account,revealSource});
    const verified=await verifyStaticSourceBytes({load,runtime,execute,sources:before,allowed:expected.static_sources,account,origin,output:args.output});
    const returned=await adapter.activateWorkflow({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},{deadline:Date.now()+30000,receipt_id:'cold-return-from-files'});
    if(returned.status!=='SUCCEEDED'||!returned.verified||!returned.cleanup_complete)throw Error('COLD_SOURCE_RETURN_UNCONFIRMED');
    graph=await adapter.observe({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},Date.now()+30000);
-   staticSources=await observeStaticSources({load,graph,channelFor,account});
+   staticSources=await observeStaticSources({load,graph,channelFor,account,revealSource});
    for(const source of staticSources.imports){
     const old=before.imports.find(s=>s.node_id===source.node_id);
     if(!old||JSON.stringify(old.configuration.source)!==JSON.stringify(source.configuration.source)||JSON.stringify(old.configuration.format)!==JSON.stringify(source.configuration.format)||JSON.stringify(old.configuration.output_mapping)!==JSON.stringify(source.configuration.output_mapping))throw Error('COLD_SOURCE_SETTINGS_CHANGED');
@@ -242,6 +257,7 @@ try {
     }),
   )
   await writeFile(join(args.output, "cleanup.json"), JSON.stringify(cleanup, null, 2) + "\n")
+  state.cleanup=cleanup
   if (cleanup.status !== "SUCCEEDED" || !cleanup.package_closed || !cleanup.logged_out)
     throw Error("COLD_CLEANUP_UNCONFIRMED")
   state.closed = true
@@ -270,6 +286,10 @@ try {
       cleanup: result.cleanup,
     }),
   )
+} catch(error) {
+  state.failure=String(error?.message??error)
+  for(const secret of [config.api_key,loginPassword].filter(Boolean))state.failure=state.failure.split(secret).join('[REDACTED]')
+  throw error
 } finally {
   if (!state.closed && !state.cleanupAttempted && state.prepared?.status === "READY" && state.prepared.package_ref?.path === saved.path) {
     await execute(
@@ -284,9 +304,13 @@ try {
         diagnosticDiscard: true,
       }),
     )
-      .then((result) => writeFile(join(args.output, "cleanup.json"), JSON.stringify(result, null, 2) + "\n"))
+      .then((result) => {state.cleanup=result;return writeFile(join(args.output, "cleanup.json"), JSON.stringify(result, null, 2) + "\n")})
       .catch(() => console.error("COLD_PACKAGE_CLEANUP_UNCONFIRMED"))
   }
+  if(state.failure)await writeFile(join(args.output,'result.json'),JSON.stringify({status:'FAIL',
+   phase:'independent_cold_reopen_readback',path:saved.path,settingsReapplied:false,error:state.failure,
+   cleanup:{package_closed:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.package_closed===true,
+    logged_out:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.logged_out===true}},null,2)+'\n')
   await context.close()
 }
 

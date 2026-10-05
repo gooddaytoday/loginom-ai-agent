@@ -960,7 +960,7 @@
     },
     "crosstable-discovery": {
       "path": "nodes/transform-crosstable/discovery.md",
-      "sha256": "5b19ace23f1a5183b91416464927d23335393166094ed85e41df2ea7f17eefdd",
+      "sha256": "6cdabf0af5665c62a82462a5563876103ea4649ccdebb9b4467390205b9ce451",
       "kind": "document",
       "availability": "retained_document",
       "source_commit": null,

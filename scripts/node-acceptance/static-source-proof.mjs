@@ -14,7 +14,7 @@ export function verifyGeneratedCollapseMapping(mapping,schema){
 
 // Read settings and cancel each wizard. No CrossTable configure handler, private
 // model receipts, supplied subtype declarations or aggregate results are used.
-export async function observeStaticSources({load,graph,channelFor,account}){
+export async function observeStaticSources({load,graph,channelFor,account,revealSource}){
  const {openPreparedWizard}=await load('client/lib/node-wizard-open.mjs');
  const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
  const {isTextImportSourceReady}=await load('client/lib/text-import-procedure.mjs');
@@ -37,9 +37,10 @@ export async function observeStaticSources({load,graph,channelFor,account}){
   const closed=await closePreparedWizard(channel);need(closed.verified&&closed.settings_applied===false,'mapping cancel');
   return {port:0,autosync:m.autosync,fields,native:m};
  };
- const selectSource=async channel=>{
+ const selectSource=async(channel,target)=>{
   // Existing settings controls are rendered only for the selected graph node.
   // Bind the gesture to the independently observed GUID before opening them.
+  if(revealSource)await revealSource(target);
   await channel.perform({condition:'cold select observed source node',
    ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'
     &&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'&&e.allowed_actions.includes('click')),
@@ -52,7 +53,7 @@ export async function observeStaticSources({load,graph,channelFor,account}){
  const sources={imports:[],collapses:[],crossTables:[]};
  for(const target of graph.nodes.filter(n=>['imports.text','transform.collapse_columns','transform.cross_table'].includes(n.type))){
   const channel=channelFor(target.ref,'source-settings-'+target.ref.node_id);
-  await selectSource(channel);
+  await selectSource(channel,target);
   try { if(target.type==='imports.text'){
    await openPreparedWizard(channel);
    let s=await channel.observe({condition:'cold observed static import',ready:isTextImportSourceReady});
@@ -84,7 +85,7 @@ export async function observeStaticSources({load,graph,channelFor,account}){
     need(variables.verified&&variables.settings_changed===false&&variables.settings_applied===false&&variables.draft_discarded===true,
      'cold variable inspection must discard its unchanged draft');
    }
-   await selectSource(channel);
+   await selectSource(channel,target);
    await openPreparedWizard(channel);
    if(target.type==='transform.collapse_columns'){
     const s=await channel.observe({condition:'cold observed Collapse',readCollapse:true,ready:s=>s.node_collapse?.verified&&s.node_collapse.inventory_complete});

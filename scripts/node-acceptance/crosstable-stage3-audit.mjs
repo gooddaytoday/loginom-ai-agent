@@ -4,6 +4,9 @@ import {pathToFileURL} from 'node:url';
 const need=(v,m)=>{if(!v)throw Error('CrossTable stage three transcript: '+m);};
 const same=(a,b)=>['document_id','workflow_id','node_id'].every(k=>typeof a?.[k]==='string'&&a[k]===b?.[k]);
 const parse=v=>{if(typeof v!=='string')return v;try{return JSON.parse(v);}catch{return null;}};
+const singleColumn=p=>Object.hasOwn(p,'columns')
+ ?!Object.hasOwn(p,'column')&&Array.isArray(p.columns)&&p.columns.length===1?p.columns[0]:null
+ :p.column;
 const complete=r=>r?.status==='SUCCEEDED'&&r.cleanup_complete===true&&r.execution?.status==='completed'
  &&r.output?.ports?.length===1&&r.output.ports[0].fresh===true&&r.output.ports[0].execution_id===r.execution.execution_id
  &&r.output.ports[0].sample_complete===true&&r.output.ports[0].sample_rows===r.output.ports[0].row_count
@@ -95,7 +98,7 @@ export function auditCrossTableStage3(events){
  const reordered=applies.find(c=>fixed&&c.index>fixed.index&&c.input.target?.type==='imports.text'&&same(c.input.target.ref,source)&&complete(reply(c))
   &&JSON.stringify(reply(c).output.ports[0].schema.map(f=>f.name))===JSON.stringify(['When','Flag','Text','Units','Amount','Channel','Category','Month','Region']));
  const reapplied=transitionHistory.find(c=>reordered&&c.index>reordered.index&&parameters(c).row_keys?.[0]?.name==='Region'
-  &&parameters(c).column?.name==='Category'&&parameters(c).facts?.[0]?.field?.name==='Amount');
+  &&singleColumn(parameters(c))?.name==='Category'&&parameters(c).facts?.[0]?.field?.name==='Amount');
  need(reordered&&reapplied,'same roles reapplied after own input reorder');columns(reapplied,['Region','C_1','C_2']);
  evidence.push({criterion:'mode_transitions_and_input_reorder',node:transitions.node,operations:[transitions.input.operation_id,sliding.input.operation_id,fixed.input.operation_id,reordered.input.operation_id,reapplied.input.operation_id]});
  return {status:'PASS',phase:'cross_table_stage_three_transcript_audit',criteria:evidence};
