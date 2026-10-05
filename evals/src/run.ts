@@ -24,6 +24,7 @@ export async function main(argv: string[], env: Record<string, string | undefine
     return calibrate(config)
   }
   const lease = config.dryRun ? undefined : await acquireHarnessLease(config.profileDir)
+  if (lease) config.profileDir = lease.profileDir
   const result = await executeRun(config)
   if (result.code === 0) await lease?.release()
   return result

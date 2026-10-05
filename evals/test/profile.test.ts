@@ -242,6 +242,25 @@ test("releaseStaleWriter: receipt не разрешает удалять зам�
   expect(await Bun.file(path.join(profile, ".writer", "owner")).text()).toBe("foreign")
 })
 
+test("releaseStaleWriter: symlink профиля сохраняет guard живой canonical группы", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-writer-alias-"))
+  const profile = path.join(directory, "profile")
+  const alias = path.join(directory, "alias")
+  await Bun.write(path.join(profile, ".writer/owner"), "observed")
+  await symlink(profile, alias)
+  const child = spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], {
+    detached: true, stdio: "ignore", env: { PATH: process.env.PATH ?? "" }, cwd: os.tmpdir(),
+  })
+  const exited = new Promise((resolve) => child.once("exit", resolve))
+  await Bun.write(`${profile}.process-group`, String(child.pid))
+  try {
+    await expect(releaseStaleWriter(alias, await writerIdentity(profile))).rejects.toThrow("занят процессами")
+    expect(await Bun.file(path.join(profile, ".writer/owner")).text()).toBe("observed")
+    expect(await Bun.file(`${profile}.process-group`).text()).toBe(String(child.pid))
+    process.kill(child.pid!, 0)
+  } finally { child.kill("SIGKILL"); await exited }
+})
+
 test("releaseStaleWriter: путь с regex-метасимволами снимает .writer", async () => {
   const profile = await mkdtemp(path.join(os.tmpdir(), "evals-profile-a+b(c)-"))
   await mkdir(path.join(profile, ".writer"))

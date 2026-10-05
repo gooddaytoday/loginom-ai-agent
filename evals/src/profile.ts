@@ -1,5 +1,5 @@
 import path from "node:path"
-import { mkdir, readdir, rm, rmdir, stat } from "node:fs/promises"
+import { mkdir, readdir, realpath, rm, rmdir, stat } from "node:fs/promises"
 import { repoRoot, type EvalConfig } from "./config"
 import type { AgentCommand } from "./cli"
 import { EvalFailure } from "./fail"
@@ -55,13 +55,14 @@ export function parseView(text: string): View | undefined {
 
 // Guard снимаем только когда ни один процесс не ссылается на профиль (Chromium держит путь в argv).
 export async function releaseStaleWriter(profileDir: string, expected?: WriterIdentity | null) {
-  const writer = path.join(profileDir, ".writer")
-  const busy = await profileProcesses(profileDir)
+  const profile = await canonicalProfilePath(profileDir)
+  const writer = path.join(profile, ".writer")
+  const busy = await profileProcesses(profile)
   if (busy.trim()) throw new EvalFailure(`Профиль ${profileDir} занят процессами:\n${busy.trim()}`, 2)
   if (!(await exists(writer))) return false
-  if (expected !== undefined && JSON.stringify(await writerIdentity(profileDir)) !== JSON.stringify(expected))
+  if (expected !== undefined && JSON.stringify(await writerIdentity(profile)) !== JSON.stringify(expected))
     throw new EvalFailure("Writer identity changed before release", 1)
-  await rm(`${profileDir}.process-group`, { force: true })
+  await rm(`${profile}.process-group`, { force: true })
   await rm(writer, { recursive: true, force: true })
   return true
 }
@@ -79,26 +80,31 @@ export async function waitProfileIdle(profileDir: string, timeoutMs = 60_000) {
 
 // Зарегистрированная группа включает host даже после завершения родительского CLI.
 async function profileProcesses(profileDir: string) {
-  const marker = Bun.file(`${profileDir}.process-group`)
+  const profile = await canonicalProfilePath(profileDir)
+  const marker = Bun.file(`${profile}.process-group`)
   const group = (await marker.exists()) ? Number((await marker.text()).trim()) : undefined
   if (group !== undefined && (!Number.isInteger(group) || group <= 0))
     throw new EvalFailure(`Некорректная группа процессов профиля ${profileDir}`, 2)
   const tracked = group === undefined ? [] : await groupProcesses(group)
-  const pattern = `${profileDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|[[:space:]]|$)`
+  const pattern = `${profile.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|[[:space:]]|$)`
   const result = await Bun.$`pgrep -u ${process.getuid?.() ?? ""} -f -- ${pattern}`.quiet().nothrow()
   if (result.exitCode > 1) throw new EvalFailure(`pgrep завершился кодом ${result.exitCode}`, 2)
-  const owners = await linuxProfileOwners(profileDir)
+  const owners = await linuxProfileOwners(profile)
   return [...tracked.map(String), ...owners.map(String), result.text().trim()].filter(Boolean).join("\n")
+}
+
+async function canonicalProfilePath(profileDir: string) {
+  return realpath(profileDir).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return path.resolve(profileDir)
+    throw error
+  })
 }
 
 // CLI хранит профиль только в env, а runtime — в cwd; argv не доказывает idle.
 async function linuxProfileOwners(profileDir: string) {
   if (process.platform !== "linux") return []
-  const { readdir, readFile, readlink, realpath } = await import("node:fs/promises")
-  const canonical = await realpath(profileDir).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT") return path.resolve(profileDir)
-    throw error
-  })
+  const { readFile, readlink } = await import("node:fs/promises")
+  const canonical = await canonicalProfilePath(profileDir)
   const readable = <T>(operation: Promise<T>, known: boolean) => operation.catch((error: NodeJS.ErrnoException) => {
     if (!known && ["EACCES", "EPERM"].includes(error.code ?? "")) return undefined
     throw error
@@ -264,7 +270,7 @@ export async function resetProfile(config: EvalConfig) {
 
 // Вызывается после recovery и копирования артефактов; долговечные stores лежат вне attempts.
 export async function pruneRuntimeAttempts(profileDir: string, owned?: string[]) {
-  const { lstat, realpath } = await import("node:fs/promises")
+  const { lstat } = await import("node:fs/promises")
   const entries = (directory: string) =>
     readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT") return []
