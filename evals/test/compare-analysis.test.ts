@@ -173,3 +173,9 @@ test("analysis: exclusions, reverse и unknown pass не дают локальн
   b.tasks[0]!.attempts[0]!.status = "infra_error"
   expect(analyzeComparison(a, b).tasks[0]!.regressions).toEqual([])
 })
+
+test("analysis: null не заменяет явно ошибочные параметры на defaults", () => {
+  const run = comparisonSummary([{ successes: 3, attempts: 3 }])
+  expect(() => analyzeComparison(run, run, { margin: null } as unknown as { margin: number })).toThrow("Некорректные параметры compare")
+  expect(() => analyzeComparison(run, run, { confidence: null } as unknown as { confidence: number })).toThrow("Некорректные параметры compare")
+})
