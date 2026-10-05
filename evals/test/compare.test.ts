@@ -124,3 +124,13 @@ test("compare: показывает неразличимость малого н
  expect(text).toContain("pass^3")
  expect(text).toContain("Hoeffding")
 })
+
+test("compare: свободный текст не создаёт строки или ячейки Markdown", () => {
+ const run = comparisonSummary([{successes:3,attempts:3}])
+ run.agent.cli_version = "v|\n## injected"
+ run.label = "label|\n## injected"
+ const text = compare(run,run)
+ expect(text).toContain("CLI v\\| ## injected")
+ expect(text).toContain("label\\| ## injected")
+ expect(text).not.toContain("\n## injected")
+})
