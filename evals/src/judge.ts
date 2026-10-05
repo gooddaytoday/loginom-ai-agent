@@ -187,6 +187,7 @@ export function judgedFields(judged: Judged) {
   if (judged.ok)
     return {
       score: judged.score,
+      structural_score: judged.structural_score,
       pass: judged.pass,
       judge_status: "scored" as const,
       judge_attempts: judged.attempts,
@@ -198,6 +199,7 @@ export function judgedFields(judged: Judged) {
     }
   return {
     score: null,
+    structural_score: null,
     pass: "oracle_pass" in judged && judged.oracle_pass === false ? false : null,
     judge_status: "error" as const,
     judge_attempts: judged.attempts,
