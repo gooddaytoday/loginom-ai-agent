@@ -1,50 +1,22 @@
 # Замена
 
-[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../RUNBOOK.md).
+Устойчивый ID: `component.transform.Replace`. Slug: `replacement`. Исторический подплан 11.
 
-Устойчивый ID: `component.transform.Replace`. Runtime: `transform.replace_columns`, режим `exact`. Исторический подплан 11.
+[Подплан](plan.md) · [реестр](../../registry.json).
 
-Это карточка существующего обработчика и его границ. Актуальные состояния и доказательства хранятся в [реестре](../../registry.json); карточка не назначает разработчика и не запускает работу.
+## Состояние
 
-## Что уже есть
+Обработчик `transform.replace_columns` / `exact` реализован; реестр сохраняет историческое `accepted_scoped` и технические Desktop случаи V37. Приёмки текущего standalone CLI нет: после прежних проверок изменена общая оболочка. Следующая карточка Multica — этап 0 подплана, перепроверка принятого объёма; статус `reverification_required`. Исторический PASS не переносится.
 
-Внутренняя exact-таблица для string/integer/real, replace/add и фактический признак _Replaced.
+Принятый объём: Внутренняя exact-таблица для string/integer/real, replace/add и фактический признак _Replaced.
 
-- Обработчик зарегистрирован в текущем исходном runtime; снимок 8b7ea1225d0e.
-- Историческая приёмка ограниченного режима сохранена, тип вошёл в прежние RC6–RC8.
-- Desktop технически создал, выполнил и сохранил этот тип в случаях V37.
-- Аналитическая правильность этой Desktop серии не проверялась. Новая приёмка standalone CLI и живая перепроверка текущего снимка не выполнялись.
+Ограничения: Нет regex, внешней таблицы, Boolean/datetime и неточного числового сравнения. real other.mode=value поддерживает максимум 2 десятичных знака; точные пары не имеют этого общего ограничения. String не длиннее 2048 символов без NUL/CR/LF; non-ASCII case-insensitive ключи отклоняются; большие Int64 передавать десятичной строкой.
 
-## Контракт и ограничения
+Общих изменений W в этом назначении нет; дефект общей оболочки требует отдельного решения владельца.
 
-- Нет regex, внешней таблицы, Boolean/datetime и неточного числового сравнения.
-- real other.mode=value поддерживает максимум 2 десятичных знака; точные пары не имеют этого общего ограничения.
-- String не длиннее 2048 символов без NUL/CR/LF; non-ASCII case-insensitive ключи отклоняются; большие Int64 передавать десятичной строкой.
+## Источники
 
-[Текущий обработчик](../../../../packages/loginom-runtime/client/lib/replacement-node.mjs); [параметры/процедура](../../../../packages/loginom-runtime/client/lib/replacement-parameters.mjs). Публичную схему и валидатор читать перед изменением; скопированный пример не заменяет проверку фактической версии.
-
-## Следующая работа для отдельного агента
-
-Поддерживать принятый scope. При изменении runtime пройти адресные проверки и отдельную standalone CLI приёмку; не разрабатывать этот тип с нуля.
-
-Перед первой правкой зафиксировать точный разрешённый объём: исправление, дополнительный режим либо проверка переноса. Назначение должно содержать базовый commit, собственные ветку/worktree, аккаунт, профиль и пакет. Основная автономная приёмка — standalone CLI с назначенным профилем модели. Старые команды Hermes из архивного подплана не запускать.
-
-Изучить фактический мастер Loginom штатными скриптами runtime и сопоставить с Help/E2E. Переиспользовать общую оболочку node.apply; не создавать параллельный исполнитель или обход unknown effects. Подготовить независимые входы и ожидаемые значения до автономной приёмки.
-
-## Проверки объявленного изменения
-
-- String/integer/real/NULL exact pairs; replace/add, multi-field и частичный existing patch.
-- Независимый _Replaced, сохранение неперечисленных правил, collisions и unsupported до эффекта.
-- Точность real/Int64 и save/reopen всех настроек/результатов.
-- На изменённых путях проверить отказ до эффекта, известную ошибку с cleanup и неопределённый результат без слепого повтора.
-- Сохранённый пакет и повторное открытие подтверждать отдельно от локальной квитанции узла. Проверять аналитические значения независимым oracle; технический успех не заменяет их.
-- Фиксировать source/runtime/client/model/platform и точный scope; исходные FAIL сохранять. Выпуск/слияние — отдельные состояния.
-
-## Сохранённые источники
-
-- [Исторический подплан](../../../../services/loginom-ai/docs/plans/loginom-dock/11-replacement.md) — объём и прошлые наблюдения; прежние статусы и исполнители исторические.
-- [Историческое принятие](../../../../services/loginom-ai/docs/loginom-dock/node11-branch-acceptance-2026-09-13.json) — доказательство только закреплённой там ревизии.
-- [Desktop результаты](../../../testing/loginom-ai-agent/scenario-debugging-results.md) и [checkpoint](../../../testing/loginom-ai-agent/scenario-debugging-checkpoint.md) — техническая серия, аналитика не проверялась.
-- [Совместная историческая приёмка](../../../../services/loginom-ai/docs/loginom-dock/releases/rc-combined-verification-2026-09-14.md) — 14 типов в трёх сценариях.
-
-Полные исторические свидетельства частично ссылаются на приватные каталоги/worktrees. В этом снимке они не перепроверялись и не включаются в архив целиком. Сохранённый отчёт не выдаётся за новый аудит исходных данных.
+- [Справка](https://help.loginom.ru/userguide/processors/transformation/substitution/) — `loginom-help@353e506b:data/processors/transformation/substitution/README.md`.
+- [Обработчик](../../../../packages/loginom-runtime/client/lib/replacement-node.mjs) и [параметры](../../../../packages/loginom-runtime/client/lib/replacement-parameters.mjs) — база `loginom@dada8010e`.
+- [исторический подплан 11](../../../../services/loginom-ai/docs/plans/loginom-dock/11-replacement.md) — справка о прежних пределах, не приёмка текущего клиента.
+- E2E `e2e-tests@486caef44:tests/toreview/acceptance/wizards/replace/{replace,replace_datasets}.ts; tests/toreview/acceptance/mapping/mapping_replace.ts`; [Desktop результаты](../../../testing/loginom-ai-agent/scenario-debugging-results.md) — техническая серия без новой аналитической приёмки.
