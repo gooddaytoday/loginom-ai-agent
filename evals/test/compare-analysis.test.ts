@@ -105,3 +105,9 @@ test("analysis: неизвестный pass не выбирает удобное
   run.tasks[0]!.attempts[0]!.pass = null
   expect(analyzeComparison(run, run).reliability.a).toEqual({ pass1: null, passk: null })
 })
+
+test("analysis: стабильная задача 3/3 → 0/3 получает наблюдаемый guard", () => {
+  const a = comparisonSummary([{ successes: 3, attempts: 3 }])
+  const b = comparisonSummary([{ successes: 0, attempts: 3 }])
+  expect(analyzeComparison(a, b).tasks[0]?.regressions).toContain("completion")
+})
