@@ -103,7 +103,11 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
    async openWizard(ctx) {
     enter(ctx);executionDriver=createNodeExecutionProcedure(channel,ctx.node);await executionDriver.prepare();
     if(!implementation)configurationGraph=await graphForRejection();
-    if(implementation?.beforeOpen)preconfiguration=await implementation.beforeOpen(channel,operation.nodeApply.request);
+    if(implementation?.beforeOpen){
+     const before=await channel.observe({condition:'select owned node before internal preparation',ready:s=>s.prepared_node_context?.surface==='graph'});
+     await selectPreparedGraphNode(channel,before,'select node before internal preparation',{refreshReplacedBody:true});
+     preconfiguration=await implementation.beforeOpen(channel,operation.nodeApply.request);
+    }
     const s=await channel.observe({condition:'calculator graph before opening',ready:s=>s.prepared_node_context?.surface==='graph'});
     await selectPreparedGraphNode(channel,s,'select calculator graph node');
     await openPreparedWizard(channel);
@@ -175,7 +179,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
       return verified({not_applicable:true,mappings:[]});
      }
      enter(ctx);
-     if(implementation?.beforeInput)await implementation.beforeInput(options,ctx,{targetOrigin,targetBuild});
+     if(implementation?.beforeInput)await implementation.beforeInput(options,ctx,{targetOrigin,targetBuild,channel,finishWizard});
      if(implementation?.configureInputs)return implementation.configureInputs(channel,mappings,ctx,operation.nodeApply.request,finishWizard);
      const recoveryGraph=(!implementation||implementation.inputMappingRecovery)?await graphForInput():null;
      await channel.openInputPort(0);
@@ -198,6 +202,47 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     }
     enter(ctx);requireValue(configured,'Configured calculator missing');
     if(implementation?.configureAllOutputs){multipleOutputs=await implementation.configureAllOutputs(channel,configured,operation.nodeApply.request.parameters,mappings,finishWizard);return multipleOutputs;}
+    // CrossTable generates its output only on Execute. This internal hook is
+    // restricted to that component; all existing handlers keep strict mappings.
+    if(implementation?.type==='transform.cross_table'&&implementation.materializedSchema){
+     if(mappings.length||operation.nodeApply.request.target.kind==='existing'&&operation.nodeApply.request.finish==='execute'){
+      requireValue(operation.nodeApply.request.finish==='execute','CrossTable output edits require fresh execution');
+      const firstFinish=await finishConfiguredGraph(channel,executionDriver,'execute',ctx.node);
+      const firstExecution=await executionDriver.waitCompleted();
+      requireValue(firstExecution.verified===true&&firstExecution.owner_verified===true,'Owned initial materialization required');
+      await channel.openOutputPort(0);
+      const {showMissingValuesMappingTable}=await import('./missing-values-output.mjs');
+      await showMissingValuesMappingTable(channel);
+      let s=await channel.observe({condition:'owned materialized CrossTable output',readMappings:true,
+       ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true&&s.node_mapping.source_identity_verified===true});
+      const sources=s.node_mapping.source_fields.map(f=>({...f,used:true}));
+      requireValue(sources.every(f=>f.required===true),'CrossTable required source inventory changed');
+      implementation.materializedSchema(sources.map((f,index)=>({...f,index})),configured,{node:ctx.node,execution:firstExecution});
+      const requested=mappings[0]??{direction:'output',port:0},changes=[];
+      resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
+      if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
+      if(requested.fields||requested.changes)changes.push(await configureOutputFields(channel,requested,sources));
+      s=await channel.observe({condition:'CrossTable output edits before order',readMappings:true,ready:s=>s.node_mapping?.verified===true});
+      const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
+      if(resolved.fields)changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
+      s=await channel.observe({condition:'CrossTable output mapping readback',readMappings:true,ready:s=>s.node_mapping?.verified===true});
+      mapping=s.node_mapping;
+      requireValue(mapping.target_fields.length===sources.length&&mapping.target_fields.every(f=>!f.excluded&&f.source),
+       'CrossTable cannot omit mandatory output sources');
+      const definition=await readOutputDefinitionPages(channel,{expectedCount:mapping.target_fields.length});
+      requireValue(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===mapping.target_fields[i][k])),
+       'CrossTable mapping rendered definition differs');
+      const finish=await finishWizard('done',true,definition);
+      configured={...configured,output_mapping:mapping};
+      // The final Execute gets a new baseline. Both executions consume this
+      // operation's original deadline; neither is an unknown-effect retry.
+      executionDriver=createNodeExecutionProcedure(channel,ctx.node);await executionDriver.prepare();
+      return verified({effect_possible:true,node_context:configured.node_context,native_mapping:mapping,definition,changes,finish,
+       initial_materialization:{finish:firstFinish,execution:firstExecution},source_identity_verified:true});
+     }
+     return verified({deferred_schema:true,node_context:configured.node_context,
+      scope:'schema_not_materialized_before_execution',settings_applied:false});
+    }
     const outputRecoveryGraph=!implementation?await graphForInput():null;
     await channel.openOutputPort(0);
     const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
@@ -235,6 +280,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
    async finish(mode,ctx){enter(ctx);if(mode==='close')return closePreparedWizard(channel);requireValue(mode==='done','Separate calculator port requires intermediate Done');return finishWizard(mode);},
    async finishGraph(mode,ctx){
     enter(ctx);
+    if(mode==='execute'&&implementation?.beforeGraphExecute)await implementation.beforeGraphExecute(options,ctx,configured);
     const graph=await channel.observe({condition:'calculator graph ready after port commit',ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
     // Loginom can leave a visible port without an SVG shape after port Done.
     // The normal node selection redraws it before the next graph checkpoint.
@@ -264,7 +310,9 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     if(!read.ports.length)return verified({status:'complete',ports:[],execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id});
     if(read.coverage==='full'){
      requireValue(implementation?.nativeFullOutput===true,'Full native output is unavailable for this handler');
-     return readCollapseNativeOutput(channel,read,ctx,options,{targetOrigin,targetBuild});
+     const output=await readCollapseNativeOutput(channel,read,ctx,{...options,nativeExecutionProof:executionReceipt},{targetOrigin,targetBuild},implementation.type==='transform.cross_table'?configured:null);
+     if(implementation.type==='transform.cross_table'){const materialized=implementation.materializedSchema(output.ports[0].schema,configured,{node:ctx.node,execution:ctx.execution});output.ports[0].category_fields=materialized.category_fields;}
+     return output;
     }
     if(implementation?.readOutputs){requireValue(multipleOutputs?.verified,'Verified output schemas missing');return implementation.readOutputs(channel,read,ctx,multipleOutputs);}
     const table=await openNewOutputTable(channel,0),formatProof=read.require_exact_numbers?await configureTablePrecision(channel,table.table):null;
@@ -272,7 +320,10 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     try {
       readSettings=await prepareTableRead(channel,table.table);
       const raw=await readTableOutputPages(channel,table.table,{sampleRows:read.sample_rows});
-      data=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:columns,requireExactNumbers:read.require_exact_numbers});
+      const materialized=implementation?.type==='transform.cross_table'&&implementation.materializedSchema
+       ?implementation.materializedSchema(raw.columns,configured,{node:ctx.node,execution:ctx.execution}):null;
+      data=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:materialized?.columns??columns,requireExactNumbers:read.require_exact_numbers});
+      if(materialized)data.category_fields=materialized.category_fields;
     } finally { if(formatProof)formatRestoration=await restoreTablePrecision(channel,formatProof); }
     const returned=await returnFromOutputTable(channel,table.table);
     return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,

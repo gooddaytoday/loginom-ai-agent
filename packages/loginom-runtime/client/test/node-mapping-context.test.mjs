@@ -69,6 +69,15 @@ test('separate output wizard distinguishes excluded source identity from an acti
  assert.equal(r.target_fields[0].excluded,false);assert.equal(r.target_fields[0].source.record_id,'s0');
  assert.equal(r.target_fields[0].inherited,false);
 });
+test('native empty source NBSP is accepted only for a verified absent connection',()=>{
+ const f=excludedFixture(),cell=f.all.find(e=>e.tid===f.base+'colSourceDisplayName_B');
+ cell.textContent='\u00a0';assert.equal(f.read().verified,true);
+ for(const text of [' ','\n','other']){cell.textContent=text;assert.equal(f.read().verified,false);}
+ const active=fixture();active.all.find(e=>e.tid===active.base+'colSourceDisplayName_Out0').textContent='\u00a0';
+ assert.equal(active.read().verified,false);
+ const label=excludedFixture();label.all.find(e=>e.tid===label.base+'colDisplayName_B').textContent='\u00a0';
+ assert.equal(label.read().verified,false);
+});
 test('unloaded derived sources retain excluded inventory but cannot prove source identity',()=>{
  const f=excludedFixture();f.source.splice(0);
  for(const t of f.target)Object.assign(t.data,{ConnectedRecord:null,SourceDisplayName:null,SourceDataType:null});
@@ -183,4 +192,13 @@ for(const [name,change] of Object.entries({foreignSelection:f=>f.selected=[{...f
 test('standalone dataset output schema retains effective data kinds and rejects malformed kinds',()=>{
  const f=fixture({socket:true});f.target[0].data.DataKind=1;const r=f.read();assert.equal(r.verified,true,r.reason);assert.equal(r.mapping_wizard,'DataSetOutputSocketWizard');assert.deepEqual(Array.from(r.target_fields,f=>f.data_kind),['Непрерывный','Дискретный']);
  f.target[0].data.DataKind=99;assert.equal(f.read().verified,false);
+});
+
+test('native mapping preserves meaningful leading/trailing label whitespace and rejects trimmed renderings',()=>{
+ const f=fixture();const label=' .Amount.Сумма ';
+ f.source[0].data.DisplayName=label;f.target[0].data.DisplayName=label;f.target[0].data.SourceDisplayName=label;
+ for(const e of f.all.filter(e=>e.parent===f.rows[0]&&e.tid&&!e.tid.includes(';colName_')))e.textContent=label;
+ assert.equal(f.read().verified,true);assert.equal(f.read().target_fields[0].label,label);
+ f.all.find(e=>e.tid===f.base+'colDisplayName_Out0').textContent=label.trim();
+ assert.equal(f.read().verified,false);
 });

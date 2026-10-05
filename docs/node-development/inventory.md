@@ -2,7 +2,7 @@
 
 Сформирован из [registry.json](registry.json). Не редактировать сводные числа вручную.
 
-Исторический каталог: **78** компонентов. Обработчики: **14**; обычный остаток: **61**; условный резерв: **3**.
+Исторический каталог: **78** компонентов. Обработчики: **15**; обычный остаток: **60**; условный резерв: **3**.
 
 Реализация и историческая приёмка не равны повторной аналитической приёмке текущего CLI. Старые номера 01/02 — инфраструктура, а не дополнительные типы узлов.
 
@@ -24,6 +24,7 @@
 | 14 | [Заполнение пропусков](nodes/missing-values/README.md) | [План](nodes/missing-values/plan.md) | `preprocessing.data_recovery` / impute | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
 | 16 | [Свёртка столбцов](nodes/collapse-columns/README.md) | [План](nodes/collapse-columns/plan.md) | `transform.collapse_columns` / unpivot | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
 | 17 | [Текстовый экспорт](nodes/text-export/README.md) | [План](nodes/text-export/plan.md) | `exports.text` / delimited | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
+| 15 | [Кросс-таблица](nodes/transform-crosstable/README.md) | [План](nodes/transform-crosstable/plan.md) | `transform.cross_table` / pivot | not_accepted | standalone_cli_accepted; аналитика: independent_oracle_pass |
 
 ## Компоненты без полного обработчика
 
@@ -79,7 +80,6 @@
 | `component.research.FactorAnalysis` | [Факторный анализ](nodes/research-factoranalysis/README.md) | [План](nodes/research-factoranalysis/plan.md) | backlog | Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность. |
 | `component.research.Quality` | [Качество данных](nodes/research-quality/README.md) | [План](nodes/research-quality/plan.md) | backlog | Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность. |
 | `component.transform.ColUnionData` | [Соединение (таблицы по позиции)](nodes/transform-coluniondata/README.md) | [План](nodes/transform-coluniondata/plan.md) | backlog | Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность. |
-| `component.transform.CrossTable` | [Кросс-таблица](nodes/transform-crosstable/README.md) | [План](nodes/transform-crosstable/plan.md) | backlog | До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения. |
 | `component.transform.EnrichData` | [Дополнение данных](nodes/transform-enrichdata/README.md) | [План](nodes/transform-enrichdata/plan.md) | backlog | Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность. |
 | `component.transform.SlidingWindow` | [Скользящее окно](nodes/transform-slidingwindow/README.md) | [План](nodes/transform-slidingwindow/plan.md) | backlog | Подплан готов к назначению этапов 0 и 1 одной карточкой Multica; этап 2 — отдельная карточка. Наличие плана не подтверждает готовность. |
 | `component.transform.UngroupData` | [Разгруппировка](nodes/transform-ungroupdata/README.md) | [План](nodes/transform-ungroupdata/plan.md) | backlog | Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность. |

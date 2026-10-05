@@ -1,0 +1,355 @@
+{
+  "outputs": [
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "C_1_Amount_Sum",
+          "label": "<...>|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_1_Amount_Min",
+          "label": "<...>|Amount|Минимум",
+          "type": "real"
+        },
+        {
+          "name": "C_1_Amount_Max",
+          "label": "<...>|Amount|Максимум",
+          "type": "real"
+        },
+        {
+          "name": "C_1_Amount_Avg",
+          "label": "<...>|Amount|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "C_1_Quantity_Sum",
+          "label": "<...>|Quantity|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Amount_Sum",
+          "label": "A|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Amount_Min",
+          "label": "A|Amount|Минимум",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Amount_Max",
+          "label": "A|Amount|Максимум",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Amount_Avg",
+          "label": "A|Amount|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Quantity_Sum",
+          "label": "A|Quantity|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_3_Amount_Sum",
+          "label": "B|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_3_Amount_Min",
+          "label": "B|Amount|Минимум",
+          "type": "real"
+        },
+        {
+          "name": "C_3_Amount_Max",
+          "label": "B|Amount|Максимум",
+          "type": "real"
+        },
+        {
+          "name": "C_3_Amount_Avg",
+          "label": "B|Amount|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "C_3_Quantity_Sum",
+          "label": "B|Quantity|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_4_Amount_Sum",
+          "label": "C|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_4_Amount_Min",
+          "label": "C|Amount|Минимум",
+          "type": "real"
+        },
+        {
+          "name": "C_4_Amount_Max",
+          "label": "C|Amount|Максимум",
+          "type": "real"
+        },
+        {
+          "name": "C_4_Amount_Avg",
+          "label": "C|Amount|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "C_4_Quantity_Sum",
+          "label": "C|Quantity|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_5_Amount_Sum",
+          "label": "<Прочее>|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_5_Amount_Min",
+          "label": "<Прочее>|Amount|Минимум",
+          "type": "real"
+        },
+        {
+          "name": "C_5_Amount_Max",
+          "label": "<Прочее>|Amount|Максимум",
+          "type": "real"
+        },
+        {
+          "name": "C_5_Amount_Avg",
+          "label": "<Прочее>|Amount|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "C_5_Quantity_Sum",
+          "label": "<Прочее>|Quantity|Сумма",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "C_1_Amount_Sum": 160.0,
+          "C_1_Amount_Min": 10.0,
+          "C_1_Amount_Max": 30.0,
+          "C_1_Amount_Avg": 20.0,
+          "C_1_Quantity_Sum": 8.0,
+          "C_2_Amount_Sum": 176.0,
+          "C_2_Amount_Min": 12.0,
+          "C_2_Amount_Max": 32.0,
+          "C_2_Amount_Avg": 22.0,
+          "C_2_Quantity_Sum": 8.0,
+          "C_3_Amount_Sum": 192.0,
+          "C_3_Amount_Min": 14.0,
+          "C_3_Amount_Max": 34.0,
+          "C_3_Amount_Avg": 24.0,
+          "C_3_Quantity_Sum": 8.0,
+          "C_4_Amount_Sum": 208.0,
+          "C_4_Amount_Min": 16.0,
+          "C_4_Amount_Max": 36.0,
+          "C_4_Amount_Avg": 26.0,
+          "C_4_Quantity_Sum": 8.0,
+          "C_5_Amount_Sum": null,
+          "C_5_Amount_Min": null,
+          "C_5_Amount_Max": null,
+          "C_5_Amount_Avg": null,
+          "C_5_Quantity_Sum": null
+        },
+        {
+          "Region": "South",
+          "C_1_Amount_Sum": 192.0,
+          "C_1_Amount_Min": 14.0,
+          "C_1_Amount_Max": 34.0,
+          "C_1_Amount_Avg": 24.0,
+          "C_1_Quantity_Sum": 8.0,
+          "C_2_Amount_Sum": 208.0,
+          "C_2_Amount_Min": 16.0,
+          "C_2_Amount_Max": 36.0,
+          "C_2_Amount_Avg": 26.0,
+          "C_2_Quantity_Sum": 8.0,
+          "C_3_Amount_Sum": 224.0,
+          "C_3_Amount_Min": 18.0,
+          "C_3_Amount_Max": 38.0,
+          "C_3_Amount_Avg": 28.0,
+          "C_3_Quantity_Sum": 8.0,
+          "C_4_Amount_Sum": 240.0,
+          "C_4_Amount_Min": 20.0,
+          "C_4_Amount_Max": 40.0,
+          "C_4_Amount_Avg": 30.0,
+          "C_4_Quantity_Sum": 8.0,
+          "C_5_Amount_Sum": null,
+          "C_5_Amount_Min": null,
+          "C_5_Amount_Max": null,
+          "C_5_Amount_Avg": null,
+          "C_5_Quantity_Sum": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "C_1_Amount_Sum",
+          "label": "<...>|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_1_Amount_Min",
+          "label": "<...>|Amount|Минимум",
+          "type": "real"
+        },
+        {
+          "name": "C_1_Amount_Max",
+          "label": "<...>|Amount|Максимум",
+          "type": "real"
+        },
+        {
+          "name": "C_1_Amount_Avg",
+          "label": "<...>|Amount|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "C_1_Quantity_Sum",
+          "label": "<...>|Quantity|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Amount_Sum",
+          "label": "A|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Amount_Min",
+          "label": "A|Amount|Минимум",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Amount_Max",
+          "label": "A|Amount|Максимум",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Amount_Avg",
+          "label": "A|Amount|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Quantity_Sum",
+          "label": "A|Quantity|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_3_Amount_Sum",
+          "label": "B|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_3_Amount_Min",
+          "label": "B|Amount|Минимум",
+          "type": "real"
+        },
+        {
+          "name": "C_3_Amount_Max",
+          "label": "B|Amount|Максимум",
+          "type": "real"
+        },
+        {
+          "name": "C_3_Amount_Avg",
+          "label": "B|Amount|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "C_3_Quantity_Sum",
+          "label": "B|Quantity|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_4_Amount_Sum",
+          "label": "C|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_4_Amount_Min",
+          "label": "C|Amount|Минимум",
+          "type": "real"
+        },
+        {
+          "name": "C_4_Amount_Max",
+          "label": "C|Amount|Максимум",
+          "type": "real"
+        },
+        {
+          "name": "C_4_Amount_Avg",
+          "label": "C|Amount|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "C_4_Quantity_Sum",
+          "label": "C|Quantity|Сумма",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "C_1_Amount_Sum": 160.0,
+          "C_1_Amount_Min": 10.0,
+          "C_1_Amount_Max": 30.0,
+          "C_1_Amount_Avg": 20.0,
+          "C_1_Quantity_Sum": 8.0,
+          "C_2_Amount_Sum": 176.0,
+          "C_2_Amount_Min": 12.0,
+          "C_2_Amount_Max": 32.0,
+          "C_2_Amount_Avg": 22.0,
+          "C_2_Quantity_Sum": 8.0,
+          "C_3_Amount_Sum": 192.0,
+          "C_3_Amount_Min": 14.0,
+          "C_3_Amount_Max": 34.0,
+          "C_3_Amount_Avg": 24.0,
+          "C_3_Quantity_Sum": 8.0,
+          "C_4_Amount_Sum": 208.0,
+          "C_4_Amount_Min": 16.0,
+          "C_4_Amount_Max": 36.0,
+          "C_4_Amount_Avg": 26.0,
+          "C_4_Quantity_Sum": 8.0
+        },
+        {
+          "Region": "South",
+          "C_1_Amount_Sum": 192.0,
+          "C_1_Amount_Min": 14.0,
+          "C_1_Amount_Max": 34.0,
+          "C_1_Amount_Avg": 24.0,
+          "C_1_Quantity_Sum": 8.0,
+          "C_2_Amount_Sum": 208.0,
+          "C_2_Amount_Min": 16.0,
+          "C_2_Amount_Max": 36.0,
+          "C_2_Amount_Avg": 26.0,
+          "C_2_Quantity_Sum": 8.0,
+          "C_3_Amount_Sum": 224.0,
+          "C_3_Amount_Min": 18.0,
+          "C_3_Amount_Max": 38.0,
+          "C_3_Amount_Avg": 28.0,
+          "C_3_Quantity_Sum": 8.0,
+          "C_4_Amount_Sum": 240.0,
+          "C_4_Amount_Min": 20.0,
+          "C_4_Amount_Max": 40.0,
+          "C_4_Amount_Avg": 30.0,
+          "C_4_Quantity_Sum": 8.0
+        }
+      ]
+    }
+  ]
+}

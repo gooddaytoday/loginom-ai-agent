@@ -27,7 +27,7 @@ function fake(mode){
  const b={runtime_binding_id:'test-binding_id',package_id:'pkg',static_source:{node_id:'source',execution_id:'d:1:1'},method:321,interface:116,port:0,offset:0,rows:1,columns:[0],execution:{status:'completed',execution_id:'d:1:2'},document_id:'d',workflow_id:'w',tab_tid:'tab',prefix:'TF',node_id:'n',port_guid:'p',origin:'http://test',source:{owner:0,object:9},schema:[{name:'Scalar',label:'Scalar',type:6}],row_count:1};
  env.__loginomDockCollapseRuntimeV1={document,binding_id:'test-binding_id',check:s=>assert.equal(s,session)};
  const context=vm.createContext(env);
- return {page:{evaluate:(fn,arg)=>{context.arg=arg;return vm.runInContext('('+fn.toString()+')(arg)',context);}},b,counters,sourceNode,node,links,sourcePort,inputPort,root,helper,dc,dt,store,finish:error=>finish(error)};
+ return {page:{evaluate:(fn,arg)=>{context.arg=arg;return vm.runInContext('('+fn.toString()+')(arg)',context);}},b,counters,nodes:card.Controller.FController.FDiagram.FNodes.FCollection,sourceNode,node,links,sourcePort,inputPort,root,helper,dc,dt,store,finish:error=>finish(error)};
 }
 test('fixed321 only and local buffers released',async()=>{const f=fake();const r=await readNativeVariant(f.page,f.b,decodeVariantFrame);assert.equal(r.cells[0].decoded.type,'real');assert.deepEqual(f.counters,{sent:1,released:2});});
 for(const mode of ['changed-cache','new-execution','stale-response'])test('reject '+mode+' after response and release buffers',async()=>{const f=fake(mode);await assert.rejects(()=>readNativeVariant(f.page,f.b,decodeVariantFrame));assert.deepEqual(f.counters,{sent:1,released:2});});
@@ -108,4 +108,43 @@ for(const [name,change] of [
 test('reopened native ports need no transient FPortIndex property',async()=>{
  const f=fake();delete f.sourcePort.FPortIndex;delete f.inputPort.FPortIndex;
  const r=await readNativeVariant(f.page,f.b,decodeVariantFrame);assert.equal(r.cells.length,1);assert.equal(f.counters.sent,1);
+});
+
+function crossFixture({collapse=false,deferred=false}={}){
+ const f=fake(deferred?'deferred':undefined);f.node.FIconCls='bg-vendor-icon-crosstab';
+ const ancestors=[{node_id:'source',icon:'bg-vendor-icon-importtextfile',execution_id:'d:1:1'}];
+ if(collapse){
+  const middle={FGuid:'collapse',data:{},FIconCls:'bg-vendor-icon-columnflipping',FStatus:1,FRunning:false};
+  const input={parent:middle,FGuid:'ci',FType:0,FSubType:1,FParam:0},output={parent:middle,FGuid:'co',FType:1,FSubType:1,FParam:0};
+  middle.FPorts=[{FCollection:[input]},{FCollection:[output]}];f.nodes.push(middle);f.middle=middle;
+  f.links[0].FTargetPort=input;f.links.push({FGuid:'second',FSourcePort:output,FTargetPort:f.inputPort});
+  f.root.childNodes[0].childNodes.push({internalId:11,data:{id:'1.2',Status:3,ErrorDetails:'',ModelNode:middle.data},childNodes:[]});
+  ancestors.push({node_id:'collapse',icon:'bg-vendor-icon-columnflipping',execution_id:'d:1:1'});
+ }
+ f.b.static_chain={kind:'crosstable_static_1',nodes:ancestors,
+  edges:f.links.map(l=>({guid:l.FGuid,source:l.FSourcePort.parent.FGuid,target:l.FTargetPort.parent.FGuid,source_port:l.FSourcePort.FGuid,input_port:l.FTargetPort.FGuid}))};
+ return f;
+}
+for(const collapse of [false,true])test('CrossTable exact read retains fixed321 for '+(collapse?'import→Collapse→CrossTable':'direct import'),async()=>{
+ const f=crossFixture({collapse});const r=await readNativeVariant(f.page,f.b,decodeVariantFrame);
+ assert.equal(r.cells[0].tag,5);assert.deepEqual(f.counters,{sent:1,released:2});
+});
+for(const [name,change] of [
+ ['missing provenance',f=>f.b.static_chain.nodes=[]],
+ ['foreign source',f=>f.b.static_chain.nodes[0].node_id='foreign'],
+ ['missing ancestor execution',f=>f.b.static_chain.nodes[1].execution_id='d:1:9'],
+ ['inactive ancestor',f=>f.middle.FStatus=0],
+ ['running ancestor',f=>f.middle.FRunning=true],
+ ['wrong ancestor type',f=>f.middle.FIconCls='bg-vendor-icon-calcdata'],
+ ['extra input',f=>f.links.push({...f.links[0],FGuid:'extra'})],
+ ['changed input owner',f=>f.links[1].FTargetPort={...f.inputPort,parent:f.middle}],
+ ['changed port identity',f=>f.links[1].FSourcePort.FGuid='foreign'],
+ ['new ancestor execution',f=>f.root.childNodes.push({internalId:12,data:{id:'3.1',Status:3,ErrorDetails:'',ModelNode:f.middle.data},childNodes:[]})]
+])test('CrossTable static chain refuses '+name+' before dispatch',async()=>{
+ const f=crossFixture({collapse:true});change(f);await assert.rejects(()=>readNativeVariant(f.page,f.b,decodeVariantFrame));assert.equal(f.counters.sent,0);
+});
+test('CrossTable rechecks the entire ancestor chain after an awaited response',async()=>{
+ const f=crossFixture({collapse:true,deferred:true}),pending=readNativeVariant(f.page,f.b,decodeVariantFrame);
+ const check=assert.rejects(pending,/stale|static/);f.middle.FPorts[1].FCollection[0].FGuid='changed';f.finish(false);await check;
+ assert.deepEqual(f.counters,{sent:1,released:2});assert.equal((await nativeVariantStatus(f.page)).published,false);
 });

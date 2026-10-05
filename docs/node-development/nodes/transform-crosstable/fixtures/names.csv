@@ -1,0 +1,9 @@
+RowID,Region,Category,Amount,Quantity
+S0,North,A-1,2,1
+S1,North,A_1,4,1
+S2,North,Привет,4,1
+S3,North,Privet,4,1
+S4,North,,5,1
+S5,North, ,5,1
+S6,North,null,7,1
+S7,North,?,9,1

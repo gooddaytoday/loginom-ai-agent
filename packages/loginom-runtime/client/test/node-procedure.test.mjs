@@ -558,6 +558,33 @@ test('Join link menu uses a unique bounded portal only during Join observation',
  state.ui.elements.push({tid:'mn',ref:'other'});await assert.rejects(channel.observe({condition:'ambiguous menu',readJoin:true,ready:()=>true}),/menu is ambiguous/);
 });
 
+test('CrossTable editors are read through their portal only with matching native selected role',async()=>{
+ for(const name of ['ColumnEditDialog','FactorEditDialog'])for(const fault of ['none','role','record','owner','duplicate','foreign_dialog']){
+  const ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
+  const base=ref.prefix+';WizrdMCF',tid=base+';'+name,node={document_id:'doc',workflow_id:'wf',node_id:'cross'};
+  const owner={...node,verified:true,surface:'wizard',tid:base};
+  const native={verified:true,node_context:owner,selected_used:['r'],input_fields:[{record_id:'r',disposition:name==='ColumnEditDialog'?1:3}],dialogs:[{name,tid}]};
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:owner,scan:{complete:true},
+   wizard:{status:'observed',stage:'crosstable',root_tid:base,root_ref:'wizard'},
+   ui:{elements:[{tid,ref:'editor'}],dialogs:[{ref:'editor',identity:{anchor_tid:tid}}],masks:[],truncated:{dialogs:false,masks:false}}};
+  if(fault==='role')native.input_fields[0].disposition=0;
+  if(fault==='record')native.selected_used=['foreign'];
+  if(fault==='owner')native.node_context={...owner,node_id:'foreign'};
+  if(fault==='duplicate')state.ui.elements.push({tid:base+';'+(name==='ColumnEditDialog'?'FactorEditDialog':'ColumnEditDialog'),ref:'other'});
+  if(fault==='foreign_dialog')state.ui.dialogs[0].identity.anchor_tid='Other;'+name;
+  const roots=[];let clock=1;
+  const channel=createNodeProcedure({operation:{id:'cross',deadline:10000,action:{action_key:'node.apply',revision:'1'}},preparedNodeContext:{document_id:'doc',workflow_ref:ref,node},
+   targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>clock++,wait:async()=>{clock+=1000},record:async e=>structuredClone(e),execute:async code=>{
+    if(code.includes('function readCrossTableBrowser'))return structuredClone(native);
+    if(!code.includes('"discover_roots":true'))roots.push(/"root_ref":"([^"]+)"/.exec(code)?.[1]);
+    return {status:'SUCCEEDED',output:structuredClone(state)};
+   }});
+  const read=()=>channel.observe({condition:'CrossTable editor',readCrossTable:true,ready:()=>true,timeoutMs:2000});
+  if(fault==='none'){await read();assert.ok(roots.length&&roots.every(r=>r==='editor'));}
+  else await assert.rejects(read());
+ }
+});
+
 test('pre-gesture recovery retains the handler stability condition',async()=>{const f=recoveryFixture({confirmIdentity:s=>s.binding});await f.perform();const observations=f.records.filter(e=>e.phase==='node_observation_completed');assert.equal(observations.length,2);assert.ok(observations.every(e=>e.readiness.required_samples===2));assert.equal(f.records.filter(e=>e.phase==='node_observation_sample').length,4);assert.equal(f.mutations,2);});
 
 test('duplicate global role editor and its dropdown use bounded roots with strict owner guards',async()=>{

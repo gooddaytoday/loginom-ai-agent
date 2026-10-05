@@ -1,0 +1,8 @@
+RowID,Region,Category,Amount,Quantity
+B1,North,A,10.0,1.0
+B2,South,A,30.0,1.0
+B3,North,B,-5.0,1.0
+B4,South,B,5.0,1.0
+B5,North,?,8.0,1.0
+B6,South,A,7.0,1.0
+B7,North,B,11.0,1.0

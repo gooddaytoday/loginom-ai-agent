@@ -1,0 +1,329 @@
+[
+  {
+    "file": "acceptance/data/sales-base.csv",
+    "bytes": 1510,
+    "sha256": "16cb3c1af2f05d1d07fda149fd23392f800cbebee349aa449817490a1b577b05",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "awaiting_live_confirmation"
+  },
+  {
+    "file": "acceptance/data/sales-update.csv",
+    "bytes": 1510,
+    "sha256": "038c538fc4f182e72948358ba790da85f116cd7e0c3731a4720b5e71dc29fb70",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "awaiting_live_confirmation"
+  },
+  {
+    "file": "fixtures/add.csv",
+    "bytes": 215,
+    "sha256": "0b4b0a6947f414ebc65c8630400d76c707779e31f79f99e9864a4ae79ec2d49c",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "awaiting_live_confirmation"
+  },
+  {
+    "file": "fixtures/base.csv",
+    "bytes": 175,
+    "sha256": "7b504aa77d02cd545f3b1e2af08df65df72a0bec99016cb214bdf634231065bd",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "awaiting_live_confirmation"
+  },
+  {
+    "file": "fixtures/drop.csv",
+    "bytes": 116,
+    "sha256": "fa7db41188b6c927783f2cb516055377a974f8148e12bf2552155b89305ee1d6",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "awaiting_live_confirmation"
+  },
+  {
+    "file": "fixtures/empty.csv",
+    "bytes": 38,
+    "sha256": "6cbbffd1359b631ee320829d147d8a4db3a1f218dd51475d35492693efeeb599",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "awaiting_live_confirmation"
+  },
+  {
+    "file": "fixtures/many-fields.csv",
+    "bytes": 577,
+    "sha256": "2a2a352861774195f8343160a76dfc809ea7a8e1d98fb05cc3a6a0c5601aa18e",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Unused00",
+      "Unused01",
+      "Unused02",
+      "Unused03",
+      "Unused04",
+      "Unused05",
+      "Unused06",
+      "Unused07",
+      "Unused08",
+      "Unused09",
+      "Unused10",
+      "Unused11",
+      "Unused12",
+      "Unused13",
+      "Unused14",
+      "Unused15",
+      "Unused16",
+      "Unused17",
+      "Unused18",
+      "Unused19",
+      "Unused20",
+      "Unused21",
+      "Unused22",
+      "Unused23",
+      "Unused24",
+      "Unused25",
+      "Unused26",
+      "Unused27",
+      "Unused28",
+      "Unused29",
+      "Unused30",
+      "Unused31",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "awaiting_live_confirmation"
+  },
+  {
+    "file": "fixtures/multi-key.csv",
+    "bytes": 127,
+    "sha256": "daafdb4f5ac42efe2143fe3f0749f3ba91a91aadaba673758aa8046ab376a98e",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Month",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "awaiting_live_confirmation"
+  },
+  {
+    "file": "fixtures/null-empty.csv",
+    "bytes": 173,
+    "sha256": "1c4b4e71ed81a9d1145ac22596a4f4c024d4ee72d0f0f5227be4934db2521453",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "awaiting_live_confirmation"
+  },
+  {
+    "file": "fixtures/replace.csv",
+    "bytes": 176,
+    "sha256": "35434299b383a974076f977a0fd6952ccd8698e2f560d8c5f03213bfda02b4a9",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "awaiting_live_confirmation"
+  },
+  {
+    "file": "fixtures/wide.csv",
+    "bytes": 1702,
+    "sha256": "ab67f37c42193d61dfaf66120628d6dd48d11a3588a18cc299b95d2c1a6ace08",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "awaiting_live_confirmation"
+  },
+  {
+    "file": "fixtures/numeric.csv",
+    "bytes": 190,
+    "sha256": "ee4890db902599283bb352e9fe1f3ad9bfb243c619b4873012e419d3b1a5b8ce",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "live_real_confirmation",
+    "use": "stage0 real stddev divisor; decimal literals are unsuitable for integer parsing"
+  },
+  {
+    "file": "numeric-integer.csv",
+    "bytes": 158,
+    "sha256": "37d23b009a132b9e85b95ae0428cb44b3e05719173e2be9c1711be9eeeff34b1",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "live_integer_confirmation",
+    "use": "stage0 integer aggregate matrix; integer literals, not decimal text"
+  },
+  {
+    "file": "categories.csv",
+    "bytes": 158,
+    "sha256": "0cb133678336cca432cb0b06bd390416b0bb211b8a2650c85295db44ae11f31d",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "live_integer_source_confirmation",
+    "use": "stage0 global Sliding limit above cardinality"
+  },
+  {
+    "file": "names.csv",
+    "bytes": 180,
+    "sha256": "aee13d386dd87470c51d34b556c3551ff3f2a04d2148874b83ff884d70e97ac4",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Quantity"
+    ],
+    "schema_status": "live_integer_source_confirmation",
+    "use": "stage0 unique names: punctuation, Cyrillic, empty, space, NULL"
+  },
+  {
+    "file": "types.csv",
+    "bytes": 116,
+    "sha256": "5183c8185b6fe4c362813d1e69eba0734557e6f29f9af00a2971e57fb72c5322",
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "quote": "\"",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "headers": [
+      "RowID",
+      "Region",
+      "Category",
+      "Amount",
+      "Flag",
+      "When"
+    ],
+    "schema_status": "live_available_functions_confirmation",
+    "use": "stage0 string/real/boolean/datetime native defaults and aggregate result matrix"
+  }
+]

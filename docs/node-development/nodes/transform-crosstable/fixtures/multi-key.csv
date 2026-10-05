@@ -1,0 +1,4 @@
+RowID,Region,Month,Category,Amount,Quantity
+K0,North,2026-09,A,10.0,1.0
+K1,North,2026-09,A,30.0,1.0
+K2,South,2026-09,B,7.0,1.0
