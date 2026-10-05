@@ -5,6 +5,7 @@ import { NamedError } from "@loginom-ai-agent/core/util/error"
 import type { Agent } from "@/agent/agent"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { InstanceState } from "@/effect/instance-state"
+import { Flag } from "@loginom-ai-agent/core/flag/flag"
 import { Global } from "@loginom-ai-agent/core/global"
 import { SkillPlugin } from "@loginom-ai-agent/core/plugin/skill"
 import { Permission } from "@/permission"
@@ -181,6 +182,14 @@ const discoverSkills = Effect.fnUntraced(function* (
   worktree: string,
 ) {
   const state: ScanState = { matches: new Set(), dirs: new Set() }
+
+  // Scanned before project and skills.paths so a skill on disk with the same name replaces the bundled copy.
+  const bundled = Flag.LOGINOM_AI_AGENT_BUNDLED_SKILLS
+  if (bundled) {
+    const bundledDir = path.isAbsolute(bundled) ? bundled : path.join(directory, bundled)
+    if (yield* fsys.isDir(bundledDir)) yield* scan(state, bundledDir, SKILL_PATTERN)
+    else yield* Effect.logWarning("bundled skill path not found", { path: bundledDir })
+  }
 
   const externalDirs: string[] = []
   if (!disableExternalSkills) {

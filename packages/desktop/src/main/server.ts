@@ -226,7 +226,9 @@ export async function checkHealth(url: string, password?: string | null): Promis
 
 function createSidecarEnv(proxy?: Record<string, string>, withoutProxy?: boolean): Record<string, string> {
   const base = withoutProxy ? withoutProxyEnvironment(process.env) : process.env
-  return sidecarEnvironment(base, withoutProxy ? undefined : proxy)
+  const env = sidecarEnvironment(base, withoutProxy ? undefined : proxy)
+  if (app.isPackaged) env.LOGINOM_AI_AGENT_BUNDLED_SKILLS = join(process.resourcesPath, "skills")
+  return env
 }
 
 function serializeError(error: unknown) {

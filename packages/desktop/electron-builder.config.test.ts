@@ -20,6 +20,10 @@ for (const channel of ["dev", "beta", "prod"] as const) {
     expect(config.protocols).toEqual({ name: Product.name, schemes: [Product.scheme] })
     expect(JSON.stringify(config)).not.toContain("opencode")
     expect(config.extraResources).not.toContainEqual(expect.objectContaining({ filter: ["opencode-cli*"] }))
+    expect(config.extraResources).toContainEqual({
+      from: "../../.loginom-ai-agent/skills/package_docs",
+      to: "skills/package_docs",
+    })
     expect(config.linux?.target).toEqual(["AppImage", "deb"])
     expect(config.linux?.icon).toBe("resources/icons/linux")
     expect(config.win?.icon).toBe("resources/icons/icon.ico")

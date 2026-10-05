@@ -59,6 +59,7 @@ const config: Configuration = {
   extraResources: [
     { from: "resources/loginom", to: "loginom" },
     { from: "resources/icons", to: "icons" },
+    { from: "../../.loginom-ai-agent/skills/package_docs", to: "skills/package_docs" },
   ],
   protocols: { name: Product.name, schemes: [Product.scheme] },
   mac: {

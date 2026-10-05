@@ -582,4 +582,88 @@ description: A skill in the .loginom-ai-agent/skills directory.
       { git: true },
     ),
   )
+
+  it.live("discovers a bundled skill outside the project", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const bundled = path.join(dir, "bundled-skills")
+          const previous = process.env.LOGINOM_AI_AGENT_BUNDLED_SKILLS
+          process.env.LOGINOM_AI_AGENT_BUNDLED_SKILLS = bundled
+          yield* Effect.addFinalizer(() =>
+            Effect.sync(() => {
+              if (previous === undefined) delete process.env.LOGINOM_AI_AGENT_BUNDLED_SKILLS
+              else process.env.LOGINOM_AI_AGENT_BUNDLED_SKILLS = previous
+            }),
+          )
+          const bundledSkill = path.join(bundled, "package_docs", "SKILL.md")
+          yield* Effect.promise(() =>
+            Bun.write(
+              bundledSkill,
+              `---
+name: package_docs
+description: Bundled package docs.
+---
+
+# Bundled
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          const found = (yield* skill.all()).find((item) => item.name === "package_docs")
+          expect(found?.description).toBe("Bundled package docs.")
+          expect(found?.location).toBe(bundledSkill)
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("lets a project skill replace a bundled skill with the same name", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const bundled = path.join(dir, "bundled-skills")
+          const previous = process.env.LOGINOM_AI_AGENT_BUNDLED_SKILLS
+          process.env.LOGINOM_AI_AGENT_BUNDLED_SKILLS = bundled
+          yield* Effect.addFinalizer(() =>
+            Effect.sync(() => {
+              if (previous === undefined) delete process.env.LOGINOM_AI_AGENT_BUNDLED_SKILLS
+              else process.env.LOGINOM_AI_AGENT_BUNDLED_SKILLS = previous
+            }),
+          )
+          const projectSkill = path.join(dir, ".loginom-ai-agent", "skills", "package_docs", "SKILL.md")
+          yield* Effect.promise(() =>
+            Promise.all([
+              Bun.write(
+                path.join(bundled, "package_docs", "SKILL.md"),
+                `---
+name: package_docs
+description: Bundled package docs.
+---
+
+# Bundled
+`,
+              ),
+              Bun.write(
+                projectSkill,
+                `---
+name: package_docs
+description: Project package docs.
+---
+
+# Project
+`,
+              ),
+            ]),
+          )
+
+          const skill = yield* Skill.Service
+          const found = (yield* skill.all()).find((item) => item.name === "package_docs")
+          expect(found?.description).toBe("Project package docs.")
+          expect(found?.location).toBe(projectSkill)
+        }),
+      { git: true },
+    ),
+  )
 })

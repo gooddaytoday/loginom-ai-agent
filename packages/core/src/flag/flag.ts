@@ -63,6 +63,9 @@ export const Flag = {
   get LOGINOM_AI_AGENT_CONFIG_DIR() {
     return process.env["LOGINOM_AI_AGENT_CONFIG_DIR"]
   },
+  get LOGINOM_AI_AGENT_BUNDLED_SKILLS() {
+    return process.env["LOGINOM_AI_AGENT_BUNDLED_SKILLS"]
+  },
   get LOGINOM_AI_AGENT_PURE() {
     return truthy("LOGINOM_AI_AGENT_PURE")
   },
