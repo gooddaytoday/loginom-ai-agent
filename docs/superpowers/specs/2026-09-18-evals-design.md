@@ -10,8 +10,11 @@ pass^1/pass^k, консервативные границы Hoeffding с confiden
 Старые неизвестные поля и неполное происхождение оценки не доказывают сравнимость.
 Structural score требует полной явной axis-разметки и сохранённого snapshot;
 evaluation_contract_hash фиксирует рубрику, судью и порог каждой оценки.
-Этот раздел заменяет прежнее ограничение «статистический вердикт не вычисляется»;
-доступность нового поведения подтверждается checkpoint реализации, не одним утверждением спеки.
+Этот раздел заменяет прежнее ограничение «статистический вердикт не вычисляется».
+Реализация в ветке `compare-verdict` проверена 2026-10-05: 285 тестов,
+typecheck и 880 000 offline-сравнений. Подробные результаты и ограничения —
+в [checkpoint реализации](../plans/2026-10-05-evals-compare-verdict.md).
+Новый live baseline после axis-разметки не выполнен.
 
 Пользователь подтвердил 18 сентября 2026: нужна система eval-прогонов, которая между изменениями кода агента отвечает на вопрос «агент стал строить сценарии Loginom лучше или хуже». Приоритет — минимально работающая метрика как можно скорее. Весь код живёт в `evals/`; остальной репозиторий не меняется, кроме одной ссылки в module map корневого `AGENTS.md`. Реализация ведётся строго через TDD (skill `tdd`: одна проверка поведения → минимальная реализация → следующая).
 
@@ -308,7 +311,9 @@ evals/
     run.ts                   entry: прогон (диспетчер режимов --judge-only / --calibrate)
     rejudge.ts               режим --judge-only
     calibrate.ts             режим --calibrate
-    compare.ts               entry: сравнение двух прогонов
+    compare.ts               entry: Markdown и CLI сравнения двух прогонов
+    compare-analysis.ts      task-paired quality, reliability, coverage и verdict
+    evaluation.ts            rubric snapshot и fingerprint контракта оценки
     fail.ts                  EvalFailure с кодом выхода
     judge-prompt.md          шаблон инструкции судьи
     verdict.schema.json      JSON-схема ответа судьи
@@ -360,10 +365,11 @@ Runtime-зависимостей нет: Bun built-ins и внешние ком�
 - `profile.ts`: `ensureProfile(config) → { dir, cliEnv }` — создаёт профиль первой management-командой, выполняет `setup --stdin-json`, пишет `config/loginom-ai-agent.json` (`permission: {"loginom_*": "allow"}` и блок провайдера из `.env`, если задан); `assertAuth(profile, model)` — провайдер модели должен присутствовать в `$PROFILE/data/auth.json` либо быть описан блоком провайдера в конфиге, иначе печатается точная команда `providers login` для этого профиля и выход 2; `releaseStaleWriter(profile)` — снимает `.writer`, только если `pgrep -f <dir профиля>` пуст; `recoverIfNeeded(profile) → { recovered: boolean, view }` — `loginom status --format json`; при непустых `recoveries` выполняет `loginom recover --acknowledge --format json` и повторяет `status`. Успех — `recoveries` пусты и `state = ready` (с `recovered = true`, если acknowledge выполнялся); транзитное `starting` ожидается повторными `status` до 10 с; любое другое состояние после повтора (`recoverable-error`, `pending`, недоступный Loginom) — отказ восстановления с текстом `state`/`failure` в причине остановки прогона.
 - `cli.ts`: `runAgent({ command, env, model, prompt, files, workdir, timeoutMs, outDir, signal }) → AgentRun`, где `AgentRun = { exitCode, timedOut, interrupted, durationMs, sessionId?, saveReceipts: string[], nodeReceipts: string[], actionManifestSha256?, finalText?, cost, tokens, errors: string[], failureKind?, counters: { toolCalls, loginomToolCalls, toolErrors, memoryToolCalls } }`. Чистая `parseEvents(lines) → …` используется тестами. `command` для `source` — `bun run src/standalone.ts` с cwd `packages/agent`; для `binary` — `EVAL_CLI_BIN`; для `fake` — `bun fixtures/fake-cli.ts` с `EVAL_TASK_ID` в окружении. `signal` — AbortSignal harness'а для Ctrl+C.
 - `artifact.ts`: `fetchArtifact({ source, candidates, resultPattern, since, outDir }) → Artifact | undefined`, где `Artifact = { origin: "receipt" | "instructed" | "scan", packagePath, localLgp, unpackedDir, resultFiles: string[], ambiguous: string[] }`; `cleanupArtifact({ source, artifact })` удаляет из хранилища ровно те файлы, которые были скопированы (`packagePath` и `resultFiles`), ничего по маске. `source` — `docker` (`docker exec ls`, `docker cp`, `docker exec rm -f`) или `dir:<path>` (`/<username>/<имя>` → `<path>/<имя>`; для `dir:` очистка не выполняется). Игнорирует `.~lgp`; при `scan` берёт новейший `.lgp` с mtime позже `since`, остальные кандидаты перечисляет в `ambiguous`. После `unzip -o -q` проверяет наличие `Unit_*/Unit.xml`.
-- `judge.ts`: `judgeTask({ task, run?, artifact, outDir, judge, signal }) → Judged | JudgeError`, где `Judged = { verdict, score, pass, items, attempts: 1 | 2 }`. `judgeTask` сам вызывает `scoreVerdict` и повторяет `codex exec` один раз при ненулевом выходе, таймауте, невалидном JSON или `ScoreError`; `EVAL_JUDGE_TIMEOUT_MS` действует на каждый вызов. `run` отсутствует при калибровке — тогда `agent-final-message.md`, `tools-summary.md`, `node-readbacks.md` содержат заглушку «недоступно: калибровка». Чистая `scoreVerdict(checklist, verdict) → { score, pass, items } | ScoreError` тестируется отдельно.
+- `judge.ts`: `judgeTask({ task, run?, artifact, outDir, judge, signal }) → Judged | JudgeError`, где `Judged = { verdict, score, structural_score, pass, items, attempts: 1 | 2 }`. `judgeTask` сам вызывает `scoreVerdict` и повторяет `codex exec` один раз при ненулевом выходе, таймауте, невалидном JSON или `ScoreError`; `EVAL_JUDGE_TIMEOUT_MS` действует на каждый вызов. `run` отсутствует при калибровке — тогда `agent-final-message.md`, `tools-summary.md`, `node-readbacks.md` содержат заглушку «недоступно: калибровка». Чистая `scoreVerdict(checklist, verdict, threshold) → { score, structural_score, pass, items } | ScoreError` тестируется отдельно.
 - `report.ts`: чистые `aggregate(attempts, config) → Metrics` и `aggregateTask(attempts) → TaskMetrics`; `writeSummary(runDir, summary)`; `renderReport(summary) → string`.
 - `run.ts`: preflight → профиль → цикл попыток → summary. Код выхода 0 при завершённом или прерванном по Ctrl+C прогоне независимо от метрик, 2 при отказе preflight/конфигурации/профильного блока, 1 при остановке прогона из-за `harness_error` с остановкой или аварии harness.
-- `compare.ts`: чистая `compare(a, b) → string` и entry `compare.ts <run-a> <run-b>`.
+- `compare-analysis.ts`: чистая `analyzeComparison(a,b,options?)`; validated JSON input через `parseComparisonSummary`.
+- `compare.ts`: `compare(a,b,options?) → string` и entry `compare.ts <run-a> <run-b> [--margin 0.5] [--confidence 0.95] [--k 3]`.
 
 ## Конвейер прогона
 
@@ -429,7 +435,7 @@ Ctrl+C в `--judge-only`: текущий вызов судьи убиваетс�
 
 `report.md`: метрики шапкой (с `scored_count`/`excluded_count`, `failure_kinds`, `memory_tool_calls`); таблица задач с агрегатами и разбросом (`min_score`–`max_score`, `completed/attempts`); таблица попыток (статус, код, `failure_kind`, score, pass, длительность, стоимость, строка резюме судьи); раздел отказов с именами ошибок из событий (в том числе `CLI_PERMISSION_REJECTED` и провайдерные отдельно) и первыми строками stderr; предупреждение, если `memory_tool_calls > 0`; раздел «Остатки в хранилище» — файлы `eval-<run-id>-*`, которые harness видел (`docker exec ls` в конце прогона), но не удалял, с готовой командой очистки.
 
-`compare.ts <run-a> <run-b>`: проверка сравнимости и окружения; предупреждение о неполном покрытии, если у одного из прогонов `interrupted: true` или `stopped_reason` (разный `total`); дельты метрик; таблица по задачам «completion a → b», «mean_score a → b» с ▲/▼ и разброс; `repeat` обоих прогонов в шапке. Результат в stdout и `results/compare-<a>-vs-<b>.md`.
+`compare.ts <run-a> <run-b> [--margin 0.5] [--confidence 0.95] [--k 3]`: проверка сравнимости, окружения и покрытия; task-paired completion/oracle/structure с интервалом, verdict и отдельным NI; pass^1/pass^k и observed guard; справочные дельты и разброс. Результат в stdout и `results/compare-<a>-vs-<b>.md`; входы не изменяются. Ошибка аргументов/summary — exit 2, штатный отчёт — exit 0. Сериализованные snapshot и evaluation provenance описаны в новом контракте выше.
 
 ## Обработка ошибок
 
