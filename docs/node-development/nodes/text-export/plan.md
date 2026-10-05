@@ -1,30 +1,86 @@
-# 17. Текстовый экспорт: подплан сопровождения и приёмки
+# Текстовый экспорт: подплан для Multica
 
-[Карточка и принятые границы](README.md) · [реестр](../../registry.json) · [работа с одним узлом](../../workflow/single-node.md).
+Статус: `reverification_required`. Редакция 1 от 2026-10-05, автор — переработка подпланов в ветке `node-coverage-plans`.
+Component ID: `component.exports.Text`, slug `text-export`. Runtime type и режимы: `exports.text` / `delimited` — закреплены.
+База назначения: ветка задания из карточки; исследованы исходники `loginom@dada8010e`. Loginom: ожидается 7.4.2, фактическую версию записать на этапе 0; платформа исполнителя — Linux x64.
 
-Обработчик `exports.text` уже реализован в режиме `delimited`. Этот подплан адаптирует исторический 17 к текущему runtime и standalone CLI: это маршрут адресного исправления, проверки переноса или отдельно назначенного расширения, не повторная разработка с нуля. Историческое принятие сохраняется в своём scope; технические Desktop проверки не являются аналитической CLI-приёмкой. Новых живых наблюдений и прогонов при составлении документа не было, readiness не повышается.
+Шаблон — [node-plan](../../templates/node-plan.md), вариант реализованного узла. Общий порядок — [RUNBOOK](../../RUNBOOK.md) и [CLI-приёмка](../../workflow/acceptance-cli.md). [Карточка](README.md) · [реестр](../../registry.json).
 
-До начала выбрать точное изменение и пройти [подготовку/жизненный цикл](../../workflow/lifecycle.md). Разработчик работает в Astra medium в своей задаче, ветке и worktree. Первичная разработка получает Goal до готовности изменения к первому ревью, без собственного token_budget. Этот документ не назначает следующий узел и не разрешает слияние.
+## 0. Как выполняется назначение
 
-## Узловые требования
+Оркестрация — Multica, сквад «Обработчики узлов»: Генератор тасок готовит назначение, Тест-Манки #1 перепроверяет и исправляет, Ловец Галюцинаций независимо принимает опубликованный SHA.
+
+Карточка:
+
+```text
+Ветка: <ветка задания>
+Узел: text-export
+Обработать узел по его подплану до независимой приёмки. Объём — этап 0 подплана (перепроверка).
+```
+
+В ветке задания должны быть RUNBOOK, этот подплан, `scripts/node-acceptance/cold-check.mjs` и сборка `--no-archive`. Отсутствие — Blocked.
+
+### Объём назначения
+
+Разрешено: собрать `acceptance/` из прежнего oracle; выполнить адресные тесты, CLI и независимую приёмку; при расхождении сверить мастер штатными средствами runtime; исправить дефекты в `text-export-*.mjs` и их тестах в принятом объёме; подготовить PR и доказательства.
+
+Не разрешено: merge и релиз; следующие этапы; изменение общей оболочки (`calculator-node.mjs`, `node-read-*`, `workspace-ui.mjs`, `node-procedure.mjs`, `collapse-native-*`) или `cold-check.mjs` без решения владельца; изменение конфигураций обвязки.
+
+Общее изменение W1 — независимая файловая приёмка после reopen: текущий cold-check читает табличный output 0. Владелец выбирает отдельный файловый cold-аудит либо расширение общего verifier; до решения W1 не реализовывать.
+
+| Параметр | Значение |
+|---|---|
+| Узел | `component.exports.Text`, slug `text-export` |
+| Исходный SHA | вершина ветки задания; Генератор фиксирует в карточке |
+| Runtime type и режимы | `exports.text` / `delimited` |
+| Стенд и аккаунты | из конфигов ролей; пара worker/reviewer от Генератора, один стенд |
+| Модель приёмки | из конфигурации обвязки; предел модельного прогона 7200 с |
+| Внешняя среда | хранилище файлов назначенного аккаунта Loginom; внешний сервис не нужен |
+
+### Стоп-условия
+
+Каждое оформить как Blocked с вопросом Генератору: нет обязательных файлов; CLI или аккаунты не `ready`; неизвестный исход операции (попытку и writer marker сохранить); дефект в общей оболочке; нужен режим вне принятого объёма.
+
+- нет решения владельца по W1 (независимая файловая приёмка); общий табличный cold-check не подтверждает экспорт.
+
+## 1. Цель и проверенная основа
+
+Цель этапа 0 — подтвердить принятый объём текущим standalone CLI и исправить адресные дефекты. Кросс-таблица изменила общую оболочку, `node-read-*`, `workspace-ui.mjs`, `node-procedure.mjs` и `collapse-native-*`; CLI-регрессии прежних обработчиков не было, unit-тесты её не заменяют.
+
+Принятый объём из реестра: Один табличный вход → проверенный CSV/TSV UTF-8; назначение в разрешённом хранилище, явный формат и overwrite.
+Ограничения: Нет табличного выхода: mappings=[], read.ports=[], sample_rows=0; результат — file_artifacts. UTF-8; разделители «;», «,» или табуляция; заголовок none/names/labels, BOM, LF/CRLF, десятичная точка/запятая, двойная кавычка. Форматы NULL, даты, времени и Boolean ограничены валидатором. Файл не больше 16 MiB; replace требует явный destination в каждом запросе. Старое ограничение /test-2 не является текущей политикой: путь проверяет storage-policy.
 
 Один табличный вход, без табличного выхода: mappings=[],read.ports=[],sample_rows=0,require_exact_numbers=false. Результат — подтверждённые file_artifacts. Новый узел требует полный формат и destination; existing patch сохраняет неперечисленное только после проверки сохранённого формата.
 
 UTF-8,CSV/TSV,разделители ;/,/табуляция, header none/names/labels, BOM, LF/CRLF, точка/запятая, двойные кавычки и ограниченные форматы даты/boolean/NULL по валидатору. Файл ≤16 МиБ. Overwrite по умолчанию reject; replace требует destination в каждом запросе. Политика каталога текущего выбранного пользователя заменяет старое ограничение /test-2.
 
-## Проверенные исходники и материалы
+| Источник | Факт | Наблюдено или гипотеза |
+|---|---|---|
+| Runtime базы | `exports.text`: `client/lib/node-contracts.mjs:11`, диспетчер `node-support.mjs:28`; параметры/границы — `text-export-parameters.mjs:24-60; text-export-output.mjs:180`; [обработчик](../../../../packages/loginom-runtime/client/lib/text-export-node.mjs) | Наблюдено в коде `dada8010e` |
+| Общая оболочка | `createNodeProcedure` и общий execution/lifecycle используются собственным обработчиком; `createTabularTransformNodeSupport` (`calculator-node.mjs:38`) — оболочка преобразований, импорт/экспорт её напрямую не вызывают; общие изменения Кросс-таблицы входят в базу | Наблюдено; CLI влияния на узел не проверен |
+| Реестр | `plan_status: accepted_scope_maintenance`, `implementation: implemented`, историческое `accepted_scoped`; Desktop V65; `standalone_status: not_revalidated` | Наблюдено; готовность не меняется |
+| Справка | [Текстовый экспорт](https://help.loginom.ru/userguide/integration/export/txt-csv.html) = `loginom-help@353e506b:data/integration/export/txt-csv.md` | Документировано, не наблюдение текущего UI |
+| E2E | `e2e-tests@486caef44:tests/acceptance/workflow/node_label/workflowAutoLabels.ts:912-929 (метки); сценариев ExportTextFile мастера по этому селектору не найдено` | Код тестов; `:toreview`/skip не приёмка |
+| История | [исторический подплан 17](../../../../services/loginom-ai/docs/plans/loginom-dock/17-text-export.md); прежние source/live результаты и FAIL имеют исходные границы | Исторический PASS не переносится |
+| Прежний oracle | `packages/loginom-runtime/tools/loginom-acceptance/fixtures/text-export/contract.json, audit-text-export.py, audit-native-text-export-observer.py, text_export_{fresh,observer}_evidence.py` | Наблюдено; прежний транспорт Hermes к CLI не адаптирован |
 
-Текущий handler и параметры: [text-export-node.mjs](../../../../packages/loginom-runtime/client/lib/text-export-node.mjs); [text-export-parameters.mjs](../../../../packages/loginom-runtime/client/lib/text-export-parameters.mjs).
+Прежние проверяющие материалы и fixtures: [text_export_acceptance.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/text_export_acceptance.py); [audit-text-export.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/audit-text-export.py); [audit-native-text-export-observer.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/audit-native-text-export-observer.py); [contract.json](../../../../packages/loginom-runtime/tools/loginom-acceptance/fixtures/text-export/contract.json).
 
-Адресные source tests: [text-export.test.mjs](../../../../packages/loginom-runtime/client/test/text-export.test.mjs); [text-export-lifecycle.test.mjs](../../../../packages/loginom-runtime/client/test/text-export-lifecycle.test.mjs); [text-export-connect.test.mjs](../../../../packages/loginom-runtime/client/test/text-export-connect.test.mjs); [text-export-virtual-storage.test.mjs](../../../../packages/loginom-runtime/client/test/text-export-virtual-storage.test.mjs); [text-export-observation.test.mjs](../../../../packages/loginom-runtime/client/test/text-export-observation.test.mjs).
+## 2. Этапы
 
-Независимые проверяющие материалы и fixtures: [text_export_acceptance.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/text_export_acceptance.py); [audit-text-export.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/audit-text-export.py); [audit-native-text-export-observer.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/audit-native-text-export-observer.py); [contract.json](../../../../packages/loginom-runtime/tools/loginom-acceptance/fixtures/text-export/contract.json).
+### Этап 0 — перепроверка принятого объёма
 
-Файлы проверены на наличие, их прогоны сейчас не выполнялись. Часть entrypoints в каталоге loginom-acceptance всё ещё ожидает Hermes skill/pins и прежний формат evidence. Они служат источником oracle и семантических проверок; перед новой приёмкой адаптировать транспорт, pins и сбор receipts к [standalone CLI](../../workflow/acceptance-cli.md), сохранив проверки значений, freshness и отказов. Нельзя переименовать старый PASS в CLI PASS или запускать прежний Hermes launcher.
+Подготовка: проверить SHA, собрать кандидата из закоммиченных исходников, получить `loginom status` = `ready` на назначенном стенде.
 
-Историческая постановка: [17](../../../../services/loginom-ai/docs/plans/loginom-dock/17-text-export.md). Прежние Help/E2E пути в ней — указатели на версионируемые источники, а не доказательство текущего live-состояния.
+1. Собрать `acceptance/` из прежнего контракта (раздел 3): независимые ожидания, значения, freshness и отказы сохранить; адаптировать транспорт, pins и receipts к CLI. Прежний launcher Hermes не запускать.
+2. Адресные тесты `client/test/text-export-*.test.mjs` и `client/test/text-export.test.mjs` (7 файлов), затем весь `client/test`: `bun run test:upstream` в `packages/loginom-runtime`.
+3. CLI-сценарий и независимое холодное открытие по RUNBOOK; generic cold-check и адресные дополнения — в разделах 3–4.
+4. При расхождении — живая сверка мастера с `?testable=true`; прочитать причину из кнопки ошибки, записать в `discovery.md`; наблюдение не подменять E2E-снимком.
+5. Исправить дефект в принятом объёме с адресным тестом; общая оболочка или расширение объёма — стоп-условие.
 
-## Шаги изменения
+Выход: PASS исполнителя и независимая приёмка того же SHA; `client_technical_validation` и `analytical_validation` отражаются только по новому результату.
+
+### Адресные действия при FAIL
 
 1. Проверить requireExportDestination/storage-policy для назначенного аккаунта и реальный export wizard, включая сохранённые неподдержанные опции.
 2. Раздельно наблюдать native Data input, Connection и Variables: не соединять источник с портом по одному UI-номеру. Связать источник и прочитать полную схему до мастера.
@@ -32,9 +88,28 @@ UTF-8,CSV/TSV,разделители ;/,/табуляция, header none/names/l
 4. Через существующий managed authenticated browser/download путь получить файл; проверить origin, имя, обычный файл без symlink, размер, bytes/SHA и связь с session/document/node/execution.
 5. Output lease не становится input/upload admission автоматически. Проверить свежесть независимо от совпавших ожидаемых байтов; сохранение самого .lgp выполнить отдельным package.save_checkpoint.
 
-## Независимые fixtures и oracle
+### Этап 1 и далее — непокрытые режимы Help 7.4 (отдельные карточки владельца)
 
-Ниже — обязательная узловая матрица для объявленного полного scope. При адресном исправлении выбрать затронутые строки и обосновать выбор; расширение режима добавляет новые строки. До автономной попытки сохранить входы и expected отдельно от handler, с версиями и SHA. Ожидания не вычислять импортом реализации и не подгонять по её приёмочному выводу.
+- Режимы с разделителями/фиксированной ширины, ограничители, семь перечисленных Help кодировок, BOM, LF/CRLF и варианты заголовков.
+- NULL, bool, числовые разделители, стандартные и пользовательские date/time formats.
+- Автоматическая/пользовательская метка и заметка Markdown.
+- Управляющие переменные для параметров экспорта.
+
+Перечень будущей полноты сохраняет прежний подплан: частично принятые действия перепроверяются на этапе 0, дополнительные controls/типы/режимы назначаются отдельно; совпавшее название режима не расширяет scope.
+
+## 3. Данные и независимые проверки
+
+Комплект `nodes/text-export/acceptance/` собирает будущая карточка:
+
+- `task.md` на бизнес-языке с `{{PACKAGE_PATH}}`; без имён инструментов и ожидаемых чисел;
+- `data/main.csv` и остальные указанные ниже CSV — точные копии прежних входов; только входы передаются модели;
+- `expected.json` из независимого `oracle.py` до прогона; адресные наборы — `fixtures/` с manifest (байты, SHA, формат, типы, порядок).
+
+Прежние входы: `fixtures/text-export/input/main.csv`: 124 байт, 5 записей, колонки `id, text, number`, разделитель `;`; `fixtures/text-export/input/typed.csv`: 148 байт, 3 записей, колонки `id, text, number, flag, stamp`, разделитель `;`; `fixtures/text-export/input/wide.csv`: 2964 байт, 3 записей, колонки `field01, field02, field03, field04, field05, field06, field07, field08, field09, field10, field11, field12, field13, field14, field15, field16, field17, field18, field19, field20, field21, field22, field23, field24, field25, field26, field27, field28, field29, field30, field31, field32, field33, field34, field35, field36, field37, field38, field39, field40`, разделитель `;`; кодировка UTF-8, NULL-маркер `? (main/wide), NULL (typed)`. Размеры и SHA сохранить в manifest до прогона.
+
+Ожидания прежнего контракта: Из `fixtures/text-export/contract.json`: ожидаемые bytes CSV=124, TSV=115, typed=138, wide=3005, header-only=15, без заголовка=0, changed=131; SHA и байты — в expected/*.bin. Свежесть исполнения проверяется отдельно от совпадения bytes/SHA.
+
+Матрица сохранена из прежнего подплана; ожидания и неоднозначные правила переподтвердить до модельного прогона:
 
 | Случай | Вход/изменение | Независимая проверка |
 | --- | --- | --- |
@@ -43,19 +118,43 @@ UTF-8,CSV/TSV,разделители ;/,/табуляция, header none/names/l
 | Пустота и ширина | Header-only и файл без заголовка с 0 байт; 40 полей×3 строки со сложным последним полем. | Полная byte-проверка, не только число строк/первые столбцы. Источник пустого экспорта должен иметь подтверждённую схему. |
 | Overwrite/persistence | Создать файл, повторить с reject, затем явный replace; после reopen указать новый destination. | Reject сохраняет старый SHA, replace подтверждает свежее выполнение, новый путь содержит ожидаемые байты; сохранённый формат не восстанавливать из expected. |
 
-## Негативные случаи
+Oracle не импортирует handler/runtime, рассчитывает по исходным байтам, сверяет исходные типы/схему и все байты файла, отличает NULL/пустую строку/0, отвергает чужой узел, старое исполнение, неполное чтение и подмену данных. Freshness, происхождение и настройки доказываются отдельно от правильных значений.
+
+Для табличных узлов базы cold-check: схема проверяется позиционно (имена, метки, типы), строки — как мультимножество, до 100 строк/выход и 32 выходов (`scripts/node-acceptance/expected-outputs.mjs:14,29-39,72-81`). Числа сравниваются точно (`cold-check.mjs:232`); большие Int64 — десятичные строки. Каждый ожидаемый выход однозначно связан с типом и меткой узла. E2E-снимки мастера не являются oracle.
+
+Generic cold-check не поддерживает file_artifacts: ожидает columns/rows (`expected-outputs.mjs:10-14`) и открывает табличный output 0 (`cold-check.mjs:221`), которого у exports.text нет. Это ограничение этапа 0: файловый oracle и новое открытие требуют W1, согласованного владельцем. Табличный upstream cold-check не доказывает файл; модельный exit 0 и старый файл также не доказывают экспорт.
+
+## 4. Проверки, приёмка и завершение
+
+Адресная матрица; непроведённое — `not_checked`:
+
+| Проверка | Условие успеха |
+|---|---|
+| Контракт | Принятые лимиты и все негативные случаи раздела 5; отказ до мутации с понятной причиной |
+| Файл/формат/reject/replace | Все байты, BOM/окончания строк/NULL/кавычки, SHA и свежесть без табличного выхода; все случаи раздела 3 |
+| NULL/пустота/формат | Независимо проверены различимость NULL/empty при выбранном маркере, header-only и 0-байтовый файл |
+| Изменение существующего | Адресный маршрут раздела 2; сохраняются незапрошенные свойства, нет второго узла или фантомных полей |
+| Persistence | Сохранение после всех чтений; новое открытие и выполнение без восстановления настроек из expected |
+| Recovery | Done/Close отдельно от Execute; неизвестный эффект не повторён; причина отказа мастера прочитана |
+| Регрессия | Адресные тесты и весь `client/test` |
+
+Задание модели: использовать `main.csv`, `typed.csv`, `wide.csv`; Выгрузить согласованную таблицу в CSV и TSV с заданным форматом, проверить запрет и явную замену файла, сохранить пакет и независимо сверить байты всех результатов; сохранить результат в `{{PACKAGE_PATH}}`.
+
+PASS исполнителя: CLI, независимая сверка по разделу 3, подтверждённые `package_closed=true`/`logged_out=true`, адресная матрица и отдельный файловый cold-аудит по согласованному W1; generic cold-check результата exports.text сейчас неприменим. Публикация и приёмка того же SHA — по RUNBOOK; `integration` и `release` не повышаются.
+
+## 5. Ловушки — переподтвердить, не копировать
 
 - Чужой каталог/path traversal, скрытый overwrite, unsupported encoding/delimiter, tabular read/mapping, >16 МиБ: явный отказ без усечения.
 - Чужой origin, symlink, несовпавшее имя/размер/SHA, старый файл с теми же байтами без freshness receipt: аудитор отвергает.
 - Потерянный ответ подтверждения replace/download, отмена и неизвестный Execute: не перезаписывать повторно ради доказательства; cleanup и lease должны соответствовать реальному состоянию.
 - Для изменённых фаз отдельно различить отказ до эффекта, известную ошибку с подтверждённым cleanup и неизвестный эффект. Повтор operation_id не создаёт второй узел/запуск; lost reply не оправдывает слепой retry. Чужой пакет и посторонние связи неизменны.
+- История 17: Data input, Connection и Variables имеют разные native индексы; «Готово»/«Закрыть» не создают file receipt. Прежнее назначение /test-2 — архив, текущий каталог определяется storage-policy назначенного аккаунта.
+- Приёмки текущего CLI нет; неподтверждено: полный файловый cold-аудит standalone, overwrite/persistence и storage-policy текущего стенда. Исторические замеры/локаль/платформа не являются гарантией текущего стенда.
 
-## Автономная проверка и передача
+## 6. Точка продолжения
 
-Выгрузить согласованную таблицу в CSV и TSV с заданным форматом, проверить запрет и явную замену файла, сохранить пакет и независимо сверить байты всех результатов.
-
-Первичная отладка — штатными скриптами текущего runtime в назначенной изоляции. После неё выполнить адресные source tests и проверить независимый oracle, включая его отказ на подменённых значениях/схеме/идентичности. Только затем подготовить неизменный candidate и получить слот по [CLI-регламенту](../../workflow/acceptance-cli.md): standalone CLI Loginom AI Agent, Sol low, согласованная подписка, бизнес-цель и входные файлы без пошаговых UI-команд.
-
-Критерий аналитического PASS — полный малый output/артефакт, проверенная схема и настройки, новый execution и сохранённый пакет, которые независимо воспроизводятся после отдельного открытия. Configure-only и Close проверяются отдельно; обычный продуктовый путь не переоткрывает мастер ради повторной проверки. Непроверенные платформы, большие наборы и дополнительные режимы остаются явно ограниченными.
-
-Передать checkpoint с точными source/runtime/client/model/platform pins, заявленным scope, результатами и неизменёнными исходными FAIL. Техническое завершение, аналитическая проверка, integration и release — отдельные состояния реестра. Один этап ревью и один раунд исправлений выполняются по общему жизненному циклу; этот подплан не добавляет повторного полного ревью.
+- **Подтверждено:** исходники `dada8010e`, Help `353e506b`, E2E `486caef44`, прежний oracle; новых runtime/UI/CLI прогонов нет, `reverification_required`.
+- **Генератор:** карточка этапа 0, исходный SHA, пара аккаунтов и решение владельца по W1.
+- **Исполнитель:** `acceptance/` → адресные тесты → CLI и независимая сверка → исправления принятого объёма.
+- **Ловец:** независимо принять опубликованный SHA и заявленные ограничения; старые FAIL сохранить.
+- **Следующая карточка:** расширение этапа 1 и далее — по решению владельца.

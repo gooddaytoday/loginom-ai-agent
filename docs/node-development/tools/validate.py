@@ -12,10 +12,9 @@ from urllib.parse import unquote
 ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parents[1]
 LAYERS = ['implementation','historical_acceptance','client_technical_validation','analytical_validation','integration','release']
-REQUIRED = ['README.md','workflow/orchestrator.md','workflow/single-node.md','workflow/lifecycle.md','workflow/acceptance-cli.md','workflow/new-node-plan.md',
+REQUIRED = ['README.md','RUNBOOK.md','workflow/acceptance-cli.md','workflow/new-node-plan.md',
             'registry.json','inventory.md','validation.md','provenance.json','history/README.md',
-            'templates/assignment.md','templates/checkpoint.md','templates/completion.md',
-            'templates/node-plan.md','templates/cross-table-plan-example.md','templates/campaign.json','templates/event.json','templates/host-resources.json',
+            'templates/assignment.md','templates/node-plan.md',
             'history/unavailable.md','history/unavailable.json','history/references.json']
 
 
@@ -40,19 +39,19 @@ def render(data):
          f"Исторический каталог: **{len(data['nodes'])}** компонентов. Обработчики: **{counts['implemented']}**; обычный остаток: **{counts['backlog']}**; условный резерв: **{counts['conditional_reserve']}**.", '',
          'Реализация и историческая приёмка не равны повторной аналитической приёмке текущего CLI. Старые номера 01/02 — инфраструктура, а не дополнительные типы узлов.', '',
          '## Реализованные обработчики','',
-         '| № | Узел | Runtime type / режимы | Историческая приёмка | Проверка нового клиента |',
-         '| --- | --- | --- | --- | --- |']
+         '| № | Узел | Подплан | Runtime type / режимы | Историческая приёмка | Проверка нового клиента |',
+         '| --- | --- | --- | --- | --- | --- |']
     for n in data['nodes']:
         if n['queue_class']!='implemented':continue
         h=n['handler']; modes=', '.join(h['modes'])
         title=f"[{n['name']}]({n['card']})"
-        out.append(f"| {n['legacy_subplan']} | {title} | `{h['type']}` / {modes} | {n['readiness']['historical_acceptance']['status']} | {n['readiness']['client_technical_validation']['status']}; аналитика: {n['readiness']['analytical_validation']['status']} |")
+        out.append(f"| {n['legacy_subplan']} | {title} | [План]({n['plan']}) | `{h['type']}` / {modes} | {n['readiness']['historical_acceptance']['status']} | {n['readiness']['client_technical_validation']['status']}; аналитика: {n['readiness']['analytical_validation']['status']} |")
     out+=['','## Компоненты без полного обработчика','',
-          'Список не является разрешённой очередью. При назначении применяется [создание подплана](workflow/new-node-plan.md). [Подплан Кросс-таблицы](nodes/transform-crosstable/plan.md) требует исследования; остальные карточки roadmap не заменяют самостоятельный подплан.', '',
-          '| Component ID | Узел | Категория | Следующее действие |','| --- | --- | --- | --- |']
+          'Список не является разрешённой очередью. У каждого компонента есть карточка и подплан; наличие подплана не подтверждает поддержку runtime и не назначает реализацию. Перед назначением подплан приводится к [шаблону](templates/node-plan.md) по [порядку создания](workflow/new-node-plan.md).', '',
+          '| Component ID | Узел | Подплан | Категория | Следующее действие |','| --- | --- | --- | --- | --- |']
     for n in data['nodes']:
         if n['queue_class']=='implemented':continue
-        out.append(f"| `{n['component_id']}` | {n['name']} | {n['queue_class']} | {str(n['next_action']).replace('|','/')} |")
+        out.append(f"| `{n['component_id']}` | [{n['name']}]({n['card']}) | [План]({n['plan']}) | {n['queue_class']} | {str(n['next_action']).replace('|','/')} |")
     out+=['','Источники, ограничения, версии и SHA перечислены в реестре и [историческом manifest](provenance.json). Готовность не изменяется от назначения владельца или переключения параллельности.','']
     return '\n'.join(out)
 
@@ -98,12 +97,18 @@ def check(render_view=False, source_archive=None):
         if n['queue_class']=='implemented':
             if not n['card'] or not (ROOT/n['card']).is_file():errors.append('missing card '+n['component_id'])
             if not n['handler']['modes']:errors.append('missing modes '+n['component_id'])
-        if n['queue_class']=='implemented' or n['component_id']=='component.transform.CrossTable':
-            if n.get('card')!=f"nodes/{n['slug']}/README.md":errors.append('card structure '+n['component_id'])
-            if n.get('plan')!=f"nodes/{n['slug']}/plan.md" or not (ROOT/n.get('plan','missing')).is_file():
-                errors.append('missing adapted plan '+n['component_id'])
+        if n.get('card')!=f"nodes/{n['slug']}/README.md" or not (ROOT/(n.get('card') or 'missing')).is_file():
+            errors.append('missing or invalid card '+n['component_id'])
+        if n.get('plan')!=f"nodes/{n['slug']}/plan.md" or not (ROOT/(n.get('plan') or 'missing')).is_file():
+            errors.append('missing or invalid plan '+n['component_id'])
         if bool(n.get('handler'))!=(n['queue_class']=='implemented'):
             errors.append('handler classification mismatch '+n['component_id'])
+        plan=ROOT/f"nodes/{n['slug']}/plan.md"
+        if plan.is_file():
+            text=plan.read_text()
+            if not re.search(r'^Статус: ',text,re.M):errors.append('plan without status '+n['slug'])
+            for number in range(7):
+                if not re.search(rf'^## {number}\. ',text,re.M):errors.append(f'plan without section {number} '+n['slug'])
         h=n.get('handler')
         if h:
             paths=h['source'] if isinstance(h['source'],list) else [h['source']]
@@ -160,15 +165,14 @@ def check(render_view=False, source_archive=None):
             if ref not in reference_ids:errors.append('unknown historical reference '+ref)
         for ref in re.findall(r'unavailable:(artifact-[0-9a-f]{16})',t):
             if ref not in artifact_ids:errors.append('unknown unavailable artifact '+ref)
+        if p.suffix=='.md' and p.is_relative_to(ROOT) and not p.is_relative_to(ROOT/'history'):
+            for line in t.splitlines():
+                if re.search(r'Hermes|Paperclip',line) and not re.search(r'истор|прежн',line,re.I):
+                    errors.append('legacy process as current '+str(p.relative_to(REPO)));break
         if re.search(r'(?:/Users/[^/]+/Git/|~/Git/)loginom-dock',t):
             errors.append('old checkout path '+str(p.relative_to(REPO)))
         if re.search(r'-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----|\bgh[pousr]_[A-Za-z0-9]{30,}|\bsk-[A-Za-z0-9_-]{32,}|\bAKIA[A-Z0-9]{16}\b',t):
             errors.append('possible secret '+str(p.relative_to(REPO)))
-    campaign=json.loads((ROOT/'templates/campaign.json').read_text())
-    if campaign['authorized_nodes'] or campaign['acceptance_slots']!=1 or campaign['memory']['status']!='not_enrolled':
-        errors.append('template inadvertently authorizes execution or memory')
-    if not campaign['resources'].get('host_registry'):
-        errors.append('missing shared host resource registry')
     return {'status':'FAIL' if errors else 'PASS','registry_components':len(nodes),'counts':dict(counts),'handler_types':len(registered),'historical_files_verified':len(prov['files']),'active_markdown_checked':len(active),'all_markdown_checked':len(all_markdown),'unavailable_artifacts_classified':len(artifact_ids),'original_archive_verified':bool(source_archive),'errors':errors}
 
 

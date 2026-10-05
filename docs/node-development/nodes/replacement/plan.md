@@ -1,30 +1,84 @@
-# 11. Замена: подплан сопровождения и приёмки
+# Замена: подплан для Multica
 
-[Карточка и принятые границы](README.md) · [реестр](../../registry.json) · [работа с одним узлом](../../workflow/single-node.md).
+Статус: `reverification_required`. Редакция 1 от 2026-10-05, автор — переработка подпланов в ветке `node-coverage-plans`.
+Component ID: `component.transform.Replace`, slug `replacement`. Runtime type и режимы: `transform.replace_columns` / `exact` — закреплены.
+База назначения: ветка задания из карточки; исследованы исходники `loginom@dada8010e`. Loginom: ожидается 7.4.2, фактическую версию записать на этапе 0; платформа исполнителя — Linux x64.
 
-Обработчик `transform.replace_columns` уже реализован в режиме `exact`. Этот подплан адаптирует исторический 11 к текущему runtime и standalone CLI: это маршрут адресного исправления, проверки переноса или отдельно назначенного расширения, не повторная разработка с нуля. Историческое принятие сохраняется в своём scope; технические Desktop проверки не являются аналитической CLI-приёмкой. Новых живых наблюдений и прогонов при составлении документа не было, readiness не повышается.
+Шаблон — [node-plan](../../templates/node-plan.md), вариант реализованного узла. Общий порядок — [RUNBOOK](../../RUNBOOK.md) и [CLI-приёмка](../../workflow/acceptance-cli.md). [Карточка](README.md) · [реестр](../../registry.json).
 
-До начала выбрать точное изменение и пройти [подготовку/жизненный цикл](../../workflow/lifecycle.md). Разработчик работает в Astra medium в своей задаче, ветке и worktree. Первичная разработка получает Goal до готовности изменения к первому ревью, без собственного token_budget. Этот документ не назначает следующий узел и не разрешает слияние.
+## 0. Как выполняется назначение
 
-## Узловые требования
+Оркестрация — Multica, сквад «Обработчики узлов»: Генератор тасок готовит назначение, Тест-Манки #1 перепроверяет и исправляет, Ловец Галюцинаций независимо принимает опубликованный SHA.
+
+Карточка:
+
+```text
+Ветка: <ветка задания>
+Узел: replacement
+Обработать узел по его подплану до независимой приёмки. Объём — этап 0 подплана (перепроверка).
+```
+
+В ветке задания должны быть RUNBOOK, этот подплан, `scripts/node-acceptance/cold-check.mjs` и сборка `--no-archive`. Отсутствие — Blocked.
+
+### Объём назначения
+
+Разрешено: собрать `acceptance/` из прежнего oracle; выполнить адресные тесты, CLI и независимую приёмку; при расхождении сверить мастер штатными средствами runtime; исправить дефекты в `replacement-*.mjs` и их тестах в принятом объёме; подготовить PR и доказательства.
+
+Не разрешено: merge и релиз; следующие этапы; изменение общей оболочки (`calculator-node.mjs`, `node-read-*`, `workspace-ui.mjs`, `node-procedure.mjs`, `collapse-native-*`) или `cold-check.mjs` без решения владельца; изменение конфигураций обвязки.
+
+Общих изменений W в этом назначении нет; дефект общей оболочки требует отдельного решения владельца.
+
+| Параметр | Значение |
+|---|---|
+| Узел | `component.transform.Replace`, slug `replacement` |
+| Исходный SHA | вершина ветки задания; Генератор фиксирует в карточке |
+| Runtime type и режимы | `transform.replace_columns` / `exact` |
+| Стенд и аккаунты | из конфигов ролей; пара worker/reviewer от Генератора, один стенд |
+| Модель приёмки | из конфигурации обвязки; предел модельного прогона 7200 с |
+| Внешняя среда | не нужна |
+
+### Стоп-условия
+
+Каждое оформить как Blocked с вопросом Генератору: нет обязательных файлов; CLI или аккаунты не `ready`; неизвестный исход операции (попытку и writer marker сохранить); дефект в общей оболочке; нужен режим вне принятого объёма.
+
+## 1. Цель и проверенная основа
+
+Цель этапа 0 — подтвердить принятый объём текущим standalone CLI и исправить адресные дефекты. Кросс-таблица изменила общую оболочку, `node-read-*`, `workspace-ui.mjs`, `node-procedure.mjs` и `collapse-native-*`; CLI-регрессии прежних обработчиков не было, unit-тесты её не заменяют.
+
+Принятый объём из реестра: Внутренняя exact-таблица для string/integer/real, replace/add и фактический признак _Replaced.
+Ограничения: Нет regex, внешней таблицы, Boolean/datetime и неточного числового сравнения. real other.mode=value поддерживает максимум 2 десятичных знака; точные пары не имеют этого общего ограничения. String не длиннее 2048 символов без NUL/CR/LF; non-ASCII case-insensitive ключи отклоняются; большие Int64 передавать десятичной строкой.
 
 Точная внутренняя таблица замен для string/integer/real. output_mode replace/add и other keep/null/value задают поведение явно. Частичные rules существующего узла сохраняют остальные правила; новый требует правила и режим.
 
 Значения типизированы; integer допускает десятичную строку Int64. Для чисел precision=0, для строк явный case_sensitive. Case-insensitive ключи ограничены ASCII. В real поле other.value принимает максимум два десятичных знака; это не ограничение точности exact pairs. Строки до 2048 символов без переносов/NUL.
 
-## Проверенные исходники и материалы
+| Источник | Факт | Наблюдено или гипотеза |
+|---|---|---|
+| Runtime базы | `transform.replace_columns`: `client/lib/node-contracts.mjs:17`, диспетчер `node-support.mjs:37`; параметры/границы — `replacement-parameters.mjs:3-53`; [обработчик](../../../../packages/loginom-runtime/client/lib/replacement-node.mjs) | Наблюдено в коде `dada8010e` |
+| Общая оболочка | `createTabularTransformNodeSupport` (`calculator-node.mjs:38`), строгое выравнивание `alignReadSchema` (`node-read-contract.mjs:78`); изменения Кросс-таблицы входят в базу | Наблюдено; CLI влияния на узел не проверен |
+| Реестр | `plan_status: accepted_scope_maintenance`, `implementation: implemented`, историческое `accepted_scoped`; Desktop V37; `standalone_status: not_revalidated` | Наблюдено; готовность не меняется |
+| Справка | [Замена](https://help.loginom.ru/userguide/processors/transformation/substitution/) = `loginom-help@353e506b:data/processors/transformation/substitution/README.md` | Документировано, не наблюдение текущего UI |
+| E2E | `e2e-tests@486caef44:tests/toreview/acceptance/wizards/replace/{replace,replace_datasets}.ts; tests/toreview/acceptance/mapping/mapping_replace.ts` | Код тестов; `:toreview`/skip не приёмка |
+| История | [исторический подплан 11](../../../../services/loginom-ai/docs/plans/loginom-dock/11-replacement.md); прежние source/live результаты и FAIL имеют исходные границы | Исторический PASS не переносится |
+| Прежний oracle | `packages/loginom-runtime/tools/loginom-acceptance/replacement_evidence_audit.py, replacement_{configuration,partial,persistence}_evidence.py` | Наблюдено; прежний транспорт Hermes к CLI не адаптирован |
 
-Текущий handler и параметры: [replacement-node.mjs](../../../../packages/loginom-runtime/client/lib/replacement-node.mjs); [replacement-parameters.mjs](../../../../packages/loginom-runtime/client/lib/replacement-parameters.mjs).
+Прежние проверяющие материалы и fixtures: [replacement_acceptance.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/replacement_acceptance.py); [replacement_evidence_audit.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/replacement_evidence_audit.py); [replacement_configuration_evidence.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/replacement_configuration_evidence.py); [replacement_persistence_evidence.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/replacement_persistence_evidence.py).
 
-Адресные source tests: [replacement-parameters.test.mjs](../../../../packages/loginom-runtime/client/test/replacement-parameters.test.mjs); [replacement-context.test.mjs](../../../../packages/loginom-runtime/client/test/replacement-context.test.mjs); [replacement-procedure.test.mjs](../../../../packages/loginom-runtime/client/test/replacement-procedure.test.mjs); [replacement-output.test.mjs](../../../../packages/loginom-runtime/client/test/replacement-output.test.mjs).
+## 2. Этапы
 
-Независимые проверяющие материалы и fixtures: [replacement_acceptance.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/replacement_acceptance.py); [replacement_evidence_audit.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/replacement_evidence_audit.py); [replacement_configuration_evidence.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/replacement_configuration_evidence.py); [replacement_persistence_evidence.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/replacement_persistence_evidence.py).
+### Этап 0 — перепроверка принятого объёма
 
-Файлы проверены на наличие, их прогоны сейчас не выполнялись. Часть entrypoints в каталоге loginom-acceptance всё ещё ожидает Hermes skill/pins и прежний формат evidence. Они служат источником oracle и семантических проверок; перед новой приёмкой адаптировать транспорт, pins и сбор receipts к [standalone CLI](../../workflow/acceptance-cli.md), сохранив проверки значений, freshness и отказов. Нельзя переименовать старый PASS в CLI PASS или запускать прежний Hermes launcher.
+Подготовка: проверить SHA, собрать кандидата из закоммиченных исходников, получить `loginom status` = `ready` на назначенном стенде.
 
-Историческая постановка: [11](../../../../services/loginom-ai/docs/plans/loginom-dock/11-replacement.md). Прежние Help/E2E пути в ней — указатели на версионируемые источники, а не доказательство текущего live-состояния.
+1. Собрать `acceptance/` из прежнего контракта (раздел 3): независимые ожидания, значения, freshness и отказы сохранить; адаптировать транспорт, pins и receipts к CLI. Прежний launcher Hermes не запускать.
+2. Адресные тесты `client/test/replacement-*.test.mjs` (4 файлов), затем весь `client/test`: `bun run test:upstream` в `packages/loginom-runtime`.
+3. CLI-сценарий и независимое холодное открытие по RUNBOOK; generic cold-check и адресные дополнения — в разделах 3–4.
+4. При расхождении — живая сверка мастера с `?testable=true`; прочитать причину из кнопки ошибки, записать в `discovery.md`; наблюдение не подменять E2E-снимком.
+5. Исправить дефект в принятом объёме с адресным тестом; общая оболочка или расширение объёма — стоп-условие.
 
-## Шаги изменения
+Выход: PASS исполнителя и независимая приёмка того же SHA; `client_technical_validation` и `analytical_validation` отражаются только по новому результату.
+
+### Адресные действия при FAIL
 
 1. Сверить native редакторы таблицы, other-policy и add/replace на целевой версии. Раздельно зафиксировать имя выходного значения и служебного _Replaced.
 2. Проверить тип каждой пары и уникальность ключа с учётом регистра/Int64; в resolveEffectiveReplacementParameters соединить patch с подтверждёнными сохранёнными правилами.
@@ -32,9 +86,28 @@
 4. Сохранить оригинальные значения неперечисленных полей и правил. Не заменять source schema строковой конверсией для упрощения редактора.
 5. Проверить значения и флаги замен независимо, включая семантику совпавшей пары from=to. Повторное выполнение после reopen использует сохранённую таблицу замен.
 
-## Независимые fixtures и oracle
+### Этап 1 и далее — непокрытые режимы Help 7.4 (отдельные карточки владельца)
 
-Ниже — обязательная узловая матрица для объявленного полного scope. При адресном исправлении выбрать затронутые строки и обосновать выбор; расширение режима добавляет новые строки. До автономной попытки сохранить входы и expected отдельно от handler, с версиями и SHA. Ожидания не вычислять импортом реализации и не подгонять по её приёмочному выводу.
+- Точность числового поиска, nearest-match/tie boundaries, изменение типа замены, регистр.
+- Regex поиск/замена и fallback regex $1; последовательность exact→regex→остальное.
+- Несколько внешних таблиц; роли Значение/Замена/Информационное/Не используемое и первый подходящий ряд.
+- Импорт/экспорт таблицы правил: UTF-8, два TSV поля без заголовка, locale decimals и ? как NULL.
+
+Перечень будущей полноты сохраняет прежний подплан: частично принятые действия перепроверяются на этапе 0, дополнительные controls/типы/режимы назначаются отдельно; совпавшее название режима не расширяет scope.
+
+## 3. Данные и независимые проверки
+
+Комплект `nodes/replacement/acceptance/` собирает будущая карточка:
+
+- `task.md` на бизнес-языке с `{{PACKAGE_PATH}}`; без имён инструментов и ожидаемых чисел;
+- `data/input.csv` и остальные указанные ниже CSV — точные копии прежних входов; только входы передаются модели;
+- `expected.json` из независимого `oracle.py` до прогона; адресные наборы — `fixtures/` с manifest (байты, SHA, формат, типы, порядок).
+
+Прежние входы: `fixtures/replacement/input.csv`: 124 байт, 6 записей, колонки `Id, Category, Code, Amount, Keep`, разделитель `;`; `fixtures/replacement/partial-input.csv`: 67 байт, 2 записей, колонки `A, A_Replace, B, C`, разделитель `;`; кодировка UTF-8, NULL-маркер `NULL`. Размеры и SHA сохранить в manifest до прогона.
+
+Ожидания прежнего контракта: Из `fixtures/replacement/expected-multi.json` и audit: Category exact case-sensitive, other=NULL; Code 1 → Int64 max и other=keep; Amount 1.25 → 9.125 и other=-5.25. При add сохранить исходные поля, добавить `_Replace` и Boolean `_Replaced`. Каждая строка проверяется отдельно.
+
+Матрица сохранена из прежнего подплана; ожидания и неоднозначные правила переподтвердить до модельного прогона:
 
 | Случай | Вход/изменение | Независимая проверка |
 | --- | --- | --- |
@@ -43,19 +116,41 @@
 | Other и режим | Тот же набор при other=null/value и output_mode add/replace. | Проверить исходный/новый столбец и _Replaced для каждого RowID; семантику флага для совпадающего from=to закрепить до autonomous run. |
 | Partial/persistence | Два поля с правилами; patch меняет только первое и затем режим вывода; пустой вход. | Второе правило и прочие свойства сохранены, пустой output имеет полную схему, настройки воспроизводимы после reopen. |
 
-## Негативные случаи
+Oracle не импортирует handler/runtime, рассчитывает по исходным байтам, сверяет все ячейки и схему, отличает NULL/пустую строку/0, отвергает чужой узел, старое исполнение, неполное чтение и подмену данных. Freshness, происхождение и настройки доказываются отдельно от правильных значений.
+
+Cold-check: схема проверяется позиционно (имена, метки, типы), строки — как мультимножество, до 100 строк/выход и 32 выходов (`scripts/node-acceptance/expected-outputs.mjs:14,29-39,72-81`). Числа сравниваются точно (`cold-check.mjs:232`); большие Int64 — десятичные строки. Каждый ожидаемый выход однозначно связан с типом и меткой узла. E2E-снимки мастера не являются oracle.
+
+## 4. Проверки, приёмка и завершение
+
+Адресная матрица; непроведённое — `not_checked`:
+
+| Проверка | Условие успеха |
+|---|---|
+| Контракт | Принятые лимиты и все негативные случаи раздела 5; отказ до мутации с понятной причиной |
+| Exact/other/add/replace | Все пары, фактический _Replaced, Int64 и сохранность незапрошенных правил; все случаи раздела 3 |
+| NULL/пустота/типы | Не заменены 0 или строкой; типы/схема пустого результата подтверждены |
+| Изменение существующего | Адресный маршрут раздела 2; сохраняются незапрошенные свойства, нет второго узла или фантомных полей |
+| Persistence | Сохранение после всех чтений; новое открытие и выполнение без восстановления настроек из expected |
+| Recovery | Done/Close отдельно от Execute; неизвестный эффект не повторён; причина отказа мастера прочитана |
+| Регрессия | Адресные тесты и весь `client/test` |
+
+Задание модели: использовать `input.csv`, `partial-input.csv`; Нормализовать коды точными согласованными таблицами замен, показать непокрытые значения через заданную политику и проверить сохранение неперечисленных правил после изменения узла; сохранить результат в `{{PACKAGE_PATH}}`.
+
+PASS исполнителя: CLI, независимая сверка по разделу 3, подтверждённые `package_closed=true`/`logged_out=true`, адресная матрица. Публикация и приёмка того же SHA — по RUNBOOK; `integration` и `release` не повышаются.
+
+## 5. Ловушки — переподтвердить, не копировать
 
 - Дубли ключей после case-folding, не-ASCII insensitive, NaN/Infinity, Int64 за границей, wrong type: отказ до редактирования.
 - other.value с real >2 десятичных знаков, недопустимый перенос строки, коллизии _Replace/_Replaced: явный отказ, не округление/переименование.
 - Потеря ответа при Apply пары либо смене режима: не продублировать правило; подмена сохранённой other-policy должна провалить аудит.
 - Для изменённых фаз отдельно различить отказ до эффекта, известную ошибку с подтверждённым cleanup и неизвестный эффект. Повтор operation_id не создаёт второй узел/запуск; lost reply не оправдывает слепой retry. Чужой пакет и посторонние связи неизменны.
+- История 11 сохраняет первоначальный автономный FAIL 55/59 и адресные исправления; не превращать focused PASS в новую CLI-приёмку. Прежний отдельный Flag Probe: other=NULL ставил _Replaced=true и на уже NULL; это расходилось с примером Help и требует перепроверки.
+- Приёмки текущего CLI нет; неподтверждено: _Replaced/from=to/other=NULL, Int64 и partial patch на текущем CLI. Исторические замеры/локаль/платформа не являются гарантией текущего стенда.
 
-## Автономная проверка и передача
+## 6. Точка продолжения
 
-Нормализовать коды точными согласованными таблицами замен, показать непокрытые значения через заданную политику и проверить сохранение неперечисленных правил после изменения узла.
-
-Первичная отладка — штатными скриптами текущего runtime в назначенной изоляции. После неё выполнить адресные source tests и проверить независимый oracle, включая его отказ на подменённых значениях/схеме/идентичности. Только затем подготовить неизменный candidate и получить слот по [CLI-регламенту](../../workflow/acceptance-cli.md): standalone CLI Loginom AI Agent, Sol low, согласованная подписка, бизнес-цель и входные файлы без пошаговых UI-команд.
-
-Критерий аналитического PASS — полный малый output/артефакт, проверенная схема и настройки, новый execution и сохранённый пакет, которые независимо воспроизводятся после отдельного открытия. Configure-only и Close проверяются отдельно; обычный продуктовый путь не переоткрывает мастер ради повторной проверки. Непроверенные платформы, большие наборы и дополнительные режимы остаются явно ограниченными.
-
-Передать checkpoint с точными source/runtime/client/model/platform pins, заявленным scope, результатами и неизменёнными исходными FAIL. Техническое завершение, аналитическая проверка, integration и release — отдельные состояния реестра. Один этап ревью и один раунд исправлений выполняются по общему жизненному циклу; этот подплан не добавляет повторного полного ревью.
+- **Подтверждено:** исходники `dada8010e`, Help `353e506b`, E2E `486caef44`, прежний oracle; новых runtime/UI/CLI прогонов нет, `reverification_required`.
+- **Генератор:** карточка этапа 0, исходный SHA, пара аккаунтов.
+- **Исполнитель:** `acceptance/` → адресные тесты → CLI и независимая сверка → исправления принятого объёма.
+- **Ловец:** независимо принять опубликованный SHA и заявленные ограничения; старые FAIL сохранить.
+- **Следующая карточка:** расширение этапа 1 и далее — по решению владельца.

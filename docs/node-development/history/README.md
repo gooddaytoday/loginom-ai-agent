@@ -51,6 +51,7 @@
 - [node-workflow-runbook](../../../services/loginom-ai/docs/plans/loginom-dock/node-workflow-runbook.md).
 - [four-stream-node-roadmap](../../../services/loginom-ai/docs/plans/loginom-dock/four-stream-node-roadmap.md).
 - [shared-project-memory](../../../services/loginom-ai/docs/loginom-dock/shared-project-memory.md).
+- [Шаблоны кампании до Multica](legacy-orchestration/README.md) — назначение, события, checkpoint, завершение и ресурсы хоста; не применяются с 2026-10-05.
 
 ## Дополнения к уже перенесённой истории
 

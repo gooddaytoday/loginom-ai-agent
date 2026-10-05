@@ -1,30 +1,84 @@
-# 16. Свёртка столбцов: подплан сопровождения и приёмки
+# Свёртка столбцов: подплан для Multica
 
-[Карточка и принятые границы](README.md) · [реестр](../../registry.json) · [работа с одним узлом](../../workflow/single-node.md).
+Статус: `reverification_required`. Редакция 1 от 2026-10-05, автор — переработка подпланов в ветке `node-coverage-plans`.
+Component ID: `component.transform.ColumnFlipping`, slug `collapse-columns`. Runtime type и режимы: `transform.collapse_columns` / `unpivot` — закреплены.
+База назначения: ветка задания из карточки; исследованы исходники `loginom@dada8010e`. Loginom: ожидается 7.4.2, фактическую версию записать на этапе 0; платформа исполнителя — Linux x64.
 
-Обработчик `transform.collapse_columns` уже реализован в режиме `unpivot`. Этот подплан адаптирует исторический 16 к текущему runtime и standalone CLI: это маршрут адресного исправления, проверки переноса или отдельно назначенного расширения, не повторная разработка с нуля. Историческое принятие сохраняется в своём scope; технические Desktop проверки не являются аналитической CLI-приёмкой. Новых живых наблюдений и прогонов при составлении документа не было, readiness не повышается.
+Шаблон — [node-plan](../../templates/node-plan.md), вариант реализованного узла. Общий порядок — [RUNBOOK](../../RUNBOOK.md) и [CLI-приёмка](../../workflow/acceptance-cli.md). [Карточка](README.md) · [реестр](../../registry.json).
 
-До начала выбрать точное изменение и пройти [подготовку/жизненный цикл](../../workflow/lifecycle.md). Разработчик работает в Astra medium в своей задаче, ветке и worktree. Первичная разработка получает Goal до готовности изменения к первому ревью, без собственного token_budget. Этот документ не назначает следующий узел и не разрешает слияние.
+## 0. Как выполняется назначение
 
-## Узловые требования
+Оркестрация — Multica, сквад «Обработчики узлов»: Генератор тасок готовит назначение, Тест-Манки #1 перепроверяет и исправляет, Ловец Галюцинаций независимо принимает опубликованный SHA.
+
+Карточка:
+
+```text
+Ветка: <ветка задания>
+Узел: collapse-columns
+Обработать узел по его подплану до независимой приёмки. Объём — этап 0 подплана (перепроверка).
+```
+
+В ветке задания должны быть RUNBOOK, этот подплан, `scripts/node-acceptance/cold-check.mjs` и сборка `--no-archive`. Отсутствие — Blocked.
+
+### Объём назначения
+
+Разрешено: собрать `acceptance/` из прежнего oracle; выполнить адресные тесты, CLI и независимую приёмку; при расхождении сверить мастер штатными средствами runtime; исправить дефекты в `collapse-*.mjs` и их тестах в принятом объёме; подготовить PR и доказательства.
+
+Не разрешено: merge и релиз; следующие этапы; изменение общей оболочки (`calculator-node.mjs`, `node-read-*`, `workspace-ui.mjs`, `node-procedure.mjs`, `collapse-native-*`) или `cold-check.mjs` без решения владельца; изменение конфигураций обвязки.
+
+Общих изменений W в этом назначении нет; дефект общей оболочки требует отдельного решения владельца.
+
+| Параметр | Значение |
+|---|---|
+| Узел | `component.transform.ColumnFlipping`, slug `collapse-columns` |
+| Исходный SHA | вершина ветки задания; Генератор фиксирует в карточке |
+| Runtime type и режимы | `transform.collapse_columns` / `unpivot` |
+| Стенд и аккаунты | из конфигов ролей; пара worker/reviewer от Генератора, один стенд |
+| Модель приёмки | из конфигурации обвязки; предел модельного прогона 7200 с |
+| Внешняя среда | не нужна |
+
+### Стоп-условия
+
+Каждое оформить как Blocked с вопросом Генератору: нет обязательных файлов; CLI или аккаунты не `ready`; неизвестный исход операции (попытку и writer marker сохранить); дефект в общей оболочке; нужен режим вне принятого объёма.
+
+## 1. Цель и проверенная основа
+
+Цель этапа 0 — подтвердить принятый объём текущим standalone CLI и исправить адресные дефекты. Кросс-таблица изменила общую оболочку, `node-read-*`, `workspace-ui.mjs`, `node-procedure.mjs` и `collapse-native-*`; CLI-регрессии прежних обработчиков не было, unit-тесты её не заменяют.
+
+Принятый объём из реестра: Информационные и упорядоченные транспонируемые поля; ignore_empty=true/false; scalar/variant-выход.
+Ограничения: Это unpivot столбцов, а не разбиение строки со списком. Входной variant не поддержан. Нативный путь полного точного чтения variant ограничен 50 строками × 8 полями и проверенным происхождением данных; тип и точность нельзя выводить по выборке. Оба списка ролей не пересекаются; служебные names/displaynames/values/datatypes запрещены в информационных именах.
 
 Unpivot преобразует упорядоченные transposed поля в строки, сохраняя information поля и явный ignore_empty. Это не разделение текстового списка. Роли не пересекаются; scalar input пяти типов, входной variant не поддержан.
 
 Mixed scalar может дать variant output; точный тип каждой ячейки не выводится по виду строки. Нативный путь полного exact variant-чтения ограничен 50 строками ×8 полями и 1 МиБ, проверяет происхождение. Расширять лимиты или переносить прототипы в public путь этим подпланом не требуется. В information запрещены служебные names/displaynames/values/datatypes.
 
-## Проверенные исходники и материалы
+| Источник | Факт | Наблюдено или гипотеза |
+|---|---|---|
+| Runtime базы | `transform.collapse_columns`: `client/lib/node-contracts.mjs:19`, диспетчер `node-support.mjs:29`; параметры/границы — `collapse-parameters.mjs:3-30; collapse-native-output.mjs (точное чтение)`; [обработчик](../../../../packages/loginom-runtime/client/lib/collapse-node.mjs) | Наблюдено в коде `dada8010e` |
+| Общая оболочка | `createTabularTransformNodeSupport` (`calculator-node.mjs:38`), строгое выравнивание `alignReadSchema` (`node-read-contract.mjs:78`); изменения Кросс-таблицы входят в базу | Наблюдено; CLI влияния на узел не проверен |
+| Реестр | `plan_status: accepted_scope_maintenance`, `implementation: implemented`, историческое `accepted_scoped`; Desktop V37; `standalone_status: not_revalidated` | Наблюдено; готовность не меняется |
+| Справка | [Свёртка столбцов](https://help.loginom.ru/userguide/processors/transformation/collapse-columns.html) = `loginom-help@353e506b:data/processors/transformation/collapse-columns.md` | Документировано, не наблюдение текущего UI |
+| E2E | `e2e-tests@486caef44:tests/acceptance/wizards/columnflipping.ts` | Код тестов; `:toreview`/skip не приёмка |
+| История | [исторический подплан 16](../../../../services/loginom-ai/docs/plans/loginom-dock/16-collapse-columns.md); прежние source/live результаты и FAIL имеют исходные границы | Исторический PASS не переносится |
+| Прежний oracle | `packages/loginom-runtime/tools/loginom-acceptance/collapse/acceptance-kit/{audit.py,expected.json}, collapse/exact-wiring/public-audit.py, collapse_acceptance.py, collapse_node_acceptance.py` | Наблюдено; прежний транспорт Hermes к CLI не адаптирован |
 
-Текущий handler и параметры: [collapse-node.mjs](../../../../packages/loginom-runtime/client/lib/collapse-node.mjs); [collapse-parameters.mjs](../../../../packages/loginom-runtime/client/lib/collapse-parameters.mjs).
+Прежние проверяющие материалы и fixtures: [collapse_node_acceptance.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/collapse_node_acceptance.py); [collapse_acceptance.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/collapse_acceptance.py); [audit.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/collapse/acceptance-kit/audit.py); [expected.json](../../../../packages/loginom-runtime/tools/loginom-acceptance/collapse/acceptance-kit/expected.json).
 
-Адресные source tests: [collapse-parameters.test.mjs](../../../../packages/loginom-runtime/client/test/collapse-parameters.test.mjs); [collapse-procedure.test.mjs](../../../../packages/loginom-runtime/client/test/collapse-procedure.test.mjs); [collapse-output-reconcile.test.mjs](../../../../packages/loginom-runtime/client/test/collapse-output-reconcile.test.mjs); [collapse-native-source.test.mjs](../../../../packages/loginom-runtime/client/test/collapse-native-source.test.mjs); [collapse-native-journal.test.mjs](../../../../packages/loginom-runtime/client/test/collapse-native-journal.test.mjs).
+## 2. Этапы
 
-Независимые проверяющие материалы и fixtures: [collapse_node_acceptance.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/collapse_node_acceptance.py); [collapse_acceptance.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/collapse_acceptance.py); [audit.py](../../../../packages/loginom-runtime/tools/loginom-acceptance/collapse/acceptance-kit/audit.py); [expected.json](../../../../packages/loginom-runtime/tools/loginom-acceptance/collapse/acceptance-kit/expected.json).
+### Этап 0 — перепроверка принятого объёма
 
-Файлы проверены на наличие, их прогоны сейчас не выполнялись. Часть entrypoints в каталоге loginom-acceptance всё ещё ожидает Hermes skill/pins и прежний формат evidence. Они служат источником oracle и семантических проверок; перед новой приёмкой адаптировать транспорт, pins и сбор receipts к [standalone CLI](../../workflow/acceptance-cli.md), сохранив проверки значений, freshness и отказов. Нельзя переименовать старый PASS в CLI PASS или запускать прежний Hermes launcher.
+Подготовка: проверить SHA, собрать кандидата из закоммиченных исходников, получить `loginom status` = `ready` на назначенном стенде.
 
-Историческая постановка: [16](../../../../services/loginom-ai/docs/plans/loginom-dock/16-collapse-columns.md). Прежние Help/E2E пути в ней — указатели на версионируемые источники, а не доказательство текущего live-состояния.
+1. Собрать `acceptance/` из прежнего контракта (раздел 3): независимые ожидания, значения, freshness и отказы сохранить; адаптировать транспорт, pins и receipts к CLI. Прежний launcher Hermes не запускать.
+2. Адресные тесты `client/test/collapse-*.test.mjs` (11 файлов), затем весь `client/test`: `bun run test:upstream` в `packages/loginom-runtime`.
+3. CLI-сценарий и независимое холодное открытие по RUNBOOK; generic cold-check и адресные дополнения — в разделах 3–4.
+4. При расхождении — живая сверка мастера с `?testable=true`; прочитать причину из кнопки ошибки, записать в `discovery.md`; наблюдение не подменять E2E-снимком.
+5. Исправить дефект в принятом объёме с адресным тестом; общая оболочка или расширение объёма — стоп-условие.
 
-## Шаги изменения
+Выход: PASS исполнителя и независимая приёмка того же SHA; `client_technical_validation` и `analytical_validation` отражаются только по новому результату.
+
+### Адресные действия при FAIL
 
 1. Проверить native роли, порядок и ignore_empty; при existing input mapping разрешать уже эффективные поля, не устаревшие исходные имена.
 2. В validate/resolveCollapseParameters проверить полные списки и reserved names до мутации; перестановка transposed меняет порядок свёртки осознанно.
@@ -32,9 +86,26 @@ Mixed scalar может дать variant output; точный тип каждо�
 4. Для exact variant проверить source ownership, полный размер и границы reader. Если доказательство не помещается, вернуть ограничение или согласовать отдельный путь; не выдавать sample за весь output.
 5. Независимый oracle сравнивает тройку исходный RowID/имя свёрнутого поля/типизированное значение, учитывая ignore_empty. Save/reopen подтверждает роли и тот же результат.
 
-## Независимые fixtures и oracle
+### Этап 1 и далее — непокрытые режимы Help 7.4 (отдельные карточки владельца)
 
-Ниже — обязательная узловая матрица для объявленного полного scope. При адресном исправлении выбрать затронутые строки и обосновать выбор; расширение режима добавляет новые строки. До автономной попытки сохранить входы и expected отдельно от handler, с версиями и SHA. Ожидания не вычислять импортом реализации и не подгонять по её приёмочному выводу.
+- Variable вход, смешанные типы, пустая строка/NULL и all-null/header-only.
+- Полные mappings, служебные поля и полное чтение сохранённого результата в пределах доказуемого бюджета.
+
+Перечень будущей полноты сохраняет прежний подплан: частично принятые действия перепроверяются на этапе 0, дополнительные controls/типы/режимы назначаются отдельно; совпавшее название режима не расширяет scope.
+
+## 3. Данные и независимые проверки
+
+Комплект `nodes/collapse-columns/acceptance/` собирает будущая карточка:
+
+- `task.md` на бизнес-языке с `{{PACKAGE_PATH}}`; без имён инструментов и ожидаемых чисел;
+- `data/mixed.csv` и остальные указанные ниже CSV — точные копии прежних входов; только входы передаются модели;
+- `expected.json` из независимого `oracle.py` до прогона; адресные наборы — `fixtures/` с manifest (байты, SHA, формат, типы, порядок).
+
+Прежние входы: `collapse/acceptance-kit/fixtures/mixed.csv`: 134 байт, 3 записей, колонки `Id, I, R, S, B, D`, разделитель `;`; `collapse/acceptance-kit/fixtures/mapped.csv`: 168 байт, 3 записей, колонки `Zone, S, Id, D, B, R, I`, разделитель `;`; кодировка UTF-8, NULL-маркер `NULL`. Размеры и SHA сохранить в manifest до прогона.
+
+Ожидания прежнего контракта: Из `collapse/acceptance-kit`: сохранить информационные поля; Names/DisplayNames/Values/DataTypes соответствуют исходному транспонированному полю. Mixed даёт Variant с точным scalar tag и native bytes; ignore_empty исключает только по подтверждённой политике. 10 случаев/470 ячеек исторической приёмки не заменяют перепроверку.
+
+Матрица сохранена из прежнего подплана; ожидания и неоднозначные правила переподтвердить до модельного прогона:
 
 | Случай | Вход/изменение | Независимая проверка |
 | --- | --- | --- |
@@ -43,19 +114,43 @@ Mixed scalar может дать variant output; точный тип каждо�
 | All-null/empty | Все transposed NULL и отдельный header-only вход; варианты DataTypes output включён/исключён. | Полный набор служебных полей/типов сохраняется; число строк соответствует ignore_empty, а не успешному открытию preview. |
 | Mapping/persistence | Переименованный input, перестановка transposed, label и output mapping; 10 малых отдельных случаев. | Сравнить полный выход каждого случая в пределах reader, настройки после отдельного reopen и fresh execution. Суммарный небольшой объём не оправдывает превышение лимита одного результата. |
 
-## Негативные случаи
+Oracle не импортирует handler/runtime, рассчитывает по исходным байтам, сверяет все ячейки и схему, отличает NULL/пустую строку/0, отвергает чужой узел, старое исполнение, неполное чтение и подмену данных. Freshness, происхождение и настройки доказываются отдельно от правильных значений.
+
+Cold-check: схема проверяется позиционно (имена, метки, типы), строки — как мультимножество, до 100 строк/выход и 32 выходов (`scripts/node-acceptance/expected-outputs.mjs:14,29-39,72-81`). Числа сравниваются точно (`cold-check.mjs:232`); большие Int64 — десятичные строки. Каждый ожидаемый выход однозначно связан с типом и меткой узла. E2E-снимки мастера не являются oracle.
+
+Native Variant: максимум 50 строк × 8 полей и 1 MiB; проверяются subtype, OADate bytes и происхождение через сохранённый импорт. За пределами лимита нельзя объявлять полный точный Variant PASS или принимать отказ native за разрешение fallback.
+
+## 4. Проверки, приёмка и завершение
+
+Адресная матрица; непроведённое — `not_checked`:
+
+| Проверка | Условие успеха |
+|---|---|
+| Контракт | Принятые лимиты и все негативные случаи раздела 5; отказ до мутации с понятной причиной |
+| Unpivot/ignore_empty/Variant | Роли, Names/DisplayNames/Values/DataTypes, точные subtype/bytes и доказанное происхождение; все случаи раздела 3 |
+| NULL/пустота/типы | Не заменены 0 или строкой; типы/схема пустого результата подтверждены |
+| Изменение существующего | Адресный маршрут раздела 2; сохраняются незапрошенные свойства, нет второго узла или фантомных полей |
+| Persistence | Сохранение после всех чтений; новое открытие и выполнение без восстановления настроек из expected |
+| Recovery | Done/Close отдельно от Execute; неизвестный эффект не повторён; причина отказа мастера прочитана |
+| Регрессия | Адресные тесты и весь `client/test` |
+
+Задание модели: использовать `mixed.csv`, `mapped.csv`; Преобразовать предоставленные показатели из столбцов в строки, сохранив идентификаторы и исходные типы, проверить оба правила пропусков и сохранить пакет с независимым полным результатом; сохранить результат в `{{PACKAGE_PATH}}`.
+
+PASS исполнителя: CLI, независимая сверка по разделу 3, подтверждённые `package_closed=true`/`logged_out=true`, адресная матрица и точный типизированный аудит Variant. Публикация и приёмка того же SHA — по RUNBOOK; `integration` и `release` не повышаются.
+
+## 5. Ловушки — переподтвердить, не копировать
 
 - Пересечение/дубли ролей, пустой transposed, unknown/reserved field, input variant: отказ до настройки.
 - 51 строка,9 полей, >1 МиБ, чужой источник или подменённые type tags: exact verifier не должен выдавать полный PASS за пределами контракта.
 - Concurrent change, reply loss и обрыв во время typed read: не склеивать данные разных исполнений; неизвестный эффект остаётся неопределённым.
 - Для изменённых фаз отдельно различить отказ до эффекта, известную ошибку с подтверждённым cleanup и неизвестный эффект. Повтор operation_id не создаёт второй узел/запуск; lost reply не оправдывает слепой retry. Чужой пакет и посторонние связи неизменны.
+- История 16: integer 1 и real 1.0 визуально неразличимы после исключения DataTypes; точность доказывается типизированными ячейками и происхождением. Native код изменён Кросс-таблицей: старый PASS особенно не переносится.
+- Приёмки текущего CLI нет; неподтверждено: точный Variant/subtype/DateTime и provenance после новых collapse-native модулей. Исторические замеры/локаль/платформа не являются гарантией текущего стенда.
 
-## Автономная проверка и передача
+## 6. Точка продолжения
 
-Преобразовать месячные показатели из столбцов в строки, сохранив идентификаторы и исходные типы, проверить оба правила пропусков и сохранить пакет с независимым полным результатом.
-
-Первичная отладка — штатными скриптами текущего runtime в назначенной изоляции. После неё выполнить адресные source tests и проверить независимый oracle, включая его отказ на подменённых значениях/схеме/идентичности. Только затем подготовить неизменный candidate и получить слот по [CLI-регламенту](../../workflow/acceptance-cli.md): standalone CLI Loginom AI Agent, Sol low, согласованная подписка, бизнес-цель и входные файлы без пошаговых UI-команд.
-
-Критерий аналитического PASS — полный малый output/артефакт, проверенная схема и настройки, новый execution и сохранённый пакет, которые независимо воспроизводятся после отдельного открытия. Configure-only и Close проверяются отдельно; обычный продуктовый путь не переоткрывает мастер ради повторной проверки. Непроверенные платформы, большие наборы и дополнительные режимы остаются явно ограниченными.
-
-Передать checkpoint с точными source/runtime/client/model/platform pins, заявленным scope, результатами и неизменёнными исходными FAIL. Техническое завершение, аналитическая проверка, integration и release — отдельные состояния реестра. Один этап ревью и один раунд исправлений выполняются по общему жизненному циклу; этот подплан не добавляет повторного полного ревью.
+- **Подтверждено:** исходники `dada8010e`, Help `353e506b`, E2E `486caef44`, прежний oracle; новых runtime/UI/CLI прогонов нет, `reverification_required`.
+- **Генератор:** карточка этапа 0, исходный SHA, пара аккаунтов.
+- **Исполнитель:** `acceptance/` → адресные тесты → CLI и независимая сверка → исправления принятого объёма.
+- **Ловец:** независимо принять опубликованный SHA и заявленные ограничения; старые FAIL сохранить.
+- **Следующая карточка:** расширение этапа 1 и далее — по решению владельца.
