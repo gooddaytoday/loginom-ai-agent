@@ -26,14 +26,23 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
   ]
   const compatibility = identity.filter(([, first, second]) => first == null || second == null || first === "" || second === "" || first !== second).map(([name]) => name)
   if (a.task_ids.length !== b.task_ids.length || a.task_ids.some((id) => !b.task_ids.includes(id))) compatibility.push("task_ids")
-  if (compatibility.length) return { policy, compatibility, reliability: { k: policy.k, a: { pass1: null, passk: null }, b: { pass1: null, passk: null }, reasons: compatibility }, axes: { completion: { observed: null } } }
+  if (compatibility.length) return { policy, compatibility, reliability: { k: policy.k, a: { pass1: null, passk: null }, b: { pass1: null, passk: null }, reasons: compatibility }, tasks: [], axes: { completion: { observed: null } } }
   const rates = a.tasks.map((task) => ({
     a: completion(task.attempts),
     b: completion(b.tasks.find((candidate) => candidate.id === task.id)!.attempts),
   }))
+  const tasks = a.tasks.map((task, index) => {
+    const other = b.tasks.find((candidate) => candidate.id === task.id)!
+    const complete = a.config.repeat === 3 && b.config.repeat === 3 &&
+      task.attempts.length === 3 && other.attempts.length === 3 &&
+      task.attempts.every((attempt) => !["infra_error", "harness_error", "interrupted"].includes(attempt.status)) &&
+      other.attempts.every((attempt) => !["infra_error", "harness_error", "interrupted"].includes(attempt.status)) &&
+      !a.interrupted && !b.interrupted && !a.stopped_reason && !b.stopped_reason
+    return { id: task.id, completion: rates[index]!, regressions: complete && rates[index]!.a === 1 && rates[index]!.b === 0 ? ["completion"] : [] }
+  })
   const first = rates.reduce((sum, rate) => sum + (rate.a ?? 0), 0) / rates.length
   const second = rates.reduce((sum, rate) => sum + (rate.b ?? 0), 0) / rates.length
-  return { policy, compatibility, reliability: { k: policy.k, a: reliability(a, policy.k), b: reliability(b, policy.k), reasons: [] }, axes: { completion: {
+  return { policy, compatibility, tasks, reliability: { k: policy.k, a: reliability(a, policy.k), b: reliability(b, policy.k), reasons: [] }, axes: { completion: {
     observed: !rates.length || rates.some((rate) => rate.a === null || rate.b === null) ? null : { a: first, b: second, drop: first - second },
   } } }
 }
