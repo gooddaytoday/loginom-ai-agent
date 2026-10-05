@@ -3,6 +3,9 @@ import { evalsRoot } from "./config"
 import { EvalFailure } from "./fail"
 import type { RunSummary } from "./report"
 import { aggregate } from "./report"
+import { analyzeComparison, type ComparePolicy } from "./compare-analysis"
+
+const cell = (text: string) => text.replaceAll("|", "\\|").replace(/[\r\n]+/g, " ")
 
 const delta = (value: number, digits: number) => `${value > 0 ? "+" : ""}${value.toFixed(digits)}`
 const num = (x: number | null, y: number | null, digits = 1) =>
@@ -12,7 +15,8 @@ const pct = (x: number | null, y: number | null) =>
 const timeouts = (limits?: Record<string, number>) =>
   limits === undefined ? null : JSON.stringify(Object.entries(limits).sort(([x], [y]) => x.localeCompare(y)))
 
-export function compare(a: RunSummary, b: RunSummary) {
+export function compare(a: RunSummary, b: RunSummary, options: Partial<ComparePolicy> = {}) {
+  const analysis = analyzeComparison(a, b, options)
   const identity: [string, unknown, unknown][] = [
     ["agent.model", a.agent.model, b.agent.model],
     ["agent.variant", a.agent.variant ?? null, b.agent.variant ?? null],
@@ -31,7 +35,7 @@ export function compare(a: RunSummary, b: RunSummary) {
     ["dock.action_manifest_sha256", [...a.dock.action_manifest_sha256].sort().join(","), [...b.dock.action_manifest_sha256].sort().join(",")],
     ["loginom.image_digest", a.loginom.image_digest, b.loginom.image_digest],
   ]
-  const mismatches = identity.filter(([, x, y]) => x !== y)
+  const mismatches = analysis.compatibility.map((name) => identity.find(([key]) => key === name) ?? [name, "unknown", "unknown"])
   const changed = environment.filter(([, x, y]) => x !== y)
   const judgeless = a.judge === null && b.judge === null
   const partial = [a, b].filter((run) => run.interrupted || run.stopped_reason)
@@ -51,20 +55,38 @@ export function compare(a: RunSummary, b: RunSummary) {
   })
   const lines = [
     ...(mismatches.length
-      ? [`**Прогоны несравнимы:** различаются ${mismatches.map(([name, x, y]) => `${name} (${String(x)} → ${String(y)})`).join("; ")}`, ""]
+      ? [`**Прогоны несравнимы:** различаются или неизвестны ${mismatches.map(([name, x, y]) => `${name} (${cell(String(x))} → ${cell(String(y))})`).join("; ")}`, ""]
       : []),
-    `# Сравнение ${a.run_id}${a.label ? ` (${a.label})` : ""} → ${b.run_id}${b.label ? ` (${b.label})` : ""}`,
+    `# Сравнение ${cell(a.run_id)}${a.label ? ` (${cell(a.label)})` : ""} → ${cell(b.run_id)}${b.label ? ` (${cell(b.label)})` : ""}`,
     "",
     `Агент A → B: ${[a, b].map((run) => `CLI ${run.agent.cli_version ?? "неизвестен"}, source ${run.agent.source_commit ?? (run.agent.cli_mode === "source" ? run.agent.git_sha : null) ?? "неизвестен"}${run.agent.source_dirty ? "-dirty" : ""}, binary ${run.agent.binary_sha256 ?? "—"}, variant ${run.agent.variant ?? "неизвестен"}`).join(" → ")}.`,
     `Повторов: ${a.config.repeat} → ${b.config.repeat}. Попыток: ${a.metrics.total} → ${b.metrics.total}.`,
-    "Показаны наблюдаемые дельты. Статистический вердикт «лучше/хуже» не вычисляется; разброс и число попыток нужно учитывать при выводах.",
+    `Метод: Hoeffding по независимым группам задач; равный вес задач. margin=${analysis.policy.margin} (${(analysis.policy.margin*100).toFixed(1)} п.п.), confidence=${analysis.policy.confidence}. Бюджет: шесть односторонних границ, alpha_tail=${((1-analysis.policy.confidence)/6).toPrecision(4)}.`,
+    "Зависимость повторов внутри задачи допустима. Интервал относится к ожидаемому падению на объявленном наборе; перенос на новые задачи не обещается.",
+    "Неразличимо не доказывает равенство. При margin=0.5 даже полное падение на 25 задачах не доказывается; предельному случаю требуется 39 независимых задач.",
     ...(partial.length ? [`**неполное покрытие:** ${partial.map((run) => `${run.run_id} (${run.interrupted ? "прерван" : run.stopped_reason})`).join(", ")} — метрики по разному числу попыток.`] : []),
     ...(coverage.length ? [`**неполное покрытие:** ${coverage.join("; ")}. Общие средние зависят от числа попыток каждой задачи.`] : []),
     ...uneven,
     ...(changed.length ? [`**изменилось окружение:** ${changed.map(([name, x, y]) => `${name} (${String(x)} → ${String(y)})`).join("; ")}. Сравнение допустимо, но часть дельты может объясняться Dock/Loginom.`] : []),
     ...(judgeless ? ["Оба прогона без судьи: сравнение только по completion_rate."] : []),
     "",
-    "## Метрики",
+    "## Отдельные оси качества",
+    "",
+    "| Ось | T | task mean A → B | Падение A−B, п.п. | Интервал, п.п. | Вердикт | Не хуже | Причины |",
+    "|---|---|---|---|---|---|---|---|",
+    ...Object.entries(analysis.axes).map(([name, axis]) => {
+      const verdict = axis.verdict === null ? "недоступно" : ({ worse: "хуже", better: "лучше", indistinguishable: "неразличимо" })[axis.verdict]
+      const ni = axis.non_inferiority === null ? "недоступно" : ({ confirmed: "подтверждено", rejected: "отклонено", inconclusive: "не доказано" })[axis.non_inferiority]
+      return `| ${name} | ${axis.task_count} | ${pct(axis.observed?.a ?? null,axis.observed?.b ?? null)} | ${axis.observed ? (100*axis.observed.drop).toFixed(1) : "—"} | ${axis.interval ? `[${(100*axis.interval.lower).toFixed(1)}, ${(100*axis.interval.upper).toFixed(1)}]` : "—"} | ${verdict} | ${ni} | ${axis.reasons.join(", ") || "—"} |`
+    }),
+    "",
+    "## Надёжность и наблюдаемые регрессии",
+    "",
+    `pass^1: ${pct(analysis.reliability.a.pass1,analysis.reliability.b.pass1)}. pass^${analysis.reliability.k ?? "k"}: ${pct(analysis.reliability.a.passk,analysis.reliability.b.passk)}. Причины: ${analysis.reliability.reasons.join(", ") || "—"}.`,
+    "pass^k — все k повторов успешны: C(c,k)/C(n,k). При обменности это оценка совместного успеха; при iid — p^k. При неоднородных повторах это доля успешных k-подмножеств.",
+    ...analysis.tasks.flatMap((task) => task.regressions.length ? [`- ${cell(task.id)}: хуже — наблюдаемый провал стабильной задачи 3/3 → 0/3 (${task.regressions.join(", ")}); отдельный guard, без утверждения 95% регрессии.`] : []),
+    "",
+    "## Справочные метрики (attempt-weighted; mean_score не основание вердикта)",
     "",
     "| Метрика | a → b |",
     "|---|---|",
@@ -90,7 +112,7 @@ export function compare(a: RunSummary, b: RunSummary) {
       const y = b.tasks.find((task) => task.id === id)?.metrics
       const spread = (m?: RunSummary["tasks"][number]["metrics"]) =>
         m && m.min_score !== null && m.max_score !== null ? `${m.min_score}–${m.max_score}` : "—"
-      return `| ${id} | ${pct(x?.completion_rate ?? null, y?.completion_rate ?? null)} | ${num(x?.mean_score ?? null, y?.mean_score ?? null)} | ${spread(x)} | ${spread(y)} |`
+      return `| ${cell(id)} | ${pct(x?.completion_rate ?? null, y?.completion_rate ?? null)} | ${num(x?.mean_score ?? null, y?.mean_score ?? null)} | ${spread(x)} | ${spread(y)} |`
     }),
     "",
   ]

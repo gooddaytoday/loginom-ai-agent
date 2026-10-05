@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { comparisonSummary } from "./helpers/compare-summary"
 import { compare } from "../src/compare"
 import { aggregate, aggregateTask, type AttemptResult, type RunSummary } from "../src/report"
 
@@ -12,11 +13,11 @@ const attempt = (over: Partial<AttemptResult>): AttemptResult => ({
 
 const summary = (attempts: AttemptResult[], over: Partial<RunSummary> = {}): RunSummary => ({
   run_id: "a", label: null, started_at: "", finished_at: "", interrupted: false, interrupted_cleanup: null, stopped_reason: null,
-  agent: { cli_mode: "source", git_sha: "1", dirty: false, model: "openai/gpt-5.6-sol" },
-  judge: { backend: "codex", codex_version: "v", model: "gpt-6-astra", reasoning: "high", prompt_sha256: "p" },
+  agent: { cli_mode: "source", git_sha: "1", dirty: false, model: "openai/gpt-5.6-sol", variant: "medium" },
+  judge: { backend: "codex", codex_version: "v", model: "gpt-6-astra", reasoning: "high", prompt_sha256: "p", schema_sha256: "schema" },
   dock: { skill_revision: "r1", action_manifest_sha256: ["m"] }, loginom: { image_digest: "d", container: "c", storage_dir: "/s" },
   agent_inputs_hash: "i", rubric_hash: "r", task_ids: ["group-sum-qty"],
-  config: { repeat: 1, timeout_ms: 1, judge_timeout_ms: 1, pass_threshold: 70, keep_storage: false },
+  config: { repeat: 1, task_timeout_ms: { "group-sum-qty": 1000 }, timeout_ms: 1, judge_timeout_ms: 1, pass_threshold: 70, keep_storage: false },
   metrics: aggregate(attempts, false), tasks: [{ id: "group-sum-qty", metrics: aggregateTask(attempts, false), attempts }], storage_leftovers: [], ...over,
 })
 
@@ -24,7 +25,7 @@ test("compare: знаковая дельта не объявляет улучш�
   const text = compare(summary([attempt({ score: 50 })], { run_id: "a" }), summary([attempt({ score: 90 })], { run_id: "b" }))
   expect(text).toContain("mean_score")
   expect(text).toContain("50.0 → 90.0 (Δ +40.0)")
-  expect(text).toContain("Статистический вердикт «лучше/хуже» не вычисляется")
+  expect(text).toContain("неразличимо")
   expect(text).not.toContain("▲")
   expect(text).not.toContain("несравнимы")
 })
@@ -54,6 +55,7 @@ test("compare: прерванный прогон — предупреждени�
 
 test("compare: неизвестный variant старого прогона нельзя считать известным variant", () => {
   const a = summary([attempt({})])
+  delete a.agent.variant
   const b = summary([attempt({})], { agent: { ...a.agent, variant: "low" } })
   expect(compare(a, b)).toContain("agent.variant (null → low)")
 })
@@ -83,11 +85,12 @@ test("compare: верность результата по oracle показан�
 
 test("compare: одинаковые лимиты задач сравнимы независимо от порядка, разные лимиты — нет", () => {
   const a = summary([attempt({})])
-  const first = { ...a, config: { ...a.config, task_timeout_ms: { first: 1000, second: 2000 } } }
-  const reordered = { ...a, config: { ...a.config, task_timeout_ms: { second: 2000, first: 1000 } } }
-  const changed = { ...a, config: { ...a.config, task_timeout_ms: { first: 1000, second: 3000 } } }
+  const first = { ...a, config: { ...a.config, task_timeout_ms: { "group-sum-qty": 1000, second: 2000 } } }
+  const reordered = { ...a, config: { ...a.config, task_timeout_ms: { second: 2000, "group-sum-qty": 1000 } } }
+  const changed = { ...a, config: { ...a.config, task_timeout_ms: { "group-sum-qty": 3000, second: 2000 } } }
   expect(compare(first, reordered)).not.toContain("несравнимы")
   expect(compare(first, changed)).toContain("config.task_timeout_ms")
+  delete a.config.task_timeout_ms
   expect(compare(a, first)).toContain("config.task_timeout_ms (null →")
 })
 
@@ -111,4 +114,13 @@ test("compare: одинаковое неполное покрытие обоих
   expect(text).toContain("неполное покрытие внутри прогона a")
   expect(text).toContain("неполное покрытие внутри прогона b")
   expect(text).toContain("group-sum-qty=3, filter-active-rows=2")
+})
+
+test("compare: показывает неразличимость малого набора и параметры решения", () => {
+ const run = comparisonSummary(Array.from({length:5}, () => ({successes:3,attempts:3})))
+ const text = compare(run,run)
+ expect(text).toContain("неразличимо")
+ expect(text).toContain("pass^1")
+ expect(text).toContain("pass^3")
+ expect(text).toContain("Hoeffding")
 })
