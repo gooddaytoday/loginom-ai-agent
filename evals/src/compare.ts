@@ -44,13 +44,13 @@ export function compare(a: RunSummary, b: RunSummary, options: Partial<ComparePo
     const first = aggregate(a.tasks.find((task) => task.id === id)?.attempts ?? [], a.judge === null)
     const second = aggregate(b.tasks.find((task) => task.id === id)?.attempts ?? [], b.judge === null)
     return first.total !== second.total || first.pass_evaluated_count !== second.pass_evaluated_count
-      ? [`${id}: попыток ${first.total} → ${second.total}, оценено ${first.pass_evaluated_count} → ${second.pass_evaluated_count}`]
+      ? [`${cell(id)}: попыток ${first.total} → ${second.total}, оценено ${first.pass_evaluated_count} → ${second.pass_evaluated_count}`]
       : []
   })
   const uneven = [a, b].flatMap((run) => {
     const counts = run.task_ids.map((id) => ({ id, total: aggregate(run.tasks.find((task) => task.id === id)?.attempts ?? [], run.judge === null).total }))
     return new Set(counts.map((task) => task.total)).size > 1
-      ? [`**неполное покрытие внутри прогона ${run.run_id}:** ${counts.map((task) => `${task.id}=${task.total}`).join(", ")}. Задачи имеют разный вес в общем среднем.`]
+      ? [`**неполное покрытие внутри прогона ${cell(run.run_id)}:** ${counts.map((task) => `${cell(task.id)}=${task.total}`).join(", ")}. Задачи имеют разный вес в общем среднем.`]
       : []
   })
   const lines = [
@@ -59,15 +59,15 @@ export function compare(a: RunSummary, b: RunSummary, options: Partial<ComparePo
       : []),
     `# Сравнение ${cell(a.run_id)}${a.label ? ` (${cell(a.label)})` : ""} → ${cell(b.run_id)}${b.label ? ` (${cell(b.label)})` : ""}`,
     "",
-    `Агент A → B: ${[a, b].map((run) => `CLI ${run.agent.cli_version ?? "неизвестен"}, source ${run.agent.source_commit ?? (run.agent.cli_mode === "source" ? run.agent.git_sha : null) ?? "неизвестен"}${run.agent.source_dirty ? "-dirty" : ""}, binary ${run.agent.binary_sha256 ?? "—"}, variant ${run.agent.variant ?? "неизвестен"}`).join(" → ")}.`,
+    `Агент A → B: ${[a, b].map((run) => cell(`CLI ${run.agent.cli_version ?? "неизвестен"}, source ${run.agent.source_commit ?? (run.agent.cli_mode === "source" ? run.agent.git_sha : null) ?? "неизвестен"}${run.agent.source_dirty ? "-dirty" : ""}, binary ${run.agent.binary_sha256 ?? "—"}, variant ${run.agent.variant ?? "неизвестен"}`)).join(" → ")}.`,
     `Повторов: ${a.config.repeat} → ${b.config.repeat}. Попыток: ${a.metrics.total} → ${b.metrics.total}.`,
     `Метод: Hoeffding по независимым группам задач; равный вес задач. margin=${analysis.policy.margin} (${(analysis.policy.margin*100).toFixed(1)} п.п.), confidence=${analysis.policy.confidence}. Бюджет: шесть односторонних границ, alpha_tail=${((1-analysis.policy.confidence)/6).toPrecision(4)}.`,
     "Зависимость повторов внутри задачи допустима. Интервал относится к ожидаемому падению на объявленном наборе; перенос на новые задачи не обещается.",
     "Неразличимо не доказывает равенство. При margin=0.5 даже полное падение на 25 задачах не доказывается; предельному случаю требуется 39 независимых задач.",
-    ...(partial.length ? [`**неполное покрытие:** ${partial.map((run) => `${run.run_id} (${run.interrupted ? "прерван" : run.stopped_reason})`).join(", ")} — метрики по разному числу попыток.`] : []),
+    ...(partial.length ? [`**неполное покрытие:** ${partial.map((run) => cell(`${run.run_id} (${run.interrupted ? "прерван" : run.stopped_reason})`)).join(", ")} — метрики по разному числу попыток.`] : []),
     ...(coverage.length ? [`**неполное покрытие:** ${coverage.join("; ")}. Общие средние зависят от числа попыток каждой задачи.`] : []),
     ...uneven,
-    ...(changed.length ? [`**изменилось окружение:** ${changed.map(([name, x, y]) => `${name} (${String(x)} → ${String(y)})`).join("; ")}. Сравнение допустимо, но часть дельты может объясняться Dock/Loginom.`] : []),
+    ...(changed.length ? [`**изменилось окружение:** ${changed.map(([name, x, y]) => `${name} (${cell(String(x))} → ${cell(String(y))})`).join("; ")}. Сравнение допустимо, но часть дельты может объясняться Dock/Loginom.`] : []),
     ...(judgeless ? ["Оба прогона без судьи: сравнение только по completion_rate."] : []),
     "",
     "## Отдельные оси качества",
