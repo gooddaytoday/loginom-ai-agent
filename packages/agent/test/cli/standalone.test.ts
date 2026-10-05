@@ -4,6 +4,8 @@ import os from "node:os"
 import path from "node:path"
 
 const roots: string[] = []
+const bundledNode =
+  process.env.LOGINOM_AI_AGENT_TEST_NODE ?? path.resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node")
 async function temporary() {
   const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "cli-entry-test-")))
   roots.push(root)
@@ -102,6 +104,116 @@ test("failed cleanup leaves the guard for offline recovery", async () => {
     await fs.unlink(alias)
     await fs.rmdir(path.dirname(alias))
   }
+})
+
+test("a host spawn failure releases the profile without losing its startup cause", async () => {
+  const root = await temporary()
+  const result = await run(
+    root,
+    `
+    import { standalone } from './src/cli/standalone.ts';
+    import { launchNodeHost } from '@loginom-ai-agent/loginom-host/node-client';
+    await standalone(['loginom', 'status'], async (args, paths) => {
+      console.log(process.env.TMPDIR);
+      await launchNodeHost({ node: ${JSON.stringify(path.join(root, "missing-node"))}, entry: ${JSON.stringify(path.join(root, "entry.mjs"))}, resources: ${JSON.stringify(root)}, root: paths.loginom, headless: true });
+    }).catch(error => console.log(JSON.stringify({ message: error.message, cause: error.cause?.message, cleanupConfirmed: error.cleanupConfirmed })));
+  `,
+  )
+  expect(result.code).toBe(0)
+  expect(result.error).toBe("")
+  const [alias, outcome] = result.out.trim().split("\n")
+  const failure = JSON.parse(outcome)
+  expect(failure.cleanupConfirmed).toBe(true)
+  expect(failure.message).toBe(failure.cause)
+  expect(await fs.readdir(path.join(root, "profile"))).not.toContain(".writer")
+  if (process.platform === "linux") await expect(fs.realpath(alias)).rejects.toMatchObject({ code: "ENOENT" })
+})
+
+test("forced startup cleanup confirms host exit but keeps the guard and its alias", async () => {
+  const root = await temporary()
+  const entry = path.join(root, "entry.mjs")
+  await fs.writeFile(
+    entry,
+    `
+    import fs from "node:fs";
+    fs.writeFileSync(${JSON.stringify(path.join(root, "pid"))}, String(process.pid));
+    process.on("SIGTERM", () => {});
+    process.on("message", message => {
+      if (message.method === "start") process.send({ id: message.id, result: { protocol: 2, ready: true, pid: process.pid } });
+    });
+    setInterval(() => {}, 1000);
+    setTimeout(() => process.exit(2), 8000);
+  `,
+  )
+  const started = Date.now()
+  const result = await run(
+    root,
+    `
+    import { standalone } from './src/cli/standalone.ts';
+    import { launchNodeHost } from '@loginom-ai-agent/loginom-host/node-client';
+    await standalone(['loginom', 'status'], async (args, paths) => {
+      console.log(process.env.TMPDIR);
+      await launchNodeHost({ node: ${JSON.stringify(bundledNode)}, entry: ${JSON.stringify(entry)}, resources: ${JSON.stringify(root)}, root: paths.loginom, headless: true }, { start: 2000, close: 100, terminate: 100, teardown: 3000 });
+    }).catch(error => console.log(JSON.stringify({ message: error.message, cause: error.cause?.message, cleanupConfirmed: error.cleanupConfirmed })));
+  `,
+  )
+  expect(result.code).toBe(0)
+  expect(Date.now() - started).toBeLessThan(5000)
+  expect(result.error).toBe("LOGINOM_HOST_CLEANUP_FAILED\n")
+  const [alias, outcome] = result.out.trim().split("\n")
+  expect(JSON.parse(outcome)).toEqual({
+    message: "LOGINOM_HANDSHAKE_INVALID",
+    cause: "LOGINOM_HANDSHAKE_INVALID",
+    cleanupConfirmed: false,
+  })
+  expect(await fs.readdir(path.join(root, "profile"))).toContain(".writer")
+  const pid = Number(await fs.readFile(path.join(root, "pid"), "utf8"))
+  expect(() => process.kill(pid, 0)).toThrow()
+  if (process.platform === "linux") {
+    expect(await fs.realpath(alias)).toBe(path.join(root, "profile", "cache", "tmp"))
+    await fs.unlink(alias)
+    await fs.rmdir(path.dirname(alias))
+  }
+}, 10_000)
+
+test("confirmed startup cleanup never removes a replaced writer nonce", async () => {
+  const root = await temporary()
+  const entry = path.join(root, "entry.mjs")
+  await fs.writeFile(
+    entry,
+    `
+    import fs from "node:fs";
+    process.on("message", message => {
+      if (message.method === "start") process.send({ id: message.id, result: { protocol: 2, ready: true, pid: process.pid } });
+      if (message.method === "close") {
+        fs.writeFileSync(${JSON.stringify(path.join(root, "profile/.writer/owner"))}, "foreign");
+        process.send({ id: message.id, result: { closed: true } }, () => process.exit(0));
+      }
+    });
+  `,
+  )
+  const result = await run(
+    root,
+    `
+    import { standalone } from './src/cli/standalone.ts';
+    import { launchNodeHost } from '@loginom-ai-agent/loginom-host/node-client';
+    await standalone(['loginom', 'status'], async (args, paths) => {
+      console.log(process.env.TMPDIR);
+      await launchNodeHost({ node: ${JSON.stringify(bundledNode)}, entry: ${JSON.stringify(entry)}, resources: ${JSON.stringify(root)}, root: paths.loginom, headless: true });
+    }).catch(error => console.log(JSON.stringify({ message: error.message, cause: error.cause?.message, cleanupConfirmed: error.cleanupConfirmed, cleanupError: error.cleanupError?.message })));
+  `,
+  )
+  expect(result.code).toBe(0)
+  expect(result.error).toBe("PROFILE_OWNER_CHANGED\n")
+  const [alias, outcome] = result.out.trim().split("\n")
+  expect(JSON.parse(outcome)).toEqual({
+    message: "LOGINOM_HANDSHAKE_INVALID",
+    cause: "LOGINOM_HANDSHAKE_INVALID",
+    cleanupConfirmed: false,
+    cleanupError: "PROFILE_OWNER_CHANGED",
+  })
+  expect(await fs.readFile(path.join(root, "profile/.writer/owner"), "utf8")).toBe("foreign")
+  if (process.platform === "linux") await expect(fs.realpath(alias)).rejects.toMatchObject({ code: "ENOENT" })
 })
 
 test("public CLI profile selector does not redirect ordinary Desktop Global imports", async () => {

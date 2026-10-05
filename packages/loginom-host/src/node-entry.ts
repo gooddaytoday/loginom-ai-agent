@@ -103,7 +103,6 @@ async function dispatch(message: unknown) {
       reply({ id: message.id, result: { protocol: 1, ready: true, pid: process.pid } })
       return
     }
-    if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
     if (message.method === "close") {
       // Stop admission now, but exclude this close request from its own drain.
       const closing = stop()
@@ -115,6 +114,7 @@ async function dispatch(message: unknown) {
       )
       return
     }
+    if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
     if (!message.method.startsWith("connection.")) {
       events.emit("message", { data: message })
       return
@@ -158,12 +158,12 @@ function stop() {
   state.closed = true
   events.emit("close")
   state.stopping = (async () => {
-    await state.starting
+    await state.starting?.catch(() => undefined)
     const cancellation = Promise.allSettled([state.host?.interruptAll()])
-    await Promise.all([...operations])
-    await state.port?.close()
+    const drain = await Promise.allSettled([...operations])
+    const port = await Promise.allSettled([state.port?.close()])
     const results = await Promise.allSettled([state.host?.close()])
-    if ([...(await cancellation), ...results].some((result) => result.status === "rejected"))
+    if ([...(await cancellation), ...drain, ...port, ...results].some((result) => result.status === "rejected"))
       throw new Error("LOGINOM_HOST_CLEANUP_FAILED")
   })()
   return state.stopping

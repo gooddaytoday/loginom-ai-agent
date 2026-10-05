@@ -2,7 +2,7 @@ import { inputStore, type InputFile } from "./inputs"
 import { readFile, rm } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
 import { randomUUID } from "node:crypto"
-import { supervise } from "./supervisor"
+import { RuntimeStartupError, supervise } from "./supervisor"
 import { connectionService } from "./connection/connection-service"
 import { connectionStore, type ActiveConnection } from "./connection/connection-store"
 import type { CredentialCodec } from "./connection/credentials"
@@ -29,12 +29,9 @@ export async function createLoginomHost(options: {
   const restarts = new Map<string, number>()
   const lost = new Set<string>()
   const stale = new Set<string>()
+  const startupCleanup = { failed: false }
   type Runtime = Awaited<ReturnType<typeof supervise>>
-  function retain(
-    generation: { children: Map<string, Promise<Runtime>> },
-    chat: string,
-    child: Promise<Runtime>,
-  ) {
+  function retain(generation: { children: Map<string, Promise<Runtime>> }, chat: string, child: Promise<Runtime>) {
     const tracked = child.then((runtime) => {
       void runtime.exited.then(() => {
         if (generation.children.get(chat) !== tracked) return
@@ -65,6 +62,11 @@ export async function createLoginomHost(options: {
       endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
       actionManifestUri: manifest.actionManifestUri,
       actionManifestSha256: manifest.actionManifestSha256,
+    }).catch((error: unknown) => {
+      // Preparation failures become recoverable status, but uncertain cleanup
+      // must still prevent the owning host from acknowledging shutdown.
+      if (error instanceof RuntimeStartupError && !error.cleanupConfirmed) startupCleanup.failed = true
+      throw error
     })
   }
   const service = await connectionService(
@@ -116,6 +118,10 @@ export async function createLoginomHost(options: {
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
   return {
     ...service,
+    async close() {
+      await service.close()
+      if (startupCleanup.failed) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    },
     api: {
       ...service.api,
       async acknowledgeRecovery(input: Parameters<typeof service.api.acknowledgeRecovery>[0]) {
@@ -140,7 +146,14 @@ export async function createLoginomHost(options: {
         const child = generation.children.get(chat)
         if (!child) continue
         generation.children.delete(chat)
-        closing.push(child.then((runtime) => runtime.close()).then(() => undefined, () => undefined))
+        closing.push(
+          child
+            .then((runtime) => runtime.close())
+            .then(
+              () => undefined,
+              () => undefined,
+            ),
+        )
       }
       await Promise.all(closing)
       restarts.delete(chat)

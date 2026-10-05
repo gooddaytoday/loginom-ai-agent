@@ -22,6 +22,16 @@ export type Launch = {
   acceptanceCleanupPackage?: string
 }
 
+export class RuntimeStartupError extends Error {
+  constructor(
+    cause: unknown,
+    readonly cleanupConfirmed: boolean,
+  ) {
+    super(cause instanceof Error ? cause.message : "LOGINOM_RUNTIME_FAILED", { cause })
+    this.name = "RuntimeStartupError"
+  }
+}
+
 export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = process.platform) {
   const env: NodeJS.ProcessEnv = {}
   const keys = [
@@ -173,25 +183,28 @@ export async function supervise(input: Launch) {
     "start",
     { ...input, environment: undefined, protocol: 1 },
     input.validation ? 210_000 : 120_000,
-  ).catch(
-    async (error: Error) => {
-      await close()
-      throw error
-    },
   )
-  if (
-    !ready ||
-    typeof ready !== "object" ||
-    !("protocol" in ready) ||
-    ready.protocol !== 1 ||
-    !("generation" in ready) ||
-    ready.generation !== input.generation ||
-    (input.validation
-      ? !("checked" in ready) || ready.checked !== true
-      : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat)
-  ) {
-    await close()
-    throw new Error("LOGINOM_HANDSHAKE_INVALID")
-  }
+    .then((ready) => {
+      if (
+        !ready ||
+        typeof ready !== "object" ||
+        !("protocol" in ready) ||
+        ready.protocol !== 1 ||
+        !("generation" in ready) ||
+        ready.generation !== input.generation ||
+        (input.validation
+          ? !("checked" in ready) || ready.checked !== true
+          : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat)
+      )
+        throw new Error("LOGINOM_HANDSHAKE_INVALID")
+      return ready
+    })
+    .catch(async (cause: unknown) => {
+      const cleanupConfirmed = await close().then(
+        () => true,
+        () => false,
+      )
+      throw new RuntimeStartupError(cause, cleanupConfirmed)
+    })
   return { ready, request, close, exited }
 }

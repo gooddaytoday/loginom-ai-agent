@@ -18,6 +18,154 @@ afterAll(async () => {
 const bundledNode =
   process.env.LOGINOM_AI_AGENT_TEST_NODE ?? resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node")
 
+test("startup timeout retains the writer through runtime close and permits a real status retry", async () => {
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-startup-")))
+  const bundle = join(directory, "bundle")
+  const profile = join(directory, "profile")
+  const closing = join(directory, "closing")
+  const release = join(directory, "release")
+  const releaseStart = join(directory, "release-start")
+  const runtimePid = join(directory, "runtime-pid")
+  const alias = join(directory, "alias")
+  try {
+    await mkdir(join(bundle, "bin"), { recursive: true })
+    await mkdir(join(bundle, "runtime/src"), { recursive: true })
+    await symlink(bundledNode, join(bundle, "bin/node"))
+    if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
+    await cp(host, join(bundle, "host"), { recursive: true })
+    await writeFile(join(bundle, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test" }))
+    await writeFile(
+      join(bundle, "runtime/src/managed-entry.mjs"),
+      `import fs from "node:fs";
+      process.on("message", message => {
+        if (message.operation === "start") {
+          fs.writeFileSync(${JSON.stringify(runtimePid)}, String(process.pid));
+          const start = setInterval(() => {
+            if (!fs.existsSync(${JSON.stringify(releaseStart)})) return;
+            clearInterval(start);
+            process.send({ id: message.id, result: {
+              protocol: 1, generation: message.input.generation, chat: message.input.chat, ready: true
+            }});
+          }, 10);
+        }
+        if (message.operation === "close") {
+          fs.writeFileSync(${JSON.stringify(closing)}, "closing");
+          const gate = setInterval(() => {
+            if (!fs.existsSync(${JSON.stringify(release)})) return;
+            clearInterval(gate);
+            process.send({ id: message.id, result: { closed: true } }, () => process.disconnect());
+          }, 10);
+        }
+      });`,
+    )
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        "--eval",
+        `
+      import { standalone } from "./src/cli/standalone.ts";
+      import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client";
+      import { connectionStore } from "@loginom-ai-agent/loginom-host/connection/connection-store";
+      import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials";
+      import fs from "node:fs/promises";
+      import path from "node:path";
+      await standalone(["loginom", "status"], async (args, paths) => {
+        await fs.writeFile(${JSON.stringify(alias)}, process.env.TMPDIR);
+        const store = connectionStore(path.join(paths.loginom, "connection"), cliCredentials(process.platform, { root: paths.loginom, resources: ${JSON.stringify(bundle)} }));
+        await store.stage({ generation: 1, revision: 1, url: "https://example.test", username: "fixture", apiKey: "fixture-key", password: "" });
+        await store.activate(1);
+        const host = await launchNodeHost({ node: ${JSON.stringify(bundledNode)}, entry: ${JSON.stringify(join(bundle, "host/node-host.mjs"))}, root: paths.loginom, resources: ${JSON.stringify(bundle)}, headless: true }, { start: 5000, close: 10000, terminate: 1000, teardown: 15000 });
+        await host.close();
+        throw Error("STARTUP_TIMEOUT_EXPECTED");
+      }).catch(error => console.log(JSON.stringify({ message: error.message, cleanupConfirmed: error.cleanupConfirmed, cause: error.cause?.message })));
+      `,
+      ],
+      {
+        cwd: resolve(import.meta.dir, "../.."),
+        env: {
+          ...process.env,
+          BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+          LOGINOM_AI_AGENT_CLI_PROFILE: profile,
+          LOGINOM_AI_AGENT_CHANNEL: "dev",
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    )
+    const output = new Response(child.stdout).text()
+    const errors = new Response(child.stderr).text()
+    const timer = setTimeout(() => child.kill("SIGKILL"), 25_000)
+    try {
+      const startupDeadline = Date.now() + 10_000
+      while (!(await Bun.file(runtimePid).exists())) {
+        if (Date.now() >= startupDeadline || child.exitCode !== null)
+          throw new Error(`Runtime did not start: ${await errors}`)
+        await Bun.sleep(10)
+      }
+      // Advance beyond the injected startup budget only after the runtime has published readiness to receive IPC.
+      await Bun.sleep(5100)
+      expect(await readdir(profile)).toContain(".writer")
+      expect(child.exitCode).toBeNull()
+      await writeFile(releaseStart, "release")
+      // The fixture publishes this marker only after the actual host requests runtime cleanup.
+      const deadline = Date.now() + 10_000
+      while (!(await Bun.file(closing).exists())) {
+        if (Date.now() >= deadline || child.exitCode !== null)
+          throw new Error(`Runtime close was not reached: ${await errors}`)
+        await Bun.sleep(10)
+      }
+      expect(await readdir(profile)).toContain(".writer")
+      expect(child.exitCode).toBeNull()
+      await writeFile(release, "release")
+      expect(await child.exited).toBe(0)
+      expect(await errors).toBe("")
+      expect(JSON.parse(await output)).toEqual({
+        message: "LOGINOM_HOST_TIMEOUT",
+        cause: "LOGINOM_HOST_TIMEOUT",
+        cleanupConfirmed: true,
+      })
+      expect(await readdir(profile)).not.toContain(".writer")
+      const pid = Number(await Bun.file(runtimePid).text())
+      expect(() => process.kill(pid, 0)).toThrow()
+      if (process.platform === "linux")
+        await expect(realpath(await readFile(alias, "utf8"))).rejects.toMatchObject({ code: "ENOENT" })
+      const retry = Bun.spawn(
+        [process.execPath, "run", "./src/standalone.ts", "loginom", "status", "--format", "json"],
+        {
+          cwd: resolve(import.meta.dir, "../.."),
+          env: {
+            ...process.env,
+            BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+            LOGINOM_AI_AGENT_CLI_PROFILE: profile,
+            LOGINOM_AI_AGENT_CLI_BUNDLE: bundle,
+            LOGINOM_AI_AGENT_CHANNEL: "dev",
+          },
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      )
+      const status = new Response(retry.stdout).text()
+      const retryErrors = new Response(retry.stderr).text()
+      expect(await retry.exited).toBe(0)
+      expect(await retryErrors).toBe("")
+      expect(JSON.parse(await status)).toMatchObject({ state: "ready", generation: 1 })
+      expect(await readdir(profile)).not.toContain(".writer")
+    } finally {
+      clearTimeout(timer)
+      await writeFile(releaseStart, "release")
+      await writeFile(release, "release")
+      child.kill("SIGKILL")
+      await child.exited
+    }
+  } finally {
+    if (process.platform === "linux" && (await Bun.file(alias).exists())) {
+      const temporary = await readFile(alias, "utf8")
+      await rm(resolve(temporary, ".."), { recursive: true, force: true })
+    }
+    await rm(directory, { recursive: true, force: true })
+  }
+}, 30_000)
+
 test("standalone exits after failed host cleanup despite retained process handles", async () => {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-failed-exit-")))
   try {
