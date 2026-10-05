@@ -20,6 +20,7 @@ export async function observeStaticSources({load,graph,channelFor,account,reveal
  const {isTextImportSourceReady}=await load('client/lib/text-import-procedure.mjs');
  const {showMissingValuesMappingTable}=await load('client/lib/missing-values-output.mjs');
  const {crossTableConfiguration}=await load('client/lib/crosstable-procedure.mjs');
+ const {selectPreparedGraphNode}=await load('client/lib/node-graph-selection.mjs');
  const mapping=async(channel,direction,generatedSchema)=>{
   await channel[direction==='input'?'openInputPort':'openOutputPort'](0);
   if(direction==='output')await showMissingValuesMappingTable(channel);
@@ -41,11 +42,12 @@ export async function observeStaticSources({load,graph,channelFor,account,reveal
   // Existing settings controls are rendered only for the selected graph node.
   // Bind the gesture to the independently observed GUID before opening them.
   if(revealSource)await revealSource(target);
-  await channel.perform({condition:'cold select observed source node',
+  const selected=await channel.observe({condition:'cold observed source selection point',
    ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'
-    &&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'&&e.allowed_actions.includes('click')),
-   identity:s=>s.prepared_node_context,
-   resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'),'source graph body').ref})});
+    &&s.ui.elements.some(e=>(e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'
+     ||e.tid===s.prepared_node_context.tid+';Label;Label'&&e.graph_node?.part==='label')
+     &&e.allowed_actions.includes('click')&&e.interaction?.state==='point_observed')});
+  await selectPreparedGraphNode(channel,selected,'cold select observed source node',{refreshReplacedBody:true});
   await channel.observe({condition:'cold active scenario title settled',
    ready:s=>s.prepared_node_context?.surface==='graph'&&s.workflow_navigation?.status==='observed'
     &&s.active_identity===s.workflow_navigation.path.at(-1)?.label});
