@@ -59,10 +59,18 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
     }
     return { id: task.id, completion: rates[index]!, regressions }
   })
+  const oraclePairs = a.tasks.map((task) => ({ a: task, b: b.tasks.find((other) => other.id === task.id)! }))
+  const oracleKnown = oraclePairs.every((pair) => pair.a.rubric_snapshot?.version === 1 && pair.b.rubric_snapshot?.version === 1 &&
+    pair.a.rubric_snapshot.oracle_applicable === pair.b.rubric_snapshot.oracle_applicable)
+  const oracleRates = oraclePairs.filter((pair) => pair.a.rubric_snapshot?.oracle_applicable && pair.b.rubric_snapshot?.oracle_applicable)
+    .map((pair) => ({ a: judgedRate(pair.a.attempts, "oracle_pass"), b: judgedRate(pair.b.attempts, "oracle_pass") }))
+  const oracleReasons = !oracleKnown ? ["snapshot_unavailable"] : !a.judge || !b.judge ? ["judge_skipped"] :
+    oraclePairs.some((pair) => pair.a.rubric_snapshot?.oracle_applicable &&
+      [pair.a, pair.b].some((task) => measured(task.attempts).some((attempt) => typeof attempt.oracle_pass !== "boolean"))) ? ["oracle_coverage"] : []
   return { policy, compatibility, tasks, reliability: { k: policy.k, a: reliability(a, policy.k), b: reliability(b, policy.k), reasons: [
     ...(policy.k === null ? ["k_unknown"] : []),
     ...([a, b].some((run) => { const result = reliability(run, policy.k); return result.pass1 === null || policy.k !== null && result.passk === null }) ? ["pass_coverage"] : []),
-  ] }, axes: { completion: axis(rates, policy, [a, b].some((run) => run.interrupted || run.stopped_reason || run.tasks.some((task) => task.attempts.some((attempt) => attempt.status === "interrupted"))) ? ["partial_run"] : []), oracle: axis([], policy, ["snapshot_unavailable"]), structure: axis([], policy, ["structure_unavailable"]) } }
+  ] }, axes: { completion: axis(rates, policy, [a, b].some((run) => run.interrupted || run.stopped_reason || run.tasks.some((task) => task.attempts.some((attempt) => attempt.status === "interrupted"))) ? ["partial_run"] : []), oracle: axis(oracleRates, policy, oracleReasons), structure: axis([], policy, ["structure_unavailable"]) } }
 }
 
 function completion(attempts: AttemptResult[]) {
@@ -129,4 +137,15 @@ function axis(rates: { a: number | null; b: number | null }[], policy: ComparePo
     non_inferiority: interval.upper <= policy.margin ? "confirmed" : interval.lower > policy.margin ? "rejected" : "inconclusive",
     reasons,
   }
+}
+
+function measured(attempts: AttemptResult[]) {
+  return attempts.filter((attempt) => !["infra_error", "harness_error", "interrupted"].includes(attempt.status))
+}
+function judgedRate(attempts: AttemptResult[], key: "oracle_pass" | "structural_score") {
+  const values = measured(attempts).flatMap((attempt) => {
+    const value = attempt[key]
+    return typeof value === "boolean" ? [Number(value)] : typeof value === "number" ? [value / 100] : []
+  })
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
 }
