@@ -217,3 +217,15 @@ test("loadTasks: некорректный oracle_tolerance отклоняетс�
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test("loadTasks: явно заданная axis сохраняется в рубрике", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-axis-"))
+  try {
+    await cp(path.join(tasksDir, "group-sum-qty"), path.join(dir, "group-sum-qty"), { recursive: true })
+    const file = path.join(dir, "group-sum-qty", "task.json")
+    const raw = await Bun.file(file).json()
+    raw.checklist[0].axis = "structure"
+    await Bun.write(file, JSON.stringify(raw))
+    expect((await loadTasks(dir))[0]!.checklist[0]!.axis).toBe("structure")
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
