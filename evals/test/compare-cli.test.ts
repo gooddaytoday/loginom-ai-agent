@@ -56,3 +56,34 @@ test("CLI compare: отсутствующая обязательная метр�
   expect(result.stderr).toContain("Некорректный summary")
  } finally { await rm(directory,{recursive:true,force:true}) }
 })
+
+test("CLI compare: invalid policy, duplicates, unknown flags и extra args дают exit 2", async () => {
+ const directory = await mkdtemp(path.join(os.tmpdir(),"evals-compare-policy-"))
+ try {
+  await summaries(directory)
+  for (const extra of [["--margin","1"],["--margin","-1"],["--confidence","0"],["--confidence","1"],["--k","0"],["--k","1.5"],["--margin","NaN"],["--margin",""],["--k"],["--unknown","3"],["extra"],["--k","3","--k","2"]])
+    expect((await runCompare(directory,["a","b",...extra])).code).toBe(2)
+ } finally { await rm(directory,{recursive:true,force:true}) }
+})
+test("CLI compare: regression, partial и incompatibility сохраняют exit 0", async () => {
+ const directory = await mkdtemp(path.join(os.tmpdir(),"evals-compare-report-status-"))
+ try {
+  await summaries(directory)
+  const a = comparisonSummary(Array.from({length:39}, () => ({successes:3,attempts:3})))
+  const b = comparisonSummary(Array.from({length:39}, () => ({successes:0,attempts:3})))
+  await Bun.write(path.join(directory,"a/summary.json"),JSON.stringify(a))
+  await Bun.write(path.join(directory,"b/summary.json"),JSON.stringify(b))
+  const regression = await runCompare(directory,["a","b"])
+  expect(regression.code).toBe(0)
+  expect(regression.stdout).toContain("хуже")
+  expect(regression.stdout).toContain("наблюдаемый провал")
+  b.interrupted = true
+  await Bun.write(path.join(directory,"b/summary.json"),JSON.stringify(b))
+  expect((await runCompare(directory,["a","b"])).code).toBe(0)
+  b.agent.variant = "different"
+  await Bun.write(path.join(directory,"b/summary.json"),JSON.stringify(b))
+  const incompatible = await runCompare(directory,["a","b"])
+  expect(incompatible.code).toBe(0)
+  expect(incompatible.stdout).toContain("несравнимы")
+ } finally { await rm(directory,{recursive:true,force:true}) }
+})
