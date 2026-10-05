@@ -1,6 +1,6 @@
 # Фильтр строк
 
-[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../workflow/single-node.md).
+[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../RUNBOOK.md).
 
 Устойчивый ID: `component.transform.FilterData`. Runtime: `transform.filter_data`, режим `conditions`. Исторический подплан 06.
 

@@ -1,6 +1,6 @@
 # Дубликаты и противоречия
 
-[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../workflow/single-node.md).
+[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../RUNBOOK.md).
 
 Устойчивый ID: `component.research.Duplicates`. Runtime: `research.duplicates`, режим `mark`. Исторический подплан 12.
 

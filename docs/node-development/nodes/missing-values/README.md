@@ -1,6 +1,6 @@
 # Заполнение пропусков
 
-[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../workflow/single-node.md).
+[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../RUNBOOK.md).
 
 Устойчивый ID: `component.preprocessing.DataRecovery`. Runtime: `preprocessing.data_recovery`, режим `impute`. Исторический подплан 14.
 

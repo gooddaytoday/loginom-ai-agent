@@ -98,10 +98,10 @@ loginom-ai-agent-cli loginom status --format json
 
 Выбрать компонент и режимы; оформить подплан/назначение, закрепить базу,
 изолированные пути и ресурсы. Подготовить постоянный worktree и его собственный
-допуск к общей памяти по [CURRENT.md](../../services/loginom-ai/tools/project-memory/CURRENT.md).
+допуск к общей памяти по [CURRENT.md](../../../../services/loginom-ai/tools/project-memory/CURRENT.md).
 Для параллельной работы нужны отдельные аккаунты и профили; здесь проверен один
 аккаунт и один профиль. Разработка, ревью и приёмка идут по
-[жизненному циклу](workflow/lifecycle.md).
+жизненному циклу (прежний `workflow/lifecycle.md`).
 
 Полный прогон узла, сохранение/переоткрытие пакета, oracle и сборка candidate
 в эту подготовку не входили. Предыдущий [аудит](readiness-audit-2026-09-24.md)

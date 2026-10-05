@@ -1,6 +1,6 @@
 # Сортировка
 
-[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../workflow/single-node.md).
+[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../RUNBOOK.md).
 
 Устойчивый ID: `component.transform.Sorting`. Runtime: `transform.sorting`, режим `keys`. Исторический подплан 08.
 

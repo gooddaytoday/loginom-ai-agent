@@ -1,6 +1,6 @@
 # Слияние
 
-[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../workflow/single-node.md).
+[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../RUNBOOK.md).
 
 Устойчивый ID: `component.transform.JoinData`. Runtime: `transform.join_data`, режим `inner`, `left`. Исторический подплан 09.
 

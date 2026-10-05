@@ -12,7 +12,7 @@ from urllib.parse import unquote
 ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parents[1]
 LAYERS = ['implementation','historical_acceptance','client_technical_validation','analytical_validation','integration','release']
-REQUIRED = ['README.md','workflow/orchestrator.md','workflow/single-node.md','workflow/lifecycle.md','workflow/acceptance-cli.md','workflow/new-node-plan.md',
+REQUIRED = ['README.md','RUNBOOK.md','workflow/acceptance-cli.md','workflow/new-node-plan.md',
             'registry.json','inventory.md','validation.md','provenance.json','history/README.md',
             'templates/assignment.md','templates/node-plan.md',
             'history/unavailable.md','history/unavailable.json','history/references.json']

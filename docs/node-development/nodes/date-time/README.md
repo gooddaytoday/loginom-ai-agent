@@ -1,6 +1,6 @@
 # Дата и время
 
-[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../workflow/single-node.md).
+[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../RUNBOOK.md).
 
 Устойчивый ID: `component.transform.DateTimeReform`. Runtime: `transform.date_time`, режим `calendar`. Исторический подплан 13.
 

@@ -1,6 +1,6 @@
 # Свёртка столбцов
 
-[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../workflow/single-node.md).
+[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../RUNBOOK.md).
 
 Устойчивый ID: `component.transform.ColumnFlipping`. Runtime: `transform.collapse_columns`, режим `unpivot`. Исторический подплан 16.
 

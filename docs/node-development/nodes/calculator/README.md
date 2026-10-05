@@ -1,6 +1,6 @@
 # Калькулятор
 
-[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../workflow/single-node.md).
+[Подплан изменения и приёмки](plan.md). Общий порядок — [один узел](../../RUNBOOK.md).
 
 Устойчивый ID: `component.transform.Calculator`. Runtime: `transform.calculator`, режим `expression`. Исторический подплан 04.
 
