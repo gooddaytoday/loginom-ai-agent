@@ -9,14 +9,11 @@ from collections import Counter
 from pathlib import Path
 from urllib.parse import unquote
 
-from coverage import check_roadmap, validate_coverage
-from parallel import check_parallel_views, validate_parallel
-
 ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parents[1]
 LAYERS = ['implementation','historical_acceptance','client_technical_validation','analytical_validation','integration','release']
 REQUIRED = ['README.md','workflow/orchestrator.md','workflow/single-node.md','workflow/lifecycle.md','workflow/acceptance-cli.md','workflow/new-node-plan.md',
-            'registry.json','coverage-map.json','parallel-execution.json','workflow/multica-parallel.md','roadmap.md','inventory.md','validation.md','provenance.json','history/README.md',
+            'registry.json','inventory.md','validation.md','provenance.json','history/README.md',
             'templates/assignment.md','templates/checkpoint.md','templates/completion.md',
             'templates/node-plan.md','templates/cross-table-plan-example.md','templates/campaign.json','templates/event.json','templates/host-resources.json',
             'history/unavailable.md','history/unavailable.json','history/references.json']
@@ -39,7 +36,7 @@ def links(path):
 def render(data):
     counts=Counter(n['queue_class'] for n in data['nodes'])
     out=['# Реестр узлов — обзор','',
-         'Сформирован из [registry.json](registry.json). Не редактировать сводные числа вручную. Полное документальное покрытие: [карта требований](coverage-map.json), [очерёдность этапов](roadmap.md).', '',
+         'Сформирован из [registry.json](registry.json). Не редактировать сводные числа вручную.', '',
          f"Исторический каталог: **{len(data['nodes'])}** компонентов. Обработчики: **{counts['implemented']}**; обычный остаток: **{counts['backlog']}**; условный резерв: **{counts['conditional_reserve']}**.", '',
          'Реализация и историческая приёмка не равны повторной аналитической приёмке текущего CLI. Старые номера 01/02 — инфраструктура, а не дополнительные типы узлов.', '',
          '## Реализованные обработчики','',
@@ -49,16 +46,13 @@ def render(data):
         if n['queue_class']!='implemented':continue
         h=n['handler']; modes=', '.join(h['modes'])
         title=f"[{n['name']}]({n['card']})"
-        plan=n.get('plan') or f"nodes/{n['slug']}/plan.md"
-        out.append(f"| {n['legacy_subplan']} | {title} | [План]({plan}) | `{h['type']}` / {modes} | {n['readiness']['historical_acceptance']['status']} | {n['readiness']['client_technical_validation']['status']}; аналитика: {n['readiness']['analytical_validation']['status']} |")
+        out.append(f"| {n['legacy_subplan']} | {title} | [План]({n['plan']}) | `{h['type']}` / {modes} | {n['readiness']['historical_acceptance']['status']} | {n['readiness']['client_technical_validation']['status']}; аналитика: {n['readiness']['analytical_validation']['status']} |")
     out+=['','## Компоненты без полного обработчика','',
-          'Каждому компоненту соответствует отдельный подплан. Рекомендуемый порядок и обязательные зависимости заданы в [roadmap](roadmap.md); наличие плана не подтверждает поддержку runtime и не является назначением на реализацию.', '',
+          'Список не является разрешённой очередью. У каждого компонента есть карточка и подплан; наличие подплана не подтверждает поддержку runtime и не назначает реализацию. Перед назначением подплан приводится к [шаблону](templates/node-plan.md) по [порядку создания](workflow/new-node-plan.md).', '',
           '| Component ID | Узел | Подплан | Категория | Следующее действие |','| --- | --- | --- | --- | --- |']
     for n in data['nodes']:
         if n['queue_class']=='implemented':continue
-        card=n.get('card') or f"nodes/{n['slug']}/README.md"
-        plan=n.get('plan') or f"nodes/{n['slug']}/plan.md"
-        out.append(f"| `{n['component_id']}` | [{n['name']}]({card}) | [План]({plan}) | {n['queue_class']} | {str(n['next_action']).replace('|','/')} |")
+        out.append(f"| `{n['component_id']}` | [{n['name']}]({n['card']}) | [План]({n['plan']}) | {n['queue_class']} | {str(n['next_action']).replace('|','/')} |")
     out+=['','Источники, ограничения, версии и SHA перечислены в реестре и [историческом manifest](provenance.json). Готовность не изменяется от назначения владельца или переключения параллельности.','']
     return '\n'.join(out)
 
@@ -70,30 +64,6 @@ def check(render_view=False, source_archive=None):
             errors.append('missing '+name)
     data=json.loads((ROOT/'registry.json').read_text())
     nodes=data['nodes'];ids=[n['component_id'] for n in nodes]
-    coverage=None
-    coverage_valid=False
-    if (ROOT/'coverage-map.json').is_file():
-        try:
-            coverage=json.loads((ROOT/'coverage-map.json').read_text())
-        except ValueError:
-            errors.append('invalid JSON coverage-map.json')
-        else:
-            coverage_errors=validate_coverage(coverage,nodes,ROOT)
-            errors.extend(coverage_errors)
-            if not coverage_errors:
-                coverage_valid=True
-                errors.extend(check_roadmap(coverage,ROOT/'roadmap.md',render_view))
-    if (ROOT/'parallel-execution.json').is_file():
-        try:
-            parallel=json.loads((ROOT/'parallel-execution.json').read_text())
-        except ValueError:
-            errors.append('invalid JSON parallel-execution.json')
-        else:
-            if coverage_valid:
-                parallel_errors=validate_parallel(parallel,coverage,ROOT)
-                errors.extend(parallel_errors)
-                if not parallel_errors:
-                    errors.extend(check_parallel_views(parallel,coverage,ROOT,render_view))
     if len(ids)!=len(set(ids)):errors.append('duplicate component IDs')
     counts=Counter(n['queue_class'] for n in nodes)
     if len(nodes)!=data['historical_catalog']['component_count']:

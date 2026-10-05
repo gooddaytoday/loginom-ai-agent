@@ -48,13 +48,3 @@ OR между группами, AND внутри; scalar-условия и дв�
 - [Совместная историческая приёмка](../../../../services/loginom-ai/docs/loginom-dock/releases/rc-combined-verification-2026-09-14.md) — 14 типов в трёх сценариях.
 
 Сырая диагностика этой исторической приёмки удалена по разрешению пользователя: [отчёт](../../../../services/loginom-ai/docs/loginom-dock/accepted-node-cleanup-2026-09-13.md). Сохранённые Markdown и хеши не заменяют отсутствующие исходные файлы; повторная проверка требует нового прогона.
-
-## План полного покрытия 2026-10-02
-
-[Отдельный подплан](plan.md) содержит 5 проверяемых требований и 3 этапов. Ранее реализованный scope и исторические доказательства сохраняются; новые требования не считаются принятыми.
-
-- `row-filter:s1` — P0, Сопровождение scalar AND/OR; `accepted_scope_maintenance`.
-- `row-filter:s2` — P1, Полная матрица predicates и редактирование; `discovery_required`.
-- `row-filter:s3` — P2, Управляющие переменные и variable поля; `discovery_required`.
-
-Первичный источник: [Фильтр строк](https://help.loginom.ru/userguide/processors/transformation/row-filter/). Все дочерние источники, зависимости и самостоятельные fixtures указаны в подплане.

@@ -4,7 +4,5 @@
   "registry_owner": null,
   "developer_leases": [],
   "acceptance_lease": null,
-  "updated_at": null,
-  "usage": "Legacy observation template; does not acquire locks or reserve Multica tasks. Current phase ownership is recorded in native issue comments under one Generator.",
-  "deprecated_for_multica": true
+  "updated_at": null
 }

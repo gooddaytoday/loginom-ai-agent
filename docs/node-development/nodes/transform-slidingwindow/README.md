@@ -1,13 +1,7 @@
 # Скользящее окно
 
-Устойчивый ID: `component.transform.SlidingWindow`. Slug: `transform-slidingwindow`.
+Component ID: `component.transform.SlidingWindow`.
 
-Обработчика в исходниках `5f772aea9` нет. План подготовлен по официальной Help 7.4; availability и UI требуют discovery. Все этапы пока `discovery_required`; разработка и live-приёмка не выполнялись.
+[Подплан](plan.md) · [реестр](../../registry.json).
 
-## План полного покрытия 2026-10-02
-
-[Отдельный подплан](plan.md) содержит 2 проверяемых требований и 1 этапов. Ранее реализованный scope и исторические доказательства сохраняются; новые требования не считаются принятыми.
-
-- `transform-slidingwindow:s1` — P1, Окна и края ряда; `discovery_required`.
-
-Первичный источник: [Скользящее окно](https://help.loginom.ru/userguide/processors/transformation/lag.html). Все дочерние источники, зависимости и самостоятельные fixtures указаны в подплане.
+Обработчик не зарегистрирован. Подплан готов к назначению этапов 0 и 1 одной карточкой Multica; этап 2 (управляющая переменная) — отдельная карточка. Наличие подплана не означает поддержку runtime.

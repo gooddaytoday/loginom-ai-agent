@@ -60,76 +60,11 @@
 
 Передать checkpoint с точными source/runtime/client/model/platform pins, заявленным scope, результатами и неизменёнными исходными FAIL. Техническое завершение, аналитическая проверка, integration и release — отдельные состояния реестра.
 
-## Полное поэтапное покрытие Help 7.4 — 2026-10-02
+## Непокрытые режимы Help 7.4
 
-Снимок исходников: `5f772aea9de6414a19feb6ecc109a196c9e92453`. Исследованы официальные страницы ниже и существующие handlers; живой discovery, новые прогоны и реализация расширений не выполнялись. `accepted_scope_maintenance` означает сопровождение ранее принятого ограниченного объёма, а не новую CLI-приёмку. Все расширения имеют статус `discovery_required`; полное покрытие не достигается одним первым этапом.
+Режимы из справки, которые не входят в принятый объём (источники: [Замена](https://help.loginom.ru/userguide/processors/transformation/substitution/), [Точное совпадение](https://help.loginom.ru/userguide/processors/transformation/substitution/exact-match.html), [Регулярное выражение](https://help.loginom.ru/userguide/processors/transformation/substitution/regexp-match.html), [Структура файла замен](https://help.loginom.ru/userguide/processors/transformation/substitution/import-tz.html), [Заменять остальное](https://help.loginom.ru/userguide/processors/transformation/substitution/other-match.html); прочитано 2026-10-02). Это перечень для будущего расширения, а не назначение. Подплан расширения пишется по [шаблону](../../templates/node-plan.md), когда расширение назначено.
 
-### `replacement:s1` — Сопровождение internal exact
-
-Статус: `accepted_scope_maintenance`. Приоритет: P0. Покрывает: `replacement:r01`.
-Жёсткие предпосылки: `foundation:oracle-tabular`. Рекомендуется после: нет.
-Условия среды: доступный компонент выбранной редакции Loginom 7.4; отдельный тестовый пакет и аккаунт.
-
-- `replacement:r01` — Exact string/integer/real, replace/add, остальное keep/null/value и _Replaced. Источник: `replacement:help1`, `replacement:help2`, `replacement:help5` Проверка: Прежние fixtures без изменения точности/NULL семантики.
-
-### `replacement:s2` — Полные внутренние правила и типы
-
-Статус: `discovery_required`. Приоритет: P1. Покрывает: `replacement:r02`, `replacement:r03`.
-Жёсткие предпосылки: `replacement:s1`. Рекомендуется после: нет.
-Условия среды: доступный компонент выбранной редакции Loginom 7.4; отдельный тестовый пакет и аккаунт.
-
-- `replacement:r02` — Точность числового поиска, nearest-match/tie boundaries, изменение типа замены, регистр. Источник: `replacement:help1`, `replacement:help2` Проверка: Граничный набор X, тип результата и значения точно; неопределённые ties подтвердить до приёмки.
-- `replacement:r03` — Regex поиск/замена и fallback regex $1; последовательность exact→regex→остальное. Источник: `replacement:help1`, `replacement:help3`, `replacement:help5` Проверка: Пересекающиеся правила, invalid regex, NULL и _Replaced для всех fallback режимов.
-
-### `replacement:s3` — Внешние таблицы и файлы правил
-
-Статус: `discovery_required`. Приоритет: P2. Покрывает: `replacement:r04`, `replacement:r05`.
-Жёсткие предпосылки: `replacement:s1`, `foundation:file-artifacts`. Рекомендуется после: нет.
-Условия среды: доступный компонент выбранной редакции Loginom 7.4; отдельный тестовый пакет и аккаунт.
-
-- `replacement:r04` — Несколько внешних таблиц; роли Значение/Замена/Информационное/Не используемое и первый подходящий ряд. Источник: `replacement:help1` Проверка: Каждая входная identity наблюдается, дубликаты правил упорядочены; дополнительное информационное поле проверено.
-- `replacement:r05` — Импорт/экспорт таблицы правил: UTF-8, два TSV поля без заголовка, locale decimals и ? как NULL. Источник: `replacement:help4` Проверка: Независимый parser небольшого файла; неподходящие строки и сохранение/повторное применение правил.
-
-### Реализация и общие контракты
-
-Расширять replacement-node/parameters/procedure, использовать multiple-input подход union/join для внешних таблиц. У regex, external tables и numeric tolerance своя readback-модель; порядок правил сохраняется.
-
-Переиспользовать `node.apply` с pure validation до эффектов, общий gate/journal/deadline и наблюдаемые node/port identities. Для новых возможностей актуализировать node registry/contracts, parameter schema, driver/readback, compact user-v1 и адресные tests; имена полей/режимов API закрепить после discovery. Публичный новый контракт и уточнённые критерии приёмки согласуются до runtime-изменения. Названия Help не являются готовыми runtime enum.
-
-Общие зависимости раскрыты в [приёмке](../../foundations/acceptance/plan.md), [типизированных портах](../../foundations/typed-ports/plan.md), [динамической схеме](../../foundations/dynamic-schema/plan.md), [обучении](../../foundations/training/plan.md) и [внешних системах](../../foundations/external-systems/plan.md). `recommended_after` передаёт опыт; самостоятельный fixture позволяет начинать без готового парного import/export либо аналитического предшественника.
-
-### Дополнительные самостоятельные fixtures
-
-X=[5,10,15,99], rules 5→-5,15→-15, tolerance=5: ожидание [-5,-15,-15,99] зафиксировано Help и отдельно проверяется. Строки [A12,B12,NULL,empty], exact A12→exact и regex ^A→regex: точное правило приоритетно. Две внешние строки для B12 демонстрируют приоритет первой.
-
-Перед автономным прогоном разместить задачу и входы отдельно от `expected`/oracle; указать точные типы, NULL, порядок там, где он значим, и числовую точность. Неоднозначную формулу/тип/границу сначала подтвердить отдельной диагностикой, затем заморозить ожидания. Сохранённые исторические fixtures, если перечислены выше, используются в исходных границах.
-
-### Приёмка и восстановление
-
-- Для каждого требования выполнить new/existing, Done/Close/Execute там, где применимо; проверить сохранённые настройки, свежий результат и save/reopen. Положительный тест сопровождается отказом на неверные типы/поля/порты.
-- Адресные tests запускаются из пакета; oracle проверяется намеренной подменой значения, порядка, схемы и execution identity. Полный небольшой результат проверяется независимо; preview или старый PASS не доказывает новый этап.
-- Один operation_id не допускает повторного эффекта. Потерянный ответ и expiry сохраняют неоднозначность до штатного inspect/recover; дедлайн не продлевается. Cancel закрывает только принадлежащий операции draft, чужие узлы/связи неизменны.
-- Cold-check должен поддерживать именно заявленный вид результата, число выходов и точность. Текущий базовый скрипт читает один tabular output 0 и сравнивает строки без порядка; такие ограничения устраняются в prerequisite до зависимой приёмки.
-- PASS требует чистый source SHA, pins клиента/runtime/модели/платформы, независимый oracle и подтверждённые `package_closed=true`, `logged_out=true`. Неисполненные строки остаются NOT_RUN; сохранение/технический успех/аналитика/интеграция/выпуск различаются. Checkpoint — до 20 строк, с результатом, ограничениями и следующим этапом.
-
-### Проверенные официальные источники
-
-- `replacement:help1` — [Замена](https://help.loginom.ru/userguide/processors/transformation/substitution/), Help 7.4, прочитано 2026-10-02.
-- `replacement:help2` — [Точное совпадение](https://help.loginom.ru/userguide/processors/transformation/substitution/exact-match.html), Help 7.4, прочитано 2026-10-02.
-- `replacement:help3` — [Регулярное выражение](https://help.loginom.ru/userguide/processors/transformation/substitution/regexp-match.html), Help 7.4, прочитано 2026-10-02.
-- `replacement:help4` — [Структура файла замен](https://help.loginom.ru/userguide/processors/transformation/substitution/import-tz.html), Help 7.4, прочитано 2026-10-02.
-- `replacement:help5` — [Заменять остальное](https://help.loginom.ru/userguide/processors/transformation/substitution/other-match.html), Help 7.4, прочитано 2026-10-02.
-
-<!-- parallel-execution:start -->
-
-## Параллельная работа
-
-При подготовке этого плана новые задачи и прогоны не запускались; существующие карточки могут уже выполняться. При назначении используются [правила Multica](../../workflow/multica-parallel.md); наличие строки не подтверждает доступность ресурса или готовность этапа.
-
-| Этап | Направление | Группа карточки | Разработка | Интеграция | Модель | Независимая проверка | Примечание |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `replacement:s1` | Выражения и настройки строк | replacement | — | runtime-registration<br>readiness-publication<br>base-branch | legacy-oauth (legacy OAuth) | oracle-profile | Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA. |
-| `replacement:s2` | Выражения и настройки строк | replacement | — | runtime-registration<br>readiness-publication<br>base-branch | legacy-oauth (legacy OAuth) | oracle-profile | Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA. |
-| `replacement:s3` | Выражения и настройки строк | replacement | — | runtime-registration<br>readiness-publication<br>base-branch | legacy-oauth (legacy OAuth) | oracle-profile | Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA. |
-
-<!-- parallel-execution:end -->
+- Точность числового поиска, nearest-match/tie boundaries, изменение типа замены, регистр.
+- Regex поиск/замена и fallback regex $1; последовательность exact→regex→остальное.
+- Несколько внешних таблиц; роли Значение/Замена/Информационное/Не используемое и первый подходящий ряд.
+- Импорт/экспорт таблицы правил: UTF-8, два TSV поля без заголовка, locale decimals и ? как NULL.

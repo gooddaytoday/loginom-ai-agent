@@ -60,76 +60,10 @@
 
 Передать checkpoint с точными source/runtime/client/model/platform pins, заявленным scope, результатами и неизменёнными исходными FAIL. Техническое завершение, аналитическая проверка, integration и release — отдельные состояния реестра.
 
-## Полное поэтапное покрытие Help 7.4 — 2026-10-02
+## Непокрытые режимы Help 7.4
 
-Снимок исходников: `5f772aea9de6414a19feb6ecc109a196c9e92453`. Исследованы официальные страницы ниже и существующие handlers; живой discovery, новые прогоны и реализация расширений не выполнялись. `accepted_scope_maintenance` означает сопровождение ранее принятого ограниченного объёма, а не новую CLI-приёмку. Все расширения имеют статус `discovery_required`; полное покрытие не достигается одним первым этапом.
+Режимы из справки, которые не входят в принятый объём (источники: [Слияние](https://help.loginom.ru/userguide/processors/transformation/join/), [Полное соединение](https://help.loginom.ru/userguide/processors/transformation/join/cross.html), [Внутреннее соединение](https://help.loginom.ru/userguide/processors/transformation/join/inner.html), [Левое соединение](https://help.loginom.ru/userguide/processors/transformation/join/left.html), [Правое соединение](https://help.loginom.ru/userguide/processors/transformation/join/right.html), [Разность](https://help.loginom.ru/userguide/processors/transformation/join/difference.html); прочитано 2026-10-02). Это перечень для будущего расширения, а не назначение. Подплан расширения пишется по [шаблону](../../templates/node-plan.md), когда расширение назначено.
 
-### `join:s1` — Сопровождение INNER/LEFT
-
-Статус: `accepted_scope_maintenance`. Приоритет: P0. Покрывает: `join:r01`.
-Жёсткие предпосылки: `foundation:oracle-tabular`. Рекомендуется после: нет.
-Условия среды: доступный компонент выбранной редакции Loginom 7.4; отдельный тестовый пакет и аккаунт.
-
-- `join:r01` — Ключи одинаковых типов, case sensitivity, правые ключи и mappings. Источник: `join:help1`, `join:help3`, `join:help4` Проверка: Сохранённые fixtures, duplicate multiplicity и NULL.
-
-### `join:s2` — FULL/CROSS, RIGHT и Разность
-
-Статус: `discovery_required`. Приоритет: P1. Покрывает: `join:r02`, `join:r03`.
-Жёсткие предпосылки: `join:s1`. Рекомендуется после: нет.
-Условия среды: доступный компонент выбранной редакции Loginom 7.4; отдельный тестовый пакет и аккаунт.
-
-- `join:r02` — Полное с ключами и без ключей; ограниченный декартов результат. Источник: `join:help2` Проверка: Независимая сверка пар для FULL=4 и CROSS=6; без ключей нельзя случайно запускать большой набор.
-- `join:r03` — Правое соединение и Разность, где выход содержит только поля основной таблицы. Источник: `join:help5`, `join:help6` Проверка: RIGHT=3, Difference только L1; проверить schema и кратности без навязанного SQL DISTINCT.
-
-### `join:s3` — Управляющие переменные
-
-Статус: `discovery_required`. Приоритет: P2. Покрывает: `join:r04`.
-Жёсткие предпосылки: `join:s2`, `foundation:typed-variables`. Рекомендуется после: нет.
-Условия среды: доступный компонент выбранной редакции Loginom 7.4; отдельный тестовый пакет и аккаунт.
-
-- `join:r04` — Выбор операции целой переменной 0..4 и регистра логической переменной. Источник: `join:help1` Проверка: Переключить значения без пересоздания узла, проверить readback, результат и ошибочные типы.
-
-### Реализация и общие контракты
-
-Расширять join-parameters/procedure/output/readback с текущих inner/left. Полное соединение имеет два поведения: без ключей CROSS, с ключами FULL; названия distinct runtime modes согласовать после discovery, сохранив старые запросы.
-
-Переиспользовать `node.apply` с pure validation до эффектов, общий gate/journal/deadline и наблюдаемые node/port identities. Для новых возможностей актуализировать node registry/contracts, parameter schema, driver/readback, compact user-v1 и адресные tests; имена полей/режимов API закрепить после discovery. Публичный новый контракт и уточнённые критерии приёмки согласуются до runtime-изменения. Названия Help не являются готовыми runtime enum.
-
-Общие зависимости раскрыты в [приёмке](../../foundations/acceptance/plan.md), [типизированных портах](../../foundations/typed-ports/plan.md), [динамической схеме](../../foundations/dynamic-schema/plan.md), [обучении](../../foundations/training/plan.md) и [внешних системах](../../foundations/external-systems/plan.md). `recommended_after` передаёт опыт; самостоятельный fixture позволяет начинать без готового парного import/export либо аналитического предшественника.
-
-### Дополнительные самостоятельные fixtures
-
-L=(L1,key1),(L2,key2),(L3,key2); R=(R1,key2),(R2,key3). INNER=2, LEFT=3, RIGHT=3, FULL=4, CROSS=6, Difference=1 (L1). Проверить реальные пары RowID, а не только количество; включение правого ключа сохраняет key3 в unmatched правой строке.
-
-Перед автономным прогоном разместить задачу и входы отдельно от `expected`/oracle; указать точные типы, NULL, порядок там, где он значим, и числовую точность. Неоднозначную формулу/тип/границу сначала подтвердить отдельной диагностикой, затем заморозить ожидания. Сохранённые исторические fixtures, если перечислены выше, используются в исходных границах.
-
-### Приёмка и восстановление
-
-- Для каждого требования выполнить new/existing, Done/Close/Execute там, где применимо; проверить сохранённые настройки, свежий результат и save/reopen. Положительный тест сопровождается отказом на неверные типы/поля/порты.
-- Адресные tests запускаются из пакета; oracle проверяется намеренной подменой значения, порядка, схемы и execution identity. Полный небольшой результат проверяется независимо; preview или старый PASS не доказывает новый этап.
-- Один operation_id не допускает повторного эффекта. Потерянный ответ и expiry сохраняют неоднозначность до штатного inspect/recover; дедлайн не продлевается. Cancel закрывает только принадлежащий операции draft, чужие узлы/связи неизменны.
-- Cold-check должен поддерживать именно заявленный вид результата, число выходов и точность. Текущий базовый скрипт читает один tabular output 0 и сравнивает строки без порядка; такие ограничения устраняются в prerequisite до зависимой приёмки.
-- PASS требует чистый source SHA, pins клиента/runtime/модели/платформы, независимый oracle и подтверждённые `package_closed=true`, `logged_out=true`. Неисполненные строки остаются NOT_RUN; сохранение/технический успех/аналитика/интеграция/выпуск различаются. Checkpoint — до 20 строк, с результатом, ограничениями и следующим этапом.
-
-### Проверенные официальные источники
-
-- `join:help1` — [Слияние](https://help.loginom.ru/userguide/processors/transformation/join/), Help 7.4, прочитано 2026-10-02.
-- `join:help2` — [Полное соединение](https://help.loginom.ru/userguide/processors/transformation/join/cross.html), Help 7.4, прочитано 2026-10-02.
-- `join:help3` — [Внутреннее соединение](https://help.loginom.ru/userguide/processors/transformation/join/inner.html), Help 7.4, прочитано 2026-10-02.
-- `join:help4` — [Левое соединение](https://help.loginom.ru/userguide/processors/transformation/join/left.html), Help 7.4, прочитано 2026-10-02.
-- `join:help5` — [Правое соединение](https://help.loginom.ru/userguide/processors/transformation/join/right.html), Help 7.4, прочитано 2026-10-02.
-- `join:help6` — [Разность](https://help.loginom.ru/userguide/processors/transformation/join/difference.html), Help 7.4, прочитано 2026-10-02.
-
-<!-- parallel-execution:start -->
-
-## Параллельная работа
-
-При подготовке этого плана новые задачи и прогоны не запускались; существующие карточки могут уже выполняться. При назначении используются [правила Multica](../../workflow/multica-parallel.md); наличие строки не подтверждает доступность ресурса или готовность этапа.
-
-| Этап | Направление | Группа карточки | Разработка | Интеграция | Модель | Независимая проверка | Примечание |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `join:s1` | Табличные соединения и форма таблицы | join | — | runtime-registration<br>readiness-publication<br>base-branch | legacy-oauth (legacy OAuth) | oracle-profile | Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA. |
-| `join:s2` | Табличные соединения и форма таблицы | join | — | runtime-registration<br>readiness-publication<br>base-branch | legacy-oauth (legacy OAuth) | oracle-profile | Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA. |
-| `join:s3` | Табличные соединения и форма таблицы | join | — | runtime-registration<br>readiness-publication<br>base-branch | legacy-oauth (legacy OAuth) | oracle-profile | Одна активная карточка разработки на узел; независимые узлы этой дорожки не образуют цепочку. Общая регистрация — отдельное короткое окно перед проверкой итогового SHA. |
-
-<!-- parallel-execution:end -->
+- Полное с ключами и без ключей; ограниченный декартов результат.
+- Правое соединение и Разность, где выход содержит только поля основной таблицы.
+- Выбор операции целой переменной 0..4 и регистра логической переменной.

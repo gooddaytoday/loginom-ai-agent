@@ -48,13 +48,3 @@
 - [Совместная историческая приёмка](../../../../services/loginom-ai/docs/loginom-dock/releases/rc-combined-verification-2026-09-14.md) — 14 типов в трёх сценариях.
 
 Сырая диагностика этой исторической приёмки удалена по разрешению пользователя: [отчёт](../../../../services/loginom-ai/docs/loginom-dock/accepted-node-cleanup-2026-09-13.md). Сохранённые Markdown и хеши не заменяют отсутствующие исходные файлы; повторная проверка требует нового прогона.
-
-## План полного покрытия 2026-10-02
-
-[Отдельный подплан](plan.md) содержит 4 проверяемых требований и 3 этапов. Ранее реализованный scope и исторические доказательства сохраняются; новые требования не считаются принятыми.
-
-- `field-parameters:s1` — P0, Сопровождение scalar параметров; `accepted_scope_maintenance`.
-- `field-parameters:s2` — P1, Кэширование набора и полей; `discovery_required`.
-- `field-parameters:s3` — P2, Полная типовая матрица и групповое редактирование; `discovery_required`.
-
-Первичный источник: [Параметры полей](https://help.loginom.ru/userguide/processors/transformation/fields-features.html). Все дочерние источники, зависимости и самостоятельные fixtures указаны в подплане.

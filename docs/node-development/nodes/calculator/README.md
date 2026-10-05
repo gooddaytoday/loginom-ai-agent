@@ -48,14 +48,3 @@
 - [Совместная историческая приёмка](../../../../services/loginom-ai/docs/loginom-dock/releases/rc-combined-verification-2026-09-14.md) — 14 типов в трёх сценариях.
 
 Сырая диагностика этой исторической приёмки удалена по разрешению пользователя: [отчёт](../../../../services/loginom-ai/docs/loginom-dock/accepted-node-cleanup-2026-09-13.md). Сохранённые Markdown и хеши не заменяют отсутствующие исходные файлы; повторная проверка требует нового прогона.
-
-## План полного покрытия 2026-10-02
-
-[Отдельный подплан](plan.md) содержит 6 проверяемых требований и 4 этапов. Ранее реализованный scope и исторические доказательства сохраняются; новые требования не считаются принятыми.
-
-- `calculator:s1` — P0, Сопровождение выражений scalar; `accepted_scope_maintenance`.
-- `calculator:s2` — P1, Полный редактор и свойства выражений; `discovery_required`.
-- `calculator:s3` — P3, JavaScript синтаксис; `discovery_required`.
-- `calculator:s4` — P2, Входные переменные в Выражении; `discovery_required`.
-
-Первичный источник: [Калькулятор](https://help.loginom.ru/userguide/processors/transformation/calc/). Все дочерние источники, зависимости и самостоятельные fixtures указаны в подплане.

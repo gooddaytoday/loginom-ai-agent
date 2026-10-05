@@ -2336,7 +2336,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/control-condition/plan.md",
       "plan_status": "discovery_required"
     },
@@ -2394,7 +2394,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/control-execnode/plan.md",
       "plan_status": "discovery_required"
     },
@@ -2453,7 +2453,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/control-loop/plan.md",
       "plan_status": "discovery_required"
     },
@@ -2511,7 +2511,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/control-referencenode/plan.md",
       "plan_status": "discovery_required"
     },
@@ -2570,7 +2570,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/control-supernode/plan.md",
       "plan_status": "discovery_required"
     },
@@ -2631,7 +2631,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/datamining-arimax/plan.md",
       "plan_status": "discovery_required"
     },
@@ -2691,7 +2691,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/datamining-assnrules/plan.md",
       "plan_status": "discovery_required"
     },
@@ -2751,7 +2751,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/datamining-clope/plan.md",
       "plan_status": "discovery_required"
     },
@@ -2810,7 +2810,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/datamining-clustering/plan.md",
       "plan_status": "discovery_required"
     },
@@ -2869,7 +2869,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/datamining-emclust/plan.md",
       "plan_status": "discovery_required"
     },
@@ -2929,7 +2929,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/datamining-linregression/plan.md",
       "plan_status": "discovery_required"
     },
@@ -2989,7 +2989,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/datamining-logregression/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3048,7 +3048,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/datamining-neuralnetclass/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3107,7 +3107,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/datamining-neuralnetreg/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3166,7 +3166,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/datamining-sonn/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3226,7 +3226,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/exports-database/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3285,7 +3285,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/exports-excel/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3344,7 +3344,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/exports-kafka/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3403,7 +3403,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/exports-lgd/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3463,7 +3463,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/exports-tableau/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3523,7 +3523,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/exports-warehouse/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3582,7 +3582,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/exports-xml/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3642,7 +3642,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/imports-database/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3701,7 +3701,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/imports-excel/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3760,7 +3760,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/imports-kafka/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3819,7 +3819,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/imports-lgd/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3879,7 +3879,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/imports-onecrequest/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3939,7 +3939,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/imports-warehouse/plan.md",
       "plan_status": "discovery_required"
     },
@@ -3998,7 +3998,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/imports-xml/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4057,7 +4057,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/integration-datatoxml/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4116,7 +4116,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/integration-execcmd/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4175,7 +4175,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/integration-extractxml/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4235,7 +4235,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/integration-restrequest/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4294,7 +4294,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/integration-soaprequest/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4353,7 +4353,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/integration-sqlscript/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4412,7 +4412,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/preprocessing-binning/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4471,7 +4471,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/preprocessing-coarseclasses/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4529,7 +4529,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/preprocessing-datapartition/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4587,7 +4587,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/preprocessing-elimoutlier/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4645,7 +4645,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/preprocessing-sampling/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4704,7 +4704,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/preprocessing-smoothing/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4763,7 +4763,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/programming-javascript/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4822,7 +4822,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/programming-python/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4881,7 +4881,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/research-autocorrelation/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4939,7 +4939,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/research-corranalysis/plan.md",
       "plan_status": "discovery_required"
     },
@@ -4998,7 +4998,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/research-factoranalysis/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5057,7 +5057,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/research-quality/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5116,7 +5116,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/transform-coluniondata/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5234,7 +5234,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/transform-enrichdata/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5293,7 +5293,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Подплан готов к назначению этапов 0 и 1 одной карточкой Multica; этап 2 — отдельная карточка. Наличие плана не подтверждает готовность.",
       "plan": "nodes/transform-slidingwindow/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5352,7 +5352,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/transform-ungroupdata/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5410,7 +5410,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/trees-calculatortree/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5469,7 +5469,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/trees-datatotree/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5527,7 +5527,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/trees-jsontotree/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5586,7 +5586,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/trees-joindatatree/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5645,7 +5645,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/trees-treetodata/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5703,7 +5703,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/trees-treetojson/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5762,7 +5762,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/trees-uniontree/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5820,7 +5820,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/variables-calculator/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5879,7 +5879,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/variables-coluniondatavar/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5938,7 +5938,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/variables-datatovar/plan.md",
       "plan_status": "discovery_required"
     },
@@ -5996,7 +5996,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/variables-replace/plan.md",
       "plan_status": "discovery_required"
     },
@@ -6055,7 +6055,7 @@
           "evidence": []
         }
       },
-      "next_action": "Исследовать первый этап полного подплана после его обязательных зависимостей; условия среды и очередь — в coverage-map.json и roadmap.md. Наличие плана не подтверждает готовность.",
+      "next_action": "Перед назначением привести подплан к шаблону templates/node-plan.md: этап 0 живого исследования, самостоятельный этап 1, независимые fixtures/oracle и критерии standalone CLI приёмки. Наличие плана не подтверждает готовность.",
       "plan": "nodes/variables-vartodata/plan.md",
       "plan_status": "discovery_required"
     }
