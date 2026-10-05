@@ -116,6 +116,7 @@ function checklist(raw: Raw, id: string) {
     if (typeof required !== "boolean")
       throw new EvalFailure(`${id}: checklist[${index}].required должен быть boolean`, 2)
     const axis = entry.axis === "structure" || entry.axis === "result" || entry.axis === "report" ? entry.axis : undefined
+    if (entry.axis !== undefined && axis === undefined) throw new EvalFailure(`${id}: checklist[${index}].axis должна быть structure, result или report`, 2)
     return { id: itemId, text: itemText, weight, requiresResultFile, requiresRun, required, ...(axis === undefined ? {} : { axis }) }
   })
   const duplicates = items.map((item) => item.id).filter((itemId, index, all) => all.indexOf(itemId) !== index)
