@@ -956,11 +956,11 @@
         "client": "Linux",
         "loginom": "7.4.2/Enterprise"
       },
-      "scope": "Поэтапный контракт CrossTable; полный standalone и независимая приёмка этапа 3 ещё не завершены."
+      "scope": "Обработчик CrossTable, этапы 1–3 приняты на 4c1eb0f49720b84e848028985691d0318f8eb9f5 (LAB-13 Done)."
     },
     "crosstable-discovery": {
       "path": "nodes/transform-crosstable/discovery.md",
-      "sha256": "ff9254d8a7a9c9e81d6c10655f5ecc8c14bcfbdf7ef3c17a9a904ca75d46e102",
+      "sha256": "f0ff09cc075e04494cff386b5e43b8b3dee94c2a4699a19790af6c84da92a7d9",
       "kind": "document",
       "availability": "retained_document",
       "source_commit": null,
@@ -969,7 +969,33 @@
         "client": "Linux",
         "loginom": "7.4.2/Enterprise"
       },
-      "scope": "Поэтапный контракт CrossTable; полный standalone и независимая приёмка этапа 3 ещё не завершены."
+      "scope": "Наблюдения стенда, на которых основан контракт CrossTable."
+    },
+    "crosstable-acceptance-task": {
+      "path": "nodes/transform-crosstable/acceptance/task.md",
+      "sha256": "96069fffe8041ed8132d947bf13f567dca55f36739376823b47320be1a157584",
+      "kind": "document",
+      "availability": "retained_document",
+      "source_commit": "4c1eb0f49720b84e848028985691d0318f8eb9f5",
+      "runtime": "7.4.2",
+      "platform": {
+        "client": "Linux",
+        "loginom": "7.4.2/Enterprise"
+      },
+      "scope": "Бизнес-задание standalone CLI: 24 выхода этапов 1–3."
+    },
+    "crosstable-oracle": {
+      "path": "nodes/transform-crosstable/acceptance/oracle.py",
+      "sha256": "3a80978e0fffb6e68e47c7056d37ef64465fab97b80aed9dc0c2fabb273efd9b",
+      "kind": "document",
+      "availability": "retained_document",
+      "source_commit": "4c1eb0f49720b84e848028985691d0318f8eb9f5",
+      "runtime": "7.4.2",
+      "platform": {
+        "client": "Linux",
+        "loginom": "7.4.2/Enterprise"
+      },
+      "scope": "Независимый CSV-oracle 24 выходов; worker stage3-worker-13 на 4c1eb0f49 — 24/24 PASS после нового открытия, независимая приёмка проверяющего PASS."
     }
   },
   "nodes": [
@@ -5068,10 +5094,10 @@
       "initial_scope": "Сохранить подплан 15: фиксированные и скользящие колонки, агрегаты и изменение схемы; календарные поля можно задать в CSV.",
       "scope_basis": "live_discovery_and_staged_crosstable_contract",
       "limitations": [
-        "Границы типов, агрегатов, нескольких измерений и Variant задаются публичным контрактом и поэтапным подпланом; этап 3 находится в разработке.",
-        "Этап 3: min_values/limit, четыре разделителя, имена по категориям, три локальные переменные, переименование/порядок/автосинхронизация собственного выхода. Required=true не исключается; согласованное исключение — через отдельный downstream ReformColumns.",
-        "Пределы точного native-чтения 50×8 и 1 MiB, протокол 321, происхождение, исполнение и Variant subtype сохраняются.",
-        "Регистрация и локальные проверки не означают успешную автономную или независимую приёмку."
+        "Native-чтение ограничено 50 строками × 8 колонками и 1 MiB, протокол 321; шире — точный formatted reader.",
+        "Поля собственного выхода с Required=true не исключаются; исключение — отдельным downstream «Параметры полей».",
+        "Функции — по наблюдённой матрице типов Loginom 7.4.2; «Единственного» в мастере нет.",
+        "Изменён общий код других обработчиков; их CLI-приёмка на этом SHA не выполнялась."
       ],
       "prerequisites": [
         "accepted_base",
@@ -5098,14 +5124,19 @@
           "evidence": []
         },
         "client_technical_validation": {
-          "status": "not_validated",
-          "evidence": [],
-          "standalone_status": "not_revalidated"
+          "status": "standalone_cli_accepted",
+          "evidence": [
+            "crosstable-acceptance-task",
+            "crosstable-oracle"
+          ],
+          "standalone_status": "accepted_4c1eb0f49"
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
-          "evidence": [],
-          "historical_scope_preserved": false
+          "status": "independent_oracle_pass",
+          "evidence": [
+            "crosstable-oracle"
+          ],
+          "historical_scope_preserved": true
         },
         "integration": {
           "status": "not_integrated",
@@ -5116,9 +5147,9 @@
           "evidence": []
         }
       },
-      "next_action": "Завершить полный standalone сценарий этапа 3 и регрессии этапов 1–2/W1–W3; передать точный чистый опубликованный SHA на независимую reviewer-приёмку.",
+      "next_action": "Принят на 4c1eb0f49 (LAB-10, LAB-12, LAB-13). Merge cross-table в loginom — решение владельца.",
       "plan": "nodes/transform-crosstable/plan.md",
-      "plan_status": "ready_for_development"
+      "plan_status": "accepted"
     },
     {
       "component_id": "component.transform.EnrichData",
