@@ -134,3 +134,12 @@ test("compare: свободный текст не создаёт строки и
  expect(text).toContain("label\\| ## injected")
  expect(text).not.toContain("\n## injected")
 })
+
+test("compare: ограничение 25/39 задач относится к default confidence", () => {
+ const a = comparisonSummary(Array.from({length:25}, () => ({successes:3,attempts:3})))
+ const b = comparisonSummary(Array.from({length:25}, () => ({successes:0,attempts:3})))
+ const text = compare(a,b,{confidence:0.5})
+ expect(text).toContain("| хуже |")
+ expect(text).not.toContain("предельному случаю требуется 39")
+ expect(compare(a,b)).toContain("margin=0.5 и confidence=0.95")
+})
