@@ -4,12 +4,15 @@ const need=(v,m)=>{if(!v)throw Error('CrossTable autosync: '+m);};
 const owner=(a,b)=>['document_id','workflow_id','node_id'].every(k=>a?.[k]===b?.[k]);
 const fields=fs=>fs.map(f=>({name:f.name,label:f.label,type:f.type}));
 const targets=fs=>fs.map(f=>({...fields([f])[0],index:f.index,excluded:f.excluded,source:fields([f.source])[0]}));
+function latestOwnOutput(history,ctx){
+ need(Array.isArray(history)&&history.length<=1024,'bounded private history required');
+ return [...history].reverse().find(i=>owner(i.outcome?.output?.node??i.request?.target?.ref,ctx.node));
+}
 
 // Private executor history only: never cross a failed, unfinished, foreign or
 // unexecuted change to use an older generated output definition.
 export function completedCrossTableOutput(history,ctx){
- need(Array.isArray(history)&&history.length<=1024,'bounded private history required');
- const item=[...history].reverse().find(i=>owner(i.outcome?.output?.node??i.request?.target?.ref,ctx.node));
+ const item=latestOwnOutput(history,ctx);
  const r=item?.request,o=item?.outcome?.output,c=o?.configuration?.readback,p=o?.output?.ports?.find(p=>p.port===0);
  need(r?.target?.type==='transform.cross_table'&&item.cleanup_confirmed===true&&item.outcome?.status==='SUCCEEDED'
   &&o.status==='SUCCEEDED'&&o.cleanup_complete===true&&o.execution?.status==='completed'
@@ -46,8 +49,12 @@ export async function prepareCrossTableAutosync(options,ctx,{channel,finishWizar
  const request=options.operation.nodeApply.request;
  if(request.target.kind!=='existing'||request.finish!=='execute'
   ||!request.mappings.some(m=>m.direction==='output'&&m.port===0&&m.autosync===true))return;
- const proof=completedCrossTableOutput(options.nodeHistory?.(),ctx);
- if(proof.mapping.autosync===true)return;
+ const history=options.nodeHistory?.();
+ // Missing explicit saved output readback grants no early mutation. New
+ // default mappings and already-enabled ports use the ordinary lifecycle,
+ // which materializes and verifies a fresh own output before its final edit.
+ if(latestOwnOutput(history,ctx)?.outcome?.output?.configuration?.readback?.output_mapping?.autosync!==false)return;
+ const proof=completedCrossTableOutput(history,ctx);
  const opened=await channel.openOutputPort(0);
  need(opened.output.port_guid===proof.port_guid,'own generated port changed');
  await showMissingValuesMappingTable(channel);

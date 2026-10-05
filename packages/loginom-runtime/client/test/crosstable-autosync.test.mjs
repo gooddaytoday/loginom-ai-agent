@@ -60,3 +60,18 @@ test('new nodes, disabled/unrequested autosync and close never open an early por
   await prepareCrossTableAutosync({operation:{nodeApply:{request:r}},nodeHistory(){throw Error('history was accessed');}},ctx,{});
  }
 });
+test('already enabled or default output without mapping readback uses the ordinary lifecycle',async()=>{
+ for(const fault of ['enabled','default','newer-unfinished']){
+  const i=fixture();
+  if(fault==='enabled')i.outcome.output.configuration.readback.output_mapping.autosync=true;
+  if(fault==='default')delete i.outcome.output.configuration.readback.output_mapping;
+  const history=fault==='newer-unfinished'?[i,{...fixture(),outcome:null}]:[i];
+  await prepareCrossTableAutosync({operation:{nodeApply:{request:{target:{kind:'existing'},finish:'execute',mappings:[{direction:'output',port:0,autosync:true}]}}},
+   nodeHistory:()=>history},ctx,{channel:{openOutputPort(){throw Error('early output was opened');}}});
+ }
+});
+test('an explicit disabled mapping still needs complete latest provenance before any early open',async()=>{
+ const i=fixture();i.cleanup_confirmed=false;
+ await assert.rejects(prepareCrossTableAutosync({operation:{nodeApply:{request:{target:{kind:'existing'},finish:'execute',mappings:[{direction:'output',port:0,autosync:true}]}}},
+  nodeHistory:()=>[i]},ctx,{channel:{openOutputPort(){throw Error('early output was opened');}}}),/latest owned completed/);
+});
