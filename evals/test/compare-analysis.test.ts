@@ -86,3 +86,11 @@ test("analysis: pass^3 означает все три успеха, а не хо
   expect(analyzeComparison(run, run).reliability.a.pass1).toBeCloseTo(2 / 3, 12)
   expect(analyzeComparison(run, run).reliability.a.passk).toBe(0)
 })
+
+test("analysis: неполные карты effective лимитов неизвестны", () => {
+  const run = comparisonSummary([{ successes: 3, attempts: 3 }])
+  for (const limits of [{}, { other: 1000 }]) {
+    run.config.task_timeout_ms = limits
+    expect(analyzeComparison(run, run).compatibility).toContain("config.task_timeout_ms")
+  }
+})
