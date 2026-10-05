@@ -1,5 +1,5 @@
 import { EvalFailure } from "./fail"
-import { evaluationContractHash } from "./evaluation"
+import { evaluationContractHash, sameRubricSnapshot } from "./evaluation"
 import type { AttemptResult, RunSummary } from "./report"
 
 export type ComparePolicy = { margin: number; confidence: number; k: number | null }
@@ -54,7 +54,7 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
       !a.interrupted && !b.interrupted && !a.stopped_reason && !b.stopped_reason
     const regressions: ("completion" | "oracle" | "pass")[] = []
     if (complete && rates[index]!.a === 1 && rates[index]!.b === 0) regressions.push("completion")
-    if (complete && freshEvaluation(a, task) && freshEvaluation(b, other) && JSON.stringify(task.rubric_snapshot) === JSON.stringify(other.rubric_snapshot)) {
+    if (complete && freshEvaluation(a, task) && freshEvaluation(b, other) && sameRubricSnapshot(task.rubric_snapshot, other.rubric_snapshot)) {
       if (task.rubric_snapshot?.oracle_applicable && other.rubric_snapshot?.oracle_applicable && task.attempts.every((attempt) => attempt.oracle_pass === true) && other.attempts.every((attempt) => attempt.oracle_pass === false)) regressions.push("oracle")
       if (task.attempts.every((attempt) => attempt.pass === true) && other.attempts.every((attempt) => attempt.pass === false)) regressions.push("pass")
     }
@@ -66,7 +66,7 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
   const oracleRates = oraclePairs.filter((pair) => pair.a.rubric_snapshot?.oracle_applicable && pair.b.rubric_snapshot?.oracle_applicable)
     .map((pair) => ({ a: judgedRate(pair.a.attempts, "oracle_pass"), b: judgedRate(pair.b.attempts, "oracle_pass") }))
   const partial = [a, b].some((run) => run.interrupted || run.stopped_reason || run.tasks.some((task) => task.attempts.some((attempt) => attempt.status === "interrupted"))) ? ["partial_run"] : []
-  const snapshotMismatch = oraclePairs.some((pair) => JSON.stringify(pair.a.rubric_snapshot) !== JSON.stringify(pair.b.rubric_snapshot)) ? ["snapshot_mismatch"] : []
+  const snapshotMismatch = oraclePairs.some((pair) => !sameRubricSnapshot(pair.a.rubric_snapshot, pair.b.rubric_snapshot)) ? ["snapshot_mismatch"] : []
   const oracleLineage = oraclePairs.filter((pair) => pair.a.rubric_snapshot?.oracle_applicable && pair.b.rubric_snapshot?.oracle_applicable).some((pair) => !freshEvaluation(a, pair.a) || !freshEvaluation(b, pair.b)) ? ["evaluation_provenance"] : []
   const lineage = oraclePairs.some((pair) => !freshEvaluation(a, pair.a) || !freshEvaluation(b, pair.b)) ? ["evaluation_provenance"] : []
   const oracleReasons = !oracleKnown ? ["snapshot_unavailable"] : !oracleRates.length ? ["oracle_not_applicable"] : !a.judge || !b.judge ? ["judge_skipped"] :
