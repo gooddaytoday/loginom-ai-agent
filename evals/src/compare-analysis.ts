@@ -66,6 +66,7 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
   const oracleRates = oraclePairs.filter((pair) => pair.a.rubric_snapshot?.oracle_applicable && pair.b.rubric_snapshot?.oracle_applicable)
     .map((pair) => ({ a: judgedRate(pair.a.attempts, "oracle_pass"), b: judgedRate(pair.b.attempts, "oracle_pass") }))
   const partial = [a, b].some((run) => run.interrupted || run.stopped_reason || run.tasks.some((task) => task.attempts.some((attempt) => attempt.status === "interrupted"))) ? ["partial_run"] : []
+  const snapshotMismatch = oraclePairs.some((pair) => JSON.stringify(pair.a.rubric_snapshot) !== JSON.stringify(pair.b.rubric_snapshot)) ? ["snapshot_mismatch"] : []
   const lineage = oraclePairs.some((pair) => !freshEvaluation(a, pair.a) || !freshEvaluation(b, pair.b)) ? ["evaluation_provenance"] : []
   const oracleReasons = !oracleKnown ? ["snapshot_unavailable"] : !oracleRates.length ? ["oracle_not_applicable"] : !a.judge || !b.judge ? ["judge_skipped"] :
     oraclePairs.some((pair) => pair.a.rubric_snapshot?.oracle_applicable &&
@@ -76,11 +77,12 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
       task.rubric_snapshot.checklist.some((item) => item.axis === undefined) ||
       !task.rubric_snapshot.checklist.some((item) => item.axis === "structure"))) ? ["structure_unclassified"] :
     oraclePairs.some((pair) => [pair.a, pair.b].some((task) => measured(task.attempts).some((attempt) => typeof attempt.structural_score !== "number"))) ? ["structure_coverage"] : []
-  return { policy, compatibility, tasks, reliability: { k: policy.k, a: reliability(a, policy.k), b: reliability(b, policy.k), reasons: [
+  return { policy, compatibility, tasks, reliability: { k: policy.k, a: snapshotMismatch.length ? {pass1:null,passk:null} : reliability(a, policy.k), b: snapshotMismatch.length ? {pass1:null,passk:null} : reliability(b, policy.k), reasons: [
     ...(policy.k === null ? ["k_unknown"] : []),
     ...lineage,
+    ...snapshotMismatch,
     ...([a, b].some((run) => { const result = reliability(run, policy.k); return result.pass1 === null || policy.k !== null && result.passk === null }) ? ["pass_coverage"] : []),
-  ] }, axes: { completion: axis(rates, policy, partial), oracle: axis(oracleRates, policy, [...oracleReasons, ...partial, ...lineage]), structure: axis(structureRates, policy, [...structureReasons, ...partial, ...lineage]) } }
+  ] }, axes: { completion: axis(rates, policy, partial), oracle: axis(oracleRates, policy, [...oracleReasons, ...partial, ...lineage, ...snapshotMismatch]), structure: axis(structureRates, policy, [...structureReasons, ...partial, ...lineage, ...snapshotMismatch]) } }
 }
 
 function completion(attempts: AttemptResult[]) {

@@ -214,3 +214,12 @@ test("analysis: oracle N/A отличается от пропущенной пр
  expect(analyzeComparison(run,run).axes.oracle.reasons).toContain("oracle_not_applicable")
  expect(analyzeComparison(run,run).axes.structure.verdict).toBe("indistinguishable")
 })
+
+test("analysis: несовпадающие saved snapshots блокируют оценочные оси", () => {
+ const a = comparisonSummary([{successes:3,attempts:3}])
+ const b = structuredClone(a)
+ b.tasks[0]!.rubric_snapshot!.checklist[0]!.weight = 2
+ expect(analyzeComparison(a,b).axes.structure.verdict).toBeNull()
+ expect(analyzeComparison(a,b).axes.oracle.reasons).toContain("snapshot_mismatch")
+ expect(analyzeComparison(a,b).reliability.a.pass1).toBeNull()
+})
