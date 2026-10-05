@@ -59,7 +59,11 @@ export function scoreVerdict(checklist: ChecklistItem[], verdict: Verdict, thres
   )
   const score = Math.round((100 * passed) / total)
   const requiredPassed = checklist.every((item) => !(item.required || item.requiresResultFile) || items.find((answer) => answer.id === item.id)?.passed)
-  return { ok: true as const, score, pass: score >= threshold && requiredPassed, items }
+  const structure = checklist.filter((item) => item.axis === "structure")
+  const structural_score = checklist.some((item) => item.axis === undefined) || !structure.length ? null :
+    100 * structure.reduce((sum, item) => sum + (items.find((answer) => answer.id === item.id)?.passed ? item.weight : 0), 0) /
+    structure.reduce((sum, item) => sum + item.weight, 0)
+  return { ok: true as const, score, pass: score >= threshold && requiredPassed, items, structural_score }
 }
 
 function parseJson(text: string): unknown {
