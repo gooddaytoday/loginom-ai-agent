@@ -109,8 +109,11 @@ function requireSummary(run: RunSummary) {
         if (measured.has(attempt.attempt)) throw new EvalFailure(`Некорректный summary: повтор попытки ${task.id}/${attempt.attempt}`, 2)
         measured.add(attempt.attempt)
       }
-      if (attempt.score != null && (typeof attempt.score !== "number" || !Number.isFinite(attempt.score) || attempt.score < 0 || attempt.score > 100))
-        throw new EvalFailure(`Некорректный summary: score задачи ${task.id}`, 2)
+      for (const key of ["score", "structural_score"] as const) {
+        const value = attempt[key]
+        if (value != null && (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 100))
+          throw new EvalFailure(`Некорректный summary: ${key} задачи ${task.id}`, 2)
+      }
       if (attempt.pass != null && typeof attempt.pass !== "boolean" || attempt.oracle_pass != null && typeof attempt.oracle_pass !== "boolean")
         throw new EvalFailure(`Некорректный summary: pass задачи ${task.id}`, 2)
     })
