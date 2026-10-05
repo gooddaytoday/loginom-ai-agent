@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
+import {createConnection} from 'node:net';
+import {errorMonitor, once} from 'node:events';
 import {createHash} from 'node:crypto';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
@@ -11,6 +13,53 @@ import {fileURLToPath} from 'node:url';
 import {systemProxyFixture} from './support/system-proxy-fixture.mjs';
 
 const execute = promisify(execFile);
+function trackSocket(socket, sockets) {
+  sockets.add(socket);
+  socket.on('close', () => sockets.delete(socket));
+  // HTTP hands CONNECT/upgrade sockets to the fixture. Browser shutdown may
+  // reset them; other transport errors must still fail the test.
+  socket.on('error', error => { if (error.code !== 'ECONNRESET') throw error; });
+}
+
+test('HTTP upgrade and CONNECT fixture sockets survive a peer reset', {timeout:10000}, async t => {
+  for (const event of ['upgrade', 'connect']) {
+    await t.test(event, async t => {
+      const sockets = new Set();
+      const server = createServer();
+      let reset;
+      let closed;
+      server.on(event, (request, socket) => {
+        trackSocket(socket, sockets);
+        // Observe without handling the error: removing trackSocket's listener
+        // must reproduce the uncaught ECONNRESET rather than silently pass.
+        reset = new Promise(resolve => socket.once(errorMonitor, resolve));
+        closed = new Promise(resolve => socket.once('close', resolve));
+        socket.write(event === 'upgrade'
+          ? 'HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n'
+          : 'HTTP/1.1 200 Connection Established\r\n\r\n');
+      });
+      t.after(async () => {
+        for (const socket of sockets) socket.destroy();
+        await new Promise(resolve => server.close(resolve));
+      });
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+      const client = createConnection(server.address().port, '127.0.0.1');
+      t.after(() => client.destroy());
+      await once(client, 'connect');
+      const response = once(client, 'data');
+      client.write(event === 'upgrade'
+        ? 'GET / HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n'
+        : 'CONNECT localhost:443 HTTP/1.1\r\nHost: localhost\r\n\r\n');
+      await response;
+      assert.equal(sockets.size, 1);
+      client.resetAndDestroy();
+      assert.equal((await reset).code, 'ECONNRESET');
+      await closed;
+      assert.equal(sockets.size, 0);
+    });
+  }
+});
+
 const html = `<!doctype html><body>
 <div data-tid="LoginForm;Login;edtUsername"><input></div>
 <div data-tid="LoginForm;Login;edtPassword"><input type="password"></div>
@@ -75,10 +124,13 @@ test('Loginom Chromium connects directly with a configured proxy', {
       await rm(directory, {recursive:true, force:true, maxRetries:5});
     }
   });
-  proxy.on('connect', (request, socket) => { requests.push(request.url); socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n'); });
+  proxy.on('connect', (request, socket) => {
+    trackSocket(socket, sockets);
+    requests.push(request.url);
+    socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n');
+  });
   origin.on('upgrade', (request, socket) => {
-    sockets.add(socket);
-    socket.on('close', () => sockets.delete(socket));
+    trackSocket(socket, sockets);
     const accept = createHash('sha1').update(request.headers['sec-websocket-key'] + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
     socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
     socket.write(Buffer.concat([Buffer.from([0x81, 16]), Buffer.from('DIRECT_WEBSOCKET')]));
