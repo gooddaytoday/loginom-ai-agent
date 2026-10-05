@@ -54,7 +54,7 @@ Count в принятой семантике Loginom считает строки
 
 | Источник | Факт | Наблюдено или гипотеза |
 |---|---|---|
-| Runtime базы | `transform.group_data`: `client/lib/node-contracts.mjs:16`, диспетчер `node-support.mjs:39`; параметры/границы — `grouping-parameters.mjs:2-23,44-61`; [обработчик](../../../../packages/loginom-runtime/client/lib/grouping-node.mjs) | Наблюдено в коде `dada8010e` |
+| Runtime базы | `transform.group_data`: `client/lib/node-contracts.mjs:16`, диспетчер `node-support.mjs:39`; параметры/границы — `grouping-parameters.mjs:2-23,44-53`; [обработчик](../../../../packages/loginom-runtime/client/lib/grouping-node.mjs) | Наблюдено в коде `dada8010e` |
 | Общая оболочка | `createTabularTransformNodeSupport` (`calculator-node.mjs:38`), строгое выравнивание `alignReadSchema` (`node-read-contract.mjs:78`); изменения Кросс-таблицы входят в базу | Наблюдено; CLI влияния на узел не проверен |
 | Реестр | `plan_status: accepted_scope_maintenance`, `implementation: implemented`, историческое `accepted_scoped`; Desktop B02, B18, B27, B37, B47, B65, V02, V27, V65; `standalone_status: not_revalidated` | Наблюдено; готовность не меняется |
 | Справка | [Группировка](https://help.loginom.ru/userguide/processors/transformation/grouping.html) = `loginom-help@353e506b:data/processors/transformation/grouping.md` | Документировано, не наблюдение текущего UI |
