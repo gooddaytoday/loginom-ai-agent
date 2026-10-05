@@ -14,7 +14,7 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
     ["agent_inputs_hash", a.agent_inputs_hash, b.agent_inputs_hash],
     ["rubric_hash", a.rubric_hash, b.rubric_hash],
     ["config.pass_threshold", a.config.pass_threshold, b.config.pass_threshold],
-    ["config.task_timeout_ms", taskTimeouts(a.config.task_timeout_ms), taskTimeouts(b.config.task_timeout_ms)],
+    ["config.task_timeout_ms", taskTimeouts(a.config.task_timeout_ms, a.task_ids), taskTimeouts(b.config.task_timeout_ms, b.task_ids)],
     ...(!a.judge && !b.judge ? [] : [
       ["judge.backend", a.judge?.backend, b.judge?.backend],
       ["judge.codex_version", a.judge?.codex_version, b.judge?.codex_version],
@@ -43,8 +43,9 @@ function completion(attempts: AttemptResult[]) {
   return measured.length ? measured.filter((attempt) => attempt.status === "completed").length / measured.length : null
 }
 
-function taskTimeouts(limits?: Record<string, number>) {
-  return limits === undefined ? null : JSON.stringify(Object.entries(limits).sort(([a], [b]) => a.localeCompare(b)))
+function taskTimeouts(limits: Record<string, number> | undefined, ids: string[]) {
+  return !limits || ids.some((id) => !Number.isFinite(limits[id]) || limits[id]! <= 0) ? null :
+    JSON.stringify(ids.toSorted().map((id) => [id, limits[id]]))
 }
 
 function requireSummary(run: RunSummary) {
