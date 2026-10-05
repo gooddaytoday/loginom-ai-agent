@@ -1,5 +1,5 @@
 import path from "node:path"
-import { cp, mkdir } from "node:fs/promises"
+import { cp, mkdir, readdir, rename } from "node:fs/promises"
 import { loadConfig, type EvalConfig } from "./config"
 import { EvalFailure } from "./fail"
 import { evaluationContractHash, rubricSnapshot } from "./evaluation"
@@ -67,44 +67,59 @@ async function executeRun(config: EvalConfig) {
   outer: for (const attempt of Array.from({ length: config.repeat }, (_, index) => index + 1)) {
     for (const task of tasks) {
       if (controller.signal.aborted || state.stopped) break outer
-      const { result, stop } = await runAttempt({
-        config,
-        command,
-        source,
-        task,
-        attempt,
-        runId,
-        runDir,
-        signal: controller.signal,
-        profileRecovered: false,
-        judge: settings,
-        skipJudge: config.skipJudge,
-        evaluationHash,
-      })
-      attempts.push(result)
-      console.error(`[${task.id}#${attempt}] ${result.status} score=${result.score ?? "—"} ${Math.round(result.duration_ms / 1000)}s`)
-      if (!config.dryRun) {
-        const out = path.join(runDir, task.id, String(attempt))
-        const after = await afterAttempt(config, { ...command, cleanupDir: path.join(out, "management") }, result, out)
-          .catch((error: unknown) => {
-            result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error: describe(error) }
-            return { stop: describe(error) }
+      const history: { initial?: AttemptResult } = {}
+      for (const retry of [0, 1]) {
+        if (controller.signal.aborted || state.stopped) break outer
+        const { result, stop } = await runAttempt({
+          config,
+          command,
+          source,
+          task,
+          attempt,
+          runId,
+          runDir,
+          signal: controller.signal,
+          profileRecovered: false,
+          initialInfraAttempt: history.initial,
+          judge: settings,
+          skipJudge: config.skipJudge,
+          evaluationHash,
+        })
+        if (retry === 0) attempts.push(result)
+        if (retry === 1) attempts[attempts.length - 1] = result
+        console.error(`[${task.id}#${attempt}] ${result.status} score=${result.score ?? "—"} ${Math.round(result.duration_ms / 1000)}s`)
+        if (!config.dryRun) {
+          const out = path.join(runDir, task.id, String(attempt))
+          const after = await afterAttempt(config, { ...command, cleanupDir: path.join(out, "management") }, result, out)
+            .catch((error: unknown) => {
+              result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error: describe(error) }
+              return { stop: describe(error) }
+            })
+          await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2)).catch(async () => {
+            const error = "Attempt result persistence failed; measured outcome retained in summary"
+            result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error }
+            state.stopped = error
+            await Bun.write(path.join(out, "result.persistence-failure.json"), JSON.stringify(result, null, 2)).catch(() => {})
           })
-        await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2)).catch(async () => {
-          const error = "Attempt result persistence failed; measured outcome retained in summary"
-          result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error }
-          state.stopped = error
-          await Bun.write(path.join(out, "result.persistence-failure.json"), JSON.stringify(result, null, 2)).catch(() => {})
+          if (state.stopped) break outer
+          if ("stop" in after) { state.stopped = after.stop ?? "Environment cleanup failed"; break outer }
+          if (result.status === "interrupted") state.interruptedCleanup = { recovered: after.recovered }
+        }
+        if (result.environment_cleanup?.status === "failed" || result.status === "harness_error" && stop) {
+          state.stopped = result.environment_cleanup?.error ?? result.harness_error ?? "harness_error"
+          break outer
+        }
+        if (result.status === "interrupted") break outer
+        if (result.status !== "infra_error" || retry === 1 || controller.signal.aborted) break
+        const out = path.join(runDir, task.id, String(attempt))
+        await archiveInfraAttempt(out).catch(async (error: unknown) => {
+          state.stopped = describe(error)
+          result.environment_cleanup = { status: "failed", evidence: "infra-error", error: state.stopped }
+          await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2)).catch(() => {})
         })
         if (state.stopped) break outer
-        if ("stop" in after) { state.stopped = after.stop ?? "Environment cleanup failed"; break outer }
-        if (result.status === "interrupted") state.interruptedCleanup = { recovered: after.recovered }
+        history.initial = result
       }
-      if (result.environment_cleanup?.status === "failed" || result.status === "harness_error" && stop) {
-        state.stopped = result.environment_cleanup?.error ?? result.harness_error ?? "harness_error"
-        break outer
-      }
-      if (result.status === "interrupted") break outer
     }
   }
   const summary: RunSummary = {
@@ -175,11 +190,15 @@ export async function runAttempt(input: {
   runDir: string
   signal: AbortSignal
   profileRecovered: boolean
+  initialInfraAttempt?: AttemptResult
   skipJudge: boolean
   judge?: JudgeSettings
   evaluationHash?: string
 }): Promise<{ result: AttemptResult; stop: boolean }> {
-  const base = emptyResult(input.task.id, input.attempt, input.profileRecovered)
+  const base: AttemptResult = {
+    ...emptyResult(input.task.id, input.attempt, input.profileRecovered),
+    ...(input.initialInfraAttempt ? { infra_retry: { initial: input.initialInfraAttempt } } : {}),
+  }
   return attemptBody(input, base).catch(async (error: unknown) => {
     const measured = base.exit_code !== null
     const result: AttemptResult = measured
@@ -313,6 +332,13 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   await Bun.write(path.join(outDir, "cleanup.json"), JSON.stringify({ processes: run.processCleanup }, null, 2))
   await Bun.write(path.join(outDir, "result.json"), JSON.stringify(result, null, 2))
   return { result, stop: stop || run.processCleanup.status === "failed" }
+}
+
+async function archiveInfraAttempt(outDir: string) {
+  const files = await readdir(outDir)
+  const archive = path.join(outDir, "infra-error")
+  await mkdir(archive)
+  await Promise.all(files.map((file) => rename(path.join(outDir, file), path.join(archive, file))))
 }
 
 async function prepareProfile(config: EvalConfig, command: AgentCommand) {
