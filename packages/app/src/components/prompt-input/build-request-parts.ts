@@ -195,7 +195,16 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
     ]
   })
 
-  const packages = input.images.flatMap((attachment): PromptRequestPart[] => {
+  requestParts.push(...files, ...context, ...agents, ...buildAttachmentParts(input.images))
+
+  return {
+    requestParts,
+    optimisticParts: requestParts.map((part) => toOptimisticPart(part, input.sessionID, input.messageID)),
+  }
+}
+
+export function buildAttachmentParts(images: BuildRequestPartsInput["images"]) {
+  const packages = images.flatMap((attachment): PromptRequestPart[] => {
     if (attachment.mime !== LOGINOM_PACKAGE_MIME) return []
     if (!attachment.sourcePath) {
       return [
@@ -218,7 +227,7 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
     ]
   })
 
-  const images = input.images.flatMap((attachment) => {
+  const files = images.flatMap((attachment) => {
     if (attachment.mime === LOGINOM_PACKAGE_MIME) return []
     return [
       {
@@ -231,10 +240,5 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
     ]
   })
 
-  requestParts.push(...files, ...context, ...agents, ...packages, ...images)
-
-  return {
-    requestParts,
-    optimisticParts: requestParts.map((part) => toOptimisticPart(part, input.sessionID, input.messageID)),
-  }
+  return [...packages, ...files]
 }

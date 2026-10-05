@@ -6,7 +6,7 @@ import { SessionProjector } from "@loginom-ai-agent/core/session/projector"
 import { eq } from "drizzle-orm"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { expect } from "bun:test"
-import { Cause, Deferred, Duration, Effect, Exit, Fiber, Layer } from "effect"
+import { Cause, Deferred, Duration, Effect, Exit, Fiber, Layer, Schema } from "effect"
 import { cp } from "fs/promises"
 import path from "path"
 import { fileURLToPath, pathToFileURL } from "url"
@@ -918,22 +918,24 @@ it.instance("glob tool keeps instance context during prompt runs", () =>
   }),
 )
 
-it.instance("package_docs loads through the agent and extracts a local package", () =>
-  Effect.gen(function* () {
-    const { dir, llm } = yield* useServerConfig(providerCfg)
-    const prompt = yield* SessionPrompt.Service
-    const sessions = yield* Session.Service
-    const source = fileURLToPath(new URL("../../../../.loginom-ai-agent/skills/package_docs", import.meta.url))
-    const skillDir = path.join(dir, ".loginom-ai-agent", "skills", "package_docs")
-    const lgp = path.join(dir, "demo.lgp")
-    const structure = path.join(dir, "structure.json")
-    yield* Effect.promise(() => cp(source, skillDir, { recursive: true }))
-    yield* Effect.promise(async () => {
-      const proc = Bun.spawn(
-        [
-          "python3",
-          "-c",
-          `
+it.instance(
+  "package_docs loads through the agent and extracts a local package",
+  () =>
+    Effect.gen(function* () {
+      const { dir, llm } = yield* useServerConfig(providerCfg)
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const source = fileURLToPath(new URL("../../../../.loginom-ai-agent/skills/package_docs", import.meta.url))
+      const skillDir = path.join(dir, ".loginom-ai-agent", "skills", "package_docs")
+      const lgp = path.join(dir, "demo.lgp")
+      const structure = path.join(dir, "structure.json")
+      yield* Effect.promise(() => cp(source, skillDir, { recursive: true }))
+      yield* Effect.promise(async () => {
+        const proc = Bun.spawn(
+          [
+            "python3",
+            "-c",
+            `
 import zipfile
 from pathlib import Path
 p = Path(${JSON.stringify(lgp)})
@@ -953,66 +955,66 @@ with zipfile.ZipFile(p, "w") as zf:
     zf.writestr("Unit_0/Info.xml", unit_info)
     zf.writestr("Unit_0/Unit.xml", unit)
 `,
-        ],
-        { stdout: "pipe", stderr: "pipe" },
-      )
-      const code = await proc.exited
-      if (code !== 0) throw new Error(await new Response(proc.stderr).text())
-    })
+          ],
+          { stdout: "pipe", stderr: "pipe" },
+        )
+        const code = await proc.exited
+        if (code !== 0) throw new Error(await new Response(proc.stderr).text())
+      })
 
-    const session = yield* sessions.create({
-      title: "Package docs",
-      permission: [{ permission: "*", pattern: "*", action: "allow" }],
-    })
-    yield* prompt.prompt({
-      sessionID: session.id,
-      agent: "build",
-      noReply: true,
-      parts: [{ type: "text", text: `Сформируй ИИ Отчет по ${lgp}` }],
-    })
-    yield* llm.tool("skill", { name: "package_docs" })
-    yield* llm.tool("bash", {
-      command: `python3 ${JSON.stringify(path.join(skillDir, "scripts", "extract_scenario_structure.py"))} ${JSON.stringify(lgp)} -o ${JSON.stringify(structure)}`,
-      workdir: dir,
-    })
-    yield* llm.text("отчёт подготовлен")
+      const session = yield* sessions.create({
+        title: "Package docs",
+        permission: [{ permission: "*", pattern: "*", action: "allow" }],
+      })
+      yield* prompt.prompt({
+        sessionID: session.id,
+        agent: "build",
+        noReply: true,
+        parts: [{ type: "text", text: `Сформируй ИИ Отчет по ${lgp}` }],
+      })
+      yield* llm.tool("skill", { name: "package_docs" })
+      yield* llm.tool("bash", {
+        command: `python3 ${JSON.stringify(path.join(skillDir, "scripts", "extract_scenario_structure.py"))} ${JSON.stringify(lgp)} -o ${JSON.stringify(structure)}`,
+        workdir: dir,
+      })
+      yield* llm.text("отчёт подготовлен")
 
-    const result = yield* prompt.loop({ sessionID: session.id })
-    expect(result.info.role).toBe("assistant")
-    const request = JSON.stringify(yield* llm.inputs)
-    expect(request).toContain("<name>package_docs</name>")
+      const result = yield* prompt.loop({ sessionID: session.id })
+      expect(result.info.role).toBe("assistant")
+      const request = JSON.stringify(yield* llm.inputs)
+      expect(request).toContain("<name>package_docs</name>")
 
-    const msgs = yield* MessageV2.filterCompactedEffect(session.id)
-    const tools = msgs.flatMap((msg) => msg.parts).filter((part): part is SessionV1.ToolPart => part.type === "tool")
-    const loaded = tools.find((part) => part.tool === "skill")
-    const extracted = tools.find((part) => part.tool === "bash")
-    expect(loaded?.state.status).toBe("completed")
-    if (loaded?.state.status === "completed") {
-      expect(loaded.state.output).toContain('<skill_content name="package_docs">')
-      expect(loaded.state.output).toContain(`Base directory for this skill: ${skillDir}`)
-      expect(loaded.state.output).toContain("абсолютный путь")
-      expect(loaded.state.output).toContain("прикрепил")
-      expect(loaded.state.output).toContain("Attached Loginom package path:")
-      expect(loaded.state.output).toContain("файлового хранилища")
-      expect(loaded.state.output).toContain("viking://resources/loginom-dock/sources/loginom-help")
-      expect(loaded.state.output).toContain(path.join(skillDir, "scripts", "extract_scenario_structure.py"))
-      expect(loaded.state.output).toContain(path.join(skillDir, "scripts", "emit_report.py"))
-      expect(loaded.state.output).toContain("не поддерживается")
-      expect(loaded.state.output).toContain("docx")
-      expect(loaded.state.output).not.toContain("hermes")
-      expect(loaded.state.output).not.toContain("Cognee")
-    }
-    expect(extracted?.state.status).toBe("completed")
-    if (extracted?.state.status === "completed") {
-      expect(extracted.state.metadata?.exit).toBe(0)
-    }
-    const written = (yield* Effect.promise(() => Bun.file(structure).json())) as {
-      schema_version: string
-      package: { name: string }
-    }
-    expect(written.schema_version).toBe("package_docs.structure.v1")
-    expect(written.package.name).toBe("demo")
-  }),
+      const msgs = yield* MessageV2.filterCompactedEffect(session.id)
+      const tools = msgs.flatMap((msg) => msg.parts).filter((part): part is SessionV1.ToolPart => part.type === "tool")
+      const loaded = tools.find((part) => part.tool === "skill")
+      const extracted = tools.find((part) => part.tool === "bash")
+      expect(loaded?.state.status).toBe("completed")
+      if (loaded?.state.status === "completed") {
+        expect(loaded.state.output).toContain('<skill_content name="package_docs">')
+        expect(loaded.state.output).toContain(`Base directory for this skill: ${skillDir}`)
+        expect(loaded.state.output).toContain("абсолютный путь")
+        expect(loaded.state.output).toContain("прикрепил")
+        expect(loaded.state.output).toContain("Attached Loginom package path:")
+        expect(loaded.state.output).toContain("файлового хранилища")
+        expect(loaded.state.output).toContain("viking://resources/loginom-dock/sources/loginom-help")
+        expect(loaded.state.output).toContain(path.join(skillDir, "scripts", "extract_scenario_structure.py"))
+        expect(loaded.state.output).toContain(path.join(skillDir, "scripts", "emit_report.py"))
+        expect(loaded.state.output).toContain("не поддерживается")
+        expect(loaded.state.output).toContain("docx")
+        expect(loaded.state.output).not.toContain("hermes")
+        expect(loaded.state.output).not.toContain("Cognee")
+      }
+      expect(extracted?.state.status).toBe("completed")
+      if (extracted?.state.status === "completed") {
+        expect(extracted.state.metadata?.exit).toBe(0)
+      }
+      const written = (yield* Effect.promise(() => Bun.file(structure).json())) as {
+        schema_version: string
+        package: { name: string }
+      }
+      expect(written.schema_version).toBe("package_docs.structure.v1")
+      expect(written.package.name).toBe("demo")
+    }),
   60_000,
 )
 
@@ -1910,6 +1912,62 @@ it.instance(
   10_000,
 )
 
+for (const subtask of [false, true]) {
+  unix(
+    `command attachment context stays literal and preserves arguments (subtask=${subtask})`,
+    () =>
+      Effect.gen(function* () {
+        const { directory: dir } = yield* TestInstance
+        const marker = path.join(dir, "attachment-shell-executed")
+        const file = path.join(dir, "existing.lgp")
+        yield* Effect.promise(() => Bun.write(file, "PACKAGE_BYTES_MARKER\0zip"))
+        const note = `Attached Loginom package demo !\`touch ${marker}\` Ж.lgp has no disk path. Ask the user for an absolute path to the .lgp file.`
+        const { llm } = yield* useServerConfig((url) => ({
+          ...providerCfg(url),
+          command: {
+            inspect: {
+              template: "Target: $1\nArguments: $ARGUMENTS\nConfigured: !`printf trusted`",
+              agent: subtask ? "general" : "build",
+              subtask,
+            },
+          },
+        }))
+        const { prompt, chat } = yield* boot()
+        yield* llm.text("done")
+        if (subtask) yield* llm.text("done")
+        yield* prompt.command(
+          Schema.decodeUnknownSync(SessionPrompt.CommandInput)({
+            sessionID: chat.id,
+            command: "inspect",
+            arguments: "feature",
+            parts: [
+              { type: "text", text: note, synthetic: true },
+              { type: "text", text: "IGNORED_ATTACHMENT_CONTEXT", ignored: true },
+              {
+                type: "file",
+                mime: "application/x-loginom-package",
+                url: pathToFileURL(file).href,
+                filename: "existing.lgp",
+              },
+            ],
+          }),
+        )
+
+        const fs = yield* FSUtil.Service
+        expect(yield* fs.existsSafe(marker)).toBe(false)
+        const inputs = yield* llm.inputs
+        const content = JSON.stringify(inputs.map((input) => input.messages))
+        expect(content).toContain("Target: feature\\nArguments: feature\\nConfigured: trusted")
+        expect(content).toContain(note)
+        expect(content).toContain(`Attached Loginom package path: ${file}`)
+        expect(content).not.toContain("PACKAGE_BYTES_MARKER")
+        expect(content).not.toContain("IGNORED_ATTACHMENT_CONTEXT")
+        expect(content).not.toContain("application/octet-stream")
+      }),
+    30_000,
+  )
+}
+
 unix(
   "command ! expansion uses configured shell over env shell",
   () =>
@@ -2265,42 +2323,40 @@ noLLMServer.instance(
   { config: cfg },
 )
 
-noLLMServer.instance(
-  "keeps an attached lgp as a path and does not inline the package",
-  () =>
-    Effect.gen(function* () {
-      const { directory: dir } = yield* TestInstance
-      const file = path.join(dir, "demo.lgp")
-      yield* Effect.promise(() => Bun.write(file, "PACKAGE_BYTES_MARKER\0zip"))
-      const prompt = yield* SessionPrompt.Service
-      const sessions = yield* Session.Service
-      const session = yield* sessions.create({})
-      const message = yield* prompt.prompt({
-        sessionID: session.id,
-        agent: "build",
-        noReply: true,
-        parts: [
-          { type: "text", text: "Сформируй ИИ Отчет" },
-          {
-            type: "file",
-            mime: "application/x-loginom-package",
-            url: pathToFileURL(file).href,
-            filename: "demo.lgp",
-          },
-        ],
-      })
-      const stored = yield* MessageV2.get({ sessionID: session.id, messageID: message.info.id })
-      const text = stored.parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")
-      expect(text).toContain(`Attached Loginom package path: ${file}`)
-      expect(text.includes("PACKAGE_BYTES_MARKER")).toBe(false)
-      const files = stored.parts.filter((part) => part.type === "file")
-      expect(files).toHaveLength(1)
-      if (files[0]?.type === "file") {
-        expect(files[0].url.startsWith("file:")).toBe(true)
-        expect(files[0].url.includes("base64")).toBe(false)
-      }
-      yield* sessions.remove(session.id)
-    }),
+noLLMServer.instance("keeps an attached lgp as a path and does not inline the package", () =>
+  Effect.gen(function* () {
+    const { directory: dir } = yield* TestInstance
+    const file = path.join(dir, "demo.lgp")
+    yield* Effect.promise(() => Bun.write(file, "PACKAGE_BYTES_MARKER\0zip"))
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const session = yield* sessions.create({})
+    const message = yield* prompt.prompt({
+      sessionID: session.id,
+      agent: "build",
+      noReply: true,
+      parts: [
+        { type: "text", text: "Сформируй ИИ Отчет" },
+        {
+          type: "file",
+          mime: "application/x-loginom-package",
+          url: pathToFileURL(file).href,
+          filename: "demo.lgp",
+        },
+      ],
+    })
+    const stored = yield* MessageV2.get({ sessionID: session.id, messageID: message.info.id })
+    const text = stored.parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")
+    expect(text).toContain(`Attached Loginom package path: ${file}`)
+    expect(text.includes("PACKAGE_BYTES_MARKER")).toBe(false)
+    const files = stored.parts.filter((part) => part.type === "file")
+    expect(files).toHaveLength(1)
+    if (files[0]?.type === "file") {
+      expect(files[0].url.startsWith("file:")).toBe(true)
+      expect(files[0].url.includes("base64")).toBe(false)
+    }
+    yield* sessions.remove(session.id)
+  }),
 )
 
 noLLMServer.instance(

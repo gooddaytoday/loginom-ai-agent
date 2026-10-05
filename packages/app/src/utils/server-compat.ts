@@ -1,6 +1,13 @@
 import type { ServerApi } from "./server"
 import type { ServerProtocol } from "./server-protocol"
-import type { AgentPartInput, FilePartInput, OpencodeClient, Session, TextPartInput } from "@loginom-ai-agent/sdk/v2/client"
+import { LOGINOM_PACKAGE_MIME } from "@/constants/file-picker"
+import type {
+  AgentPartInput,
+  FilePartInput,
+  OpencodeClient,
+  Session,
+  TextPartInput,
+} from "@loginom-ai-agent/sdk/v2/client"
 import type {
   Project,
   ProjectCurrent,
@@ -23,7 +30,7 @@ type CompatibleSessionApi = Omit<
   "prompt" | "command" | "shell" | "compact" | "rename" | "archive" | "remove"
 > & {
   prompt: (input: SessionPromptInput & LegacyPrompt) => Promise<SessionPromptOutput>
-  command: (input: SessionCommandInput) => Promise<SessionCommandOutput>
+  command: (input: SessionCommandInput & LegacyCommand) => Promise<SessionCommandOutput>
   shell: (input: SessionShellInput & LegacyPrompt) => Promise<SessionShellOutput>
   compact: (input: SessionCompactInput & { model?: LegacyPrompt["model"] }) => Promise<SessionCompactOutput>
   rename: (input: Parameters<SessionApi["rename"]>[0] & LegacyLocation) => ReturnType<SessionApi["rename"]>
@@ -45,6 +52,9 @@ type LegacyPrompt = {
   variant?: string
   legacyParts?: (TextPartInput | FilePartInput | AgentPartInput)[]
 }
+type LegacyCommand = {
+  legacyParts?: (TextPartInput | FilePartInput)[]
+}
 type LegacyLocation = { directory?: string }
 type CompatibleInput = {
   protocol: Promise<ServerProtocol>
@@ -54,6 +64,7 @@ type CompatibleInput = {
 }
 
 function mime(uri: string) {
+  if (uri.startsWith("file:") && new URL(uri).pathname.toLowerCase().endsWith(".lgp")) return LOGINOM_PACKAGE_MIME
   const match = /^data:([^;,]+)/.exec(uri)
   return match?.[1] ?? "application/octet-stream"
 }
@@ -238,7 +249,7 @@ function createV1Api(input: CompatibleInput): CompatibleApi {
           delivery: value.delivery ?? "steer",
         }
       },
-      async command(value: SessionCommandInput) {
+      async command(value: SessionCommandInput & LegacyCommand) {
         await legacy().session.command({
           sessionID: value.sessionID,
           messageID: value.id ?? undefined,
@@ -247,12 +258,14 @@ function createV1Api(input: CompatibleInput): CompatibleApi {
           agent: value.agent ?? undefined,
           model: value.model ? `${value.model.providerID}/${value.model.id}` : undefined,
           variant: value.model?.variant,
-          parts: value.files?.map((file) => ({
-            type: "file" as const,
-            mime: mime(file.uri),
-            url: file.uri,
-            filename: file.name,
-          })),
+          parts:
+            value.legacyParts ??
+            value.files?.map((file) => ({
+              type: "file" as const,
+              mime: mime(file.uri),
+              url: file.uri,
+              filename: file.name,
+            })),
         })
         return {
           admittedSeq: 0,
