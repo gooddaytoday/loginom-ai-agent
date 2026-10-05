@@ -2,7 +2,7 @@
 export function captureJavascriptSelection({binding,node}) {
     const tab=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
     const diagram=tab?.Controller?.FController?.FDiagram,nodes=diagram?.FNodes?.FCollection;
-    const found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===node.id):[];
+    const found=Array.isArray(nodes)&&nodes.length<=200?nodes.filter(n=>n.FGuid===node.id):[];
     if(tab!==binding.tab||found.length!==1)throw Error('Private selection binding unavailable');
     const selected=diagram.FmxGraph.getSelectionCells();
     return {document,controller:tab.Controller,tabRoot:tab.el?.dom,model:tab.Controller.FController,diagram,graph:diagram.FmxGraph,container:diagram.FmxGraph.container,native:found[0],cell:found[0].FCell,shape:diagram.FmxGraph.view.getState(found[0].FCell)?.shape?.node,replacements:0,initialSelectionCount:Array.isArray(selected)?selected.length:null,initialSelected:Array.isArray(selected)&&selected.length===1&&selected[0]===found[0].FCell};
@@ -11,7 +11,7 @@ export function captureJavascriptSelection({binding,node}) {
 export function inspectJavascriptSelection({binding,node,icon,retained:r,requireSettings,requireVisualizers,inspectPhase,deadline,targetOrigin,targetBuild,poll=false,afterGesture=false}) {
     const app=globalThis.bg?.app,tab=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
     const diagram=tab?.Controller?.FController?.FDiagram,nodes=diagram?.FNodes?.FCollection;
-    const found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===node.id):[];
+    const found=Array.isArray(nodes)&&nodes.length<=200?nodes.filter(n=>n.FGuid===node.id):[];
     if(document!==r.document||location.origin!==targetOrigin||app?.Version!==targetBuild
       ||tab!==binding.tab||tab?.Controller!==r.controller||tab.Controller.FController!==r.model
       ||tab?.Controller?.Node?.data?.node!==binding.workflow||diagram!==r.diagram

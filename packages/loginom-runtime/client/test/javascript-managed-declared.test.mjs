@@ -128,3 +128,28 @@ test('foreign declared receipt cannot advance to the next column step',async()=>
     record:async event=>{events.push(event);return event;},receiptOptions:()=>({})}),/effect unconfirmed/);
   assert.equal(calls,3);assert.equal(events.length,1);
 });
+
+test('declared transport covers a generated Apply settling after forty seconds without replay',async()=>{
+  const started=Date.now(),owned={...task,deadline:started+180000};
+  const declared=[{name:'Value',label:'Value',type:'integer',data_kind:'Непрерывный',usage:'Не задано'}];
+  const expected={status:'ready',base:'editor'},gesture_id=owned.operation_id+':declared-0-apply';
+  let elapsed=0,clicks=0,timeout;
+  const lease={identity:JSON.stringify([owned.owner,owned.workflow_ref,owned.targetOrigin,owned.targetBuild,owned.deadline]),
+    settingAttempted:true,wizardCaptured:{},handle:{},declared:{columns:JSON.stringify(declared),index:0,step:5,
+      pending:{held:{dispose:async()=>{}}},context:{dispose:async()=>{}},attempted:new Set(),
+      prepared:{gesture_id,observed:expected}}};
+  const page={evaluate:async(fn,args)=>args?.phase==='applied'
+    ?{status:elapsed<40000?'pending':'settled',reason:'ui_busy'}:args?.phase==='editing'?expected:{verified:true},
+    waitForTimeout:async ms=>{elapsed+=ms;},locator:()=>({filter:()=>({click:async()=>{clicks++;}})})};
+  page[Symbol.for('loginom-dock.javascript-owned-selection-v1')]=new Map([[owned.operation_id,lease]]);
+  const code=makeJavascriptManagedDeclaredCode({...owned,columns:declared,index:0,step:'apply',mode:'effect',
+    expected,gesture_id,usage_value:0});
+  const run=runInNewContext('('+code+')',{Date:{now:()=>started+elapsed},Symbol,Set,Map,JSON,TextEncoder});
+  assert.equal((await run(page)).status,'SUCCEEDED');
+  assert.equal(elapsed,40000);assert.equal(clicks,1);assert.equal(lease.declared.complete,true);
+  await assert.rejects(run(page),/order or parameters changed/);assert.equal(clicks,1);
+  await assert.rejects(dispatchManagedJavascriptDeclared({task:owned,columns:declared,
+    execute:async(code,options)=>{if(options){timeout=options.timeout;throw Error('stop after admission');}
+      return {status:'prepared'};},record:async event=>event,receiptOptions:()=>({})}),/stop after admission/);
+  assert.ok(timeout>=180000&&timeout<=185000,`transport timeout ${timeout} must cover the original deadline`);
+});

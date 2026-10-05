@@ -70,7 +70,7 @@ export function verifiedJavascriptWizardRefusal(refusal,request) {
   const uuid=value=>/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value);
   const digest=value=>/^[a-f0-9]{64}$/.test(value);
   return request.target.kind==='existing'&&request.target.type==='programming.javascript'&&request.mode==='script'
-    &&request.finish==='execute'&&request.inputs.length===0&&request.mappings.length===0&&request.parameters.columns===undefined
+    &&['done','execute'].includes(request.finish)&&request.inputs.length===0&&request.mappings.length===0&&request.parameters.columns===undefined
     &&refusal?.verification===verification&&same(proof?.node,node)
     &&['document_id','workflow_id','node_id'].every(key=>proof?.owner?.[key]===node[key])
     &&proof.owner.operation_id===request.operation_id&&Number.isSafeInteger(proof.owner.ui_epoch)&&proof.owner.ui_epoch>=0

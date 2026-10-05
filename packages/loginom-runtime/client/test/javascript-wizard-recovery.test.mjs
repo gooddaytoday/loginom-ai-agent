@@ -50,6 +50,23 @@ async function refusalError(options) {
  try{await retainedJavascriptWizardRefusal(options);}catch(error){return error;}
  throw Error('Expected refusal');
 }
+for(const mode of ['code','declared'])test('Done accepts the actual closed native refusal without executing '+mode,async()=>{
+ const f=await fixture(mode);f.request.finish='done';
+ f.request.read={ports:[],sample_rows:0,require_exact_numbers:false};
+ const error=await refusalError(f.options),calls=[];
+ const verified=async()=>({verified:true,cleanup_complete:true,effect_possible:true});
+ const result=await applyNode({request:f.request,operation:{id:f.request.operation_id},
+  handlers:new Map([['programming.javascript',{revision:'test',modes:['script'],output_wizard:'separate',validate(){},configure:verified}]]),
+  drivers:{verifySource:verified,prepareTarget:async()=>({...await verified(),node:f.node}),mapPorts:verified,openWizard:verified,
+   finish:async()=>{calls.push('Done');throw error;},finishGraph:async()=>{calls.push('unexpected');},
+   waitExecution:async()=>{calls.push('unexpected');}},record:async event=>event});
+ assert.deepEqual(calls,['Done']);assert.equal(result.status,'FAILED');
+ assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
+ assert.equal(result.configuration.status,'discarded');assert.equal(result.execution.status,'not_requested');
+ assert.equal(result.error.native.source_sha256,error.nodePhaseRefusal.proof.rejected_source_sha256);
+ const foreign=structuredClone(error.nodePhaseRefusal);foreign.proof.owner.node_id='foreign';
+ assert.equal(verifiedJavascriptWizardRefusal(foreign,f.request),false);
+});
 for(const mode of ['code','declared'])test('two actual owned source admissions and graph preservation allow typed native refusal '+mode,async()=>{
  const f=await fixture(mode),error=await refusalError(f.options);
  assert.equal(verifiedJavascriptWizardRefusal(error.nodePhaseRefusal,f.request),true);

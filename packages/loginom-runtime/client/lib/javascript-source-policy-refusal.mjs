@@ -40,7 +40,7 @@ export function verifiedJavascriptSourcePolicyRefusal(refusal,request,configured
   &&Number.isSafeInteger(closed.owner.ui_epoch)&&closed.owner.ui_epoch>=0
   &&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(closed.admission_id)
   &&Number.isSafeInteger(closed.read_id)&&closed.read_id>0&&Number.isSafeInteger(closed.deadline)
-  &&['policy','stale_identity','effect_drift'].includes(closed.reason)
+  &&['policy','stale_identity','stale_digest','effect_drift'].includes(closed.reason)
   &&closed.source_read_discard_verified===true&&closed.check_callback_dispatched===false
   &&/^[a-f0-9]{64}$/.test(source?.source_sha256)&&Number.isInteger(source.source_utf8_bytes)
   &&source.source_utf8_bytes>=0&&source.source_utf8_bytes<=32768&&Number.isInteger(source.source_lf_lines)

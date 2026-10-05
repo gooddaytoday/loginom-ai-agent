@@ -7,6 +7,7 @@ import { appendFileSync } from "node:fs"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { closeManagedResources } from "./managed-resources-close.mjs"
+import { runtimeCallTimeout } from "./call-timeout.mjs"
 import { loginBrowser, checkConnection, loginomAddress } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts } from "../client/lib/artifacts.mjs"
@@ -204,11 +205,11 @@ async function handle(message) {
     const controller = new AbortController()
     state.controller = controller
     try {
-      // dock_node_wait may legitimately wait 60 seconds. Leave room for its receipt
-      // before the supervisor's 120-second deadline, instead of the SDK's 60-second default.
+      // Allow the bounded owned read and cleanup to return before the outer IPC
+      // deadlines. Other tools retain room for a 60-second dock_node_wait.
       const result = await state.client.callTool(message.input, undefined, {
         signal: controller.signal,
-        timeout: 105_000,
+        timeout: runtimeCallTimeout(message.input.name, message.input.arguments),
       })
       send({ id: message.id, result: {
         result, recoveryPending: state.bridge.hasUnsettledWork(), activeWork: state.bridge.hasActiveWork(),

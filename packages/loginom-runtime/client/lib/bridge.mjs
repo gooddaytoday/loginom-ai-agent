@@ -10,6 +10,7 @@ import { makeClipboardCode, runClipboardTransfer, createSerialGate, clipboardToo
 import { createSkillLoader, skillTransport, skillUri, prepareTool } from './skill.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import {randomUUID} from 'node:crypto';
 import { openArchive } from './archive.mjs';
 import { diagnoseConnection } from './diagnostics.mjs';
 import { pinActionCatalog, assertCatalogTarget, validateActionParameters } from './action-catalog.mjs';
@@ -134,7 +135,8 @@ export async function createBridge(config, session, { browserTransport: managedB
   const browserGate = createSerialGate();
   const heldLeases = new Set();
   const savedPackages = new Map();
-  const confirmedSaves = new Set();
+  const saveAdmissions = new Map();
+  let saveSequence=0;
   let lastSavedPackage = null;
   let closing, shutdownStarted = false;
   const skill = createSkillLoader({ directory: session.directory, transport: skillTransport(config) });
@@ -348,6 +350,13 @@ export async function createBridge(config, session, { browserTransport: managedB
               validateActionParameters(definition.inputSchema,args);
             }
             if (!(request.params.name === 'dock_workspace_observe' && args.scope === 'bootstrap')) requirePreparedWorkspace(session.metadata);
+            const saveRequest=request.params.name==='dock_action_run'
+              &&['package.save_as','package.save_checkpoint'].includes(args.action_key);
+            const operationId=saveRequest&&args.operation_id===undefined?randomUUID():args.operation_id;
+            const newSave=saveRequest&&!saveAdmissions.has(operationId);
+            const saveAdmission=newSave?{
+              sequence:saveSequence++,action_key:args.action_key,path:args.parameters?.path,
+              document_id:session.metadata.workspacePreparation?.state?.document_id}:null;
             const outcome = request.params.name === 'dock_workspace_observe' ? await actionRuntime.observe({ signal: extra.signal, scope: args.scope, cursor: args.cursor, rootRef: args.root_ref, observationId: args.observation_id, storageName: args.storage_name })
               : request.params.name === 'dock_operation_inspect' ? await actionRuntime.inspect({ operationId: args.operation_id, signal: extra.signal })
                 : request.params.name === 'dock_operation_recover' ? await actionRuntime.recover(args.operation_id,
@@ -358,19 +367,31 @@ export async function createBridge(config, session, { browserTransport: managedB
                     observationId:args.observation_id,operationId:args.operation_id,signal:extra.signal})
                   : request.params.name === 'dock_ui_action' ? await actionRuntime.uiAct(args.action,
                     { observationId: args.observation_id, operationId: args.operation_id, recoveryOperationId: args.recovery_operation_id, signal: extra.signal })
-                    : await actionRuntime.run(args.action_key, args.parameters, { signal: extra.signal, operationId: args.operation_id });
+                    : await actionRuntime.run(args.action_key, args.parameters, { signal: extra.signal, operationId });
+            // Validation throws, earlier reconciliation and proven no-effect
+            // refusals do not admit this Save. Bind only its returned receipt;
+            // an ambiguous admitted result can still be confirmed by inspection.
+            if(saveAdmission&&outcome.operation_id===operationId
+              &&!(['NOT_APPLIED','FAILED'].includes(outcome.status)&&outcome.effect_possible===false))
+              saveAdmissions.set(operationId,saveAdmission);
             await logResult(request.params.name,outcome);
             if (outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
                 && outcome.output?.package_ref?.path) savedPackages.set(outcome.output.package_ref.path, outcome.operation_id);
-            // Inspecting/retrying an older receipt is not a new Save. Keep the
-            // latest confirmed mutation, including another Save to the same path.
-            if (request.params.name === 'dock_action_run' && outcome.status === 'SUCCEEDED'
-                && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
-                && args.action_key === outcome.action_key && args.operation_id === outcome.operation_id
-                && outcome.output?.package_ref?.path && !confirmedSaves.has(outcome.operation_id)) {
-              confirmedSaves.add(outcome.operation_id);
-              lastSavedPackage = {path:outcome.output.package_ref.path, operation_id:outcome.operation_id,
-                document_id:session.metadata.workspacePreparation?.state?.document_id};
+            const confirmedSave=saveRequest?outcome:request.params.name==='dock_operation_inspect'
+              &&outcome.status==='SUCCEEDED'&&outcome.action_key==='operation.inspect'
+              &&outcome.operation_id===args.operation_id&&outcome.output?.state==='resolved'
+              &&outcome.output.cleanup_confirmed===true&&outcome.output.outcome?.operation_id===args.operation_id
+                ?outcome.output.outcome:null;
+            const admission=confirmedSave&&saveAdmissions.get(confirmedSave.operation_id);
+            // Reconciliation confirms the original admission, not a new Save.
+            // An older receipt can never supersede a later confirmed mutation.
+            if(admission&&confirmedSave.status==='SUCCEEDED'&&confirmedSave.action_key===admission.action_key
+              &&confirmedSave.output?.package_ref?.path===admission.path
+              &&admission.document_id===session.metadata.workspacePreparation?.state?.document_id
+              &&(!lastSavedPackage||admission.sequence>lastSavedPackage.sequence)) {
+              savedPackages.set(admission.path,confirmedSave.operation_id);
+              lastSavedPackage={path:admission.path,operation_id:confirmedSave.operation_id,
+                document_id:admission.document_id,sequence:admission.sequence};
             }
             if (userProfile && outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key))
               for (const continuation of outcome.output?.workflow_continuations ?? []) userWorkflows.remember(continuation);

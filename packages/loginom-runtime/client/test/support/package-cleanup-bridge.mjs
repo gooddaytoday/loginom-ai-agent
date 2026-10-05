@@ -9,6 +9,7 @@ import * as executor from '../../lib/executor.mjs';
 import * as catalog from '../../lib/action-catalog.mjs';
 import * as skill from '../../lib/skill.mjs';
 import * as workspace from '../../lib/workspace.mjs';
+import {Page,runtime} from './executor-fixture.mjs';
 
 // Bridge lifecycle test: external services and the action executor are fixtures.
 // The serialized Loginom close body is exercised separately in package-cleanup.test.
@@ -56,17 +57,58 @@ mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExport
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>{
   const f=current;return {tools:executor.executorTools,describe:()=>({}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},
+    requestFailure:error=>{
+      f.failureMessages??=[];f.failureMessages.push(error.message);
+      return {status:'NOT_APPLIED',operation_id:'refused-save',effect_possible:false,cleanup_complete:true};
+    },
     run:async(key,parameters,{operationId})=>{
+      // Keep the real executor's explicit-null validation authoritative.
+      if(operationId===null)return runtime(new Page()).run(key,parameters,{operationId});
+      operationId??='generated-save-id';
+      if(f.throwOnce===operationId){f.throwOnce=null;throw Error('Invalid Save parameters');}
+      if(f.returnOlderOnce===operationId){f.returnOlderOnce=null;return f.receipts.get('own-save');}
+      if(f.refuseOnce===operationId){f.refuseOnce=null;return {status:'NOT_APPLIED',action_key:key,operation_id:operationId,effect_possible:false,cleanup_complete:true,output:{}};}
       if(f.receipts.has(operationId))return f.receipts.get(operationId);
       if(f.scenario==='failed-new-save'&&operationId==='failed-save')return {status:'NOT_APPLIED',action_key:key,operation_id:operationId,effect_possible:false,output:{}};
       f.saves++;f.path=parameters.path;
       const result={status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};
-      f.receipts.set(operationId,result);return result;
+      f.receipts.set(operationId,result);return f.loseId===operationId?{...result,status:'AMBIGUOUS'}:result;
     },
-    inspect:async({operationId})=>f.receipts.get(operationId),
+    inspect:async({operationId})=>f.inspection??{status:'SUCCEEDED',action_key:'operation.inspect',operation_id:operationId,
+      output:{state:'resolved',cleanup_confirmed:true,outcome:f.receipts.get(operationId)}},
   };
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
+
+for(const action_key of ['package.save_checkpoint','package.save_as'])
+ test('Save rejects explicit null but permits an omitted ID: '+action_key,async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'cleanup-null-save-'));
+  const f=current={scenario:'success',events:[],busy:false,saves:0,path,receipts:new Map()};
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+   metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+   artifactStore:{list:()=>[],async releaseUploads(){}}};
+  const bridge=await createBridge({mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+   loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+  const client=new AgentClient({name:'null-save',version:'1'});
+  try{
+   const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+   await client.callTool({name:'dock_prepare',arguments:{}});
+   for(let attempt=0;attempt<2;attempt++){
+    const response=await client.callTool({name:'dock_action_run',arguments:{action_key,parameters:{path,conflict_policy:'replace'},operation_id:null}});
+    const refusal=JSON.parse(response.content[0].text);
+    assert.equal(refusal.status,'NOT_APPLIED');assert.equal(refusal.effect_possible,false);
+    assert.match(f.failureMessages.at(-1),/operation_id must be a stable identifier/);
+    assert.equal(f.saves,0);assert.equal(f.receipts.size,0);assert.equal(f.events.includes('saved-state'),false);
+   }
+   const response=await client.callTool({name:'dock_action_run',arguments:{action_key,parameters:{path,conflict_policy:'replace'}}});
+   const saved=JSON.parse(response.content[0].text);
+   assert.equal(saved.status,'SUCCEEDED');assert.match(saved.operation_id,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+   assert.equal(f.saves,1);
+   assert.equal((await bridge.close()).browser_transport_closed,true);
+   const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
+   assert.equal(cleanup.status,'SUCCEEDED');assert.equal(cleanup.save_operation_id,saved.operation_id);
+  }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+ });
 
 const cases=['success','unprepared','no-save','native-blocked','busy','dirty-after-save','state-unavailable'];
 for(const mode of ['isolated','normal'])for(const scenario of mode==='isolated'?cases:[...cases,
@@ -142,3 +184,55 @@ for(const mode of ['isolated','normal'])for(const scenario of mode==='isolated'?
     }
   }finally{await client?.close();await bridge?.close();await rm(directory,{recursive:true,force:true});}
 });
+
+for(const scenario of ['generated-id','reconciled-own','reconciled-older','reconciled-not-admitted','noeffect-retry','validation-retry','changed-document-reconciled',
+ 'foreign-id','wrong-path','wrong-action','unresolved-inspection','unclean-inspection','unknown-inspection'])
+ test('normal shutdown binds only an admitted confirmed Save: '+scenario,async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'cleanup-save-admission-'));
+  const f=current={scenario,events:[],busy:false,saves:0,path,receipts:new Map(),loseId:scenario==='generated-id'?null:'own-save'};
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+   metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){}}};
+  const bridge=await createBridge({mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+   loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+  const client=new AgentClient({name:'save-admission',version:'1'});
+  try{
+   const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+   await client.callTool({name:'dock_prepare',arguments:{}});
+   const response=await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},
+    ...(scenario==='generated-id'?{}:{operation_id:'own-save'})}});
+   const save=JSON.parse(response.content[0].text);
+   assert.equal(save.status,scenario==='generated-id'?'SUCCEEDED':'AMBIGUOUS');
+   assert.equal(typeof save.operation_id,'string');
+   if(scenario==='reconciled-older')
+    await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_as',parameters:{path:secondPath},operation_id:'newer-save'}});
+   if(['reconciled-not-admitted','noeffect-retry','validation-retry'].includes(scenario)){
+    if(scenario==='reconciled-not-admitted')f.returnOlderOnce='deferred-save';
+    if(scenario==='noeffect-retry')f.refuseOnce='deferred-save';
+    if(scenario==='validation-retry')f.throwOnce='deferred-save';
+    const args={action_key:'package.save_checkpoint',parameters:{path},operation_id:'deferred-save'};
+    await client.callTool({name:'dock_action_run',arguments:args});
+    await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_as',parameters:{path:secondPath},operation_id:'newer-save'}});
+    await client.callTool({name:'dock_action_run',arguments:args});
+   }
+   if(scenario==='changed-document-reconciled')session.metadata.workspacePreparation.state.document_id='foreign-doc';
+   if(scenario!=='generated-id'){
+    const outcome=structuredClone(f.receipts.get('own-save'));
+    if(['foreign-id','unknown-inspection'].includes(scenario))outcome.operation_id='foreign-save';
+    if(scenario==='wrong-path')outcome.output.package_ref.path=secondPath;
+    if(scenario==='wrong-action')outcome.action_key='package.save_as';
+    f.inspection={status:'SUCCEEDED',action_key:'operation.inspect',operation_id:scenario==='unknown-inspection'?'foreign-save':'own-save',
+     output:{state:scenario==='unresolved-inspection'?'pending':'resolved',cleanup_confirmed:scenario!=='unclean-inspection',outcome}};
+    await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:scenario==='unknown-inspection'?'foreign-save':'own-save'}});
+   }
+   const closed=await bridge.close();
+   const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
+   const accepted=['generated-id','reconciled-own','reconciled-older','reconciled-not-admitted','noeffect-retry','validation-retry'].includes(scenario);
+   assert.equal(closed.browser_transport_closed,accepted);
+   assert.equal(cleanup.status,accepted?'SUCCEEDED':'BLOCKED');
+   assert.equal(cleanup.save_operation_id,accepted?(scenario==='reconciled-older'?'newer-save'
+    :['reconciled-not-admitted','noeffect-retry','validation-retry'].includes(scenario)?'deferred-save':save.operation_id):null);
+   assert.equal(cleanup.package_path,accepted?(scenario==='reconciled-older'?secondPath:path):null);
+   assert.equal(f.events.filter(event=>event==='package-cleanup').length,accepted?1:0);
+   if(!accepted)assert.equal(closed.package_cleanup.reason,'CONFIRMED_SAVE_REQUIRED');
+  }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+ });

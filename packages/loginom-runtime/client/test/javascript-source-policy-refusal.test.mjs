@@ -22,9 +22,24 @@ function fixture({source='import "PRIVATE_SENTINEL";',record,closeError=false}={
   sourceAdapter:()=>({open:async()=>{calls.push('open');return browser.observe({context:browser.context,owner,epoch:1,capture:true});},
    read:async held=>({...browser.observe({context:browser.context,owner,epoch:1,held}),settings:{generation:true}}),
    discard:async()=>{calls.push('close');if(closeError)throw Error('Close reply lost');return {closed:true,owner};}})});
- const run=(phase='target')=>withJavascriptSourcePolicyBoundary({phase,owner,deadline,record:journal},()=>admission.admit({}));
+ const run=(phase='target',parameters={})=>withJavascriptSourcePolicyBoundary({phase,owner,deadline,record:journal},()=>admission.admit(parameters));
  return {browser,events,calls,admission,run,journal,deadline};
 }
+for(const finish of ['done','close','execute'])test('stale digest after actual verified Close clears only the pending phase '+finish,async()=>{
+ const f=fixture({source:'import "builtIn/Data";'}),p=request();p.finish=finish;
+ p.read={ports:[],sample_rows:0,require_exact_numbers:false};
+ p.parameters={source_text:'',expected_source_sha256:'a'.repeat(64)};
+ let failure;
+ const result=await applyNode({request:p,operation:{id:owner.operation_id},record:f.journal,now:()=>f.deadline-60000,
+  handlers:new Map([['programming.javascript',{revision:'test',modes:['script'],validate(){},configure(){assert.fail('Must not configure');}}]]),
+  drivers:{verifySource:async()=>({verified:true,cleanup_complete:true,effect_possible:false}),
+   prepareTarget:async()=>{try{return await f.run('target',p.parameters);}catch(error){failure=error;throw error;}}}});
+ assert.deepEqual(f.calls,['open','close']);assert.equal(failure.code,'stale_digest');
+ assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
+ assert.equal(verifiedJavascriptSourcePolicyRefusal(failure.nodePhaseRefusal,p),true);
+ const foreign=structuredClone(failure.nodePhaseRefusal);foreign.proof.closed.check_callback_dispatched=true;
+ assert.equal(verifiedJavascriptSourcePolicyRefusal(foreign,p),false);
+});
 for(const source of ['import "PRIVATE_SENTINEL";', 'export * from "PRIVATE_SENTINEL";',
  'require("PRIVATE_SENTINEL");', 'import("builtIn/Data");', 'const value=`${require("PRIVATE_SENTINEL")}`;', 'const value=;'])
  test('actual full source reader and verified discard settle unsupported preserved source '+source.slice(0,18),async()=>{

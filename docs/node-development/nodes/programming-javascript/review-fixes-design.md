@@ -10,11 +10,15 @@ Canonical история обучения остаётся в `origin/javascript
 
 ## Решения
 
-1. **Save без operation_id.** Tracker принимает выданный executor ID, но
+1. **Save без operation_id.** Bridge выдаёт private ID до вызова executor, но
    подтверждает только Save, первоначально допущенный через эту bridge-сессию.
    Связываются action key, path и подготовленный document, а не model owner.
+   Private ID создаётся только при `operation_id === undefined`; явный `null`
+   передаётся исходному валидатору executor и отклоняется до Save.
 2. **Save после inspection.** Реестр первоначальных Save admissions хранит
-   последовательность до dispatch. Подтверждённый вложенный `output.outcome`
+   последовательность до dispatch и связывает её только с собственной returned
+   receipt. Validation throw, no-effect refusal и чужая reconciliation не
+   допускают новый Save. Подтверждённый вложенный `output.outcome`
    принимается только для exact operation ID/action/path/document и resolved
    inspection с подтверждённой cleanup. Более ранний admission не вытесняет
    более поздний подтверждённый Save; повтор не становится новым admission.

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {runInNewContext} from 'node:vm';
 import {makeJavascriptManagedViewsCode,runManagedJavascriptViewsGesture,
   openManagedJavascriptOutputViews} from '../lib/javascript-managed-views.mjs';
 
@@ -57,4 +58,32 @@ test('managed Views dispatch requires an exact durable journal ACK before its mu
   record:async event=>({...event,gesture_id:'wrong-ack'}),receiptOptions:()=>assert.fail('unexpected body'),
   wrapMutation:()=>assert.fail('mutation before ACK')}),/ACK/);
  assert.equal(calls.length,2);
+});
+
+test('generated Views capture and settlement can each wait seventy seconds under one original deadline',async()=>{
+ const f=fixture(),started=Date.now(),deadline=started+180000,timeouts=[],waits=[];
+ let elapsed=0,clicks=0;
+ const leases=new Map();
+ const page={[Symbol.for('loginom-dock.javascript-owned-selection-v1')]:leases,
+  waitForFunction:async(fn,args,options)=>{waits.push(options.timeout);elapsed+=70000;
+   assert.ok(elapsed<deadline-started);return {dispose:async()=>{}};},
+  evaluateHandle:async()=>({dispose:async()=>{}}),
+  evaluate:async(fn,args)=>args.task.mode==='settle'
+   ?{ready:true,surface:'views',native_owner_verified:true,node_id:'node',port_guid:'port'}:f.task.expected,
+  mouse:{click:async()=>{clicks++;}}};
+ const result=await openManagedJavascriptOutputViews({prepared:f.task.prepared,node:f.task.owner,
+  output:f.task.output,deadline,targetOrigin:f.task.targetOrigin,record:async event=>event,
+  receiptOptions:()=>assert.fail('unexpected body'),wrapMutation:code=>code,
+  execute:async(code,options)=>{
+   if(code.includes('runManagedJavascriptSelectionRead'))return {ready:true};
+   const bound=JSON.parse(code.match(/\(page,(.*),function inspect/)[1]);
+   if(!leases.has(bound.operation_id))leases.set(bound.operation_id,{bodySettled:true,handle:{},
+    identity:JSON.stringify([bound.owner,bound.workflow_ref,bound.targetOrigin,bound.targetBuild,bound.deadline])});
+   if(['capture','settle'].includes(bound.mode))timeouts.push(options?.timeout??60000);
+   return runInNewContext('('+code+')',{Date:{now:()=>started+elapsed},Symbol,JSON})(page);
+  }});
+ assert.equal(result.surface_verified,true);assert.equal(elapsed,140000);assert.equal(clicks,1);
+ assert.deepEqual(waits,[180000,110000]);
+ assert.ok(timeouts.every((timeout,index)=>timeout>=waits[index]&&timeout<=185000),JSON.stringify(timeouts));
+ assert.equal(leases.values().next().value.viewsSettled,true);
 });

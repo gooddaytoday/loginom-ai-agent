@@ -49,8 +49,9 @@ test('public handler refuses cap+1, line+1, modules, columns and redaction befor
  let browserCalls=0;
  for(const source_text of ['const value="SYNTHETIC_SOURCE_SECRET";','// Bearer abcdefghijklmnop']) {
   const request={...valid,parameters:{...valid.parameters,source_text}},driver=support.nodeApplyDriverFactory({operation:{id:request.operation_id,parameters:request},execute:async()=>{browserCalls++;throw Error('Unexpected browser call');},onRecord:async event=>event,now:Date.now,receiptOptions:()=>({})});
-  await driver.verifySource(request.parameters);
-  await assert.rejects(()=>driver.beforeTarget({document_id:node.document_id,workflow_ref:prepared.workflow_ref,deadline:Date.now()+60000}),/admission refused/);
+  await assert.rejects(()=>driver.verifySource(request.parameters),error=>
+   error.nodePhaseRefusal?.phase==='source'&&error.nodePhaseRefusal.status==='NOT_APPLIED'
+   &&error.nodePhaseRefusal.effect_possible===false&&error.nodePhaseRefusal.cleanup_complete===true);
  }
  assert.equal(browserCalls,0);
 });

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto"
 import type { createLoginomHost } from "./host"
 import type { InputFile } from "./inputs"
 import { hostError } from "./errors"
+import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 export type HostPort = {
   postMessage(value: unknown): void
   on(event: "message", listener: (event: { data: unknown }) => void): void
@@ -144,7 +145,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           const result = await runtime.request("call", {
             name: input.name,
             arguments: "args" in input ? input.args : undefined,
-          })
+          }, runtimeCallTimeout(input.name, "args" in input ? input.args : undefined) + 15_000)
           if (
             !result ||
             typeof result !== "object" ||

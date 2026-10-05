@@ -1,5 +1,19 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-05 — установлен Desktop с JavaScript и review fixes
+
+Установлена локальная production-сборка `0.1.17-local.20261005.javascript.0d884d197`.
+Точный source snapshot `0d884d1977396e8dfa296291a57dffccb25647fc` создан в отдельной build-копии
+из текущей `javascript-fixes` с сохранением всех37 незакоммиченных файлов.
+Рабочая ветка и исправления не коммитились и не изменялись. DEB/AppImage static,
+4455 installed resources, ASAR equality, Desktop typecheck,48 тестов (1SKIP),
+199 JavaScript тестов,38 Save/shutdown fixtures, GUI smoke, crash/logging и
+sandboxed Chromium launch PASS. Профиль сохранён, пользовательское приложение
+не завершалось; для применения сборки нужен полный перезапуск.
+[Отчёт установки](../testing/loginom-ai-agent/reports/2026-10-05-javascript-desktop-install.md).
+Новая live JavaScript acceptance на установленном Desktop не выполнялась.
+Сборка локальная, неподписанная, без публикации.
+
 ## 2026-09-25 — scale-fix Desktop 0.1.16 установлен локально
 
 Из `scale-fix` commit `9b68f346d6784cd0a7ad65ee211a568810c78e91`

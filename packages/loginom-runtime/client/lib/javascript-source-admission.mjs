@@ -110,7 +110,7 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
     // Only a completely delivered owned read/discard, before a host callback,
     // can settle a policy refusal. Unknown Close/ACK/callback failures cannot.
     if (error instanceof SourceAdmissionError && ['admitting','checking_effect'].includes(before)
-      && ['policy','stale_identity','effect_drift'].includes(error.code) && lastClosedRead?.read_id === readId) {
+      && ['policy','stale_identity','stale_digest','effect_drift'].includes(error.code) && lastClosedRead?.read_id === readId) {
       const proof = immutable({owner:targetOwner,admission_id:admissionId,read_id:readId,deadline,
         reason:error.code,source_identity:lastClosedRead.identity,settings_sha256:lastClosedRead.settings,
         policy:inspectJavascriptModulePolicy(lastClosedRead.source),source_read_discard_verified:true,
