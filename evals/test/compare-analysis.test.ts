@@ -223,3 +223,11 @@ test("analysis: несовпадающие saved snapshots блокируют о
  expect(analyzeComparison(a,b).axes.oracle.reasons).toContain("snapshot_mismatch")
  expect(analyzeComparison(a,b).reliability.a.pass1).toBeNull()
 })
+
+test("analysis: structural score проверяется до применения bounded CI", () => {
+ const run = comparisonSummary([{successes:3,attempts:3}])
+ for (const score of [-1,101,NaN,Infinity]) {
+  run.tasks[0]!.attempts[0]!.structural_score = score
+  expect(() => analyzeComparison(run,run)).toThrow("Некорректный summary: structural_score")
+ }
+})
