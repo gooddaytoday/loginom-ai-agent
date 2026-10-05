@@ -87,3 +87,18 @@ test("CLI compare: regression, partial и incompatibility сохраняют exi
   expect(incompatible.stdout).toContain("несравнимы")
  } finally { await rm(directory,{recursive:true,force:true}) }
 })
+
+test("CLI compare: serialized enum values проверяются по типу и допустимому значению", async () => {
+ const directory = await mkdtemp(path.join(os.tmpdir(),"evals-compare-enums-"))
+ try {
+  await summaries(directory)
+  for (const kind of ["judge","axis"]) {
+   const run = comparisonSummary([{successes:3,attempts:3}])
+   const raw = JSON.parse(JSON.stringify(run))
+   if (kind === "judge") raw.tasks[0].attempts[0].judge_status = "garbage"
+   if (kind === "axis") raw.tasks[0].rubric_snapshot.checklist[0].axis = ["structure"]
+   await Bun.write(path.join(directory,"a/summary.json"),JSON.stringify(raw))
+   expect((await runCompare(directory,["a","b"])).code).toBe(2)
+  }
+ } finally { await rm(directory,{recursive:true,force:true}) }
+})
