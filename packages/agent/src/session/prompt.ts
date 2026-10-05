@@ -1497,7 +1497,9 @@ const layer = Layer.effect(
 
       const templateParts = yield* resolvePromptParts(template)
       const inputFiles = new Set(
-        input.parts?.filter((part) => new URL(part.url).protocol === "file:").map((part) => fileURLToPath(part.url)),
+        input.parts?.flatMap((part) =>
+          part.type === "file" && new URL(part.url).protocol === "file:" ? [fileURLToPath(part.url)] : [],
+        ),
       )
       const uniqueTemplateParts = templateParts.filter(
         (part) => part.type !== "file" || !inputFiles.has(fileURLToPath(part.url)),
@@ -1511,7 +1513,17 @@ const layer = Layer.effect(
               description: cmd.description ?? "",
               command: input.command,
               model: { providerID: taskModel.providerID, modelID: taskModel.modelID },
-              prompt: templateParts.find((y) => y.type === "text")?.text ?? "",
+              // Subtasks receive text, so retain attachment context after template and shell expansion.
+              prompt: [
+                templateParts.find((y) => y.type === "text")?.text ?? "",
+                ...(input.parts?.flatMap((part) => {
+                  if (part.type === "text") return part.ignored ? [] : [part.text]
+                  if (part.mime === "application/x-loginom-package" && part.url.startsWith("file:")) {
+                    return [`Attached Loginom package path: ${fileURLToPath(part.url)}`]
+                  }
+                  return []
+                }) ?? []),
+              ].join("\n\n"),
             },
           ]
         : [...uniqueTemplateParts, ...(input.parts ?? [])]
@@ -1613,6 +1625,7 @@ export const CommandInput = Schema.Struct({
   parts: Schema.optional(
     Schema.Array(
       Schema.Union([
+        SessionV1.TextPartInput,
         Schema.Struct({
           id: Schema.optional(PartID),
           type: Schema.Literal("file"),

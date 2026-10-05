@@ -4,6 +4,7 @@ import type { Prompt, PromptStore } from "@/context/prompt"
 import type { ModelSelection } from "@/context/local"
 
 let createPromptSubmit: typeof import("./submit").createPromptSubmit
+let sendFollowupDraft: typeof import("./submit").sendFollowupDraft
 
 const createdClients: string[] = []
 const createdSessions: string[] = []
@@ -132,8 +133,7 @@ beforeAll(async () => {
     },
   }))
 
-  mock.module("@loginom-ai-agent/ui/toast", () => ({
-    Toast: { Region: () => null },
+  mock.module("@/utils/toast", () => ({
     showToast: () => 0,
   }))
 
@@ -276,6 +276,7 @@ beforeAll(async () => {
 
   const mod = await import("./submit")
   createPromptSubmit = mod.createPromptSubmit
+  sendFollowupDraft = mod.sendFollowupDraft
 })
 
 beforeEach(() => {
@@ -532,6 +533,110 @@ describe("prompt submit worktree selection", () => {
     ])
     expect(serverSessionSyncs).toBe(0)
   })
+
+  for (const delivery of ["initial", "followup"] as const) {
+    test.each([undefined, "/home/user/demo #1.lgp"])(
+      `${delivery} slash commands preserve Loginom package paths or request missing paths (%s)`,
+      async (sourcePath) => {
+        params = { id: "session-1" }
+        commands.push({ name: "review" })
+        const images: Extract<Prompt[number], { type: "image" }>[] = [
+          {
+            type: "image",
+            id: "package-1",
+            filename: "demo !`printf injected` Ж.lgp",
+            mime: "application/x-loginom-package",
+            sourcePath,
+            blob: { id: "package-1", url: "data:application/x-loginom-package;base64,UEsDBA==" },
+          },
+          ...(sourcePath
+            ? []
+            : [
+                {
+                  type: "image" as const,
+                  id: "package-2",
+                  filename: "other.lgp",
+                  mime: "application/x-loginom-package",
+                  blob: { id: "package-2", url: "data:application/x-loginom-package;base64,UEsDBA==" },
+                },
+              ]),
+          {
+            type: "image",
+            id: "image-1",
+            filename: "preview.png",
+            mime: "image/png",
+            blob: { id: "image-1", url: "data:image/png;base64,cHJldmlldw==" },
+          },
+        ]
+        promptValue = [{ type: "text", content: "/review staged changes", start: 0, end: 22 }, ...images]
+
+        if (delivery === "followup") {
+          await sendFollowupDraft({
+            api: clientFor("/repo/main").api.session as unknown as Parameters<typeof sendFollowupDraft>[0]["api"],
+            serverSync: {} as Parameters<typeof sendFollowupDraft>[0]["serverSync"],
+            sync: { data: { command: commands } } as unknown as Parameters<typeof sendFollowupDraft>[0]["sync"],
+            draft: {
+              sessionID: "session-1",
+              sessionDirectory: "/repo/main",
+              prompt: promptValue,
+              context: [],
+              agent: "agent",
+              model: { providerID: "provider", modelID: "model" },
+            },
+          })
+        }
+
+        if (delivery === "initial") {
+          const submit = createPromptSubmit({
+            prompt,
+            info: () => ({ id: "session-1" }),
+            imageAttachments: () => images,
+            commentCount: () => 0,
+            autoAccept: () => false,
+            mode: () => "normal",
+            working: () => false,
+            editor: () => undefined,
+            queueScroll: () => undefined,
+            promptLength: (value) =>
+              value.reduce((sum, part) => sum + ("content" in part ? part.content.length : 0), 0),
+            addToHistory: () => undefined,
+            resetHistoryNavigation: () => undefined,
+            setMode: () => undefined,
+            setPopover: () => undefined,
+          })
+          await submit.handleSubmit({ preventDefault: () => undefined } as unknown as Event)
+        }
+
+        expect(sentCommands).toHaveLength(1)
+        const command = sentCommands[0] as {
+          command: string
+          arguments: string
+          files: { uri: string; name: string }[]
+          legacyParts: { type: string; text?: string; synthetic?: boolean; mime?: string; url?: string }[]
+        }
+        expect(command.command).toBe("review")
+        expect(command.arguments).toBe("staged changes")
+        expect(command.files).toContainEqual({ uri: "data:image/png;base64,cHJldmlldw==", name: "preview.png" })
+        expect(command.files.some((file) => file.uri.startsWith("data:application/x-loginom-package"))).toBe(false)
+        if (sourcePath) {
+          expect(command.files).toHaveLength(2)
+          expect(command.files).toContainEqual({ uri: "file:///home/user/demo%20%231.lgp", name: "demo #1.lgp" })
+          expect(command.legacyParts).toContainEqual(
+            expect.objectContaining({ type: "file", mime: "application/x-loginom-package" }),
+          )
+        }
+        if (!sourcePath) {
+          expect(command.files).toHaveLength(1)
+          const notes = command.legacyParts.filter((part) => part.type === "text")
+          expect(notes).toHaveLength(2)
+          expect(notes.every((part) => part.synthetic)).toBe(true)
+          expect(notes[0]?.text).toContain("demo !`printf injected` Ж.lgp has no disk path")
+          expect(notes[1]?.text).toContain("other.lgp has no disk path")
+          expect(notes[0]?.text).toContain("Ask the user for an absolute path to the .lgp file.")
+        }
+      },
+    )
+  }
 
   test("uses an injected model selection", async () => {
     params = { id: "session-1" }
