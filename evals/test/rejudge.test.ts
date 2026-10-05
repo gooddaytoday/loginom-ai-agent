@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
 import { cp, mkdtemp, rm } from "node:fs/promises"
+import { evaluationContractHash } from "../src/evaluation"
 import { analyzeComparison } from "../src/compare-analysis"
 import { main } from "../src/run"
 import { evalsRoot } from "../src/config"
@@ -315,6 +316,7 @@ test("--judge-only: сохранённая попытка сохраняет с�
    const current = await summaryFile.json() as RunSummary
    expect(current.tasks[0]!.attempts[0]!.evaluation_contract_hash).toBe(old)
    expect(current.tasks[0]!.attempts[1]!.evaluation_contract_hash).not.toBe(old)
+   expect(current.tasks[0]!.attempts[1]!.evaluation_contract_hash).toBe(evaluationContractHash({rubric_hash:current.rubric_hash,judge:current.judge,pass_threshold:current.config.pass_threshold}))
    const result = analyzeComparison(current,current)
    expect(result.axes.completion.verdict).toBe("indistinguishable")
    expect(result.axes.oracle.verdict).toBeNull()
