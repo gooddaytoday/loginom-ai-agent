@@ -1,6 +1,7 @@
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {join} from 'node:path';
+import {observeColdCrossTable} from './cold-crosstable-settings.mjs';
 const need=(v,m)=>{if(!v)throw Error('COLD_SOURCE:'+m);};
 const one=(xs,m)=>{need(xs.length===1,m);return xs[0];};
 const pick=(f,ks)=>Object.fromEntries(ks.map(k=>[k,f[k]]));
@@ -98,14 +99,14 @@ export async function observeStaticSources({load,graph,channelFor,account,reveal
     const output=await mapping(channel,'output',generatedSchema);configuration.output_mapping={port:0,autosync:output.autosync,fields:output.fields};
     sources.collapses.push({node_id:target.ref.node_id,configuration});
    }else{
-    const s=await channel.observe({condition:'cold observed CrossTable',readCrossTable:true,ready:s=>s.node_crosstable?.verified&&s.node_crosstable.inventory_complete});
+    const {state:s,variablesInspected}=await observeColdCrossTable(channel,target,{closePreparedWizard,openPreparedWizard,selectSource});
     const configuration=crossTableConfiguration(s.node_crosstable,input.native);
     sources.crossTables.push({node_id:target.ref.node_id,configuration});
     await closePreparedWizard(channel);
     // Complete owned CrossTable settings expose every supported binding and
     // its resolved value. Inspect definitions for every bound node; unbound
     // local definitions cannot change these independently observed settings.
-    if(Object.keys(configuration.options.variable_bindings).length){
+    if(Object.keys(configuration.options.variable_bindings).length&&!variablesInspected){
      const variables=await channel.configureCrossTableVariables([]);
      need(variables.verified&&variables.settings_changed===false&&variables.settings_applied===false&&variables.draft_discarded===true,
       'cold variable inspection must discard its unchanged draft');
