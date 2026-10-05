@@ -76,7 +76,7 @@ function reliability(run: RunSummary, k: number | null) {
     const successes = attempts.filter((attempt) => attempt.pass === true).length
     return {
       pass1: attempts.length ? successes / attempts.length : null,
-      passk: k === null || attempts.length < k ? null : successes < k ? 0 : 1,
+      passk: k === null || attempts.length < k ? null : successes < k ? 0 : Array.from({ length: k }, (_, j) => (successes - j) / (attempts.length - j)).reduce((product, value) => product * value, 1),
     }
   })
   return {

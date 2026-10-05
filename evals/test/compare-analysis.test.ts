@@ -94,3 +94,8 @@ test("analysis: неполные карты effective лимитов неизв�
     expect(analyzeComparison(run, run).compatibility).toContain("config.task_timeout_ms")
   }
 })
+
+test("analysis: pass^k использует выборку без возвращения", () => {
+  const run = comparisonSummary([{ successes: 3, attempts: 6 }])
+  expect(analyzeComparison(run, run, { k: 3 }).reliability.a.passk).toBeCloseTo(0.05, 12)
+})
