@@ -57,6 +57,22 @@ test('literal NBSP remains distinct from the empty native display placeholder',a
  const f=fixture();f.records[1].data.Text.ValueText='\u00a0';
  const r=await read(f);assert.equal(r.verified,true);assert.equal(r.rows[1].cells[1].text,'\u00a0');
 });
+test('native single-space display preserves ASCII space, empty and literal NBSP distinctly',async()=>{
+ for(const text of ['', ' ', '\u00a0']) {
+  const f=fixture();f.records[1].data.Text.ValueText=text;f.cells[4].textContent='\u00a0';
+  const r=await read(f);assert.equal(r.verified,true,JSON.stringify(r));assert.equal(r.rows[1].cells[1].text,text);
+ }
+});
+for(const [name,text,type,dom] of [
+ ['two spaces','  ','dtString','\u00a0'],['tab','\t','dtString','\u00a0'],
+ ['different text','x','dtString','\u00a0'],['integer space',' ','dtInteger','\u00a0'],
+ ['real space',' ','dtFloat','\u00a0'],['variant space',' ','dtVariant','\u00a0'],
+ ['wrong empty render','','dtString',' '],['wrong space render',' ','dtString',''],
+])test('native whitespace equivalence refuses '+name,async()=>{
+ const f=fixture();f.records[1].data.Text.ValueText=text;f.cells[4].textContent=dom;
+ f.columns[1].el.dom.attrs.class='bg-TBGDataType-'+type+'-before';
+ assert.equal((await read(f)).reason,'cell_render_mismatch');
+});
 test('zero rows remains a complete empty page with an observed schema',async()=>{
  const f=fixture();f.store.totalCount=0;f.paging.FTotalRowCount=0;f.store.data.map={};f.left.children=[];f.right.children=[];
  const r=await read(f);assert.equal(r.verified,true);assert.equal(r.row_total,0);assert.deepEqual(r.rows,[]);assert.equal(r.columns.length,3);

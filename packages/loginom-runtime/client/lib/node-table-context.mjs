@@ -143,7 +143,11 @@ export async function readNodeTable(page,binding,table,request,readOutputs=readO
           if(text!==undefined)return fail('null_cache_mismatch');
           cells.push({column:field.index,is_null:true,text:null});continue;
         }
-        if(typeof text!=='string'||text.length>16384||els[0].textContent!==(text===''?'\u00a0':text))return fail('cell_render_mismatch');
+        // The native string renderer paints one ASCII space as NBSP, just
+        // like its empty display placeholder. Preserve the exact cached value;
+        // this equivalence applies only to that observed string display case.
+        const display=text===''||(field.type==='string'&&text===' ')?'\u00a0':text;
+        if(typeof text!=='string'||text.length>16384||els[0].textContent!==display)return fail('cell_render_mismatch');
         cells.push({column:field.index,is_null:false,text});
       }
       values.push({index:request.row_offset+offset,record_id:recordId,cells});
