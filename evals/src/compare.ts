@@ -50,7 +50,7 @@ export function compare(a: RunSummary, b: RunSummary, options: Partial<ComparePo
   const uneven = [a, b].flatMap((run) => {
     const counts = run.task_ids.map((id) => ({ id, total: aggregate(run.tasks.find((task) => task.id === id)?.attempts ?? [], run.judge === null).total }))
     return new Set(counts.map((task) => task.total)).size > 1
-      ? [`**неполное покрытие внутри прогона ${cell(run.run_id)}:** ${counts.map((task) => `${cell(task.id)}=${task.total}`).join(", ")}. Задачи имеют разный вес в общем среднем.`]
+      ? [`**неполное покрытие внутри прогона ${cell(run.run_id)}:** ${counts.map((task) => `${cell(task.id)}=${task.total}`).join(", ")}. Задачи имеют разный вес в справочном среднем по попыткам.`]
       : []
   })
   const lines = [
