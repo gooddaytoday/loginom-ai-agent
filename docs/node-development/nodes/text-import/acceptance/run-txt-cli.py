@@ -50,13 +50,21 @@ try:
   proc=subprocess.run(['python3',acceptance/'txt-oracle.py','compare','--expected',expected,'--exported',oracle/'cold-output.csv'],capture_output=True,text=True)
   if proc.returncode:raise RuntimeError('FULL_COLD_VALUES_DIFFER')
   cold['full_values']=json.loads(proc.stdout);cold['status']='PASS';write_private(oracle/'result.json',cold);result['oracle']={'status':'PASS','full_values':cold['full_values']}
-  result['status']='PASS' if result['cli_exit']==0 and result['oracle_exit']==0 and all(result['cleanup'].values()) else 'FAIL'
  write_private(evidence/'result.json',result)
  # Full values before cold reopen are independently checked against the same original oracle.
  subprocess.run(['python3',acceptance/'txt-cli-audit.py',attempt,expected],check=True,capture_output=True)
- result=json.loads((evidence/'result.json').read_text()) if (evidence/'result.json').exists() else result
+ result=json.loads((evidence/'result.json').read_text())
+ if (result['cli_exit']!=0 or result['oracle_exit']!=0
+     or result['oracle'].get('status')!='PASS'
+     or not all(result['cleanup'].get(key) is True for key in ('package_closed','logged_out'))
+     or not all(result.get(key,{}).get('status')=='PASS' and result[key].get('all_values_compared') is True
+                for key in ('cli_full_values',))
+     or result['oracle'].get('full_values',{}).get('status')!='PASS'
+     or result['oracle']['full_values'].get('all_values_compared') is not True):
+  raise RuntimeError('FULL_ACCEPTANCE_REQUIRED')
+ result['status']='PASS'
 except Exception as error:
- result['error']=str(error)[:300];print('FAILED',result['error'],flush=True)
+ result['status']='FAIL';result['error']=str(error)[:300];print('FAILED',result['error'],flush=True)
 finally:
  if rawout.exists() and rawerr.exists():
   subprocess.run([node,OPS/'redact.mjs',root/'packages/loginom-runtime/client/lib/redact.mjs',cfgpath,cfg['provider_auth_file'],rawout,rawerr,evidence],capture_output=True)

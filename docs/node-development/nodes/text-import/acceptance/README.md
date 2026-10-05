@@ -20,3 +20,11 @@ The runner admits only the task and original TXT through standalone CLI `--file`
 `txt-cold-check.mjs` uses a new browser profile, reads/cancels persisted native settings, verifies the server source again, executes the import freshly without changing its settings, and executes the saved export. Explicit replace is authorized only for that export's independently observed saved destination. The default scenario-variables node is accepted; extra processing nodes or links are refused. Python compares complete downloaded exports before and after reopen as multisets, including duplicate multiplicities, dates, numeric values, and unchanged string identifiers. Full expected records and exported data stay private. Publication uses `publish-evidence.py` on this attempt's sanitized evidence.
 
 A known failed import with confirmed draft cleanup may be corrected on the same retained node. The transcript binds the single original creation and its cleanup to that node GUID, then requires one successful import and the same persisted GUID; ambiguous effects, extra creations and duplicate uploads are refused.
+
+The runner keeps overall status FAIL until the mandatory warm audit has completed, both full-value comparisons pass, CLI/oracle exits are zero, and both cleanup confirmations are true. Every caught exception resets FAIL and the final process exits nonzero. `txt-cli-audit.py` contributes evidence but does not decide overall acceptance.
+
+Run the offline negative gate regression (real audit subprocess rejected after cold PASS, plus success and cleanup/exit refusals):
+
+```sh
+python3 docs/node-development/nodes/text-import/acceptance/test-txt-runner.py
+```

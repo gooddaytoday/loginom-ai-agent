@@ -38,5 +38,4 @@ print(json.dumps(report,ensure_ascii=False))
 (attempt/'evidence/oracle/cli-full-result.json').write_text(json.dumps(report,ensure_ascii=False))
 result=json.loads((attempt/'evidence/result.json').read_text());cold=json.loads((attempt/'evidence/oracle/result.json').read_text());cold['cli_full_values']=values;cold['admitted_source_chain']=report
 (attempt/'evidence/oracle/result.json').write_text(json.dumps(cold,ensure_ascii=False));result['cli_full_values']=values
-result['status']='PASS' if result['cli_exit']==0 and result['oracle_exit']==0 and result['oracle']['status']=='PASS' and all(result['cleanup'].values()) else 'FAIL'
 (attempt/'evidence/result.json').write_text(json.dumps(result,ensure_ascii=False))
