@@ -1,45 +1,164 @@
-# Калькулятор (дерево): черновик требований
+# Калькулятор (дерево): подплан для Multica
 
-Component ID: `component.trees.CalculatorTree`. Slug: `trees-calculatortree`. [Карточка](README.md) · [Реестр](../../registry.json) · [Шаблон подплана](../../templates/node-plan.md).
+Статус: `discovery_required`. Редакция 1 от 2026-10-05, автор — переработка подпланов в ветке `node-coverage-plans`.
+Component ID: `component.trees.CalculatorTree`, slug `trees-calculatortree`. Runtime type и режим: `trees.calculator` / `javascript` — предложение до конца этапа 0.
+База назначения: ветка задания из карточки; исследованы исходники `loginom@dada8010e`. Loginom: ожидается 7.4.2, фактическую версию записать на этапе 0; платформа исполнителя — Linux x64.
 
-Черновик собран 2026-10-02 по справке и исходникам `5f772aea9`; каталог: компонент есть в текущей Help 7.4. Живое исследование, E2E и прогоны не выполнялись, обработчика нет. Это входные данные для подплана, а не назначение: перед назначением подплан переписывается по шаблону — этап 0 живого исследования, самостоятельный этап 1, приёмочный комплект и задание модели.
+[Шаблон](../../templates/node-plan.md) · [RUNBOOK](../../RUNBOOK.md) · [CLI-приёмка](../../workflow/acceptance-cli.md) · [карточка](README.md) · [реестр](../../registry.json). Образец нового подплана — [ARIMAX](../datamining-arimax/plan.md).
 
-## Источники
+## 0. Как выполняется назначение
 
-- `trees-calculatortree:help01` — [Калькулятор (дерево)](https://help.loginom.ru/userguide/processors/data-trees/calculator-tree/), Help 7.4, прочитано 2026-10-02.
-- `trees-calculatortree:help02` — [Калькулятор (дерево) — JavaScript](https://help.loginom.ru/userguide/processors/data-trees/calculator-tree/javascript.html), Help 7.4, прочитано 2026-10-02.
-- `trees-calculatortree:help03` — [Функции дерева](https://help.loginom.ru/userguide/processors/func/calc-func/data-tree.html), Help 7.4, прочитано 2026-10-02.
-- `trees-calculatortree:help04` — [Порт Дерево](https://help.loginom.ru/userguide/workflow/ports/mapping-trees.html), Help 7.4, прочитано 2026-10-02.
-- `trees-calculatortree:help05` — [Внешние модули JS](https://help.loginom.ru/userguide/processors/programming/java-script/external-modules.html), Help 7.4, прочитано 2026-10-02.
+Оркестрация — Multica, сквад «Обработчики узлов»: Генератор тасок готовит назначение, Тест-Манки #1 разрабатывает и проходит приёмку, Ловец Галюцинаций независимо принимает опубликованный SHA.
 
-## Требования справки
+```text
+Ветка: <ветка задания>
+Узел: trees-calculatortree
+Обработать узел по его подплану до независимой приёмки. Объём — этап <N> подплана.
+```
 
-| ID | Возможность | Предлагаемая независимая проверка | Источник |
-| --- | --- | --- | --- |
-| `trees-calculatortree:r01` | Создать/клонировать/заменить/переставить/удалить выражения; path/name/label/type/description | Вход Price=2,Qty=3 даёт Total=6; replacement меняет только нужный path, reorder зависимых выражений проверяет сохранённый смысл. | `trees-calculatortree:help01` |
-| `trees-calculatortree:r02` | JavaScript expression или function-body return, scalar/variant/undefined, встроенные функции | Синтаксис/тип результата проверяются; не использовать табличный calculator parser. Invalid code возвращает native диагностику. | `trees-calculatortree:help01`, `trees-calculatortree:help02` |
-| `trees-calculatortree:r03` | Абсолютные $Root и относительные Parent/$Parent/$Index, arrays и ItemIndex/ItemCount/Location/DisplayName | Две строки массива с разными Qty выявляют смешение контекстов; index0/1, count2, path/label сверяются независимо. | `trees-calculatortree:help02`, `trees-calculatortree:help03` |
-| `trees-calculatortree:r04` | Входные переменные this.Var, одинаковое имя node/variable, ссылки на другие выражения | Имя узла приоритетно без префикса; this.Var однозначен; cycles и исчезнувший path дают отказ, а не чужое значение. | `trees-calculatortree:help01`, `trees-calculatortree:help02` |
-| `trees-calculatortree:r05` | Intermediate/Cache, новые контейнеры, взаимные references и изменившийся source | Intermediate отсутствует в выходе, но доступен вычислениям; cache не переносит старое значение через новый execution без native правила. | `trees-calculatortree:help01`, `trees-calculatortree:help02` |
-| `trees-calculatortree:r06` | CommonJS require, JSON module, относительный/абсолютный путь, require.resolve/cache; запрет ES6/Promise | Изолированный stateless fixture модуля и сохранённый/несохранённый пакет; не передавать state через cache из-за пула интерпретаторов. | `trees-calculatortree:help02`, `trees-calculatortree:help05` |
-| `trees-calculatortree:r07` | Полная схема дерева: имена/метки, scalar/variant, data_kind, container/array, обязательность, порядок, ручные связи и автосвязывание по имени+типу, autosync on/off, исключения и восстановление связей; загрузка JSON/XSD, namespace/root/recursion0..3, раскрытие рекурсивных узлов и метки xsd:documentation. | Независимый typed-tree oracle сравнивает пути, флаги, порядок массивов, точные значения и отсутствие контейнеров отдельно от NULL примитива; обязательный корень нельзя оставить несвязанным. Загрузка схемы проверяется как замена старой структуры, Cancel её сохраняет. | `trees-calculatortree:help04` |
-| `trees-calculatortree:r08` | Preview/console ошибок, метки/комментарии, save/reopen; представительные семейства встроенных функций | Preview не заменяет execution. Date/string/math/Boolean/tree functions проходят по одному независимому fixture; передаваемый код не ограничивать искусственным списком пяти функций. | `trees-calculatortree:help01`, `trees-calculatortree:help02`, `trees-calculatortree:help03` |
+Первая карточка — этап 0 отдельно. Этап 1 назначается после фиксации контракта и решения владельца по нужным этому этапу W (W1, W2); W следующих этапов согласуются перед их назначением.
+В ветке задания обязательны RUNBOOK, этот подплан, standalone CLI и инструменты приёмки; отсутствие — Blocked.
+Разрешено: живое исследование в собственном аккаунте; назначенный этап и его согласованные W; приёмочный комплект, PR в ветку задания, публикация доказательств и независимая приёмка.
+Не разрешено: merge и релиз, следующие этапы, общие изменения без решения владельца, изменение конфигураций обвязки.
 
-## Предлагаемое разбиение на этапы
+| Параметр | Значение |
+|---|---|
+| Узел | `component.trees.CalculatorTree`, slug `trees-calculatortree` |
+| Исходный SHA | вершина ветки задания; Генератор фиксирует его в карточке |
+| Runtime type и режим | `trees.calculator` / `javascript` — предложение до конца этапа 0 |
+| Стенд и аккаунты | один стенд, пара worker/reviewer из конфигов ролей |
+| Модель приёмки | из конфигурации обвязки; предел модельного прогона 7200 с |
+| Внешняя среда | этап 3: собственные stateless CommonJS/JSON файлы в хранилище Loginom с разрешённым доступом |
 
-Разбиение — гипотеза до этапа 0. Каждый этап должен приниматься самостоятельно; общие изменения, нужные этапу, входят в его же карточку.
+Стоп-условия — Blocked с конкретным вопросом Генератору:
 
-- `trees-calculatortree:s1` — Скалярные выражения и replacement. Требования: `trees-calculatortree:r01`, `trees-calculatortree:r02`.
-- `trees-calculatortree:s2` — Иерархия, массивы и переменные. Требования: `trees-calculatortree:r03`, `trees-calculatortree:r04`, `trees-calculatortree:r05`. После: `trees-calculatortree:s1`.
-- `trees-calculatortree:s3` — CommonJS и полная конфигурация. Требования: `trees-calculatortree:r06`, `trees-calculatortree:r07`, `trees-calculatortree:r08`. После: `trees-calculatortree:s2`. Среда: Разрешённый доступ к собственным CommonJS/JSON fixtures в файловом хранилище.
+- нет обязательных файлов, CLI или пары аккаунтов `ready`;
+- в палитре стенда нет компонента «Калькулятор (дерево)»;
+- неизвестен исход операции: сохранить попытку, writer marker не удалять;
+- нет решения владельца по нужному этапу W1, W2, W3, W4, W5, требуется новый общий контракт или режим сверх назначения;
+- внешняя среда назначенного случая недоступна либо независимый reader не доказывает его полный результат.
 
-## Заметки черновика
+## 1. Цель и проверенная основа
 
-- `trees-calculatortree:help01` — [Калькулятор (дерево)](https://help.loginom.ru/userguide/processors/data-trees/calculator-tree/) (Help 7.4, прочитано 2026-10-02).
-- `trees-calculatortree:help02` — [Калькулятор (дерево) — JavaScript](https://help.loginom.ru/userguide/processors/data-trees/calculator-tree/javascript.html) (Help 7.4, прочитано 2026-10-02).
-- `trees-calculatortree:help03` — [Функции дерева](https://help.loginom.ru/userguide/processors/func/calc-func/data-tree.html) (Help 7.4, прочитано 2026-10-02).
-- `trees-calculatortree:help04` — [Порт Дерево](https://help.loginom.ru/userguide/workflow/ports/mapping-trees.html) (Help 7.4, прочитано 2026-10-02).
-- `trees-calculatortree:help05` — [Внешние модули JS](https://help.loginom.ru/userguide/processors/programming/java-script/external-modules.html) (Help 7.4, прочитано 2026-10-02).
+Обязательный вход/выход дерева и необязательные переменные; выражения используют JavaScript и пути дерева, промежуточные/кэшируемые значения; имена уникальны в пределах родителя.
+Этап 1 — «Скалярные выражения и replacement»; остальные требования Help распределены по самостоятельным карточкам ниже. Это предложение разбиения до этапа 0, а не утверждение о живой работоспособности.
+
+| Источник | Факт | Наблюдено или гипотеза |
+|---|---|---|
+| Runtime базы | Обработчика нет; 15 типов в `client/lib/node-contracts.mjs:8-22`, диспетчер `node-support.mjs:27-41`; графовые inputs табличные, межсценарная связь отклоняется (`node-contracts.mjs:74-78`) | Наблюдено в коде `dada8010e` |
+| Общая оболочка | `createTabularTransformNodeSupport` (`calculator-node.mjs:38`), строгая схема `alignReadSchema` (`node-read-contract.mjs:78`); `node-workflow-activation.mjs:2-40` активирует подготовленную вкладку, не входит в Подмодель | Наблюдено в коде; пригодность для нового узла не доказана |
+| Переменные | `node-api.mjs:40-41`: только локальные `local_variables`/`bindings` Кросс-таблицы; это не произвольное чтение выходных переменных/деревьев | Наблюдено в коде |
+| Реестр | `plan_status: discovery_required`, `handler: null`, реализация/приёмка/валидация/интеграция/релиз не подтверждены | Наблюдено; реестр не изменяется |
+| Справка | [Калькулятор (дерево)](https://help.loginom.ru/userguide/processors/data-trees/calculator-tree/) = `loginom-help@353e506b:data/processors/data-trees/calculator-tree/README.md`; факты и связанные страницы ниже | Документировано; UI не наблюдался |
+| E2E | `e2e-tests@486caef44:tests/toreview/acceptance/wizards/calculator_tree/calculator_tree.ts:13,19 — :sandbox; calculator_tree_expressions_path.ts — :toreview` | Код тестов/метки, не живая приёмка; :toreview/:sandbox не переносится как PASS |
+| История | Исторического номера подплана и принятого обработчика нет | Наблюдено в реестре |
+
+Связанные страницы Help `353e506b`: [Калькулятор (дерево) — JavaScript](https://help.loginom.ru/userguide/processors/data-trees/calculator-tree/javascript.html), [Функции дерева](https://help.loginom.ru/userguide/processors/func/calc-func/data-tree.html), [Порт Дерево](https://help.loginom.ru/userguide/workflow/ports/mapping-trees.html), [Внешние модули JS](https://help.loginom.ru/userguide/processors/programming/java-script/external-modules.html).
+
+Общие изменения — отдельными коммитами назначенного этапа, после решения владельца; W с одинаковым смыслом можно переиспользовать только по принятому SHA и адресной регрессии:
+
+- **W1** — типизированные tree refs/связи/схема/чтение полного дерева и независимая cold-приёмка с путями, точными Int64, NULL и отсутствием узлов; требуется этапу 1.
+- **W2** — общее применение JavaScript в редакторе и передача native диагностики без языка табличных выражений; требуется этапу 1.
+- **W3** — типизированные входные переменные this.Var и точное чтение; требуется этапу 2.
+- **W4** — полный tree mapping/JSON/XSD и собственные CommonJS/JSON файлы с независимым файловым аудитом; требуется этапу 3.
+- **W5** — допуск вещественных выходов, объявленный в expected.json до прогона для тестов встроенных функций; требуется этапу 3.
+
+Точки согласованного W: `node-contracts.mjs`/`.d.ts`, `node-target-browser.mjs`, `node-procedure.mjs`, `node-read-*`, `workspace-ui.mjs`; при необходимости — новые `node-typed-port-*.mjs`, `node-variable-read-*.mjs`, `node-tree-read-*.mjs`. Независимая приёмка — `scripts/node-acceptance/{expected-outputs,cold-check}.mjs` и отдельный узловой аудит; тесты проверяют отказ чужого владельца, точные типы и полный результат. Состав файлов окончательно закрепить на этапе 0, W выпускать отдельным коммитом назначенной карточки.
+
+## 2. Этапы
+
+### Этап 0 — подготовка, живое исследование, контракт
+
+Проверить checkout/SHA; собрать кандидата из закоммиченных исходников; `loginom status` = `ready`. Исследовать штатными средствами runtime с `?testable=true`; каждый отказ мастера прочитать из кнопки ошибки.
+
+1. Палитра, fulltype, точный заголовок/корень мастера, страницы, типы и обязательность портов; зафиксировать редакцию Loginom.
+2. Редактор JavaScript: expression/function body, path/name/type/description, replacement; выдача Syntax/reference/type ошибок.
+3. Абсолютный $Root, Parent/$Parent/$Index, массивы и ItemIndex/ItemCount/Location/DisplayName; нумерация с нуля и scope.
+4. this.Var при конфликте имени, порядок взаимных references, промежуточное/кэшируемое значение и смена источника.
+5. CommonJS/JSON файлы и ограничения ES6/Promise; preview/console отдельно от Execute; точность Int64 JavaScript и real.
+6. Имена/метки/типы/порядок полного результата, момент появления схемы до/после Execute; новые данные того же источника без перенастройки узла.
+7. Неверные параметры, несовместимая схема, потерянный источник, отмена и неизвестный эффект; читать причину native отказа, не заменять её таймаутом.
+
+Результат — `discovery.md`: семантика «наблюдено / гипотеза», конкретные числа и решения по W. После закрытия открытых вопросов — `ready_for_development`, закреплённые type/режим, `fixtures/`, `acceptance/` до кода. Нет решения по W — этап 1 не назначается.
+
+### Этап 1 — Скалярные выражения и replacement
+
+- `trees-calculatortree:r01` — Создать/клонировать/заменить/переставить/удалить выражения; path/name/label/type/description
+- `trees-calculatortree:r02` — JavaScript expression или function-body return, scalar/variant/undefined, встроенные функции
+
+Общие изменения этапа: W1 (типизированные tree refs/связи/схема/чтение полного дерева и независимая cold-приёмка с путями, точными Int64, NULL и отсутствием узлов); W2 (общее применение JavaScript в редакторе и передача native диагностики без языка табличных выражений).
+
+Scope: только требования этапа 1; последующие режимы отклоняются до мутации с объяснимой ошибкой. Исходный предлагаемый объём реестра: Ограниченные выражения для выбранных узлов дерева с сохранением остальной структуры; без произвольного расширения языка.
+
+Файлы: новые `packages/loginom-runtime/client/lib/trees-calculatortree-{node,parameters,procedure,context,readback}.mjs`, тесты `client/test/trees-calculatortree-*.test.mjs`; регистрация в `node-contracts.mjs` и `.d.ts`, `node-support.mjs`, `node-api.mjs`, `node-procedure.mjs`, `workspace-ui.mjs`, `node-result-schema.mjs`, `user-results.mjs`. Образец — `calculator-*.mjs`; переиспользовать только подходящий lifecycle, не семантику другого узла.
+Видимость для модели: `semantics` объясняет бизнес-результат и ограничения; `description` у каждого поля `parameter_schema`, строковые enum; компактный readback подтверждает режим, настройки, identity и фактические связи.
+Тесты из пакета `packages/loginom-runtime`: `bun run test:upstream` (адресные тесты и весь `client/test`). При общих изменениях приёмки — `node --test ../../scripts/node-acceptance/tests/*.test.mjs` из того же пакета. Новые адресные файлы — часть будущей реализации, сейчас их нет.
+
+### Этап 2 — Иерархия, массивы и переменные (отдельная карточка)
+
+- `trees-calculatortree:r03` — Абсолютные $Root и относительные Parent/$Parent/$Index, arrays и ItemIndex/ItemCount/Location/DisplayName
+- `trees-calculatortree:r04` — Входные переменные this.Var, одинаковое имя node/variable, ссылки на другие выражения
+- `trees-calculatortree:r05` — Intermediate/Cache, новые контейнеры, взаимные references и изменившийся source
+
+Общие изменения этапа: W3 (типизированные входные переменные this.Var и точное чтение).
+
+### Этап 3 — CommonJS и полная конфигурация (отдельная карточка)
+
+- `trees-calculatortree:r06` — CommonJS require, JSON module, относительный/абсолютный путь, require.resolve/cache; запрет ES6/Promise
+- `trees-calculatortree:r07` — Полная схема дерева: имена/метки, scalar/variant, data_kind, container/array, обязательность, порядок, ручные связи и автосвязывание по имени+типу, autosync on/off, исключения и восстановление связей; загрузка JSON/XSD, namespace/root/recursion0..3, раскрытие рекурсивных узлов и метки xsd:documentation.
+- `trees-calculatortree:r08` — Preview/console ошибок, метки/комментарии, save/reopen; представительные семейства встроенных функций
+
+Общие изменения этапа: W4 (полный tree mapping/JSON/XSD и собственные CommonJS/JSON файлы с независимым файловым аудитом); W5 (допуск вещественных выходов, объявленный в expected.json до прогона для тестов встроенных функций).
+
+## 3. Данные и независимые проверки
+
+Комплект `nodes/trees-calculatortree/acceptance/stageN/`: `task.md` с `{{PACKAGE_PATH}}` на бизнес-языке, `data/` только с входами модели, независимый `oracle.py` и сгенерированный до обработчика `expected.json` вне её контекста.
+Формат CSV: UTF-8, запятая, десятичная точка, заголовок, NULL-маркер `?`; пустая строка в кавычках отличается от NULL. Числа/даты и типы явно закрепить в manifest.
+
+data/items.csv: RowID,Price,Qty: (1,2,3),(2,5,0). Независимый подготовленный источник: Order→Items[] с этими листьями, Discount integer=1; отдельный набор переменных Discount=2; replace меняет первую Qty на 4.
+
+Для типизированных источников CSV описывает независимые значения, а не подменяет порт таблицей: на этапе 0 подготовить собственную копию малого fixture-пакета и подтвердить source identities, схему/значения отдельным reader. Готовый соседний handler не требуется. Модель сохраняет новый пакет по уникальному пути.
+Адресные `fixtures/manifest.json`: байты, SHA256, кодировка, разделители, типы, NULL-маркер, порядок и source identity. Ожидания поздних этапов не входят в раннее назначение.
+
+| Набор | Независимая проверка и ожидание |
+|---|---|
+| `r01` | Вход Price=2,Qty=3 даёт Total=6; replacement меняет только нужный path, reorder зависимых выражений проверяет сохранённый смысл. |
+| `r02` | Синтаксис/тип результата проверяются; не использовать табличный calculator parser. Invalid code возвращает native диагностику. |
+| `r03` | Две строки массива с разными Qty выявляют смешение контекстов; index0/1, count2, path/label сверяются независимо. |
+| `r04` | Имя узла приоритетно без префикса; this.Var однозначен; cycles и исчезнувший path дают отказ, а не чужое значение. |
+| `r05` | Intermediate отсутствует в выходе, но доступен вычислениям; cache не переносит старое значение через новый execution без native правила. |
+| `r06` | Изолированный stateless fixture модуля и сохранённый/несохранённый пакет; не передавать state через cache из-за пула интерпретаторов. |
+| `r07` | Независимый typed-tree oracle сравнивает пути, флаги, порядок массивов, точные значения и отсутствие контейнеров отдельно от NULL примитива; обязательный корень нельзя оставить несвязанным. Загрузка схемы проверяется как замена старой структуры, Cancel её сохраняет. |
+| `r08` | Preview не заменяет execution. Date/string/math/Boolean/tree functions проходят по одному независимому fixture; передаваемый код не ограничивать искусственным списком пяти функций. |
+| `empty/null/replace` | Нулевой вход, NULL/пустая строка, новый источник: результат по заранее закреплённой семантике, старое исполнение отклонено |
+
+Oracle не импортирует runtime/обработчик. Считает по входам, проверяет каждое значение, имя/метку/тип/порядок, кратность и связи; отличает NULL, отсутствие, ноль и пустую строку. Для дерева schema отдельно от values, массивный порядок точный, Int64 — десятичный текст/целое Python, Variant — subtype каждой ячейки.
+Отклонять чужой узел/порт, источник с другой identity, старый execution и подмену графа. E2E-снимки не являются oracle; LGD-импорт агента отсутствует, исходные данные доставляются текстом или независимо подготовленным источником.
+Ограничения: `scripts/node-acceptance/expected-outputs.mjs:14,29-39` — до 100 строк на табличный выход, до 32 отчётов (`:8`); схема позиционная, строки как мультимножество. `:72-81` сопоставляет разные узлы по type/label/values и `node_id`, без identity порта. `cold-check.mjs:221,232` открывает порт 0 и требует точные числа.
+Базовый cold-check не принимает дерево/набор переменных и не доказывает вложенные границы, исходный компонент или активность ветвей. Нужен согласованный W с независимым структурным/типизированным cold-аудитом; вывод через временную таблицу не заменяет исходный порт.
+Полный табличный порядок проверять отдельно по RowID/адресному readback: базовый cold-check сравнивает мультимножество строк. Допуск, когда требуется W, задаётся в `expected.json` до прогона; округлять ответ ради PASS нельзя.
+
+## 4. Проверки, приёмка и завершение
+
+Адресная матрица; непроведённая проверка — `not_checked`. Каждый rNN имеет fixture выше и полный доказанный readback назначенного этапа.
+
+| Проверка | Условие успеха |
+|---|---|
+| Контракт | Неподдержанные параметры/режимы отвергнуты до мутации; ошибка объясняет исправление |
+| Семантика этапа | Все его rNN совпали с независимым oracle, включая типы/порядок/кратность |
+| Identity и ownership | Узел, источник и каждый порт принадлежат нужному workflow; одинаковые метки не подменяют IDs |
+| Пустой вход/NULL | Схема и различия пустого/пропущенного/неактивного подтверждены по discovery |
+| Изменение существующего | Меняется только запрошенное; полный readback и отсутствие случайных настроек |
+| Смена источника | Новый источник в прежнем месте; Execute/read того же узла без перенастройки, свежий полный результат |
+| Persistence | Сохранение после всех чтений; новый профиль/открытие/выполнение без восстановления настроек |
+| Recovery | Неизвестный эффект не повторён; native причина отказа прочитана, cleanup подтверждён |
+| Регрессия | Адресные тесты и весь `client/test`; изменённые общие модули и приёмка покрыты |
+
+Задание модели: В подготовленном дереве заказа рассчитать стоимость каждой позиции и общий итог, сохранив остальную структуру, показать дерево полностью; изменить количество позиции и сохранить пакет после повторного расчёта. Место сохранения — `{{PACKAGE_PATH}}`. При назначении этапа task конкретизируется бизнес-настройками, без имён инструментов, enum, ожидаемых чисел и сведений об oracle.
+PASS: CLI и независимый cold-check после согласованных W, адресная матрица/узловой аудит, `package_closed=true`, `logged_out=true`, независимая приёмка того же чистого опубликованного SHA. Базовый табличный cold-check сам по себе не доказывает нетабличный/структурный результат.
+Публикация/реестр — по RUNBOOK; слои `integration` и `release` не меняются. Эта редакция проверяет документацию; runtime, UI, E2E и модельные прогоны не выполнялись.
+
+## 5. Ловушки — переподтвердить, не копировать
 
 Обязательный tree input, необязательные typed variables, tree output. Код выражений — JavaScript, не язык табличного expression-калькулятора. Выражение создаёт/заменяет leaf по абсолютному path, может быть intermediate/cached. References case-sensitive; имена уникальны внутри parent, arrays индексируются с0. Обучение отсутствует.
 
@@ -48,3 +167,14 @@ Component ID: `component.trees.CalculatorTree`. Slug: `trees-calculatortree`. [�
 Дерево Order с Items[(Price=2,Qty=3),(Price=5,Qty=0)] и Discount=1: per-item Total=6/0, aggregate=6, variable Discount=2 отдельно проверяет this.Var. Сгенерировать поля index/count/path/displayname с точными expected. Использовать intermediate массив и cached значение в нескольких выражениях, затем заменить Qty=4 и проверить новый execution. Independent oracle вычисляет арифметику и paths, не исполняет handler. CommonJS fixture exports add(a,b), отдельный JSON файл с rate; запрещены сеть/побочные внешние операции. Для Date — зафиксированный timestamp/timezone, для real atol=1e-10; неподдержанная Int64 точность JS явно отражается как ограничение, не маскируется.
 
 Узловые отказы: Syntax/reference/type errors, cycle, out-of-range index, неоднозначный path, missing module, Promise/ES6 import. Read error console до cleanup; не переписывать JavaScript автоматически ради успешного выполнения.
+- Наличие `navigation_path` или имени в палитре не доказывает поддержку. Не маскировать отсутствие typed reader строковым preview; не менять формулу/связь ради PASS.
+- Семантика Help/E2E документирована на указанных ревизиях; настройки/лимиты актуального стенда до этапа 0 остаются гипотезой.
+
+## 6. Точка продолжения
+
+- **Подтверждено:** исходные требования rNN сохранены в этапах; код `dada8010e`, Help `353e506b`, E2E `486caef44` сверены; живых наблюдений нет.
+- **Генератор:** карточка этапа 0, исходный SHA, пара аккаунтов и среда назначенных случаев.
+- **Исполнитель:** discovery → fixtures/oracle/expected → решение по W → назначенный самостоятельный этап.
+- **Владелец:** согласовать нужные этапу W (W1, W2, W3, W4, W5) до реализации общих контрактов.
+- **Ловец:** независимая приёмка опубликованного SHA, полного результата и ownership.
+- **Следующая карточка:** следующий этап только после самостоятельной приёмки предыдущего; готовность реестра пока прежняя.
