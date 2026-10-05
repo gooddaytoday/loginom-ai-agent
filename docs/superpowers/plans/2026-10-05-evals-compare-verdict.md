@@ -325,3 +325,12 @@ bun run script/check-compare-noise.ts
 плана получено; повторно запрашивать его не нужно. Проверки новых verdict,
 full suite, simulation и live Loginom в ходе планирования не выполнялись.
 Goal планирования завершается после проверки записи утверждения и документов.
+
+## Checkpoint реализации — 2026-10-05
+
+Worktree: `/home/kiselev/.codex/worktrees/compare-verdict/loginom-ai-agent`.
+Ветка: `compare-verdict`; база `f40cc50572a669b8e31759fa6359334c4293aaec`
+(документационный потомок проверенной продуктовой базы `2c06a3071`).
+Основной checkout и живые eval-ресурсы не изменяются.
+Перед RED: 31 focused tests pass, dev-зависимости установлены из evals/bun.lock.
+Task 1 начата; остальные задачи ожидают её завершения.
