@@ -3,7 +3,7 @@ import { evalsRoot } from "./config"
 import { EvalFailure } from "./fail"
 import type { RunSummary } from "./report"
 import { aggregate } from "./report"
-import { analyzeComparison, type ComparePolicy } from "./compare-analysis"
+import { analyzeComparison, parseComparisonSummary, type ComparePolicy } from "./compare-analysis"
 
 const cell = (text: string) => text.replaceAll("|", "\\|").replace(/[\r\n]+/g, " ")
 
@@ -140,7 +140,7 @@ export async function compareMain(argv: string[], env: Record<string,string|unde
   const read = async (id: string) => {
     const file = Bun.file(path.join(results,id,"summary.json"))
     if (!await file.exists()) throw new EvalFailure(`Нет summary.json для прогона ${id}`,2)
-    return await file.json().catch(() => { throw new EvalFailure("Некорректный summary: JSON",2) }) as RunSummary
+    return parseComparisonSummary(await file.json().catch(() => { throw new EvalFailure("Некорректный summary: JSON",2) }))
   }
   const [a,b] = await Promise.all(ids.map(read))
   const text = compare(a!,b!,options)

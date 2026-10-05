@@ -172,3 +172,98 @@ function freshEvaluation(run: RunSummary, task: RunSummary["tasks"][number]) {
   const contract = evaluationContractHash({ rubric_hash: run.rubric_hash, judge: run.judge, pass_threshold: run.config.pass_threshold })
   return measured(task.attempts).every((attempt) => attempt.evaluation_contract_hash === contract)
 }
+
+export function parseComparisonSummary(value: unknown): RunSummary {
+  const run = object(value)
+  const agent = object(run.agent)
+  const config = object(run.config)
+  const dock = object(run.dock)
+  const loginom = object(run.loginom)
+  text(run.run_id)
+  if (run.label !== null) text(run.label)
+  for (const key of ["started_at","finished_at"]) text(run[key], true)
+  boolean(run.interrupted)
+  if (run.stopped_reason !== null) text(run.stopped_reason)
+  for (const key of ["model","variant"]) optionalText(agent[key])
+  for (const key of ["cli_mode","git_sha","cli_version","source_commit","binary_sha256"]) optionalText(agent[key])
+  optionalText(run.agent_inputs_hash)
+  optionalText(run.rubric_hash)
+  numbers(config, ["repeat","timeout_ms","judge_timeout_ms"],1,Infinity,true)
+  numeric(config.pass_threshold,0,100)
+  boolean(config.keep_storage)
+  if (config.task_timeout_ms !== undefined) Object.values(object(config.task_timeout_ms)).forEach((value) => numeric(value,1,Infinity,true))
+  if (run.judge !== null) {
+    const judge = object(run.judge)
+    for (const key of ["backend","codex_version","model","reasoning","prompt_sha256","schema_sha256"]) optionalText(judge[key])
+  }
+  optionalText(dock.skill_revision)
+  stringArray(dock.action_manifest_sha256)
+  if (dock.skill_revisions !== undefined) stringArray(dock.skill_revisions)
+  for (const key of ["image_digest","container","storage_dir"]) optionalText(loginom[key])
+  stringArray(run.task_ids)
+  metrics(object(run.metrics))
+  if (!Array.isArray(run.tasks)) invalid()
+  for (const raw of run.tasks as unknown[]) {
+    const task = object(raw)
+    text(task.id)
+    metrics(object(task.metrics),true)
+    if (!Array.isArray(task.attempts)) invalid()
+    for (const raw of task.attempts as unknown[]) {
+      const attempt = object(raw)
+      text(attempt.task_id)
+      numeric(attempt.attempt,1,Infinity,true)
+      text(attempt.status)
+      for (const key of ["score","structural_score"]) if (attempt[key] != null) numeric(attempt[key],0,100)
+      for (const key of ["pass","oracle_pass"]) if (attempt[key] != null) boolean(attempt[key])
+      optionalText(attempt.evaluation_contract_hash)
+      text(attempt.judge_status)
+      numeric(attempt.duration_ms,0,Infinity)
+      numeric(attempt.cost,0,Infinity)
+      numbers(object(attempt.tokens),["input","output","reasoning"],0,Infinity)
+      numbers(object(attempt.counters),["toolCalls","loginomToolCalls","toolErrors","memoryToolCalls"],0,Infinity)
+    }
+    if (task.rubric_snapshot !== undefined) {
+      const snapshot = object(task.rubric_snapshot)
+      if (snapshot.version !== 1 || !Array.isArray(snapshot.checklist)) invalid()
+      boolean(snapshot.oracle_applicable)
+      numeric(snapshot.oracle_tolerance,0,Infinity)
+      const ids = new Set<string>()
+      for (const raw of snapshot.checklist as unknown[]) {
+        const item = object(raw)
+        text(item.id)
+        if (ids.has(item.id as string)) invalid()
+        ids.add(item.id as string)
+        numeric(item.weight,Number.MIN_VALUE,Infinity)
+        for (const key of ["required","requires_result_file","requires_run"]) boolean(item[key])
+        if (item.axis !== undefined && !["structure","result","report"].includes(String(item.axis))) invalid()
+      }
+    }
+  }
+  const parsed = value as RunSummary // Все используемые поля проверены; исторические необязательные поля допускаются.
+  requireSummary(parsed)
+  return parsed
+}
+function invalid(): never { throw new EvalFailure("Некорректный summary: форма данных",2) }
+function object(value: unknown): Record<string,unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return invalid()
+  return value as Record<string,unknown>
+}
+function text(value: unknown, empty = false) {
+  if (typeof value !== "string" || !empty && !value) invalid()
+}
+function optionalText(value: unknown) { if (value != null) text(value,true) }
+function boolean(value: unknown) { if (typeof value !== "boolean") invalid() }
+function numeric(value: unknown,min: number,max: number,integer = false) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max || integer && !Number.isInteger(value)) invalid()
+}
+function numbers(record: Record<string,unknown>,keys: string[],min: number,max: number,integer = false) {
+  keys.forEach((key) => numeric(record[key],min,max,integer))
+}
+function stringArray(value: unknown) {
+  if (!Array.isArray(value) || !value.every((item: unknown) => typeof item === "string" && item.length > 0)) invalid()
+}
+function metrics(record: Record<string,unknown>,task = false) {
+  numbers(record,task ? ["attempts","completed"] : ["total","completed","tool_errors","total_cost"],0,Infinity)
+  for (const key of ["completion_rate","pass_rate","oracle_pass_rate"]) if (record[key] != null) numeric(record[key],0,1)
+  for (const key of task ? ["mean_score","min_score","max_score"] : ["mean_score","mean_score_completed"]) if (record[key] != null) numeric(record[key],0,100)
+}
