@@ -126,3 +126,10 @@ test("analysis: общий k и недостаточное покрытие яв
   expect(analyzeComparison(a, b, { k: 3 }).reliability.a.passk).toBe(1)
   expect(analyzeComparison(a, b, { k: 4 }).reliability.reasons).toContain("pass_coverage")
 })
+
+test("analysis: одинаковые 5×3 не доказывают направление или non-inferiority", () => {
+  const run = comparisonSummary(Array.from({ length: 5 }, () => ({ successes: 3, attempts: 3 })))
+  expect(analyzeComparison(run, run).axes.completion).toMatchObject({
+    interval: { lower: -1, upper: 1 }, verdict: "indistinguishable", non_inferiority: "inconclusive",
+  })
+})

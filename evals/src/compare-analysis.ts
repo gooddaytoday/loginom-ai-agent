@@ -2,6 +2,15 @@ import { EvalFailure } from "./fail"
 import type { AttemptResult, RunSummary } from "./report"
 
 export type ComparePolicy = { margin: number; confidence: number; k: number | null }
+export type ComparisonAxis = {
+  task_count: number
+  observed: { a: number; b: number; drop: number } | null
+  interval: { lower: number; upper: number } | null
+  verdict: "worse" | "better" | "indistinguishable" | null
+  non_inferiority: "confirmed" | "rejected" | "inconclusive" | null
+  reasons: string[]
+}
+export type ComparisonAnalysis = ReturnType<typeof analyzeComparison>
 
 export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial<ComparePolicy> = {}) {
   const policy = { margin: options.margin ?? 0.5, confidence: options.confidence ?? 0.95,
@@ -26,7 +35,7 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
   ]
   const compatibility = identity.filter(([, first, second]) => first == null || second == null || first === "" || second === "" || first !== second).map(([name]) => name)
   if (a.task_ids.length !== b.task_ids.length || a.task_ids.some((id) => !b.task_ids.includes(id))) compatibility.push("task_ids")
-  if (compatibility.length) return { policy, compatibility, reliability: { k: policy.k, a: { pass1: null, passk: null }, b: { pass1: null, passk: null }, reasons: compatibility }, tasks: [], axes: { completion: { observed: null } } }
+  if (compatibility.length) return { policy, compatibility, reliability: { k: policy.k, a: { pass1: null, passk: null }, b: { pass1: null, passk: null }, reasons: compatibility }, tasks: [], axes: { completion: axis([], policy, compatibility), oracle: axis([], policy, ["snapshot_unavailable"]), structure: axis([], policy, ["structure_unavailable"]) } }
   const rates = a.tasks.map((task) => ({
     a: completion(task.attempts),
     b: completion(b.tasks.find((candidate) => candidate.id === task.id)!.attempts),
@@ -46,14 +55,10 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
     }
     return { id: task.id, completion: rates[index]!, regressions }
   })
-  const first = rates.reduce((sum, rate) => sum + (rate.a ?? 0), 0) / rates.length
-  const second = rates.reduce((sum, rate) => sum + (rate.b ?? 0), 0) / rates.length
   return { policy, compatibility, tasks, reliability: { k: policy.k, a: reliability(a, policy.k), b: reliability(b, policy.k), reasons: [
     ...(policy.k === null ? ["k_unknown"] : []),
     ...([a, b].some((run) => { const result = reliability(run, policy.k); return result.pass1 === null || policy.k !== null && result.passk === null }) ? ["pass_coverage"] : []),
-  ] }, axes: { completion: {
-    observed: !rates.length || rates.some((rate) => rate.a === null || rate.b === null) ? null : { a: first, b: second, drop: first - second },
-  } } }
+  ] }, axes: { completion: axis(rates, policy, []), oracle: axis([], policy, ["snapshot_unavailable"]), structure: axis([], policy, ["structure_unavailable"]) } }
 }
 
 function completion(attempts: AttemptResult[]) {
@@ -101,5 +106,23 @@ function reliability(run: RunSummary, k: number | null) {
   return {
     pass1: !tasks.length || tasks.some((task) => task.pass1 === null) ? null : tasks.reduce((sum, task) => sum + task.pass1!, 0) / tasks.length,
     passk: !tasks.length || tasks.some((task) => task.passk === null) ? null : tasks.reduce((sum, task) => sum + task.passk!, 0) / tasks.length,
+  }
+}
+
+function axis(rates: { a: number | null; b: number | null }[], policy: ComparePolicy, reasons: string[]): ComparisonAxis {
+  if (!rates.length || rates.some((rate) => rate.a === null || rate.b === null)) return {
+    task_count: rates.length, observed: null, interval: null, verdict: null, non_inferiority: null,
+    reasons: [...reasons, "coverage"],
+  }
+  const first = rates.reduce((sum, rate) => sum + rate.a!, 0) / rates.length
+  const second = rates.reduce((sum, rate) => sum + rate.b!, 0) / rates.length
+  const observed = { a: first, b: second, drop: first - second }
+  if (reasons.length) return { task_count: rates.length, observed, interval: null, verdict: null, non_inferiority: null, reasons }
+  const width = Math.sqrt(2 * Math.log(6 / (1 - policy.confidence)) / rates.length)
+  const interval = { lower: Math.max(-1, observed.drop - width), upper: Math.min(1, observed.drop + width) }
+  return { task_count: rates.length, observed, interval,
+    verdict: interval.lower > policy.margin ? "worse" : interval.upper < -policy.margin ? "better" : "indistinguishable",
+    non_inferiority: interval.upper <= policy.margin ? "confirmed" : interval.lower > policy.margin ? "rejected" : "inconclusive",
+    reasons,
   }
 }
