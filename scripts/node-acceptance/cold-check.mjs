@@ -175,8 +175,7 @@ try {
   })
   const nativeSource=staticSources?.crossTables.find(c=>c.node_id===node.node_id);
   const nativeConfiguration=nativeSource?.configuration;
-  const useNative=coldNativeEligible(nativeConfiguration,nativeSource?.output_definition);
-  if(useNative){
+  if(nativeConfiguration){
    const {prepareCrossTableAncestorExecution}=await load('client/lib/crosstable-ancestor-execution.mjs');
    await prepareCrossTableAncestorExecution({graph,node,sources:staticSources,operation,execute,record,targetOrigin:origin,targetBuild:'7.4.2',
     wrapMutation:(code,r)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})});
@@ -189,6 +188,22 @@ try {
   if (execution.status !== "completed" || !execution.verified || !execution.owner_verified)
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
   ownedExecutions.push(execution);
+
+  let useNative=false;
+  if(nativeConfiguration){
+   const {showMissingValuesMappingTable}=await load('client/lib/missing-values-output.mjs');
+   const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
+   await channel.openOutputPort(0);
+   await showMissingValuesMappingTable(channel);
+   const output=await channel.observe({condition:'cold completed owned output definition',readMappings:true,
+    ready:s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
+   if(output.node_mapping.node_context?.output_port?.port!==0
+    ||!['document_id','workflow_id','node_id'].every(k=>output.node_mapping.node_context[k]===node[k]))
+    throw Error('COLD_OUTPUT_DEFINITION_OWNER_DIFFERS');
+   useNative=coldNativeEligible(nativeConfiguration,output.node_mapping);
+   const closed=await closePreparedWizard(channel);
+   if(!closed.verified||closed.settings_applied!==false)throw Error('COLD_OUTPUT_DEFINITION_CANCEL_UNCONFIRMED');
+  }
 
   let data;
   if(useNative){

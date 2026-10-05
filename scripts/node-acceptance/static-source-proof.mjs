@@ -87,7 +87,6 @@ export async function observeStaticSources({load,graph,channelFor,account,reveal
     need(variables.verified&&variables.settings_changed===false&&variables.settings_applied===false&&variables.draft_discarded===true,
      'cold variable inspection must discard its unchanged draft');
    }
-   await selectSource(channel,target);
    await openPreparedWizard(channel);
    if(target.type==='transform.collapse_columns'){
     const s=await channel.observe({condition:'cold observed Collapse',readCollapse:true,ready:s=>s.node_collapse?.verified&&s.node_collapse.inventory_complete});
@@ -104,16 +103,8 @@ export async function observeStaticSources({load,graph,channelFor,account,reveal
     sources.collapses.push({node_id:target.ref.node_id,configuration});
    }else{
     const s=await channel.observe({condition:'cold observed CrossTable',readCrossTable:true,ready:s=>s.node_crosstable?.verified&&s.node_crosstable.inventory_complete});
-    const configuration= crossTableConfiguration(s.node_crosstable,input.native);
+    sources.crossTables.push({node_id:target.ref.node_id,configuration:crossTableConfiguration(s.node_crosstable,input.native)});
     await closePreparedWizard(channel);
-    await channel.openOutputPort(0);
-    await showMissingValuesMappingTable(channel);
-    const output=await channel.observe({condition:'cold complete owned output definition',readMappings:true,
-     ready:s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
-    need(output.node_mapping.node_context?.output_port?.port===0
-     &&['document_id','workflow_id','node_id'].every(k=>output.node_mapping.node_context[k]===target.ref[k]),'output definition owner differs');
-    const closed=await closePreparedWizard(channel);need(closed.verified&&closed.settings_applied===false,'output definition cancel');
-    sources.crossTables.push({node_id:target.ref.node_id,configuration,output_definition:output.node_mapping});
    }
   }} catch(error){
    // A refused read must cancel its own editor before package cleanup. Do not
