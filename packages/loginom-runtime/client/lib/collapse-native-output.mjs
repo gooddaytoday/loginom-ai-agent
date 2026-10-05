@@ -58,7 +58,7 @@ export async function readCollapseNativeOutput(channel,read,ctx,options,config,c
  const {execute,operation,onRecord,now}=options;
  need(options.exclusiveNodeOperation?.()===true,'Exact read requires the owning executor operation lock');
  const imports=options.coldStaticSources?.imports??completedStaticImports(options.nodeHistory?.(),options.verifiedUploads?.(),ctx,options.uploadHistory?.());
- const crossSources=crossTableConfiguration?validateCrossTableNativeSources(imports,options.coldStaticSources?.collapses??completedCrossTableCollapses(options.nodeHistory?.(),ctx),crossTableConfiguration.input_fields):null;
+ const crossSources=crossTableConfiguration?validateCrossTableNativeSources(imports,options.coldStaticSources?.collapses??completedCrossTableCollapses(options.nodeHistory?.(),ctx),crossTableConfiguration.input_fields,crossTableConfiguration.input_mapping,crossTableConfiguration.node_context):null;
  if(crossSources)verifyCrossTableExecutionOwner(options.nativeExecutionProof,ctx);
  const frontends=await verifyFrontends(execute,config.targetOrigin,ctx.signal);
  const graph=s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent';

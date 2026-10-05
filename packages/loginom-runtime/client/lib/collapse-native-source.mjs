@@ -83,8 +83,8 @@ export async function bindCollapseNative(page,args) {
    const fields=imports[0].configuration.output_mapping.fields;
    if(collapse){
     need(JSON.stringify(project(collapse.configuration.input_mapping.fields))===JSON.stringify(project(fields)),'Collapse input differs from verified import');
-    need(JSON.stringify(project(collapse.configuration.output_mapping.fields))===JSON.stringify(a.cross_table.input_schema),'CrossTable input differs from verified Collapse');
-   }else need(JSON.stringify(project(fields))===JSON.stringify(a.cross_table.input_schema),'CrossTable input differs from verified import');
+    need(JSON.stringify(project(collapse.configuration.output_mapping.fields))===JSON.stringify(a.cross_table.input_source_schema??a.cross_table.input_schema),'CrossTable input differs from verified Collapse');
+   }else need(JSON.stringify(project(fields))===JSON.stringify(a.cross_table.input_source_schema??a.cross_table.input_schema),'CrossTable input differs from verified import');
    // Opening a readonly definition deactivates its output. The owned CrossTable
    // execution may therefore run an ancestor again. Accept only the original
    // completed group or this exact, independently verified execution group.

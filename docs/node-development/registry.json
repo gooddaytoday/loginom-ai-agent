@@ -947,7 +947,7 @@
     },
     "crosstable-handler": {
       "path": "../../packages/loginom-runtime/client/lib/crosstable-node.mjs",
-      "sha256": "d625db9947c6688bf3ac612099221df5745b8a5a78a7504fafb694792af56276",
+      "sha256": "12a015658e1674c19aa8d924f5a4579b7e5c905c497f38780be30ddab3c1346a",
       "kind": "source",
       "availability": "retained_document",
       "source_commit": null,
@@ -960,7 +960,7 @@
     },
     "crosstable-discovery": {
       "path": "nodes/transform-crosstable/discovery.md",
-      "sha256": "951163241f7451eb728097527982581363656e3efb7372694ef3cd830ccc6e76",
+      "sha256": "02de117a1688814f75a3c0545ca2df2eb1df673a28a47bffd1180bccc84dcaba",
       "kind": "document",
       "availability": "retained_document",
       "source_commit": null,

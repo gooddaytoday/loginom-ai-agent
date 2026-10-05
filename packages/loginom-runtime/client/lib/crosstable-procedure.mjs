@@ -23,7 +23,7 @@ export function crossTableConfiguration(native,mapping){
  const column=columns[0]??null,mode=o.pedSlidingUniqueValues.value?'sliding':'fixed';
  need(['|','.','->',' '].includes(o.pedDisplayNameSeparator.value)&&typeof o.pedUniqueValueNames.value==='boolean'&&Number.isSafeInteger(o.pedSlidingUniqueValuesLimit.value)&&o.pedSlidingUniqueValuesLimit.value>=0,'unsupported names, separator or limits');
  need(mode!=='sliding'||columns.every(f=>!f.include_null&&!f.include_other),'sliding retains unsupported fixed flags; request complete replacement');
- const result={verified:true,inventory_complete:true,kind:'crosstable',node_context:native.node_context,input_fields:fields,
+ const result={verified:true,inventory_complete:true,kind:'crosstable',node_context:native.node_context,input_fields:fields,input_mapping:structuredClone(mapping),
   category_mode:mode,column:column?{...column}:null,columns:columns.map(f=>({...f})),row_keys:keys,facts:facts.map(f=>{
    need(f.functions>0&&(f.functions&~2047)===0&&(f.functions&~f.available_functions)===0,'unsupported fact/function mask');
    return {...f,functions:Object.entries(CROSSTABLE_FUNCTIONS).filter(([,v])=>(f.functions&v.bit)!==0).map(([fn])=>fn)};

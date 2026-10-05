@@ -18,7 +18,7 @@ export function createCrossTableNodeSupport(config){return createTabularTransfor
  async beforeGraphExecute(options,ctx,configuration){
   if(options.operation.parameters.read?.coverage!=='full')return;
   const imports=completedStaticImports(options.nodeHistory?.(),options.verifiedUploads?.(),ctx,options.uploadHistory?.());
-  const sources=validateCrossTableNativeSources(imports,completedCrossTableCollapses(options.nodeHistory?.(),ctx),configuration.input_fields);
+  const sources=validateCrossTableNativeSources(imports,completedCrossTableCollapses(options.nodeHistory?.(),ctx),configuration.input_fields,configuration.input_mapping,configuration.node_context);
   const graph=await options.operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline);
   return prepareCrossTableAncestorExecution({graph,node:ctx.node,sources,operation:options.operation,execute:options.execute,record:options.onRecord,
    targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,signal:ctx.signal,now:options.now,
