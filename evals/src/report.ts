@@ -33,6 +33,7 @@ export function statusFor(
 export type AttemptResult = {
   task_id: string
   attempt: number
+  infra_retry?: { initial: AttemptResult }
   status: Status
   exit_code: number | null
   timed_out: boolean
@@ -73,8 +74,9 @@ const mean = (values: number[]) =>
 const scoresOf = (list: AttemptResult[]) => list.flatMap((item) => (typeof item.score === "number" ? [item.score] : []))
 
 export function aggregate(attempts: AttemptResult[], skipJudge: boolean) {
-  const spent = attempts.filter((item) => item.status !== "interrupted")
-  const counted = spent.filter((item) => item.status !== "harness_error" && item.status !== "infra_error")
+  const runs = runsOf(attempts)
+  const spent = runs.filter((item) => item.status !== "interrupted")
+  const counted = attempts.filter((item) => !["interrupted", "harness_error", "infra_error"].includes(item.status))
   const total = counted.length
   const completed = counted.filter((item) => item.status === "completed")
   const scored = counted.filter((item) => typeof item.score === "number")
@@ -83,8 +85,8 @@ export function aggregate(attempts: AttemptResult[], skipJudge: boolean) {
   const sum = (pick: (item: AttemptResult) => number) => spent.reduce((acc, item) => acc + pick(item), 0)
   return {
     total,
-    environment_cleanup_error_count: attempts.filter((item) => item.environment_cleanup?.status === "failed").length,
-    environment_cleanup_checked_count: attempts.filter((item) => ["failed", "confirmed"].includes(item.environment_cleanup?.status ?? "")).length,
+    environment_cleanup_error_count: runs.filter((item) => item.environment_cleanup?.status === "failed").length,
+    environment_cleanup_checked_count: runs.filter((item) => ["failed", "confirmed"].includes(item.environment_cleanup?.status ?? "")).length,
     completed: completed.length,
     completion_rate: total ? round(completed.length / total, 3) : null,
     mean_score: skipJudge ? null : mean(scoresOf(scored)),
@@ -110,6 +112,10 @@ export function aggregate(attempts: AttemptResult[], skipJudge: boolean) {
   }
 }
 export type Metrics = ReturnType<typeof aggregate>
+
+function runsOf(attempts: AttemptResult[]) {
+  return attempts.flatMap((item) => item.infra_retry ? [item.infra_retry.initial, item] : [item])
+}
 
 export function aggregateTask(attempts: AttemptResult[], skipJudge: boolean) {
   const base = aggregate(attempts, skipJudge)
@@ -210,19 +216,19 @@ export function renderReport(summary: RunSummary) {
     "| Задача | # | Статус | Код | failure_kind | score | pass | oracle | Время | Стоимость | Судья | Cleanup |",
     "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ...summary.tasks.flatMap((task) =>
-      task.attempts.map(
+      runsOf(task.attempts).map(
         (item) =>
-          `| ${task.id} | ${item.attempt} | ${item.status} | ${item.exit_code ?? "—"} | ${item.failure_kind ?? "—"} | ${item.score ?? "—"} | ${item.pass === null ? "—" : item.pass ? "✓" : "✗"} | ${item.oracle_pass === undefined || item.oracle_pass === null ? "—" : item.oracle_pass ? "✓" : `✗ ${cell(item.oracle_error ?? "")}`} | ${Math.round(item.duration_ms / 1000)}s | ${item.cost.toFixed(4)} | ${cell(item.judge_summary ?? item.judge_status)} | ${item.environment_cleanup?.status === "confirmed" ? "confirmed" : item.environment_cleanup?.status === "failed" ? "failed" : "не проверялось"} |`,
+          `| ${task.id} | ${item.attempt}${item.infra_retry ? " (повтор)" : ""} | ${item.status} | ${item.exit_code ?? "—"} | ${item.failure_kind ?? "—"} | ${item.score ?? "—"} | ${item.pass === null ? "—" : item.pass ? "✓" : "✗"} | ${item.oracle_pass === undefined || item.oracle_pass === null ? "—" : item.oracle_pass ? "✓" : `✗ ${cell(item.oracle_error ?? "")}`} | ${Math.round(item.duration_ms / 1000)}s | ${item.cost.toFixed(4)} | ${cell(item.judge_summary ?? item.judge_status)} | ${item.environment_cleanup?.status === "confirmed" ? "confirmed" : item.environment_cleanup?.status === "failed" ? "failed" : "не проверялось"} |`,
       ),
     ),
   ]
   const failures = summary.tasks.flatMap((task) =>
-    task.attempts
+    runsOf(task.attempts)
       .filter((item) => item.status !== "completed" || item.environment_cleanup?.status === "failed")
       .map((item) => {
         const names = [...item.errors.map(cell), item.harness_error ? cell(item.harness_error) : ""].filter(Boolean).join(", ") || "без событий error"
         const stderr = (item.stderr_head ?? "").split(/\r?\n/).find((line) => line.trim())?.slice(0, 200)
-        return `- ${task.id}#${item.attempt}: ${item.status}${item.failure_kind ? ` (${item.failure_kind})` : ""} — ${names}${stderr ? ` — stderr: ${cell(stderr)}` : ""}${item.environment_cleanup?.status === "failed" ? ` — cleanup failed — ${cell(item.environment_cleanup.error ?? "unconfirmed")}` : ""}`
+        return `- ${task.id}#${item.attempt}${item.infra_retry ? " (повтор)" : ""}: ${item.status}${item.failure_kind ? ` (${item.failure_kind})` : ""} — ${names}${stderr ? ` — stderr: ${cell(stderr)}` : ""}${item.environment_cleanup?.status === "failed" ? ` — cleanup failed — ${cell(item.environment_cleanup.error ?? "unconfirmed")}` : ""}`
       }),
   )
   const leftovers =

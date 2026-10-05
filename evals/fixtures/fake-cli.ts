@@ -5,6 +5,21 @@ import { mkdir, rm } from "node:fs/promises"
 const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
 const transition = process.env.EVAL_TASK_ID?.match(/^a-(process|archive|ready)-(no-artifact|failed|timeout|completed)$/)
+const infraRetry = command === "run" && process.env.EVAL_TASK_ID === "infra-retry-success"
+const launch = infraRetry ? await (async () => {
+  const file = Bun.file(path.join(Bun.argv[Bun.argv.indexOf("--dir") + 1]!, "fake-launches.json"))
+  const count = await file.json().catch(() => 0) as number
+  await Bun.write(file, JSON.stringify(count + 1))
+  if (count === 0) {
+    process.env.EVAL_FAKE_RUNTIME_EVENTS = '{"phase":"AMBIGUOUS"}\n'
+    process.env.EVAL_FAKE_STALE_WRITER = "1"
+  }
+  if (count > 0 && await Bun.file(path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, ".writer/owner")).exists()) {
+    process.stderr.write("PROFILE_BUSY\n")
+    process.exit(3)
+  }
+  return count + 1
+})() : undefined
 
 if (process.env.EVAL_FAKE_ARGS_FILE) await Bun.write(process.env.EVAL_FAKE_ARGS_FILE, JSON.stringify(Bun.argv.slice(2)))
 if (command === "run" && process.env.EVAL_TASK_ID === "a-cleanup-failure") process.env.EVAL_FAKE_CHANGED_WRITER = "1"
@@ -88,7 +103,8 @@ if (command === "loginom") {
 }
 
 if (process.env.EVAL_FAKE_SLEEP_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_SLEEP_MS))
-const id = transition ? ({ failed: "transition-failed", completed: "group-sum-qty" }[transition[2]!] ?? "default")
+const id = infraRetry ? launch === 1 ? "host-timeout" : "group-sum-qty"
+  : transition ? ({ failed: "transition-failed", completed: "group-sum-qty" }[transition[2]!] ?? "default")
   : process.env.EVAL_TASK_ID?.match(/^a-exit[23]$/) ? "stop-case" : process.env.EVAL_TASK_ID ?? "default"
 const events = Bun.file(path.join(fixtures, `${id}.jsonl`))
 const chosen = (await events.exists()) ? events : Bun.file(path.join(fixtures, "default.jsonl"))
