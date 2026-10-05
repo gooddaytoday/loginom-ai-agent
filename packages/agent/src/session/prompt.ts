@@ -803,9 +803,7 @@ const layer = Layer.effect(
                     sessionID: input.sessionID,
                     type: "text",
                     synthetic: true,
-                    text: process.env.LOGINOM_AI_AGENT_CLI_ROOT
-                      ? attachmentPreview(decodeDataUrl(part.url))
-                      : decodeDataUrl(part.url),
+                    text: attachmentPreview(decodeDataUrl(part.url)),
                   },
                   { ...part, messageID: info.id, sessionID: input.sessionID },
                 ]

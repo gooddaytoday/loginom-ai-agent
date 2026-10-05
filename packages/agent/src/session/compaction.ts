@@ -53,11 +53,13 @@ const truncate = (value: string) =>
 
 const serialize = (message: SessionV1.WithParts) => {
   if (message.info.role === "user") {
-    const text = message.parts
-      .filter((part): part is SessionV1.TextPart => part.type === "text" && !part.ignored)
-      .map((part) => part.text)
-      .filter(Boolean)
-      .join("\n")
+    const text = truncate(
+      message.parts
+        .filter((part): part is SessionV1.TextPart => part.type === "text" && !part.ignored)
+        .map((part) => part.text)
+        .filter(Boolean)
+        .join("\n"),
+    )
     const files = message.parts.flatMap((part) =>
       part.type === "file" ? [`[Attached ${part.mime}: ${part.filename ?? "file"}]`] : [],
     )
@@ -65,8 +67,8 @@ const serialize = (message: SessionV1.WithParts) => {
   }
   return message.parts
     .flatMap((part) => {
-      if (part.type === "text") return part.text ? [`[Assistant]: ${part.text}`] : []
-      if (part.type === "reasoning") return part.text ? [`[Assistant reasoning]: ${part.text}`] : []
+      if (part.type === "text") return part.text ? [`[Assistant]: ${truncate(part.text)}`] : []
+      if (part.type === "reasoning") return part.text ? [`[Assistant reasoning]: ${truncate(part.text)}`] : []
       if (part.type !== "tool") return []
       const call = `[Assistant tool call]: ${part.tool}(${JSON.stringify(part.state.input)})`
       if (part.state.status === "completed") {
@@ -451,7 +453,7 @@ const layer = Layer.effect(
         processor.message.error = new SessionV1.ContextOverflowError({
           message: replay
             ? "Conversation history too large to compact - exceeds model context limit"
-            : "Session too large to compact - context exceeds model limit even after stripping media",
+            : "Session too large to compact - context exceeds model limit even after truncating conversation text",
         }).toObject()
         processor.message.finish = "error"
         yield* session.updateMessage(processor.message)
