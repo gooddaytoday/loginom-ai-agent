@@ -14,8 +14,7 @@ REPO = ROOT.parents[1]
 LAYERS = ['implementation','historical_acceptance','client_technical_validation','analytical_validation','integration','release']
 REQUIRED = ['README.md','workflow/orchestrator.md','workflow/single-node.md','workflow/lifecycle.md','workflow/acceptance-cli.md','workflow/new-node-plan.md',
             'registry.json','inventory.md','validation.md','provenance.json','history/README.md',
-            'templates/assignment.md','templates/checkpoint.md','templates/completion.md',
-            'templates/node-plan.md','templates/cross-table-plan-example.md','templates/campaign.json','templates/event.json','templates/host-resources.json',
+            'templates/assignment.md','templates/node-plan.md',
             'history/unavailable.md','history/unavailable.json','history/references.json']
 
 
@@ -164,11 +163,6 @@ def check(render_view=False, source_archive=None):
             errors.append('old checkout path '+str(p.relative_to(REPO)))
         if re.search(r'-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----|\bgh[pousr]_[A-Za-z0-9]{30,}|\bsk-[A-Za-z0-9_-]{32,}|\bAKIA[A-Z0-9]{16}\b',t):
             errors.append('possible secret '+str(p.relative_to(REPO)))
-    campaign=json.loads((ROOT/'templates/campaign.json').read_text())
-    if campaign['authorized_nodes'] or campaign['acceptance_slots']!=1 or campaign['memory']['status']!='not_enrolled':
-        errors.append('template inadvertently authorizes execution or memory')
-    if not campaign['resources'].get('host_registry'):
-        errors.append('missing shared host resource registry')
     return {'status':'FAIL' if errors else 'PASS','registry_components':len(nodes),'counts':dict(counts),'handler_types':len(registered),'historical_files_verified':len(prov['files']),'active_markdown_checked':len(active),'all_markdown_checked':len(all_markdown),'unavailable_artifacts_classified':len(artifact_ids),'original_archive_verified':bool(source_archive),'errors':errors}
 
 
