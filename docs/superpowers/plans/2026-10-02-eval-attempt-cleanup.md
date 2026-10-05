@@ -375,3 +375,12 @@ browser/helper admission разрешает сигнал. Adopted неизвес
 и registration guard сохранены; cleanup failed. Process suite: 11 pass, 47
 assertions, 55.84 с; bun typecheck pass. Установленный продукт не изменялся.
 P2 (canonical profile lease/registration) выполняется следующим TDD-срезом.
+
+P2: red подтвердил второй lease через symlink, обход canonical registration
+и удаление writer живой группы при обращении через alias. Green: lease создаётся
+рядом с realpath профиля и возвращает его конвейеру; supervisor, profile process
+checks и writer release используют canonical registration/path. Три новых
+публичных теста прошли (7 + 3 assertions), bun typecheck pass. Новая папка профиля
+создаётся приватно перед канонизацией, существующий lease не отбирается.
+Полная suite и итоговый diff gate выполняются; live native приёмка текущих
+исправлений ещё не проводилась. Историческая приёмка a2bf34b77 остаётся прежней.

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp } from "node:fs/promises"
+import { mkdir, mkdtemp, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { spawn } from "node:child_process"
@@ -279,6 +279,23 @@ test("runAgent: занятая process registration запрещает dispatch 
     outDir: out, profileDir: out, timeoutMs: 30_000 })).rejects.toThrow("Registration unavailable")
   expect(await Bun.file(args).exists()).toBe(false)
   expect(await Bun.file(`${out}.process-group`).text()).toBe("foreign-marker")
+})
+
+test("runAgent: symlink профиля не обходит canonical process registration", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-registration-alias-"))
+  const profile = path.join(directory, "profile")
+  const alias = path.join(directory, "alias")
+  await mkdir(profile)
+  await symlink(profile, alias)
+  await Bun.write(`${profile}.process-group`, "foreign-marker")
+  const command = fakeCommand()
+  const args = path.join(directory, "called.json")
+  await expect(runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_ARGS_FILE: args } },
+    taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: directory,
+    outDir: directory, profileDir: alias, timeoutMs: 30_000 })).rejects.toThrow("Registration unavailable")
+  expect(await Bun.file(args).exists()).toBe(false)
+  expect(await Bun.file(`${profile}.process-group`).text()).toBe("foreign-marker")
+  expect(await Bun.file(`${alias}.process-group`).exists()).toBe(false)
 })
 
 test("runAgent: таймаут останавливает процесс и помечает timedOut", async () => {

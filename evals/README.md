@@ -130,12 +130,17 @@ docker exec loginom-server-7.4.2-test sh -c 'rm -f /workdir/UserStorage/user/eva
 параллельного ручного CLI/Desktop. `EVAL_PROFILE_DIR` и `EVAL_RESULTS_DIR` задают
 отдельные каталоги; по умолчанию `.profile/agent` и `results`. Lease защищает от
 второго harness; атомарный handoff с произвольным внешним CLI не обеспечивается.
+Профиль канонизируется через realpath до lease и dispatch: symlink и прямой
+путь используют общие lease/registration, CLI environment и проверки cleanup.
 
 Каждый agent/setup/status/recover получает отдельный Linux subreaper launcher.
 Один ledger хранит identity, происхождение launcher/cli/parent/subreaper,
 admission pending/allowed/refused и browser binding. PGID/SID сохраняются для
 проверок и аудита; принадлежность подтверждается живой цепочкой родителей или
 усыновлением этим launcher. Launcher завершается последним.
+Усыновлённый процесс с потерянной parent chain при выбранном browser остаётся
+pending до проверки CLI или browser/helper admission. Неизвестный executable
+вне bundle и его потомки не получают сигнал через generic descendant admission.
 
 Общий supervisor опрашивает `/proc` каждые 100 мс и сохраняет UID/PID/starttime,
 наблюдённое происхождение, executable и PGID/SID. Окно запуска опрашивается каждые

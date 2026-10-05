@@ -1,13 +1,14 @@
 import path from "node:path"
-import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { lstat, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { EvalFailure } from "./fail"
 
 /** Sibling of the product profile: resetProfile cannot remove the harness lock.
  * A stale lock requires inspection; PID alone never authorizes lock stealing.
  */
 export async function acquireHarnessLease(profile: string) {
-  const directory = `${path.resolve(profile)}.harness-lease`
-  await mkdir(path.dirname(directory), { recursive: true, mode: 0o700 })
+  await mkdir(path.resolve(profile), { recursive: true, mode: 0o700 })
+  const profileDir = await realpath(profile)
+  const directory = `${profileDir}.harness-lease`
   await mkdir(directory, { mode: 0o700 }).catch(() => {
     throw new EvalFailure(`Exclusive harness lease unavailable: ${directory}`, 2)
   })
@@ -18,6 +19,7 @@ export async function acquireHarnessLease(profile: string) {
   await writeFile(path.join(directory, "owner.json"), owner, { flag: "wx", mode: 0o600 })
   return {
     directory,
+    profileDir,
     async release() {
       const current = await lstat(directory)
       if (current.dev !== info.dev || current.ino !== info.ino || current.isSymbolicLink() ||

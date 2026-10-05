@@ -186,7 +186,7 @@ export async function superviseProcess(input: {
   cleanup.selectedCli = { executable: cliExecutable, device: cliInfo.dev, inode: cliInfo.ino }
   if (input.signal?.aborted) return { stdout: "", stderr: "", exitCode: -1, timedOut: false, interrupted: true,
     startedAt, durationMs: 0, processCleanup: cleanup }
-  const marker = input.profileDir ? `${input.profileDir}.process-group` : undefined
+  const marker = profile ? `${profile}.process-group` : undefined
   const registration = marker ? await open(marker, "wx", 0o600).catch(() => {
     throw Error("Registration unavailable before dispatch")
   }) : undefined
