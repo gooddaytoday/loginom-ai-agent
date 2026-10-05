@@ -1,6 +1,7 @@
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {join} from 'node:path';
+import {observeColdCrossTable} from './cold-crosstable-settings.mjs';
 const need=(v,m)=>{if(!v)throw Error('COLD_SOURCE:'+m);};
 const one=(xs,m)=>{need(xs.length===1,m);return xs[0];};
 const pick=(f,ks)=>Object.fromEntries(ks.map(k=>[k,f[k]]));
@@ -14,12 +15,13 @@ export function verifyGeneratedCollapseMapping(mapping,schema){
 
 // Read settings and cancel each wizard. No CrossTable configure handler, private
 // model receipts, supplied subtype declarations or aggregate results are used.
-export async function observeStaticSources({load,graph,channelFor,account}){
+export async function observeStaticSources({load,graph,channelFor,account,revealSource}){
  const {openPreparedWizard}=await load('client/lib/node-wizard-open.mjs');
  const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
  const {isTextImportSourceReady}=await load('client/lib/text-import-procedure.mjs');
  const {showMissingValuesMappingTable}=await load('client/lib/missing-values-output.mjs');
  const {crossTableConfiguration}=await load('client/lib/crosstable-procedure.mjs');
+ const {selectPreparedGraphNode}=await load('client/lib/node-graph-selection.mjs');
  const mapping=async(channel,direction,generatedSchema)=>{
   await channel[direction==='input'?'openInputPort':'openOutputPort'](0);
   if(direction==='output')await showMissingValuesMappingTable(channel);
@@ -37,14 +39,16 @@ export async function observeStaticSources({load,graph,channelFor,account}){
   const closed=await closePreparedWizard(channel);need(closed.verified&&closed.settings_applied===false,'mapping cancel');
   return {port:0,autosync:m.autosync,fields,native:m};
  };
- const selectSource=async channel=>{
+ const selectSource=async(channel,target)=>{
   // Existing settings controls are rendered only for the selected graph node.
   // Bind the gesture to the independently observed GUID before opening them.
-  await channel.perform({condition:'cold select observed source node',
+  if(revealSource)await revealSource(target);
+  const selected=await channel.observe({condition:'cold observed source selection point',
    ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'
-    &&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'&&e.allowed_actions.includes('click')),
-   identity:s=>s.prepared_node_context,
-   resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'),'source graph body').ref})});
+    &&s.ui.elements.some(e=>(e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'
+     ||e.tid===s.prepared_node_context.tid+';Label;Label'&&e.graph_node?.part==='label')
+     &&e.allowed_actions.includes('click')&&e.interaction?.state==='point_observed')});
+  await selectPreparedGraphNode(channel,selected,'cold select observed source node',{refreshReplacedBody:true});
   await channel.observe({condition:'cold active scenario title settled',
    ready:s=>s.prepared_node_context?.surface==='graph'&&s.workflow_navigation?.status==='observed'
     &&s.active_identity===s.workflow_navigation.path.at(-1)?.label});
@@ -52,7 +56,7 @@ export async function observeStaticSources({load,graph,channelFor,account}){
  const sources={imports:[],collapses:[],crossTables:[]};
  for(const target of graph.nodes.filter(n=>['imports.text','transform.collapse_columns','transform.cross_table'].includes(n.type))){
   const channel=channelFor(target.ref,'source-settings-'+target.ref.node_id);
-  await selectSource(channel);
+  await selectSource(channel,target);
   try { if(target.type==='imports.text'){
    await openPreparedWizard(channel);
    let s=await channel.observe({condition:'cold observed static import',ready:isTextImportSourceReady});
@@ -79,7 +83,7 @@ export async function observeStaticSources({load,graph,channelFor,account}){
    sources.imports.push({node_id:target.ref.node_id,configuration:{kind:'text_import',values_are:'observed_ui_values',node:target.ref,source,format,output_mapping:{port:0,autosync:output.autosync,fields:output.fields}}});
   }else{
    const input=await mapping(channel,'input');
-   await selectSource(channel);
+   await selectSource(channel,target);
    await openPreparedWizard(channel);
    if(target.type==='transform.collapse_columns'){
     const s=await channel.observe({condition:'cold observed Collapse',readCollapse:true,ready:s=>s.node_collapse?.verified&&s.node_collapse.inventory_complete});
@@ -95,9 +99,18 @@ export async function observeStaticSources({load,graph,channelFor,account}){
     const output=await mapping(channel,'output',generatedSchema);configuration.output_mapping={port:0,autosync:output.autosync,fields:output.fields};
     sources.collapses.push({node_id:target.ref.node_id,configuration});
    }else{
-    const s=await channel.observe({condition:'cold observed CrossTable',readCrossTable:true,ready:s=>s.node_crosstable?.verified&&s.node_crosstable.inventory_complete});
-    sources.crossTables.push({node_id:target.ref.node_id,configuration:crossTableConfiguration(s.node_crosstable,input.native)});
+    const {state:s,variablesInspected}=await observeColdCrossTable(channel,target,{closePreparedWizard,openPreparedWizard,selectSource});
+    const configuration=crossTableConfiguration(s.node_crosstable,input.native);
+    sources.crossTables.push({node_id:target.ref.node_id,configuration});
     await closePreparedWizard(channel);
+    // Complete owned CrossTable settings expose every supported binding and
+    // its resolved value. Inspect definitions for every bound node; unbound
+    // local definitions cannot change these independently observed settings.
+    if(Object.keys(configuration.options.variable_bindings).length&&!variablesInspected){
+     const variables=await channel.configureCrossTableVariables([]);
+     need(variables.verified&&variables.settings_changed===false&&variables.settings_applied===false&&variables.draft_discarded===true,
+      'cold variable inspection must discard its unchanged draft');
+    }
    }
   }} catch(error){
    // A refused read must cancel its own editor before package cleanup. Do not
@@ -160,7 +173,8 @@ export async function verifyStaticSourceBytes({load,runtime,execute,sources,allo
    proofs.set(path,{destination:path,bytes:bytes.length,sha256,bytes_verified:true,download_completion_verified:true,provenance:'independent_server_file_download',fixture});
   }
   source.source=proofs.get(path);
-  need(JSON.stringify(source.configuration.output_mapping.fields.map(f=>pick(f,['name','label','type'])))===JSON.stringify(source.source.fixture.columns),'source fixture schema differs');
+  const observed=JSON.stringify(source.configuration.output_mapping.fields.map(f=>pick(f,['name','label','type'])));
+  need([source.source.fixture.columns,...(source.source.fixture.output_orders??[])].some(cols=>observed===JSON.stringify(cols)),'source fixture schema differs');
  }
  return proofs;
 }

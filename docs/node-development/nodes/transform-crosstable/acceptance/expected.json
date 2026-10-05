@@ -9,6 +9,9 @@
     },
     {
       "type": "transform.cross_table"
+    },
+    {
+      "type": "transform.reform_columns"
     }
   ],
   "outputs": [
@@ -41,6 +44,11 @@
           "type": "real"
         },
         {
+          "name": "C_1_Quantity_Sum",
+          "label": "<...>|Quantity|Сумма",
+          "type": "real"
+        },
+        {
           "name": "C_2_Amount_Sum",
           "label": "A|Amount|Сумма",
           "type": "real"
@@ -58,6 +66,11 @@
         {
           "name": "C_2_Amount_Avg",
           "label": "A|Amount|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Quantity_Sum",
+          "label": "A|Quantity|Сумма",
           "type": "real"
         },
         {
@@ -81,6 +94,11 @@
           "type": "real"
         },
         {
+          "name": "C_3_Quantity_Sum",
+          "label": "B|Quantity|Сумма",
+          "type": "real"
+        },
+        {
           "name": "C_4_Amount_Sum",
           "label": "C|Amount|Сумма",
           "type": "real"
@@ -101,6 +119,11 @@
           "type": "real"
         },
         {
+          "name": "C_4_Quantity_Sum",
+          "label": "C|Quantity|Сумма",
+          "type": "real"
+        },
+        {
           "name": "C_5_Amount_Sum",
           "label": "<Прочее>|Amount|Сумма",
           "type": "real"
@@ -118,26 +141,6 @@
         {
           "name": "C_5_Amount_Avg",
           "label": "<Прочее>|Amount|Среднее",
-          "type": "real"
-        },
-        {
-          "name": "C_1_Quantity_Sum",
-          "label": "<...>|Quantity|Сумма",
-          "type": "real"
-        },
-        {
-          "name": "C_2_Quantity_Sum",
-          "label": "A|Quantity|Сумма",
-          "type": "real"
-        },
-        {
-          "name": "C_3_Quantity_Sum",
-          "label": "B|Quantity|Сумма",
-          "type": "real"
-        },
-        {
-          "name": "C_4_Quantity_Sum",
-          "label": "C|Quantity|Сумма",
           "type": "real"
         },
         {
@@ -234,6 +237,11 @@
           "type": "real"
         },
         {
+          "name": "C_1_Quantity_Sum",
+          "label": "<...>|Quantity|Сумма",
+          "type": "real"
+        },
+        {
           "name": "C_2_Amount_Sum",
           "label": "A|Amount|Сумма",
           "type": "real"
@@ -251,6 +259,11 @@
         {
           "name": "C_2_Amount_Avg",
           "label": "A|Amount|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Quantity_Sum",
+          "label": "A|Quantity|Сумма",
           "type": "real"
         },
         {
@@ -274,6 +287,11 @@
           "type": "real"
         },
         {
+          "name": "C_3_Quantity_Sum",
+          "label": "C|Quantity|Сумма",
+          "type": "real"
+        },
+        {
           "name": "C_4_Amount_Sum",
           "label": "D|Amount|Сумма",
           "type": "real"
@@ -291,21 +309,6 @@
         {
           "name": "C_4_Amount_Avg",
           "label": "D|Amount|Среднее",
-          "type": "real"
-        },
-        {
-          "name": "C_1_Quantity_Sum",
-          "label": "<...>|Quantity|Сумма",
-          "type": "real"
-        },
-        {
-          "name": "C_2_Quantity_Sum",
-          "label": "A|Quantity|Сумма",
-          "type": "real"
-        },
-        {
-          "name": "C_3_Quantity_Sum",
-          "label": "C|Quantity|Сумма",
           "type": "real"
         },
         {
@@ -761,18 +764,9 @@
         {
           "Region": "North",
           "When_Count": 4,
-          "When_Min": {
-            "cell_type": "datetime",
-            "bytes_le": "00000000e078e640"
-          },
-          "When_Max": {
-            "cell_type": "datetime",
-            "bytes_le": "000000006079e640"
-          },
-          "When_Avg": {
-            "cell_type": "datetime",
-            "bytes_le": "000000002079e640"
-          },
+          "When_Min": "2026-01-01T00:00:00.000",
+          "When_Max": "2026-01-05T00:00:00.000",
+          "When_Avg": "2026-01-03T00:00:00.000",
           "When_StdDev": 2.0000000298023224
         },
         {
@@ -819,10 +813,7 @@
           "Region": "North",
           "When_UniqueCount": 3,
           "When_NullCount": 1,
-          "When_First": {
-            "cell_type": "datetime",
-            "bytes_le": "00000000e078e640"
-          },
+          "When_First": "2026-01-01T00:00:00.000",
           "When_Last": null
         },
         {
@@ -1208,6 +1199,473 @@
           }
         }
       ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Граница исключения",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "C_1_Amount_Sum",
+          "label": "A|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_1_Amount_Count",
+          "label": "A|Amount|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "C_2_Amount_Sum",
+          "label": "B|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Amount_Count",
+          "label": "B|Amount|Количество",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "C_1_Amount_Sum": 9.0,
+          "C_1_Amount_Count": 4,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": null
+        },
+        {
+          "Region": null,
+          "C_1_Amount_Sum": null,
+          "C_1_Amount_Count": null,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": 1
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Резерв категорий",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "C_1_Amount_Sum",
+          "label": "A|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_1_Amount_Count",
+          "label": "A|Amount|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "C_2_Amount_Sum",
+          "label": "B|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Amount_Count",
+          "label": "B|Amount|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "C_3_Amount_Sum",
+          "label": "3|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_3_Amount_Count",
+          "label": "3|Amount|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "C_4_Amount_Sum",
+          "label": "4|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_4_Amount_Count",
+          "label": "4|Amount|Количество",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "C_1_Amount_Sum": 9.0,
+          "C_1_Amount_Count": 4,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": null,
+          "C_3_Amount_Sum": null,
+          "C_3_Amount_Count": null,
+          "C_4_Amount_Sum": null,
+          "C_4_Amount_Count": null
+        },
+        {
+          "Region": null,
+          "C_1_Amount_Sum": null,
+          "C_1_Amount_Count": null,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": 1,
+          "C_3_Amount_Sum": null,
+          "C_3_Amount_Count": null,
+          "C_4_Amount_Sum": null,
+          "C_4_Amount_Count": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Ограничение категорий",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "C_1_Amount_Sum",
+          "label": "A|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_1_Amount_Count",
+          "label": "A|Amount|Количество",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "C_1_Amount_Sum": 9.0,
+          "C_1_Amount_Count": 4
+        },
+        {
+          "Region": null,
+          "C_1_Amount_Sum": null,
+          "C_1_Amount_Count": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Управляемая схема",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "A_Amount_Sum",
+          "label": "A.Amount.Сумма",
+          "type": "real"
+        },
+        {
+          "name": "A_Amount_Count",
+          "label": "A.Amount.Количество",
+          "type": "integer"
+        },
+        {
+          "name": "B_Amount_Sum",
+          "label": "B.Amount.Сумма",
+          "type": "real"
+        },
+        {
+          "name": "B_Amount_Count",
+          "label": "B.Amount.Количество",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "A_Amount_Sum": 9.0,
+          "A_Amount_Count": 4,
+          "B_Amount_Sum": null,
+          "B_Amount_Count": null
+        },
+        {
+          "Region": null,
+          "A_Amount_Sum": null,
+          "A_Amount_Count": null,
+          "B_Amount_Sum": null,
+          "B_Amount_Count": 1
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Редактирование выхода",
+      "columns": [
+        {
+          "name": "C_2_Amount_Sum",
+          "label": "B|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "RevenueA",
+          "label": "Доход A",
+          "type": "real"
+        },
+        {
+          "name": "C_1_Amount_Count",
+          "label": "A|Amount|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "C_2_Amount_Count",
+          "label": "B|Amount|Количество",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "C_1_Amount_Count": 4,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": null,
+          "RevenueA": 9.0
+        },
+        {
+          "Region": null,
+          "C_1_Amount_Count": null,
+          "C_2_Amount_Sum": null,
+          "C_2_Amount_Count": 1,
+          "RevenueA": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.reform_columns",
+      "output_node_label": "Представление без количества B",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "C_1_Amount_Sum",
+          "label": "A|Amount|Сумма",
+          "type": "real"
+        },
+        {
+          "name": "C_1_Amount_Count",
+          "label": "A|Amount|Количество",
+          "type": "integer"
+        },
+        {
+          "name": "C_2_Amount_Sum",
+          "label": "B|Amount|Сумма",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "C_1_Amount_Sum": 9.0,
+          "C_1_Amount_Count": 4,
+          "C_2_Amount_Sum": null
+        },
+        {
+          "Region": null,
+          "C_1_Amount_Sum": null,
+          "C_1_Amount_Count": null,
+          "C_2_Amount_Sum": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Имена категорий",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "NullGroup_Amount_Sum",
+          "label": "<...>.Amount.Сумма",
+          "type": "real"
+        },
+        {
+          "name": "NullGroup_Amount_Count",
+          "label": "<...>.Amount.Количество",
+          "type": "integer"
+        },
+        {
+          "name": "Amount_Sum",
+          "label": "Amount.Сумма",
+          "type": "real"
+        },
+        {
+          "name": "Amount_Count",
+          "label": "Amount.Количество",
+          "type": "integer"
+        },
+        {
+          "name": "__Amount_Sum",
+          "label": " .Amount.Сумма",
+          "type": "real"
+        },
+        {
+          "name": "__Amount_Count",
+          "label": " .Amount.Количество",
+          "type": "integer"
+        },
+        {
+          "name": "Privet_Amount_Sum_1",
+          "label": "Привет.Amount.Сумма",
+          "type": "real"
+        },
+        {
+          "name": "Privet_Amount_Count_1",
+          "label": "Привет.Amount.Количество",
+          "type": "integer"
+        },
+        {
+          "name": "A_1_Amount_Sum",
+          "label": "A_1.Amount.Сумма",
+          "type": "real"
+        },
+        {
+          "name": "A_1_Amount_Count",
+          "label": "A_1.Amount.Количество",
+          "type": "integer"
+        },
+        {
+          "name": "A_1_Amount_Sum_1",
+          "label": "A-1.Amount.Сумма",
+          "type": "real"
+        },
+        {
+          "name": "A_1_Amount_Count_1",
+          "label": "A-1.Amount.Количество",
+          "type": "integer"
+        },
+        {
+          "name": "null_Amount_Sum",
+          "label": "null.Amount.Сумма",
+          "type": "real"
+        },
+        {
+          "name": "null_Amount_Count",
+          "label": "null.Amount.Количество",
+          "type": "integer"
+        },
+        {
+          "name": "Privet_Amount_Sum",
+          "label": "Privet.Amount.Сумма",
+          "type": "real"
+        },
+        {
+          "name": "Privet_Amount_Count",
+          "label": "Privet.Amount.Количество",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "NullGroup_Amount_Sum": 9.0,
+          "NullGroup_Amount_Count": 1,
+          "Amount_Sum": 5.0,
+          "Amount_Count": 1,
+          "__Amount_Sum": 5.0,
+          "__Amount_Count": 1,
+          "Privet_Amount_Sum_1": 4.0,
+          "Privet_Amount_Count_1": 1,
+          "A_1_Amount_Sum": 4.0,
+          "A_1_Amount_Count": 1,
+          "A_1_Amount_Sum_1": 2.0,
+          "A_1_Amount_Count_1": 1,
+          "null_Amount_Sum": 7.0,
+          "null_Amount_Count": 1,
+          "Privet_Amount_Sum": 4.0,
+          "Privet_Amount_Count": 1
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Автосинхронизация выхода",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "C_1",
+          "label": "A",
+          "type": "real"
+        },
+        {
+          "name": "C_2",
+          "label": "B",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "C_1": 9.0,
+          "C_2": null
+        },
+        {
+          "Region": null,
+          "C_1": null,
+          "C_2": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Переходы режимов",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "C_1",
+          "label": "A",
+          "type": "integer"
+        },
+        {
+          "name": "C_2",
+          "label": "B",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "C_1": 4,
+          "C_2": null
+        },
+        {
+          "Region": null,
+          "C_1": null,
+          "C_2": 1
+        }
+      ]
     }
   ],
   "static_sources": [
@@ -1293,6 +1751,55 @@
           "label": "When",
           "type": "datetime"
         }
+      ],
+      "output_orders": [
+        [
+          {
+            "name": "When",
+            "label": "When",
+            "type": "datetime"
+          },
+          {
+            "name": "Flag",
+            "label": "Flag",
+            "type": "boolean"
+          },
+          {
+            "name": "Text",
+            "label": "Text",
+            "type": "string"
+          },
+          {
+            "name": "Units",
+            "label": "Units",
+            "type": "integer"
+          },
+          {
+            "name": "Amount",
+            "label": "Amount",
+            "type": "real"
+          },
+          {
+            "name": "Channel",
+            "label": "Channel",
+            "type": "string"
+          },
+          {
+            "name": "Category",
+            "label": "Category",
+            "type": "string"
+          },
+          {
+            "name": "Month",
+            "label": "Month",
+            "type": "string"
+          },
+          {
+            "name": "Region",
+            "label": "Region",
+            "type": "string"
+          }
+        ]
       ]
     },
     {
@@ -1376,6 +1883,38 @@
           "name": "WhenValue",
           "label": "WhenValue",
           "type": "datetime"
+        }
+      ]
+    },
+    {
+      "name": "names.csv",
+      "bytes": 180,
+      "sha256": "aee13d386dd87470c51d34b556c3551ff3f2a04d2148874b83ff884d70e97ac4",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "string"
+        },
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real"
+        },
+        {
+          "name": "Quantity",
+          "label": "Quantity",
+          "type": "real"
         }
       ]
     }

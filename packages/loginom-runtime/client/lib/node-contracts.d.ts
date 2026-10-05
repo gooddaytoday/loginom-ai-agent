@@ -269,7 +269,9 @@ export interface CrossTableParameters {
  row_keys: ConfiguredInputField[]; column?: ConfiguredInputField; columns?: ConfiguredInputField[];
  facts: {field: ConfiguredInputField; functions: CrossTableFunction[]}[];
  category_mode: 'fixed'|'sliding'; include_null?: boolean; include_other?: boolean;
- min_values?: 0; limit?: 0; separator?: '|'; unique_names?: false;
+ local_variables?:{name:string;type:'integer'|'boolean'|'string';value:number|boolean|string}[];
+ bindings?:{limit?:{variable:string};unique_names?:{variable:string};separator?:{variable:string}};
+ min_values?: number; limit?: number; separator?: '|'|'.'|'->'|' '; unique_names?: boolean;
 }
 export interface ConfiguredInputField {kind:'input_field'; name:string}
 export interface CrossTableConfigurationReadback {
@@ -277,8 +279,9 @@ export interface CrossTableConfigurationReadback {
  receipt_ids:string[]; mode:'pivot'; category_mode:'fixed'|'sliding';
  row_keys:{name:string;label:string;type:string;order:number}[]; column:{name:string;label:string;type:string}|null; columns:{name:string;label:string;type:string;order:number}[];
  facts:{name:string;label:string;type:'integer'|'real'|'string'|'boolean'|'datetime'|'variant';order:number;functions:CrossTableFunction[]}[];
- options:{separator:'|';unique_names:false;limit:0;min_values:0;include_null:boolean;include_other:boolean};
+ options:{separator:string;unique_names:boolean;limit:number;min_values:number;min_values_by_dimension?:{field:string;value:number}[];variable_bindings?:Partial<Record<'limit'|'unique_names'|'separator',{name:string;id:number;type:number;value:number|boolean|string;selected_proxy_equal:true}>>;include_null:boolean;include_other:boolean};
  output_scope:'not_materialized'|'observed_after_verified_execution'; execution_id:string|null;
- category_fields:{category:string|null;category_kind:'null'|'other'|'value';fact:string;function:CrossTableFunction;field:string;label:string;type:string;categories?:{dimension:string;caption:string;kind:'null'|'other'|'value';value:string|null}[]}[];
+ output_mapping?:{verified:true;inventory_complete:true;source_identity_verified:true;autosync:boolean;node_context:NodeRef&{verified:true;output_port:{port:0}};source_fields:{record_id:string;name:string;label:string;type:string;required:boolean}[];target_fields:{index:number;name:string;label:string;type:string;excluded:boolean;source:{record_id:string;name:string;label:string;type:string}}[]};
+ category_fields:{reserved_possible?:boolean;category_identity_source?:'observed_caption';category:string|null;category_kind:'null'|'other'|'value';fact:string;function:CrossTableFunction;field:string;label:string;type:string;categories?:{dimension:string;caption:string;kind:'null'|'other'|'value';value:string|null}[]}[];
  package_persistence_verified:false;
 }

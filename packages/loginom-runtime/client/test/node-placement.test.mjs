@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
 import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
-import {nodePlacementPoint,nodePlacementPosition,revealNodePlacement,samePlacementGraph} from '../lib/node-placement.mjs';
+import {nodePlacementPoint,nodePlacementPosition,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from '../lib/node-placement.mjs';
 
 for(const {scale,translate,expected} of [
  {scale:1.5,translate:{x:0,y:0},expected:{x:160,y:136}},
@@ -39,6 +39,38 @@ test('viewport rebinding ignores only node DOM epochs and preserves graph root a
  }
 });
 const view=()=>({x:324,y:100,width:1178,height:756,viewportWidth:1508,viewportHeight:862,scale:1,translate:{x:0,y:0},scroll:{x:0,y:0}});
+test('crowded automatic placement chooses a bounded row beyond all observed drawings',async()=>{
+ const v=view(),occupied=[{left:324,right:1502,top:100,bottom:856},{left:400,right:700,top:950,bottom:1200}];
+ const run=runInNewContext('('+nodePlacementOverflow.toString()+')');
+ const position=structuredClone(run(v,occupied,64,10000));
+ assert.deepEqual(position,{x:80,y:1232});
+ const f=fixture();f.args.position=position;
+ assert.equal((await revealNodePlacement(f.args)).fully_visible,true);
+ assert.ok(f.state().clicks>0);assert.equal(f.state().open,false);
+});
+test('browser automatic placement retains overflow coordinates in its serialized evaluator',async()=>{
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type:'imports.text'},inputs:[]};
+ const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
+ const box={x:0,y:0,left:0,right:800,top:0,bottom:600,width:800,height:600};
+ const canvas={getBoundingClientRect:()=>box,querySelectorAll:()=>[{getBoundingClientRect:()=>box}],scrollLeft:0,scrollTop:0};
+ const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:1,translate:{x:0,y:0}}}}}};
+ const context={innerWidth:800,innerHeight:600,document:{elementFromPoint:()=>canvas},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
+ let calls=0;const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>++calls===1?graph:runInNewContext('('+code+')',context)({locator:()=>({evaluate:async fn=>fn(canvas)})})});
+ assert.deepEqual(structuredClone(await adapter.choosePosition(request,graph,Date.now()+10000)),{x:80,y:728});
+});
+test('overflow remains beyond occupied drawings under zoom, translation and scroll',()=>{
+ for(const scale of [.5,1,2]){
+  const v={...view(),scale,translate:{x:32,y:-16},scroll:{x:24,y:40}};
+  const occupied=[{left:350,right:800,top:200,bottom:950}];
+  const p=nodePlacementOverflow(v,occupied,64,10000),screen=nodePlacementPoint(v,p);
+  assert.ok(screen.y>=950+128);assert.ok(p.x>=64&&p.y>=64);
+ }
+});
+test('overflow refuses absent, malformed and out-of-contract space',()=>{
+ assert.equal(nodePlacementOverflow(view(),[],64,10000),null);
+ assert.equal(nodePlacementOverflow(view(),[{left:324,right:1500,top:100,bottom:10100}],64,10000),null);
+ for(const r of [{left:1,right:0,top:1,bottom:2},{left:1,right:2,top:NaN,bottom:2}])assert.throws(()=>nodePlacementOverflow(view(),[r],64,10000),/bounds/);
+});
 test('model coordinates account for zoom, translation, scroll and grid before screen rounding',()=>{
  for(const scale of [.5,1,.8264462809917354,1.5,2]){
   const v={...view(),x:324.125,y:100.375,scale,translate:{x:32.25,y:-16.125},scroll:{x:40.375,y:24.125}};

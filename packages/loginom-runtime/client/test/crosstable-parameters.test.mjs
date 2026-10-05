@@ -10,7 +10,8 @@ test('numeric pivot supports both modes and rejects unimplemented features befor
  assert.equal(validateCrossTableParameters(p,'pivot',r),p);assert.equal(resolveCrossTableParameters(p,fields).column.name,'Category');
  const sliding={...p,category_mode:'sliding'};delete sliding.include_null;delete sliding.include_other;
  assert.equal(validateCrossTableParameters(sliding,'pivot',r),sliding);
- for(const patch of [{limit:1},{min_values:1},{unique_names:true},{separator:'.'},{categories:['A']},{variables:{}},
+ assert.doesNotThrow(()=>validateCrossTableParameters({...sliding,min_values:4,limit:1,unique_names:true,separator:'.'},'pivot',r));
+ for(const patch of [{limit:-1},{min_values:1.5},{unique_names:'true'},{separator:'bad'},{categories:['A']},{variables:{}},
   {row_keys:[field('Region'),field('Region')]},{category_mode:'sliding'},
   {facts:[{field:field('Amount'),functions:['median']}]},{facts:[{field:field('Amount'),functions:['sum','sum']}]},
   {columns:[field('Category')]},{columns:'Category',column:undefined}])
@@ -57,5 +58,32 @@ test('native Index binds to the verified input mapping, never to a display name 
  for(const mutate of [m=>m.node_context.node_id='other',m=>m.target_fields.reverse(),m=>m.target_fields[0].label='different',
   m=>m.target_fields[0].excluded=true,m=>m.target_fields[0].type='integer',m=>m.target_fields[0].data_kind='Непрерывный']){
   const m=structuredClone(mapping);mutate(m);assert.throws(()=>bindCrossTableInput(native,m));
+ }
+});
+
+test('own mandatory output exclusion refuses before drivers while downstream remains separate',()=>{
+ const mapping={direction:'output',port:0,fields:[{source:{kind:'configured_field',name:'C_1_Amount_Sum'},excluded:true}]};
+ assert.throws(()=>validateCrossTableParameters(p,'pivot',{...r,finish:'execute',mappings:[mapping]}),/required/);
+ mapping.fields[0].excluded=false;
+ assert.doesNotThrow(()=>validateCrossTableParameters(p,'pivot',{...r,finish:'execute',mappings:[mapping]}));
+ assert.throws(()=>validateCrossTableParameters(p,'pivot',{...r,finish:'done',mappings:[mapping]}),/fresh materialization/);
+});
+
+test('local bindings reject conflicting static values, wrong types and undeclared new variables before mutation',()=>{
+ const q={...p,local_variables:[{name:'Limit',type:'integer',value:1}],bindings:{limit:{variable:'Limit'}}};
+ assert.doesNotThrow(()=>validateCrossTableParameters(q,'pivot',r));
+ for(const mutate of [q=>q.limit=1,q=>q.local_variables[0].type='string',q=>q.local_variables[0].value=1.5,q=>q.bindings.limit.variable='Missing',q=>q.local_variables.push({...q.local_variables[0]})]){
+  const copy=structuredClone(q);mutate(copy);assert.throws(()=>validateCrossTableParameters(copy,'pivot',r));
+ }
+ assert.doesNotThrow(()=>validateCrossTableParameters({local_variables:[{name:'Limit',type:'integer',value:0}]},'pivot',{...r,target:{kind:'existing'},inputs:[]}));
+});
+test('native separator admission follows the four observed choices for literals and bindings',()=>{
+ for(const separator of ['|','.','->',' ']){
+  assert.doesNotThrow(()=>validateCrossTableParameters({...p,separator},'pivot',r));
+  assert.doesNotThrow(()=>validateCrossTableParameters({...p,local_variables:[{name:'Separator',type:'string',value:separator}],bindings:{separator:{variable:'Separator'}}},'pivot',r));
+ }
+ for(const separator of ['_','-','bad']){
+  assert.throws(()=>validateCrossTableParameters({...p,separator},'pivot',r));
+  assert.throws(()=>validateCrossTableParameters({...p,local_variables:[{name:'Separator',type:'string',value:separator}],bindings:{separator:{variable:'Separator'}}},'pivot',r));
  }
 });

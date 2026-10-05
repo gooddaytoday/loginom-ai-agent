@@ -33,3 +33,17 @@ test('materialized readback requires fresh execution and matching category ident
   const ps=phases(true);mutate(ps);assert.throws(()=>read(ps));
  }
 });
+test('materialized mapping requires an owned completed first execution',()=>{
+ const ps=phases(),mapped=ps.find(p=>p.phase==='output_mapping');
+ delete mapped.value.deferred_schema;
+ mapped.value.native_mapping={verified:true,inventory_complete:true,source_identity_verified:true,autosync:false,
+  node_context:{...owner,output_port:{port:0}},source_fields:[],target_fields:[]};
+ mapped.value.finish={settings_applied:true};
+ mapped.value.initial_materialization={finish:{node_context:owner},execution:{verified:true,owner_verified:true,status:'completed',execution_id:'doc:root:group'}};
+ assert.equal(read(ps).output_mapping.autosync,false);
+ for(const damage of [v=>v.initial_materialization.finish.node_context.node_id='foreign',
+  v=>v.initial_materialization.execution.status='failed',v=>v.initial_materialization.execution.execution_id='foreign:root:group',
+  v=>v.initial_materialization.execution.owner_verified=false,v=>v.native_mapping.node_context.output_port.port=1]){
+  const copy=structuredClone(ps);damage(copy.find(p=>p.phase==='output_mapping').value);assert.throws(()=>read(copy));
+ }
+});

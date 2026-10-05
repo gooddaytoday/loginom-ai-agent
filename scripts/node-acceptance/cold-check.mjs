@@ -5,6 +5,8 @@ import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions} from './static-source-proof.mjs'
+import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
+import {coldNativeEligible} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -107,17 +109,31 @@ try {
    preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,receipt)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:receipt.id,receipt_signature:receipt.signature,operation_id:receipt.id})});
   let staticSources;
   if(expected.static_sources){
+   const {readGraph}=await load('client/lib/node-target-browser.mjs');
+   const viewportHelpers=await load('client/lib/node-placement.mjs');
+   const {NODE_TYPES}=await load('client/lib/node-contracts.mjs');
+   const revealSource=async target=>{
+    const id='cold-source-reveal-'+target.ref.node_id+'-'+(++coldChannelSequence);
+    const code=makeColdSourceRevealCode({node:target.ref,type:target.type,
+     request:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},types:NODE_TYPES,
+     origin,build:'7.4.2',deadline:Date.now()+30000},{readGraph,...viewportHelpers});
+    const result=await execute(withBrowserReceipt(`(${code})(page)`,{
+     receipt_namespace:session,receipt_id:id,receipt_signature:id,operation_id:id}));
+    await record({phase:'cold_source_viewport',node:target.ref,receipt_id:id,result});
+    if(result.status!=='SUCCEEDED'||result.verified!==true||result.graph_unchanged!==true||result.fully_visible!==true||result.settings_applied!==false)
+     throw Error('COLD_SOURCE_REVEAL_UNCONFIRMED');
+   };
    const {createActionRuntime}=await load('client/lib/executor.mjs');
    const catalog=JSON.parse(await readFile(join(root,'runtime/executor/catalog/actions.json'),'utf8'));
    const selectors=JSON.parse(await readFile(join(root,'runtime/executor/catalog/selectors.json'),'utf8'));
    const runtime=createActionRuntime({pinned:{actions:new Map(catalog.actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.selectors.map(s=>[s.symbol,s])),pins:{}},execute,onRecord:record,targetOrigin:origin,targetBuild:'7.4.2',allowCandidate:true});
    const account=config.workflow_profile.loginom_user;
-   const before=await observeStaticSources({load,graph:{...graph,nodes:graph.nodes.filter(n=>n.type==='imports.text')},channelFor,account});
+   const before=await observeStaticSources({load,graph:{...graph,nodes:graph.nodes.filter(n=>n.type==='imports.text')},channelFor,account,revealSource});
    const verified=await verifyStaticSourceBytes({load,runtime,execute,sources:before,allowed:expected.static_sources,account,origin,output:args.output});
    const returned=await adapter.activateWorkflow({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},{deadline:Date.now()+30000,receipt_id:'cold-return-from-files'});
    if(returned.status!=='SUCCEEDED'||!returned.verified||!returned.cleanup_complete)throw Error('COLD_SOURCE_RETURN_UNCONFIRMED');
    graph=await adapter.observe({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},Date.now()+30000);
-   staticSources=await observeStaticSources({load,graph,channelFor,account});
+   staticSources=await observeStaticSources({load,graph,channelFor,account,revealSource});
    for(const source of staticSources.imports){
     const old=before.imports.find(s=>s.node_id===source.node_id);
     if(!old||JSON.stringify(old.configuration.source)!==JSON.stringify(source.configuration.source)||JSON.stringify(old.configuration.format)!==JSON.stringify(source.configuration.format)||JSON.stringify(old.configuration.output_mapping)!==JSON.stringify(source.configuration.output_mapping))throw Error('COLD_SOURCE_SETTINGS_CHANGED');
@@ -157,6 +173,13 @@ try {
         operation_id: receipt.id,
       }),
   })
+  const nativeSource=staticSources?.crossTables.find(c=>c.node_id===node.node_id);
+  const nativeConfiguration=nativeSource?.configuration;
+  if(nativeConfiguration){
+   const {prepareCrossTableAncestorExecution}=await load('client/lib/crosstable-ancestor-execution.mjs');
+   await prepareCrossTableAncestorExecution({graph,node,sources:staticSources,operation,execute,record,targetOrigin:origin,targetBuild:'7.4.2',
+    wrapMutation:(code,r)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})});
+  }
   const driver = createNodeExecutionProcedure(channel, node)
   await driver.prepare()
   await driver.launchGraph()
@@ -166,19 +189,20 @@ try {
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
   ownedExecutions.push(execution);
 
-  const nativeConfiguration=staticSources?.crossTables.find(c=>c.node_id===node.node_id)?.configuration;
-  const useNative=nativeConfiguration&&expectedOutputs.some(o=>o.columns.length<=8);
+  let useNative=false,ownedPreview;
+  const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,execution,deadline:operation.deadline,receipt_id:operation.id};
+  if(nativeConfiguration){
+   const {openOwnedNativePreview,closeOwnedNativePreview}=await load('client/lib/collapse-native-output.mjs');
+   ownedPreview=await openOwnedNativePreview(channel,ctx);
+   useNative=coldNativeEligible(nativeConfiguration,ownedPreview.preview);
+   if(!useNative)await closeOwnedNativePreview(channel,ctx,ownedPreview.port,ownedPreview.preview.root_tid);
+  }
+
   let data;
   if(useNative){
    // Preview enforces the actual 50x8 bound; wide baseline reports retain their
    // existing formatted scalar reader. No native fallback after a failed read.
-   const want=expectedOutputs.find(o=>o.columns.length<=8&&o.output_node_type===target.type&&o.columns.some(c=>c.type==='variant'));
-   const isVariant=nativeConfiguration.facts.some(f=>f.type==='variant');
-   const factWidth=nativeConfiguration.columns.length===0?nativeConfiguration.row_keys.length+nativeConfiguration.facts.reduce((n,f)=>n+f.functions.length,0):null;
-   if(isVariant||factWidth!==null&&factWidth<=8){
-    if(isVariant&&!want)throw Error('COLD_VARIANT_EXPECTATION_MISSING');
     const {readCollapseNativeOutput}=await load('client/lib/collapse-native-output.mjs');
-    const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,execution,deadline:operation.deadline,receipt_id:operation.id};
     const ancestors=new Set();let upstream=node.node_id;
     for(let depth=0;depth<3;depth++){
      const incoming=graph.links.filter(l=>l.target===upstream);
@@ -189,10 +213,9 @@ try {
     }
     const chain={imports:staticSources.imports.filter(s=>ancestors.has(s.node_id)),collapses:staticSources.collapses.filter(s=>ancestors.has(s.node_id))};
     const coldStaticSources=await bindColdExecutions({execute,sources:chain,ctx,ownedExecutions});
-    const read=await readCollapseNativeOutput(channel,{sample_rows:50},ctx,{execute,operation,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>true,coldStaticSources,nativeExecutionProof:execution},{targetOrigin:origin,targetBuild:'7.4.2'},nativeConfiguration);
+    const read=await readCollapseNativeOutput(channel,{sample_rows:50},ctx,{execute,operation,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>true,coldStaticSources,nativeExecutionProof:execution,ownedPreview},{targetOrigin:origin,targetBuild:'7.4.2'},nativeConfiguration);
     if(!read.cleanup_complete)throw Error('COLD_NATIVE_CLEANUP_UNCONFIRMED');
     data=read.ports[0];
-   }
   }
   if(!data){
   const opened = await openNewOutputTable(channel, 0)
@@ -216,7 +239,12 @@ try {
   await returnFromOutputTable(channel, opened.table)
   }
 
-  actual.push({node,type:target.type,execution,data});
+  actual.push({node,type:target.type,label:target.label,execution,data});
+  // Preserve independently read values before correspondence can refuse. A
+  // failed match is still FAIL; this private checkpoint makes it diagnosable.
+  const checkpoint=JSON.stringify({phase:'independent_cold_read_checkpoint',path:saved.path,outputs:actual});
+  if([config.api_key,loginPassword].filter(Boolean).some(secret=>checkpoint.includes(secret)))throw Error('SECRET_IN_RESULT');
+  await writeFile(join(args.output,'actual-readback.json'),checkpoint+'\n');
   }
   const correspondence=matchExpectedOutputs(actual,expectedOutputs);
 
@@ -236,6 +264,7 @@ try {
     }),
   )
   await writeFile(join(args.output, "cleanup.json"), JSON.stringify(cleanup, null, 2) + "\n")
+  state.cleanup=cleanup
   if (cleanup.status !== "SUCCEEDED" || !cleanup.package_closed || !cleanup.logged_out)
     throw Error("COLD_CLEANUP_UNCONFIRMED")
   state.closed = true
@@ -264,6 +293,10 @@ try {
       cleanup: result.cleanup,
     }),
   )
+} catch(error) {
+  state.failure=String(error?.message??error)
+  for(const secret of [config.api_key,loginPassword].filter(Boolean))state.failure=state.failure.split(secret).join('[REDACTED]')
+  throw error
 } finally {
   if (!state.closed && !state.cleanupAttempted && state.prepared?.status === "READY" && state.prepared.package_ref?.path === saved.path) {
     await execute(
@@ -278,9 +311,13 @@ try {
         diagnosticDiscard: true,
       }),
     )
-      .then((result) => writeFile(join(args.output, "cleanup.json"), JSON.stringify(result, null, 2) + "\n"))
+      .then((result) => {state.cleanup=result;return writeFile(join(args.output, "cleanup.json"), JSON.stringify(result, null, 2) + "\n")})
       .catch(() => console.error("COLD_PACKAGE_CLEANUP_UNCONFIRMED"))
   }
+  if(state.failure)await writeFile(join(args.output,'result.json'),JSON.stringify({status:'FAIL',
+   phase:'independent_cold_reopen_readback',path:saved.path,settingsReapplied:false,error:state.failure,
+   cleanup:{package_closed:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.package_closed===true,
+    logged_out:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.logged_out===true}},null,2)+'\n')
   await context.close()
 }
 

@@ -28,7 +28,37 @@ export function completedCrossTableCollapses(history,ctx){
  return result;
 }
 
-export function validateCrossTableNativeSources(imports,collapses,inputFields){
+// The CrossTable input may retain its own target order after an upstream
+// import reorders its output. Admit only the complete observed one-to-one
+// identity mapping, never an unordered comparison of names or display text.
+export function crossTableInputSourceSchema(inputFields,mapping,node){
+ need(node?.verified===true&&['document_id','workflow_id','node_id'].every(k=>typeof node[k]==='string'&&node[k].length>0)
+  &&mapping?.verified===true&&mapping.inventory_complete===true&&mapping.source_identity_verified===true
+  &&mapping.node_context?.verified===true&&mapping.node_context.input_port?.port===0
+  &&owner(mapping.node_context,node),'owned complete input lineage required');
+ const sources=mapping.source_fields,targets=mapping.target_fields;
+ need(Array.isArray(sources)&&Array.isArray(targets)&&sources.length===inputFields.length&&targets.length===sources.length
+  &&sources.length>0&&sources.length<=128,'complete input source/target inventory required');
+ const ids=new Set(),names=new Set();
+ for(const [index,s] of sources.entries()){
+  need(s.index===index&&typeof s.record_id==='string'&&s.record_id.length>0&&s.record_id.length<=256
+   &&typeof s.name==='string'&&s.name.length>0&&s.name.length<=256&&typeof s.label==='string'&&s.label.length<=2048
+   &&['integer','real','string','boolean','datetime','variant'].includes(s.type)&&!ids.has(s.record_id)&&!names.has(s.name),'unique ordered input source identity required');
+  ids.add(s.record_id);names.add(s.name);
+ }
+ need(JSON.stringify(schema(targets))===JSON.stringify(schema(inputFields)),'owned input target schema differs');
+ const used=new Set();
+ for(const [index,t] of targets.entries()){
+  const matches=sources.filter(s=>t.source&&s.record_id===t.source.record_id
+   &&['field_id','index','name','label','type'].every(k=>s[k]===t.source[k]));
+  need(t.index===index&&!t.excluded&&matches.length===1&&!used.has(t.source.record_id)
+   &&['name','label','type'].every(k=>t[k]===matches[0][k]),'input mapping must preserve every source identity exactly once');
+  used.add(t.source.record_id);
+ }
+ return schema(sources);
+}
+
+export function validateCrossTableNativeSources(imports,collapses,inputFields,inputMapping=null,node=null){
  need(Array.isArray(imports)&&imports.length>0&&imports.length<=128&&Array.isArray(collapses)&&collapses.length<=128,'source provenance required');
  for(const source of imports)need(typeof source.node_id==='string'&&typeof source.execution_id==='string'
   &&source.configuration?.kind==='text_import'&&source.configuration.source.connection==='Локальное'
@@ -47,5 +77,5 @@ export function validateCrossTableNativeSources(imports,collapses,inputFields){
    &&cfg.output_mapping.fields.every(f=>!f.excluded&&f.name===f.source_name),'mapped or excluded ancestor fields are unsupported');
  }
  need(Array.isArray(inputFields)&&inputFields.length>0&&inputFields.length<=128,'bounded complete input schema required');
- return {imports:structuredClone(imports),collapses:structuredClone(collapses),input_schema:schema(inputFields)};
+ return {imports:structuredClone(imports),collapses:structuredClone(collapses),input_schema:schema(inputFields),...(inputMapping?{input_source_schema:crossTableInputSourceSchema(inputFields,inputMapping,node)}:{})};
 }

@@ -1,8 +1,8 @@
 """Versioned independent expectations, generated exclusively from input CSVs.
 
-No runtime imports and no recorded aggregate output. Native DateTime is compared
-as serial bytes of these known fixture dates, without granting calendar semantics
-to arbitrary public native-reader output.
+No runtime imports and no recorded aggregate output. Scalar DateTime uses exact
+local millisecond calendar strings. Variant DateTime retains serial bytes of known
+fixture dates without granting calendar semantics to arbitrary native output.
 """
 import csv
 import hashlib
@@ -27,6 +27,9 @@ def result_type(kind, function):
 def encode(value, kind, variant=False):
     if value is None: return None
     if kind == 'datetime':
+        if not variant:
+            if value.microsecond % 1000: raise ValueError('Fixture exceeds scalar millisecond precision')
+            return value.isoformat(timespec='milliseconds')
         serial = (value-datetime(1899,12,30)).total_seconds()/86400
         return {'cell_type':kind,'bytes_le':struct.pack('<d',serial).hex()}
     if variant:
@@ -112,5 +115,5 @@ def generate():
     assert len(outputs)==15
     (ROOT/'expected.json').write_text(json.dumps(expected,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
     manifest={'kind':'source_only','package_basename':'lab12-stage2-source-v3.lgp','file':sources[-1],'collapse':{'information':['Key'],'transposed':['RealValue','TextValue','FlagValue','WhenValue'],'ignore_empty':False},'derived_reports':False}
-    (ROOT/'data/source-manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
+    (ROOT/'source-manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
 if __name__=='__main__':generate()

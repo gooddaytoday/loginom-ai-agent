@@ -5,10 +5,29 @@ import {configureCrossTable} from './crosstable-procedure.mjs';
 import {materializeCrossTableOutput} from './crosstable-output.mjs';
 import {crossTableConfigurationReadback} from './crosstable-readback.mjs';
 import {crossTableParametersSchema} from './node-api.mjs';
+import {completedStaticImports} from './collapse-native-source.mjs';
+import {completedCrossTableCollapses,validateCrossTableNativeSources} from './crosstable-native-source.mjs';
+import {prepareCrossTableAncestorExecution} from './crosstable-ancestor-execution.mjs';
+import {withBrowserReceipt} from './executor.mjs';
+import {prepareCrossTableAutosync} from './crosstable-autosync.mjs';
 const need=(v,m)=>{if(!v)throw Error('CrossTable: '+m);};
 export function createCrossTableNodeSupport(config){return createTabularTransformNodeSupport(config,{
- nativeFullOutput:true,type:'transform.cross_table',mode:'pivot',revision:'crosstable-v2-internal-1',readback:crossTableConfigurationReadback,
+ nativeFullOutput:true,type:'transform.cross_table',mode:'pivot',revision:'crosstable-v3-internal-1',readback:crossTableConfigurationReadback,
  parameterSchema:crossTableParametersSchema,validate:validateCrossTableParameters,preflight:preflightCrossTableSource,
+ beforeInput:prepareCrossTableAutosync,
+ async beforeGraphExecute(options,ctx,configuration){
+  if(options.operation.parameters.read?.coverage!=='full')return;
+  const imports=completedStaticImports(options.nodeHistory?.(),options.verifiedUploads?.(),ctx,options.uploadHistory?.());
+  const sources=validateCrossTableNativeSources(imports,completedCrossTableCollapses(options.nodeHistory?.(),ctx),configuration.input_fields,configuration.input_mapping,configuration.node_context);
+  const graph=await options.operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline);
+  return prepareCrossTableAncestorExecution({graph,node:ctx.node,sources,operation:options.operation,execute:options.execute,record:options.onRecord,
+   targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,signal:ctx.signal,now:options.now,
+   wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...options.receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
+ },
+ async beforeOpen(channel,request){
+  if(request.parameters.local_variables||request.parameters.bindings||request.target.kind==='existing')
+   return channel.configureCrossTableVariables(request.parameters.local_variables??[]);
+ },
  configurationObservation:{condition:'owned CrossTable configuration',readCrossTable:true,ready:s=>s.wizard?.stage==='crosstable'&&s.node_crosstable?.verified===true},
  async configure(channel,p,context){
   const changed=await configureCrossTable(channel,p,context);if(context.request.finish==='close')return changed;
@@ -33,7 +52,7 @@ export async function advanceCrossTableConfiguration(channel,changed){
   if(destination.wizard.stage==='output_mapping'){
    need(destination.prepared_node_context?.verified===true
     &&['document_id','workflow_id','node_id'].every(k=>destination.prepared_node_context[k]===changed.configuration.node_context[k])
-    &&destination.wizard.root_tid===root&&destination.wizard.title==='Настройка соответствия между столбцами','inline output owner differs');
+   &&destination.wizard.root_tid===root&&destination.wizard.title==='Настройка соответствия между столбцами','inline output owner differs');
    // Native CrossTable generates/synchronizes these fields on execution. No
    // guessed source inventory, mapping override or premature schema comparison.
    await next(destination,'done');

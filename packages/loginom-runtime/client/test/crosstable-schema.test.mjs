@@ -20,7 +20,7 @@ test('sliding identities follow observed category labels, including a same-width
 test('complete row and fact identities survive ordering while ambiguous/truncated groups refuse',()=>{
  const good=fields(['A','B']);
  for(const mutate of [xs=>xs.pop(),xs=>xs.push({...xs[1],index:5}),xs=>xs[1].label='A|Amount',
-  xs=>xs[1].label='|Amount|Сумма',xs=>xs[1].label='A|Wrong|Сумма',xs=>xs[1].type='integer',
+xs=>xs[1].label='A|Wrong|Сумма',xs=>xs[1].type='integer',
   xs=>xs[1].name='C_1_Amount_Min',xs=>xs[0].label='Wrong',xs=>xs[0].type='integer',
   xs=>xs[3].label='A|Amount|Сумма',xs=>xs[1].index=2]){
   const copy=structuredClone(good);mutate(copy);assert.throws(()=>resolveCrossTableSchema(copy,configuration));
@@ -67,7 +67,7 @@ test('native single result omits redundant fact/function while type identity rem
   {index:1,name:'C_1',label:'A',type:'integer'}];
  const p=resolveCrossTableSchema(xs,c).category_fields[0];
  assert.equal(p.function,'count');assert.equal(p.fact,'Amount');assert.equal(p.category,'A');
- for(const patch of [{type:'real'},{name:'C_1_Amount_Sum'},{label:'A|Сумма'}])
+ for(const patch of [{type:'real'},{name:'C_1_Amount_Sum'},{label:'A|Количество',name:'C_1_CountWrong'}])
   assert.throws(()=>resolveCrossTableSchema([xs[0],{...xs[1],...patch}],c));
 });
 test('native scalar aggregate result types distinguish counts, DateTime mean and day StdDev',()=>{
@@ -109,3 +109,50 @@ test('observed configurations without columns or any dimensions retain explicit 
   assert.throws(()=>resolveCrossTableSchema([...xs.slice(0,-1),{...xs.at(-1),name:'C_1'}],c));
  }
 });
+
+test('single category preserves separator characters, empty text, spaces and native collision identities',()=>{
+ const c={...configuration,options:{separator:'.',unique_names:true,limit:0,min_values:0}};
+ const captions=['',' ','A.B','Привет','Privet'];
+ const roots=['','_','A_B','Privet','Privet'];
+ const xs=[{index:0,name:'Region',label:'Region',type:'string'},...captions.flatMap((v,i)=>['sum','min'].map(fn=>({
+  name:roots[i]+(roots[i]?'_':'')+'Amount_'+(fn==='sum'?'Sum':'Min')+(i===4?'_1':''),label:v+'.Amount.'+(fn==='sum'?'Сумма':'Минимум'),type:'real'
+ }))).map((f,i)=>({...f,index:i+1}))];
+ const r=resolveCrossTableSchema(xs,c);assert.deepEqual(r.category_fields.map(f=>f.category),captions.flatMap(v=>[v,v]));
+ const wrong=structuredClone(xs);wrong[1].type='integer';assert.throws(()=>resolveCrossTableSchema(wrong,c));
+});
+test('reserved captions carry uncertainty rather than claiming an observed source category',()=>{
+ const c={...configuration,options:{...configuration.options,min_values:4,limit:1}};
+ const r=resolveCrossTableSchema(fields(['3']),c);
+ assert.equal(r.category_fields[0].reserved_possible,true);assert.equal(r.category_fields[0].category_identity_source,'observed_caption');
+});
+test('own renamed output retains every required source and refuses foreign or damaged lineage',()=>{
+ const source_fields=fields(['A','B']).map((f,i)=>({...f,record_id:'r'+i,required:true}));
+ const target_fields=[source_fields[3],source_fields[1],source_fields[0],source_fields[2],source_fields[4]]
+  .map((f,index)=>({index,name:f.name,label:f.label,type:f.type,excluded:false,source:{...f}}));
+ target_fields[1].name='RevenueA';target_fields[1].label='Доход A';
+ const c={...configuration,node,output_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,
+  node_context:{...node,output_port:{port:0}},source_fields,target_fields}};
+ const columns=target_fields.map(({index,name,label,type})=>({index,name,label,type}));
+ assert.equal(resolveCrossTableSchema(columns,c).category_fields.find(f=>f.field==='RevenueA').category,'A');
+ for(const damage of [m=>m.node_context.node_id='foreign',m=>m.source_fields.pop(),
+  m=>m.source_fields[0].required=false,m=>m.target_fields[1].excluded=true,
+  m=>m.target_fields[1].source.record_id='foreign',m=>m.target_fields[1].source.type='string',
+  m=>m.target_fields[1].source={...m.target_fields[0].source},m=>m.target_fields.reverse()]){
+  const copy=structuredClone(c);damage(copy.output_mapping);assert.throws(()=>resolveCrossTableSchema(columns,copy));
+ }
+});
+
+ test('native omitted empty-caption separator requires exact empty technical aggregate identity',()=>{
+ const c={...configuration,facts:[{name:'Amount',label:'Amount',type:'real',functions:['sum','count']}],options:{separator:'.',unique_names:true,limit:0,min_values:0}};
+ const xs=[{index:0,name:'Region',label:'Region',type:'string'},
+  {index:1,name:'Amount_Sum',label:'Amount.Сумма',type:'real'},
+  {index:2,name:'Amount_Count',label:'Amount.Количество',type:'integer'},
+  {index:3,name:'__Amount_Sum',label:' .Amount.Сумма',type:'real'},
+  {index:4,name:'__Amount_Count',label:' .Amount.Количество',type:'integer'}];
+ assert.deepEqual(resolveCrossTableSchema(xs,c).category_fields.map(f=>f.category),['','',' ',' ']);
+ for(const patch of [{name:'Amount_SumWrong'},{type:'integer'},{label:'Wrong.Сумма'},{name:'__Amount_Sum'}]){
+  const wrong=structuredClone(xs);Object.assign(wrong[1],patch);assert.throws(()=>resolveCrossTableSchema(wrong,c));
+ }
+ assert.throws(()=>resolveCrossTableSchema(xs,{...c,options:{...c.options,unique_names:false}}));
+ assert.throws(()=>resolveCrossTableSchema(xs,{...c,columns:[c.column,c.column]}));
+ });

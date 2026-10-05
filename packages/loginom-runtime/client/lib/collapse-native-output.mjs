@@ -37,6 +37,38 @@ export async function closeOwnedNativePreview(channel,ctx,port,root) {
  need(graph(returned),'Owned workflow return unconfirmed');
  return {verified:true,cleanup_complete:true,preview_closed:true,port_guid:port.port_guid,node_context:returned.prepared_node_context};
 }
+async function activeNativeOutput(channel,{readPreview=false}={}) {
+ const s=await channel.observe({condition:'exact output graph',readOutputs:true,readPreview,
+  ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'&&s.node_outputs?.verified===true});
+ const ports=s.node_outputs.ports.filter(p=>p.index===0);
+ need(ports.length===1&&ports[0].active===true,'Active exact output required');
+ return {state:s,port:ports[0]};
+}
+export async function openOwnedNativePreview(channel,ctx) {
+ const {state,port}=await activeNativeOutput(channel);
+ const graph=s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent';
+ const control=(s,verb)=>{const es=s.ui.elements.filter(e=>e.tid===port.tid&&e.allowed_actions.includes(verb));need(es.length===1,'Exact output control unavailable');return es[0];};
+ await channel.perform({condition:'select exact output Preview',initialObservation:state,ready:graph,identity:()=>ctx.node,resolve:s=>({verb:'click',ref:control(s,'click').ref})});
+ const s=await channel.observe({condition:'exact output Preview command',ready:s=>graph(s)&&s.ui.elements.some(e=>e.tid===port.tid&&e.allowed_actions.includes('press'))});
+ await channel.perform({condition:'open exact output Preview',initialObservation:s,ready:graph,identity:()=>ctx.node,resolve:s=>({verb:'press',ref:control(s,'press').ref,key:'F3'})});
+ const observed=await channel.observe({condition:'exact output complete schema',readPreview:true,
+  ready:s=>s.node_preview_schema?.verified===true&&s.node_preview_schema.port_guid===port.port_guid&&s.node_preview_schema.port===0});
+ return {node:structuredClone(ctx.node),port,preview:observed.node_preview_schema};
+}
+export function verifyOwnedNativePreview(handle,ctx,port,preview) {
+ need(handle&&['document_id','workflow_id','node_id'].every(k=>typeof ctx.node[k]==='string'&&ctx.node[k]===handle.node?.[k]),'Native Preview handle owner differs');
+ need(handle.port?.port_guid===port.port_guid&&handle.port?.tid===port.tid&&handle.port?.index===0&&port.active===true,'Native Preview handle port differs');
+ need(preview?.verified===true&&preview.inventory_complete===true&&preview.port===0&&preview.node_id===ctx.node.node_id
+  &&preview.port_guid===port.port_guid&&preview.root_tid===handle.preview?.root_tid
+  &&JSON.stringify(preview.fields)===JSON.stringify(handle.preview?.fields),'Native Preview handle schema changed');
+}
+export async function reuseOwnedNativePreview(channel,handle,ctx) {
+ // readPreview admits only the independently bound own Preview in the existing
+ // procedure context guard. Generic masks/dialogs remain prohibited.
+ const {state,port}=await activeNativeOutput(channel,{readPreview:true});
+ verifyOwnedNativePreview(handle,ctx,port,state.node_preview_schema);
+ return {port,preview:state.node_preview_schema};
+}
 async function verifyFrontends(execute,origin,signal) {
  const urls=await execute(`async page=>page.evaluate(names=>Object.fromEntries(names.map(name=>{
   const urls=[...document.scripts].map(s=>s.src).filter(u=>u&&new URL(u).pathname.split('/').at(-1)===name);
@@ -58,17 +90,14 @@ export async function readCollapseNativeOutput(channel,read,ctx,options,config,c
  const {execute,operation,onRecord,now}=options;
  need(options.exclusiveNodeOperation?.()===true,'Exact read requires the owning executor operation lock');
  const imports=options.coldStaticSources?.imports??completedStaticImports(options.nodeHistory?.(),options.verifiedUploads?.(),ctx,options.uploadHistory?.());
- const crossSources=crossTableConfiguration?validateCrossTableNativeSources(imports,options.coldStaticSources?.collapses??completedCrossTableCollapses(options.nodeHistory?.(),ctx),crossTableConfiguration.input_fields):null;
+ const crossSources=crossTableConfiguration?validateCrossTableNativeSources(imports,options.coldStaticSources?.collapses??completedCrossTableCollapses(options.nodeHistory?.(),ctx),crossTableConfiguration.input_fields,crossTableConfiguration.input_mapping,crossTableConfiguration.node_context):null;
  if(crossSources)verifyCrossTableExecutionOwner(options.nativeExecutionProof,ctx);
  const frontends=await verifyFrontends(execute,config.targetOrigin,ctx.signal);
- const graph=s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent';
- let s=await channel.observe({condition:'exact output graph',readOutputs:true,ready:s=>graph(s)&&s.node_outputs?.verified===true});
- const ports=s.node_outputs.ports.filter(p=>p.index===0);need(ports.length===1&&ports[0].active===true,'Active exact output required');const port=ports[0];
- const control=(s,verb)=>{const es=s.ui.elements.filter(e=>e.tid===port.tid&&e.allowed_actions.includes(verb));need(es.length===1,'Exact output control unavailable');return es[0];};
- await channel.perform({condition:'select exact output Preview',initialObservation:s,ready:graph,identity:()=>ctx.node,resolve:s=>({verb:'click',ref:control(s,'click').ref})});
- s=await channel.observe({condition:'exact output Preview command',ready:s=>graph(s)&&s.ui.elements.some(e=>e.tid===port.tid&&e.allowed_actions.includes('press'))});
- await channel.perform({condition:'open exact output Preview',initialObservation:s,ready:graph,identity:()=>ctx.node,resolve:s=>({verb:'press',ref:control(s,'press').ref,key:'F3'})});
- const preview=await channel.observe({condition:'exact output complete schema',readPreview:true,ready:s=>s.node_preview_schema?.verified===true&&s.node_preview_schema.port_guid===port.port_guid&&s.node_preview_schema.port===0});
+ let handle;
+ if(options.ownedPreview){
+  handle=await reuseOwnedNativePreview(channel,options.ownedPreview,ctx);
+ }else handle=await openOwnedNativePreview(channel,ctx);
+ const {port}=handle,preview={node_preview_schema:handle.preview};
  const codes={boolean:1,datetime:2,real:3,integer:4,string:5,variant:6};
  const args={document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,package_id:ctx.document_id+':'+ctx.workflow_ref.workflow_id,
   node_id:ctx.node.node_id,port_guid:port.port_guid,execution:ctx.execution,tab_tid:ctx.workflow_ref.tab_tid,prefix:ctx.workflow_ref.prefix,

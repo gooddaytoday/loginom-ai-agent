@@ -280,7 +280,7 @@
     },
     "calculator-handler": {
       "path": "../../packages/loginom-runtime/client/lib/calculator-node.mjs",
-      "sha256": "f6b89414213655228e33c77ad1de28fcd3def7273af5c0a33a49326bf2deca99",
+      "sha256": "3f4dfcc7342463e768cc93dd0defda59f892989c23e3e4f305f8d60fc857dc51",
       "kind": "source",
       "availability": "retained_document",
       "source_commit": null,
@@ -947,7 +947,7 @@
     },
     "crosstable-handler": {
       "path": "../../packages/loginom-runtime/client/lib/crosstable-node.mjs",
-      "sha256": "90178931acced1c7a0855b6a9223c97e12eb7cd51ce7d7a73f73985ff920f716",
+      "sha256": "12a015658e1674c19aa8d924f5a4579b7e5c905c497f38780be30ddab3c1346a",
       "kind": "source",
       "availability": "retained_document",
       "source_commit": null,
@@ -956,11 +956,11 @@
         "client": "Linux",
         "loginom": "7.4.2/Enterprise"
       },
-      "scope": "Ограниченный этап 1; автономная приёмка ещё не выполнена."
+      "scope": "Поэтапный контракт CrossTable; полный standalone и независимая приёмка этапа 3 ещё не завершены."
     },
     "crosstable-discovery": {
       "path": "nodes/transform-crosstable/discovery.md",
-      "sha256": "549618be70ef97c289e7f9c048fa84dcf16422ef05614b6d3be15a08c1d50cef",
+      "sha256": "ff9254d8a7a9c9e81d6c10655f5ecc8c14bcfbdf7ef3c17a9a904ca75d46e102",
       "kind": "document",
       "availability": "retained_document",
       "source_commit": null,
@@ -969,7 +969,7 @@
         "client": "Linux",
         "loginom": "7.4.2/Enterprise"
       },
-      "scope": "Ограниченный этап 1; автономная приёмка ещё не выполнена."
+      "scope": "Поэтапный контракт CrossTable; полный standalone и независимая приёмка этапа 3 ещё не завершены."
     }
   },
   "nodes": [
@@ -5066,10 +5066,11 @@
       },
       "card": "nodes/transform-crosstable/README.md",
       "initial_scope": "Сохранить подплан 15: фиксированные и скользящие колонки, агрегаты и изменение схемы; календарные поля можно задать в CSV.",
-      "scope_basis": "live_discovery_and_numeric_stage_one_contract",
+      "scope_basis": "live_discovery_and_staged_crosstable_contract",
       "limitations": [
-        "Этап 1: дискретная строковая колонка, дискретные ключи строк, integer/real факты sum/min/max/avg; число записей через сумму Quantity=1.",
-        "Fixed/Sliding: separator=|, unique_names=false, min_values=0, limit=0; переменные, прочие агрегаты и variant остаются этапам 2–3.",
+        "Границы типов, агрегатов, нескольких измерений и Variant задаются публичным контрактом и поэтапным подпланом; этап 3 находится в разработке.",
+        "Этап 3: min_values/limit, четыре разделителя, имена по категориям, три локальные переменные, переименование/порядок/автосинхронизация собственного выхода. Required=true не исключается; согласованное исключение — через отдельный downstream ReformColumns.",
+        "Пределы точного native-чтения 50×8 и 1 MiB, протокол 321, происхождение, исполнение и Variant subtype сохраняются.",
         "Регистрация и локальные проверки не означают успешную автономную или независимую приёмку."
       ],
       "prerequisites": [
@@ -5115,7 +5116,7 @@
           "evidence": []
         }
       },
-      "next_action": "Реализовать ограниченное numeric ядро этапа 1 и W1–W3 по подтверждённому discovery; выполнить автономную и независимую приёмку.",
+      "next_action": "Завершить полный standalone сценарий этапа 3 и регрессии этапов 1–2/W1–W3; передать точный чистый опубликованный SHA на независимую reviewer-приёмку.",
       "plan": "nodes/transform-crosstable/plan.md",
       "plan_status": "ready_for_development"
     },

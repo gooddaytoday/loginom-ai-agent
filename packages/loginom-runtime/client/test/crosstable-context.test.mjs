@@ -18,7 +18,9 @@ function fixture(){
  }
  const document={querySelectorAll:selector=>elements.get(JSON.parse(selector.slice('[data-tid='.length,-1)))??[]};
  const evaluate=()=>runInNewContext('('+readCrossTableBrowser.toString()+')("MF;TF-1")',{document,Ext:{getCmp:id=>components.get(id)}});
- return {base,records,store,elements,components,evaluate};
+ const context={document,Ext:{getCmp:id=>components.get(id)}};
+ const evaluateWith=extra=>runInNewContext('('+readCrossTableBrowser.toString()+')("MF;TF-1")',{...context,...extra});
+ return {base,records,store,elements,components,evaluate,evaluateWith};
 }
 test('cached CrossTable roles retain ordinals and never invent technical names',()=>{
  const f=fixture(),r=f.evaluate();assert.equal(r.verified,true);assert.equal(r.input_fields.length,3);
@@ -66,4 +68,23 @@ test('native removed role sentinel is accepted only for an unused record',()=>{
  assert.equal(removed.input_fields[2].disposition,0);assert.equal(removed.input_fields[2].order,-1);
  for(const role of [1,2,3]){f.records[2].data.Disposition=role;assert.equal(f.evaluate().verified,false);}
  f.records[2].data.Disposition=0;f.records[2].data.Order=-2;assert.equal(f.evaluate().verified,false);
+});
+
+test('bound options use verified local values and opaque identity rather than hidden static controls',()=>{
+ const f=fixture(),wf={},nodeData=new Proxy({},{get(){throw Error('proxy dereference forbidden');}}),variable=new Proxy({},{get(){throw Error('variable dereference forbidden');}});
+ const type={pedSlidingUniqueValuesLimit:4,pedUniqueValueNames:1,pedDisplayNameSeparator:5};
+ const values=[{id:0,name:'Limit',label:'Limit',type:4,value:1,is_null:false},{id:1,name:'Names',label:'Names',type:1,value:true,is_null:false},{id:2,name:'Separator',label:'Separator',type:5,value:'.',is_null:false}];
+ const tree={ParentNode:{FGuid:'cross',ParentNode:wf}},card={Controller:{Node:{data:{node:tree}},FController:{FModelNode:nodeData}}};
+ const prep={id:'doc',crossTableLocalVariables:new Map([['cross',{document_id:'doc',workflow:wf,nodeData,values}]])};
+ const extra={bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>card}}}}}}},__loginomDockPreparationV1:prep};
+ for(const [key,t] of Object.entries(type)){
+  const v=values.find(v=>v.type===t),combo=f.components.get(f.base+key+';VariableControl');
+  Object.assign(combo,{getValue:()=>variable,isVisible:()=>true,getStore:()=>({getData:()=>({items:[{data:{field1:variable,field2:v.label+' ( '+String(v.value)+' )'}}]})})});
+  f.components.get(f.base+key+';SwitchButton').pressed=true;
+ }
+ const r=f.evaluateWith(extra);assert.equal(r.verified,true);assert.equal(r.options.pedSlidingUniqueValuesLimit.value,1);
+ assert.equal(r.options.pedUniqueValueNames.value,true);assert.equal(r.options.pedDisplayNameSeparator.value,'.');
+ for(const mutate of [()=>prep.crossTableLocalVariables.get('cross').document_id='other',()=>card.Controller.FController.FModelNode={},()=>values[0].type=5,()=>values[0].is_null=true]){
+  mutate();assert.equal(f.evaluateWith(extra).verified,false);
+ }
 });
