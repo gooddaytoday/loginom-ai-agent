@@ -48,7 +48,10 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
   })
   const first = rates.reduce((sum, rate) => sum + (rate.a ?? 0), 0) / rates.length
   const second = rates.reduce((sum, rate) => sum + (rate.b ?? 0), 0) / rates.length
-  return { policy, compatibility, tasks, reliability: { k: policy.k, a: reliability(a, policy.k), b: reliability(b, policy.k), reasons: [] }, axes: { completion: {
+  return { policy, compatibility, tasks, reliability: { k: policy.k, a: reliability(a, policy.k), b: reliability(b, policy.k), reasons: [
+    ...(policy.k === null ? ["k_unknown"] : []),
+    ...([a, b].some((run) => { const result = reliability(run, policy.k); return result.pass1 === null || policy.k !== null && result.passk === null }) ? ["pass_coverage"] : []),
+  ] }, axes: { completion: {
     observed: !rates.length || rates.some((rate) => rate.a === null || rate.b === null) ? null : { a: first, b: second, drop: first - second },
   } } }
 }
