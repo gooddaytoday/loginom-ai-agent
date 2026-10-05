@@ -38,7 +38,13 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
       task.attempts.every((attempt) => !["infra_error", "harness_error", "interrupted"].includes(attempt.status)) &&
       other.attempts.every((attempt) => !["infra_error", "harness_error", "interrupted"].includes(attempt.status)) &&
       !a.interrupted && !b.interrupted && !a.stopped_reason && !b.stopped_reason
-    return { id: task.id, completion: rates[index]!, regressions: complete && rates[index]!.a === 1 && rates[index]!.b === 0 ? ["completion"] : [] }
+    const regressions: ("completion" | "oracle" | "pass")[] = []
+    if (complete && rates[index]!.a === 1 && rates[index]!.b === 0) regressions.push("completion")
+    if (complete && a.judge && b.judge) {
+      if (task.attempts.every((attempt) => attempt.oracle_pass === true) && other.attempts.every((attempt) => attempt.oracle_pass === false)) regressions.push("oracle")
+      if (task.attempts.every((attempt) => attempt.pass === true) && other.attempts.every((attempt) => attempt.pass === false)) regressions.push("pass")
+    }
+    return { id: task.id, completion: rates[index]!, regressions }
   })
   const first = rates.reduce((sum, rate) => sum + (rate.a ?? 0), 0) / rates.length
   const second = rates.reduce((sum, rate) => sum + (rate.b ?? 0), 0) / rates.length
