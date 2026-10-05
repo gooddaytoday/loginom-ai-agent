@@ -22,6 +22,7 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
     throw new EvalFailure("Некорректные параметры compare", 2)
   requireSummary(a)
   requireSummary(b)
+  const bTasks = new Map(b.tasks.map((task) => [task.id, task]))
   const identity: [string, unknown, unknown][] = [
     ["agent.model", a.agent.model, b.agent.model],
     ["agent.variant", a.agent.variant, b.agent.variant],
@@ -39,14 +40,16 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
     ] as [string, unknown, unknown][]),
   ]
   const compatibility = identity.filter(([, first, second]) => first == null || second == null || first === "" || second === "" || first !== second).map(([name]) => name)
-  if (a.task_ids.length !== b.task_ids.length || a.task_ids.some((id) => !b.task_ids.includes(id))) compatibility.push("task_ids")
+  if (a.task_ids.length !== b.task_ids.length || a.task_ids.some((id) => !bTasks.has(id))) compatibility.push("task_ids")
   if (compatibility.length) return { policy, compatibility, reliability: { k: policy.k, a: { pass1: null, passk: null }, b: { pass1: null, passk: null }, reasons: compatibility }, tasks: [], axes: { completion: axis([], policy, compatibility), oracle: axis([], policy, ["snapshot_unavailable"]), structure: axis([], policy, ["structure_unavailable"]) } }
+  const contractA = evaluationContractHash({rubric_hash:a.rubric_hash,judge:a.judge,pass_threshold:a.config.pass_threshold})
+  const contractB = evaluationContractHash({rubric_hash:b.rubric_hash,judge:b.judge,pass_threshold:b.config.pass_threshold})
   const rates = a.tasks.map((task) => ({
     a: completion(task.attempts),
-    b: completion(b.tasks.find((candidate) => candidate.id === task.id)!.attempts),
+    b: completion(bTasks.get(task.id)!.attempts),
   }))
   const tasks = a.tasks.map((task, index) => {
-    const other = b.tasks.find((candidate) => candidate.id === task.id)!
+    const other = bTasks.get(task.id)!
     const complete = a.config.repeat === 3 && b.config.repeat === 3 &&
       task.attempts.length === 3 && other.attempts.length === 3 &&
       task.attempts.every((attempt) => !["infra_error", "harness_error", "interrupted"].includes(attempt.status)) &&
@@ -54,21 +57,21 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
       !a.interrupted && !b.interrupted && !a.stopped_reason && !b.stopped_reason
     const regressions: ("completion" | "oracle" | "pass")[] = []
     if (complete && rates[index]!.a === 1 && rates[index]!.b === 0) regressions.push("completion")
-    if (complete && freshEvaluation(a, task) && freshEvaluation(b, other) && sameRubricSnapshot(task.rubric_snapshot, other.rubric_snapshot)) {
+    if (complete && freshEvaluation(a, task, contractA) && freshEvaluation(b, other, contractB) && sameRubricSnapshot(task.rubric_snapshot, other.rubric_snapshot)) {
       if (task.rubric_snapshot?.oracle_applicable && other.rubric_snapshot?.oracle_applicable && task.attempts.every((attempt) => attempt.oracle_pass === true) && other.attempts.every((attempt) => attempt.oracle_pass === false)) regressions.push("oracle")
       if (task.attempts.every((attempt) => attempt.pass === true) && other.attempts.every((attempt) => attempt.pass === false)) regressions.push("pass")
     }
     return { id: task.id, completion: rates[index]!, oracle: { a: judgedRate(task.attempts, "oracle_pass"), b: judgedRate(other.attempts, "oracle_pass") }, structure: { a: judgedRate(task.attempts, "structural_score"), b: judgedRate(other.attempts, "structural_score") }, regressions }
   })
-  const oraclePairs = a.tasks.map((task) => ({ a: task, b: b.tasks.find((other) => other.id === task.id)! }))
+  const oraclePairs = a.tasks.map((task) => ({ a: task, b: bTasks.get(task.id)! }))
   const oracleKnown = oraclePairs.every((pair) => pair.a.rubric_snapshot?.version === 1 && pair.b.rubric_snapshot?.version === 1 &&
     pair.a.rubric_snapshot.oracle_applicable === pair.b.rubric_snapshot.oracle_applicable)
   const oracleRates = oraclePairs.filter((pair) => pair.a.rubric_snapshot?.oracle_applicable && pair.b.rubric_snapshot?.oracle_applicable)
     .map((pair) => ({ a: judgedRate(pair.a.attempts, "oracle_pass"), b: judgedRate(pair.b.attempts, "oracle_pass") }))
   const partial = [a, b].some((run) => run.interrupted || run.stopped_reason || run.tasks.some((task) => task.attempts.some((attempt) => attempt.status === "interrupted"))) ? ["partial_run"] : []
   const snapshotMismatch = oraclePairs.some((pair) => !sameRubricSnapshot(pair.a.rubric_snapshot, pair.b.rubric_snapshot)) ? ["snapshot_mismatch"] : []
-  const oracleLineage = oraclePairs.filter((pair) => pair.a.rubric_snapshot?.oracle_applicable && pair.b.rubric_snapshot?.oracle_applicable).some((pair) => !freshEvaluation(a, pair.a) || !freshEvaluation(b, pair.b)) ? ["evaluation_provenance"] : []
-  const lineage = oraclePairs.some((pair) => !freshEvaluation(a, pair.a) || !freshEvaluation(b, pair.b)) ? ["evaluation_provenance"] : []
+  const oracleLineage = oraclePairs.filter((pair) => pair.a.rubric_snapshot?.oracle_applicable && pair.b.rubric_snapshot?.oracle_applicable).some((pair) => !freshEvaluation(a, pair.a, contractA) || !freshEvaluation(b, pair.b, contractB)) ? ["evaluation_provenance"] : []
+  const lineage = oraclePairs.some((pair) => !freshEvaluation(a, pair.a, contractA) || !freshEvaluation(b, pair.b, contractB)) ? ["evaluation_provenance"] : []
   const oracleReasons = !oracleKnown ? ["snapshot_unavailable"] : !oracleRates.length ? ["oracle_not_applicable"] : !a.judge || !b.judge ? ["judge_skipped"] :
     oraclePairs.some((pair) => pair.a.rubric_snapshot?.oracle_applicable &&
       [pair.a, pair.b].some((task) => measured(task.attempts).some((attempt) => typeof attempt.oracle_pass !== "boolean"))) ? ["oracle_coverage"] : []
@@ -78,11 +81,13 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
       task.rubric_snapshot.checklist.some((item) => item.axis === undefined) ||
       !task.rubric_snapshot.checklist.some((item) => item.axis === "structure"))) ? ["structure_unclassified"] :
     oraclePairs.some((pair) => [pair.a, pair.b].some((task) => measured(task.attempts).some((attempt) => typeof attempt.structural_score !== "number"))) ? ["structure_coverage"] : []
-  return { policy, compatibility, tasks, reliability: { k: policy.k, a: snapshotMismatch.length ? {pass1:null,passk:null} : reliability(a, policy.k), b: snapshotMismatch.length ? {pass1:null,passk:null} : reliability(b, policy.k), reasons: [
+  const reliabilityA = reliability(a, policy.k, contractA)
+  const reliabilityB = reliability(b, policy.k, contractB)
+  return { policy, compatibility, tasks, reliability: { k: policy.k, a: snapshotMismatch.length ? {pass1:null,passk:null} : reliabilityA, b: snapshotMismatch.length ? {pass1:null,passk:null} : reliabilityB, reasons: [
     ...(policy.k === null ? ["k_unknown"] : []),
     ...lineage,
     ...snapshotMismatch,
-    ...([a, b].some((run) => { const result = reliability(run, policy.k); return result.pass1 === null || policy.k !== null && result.passk === null }) ? ["pass_coverage"] : []),
+    ...([reliabilityA, reliabilityB].some((result) => result.pass1 === null || policy.k !== null && result.passk === null) ? ["pass_coverage"] : []),
   ] }, axes: { completion: axis(rates, policy, partial), oracle: axis(oracleRates, policy, [...oracleReasons, ...partial, ...oracleLineage, ...snapshotMismatch]), structure: axis(structureRates, policy, [...structureReasons, ...partial, ...lineage, ...snapshotMismatch]) } }
 }
 
@@ -121,8 +126,8 @@ function requireSummary(run: RunSummary) {
   })
 }
 
-function reliability(run: RunSummary, k: number | null) {
-  if (run.tasks.some((task) => !freshEvaluation(run, task))) return { pass1: null, passk: null }
+function reliability(run: RunSummary, k: number | null, contract: string) {
+  if (run.tasks.some((task) => !freshEvaluation(run, task, contract))) return { pass1: null, passk: null }
   const tasks = run.tasks.map((task) => {
     const attempts = task.attempts.filter((attempt) => !["infra_error", "harness_error", "interrupted"].includes(attempt.status))
     if (attempts.some((attempt) => typeof attempt.pass !== "boolean")) return { pass1: null, passk: null }
@@ -167,9 +172,8 @@ function judgedRate(attempts: AttemptResult[], key: "oracle_pass" | "structural_
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
 }
 
-function freshEvaluation(run: RunSummary, task: RunSummary["tasks"][number]) {
+function freshEvaluation(run: RunSummary, task: RunSummary["tasks"][number], contract: string) {
   if (!run.judge || task.rubric_snapshot?.version !== 1) return false
-  const contract = evaluationContractHash({ rubric_hash: run.rubric_hash, judge: run.judge, pass_threshold: run.config.pass_threshold })
   return measured(task.attempts).every((attempt) => attempt.evaluation_contract_hash === contract)
 }
 
