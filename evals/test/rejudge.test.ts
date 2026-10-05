@@ -261,3 +261,19 @@ test("--judge-only: явный --tasks сохраняет новую рубри�
     await rm(dir, { recursive: true, force: true })
   }
 }, 30_000)
+
+test("--judge-only: фиксирует полный контракт и фактический threshold", async () => {
+ const directory = await mkdtemp(path.join(os.tmpdir(), "evals-compare-contract-"))
+ const env = { EVAL_RESULTS_DIR: path.join(directory, "results"), EVAL_PROFILE_DIR: path.join(directory, "profile"), EVAL_WORKSPACE_ROOT: path.join(directory, "workspace"), EVAL_JUDGE_COMMAND: fakeJudge, JUDGE_MODEL: "fake" }
+ try {
+  const dry = await main(["--dry-run","--only","group-sum-qty","--repeat","1"],env)
+  await main(["--judge-only",path.basename(dry.runDir!)],{...env,EVAL_PASS_THRESHOLD:"80"})
+  const saved = await Bun.file(path.join(dry.runDir!, "summary.json")).json() as RunSummary
+  expect(saved.config.pass_threshold).toBe(80)
+  expect(saved.tasks[0]!.rubric_snapshot!.version).toBe(1)
+  expect(saved.tasks[0]!.attempts[0]!.evaluation_contract_hash).toMatch(/^[0-9a-f]{64}$/)
+  expect(saved.tasks[0]!.attempts[0]!.structural_score).toBe(100)
+ } finally { await rm(directory, { recursive:true, force:true }) }
+})
+
+
