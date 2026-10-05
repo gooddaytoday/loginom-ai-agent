@@ -240,6 +240,11 @@ try {
   }
 
   actual.push({node,type:target.type,label:target.label,execution,data});
+  // Preserve independently read values before correspondence can refuse. A
+  // failed match is still FAIL; this private checkpoint makes it diagnosable.
+  const checkpoint=JSON.stringify({phase:'independent_cold_read_checkpoint',path:saved.path,outputs:actual});
+  if([config.api_key,loginPassword].filter(Boolean).some(secret=>checkpoint.includes(secret)))throw Error('SECRET_IN_RESULT');
+  await writeFile(join(args.output,'actual-readback.json'),checkpoint+'\n');
   }
   const correspondence=matchExpectedOutputs(actual,expectedOutputs);
 

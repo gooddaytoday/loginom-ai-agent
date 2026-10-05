@@ -44,6 +44,11 @@
           "type": "real"
         },
         {
+          "name": "C_1_Quantity_Sum",
+          "label": "<...>|Quantity|Сумма",
+          "type": "real"
+        },
+        {
           "name": "C_2_Amount_Sum",
           "label": "A|Amount|Сумма",
           "type": "real"
@@ -61,6 +66,11 @@
         {
           "name": "C_2_Amount_Avg",
           "label": "A|Amount|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Quantity_Sum",
+          "label": "A|Quantity|Сумма",
           "type": "real"
         },
         {
@@ -84,6 +94,11 @@
           "type": "real"
         },
         {
+          "name": "C_3_Quantity_Sum",
+          "label": "B|Quantity|Сумма",
+          "type": "real"
+        },
+        {
           "name": "C_4_Amount_Sum",
           "label": "C|Amount|Сумма",
           "type": "real"
@@ -104,6 +119,11 @@
           "type": "real"
         },
         {
+          "name": "C_4_Quantity_Sum",
+          "label": "C|Quantity|Сумма",
+          "type": "real"
+        },
+        {
           "name": "C_5_Amount_Sum",
           "label": "<Прочее>|Amount|Сумма",
           "type": "real"
@@ -121,26 +141,6 @@
         {
           "name": "C_5_Amount_Avg",
           "label": "<Прочее>|Amount|Среднее",
-          "type": "real"
-        },
-        {
-          "name": "C_1_Quantity_Sum",
-          "label": "<...>|Quantity|Сумма",
-          "type": "real"
-        },
-        {
-          "name": "C_2_Quantity_Sum",
-          "label": "A|Quantity|Сумма",
-          "type": "real"
-        },
-        {
-          "name": "C_3_Quantity_Sum",
-          "label": "B|Quantity|Сумма",
-          "type": "real"
-        },
-        {
-          "name": "C_4_Quantity_Sum",
-          "label": "C|Quantity|Сумма",
           "type": "real"
         },
         {
@@ -237,6 +237,11 @@
           "type": "real"
         },
         {
+          "name": "C_1_Quantity_Sum",
+          "label": "<...>|Quantity|Сумма",
+          "type": "real"
+        },
+        {
           "name": "C_2_Amount_Sum",
           "label": "A|Amount|Сумма",
           "type": "real"
@@ -254,6 +259,11 @@
         {
           "name": "C_2_Amount_Avg",
           "label": "A|Amount|Среднее",
+          "type": "real"
+        },
+        {
+          "name": "C_2_Quantity_Sum",
+          "label": "A|Quantity|Сумма",
           "type": "real"
         },
         {
@@ -277,6 +287,11 @@
           "type": "real"
         },
         {
+          "name": "C_3_Quantity_Sum",
+          "label": "C|Quantity|Сумма",
+          "type": "real"
+        },
+        {
           "name": "C_4_Amount_Sum",
           "label": "D|Amount|Сумма",
           "type": "real"
@@ -294,21 +309,6 @@
         {
           "name": "C_4_Amount_Avg",
           "label": "D|Amount|Среднее",
-          "type": "real"
-        },
-        {
-          "name": "C_1_Quantity_Sum",
-          "label": "<...>|Quantity|Сумма",
-          "type": "real"
-        },
-        {
-          "name": "C_2_Quantity_Sum",
-          "label": "A|Quantity|Сумма",
-          "type": "real"
-        },
-        {
-          "name": "C_3_Quantity_Sum",
-          "label": "C|Quantity|Сумма",
           "type": "real"
         },
         {

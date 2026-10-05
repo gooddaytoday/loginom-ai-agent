@@ -27,8 +27,10 @@ def load(name):
 def report(records, categories, fixed=False):
     # Special group tokens are deliberately separate from literal input strings.
     columns = [{"name": "Region", "label": "Region", "type": "string"}]
-    for fact, functions in [("Amount", FUNCTIONS), ("Quantity", [("Sum", "Сумма")])]:
-        for i, category in enumerate(categories, 1):
+    # Native CrossTable groups output fields by category, then fact/function.
+    # Keep the ordered oracle strict; values still derive only from CSV input.
+    for i, category in enumerate(categories, 1):
+        for fact, functions in [("Amount", FUNCTIONS), ("Quantity", [("Sum", "Сумма")])]:
             label = "<...>" if category is None else "<Прочее>" if category == OTHER else category
             columns.extend({"name": f"C_{i}_{fact}_{f}", "label": f"{label}|{fact}|{text}", "type": "real"}
                            for f, text in functions)
