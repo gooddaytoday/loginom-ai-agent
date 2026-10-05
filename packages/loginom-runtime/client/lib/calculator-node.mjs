@@ -179,7 +179,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
       return verified({not_applicable:true,mappings:[]});
      }
      enter(ctx);
-     if(implementation?.beforeInput)await implementation.beforeInput(options,ctx,{targetOrigin,targetBuild});
+     if(implementation?.beforeInput)await implementation.beforeInput(options,ctx,{targetOrigin,targetBuild,channel,finishWizard});
      if(implementation?.configureInputs)return implementation.configureInputs(channel,mappings,ctx,operation.nodeApply.request,finishWizard);
      const recoveryGraph=(!implementation||implementation.inputMappingRecovery)?await graphForInput():null;
      await channel.openInputPort(0);

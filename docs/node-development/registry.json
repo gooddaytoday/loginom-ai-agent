@@ -280,7 +280,7 @@
     },
     "calculator-handler": {
       "path": "../../packages/loginom-runtime/client/lib/calculator-node.mjs",
-      "sha256": "6890c000e35536558efe311c7befda677803dbdd4734304bfa69592d6dd69a05",
+      "sha256": "3f4dfcc7342463e768cc93dd0defda59f892989c23e3e4f305f8d60fc857dc51",
       "kind": "source",
       "availability": "retained_document",
       "source_commit": null,
@@ -947,7 +947,7 @@
     },
     "crosstable-handler": {
       "path": "../../packages/loginom-runtime/client/lib/crosstable-node.mjs",
-      "sha256": "fe9dbc26093e5cf6153389d01f3c90ce27562fd7b4af0650eab675f11f081573",
+      "sha256": "d625db9947c6688bf3ac612099221df5745b8a5a78a7504fafb694792af56276",
       "kind": "source",
       "availability": "retained_document",
       "source_commit": null,
@@ -960,7 +960,7 @@
     },
     "crosstable-discovery": {
       "path": "nodes/transform-crosstable/discovery.md",
-      "sha256": "fc355b7184e003963489f68552b9601473c5129a9f72306612cce3c78a2fd67a",
+      "sha256": "8f9f88a1b790b643b154bc88fa7df81e92ffe4a252b52eb9f9b5494b02b51359",
       "kind": "document",
       "availability": "retained_document",
       "source_commit": null,
