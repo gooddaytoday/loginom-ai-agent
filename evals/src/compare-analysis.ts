@@ -1,13 +1,15 @@
 import type { AttemptResult, RunSummary } from "./report"
 
 export function analyzeComparison(a: RunSummary, b: RunSummary) {
+  const compatible = [...a.task_ids].sort().join("\\0") === [...b.task_ids].sort().join("\\0")
+  if (!compatible) return { compatibility: ["task_ids"], axes: { completion: { observed: null } } }
   const rates = a.tasks.map((task) => ({
     a: completion(task.attempts),
     b: completion(b.tasks.find((candidate) => candidate.id === task.id)!.attempts),
   }))
   const first = rates.reduce((sum, rate) => sum + (rate.a ?? 0), 0) / rates.length
   const second = rates.reduce((sum, rate) => sum + (rate.b ?? 0), 0) / rates.length
-  return { axes: { completion: { observed: !rates.length || rates.some((rate) => rate.a === null || rate.b === null) ? null : { a: first, b: second, drop: first - second } } } }
+  return { compatibility: [], axes: { completion: { observed: !rates.length || rates.some((rate) => rate.a === null || rate.b === null) ? null : { a: first, b: second, drop: first - second } } } }
 }
 
 function completion(attempts: AttemptResult[]) {

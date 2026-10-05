@@ -20,3 +20,10 @@ test("analysis: пустая задача не создаёт нулевую о�
   const run = comparisonSummary([{ successes: 0, attempts: 0 }])
   expect(analyzeComparison(run, run).axes.completion.observed).toBeNull()
 })
+
+test("analysis: разные наборы задач не сравниваются по удобному пересечению", () => {
+  const a = comparisonSummary([{ successes: 3, attempts: 3 }])
+  const b = comparisonSummary([{ successes: 3, attempts: 3 }, { successes: 0, attempts: 3 }])
+  expect(analyzeComparison(a, b).axes.completion.observed).toBeNull()
+  expect(analyzeComparison(a, b).compatibility).toContain("task_ids")
+})
