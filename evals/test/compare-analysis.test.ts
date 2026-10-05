@@ -231,3 +231,10 @@ test("analysis: structural score проверяется до применени�
   expect(() => analyzeComparison(run,run)).toThrow("Некорректный summary: structural_score")
  }
 })
+
+test("analysis: evaluated guards требуют совместимых локальных snapshots", () => {
+ const a = comparisonSummary([{successes:3,attempts:3}])
+ const b = comparisonSummary([{successes:0,attempts:3}])
+ b.tasks[0]!.rubric_snapshot!.checklist[0]!.weight = 2
+ expect(analyzeComparison(a,b).tasks[0]!.regressions).toEqual(["completion"])
+})

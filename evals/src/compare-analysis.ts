@@ -54,7 +54,7 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
       !a.interrupted && !b.interrupted && !a.stopped_reason && !b.stopped_reason
     const regressions: ("completion" | "oracle" | "pass")[] = []
     if (complete && rates[index]!.a === 1 && rates[index]!.b === 0) regressions.push("completion")
-    if (complete && freshEvaluation(a, task) && freshEvaluation(b, other)) {
+    if (complete && freshEvaluation(a, task) && freshEvaluation(b, other) && JSON.stringify(task.rubric_snapshot) === JSON.stringify(other.rubric_snapshot)) {
       if (task.rubric_snapshot?.oracle_applicable && other.rubric_snapshot?.oracle_applicable && task.attempts.every((attempt) => attempt.oracle_pass === true) && other.attempts.every((attempt) => attempt.oracle_pass === false)) regressions.push("oracle")
       if (task.attempts.every((attempt) => attempt.pass === true) && other.attempts.every((attempt) => attempt.pass === false)) regressions.push("pass")
     }
