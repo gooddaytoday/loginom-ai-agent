@@ -384,3 +384,33 @@ evals и согласованные документы (25 файлов); lockfi
 симуляции сверены с сохранённым JSON. Remaining-work вне пункта 1 побайтно совпадает с базой. Основной checkout, live results, profile, bundle и
 внешние коллекции не изменялись. Runtime-код и зависимости вне evals не менялись.
 Live baseline, установка, merge и push не выполнялись.
+
+
+## Исправления после review — 2026-10-05
+
+Оба подтверждённых замечания закрыты отдельными RED→GREEN циклами:
+
+- `52a2c634a`: пять structural-пунктов с весом 0.53 и полным успехом больше
+  не дают 100.00000000000001. Scorer ограничивает численное превышение 100;
+  дробные промежуточные оценки не округляются. Новый тест проходит через
+  scoreVerdict → сериализацию JSON → parseComparisonSummary → analyzeComparison.
+- `32a331c5b`: пустая строковая `label`, которую принимает loadConfig/run,
+  допустима в parser compare. Новый тест настоящего CLI проверяет exit 0,
+  отчёт и побайтную неизменность входных summary.
+
+Оба новых теста сначала дали RED именно на найденных дефектах.
+После исправлений проверено из implementation `evals/`:
+
+```sh
+bun test test/judge.test.ts test/calibrate.test.ts test/rejudge.test.ts test/report.test.ts test/compare-analysis.test.ts test/compare.test.ts test/compare-cli.test.ts
+bun typecheck
+```
+
+**110 pass, 0 fail, 404 assertions, 7 файлов**; typecheck — exit 0.
+Первый запуск расширенной проверки в sandbox получил EROFS при создании
+fixture-results в отдельном worktree. Повтор с доступом на запись прошёл;
+это ограничение среды, код и assertions для обхода ошибки не менялись.
+`git diff --check` — exit 0. Основной checkout чистый.
+Полный suite и Monte Carlo повторно не запускались: изменения ограничены
+численной границей scorer и строковой меткой, статистическое правило не менялось.
+Live judge/baseline, установка, merge и push не выполнялись.
