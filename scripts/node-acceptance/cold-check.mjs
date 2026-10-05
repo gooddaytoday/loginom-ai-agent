@@ -189,20 +189,13 @@ try {
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
   ownedExecutions.push(execution);
 
-  let useNative=false;
+  let useNative=false,ownedPreview;
+  const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,execution,deadline:operation.deadline,receipt_id:operation.id};
   if(nativeConfiguration){
-   const {showMissingValuesMappingTable}=await load('client/lib/missing-values-output.mjs');
-   const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
-   await channel.openOutputPort(0);
-   await showMissingValuesMappingTable(channel);
-   const output=await channel.observe({condition:'cold completed owned output definition',readMappings:true,
-    ready:s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
-   if(output.node_mapping.node_context?.output_port?.port!==0
-    ||!['document_id','workflow_id','node_id'].every(k=>output.node_mapping.node_context[k]===node[k]))
-    throw Error('COLD_OUTPUT_DEFINITION_OWNER_DIFFERS');
-   useNative=coldNativeEligible(nativeConfiguration,output.node_mapping);
-   const closed=await closePreparedWizard(channel);
-   if(!closed.verified||closed.settings_applied!==false)throw Error('COLD_OUTPUT_DEFINITION_CANCEL_UNCONFIRMED');
+   const {openOwnedNativePreview,closeOwnedNativePreview}=await load('client/lib/collapse-native-output.mjs');
+   ownedPreview=await openOwnedNativePreview(channel,ctx);
+   useNative=coldNativeEligible(nativeConfiguration,ownedPreview.preview);
+   if(!useNative)await closeOwnedNativePreview(channel,ctx,ownedPreview.port,ownedPreview.preview.root_tid);
   }
 
   let data;
@@ -210,7 +203,6 @@ try {
    // Preview enforces the actual 50x8 bound; wide baseline reports retain their
    // existing formatted scalar reader. No native fallback after a failed read.
     const {readCollapseNativeOutput}=await load('client/lib/collapse-native-output.mjs');
-    const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,execution,deadline:operation.deadline,receipt_id:operation.id};
     const ancestors=new Set();let upstream=node.node_id;
     for(let depth=0;depth<3;depth++){
      const incoming=graph.links.filter(l=>l.target===upstream);
@@ -221,7 +213,7 @@ try {
     }
     const chain={imports:staticSources.imports.filter(s=>ancestors.has(s.node_id)),collapses:staticSources.collapses.filter(s=>ancestors.has(s.node_id))};
     const coldStaticSources=await bindColdExecutions({execute,sources:chain,ctx,ownedExecutions});
-    const read=await readCollapseNativeOutput(channel,{sample_rows:50},ctx,{execute,operation,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>true,coldStaticSources,nativeExecutionProof:execution},{targetOrigin:origin,targetBuild:'7.4.2'},nativeConfiguration);
+    const read=await readCollapseNativeOutput(channel,{sample_rows:50},ctx,{execute,operation,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>true,coldStaticSources,nativeExecutionProof:execution,ownedPreview},{targetOrigin:origin,targetBuild:'7.4.2'},nativeConfiguration);
     if(!read.cleanup_complete)throw Error('COLD_NATIVE_CLEANUP_UNCONFIRMED');
     data=read.ports[0];
   }

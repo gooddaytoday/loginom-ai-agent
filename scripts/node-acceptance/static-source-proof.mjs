@@ -82,11 +82,6 @@ export async function observeStaticSources({load,graph,channelFor,account,reveal
    sources.imports.push({node_id:target.ref.node_id,configuration:{kind:'text_import',values_are:'observed_ui_values',node:target.ref,source,format,output_mapping:{port:0,autosync:output.autosync,fields:output.fields}}});
   }else{
    const input=await mapping(channel,'input');
-   if(target.type==='transform.cross_table'){
-    const variables=await channel.configureCrossTableVariables([]);
-    need(variables.verified&&variables.settings_changed===false&&variables.settings_applied===false&&variables.draft_discarded===true,
-     'cold variable inspection must discard its unchanged draft');
-   }
    await selectSource(channel,target);
    await openPreparedWizard(channel);
    if(target.type==='transform.collapse_columns'){
@@ -104,8 +99,17 @@ export async function observeStaticSources({load,graph,channelFor,account,reveal
     sources.collapses.push({node_id:target.ref.node_id,configuration});
    }else{
     const s=await channel.observe({condition:'cold observed CrossTable',readCrossTable:true,ready:s=>s.node_crosstable?.verified&&s.node_crosstable.inventory_complete});
-    sources.crossTables.push({node_id:target.ref.node_id,configuration:crossTableConfiguration(s.node_crosstable,input.native)});
+    const configuration=crossTableConfiguration(s.node_crosstable,input.native);
+    sources.crossTables.push({node_id:target.ref.node_id,configuration});
     await closePreparedWizard(channel);
+    // Complete owned CrossTable settings expose every supported binding and
+    // its resolved value. Inspect definitions for every bound node; unbound
+    // local definitions cannot change these independently observed settings.
+    if(Object.keys(configuration.options.variable_bindings).length){
+     const variables=await channel.configureCrossTableVariables([]);
+     need(variables.verified&&variables.settings_changed===false&&variables.settings_applied===false&&variables.draft_discarded===true,
+      'cold variable inspection must discard its unchanged draft');
+    }
    }
   }} catch(error){
    // A refused read must cancel its own editor before package cleanup. Do not
