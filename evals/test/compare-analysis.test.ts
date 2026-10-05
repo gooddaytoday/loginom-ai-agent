@@ -268,3 +268,15 @@ test("analysis: оба judge=null разрешают только completion, pa
  fresh.interrupted = true
  Object.values(analyzeComparison(fresh,fresh).axes).forEach((axis) => expect(axis.verdict).toBeNull())
 })
+
+test("analysis: oracle lineage проверяется только у применимых задач", () => {
+ const a = comparisonSummary(Array.from({length:40}, () => ({successes:3,attempts:3})))
+ const b = comparisonSummary(Array.from({length:40}, () => ({successes:0,attempts:3})))
+ for (const run of [a,b]) {
+  run.tasks[39]!.rubric_snapshot!.oracle_applicable = false
+  run.tasks[39]!.attempts.forEach((attempt) => { delete attempt.evaluation_contract_hash })
+ }
+ expect(analyzeComparison(a,b).axes.oracle).toMatchObject({task_count:39, verdict:"worse"})
+ expect(analyzeComparison(a,b).axes.structure.verdict).toBeNull()
+ expect(analyzeComparison(a,b).reliability.a.pass1).toBeNull()
+})
