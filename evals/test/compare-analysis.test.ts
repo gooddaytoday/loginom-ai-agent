@@ -117,3 +117,12 @@ test("analysis: oracle и конечный pass имеют отдельные н
   const b = comparisonSummary([{ successes: 0, attempts: 3 }])
   expect(analyzeComparison(a, b).tasks[0]?.regressions).toEqual(["completion", "oracle", "pass"])
 })
+
+test("analysis: общий k и недостаточное покрытие явно объясняются", () => {
+  const a = comparisonSummary([{ successes: 3, attempts: 3 }], 3)
+  const b = comparisonSummary([{ successes: 3, attempts: 3 }], 6)
+  expect(analyzeComparison(a, b).reliability).toMatchObject({ k: null, a: { pass1: 1, passk: null } })
+  expect(analyzeComparison(a, b).reliability.reasons).toContain("k_unknown")
+  expect(analyzeComparison(a, b, { k: 3 }).reliability.a.passk).toBe(1)
+  expect(analyzeComparison(a, b, { k: 4 }).reliability.reasons).toContain("pass_coverage")
+})
