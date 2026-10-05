@@ -195,3 +195,15 @@ test("analysis: structure не подменяется полным смешан�
   expect(analyzeComparison(a,b).axes.structure).toMatchObject({task_count:39, observed:{a:1,b:0,drop:1},verdict:"worse"})
   expect(analyzeComparison(a,b).axes.oracle.verdict).toBe("indistinguishable")
 })
+
+test("analysis: смешанный evaluation lineage блокирует свежие оценочные выводы", () => {
+ const a = comparisonSummary(Array.from({length:39}, () => ({successes:3,attempts:3})))
+ const b = structuredClone(a)
+ b.tasks[0]!.attempts[0]!.evaluation_contract_hash = "old-contract"
+ const result = analyzeComparison(a,b)
+ expect(result.axes.oracle.verdict).toBeNull()
+ expect(result.axes.structure.verdict).toBeNull()
+ expect(result.reliability.b).toEqual({pass1:null,passk:null})
+ expect(result.axes.completion.verdict).toBe("indistinguishable")
+ expect(result.axes.structure.reasons).toContain("evaluation_provenance")
+})
