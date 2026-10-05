@@ -33,7 +33,7 @@ def report(records, categories, functions=("sum", "count"), separator="|", names
             else:
                 root, collision = names[category]
                 name = (root + "_" if root else "") + "Amount_" + SUFFIX[fn] + collision
-            text = separator.join([caption, "Amount", LABEL[fn]]) if len(functions) > 1 else caption
+            text = separator.join(([caption] if caption != "" else []) + ["Amount", LABEL[fn]]) if len(functions) > 1 else caption
             columns.append({"name": name, "label": text, "type": "integer" if fn == "count" else "real"})
             addresses.append((name, category, fn))
     groups = defaultdict(list)

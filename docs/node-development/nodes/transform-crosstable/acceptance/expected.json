@@ -1522,12 +1522,12 @@
         },
         {
           "name": "Amount_Sum",
-          "label": ".Amount.Сумма",
+          "label": "Amount.Сумма",
           "type": "real"
         },
         {
           "name": "Amount_Count",
-          "label": ".Amount.Количество",
+          "label": "Amount.Количество",
           "type": "integer"
         },
         {

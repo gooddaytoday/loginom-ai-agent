@@ -141,3 +141,18 @@ test('own renamed output retains every required source and refuses foreign or da
   const copy=structuredClone(c);damage(copy.output_mapping);assert.throws(()=>resolveCrossTableSchema(columns,copy));
  }
 });
+
+ test('native omitted empty-caption separator requires exact empty technical aggregate identity',()=>{
+ const c={...configuration,facts:[{name:'Amount',label:'Amount',type:'real',functions:['sum','count']}],options:{separator:'.',unique_names:true,limit:0,min_values:0}};
+ const xs=[{index:0,name:'Region',label:'Region',type:'string'},
+  {index:1,name:'Amount_Sum',label:'Amount.Сумма',type:'real'},
+  {index:2,name:'Amount_Count',label:'Amount.Количество',type:'integer'},
+  {index:3,name:'__Amount_Sum',label:' .Amount.Сумма',type:'real'},
+  {index:4,name:'__Amount_Count',label:' .Amount.Количество',type:'integer'}];
+ assert.deepEqual(resolveCrossTableSchema(xs,c).category_fields.map(f=>f.category),['','',' ',' ']);
+ for(const patch of [{name:'Amount_SumWrong'},{type:'integer'},{label:'Wrong.Сумма'},{name:'__Amount_Sum'}]){
+  const wrong=structuredClone(xs);Object.assign(wrong[1],patch);assert.throws(()=>resolveCrossTableSchema(wrong,c));
+ }
+ assert.throws(()=>resolveCrossTableSchema(xs,{...c,options:{...c.options,unique_names:false}}));
+ assert.throws(()=>resolveCrossTableSchema(xs,{...c,columns:[c.column,c.column]}));
+ });

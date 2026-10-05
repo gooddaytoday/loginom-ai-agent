@@ -55,7 +55,13 @@ export function resolveCrossTableSchema(columns,configuration){
    for(const f of expected){
     const tail=[...(showFact?[f.label]:[]),...(showFunction?[CROSSTABLE_FUNCTIONS[f.function].label]:[])].join(separator);
     let prefix;
-    if(dimensions.length){if(tail){if(!c.label.endsWith(separator+tail))continue;prefix=c.label.slice(0,-(separator+tail).length);}else prefix=c.label;}
+    if(dimensions.length){if(tail){
+     // Native unique-name output omits the empty single category caption
+     // and its separator. The technical aggregate identity below must still
+     // prove that empty category; a whitespace caption is never trimmed.
+     if(dimensions.length===1&&configuration.options.unique_names&&c.label===tail)prefix='';
+     else {if(!c.label.endsWith(separator+tail))continue;prefix=c.label.slice(0,-(separator+tail).length);}
+    }else prefix=c.label;}
     else {if(c.label!==tail)continue;prefix='';}
     const captions=dimensions.length===1?[prefix]:dimensions.length?prefix.split(separator):[];
     if(captions.length!==dimensions.length)continue;
