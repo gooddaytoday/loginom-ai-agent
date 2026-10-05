@@ -20,3 +20,16 @@ export function evaluationContractHash(input: { rubric_hash: string; judge: RunS
     pass_threshold: input.pass_threshold,
   })).digest("hex")
 }
+
+export function sameRubricSnapshot(a?: RubricSnapshot, b?: RubricSnapshot) {
+  return snapshotIdentity(a) === snapshotIdentity(b)
+}
+function snapshotIdentity(snapshot?: RubricSnapshot) {
+  return snapshot === undefined ? null : JSON.stringify({
+    version: snapshot.version, oracle_applicable: snapshot.oracle_applicable, oracle_tolerance: snapshot.oracle_tolerance,
+    checklist: snapshot.checklist.map((item) => ({
+      id: item.id, weight: item.weight, required: item.required, requires_result_file: item.requires_result_file,
+      requires_run: item.requires_run, axis: item.axis,
+    })).toSorted((a,b) => a.id.localeCompare(b.id)),
+  })
+}

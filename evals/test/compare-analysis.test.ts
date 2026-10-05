@@ -280,3 +280,13 @@ test("analysis: oracle lineage проверяется только у приме
  expect(analyzeComparison(a,b).axes.structure.verdict).toBeNull()
  expect(analyzeComparison(a,b).reliability.a.pass1).toBeNull()
 })
+
+test("analysis: порядок ключей snapshot не меняет сравнимость", () => {
+ const a = comparisonSummary([{successes:3,attempts:3}])
+ const b = comparisonSummary([{successes:0,attempts:3}])
+ const old = b.tasks[0]!.rubric_snapshot!
+ b.tasks[0]!.rubric_snapshot = {checklist:old.checklist,oracle_tolerance:old.oracle_tolerance,oracle_applicable:old.oracle_applicable,version:old.version}
+ expect(analyzeComparison(a,b).axes.structure.verdict).toBe("indistinguishable")
+ expect(analyzeComparison(a,b).reliability.a.pass1).toBe(1)
+ expect(analyzeComparison(a,b).tasks[0]!.regressions).toEqual(["completion","oracle","pass"])
+})
