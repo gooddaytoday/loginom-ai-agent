@@ -50,7 +50,7 @@ export function compare(a: RunSummary, b: RunSummary, options: Partial<ComparePo
   const uneven = [a, b].flatMap((run) => {
     const counts = run.task_ids.map((id) => ({ id, total: aggregate(run.tasks.find((task) => task.id === id)?.attempts ?? [], run.judge === null).total }))
     return new Set(counts.map((task) => task.total)).size > 1
-      ? [`**неполное покрытие внутри прогона ${cell(run.run_id)}:** ${counts.map((task) => `${cell(task.id)}=${task.total}`).join(", ")}. Задачи имеют разный вес в справочном среднем по попыткам.`]
+      ? [`**неполное покрытие внутри прогона ${cell(run.run_id)}:** ${counts.map((task) => `${cell(task.id)}=${task.total}`).join(", ")}. Задачи имеют разный вес в общем среднем.`]
       : []
   })
   const lines = [
@@ -63,7 +63,9 @@ export function compare(a: RunSummary, b: RunSummary, options: Partial<ComparePo
     `Повторов: ${a.config.repeat} → ${b.config.repeat}. Попыток: ${a.metrics.total} → ${b.metrics.total}.`,
     `Метод: Hoeffding по независимым группам задач; равный вес задач. margin=${analysis.policy.margin} (${(analysis.policy.margin*100).toFixed(1)} п.п.), confidence=${analysis.policy.confidence}. Бюджет: шесть односторонних границ, alpha_tail=${((1-analysis.policy.confidence)/6).toPrecision(4)}.`,
     "Зависимость повторов внутри задачи допустима. Интервал относится к ожидаемому падению на объявленном наборе; перенос на новые задачи не обещается.",
-    "Неразличимо не доказывает равенство. При margin=0.5 даже полное падение на 25 задачах не доказывается; предельному случаю требуется 39 независимых задач.",
+    analysis.policy.margin === 0.5 && analysis.policy.confidence === 0.95 ?
+      "Неразличимо не доказывает равенство. При margin=0.5 и confidence=0.95 даже полное падение на 25 задачах не доказывается; предельному случаю требуется 39 независимых задач." :
+      "Неразличимо не доказывает равенство. Ширина интервала и достаточное число задач зависят от выбранных margin/confidence.",
     ...(partial.length ? [`**неполное покрытие:** ${partial.map((run) => cell(`${run.run_id} (${run.interrupted ? "прерван" : run.stopped_reason})`)).join(", ")} — метрики по разному числу попыток.`] : []),
     ...(coverage.length ? [`**неполное покрытие:** ${coverage.join("; ")}. Общие средние зависят от числа попыток каждой задачи.`] : []),
     ...uneven,
