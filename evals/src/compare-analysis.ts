@@ -5,12 +5,12 @@ export function analyzeComparison(a: RunSummary, b: RunSummary) {
     a: completion(task.attempts),
     b: completion(b.tasks.find((candidate) => candidate.id === task.id)!.attempts),
   }))
-  const first = rates.reduce((sum, rate) => sum + rate.a, 0) / rates.length
-  const second = rates.reduce((sum, rate) => sum + rate.b, 0) / rates.length
-  return { axes: { completion: { observed: { a: first, b: second, drop: first - second } } } }
+  const first = rates.reduce((sum, rate) => sum + (rate.a ?? 0), 0) / rates.length
+  const second = rates.reduce((sum, rate) => sum + (rate.b ?? 0), 0) / rates.length
+  return { axes: { completion: { observed: !rates.length || rates.some((rate) => rate.a === null || rate.b === null) ? null : { a: first, b: second, drop: first - second } } } }
 }
 
 function completion(attempts: AttemptResult[]) {
   const measured = attempts.filter((attempt) => !["infra_error", "harness_error", "interrupted"].includes(attempt.status))
-  return measured.filter((attempt) => attempt.status === "completed").length / measured.length
+  return measured.length ? measured.filter((attempt) => attempt.status === "completed").length / measured.length : null
 }

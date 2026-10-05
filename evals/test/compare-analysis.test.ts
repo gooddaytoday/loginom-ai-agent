@@ -15,3 +15,8 @@ test("analysis: инфраструктура и прерывание не сни
   run.tasks[0]!.attempts[3]!.status = "interrupted"
   expect(analyzeComparison(run, run).axes.completion.observed).toEqual({ a: 1, b: 1, drop: 0 })
 })
+
+test("analysis: пустая задача не создаёт нулевую оценку или NaN", () => {
+  const run = comparisonSummary([{ successes: 0, attempts: 0 }])
+  expect(analyzeComparison(run, run).axes.completion.observed).toBeNull()
+})
