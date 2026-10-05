@@ -207,3 +207,10 @@ test("analysis: смешанный evaluation lineage блокирует све�
  expect(result.axes.completion.verdict).toBe("indistinguishable")
  expect(result.axes.structure.reasons).toContain("evaluation_provenance")
 })
+
+test("analysis: oracle N/A отличается от пропущенной проверки", () => {
+ const run = comparisonSummary([{successes:3,attempts:3}])
+ run.tasks[0]!.rubric_snapshot!.oracle_applicable = false
+ expect(analyzeComparison(run,run).axes.oracle.reasons).toContain("oracle_not_applicable")
+ expect(analyzeComparison(run,run).axes.structure.verdict).toBe("indistinguishable")
+})

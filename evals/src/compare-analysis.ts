@@ -67,7 +67,7 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
     .map((pair) => ({ a: judgedRate(pair.a.attempts, "oracle_pass"), b: judgedRate(pair.b.attempts, "oracle_pass") }))
   const partial = [a, b].some((run) => run.interrupted || run.stopped_reason || run.tasks.some((task) => task.attempts.some((attempt) => attempt.status === "interrupted"))) ? ["partial_run"] : []
   const lineage = oraclePairs.some((pair) => !freshEvaluation(a, pair.a) || !freshEvaluation(b, pair.b)) ? ["evaluation_provenance"] : []
-  const oracleReasons = !oracleKnown ? ["snapshot_unavailable"] : !a.judge || !b.judge ? ["judge_skipped"] :
+  const oracleReasons = !oracleKnown ? ["snapshot_unavailable"] : !oracleRates.length ? ["oracle_not_applicable"] : !a.judge || !b.judge ? ["judge_skipped"] :
     oraclePairs.some((pair) => pair.a.rubric_snapshot?.oracle_applicable &&
       [pair.a, pair.b].some((task) => measured(task.attempts).some((attempt) => typeof attempt.oracle_pass !== "boolean"))) ? ["oracle_coverage"] : []
   const structureRates = oraclePairs.map((pair) => ({ a: judgedRate(pair.a.attempts, "structural_score"), b: judgedRate(pair.b.attempts, "structural_score") }))
