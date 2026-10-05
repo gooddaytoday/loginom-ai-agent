@@ -243,3 +243,12 @@ test("loadTasks: неизвестная axis отклоняется", async () =
     }
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
+
+test("loadTasks: все core рубрики явно разделяют структуру, результат и ответ", async () => {
+  for (const task of await loadTasks(tasksDir)) {
+    expect(task.checklist.every((item) => item.axis !== undefined)).toBe(true)
+    expect(task.checklist.find((item) => item.id === "result-rows")!.axis).toBe("result")
+    expect(task.checklist.find((item) => item.id === "honest-report")!.axis).toBe("report")
+    expect(task.checklist.filter((item) => item.axis === "structure")).toHaveLength(5)
+  }
+})
