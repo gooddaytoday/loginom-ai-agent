@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Проверки разбора и каркаса отчёта package_docs без сети.
 
-Запуск: python3 .loginom-ai-agent/skills/package_docs/scripts/test_extract_scenario_structure.py
+Запуск: python3 packages/desktop/resources/skills/package_docs/scripts/test_extract_scenario_structure.py
 """
 
 from __future__ import annotations

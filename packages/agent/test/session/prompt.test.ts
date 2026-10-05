@@ -925,7 +925,7 @@ it.instance(
       const { dir, llm } = yield* useServerConfig(providerCfg)
       const prompt = yield* SessionPrompt.Service
       const sessions = yield* Session.Service
-      const source = fileURLToPath(new URL("../../../../.loginom-ai-agent/skills/package_docs", import.meta.url))
+      const source = fileURLToPath(new URL("../../../desktop/resources/skills/package_docs", import.meta.url))
       const skillDir = path.join(dir, ".loginom-ai-agent", "skills", "package_docs")
       const lgp = path.join(dir, "demo.lgp")
       const structure = path.join(dir, "structure.json")

@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test"
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
+import path from "node:path"
 import type { Configuration } from "electron-builder"
 import { Product, productName, productSlug } from "@loginom-ai-agent/product"
 
@@ -21,8 +23,8 @@ for (const channel of ["dev", "beta", "prod"] as const) {
     expect(JSON.stringify(config)).not.toContain("opencode")
     expect(config.extraResources).not.toContainEqual(expect.objectContaining({ filter: ["opencode-cli*"] }))
     expect(config.extraResources).toContainEqual({
-      from: "../../.loginom-ai-agent/skills/package_docs",
-      to: "skills/package_docs",
+      from: "resources/skills",
+      to: "skills",
     })
     expect(config.linux?.target).toEqual(["AppImage", "deb"])
     expect(config.linux?.icon).toBe("resources/icons/linux")
@@ -56,3 +58,30 @@ test("macOS test packages use explicit ad-hoc arm64 signing without rewriting ve
   expect(config.mac?.signIgnore).toEqual(["/Contents/Resources/loginom/bin/", "/Contents/Resources/loginom/browsers/"])
   expect(JSON.stringify(config.extraResources)).not.toContain("native/")
 })
+
+test("every resources/skills folder ships as an agent skill with a matching name and description", () => {
+  const root = path.join(import.meta.dirname, "resources", "skills")
+  const names = readdirSync(root).filter((name) => statSync(path.join(root, name)).isDirectory())
+  expect(names.length).toBeGreaterThan(0)
+  for (const name of names) {
+    const file = path.join(root, name, "SKILL.md")
+    expect(
+      existsSync(file),
+      `Add the product skill at resources/skills/${name}/SKILL.md. The whole resources/skills directory is packaged; do not add an extraResources entry.`,
+    ).toBe(true)
+    const frontmatter = skillFrontmatter(readFileSync(file, "utf8"))
+    expect(frontmatter.name, `${name}: frontmatter name must equal the folder name`).toBe(name)
+    expect(
+      frontmatter.description.length,
+      `${name}: frontmatter description is required or the model never sees the skill`,
+    ).toBeGreaterThan(0)
+  }
+})
+
+function skillFrontmatter(markdown: string) {
+  const block = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] ?? ""
+  const name = block.match(/^name:\s*(\S+)\s*$/m)?.[1] ?? ""
+  const described = block.split(/^description:\s*/m)[1] ?? ""
+  const description = described.replace(/^(?:>[+-]?|[|][+-]?)\s*/, "").trim()
+  return { name, description }
+}

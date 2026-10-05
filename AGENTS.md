@@ -175,6 +175,7 @@ const table = sqliteTable("session", {
 
 - [Product identity and release pins](packages/product/AGENTS.md)
 - [Desktop packaging, installation and acceptance](packages/desktop/AGENTS.md)
+- [Bundled Desktop agent skills](packages/desktop/AGENTS.md#bundled-agent-skills)
 - [Connection generations, credentials and recovery](packages/desktop/src/main/loginom/AGENTS.md)
 - [Runtime host and attachment admission](packages/loginom-host/AGENTS.md)
 - [Migrated Loginom client and browser runtime](packages/loginom-runtime/AGENTS.md)

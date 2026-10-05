@@ -13,6 +13,12 @@
 - Record the corpora used and flag uncertain or regional terminology in review notes.
 - Also use the relevant language authority or official dictionary for the locale (for example RAE/Fundéu, FranceTerme, Duden, TDK, Kotus/Kielitoimiston sanakirja, Språkrådet/Bokmålsordboka, Rada Języka Polskiego/PWN, the Russian and Arabic language academies, the Ukrainian Orthography, Taiwan MOE dictionaries, or the Royal Society of Thailand). Treat the English dictionary as the semantic source of truth and preserve placeholders, code identifiers, product names, and keyboard labels.
 
+## Bundled agent skills
+
+Product skills that the installed Desktop agent should load live in `resources/skills/<name>/SKILL.md`. `electron-builder` copies that whole directory to `resources/skills`; do not add one `extraResources` entry per skill. A new skill is a new folder there. `.loginom-ai-agent/skills` is only for repository-local skills and is not packaged.
+
+`SKILL.md` frontmatter must set `name` to the folder name and a non-empty `description`. A skill without `description` is loaded but never shown to the model. A project skill with the same name replaces the bundled copy. The CLI archive does not receive this directory.
+
 ## Loginom packaging and operations
 
 - Identity/pins come from [product](../product/AGENTS.md); connection lifecycle has [its own instructions](src/main/loginom/AGENTS.md).
