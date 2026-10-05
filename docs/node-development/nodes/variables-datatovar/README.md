@@ -1,7 +1,20 @@
 # Таблица в переменные
 
-Component ID: `component.variables.DataToVar`.
+Устойчивый ID: `component.variables.DataToVar`. Slug: `variables-datatovar`. Исторического номера подплана нет.
 
-[Черновик подплана](plan.md) · [реестр](../../registry.json).
+[Подплан](plan.md) · [реестр](../../registry.json).
 
-Обработчик не зарегистрирован. Подплан — черновик требований справки; перед назначением его переписывают по [шаблону](../../templates/node-plan.md). Наличие черновика не означает поддержку runtime.
+## Состояние
+
+Обработчика нет; статус `discovery_required`. Следующая карточка Multica — этап 0 отдельно: живое исследование, контракт и независимый комплект. Этап 1 — после решения владельца по нужным ему W (W1). Общие изменения всех этапов: W1, W2; точный объём и условия — в подплане.
+
+## Планируемый объём по этапам
+
+- Этап 1: Базовые агрегаты и выход переменных.
+- Этап 2: Все допустимые агрегаты, типы и выходная схема.
+
+## Источники
+
+- [Справка](https://help.loginom.ru/userguide/processors/variables/variables-from-table.html), `loginom-help@353e506b:data/processors/variables/variables-from-table.md`.
+- E2E `e2e-tests@486caef44:tests/acceptance/wizards/data_to_variables.ts:18,24,200-221; tests/acceptance/wizards/data_to_variables/concat.ts` — источник требований, без переноса PASS.
+- Runtime `loginom@dada8010e`: `node-contracts.mjs:8-22`, `node-support.mjs:27-41`; зарегистрированного обработчика нет.
