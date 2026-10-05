@@ -24,7 +24,7 @@
 | 14 | [Заполнение пропусков](nodes/missing-values/README.md) | `preprocessing.data_recovery` / impute | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
 | 16 | [Свёртка столбцов](nodes/collapse-columns/README.md) | `transform.collapse_columns` / unpivot | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
 | 17 | [Текстовый экспорт](nodes/text-export/README.md) | `exports.text` / delimited | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
-| 15 | [Кросс-таблица](nodes/transform-crosstable/README.md) | `transform.cross_table` / pivot | not_accepted | not_validated; аналитика: not_revalidated_standalone |
+| 15 | [Кросс-таблица](nodes/transform-crosstable/README.md) | `transform.cross_table` / pivot | not_accepted | standalone_cli_accepted; аналитика: independent_oracle_pass |
 
 ## Компоненты без полного обработчика
 
