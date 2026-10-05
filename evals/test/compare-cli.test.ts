@@ -4,6 +4,7 @@ import path from "node:path"
 import os from "node:os"
 import { mkdtemp, mkdir, rm } from "node:fs/promises"
 import { comparisonSummary } from "./helpers/compare-summary"
+import { loadConfig } from "../src/config"
 
 async function runCompare(directory: string, args: string[]) {
  const process = Bun.spawn([Bun.which("bun")!,path.resolve("src/compare.ts"),...args], {env:{...Bun.env,EVAL_RESULTS_DIR:directory},stdout:"pipe",stderr:"pipe"})
@@ -112,4 +113,21 @@ test("CLI compare: массив не подменяет строку judge_statu
   await Bun.write(path.join(directory,"a/summary.json"),JSON.stringify(raw))
   expect((await runCompare(directory,["a","b"])).code).toBe(2)
  } finally { await rm(directory,{recursive:true,force:true}) }
+})
+
+
+test("CLI compare: пустая метка из run допустима и входы не изменяются", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-compare-empty-label-"))
+  try {
+    const original = await summaries(directory)
+    const run = JSON.parse(original)
+    run.label = loadConfig(["--dry-run", "--label", ""], {}).label
+    const saved = JSON.stringify(run)
+    await Bun.write(path.join(directory, "a/summary.json"), saved)
+    const result = await runCompare(directory, ["a", "b"])
+    expect(result.code).toBe(0)
+    expect(result.stdout).toContain("неразличимо")
+    expect(await Bun.file(path.join(directory, "a/summary.json")).text()).toBe(saved)
+    expect(await Bun.file(path.join(directory, "b/summary.json")).text()).toBe(original)
+  } finally { await rm(directory, { recursive: true, force: true }) }
 })
