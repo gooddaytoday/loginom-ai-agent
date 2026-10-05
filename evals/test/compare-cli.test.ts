@@ -30,3 +30,16 @@ test("CLI compare: изолированный results, отчёт и неизм�
  } finally { await rm(directory,{recursive:true,force:true}) }
 })
 
+
+test("CLI compare: malformed JSON shapes дают exit 2", async () => {
+ const directory = await mkdtemp(path.join(os.tmpdir(),"evals-compare-bad-json-"))
+ try {
+  await summaries(directory)
+  for (const source of ["null","[]","{}","{ broken",JSON.stringify({...comparisonSummary([{successes:3,attempts:3}]), tasks:[{id:"task-0",attempts:"bad"}]})]) {
+   await Bun.write(path.join(directory,"a/summary.json"),source)
+   const result = await runCompare(directory,["a","b"])
+   expect(result.code).toBe(2)
+   expect(result.stderr).toContain("Некорректный summary")
+  }
+ } finally { await rm(directory,{recursive:true,force:true}) }
+})
