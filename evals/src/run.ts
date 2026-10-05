@@ -2,6 +2,7 @@ import path from "node:path"
 import { cp, mkdir } from "node:fs/promises"
 import { loadConfig, type EvalConfig } from "./config"
 import { EvalFailure } from "./fail"
+import { rubricSnapshot } from "./evaluation"
 import { agentInputsHash, buildAgentPrompt, loadTasks, rubricHash, taskTimeoutMs, type Task } from "./task"
 import { agentCommand, runAgent, type AgentCommand } from "./cli"
 import { cleanupArtifact, fetchArtifact, listStorage, parseArtifactSource, type ArtifactSource } from "./artifact"
@@ -53,6 +54,8 @@ async function executeRun(config: EvalConfig) {
         passThreshold: config.passThreshold,
       }
     : undefined
+  const inputsHash = await agentInputsHash(tasks)
+  const rubric = await rubricHash(tasks)
   const attempts: AttemptResult[] = []
   const state: { stopped: string | null; interruptedCleanup: { recovered: boolean } | null } = {
     stopped: null,
@@ -135,8 +138,8 @@ async function executeRun(config: EvalConfig) {
       container: source.kind === "dir" ? null : config.loginom.container,
       storage_dir: source.kind === "dir" ? null : config.loginom.storageDir,
     },
-    agent_inputs_hash: await agentInputsHash(tasks),
-    rubric_hash: await rubricHash(tasks),
+    agent_inputs_hash: inputsHash,
+    rubric_hash: rubric,
     task_ids: tasks.map((task) => task.id),
     config: {
       repeat: config.repeat,
@@ -150,7 +153,7 @@ async function executeRun(config: EvalConfig) {
     metrics: aggregate(attempts, config.skipJudge),
     tasks: tasks.map((task) => {
       const own = attempts.filter((item) => item.task_id === task.id)
-      return { id: task.id, metrics: aggregateTask(own, config.skipJudge), attempts: own }
+      return { id: task.id, rubric_snapshot: rubricSnapshot(task), metrics: aggregateTask(own, config.skipJudge), attempts: own }
     }),
     storage_leftovers: config.dryRun ? [] : await leftovers(source, runId),
   }
@@ -401,6 +404,7 @@ function emptyResult(taskId: string, attempt: number, profileRecovered: boolean)
     timed_out: false,
     interrupted: false,
     failure_kind: null,
+    structural_score: null,
     score: null,
     pass: null,
     judge_status: "skipped",
