@@ -37,8 +37,8 @@ export async function closeOwnedNativePreview(channel,ctx,port,root) {
  need(graph(returned),'Owned workflow return unconfirmed');
  return {verified:true,cleanup_complete:true,preview_closed:true,port_guid:port.port_guid,node_context:returned.prepared_node_context};
 }
-async function activeNativeOutput(channel) {
- const s=await channel.observe({condition:'exact output graph',readOutputs:true,
+async function activeNativeOutput(channel,{readPreview=false}={}) {
+ const s=await channel.observe({condition:'exact output graph',readOutputs:true,readPreview,
   ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'&&s.node_outputs?.verified===true});
  const ports=s.node_outputs.ports.filter(p=>p.index===0);
  need(ports.length===1&&ports[0].active===true,'Active exact output required');
@@ -61,6 +61,13 @@ export function verifyOwnedNativePreview(handle,ctx,port,preview) {
  need(preview?.verified===true&&preview.inventory_complete===true&&preview.port===0&&preview.node_id===ctx.node.node_id
   &&preview.port_guid===port.port_guid&&preview.root_tid===handle.preview?.root_tid
   &&JSON.stringify(preview.fields)===JSON.stringify(handle.preview?.fields),'Native Preview handle schema changed');
+}
+export async function reuseOwnedNativePreview(channel,handle,ctx) {
+ // readPreview admits only the independently bound own Preview in the existing
+ // procedure context guard. Generic masks/dialogs remain prohibited.
+ const {state,port}=await activeNativeOutput(channel,{readPreview:true});
+ verifyOwnedNativePreview(handle,ctx,port,state.node_preview_schema);
+ return {port,preview:state.node_preview_schema};
 }
 async function verifyFrontends(execute,origin,signal) {
  const urls=await execute(`async page=>page.evaluate(names=>Object.fromEntries(names.map(name=>{
@@ -88,11 +95,7 @@ export async function readCollapseNativeOutput(channel,read,ctx,options,config,c
  const frontends=await verifyFrontends(execute,config.targetOrigin,ctx.signal);
  let handle;
  if(options.ownedPreview){
-  const {port}=await activeNativeOutput(channel);
-  const s=await channel.observe({condition:'reuse freshly verified owned Preview',readPreview:true,
-   ready:s=>s.node_preview_schema?.verified===true&&s.node_preview_schema.port_guid===port.port_guid&&s.node_preview_schema.port===0});
-  verifyOwnedNativePreview(options.ownedPreview,ctx,port,s.node_preview_schema);
-  handle={port,preview:s.node_preview_schema};
+  handle=await reuseOwnedNativePreview(channel,options.ownedPreview,ctx);
  }else handle=await openOwnedNativePreview(channel,ctx);
  const {port}=handle,preview={node_preview_schema:handle.preview};
  const codes={boolean:1,datetime:2,real:3,integer:4,string:5,variant:6};
