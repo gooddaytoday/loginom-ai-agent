@@ -5,12 +5,13 @@ import { mkdir, rm } from "node:fs/promises"
 const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
 const transition = process.env.EVAL_TASK_ID?.match(/^a-(process|archive|ready)-(no-artifact|failed|timeout|completed)$/)
-const infraRetry = command === "run" && process.env.EVAL_TASK_ID === "infra-retry-success"
+const infraRetry = command === "run" && process.env.EVAL_TASK_ID?.startsWith("infra-retry-")
 const launch = infraRetry ? await (async () => {
   const file = Bun.file(path.join(Bun.argv[Bun.argv.indexOf("--dir") + 1]!, "fake-launches.json"))
   const count = await file.json().catch(() => 0) as number
   await Bun.write(file, JSON.stringify(count + 1))
-  if (count === 0) {
+  if (count === 0 && process.env.EVAL_TASK_ID === "infra-retry-cleanup-failure") process.env.EVAL_FAKE_CHANGED_WRITER = "1"
+  if (count === 0 && process.env.EVAL_TASK_ID !== "infra-retry-cleanup-failure") {
     process.env.EVAL_FAKE_RUNTIME_EVENTS = '{"phase":"AMBIGUOUS"}\n'
     process.env.EVAL_FAKE_STALE_WRITER = "1"
   }
@@ -103,7 +104,11 @@ if (command === "loginom") {
 }
 
 if (process.env.EVAL_FAKE_SLEEP_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_SLEEP_MS))
-const id = infraRetry ? launch === 1 ? "host-timeout" : "group-sum-qty"
+const retryOutcomes: Record<string, string> = {
+  "infra-retry-twice": "host-timeout", "infra-retry-no-artifact": "default",
+  "infra-retry-failed": "transition-failed", "infra-retry-harness-error": "stop-case",
+}
+const id = infraRetry ? launch === 1 ? "host-timeout" : retryOutcomes[process.env.EVAL_TASK_ID!] ?? "group-sum-qty"
   : transition ? ({ failed: "transition-failed", completed: "group-sum-qty" }[transition[2]!] ?? "default")
   : process.env.EVAL_TASK_ID?.match(/^a-exit[23]$/) ? "stop-case" : process.env.EVAL_TASK_ID ?? "default"
 const events = Bun.file(path.join(fixtures, `${id}.jsonl`))

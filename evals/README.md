@@ -92,6 +92,20 @@ bun run script/check-compare-noise.ts > /tmp/evals-compare-noise.json # offline 
 
 `judge_status`: с `--skip-judge` у **всех** попыток `skipped` (score `null`), независимо от артефакта; oracle тоже пропущен. Без `--skip-judge` попытка без `.lgp` получает score 0 и `judge_status: no_artifact`. `scored` — валидный вердикт; `error` — отказ, таймаут или невалидный вердикт судьи после повтора (или убийство судьи по Ctrl+C). `harness_error` / `infra_error` / `interrupted` и Ctrl+C до старта судьи тоже дают `skipped`.
 
+После `infra_error` та же задача с тем же номером попытки запускается ещё один
+раз, после подтверждённой очистки процессов, снятия stale `.writer` и проверки
+готовности профиля. Ошибка очистки останавливает прогон. `no_artifact`, `failed`,
+`harness_error`, `timeout` и `interrupted` автоматически не повторяются.
+Ctrl+C запрещает новые запуски.
+
+Итоговый `<attempt>/result.json` и одна запись в `summary.tasks[].attempts[]`
+описывают последний запуск. Поле `infra_retry.initial` хранит первый сбой,
+а его исходные файлы находятся в `<attempt>/infra-error/`. В качество входит
+только итог; `infra_error_count` и cleanup-счётчики учитывают оба запуска.
+Два инфраструктурных сбоя дают `infra_error_count=2` и ни одной quality-попытки.
+Report показывает оба исхода, повтор помечен явно. `--judge-only` пересуживает
+итог и сохраняет исходный сбой. Результаты без `infra_retry` читаются как прежде.
+
 Артефакты попытки: `<attempt>/judge/` (входы судьи и `verdict.json`), `<attempt>/judge-events-<n>.jsonl`, `<attempt>/judge-stderr-<n>.txt`. После `--judge-only`: `<attempt>/verdict.prev.json` (рядом с `judge/`) и `results/<run>/summary.prev.json`.
 
 `--judge-only` пересчитывает oracle у ранее оценённых `no_artifact` по текущей
