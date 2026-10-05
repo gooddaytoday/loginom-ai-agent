@@ -62,7 +62,7 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
   return { policy, compatibility, tasks, reliability: { k: policy.k, a: reliability(a, policy.k), b: reliability(b, policy.k), reasons: [
     ...(policy.k === null ? ["k_unknown"] : []),
     ...([a, b].some((run) => { const result = reliability(run, policy.k); return result.pass1 === null || policy.k !== null && result.passk === null }) ? ["pass_coverage"] : []),
-  ] }, axes: { completion: axis(rates, policy, []), oracle: axis([], policy, ["snapshot_unavailable"]), structure: axis([], policy, ["structure_unavailable"]) } }
+  ] }, axes: { completion: axis(rates, policy, [a, b].some((run) => run.interrupted || run.stopped_reason || run.tasks.some((task) => task.attempts.some((attempt) => attempt.status === "interrupted"))) ? ["partial_run"] : []), oracle: axis([], policy, ["snapshot_unavailable"]), structure: axis([], policy, ["structure_unavailable"]) } }
 }
 
 function completion(attempts: AttemptResult[]) {

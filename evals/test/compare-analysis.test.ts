@@ -139,3 +139,11 @@ test("analysis: policy отклоняет недопустимые вероят�
   for (const options of [{ margin: -1 }, { margin: 1 }, { margin: NaN }, { confidence: 0 }, { confidence: 1 }, { confidence: Infinity }, { k: 0 }, { k: 1.5 }])
     expect(() => analyzeComparison(run, run, options)).toThrow("Некорректные параметры compare")
 })
+
+test("analysis: остановленный прогон сохраняет описание без inferential verdict", () => {
+  const run = comparisonSummary(Array.from({ length: 39 }, () => ({ successes: 3, attempts: 3 })))
+  run.stopped_reason = "test stop"
+  expect(analyzeComparison(run, run).axes.completion).toMatchObject({
+    observed: { a: 1, b: 1, drop: 0 }, interval: null, verdict: null, non_inferiority: null, reasons: ["partial_run"],
+  })
+})
