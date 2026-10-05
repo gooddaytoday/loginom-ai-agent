@@ -384,3 +384,22 @@ checks и writer release используют canonical registration/path. Тр�
 создаётся приватно перед канонизацией, существующий lease не отбирается.
 Полная suite и итоговый diff gate выполняются; live native приёмка текущих
 исправлений ещё не проводилась. Историческая приёмка a2bf34b77 остаётся прежней.
+
+Итог исправлений review: P1 — fddc74f2e; P2 — 6001c8a8e. Полный gate из evals
+на этом code SHA: 232 pass / 0 fail / 1006 assertions / 299.69 с, bun typecheck
+и git diff --check pass. Четыре новых regression tests прошли red → green;
+исходные quality/transition/legacy/rejudge/management проверки сохранены.
+Пользовательские system-bugs.md и repository-week.md не изменялись этим срезом
+и не включались в коммиты.
+
+Адресный native smoke установленного CLI 0.1.17 без модели/setup/rebuild:
+частный прежний acceptance-профиль свободен до запуска; supervised loginom status
+вернул ready/exit 0/confirmed cleanup. Один validation browser binding,
+16 наблюдённых identities, два финальных passes owned_remaining=0; отдельный
+host PID/starttime audit также подтвердил отсутствие этих identities.
+Own validation directory архивирован и адресно pruned; lease/registration/writer
+после smoke отсутствуют. Auth bytes, CLI/Chromium/resource-manifest SHA256
+совпадают до/после и с pins исторической приёмки. Evidence:
+evals/results/review-fixes-status-1791182921972/{acceptance,process-audit,source-gate}.json
+и management receipts/manifest. Полные control/addressed model runs 2 октября
+повторно не выполнялись; этот smoke не новый baseline и не server-cancel proof.
