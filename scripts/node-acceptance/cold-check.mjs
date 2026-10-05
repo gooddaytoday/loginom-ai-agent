@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
+import {coldNativeEligible} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -172,10 +173,10 @@ try {
         operation_id: receipt.id,
       }),
   })
-  const nativeConfiguration=staticSources?.crossTables.find(c=>c.node_id===node.node_id)?.configuration;
-  const useNative=nativeConfiguration&&expectedOutputs.some(o=>o.columns.length<=8);
-  const nativeFactWidth=nativeConfiguration?.columns.length===0?nativeConfiguration.row_keys.length+nativeConfiguration.facts.reduce((n,f)=>n+f.functions.length,0):null;
-  if(useNative&&(nativeConfiguration.facts.some(f=>f.type==='variant')||nativeFactWidth!==null&&nativeFactWidth<=8)){
+  const nativeSource=staticSources?.crossTables.find(c=>c.node_id===node.node_id);
+  const nativeConfiguration=nativeSource?.configuration;
+  const useNative=coldNativeEligible(nativeConfiguration,nativeSource?.output_definition);
+  if(useNative){
    const {prepareCrossTableAncestorExecution}=await load('client/lib/crosstable-ancestor-execution.mjs');
    await prepareCrossTableAncestorExecution({graph,node,sources:staticSources,operation,execute,record,targetOrigin:origin,targetBuild:'7.4.2',
     wrapMutation:(code,r)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})});
@@ -193,11 +194,6 @@ try {
   if(useNative){
    // Preview enforces the actual 50x8 bound; wide baseline reports retain their
    // existing formatted scalar reader. No native fallback after a failed read.
-   const want=expectedOutputs.find(o=>o.columns.length<=8&&o.output_node_type===target.type&&o.columns.some(c=>c.type==='variant'));
-   const isVariant=nativeConfiguration.facts.some(f=>f.type==='variant');
-   const factWidth=nativeConfiguration.columns.length===0?nativeConfiguration.row_keys.length+nativeConfiguration.facts.reduce((n,f)=>n+f.functions.length,0):null;
-   if(isVariant||factWidth!==null&&factWidth<=8){
-    if(isVariant&&!want)throw Error('COLD_VARIANT_EXPECTATION_MISSING');
     const {readCollapseNativeOutput}=await load('client/lib/collapse-native-output.mjs');
     const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,execution,deadline:operation.deadline,receipt_id:operation.id};
     const ancestors=new Set();let upstream=node.node_id;
@@ -213,7 +209,6 @@ try {
     const read=await readCollapseNativeOutput(channel,{sample_rows:50},ctx,{execute,operation,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>true,coldStaticSources,nativeExecutionProof:execution},{targetOrigin:origin,targetBuild:'7.4.2'},nativeConfiguration);
     if(!read.cleanup_complete)throw Error('COLD_NATIVE_CLEANUP_UNCONFIRMED');
     data=read.ports[0];
-   }
   }
   if(!data){
   const opened = await openNewOutputTable(channel, 0)
