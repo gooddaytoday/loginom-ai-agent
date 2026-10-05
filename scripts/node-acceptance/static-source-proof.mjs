@@ -87,6 +87,7 @@ export async function observeStaticSources({load,graph,channelFor,account,reveal
     need(variables.verified&&variables.settings_changed===false&&variables.settings_applied===false&&variables.draft_discarded===true,
      'cold variable inspection must discard its unchanged draft');
    }
+   await selectSource(channel,target);
    await openPreparedWizard(channel);
    if(target.type==='transform.collapse_columns'){
     const s=await channel.observe({condition:'cold observed Collapse',readCollapse:true,ready:s=>s.node_collapse?.verified&&s.node_collapse.inventory_complete});
