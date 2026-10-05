@@ -75,10 +75,10 @@ export function inspectManagedJavascriptCloseDecision({held,task}) {
     if(!app?.ModelForm||!(model instanceof app.ModelForm))
       return {state:'waiting',node_id:task.owner.node_id,root_visible:false,dialog_count:0};
     const diagram=model?.FDiagram,nodes=diagram?.FNodes?.FCollection;
-    const found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===task.owner.node_id):[];
+    const found=Array.isArray(nodes)&&nodes.length<=200?nodes.filter(n=>n.FGuid===task.owner.node_id):[];
     const graph=diagram?.FmxGraph,shape=found.length===1?graph?.view?.getState?.(found[0].FCell)?.shape?.node:null;
     const roots=[...document.querySelectorAll('[data-tid='+JSON.stringify(task.workflow_ref.prefix+';ModelForm;cmpDiagram')+']')];
-    if(!Array.isArray(nodes)||nodes.length>20||found.length>1||roots.length>1
+    if(!Array.isArray(nodes)||nodes.length>200||found.length>1||roots.length>1
       ||found.length===1&&found[0].FIconCls!=='bg-vendor-icon-javascript'
       ||roots.length===1&&graph?.container&&roots[0]!==graph.container
       ||shape?.isConnected&&roots.length===1&&(!roots[0].contains(shape)||shape.getAttribute('data-tid')!==held.node.tid))

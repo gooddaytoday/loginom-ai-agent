@@ -11,7 +11,7 @@ export function captureManagedJavascriptSelection(task,capture) {
     &&item.workflowId===task.owner.workflow_id);
   const workflow=tab?.Controller?.Node?.data?.node,model=tab?.Controller?.FController;
   const diagram=model?.FDiagram,graph=diagram?.FmxGraph,nodes=diagram?.FNodes?.FCollection;
-  const found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(item=>item.FGuid===task.owner.node_id):[];
+  const found=Array.isArray(nodes)&&nodes.length<=200?nodes.filter(item=>item.FGuid===task.owner.node_id):[];
   const native=found[0],shape=native&&graph?.view?.getState?.(native.FCell)?.shape?.node;
   const tid=shape?.getAttribute?.('data-tid');
   const tabs=[...document.querySelectorAll('[data-tid='+JSON.stringify(task.workflow_ref.tab_tid)+']')];

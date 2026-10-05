@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto"
 import type { createLoginomHost } from "./host"
 import type { InputFile } from "./inputs"
 import { hostError } from "./errors"
+import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 import { HostTaskScope } from "./task-scope"
 import { Schema } from "effect"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
@@ -417,10 +418,14 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             throw new Error("LOGINOM_SCOPE_DENIED")
           }
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
-          const result = await runtime.request("call", {
-            name: input.name,
-            arguments: "args" in input ? input.args : undefined,
-          })
+          const result = await runtime.request(
+            "call",
+            {
+              name: input.name,
+              arguments: "args" in input ? input.args : undefined,
+            },
+            runtimeCallTimeout(input.name, "args" in input ? input.args : undefined) + 15_000,
+          )
           if (
             !result ||
             typeof result !== "object" ||

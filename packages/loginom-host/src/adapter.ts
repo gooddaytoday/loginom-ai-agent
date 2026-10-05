@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto"
 import { transport, type Port } from "./transport"
 import { HostTaskScope } from "./task-scope"
 import { Schema } from "effect"
+import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 
 const state: { connection?: ReturnType<typeof transport> } = {}
 export function connect(port: Port) {
@@ -81,7 +82,12 @@ export async function acquire(session: string) {
         try {
           if (queue.released || signal?.aborted) throw new Error("LOGINOM_RUN_ABORTED")
           signal?.addEventListener("abort", abort, { once: true })
-          return await connection.request("call", { run, name, args, userMessage, admissions }, undefined, observe)
+          return await connection.request(
+            "call",
+            { run, name, args, userMessage, admissions },
+            Math.max(180_000, runtimeCallTimeout(name, args) + 30_000),
+            observe,
+          )
         } finally {
           signal?.removeEventListener("abort", abort)
         }

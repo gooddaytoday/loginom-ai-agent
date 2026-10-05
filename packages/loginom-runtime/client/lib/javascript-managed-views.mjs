@@ -113,7 +113,8 @@ export async function openManagedJavascriptOutputViews({prepared,node,output,dea
   if(before.ready!==true)await dispatchManagedJavascriptBody({task,before,execute,record,receiptOptions});
   const views={...task,prepared:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},
     output:{index:0,native_index:output.native_index,active:output.active,port_guid:output.port_guid}};
-  const expected=await execute(makeJavascriptManagedViewsCode({...views,mode:'capture'}));
+  const expected=await execute(makeJavascriptManagedViewsCode({...views,mode:'capture'}),
+    {timeout:Math.max(1,deadline-Date.now()+5000)});
   const gesture={...views,mode:'open',expected,gesture_id:task.operation_id+':views'};
   const code=makeJavascriptManagedViewsCode(gesture);
   const event={phase:'javascript_managed_views_prepared',owner:node,gesture_id:gesture.gesture_id,
@@ -125,7 +126,8 @@ export async function openManagedJavascriptOutputViews({prepared,node,output,dea
     &&receipt.operation_id===gesture.gesture_id&&receipt.effect_possible===true&&receipt.cleanup_complete===true
     &&receipt.output?.views_gesture_returned===true&&receipt.output.surface_verified===false
     &&receipt.output.execution_started===false,'Managed JavaScript Views gesture unconfirmed');
-  const after=await execute(makeJavascriptManagedViewsCode({...views,mode:'settle'}));
+  const after=await execute(makeJavascriptManagedViewsCode({...views,mode:'settle'}),
+    {timeout:Math.max(1,deadline-Date.now()+5000)});
   need(after.ready===true&&after.native_owner_verified===true&&after.port_guid===output.port_guid
     &&after.node_id===node.node_id,'Managed JavaScript Views owned surface unconfirmed');
   const verified={phase:'javascript_managed_views_verified',owner:node,gesture_id:gesture.gesture_id,receipt,after,deadline};

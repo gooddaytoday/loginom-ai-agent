@@ -179,7 +179,7 @@ export async function dispatchManagedJavascriptDeclared({task,columns,execute,re
         'Managed JavaScript declared journal ACK differs');
       const result=await execute(withBrowserReceipt('('+makeJavascriptManagedDeclaredCode({...bound,mode:'effect',expected})+')(page)',{
         ...receiptOptions(gesture_id,'javascript.schema.declared',signature),operation_id:gesture_id}),
-        {timeout:Math.max(1,Math.min(35000,task.deadline-Date.now()+5000))});
+        {timeout:Math.max(1,task.deadline-Date.now()+5000)});
       need(result?.status==='SUCCEEDED'&&result.operation_id===gesture_id&&result.action_key==='javascript.schema.declared'
         &&result.action_revision==='1'&&result.phase==='owned_column_step_verified'
         &&typeof result.effect_possible==='boolean'&&result.cleanup_complete===true

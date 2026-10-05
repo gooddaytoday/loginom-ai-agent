@@ -5,6 +5,7 @@ import {createJavascriptSourceAdmission} from '../lib/javascript-source-admissio
 import {javascriptManagedSourceSettings} from '../lib/javascript-managed-source-adapter.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 import {sourceFixture} from './support/javascript-source-fixture.mjs';
+import {applyNode} from '../lib/node-apply.mjs';
 const owner={document_id:'document',workflow_id:'workflow',node_id:'node',operation_id:'edit',ui_epoch:1};
 async function fixture(mode,{close=true}={}) {
  const browser=sourceFixture('import {InputTable} from "builtIn/Data";\n'),events=[],calls=[];
@@ -22,7 +23,19 @@ for(const mode of ['code','declared'])test('actual owned admission/discard produ
  try{await admitJavascriptExistingSchema(f);}catch(value){error=value;}
  assert.equal(error.nodePhaseRefusal.cleanup_complete,true);assert.equal(error.nodePhaseRefusal.effect_possible,true);
  const proof=error.nodePhaseRefusal.proof,node=proof.node;
- assert.equal(verifiedJavascriptExistingSchemaRefusal(error.nodePhaseRefusal,{operation_id:owner.operation_id,target:{kind:'existing',type:'programming.javascript',ref:node},mode:'script',finish:'execute',inputs:[],mappings:[],parameters:f.parameters}),true);
+ for(const finish of ['done','close','execute']){
+  const request={operation_id:owner.operation_id,contract_revision:'1.0.0',document_id:owner.document_id,
+   workflow_ref:{workflow_id:owner.workflow_id,prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'nav',label:'Scenario'}]},
+   target:{kind:'existing',type:'programming.javascript',ref:node},mode:'script',finish,inputs:[],mappings:[],parameters:f.parameters,
+   read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:60000,execute_ms:1000,total_ms:60000}};
+  assert.equal(verifiedJavascriptExistingSchemaRefusal(error.nodePhaseRefusal,request),true);
+  const result=await applyNode({request,operation:{id:owner.operation_id},record:async event=>event,
+   handlers:new Map([['programming.javascript',{revision:'test',modes:['script'],validate(){},configure(){assert.fail('Must not configure');}}]]),
+   drivers:{verifySource:async()=>({verified:true,cleanup_complete:true,effect_possible:false}),prepareTarget:async()=>{throw error;}}});
+  assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
+  const foreign=structuredClone(error.nodePhaseRefusal);foreign.proof.owner.node_id='foreign';
+  assert.equal(verifiedJavascriptExistingSchemaRefusal(foreign,request),false);
+ }
  assert.deepEqual(f.calls,['open','discard']);assert.equal(proof.settings_sha256,f.receipt.settings_sha256);
  assert.equal(proof.editor_mutation_started,false);assert.equal(proof.explicit_execute_requested,false);
  assert.equal(f.events.at(-1).phase,'javascript_existing_schema_mode_refused');

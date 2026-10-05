@@ -3,7 +3,7 @@
 export function inspectJavascriptVisualizers({binding:b,node,output,held=null,capture=false,poll=false,requireSelected=true,targetOrigin="http://logi-test-plan.bg.local",targetBuild="7.4.2"}) {
   const app=globalThis.bg?.app,tab=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
   const controller=tab?.Controller,model=controller?.FController,diagram=model?.FDiagram,graph=diagram?.FmxGraph;
-  const nodes=diagram?.FNodes?.FCollection,found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===node.id):[];
+  const nodes=diagram?.FNodes?.FCollection,found=Array.isArray(nodes)&&nodes.length<=200?nodes.filter(n=>n.FGuid===node.id):[];
   if(document!==b.document||location.origin!==targetOrigin||app?.Version!==targetBuild
     ||tab!==b.tab||controller!==b.controller||model!==b.model||diagram!==b.diagram||graph!==b.graph||graph?.container!==b.container
     ||controller.Node?.data?.node!==b.workflow||found.length!==1||found[0]!==b.native

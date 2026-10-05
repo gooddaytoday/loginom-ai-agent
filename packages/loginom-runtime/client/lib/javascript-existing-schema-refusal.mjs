@@ -35,7 +35,7 @@ export async function admitJavascriptExistingSchema({receipt,snapshot,parameters
 export function verifiedJavascriptExistingSchemaRefusal(refusal,request) {
   const proof=refusal?.proof,node=request.target.ref,source=proof?.source_identity;
   return request.target.type==='programming.javascript'&&request.target.kind==='existing'
-    &&request.mode==='script'&&request.finish==='execute'&&request.inputs.length===0&&request.mappings.length===0
+    &&request.mode==='script'&&['done','close','execute'].includes(request.finish)&&request.inputs.length===0&&request.mappings.length===0
     &&request.parameters.columns===undefined&&refusal?.verification===phase&&same(proof?.node,node)
     &&['document_id','workflow_id','node_id'].every(key=>proof?.owner?.[key]===node[key])
     &&proof?.owner?.operation_id===request.operation_id&&Number.isSafeInteger(proof.owner.ui_epoch)&&proof.owner.ui_epoch>=0

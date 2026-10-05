@@ -7,11 +7,30 @@ import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {compactNodeResult} from '../lib/user-results.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {createRedactor} from '../lib/redact.mjs';
+import {applyNode} from '../lib/node-apply.mjs';
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
 const source={node_id:'source',document_id:'doc',workflow_id:'flow'};
 const request={target:{kind:'new',type:'programming.javascript',position:{x:256,y:256}},mode:'script',
   inputs:[{source,output:0,input:0}],parameters:{source_text:'import {OutputTable} from "builtIn/Data";\n',schema_mode:'code'},
   mappings:[],finish:'execute',read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'}};
+
+for(const kind of ['new','existing'])test('redaction preflight refuses before the actual target/browser boundary '+kind,async()=>{
+ const p={...structuredClone(request),operation_id:'redaction-'+kind,contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'nav',label:'Scenario'}]},
+  target:kind==='new'?request.target:{kind,type:'programming.javascript',ref:node},inputs:kind==='new'?request.inputs:[],finish:'done',
+  parameters:{schema_mode:'code',source_text:'// Bearer abcdefghijklmnop\nconst x=1;',...(kind==='existing'?{expected_source_sha256:'a'.repeat(64)}:{})},
+  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:60000,execute_ms:1000,total_ms:60000}};
+ const events=[],calls=[],operation={id:p.operation_id,parameters:p};
+ const support=createJavascriptCodeNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2',redactor:createRedactor()});
+ const driver=support.nodeApplyDriverFactory({operation,execute:async()=>{calls.push('browser');assert.fail('Must not touch browser');},
+  onRecord:async event=>event,now:Date.now,receiptOptions:()=>({})});
+ const result=await applyNode({request:p,operation,handlers:support.nodeApplyHandlers,
+  drivers:{...driver,prepareTarget:async(graph,ctx)=>{calls.push('target');return driver.beforeTarget(ctx);}},
+  record:async event=>{events.push(event);return event;}});
+ assert.equal(result.status,'NOT_APPLIED');assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
+ assert.equal(result.effect_possible,false);assert.deepEqual(calls,[]);
+ assert.equal(events.some(event=>event.phase==='node_phase_prepared'&&event.receipt.phase==='target'),false);
+});
 
 test('Code lifecycle admits complete new source but refuses unsupported scopes before effects',()=>{
  assert.equal(validateJavascriptCodeRequest(request.parameters,'script',request),request.parameters);

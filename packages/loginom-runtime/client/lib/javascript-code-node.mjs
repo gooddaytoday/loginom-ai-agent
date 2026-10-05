@@ -3,7 +3,7 @@ import {retainedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs'
 export {verifyJavascriptMappingGraph} from './javascript-graph-preservation.mjs';
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
 import {createJavascriptSourceAdmission,javascriptSourceSettingsDigest} from './javascript-source-admission.mjs';
-import {javascriptSourceIdentity} from './javascript-source-read.mjs';
+import {javascriptSourceIdentity,prepareJavascriptSourceDelivery} from './javascript-source-read.mjs';
 import {validateJavascriptParameters} from './javascript-parameters.mjs';
 import {javascriptParametersSchema} from './node-api.mjs';
 import {createNodeProcedure} from './node-procedure.mjs';
@@ -189,6 +189,14 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
     return {
       verifySource:async parameters=>{
         validateJavascriptCodeRequest(parameters,request.mode,request);
+        if(parameters.source_text!==undefined){
+          try{prepareJavascriptSourceDelivery({source:parameters.source_text,owner:initialOwner,redactor});}
+          catch{
+            const error=Error('JavaScript source delivery preflight refused');
+            error.nodePhaseRefusal={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+            throw error;
+          }
+        }
         return verified(parameters.source_text===undefined?{}:
           {source_sha256:javascriptSourceIdentity(parameters.source_text).source_sha256});
       },
