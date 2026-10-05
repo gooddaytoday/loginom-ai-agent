@@ -446,3 +446,18 @@ test("main: отказ записи result сохраняет summary и зап�
     expect(await Bun.file(path.join(`${profile}.harness-lease`, "owner.json")).exists()).toBe(true)
   } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
 })
+
+test("main --dry-run: сохраняет rubric snapshot без структурного балла skip-judge", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-compare-run-"))
+  try {
+    const result = await main(["--dry-run", "--repeat", "1"], {
+      EVAL_RESULTS_DIR: path.join(directory, "results"),
+      EVAL_PROFILE_DIR: path.join(directory, "profile"),
+      EVAL_WORKSPACE_ROOT: path.join(directory, "workspace"),
+    })
+    const saved = await Bun.file(path.join(result.runDir!, "summary.json")).json() as RunSummary
+    expect(saved.tasks.find((task) => task.id === "group-sum-qty")?.rubric_snapshot?.version).toBe(1)
+    expect(saved.tasks.flatMap((task) => task.attempts).every((attempt) => attempt.structural_score === null)).toBe(true)
+    expect(saved.tasks[0]!.rubric_snapshot!.oracle_applicable).toBe(false)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})

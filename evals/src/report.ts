@@ -38,6 +38,8 @@ export type AttemptResult = {
   timed_out: boolean
   interrupted: boolean
   failure_kind: FailureKind | null
+  structural_score?: number | null
+  evaluation_contract_hash?: string
   score: number | null
   pass: boolean | null
   oracle_pass?: boolean | null
@@ -126,6 +128,12 @@ export function aggregateTask(attempts: AttemptResult[], skipJudge: boolean) {
 }
 export type TaskMetrics = ReturnType<typeof aggregateTask>
 
+export type RubricSnapshot = {
+  version: 1
+  checklist: { id: string; weight: number; required: boolean; requires_result_file: boolean; requires_run: boolean; axis?: "structure" | "result" | "report" }[]
+  oracle_applicable: boolean
+  oracle_tolerance: number
+}
 export type RunSummary = {
   run_id: string
   label: string | null
@@ -151,7 +159,7 @@ export type RunSummary = {
     tasks_dir?: string; task_timeout_ms?: Record<string, number>
   }
   metrics: Metrics
-  tasks: { id: string; metrics: TaskMetrics; attempts: AttemptResult[] }[]
+  tasks: { id: string; rubric_snapshot?: RubricSnapshot; metrics: TaskMetrics; attempts: AttemptResult[] }[]
   storage_leftovers: string[] | null
 }
 
