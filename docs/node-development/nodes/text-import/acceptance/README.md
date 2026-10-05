@@ -28,3 +28,5 @@ Run the offline negative gate regression (real audit subprocess rejected after c
 ```sh
 python3 docs/node-development/nodes/text-import/acceptance/test-txt-runner.py
 ```
+
+Owner-authorized follow-up: an existing import with an independently observed empty source path requires full initial settings, including an explicit verified `settings.source.source_path`. Upload references never fill this setting automatically. Incomplete settings are refused before settings gestures; the runtime cancels only the operation-owned draft and accepts cleanup only after observing the same unlocked graph node. Transport loss, a changed owner or incomplete cancellation stays uncertain. The existing node-apply refusal validator admits this narrowly typed cleanup receipt and instructs correction on the same node without another upload. Configured existing imports retain partial-patch behavior.

@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {configureTextImportPatch} from '../lib/text-import-procedure.mjs';
+import {configureTextImportPatch,ImportInitialSettingsError} from '../lib/text-import-procedure.mjs';
 
 function fixture({samePath=false,emptyPatch=false,control='valid',drift=false,incompleteNewField=false,unconfigured=false}={}) {
  const retained=[{name:'Id',label:'Identifier',type:'integer',data_kind:'Дискретный',used:true},
   {name:'Title',label:'Custom title',type:'string',data_kind:'Дискретный',used:true}];
  const extra={name:'Zone',label:'Zone',type:'string',data_kind:'Дискретный',used:true};
  const owner={status:'observed',node:{tid:'node'},path:[{tid:'path',label:'Scenario'}]};
+ const gestures=[];
  let stage='text_import_file',sourcePath=unconfigured?'':'/test/old.csv',columns=structuredClone(retained),refreshes=0,decimal='.';
  const source={source_path:sourcePath,connection:'Server',encoding:'UTF-8 (65001)',rows_to_skip:'0',first_line_as_title:true};
  const parameters=emptyPatch?{}:{source:{source_path:samePath?sourcePath:'/test/new.csv'},...(!samePath?{columns:[{...extra}]}:{})};
@@ -21,6 +22,7 @@ function fixture({samePath=false,emptyPatch=false,control='valid',drift=false,in
    ...(control==='missing'?[]:Array.from({length:control==='duplicate'?2:1},(_,i)=>({tid:(control==='foreign'?'other':'wizard')+';ImportTextFileParamsWizard;ColumnDefsTuning;btnRefreshAll',ref:'refresh'+i,allowed_actions:['click']})))]}});
  const channel={observe:async options=>{const s=structuredClone(state(options.importColumnPage?.offset??0));if(!options.ready(s))throw Error('Observation refused: '+options.condition);return s;},
   act:async action=>{
+   gestures.push(action);
    if(action.verb==='wizard_step'){assert.ok(sourcePath,'Cannot advance without source');stage=action.expected_stage;return;}
    if(action.verb==='fill'&&action.ref==='source_path'){sourcePath=action.text;return;}
    if(action.verb==='press'&&action.ref==='source_path'&&action.key==='Tab')return;
@@ -29,7 +31,7 @@ function fixture({samePath=false,emptyPatch=false,control='valid',drift=false,in
    }
    assert.fail('Unexpected gesture '+JSON.stringify(action));
   }};
- return {parameters,owner,channel,retained,extra,get refreshes(){return refreshes;}};
+ return {parameters,owner,channel,retained,extra,gestures,get refreshes(){return refreshes;}};
 }
 
 test('changed existing source refreshes stale native definitions and reconciles new order by name',async()=>{
@@ -63,3 +65,20 @@ test('unconfigured existing import requires complete settings and verified sourc
  await assert.rejects(configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/foreign.csv'),/verified upload/);
  assert.equal(f.refreshes,0);
 });
+
+ test('unconfigured patch without explicit path refuses before any settings gesture and leaves request intact',async()=>{
+  for(const change of [p=>delete p.source.source_path,p=>delete p.source,p=>delete p.format,p=>p.columns=[],p=>p.columns.forEach(c=>c.used=false),p=>p.source.source_path='/test/foreign.csv']) {
+   const f=fixture({unconfigured:true});change(f.parameters);const before=structuredClone(f.parameters);
+   await assert.rejects(configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv'),e=>e instanceof ImportInitialSettingsError&&/complete settings.source.*explicit source_path/.test(e.message));
+   assert.deepEqual(f.gestures,[]);assert.deepEqual(f.parameters,before);
+  }
+ });
+ test('unconfigured state transport or owner loss is not a local settings refusal',async()=>{
+  for(const failure of ['transport','owner']) {
+   const f=fixture({unconfigured:true});delete f.parameters.source.source_path;
+   const observe=f.channel.observe;
+   f.channel.observe=async options=>{if(failure==='transport')throw Error('transport lost');const s=await observe({...options,ready:()=>true});s.wizard.owner_context={status:'observed',node:{tid:'foreign'},path:[]};options.ready(s);return s;};
+   await assert.rejects(configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv'),e=>!(e instanceof ImportInitialSettingsError));
+   assert.deepEqual(f.gestures,[]);
+  }
+ });

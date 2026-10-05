@@ -71,6 +71,23 @@ function validateSettings(p,maxColumns) {
 export const validateTextImportRequest=p=>validateSettings(p,8);
 export const validateTextImportFieldsRequest=p=>{validateSettings(p,1000);resolveTextImportEncoding(p.source.encoding);};
 
+export class ImportInitialSettingsError extends Error {
+  constructor(reason) {
+    super('Existing import has no saved source. Supply complete settings.source including an explicit source_path matching the verified upload, complete settings.format and nonempty settings.columns; the upload reference does not supply settings. '+reason);
+    this.name='ImportInitialSettingsError';
+  }
+}
+
+export function validateInitialExistingImportSettings(parameters,verifiedSourcePath) {
+  try {
+    validateTextImportFieldsRequest(parameters);
+    requireValue(parameters.source.source_path===verifiedSourcePath,'Existing source does not match the verified upload');
+    requireValue(parameters.columns.some(c=>c.used),'Import output requires at least one used field');
+  } catch(error) {
+    throw new ImportInitialSettingsError(error.message);
+  }
+}
+
 export function validateTextImportPatch(p) {
   const object=value=>value && typeof value==='object' && !Array.isArray(value);
   requireValue(object(p) && Object.keys(p).every(k=>['source','format','columns'].includes(k)), 'Invalid import settings patch');
@@ -286,8 +303,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   // A discarded first configuration leaves a graph node with no source. There
   // is no retained schema to inspect until complete source settings are applied.
   if(patch&&sourceBaseline.fields.source_path.value==='') {
-    validateTextImportFieldsRequest(parameters);
-    requireValue(parameters.source.source_path===patch.verifiedSourcePath,'Existing source does not match the verified upload');
+    validateInitialExistingImportSettings(parameters,patch.verifiedSourcePath);
     return configureImport(channel,parameters,owner,true);
   }
   if(patch && parameters.source.source_path===undefined)requireValue(sourceBaseline.fields.source_path.value===patch.verifiedSourcePath,'Existing source does not match the verified upload');
