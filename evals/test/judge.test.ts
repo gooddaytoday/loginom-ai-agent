@@ -8,6 +8,8 @@ import { EvalFailure } from "../src/fail"
 import { judgeCommand, judgedFields, judgeInfo, judgeTask, prepareJudgeDir, scoreVerdict, type JudgeSettings, type Verdict } from "../src/judge"
 import { aggregate } from "../src/report"
 import { loadTasks } from "../src/task"
+import { analyzeComparison, parseComparisonSummary } from "../src/compare-analysis"
+import { comparisonSummary } from "./helpers/compare-summary"
 
 const checklist = [
   { id: "a", text: "A", weight: 1, requiresResultFile: false, requiresRun: false, required: false },
@@ -325,4 +327,17 @@ test("scoreVerdict: structural weights не округляются и требу
  expect(scoreVerdict(checklist.map((item) => ({...item,axis:"result" as const})), verdict({a:true,b:true,c:true}),70)).toMatchObject({structural_score:null})
  const partial = rubric.map((item,index) => index === 0 ? {...item,axis:undefined} : item)
  expect(scoreVerdict(partial, verdict({a:true,b:true,c:true}),70)).toMatchObject({structural_score:null})
+})
+
+
+test("scoreVerdict: дробные веса полного успеха остаются сравнимы после JSON", async () => {
+  const task = (await loadTasks(path.join(evalsRoot, "tasks"), ["group-sum-qty"]))[0]!
+  const rubric = task.checklist.map((item) => ({ ...item, weight: 0.53 }))
+  const scored = scoreVerdict(rubric, verdict(Object.fromEntries(rubric.map((item) => [item.id, true]))), 70)
+  if (!scored.ok) throw new Error(scored.error)
+  const run = comparisonSummary([{ successes: 3, attempts: 3 }])
+  run.tasks[0]!.attempts.forEach((attempt) => { attempt.structural_score = scored.structural_score })
+  const saved = parseComparisonSummary(JSON.parse(JSON.stringify(run)))
+  expect(analyzeComparison(saved, saved).axes.structure.observed).toEqual({ a: 1, b: 1, drop: 0 })
+  expect(scored.structural_score).toBe(100)
 })

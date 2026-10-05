@@ -146,7 +146,9 @@ Guard не меняет общий статистический verdict, не д
 Отсутствие означает unclassified; ось не выводится по ID/тексту/флагам.
 Structural score доступен только при полностью размеченной рубрике и непустом
 structural subset. Он равен `100 * sum(passed structural weights) / sum(structural weights)`;
-для вычислений не округляется. Старые `score/pass` и calibration thresholds
+для вычислений не округляется. Численное превышение верхней границы из-за
+арифметики floating point ограничивается 100, чтобы сохранённая оценка оставалась
+в допустимом диапазоне. Старые `score/pass` и calibration thresholds
 сохраняют прежнюю семантику.
 
 Три встроенные рубрики размечаются вручную: import, transform, export, links,
