@@ -13,7 +13,7 @@ export type ComparisonAxis = {
 export type ComparisonAnalysis = ReturnType<typeof analyzeComparison>
 
 export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial<ComparePolicy> = {}) {
-  const policy = { margin: options.margin ?? 0.5, confidence: options.confidence ?? 0.95,
+  const policy = { margin: options.margin === undefined ? 0.5 : options.margin, confidence: options.confidence === undefined ? 0.95 : options.confidence,
     k: options.k === undefined ? a.config.repeat === b.config.repeat ? a.config.repeat : null : options.k }
   if (!Number.isFinite(policy.margin) || policy.margin < 0 || policy.margin >= 1 ||
     !Number.isFinite(policy.confidence) || policy.confidence <= 0 || policy.confidence >= 1 ||
