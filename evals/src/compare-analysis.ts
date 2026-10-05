@@ -1,7 +1,11 @@
 import { EvalFailure } from "./fail"
 import type { AttemptResult, RunSummary } from "./report"
 
-export function analyzeComparison(a: RunSummary, b: RunSummary) {
+export type ComparePolicy = { margin: number; confidence: number; k: number | null }
+
+export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial<ComparePolicy> = {}) {
+  const policy = { margin: options.margin ?? 0.5, confidence: options.confidence ?? 0.95,
+    k: options.k === undefined ? a.config.repeat === b.config.repeat ? a.config.repeat : null : options.k }
   requireSummary(a)
   requireSummary(b)
   const identity: [string, unknown, unknown][] = [
@@ -22,14 +26,14 @@ export function analyzeComparison(a: RunSummary, b: RunSummary) {
   ]
   const compatibility = identity.filter(([, first, second]) => first == null || second == null || first === "" || second === "" || first !== second).map(([name]) => name)
   if (a.task_ids.length !== b.task_ids.length || a.task_ids.some((id) => !b.task_ids.includes(id))) compatibility.push("task_ids")
-  if (compatibility.length) return { compatibility, axes: { completion: { observed: null } } }
+  if (compatibility.length) return { policy, compatibility, reliability: { k: policy.k, a: { pass1: null, passk: null }, b: { pass1: null, passk: null }, reasons: compatibility }, axes: { completion: { observed: null } } }
   const rates = a.tasks.map((task) => ({
     a: completion(task.attempts),
     b: completion(b.tasks.find((candidate) => candidate.id === task.id)!.attempts),
   }))
   const first = rates.reduce((sum, rate) => sum + (rate.a ?? 0), 0) / rates.length
   const second = rates.reduce((sum, rate) => sum + (rate.b ?? 0), 0) / rates.length
-  return { compatibility, axes: { completion: {
+  return { policy, compatibility, reliability: { k: policy.k, a: reliability(a, policy.k), b: reliability(b, policy.k), reasons: [] }, axes: { completion: {
     observed: !rates.length || rates.some((rate) => rate.a === null || rate.b === null) ? null : { a: first, b: second, drop: first - second },
   } } }
 }
@@ -63,4 +67,19 @@ function requireSummary(run: RunSummary) {
         throw new EvalFailure(`Некорректный summary: pass задачи ${task.id}`, 2)
     })
   })
+}
+
+function reliability(run: RunSummary, k: number | null) {
+  const tasks = run.tasks.map((task) => {
+    const attempts = task.attempts.filter((attempt) => !["infra_error", "harness_error", "interrupted"].includes(attempt.status) && typeof attempt.pass === "boolean")
+    const successes = attempts.filter((attempt) => attempt.pass === true).length
+    return {
+      pass1: attempts.length ? successes / attempts.length : null,
+      passk: k === null || attempts.length < k ? null : successes < k ? 0 : 1,
+    }
+  })
+  return {
+    pass1: !tasks.length || tasks.some((task) => task.pass1 === null) ? null : tasks.reduce((sum, task) => sum + task.pass1!, 0) / tasks.length,
+    passk: !tasks.length || tasks.some((task) => task.passk === null) ? null : tasks.reduce((sum, task) => sum + task.passk!, 0) / tasks.length,
+  }
 }

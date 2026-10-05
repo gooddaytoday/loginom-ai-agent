@@ -68,3 +68,21 @@ test("analysis: повреждённые данные отклоняются в�
     expect(() => analyzeComparison(run, run)).toThrow("Некорректный summary")
   })
 })
+
+test("analysis: порядок задач и смена commit сохраняют сравнимость", () => {
+  const a = comparisonSummary([{ successes: 3, attempts: 3 }, { successes: 1, attempts: 3 }])
+  const b = comparisonSummary([{ successes: 3, attempts: 3 }, { successes: 1, attempts: 3 }])
+  b.tasks.reverse()
+  b.task_ids.reverse()
+  b.agent.git_sha = "source-b"
+  b.agent.source_commit = "other-source"
+  b.agent.binary_sha256 = "other-binary"
+  expect(analyzeComparison(a, b).compatibility).toEqual([])
+  expect(analyzeComparison(a, b).axes.completion.observed).toEqual({ a: 2 / 3, b: 2 / 3, drop: 0 })
+})
+
+test("analysis: pass^3 означает все три успеха, а не хотя бы один", () => {
+  const run = comparisonSummary([{ successes: 2, attempts: 3 }])
+  expect(analyzeComparison(run, run).reliability.a.pass1).toBeCloseTo(2 / 3, 12)
+  expect(analyzeComparison(run, run).reliability.a.passk).toBe(0)
+})
