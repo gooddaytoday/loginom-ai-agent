@@ -266,6 +266,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const judgeFields = judged
     ? judgedFields(judged)
     : {
+        structural_score: skippedJudge || task.checklist.some((item) => item.axis === undefined) || !task.checklist.some((item) => item.axis === "structure") ? null : 0,
         score: skippedJudge ? null : 0,
         pass: skippedJudge ? null : false,
         judge_status: (skippedJudge ? "skipped" : "no_artifact") as AttemptResult["judge_status"],
