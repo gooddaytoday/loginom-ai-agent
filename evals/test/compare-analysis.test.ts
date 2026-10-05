@@ -52,3 +52,19 @@ test("analysis: несовместимые и неизвестные идент�
   delete legacy.agent.variant
   expect(analyzeComparison(legacy, legacy).compatibility).toContain("agent.variant")
 })
+
+test("analysis: повреждённые данные отклоняются вместо тихого пересчёта", () => {
+  const changes: ((run: ReturnType<typeof comparisonSummary>) => void)[] = [
+    (run) => { run.task_ids.push("task-0") },
+    (run) => { run.tasks[0]!.id = "other-task" },
+    (run) => { run.tasks[0]!.attempts[1]!.attempt = 1 },
+    (run) => { run.tasks[0]!.attempts[0]!.score = NaN },
+    (run) => { run.tasks[0]!.attempts[0]!.score = 101 },
+    (run) => { Object.assign(run.tasks[0]!.attempts[0]!, { pass: "yes" }) },
+  ]
+  changes.forEach((change) => {
+    const run = comparisonSummary([{ successes: 3, attempts: 3 }])
+    change(run)
+    expect(() => analyzeComparison(run, run)).toThrow("Некорректный summary")
+  })
+})

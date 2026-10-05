@@ -2,6 +2,8 @@ import { EvalFailure } from "./fail"
 import type { AttemptResult, RunSummary } from "./report"
 
 export function analyzeComparison(a: RunSummary, b: RunSummary) {
+  requireSummary(a)
+  requireSummary(b)
   const identity: [string, unknown, unknown][] = [
     ["agent.model", a.agent.model, b.agent.model],
     ["agent.variant", a.agent.variant, b.agent.variant],
@@ -39,4 +41,26 @@ function completion(attempts: AttemptResult[]) {
 
 function taskTimeouts(limits?: Record<string, number>) {
   return limits === undefined ? null : JSON.stringify(Object.entries(limits).sort(([a], [b]) => a.localeCompare(b)))
+}
+
+function requireSummary(run: RunSummary) {
+  if (new Set(run.task_ids).size !== run.task_ids.length || new Set(run.tasks.map((task) => task.id)).size !== run.tasks.length ||
+    run.task_ids.length !== run.tasks.length || run.tasks.some((task) => !run.task_ids.includes(task.id)))
+    throw new EvalFailure("Некорректный summary: task_ids не соответствуют уникальным tasks", 2)
+  run.tasks.forEach((task) => {
+    const measured = new Set<number>()
+    task.attempts.forEach((attempt) => {
+      if (attempt.task_id !== task.id || !Number.isInteger(attempt.attempt) || attempt.attempt < 1 ||
+        !["completed", "failed", "timeout", "interrupted", "no_artifact", "harness_error", "infra_error"].includes(attempt.status))
+        throw new EvalFailure(`Некорректный summary: попытка задачи ${task.id}`, 2)
+      if (!["interrupted", "harness_error", "infra_error"].includes(attempt.status)) {
+        if (measured.has(attempt.attempt)) throw new EvalFailure(`Некорректный summary: повтор попытки ${task.id}/${attempt.attempt}`, 2)
+        measured.add(attempt.attempt)
+      }
+      if (attempt.score != null && (typeof attempt.score !== "number" || !Number.isFinite(attempt.score) || attempt.score < 0 || attempt.score > 100))
+        throw new EvalFailure(`Некорректный summary: score задачи ${task.id}`, 2)
+      if (attempt.pass != null && typeof attempt.pass !== "boolean" || attempt.oracle_pass != null && typeof attempt.oracle_pass !== "boolean")
+        throw new EvalFailure(`Некорректный summary: pass задачи ${task.id}`, 2)
+    })
+  })
 }
