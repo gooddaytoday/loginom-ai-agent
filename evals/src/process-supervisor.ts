@@ -257,7 +257,10 @@ export async function superviseProcess(input: {
     return undefined
   }) : undefined
   const track = (entry: ProcessIdentity, via: ProcessOrigin["via"], parent?: ProcessIdentity) => {
-    const tracked = ledger.get(key(entry)) ?? { process: identity(entry), admission: "allowed" as const }
+    // Adoption retains launcher ownership, but loses the browser parent chain.
+    // Keep it unadmitted until CLI identity or native admission resolves it.
+    const tracked: ProcessEntry = ledger.get(key(entry)) ?? { process: identity(entry),
+      admission: browser && via === "subreaper" ? "pending" : "allowed" }
     if (tracked.foreign) {
       tracked.foreign = false; tracked.admission = "refused"
       cleanup.error ??= `Browser binding differs PID ${entry.pid}`
@@ -306,6 +309,7 @@ export async function superviseProcess(input: {
     const cli = live.find((entry) => entry.pid === cliPid && entry.parent === root?.pid && ledger.has(key(entry)))
     if (cli && cli.device === cliInfo.dev && cli.inode === cliInfo.ino && ledger.get(key(cli))!.origin!.via !== "cli") {
       ledger.get(key(cli))!.origin!.via = "cli"
+      if (ledger.get(key(cli))!.admission === "pending") ledger.get(key(cli))!.admission = "allowed"
     }
     if (profile && root && live.some((entry) => key(entry) === key(root))) {
       const writer = await writerIdentity(profile)
@@ -320,15 +324,17 @@ export async function superviseProcess(input: {
         while (parent && !visited.has(parent)) {
           const candidate = ledger.get(parent)
           if (candidate?.binding || !requireBinding && candidate &&
-            (candidate.process.device === browser.device && candidate.process.inode === browser.inode || inside(candidate.process.executable, browser.directory))) return true
+            (candidate.process.device === browser.device && candidate.process.inode === browser.inode || inside(candidate.process.executable, browser.directory) ||
+              cliPid !== undefined && candidate.origin?.via === "subreaper" && candidate.process.pid !== cliPid)) return true
           visited.add(parent); parent = candidate?.origin?.parent
         }
         return false
       }
-      // A browser child cannot evade helper admission by executing outside the
-      // bundle. The same recorded parent chain identifies it before binding.
+      // An adopted process with a lost chain may be a browser helper outside the
+      // bundle. Adoption cannot bypass executable admission, including its children.
       const native = live.filter((entry) => entry.device === browser.device && entry.inode === browser.inode ||
-        inside(entry.executable, browser.directory) || ledger.has(key(entry)) && browserAncestor(ledger.get(key(entry))!, false))
+        inside(entry.executable, browser.directory) || ledger.has(key(entry)) &&
+          (browserAncestor(ledger.get(key(entry))!, false) || cliPid !== undefined && entry.pid !== cliPid && ledger.get(key(entry))!.origin?.via === "subreaper"))
       // Establish exact root bindings first. Helpers cannot supply a missing
       // root proof, even when the kernel has adopted them to our launcher.
       for (const current of native) {

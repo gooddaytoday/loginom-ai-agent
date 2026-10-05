@@ -266,3 +266,40 @@ test("supervisor: validation browser требует точного нового 
     }
   }
 }, 20_000)
+
+test("supervisor: неизвестный adopted helper вне bundle не получает сигнал после потери parent chain", async () => {
+  const out = await mkdtemp(path.join(os.tmpdir(), "evals-adopted-helper-"))
+  const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-adopted-bundle-"))
+  await cp(Bun.which("node")!, path.join(bundle, "chrome"), { dereference: true })
+  await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
+  const helper = path.join(out, "helper.ts")
+  const pidFile = path.join(out, "helper.pid")
+  await Bun.write(helper, `process.on('SIGINT',()=>{}); process.on('SIGTERM',()=>{});
+    await Bun.write(${JSON.stringify(pidFile)},String(process.pid)); setInterval(()=>{},1000)`)
+  const script = path.join(bundle, "browser.mjs")
+  await Bun.write(script, `import {spawn} from 'node:child_process';
+    process.on('SIGTERM',()=>{}); setInterval(()=>{},1000);
+    setTimeout(()=>spawn('/bin/sh',['-c',${JSON.stringify(`'${process.execPath}' '${helper}' --type=unknown-helper &`)}],{stdio:'ignore'}),600)`)
+  const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: out })
+  let run: Awaited<ReturnType<typeof runAgent>> | undefined
+  try {
+    run = await runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+      EVAL_FAKE_BROWSER_SCRIPT: script, EVAL_FAKE_BROWSER_PID_FILE: path.join(out, "browser.pid") } },
+      taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: out,
+      outDir: out, profileDir: out, timeoutMs: 30_000 })
+    const pid = Number(await Bun.file(pidFile).text())
+    expect(run.processCleanup.origins?.find((entry) => entry.pid === pid)?.via).toBe("subreaper")
+    expect(run.processCleanup.status).toBe("failed")
+    expect(run.exitCode).toBe(0)
+    expect(run.sessionId).toBe("ses_fixture03")
+    expect(run.processCleanup.admissions?.find((entry) => entry.pid === pid)?.status).not.toBe("allowed")
+    process.kill(pid, 0)
+    expect(await Bun.file(`${out}.process-group`).exists()).toBe(true)
+  } finally {
+    if (await Bun.file(pidFile).exists()) {
+      const pid = Number(await Bun.file(pidFile).text())
+      const identity = run?.processCleanup.processes.find((entry) => entry.pid === pid)
+      if (identity) await signalProcess(identity, "SIGKILL")
+    }
+  }
+}, 20_000)
