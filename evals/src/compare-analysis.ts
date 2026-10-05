@@ -184,7 +184,7 @@ export function parseComparisonSummary(value: unknown): RunSummary {
   const dock = object(run.dock)
   const loginom = object(run.loginom)
   text(run.run_id)
-  if (run.label !== null) text(run.label)
+  if (run.label !== null) text(run.label, true)
   for (const key of ["started_at","finished_at"]) text(run[key], true)
   boolean(run.interrupted)
   if (run.stopped_reason !== null) text(run.stopped_reason)
