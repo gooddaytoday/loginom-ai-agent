@@ -13,7 +13,7 @@ const config=JSON.parse(await readFile(args.config,'utf8')),saved=JSON.parse(awa
 // Bind the independent native source read to the CLI's admitted transfer,
 // without using the model's table values as expected data.
 const transcript=(await readFile(join(dirname(args.saved),'stdout.raw'),'utf8')).split('\n').flatMap(line=>{try{return [JSON.parse(line)];}catch{return [];}});
-const terminal=transcript.filter(e=>e.type==='tool_use'&&e.part?.state?.status==='completed').map(e=>{try{return {tool:e.part.tool,input:e.part.state.input,result:JSON.parse(e.part.state.output)};}catch{return null;}}).filter(Boolean);
+const terminal=transcript.filter(e=>e.type==='tool_use'&&['completed','error'].includes(e.part?.state?.status)).map(e=>{try{return {tool:e.part.tool,input:e.part.state.input,result:JSON.parse(e.part.state.output??e.part.state.error)};}catch{return null;}}).filter(Boolean);
 const preparedReply=terminal.find(e=>e.tool==='loginom_dock_prepare')?.result;
 const admitted=preparedReply?.input_artifacts?.filter(a=>a.bytes===expected.source.bytes&&a.sha256===expected.source.sha256&&a.name.endsWith(expected.source.name));
 need(admitted?.length===1,'EXACT_ADMITTED_TXT_REQUIRED');
@@ -63,9 +63,15 @@ try{
   need(imports.length===1&&exports.length===1&&graph.nodes.every(n=>['imports.text','exports.text','bg-vendor-icon-modelvariables'].includes(n.type)),'EXACT_IMPORT_EXPORT_GRAPH_REQUIRED');
   const source=imports[0],target=exports[0];
   const settled=new Map(terminal.filter(e=>e.result.state==='settled').map(e=>[e.result.operation_id,e.result]));
-  const created=type=>terminal.filter(e=>e.tool==='loginom_dock_node_apply'&&e.input.target?.kind==='new'&&e.input.target.type===type).map(e=>settled.get(e.input.operation_id)).filter(r=>r?.status==='SUCCEEDED');
-  const warmImports=created('imports.text'),warmExports=created('exports.text');
+  const completed=type=>terminal.filter(e=>e.tool==='loginom_dock_node_apply'&&e.input.target?.type===type).map(e=>settled.get(e.input.operation_id)).filter(r=>r?.status==='SUCCEEDED');
+  const warmImports=completed('imports.text'),warmExports=completed('exports.text');
   need(warmImports.length===1&&warmExports.length===1&&warmImports[0].node.node_id===source.ref.node_id&&warmExports[0].node.node_id===target.ref.node_id,'PERSISTED_CLI_NODE_IDENTITY_DIFFERS');
+  for(const [type,node] of [['imports.text',source],['exports.text',target]]){
+   const creation=terminal.filter(e=>e.tool==='loginom_dock_node_apply'&&e.input.target?.kind==='new'&&e.input.target.type===type);
+   need(creation.length===1,'ONE_ORIGINAL_NODE_CREATION_REQUIRED');
+   const original=settled.get(creation[0].input.operation_id);
+   need(original?.node?.node_id===node.ref.node_id&&original.cleanup_complete===true&&['SUCCEEDED','FAILED'].includes(original.status),'ORIGINAL_NODE_OWNERSHIP_OR_CLEANUP_UNCONFIRMED');
+  }
   need(graph.links.length===1&&graph.links[0].source===source.ref.node_id&&graph.links[0].target===target.ref.node_id&&graph.links[0].input===0&&graph.links[0].output===0,'PERSISTED_LINK_DIFFERS');
   const channel=createNodeProcedure({operation:{id:'txt-cold-settings',action:{action_key:'acceptance.txt_settings',revision:'1'},deadline:Date.now()+540000},execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node:source.ref},wrapMutation:(code,r)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})});
   let s=await channel.observe({condition:'saved source selection',ready:s=>s.prepared_node_context?.surface==='graph'});
