@@ -1273,9 +1273,38 @@ prompt-host-release-full-regression.log: **168 PASS / 1 SKIP**, 720 assertions,
 и весь HTTP SDK. Agent typecheck и format/diff checks PASS.
 Это source/control-provider proof; installed GUI/TTY и живой выбор ещё открыты.
 
+## Промежуточный native CLI candidate для дальнейшей приёмки
+
+Полный Linux x64 CLI из чистого c4dc5bd4c817c62ffea24be8af02a7e359f6dc68
+сохранён отдельно: acceptance/package-docs-20261006/candidate-c4dc5bd4c/payload.
+Manifest sourceTreeSha256:
+279bcd4ea959528feebb6619bbbe508b99993767a1a0a78cf1ab3538dfb72ce6.
+TAR.GZ SHA256: 7b034a5c1e67f19514a5ba3803213821c83051f72c1c7da9895f45bb0dca3cae.
+Build resource/manifest checks, archive roundtrip, независимый
+verify-cli-candidate и checksum PASS; --version/--help PASS.
+Начальный общий parent конфликтовал с именем baseline archive: EEXIST сохранил
+baseline; повторная сборка выполнена в отдельном parent. Baseline checksum PASS.
+
+Native run --command package-docs --file с кириллицей/пробелами/uppercase LGP,
+явным --dir и собственным profile выполнил настоящий bundled extract.
+Код 0, .writer отсутствует; весь structure.json совпадает с fixture, кроме
+ожидаемого нового package.file_name. Provider catalogs содержат docs executor
+и не содержат task/bash/browser prepare. Loginom не настроен; PATH у CLI
+/nonexistent, поэтому generator использует поставляемый Node.
+Драйвер Python работает снаружи испытуемого процесса как test infrastructure.
+docs-smoke-{driver.log,result.json,stdout,stderr,provider.json} и driver script
+сохранены в candidate directory. Неподдерживаемый debug skill вернул
+CLI_ARGUMENT_INVALID/2; discovery проверен через разрешённый run.
+
+Это распакованный native artifact с controlled provider: не installed
+GUI/TTY, не естественный выбор и не final candidate для paired live evals.
+Chromium PID observation здесь не выполнен. Дальнейшие product changes требуют
+нового candidate; исходный SHA этого комплекта не заменять SHA doc checkpoint.
+Рабочее дерево чисто после удаления только собственного smoke output.
+
 ## Checkpoint
 
-- Исходный SHA `40dc57987` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
+- Product candidate SHA `c4dc5bd4c` (`docs-no-browser`); полный native CLI/resources/manifest/archive сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -1292,4 +1321,4 @@ prompt-host-release-full-regression.log: **168 PASS / 1 SKIP**, 720 assertions,
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS; attachment: 44 PASS; exit/cancel race закрыта; далее PTY/activation races.
-- Затем Linux Desktop/CLI/TTY, естественный выбор skill и парные live evals на принятом harness SHA.
+- Native docs extract PASS без system Node/Python; затем PTY/Desktop, естественный выбор и парные live evals.
