@@ -78,6 +78,11 @@ Do not weaken rubrics, expected failures or thresholds. Semantic misses are not 
   Session 71451; /tmp/calibration-live-acceptance.log. Do not modify the prompt
   during this run. Full tests repeated in session 51382; logs
   /tmp/calibration-ec9813-full-tests.log and /tmp/calibration-ec9813-typecheck.log.
+  Checks completed: 321 pass, 0 fail, 1433 assertions, 21 files, 356.66s;
+  typecheck and diff-check exit 0.
+- Subsequent checker import rename (34a62f215) follows the no-alias project rule;
+  it changes no calculations or runtime calibration behavior. Full independent
+  reproduction remains 35 tasks / 113 cases; representative integration test passes.
 - Goal remains active. Final acceptance still requires every one of the 183 rows
   under the new prompt to meet its gates and the final report/checkpoint updates.
 
