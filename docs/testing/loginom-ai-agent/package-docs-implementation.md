@@ -536,6 +536,29 @@ reserved-command-mcp-green, reserved-source-matrix-green.log. Все profiles,
 HTTP cache и процесс MCP принадлежат изолированным test fixtures.
 Первый пункт reserved policy этапа 3 отмечен; installed/Desktop/TUI ещё открыты.
 
+Linux artifact completeness: CLI и Desktop RED принимали точный manifest без
+Product skills. GREEN — общий Host verifyProductSkills поверх той же проверки
+2.3, с обязательными именами из Product. Он вызывается в Linux CLI payload
+и Desktop resource verifier, которым пользуются оба DEB/AppImage extraction
+branches. Проверены отсутствие каталога, missing generated/font при заново
+собранных честных manifests и unlisted skill file; код извлечённого артефакта
+не исполняется. Fixtures копируют настоящие Product metadata/assets и собирают
+Node executor дочерним Bun; общий кэш убран после fixture lifetime failure
+между файлами. Installer regression сохраняет чужие launcher/profile и busy guard.
+CLI+installer 7 PASS (63 assertions); Desktop config+artifact 12 PASS / 2 native
+macOS SKIP (102 assertions), оба typecheck PASS. Full Host 184 PASS / 6 native
+Windows SKIP, 978 assertions, 70.14 s. tdd-{cli,desktop}-artifact-skills-*,
+{cli,desktop}-artifact-skills-green.log, stage3-host-suite.log.
+Новая обязательность applies только к Linux acceptance scope; native критерии
+Windows/macOS не расширены. Реальные DEB/AppImage ещё не собирались/не ставились.
+Сохранённый baseline повторно прошёл точный старый verifier из чистого frozen
+fc3d97dbf worktree: version 0.1.17, sourceDirty false, исходный tree hash;
+baseline-original-manifest-recheck.log. Baseline проверяется по своему сохранённому
+контракту, candidate — по новому, без изменения обоих payloads.
+Product/root AGENTS зафиксировали catalog/generated/integrity/добавление skill;
+временного Product skills.paths моста в исходниках нет. Соответствующие пункты
+этапа 3 отмечены; installed run/TUI и единый knowledge lifecycle ещё открыты.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -553,4 +576,5 @@ HTTP cache и процесс MCP принадлежат изолированны
 - Tool/SKILL Node workflow и lifecycle проверены; далее TaskScope и actual run permissions.
 - Старый session package_docs/Python тест требует замены при SessionTools integration.
 - Reserved skill/command policy и пользовательские предупреждения проверены по sources.
+- Linux artifact completeness/shared closure проверены; Host suite 184 PASS / 6 SKIP.
 - Живая приёмка и удаление серверного skill остаются открытыми.

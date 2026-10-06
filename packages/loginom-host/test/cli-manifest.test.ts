@@ -4,6 +4,58 @@ import { tmpdir } from "node:os"
 import { join, dirname } from "node:path"
 import { createHash } from "node:crypto"
 import { writeCliManifest, verifyCliManifest } from "../src/cli-manifest"
+import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
+import { copyProductSkillsFixture } from "./fixtures/product-skills"
+
+test("CLI artifact verification rejects an accurately inventoried payload without Product skills", async () => {
+  const root = await mkdtemp(join(tmpdir(), "cli-product-skills-"))
+  try {
+    for (const path of ["bin/loginom-ai-agent-cli", "resources/loginom/bin/node", "resources/loginom/host/node-host.mjs"])
+      await Bun.write(join(root, path), "fixture")
+    await Bun.write(join(root, "resources/loginom/resource-manifest.json"), JSON.stringify({
+      protocol: 1,
+      files: await resourceInventory(join(root, "resources/loginom")),
+    }))
+    const info = { version: "test", channel: "dev", platform: "linux", arch: "x64", sourceCommit: "a".repeat(40),
+      sourceTreeSha256: "b".repeat(64), sourceDirty: true, dependencies: {} }
+    await writeCliManifest(root, info)
+    await expect(verifyCliManifest(root, info)).rejects.toThrow("LOGINOM_PRODUCT_SKILLS_INCOMPLETE")
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("CLI artifact verification rejects required skill files omitted from freshly rebuilt manifests", async () => {
+  const root = await mkdtemp(join(tmpdir(), "cli-product-skill-closure-"))
+  const resources = join(root, "resources/loginom")
+  const info = { version: "test", channel: "dev", platform: "linux", arch: "x64", sourceCommit: "a".repeat(40),
+    sourceTreeSha256: "b".repeat(64), sourceDirty: true, dependencies: {} }
+  try {
+    for (const path of ["bin/loginom-ai-agent-cli", "resources/loginom/bin/node", "resources/loginom/host/node-host.mjs"])
+      await Bun.write(join(root, path), "fixture")
+    await copyProductSkillsFixture(resources)
+    for (const path of ["skills/package-docs/scripts/package-docs.mjs", "skills/package-docs/assets/fonts/GolosText-Regular.ttf"]) {
+      const content = await readFile(join(resources, path))
+      await unlink(join(resources, path))
+      await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({
+        protocol: 1, files: await resourceInventory(resources),
+      }))
+      await writeCliManifest(root, info)
+      await expect(verifyCliManifest(root, info)).rejects.toThrow("LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING")
+      await writeFile(join(resources, path), content)
+    }
+    await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({
+      protocol: 1, files: await resourceInventory(resources),
+    }))
+    await writeCliManifest(root, info)
+    expect(await verifyCliManifest(root, info)).toEqual(info)
+    await writeFile(join(resources, "skills/package-docs/unlisted.mjs"), "unlisted")
+    await writeCliManifest(root, info)
+    await expect(verifyCliManifest(root, info)).rejects.toThrow("LOGINOM_SKILL_UNMANIFESTED_FILE")
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
 test("CLI manifest verifies complete payload and rejects mutation, extras and escaped links", async () => {
   const root = await mkdtemp(join(tmpdir(), "cli-manifest-"))
@@ -27,6 +79,10 @@ test("CLI manifest verifies complete payload and rejects mutation, extras and es
       sourceDirty: true,
       dependencies: { node: "24.19.0" },
     }
+    await copyProductSkillsFixture(join(root, "resources/loginom"))
+    await Bun.write(join(root, "resources/loginom/resource-manifest.json"), JSON.stringify({
+      protocol: 1, files: await resourceInventory(join(root, "resources/loginom")),
+    }))
     await writeCliManifest(root, info)
     expect(await verifyCliManifest(root, { platform: "linux", arch: "x64", version: "test" })).toEqual(info)
     if (process.platform !== "win32") {
@@ -78,6 +134,12 @@ test.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
         sourceTreeSha256: "b".repeat(64),
         sourceDirty: true,
         dependencies: {},
+      }
+      if (process.platform === "linux") {
+        await copyProductSkillsFixture(join(source, "resources/loginom"))
+        await Bun.write(join(source, "resources/loginom/resource-manifest.json"), JSON.stringify({
+          protocol: 1, files: await resourceInventory(join(source, "resources/loginom")),
+        }))
       }
       await writeCliManifest(source, info)
       const archive = join(root, "payload.tar.gz")

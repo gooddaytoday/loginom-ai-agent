@@ -4,6 +4,8 @@ import { join, dirname } from "node:path"
 import { tmpdir } from "node:os"
 import { installCli, uninstallCli } from "../src/cli-install"
 import { writeCliManifest } from "../src/cli-manifest"
+import { copyProductSkillsFixture } from "./fixtures/product-skills"
+import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 
 test.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
   "user install preserves foreign launchers/profiles and refuses uninstall of a live payload",
@@ -21,6 +23,12 @@ test.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
       ]) {
         await mkdir(dirname(join(artifact, file)), { recursive: true })
         await writeFile(join(artifact, file), file)
+      }
+      if (process.platform === "linux") {
+        await copyProductSkillsFixture(join(artifact, "resources/loginom"))
+        await writeFile(join(artifact, "resources/loginom/resource-manifest.json"), JSON.stringify({
+          protocol: 1, files: await resourceInventory(join(artifact, "resources/loginom")),
+        }))
       }
       await cp("/bin/sleep", join(artifact, "bin/loginom-ai-agent-cli"))
       await symlink("loginom-ai-agent-cli", join(artifact, "bin/alias"))

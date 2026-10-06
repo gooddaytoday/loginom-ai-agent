@@ -3,6 +3,7 @@ import { createReadStream } from "node:fs"
 import { lstat, open, readFile, readdir, readlink, realpath, stat, writeFile } from "node:fs/promises"
 import { isAbsolute, join, relative, sep } from "node:path"
 import { Option, Schema } from "effect"
+import { verifyProductSkills } from "./bundled-skills"
 
 const file = Schema.Struct({
   path: Schema.String,
@@ -77,6 +78,7 @@ export async function verifyCliManifest(root: string, expected: { platform: stri
     if (!entries.has(required)) throw new Error("LOGINOM_MANIFEST_INCOMPLETE")
   }
   if (info.platform === "win32" && info.arch === "x64") await verifyWindowsPayload(root, entries)
+  if (info.platform === "linux") await verifyProductSkills(join(root, "resources/loginom"))
   return info
 }
 
