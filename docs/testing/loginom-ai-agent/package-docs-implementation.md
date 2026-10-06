@@ -339,6 +339,25 @@ Python skeleton после нормализации времени. Ещё че�
 (40 assertions), Host typecheck PASS. Логи tdd-node-skeleton-{red,green}.log,
 node-skeleton-regression.log. Writers/tool ещё открыты; требования плана не менялись.
 
+Node Markdown/DOCX writers: RED — EMIT_UNSUPPORTED для MD и DOCX;
+отдельный RED — незаполненный PLACEHOLDER_ выпускался как Markdown.
+GREEN — MD сохраняет текст и завершающий newline; любой PLACEHOLDER_ запрещён
+до рендеринга. Word document.xml совпадает с сохранённым baseline и двумя
+новыми frozen-Python oracle (форматирование, вложенный пакет); ZIP содержит
+стили и relationships. Источник emit_report.py SHA-256:
+098deb4455a5e428c4aab6544bbeaa13dc0c2081525675ee38c61ec3fde70426.
+Реальный pinned Node создаёт DOCX без Bun/Python. 21 PASS (47 assertions),
+Host typecheck PASS; логи tdd-node-{emit-md,emit-placeholder,docx}-*.
+
+Диагностика тестовой инфраструктуры: в общем файле второй ZIP Bun.build
+стабильно падал Unexpected reading file (3/3), обе Node проверки отдельно
+проходили 3/3. Файл зависимости существует, простой последовательный build
+вне bun:test проходит; внутреннюю причину Bun не считаем установленной.
+Одна staged fixture-сборка сохраняет все проверки результата и даёт 3/3
+зелёных общих прогонов. Нет изменения версии Bun, retries или ослабления
+проверок содержимого. Логи docx-build-signal-*-collector.log,
+node-docx-single-bundle-{green,refactor-*}.log. PDF и product tool остаются открытыми.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -352,6 +371,6 @@ node-skeleton-regression.log. Writers/tool ещё открыты; требова
 - Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
-- Этап 2: ZIP/XML и Markdown skeleton parity, bundled Node 15 PASS; writer/tool ещё открыты.
-- Следующий шаг — emit; 35 baseline source-map mismatches остаются live gate.
+- Этап 2: extraction/skeleton/MD/DOCX parity, bundled Node 21 PASS; PDF/tool ещё открыты.
+- Следующий шаг — PDF; 35 baseline source-map mismatches остаются live gate.
 - Живая приёмка и удаление серверного skill остаются открытыми.

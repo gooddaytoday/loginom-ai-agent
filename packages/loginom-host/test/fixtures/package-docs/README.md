@@ -21,3 +21,8 @@ visualizers do not change workflow statistics. Both use the same frozen oracle.
 Skeleton Markdown variants were rendered by the unchanged Python source at
 the same baseline SHA (source SHA-256 0bbb539bc8981f0b7eb7ca712ee84873df230a173844b596620186be9d89e0a9).
 Only the generation timestamp is normalized during comparison.
+
+`demo.report.md` and `demo.word-document.xml` retain the saved baseline output.
+Formatting and nested report/Word XML variants use the unchanged baseline
+emit_report.py (source SHA-256 098deb4455a5e428c4aab6544bbeaa13dc0c2081525675ee38c61ec3fde70426).
+DOCX archive timestamps/bytes are not compared.
