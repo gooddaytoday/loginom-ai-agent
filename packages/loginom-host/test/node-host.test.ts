@@ -35,7 +35,8 @@ test("bundled Node host handshakes without Electron, manages its profile and clo
       .catch((error: Error) => error.message)
     expect(error).not.toContain("private-sentinel")
     expect(error).toBe("LOGINOM_CANDIDATE_INVALID")
-    expect(await host.request("acquire", { run: "test", session: "chat" })).toBeNull()
+    expect(await host.request("acquire", { run: "test", session: "chat" })).toEqual({ generation: 0 })
+    expect(await host.request("release", { run: "test" })).toBe(true)
   } finally {
     await host.close()
   }

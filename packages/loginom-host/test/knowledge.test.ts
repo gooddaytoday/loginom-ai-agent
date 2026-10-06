@@ -147,6 +147,27 @@ test("restored Host starts only knowledge and local settled does not wait for th
     expect(await host.api.status()).toMatchObject({ state: "starting", generation: 1 })
     await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
     await entered.promise
+    expect(await client.request("acquire", { run: "before-ready", session: "local-chat" })).toEqual({ generation: 1 })
+    expect(await client.request("tools", { run: "before-ready" })).toMatchObject({
+      tools: [expect.objectContaining({ name: "dock_prepare" }), expect.objectContaining({ name: "dock_diagnostics" })],
+    })
+    expect(
+      await client.request("call", {
+        run: "before-ready",
+        name: "dock_diagnostics",
+        args: {},
+        userMessage: "original",
+      }),
+    ).toMatchObject({ structuredContent: { state: "starting", generation: 1, hasApiKey: true } })
+    await expect(
+      client.request("call", {
+        run: "before-ready",
+        name: "read",
+        args: { uri: "Help/node.md" },
+        userMessage: "original",
+      }),
+    ).rejects.toThrow("LOGINOM_CONNECTION_NOT_READY")
+    await client.request("release", { run: "before-ready" })
     release.resolve()
     await host.catalog(1)
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })

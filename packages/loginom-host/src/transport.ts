@@ -11,7 +11,12 @@ export function transport(port: Port) {
   const state = { closed: false }
   const pending = new Map<
     string,
-    { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
+    {
+      resolve(value: unknown): void
+      reject(error: Error): void
+      timer: ReturnType<typeof setTimeout>
+      observe?(value: unknown): void
+    }
   >()
   function close() {
     state.closed = true
@@ -28,6 +33,7 @@ export function transport(port: Port) {
     if (!request) return
     pending.delete(data.id)
     clearTimeout(request.timer)
+    request.observe?.(data)
     if ("error" in data) {
       request.reject(new Error(hostError(data.error)))
       return
@@ -36,7 +42,7 @@ export function transport(port: Port) {
   })
   port.start()
   return {
-    request(method: string, input: unknown, timeout = 180_000) {
+    request(method: string, input: unknown, timeout = 180_000, observe?: (value: unknown) => void) {
       if (state.closed) return Promise.reject(new Error("LOGINOM_HOST_CLOSED"))
       const id = randomUUID()
       return new Promise<unknown>((resolve, reject) => {
@@ -44,7 +50,7 @@ export function transport(port: Port) {
           pending.delete(id)
           reject(new Error("LOGINOM_HOST_TIMEOUT"))
         }, timeout)
-        pending.set(id, { resolve, reject, timer })
+        pending.set(id, { resolve, reject, timer, observe })
         try {
           port.postMessage({ id, method, input })
         } catch {

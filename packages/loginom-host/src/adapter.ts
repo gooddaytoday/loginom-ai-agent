@@ -21,14 +21,27 @@ export async function acquire(session: string) {
   if (!value) throw new Error("LOGINOM_HOST_NOT_READY")
   if (typeof value !== "object" || !("generation" in value) || typeof value.generation !== "number")
     throw new Error("LOGINOM_HANDSHAKE_INVALID")
-  const queue = { tail: Promise.resolve(), released: false }
+  const queue = { tail: Promise.resolve(), released: false, generation: value.generation }
+  const observe = (reply: unknown) => {
+    if (
+      reply &&
+      typeof reply === "object" &&
+      "generation" in reply &&
+      typeof reply.generation === "number" &&
+      Number.isSafeInteger(reply.generation) &&
+      reply.generation >= 0
+    )
+      queue.generation = reply.generation
+  }
   return {
-    generation: value.generation,
+    get generation() {
+      return queue.generation
+    },
     async admit(userMessage: string, files: InputFile[]) {
-      return connection.request("admit", { run, userMessage, files })
+      return connection.request("admit", { run, userMessage, files }, undefined, observe)
     },
     async tools() {
-      return connection.request("tools", { run })
+      return connection.request("tools", { run }, undefined, observe)
     },
     async call(name: string, args: unknown, userMessage: string, signal?: AbortSignal) {
       // Serialize before transport admission so waiting does not consume the IPC timeout
@@ -43,7 +56,7 @@ export async function acquire(session: string) {
       try {
         if (queue.released || signal?.aborted) throw new Error("LOGINOM_RUN_ABORTED")
         signal?.addEventListener("abort", abort, { once: true })
-        return await connection.request("call", { run, name, args, userMessage })
+        return await connection.request("call", { run, name, args, userMessage }, undefined, observe)
       } finally {
         signal?.removeEventListener("abort", abort)
         next.resolve()

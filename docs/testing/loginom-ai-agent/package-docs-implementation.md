@@ -727,15 +727,45 @@ preflight item; lazy exit contract конкретного natural tool отка�
 не автоматическую активацию skill. TUI startup logic не менялась; installed
 Desktop/CLI, live routing и полная приёмка этапа 4 остаются открытыми.
 
+Local Host run and lazy lease: RED — unconfigured `acquire` возвращал null;
+после отделения run два одновременных acquire одного чата оба принимались.
+GREEN — локальная identity резервируется перед await, run создаётся без
+connection lease; unconfigured/starting catalog и diagnostics работают без
+создания chat runtime и network wait. Настоящие Help schemas появляются только
+после готового knowledge catalog; без него возвращаются local descriptors,
+схемы не синтезируются. Конкретная внешняя операция получает typed
+`LOGINOM_CONFIG_REQUIRED` / `LOGINOM_CONNECTION_NOT_READY` до runtime/journal,
+либо один текущий lease, удерживаемый до завершения run/запроса.
+Реальный HTTP MCP тест покрывает local run при заблокированном catalog;
+pending catalog не блокирует диагностику, browser marker отсутствует.
+Настройки могут смениться при local run; первая Help операция закрепляет
+поколение, и последующее сохранение ждёт lease release. Старый advisory тест
+предполагал lease уже после acquire: он разделён на local/leased варианты,
+с настоящей Help операцией перед save в leased случае, остальные assertions
+uncertainty/release сохранены. RED дополнительной проверки — adapter metadata
+продолжала показывать generation 1 после смены на 2 до первого внешнего вызова.
+GREEN — private Host reply header передаёт observed/bound generation, scoped
+observer в transport обновляет adapter getter; MCP result body не изменён.
+Full Host: 194 PASS / 7 SKIP / 0 FAIL, 1052 assertions, 73.22 s;
+stage4-host-local-run-suite.log. Шесть SKIP — native Windows, optional staging
+был отдельно выполнен ранее с pinned inputs. Desktop real-Host lease regression:
+4 PASS / 16 assertions; standalone actual process regression: 6 PASS / 35;
+Host и Agent typecheck PASS. desktop-local-run-lease-regression.log,
+standalone-local-run-regression.log, host-local-run-{typecheck,agent-typecheck}.log.
+RED: tdd-host-{local-run,local-acquire-race,lazy-generation-metadata}-red.log.
+Частный протокол расширен контрольным header, публичный Protocol/HttpApi не менялся.
+TaskScope, каталог по профилям, lazy natural-tool exit contract и разрешённый
+первый prepare/admission ещё открыты; общий run/scope item пока не отмечен.
+Один dangling alias собственного SIGKILL RED fixture удалён после подтверждения
+отсутствия target; чужие profiles, worktrees и launcher не менялись.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
 - Этап 0 выполнен: полный чистый baseline и детерминированные проверки сохранены.
 - Этап 1 выполнен: каталог, staging, локальный runtime и передача resource root проверены.
-- Каталог skills перенесён и адаптирован; source-only проверки перечислены выше.
-- Локальный loader и динамический prepare реализованы; единый digest проверен в Bun/Node.
-- Shared inventory и полный staging реализованы, два настоящих bundled skills найдены вне checkout.
-- Полный verifier общий для Host/runtime; reference/generated closure и classic bridge проверены.
+- Каталог skills, локальный loader и prepare реализованы; единый digest проверен в Bun/Node.
+- Shared inventory/staging: два bundled skills вне checkout; общий verifier и closure проверены.
 - Publisher отключён без чтения файлов/сети; серверная запись сохранена для baseline/старых клиентов.
 - Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
@@ -745,7 +775,7 @@ Desktop/CLI, live routing и полная приёмка этапа 4 остаю
 - Старый session package_docs/Python тест требует замены при SessionTools integration.
 - Reserved skill/command policy и пользовательские предупреждения проверены по sources.
 - Linux artifact completeness/shared closure проверены; Host suite 184 PASS / 6 SKIP.
-- Host knowledge/catalog/Help реализованы; full Host 190 PASS / 7 SKIP, staging 13 PASS.
-- Desktop source lifecycle 36 PASS; lazy CLI preflight 12 PASS, Host readiness 15 PASS.
-- Далее local run и lazy tool exit contract, затем validation/save/browser status/UI.
+- Host local run/lazy lease и knowledge реализованы; full Host 194 PASS / 7 SKIP.
+- Desktop source lifecycle 36 PASS, lease 4 PASS; CLI preflight 12 PASS и local-run 6 PASS.
+- Далее TaskScope/lazy tool exit contract, validation/save/browser status/UI; staging 13 PASS.
 - Живая приёмка и удаление серверного skill остаются открытыми.

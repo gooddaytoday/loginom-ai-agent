@@ -50,31 +50,43 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     string,
     {
       chat: string
-      lease: NonNullable<ReturnType<typeof service.acquire>>
+      lease?: NonNullable<ReturnType<typeof service.acquire>>
       calls: number
       dispatching: boolean
       released: boolean
       active: Set<string>
     }
   >()
+  const acquiring = new Map<string, string>()
   const state = { closed: false, stopping: undefined as Promise<void> | undefined }
   const pending = new Set<Promise<void>>()
   async function abandon(run: NonNullable<ReturnType<typeof runs.get>>) {
     for (const id of run.active) await service.journal.settle(id, false)
     const retained = [...run.active].filter((id) => service.journal.pending().includes(id))
     run.active.clear()
-    if (!retained.length) return
+    if (!retained.length || !run.lease) return
     run.lease.holdRecovery()
     service.recoveries.set(run.chat, run.lease)
   }
   async function release(id: string, run: NonNullable<ReturnType<typeof runs.get>>) {
     await abandon(run)
-    run.lease.release()
+    run.lease?.release()
     runs.delete(id)
   }
-  function reply(value: unknown) {
+  function reply(value: { id: string; result?: unknown; error?: string }, generation?: number) {
     if (state.closed) return
-    port.postMessage(value)
+    port.postMessage(generation === undefined ? value : { ...value, generation })
+  }
+  async function connectionLease(id: string, run: NonNullable<ReturnType<typeof runs.get>>) {
+    if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
+    if (run.lease) return run.lease
+    const status = await service.api.status()
+    if (run.lease) return run.lease
+    if (!status.hasApiKey) throw new Error("LOGINOM_CONFIG_REQUIRED")
+    const lease = service.acquire(`${owner}:${id}`)
+    if (!lease) throw new Error("LOGINOM_CONNECTION_NOT_READY")
+    run.lease = lease
+    return lease
   }
   async function handle(data: unknown) {
     if (state.closed) return
@@ -94,20 +106,31 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     }
     try {
       if (data.method === "acquire") {
-        if (!("session" in input) || typeof input.session !== "string" || !input.session || runs.has(input.run))
+        if (
+          !("session" in input) ||
+          typeof input.session !== "string" ||
+          !input.session ||
+          runs.has(input.run) ||
+          acquiring.has(input.run)
+        )
           throw new Error("LOGINOM_RUN_INVALID")
         const chat = createHash("sha256").update(input.session).digest("hex")
-        if (service.recoveries.has(chat)) throw new Error("LOGINOM_RECOVERY_REQUIRED")
-        if ([...runs.values()].some((run) => run.chat === chat)) throw new Error("LOGINOM_CALL_BUSY")
-        const lease = service.acquire(`${owner}:${input.run}`)
-        if (!lease) {
-          reply({ id: data.id, result: null })
-          return
+        if (service.recoveries.has(chat) || service.journal.pending().length)
+          throw new Error("LOGINOM_RECOVERY_REQUIRED")
+        if ([...runs.values()].some((run) => run.chat === chat) || [...acquiring.values()].includes(chat))
+          throw new Error("LOGINOM_CALL_BUSY")
+        // Reserve the local identity before yielding; no connection lease is needed.
+        acquiring.set(input.run, chat)
+        try {
+          const status = await service.api.status()
+          await service.retireRuntime(chat)
+          service.resetRestarts(chat)
+          if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
+          runs.set(input.run, { chat, calls: 0, dispatching: false, released: false, active: new Set() })
+          reply({ id: data.id, result: { generation: status.generation } })
+        } finally {
+          acquiring.delete(input.run)
         }
-        await service.retireRuntime(chat)
-        service.resetRestarts(chat)
-        runs.set(input.run, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set() })
-        reply({ id: data.id, result: { generation: lease.generation } })
         return
       }
       const run = runs.get(input.run)
@@ -128,28 +151,40 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       run.calls++
       try {
         if (data.method === "tools") {
-          const knowledge = catalogTools(await service.catalog(run.lease.generation))
-          const browser = service.hasRuntime(run.lease.generation, run.chat)
-            ? catalogTools(await (await service.runtime(run.lease.generation, run.chat)).request("list"))
-            : []
-          reply({
-            id: data.id,
-            result: {
-              tools: [
-                ...knowledge,
-                prepareTool,
-                diagnosticTool,
-                ...browser.filter(
-                  (tool) =>
-                    !knowledgeTools.has(tool.name) && ![prepareTool.name, diagnosticTool.name].includes(tool.name),
-                ),
-              ],
+          const status = await service.api.status()
+          const generation = run.lease?.generation ?? status.generation
+          const knowledge =
+            run.lease || status.state === "ready"
+              ? catalogTools(await service.catalog(generation).catch(() => ({ tools: [] })))
+              : []
+          // Listing an existing browser is an external operation; an empty local
+          // catalog must remain usable when that connection cannot be leased.
+          if (!run.lease && service.hasRuntime(generation, run.chat))
+            await connectionLease(input.run, run).catch(() => undefined)
+          const browser =
+            run.lease && service.hasRuntime(run.lease.generation, run.chat)
+              ? catalogTools(await (await service.runtime(run.lease.generation, run.chat)).request("list"))
+              : []
+          reply(
+            {
+              id: data.id,
+              result: {
+                tools: [
+                  ...knowledge,
+                  prepareTool,
+                  diagnosticTool,
+                  ...browser.filter(
+                    (tool) =>
+                      !knowledgeTools.has(tool.name) && ![prepareTool.name, diagnosticTool.name].includes(tool.name),
+                  ),
+                ],
+              },
             },
-          })
+            run.lease?.generation ?? status.generation,
+          )
           return
         }
         if (data.method === "admit") {
-          const runtime = await service.runtime(run.lease.generation, run.chat)
           if (
             !("userMessage" in input) ||
             typeof input.userMessage !== "string" ||
@@ -161,15 +196,28 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             )
           )
             throw new Error("LOGINOM_INPUT_INVALID")
-          const files = await service.inputs(run.lease.generation, run.chat, input.userMessage, input.files)
+          const lease = await connectionLease(input.run, run)
+          const runtime = await service.runtime(lease.generation, run.chat)
+          const files = await service.inputs(lease.generation, run.chat, input.userMessage, input.files)
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
-          reply({
-            id: data.id,
-            result: await runtime.request("admit", { files, userMessage: input.userMessage }),
-          })
+          reply(
+            {
+              id: data.id,
+              result: await runtime.request("admit", { files, userMessage: input.userMessage }),
+            },
+            lease.generation,
+          )
           return
         }
         if (data.method === "interrupt") {
+          if (!run.lease) {
+            const status = await service.api.status()
+            if (service.hasRuntime(status.generation, run.chat)) await connectionLease(input.run, run)
+          }
+          if (!run.lease) {
+            reply({ id: data.id, result: true })
+            return
+          }
           await service.knowledge(run.lease.generation).request("interrupt", { run: `${owner}:${input.run}` })
           if (!service.hasRuntime(run.lease.generation, run.chat)) {
             reply({ id: data.id, result: true })
@@ -189,31 +237,36 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         )
           throw new Error("LOGINOM_CALL_INVALID")
         if (knowledgeTools.has(input.name)) {
-          const result = await service.knowledge(run.lease.generation).request("call", {
+          const lease = await connectionLease(input.run, run)
+          const result = await service.knowledge(lease.generation).request("call", {
             run: `${owner}:${input.run}`,
             id: data.id,
             name: input.name,
             arguments: "args" in input ? input.args : undefined,
           })
-          reply({ id: data.id, result })
+          reply({ id: data.id, result }, lease.generation)
           return
         }
         if (input.name === "dock_diagnostics") {
           const status = await service.api.status()
-          reply({
-            id: data.id,
-            result: { content: [{ type: "text", text: JSON.stringify(status) }], structuredContent: status },
-          })
+          reply(
+            {
+              id: data.id,
+              result: { content: [{ type: "text", text: JSON.stringify(status) }], structuredContent: status },
+            },
+            run.lease?.generation ?? status.generation,
+          )
           return
         }
+        const lease = await connectionLease(input.run, run)
         const recovery = { id: undefined as string | undefined }
         try {
           // A dead runtime is replaced before admission. Past the relaunch limit this
           // is a known refusal, not an uncertain dispatch.
-          await service.runtime(run.lease.generation, run.chat)
-          recovery.id = await service.journal.begin(run.chat, run.lease.generation)
+          await service.runtime(lease.generation, run.chat)
+          recovery.id = await service.journal.begin(run.chat, lease.generation)
           run.active.add(recovery.id)
-          const runtime = await service.runtime(run.lease.generation, run.chat)
+          const runtime = await service.runtime(lease.generation, run.chat)
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
           const result = await runtime.request("call", {
             name: input.name,
@@ -237,11 +290,11 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             for (const id of run.active) await service.journal.settle(id, true)
             run.active.clear()
             if (!service.journal.pending().length) {
-              run.lease.reconciled()
+              lease.reconciled()
               service.recoveries.delete(run.chat)
             }
           }
-          reply({ id: data.id, result: result.result })
+          reply({ id: data.id, result: result.result }, lease.generation)
         } catch (error) {
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
           // A journal write failure precedes runtime dispatch and cannot establish
@@ -259,7 +312,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         }
       }
     } catch (error) {
-      reply({ id: data.id, error: hostError(error) })
+      reply({ id: data.id, error: hostError(error) }, runs.get(input.run)?.lease?.generation)
     }
   }
   port.on("message", ({ data }) => {

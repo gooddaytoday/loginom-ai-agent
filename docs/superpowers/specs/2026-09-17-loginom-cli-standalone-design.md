@@ -3245,3 +3245,17 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   запросу эти deterministic тесты не подтверждают.
 
 [Журнал и checkpoint](../../testing/loginom-ai-agent/package-docs-implementation.md).
+
+### Package docs isolation: local run и generation lease (2026-10-06)
+
+- Source implementation допускает Host run без готового подключения; каталог
+  local descriptors и диагностика не ждут Help/network. Connection lease
+  появляется при первой внешней операции и сохраняет generation/recovery
+  ownership до её завершения и release run. Local run не блокирует save.
+- Adapter обновляет observed/bound generation из private reply header после
+  смены настроек до первой операции. MCP result body остаётся прежним.
+- Full Host: 194 PASS / 7 SKIP / 0 FAIL (1052 assertions); Desktop actual Host
+  lease checks: 4 PASS; actual standalone: 6 PASS; Host/Agent typecheck PASS.
+  Linux source checks не заменяют installed acceptance и live skill selection.
+- Открыто: TaskScope/catalog allowlists, natural-tool lazy exit codes,
+  validation/save с раздельным browser status и установленные Linux кандидаты.
