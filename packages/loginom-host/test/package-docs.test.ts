@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "bun:test"
 import { Uint8ArrayReader, TextWriter, ZipReader } from "@zip.js/zip.js"
 import { createHash } from "node:crypto"
-import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { cp, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises"
 import { inflateSync } from "node:zlib"
 import { tmpdir } from "node:os"
 import { pathToFileURL } from "node:url"
@@ -84,6 +84,117 @@ test("repeating skeleton preserves the user's filled draft", async () => {
     const repeated = await docsCommand(args, directory)
     expect(repeated.code).toBe(0)
     expect(await readFile(path, "utf8")).toBe("# Заполненный пользователем черновик\n")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 20_000)
+
+test("Node CLI emits default PDF into the session directory from its filled draft", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-emit-session-"))
+  try {
+    const options = ["--lgp", join(fixtures, "demo.lgp"), "--directory", directory]
+    const skeleton = await docsCommand(["skeleton", ...options], directory)
+    expect(skeleton.code).toBe(0)
+    const report = JSON.parse(skeleton.stdout).report
+    await writeFile(report, (await readFile(report, "utf8")).replace(/PLACEHOLDER_[A-Z_0-9]+/g, "Описание сценария и потоков данных."))
+    const result = await docsCommand(["emit", ...options], directory)
+    expect(result.code).toBe(0)
+    expect(result.stderr).toBe("")
+    expect(JSON.parse(result.stdout).output).toBe(join(directory, "demo.lgp_report.pdf"))
+    expect(pdfText(await readFile(join(directory, "demo.lgp_report.pdf"))).join(" ")).toContain("Описание сценария и потоков данных.")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 20_000)
+
+test("emit rejects a draft missing mandatory sections without publishing a report", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-incomplete-"))
+  try {
+    const options = ["--lgp", join(fixtures, "demo.lgp"), "--directory", directory]
+    const skeleton = await docsCommand(["skeleton", ...options], directory)
+    expect(skeleton.code).toBe(0)
+    await writeFile(JSON.parse(skeleton.stdout).report, "# Отчет о пакете «demo.lgp»\n\nТолько описание.\n")
+    const result = await docsCommand(["emit", ...options, "--format", "md"], directory)
+    expect(result.code).toBe(1)
+    expect(result.stderr).toBe("PACKAGE_DOCS_REQUIRED_SECTION\n")
+    expect(result.stdout).toBe("")
+    expect(await readdir(directory)).toEqual([".work"])
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 20_000)
+
+test("emit preserves existing reports and chooses the next free collision suffix", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-collision-"))
+  try {
+    const options = ["--lgp", join(fixtures, "demo.lgp"), "--directory", directory]
+    const skeleton = await docsCommand(["skeleton", ...options], directory)
+    expect(skeleton.code).toBe(0)
+    const draft = JSON.parse(skeleton.stdout).report
+    const markdown = (await readFile(draft, "utf8")).replace(/PLACEHOLDER_[A-Z_0-9]+/g, "Описание пакета.")
+    await writeFile(draft, markdown)
+    await writeFile(join(directory, "demo.lgp_report.md"), "first original")
+    await writeFile(join(directory, "demo.lgp_report-2.md"), "second original")
+    const result = await docsCommand(["emit", ...options, "--format", "markdown"], directory)
+    expect(result.code).toBe(0)
+    expect(JSON.parse(result.stdout).output).toBe(join(directory, "demo.lgp_report-3.md"))
+    expect(await readFile(join(directory, "demo.lgp_report.md"), "utf8")).toBe("first original")
+    expect(await readFile(join(directory, "demo.lgp_report-2.md"), "utf8")).toBe("second original")
+    expect(await readFile(join(directory, "demo.lgp_report-3.md"), "utf8")).toBe(markdown)
+    expect((await readdir(directory)).filter((name) => name.endsWith(".tmp"))).toEqual([])
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 20_000)
+
+test("CLI handles spaces and quoted Cyrillic paths, all formats and format aliases", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom docs formats "))
+  try {
+    const lgp = join(directory, "Пакет & 'данные'.lgp")
+    await cp(join(fixtures, "demo.lgp"), lgp)
+    const before = createHash("sha256").update(await readFile(lgp)).digest("hex")
+    const options = ["--lgp", lgp, "--directory", directory]
+    const skeleton = await docsCommand(["skeleton", ...options], directory)
+    expect(skeleton.code).toBe(0)
+    const report = JSON.parse(skeleton.stdout).report
+    await writeFile(report, (await readFile(report, "utf8")).replace(/PLACEHOLDER_[A-Z_0-9]+/g, "Готовое описание."))
+    for (const [requested, extension] of [["WORD", "docx"], [".md", "md"], ["unknown", "pdf"]]) {
+      const result = await docsCommand(["emit", ...options, "--format", requested], directory)
+      expect(result.code).toBe(0)
+      const file = JSON.parse(result.stdout).output
+      expect(file).toBe(join(directory, "Пакет & 'данные'.lgp_report." + extension))
+      const bytes = await readFile(file)
+      if (extension === "md") expect(bytes.toString()).toContain("Готовое описание.")
+      if (extension === "pdf") expect(pdfText(bytes).join(" ")).toContain("Готовое описание.")
+      if (extension === "docx") {
+        const zip = new ZipReader(new Uint8ArrayReader(new Uint8Array(bytes)), { useWebWorkers: false })
+        try {
+          const entry = (await zip.getEntries()).find((entry) => entry.filename === "word/document.xml")!
+          expect(await entry.getData!(new TextWriter())).toContain("Готовое описание.")
+        } finally { await zip.close() }
+      }
+    }
+    expect(createHash("sha256").update(await readFile(lgp)).digest("hex")).toBe(before)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 20_000)
+
+test("a workspace symlink cannot redirect generated files outside the session", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-linked-work-"))
+  const external = await mkdtemp(join(tmpdir(), "loginom-docs-external-"))
+  try {
+    await writeFile(join(external, "keep"), "original")
+    await symlink(external, join(directory, ".work"))
+    const result = await docsCommand(["extract", "--lgp", join(fixtures, "demo.lgp"), "--directory", directory], directory)
+    expect(result.code).toBe(1)
+    expect(result.stderr).toBe("PACKAGE_DOCS_OUTPUT_ESCAPE\n")
+    expect(result.stdout).toBe("")
+    expect(await readdir(external)).toEqual(["keep"])
+    expect(await readFile(join(external, "keep"), "utf8")).toBe("original")
+  } finally { await rm(directory, { recursive: true, force: true }); await rm(external, { recursive: true, force: true }) }
+}, 20_000)
+
+test("CLI placeholder failure leaves no final report or publication temporary file", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-placeholders-"))
+  try {
+    const options = ["--lgp", join(fixtures, "demo.lgp"), "--directory", directory]
+    expect((await docsCommand(["skeleton", ...options], directory)).code).toBe(0)
+    const result = await docsCommand(["emit", ...options], directory)
+    expect(result.code).toBe(1)
+    expect(result.stderr).toBe("PACKAGE_DOCS_PLACEHOLDER\n")
+    expect(result.stdout).toBe("")
+    expect(await readdir(directory)).toEqual([".work"])
   } finally { await rm(directory, { recursive: true, force: true }) }
 }, 20_000)
 

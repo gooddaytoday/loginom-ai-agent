@@ -392,6 +392,20 @@ GREEN — report.md создаётся эксклюзивно в том же wor
 (87 assertions), Host typecheck PASS. Логи tdd-node-docs-cli-skeleton-*,
 node-cli-skeleton-regression.log. Emit/staging/product tool остаются открытыми.
 
+Node CLI emit: RED — команда emit отсутствовала; затем отдельные RED —
+неполный Markdown выпускался, занятое имя завершалось ошибкой вместо суффикса.
+GREEN — fixed CLI читает только свой report.md, проверяет обязательные
+заголовки из реальной структуры и placeholders; PDF по умолчанию, сохранены
+Word/Markdown aliases и fallback неизвестного формата на PDF. Готовые bytes
+создаются во временном файле session directory и публикуются exclusive link;
+занятые имена сохраняются, выдаётся -2/-3 и далее. Temp удаляется после выпуска.
+Регрессии: кириллица/пробелы/кавычки в путях, все три формата, неизменность
+входного SHA, отсутствие final/temp после placeholders/неполного отчёта,
+workspace symlink не создаёт ничего снаружи. 38 PASS (125 assertions), Host
+typecheck PASS. Логи tdd-node-docs-{cli-emit,emit-sections,emit-collision}-*,
+node-cli-publication-regression.log. Staging и агентская авторизация/timeout
+ещё открыты; этот CLI не является установленной сборкой продукта.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -405,6 +419,6 @@ node-cli-skeleton-regression.log. Emit/staging/product tool остаются о�
 - Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
-- Этап 2: writers и Node CLI extract/skeleton 32 PASS; emit CLI, staging/tool ещё открыты.
-- Следующий шаг — emit CLI; 35 baseline source-map mismatches остаются live gate.
+- Этап 2: writers и все три Node CLI команды 38 PASS; staging/tool ещё открыты.
+- Следующий шаг — build/staging; 35 baseline source-map mismatches остаются live gate.
 - Живая приёмка и удаление серверного skill остаются открытыми.

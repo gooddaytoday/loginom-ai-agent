@@ -2,6 +2,20 @@ import { TextReader, Uint8ArrayWriter, ZipWriter } from "@zip.js/zip.js"
 import { deflateSync } from "node:zlib"
 import { loadFont, subsetFont } from "./font"
 import type { ReportFont } from "./font"
+import { renderSkeleton } from "./skeleton"
+import type { PackageStructure } from "./extract"
+
+export function validateReport(markdown: string, structure: PackageStructure) {
+  const headings = (text: string) => text.split(/\r?\n/).map((line) => line.trim())
+    .filter((line) => /^#{1,3}\s/.test(line)).map((line) => line.replace(/ \(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\)$/, ""))
+  const actual = headings(markdown)
+  let cursor = 0
+  for (const required of headings(renderSkeleton(structure))) {
+    const index = actual.indexOf(required, cursor)
+    if (index < 0) throw Error("PACKAGE_DOCS_REQUIRED_SECTION")
+    cursor = index + 1
+  }
+}
 
 export async function renderReport(markdown: string, format: "md" | "docx" | "pdf" = "pdf", fonts = new URL("../assets/fonts/", import.meta.url)): Promise<Uint8Array> {
   if (/PLACEHOLDER_/.test(markdown)) throw Error("PACKAGE_DOCS_PLACEHOLDER")
