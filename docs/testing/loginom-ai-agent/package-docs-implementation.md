@@ -283,19 +283,21 @@ Agent/Desktop typecheck PASS. Логи tdd-{desktop,cli}-resource-root-*,
 resource-root-bundled-commands.log и *resource-root*typecheck.log.
 При расширении Command fixture сначала не был экспортирован dependency Skill;
 исправлена fixture через штатный LayerNode.group, без изменения реализации.
-Полный client suite запущен отдельно; итог ещё ожидается. Installed/live не проверены.
+Полный client suite: 2550 PASS, 0 FAIL, 10 SKIP (2560 тестов, 190.9 s);
+лог stage1-client-suite.log. Installed/live не проверены.
 
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
 - Этап 0 выполнен: полный чистый baseline и детерминированные проверки сохранены.
-- Начата проверенная TDD-связка discovery/integrity, этап 1 остаётся открытым.
+- Этап 1 выполнен: каталог, staging, локальный runtime и передача resource root проверены.
 - Каталог skills перенесён и адаптирован; source-only проверки перечислены выше.
 - Локальный loader и динамический prepare реализованы; единый digest проверен в Bun/Node.
 - Shared inventory и полный staging реализованы, два настоящих bundled skills найдены вне checkout.
 - Полный verifier общий для Host/runtime; reference/generated closure и classic bridge проверены.
 - Publisher отключён без чтения файлов/сети; серверная запись сохранена для baseline/старых клиентов.
-- Static catalog и source/installed generated exception проверены; этап 1 остаётся открытым.
+- Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
-- Resource root Desktop/CLI и обе bundled команды проверены; следующий шаг — Node executor.
+- Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
+- Следующий шаг — этап 2, Node executor; 35 исходных source-map mismatches остаются live gate.
 - Живая приёмка и удаление серверного skill остаются открытыми.

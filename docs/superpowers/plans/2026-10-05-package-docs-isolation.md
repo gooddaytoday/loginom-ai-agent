@@ -455,7 +455,7 @@ GREEN. Покрытие поведения важнее процента стр�
 зафиксированы в журнале реализации. Наблюдавшийся SHA калибровки `bc24b7baa`
 не является автоматически принятым pin для живой приёмки.
 
-### Этап 1. Каталог skills, staging и локальный источник
+### Этап 1. Каталог skills, staging и локальный источник — выполнен
 
 **Создать/перенести:** `packages/product/skills/{loginom-automation,package-docs}/`,
 Node-only export Product `./skills`, общую проверку/digest из 2.3,
@@ -662,7 +662,7 @@ type PackageDocsRun =
 `packages/loginom-host/src/cli-manifest.ts`,
 `packages/desktop/scripts/release/verify-artifact.ts` и целевые тесты.
 
-- [ ] Довести 2.1–2.3: один проверенный resource root через `createSidecarEnv`
+- [x] Довести 2.1–2.3: один проверенный resource root через `createSidecarEnv`
   и standalone launcher/worker, manifest-only discovery, `source/digest`,
   последовательный порядок, realpath-dedup. Базовые staging/integrity из этапа 1
   переиспользовать. `LOGINOM_AI_AGENT_CLI_BUNDLE` не отключает эту проверку.
