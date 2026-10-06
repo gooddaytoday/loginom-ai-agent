@@ -236,6 +236,8 @@ async function dataset(label: "A" | "B") {
   const path = `/${config.workflow_profile.loginom_user}/loginom-ai-agent-acceptance-${chat}.lgp`
   const child = await launch(chat, csv, path)
   const outcome = await (async () => {
+    if (transport !== "runtime")
+      await child.request("call", { name: "skill", arguments: { name: "loginom-automation" } })
     const bytes = Buffer.from(csv)
     const files = await inputStore(join(directory, "inputs")).admit(
       chat,

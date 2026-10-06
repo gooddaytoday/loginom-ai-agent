@@ -1622,6 +1622,24 @@ Prettier/diff-check PASS. GitHub workflow удалённо не запускал
 Источник бинарников остаётся `8dc7bdccb`, последующие CI/doc commits его не заменяют.
 Требования плана не изменены; отмечены только CI inclusion и подготовка кандидатов.
 
+## Oracle: обычная активация automation перед построением
+
+`oracle-provider` теперь передаёт `skill` без префикса `loginom_`, сохраняя
+префикс для Dock-инструментов. Контракт модели записывается, когда каталог
+уже содержит `loginom_dock_prepare`: после штатной активации, а не в default.
+`runtime-acceptance.ts` для Desktop/CLI и `desktop-cli-independence.ts` первым
+инструментом вызывают `skill(loginom-automation)`. Прямой runtime transport
+не изображает продуктовую Skill API и сохраняет отдельный сценарий проверки.
+Applied grants вручную не создаются, проверка advertised tools остаётся строгой.
+
+Новый HTTP test сначала получил **500** из-за запроса `loginom_skill` при
+advertised `skill`; после минимальной правки **3 PASS / 20 assertions**.
+Проверены raw skill arguments, следующая prefixed prepare операция и запись
+automation contract; старые exchange/exit tests сохранены. Host/Desktop typecheck,
+Prettier и diff-check PASS. Логи `oracle-skill-{red,green,final}.log` и
+`oracle-skill-{host,desktop}-typecheck.log`. Это приёмка adapter и типов;
+живые CSV55/101 через установленные продукты ещё не выполнены и не отмечены.
+
 ## Checkpoint
 
 - Product candidate SHA `8dc7bdccb` (`docs-no-browser`); полные Desktop/CLI artifacts/manifest/archive сохранены.

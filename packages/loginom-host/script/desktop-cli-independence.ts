@@ -52,6 +52,7 @@ for (const first of ["desktop", "cli"] as const) {
   const closed = new Set<string>()
   try {
     for (const child of [cliChild, desktopChild]) {
+      await child.request("call", { name: "skill", arguments: { name: "loginom-automation" } })
       const reply = await call(child, "dock_prepare", { intent: "new_draft", operation_id: "prepare" })
       if (!reply.prepared || !reply.workspace?.authenticated) throw Error("PREPARATION_FAILED")
     }

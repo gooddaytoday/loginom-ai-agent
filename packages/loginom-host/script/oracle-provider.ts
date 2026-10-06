@@ -25,7 +25,7 @@ export function oracleProvider(options: { directory: string; apiKey: string; onF
         tools?: { function?: { name?: string } }[]
       }
       const title = JSON.stringify(body.messages).includes("Generate a title for this conversation")
-      if (!title && !state.captured) {
+      if (!title && !state.captured && body.tools?.some((tool) => tool.function?.name === "loginom_dock_prepare")) {
         const contract = JSON.stringify({
           system: body.messages.filter((message) => message.role === "system"),
           tools: body.tools?.filter((tool) => tool.function?.name?.startsWith("loginom_")),
@@ -126,7 +126,11 @@ export function oracleProvider(options: { directory: string; apiKey: string; onF
       const result = Promise.withResolvers<unknown>()
       const id = `oracle_${invocation}_${++state.sequence}`
       state.pending = { id, resolve: result.resolve, reject: result.reject }
-      state.next.resolve({ id, name: "loginom_" + input.name, args: input.arguments as Record<string, unknown> })
+      state.next.resolve({
+        id,
+        name: input.name === "skill" ? "skill" : "loginom_" + input.name,
+        args: input.arguments as Record<string, unknown>,
+      })
       return result.promise
     },
     finish() {
