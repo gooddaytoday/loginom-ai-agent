@@ -5,6 +5,7 @@ export type NodeXml = { scope: string; id: string; type: string; engine: Record<
   columns: (Record<string, string> & { extension: Record<string, string> })[];
   inputs: Record<string, string>; outputs: Record<string, string>; variables: unknown[] }
 export type PackageXml = { nodes: NodeXml[]; links: { scope: string; source: Record<string, string>; target: Record<string, string> }[] }
+export const numericType = (type: string | undefined) => type !== undefined && ["dtFloat", "dtInteger"].includes(type)
 
 export async function readNodeXml(artifactDir: string): Promise<PackageXml | { invalid: string }> {
   const child = Bun.spawn(["python3", path.join(evalsRoot, "script/inspect-node-package.py"),
@@ -25,8 +26,8 @@ export function checkNodeXml(xml: PackageXml, id: string, required: Set<string>)
     if (cross) {
       const mode = cross.engine.SlidingUniqueValues === "true" ? "sliding" : "fixed"
       if (mode !== (id === "crosstable-sliding-average" ? "sliding" : "fixed")) failures.push("crosstable: category mode differs")
-      const roles = cross.columns.map(c => `${c.Name}:${c.InputColumnInfoName}:${c.UsageType}:${c.DataType}`).sort()
-      if (JSON.stringify(roles) !== JSON.stringify(["Amount:Amount:utValue:dtFloat", "Category:Category:utGroup:dtString", "Region:Region:utActive:dtString"]))
+      const roles = cross.columns.map(c => `${c.Name}:${c.InputColumnInfoName}:${c.UsageType}:${numericType(c.DataType) ? "numeric" : c.DataType}`).sort()
+      if (JSON.stringify(roles) !== JSON.stringify(["Amount:Amount:utValue:numeric", "Category:Category:utGroup:dtString", "Region:Region:utActive:dtString"]))
         failures.push("crosstable: field roles/types differ")
       const amount = cross.columns.find(c => c.Name === "Amount")
       if (amount?.extension.AggregationTypes !== (id === "crosstable-fixed-sum" ? "ctatSum" : "ctatAvg")) failures.push("crosstable: aggregate differs")

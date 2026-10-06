@@ -1,8 +1,8 @@
 import path from "node:path"
 import { createHash } from "node:crypto"
 import { readdir } from "node:fs/promises"
-import { checkNodeSequence, operationReceipts, readNodeEvents, successful } from "./node-events"
-import { checkNodeXml, type PackageXml } from "./node-xml"
+import { after, checkNodeSequence, operationReceipts, readNodeEvents, successful } from "./node-events"
+import { checkNodeXml, numericType, type PackageXml } from "./node-xml"
 
 const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex")
 export async function checkNodeEvidence(taskDir: string, attemptDir: string, id: string, required: Set<string>, xml: PackageXml, packagePath?: string) {
@@ -25,10 +25,10 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
       receipt.output.configuration?.readback?.source?.source_path === imp?.engine.FileName &&
       receipt.output.configuration?.readback?.source?.first_line_as_title === true &&
       receipt.output.configuration?.readback?.format?.delimiter === ",")
-    const columns = imp?.columns.map(c => `${c.Name}:${c.DataType}:${c.UsageType}`).sort()
-    if (imports.length !== 1 || !delivery || !imported || delivery.index >= imported.request.index ||
+    const columns = imp?.columns.map(c => `${c.Name}:${numericType(c.DataType) ? "numeric" : c.DataType}:${c.UsageType}`).sort()
+    if (imports.length !== 1 || !delivery || !imported || !after(imported.request, delivery) ||
       imp?.engine.CodePage !== "65001" || imp?.engine.DelimiterChar !== "," ||
-      JSON.stringify(columns) !== JSON.stringify(["Amount:dtFloat:utActive", "Category:dtString:utActive", "Region:dtString:utActive"]))
+      JSON.stringify(columns) !== JSON.stringify(["Amount:numeric:utActive", "Category:dtString:utActive", "Region:dtString:utActive"]))
       failures.push("input: original bytes and native CSV import proof required")
   }
   if (required.has("export") || required.has("sequence")) {
@@ -47,7 +47,7 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
       const exported = operations.receipts.find(({ request, receipt }) => {
         const r = receipt.output, artifact = r.output?.file_artifacts?.[0]
         return request.input.target?.type === "exports.text" && r.node?.node_id === out?.id &&
-          r.execution?.status === "completed" && sequence.final && request.index > sequence.final.receipt.index &&
+          r.execution?.status === "completed" && sequence.final && after(request, sequence.final.receipt) &&
           r.node?.document_id === sequence.final.config.node?.document_id && r.node?.workflow_id === sequence.final.config.node?.workflow_id &&
           r.configuration?.readback?.destination === out?.engine.FileName &&
           r.output?.file_artifacts?.length === 1 && artifact?.destination === out?.engine.FileName &&
@@ -63,7 +63,7 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
           r.output?.save_completed === true && r.output?.workflow_preserved === true && typeof r.output?.package_ref?.path === "string" &&
           (!packagePath || r.output.package_ref.path === packagePath) &&
           r.output.package_ref.path === call.input.parameters?.path &&
-          exported && call.index > exported.receipt.index && sequence.final && call.index > sequence.final.receipt.index &&
+          exported && after(call, exported.receipt) && sequence.final && after(call, sequence.final.receipt) &&
           r.output?.workflow_continuations?.some((w: Record<string, any>) => w.document_id === sequence.final!.config.node?.document_id &&
             w.workflow_ref?.workflow_id === sequence.final!.config.node?.workflow_id)
       })

@@ -18,6 +18,7 @@ test("реальный XML: неверный aggregate, category mode и обх�
       return validateNodeAttempt(root, root)
     }
     expect((await validate(xml)).failures).toEqual([])
+    expect((await validate(xml.replaceAll('DataType="dtFloat"', 'DataType="dtInteger"'))).failures).toEqual([])
     expect((await validate(xml.replace('AggregationTypes="ctatSum"', 'AggregationTypes="ctatAvg"'))).failures.join(" ")).toContain("aggregate")
     expect((await validate(xml.replace('UniqueValueNames="true"', 'UniqueValueNames="true" SlidingUniqueValues="true"'))).failures.join(" ")).toContain("category")
     const cross = "94746d7f-26b3-48ee-9712-029525b6c757"
