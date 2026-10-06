@@ -9,6 +9,7 @@ import os
 parser=argparse.ArgumentParser()
 for key in ['worktree','config','out']:parser.add_argument('--'+key,required=True,type=Path)
 parser.add_argument('--case',required=True)
+parser.add_argument('--same-node-correction',action='store_true')
 parser.add_argument('--matrix',choices=['matrix','csv-matrix'],default='matrix')
 args=parser.parse_args()
 sys.dont_write_bytecode=True
@@ -34,8 +35,13 @@ instructions=f"""Создай новый пакет {package}. Импортир�
 Поля в исходном порядке: {json.dumps(case['columns'],ensure_ascii=False)}
 Настрой технические имена, метки, типы, виды и использование всех полей; входные имена бери из фактического определения полей (для файла без заголовков не угадывай их). Не теряй строки, NULL, пустые значения, ведущие нули, кавычки и переносы. Выполни импорт, прочитай всю небольшую таблицу (до 10 строк) с точными числами. Сохрани новый пакет после успеха. При неизвестном эффекте остановись, не повторяй загрузку или создание.
 """
+if args.same_node_correction:
+ if case['case_id']!='pipe_multiline':raise RuntimeError('CORRECTION_CASE_REQUIRES_PIPE_FIXTURE')
+ instructions += """
+Проверка исправления на том же узле: сначала выполни ровно один новый импорт с тем же исходным файлом и всеми заданными настройками, но delimiter="," вместо "|". Ожидается известный отказ привязки числа полей. Продолжать можно только после settled FAILED и cleanup_complete=true с подтверждённым сохранённым node_id; при другом/неизвестном исходе остановись. Затем на ЭТОМ ЖЕ узле под новым operation_id примени все правильные настройки выше (delimiter="|") и выполни импорт. Не создавай второй узел и не загружай файл снова. Сохрани успешный пакет. Оба исхода зафиксируй.
+"""
 (work/'task.md').write_text(instructions)
-result={'status':'FAIL','node':'text-import','case_id':case['case_id'],'matrix':args.matrix,'input_source':case['source'],'role':cfg['role'],**owner,'source_sha':meta['sourceCommit'],'source_tree_sha256':meta['sourceTreeSha256'],'cli_manifest_sha256':hashlib.sha256((payload/'cli-manifest.json').read_bytes()).hexdigest(),'ops':ops_identity(),'model':cfg['model'],'variant':cfg['variant'],'cli_exit':None,'oracle_exit':None,'timed_out':False,'package_path':package,'oracle':{'status':'not_run'},'cleanup':{'package_closed':False,'logged_out':False},'desktop':'not_checked','cli_manifest_metadata':meta}
+result={'status':'FAIL','node':'text-import','case_id':case['case_id'],'matrix':args.matrix,'same_node_correction_required':args.same_node_correction,'input_source':case['source'],'role':cfg['role'],**owner,'source_sha':meta['sourceCommit'],'source_tree_sha256':meta['sourceTreeSha256'],'cli_manifest_sha256':hashlib.sha256((payload/'cli-manifest.json').read_bytes()).hexdigest(),'ops':ops_identity(),'model':cfg['model'],'variant':cfg['variant'],'cli_exit':None,'oracle_exit':None,'timed_out':False,'package_path':package,'oracle':{'status':'not_run'},'cleanup':{'package_closed':False,'logged_out':False},'desktop':'not_checked','cli_manifest_metadata':meta}
 started=time.monotonic();kw=dict(attempt=attempt,payload=payload,profile=profile,cwd=work,auth=Path(cfg['provider_auth_file']),pass_fds=(lock,))
 def invoke(command,stdout,stderr,**more):
  with stdout.open('wb') as out,stderr.open('wb') as err:return run(command,stdout=out,stderr=err,**more)
@@ -86,6 +92,16 @@ try:
  ports=warm['output']['ports']
  if len(ports)!=1:raise RuntimeError('WARM_OUTPUT_INCOMPLETE')
  result['cli_full_values']=oracle_module.compare(case,ports[0])
+ if result.get('same_node_correction_required'):
+  calls=[t for t in terminal if t['tool']=='loginom_dock_node_apply' and t['input'].get('target',{}).get('type')=='imports.text']
+  if len(calls)!=2 or [t['input']['target']['kind'] for t in calls]!=['new','existing']:raise RuntimeError('CORRECTION_EXACT_TWO_APPLIES_REQUIRED')
+  first,second=[settled.get(t['input']['operation_id']) for t in calls]
+  if not first or first.get('status')!='FAILED' or first.get('cleanup_complete') is not True or second is not warm:raise RuntimeError('CORRECTION_KNOWN_REFUSAL_REQUIRED')
+  if not first.get('node',{}).get('node_id') or first['node']['node_id']!=second['node']['node_id']:raise RuntimeError('CORRECTION_SAME_NODE_REQUIRED')
+  if len([t for t in terminal if t['tool']=='loginom_dock_artifact_deliver'])!=1:raise RuntimeError('CORRECTION_SINGLE_DELIVERY_REQUIRED')
+  if calls[0]['input']['parameters']['settings']['format']['delimiter']!=',' or calls[1]['input']['parameters']['settings']['format']['delimiter']!='|':raise RuntimeError('CORRECTION_DELIMITER_SEQUENCE_REQUIRED')
+  result['same_node_correction']={'status':'PASS','node_id':first['node']['node_id'],'original_refusal':first,'corrected_operation_id':second['operation_id'],'node_apply_count':2,'delivery_count':1}
+
  if result['cli_exit']!=0 or result['oracle_exit']!=0 or not all(result['cleanup'].get(k) is True for k in ['package_closed','logged_out']):raise RuntimeError('FULL_ACCEPTANCE_REQUIRED')
  result['status']='PASS'
 except Exception as error:
