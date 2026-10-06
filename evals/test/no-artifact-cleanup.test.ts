@@ -72,3 +72,17 @@ test("cleanupOrphanResult не читает и не удаляет symlink на 
     expect(await Bun.file(path.join(directory, "evidence", "storage-outputs", name)).exists()).toBe(false)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
+
+test("cleanupOrphanResult подтверждает byte/hash evidence и проверяет отсутствие файла после удаления", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "eval-orphan-"))
+  try {
+    const name = "eval-run-case-1.result.csv", bytes = "csv bytes\n"
+    await Bun.write(path.join(directory, name), bytes)
+    await cleanupOrphanResult({ source: parseArtifactSource(`dir:${directory}`, { container: "", storageDir: "" }),
+      name, outDir: path.join(directory, "evidence"), existingNames: [] })
+    expect(await Bun.file(path.join(directory, "evidence/storage-cleanup.json")).json()).toMatchObject({
+      status: "confirmed", name, existed_before: false, removed: true, verified_absent: true,
+      archived: { path: `storage-outputs/${name}`, bytes: Buffer.byteLength(bytes), sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex") },
+    })
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})

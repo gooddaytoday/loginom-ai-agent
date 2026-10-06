@@ -122,22 +122,46 @@ export async function cleanupArtifact(source: ArtifactSource, artifact: Artifact
 }
 
 export async function cleanupOrphanResult(input: { source: ArtifactSource; name: string; outDir: string; existingNames: readonly string[] | null }) {
-  if (path.basename(input.name) !== input.name) throw Error("Unsafe result filename")
-  if (input.existingNames === null) throw Error("Storage ownership baseline unavailable")
-  if (input.existingNames.includes(input.name)) throw Error("Result ownership unconfirmed: pre-existing filename")
-  const entries = await listStorage(input.source)
-  if (!entries.some(entry => entry.name === input.name)) return
-  if (input.source.kind === "dir") {
-    if (!(await lstat(path.join(input.source.dir, input.name))).isFile()) throw Error("Result is not a regular file")
-  } else {
-    const regular = await Bun.$`docker exec ${input.source.container} sh -c ${'test -f "$1" && ! test -L "$1"'} eval-orphan ${`${input.source.storageDir}/${input.name}`}`.quiet().nothrow()
-    if (regular.exitCode !== 0) throw Error("Result is not a regular file")
+  const evidence: { status: string; name: string; existed_before: boolean | null; removed: boolean;
+    verified_absent: boolean; archived?: { path: string; bytes: number; sha256: string }; error?: string } = {
+    status: "failed", name: input.name, existed_before: input.existingNames?.includes(input.name) ?? null,
+    removed: false, verified_absent: false,
   }
-  await mkdir(path.join(input.outDir, "storage-outputs"), { recursive: true })
-  await copyOut(input.source, input.name, path.join(input.outDir, "storage-outputs", input.name))
-  if (input.source.kind === "dir") return rm(path.join(input.source.dir, input.name))
-  const removed = await Bun.$`docker exec ${input.source.container} rm -f -- ${`${input.source.storageDir}/${input.name}`}`.quiet().nothrow()
-  if (removed.exitCode !== 0) throw Error(`docker exec rm: ${removed.stderr.toString().trim()}`)
+  try {
+    if (path.basename(input.name) !== input.name) throw Error("Unsafe result filename")
+    if (input.existingNames === null) throw Error("Storage ownership baseline unavailable")
+    if (evidence.existed_before) throw Error("Result ownership unconfirmed: pre-existing filename")
+    const entries = await listStorage(input.source)
+    if (entries.some(entry => entry.name === input.name)) {
+      if (input.source.kind === "dir") {
+        if (!(await lstat(path.join(input.source.dir, input.name))).isFile()) throw Error("Result is not a regular file")
+      } else {
+        const regular = await Bun.$`docker exec ${input.source.container} sh -c ${'test -f "$1" && ! test -L "$1"'} eval-orphan ${`${input.source.storageDir}/${input.name}`}`.quiet().nothrow()
+        if (regular.exitCode !== 0) throw Error("Result is not a regular file")
+      }
+      await mkdir(path.join(input.outDir, "storage-outputs"), { recursive: true })
+      const local = path.join(input.outDir, "storage-outputs", input.name)
+      await copyOut(input.source, input.name, local)
+      const bytes = await Bun.file(local).arrayBuffer()
+      evidence.archived = { path: `storage-outputs/${input.name}`, bytes: bytes.byteLength,
+        sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex") }
+      if (input.source.kind === "dir") await rm(path.join(input.source.dir, input.name))
+      else {
+        const removed = await Bun.$`docker exec ${input.source.container} rm -f -- ${`${input.source.storageDir}/${input.name}`}`.quiet().nothrow()
+        if (removed.exitCode !== 0) throw Error(`docker exec rm: ${removed.stderr.toString().trim()}`)
+      }
+      evidence.removed = true
+    }
+    if ((await listStorage(input.source)).some(entry => entry.name === input.name)) throw Error("Result storage cleanup unconfirmed")
+    evidence.verified_absent = true
+    evidence.status = "confirmed"
+  } catch (error) {
+    evidence.error = error instanceof Error ? error.message : String(error)
+    throw error
+  } finally {
+    await mkdir(input.outDir, { recursive: true })
+    await Bun.write(path.join(input.outDir, "storage-cleanup.json"), JSON.stringify(evidence, null, 2) + "\n")
+  }
 }
 
 function belongsToAttempt(name: string, prefix: string) {
