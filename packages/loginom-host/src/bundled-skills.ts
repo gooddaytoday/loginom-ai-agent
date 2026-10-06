@@ -1,11 +1,16 @@
 import { createHash } from "node:crypto"
 import { readFile, readdir, realpath, stat } from "node:fs/promises"
-import { isAbsolute, join, relative, sep } from "node:path"
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { Option, Schema } from "effect"
+import { parseDocument } from "yaml"
 
 const manifest = Schema.Struct({
   protocol: Schema.Literal(1),
   files: Schema.Array(Schema.Struct({ path: Schema.String, sha256: Schema.String })),
+})
+const frontmatter = Schema.Struct({
+  name: Schema.String,
+  metadata: Schema.optional(Schema.Record(Schema.String, Schema.String)),
 })
 
 // Verification is independent of bundled Node/Chromium so backend discovery
@@ -45,6 +50,27 @@ export async function verifyBundledSkills(resources: string) {
     if (createHash("sha256").update(await readFile(absolute)).digest("hex") !== file.sha256)
       throw Error("LOGINOM_SKILL_HASH_MISMATCH")
   }
+  for (const entry of entries.filter((file) => /^skills\/[^/]+\/SKILL\.md$/.test(file.path))) {
+    const directory = join(root, dirname(entry.path))
+    const content = await readFile(join(root, entry.path), "utf8")
+    const header = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)?.[1]
+    if (!header) throw Error("LOGINOM_SKILL_FRONTMATTER_INVALID")
+    const yaml = parseDocument(header)
+    if (yaml.errors.length) throw Error("LOGINOM_SKILL_FRONTMATTER_INVALID")
+    const data = Schema.decodeUnknownOption(frontmatter)(yaml.toJS() as unknown)
+    if (Option.isNone(data) || data.value.name !== entry.path.split("/")[1])
+      throw Error("LOGINOM_SKILL_FRONTMATTER_INVALID")
+    const generated = data.value.metadata?.["loginom-generated"]
+    if (generated) requireResource(root, directory, directory, generated, listed)
+    for (const markdown of entries.filter((file) => file.path.startsWith(dirname(entry.path) + "/") && file.path.endsWith(".md"))) {
+      const text = await readFile(join(root, markdown.path), "utf8")
+      for (const link of text.matchAll(/\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\)/g)) {
+        const target = link[1] ?? link[2]
+        if (/^(?:https?:|viking:|mailto:|#)/i.test(target)) continue
+        requireResource(root, directory, dirname(join(root, markdown.path)), target, listed)
+      }
+    }
+  }
   return entries
     .filter((file) => /^skills\/[^/]+\/SKILL\.md$/.test(file.path))
     .map((file) => {
@@ -60,4 +86,13 @@ export async function verifyBundledSkills(resources: string) {
           .digest("hex"),
       }
     })
+}
+
+function requireResource(root: string, skill: string, parent: string, target: string, listed: Set<string>) {
+  const path = resolve(parent, decodeURIComponent(target.split(/[?#]/)[0]))
+  const inside = relative(skill, path)
+  if (!inside || isAbsolute(inside) || inside === ".." || inside.startsWith(".." + sep))
+    throw Error("LOGINOM_SKILL_RESOURCE_ESCAPE")
+  if (!listed.has(relative(root, path).split(sep).join("/")))
+    throw Error("LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING")
 }

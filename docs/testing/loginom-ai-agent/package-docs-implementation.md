@@ -100,6 +100,18 @@ manifest source V1. Первые проверки выполняются на м
 typecheck Agent, Host и Product — PASS. Полная проверка assets/metadata,
 классификация источников и их порядок, runtime/staging ещё открыты.
 
+Следующий цикл assets: RED — отсутствующий шрифт из ссылки в references
+успешно проходил проверку; GREEN — отклоняется. Общий verifier читает YAML
+frontmatter (прямая зависимость `yaml 2.9.1` из существующего lock), проверяет
+относительные Markdown-ссылки и `metadata.loginom-generated`.
+Первая регрессия: Host 6 PASS / 1 FAIL из-за ошибочного symlink fixture,
+который размещал «внешний» файл внутри resources. Fixture исправлен на отдельный
+внешний каталог; повторный запуск подтвердил 7 PASS / 0 FAIL.
+Проверки: неучтённые/изменённые/отсутствующие файлы, ссылки references,
+generated executable, выход за границы skill и symlink escape, независимый
+digest двух skills. Host typecheck PASS; Agent bundled discovery 2 PASS.
+Lock изменился только добавлением прямой зависимости Host, без обновления версий.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
