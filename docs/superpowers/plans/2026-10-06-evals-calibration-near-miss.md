@@ -7,7 +7,8 @@ Spec: ../specs/2026-09-18-evals-design.md, calibration section.
 - [x] TDD tracer: missed sort is rejected despite oracle failure.
 - [x] Expected checklist/oracle gates, corpus validation and compatibility.
 - [x] 35-task corpus: sort 35, aggregate 34, threshold 6, filter 3, column 35.
-- [ ] Independent CSV reproduction; full test/typecheck/diff-check.
+- [x] Independent CSV reproduction.
+- [ ] Final full test/typecheck/diff-check.
 - [ ] Live full acceptance; general judge prompt tuning if necessary.
 - [ ] Final single-prompt run and acceptance report; Goal completion audit.
 
@@ -19,13 +20,26 @@ Do not weaken rubrics, expected failures or thresholds. Semantic misses are not 
 - Worktree: /home/kiselev/.codex/worktrees/calibration-near-miss/loginom-ai-agent.
 - Independent reproduction: 35 tasks, 113 cases, exact saved mutant CSV matches.
 - Public prepareCalibrationCases: 113 prepared; oracle true only low-liquidity-companies/filter.
-- Corpus SHA256: 72e7b163ea881bbbf4ce614529a69925f118dde81501529127ca07e9eb880e0f.
+- Initial corpus SHA256: 72e7b163ea881bbbf4ce614529a69925f118dde81501529127ca07e9eb880e0f.
+- Corrected corpus SHA256: 00f59c212eb01a2e0dde4ea7441629538cc3f20e2fca904dc103ca98a32a8450.
+  first-last-touch/aggregate now preserves the unchanged downstream Round(..., 2).
+  Its original six-decimal mean was within oracle tolerance but was corrected for XML/CSV agreement.
+  Expectations were not changed. Independent reproduction and public preparation passed again.
 - First full suite: 314 pass, 0 fail, 1419 assertions, 21 files, 352.17s; typecheck exit 0.
   Additional strict-gate tests were added afterwards; final full suite is still required.
 - Live full initial run: results/near-miss-live/20261006-063149-calibrate.
   It started from d12be3912 with the original judge prompt. Reporting/validation
-  changes made afterwards do not alter this in-flight evaluation; do not edit
-  judge-prompt.md while it runs. Session 5243, log /tmp/calibration-live-initial.log.
+  changes made afterwards did not alter its imported code. Stopped with exit 143
+  after 12 positive/foreign pairs (all 100/0) to correct corpus rounding.
+  It is an incomplete diagnostic, not acceptance. Log /tmp/calibration-live-initial.log.
+- New full run from clean c1e606017: results/near-miss-final/20261006-065028-calibrate.
+  Session 68631, log /tmp/calibration-live-final.log. Original prompt remains fixed
+  (SHA256 1aa36ad41f999d999526edd387b014f2b232d27617fba2d9503787b8fbbf287c).
+  Do not edit the prompt while a full run is active.
+- Intermediate full tests: 319 pass, 0 fail, 1431 assertions, 21 files, 362.08s; typecheck exit 0.
+  Final full checks restarted after the rounding fix: session 6428,
+  /tmp/calibration-c1e606-full-tests.log and /tmp/calibration-c1e606-typecheck.log.
+- Latest targeted tests: 22 pass, 0 fail. Missing XML now reports corpus exit 2.
 - Targeted live sales missing-column diagnostic: result in
   results/near-miss-column-diagnostic/result.json. gpt-6-astra/high:
   score 57, export-columns=false, result-rows=false; other supplied items true.
