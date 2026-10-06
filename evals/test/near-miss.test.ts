@@ -185,6 +185,9 @@ test("calibration accepts a judge that fails every expected near-miss item", asy
     expect(result.code).toBe(0)
     const report = await Bun.file(path.join(result.runDir, "calibration.json")).json()
     expect(report.rows.find((row: { kind: string }) => row.kind === "near-miss")).toMatchObject({ expectations_met: true })
+    const markdown = await Bun.file(path.join(result.runDir, "calibration.md")).text()
+    expect(markdown).toContain("near-miss/sort")
+    expect(markdown).toContain("oracle")
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
