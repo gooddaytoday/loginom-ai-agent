@@ -187,3 +187,15 @@ test("calibration accepts a judge that fails every expected near-miss item", asy
     expect(report.rows.find((row: { kind: string }) => row.kind === "near-miss")).toMatchObject({ expectations_met: true })
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("calculator threshold mutation recomputes downstream class totals", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-threshold-"))
+  try {
+    const tasks = await loadTasks(path.join(evalsRoot, "fixtures/calibration"), ["abc-pareto-groups"])
+    const result = await prepareCalibrationCases(tasks, root, path.join(evalsRoot, "calibration"))
+    const entry = result.prepared.find((item) => item.mutation.kind === "threshold")
+    expect(entry).toBeDefined()
+    expect(entry!.mutation.expected_failed).toEqual(["cumulative-class", "result-rows"])
+    expect(entry!.oracle.passed).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
