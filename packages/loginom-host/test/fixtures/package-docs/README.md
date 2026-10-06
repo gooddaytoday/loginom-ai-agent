@@ -26,3 +26,5 @@ Only the generation timestamp is normalized during comparison.
 Formatting and nested report/Word XML variants use the unchanged baseline
 emit_report.py (source SHA-256 098deb4455a5e428c4aab6544bbeaa13dc0c2081525675ee38c61ec3fde70426).
 DOCX archive timestamps/bytes are not compared.
+PDF variants retain the same baseline writer and bundled Golos fonts. Tests
+decode page text through ToUnicode and compare runs, not compressed PDF bytes.

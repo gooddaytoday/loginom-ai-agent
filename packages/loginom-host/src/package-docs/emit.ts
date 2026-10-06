@@ -1,10 +1,13 @@
 import { TextReader, Uint8ArrayWriter, ZipWriter } from "@zip.js/zip.js"
+import { deflateSync } from "node:zlib"
+import { loadFont, subsetFont } from "./font"
+import type { ReportFont } from "./font"
 
-export async function renderReport(markdown: string, format: "md" | "docx" | "pdf" = "pdf"): Promise<Uint8Array> {
+export async function renderReport(markdown: string, format: "md" | "docx" | "pdf" = "pdf", fonts = new URL("../assets/fonts/", import.meta.url)): Promise<Uint8Array> {
   if (/PLACEHOLDER_/.test(markdown)) throw Error("PACKAGE_DOCS_PLACEHOLDER")
   if (format === "md") return new TextEncoder().encode(markdown.endsWith("\n") ? markdown : markdown + "\n")
   if (format === "docx") return writeDocx(parseBlocks(markdown))
-  throw Error("PACKAGE_DOCS_EMIT_UNSUPPORTED")
+  return writePdf(parseBlocks(markdown), fonts)
 }
 
 type Run = { text: string; bold: boolean }
@@ -86,6 +89,175 @@ function docxRun(run: Run) {
   const space = run.text.startsWith(" ") || run.text.endsWith(" ") || run.text.includes("  ") ? ' xml:space="preserve"' : ""
   const text = run.text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
   return `<w:r>${run.bold ? "<w:rPr><w:b/></w:rPr>" : ""}<w:t${space}>${text}</w:t></w:r>`
+}
+
+type Glyphs = { F1: Map<number, string>; F2: Map<number, string> }
+type Page = { commands: string[]; glyphs: Glyphs }
+type Character = { text: string; bold: boolean }
+
+async function writePdf(blocks: Block[], fonts: URL) {
+  const [regular, bold] = await Promise.all([
+    loadFont(new URL("GolosText-Regular.ttf", fonts), "GolosText"),
+    loadFont(new URL("GolosText-Bold.ttf", fonts), "GolosText-Bold"),
+  ])
+  const pages = layoutPdf(blocks, regular, bold)
+  regular.data = subsetFont(regular.data, new Set(pages.flatMap((page) => [...page.glyphs.F1.keys()])))
+  bold.data = subsetFont(bold.data, new Set(pages.flatMap((page) => [...page.glyphs.F2.keys()])))
+  return assemblePdf(pages, regular, bold)
+}
+
+function layoutPdf(blocks: Block[], regular: ReportFont, bold: ReportFont) {
+  const pages: Page[] = []
+  let current: Page = { commands: [], glyphs: { F1: new Map(), F2: new Map() } }
+  let y = 841.89 - 56
+  const newPage = () => {
+    if (current.commands.length) pages.push(current)
+    current = { commands: [], glyphs: { F1: new Map(), F2: new Map() } }
+    y = 841.89 - 56
+  }
+  const gap = (amount: number) => {
+    if (current.commands.length && y - amount < 56) { newPage(); return }
+    y -= amount
+  }
+  for (const block of blocks) {
+    const style = pdfStyle(block)
+    const chars = block.runs.flatMap((run) => [...run.text].map((text) => ({ text, bold: block.kind.startsWith("h") || run.bold })))
+    const marker = block.marker ? block.marker + " " : ""
+    const markerWidth = [...marker].reduce((sum, char) => sum + regular.width(char, style.size), 0)
+    const wrapped = wrapText(chars, 595.28 - 112 - style.indent - markerWidth, style.size, regular, bold)
+    gap(style.before)
+    const ascent = regular.ascent * style.size / regular.units, leading = style.size * 1.35
+    for (const [index, line] of (wrapped.length ? wrapped : [[]]).entries()) {
+      if (y - leading < 56) newPage()
+      const baseline = y - ascent, x = 56 + style.indent
+      if (!index && marker) current.commands.push(pdfTextCommand(regular, "F1", marker, style.size, x, baseline, current.glyphs))
+      current.commands.push(pdfLine(line, style.size, x + (!index ? markerWidth : 0), baseline, regular, bold, current.glyphs))
+      y -= leading
+    }
+    gap(style.after)
+  }
+  pages.push(current)
+  return pages.some((page) => page.commands.length) ? pages.filter((page) => page.commands.length) : [current]
+}
+
+function pdfStyle(block: Block) {
+  if (block.kind === "h1") return { size: 18, before: 12, after: 8, indent: 0 }
+  if (block.kind === "h2") return { size: 15, before: 10, after: 6, indent: 0 }
+  if (block.kind === "h3" || block.kind === "h4") return { size: 13, before: 8, after: 4, indent: 0 }
+  if (block.kind === "quote") return { size: 11, before: 2, after: 6, indent: 16 }
+  if (block.kind === "li") return { size: 11, before: 1, after: 2, indent: 14 * block.depth }
+  return { size: 11, before: 2, after: 6, indent: 0 }
+}
+
+function wrapText(chars: Character[], maximum: number, size: number, regular: ReportFont, bold: ReportFont) {
+  const lines: Character[][] = []
+  let line: Character[] = [], width = 0, lastSpace = -1
+  const measure = (character: Character) => (character.bold ? bold : regular).width(character.text, size)
+  for (const character of chars) {
+    const next = measure(character)
+    if (character.text === " ") lastSpace = line.length
+    if (line.length && width + next > maximum) {
+      lines.push(lastSpace > 0 ? line.slice(0, lastSpace) : line)
+      line = lastSpace > 0 ? line.slice(lastSpace + 1) : []
+      width = line.reduce((sum, character) => sum + measure(character), 0)
+      lastSpace = -1
+    }
+    line.push(character)
+    width += next
+  }
+  if (line.length) lines.push(line)
+  return lines
+}
+
+function pdfLine(line: Character[], size: number, x: number, y: number, regular: ReportFont, bold: ReportFont, used: Glyphs) {
+  const chunks: string[] = []
+  let cursor = x, index = 0
+  while (index < line.length) {
+    const isBold = line[index].bold
+    let end = index + 1
+    while (end < line.length && line[end].bold === isBold) end++
+    const text = line.slice(index, end).map((character) => character.text).join("")
+    const font = isBold ? bold : regular
+    chunks.push(pdfTextCommand(font, isBold ? "F2" : "F1", text, size, cursor, y, used))
+    cursor += [...text].reduce((sum, character) => sum + font.width(character, size), 0)
+    index = end
+  }
+  return chunks.join("\n")
+}
+
+function pdfTextCommand(font: ReportFont, key: keyof Glyphs, text: string, size: number, x: number, y: number, used: Glyphs) {
+  const glyphs = [...text].map((character) => {
+    const glyph = font.glyph(character)
+    if (!used[key].has(glyph)) used[key].set(glyph, character)
+    return glyph.toString(16).toUpperCase().padStart(4, "0")
+  }).join("")
+  return `BT /${key} ${size.toFixed(2)} Tf 1 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)} Tm <${glyphs}> Tj ET`
+}
+
+function assemblePdf(pages: Page[], regular: ReportFont, bold: ReportFont) {
+  // Objects 3–12 contain two fonts; page and content objects follow them.
+  const used: Glyphs = { F1: new Map(), F2: new Map() }
+  for (const page of pages) for (const key of ["F1", "F2"] as const)
+    for (const [glyph, character] of page.glyphs[key]) used[key].set(glyph, character)
+  const objects = [
+    Buffer.from("<< /Type /Catalog /Pages 2 0 R >>"),
+    Buffer.from(`<< /Type /Pages /Count ${pages.length} /Kids [${pages.map((_, index) => `${13 + index} 0 R`).join(" ")}] >>`),
+    ...fontObjects(regular, used.F1, 3), ...fontObjects(bold, used.F2, 8),
+    ...pages.map((_, index) => Buffer.from("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] " +
+      `/Resources << /Font << /F1 7 0 R /F2 12 0 R >> >> /Contents ${13 + pages.length + index} 0 R >>`)),
+    ...pages.map((page) => stream(Buffer.from(page.commands.join("\n") + "\n"))),
+  ]
+  return pdfBytes(objects)
+}
+
+function stream(bytes: Buffer, extra = "") {
+  return Buffer.concat([Buffer.from(`<< /Length ${bytes.length}${extra} >>\nstream\n`), bytes, Buffer.from("\nendstream")])
+}
+
+function fontObjects(font: ReportFont, used: Map<number, string>, first: number) {
+  const widths = [...used.keys()].toSorted((a, b) => a - b).map((glyph) => {
+    const width = font.advances[Math.min(glyph, font.advances.length - 1)] * 1000 / font.units
+    return `${glyph} [${width % 1 === 0.5 ? 2 * Math.round(width / 2) : Math.round(width)}]`
+  }).join(" ")
+  return [
+    stream(deflateSync(font.data), ` /Length1 ${font.data.length} /Filter /FlateDecode`),
+    Buffer.from(`<< /Type /FontDescriptor /FontName /${font.name} /Flags 32 /FontBBox [${font.bbox.join(" ")}] ` +
+      `/ItalicAngle 0 /Ascent ${font.ascent} /Descent ${font.descent} /CapHeight ${font.ascent} /StemV 80 /FontFile2 ${first} 0 R >>`),
+    Buffer.from(`<< /Type /Font /Subtype /CIDFontType2 /BaseFont /${font.name} ` +
+      `/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor ${first + 1} 0 R /CIDToGIDMap /Identity /DW 500 /W [${widths}] >>`),
+    stream(Buffer.from(toUnicode(used))),
+    Buffer.from(`<< /Type /Font /Subtype /Type0 /BaseFont /${font.name} /Encoding /Identity-H /DescendantFonts [${first + 2} 0 R] /ToUnicode ${first + 3} 0 R >>`),
+  ]
+}
+
+function toUnicode(used: Map<number, string>) {
+  const pairs = [...used].toSorted((a, b) => a[0] - b[0])
+  const lines = ["/CIDInit /ProcSet findresource begin", "12 dict begin", "begincmap",
+    "/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> def",
+    "/CMapName /Adobe-Identity-UCS def", "/CMapType 2 def", "1 begincodespacerange", "<0000> <FFFF>", "endcodespacerange"]
+  for (let offset = 0; offset < pairs.length; offset += 100) {
+    const chunk = pairs.slice(offset, offset + 100)
+    lines.push(`${chunk.length} beginbfchar`, ...chunk.map(([glyph, character]) =>
+      `<${glyph.toString(16).toUpperCase().padStart(4, "0")}> <${Buffer.from(character, "utf16le").swap16().toString("hex").toUpperCase()}>`), "endbfchar")
+  }
+  if (!pairs.length) lines.push("0 beginbfchar", "endbfchar")
+  return [...lines, "endcmap", "CMapName currentdict /CMap defineresource pop", "end", "end", ""].join("\n")
+}
+
+function pdfBytes(objects: Buffer[]) {
+  const chunks = [Buffer.from("%PDF-1.4\n%\xe2\xe3\xcf\xd3\n", "latin1")]
+  const offsets: number[] = []
+  let cursor = chunks[0].length
+  for (const [index, body] of objects.entries()) {
+    const chunk = Buffer.concat([Buffer.from(`${index + 1} 0 obj\n`), body, Buffer.from("\nendobj\n")])
+    offsets.push(cursor)
+    chunks.push(chunk)
+    cursor += chunk.length
+  }
+  chunks.push(Buffer.from(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n` +
+    offsets.map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("") +
+    `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${cursor}\n%%EOF\n`))
+  return Buffer.concat(chunks)
 }
 
 const docxParts = {

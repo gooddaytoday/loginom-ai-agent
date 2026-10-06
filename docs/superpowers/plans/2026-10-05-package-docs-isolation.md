@@ -628,12 +628,12 @@ type PackageDocsRun =
   `stageResources` кладёт bundle в skill до inventory. Шрифты искать от
   `import.meta.url` (`../assets/fonts`). Metafile передать в
   `collect-build-notices.ts`, Golos OFL включить в `THIRD_PARTY_NOTICES`.
-- [ ] ZIP — прямая зависимость `loginom-host` на имеющуюся `@zip.js/zip.js` 2.7.62,
+- [x] ZIP — прямая зависимость `loginom-host` на имеющуюся `@zip.js/zip.js` 2.7.62,
   XML — `@xmldom/xmldom` с закреплённой версией. Перенести собственные писатели
   PDF/DOCX на Node и `node:zlib`, включая subset TTF, Identity-H и ToUnicode;
   отдельные PDF/DOCX библиотеки, LibreOffice и Chromium не нужны.
   Сохранить ZIP-имена без учёта регистра и разделители `/` и `\`.
-- [ ] Сначала отдельные TDD-циклы паритета: нормализованный `structure.v1`,
+- [x] Сначала отдельные TDD-циклы паритета: нормализованный `structure.v1`,
   skeleton без локального времени, текст PDF через ToUnicode, `word/document.xml`.
   Fixtures: простой пакет, подмодели, кириллица. Не сравнивать байты ZIP/PDF.
   Затем отдельные тесты нового поведения, не использующие ошибочный Python

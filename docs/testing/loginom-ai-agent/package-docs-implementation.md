@@ -358,6 +358,22 @@ Host typecheck PASS; логи tdd-node-{emit-md,emit-placeholder,docx}-*.
 проверок содержимого. Логи docx-build-signal-*-collector.log,
 node-docx-single-bundle-{green,refactor-*}.log. PDF и product tool остаются открытыми.
 
+Node PDF: RED — EMIT_UNSUPPORTED для default PDF; отдельные RED — отсутствие
+шрифта давало ENOENT, усечённая head metrics table — Buffer bounds error.
+GREEN — собственный PDF writer использует node:zlib, subset TTF с исходными
+glyph IDs, Identity-H и ToUnicode. Текст трёх PDF совпадает с frozen-Python
+oracle (demo/форматирование/подмодели); общий Node bundle ищет шрифты рядом
+с skill через import.meta.url. Subset меньше исходных TTF, полная контрольная
+сумма каждого 0xb1b0afba, исходные fonts не меняются. Многостраничный PDF
+содержит все 100 абзацев. Placeholders запрещены во всех трёх форматах;
+missing/invalid metrics дают отдельные ошибки. 29 PASS (75 assertions),
+Host typecheck PASS. Логи tdd-node-pdf-*, node-docs-writers-final.log.
+Три образца в собственном acceptance/node-pdf-visual просмотрены после PNG
+рендеринга: читаемая кириллица, без обрезаний/наложений. Bundled Poppler
+несовместим с glibc стенда; /usr/bin/pdftoppm/pdfinfo/pdftotext успешно проверили
+те же Node PDF. Это инструменты визуальной приёмки, не зависимости продукта/CI.
+Два writer/parity пункта этапа 2 отмечены; bundle staging и product tool открыты.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -371,6 +387,6 @@ node-docx-single-bundle-{green,refactor-*}.log. PDF и product tool остают
 - Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
-- Этап 2: extraction/skeleton/MD/DOCX parity, bundled Node 21 PASS; PDF/tool ещё открыты.
-- Следующий шаг — PDF; 35 baseline source-map mismatches остаются live gate.
+- Этап 2: extraction/skeleton/MD/DOCX/PDF parity, bundled Node 29 PASS; staging/tool ещё открыты.
+- Следующий шаг — CLI генератора и staging; 35 baseline source-map mismatches остаются live gate.
 - Живая приёмка и удаление серверного skill остаются открытыми.
