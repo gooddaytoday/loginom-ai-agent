@@ -134,3 +134,18 @@ string, сохраняя исходный ValueText без нормализац�
 по-прежнему отказывается. Адресные 62 Table теста PASS.
 Матрица и регрессии нового чистого SHA требуют
 новых CLI/cold попыток; пять PASS старого SHA не переносятся.
+
+
+### LAB-15: initial field-count refusal
+
+`wrong_delimiter` exposed a complete native definition with one field while
+the request contained two. The old shared reader raised a generic count error
+before the import handler could perform its existing owned draft discard.
+Initial `imports.text` now reads the whole bounded owner-bound schema and
+raises `ImportColumnCountError` (a binding refusal) before column edits. Other
+reader errors and transport uncertainty retain their existing behavior.
+Existing-node partial patches still reconcile the complete retained schema.
+Seven addressed tests cover short/wide mismatches, complete traversal, no
+column edits, incomplete/changing pages, foreign owner and transport loss.
+Live acceptance requires fresh attempts on the published candidate; historical
+AMBIGUOUS/false-cleanup receipts are preserved.
