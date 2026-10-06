@@ -1531,6 +1531,29 @@ narrative, выбор реальной моделью, live Help или уста
 Эти выпускные gates остаются открыты. Требования плана не переработаны; отмечены
 только выполненные deterministic pipeline и matrix/visual QA пункты.
 
+## Product routing corpus для живой модели
+
+Подготовлен `packages/agent/test/cli/package-docs-routing/cases.json`: 20
+естественных русских запросов, 10 docs / 5 scenario / 5 default. Включены локальный
+путь, вложение, PDF/Word/Markdown, `.lgp` + PNG, кириллица/пробелы, внешний путь
+с permission refusal в run, отсутствующий файл/вход и ссылка только на текущий
+серверный пакет. Отдельные setup/followup описывают реальные build → docs,
+составной запрос и docs → build новым пользовательским сообщением в том же чате.
+Справка, инструкции по настройке и обычный разговор остаются default; arithmetic
+выполняется без Loginom key. Slash smoke проверяется отдельно от естественного
+выбора. README фиксирует отправку настоящих file parts, собственный server
+namespace и сбор доказательств для каждого повтора.
+
+Одноразовая статическая проверка из `packages/agent` подтвердила уникальные IDs,
+соотношение 10/5/5, существование всех трёх fixtures, их bytes/hashes, полный
+набор bindings и отсутствие slash-команд среди natural prompts. Prettier и
+`git diff --check` PASS. JSON отчёт сохранён в собственном acceptance-каталоге:
+`product-routing-corpus-verification.json`. SHA-256 cases.json:
+`30fc221f1eb848c083600346bce65d63e3aaa4fd7b129b97fdfda0391724155a`.
+Это проверка подготовки, **liveRuns: 0**; критерии модели/повторов ещё не приняты.
+Пункт подготовки 20 запросов отмечен в плане. Общий evals harness, corpus
+near-miss, judge prompt, профили и launcher соседней сессии не изменялись.
+
 ## Checkpoint
 
 - Product candidate SHA `05d3d144b` (`docs-no-browser`); полный native CLI/resources/manifest/archive сохранены.
@@ -1550,4 +1573,4 @@ narrative, выбор реальной моделью, live Help или уста
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS, native PTY paste/mention 2 PASS; attachment: 44 PASS.
-- Native docs PDF/DOCX/MD 3 PASS, visual QA PASS; TUI 2 PASS; Desktop picker 20 MiB; далее GUI/natural/live evals.
+- Native docs PDF/DOCX/MD 3 PASS, visual QA PASS; TUI 2 PASS; routing corpus 20 готов/live 0; далее GUI/model/evals.

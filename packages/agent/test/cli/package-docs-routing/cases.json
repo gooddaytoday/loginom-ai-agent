@@ -1,0 +1,263 @@
+{
+  "schema_version": "loginom-skills-routing.v1",
+  "scope": "product-routing",
+  "fixtures": {
+    "lgp": "packages/loginom-host/test/fixtures/package-docs/nested.lgp",
+    "png": "packages/agent/test/tool/fixtures/large-image.png",
+    "csv": "packages/desktop/test/loginom/fixtures/standalone-cli/A/sales.csv"
+  },
+  "bindings": ["local_lgp", "unicode_lgp", "missing_lgp", "server_package"],
+  "cases": [
+    {
+      "id": "docs-local-path",
+      "group": "docs",
+      "prompt": "Напиши документацию по локальному пакету {{local_lgp}}. Результат нужен в PDF.",
+      "input": "workspace-path",
+      "expected": {
+        "profile": "package-docs",
+        "result": "pdf"
+      }
+    },
+    {
+      "id": "docs-attached-pdf",
+      "group": "docs",
+      "prompt": "Подготовь понятное бизнес-описание приложенного сценария Loginom в PDF.",
+      "input": "lgp-attachment",
+      "expected": {
+        "profile": "package-docs",
+        "result": "pdf"
+      }
+    },
+    {
+      "id": "docs-attached-word",
+      "group": "docs",
+      "prompt": "Сделай Word-документ: объясни, зачем нужен приложенный пакет, как устроены модули и подмодели.",
+      "input": "lgp-attachment",
+      "expected": {
+        "profile": "package-docs",
+        "result": "docx"
+      }
+    },
+    {
+      "id": "docs-markdown",
+      "group": "docs",
+      "prompt": "Опиши приложенный сценарий Loginom и сохрани описание в Markdown.",
+      "input": "lgp-attachment",
+      "expected": {
+        "profile": "package-docs",
+        "result": "md"
+      }
+    },
+    {
+      "id": "docs-lgp-and-png",
+      "group": "docs",
+      "prompt": "Напиши документацию в PDF по приложенному .lgp. Изображение приложено для контекста; факты о сценарии возьми из пакета.",
+      "input": "lgp-and-png-attachments",
+      "expected": {
+        "profile": "package-docs",
+        "result": "pdf"
+      }
+    },
+    {
+      "id": "docs-external-unicode-path",
+      "group": "docs",
+      "prompt": "Сформируй ИИ Отчет по файлу {{unicode_lgp}}.",
+      "input": "external-text-path",
+      "expected": {
+        "profile": "package-docs",
+        "result": {
+          "desktop": "pdf-after-permission",
+          "run": "permission-refusal-with-file-hint",
+          "tui": "pdf-after-permission"
+        }
+      }
+    },
+    {
+      "id": "docs-missing-file",
+      "group": "docs",
+      "prompt": "Документируй пакет {{missing_lgp}} и подготовь PDF.",
+      "input": "missing-path",
+      "expected": {
+        "profile": "package-docs",
+        "result": "request-existing-local-package",
+        "output": "none"
+      }
+    },
+    {
+      "id": "docs-no-input",
+      "group": "docs",
+      "prompt": "Мне нужна документация по сценарию Loginom. Подготовь ИИ Отчет.",
+      "input": "none",
+      "expected": {
+        "profile": "package-docs",
+        "result": "request-local-package",
+        "output": "none"
+      }
+    },
+    {
+      "id": "docs-current-server-package",
+      "group": "docs",
+      "prompt": "Напиши документацию по текущему открытому сценарию Loginom. Он сохранён на сервере как {{server_package}}.",
+      "input": "server-reference-only",
+      "expected": {
+        "profile": "package-docs",
+        "result": "request-local-package",
+        "output": "none"
+      }
+    },
+    {
+      "id": "docs-after-build",
+      "group": "docs",
+      "setup": {
+        "action": "build-through-real-user-turn",
+        "prompt": "Построй сценарий: импортируй приложенный CSV, сгруппируй строки по Category и просуммируй amount. Сохрани пакет в {{server_package}}.",
+        "input": "csv-attachment",
+        "expectedProfile": "loginom-automation"
+      },
+      "prompt": "Теперь напиши PDF-документацию по созданному сценарию. Локальный пакет прикладываю.",
+      "input": "created-lgp-attachment",
+      "expected": {
+        "profile": "package-docs",
+        "result": "pdf",
+        "transition": "new-user-turn"
+      }
+    },
+    {
+      "id": "scenario-create",
+      "group": "scenario",
+      "prompt": "Построй в Loginom сценарий по приложенному CSV: сгруппируй строки по Category, вычисли сумму amount, выполни и сохрани пакет в {{server_package}}.",
+      "input": "csv-attachment",
+      "expected": {
+        "profile": "loginom-automation",
+        "result": "saved-executed-package"
+      }
+    },
+    {
+      "id": "scenario-modify",
+      "group": "scenario",
+      "setup": {
+        "action": "build-through-real-user-turn",
+        "prompt": "Импортируй приложенный CSV в новый сценарий и сохрани пакет в {{server_package}}.",
+        "input": "csv-attachment",
+        "expectedProfile": "loginom-automation"
+      },
+      "prompt": "В нашем созданном пакете {{server_package}} добавь вычисляемое поле amount_double = amount * 2, выполни узел и сохрани изменения.",
+      "input": "own-created-server-package",
+      "expected": {
+        "profile": "loginom-automation",
+        "result": "saved-executed-package",
+        "transition": "new-user-turn"
+      }
+    },
+    {
+      "id": "scenario-execute-save",
+      "group": "scenario",
+      "setup": {
+        "action": "build-through-real-user-turn",
+        "prompt": "Создай сценарий импорта приложенного CSV и сохрани пакет в {{server_package}}.",
+        "input": "csv-attachment",
+        "expectedProfile": "loginom-automation"
+      },
+      "prompt": "Открой наш пакет {{server_package}}, выполни сценарий, проверь результат и сохрани пакет.",
+      "input": "own-created-server-package",
+      "expected": {
+        "profile": "loginom-automation",
+        "result": "saved-executed-package",
+        "transition": "new-user-turn"
+      }
+    },
+    {
+      "id": "scenario-then-docs",
+      "group": "scenario",
+      "prompt": "Построй сценарий по приложенному CSV: сумма amount по Category. Сохрани его в {{server_package}}, затем подготовь документацию в PDF.",
+      "input": "csv-attachment",
+      "expected": {
+        "profile": "loginom-automation",
+        "result": "saved-package-and-request-local-package",
+        "output": "no-document-before-local-input"
+      },
+      "followup": {
+        "prompt": "Локальный сохранённый пакет прикладываю. Теперь напиши документацию в PDF.",
+        "input": "created-lgp-attachment",
+        "expected": {
+          "profile": "package-docs",
+          "result": "pdf",
+          "transition": "new-user-turn"
+        }
+      }
+    },
+    {
+      "id": "scenario-after-docs",
+      "group": "scenario",
+      "setup": {
+        "action": "document-through-real-user-turn",
+        "prompt": "Подготовь PDF документацию приложенного пакета.",
+        "input": "lgp-attachment",
+        "expectedProfile": "package-docs"
+      },
+      "prompt": "Документация готова. Новая задача: построй отдельный сценарий по приложенному CSV с суммированием amount по Category и сохрани его в {{server_package}}.",
+      "input": "csv-attachment",
+      "expected": {
+        "profile": "loginom-automation",
+        "result": "saved-executed-package",
+        "transition": "new-user-turn"
+      }
+    },
+    {
+      "id": "default-node-purpose",
+      "group": "default",
+      "prompt": "Что делает узел «Калькулятор» в Loginom? Объясни его назначение.",
+      "input": "none",
+      "expected": {
+        "profile": "default",
+        "result": "help-answer",
+        "output": "none"
+      }
+    },
+    {
+      "id": "default-configuration-advice",
+      "group": "default",
+      "prompt": "Объясни словами, как настроить вычисляемое поле в Loginom. Пока нужны только инструкции.",
+      "input": "none",
+      "expected": {
+        "profile": "default",
+        "result": "help-answer",
+        "output": "none"
+      }
+    },
+    {
+      "id": "default-ui-reference",
+      "group": "default",
+      "prompt": "Где в интерфейсе Loginom находятся настройки группировки и какие параметры у этого обработчика?",
+      "input": "none",
+      "expected": {
+        "profile": "default",
+        "result": "help-answer",
+        "output": "none"
+      }
+    },
+    {
+      "id": "default-unconfigured-arithmetic",
+      "group": "default",
+      "prompt": "Сколько будет 17 × 6? Дай только результат.",
+      "input": "none",
+      "connection": "unconfigured",
+      "expected": {
+        "profile": "default",
+        "result": "102",
+        "output": "none"
+      }
+    },
+    {
+      "id": "default-translation",
+      "group": "default",
+      "prompt": "Переведи на английский фразу «Документация готова».",
+      "input": "none",
+      "expected": {
+        "profile": "default",
+        "result": "translation",
+        "output": "none"
+      }
+    }
+  ]
+}
