@@ -17,6 +17,40 @@ test("незавершённый run получает ERROR/2, даже если
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+test("oracle проверяет порядок строк, лишнюю колонку и отсутствие CSV, допускает перестановку колонок", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
+  try {
+    await Bun.write(path.join(directory, "task.json"), JSON.stringify({
+      id: "crosstable-fixed-sum", oracle_tolerance: 0, checklist: [{ id: "result", required: true }],
+    }))
+    await Bun.write(path.join(directory, "oracle.csv"), "Region,A,B\nN,15,7\nS,3,2\n")
+    await Bun.write(path.join(directory, "attempt/artifact/package.lgp"), "package placeholder for isolated CSV test")
+    const resultFile = path.join(directory, "attempt/artifact/results/table.result.csv")
+    for (const csv of ["Region,A,B\nS,3,2\nN,15,7\n", "Region,A,B,extra\nN,15,7,0\nS,3,2,0\n"]) {
+      await Bun.write(resultFile, csv)
+      expect((await validateNodeAttempt(directory, path.join(directory, "attempt"))).failures.length).toBeGreaterThan(0)
+    }
+    await Bun.write(resultFile, "B,Region,A\n7,N,15\n2,S,3\n")
+    expect((await validateNodeAttempt(directory, path.join(directory, "attempt"))).failures).toEqual([])
+    await rm(resultFile)
+    expect((await validateNodeAttempt(directory, path.join(directory, "attempt"))).failures.length).toBeGreaterThan(0)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("правильные значения с разделителем точка с запятой нарушают CSV контракт", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
+  try {
+    await Bun.write(path.join(directory, "task.json"), JSON.stringify({
+      id: "crosstable-fixed-sum", oracle_tolerance: 0, checklist: [{ id: "result", required: true }],
+    }))
+    await Bun.write(path.join(directory, "oracle.csv"), "Region,A,B\nN,15,7\nS,3,2\n")
+    await Bun.write(path.join(directory, "attempt/artifact/package.lgp"), "package placeholder for isolated CSV test")
+    await Bun.write(path.join(directory, "attempt/artifact/results/table.result.csv"), "Region;A;B\nN;15;7\nS;3;2\n")
+    const result = await validateNodeAttempt(directory, path.join(directory, "attempt"))
+    expect(result.failures.join(" ")).toContain("comma")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test("каждая ячейка CSV проверяется с tolerance=0 даже при существующем пакете", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
   try {
