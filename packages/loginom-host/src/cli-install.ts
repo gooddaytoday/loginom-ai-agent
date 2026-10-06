@@ -115,7 +115,7 @@ export async function uninstallCli(home: string) {
 }
 
 // Chromium's setuid sandbox must be root:root and 4755. The manifest checks the mode only.
-// A user install keeps that mode and asks sudo for the owner; without it the browser aborts.
+// Linux chown clears setuid, so restore the mode after changing ownership.
 async function ownLinuxSandbox(payload: string) {
   if (process.platform !== "linux") return
   const path = join(payload, "resources/loginom/browsers/chromium-1243/chrome-linux64/chrome-sandbox")
@@ -125,19 +125,25 @@ async function ownLinuxSandbox(payload: string) {
   })
   if (!info || info.isSymbolicLink()) return
   if ((info.mode & 0o7777) !== 0o4755) throw new Error("CLI_SANDBOX_MODE_INVALID")
-  if (info.uid === 0) return
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn("sudo", ["chown", "root:root", path], { timeout: 120_000, stdio: "inherit" })
-    child.once("error", () => {
-      reject(new Error("CLI_SANDBOX_OWNER_REQUIRED"))
+  if (info.uid === 0 && info.gid === 0) return
+  for (const args of [
+    ["chown", "root:root", path],
+    ["chmod", "4755", path],
+  ]) {
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn("sudo", args, { timeout: 120_000, stdio: "inherit" })
+      child.once("error", () => {
+        reject(new Error("CLI_SANDBOX_OWNER_REQUIRED"))
+      })
+      child.once("close", (code) => {
+        if (code === 0) resolve()
+        else reject(new Error("CLI_SANDBOX_OWNER_REQUIRED"))
+      })
     })
-    child.once("close", (code) => {
-      if (code === 0) resolve()
-      else reject(new Error("CLI_SANDBOX_OWNER_REQUIRED"))
-    })
-  })
+  }
   const owned = await lstat(path)
-  if (owned.uid !== 0 || (owned.mode & 0o7777) !== 0o4755) throw new Error("CLI_SANDBOX_OWNER_REQUIRED")
+  if (owned.uid !== 0 || owned.gid !== 0 || (owned.mode & 0o7777) !== 0o4755)
+    throw new Error("CLI_SANDBOX_OWNER_REQUIRED")
 }
 
 async function absent(path: string) {

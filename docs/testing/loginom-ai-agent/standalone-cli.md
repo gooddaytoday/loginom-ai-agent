@@ -404,6 +404,29 @@ uninstall из installed payload → profile sentinel сохранён. Это d
 live Loginom/Chromium, Desktop regression и license review не выполнены.
 
 
+### Native regression gate: установка Linux CLI обычным пользователем
+
+Запускать в отдельной Linux-среде без пользовательской установки: UID не 0,
+полный распакованный CLI archive, системные зависимости закреплённого Chromium
+и sudo для смены owner и восстановления mode sandbox. После `chown` Linux
+сбрасывает setuid; installer должен восстановить root:root/4755 до выдачи launcher.
+Не отключать sandbox браузера. Из `packages/loginom-host`:
+
+```sh
+LOGINOM_AI_AGENT_TEST_CLI_ARTIFACT=/absolute/path/to/extracted-cli \
+LOGINOM_AI_AGENT_TEST_ARTIFACTS=/absolute/path/to/new-evidence-directory \
+/absolute/path/to/extracted-cli/resources/loginom/bin/node test/cli-install-native.mjs
+```
+
+Driver создаёт отдельный temporary HOME, выполняет настоящий `install.sh`,
+проверяет installed launcher/status без bundle override, manifest и права
+sandbox, запускает поставленный Chromium и удаляет payload штатным
+`uninstall.sh`. Profile sentinel должен сохраниться. Evidence directory должна
+быть новой; stdout/stderr каждого шага и итог сохраняются даже при отказе.
+Этот gate проверяет install/uninstall и browser mechanics; live Loginom,
+история обновления, docs routing и TUI проверяются отдельно. Source-only тесты
+не заменяют этот прогон. Исторические results выше относятся к своим candidates.
+
 ### Автоматический архив Linux
 
 `build-cli.ts` теперь создаёт рядом с новым payload файлы

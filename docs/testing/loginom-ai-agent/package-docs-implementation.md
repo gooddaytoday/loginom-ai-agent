@@ -1687,6 +1687,47 @@ Evidence: `candidate-8dc7bdccb-desktop/native-appimage-source-driver/`,
 Подтверждены cold startup/resources/discovery/cleanup; docs/model/Help first setup,
 CSV oracle, CLI installation/update и остальные Linux-среды остаются открыты.
 
+## Linux CLI installer: восстановление setuid после chown
+
+Установка исходного immutable CLI `8dc7bdccb` обычным пользователем UID 1200
+стабильно отказала **3/3**, exit 1 / `CLI_INSTALL_FAILED`, в независимых собственных
+контейнерах с `network none`, без OOM и таймаутов. Signal report и receipts:
+`cli-install-signal/run-{1,2,3}.{log,receipt.json}`. Нативный regression driver
+`packages/loginom-host/test/cli-install-native.mjs` также получил RED на штатном
+`install.sh`; evidence сохранён в `cli-install-native-red-evidence`.
+Контейнеры удалены после сохранения результатов.
+
+**Диагноз: code regression**, commit
+`d301992c58bd0e375fb1b0866b47daeb5c4e274b`
+(`fix(loginom): restore chrome-sandbox mode 4755 and root ownership`). Установщик
+делал `sudo chown root:root`, но Linux сбрасывает setuid при смене владельца.
+Отдельный kernel probe подтвердил переход user:group/**4755** → root:root/**755**,
+а диагностический bundle фактической `installCli` вернул
+`CLI_SANDBOX_OWNER_REQUIRED`. Предупреждение sudo о DNS в контейнере без сети
+не является причиной: смена владельца состоялась. Обычные source installer/
+manifest tests были зелёными (**7 PASS / 63 assertions**), их fixture не содержит
+реального sandbox; это объясняет пропуск, но не отменяет ошибку продукта.
+
+`ownLinuxSandbox` теперь последовательно выполняет фиксированные argv
+`sudo chown root:root <sandbox>` и `sudo chmod 4755 <sandbox>`, затем проверяет
+uid, gid и mode. Проверки manifest и запрет browser `--no-sandbox` сохранены.
+В новом собственном prerequisites image разрешены обе команды sudo. Публичная
+исправленная `installCli`, собранная в диагностический Node bundle, на полном
+неизменённом исходном payload дала GREEN: root:root/**4755**, installed manifest
+verified, uninstall PASS. Лог `source-cli-install-green.log`. Это source API
+проверка с actual Linux filesystem, **не новый исправленный CLI binary**.
+Полный Host suite **226 PASS / 6 SKIP / 1260 assertions**, Host typecheck,
+Prettier и diff-check PASS. Логи `cli-install-fix-host-{suite,typecheck}.log`.
+Новая immutable сборка проверяется отдельно. Исходный C8 archive не
+переписывается и остаётся не прошедшим установку.
+
+Native regression driver проверяет original archive installer, installed launcher
+без bundle override, unconfigured status, неизменность manifest, root:root/4755,
+поставленный Chromium с sandbox и uninstall с сохранением profile sentinel.
+Используется собственный temporary HOME и новый evidence directory; пользовательская
+установка и соседний evals worktree не затрагиваются. Driver не доказывает
+естественный выбор skill, документацию, обновление истории или live Loginom.
+
 ## Checkpoint
 
 - Product candidate SHA `8dc7bdccb` (`docs-no-browser`); полные Desktop/CLI artifacts/manifest/archive сохранены.
@@ -1706,4 +1747,5 @@ CSV oracle, CLI installation/update и остальные Linux-среды ос�
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS, native PTY paste/mention 2 PASS; attachment: 44 PASS.
+- CLI installer C8 RED 3/3: chown сбрасывал setuid; source fix GREEN, Host 226 PASS / 6 SKIP; новый binary gate открыт.
 - Desktop static/native AppImage/Ubuntu22 installed cold PASS; native docs 3 PASS; routing live 0; далее CLI/model/evals.
