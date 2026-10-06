@@ -8370,6 +8370,8 @@ export type AppSkillsResponses = {
     description?: string
     location: string
     content: string
+    source?: "builtin" | "bundled" | "external" | "project" | "config" | "url"
+    digest?: string
   }>
 }
 
