@@ -286,6 +286,22 @@ resource-root-bundled-commands.log и *resource-root*typecheck.log.
 Полный client suite: 2550 PASS, 0 FAIL, 10 SKIP (2560 тестов, 190.9 s);
 лог stage1-client-suite.log. Installed/live не проверены.
 
+## Этап 2: Node extraction, первый паритет
+
+RED — новый Node extractor не выполнял extract (PACKAGE_DOCS_EXTRACT_UNSUPPORTED).
+GREEN — настоящий ZIP/XML reader выдаёт сохранённый Python structure.v1 для
+двух узлов с кириллицей; SHA входного .lgp не меняется. Собранный target=node
+модуль проверен поставляемым Node 24.19.0 с минимальным окружением, без Bun/Python.
+2 теста PASS, Host typecheck PASS. Логи tdd-node-extract-parity-*,
+node-extract-pinned-node.log, node-extract-host-typecheck.log.
+При чтении Buffer выявлен offset в Buffer.slice у zip.js: reader получает
+собственную Uint8Array. Писатели и product tool пока не подключены; подмодели
+ещё отклоняются явно. Notes/views/references и полная вложенная статистика —
+следующие TDD-циклы, этап 2 не завершён.
+Прямые зависимости Host: @zip.js/zip.js 2.7.62 и @xmldom/xmldom 0.8.15,
+обе уже были в bun.lock; изменены только dependency edges Host, не версии closure.
+Oracle fixtures перенесены из сохранённого baseline, происхождение указано в README.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -299,5 +315,6 @@ resource-root-bundled-commands.log и *resource-root*typecheck.log.
 - Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
-- Следующий шаг — этап 2, Node executor; 35 исходных source-map mismatches остаются live gate.
+- Начат этап 2: ZIP/XML parity и bundled Node 2 PASS; writer/tool ещё не подключены.
+- Следующий шаг — подмодели, skeleton/emit; 35 baseline source-map mismatches остаются live gate.
 - Живая приёмка и удаление серверного skill остаются открытыми.
