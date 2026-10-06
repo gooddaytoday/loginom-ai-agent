@@ -24,11 +24,9 @@ export async function createKnowledgeClient({ endpoint, apiKey }, signal) {
       catalogSha256: catalog.sha256,
       async call(input, signal) {
         if (state.closed) throw Error('LOGINOM_KNOWLEDGE_CLOSED');
-        if (!input || typeof input.run !== 'string' || !input.run || typeof input.id !== 'string' || !input.id)
-          throw Error('LOGINOM_KNOWLEDGE_REQUEST_INVALID');
+        const key = knowledgeRequestKey(input);
         if (!catalog.routes.has(input.name)) throw Error('LOGINOM_KNOWLEDGE_TOOL_DENIED');
         signal?.throwIfAborted();
-        const key = JSON.stringify([input.run, input.id]);
         if (pending.has(key)) throw Error('LOGINOM_KNOWLEDGE_REQUEST_BUSY');
         const entry = { run: input.run, id: input.id, controller: new AbortController(), promise: undefined };
         pending.set(key, entry);
@@ -43,11 +41,9 @@ export async function createKnowledgeClient({ endpoint, apiKey }, signal) {
         } finally { pending.delete(key); }
       },
       interrupt(input) {
-        if (!input || typeof input.run !== 'string' || !input.run
-          || (input.id !== undefined && (typeof input.id !== 'string' || !input.id)))
-          throw Error('LOGINOM_KNOWLEDGE_REQUEST_INVALID');
+        const all = validateKnowledgeInterrupt(input);
         for (const entry of pending.values())
-          if (entry.run === input.run && (input.id === undefined || input.id === entry.id))
+          if (all || (entry.run === input.run && (input.id === undefined || input.id === entry.id)))
             entry.controller.abort(Error('LOGINOM_KNOWLEDGE_INTERRUPTED'));
       },
       close() {
@@ -64,4 +60,18 @@ export async function createKnowledgeClient({ endpoint, apiKey }, signal) {
     signal?.throwIfAborted();
     throw error;
   }
+}
+
+export function knowledgeRequestKey(input) {
+  if (!input || typeof input.run !== 'string' || !input.run || typeof input.id !== 'string' || !input.id)
+    throw Error('LOGINOM_KNOWLEDGE_REQUEST_INVALID');
+  return JSON.stringify([input.run, input.id]);
+}
+
+export function validateKnowledgeInterrupt(input) {
+  const all = input?.all === true && Object.keys(input).length === 1;
+  if (!input || (input.all !== undefined && !all) || (!all && (typeof input.run !== 'string' || !input.run
+    || (input.id !== undefined && (typeof input.id !== 'string' || !input.id)))))
+    throw Error('LOGINOM_KNOWLEDGE_REQUEST_INVALID');
+  return all;
 }

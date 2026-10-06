@@ -1,8 +1,9 @@
-import { createKnowledgeClient } from '../client/lib/knowledge-client.mjs';
+import { createKnowledgeClient, knowledgeRequestKey, validateKnowledgeInterrupt } from '../client/lib/knowledge-client.mjs';
 
 process.umask(0o077);
 const state = { client: undefined, closing: undefined, controller: new AbortController() };
 const requests = new Set();
+const calls = new Map();
 const send = (message, disconnect = false) => {
   if (process.connected) process.send(message, () => {
     if (disconnect && process.connected) process.disconnect();
@@ -12,6 +13,7 @@ const send = (message, disconnect = false) => {
 function close() {
   return state.closing ??= (async () => {
     state.controller.abort(Error('LOGINOM_KNOWLEDGE_CLOSED'));
+    for (const call of calls.values()) call.controller.abort(Error('LOGINOM_KNOWLEDGE_CLOSED'));
     const client = await state.client?.catch(() => undefined);
     await client?.close();
     await Promise.allSettled([...requests]);
@@ -63,13 +65,14 @@ async function handle(message) {
       return;
     }
     if (message.operation === 'call') {
-      const client = await state.client;
-      send({ id: message.id, result: await client.call(message.input) });
+      send({ id: message.id, result: await call(message.input) });
       return;
     }
     if (message.operation === 'interrupt') {
-      const client = await state.client;
-      client.interrupt(message.input);
+      const all = validateKnowledgeInterrupt(message.input);
+      for (const call of calls.values())
+        if (all || (call.input.run === message.input.run && (message.input.id === undefined || call.input.id === message.input.id)))
+          call.controller.abort(Error('LOGINOM_KNOWLEDGE_INTERRUPTED'));
       send({ id: message.id, result: { interrupted: true } });
       return;
     }
@@ -77,5 +80,24 @@ async function handle(message) {
   } catch (error) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? '') ? error.message : 'LOGINOM_KNOWLEDGE_FAILED';
     send({ id: message.id, error: code }, message.operation === 'close');
+  }
+}
+
+async function call(input) {
+  const key = knowledgeRequestKey(input);
+  if (calls.has(key)) throw Error('LOGINOM_KNOWLEDGE_REQUEST_BUSY');
+  const entry = { input, controller: new AbortController() };
+  const aborted = Promise.withResolvers();
+  const abort = () => aborted.reject(entry.controller.signal.reason);
+  entry.controller.signal.addEventListener('abort', abort, { once: true });
+  calls.set(key, entry);
+  try {
+    // A run may be cancelled while it is waiting for the shared generation to initialize.
+    const client = await Promise.race([state.client, aborted.promise]);
+    entry.controller.signal.throwIfAborted();
+    return await client.call(input, entry.controller.signal);
+  } finally {
+    entry.controller.signal.removeEventListener('abort', abort);
+    calls.delete(key);
   }
 }

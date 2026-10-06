@@ -649,6 +649,18 @@ desktop-regression,host-typecheck,desktop-typecheck}.log. Existing RuntimeHandle
 Это изменение общего lifecycle; createLoginomHost ещё использует browser
 readiness, его переключение и HostPort routing остаются следующей задачей.
 
+Knowledge IPC cancellation before readiness: RED — interrupt ждал общий startup,
+а owner-wide interrupt отвергался как invalid. GREEN — entry хранит собственные
+controllers запросов, включая ожидание client promise; request identity и
+interrupt validation общие с клиентом. Отмена A до initialize завершает только
+A, B продолжает после разблокировки; cancelled call не дошёл до HTTP. Private
+owner-wide interrupt отменяет все calls и сохраняет готовый клиент; смешанный
+all/run payload отклонён. close отменяет и эти waiters. Entry/client/catalog:
+27 PASS, knowledge-interrupt-regression.log, отдельные RED в
+tdd-knowledge-{shutdown-interrupt,startup-call-cancel}-red.log.
+Этот private all flag используется владельцем Host при shutdown; публичный
+HostPort строит только собственный run и игнорирует поданный caller all.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.

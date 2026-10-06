@@ -190,3 +190,43 @@ test('private errors conceal remote secrets and missing-key startup does not use
   await assert.rejects(runtime.request('call', { run: 'run', id: 'read', name: 'read', arguments: { uri: 'help' } }),
     { message: 'LOGINOM_KNOWLEDGE_FAILED' });
 });
+
+test('private owner shutdown can interrupt every run without closing the knowledge client', async t => {
+  const entered = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  t.after(() => release.resolve({ content: [] }));
+  const server = await knowledgeServer(t, { call: params => {
+    if (params.arguments.uri === 'after') return Promise.resolve({ content: [{ type: 'text', text: 'still ready' }] });
+    if (server.calls.length === 2) entered.resolve();
+    return release.promise;
+  } });
+  const runtime = entry(t);
+  await runtime.request('start', { protocol: 1, generation: 21, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
+  const calls = ['A', 'B'].map(run => runtime.request('call', { run, id: 'pending', name: 'read', arguments: { uri: run } }));
+  calls.forEach(call => call.catch(() => {}));
+  await entered.promise;
+  assert.deepEqual(await runtime.request('interrupt', { all: true }), { interrupted: true });
+  for (const call of calls) await assert.rejects(call, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
+  assert.equal((await runtime.request('call', { run: 'next', id: 'after', name: 'read', arguments: { uri: 'after' } })).content[0].text,
+    'still ready');
+  for (const input of [{ all: 'true' }, { all: true, run: 'A' }])
+    await assert.rejects(runtime.request('interrupt', input), /LOGINOM_KNOWLEDGE_REQUEST_INVALID/);
+});
+
+test('interrupting a call waiting for startup leaves other runs and initialization intact', async t => {
+  const entered = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  t.after(() => release.resolve());
+  const server = await knowledgeServer(t, { initialize: () => { entered.resolve(); return release.promise; } });
+  const runtime = entry(t);
+  await runtime.request('start', { protocol: 1, generation: 22, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
+  await entered.promise;
+  const first = runtime.request('call', { run: 'A', id: 'queued', name: 'read', arguments: { uri: 'cancelled' } });
+  const other = runtime.request('call', { run: 'B', id: 'queued', name: 'read', arguments: { uri: 'survives' } });
+  [first, other].forEach(call => call.catch(() => {}));
+  assert.deepEqual(await runtime.request('interrupt', { run: 'A' }), { interrupted: true });
+  await assert.rejects(first, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
+  release.resolve();
+  assert.equal(JSON.parse((await other).content[0].text).arguments.uri, 'survives');
+  assert.equal(server.calls.length, 1);
+});
