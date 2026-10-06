@@ -104,6 +104,13 @@ JUDGE_MODEL=gpt-6-astra JUDGE_REASONING=high bun run src/run.ts --calibrate --ta
 фактические провалы, oracle и покрытие. Неописанные задачи сохраняют прежнюю
 калибровку и явно имеют нулевое покрытие near-miss.
 
+Приёмка 2026-10-06: **183/183, exit 0**, gpt-6-astra/high, один промпт:
+35 positive (100/oracle=true), 35 foreign (0–33), 113 near-miss с выполненными
+ожиданиями. Хэши и полный JSON — в
+[отчёте](../docs/testing/loginom-ai-agent/reports/2026-10-06-calibration-near-miss.md).
+Она подтверждает синтетические артефакты без выполнения в Loginom и без нового
+baseline агента.
+
 `judge_status`: с `--skip-judge` у **всех** попыток `skipped` (score `null`), независимо от артефакта; oracle тоже пропущен. Без `--skip-judge` попытка без `.lgp` получает score 0 и `judge_status: no_artifact`. `scored` — валидный вердикт; `error` — отказ, таймаут или невалидный вердикт судьи после повтора (или убийство судьи по Ctrl+C). `harness_error` / `infra_error` / `interrupted` и Ctrl+C до старта судьи тоже дают `skipped`.
 
 После `infra_error` та же задача с тем же номером попытки запускается ещё один

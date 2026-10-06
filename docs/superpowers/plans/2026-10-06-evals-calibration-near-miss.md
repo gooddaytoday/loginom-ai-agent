@@ -1,104 +1,66 @@
-# Near-miss calibration implementation checkpoint
+# Near-miss калибровка: итоговый checkpoint
 
-Goal: 35 analytic tasks, 113 near-misses, green gpt-6-astra/high acceptance (183 rows).
-Base: evals f4fe4224825fab2f894a4b792951771cfd081c89; branch calibration-near-miss.
-Spec: ../specs/2026-09-18-evals-design.md, calibration section.
+**Все критерии Goal выполнены — 2026-10-06.** Реализация через TDD и полная живая
+приёмка завершены. Канонический контракт —
+[спецификация](../specs/2026-09-18-evals-design.md), раздел «Калибровка судьи».
+Подробные результаты и хэши —
+[приёмочный отчёт](../../testing/loginom-ai-agent/reports/2026-10-06-calibration-near-miss.md).
 
-- [x] TDD tracer: missed sort is rejected despite oracle failure.
-- [x] Expected checklist/oracle gates, corpus validation and compatibility.
-- [x] 35-task corpus: sort 35, aggregate 34, threshold 6, filter 3, column 35.
-- [x] Independent CSV reproduction.
-- [x] Final full test/typecheck/diff-check.
-- [ ] Live full acceptance; general judge prompt tuning if necessary.
-- [ ] Final single-prompt run and acceptance report; Goal completion audit.
+## Реализация и проверки
 
-Boundaries: harness/corpus/docs only, no external task edits or Loginom execution.
-Do not weaken rubrics, expected failures or thresholds. Semantic misses are not retried for a lucky pass.
+- [x] Отдельный worktree calibration-near-miss от проверенного evals
+  `f4fe4224825fab2f894a4b792951771cfd081c89`.
+- [x] Сквозной RED → GREEN: пропущенная сортировка даёт exit 1, даже если oracle
+  ожидаемо провален. Далее каждый шаг — падающий тест, минимальная реализация,
+  зелёный тест, коммит.
+- [x] Строгая проверка всех expected_failed и точного expected_oracle_pass;
+  синтетический CSV, requires_result_file включён, requires_run исключён.
+- [x] Корпус 35 задач / 113 мутаций: sort 35, aggregate 34, threshold 6,
+  filter 3, column 35. SHA256 источников, точные XML-замены, пересборка ZIP.
+- [x] Повреждённый корпус отклоняется до судьи с exit 2; семантические пропуски
+  и ошибки судьи дают exit 1 после отчёта. Старые core/--only сохранены.
+- [x] Независимый пересчёт: 35 исходных oracle и 113 мутантов совпали;
+  топология графа сохранена. Python не требуется при самой калибровке.
+- [x] Полный bun test: 321 pass, 0 fail, 1433 assertions, 21 файл, 356.66 с;
+  bun typecheck и diff-check exit 0.
+- [x] Живая приёмка gpt-6-astra/high: 183/183, exit 0, один промпт,
+  без предупреждений, ошибок и повторов судьи.
+- [x] Спецификация, инструкции harness, итоговый отчёт и пункт 4 исходного
+  remaining-work обновлены. Все условия закрытия Goal подтверждены.
 
-## Verified checkpoint — 2026-10-06
+## Итоговый прогон
 
-- Worktree: /home/kiselev/.codex/worktrees/calibration-near-miss/loginom-ai-agent.
-- Independent reproduction: 35 tasks, 113 cases, exact saved mutant CSV matches.
-- Public prepareCalibrationCases: 113 prepared; oracle true only low-liquidity-companies/filter.
-- Initial corpus SHA256: 72e7b163ea881bbbf4ce614529a69925f118dde81501529127ca07e9eb880e0f.
-- Corrected corpus SHA256: 00f59c212eb01a2e0dde4ea7441629538cc3f20e2fca904dc103ca98a32a8450.
-  first-last-touch/aggregate now preserves the unchanged downstream Round(..., 2).
-  Its original six-decimal mean was within oracle tolerance but was corrected for XML/CSV agreement.
-  Expectations were not changed. Independent reproduction and public preparation passed again.
-- First full suite: 314 pass, 0 fail, 1419 assertions, 21 files, 352.17s; typecheck exit 0.
-  Additional strict-gate tests were added afterwards; final full suite is still required.
-- Live full initial run: results/near-miss-live/20261006-063149-calibrate.
-  It started from d12be3912 with the original judge prompt. Reporting/validation
-  changes made afterwards did not alter its imported code. Stopped with exit 143
-  after 12 positive/foreign pairs (all 100/0) to correct corpus rounding.
-  It is an incomplete diagnostic, not acceptance. Log /tmp/calibration-live-initial.log.
-- New full run from clean c1e606017: results/near-miss-final/20261006-065028-calibrate.
-  Session 68631, log /tmp/calibration-live-final.log. Original prompt remains fixed
-  (SHA256 1aa36ad41f999d999526edd387b014f2b232d27617fba2d9503787b8fbbf287c).
-  Do not edit the prompt while a full run is active.
-  At 2026-10-06 07:43 UTC: all 70 controls completed; positive 35x100,
-  positive oracle independently rechecked 35/35 true; foreign 0..33 (variant-conversion=33),
-  all <=40, zero judge errors. Full run is now evaluating 113 near-misses.
-  First semantic miss: first-last-touch/filter. Judge fails result-rows but passes
-  two-aggregates, relying on absence of None in CSV despite the XML excluding Email.
-  Expected failures remain two-aggregates + result-rows. Finish this full run and
-  retain its failed report; then strengthen only the general rule for checking
-  every clause and XML selection/exclusion settings, and rerun all 183 rows.
-  Do not modify the prompt while the current run is active or retry this unchanged judgment.
-- Intermediate full tests: 319 pass, 0 fail, 1431 assertions, 21 files, 362.08s; typecheck exit 0.
-  Final checks after c1e606017: 321 pass, 0 fail, 1433 assertions, 21 files, 358.15s;
-  typecheck and git diff --check exit 0. Logs: /tmp/calibration-c1e606-full-tests.log
-  and /tmp/calibration-c1e606-typecheck.log.
-- Latest targeted tests: 22 pass, 0 fail. Missing XML now reports corpus exit 2.
-- Public CLI full-corpus fake run: results/near-miss-fake-full/20261006-065425-calibrate,
-  exit 0, 35 positive + 35 foreign + 113 near-miss, all expectations met, warnings empty.
-  JSON and Markdown fields/counts verified. Rubric hash:
-  02a57c7cec329b8dbfd0c8db93a6e0c04e444125efe55e3891fe1bcd3f90547b.
-- Targeted live boundary-filter diagnostic: results/near-miss-boundary-diagnostic/result.json,
-  score 86, only filter-ratio=false; prepared CSV oracle=true. Original prompt.
-  Diagnostics and fake acceptance do not replace the full live 183-row acceptance.
-- Targeted live sales missing-column diagnostic: result in
-  results/near-miss-column-diagnostic/result.json. gpt-6-astra/high:
-  score 57, export-columns=false, result-rows=false; other supplied items true.
+Worktree: `/home/kiselev/.codex/worktrees/calibration-near-miss/loginom-ai-agent`.
+Код прогона: `ec9813bfee6e963a3ca7b7a74d7710afba5f1fe1`.
+Run: `evals/results/near-miss-acceptance/20261006-092100-calibrate`;
+сессия 71451 завершена exit 0. 35 positive: score 100/oracle=true;
+35 foreign: 0–33; 113 near-miss: все заданные ID false и oracle совпал.
+Единственный near-miss с oracle=true — low-liquidity-companies/filter.
+Все 113 архивов побайтово совпали с распакованными файлами, CSV — с корпусом.
+183 копии PROMPT.md имеют SHA256
+`6562edddd63d38ab7e8400795c6d1f1198bf2551e2b35baffe0b464248ab6daa`.
+Корпус: `00f59c212eb01a2e0dde4ea7441629538cc3f20e2fca904dc103ca98a32a8450`.
+Рубрика: `02a57c7cec329b8dbfd0c8db93a6e0c04e444125efe55e3891fe1bcd3f90547b`.
 
-## Prompt correction and current acceptance run
+После SHA прогона менялись только документы и alias импорта Python checker
+(34a62f215); независимый пересчёт и его интеграционный тест проверены повторно.
+Runtime, корпус и промпт не менялись. Исходный checkout чистый; изменения
+ограничены evals/ и docs/, встроенные задачи и внешний каталог не менялись.
 
-- Full original-prompt run completed: near-miss-final/20261006-065028-calibrate,
-  exit 1 after saving calibration.json and calibration.md; 183 rows, 112/113
-  near-misses detected, one warning (first-last-touch/filter), zero judge errors.
-  Positive 35x100/oracle=true; foreign 0..33. One prompt SHA256 1aa36ad...fbbf287c.
-- Semantic red-green: two general rules added to judge-prompt.md for all clauses
-  and XML selection/exclusion along the full result path. No case-specific hints,
-  rubric/corpus/threshold/expectation edits. Targeted live prompt-check now fails
-  two-aggregates and result-rows, score 63, with evidence about the XML rule.
-- Prompt source commit: ec9813bfee6e963a3ca7b7a74d7710afba5f1fe1.
-  Prompt SHA256: 6562edddd63d38ab7e8400795c6d1f1198bf2551e2b35baffe0b464248ab6daa.
-  Targeted harness tests: 58 pass, 0 fail; typecheck exit 0.
-- Current full rerun: results/near-miss-acceptance/20261006-092100-calibrate.
-  Session 71451; /tmp/calibration-live-acceptance.log. Do not modify the prompt
-  during this run. Full tests repeated in session 51382; logs
-  /tmp/calibration-ec9813-full-tests.log and /tmp/calibration-ec9813-typecheck.log.
-  Checks completed: 321 pass, 0 fail, 1433 assertions, 21 files, 356.66s;
-  typecheck and diff-check exit 0.
-- Subsequent checker import rename (34a62f215) follows the no-alias project rule;
-  it changes no calculations or runtime calibration behavior. Full independent
-  reproduction remains 35 tasks / 113 cases; representative integration test passes.
-- Current rerun milestone: 35 positive (all 100), 35 foreign (0..33),
-  52 near-misses; no judge errors or missing expected IDs, one prompt hash.
-  first-last-touch/filter now fails both two-aggregates and result-rows in
-  the full rerun. Evidence checks the XML filter along the export path,
-  independently of the absence of None in the saved CSV.
-- Goal remains active. Final acceptance still requires every one of the 183 rows
-  under the new prompt to meet its gates and the final report/checkpoint updates.
+## Сохранённая диагностика
 
-## Remaining completion gates
+Первый запуск `near-miss-live/20261006-063149-calibrate` остановлен exit 143
+после 12 positive/foreign пар (100/0) для исправления округления
+first-last-touch/aggregate. Согласование с неизменённым Round(..., 2)
+исправило CSV на 2496.84; ожидания не менялись. Это неполная диагностика.
 
-1. All 35 positive >=90 and oracle=true; all 35 foreign <=40.
-2. All 113 near-misses detect every expected_failed and match oracle.
-3. Zero judge errors/warnings, exit 0; all judge PROMPT.md hashes identical.
-4. If the prompt changes, rerun the entire 183-case suite under that final prompt.
-5. Final tests/typecheck/diff-check and acceptance report with tested source,
-   model/reasoning, rubric/corpus/prompt hashes.
-6. Mark remaining-work item 4 closed only after these gates pass; then complete Goal.
+Полный исходный промпт в `near-miss-final/20261006-065028-calibrate`
+выявил 112/113 мутаций, exit 1, один пропуск: first-last-touch/filter,
+обязательный two-aggregates. Неуспешные JSON/Markdown сохранены.
+Два общих правила проверки всех условий и пути отбора в XML исправили
+адресную живую проверку. После этого весь набор повторён новым промптом;
+все 183 оценки прошли. Семантически неудачные оценки неизменённым промптом
+не повторялись ради случайного успеха.
 
-No Loginom or agent baseline was run; mutated packages are not execution-certified.
+Выполнение изменённых пакетов в Loginom и новый baseline агента не входили
+в задачу. Приёмка касается сохранённых синтетических артефактов.

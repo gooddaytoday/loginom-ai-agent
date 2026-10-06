@@ -1,0 +1,3274 @@
+{
+  "run_id": "20261006-092100-calibrate",
+  "judge": {
+    "backend": "codex",
+    "codex_version": "codex-cli 0.157.0",
+    "model": "gpt-6-astra",
+    "reasoning": "high",
+    "prompt_sha256": "6562edddd63d38ab7e8400795c6d1f1198bf2551e2b35baffe0b464248ab6daa",
+    "schema_sha256": "f7341e870bf242d31fce9d8d4c1cf79a239bf34e39860496acdb9d956ba7709a"
+  },
+  "rubric_hash": "02a57c7cec329b8dbfd0c8db93a6e0c04e444125efe55e3891fe1bcd3f90547b",
+  "thresholds": {
+    "positiveMin": 90,
+    "negativeMax": 40
+  },
+  "calibration_hash": "00f59c212eb01a2e0dde4ea7441629538cc3f20e2fca904dc103ca98a32a8450",
+  "near_miss_coverage": {
+    "ab-revenue-per-converter": 3,
+    "abc-pareto-groups": 4,
+    "articles-by-author": 3,
+    "basket-category-width": 3,
+    "budget-variance-by-category": 3,
+    "campaign-roi-by-channel": 3,
+    "category-promo-demand": 3,
+    "category-rating-revenue": 3,
+    "channel-engagement": 3,
+    "cohort-spend-activity": 3,
+    "customer-activity-segments": 4,
+    "defect-rate-line-shift": 3,
+    "department-overtime-load": 4,
+    "department-turnover": 3,
+    "device-visit-value": 3,
+    "first-last-touch": 4,
+    "fraud-profile": 3,
+    "holiday-month-sales": 3,
+    "inventory-by-category": 3,
+    "language-repository-stars": 3,
+    "loan-term-risk": 4,
+    "low-liquidity-companies": 3,
+    "month-stockout-demand": 3,
+    "monthly-demand": 3,
+    "nps-segments-by-tier": 4,
+    "price-test-margin": 3,
+    "region-sales-density": 3,
+    "risky-approved-claims": 4,
+    "sales-by-category": 3,
+    "season-price-markup": 3,
+    "slow-supplier-deliveries": 4,
+    "specialization-applications": 3,
+    "support-by-priority": 3,
+    "trial-dosage-outcomes": 3,
+    "variant-conversion": 3
+  },
+  "rows": [
+    {
+      "task": "ab-revenue-per-converter",
+      "kind": "positive",
+      "reference": "ab-revenue-per-converter",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "ab-revenue-per-converter",
+      "kind": "negative",
+      "reference": "abc-pareto-groups",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-test",
+        "per-converter",
+        "sort-conversion",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "abc-pareto-groups",
+      "kind": "positive",
+      "reference": "abc-pareto-groups",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "abc-pareto-groups",
+      "kind": "negative",
+      "reference": "articles-by-author",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "sort-revenue",
+        "cumulative-class",
+        "group-class",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "articles-by-author",
+      "kind": "positive",
+      "reference": "articles-by-author",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "articles-by-author",
+      "kind": "negative",
+      "reference": "basket-category-width",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "unknown-author",
+        "author-metrics",
+        "sort-articles",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "basket-category-width",
+      "kind": "positive",
+      "reference": "basket-category-width",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "basket-category-width",
+      "kind": "negative",
+      "reference": "budget-variance-by-category",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "width",
+        "group-width",
+        "return-share",
+        "sort-width",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "budget-variance-by-category",
+      "kind": "positive",
+      "reference": "budget-variance-by-category",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "budget-variance-by-category",
+      "kind": "negative",
+      "reference": "campaign-roi-by-channel",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-category",
+        "over-budget-pct",
+        "sort-variance",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "campaign-roi-by-channel",
+      "kind": "positive",
+      "reference": "campaign-roi-by-channel",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "campaign-roi-by-channel",
+      "kind": "negative",
+      "reference": "category-promo-demand",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-channel",
+        "roi-from-sums",
+        "sort-roi",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "category-promo-demand",
+      "kind": "positive",
+      "reference": "category-promo-demand",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "category-promo-demand",
+      "kind": "negative",
+      "reference": "category-rating-revenue",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-category",
+        "promo-share",
+        "sort-promo",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "category-rating-revenue",
+      "kind": "positive",
+      "reference": "category-rating-revenue",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "category-rating-revenue",
+      "kind": "negative",
+      "reference": "channel-engagement",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-category",
+        "recommended-share",
+        "sort-rating",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "channel-engagement",
+      "kind": "positive",
+      "reference": "channel-engagement",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "channel-engagement",
+      "kind": "negative",
+      "reference": "cohort-spend-activity",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-channel",
+        "simple-mean",
+        "sort-views",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "cohort-spend-activity",
+      "kind": "positive",
+      "reference": "cohort-spend-activity",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "cohort-spend-activity",
+      "kind": "negative",
+      "reference": "customer-activity-segments",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "cohort-text",
+        "group-cohort",
+        "active-share",
+        "sort-cohort",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "customer-activity-segments",
+      "kind": "positive",
+      "reference": "customer-activity-segments",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "customer-activity-segments",
+      "kind": "negative",
+      "reference": "defect-rate-line-shift",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "segment-bounds",
+        "group-segment",
+        "sort-segment",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "defect-rate-line-shift",
+      "kind": "positive",
+      "reference": "defect-rate-line-shift",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "defect-rate-line-shift",
+      "kind": "negative",
+      "reference": "department-overtime-load",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-line-shift",
+        "rate-from-sums",
+        "sort-rate",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "department-overtime-load",
+      "kind": "positive",
+      "reference": "department-overtime-load",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "department-overtime-load",
+      "kind": "negative",
+      "reference": "department-turnover",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "heavy-overtime",
+        "overtime-share",
+        "sort-overtime",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "department-turnover",
+      "kind": "positive",
+      "reference": "department-turnover",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "department-turnover",
+      "kind": "negative",
+      "reference": "device-visit-value",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-department",
+        "turnover-share",
+        "sort-turnover",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "device-visit-value",
+      "kind": "positive",
+      "reference": "device-visit-value",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "device-visit-value",
+      "kind": "negative",
+      "reference": "first-last-touch",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-device",
+        "visit-value",
+        "sort-conversion",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "first-last-touch",
+      "kind": "positive",
+      "reference": "first-last-touch",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "first-last-touch",
+      "kind": "negative",
+      "reference": "fraud-profile",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "last-touch",
+        "two-aggregates",
+        "sort-first",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "fraud-profile",
+      "kind": "positive",
+      "reference": "fraud-profile",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "fraud-profile",
+      "kind": "negative",
+      "reference": "holiday-month-sales",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-fraud",
+        "sort-fraud",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "holiday-month-sales",
+      "kind": "positive",
+      "reference": "holiday-month-sales",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "holiday-month-sales",
+      "kind": "negative",
+      "reference": "inventory-by-category",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-holidays",
+        "holiday-flag",
+        "sort-sales",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "inventory-by-category",
+      "kind": "positive",
+      "reference": "inventory-by-category",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "inventory-by-category",
+      "kind": "negative",
+      "reference": "language-repository-stars",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-category",
+        "rates-from-sums",
+        "sort-margin",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "language-repository-stars",
+      "kind": "positive",
+      "reference": "language-repository-stars",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "language-repository-stars",
+      "kind": "negative",
+      "reference": "loan-term-risk",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-language",
+        "language-text",
+        "sort-stars",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "loan-term-risk",
+      "kind": "positive",
+      "reference": "loan-term-risk",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "loan-term-risk",
+      "kind": "negative",
+      "reference": "low-liquidity-companies",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-term",
+        "high-risk-share",
+        "sort-term",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "low-liquidity-companies",
+      "kind": "positive",
+      "reference": "low-liquidity-companies",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "low-liquidity-companies",
+      "kind": "negative",
+      "reference": "month-stockout-demand",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "filter-ratio",
+        "sort-ratio-id",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "month-stockout-demand",
+      "kind": "positive",
+      "reference": "month-stockout-demand",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "month-stockout-demand",
+      "kind": "negative",
+      "reference": "monthly-demand",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "month-text",
+        "group-month",
+        "stockout-share",
+        "sort-demand",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "monthly-demand",
+      "kind": "positive",
+      "reference": "monthly-demand",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "monthly-demand",
+      "kind": "negative",
+      "reference": "nps-segments-by-tier",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "month-from-date",
+        "group-month",
+        "sort-month",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "nps-segments-by-tier",
+      "kind": "positive",
+      "reference": "nps-segments-by-tier",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "nps-segments-by-tier",
+      "kind": "negative",
+      "reference": "price-test-margin",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "segments",
+        "group-tier",
+        "segment-shares",
+        "sort-score",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "price-test-margin",
+      "kind": "positive",
+      "reference": "price-test-margin",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "price-test-margin",
+      "kind": "negative",
+      "reference": "region-sales-density",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-test",
+        "simple-margin",
+        "sort-margin",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "region-sales-density",
+      "kind": "positive",
+      "reference": "region-sales-density",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "region-sales-density",
+      "kind": "negative",
+      "reference": "risky-approved-claims",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-region",
+        "density-from-sums",
+        "sort-density",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "risky-approved-claims",
+      "kind": "positive",
+      "reference": "risky-approved-claims",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "risky-approved-claims",
+      "kind": "negative",
+      "reference": "sales-by-category",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "approved-and-score",
+        "group-policy",
+        "sort-payout",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "sales-by-category",
+      "kind": "positive",
+      "reference": "sales-by-category",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "sales-by-category",
+      "kind": "negative",
+      "reference": "season-price-markup",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-category",
+        "sort-revenue",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "season-price-markup",
+      "kind": "positive",
+      "reference": "season-price-markup",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "season-price-markup",
+      "kind": "negative",
+      "reference": "slow-supplier-deliveries",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-season",
+        "markup-ratio",
+        "sort-markup",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "slow-supplier-deliveries",
+      "kind": "positive",
+      "reference": "slow-supplier-deliveries",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "slow-supplier-deliveries",
+      "kind": "negative",
+      "reference": "specialization-applications",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "slow-condition",
+        "group-supplier",
+        "slow-share",
+        "sort-slow",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "specialization-applications",
+      "kind": "positive",
+      "reference": "specialization-applications",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "specialization-applications",
+      "kind": "negative",
+      "reference": "support-by-priority",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-specialization",
+        "specialization-text",
+        "sort-applications",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "support-by-priority",
+      "kind": "positive",
+      "reference": "support-by-priority",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "support-by-priority",
+      "kind": "negative",
+      "reference": "trial-dosage-outcomes",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-priority",
+        "business-order",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "trial-dosage-outcomes",
+      "kind": "positive",
+      "reference": "trial-dosage-outcomes",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "trial-dosage-outcomes",
+      "kind": "negative",
+      "reference": "variant-conversion",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "group-dosage",
+        "side-effect-share",
+        "sort-dosage",
+        "export-columns",
+        "chain-links"
+      ],
+      "error": null
+    },
+    {
+      "task": "variant-conversion",
+      "kind": "positive",
+      "reference": "variant-conversion",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "variant-conversion",
+      "kind": "negative",
+      "reference": "ab-revenue-per-converter",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 33,
+      "failed": [
+        "import-csv",
+        "group-variant",
+        "conversion-share",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "ab-revenue-per-converter",
+      "kind": "near-miss",
+      "reference": "ab-revenue-per-converter",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-conversion",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка test_group: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-conversion",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "ab-revenue-per-converter",
+      "kind": "near-miss",
+      "reference": "ab-revenue-per-converter",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-test",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка total_revenue: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "group-test",
+        "per-converter",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "ab-revenue-per-converter",
+      "kind": "near-miss",
+      "reference": "ab-revenue-per-converter",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"revenue_per_converter\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "abc-pareto-groups",
+      "kind": "near-miss",
+      "reference": "abc-pareto-groups",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-revenue",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка items: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-revenue",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "abc-pareto-groups",
+      "kind": "near-miss",
+      "reference": "abc-pareto-groups",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-class",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка profit: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-class",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "abc-pareto-groups",
+      "kind": "near-miss",
+      "reference": "abc-pareto-groups",
+      "case_id": "threshold",
+      "expected_failed": [
+        "cumulative-class",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка items: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "cumulative-class",
+        "group-class",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "abc-pareto-groups",
+      "kind": "near-miss",
+      "reference": "abc-pareto-groups",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"storage_cost\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "articles-by-author",
+      "kind": "near-miss",
+      "reference": "articles-by-author",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-articles",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка author: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-articles",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "articles-by-author",
+      "kind": "near-miss",
+      "reference": "articles-by-author",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "author-metrics",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка avg_popularity: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "author-metrics",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "articles-by-author",
+      "kind": "near-miss",
+      "reference": "articles-by-author",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"positive_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "basket-category-width",
+      "kind": "near-miss",
+      "reference": "basket-category-width",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-width",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка category_count: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-width",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "basket-category-width",
+      "kind": "near-miss",
+      "reference": "basket-category-width",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-width",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка avg_order_value: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-width",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "basket-category-width",
+      "kind": "near-miss",
+      "reference": "basket-category-width",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"return_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "budget-variance-by-category",
+      "kind": "near-miss",
+      "reference": "budget-variance-by-category",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-variance",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка category: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-variance",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "budget-variance-by-category",
+      "kind": "near-miss",
+      "reference": "budget-variance-by-category",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-category",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка total_budgeted: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-category",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "budget-variance-by-category",
+      "kind": "near-miss",
+      "reference": "budget-variance-by-category",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"over_budget_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "campaign-roi-by-channel",
+      "kind": "near-miss",
+      "reference": "campaign-roi-by-channel",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-roi",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка channel: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-roi",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "campaign-roi-by-channel",
+      "kind": "near-miss",
+      "reference": "campaign-roi-by-channel",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-channel",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка channel: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "group-channel",
+        "roi-from-sums",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "campaign-roi-by-channel",
+      "kind": "near-miss",
+      "reference": "campaign-roi-by-channel",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"roi_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "category-promo-demand",
+      "kind": "near-miss",
+      "reference": "category-promo-demand",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-promo",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка category: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-promo",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "category-promo-demand",
+      "kind": "near-miss",
+      "reference": "category-promo-demand",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-category",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка total_demand: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-category",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "category-promo-demand",
+      "kind": "near-miss",
+      "reference": "category-promo-demand",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"total_demand\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "category-rating-revenue",
+      "kind": "near-miss",
+      "reference": "category-rating-revenue",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-rating",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка category: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-rating",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "category-rating-revenue",
+      "kind": "near-miss",
+      "reference": "category-rating-revenue",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-category",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка total_revenue: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-category",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "category-rating-revenue",
+      "kind": "near-miss",
+      "reference": "category-rating-revenue",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"recommended_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "channel-engagement",
+      "kind": "near-miss",
+      "reference": "channel-engagement",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-views",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка channel: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-views",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "channel-engagement",
+      "kind": "near-miss",
+      "reference": "channel-engagement",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-channel",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка total_forwards: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-channel",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "channel-engagement",
+      "kind": "near-miss",
+      "reference": "channel-engagement",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"avg_engagement_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "cohort-spend-activity",
+      "kind": "near-miss",
+      "reference": "cohort-spend-activity",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-cohort",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка cohort: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-cohort",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "cohort-spend-activity",
+      "kind": "near-miss",
+      "reference": "cohort-spend-activity",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-cohort",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка total_spend: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-cohort",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "cohort-spend-activity",
+      "kind": "near-miss",
+      "reference": "cohort-spend-activity",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"active_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "customer-activity-segments",
+      "kind": "near-miss",
+      "reference": "customer-activity-segments",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-segment",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка segment: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-segment",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "customer-activity-segments",
+      "kind": "near-miss",
+      "reference": "customer-activity-segments",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-segment",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка avg_total_spent: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-segment",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "customer-activity-segments",
+      "kind": "near-miss",
+      "reference": "customer-activity-segments",
+      "case_id": "threshold",
+      "expected_failed": [
+        "segment-bounds",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка customers: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "segment-bounds",
+        "group-segment",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "customer-activity-segments",
+      "kind": "near-miss",
+      "reference": "customer-activity-segments",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"avg_order_value\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "defect-rate-line-shift",
+      "kind": "near-miss",
+      "reference": "defect-rate-line-shift",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-rate",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка production_line: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-rate",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "defect-rate-line-shift",
+      "kind": "near-miss",
+      "reference": "defect-rate-line-shift",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-line-shift",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка production_line: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "group-line-shift",
+        "rate-from-sums",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "defect-rate-line-shift",
+      "kind": "near-miss",
+      "reference": "defect-rate-line-shift",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"defect_rate_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "department-overtime-load",
+      "kind": "near-miss",
+      "reference": "department-overtime-load",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-overtime",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка department: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-overtime",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "department-overtime-load",
+      "kind": "near-miss",
+      "reference": "department-overtime-load",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "overtime-share",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка department: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "heavy-overtime",
+        "overtime-share",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "department-overtime-load",
+      "kind": "near-miss",
+      "reference": "department-overtime-load",
+      "case_id": "threshold",
+      "expected_failed": [
+        "heavy-overtime",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка department: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "heavy-overtime",
+        "overtime-share",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "department-overtime-load",
+      "kind": "near-miss",
+      "reference": "department-overtime-load",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"avg_kpi\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "department-turnover",
+      "kind": "near-miss",
+      "reference": "department-turnover",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-turnover",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка department: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-turnover",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "department-turnover",
+      "kind": "near-miss",
+      "reference": "department-turnover",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-department",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка leavers: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "group-department",
+        "turnover-share",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "department-turnover",
+      "kind": "near-miss",
+      "reference": "department-turnover",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"turnover_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "device-visit-value",
+      "kind": "near-miss",
+      "reference": "device-visit-value",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-conversion",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка device: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-conversion",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "device-visit-value",
+      "kind": "near-miss",
+      "reference": "device-visit-value",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-device",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка total_revenue: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "group-device",
+        "visit-value",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "device-visit-value",
+      "kind": "near-miss",
+      "reference": "device-visit-value",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"revenue_per_visit\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "first-last-touch",
+      "kind": "near-miss",
+      "reference": "first-last-touch",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-first",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка channel: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-first",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "first-last-touch",
+      "kind": "near-miss",
+      "reference": "first-last-touch",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "two-aggregates",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка first_touch_value: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "two-aggregates",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "first-last-touch",
+      "kind": "near-miss",
+      "reference": "first-last-touch",
+      "case_id": "filter",
+      "expected_failed": [
+        "two-aggregates",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Количество строк результата не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "two-aggregates",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "first-last-touch",
+      "kind": "near-miss",
+      "reference": "first-last-touch",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"last_touch_value\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "fraud-profile",
+      "kind": "near-miss",
+      "reference": "fraud-profile",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-fraud",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка fraud: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 57,
+      "failed": [
+        "sort-fraud",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "fraud-profile",
+      "kind": "near-miss",
+      "reference": "fraud-profile",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-fraud",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка avg_account_age_days: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 57,
+      "failed": [
+        "group-fraud",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "fraud-profile",
+      "kind": "near-miss",
+      "reference": "fraud-profile",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"avg_account_age_days\"",
+      "expectations_met": true,
+      "score": 57,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "holiday-month-sales",
+      "kind": "near-miss",
+      "reference": "holiday-month-sales",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-sales",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка holidays: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-sales",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "holiday-month-sales",
+      "kind": "near-miss",
+      "reference": "holiday-month-sales",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-holidays",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка advertising_budget: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-holidays",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "holiday-month-sales",
+      "kind": "near-miss",
+      "reference": "holiday-month-sales",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"advertising_budget\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "inventory-by-category",
+      "kind": "near-miss",
+      "reference": "inventory-by-category",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-margin",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка category: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-margin",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "inventory-by-category",
+      "kind": "near-miss",
+      "reference": "inventory-by-category",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-category",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка total_stock: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "group-category",
+        "rates-from-sums",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "inventory-by-category",
+      "kind": "near-miss",
+      "reference": "inventory-by-category",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"margin_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "language-repository-stars",
+      "kind": "near-miss",
+      "reference": "language-repository-stars",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-stars",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка language: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-stars",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "language-repository-stars",
+      "kind": "near-miss",
+      "reference": "language-repository-stars",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-language",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка language: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "group-language",
+        "sort-stars",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "language-repository-stars",
+      "kind": "near-miss",
+      "reference": "language-repository-stars",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"max_stars\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "loan-term-risk",
+      "kind": "near-miss",
+      "reference": "loan-term-risk",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-term",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка loan_term_months: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-term",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "loan-term-risk",
+      "kind": "near-miss",
+      "reference": "loan-term-risk",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-term",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка avg_default_risk: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-term",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "loan-term-risk",
+      "kind": "near-miss",
+      "reference": "loan-term-risk",
+      "case_id": "threshold",
+      "expected_failed": [
+        "high-risk-share",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка high_risk_pct: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "high-risk-share",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "loan-term-risk",
+      "kind": "near-miss",
+      "reference": "loan-term-risk",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"high_risk_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "low-liquidity-companies",
+      "kind": "near-miss",
+      "reference": "low-liquidity-companies",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-ratio-id",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка company_id: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 57,
+      "failed": [
+        "sort-ratio-id",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "low-liquidity-companies",
+      "kind": "near-miss",
+      "reference": "low-liquidity-companies",
+      "case_id": "filter",
+      "expected_failed": [
+        "filter-ratio"
+      ],
+      "expected_oracle_pass": true,
+      "oracle_pass": true,
+      "oracle_error": null,
+      "expectations_met": true,
+      "score": 86,
+      "failed": [
+        "filter-ratio"
+      ],
+      "error": null
+    },
+    {
+      "task": "low-liquidity-companies",
+      "kind": "near-miss",
+      "reference": "low-liquidity-companies",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"current_liabilities\"",
+      "expectations_met": true,
+      "score": 57,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "month-stockout-demand",
+      "kind": "near-miss",
+      "reference": "month-stockout-demand",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-demand",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка month: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-demand",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "month-stockout-demand",
+      "kind": "near-miss",
+      "reference": "month-stockout-demand",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-month",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка month: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "group-month",
+        "sort-demand",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "month-stockout-demand",
+      "kind": "near-miss",
+      "reference": "month-stockout-demand",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"stockout_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "monthly-demand",
+      "kind": "near-miss",
+      "reference": "monthly-demand",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-month",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка month: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-month",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "monthly-demand",
+      "kind": "near-miss",
+      "reference": "monthly-demand",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-month",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка promo_days: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-month",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "monthly-demand",
+      "kind": "near-miss",
+      "reference": "monthly-demand",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"promo_days\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "nps-segments-by-tier",
+      "kind": "near-miss",
+      "reference": "nps-segments-by-tier",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-score",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка customer_tier: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-score",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "nps-segments-by-tier",
+      "kind": "near-miss",
+      "reference": "nps-segments-by-tier",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-tier",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка avg_nps_score: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "group-tier",
+        "sort-score",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "nps-segments-by-tier",
+      "kind": "near-miss",
+      "reference": "nps-segments-by-tier",
+      "case_id": "threshold",
+      "expected_failed": [
+        "segments",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка promoters_pct: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "segments",
+        "segment-shares",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "nps-segments-by-tier",
+      "kind": "near-miss",
+      "reference": "nps-segments-by-tier",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"detractors_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "price-test-margin",
+      "kind": "near-miss",
+      "reference": "price-test-margin",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-margin",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка price_test_group: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-margin",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "price-test-margin",
+      "kind": "near-miss",
+      "reference": "price-test-margin",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-test",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка units: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-test",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "price-test-margin",
+      "kind": "near-miss",
+      "reference": "price-test-margin",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"avg_satisfaction\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "region-sales-density",
+      "kind": "near-miss",
+      "reference": "region-sales-density",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-density",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка region: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-density",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "region-sales-density",
+      "kind": "near-miss",
+      "reference": "region-sales-density",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-region",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка total_sales: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "group-region",
+        "density-from-sums",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "region-sales-density",
+      "kind": "near-miss",
+      "reference": "region-sales-density",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"sales_per_sqm\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "risky-approved-claims",
+      "kind": "near-miss",
+      "reference": "risky-approved-claims",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-payout",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка policy_type: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-payout",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "risky-approved-claims",
+      "kind": "near-miss",
+      "reference": "risky-approved-claims",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-policy",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка total_claimed: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-policy",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "risky-approved-claims",
+      "kind": "near-miss",
+      "reference": "risky-approved-claims",
+      "case_id": "filter",
+      "expected_failed": [
+        "approved-and-score",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка policy_type: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "approved-and-score",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "risky-approved-claims",
+      "kind": "near-miss",
+      "reference": "risky-approved-claims",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"avg_fraud_score\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "sales-by-category",
+      "kind": "near-miss",
+      "reference": "sales-by-category",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-revenue",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка category: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 57,
+      "failed": [
+        "sort-revenue",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "sales-by-category",
+      "kind": "near-miss",
+      "reference": "sales-by-category",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-category",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка revenue: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 43,
+      "failed": [
+        "group-category",
+        "sort-revenue",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "sales-by-category",
+      "kind": "near-miss",
+      "reference": "sales-by-category",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"avg_unit_price\"",
+      "expectations_met": true,
+      "score": 57,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "season-price-markup",
+      "kind": "near-miss",
+      "reference": "season-price-markup",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-markup",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка season: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-markup",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "season-price-markup",
+      "kind": "near-miss",
+      "reference": "season-price-markup",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-season",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка units: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-season",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "season-price-markup",
+      "kind": "near-miss",
+      "reference": "season-price-markup",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"markup_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "slow-supplier-deliveries",
+      "kind": "near-miss",
+      "reference": "slow-supplier-deliveries",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-slow",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка supplier: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-slow",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "slow-supplier-deliveries",
+      "kind": "near-miss",
+      "reference": "slow-supplier-deliveries",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-supplier",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка total_cost: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-supplier",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "slow-supplier-deliveries",
+      "kind": "near-miss",
+      "reference": "slow-supplier-deliveries",
+      "case_id": "threshold",
+      "expected_failed": [
+        "slow-condition",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка slow_orders: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 38,
+      "failed": [
+        "slow-condition",
+        "group-supplier",
+        "slow-share",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "slow-supplier-deliveries",
+      "kind": "near-miss",
+      "reference": "slow-supplier-deliveries",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"total_cost\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "specialization-applications",
+      "kind": "near-miss",
+      "reference": "specialization-applications",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-applications",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка specialization: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-applications",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "specialization-applications",
+      "kind": "near-miss",
+      "reference": "specialization-applications",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-specialization",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка applications: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "group-specialization",
+        "sort-applications",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "specialization-applications",
+      "kind": "near-miss",
+      "reference": "specialization-applications",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"avg_days_open\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "support-by-priority",
+      "kind": "near-miss",
+      "reference": "support-by-priority",
+      "case_id": "sort",
+      "expected_failed": [
+        "business-order",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка priority: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 57,
+      "failed": [
+        "business-order",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "support-by-priority",
+      "kind": "near-miss",
+      "reference": "support-by-priority",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-priority",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка avg_response_min: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 57,
+      "failed": [
+        "group-priority",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "support-by-priority",
+      "kind": "near-miss",
+      "reference": "support-by-priority",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"avg_satisfaction\"",
+      "expectations_met": true,
+      "score": 57,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "trial-dosage-outcomes",
+      "kind": "near-miss",
+      "reference": "trial-dosage-outcomes",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-dosage",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка treatment_group: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-dosage",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "trial-dosage-outcomes",
+      "kind": "near-miss",
+      "reference": "trial-dosage-outcomes",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-dosage",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка avg_improvement: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "group-dosage",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "trial-dosage-outcomes",
+      "kind": "near-miss",
+      "reference": "trial-dosage-outcomes",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"side_effect_pct\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "variant-conversion",
+      "kind": "near-miss",
+      "reference": "variant-conversion",
+      "case_id": "sort",
+      "expected_failed": [
+        "sort-conversion",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка variant: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "sort-conversion",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "variant-conversion",
+      "kind": "near-miss",
+      "reference": "variant-conversion",
+      "case_id": "aggregate",
+      "expected_failed": [
+        "group-variant",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Строка 1, колонка conversions: результат не совпадает с oracle",
+      "expectations_met": true,
+      "score": 50,
+      "failed": [
+        "group-variant",
+        "conversion-share",
+        "result-rows"
+      ],
+      "error": null
+    },
+    {
+      "task": "variant-conversion",
+      "kind": "near-miss",
+      "reference": "variant-conversion",
+      "case_id": "column",
+      "expected_failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "oracle_pass": false,
+      "oracle_error": "Колонки результата не совпадают с oracle: нет \"avg_page_views\"",
+      "expectations_met": true,
+      "score": 63,
+      "failed": [
+        "export-columns",
+        "result-rows"
+      ],
+      "error": null
+    }
+  ],
+  "warnings": []
+}
