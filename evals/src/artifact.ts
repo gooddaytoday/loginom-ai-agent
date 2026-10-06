@@ -1,5 +1,5 @@
 import path from "node:path"
-import { cp, mkdir, readdir, rm, stat } from "node:fs/promises"
+import { cp, lstat, mkdir, readdir, rm, stat } from "node:fs/promises"
 import { evalsRoot } from "./config"
 import { EvalFailure } from "./fail"
 
@@ -127,6 +127,12 @@ export async function cleanupOrphanResult(input: { source: ArtifactSource; name:
   if (input.existingNames.includes(input.name)) throw Error("Result ownership unconfirmed: pre-existing filename")
   const entries = await listStorage(input.source)
   if (!entries.some(entry => entry.name === input.name)) return
+  if (input.source.kind === "dir") {
+    if (!(await lstat(path.join(input.source.dir, input.name))).isFile()) throw Error("Result is not a regular file")
+  } else {
+    const regular = await Bun.$`docker exec ${input.source.container} sh -c ${'test -f "$1" && ! test -L "$1"'} eval-orphan ${`${input.source.storageDir}/${input.name}`}`.quiet().nothrow()
+    if (regular.exitCode !== 0) throw Error("Result is not a regular file")
+  }
   await mkdir(path.join(input.outDir, "storage-outputs"), { recursive: true })
   await copyOut(input.source, input.name, path.join(input.outDir, "storage-outputs", input.name))
   if (input.source.kind === "dir") return rm(path.join(input.source.dir, input.name))
