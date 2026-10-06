@@ -445,16 +445,16 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
   проектный skill сохраняет source, источники загружаются последовательно,
   более поздний configured source побеждает для незарезервированного имени.
   Проверено отсутствие fallback после повреждения bundled файла.
-- [ ] Перенести существующий `loginom-automation` с сохранением имени и нужных
+- [x] Перенести существующий `loginom-automation` с сохранением имени и нужных
   references в Product; `.loginom-ai-agent/skills/package_docs/` перенести в
   `packages/product/skills/package-docs/`, изменив каталог/frontmatter.
   Контракт JSON `package_docs.structure.v1` не переименовывать.
-- [ ] Description automation ограничить созданием, изменением и выполнением
+- [x] Description automation ограничить созданием, изменением и выполнением
   сценариев: справочные вопросы используют Help без этого skill, локальная
   документация — `package-docs`. Description docs включает пользовательские
   формулировки, «ИИ Отчет», локальный `.lgp` и PDF/DOCX/MD. Добавить compatibility.
   В system prompt входят метаданные, полный текст загружается по необходимости.
-- [ ] Перенести действующие `userWorkflowInstructions` с node lifecycle,
+- [x] Перенести действующие `userWorkflowInstructions` с node lifecycle,
   CrossTable, проверкой результатов, отменой, host deadlines и
   `package.save_checkpoint`. Удалить неподдерживаемые raw UI/clipboard/Playwright,
   `node.add/link.create` через action API, model `budget_ms`, устаревший обязательный

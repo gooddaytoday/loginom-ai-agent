@@ -2008,5 +2008,30 @@
     "baseHash": "1fb5d7d07fb6fa868127a15b31b6ba6e880c1d25f292518f9edcf40f42b0e29d",
     "hash": "cf92229b08aa83d26eb3b90b0900f323302df868836db1f30ba0b3fbcee9e25c",
     "reason": "Regress private login followed by workspace preparation using the same canonical public/custom URL; preserve strict foreign-page rejection."
+  },
+  "packages/product/skills/loginom-automation/SKILL.md": {
+    "baseHash": "b6c82e54976d232bcac64b536cc3dca7d638c62ae935d98e30db2affd24cfebb",
+    "hash": "f516bd12110071852baccca5197e86fc7bb6641d6adccd8c30634fa7bfd784ce",
+    "reason": "Deliver the canonical product skill locally; adapt the entrypoint and references to the current managed user-v1 workflow, including CrossTable, result verification, cancellation and checkpoint saves; preserve upstream attribution."
+  },
+  "packages/product/skills/loginom-automation/references/browser.md": {
+    "baseHash": "e7d22269d1cd0c405a351a1ac5364e54c8e463566b73c28c64ec571e4f9f7c79",
+    "hash": "a6b73339f4c3432b76a8c2bfe0466980a76741b01afd04dab0c8d3306e0b5cf2",
+    "reason": "Deliver the canonical product skill locally; adapt the entrypoint and references to the current managed user-v1 workflow, including CrossTable, result verification, cancellation and checkpoint saves; preserve upstream attribution."
+  },
+  "packages/product/skills/loginom-automation/references/canvas.md": {
+    "baseHash": "3038df86030641f5b04b2552ae9e62c6f4490f64de7633e0739e6f8091299c9c",
+    "hash": "d4ea54fb8d756f00a0c7c781de08daa7ddf5536b3645b51e24fe95b51747d088",
+    "reason": "Deliver the canonical product skill locally; adapt the entrypoint and references to the current managed user-v1 workflow, including CrossTable, result verification, cancellation and checkpoint saves; preserve upstream attribution."
+  },
+  "packages/product/skills/loginom-automation/references/sources.md": {
+    "baseHash": "aaeb63c94a7c5a38cfd8880a37f45defe0c23395100b85cc9c93b056c0be905f",
+    "hash": "b364a93fa87b383a79fa304fb98309373c0748013eed5efbe0b21dec6e05f98f",
+    "reason": "Deliver the canonical product skill locally; adapt the entrypoint and references to the current managed user-v1 workflow, including CrossTable, result verification, cancellation and checkpoint saves; preserve upstream attribution."
+  },
+  "packages/product/skills/loginom-automation/references/workflow.md": {
+    "baseHash": "a43862d340aae90097fbf16d88a47aa2c9f73a5150359774e1134830490affe3",
+    "hash": "389bffb12e37462b89b2452e9eb9c6d22d910dbc0fb56a10ad46458496370b6d",
+    "reason": "Deliver the canonical product skill locally; adapt the entrypoint and references to the current managed user-v1 workflow, including CrossTable, result verification, cancellation and checkpoint saves; preserve upstream attribution."
   }
 }

@@ -1,6 +1,6 @@
-import { afterAll, expect } from "bun:test"
+import { afterAll, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdtemp, rm, symlink } from "node:fs/promises"
+import { mkdtemp, readdir, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect, Layer } from "effect"
@@ -10,6 +10,32 @@ import { Skill } from "../../src/skill"
 import { RuntimeFlags } from "../../src/effect/runtime-flags"
 import { provideTmpdirInstance, testInstanceStoreLayer } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
+import { productSkillsDirectory, reservedSkillNames } from "@loginom-ai-agent/product/skills"
+import { ConfigMarkdown } from "../../src/config/markdown"
+
+test("the product has one canonical directory for each shipped skill", async () => {
+  const directories = (await readdir(productSkillsDirectory, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .toSorted()
+  expect(directories).toEqual([...reservedSkillNames].toSorted())
+})
+
+test("shipped skill metadata conforms to the Agent Skills specification", async () => {
+  for (const name of reservedSkillNames) {
+    const skill = await ConfigMarkdown.parse(join(productSkillsDirectory, name, "SKILL.md"))
+    expect(skill.data.name).toBe(name)
+    expect(name.length).toBeLessThanOrEqual(64)
+    expect(name).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    expect(typeof skill.data.description).toBe("string")
+    expect(skill.data.description.trim().length).toBeGreaterThan(0)
+    expect(skill.data.description.length).toBeLessThanOrEqual(1024)
+    expect(typeof skill.data.compatibility).toBe("string")
+    expect(skill.data.compatibility.length).toBeLessThanOrEqual(500)
+    const supported = ["name", "description", "compatibility", "license", "metadata", "allowed-tools"]
+    expect(Object.keys(skill.data).filter((key) => !supported.includes(key))).toEqual([])
+  }
+})
 
 const resources = await mkdtemp(join(tmpdir(), "loginom-bundled-skills-"))
 const content = "---\nname: package-docs\ndescription: Документация локального пакета Loginom.\n---\n\n# Документация\n"

@@ -120,10 +120,34 @@ matches отсортированы. Дополнительные регресс�
 для обычного имени и отсутствие fallback при повреждении bundled файла.
 Полный выбранный discovery/tool/attachment suite: 34 PASS, Agent typecheck PASS.
 
+Каталог Product: RED — `packages/product/skills/` отсутствовал. GREEN — два
+канонических каталога, затем metadata/frontmatter regression: 8 PASS.
+`loginom-automation` перенесён из services, `package_docs` из проектного каталога
+переименован в `package-docs`. Четыре references automation сохранены по именам
+и адаптированы к user-v1; workflow взят из действующего `userWorkflowInstructions`
+с CrossTable, проверками результата, отменой и checkpoint. Имена инструментов
+согласованы с префиксом `loginom_`; receipt `dock_saved_package_state` не переименован.
+Неподдержанные ручные UI/clipboard и action API для узлов/связей исключены.
+Descriptions разделяют построение, локальную документацию и обычную справку.
+Добавлено постоянное правило в Product AGENTS; ссылка из root AGENTS уже есть.
+
+Проверены 7 исходных Python-тестов после переноса. Python-скрипты пока сохранены
+до порта этапа 2; инструкции docs об executor/выходном каталоге обновятся с ним.
+Source map переведён на новые destinations с исходными hash/object/ref и явными
+source-transforms: 5 перенесённых файлов PASS. Общий source verification выявил
+`IMPORTED_HASH_MISMATCH: packages/loginom-runtime/client/lib/bridge.mjs`;
+тот же отказ воспроизведён на чистом исходном baseline. Это исходная проблема
+attribution manifest, не PASS общего аудита; устранение учитывать при изменениях runtime.
+
+Штатные `bun run generate` (Client) и SDK `script/build.ts` завершились успешно.
+Client generated не изменился (другой API); legacy SDK получил только `source`
+и `digest` в AppSkillsResponses, SDK typecheck PASS. Generated вручную не редактировался.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
 - Этап 0 выполнен: полный чистый baseline и детерминированные проверки сохранены.
 - Начата проверенная TDD-связка discovery/integrity, этап 1 остаётся открытым.
-- Следующий шаг: ссылки/metadata assets, realpath-dedup, перенос каталога skills и staging/runtime.
+- Каталог skills перенесён и адаптирован; source-only проверки перечислены выше.
+- Следующий шаг: staging, локальный runtime loader и отключение публикации; затем Node executor.
 - Живая приёмка и удаление серверного skill остаются открытыми.
