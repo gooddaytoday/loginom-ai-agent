@@ -105,8 +105,8 @@ async function executeRun(config: EvalConfig) {
           if ("stop" in after) { state.stopped = after.stop ?? "Environment cleanup failed"; break outer }
           if (result.status === "interrupted") state.interruptedCleanup = { recovered: after.recovered }
         }
-        if (result.environment_cleanup?.status === "failed" || result.status === "harness_error" && stop) {
-          state.stopped = result.environment_cleanup?.error ?? result.harness_error ?? "harness_error"
+        if (result.cleanup_error || result.environment_cleanup?.status === "failed" || result.status === "harness_error" && stop) {
+          state.stopped = result.cleanup_error ?? result.environment_cleanup?.error ?? result.harness_error ?? "harness_error"
           break outer
         }
         if (result.status === "interrupted") break outer

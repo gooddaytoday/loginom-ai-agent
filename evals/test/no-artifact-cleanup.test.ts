@@ -69,6 +69,22 @@ test("code-only pipeline даёт FAIL/no_artifact с подтверждённы
   } finally { fixture.server.stop(true); await rm(directory, { recursive: true, force: true }) }
 }, 30_000)
 
+test("main останавливает dispatch после storage cleanup failure, сохраняя качество и process cleanup", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "eval-orphan-pipeline-"))
+  const fixture = await orphanPipeline(directory, true)
+  try {
+    const result = await main(["--tasks", fixture.tasks, "--skip-judge"], fixture.env)
+    expect(result.code).toBe(1)
+    const summary = await Bun.file(path.join(result.runDir, "summary.json")).json()
+    expect(summary.stopped_reason).toMatch(/EACCES|Permission denied/)
+    expect(summary.tasks[0].attempts[0]).toMatchObject({ status: "no_artifact", cleanup_error: expect.any(String),
+      environment_cleanup: { status: "confirmed" } })
+    expect(summary.tasks[1].attempts).toEqual([])
+    expect(summary.storage_leftovers).toHaveLength(1)
+    expect(await Bun.file(path.join(result.runDir, "a-orphan-csv/1/storage-cleanup.json")).json()).toMatchObject({ status: "failed", removed: false })
+  } finally { fixture.server.stop(true); await chmod(fixture.storage, 0o700); await rm(directory, { recursive: true, force: true }) }
+}, 30_000)
+
 test("cleanupOrphanResult удаляет только точный собственный CSV после сохранения evidence", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "eval-orphan-"))
   try {
