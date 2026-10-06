@@ -1070,13 +1070,29 @@ Desktop/CLI installed acceptance и парные live evals остаются о�
 Следующий шаг — граничные race/revert случаи, slash/run-command producer и
 Task bypass guards. Общий этап 5 ещё не выполнен; план не перерабатывался.
 
+## Pending-активация и свежая граница revert
+
+Новый actual-loop RED подтвердил ошибку: между request и следующей границей
+source skill part исключалась через Session revert, но backend находил её
+в полной истории и применял переход. Apply теперь требует присутствия именно
+этой части в `TaskScope.visible` с актуальным revert. Одна сохранённая task ID
+не выдаёт права. В этом случае Host apply не вызывается и grant не пишется;
+следующее bind прежнего профиля очищает pending на том же run.
+
+`tdd-reverted-pending-activation-red.log` →
+`activation-revert-final-boundaries.log`: **4 PASS**, 63 assertions
+(успех, request/apply отказы, revert). Более широкие регрессии
+`activation-revert-prompt-regression.log`: **87 PASS / 1 SKIP**, 407 assertions
+(полный prompt, task scope, revert-compact). Agent typecheck и format/diff
+checks прошли. Другие гонки pending/новой задачи/отмены, slash/run-command
+producer и Task bypass остаются следующими открытыми проверками.
+
 ## Checkpoint
 
-- Исходный SHA `a369811c9` (`docs-no-browser`); Host scope, catalogs, metadata guards и bundled loop activation выше.
+- Исходный SHA `c8d309e01` (`docs-no-browser`); Host/catalogs/metadata/bundled loop и pending-revert проверены выше.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
-- Shared inventory, dependency closure и source/installed generated exception проверены.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 41 PASS; оригинальные файлы/permission/cancellation проверены отдельно.
 - BrowserStatus и key-only Help работают по sources; GUI/TTY и первый запуск ещё открыты.
@@ -1088,5 +1104,6 @@ Task bypass guards. Общий этап 5 ещё не выполнен; план
 - Старый package_docs/Python тест заменён actual bundled flow/Node executor без Host call/admit.
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: полный prompt/инструменты 109 PASS / 1 SKIP; Agent typecheck PASS.
-- Далее: race/revert, slash/run-command activation, Task bypass guards и original-file acceptance.
+- Pending-revert: 4 boundary tests и 87 PASS / 1 SKIP регрессий; typecheck PASS.
+- Далее: остальные races, slash/run-command, Task bypass и original-file acceptance.
 - Затем Linux Desktop/CLI/TTY, естественный выбор skill и парные live evals на принятом harness SHA.

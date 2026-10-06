@@ -13,6 +13,7 @@ import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
 import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
 import { isRecord } from "@/util/record"
+import { EffectBridge } from "@/effect/bridge"
 import path from "path"
 import { fileURLToPath, pathToFileURL } from "url"
 import { NamedError } from "@loginom-ai-agent/core/util/error"
@@ -1058,8 +1059,9 @@ const bundledResources = await mkdtemp(path.join(tmpdir(), "loginom-prompt-bundl
 afterAll(() => rm(bundledResources, { recursive: true, force: true }))
 const bundled = testEffect(makeHttp({ resources: bundledResources }))
 
-for (const failure of [undefined, "request", "apply"]) {
+for (const failure of [undefined, "request", "apply", "revert"]) {
   const denied = !!failure
+  const reverted = failure === "revert"
   bundled.instance(
     denied
       ? `rejected bundled profile ${failure} preserves the old catalog and records no grant`
@@ -1092,6 +1094,9 @@ for (const failure of [undefined, "request", "apply"]) {
           ),
         )
         const requests: { method: string; input: unknown }[] = []
+        const bridge = yield* EffectBridge.make()
+        const sessions = yield* Session.Service
+        const active: { sessionID?: SessionID } = {}
         let receive: ((event: { data: unknown }) => void) | undefined
         LoginomHost.connect({
           start() {},
@@ -1109,7 +1114,7 @@ for (const failure of [undefined, "request", "apply"]) {
                   : value.method === "tools"
                     ? { tools: [] }
                     : {}
-            receive?.({
+            const response = {
               data: {
                 id: value.id,
                 generation: 9,
@@ -1117,19 +1122,43 @@ for (const failure of [undefined, "request", "apply"]) {
                   ? { error: "LOGINOM_SCOPE_DENIED" }
                   : { result }),
               },
-            })
+            }
+            if (reverted && value.method === "scope" && isRecord(value.input) && value.input.mode === "request") {
+              void bridge
+                .promise(
+                  Effect.gen(function* () {
+                    if (!active.sessionID) throw Error("No active test session")
+                    const history = yield* sessions.messages({ sessionID: active.sessionID })
+                    const part = history
+                      .flatMap((message) => message.parts)
+                      .find((part) => part.type === "tool" && part.tool === "skill")
+                    if (!part) throw Error("No running skill call")
+                    yield* sessions.setRevert({
+                      sessionID: active.sessionID,
+                      revert: { messageID: part.messageID, partID: part.id },
+                      summary: undefined,
+                    })
+                  }),
+                )
+                .then(
+                  () => receive?.(response),
+                  () => receive?.({ data: { id: value.id, error: "LOGINOM_SCOPE_DENIED" } }),
+                )
+              return
+            }
+            receive?.(response)
           },
         })
         yield* Effect.addFinalizer(() => Effect.sync(() => LoginomHost.disconnect()))
         const { dir, llm } = yield* useServerConfig(providerCfg)
         const prompt = yield* SessionPrompt.Service
-        const sessions = yield* Session.Service
         const skills = yield* Skill.Service
         const lgp = path.join(dir, "demo.lgp")
         yield* Effect.promise(() =>
           cp(path.join(import.meta.dir, "../../../loginom-host/test/fixtures/package-docs/demo.lgp"), lgp),
         )
         const session = yield* sessions.create({ permission: [{ permission: "*", pattern: "*", action: "allow" }] })
+        active.sessionID = session.id
         const user = yield* prompt.prompt({
           sessionID: session.id,
           agent: "build",
@@ -1148,18 +1177,16 @@ for (const failure of [undefined, "request", "apply"]) {
           .flatMap((message) => message.parts)
           .filter((part): part is SessionV1.ToolPart => part.type === "tool")
         const loaded = parts.find((part) => part.tool === "skill")
-        expect(loaded?.state.status).toBe(denied ? "error" : "completed")
+        expect(loaded?.state.status).toBe(denied && !reverted ? "error" : "completed")
         if (loaded?.state.status === "error") {
           expect(loaded.state.error).toContain("LOGINOM_SCOPE_DENIED")
           expect(loaded.state.metadata?.activation).toBeUndefined()
         }
         const info = yield* skills.require("package-docs")
         if (loaded?.state.status === "completed")
-          expect(loaded.state.metadata.activation).toEqual({
-            name: "package-docs",
-            profile: "package-docs",
-            digest: info.digest,
-          })
+          expect(loaded.state.metadata.activation).toEqual(
+            reverted ? undefined : { name: "package-docs", profile: "package-docs", digest: info.digest },
+          )
         const extracted = parts.find((part) => part.tool === "package_docs_run")
         expect(extracted?.state.status).toBe(denied ? undefined : "completed")
         if (extracted?.state.status === "completed") {
@@ -1190,7 +1217,7 @@ for (const failure of [undefined, "request", "apply"]) {
             .filter((request) => request.method === "scope")
             .map((request) => (isRecord(request.input) ? request.input.mode : undefined)),
         ).toEqual(
-          failure === "request"
+          failure === "request" || reverted
             ? ["bind", "request", "bind"]
             : denied
               ? ["bind", "request", "apply", "bind"]

@@ -1151,6 +1151,7 @@ const layer = Layer.effect(
           activation = undefined
           if (pending && loginom) {
             const task = TaskScope.derive({ sessionID, messages: history, revert: session.revert })
+            const visible = TaskScope.visible({ sessionID, messages: history, revert: session.revert })
             const message = history.find((message) => message.info.id === pending.messageID)
             const part = message?.parts.find(
               (part) => part.type === "tool" && part.tool === "skill" && part.callID === pending.callID,
@@ -1158,7 +1159,8 @@ const layer = Layer.effect(
             if (
               task?.taskMessageID === pending.scope.taskMessageID &&
               part?.type === "tool" &&
-              part.state.status === "completed"
+              part.state.status === "completed" &&
+              visible.some((message) => message.parts.some((candidate) => candidate.id === part.id))
             ) {
               const state = part.state
               const updated = yield* Effect.gen(function* () {
