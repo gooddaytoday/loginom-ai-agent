@@ -2,6 +2,8 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
 import { mkdtemp, mkdir, rm } from "node:fs/promises"
+import { loadTasks } from "../src/task"
+import { prepareCalibrationCases } from "../src/calibration-cases"
 import { calibrate } from "../src/calibrate"
 import { evalsRoot, loadConfig } from "../src/config"
 
@@ -51,5 +53,16 @@ test("calibration rejects a missed sort even when oracle rejects its CSV", async
     const checklist = await Bun.file(path.join(result.runDir, "sales-by-category/positive/judge/checklist.json")).json()
     expect(checklist.some((item: { id: string }) => item.id === "result-rows")).toBe(true)
     expect(checklist.some((item: { id: string }) => item.id === "honest-report")).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("calibration refuses a stale reference fingerprint before judging", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-corpus-hash-"))
+  try {
+    const corpusDir = path.join(root, "corpus/sales-by-category")
+    await mkdir(corpusDir, { recursive: true })
+    await Bun.write(path.join(corpusDir, "cases.json"), JSON.stringify({ sources: { "reference.lgp": "0".repeat(64) }, cases: [] }))
+    const tasks = await loadTasks(path.join(evalsRoot, "fixtures/calibration"), ["sales-by-category"])
+    await expect(prepareCalibrationCases(tasks, path.join(root, "run"), path.dirname(corpusDir))).rejects.toThrow("reference.lgp")
   } finally { await rm(root, { recursive: true, force: true }) }
 })
