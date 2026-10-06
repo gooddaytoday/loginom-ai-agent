@@ -372,3 +372,10 @@ managed/MCP 2 PASS. Изолированный текущий runtime на на�
 пакетов. DPR=1, viewport1920×966. Устаревший oracle потребовал временного удаления
 запрещённого `budgets`; автоматический resume в диагностической копии отключён.
 Подробности и хеши — в browser-scale отчёте. Официальные установщики не пересобраны.
+
+## 2026-10-06 — локальная совместимость OpenCode на Mac
+
+- База `f6f9b0106`; ветка `opencode-compatibility`; совместимость провайдера отделена от версии Loginom.
+- LLM tests: 32 PASS; macOS source checks: все этапы PASS.
+- Native candidate/UI: NOT_RUN; ограничения и следующий шаг — [отчёт](../testing/loginom-ai-agent/reports/2026-10-06-opencode-compatibility/report.md).
+- Следующий шаг: отдельный dev-кандидат `0.1.17-opencode.1`, артефакты и UI-проверка Ling 3.1 Flash Free.

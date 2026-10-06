@@ -7,6 +7,8 @@ export const Product = Object.freeze({
   executable: "loginom-ai-agent",
   cliExecutable: "loginom-ai-agent-cli",
   wordmark: "Loginom AI",
+  // OpenCode base before product migration: d848db933^:packages/opencode/package.json.
+  opencodeCompatibilityVersion: "1.18.31",
   database: "loginom-ai-agent.db",
   updateFeed: null as string | null,
   changelogFeed: null as string | null,
