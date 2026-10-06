@@ -552,7 +552,7 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
   на проверенный staged root через `LOGINOM_AI_AGENT_RESOURCES` (2.1);
   если мост сохранился в другом переходном состоянии, удалить в этапе 3.
   Проверку realpath-дедупликации сохранить для обычных `skills.paths`.
-- [ ] Статический тест разместить в `packages/agent/test/skill/bundled-skills.test.ts`:
+- [x] Статический тест разместить в `packages/agent/test/skill/bundled-skills.test.ts`:
   он использует настоящий `ConfigMarkdown.parse` и не создаёт цикл Product → Core.
   Проверить допустимые поля frontmatter (`name`, `description`, `license`,
   `allowed-tools`, `metadata`, `compatibility`), имя до 64 символов: строчные

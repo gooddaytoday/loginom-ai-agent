@@ -54,6 +54,29 @@ test('local bundle verification enforces frontmatter, required assets and genera
   }
 });
 
+test('bundled skill frontmatter rejects fields outside the Agent Skills specification', async t => {
+  const source = await createBundledSkillFixture(t);
+  const content = await readFile(source.main, 'utf8');
+  await writeFile(source.main, content.replace('\n---\n', '\nunsupported: value\n---\n'));
+  await refreshSkillFixtureManifest(source.resources);
+  await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(), /LOGINOM_SKILL_FRONTMATTER_INVALID/);
+});
+
+test('bundled skill frontmatter enforces description, compatibility and metadata value types', async t => {
+  for (const header of [
+    'description: []', 'description: ""', 'description: ' + 'x'.repeat(1025),
+    'description: Build.\ncompatibility: ' + 'x'.repeat(501),
+    'description: Build.\nmetadata:\n  purpose: 1',
+    'description: Build.\nlicense: []',
+    'description: Build.\nallowed-tools: []',
+  ]) {
+    const source = await createBundledSkillFixture(t);
+    await writeFile(source.main, '---\nname: loginom-automation\n' + header + '\n---\n\n# Build\n');
+    await refreshSkillFixtureManifest(source.resources);
+    await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(), /LOGINOM_SKILL_FRONTMATTER_INVALID/);
+  }
+});
+
 test('a manifested symlink cannot read a different skill within the resource root', async t => {
   const source = await createBundledSkillFixture(t);
   await mkdir(join(source.resources, 'skills/other'));

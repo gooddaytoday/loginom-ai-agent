@@ -229,6 +229,17 @@ caller admin/archive не изменены, report не создан. Host typec
 `skill-publisher-host-typecheck.log`. Обновление acceptance audit/evidence и
 устранение исходного source-map mismatch остаются отдельными открытыми задачами.
 
+Проверка формата: RED — runtime принимал неизвестное поле frontmatter;
+RED — исходная проверка не допускала объявленный generated-файл до staging.
+GREEN — единый verifier проверяет допустимые поля, типы и длины; режим source
+откладывает только metadata.loginom-generated. Режим installed остаётся строгим,
+отсутствующий reference/font не допускается в обоих режимах.
+Настоящий ConfigMarkdown.parse и source closure Product: Agent 9 PASS;
+Host integrity/publisher 10 PASS; runtime targeted 29 PASS.
+Agent/Host typecheck PASS. Логи tdd-skill-frontmatter-fields-red.log,
+tdd-skill-generated-source-mode-red.log и skill-format-*.log.
+Source transform изменённого skill.test.mjs проверен, исходная атрибуция сохранена.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -239,5 +250,6 @@ caller admin/archive не изменены, report не создан. Host typec
 - Shared inventory и полный staging реализованы, два настоящих bundled skills найдены вне checkout.
 - Полный verifier общий для Host/runtime; reference/generated closure и classic bridge проверены.
 - Publisher отключён без чтения файлов/сети; серверная запись сохранена для baseline/старых клиентов.
-- Следующий шаг: bootstrap, static catalog, acceptance evidence/source attribution; затем Node executor.
+- Static catalog и source/installed generated exception проверены; этап 1 остаётся открытым.
+- Следующий шаг: bootstrap, acceptance evidence/source attribution; затем Node executor.
 - Живая приёмка и удаление серверного skill остаются открытыми.

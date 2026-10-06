@@ -2066,8 +2066,8 @@
   },
   "packages/loginom-runtime/client/test/skill.test.mjs": {
     "baseHash": "b0f04fac63c68cfa5b344c95069e927b7dd2762fca788b432482a5a748310719",
-    "hash": "15052a7133b6bca7d186c17bfd7d41f5cbf9c5476eb9d62198486fe0c4a354c1",
-    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks. Share the complete bundled skill verifier across Host and all runtime modes with the same pinned YAML parser; preserve local revision and reference/generated integrity."
+    "hash": "03c1638433518de8c279539a5aec41416694cf428af43cd53dbeb2b4124d0864",
+    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks. Share the complete bundled skill verifier across Host and all runtime modes with the same pinned YAML parser; preserve local revision and reference/generated integrity. Validate Agent Skills field types/bounds and the generated-resource exception only before staging."
   },
   "packages/loginom-runtime/client/test/support/bridge-contract.mjs": {
     "baseHash": "7a9ed0443eef7105eaef18878eaf6e9ca68c83840955278f88eecb3d6eadd5b6",

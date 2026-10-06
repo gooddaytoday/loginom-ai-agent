@@ -12,6 +12,7 @@ import { testEffect } from "../lib/effect"
 import { productSkillsDirectory, reservedSkillNames } from "@loginom-ai-agent/product/skills"
 import { ConfigMarkdown } from "../../src/config/markdown"
 import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
+import { verifyBundledSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
 
 test("the product has one canonical directory for each shipped skill", async () => {
   const directories = (await readdir(productSkillsDirectory, { withFileTypes: true }))
@@ -24,16 +25,16 @@ test("the product has one canonical directory for each shipped skill", async () 
 test("shipped skill metadata conforms to the Agent Skills specification", async () => {
   for (const name of reservedSkillNames) {
     const skill = await ConfigMarkdown.parse(join(productSkillsDirectory, name, "SKILL.md"))
-    expect(skill.data.name).toBe(name)
-    expect(name.length).toBeLessThanOrEqual(64)
-    expect(name).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-    expect(typeof skill.data.description).toBe("string")
+    expect(skill.data.name, `${name}/SKILL.md: name must match its directory`).toBe(name)
+    expect(name.length, `${name}: name must be at most 64 characters`).toBeLessThanOrEqual(64)
+    expect(name, `${name}: use lowercase letters, digits and single internal hyphens`).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    expect(typeof skill.data.description, `${name}/SKILL.md: description must be a nonempty string`).toBe("string")
     expect(skill.data.description.trim().length).toBeGreaterThan(0)
     expect(skill.data.description.length).toBeLessThanOrEqual(1024)
     expect(typeof skill.data.compatibility).toBe("string")
     expect(skill.data.compatibility.length).toBeLessThanOrEqual(500)
     const supported = ["name", "description", "compatibility", "license", "metadata", "allowed-tools"]
-    expect(Object.keys(skill.data).filter((key) => !supported.includes(key))).toEqual([])
+    expect(Object.keys(skill.data).filter((key) => !supported.includes(key)), `${name}/SKILL.md: remove unsupported frontmatter fields`).toEqual([])
   }
 })
 
@@ -48,6 +49,13 @@ await Bun.write(
   }),
 )
 afterAll(() => rm(resources, { recursive: true, force: true }))
+
+test("the product source catalog has all linked resources except declared generated files", async () => {
+  const skills = await verifyBundledSkills(resources, { mode: "source" }).catch((error: unknown) => {
+    throw Error("Product skills: fix SKILL.md fields and relative references inside each skill; add missing assets or declare the generated file in metadata.loginom-generated. " + String(error))
+  })
+  expect(skills.map((skill) => skill.name).toSorted()).toEqual([...reservedSkillNames].toSorted())
+})
 
 const it = testEffect(
   Layer.mergeAll(

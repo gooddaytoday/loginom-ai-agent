@@ -75,6 +75,19 @@ test("generated executables declared in metadata must be present in the manifest
   await expect(verifyBundledSkills(resource.root)).rejects.toThrow("LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING")
 })
 
+test("only source catalog validation may defer an explicitly declared generated file", async () => {
+  await using resource = await fixture({
+    "package-docs/SKILL.md": "---\nname: package-docs\ndescription: Docs.\nmetadata:\n  loginom-generated: scripts/package-docs.mjs\n---\n\n[Executor](scripts/package-docs.mjs)\n",
+  })
+  expect((await verifyBundledSkills(resource.root, { mode: "source" })).map((skill) => skill.name)).toEqual(["package-docs"])
+  await expect(verifyBundledSkills(resource.root)).rejects.toThrow("LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING")
+
+  await using missingFont = await fixture({
+    "package-docs/SKILL.md": "---\nname: package-docs\ndescription: Docs.\nmetadata:\n  loginom-generated: scripts/package-docs.mjs\n---\n\n[Executor](scripts/package-docs.mjs)\n[Font](assets/missing.ttf)\n",
+  })
+  await expect(verifyBundledSkills(missingFont.root, { mode: "source" })).rejects.toThrow("LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING")
+})
+
 test("verified skill references cannot escape into another skill", async () => {
   await using resource = await fixture({
     "package-docs/SKILL.md": "---\nname: package-docs\ndescription: Docs.\n---\n\n[Other skill](../loginom-automation/SKILL.md)\n",

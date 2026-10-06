@@ -29,7 +29,8 @@ export function bundledSkillInventory(files) {
 
 // Host discovery and every bridge mode share the same installed-bundle contract.
 // The manifest is a corruption check, not a signature against writers of the installation.
-export async function verifyBundledSkills(resources) {
+export async function verifyBundledSkills(resources, { mode = 'installed' } = {}) {
+  if (!['installed', 'source'].includes(mode)) throw Error('LOGINOM_SKILL_RESOURCES_INVALID');
   if (typeof resources !== 'string' || !isAbsolute(resources) || !(await stat(resources)).isDirectory())
     throw Error('LOGINOM_SKILL_RESOURCES_INVALID');
   const root = await realpath(resources);
@@ -70,17 +71,26 @@ export async function verifyBundledSkills(resources) {
     const yaml = parseDocument(header);
     if (yaml.errors.length) throw Error('LOGINOM_SKILL_FRONTMATTER_INVALID');
     const data = yaml.toJS();
+    const fields = ['name', 'description', 'license', 'allowed-tools', 'metadata', 'compatibility'];
     if (!data || typeof data !== 'object' || data.name !== entry.path.split('/')[1]
+      || data.name.length > 64 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(data.name)
+      || Object.keys(data).some(key => !fields.includes(key))
+      || typeof data.description !== 'string' || !data.description.trim() || data.description.length > 1024
+      || (data.compatibility !== undefined && (typeof data.compatibility !== 'string' || data.compatibility.length > 500))
+      || ['license', 'allowed-tools'].some(key => data[key] !== undefined && typeof data[key] !== 'string')
       || (data.metadata !== undefined && (!data.metadata || typeof data.metadata !== 'object'
         || Array.isArray(data.metadata) || Object.values(data.metadata).some(value => typeof value !== 'string'))))
       throw Error('LOGINOM_SKILL_FRONTMATTER_INVALID');
     const generated = data.metadata?.['loginom-generated'];
-    if (generated) requireResource(root, directory, directory, generated, listed);
+    const allowedMissing = mode === 'source' && generated
+      ? new Set([relative(root, resolve(directory, decodeURIComponent(generated.split(/[?#]/)[0]))).split(sep).join('/')])
+      : new Set();
+    if (generated) requireResource(root, directory, directory, generated, listed, allowedMissing);
     for (const markdown of entries.filter(file => file.path.startsWith(dirname(entry.path) + '/') && file.path.endsWith('.md'))) {
       for (const link of contents.get(markdown.path).matchAll(/\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\)/g)) {
         const target = link[1] ?? link[2];
         if (/^(?:https?:|viking:|mailto:|#)/i.test(target)) continue;
-        requireResource(root, directory, dirname(join(root, markdown.path)), target, listed);
+        requireResource(root, directory, dirname(join(root, markdown.path)), target, listed, allowedMissing);
       }
     }
   }
@@ -88,11 +98,12 @@ export async function verifyBundledSkills(resources) {
     location: join(root, 'skills', skill.name, 'SKILL.md'), content: contents.get('skills/' + skill.name + '/SKILL.md') }));
 }
 
-function requireResource(root, skill, parent, target, listed) {
+function requireResource(root, skill, parent, target, listed, allowedMissing) {
   const path = resolve(parent, decodeURIComponent(target.split(/[?#]/)[0]));
   const inside = relative(skill, path);
   if (!inside || isAbsolute(inside) || inside === '..' || inside.startsWith('..' + sep))
     throw Error('LOGINOM_SKILL_RESOURCE_ESCAPE');
-  if (!listed.has(relative(root, path).split(sep).join('/')))
+  const key = relative(root, path).split(sep).join('/');
+  if (!listed.has(key) && !allowedMissing.has(key))
     throw Error('LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING');
 }
