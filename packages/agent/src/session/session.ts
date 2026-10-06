@@ -725,6 +725,12 @@ const layer: Layer.Layer<
           if (p.type === "compaction" && p.tail_start_id) {
             p.tail_start_id = idMap.get(p.tail_start_id)
           }
+          if (p.type === "text" && typeof p.metadata?.compaction_replay_of === "string") {
+            p.metadata = {
+              ...p.metadata,
+              compaction_replay_of: idMap.get(p.metadata.compaction_replay_of) ?? p.metadata.compaction_replay_of,
+            }
+          }
           yield* updatePart(p)
         }
       }

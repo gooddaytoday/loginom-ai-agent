@@ -9,6 +9,7 @@ import * as Stream from "effect/Stream"
 import { Config } from "@/config/config"
 import { LLM } from "../../src/session/llm"
 import { SessionCompaction } from "../../src/session/compaction"
+import { TaskScope } from "../../src/session/task-scope"
 import { Token } from "@/util/token"
 import { Plugin } from "../../src/plugin"
 import { provideTmpdirInstance, TestInstance } from "../fixture/fixture"
@@ -1169,6 +1170,75 @@ describe("session.compaction.process", () => {
       expect(
         last?.parts.some((part) => part.type === "text" && part.text.includes("Attached image/png: cat.png")),
       ).toBe(true)
+      expect(last && TaskScope.replayOf(last)).toBe(replay.id)
+    }),
+  )
+
+  it.instance(
+    "file-only overflow replay retains the applied docs task in durable history",
+    Effect.gen(function* () {
+      const ssn = yield* SessionNs.Service
+      const session = yield* ssn.create({})
+      yield* createUserMessage(session.id, "root")
+      const original = yield* ssn.updateMessage({
+        id: MessageID.ascending(),
+        sessionID: session.id,
+        role: "user",
+        agent: "build",
+        model: ref,
+        time: { created: Date.now() },
+      })
+      yield* ssn.updatePart({
+        id: PartID.ascending(),
+        sessionID: session.id,
+        messageID: original.id,
+        type: "file",
+        mime: "application/x-loginom-package",
+        filename: "scenario.lgp",
+        url: "file:///workspace/scenario.lgp",
+      })
+      const grant = yield* createAssistantMessage(session.id, original.id, "/workspace")
+      yield* ssn.updatePart({
+        id: PartID.ascending(),
+        sessionID: session.id,
+        messageID: grant.id,
+        type: "tool",
+        tool: "skill",
+        callID: "docs",
+        state: {
+          status: "completed",
+          input: { name: "package-docs" },
+          title: "Skill",
+          output: "Loaded docs",
+          metadata: { activation: { name: "package-docs", profile: "package-docs", digest: "a".repeat(64) } },
+          time: { start: Date.now(), end: Date.now() },
+        },
+      })
+      yield* createCompactionMarker(session.id)
+      const messages = yield* ssn.messages({ sessionID: session.id })
+      const marker = messages.at(-1)
+      if (!marker) throw new Error("Expected compaction marker")
+      expect(TaskScope.derive({ sessionID: session.id, messages })?.profile).toBe("package-docs")
+      expect(
+        yield* SessionCompaction.use.process({
+          parentID: marker.info.id,
+          messages,
+          sessionID: session.id,
+          auto: true,
+          overflow: true,
+        }),
+      ).toBe("continue")
+      const persisted = yield* ssn.messages({ sessionID: session.id })
+      const replay = persisted.at(-1)
+      expect(replay && TaskScope.replayOf(replay)).toBe(original.id)
+      expect(replay?.parts.filter((part) => part.type === "file").map((part) => part.url)).toEqual([
+        "file:///workspace/scenario.lgp",
+      ])
+      expect(TaskScope.derive({ sessionID: session.id, messages: persisted })).toEqual({
+        sessionID: session.id,
+        taskMessageID: original.id,
+        profile: "package-docs",
+      })
     }),
   )
 

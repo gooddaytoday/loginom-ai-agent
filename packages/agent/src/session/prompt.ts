@@ -9,6 +9,7 @@ import os from "os"
 import { SessionID, MessageID, PartID } from "./schema"
 import { MessageV2 } from "./message-v2"
 import { SessionRevert } from "./revert"
+import { TaskScope } from "./task-scope"
 import { Session } from "./session"
 import { Agent } from "../agent/agent"
 import { Provider } from "@/provider/provider"
@@ -1032,7 +1033,7 @@ const layer = Layer.effect(
       })
 
       const resolvedParts = yield* Effect.forEach(input.parts, resolvePart, { concurrency: "unbounded" }).pipe(
-        Effect.map((x) => x.flat().map(assign)),
+        Effect.map((x) => x.flat().map(assign).map(TaskScope.sanitize)),
       )
 
       yield* plugin.trigger(
@@ -1047,7 +1048,7 @@ const layer = Layer.effect(
         { message: info, parts: resolvedParts },
       )
 
-      const parts = yield* Effect.forEach(resolvedParts, (part) =>
+      const parts = yield* Effect.forEach(resolvedParts.map(TaskScope.sanitize), (part) =>
         part.type === "file" && part.mime.startsWith("image/")
           ? image.normalize(part).pipe(
               Effect.catchIf(

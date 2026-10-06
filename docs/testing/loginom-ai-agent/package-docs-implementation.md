@@ -829,6 +829,42 @@ RU терминология сверена с независимыми корп�
 Help в RU — «справка»; слова browser/unknown/verified/failed в JSON — кодовые значения.
 Требования плана и исходный документ корректировок не менялись.
 
+## 2026-10-06: восстановление TaskScope из истории
+
+Добавлена чистая функция `TaskScope.derive` с существующими брендированными ID.
+Она читает переданную полную историю, сортирует сообщения по порядку хранения,
+учитывает границу revert, отличает настоящий запрос от synthetic/compaction/replay
+и восстанавливает только применённую activation. Pending, незавершённый или
+ошибочный tool, обычный skill, malformed digest и чужие части не выдают профиль.
+Новый настоящий запрос сбрасывает профиль в default; docs → automation внутри
+той же задачи не разрешается. Старые ответы и replay прежней задачи не меняют
+новую задачу. Текст запроса не служит выдачей прав.
+
+Публичный prompt и command удаляют зарезервированные activation/pending/replay
+поля до `chat.message` и повторно после hook, сохраняя прочие аннотации.
+Проверены реальный public prompt, command с controlled provider и локальный
+plugin, пытающийся подделать поля. Данные перечитываются через реальные Session
+и MessageV2/БД; входные metadata не изменяются.
+Overflow compaction теперь сохраняет исходный message ID; file-only replay
+получает пустой ignored synthetic marker без изменения публичной схемы.
+Fork переназначает ссылки на новые message IDs и сохраняет исходную историю.
+
+TDD RED зафиксирован до исправлений: transition, part binding, public metadata,
+fork, compaction и file-only replay; прежние RED default/activation/replay/slash/
+revert также сохранены в acceptance-каталоге. Regression history/session/
+compaction/revert: 82 PASS / 1 SKIP / 283 assertions; focused prompt/command/
+plugin/обычный loop: 6 PASS / 1 SKIP / 24 assertions. SKIP относится к ранее
+отключённой V2 projection, не к TaskScope. Agent `bun typecheck` PASS;
+форматирование и `git diff --check` PASS. Логи: `task-scope-history-regression.log`,
+`task-scope-prompt-regression.log`, `task-scope-agent-typecheck.log` в
+`/home/kiselev/.local/share/loginom-ai-agent-acceptance/package-docs-20261006`.
+
+Это часть этапа 5. Запись доверенной activation при реальном bundled skill,
+pending-переходы на границе provider-turn и проверки Host/resolve/execute ещё
+не подключены; первый пункт этапа не отмечен. Source tests не доказывают
+естественный выбор skill, установленный Desktop/CLI или живую приёмку.
+Требования плана и документ корректировок повторно не перерабатывались.
+
 ## Checkpoint
 
 - `docs-no-browser`: baseline `fc3d97dbf`, Host `3025beb91`, settings `197b178b6`.
@@ -841,11 +877,11 @@ Help в RU — «справка»; слова browser/unknown/verified/failed в
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
 - Этап 2: pipeline 41 PASS, staging 13 PASS; Host suite 180 PASS / 6 SKIP.
-- Tool/SKILL Node workflow и lifecycle проверены; далее TaskScope и actual run permissions.
+- Tool/SKILL Node workflow и lifecycle проверены; TaskScope history 82 PASS / 1 SKIP.
 - Старый session package_docs/Python тест требует замены при SessionTools integration.
 - Reserved skill/command policy и пользовательские предупреждения проверены по sources.
 - Linux artifact completeness/shared closure проверены; Host suite 184 PASS / 6 SKIP.
 - Host local run/knowledge и отдельный BrowserStatus; full Host 207 PASS / 7 SKIP.
 - Desktop source lifecycle 36 PASS, lease 4 PASS; CLI preflight 12 PASS и local-run 6 PASS.
-- Host validation/save и Desktop/CLI статусы реализованы; далее GUI/TTY, TaskScope и lazy exits.
+- Host validation/save и статусы реализованы; далее Host scopes/activation, GUI/TTY и lazy exits.
 - Живая приёмка и удаление серверного skill остаются открытыми.
