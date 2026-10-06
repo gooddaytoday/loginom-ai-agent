@@ -156,3 +156,18 @@ test("missing export column keeps CSV and explicit export schema consistent", as
     expect(entry!.oracle.passed).toBe(false)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("wrong aggregation preserves exported names with recomputed values", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-aggregate-"))
+  try {
+    const tasks = await loadTasks(path.join(evalsRoot, "fixtures/calibration"), ["sales-by-category"])
+    const result = await prepareCalibrationCases(tasks, root, path.join(evalsRoot, "calibration"))
+    const entry = result.prepared.find((item) => item.mutation.kind === "aggregate")
+    expect(entry).toBeDefined()
+    const xml = await Bun.file(path.join(entry!.artifactDir, "unpacked/Unit_0/Unit.xml")).text()
+    expect(xml).toContain('Source="total_Avg"')
+    expect(xml).not.toContain('Source="total_Sum"')
+    expect(entry!.mutation.expected_failed).toEqual(["group-category", "result-rows"])
+    expect(entry!.oracle.passed).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
