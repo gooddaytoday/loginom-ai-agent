@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import argparse,csv,hashlib,io,json,pathlib,shutil,subprocess,tempfile,zipfile,xml.etree.ElementTree as ET
+import argparse,csv,hashlib,io,json,pathlib,shutil,subprocess,tempfile,zipfile
+from xml.etree import ElementTree
 
 def run_recipe(task,recipe):
  with tempfile.TemporaryDirectory(prefix='calibration-oracle-') as temp:
@@ -60,9 +61,9 @@ def main():
     assert mutated[edit['file']].count(edit['from'])==edit['count'],(name,case['id'],'XML count')
     mutated[edit['file']]=mutated[edit['file']].replace(edit['from'],edit['to'])
    for file,source in mutated.items():
-    original=ET.fromstring(originals[file]);changed=ET.fromstring(source)
+    original=ElementTree.fromstring(originals[file]);changed=ElementTree.fromstring(source)
     assert [n.get('Guid') for n in original.findall('.//Nodes/Item')]==[n.get('Guid') for n in changed.findall('.//Nodes/Item')],(name,case['id'],'node topology')
-    assert ET.tostring(original.find('.//Links'))==ET.tostring(changed.find('.//Links')),(name,case['id'],'link topology')
+    assert ElementTree.tostring(original.find('.//Links'))==ElementTree.tostring(changed.find('.//Links')),(name,case['id'],'link topology')
    counts[case['kind']]+=1
  if not args.only:
   assert len(names)==35,('task coverage',len(names))
