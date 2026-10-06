@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import os from "node:os"
 import path from "node:path"
-import { chmod, cp, mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
+import { chmod, cp, link, mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import { cleanupOrphanResult, parseArtifactSource } from "../src/artifact"
 import { agentCommand } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
@@ -137,6 +137,19 @@ test("cleanupOrphanResult не читает и не удаляет symlink на 
       name, outDir: path.join(directory, "evidence"), existingNames: [], processesConfirmed: true })).rejects.toThrow("regular file")
     expect(await Bun.file(path.join(directory, name)).text()).toBe("foreign bytes\n")
     expect(await Bun.file(path.join(directory, "evidence", "storage-outputs", name)).exists()).toBe(false)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("cleanupOrphanResult отказывает ownership для hardlink на чужой файл", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "eval-orphan-"))
+  try {
+    const name = "eval-run-case-1.result.csv"
+    await Bun.write(path.join(directory, "foreign.csv"), "foreign bytes\n")
+    await link(path.join(directory, "foreign.csv"), path.join(directory, name))
+    await expect(cleanupOrphanResult({ source: parseArtifactSource(`dir:${directory}`, { container: "", storageDir: "" }),
+      name, outDir: path.join(directory, "evidence"), existingNames: [], processesConfirmed: true })).rejects.toThrow("ownership")
+    expect(await Bun.file(path.join(directory, name)).text()).toBe("foreign bytes\n")
+    expect(await Bun.file(path.join(directory, "evidence/storage-outputs", name)).exists()).toBe(false)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
