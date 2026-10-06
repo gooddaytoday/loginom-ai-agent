@@ -1327,7 +1327,7 @@ const layer = Layer.effect(
                   ]
                 : loginom
                   ? [
-                      "Loginom is available through the bundled loginom_* tools. Use loginom_dock_prepare only to create or change a scenario, then follow its verified instructions. Help, diagnostics, and package reports do not start with loginom_dock_prepare. All Dock tool names mentioned there have the loginom_ prefix here. Connection credentials are managed privately by the desktop; never ask the model to enter or reveal them.",
+                      "Loginom is available through the bundled loginom_* tools. To create, change or execute a scenario, first activate the bundled loginom-automation skill. Browser Loginom tools are available after activation; then use loginom_dock_prepare for dynamic readiness and input artifacts. Help and diagnostics do not require loginom_dock_prepare. Use package-docs for local package reports. Dock tool names in skills have the loginom_ prefix here. Connection credentials are managed privately by the desktop; never ask the model to enter or reveal them.",
                     ]
                   : []),
               ...(skills ? [skills] : []),

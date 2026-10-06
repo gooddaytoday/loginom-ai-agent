@@ -6,8 +6,8 @@
   },
   "packages/loginom-runtime/client/lib/bridge.mjs": {
     "baseHash": "c56450b8f4db74c4ccfbf3162d1a7d6dc7422bab3ac35704f7d45923282630c3",
-    "hash": "0ec5d1aa8b7028f5602a6bcfcd73ad4fd60d10b62f177ff71ee60e50fd23a906",
-    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests."
+    "hash": "183720e49eae59022d8811695fd54997156a7f56c274179669da15144f8c20c2",
+    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests. Align scenario bootstrap instructions with bundled skill activation and keep Help, diagnostics and local reports independent of prepare."
   },
   "packages/loginom-runtime/client/lib/executor.mjs": {
     "baseHash": "df21720858bb89bb40d6c4fe46620728b1d6e86b0d9d7aafa4992c8f2cf93a6e",
@@ -2071,8 +2071,8 @@
   },
   "packages/loginom-runtime/client/test/support/bridge-contract.mjs": {
     "baseHash": "7a9ed0443eef7105eaef18878eaf6e9ca68c83840955278f88eecb3d6eadd5b6",
-    "hash": "0aacb41f8c2f5b06448b8f20eb4c32733a3068a601d64f034ed6be2cf9271fb4",
-    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks."
+    "hash": "10bd0e1516fab794af7dbf7d9e917399fd6e643151714a4d82b4a97f56086293",
+    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks. Align scenario bootstrap instructions with bundled skill activation and keep Help, diagnostics and local reports independent of prepare."
   },
   "packages/loginom-runtime/client/test/support/package-cleanup-bridge.mjs": {
     "baseHash": "f2e051aa0b71c34f3f8a704bb8944506026f10ba0414189bb921f7277da215bd",
@@ -2093,5 +2093,25 @@
     "baseHash": "4acacab41dea58cf19135522580a232165076718a39e7aaec9a88cc97126df56",
     "reason": " Share the complete bundled skill verifier across Host and all runtime modes with the same pinned YAML parser; preserve local revision and reference/generated integrity.",
     "hash": "b1634010630f2f427f5f30beda2cada925b6da38cc32eef69ed22543419d3e1f"
+  },
+  "packages/loginom-runtime/client/lib/hermes-router.mjs": {
+    "baseHash": "e0837e03ce8c1375cac4290dd8da182c3c1edcabea047bbdd2c1eb41230fa9c1",
+    "hash": "efc2fc8e20a9ba6318ce8d6df7d180d0a9379c969bb9571c5b890d83d1bdf10d",
+    "reason": "Align scenario bootstrap instructions with bundled skill activation and keep Help, diagnostics and local reports independent of prepare."
+  },
+  "packages/loginom-runtime/client/lib/host-inputs.mjs": {
+    "baseHash": "b169f8f6a2702b11a6fcb970206648fa0c5f7b709ff00dfba915d366981f9056",
+    "hash": "3bd88f86794690803ae5195bb62316edbde9a59c5770a1e72729e08948200138",
+    "reason": "Align scenario bootstrap instructions with bundled skill activation and keep Help, diagnostics and local reports independent of prepare."
+  },
+  "packages/loginom-runtime/client/test/hermes-router.test.mjs": {
+    "baseHash": "00b426de7a2047b095116743988e4839b412aef5e5e15150d8c8114335aa0a2f",
+    "hash": "cd46ae54d38da7c2238577975e7c4f88ac9f40a9b533b1d81212fe1cf3fd362b",
+    "reason": "Align scenario bootstrap instructions with bundled skill activation and keep Help, diagnostics and local reports independent of prepare."
+  },
+  "packages/loginom-runtime/client/test/host-inputs.test.mjs": {
+    "baseHash": "9f535e6bce66222b5ee78a673b2c14c29d6270d3c12833106acd7226faa7a11d",
+    "hash": "76d1446cf4dc605858add8f3d4ea12a71cbbf76c67c0c66579007b1ddf1e7106",
+    "reason": "Align scenario bootstrap instructions with bundled skill activation and keep Help, diagnostics and local reports independent of prepare."
   }
 }

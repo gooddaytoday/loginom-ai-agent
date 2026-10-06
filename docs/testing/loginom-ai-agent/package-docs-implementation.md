@@ -240,6 +240,18 @@ Agent/Host typecheck PASS. Логи tdd-skill-frontmatter-fields-red.log,
 tdd-skill-generated-source-mode-red.log и skill-format-*.log.
 Source transform изменённого skill.test.mjs проверен, исходная атрибуция сохранена.
 
+Bootstrap: RED — real MCP initialize в classic и Hermes не сообщал активацию
+automation; native dataset context также направлял в prepare без активации.
+GREEN — общий MCP bootstrap classic/diagnostic/user-v1 и Hermes требует
+loginom-automation для сценария, исключает Help/diagnostics/package reports.
+Backend bootstrap согласован с локальным источником; prepare не обещает выдачу
+полного skill. Native context сохраняет прежний приватный механизм ticket.
+Runtime targeted 31 PASS; backend MCP system-context 1 PASS, Agent typecheck PASS.
+Это source/protocol проверки, не доказательство выбора skill живой моделью
+или enforcement профиля (этапы 5–6). RED/GREEN логи tdd-bootstrap-activation-*,
+tdd-hermes-bootstrap-*, tdd-input-bootstrap-red.log; regression bootstrap-*.log.
+Преобразования изменённых импортированных файлов проверены отдельно.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -251,5 +263,5 @@ Source transform изменённого skill.test.mjs проверен, исх�
 - Полный verifier общий для Host/runtime; reference/generated closure и classic bridge проверены.
 - Publisher отключён без чтения файлов/сети; серверная запись сохранена для baseline/старых клиентов.
 - Static catalog и source/installed generated exception проверены; этап 1 остаётся открытым.
-- Следующий шаг: bootstrap, acceptance evidence/source attribution; затем Node executor.
+- Bootstrap согласован и проверен через MCP; следующий шаг — acceptance evidence/source attribution.
 - Живая приёмка и удаление серверного skill остаются открытыми.

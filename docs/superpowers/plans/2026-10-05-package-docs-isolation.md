@@ -523,7 +523,7 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
   в SKILL.md. Сохранить `compactKnowledgeBundle`, `input_artifacts`, identities,
   readiness и динамические descriptions. Закреплённый action catalog загружается
   независимо: это данные runtime, не источник текста skill.
-- [ ] В `diagnostics.mjs` заменить удалённый manifest локальной проверкой;
+- [x] В `diagnostics.mjs` заменить удалённый manifest локальной проверкой;
   недоступный Skills API не ухудшает `ok`. Переписать `prepareTool.description`,
   MCP-инструкции и выдачу SKILL.md в `bridge.mjs`, тексты `hermes-router.mjs`,
   `host-inputs.mjs`, bootstrap-фразу «then follow its verified instructions».

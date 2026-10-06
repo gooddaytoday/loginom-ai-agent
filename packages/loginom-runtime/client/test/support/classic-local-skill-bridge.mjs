@@ -38,6 +38,8 @@ for (const missing of [false, true]) test(`classic local prepare with required r
   try {
     const [agent, server] = InMemoryTransport.createLinkedPair();
     await Promise.all([client.connect(agent), bridge.server.connect(server)]);
+    assert.match(client.getInstructions(), /activate.*loginom-automation/i);
+    assert.match(client.getInstructions(), /Help, diagnostics, and package reports do not require/i);
     const reply = await client.callTool({ name: 'dock_prepare', arguments: {} });
     if (missing) {
       assert.equal(reply.isError, true);

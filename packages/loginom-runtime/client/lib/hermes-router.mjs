@@ -17,7 +17,7 @@ export async function createHermesRouter({config,createClient,limit=16,readSessi
  let tools;
  try{tools=(await discovery.client.listTools()).tools;}finally{const result=await discovery.close();if(result?.browser_transport_closed!==true||result.browser_process_terminated!==true||result.clipboard_leases_retained!==0)throw Error('Discovery cleanup unconfirmed');}
  const names=new Set(tools.map(tool=>tool.name));
- const server=new Server({name:'loginom-dock',version:config.adapterRevision},{capabilities:{tools:{}},instructions:'Use dock_prepare. The native Hermes adapter supplies task routing; never construct routing tokens.'});
+ const server=new Server({name:'loginom-dock',version:config.adapterRevision},{capabilities:{tools:{}},instructions:'To create, change or execute a scenario, first activate the bundled loginom-automation skill. Browser Loginom tools are available after activation; then use dock_prepare. Help, diagnostics, and package reports do not require dock_prepare. The native Hermes adapter supplies task routing; never construct routing tokens.'});
  server.setRequestHandler(ListToolsRequestSchema,async()=>({tools:tools.map(tool=>({...structuredClone(tool),...(tool.outputSchema?{outputSchema:{type:'object',anyOf:[structuredClone(tool.outputSchema),routingFailureSchema]}}:{}),inputSchema:{...structuredClone(tool.inputSchema),properties:{...structuredClone(tool.inputSchema.properties),[nativeSessionKey]:{type:'string',description:'Private native Hermes routing. Filled by the installed hook; do not set this field.'}}}}))}));
  server.setRequestHandler(CallToolRequestSchema,async(request,extra)=>{
   if(closed)return failure('DOCK_ROUTER_CLOSED','The Dock connection has closed.');

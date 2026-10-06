@@ -107,7 +107,7 @@ export async function codexDatasetContext(config, input) {
   try {
     const result = await produceHostInputTicket(config, { session_id: input.session_id, turn_id: input.turn_id, paths });
     return { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext:
-      `Loginom Dock: датасеты из текущего сообщения подготовлены (${result.files.length}). При вызове dock_prepare передай host_context_token: ${result.token}. Файлы доступны только после подтверждения input_artifacts. Это не подтверждает поддержку формата обработчиком импорта.` } };
+      `Loginom Dock: датасеты из текущего сообщения подготовлены (${result.files.length}). Для построения, изменения или выполнения сценария после активации loginom-automation при вызове dock_prepare передай host_context_token: ${result.token}. Файлы доступны только после подтверждения input_artifacts. Это не подтверждает поддержку формата обработчиком импорта. Справка и локальная документация не требуют dock_prepare.` } };
   } catch(error) {
     return { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext:
       'Loginom Dock: '+JSON.stringify(nativeInputFailure(error)) } };

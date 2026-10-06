@@ -78,6 +78,8 @@ test('MCP application refusals remain typed normal content and the same connecti
     client = new ProtocolClient({ name: 'test-agent', version: '1.0.0' });
     const [agentTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
     await Promise.all([bridge.server.connect(bridgeTransport), client.connect(agentTransport)]);
+    assert.match(client.getInstructions(), /activate.*loginom-automation/i);
+    assert.match(client.getInstructions(), /Help, diagnostics, and package reports do not require/i);
     const listed = await client.listTools();
     assert.ok(listed.tools.some(tool => tool.name === 'dock_operation_recover'));
     assert.ok(listed.tools.some(tool => tool.name === 'dock_artifact_upload'));

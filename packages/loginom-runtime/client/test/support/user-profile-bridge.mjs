@@ -55,6 +55,8 @@ test('managed user preparation returns local pins and dynamic knowledge without 
   try {
     const [agent, server] = InMemoryTransport.createLinkedPair();
     await Promise.all([client.connect(agent), bridge.server.connect(server)]);
+    assert.match(client.getInstructions(), /activate.*loginom-automation/i);
+    assert.match(client.getInstructions(), /Help, diagnostics, and package reports do not require/i);
     const reply = await client.callTool({ name: 'dock_prepare', arguments: {} });
     assert.notEqual(reply.isError, true, JSON.stringify(reply));
     assert.equal(reply.content.length, 1);
