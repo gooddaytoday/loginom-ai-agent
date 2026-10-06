@@ -1,0 +1,90 @@
+import { expect, test } from "bun:test"
+import path from "node:path"
+import os from "node:os"
+import { mkdtemp, rm } from "node:fs/promises"
+import { validateNodeAttempt, validateNodeRun } from "../src/node-evals"
+
+test("незавершённый run получает ERROR/2, даже если generic harness завершился успешно", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
+  try {
+    await Bun.write(path.join(directory, "summary.json"), JSON.stringify({
+      interrupted: false, stopped_reason: null, task_ids: ["crosstable-fixed-sum"],
+      config: { repeat: 1 }, storage_leftovers: [], tasks: [{ id: "crosstable-fixed-sum", attempts: [] }],
+    }))
+    const result = await validateNodeRun(directory, ["crosstable-fixed-sum"])
+    expect(result).toMatchObject({ verdict: "ERROR", code: 2 })
+    expect(result.errors.join(" ")).toContain("incomplete")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("неизвестный required checklist ID — ошибка валидатора, даже при отсутствующем артефакте", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
+  try {
+    await Bun.write(path.join(directory, "task.json"), JSON.stringify({
+      id: "crosstable-fixed-sum", checklist: [{ id: "unimplemented-rule", required: true }],
+    }))
+    const result = await validateNodeAttempt(directory, path.join(directory, "attempt"))
+    expect(result.errors.join(" ")).toContain("unknown required ID")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("interrupted, остановка и неизвестный листинг storage имеют приоритет ERROR над FAIL", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
+  try {
+    for (const overrides of [{ interrupted: true }, { stopped_reason: "preparation failed" }, { storage_leftovers: null }]) {
+      await Bun.write(path.join(directory, "summary.json"), JSON.stringify({
+        interrupted: false, stopped_reason: null, task_ids: ["crosstable-fixed-sum"],
+        config: { repeat: 1 }, storage_leftovers: [], tasks: [{ id: "crosstable-fixed-sum", attempts: [
+          { attempt: 1, status: "failed", cleanup_error: null, environment_cleanup: { status: "confirmed" } },
+        ] }], ...overrides,
+      }))
+      expect(await validateNodeRun(directory, ["crosstable-fixed-sum"])).toMatchObject({ verdict: "ERROR", code: 2 })
+    }
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("failed/timeout/no_artifact — FAIL/1, а generic pass=null не создаёт PASS", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
+  try {
+    for (const status of ["failed", "timeout", "no_artifact"]) {
+      await Bun.write(path.join(directory, "summary.json"), JSON.stringify({
+        interrupted: false, stopped_reason: null, task_ids: ["crosstable-fixed-sum"],
+        config: { repeat: 1 }, storage_leftovers: [], tasks: [{ id: "crosstable-fixed-sum", attempts: [
+          { attempt: 1, status, pass: null, cleanup_error: null, environment_cleanup: { status: "confirmed" } },
+        ] }],
+      }))
+      expect(await validateNodeRun(directory, ["crosstable-fixed-sum"])).toMatchObject({ verdict: "FAIL", code: 1 })
+    }
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("completed без подтверждённого cleanup получает ERROR/2", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
+  try {
+    await Bun.write(path.join(directory, "summary.json"), JSON.stringify({
+      interrupted: false, stopped_reason: null, task_ids: ["crosstable-fixed-sum"],
+      config: { repeat: 1 }, storage_leftovers: [], tasks: [{ id: "crosstable-fixed-sum", attempts: [
+        { attempt: 1, status: "completed", cleanup_error: null, environment_cleanup: { status: "not_run" } },
+      ] }],
+    }))
+    const result = await validateNodeRun(directory, ["crosstable-fixed-sum"])
+    expect(result).toMatchObject({ verdict: "ERROR", code: 2 })
+    expect(result.errors.join(" ")).toContain("cleanup")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("infra_error при полном наборе попыток получает ERROR/2 и сохраняет исходный infra retry", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
+  try {
+    await Bun.write(path.join(directory, "summary.json"), JSON.stringify({
+      interrupted: false, stopped_reason: null, task_ids: ["crosstable-fixed-sum"],
+      config: { repeat: 1 }, storage_leftovers: [], tasks: [{ id: "crosstable-fixed-sum", attempts: [
+        { attempt: 1, status: "infra_error", environment_cleanup: { status: "confirmed" },
+          infra_retry: { initial: { status: "infra_error" } } },
+      ] }],
+    }))
+    const result = await validateNodeRun(directory, ["crosstable-fixed-sum"])
+    expect(result).toMatchObject({ verdict: "ERROR", code: 2 })
+    expect(result.errors.join(" ")).toContain("infra_error")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
