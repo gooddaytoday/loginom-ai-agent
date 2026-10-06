@@ -252,6 +252,24 @@ Runtime targeted 31 PASS; backend MCP system-context 1 PASS, Agent typecheck PAS
 tdd-hermes-bootstrap-*, tdd-input-bootstrap-red.log; regression bootstrap-*.log.
 Преобразования изменённых импортированных файлов проверены отдельно.
 
+Свидетельства приёмки: RED — knowledge scope принимал серверный product skill;
+RED — session audit отвергал локальную bundled директорию (skill_file_pin).
+GREEN — Help/E2E/ai-skills разрешены, product skill URI исключён. Session audit
+проверяет каталог resources/skills/loginom-automation, явно закреплённые
+request.bundled_resources.path/manifest_sha256 и per-skill JSON-pair digest.
+Legacy cache/SKILL.md paths, изменённый manifest и изменённые/лишние bytes
+отклоняются. Golden digest получен настоящим bundledSkillInventory в pinned Node;
+Python здесь — независимый evidence auditor, не второй runtime verifier.
+48 адресных Python тестов PASS, источники восьми изменённых импортированных
+файлов проверены. Логи tdd-knowledge-source-*, tdd-session-bundled-skill-*,
+local-skill-evidence-regression.log. Legacy producers без bundled_resources
+pin отклоняются; живой приёмочный адаптер должен записать pin до model launch.
+Общий source audit имеет 35 исходных несовпадений, побайтно совпадающих с baseline:
+[реестр](../../migration/package-docs-source-attribution-baseline.md).
+Они не исключены из verifier и не скрыты пересчётом; перед live gate требуется
+отдельный разбор истории. Изменения Product/публикации записаны отдельно,
+исходная атрибуция Dock в source-map сохранена.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -263,5 +281,6 @@ tdd-hermes-bootstrap-*, tdd-input-bootstrap-red.log; regression bootstrap-*.log.
 - Полный verifier общий для Host/runtime; reference/generated closure и classic bridge проверены.
 - Publisher отключён без чтения файлов/сети; серверная запись сохранена для baseline/старых клиентов.
 - Static catalog и source/installed generated exception проверены; этап 1 остаётся открытым.
-- Bootstrap согласован и проверен через MCP; следующий шаг — acceptance evidence/source attribution.
+- Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
+- Следующий шаг: staged dev root, Node executor; разбор атрибуции остаётся gate живой приёмки.
 - Живая приёмка и удаление серверного skill остаются открытыми.

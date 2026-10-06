@@ -71,6 +71,12 @@ class KnowledgeTest(unittest.TestCase):
         data['native_skill_unchanged'] = False
         self.assertFalse(audit.audit(request, data, prompt)['all_assertions_passed'])
 
+    def test_product_skill_uri_is_not_a_remote_knowledge_source(self):
+        call = {'tool': audit.PREFIX + 'read', 'arguments': {'uris': ['viking://agent/skills/loginom-automation/SKILL.md']}}
+        self.assertFalse(audit.knowledge_scope(call))
+        call['arguments']['uris'] = ['viking://resources/loginom-dock/sources/ai-skills/imports/text.md']
+        self.assertTrue(audit.knowledge_scope(call))
+
     def test_scope_is_segment_based(self):
         root = audit.SOURCE_ROOTS[0]
         for uri in [root + '-private/x', root + '/../x', root + '/%2e%2e/x', root + '/x?token=hidden']:

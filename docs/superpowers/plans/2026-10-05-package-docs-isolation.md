@@ -529,7 +529,7 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
   `host-inputs.mjs`, bootstrap-фразу «then follow its verified instructions».
   Явно сообщать: браузерные Loginom-инструменты доступны после активации
   `loginom-automation`.
-- [ ] Отключить новые публикации из этого repo: удалить старую копию и
+- [x] Отключить новые публикации из этого repo: удалить старую копию и
   `services/loginom-ai/deploy/loginom-dock/publish-skill.py` либо оставить скрипт,
   который только отказывает с объяснением. Общий серверный Skills API сохранить.
   Обновить `packages/loginom-runtime/tools/loginom-acceptance/audit.py` и

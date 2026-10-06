@@ -1951,13 +1951,13 @@
   },
   "services/loginom-ai/docs/loginom-dock/operations.md": {
     "baseHash": "7407f2f64cdd3af827bb696218bcd35682891d823b3a205bb0cdb1a4922a6da1",
-    "hash": "8ffa9017b434f5d8b8718c94a4d3edd59b9cb810fbe98e6e57a93d6161dc7a8c",
-    "reason": "Label related legacy documentation and replace obsolete checkout requirement with an explicit historical reference; original version retained in recorded Git commit."
+    "hash": "10b9c52abc08e4963998f9a6a4d834c3dd9129ace9072b70dd699d56119063a8",
+    "reason": "Label related legacy documentation and replace obsolete checkout requirement with an explicit historical reference; original version retained in recorded Git commit. Retain historical operations evidence and link the current fail-only publisher/product delivery checkpoint (fb175e4d1)."
   },
   "services/loginom-ai/docs/loginom-dock/agent-handoff.md": {
     "baseHash": "3ea2f67253ef2d70a720f203b59fe024a6d7eb9535cc00b7b93a6573c5311f8b",
-    "hash": "3b76063268769cd8a62d083d8252fef92537a905b1b2ecbe0af4b364cb4d62bc",
-    "reason": "Label related legacy documentation and replace obsolete checkout requirement with an explicit historical reference; original version retained in recorded Git commit."
+    "hash": "f54d017ac3a5e3b44cc7268f9175b7e5930b274ecb4a4ae80a2bc251c0590754",
+    "reason": "Label related legacy documentation and replace obsolete checkout requirement with an explicit historical reference; original version retained in recorded Git commit. Retain historical handoff evidence and link the current product skill delivery checkpoint (fb175e4d1)."
   },
   "services/loginom-ai/tools/project-memory/adapter.patch": {
     "baseHash": "697293ff468a7e3594c52e5d6d9345ab79e64294b084ea28af18527472d6f872",
@@ -2113,5 +2113,35 @@
     "baseHash": "9f535e6bce66222b5ee78a673b2c14c29d6270d3c12833106acd7226faa7a11d",
     "hash": "76d1446cf4dc605858add8f3d4ea12a71cbbf76c67c0c66579007b1ddf1e7106",
     "reason": "Align scenario bootstrap instructions with bundled skill activation and keep Help, diagnostics and local reports independent of prepare."
+  },
+  "services/loginom-ai/deploy/loginom-dock/publish-skill.py": {
+    "baseHash": "5bcf01c8c08f6d8a47597f6a4dd8ac0e132b315b27e97188e9c6ed7ec9f5ac7a",
+    "hash": "e45aa1b2982cae45d88537c7347ef2a4d017ffb4a7e0e8587100f1394ef4b03f",
+    "reason": "Disable product skill publication before reading caller configuration or starting network work; retain a fail-only compatibility entrypoint (fb175e4d1)."
+  },
+  "services/loginom-ai/docs/loginom-dock/implementation-status.md": {
+    "baseHash": "ebbc021a32183fb4d8f0d59033b0e98f4a4d5d68071e01e825e6e3481f2e63dc",
+    "hash": "cb3c11593ffd3b061589784c45361cfe0a693d32c3f2a7ca2dd604b07c3b20d5",
+    "reason": "Retain historical implementation evidence and link the current product skill delivery checkpoint (fb175e4d1)."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/audit.py": {
+    "baseHash": "47272a7173ec3d909ed6174c5d171edcbfd006c8d6190b52c1a8183ac5ade789",
+    "hash": "9da1dc1cfecbba30cc011c323a5ff2f995cdb50da893948eb22ebeaa72e51744",
+    "reason": "Exclude the retired remote product skill URI from current knowledge evidence while preserving Help/E2E/ai-skills sources."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/replacement_session_evidence.py": {
+    "baseHash": "d81b45ec00f288594a53173d0e3bb2af0bad1dd3d3a0abefd53e42a7d968af9f",
+    "hash": "dc689209f5b9b7ff4b81f4644f7817312701aec72ced500f8c5c4a0abe36568c",
+    "reason": "Audit the local bundled skill directory and its UTF-8 JSON-pair digest; require the independently pinned resource root and manifest, rejecting legacy session download paths."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/test_knowledge.py": {
+    "baseHash": "054dfb2d6d31d2f29146c0e718eb32ca30bddd0c6a8e5159a2502c27eb1a1ae5",
+    "hash": "6786ff03c9521934d40ac6ac92b69c8931c72a15008c3b95ae1ddcd64e8cb31a",
+    "reason": "Verify that current evidence rejects the remote product skill URI while retaining ai-skills Help provenance."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/test_replacement_session_evidence.py": {
+    "baseHash": "dfd25ae4a119c9fb558d553c6f4f91441848f1e45525f143960948afb370110e",
+    "hash": "91a370918aee82bdc93541a25d832abd8f4911701d2f51d3dcb14394ac650fea",
+    "reason": "Use a local resource bundle with a pinned manifest; cover altered manifests/skill bytes, legacy paths and the pinned Node digest golden value."
   }
 }
