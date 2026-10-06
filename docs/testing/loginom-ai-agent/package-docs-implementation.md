@@ -220,6 +220,15 @@ Node/Bun/Playwright/Chromium pins прежние. Source transforms четырё
 Массового пересчёта атрибуции не было. Логи `shared-verifier-*.log`, RED/GREEN
 `tdd-shared-skill-closure-{red,green}.log`; installed/live ещё не выполнялись.
 
+Publisher: RED — audit-hook перехватил попытку чтения admin-файла старым
+publish-skill.py. GREEN — 1 PASS: код 2 и PUBLICATION_DISABLED до файлов/сети;
+caller admin/archive не изменены, report не создан. Host typecheck PASS.
+Скрипт оставлен только отказом; серверная запись и общий Skills API не менялись.
+В services docs добавлен актуальный product checkpoint, старые журналы сохранены
+и ссылаются на него. Логи `tdd-skill-publisher-{red,green}.log`,
+`skill-publisher-host-typecheck.log`. Обновление acceptance audit/evidence и
+устранение исходного source-map mismatch остаются отдельными открытыми задачами.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -229,5 +238,6 @@ Node/Bun/Playwright/Chromium pins прежние. Source transforms четырё
 - Локальный loader и динамический prepare реализованы; единый digest проверен в Bun/Node.
 - Shared inventory и полный staging реализованы, два настоящих bundled skills найдены вне checkout.
 - Полный verifier общий для Host/runtime; reference/generated closure и classic bridge проверены.
-- Следующий шаг: тексты bootstrap, static catalog и отключение publisher; затем Node executor.
+- Publisher отключён без чтения файлов/сети; серверная запись сохранена для baseline/старых клиентов.
+- Следующий шаг: bootstrap, static catalog, acceptance evidence/source attribution; затем Node executor.
 - Живая приёмка и удаление серверного skill остаются открытыми.
