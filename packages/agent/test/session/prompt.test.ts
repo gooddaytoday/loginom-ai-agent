@@ -1417,6 +1417,147 @@ it.instance("loop continues when finish is stop but assistant has tool parts", (
   }),
 )
 
+for (const mode of ["resume", "cancel", "cancel-followup"] as const) {
+  const cancelled = mode === "cancel"
+  bundled.instance(
+    cancelled
+      ? "cancel during Host release does not restart an admitted prompt"
+      : mode === "cancel-followup"
+        ? "a prompt resumed after Host release remains owned and cancellable"
+        : "a new prompt admitted during Host release runs as a default task after the previous task ends",
+    () =>
+      Effect.gen(function* () {
+        yield* stageBundledResources
+        const releasing = defer<void>()
+        const release = defer<void>()
+        const scopes: unknown[] = []
+        let releases = 0
+        let receive: ((event: { data: unknown }) => void) | undefined
+        LoginomHost.connect({
+          start() {},
+          on(_event, listener) {
+            receive = listener
+          },
+          postMessage(value) {
+            if (!isRecord(value) || typeof value.method !== "string") throw Error("Invalid Host request")
+            if (value.method === "scope" && isRecord(value.input)) scopes.push(value.input.scope)
+            const result =
+              value.method === "acquire"
+                ? { generation: 9 }
+                : value.method === "scope" && isRecord(value.input)
+                  ? value.input.scope
+                  : value.method === "tools"
+                    ? { tools: [] }
+                    : {}
+            const respond = () => receive?.({ data: { id: value.id, generation: 9, result } })
+            if (value.method === "release" && ++releases === 1) {
+              releasing.resolve()
+              void release.promise.then(respond)
+              return
+            }
+            respond()
+          },
+        })
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            release.resolve()
+            LoginomHost.disconnect()
+          }),
+        )
+        const { llm } = yield* useServerConfig(providerCfg)
+        const prompt = yield* SessionPrompt.Service
+        const run = yield* SessionRunState.Service
+        const sessions = yield* Session.Service
+        const skills = yield* Skill.Service
+        const chat = yield* sessions.create({
+          title: "Host release admission race",
+          permission: [{ permission: "*", pattern: "*", action: "allow" }],
+        })
+        const original = yield* prompt.prompt({
+          sessionID: chat.id,
+          agent: "build",
+          model: ref,
+          noReply: true,
+          parts: [{ type: "text", text: "Документация" }],
+        })
+        const body = original.parts.find((part) => part.type === "text")
+        if (!body || body.type !== "text") throw Error("expected a user body")
+        const skill = yield* skills.require("package-docs")
+        yield* sessions.updatePart({
+          ...body,
+          metadata: { skill_activation: { name: "package-docs", profile: "package-docs", digest: skill.digest } },
+        })
+        yield* llm.text("Первый ответ")
+        if (mode === "cancel-followup") yield* llm.hang
+        else yield* llm.text("Новый ответ")
+        const first = yield* prompt.loop({ sessionID: chat.id }).pipe(Effect.forkChild)
+        yield* awaitWithTimeout(
+          Effect.promise(() => releasing.promise),
+          "Host release was not reached",
+        )
+        const messageID = MessageID.ascending()
+        const second = yield* prompt
+          .prompt({
+            sessionID: chat.id,
+            messageID,
+            agent: "build",
+            model: ref,
+            parts: [{ type: "text", text: "Новая задача" }],
+          })
+          .pipe(Effect.forkChild)
+        yield* pollWithTimeout(
+          sessions
+            .messages({ sessionID: chat.id })
+            .pipe(
+              Effect.map((messages) => (messages.some((message) => message.info.id === messageID) ? true : undefined)),
+            ),
+          "new prompt was not saved",
+        )
+        yield* Effect.yieldNow
+        const cancelling = cancelled ? yield* prompt.cancel(chat.id).pipe(Effect.forkChild) : undefined
+        if (cancelling)
+          yield* pollWithTimeout(
+            run.assertNotBusy(chat.id).pipe(
+              Effect.as(true),
+              Effect.catchTag("SessionBusyError", () => Effect.succeed(undefined)),
+            ),
+            "cancellation did not interrupt the current runner",
+          )
+        release.resolve()
+        if (cancelling) yield* Fiber.join(cancelling)
+        yield* Fiber.join(first)
+        if (mode === "cancel-followup") {
+          yield* llm.wait(2)
+          const busy = yield* run.assertNotBusy(chat.id).pipe(Effect.exit)
+          expect(Exit.isFailure(busy)).toBe(true)
+          if (Exit.isFailure(busy)) expect(Cause.squash(busy.cause)).toBeInstanceOf(Session.BusyError)
+          yield* prompt.cancel(chat.id)
+          const result = yield* Fiber.join(second)
+          expect(result.info.role === "assistant" && result.info.error?.name).toBe("MessageAbortedError")
+          expect(yield* llm.calls).toBe(2)
+          return
+        }
+        const result = yield* Fiber.join(second)
+        if (cancelled) {
+          expect(yield* llm.calls).toBe(1)
+          expect(result.parts.some((part) => part.type === "text" && part.text === "Новый ответ")).toBe(false)
+          expect(scopes).not.toContainEqual({ taskMessageID: messageID, profile: "default" })
+          return
+        }
+        expect(yield* llm.calls).toBe(2)
+        expect(result.info.role === "assistant" && result.info.parentID).toBe(messageID)
+        expect(result.parts.some((part) => part.type === "text" && part.text === "Новый ответ")).toBe(true)
+        expect(scopes).toContainEqual({ taskMessageID: messageID, profile: "default" })
+        const history = yield* sessions.messages({ sessionID: chat.id })
+        expect(TaskScope.derive({ sessionID: chat.id, messages: history })?.profile).toBe("default")
+        const inputs = yield* llm.inputs
+        expect(JSON.stringify(inputs[0].tools)).toContain("package_docs_run")
+        expect(JSON.stringify(inputs[1].tools)).not.toContain("package_docs_run")
+      }),
+    30_000,
+  )
+}
+
 for (const profile of ["package-docs", "loginom-automation"] as const) {
   it.instance(`a restored ${profile} task cannot dispatch a persisted subtask outside the tool catalog`, () =>
     Effect.gen(function* () {

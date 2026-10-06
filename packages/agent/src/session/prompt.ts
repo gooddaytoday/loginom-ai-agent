@@ -1139,7 +1139,7 @@ const layer = Layer.effect(
       }
 
       if (input.noReply === true) return message
-      return yield* loop({ sessionID: input.sessionID })
+      return yield* loop({ sessionID: input.sessionID }, message.info.id)
     })
 
     const lastAssistant = Effect.fnUntraced(function* (sessionID: SessionID) {
@@ -1583,10 +1583,22 @@ const layer = Layer.effect(
       Effect.scoped,
     )
 
-    const loop: (input: LoopInput) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.loop")(function* (
-      input: LoopInput,
-    ) {
-      return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID))
+    const loop: (input: LoopInput, messageID?: MessageID) => Effect.Effect<SessionV1.WithParts> = Effect.fn(
+      "SessionPrompt.loop",
+    )(function* (input: LoopInput, messageID?: MessageID) {
+      return yield* state.ensureRunning(
+        input.sessionID,
+        lastAssistant(input.sessionID),
+        runLoop(input.sessionID),
+        // A prompt may join a run already releasing its Host lease. Restart
+        // through SessionRunState so the new run remains registered/cancellable.
+        messageID
+          ? (result) =>
+              result.info.role === "assistant" && result.info.parentID !== messageID
+                ? loop({ sessionID: input.sessionID })
+                : Effect.succeed(result)
+          : undefined,
+      )
     })
 
     const shell: (input: ShellInput) => Effect.Effect<SessionV1.WithParts, Session.BusyError> = Effect.fn(

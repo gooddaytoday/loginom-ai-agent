@@ -1250,16 +1250,39 @@ product-scope-command-regression.log: **132 PASS / 1 SKIP**, 588 assertions
 (prompt, TaskScope, SessionTools, registry, весь HTTP SDK).
 Agent typecheck и format/diff checks PASS. Installed/live выбор не проверен.
 
+## Новое сообщение на выходе V1 run
+
+TDD подтвердил гонку: сообщение, сохранённое во время Host release предыдущего
+run, присоединялось к его результату и не получало provider turn. Prompt теперь
+передаёт внутренний ID принятого сообщения; только после успешного join
+проверяется принадлежность результата. Нужный повторный проход идёт через
+SessionRunState, создавая зарегистрированный runner с новым default-профилем.
+Cancellation не вызывает продолжение; V2 queue/HTTP input не добавлены.
+
+Три последовательных RED→GREEN случая: admission во время release,
+отмена во время release без возобновления и отменяемость нового прохода.
+Последний выявил, что рекурсивный запуск на уже удалённом Runner терял
+регистрацию; финальный вариант заново разрешает Runner через SessionRunState.
+Host/provider barriers и реальные Session/Runner проверяют эти границы,
+без time-based sleep. Восстановленный docs grant берёт digest actual bundle.
+
+tdd-prompt-host-release-{admission,cancel,runner-ownership}-red.log →
+prompt-host-release-owned-green.log: **28 PASS**, 80 assertions.
+prompt-host-release-full-regression.log: **168 PASS / 1 SKIP**, 720 assertions,
+включая Runner, prompt, TaskScope, SessionTools, registry, revert/compaction
+и весь HTTP SDK. Agent typecheck и format/diff checks PASS.
+Это source/control-provider proof; installed GUI/TTY и живой выбор ещё открыты.
+
 ## Checkpoint
 
-- Исходный SHA `9fc5dfa1e` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
+- Исходный SHA `40dc57987` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 41 PASS; оригинальные файлы/permission/cancellation проверены отдельно.
 - BrowserStatus и key-only Help работают по sources; GUI/TTY и первый запуск ещё открыты.
-- Общая source scope/command/HTTP регрессия: 132 PASS / 1 SKIP; typecheck PASS; SSE cleanup исправлен.
+- Общая source scope/command/HTTP/Runner/revert регрессия: 168 PASS / 1 SKIP; typecheck PASS; SSE cleanup исправлен.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
@@ -1268,5 +1291,5 @@ Agent typecheck и format/diff checks PASS. Installed/live выбор не пр�
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
-- CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS; attachment/TaskScope: 44 PASS; далее actual PTY и races.
+- CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS; attachment: 44 PASS; exit/cancel race закрыта; далее PTY/activation races.
 - Затем Linux Desktop/CLI/TTY, естественный выбор skill и парные live evals на принятом harness SHA.

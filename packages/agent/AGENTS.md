@@ -187,6 +187,8 @@ Plain async code should pass explicit context or stay inside an Effect fiber; do
 
 - Persisted subtask parts must pass the current task profile before initialization or child-session creation. Derive that profile from fresh full history and the Session revert boundary; both product profiles reject subtask dispatch even when it bypasses the provider tool catalog. Default-profile subtask behavior remains available.
 
+- A V1 prompt admitted while the previous run releases its Host lease may join that completed run. After successful join, rerun through SessionRunState when the returned assistant belongs to another user message; the new runner must remain registered and cancellable. Runner cancellation must bypass this continuation. The subsequent provider turn derives the new task's default profile from fresh history. This is internal continuation, not a V2 queue or public input field.
+
 - PackageDocs attachment authorization uses owned parts from visible original user messages, honoring Session revert. A compaction replay copy cannot authorize a package when its original is absent; visible originals and their forked copies retain authorization. Ordinary read/external-directory permissions still apply, including explicit denies, before the bundled executor starts.
 
 - For standalone run, bootstrap owns the SIGINT handler through profile release. The shared cancellation signal survives startup/import boundaries; stdin admission and provider dispatch check it before starting work. Command-specific interruption still aborts active sessions. Repeated signals must not force an exit during acknowledged host cleanup, and failed cleanup must still retain the guard.
