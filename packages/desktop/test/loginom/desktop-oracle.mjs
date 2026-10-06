@@ -15,6 +15,7 @@ await writeFile(join(workspace, "sales.csv"), input.csv, { mode: 0o600 })
 const application = await _electron.launch({
   executablePath: input.executable,
   args: [],
+  chromiumSandbox: true,
   cwd: directory,
   env: {
     ...process.env,
@@ -46,9 +47,7 @@ try {
       url: connection.url,
       username: connection.username,
       apiKey: { operation: "replace", value: connection.apiKey },
-      password: connection.password
-        ? { operation: "replace", value: connection.password }
-        : { operation: "empty" },
+      password: connection.password ? { operation: "replace", value: connection.password } : { operation: "empty" },
     })
     await window.api.loginom.save({ revision: current.revision, validationId: validation.validationId })
   }, input.connection)

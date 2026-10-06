@@ -1779,6 +1779,59 @@ private profiles и PATH без глобального Node. Это механи
 static Desktop verification и native AppImage/installed launchers. Требования
 плана не пересматривались; этап 8 остаётся открытым.
 
+## Первый natural routing smoke: запрос документации без файла
+
+Проверен исходный corpus case `docs-no-input`, без slash-команды и scripted LLM:
+«Мне нужна документация по сценарию Loginom. Подготовь ИИ Отчет.»
+Основная модель **xiaomi-token-plan-sgp/mimo-v2.5-pro**, variant `default`:
+CLI `run` на полном native C6 artifact **3/3 PASS**; packaged Desktop backend
+AppImage C8 через настоящий preload/HTTP **3/3 PASS**. Каждый повтор использовал
+отдельные HOME/workspace/profile и новый настоящий user message. Настройки
+Loginom отсутствовали, Help/API key не добавлялись. Через API Desktop отправлен
+реальный prompt; renderer composer/вложения этим smoke не проверены.
+
+Во всех шести случаях модель загрузила `package-docs`, а trusted applied
+activation подтверждена фактической историей/CLI tool events. Модель запросила
+локальный `.lgp`, не объявляла отчёт готовым; workspace остался без выходных
+файлов. Один Desktop repeat дополнительно выполнил локальный glob до skill.
+CLI публикует первоначальное и обновлённое событие одного skill call: проверки
+свели их по part ID, наличие двух events не считается двумя вызовами модели.
+Digests сверены со своим bundled catalog/артефактом, не с другой сборкой:
+Desktop `513c84464aeb40bf0bc8bdec4c2ef9e8153de55b78e01697cdccf437638b0270`,
+CLI `8bbc36e890d83c367d3b17dd7b5436c9ec5830c105cb5699a8979a330ab7daa2`.
+В manifest skill tree отличается только generated `scripts/package-docs.mjs`;
+источники этих binary различаются и записаны отдельно. Ошибочное сравнение
+Desktop digest с CLI digest в дополнительном verifier исправлено на сверку
+с фактическим Desktop catalog; сами runs/артефакты не менялись.
+
+CLI наблюдался через **strace -f -e trace=process**: ноль exec Chromium во всех
+трёх повторах, `.writer` снят. Desktop с явным Electron sandbox наблюдался
+через `/proc` каждые **25 ms**, **36 processes**, remaining **0**; отдельный
+Loginom Chromium и `--no-sandbox` не наблюдались. Polling Desktop не является
+полным exec audit. Для будущего CSV oracle `desktop-oracle.mjs` также явно
+включает `chromiumSandbox: true`; его actual CSV проход остаётся открытым.
+
+Вторая поддерживаемая модель **xiaomi-token-plan-sgp/mimo-v2.5**, `default`:
+один CLI smoke того же запроса **PASS**, applied docs activation, локальные
+glob/read пустого workspace, запрос файла, отсутствие output/browser exec и
+снятый writer. Это короткий smoke второй модели, не её полная матрица.
+Отдельный настоящий CLI arithmetic запрос без Loginom дал **42**, exit 0,
+6.989 s, writer released, candidate processes remaining 0. Предварительный
+вызов с урезанным окружением без штатных proxy достиг timeout 180 s и не
+засчитывается; последующие runs наследуют только нужные явные proxy settings.
+Credentials выбранного провайдера скопированы в собственные private profiles,
+не сохранены в git или conditions; исходный auth/user profiles не изменялись.
+
+Evidence находится в общем собственном acceptance root:
+`live-docs-no-input-6c24f8de7/`, `desktop-live-no-input-8dc7bdccb/`,
+`live-docs-no-input-secondary-6c24f8de7/`, `model-proxy-native-6c24f8de7/`.
+Сохранены conditions, настоящие messages/events, process traces/observations,
+roots и отдельные verification JSON; hashes приёмочных drivers —
+`live-routing-smoke-drivers.json`. Snapshot corpus и source/binary pins записаны.
+Проверен **один из 20** кейсов основного corpus, остальные запросы, полный
+отчёт с live Help, TUI, update и A/B evals не приняты. Этапы 6/7/8 остаются
+открытыми; требования плана не пересмотрены и новые ticks здесь не добавлены.
+
 ## Checkpoint
 
 - Product candidates: Desktop `8dc7bdccb`, CLI `6c24f8de7`; полные artifacts/manifest/archive сохранены, SHA различаются.
@@ -1799,4 +1852,4 @@ static Desktop verification и native AppImage/installed launchers. Требов
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS, native PTY paste/mention 2 PASS; attachment: 44 PASS.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
-- Desktop static/native AppImage/Ubuntu22 installed cold PASS; native docs 3 PASS; routing live 0; далее CLI/model/evals.
+- Desktop static/native/Ubuntu22 cold PASS; docs mechanics 3 PASS; natural no-input CLI/Desktop 3/3 + secondary CLI smoke; остальные 19 кейсов/TUI/evals открыты.
