@@ -34,6 +34,20 @@ Windows/macOS изменяют нативные настройки только 
 WinINET per-connection API / SystemConfiguration Dynamic Store. После теста
 восстанавливаются исходные значения с read-back. Пользовательская сессия не меняется.
 
+Перед Windows-проверкой CI отключает и останавливает задачи `\Mozilla\`, затем
+останавливает `firefox`, `default-browser-agent` и `pingsender` на одноразовом runner.
+Состояние задач и отсутствие процессов проверяются до изменения WinINET.
+Это изоляция окружения: продукт и строгая проверка отсутствия запросов к прокси
+не меняются. Список отключённых задач и остановленных процессов выводится в CI.
+Mozilla описывает фоновые задачи [обновления Firefox](https://firefox-source-docs.mozilla.org/toolkit/mozapps/update/docs/BackgroundUpdates.html)
+и [Default Browser Agent](https://firefox-source-docs.mozilla.org/toolkit/mozapps/defaultagent/default-browser-agent/index.html).
+
+Причина изменения: [Windows run 37465813876](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/37465813876)
+зафиксировал четыре CONNECT к `incoming.telemetry.mozilla.org:443` во время
+`manual, headed`. Лог не содержит идентификатора отправившего процесса, поэтому
+его принадлежность Mozilla остаётся гипотезой; повторная Windows-проверка должна
+подтвердить работоспособность изоляции. Домены Mozilla не исключаются из проверки.
+
 Для обычной локальной проверки без изменения настроек ОС:
 
 ```sh
