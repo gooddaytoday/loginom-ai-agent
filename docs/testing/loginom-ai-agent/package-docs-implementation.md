@@ -705,6 +705,28 @@ tdd-node-help-preflight-{red,cancel-red}.log. Изменён только privat
 В плане отмечены реализованные knowledge lifecycle, local startup/readiness
 и concurrency проверки. Этап 4 целиком остаётся открытым.
 
+Standalone lazy preflight: RED — ordinary запрос завершался с exit 2
+`LOGINOM_CONFIG_REQUIRED` до HTTP provider; explicit command после local ACK
+ошибочно давал `LOGINOM_CONNECTION_NOT_READY` вместо ожидания Help. GREEN —
+ранние hasApiKey/Help readiness checks только у `--command loginom-automation`
+(обе формы argv); обычный запрос до выбора профиля доходит до модели.
+Strict recovery по-прежнему блокирует до provider с exit 4 и сохраняет запись.
+SIGINT во время ожидания Help первоначально зависал до test deadline/exit 137;
+теперь отменяет waiter, ждёт подтверждённый Host cleanup и освобождает `.writer`,
+exit 130. Actual standalone/Bun → compiled Node Host → real HTTP MCP и внешний
+test provider: обычный unconfigured ответ, explicit ready/cancel/unavailable,
+обычный ответ при отказе Help, strict recovery; DISPLAY/Wayland отключены,
+browser entry запрещён spy marker. Existing early-config/resource-root тест
+переведён на explicit automation без потери exit 2/no-DB assertions.
+CLI focused regression: 12 PASS (81 assertions), Agent typecheck PASS;
+standalone-lazy-preflight-{regression,agent-typecheck}.log. RED:
+tdd-standalone-{natural-preflight,explicit-help-preflight,help-preflight-sigint}-red.log.
+Agent AGENTS и progress standalone design обновлены. В плане отмечен только
+preflight item; lazy exit contract конкретного natural tool отказа ещё открыт
+до local run/TaskScope integration. Fake provider доказывает границу preflight,
+не автоматическую активацию skill. TUI startup logic не менялась; installed
+Desktop/CLI, live routing и полная приёмка этапа 4 остаются открытыми.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -724,5 +746,6 @@ tdd-node-help-preflight-{red,cancel-red}.log. Изменён только privat
 - Reserved skill/command policy и пользовательские предупреждения проверены по sources.
 - Linux artifact completeness/shared closure проверены; Host suite 184 PASS / 6 SKIP.
 - Host knowledge/catalog/Help реализованы; full Host 190 PASS / 7 SKIP, staging 13 PASS.
-- Desktop source lifecycle 36 PASS; далее local run и lazy CLI preflight, затем validation/UI.
+- Desktop source lifecycle 36 PASS; lazy CLI preflight 12 PASS, Host readiness 15 PASS.
+- Далее local run и lazy tool exit contract, затем validation/save/browser status/UI.
 - Живая приёмка и удаление серверного skill остаются открытыми.

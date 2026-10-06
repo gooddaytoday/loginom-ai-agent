@@ -11,6 +11,12 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
   const signal = mode === "run" ? standaloneCancellation() : undefined
   const boundary = args.indexOf("--") < 0 ? args.length : args.indexOf("--")
   const flags = args.slice(0, boundary)
+  const automation =
+    flags
+      .flatMap((value, index) =>
+        value === "--command" ? [flags[index + 1]] : value.startsWith("--command=") ? [value.slice(10)] : [],
+      )
+      .at(-1) === "loginom-automation"
   const json =
     flags.includes("--format=json") || flags.some((value, index) => value === "--format" && flags[index + 1] === "json")
   const headless = flags.includes("--headless")
@@ -58,10 +64,7 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
   }).catch((error: unknown) => {
     // The host child is already stopped. Returning lets the profile guard release; a throw would leave PROFILE_BUSY.
-    failure(
-      error instanceof Error && /^LOGINOM_[A-Z_]+$/.test(error.message) ? error.message : "CLI_START_FAILED",
-      1,
-    )
+    failure(error instanceof Error && /^LOGINOM_[A-Z_]+$/.test(error.message) ? error.message : "CLI_START_FAILED", 1)
     return undefined
   })
   if (!host) return
@@ -74,13 +77,26 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
       failure("LOGINOM_RECOVERY_REQUIRED", 4)
       return
     }
-    if (mode === "run" && !status.value.hasApiKey) {
+    if (mode === "run" && automation && !status.value.hasApiKey) {
       failure("LOGINOM_CONFIG_REQUIRED", 2)
       return
     }
-    if (mode === "run" && status.value.state !== "ready") {
-      failure("LOGINOM_CONNECTION_NOT_READY", 1)
-      return
+    if (mode === "run" && automation) {
+      const cancelled = Promise.withResolvers<never>()
+      const interrupt = () => cancelled.reject(new Error("CLI_CANCELLED"))
+      signal?.addEventListener("abort", interrupt, { once: true })
+      try {
+        if (signal?.aborted) throw new Error("CLI_CANCELLED")
+        const ready = await Promise.race([host.request("connection.ready", {}), cancelled.promise]).then(
+          Schema.decodeUnknownOption(Loginom.View),
+        )
+        if (Option.isNone(ready) || ready.value.state !== "ready") {
+          failure("LOGINOM_CONNECTION_NOT_READY", 1)
+          return
+        }
+      } finally {
+        signal?.removeEventListener("abort", interrupt)
+      }
     }
     if (mode === "tui" && !status.value.hasApiKey && process.stdin.isTTY) {
       const { confirm, isCancel } = await import("@clack/prompts")
@@ -101,7 +117,7 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
         process.stdin.resume()
       }
     }
-    // Configure the existing v1 backend only after the profile and Loginom preflight.
+    // An ordinary request reaches the model before its Loginom task profile is known.
     process.env.LOGINOM_AI_AGENT_DISABLE_AUTOUPDATE = "1"
     process.env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH = "1"
     const { applyCliSystemProxy, systemProxyNoticeLine } = await import("./standalone-proxy")
@@ -152,7 +168,9 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
       return
     }
     failure(
-      error instanceof Error && error.message === "CLI_ARGUMENT_INVALID" ? "CLI_ARGUMENT_INVALID" : "CLI_RUN_FAILED",
+      error instanceof Error && ["CLI_ARGUMENT_INVALID", "LOGINOM_CONNECTION_NOT_READY"].includes(error.message)
+        ? error.message
+        : "CLI_RUN_FAILED",
       error instanceof Error && error.message === "CLI_ARGUMENT_INVALID" ? 2 : 1,
     )
   } finally {

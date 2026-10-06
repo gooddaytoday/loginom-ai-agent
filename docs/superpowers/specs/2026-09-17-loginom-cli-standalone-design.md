@@ -3223,3 +3223,25 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   40 crate sources std, проверенных по upstream checksum/lock; host typecheck PASS.
 - **На момент записи оставалось / не подтверждалось:** Отдельная будущая работа: полный юридический аудит и actual relinking.
   Native Windows/macOS и production release также не объявляются выполненными.
+
+### Package docs isolation: ленивый preflight run (2026-10-06)
+
+- Реализовано и проверено из source: обычный `run` до выбора task profile
+  допускается без Loginom API key и готовности Help; strict recovery остаётся
+  обязательным до модели и сохраняет exit 4.
+- Явный `--command loginom-automation` (обе формы argv) сохраняет ранний exit 2
+  без ключа и ждёт настоящий Help catalog через private `connection.ready`.
+  Local Host startup acknowledgement не считается готовностью каталога.
+  Недоступный Help возвращает exit 1 `LOGINOM_CONNECTION_NOT_READY`; ordinary
+  ответ при том же отказе остаётся успешным. SIGINT во время ожидания — 130
+  после подтверждённого Host shutdown и release `.writer`.
+- Focused CLI regression: 12 PASS / 81 assertions; Host readiness/lifecycle:
+  15 PASS / 90 assertions; Agent и Host typecheck PASS. Использованы actual
+  standalone process, compiled Node Host, HTTP MCP и контролируемый provider.
+  Проверки выполнены без DISPLAY/Wayland с запрещённым browser entry.
+- Открыто: local run/catalog без connection lease, lazy exit codes конкретных
+  Loginom tool отказов в natural task, TaskScope и установленная Linux приёмка.
+  TUI startup logic сохранена. Автоматический выбор skill по естественному
+  запросу эти deterministic тесты не подтверждают.
+
+[Журнал и checkpoint](../../testing/loginom-ai-agent/package-docs-implementation.md).

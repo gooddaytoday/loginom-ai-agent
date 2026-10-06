@@ -728,7 +728,7 @@ CLI его не использует, отдельная V2-регистраци
   `loginom status`: Help-ready и browser `unknown/verified/failed` показываются
   отдельно через i18n. При изменении публичного Protocol/HttpApi выполнить
   штатную генерацию клиента/SDK, generated-файлы не править вручную.
-- [ ] В standalone `run` до модели оставить обязательным только strict recovery
+- [x] В standalone `run` до модели оставить обязательным только strict recovery
   (код 4). Убрать обязательный `hasApiKey/ready` для естественного запроса,
   пока профиль неизвестен. Для `--command loginom-automation` ранняя проверка
   ключа и готовности Help сохраняется. TUI preflight не менять: обязательные

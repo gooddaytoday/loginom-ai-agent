@@ -108,12 +108,16 @@ test("actual standalone status launches bundled Node and releases the isolated p
     expect(await readdir(join(directory, "profile"))).not.toContain(".writer")
     expect(await readdir(join(directory, "profile", "loginom"))).not.toContain("runtime")
     const resourceProbe = Bun.spawn(
-      [process.execPath, "--eval", `
+      [
+        process.execPath,
+        "--eval",
+        `
         import { standalone } from './src/cli/standalone.ts';
         import { standaloneRun } from './src/cli/standalone-run.ts';
-        await standalone(['run', 'probe'], (args, paths) => standaloneRun(args, paths));
+        await standalone(['run', '--command=loginom-automation', 'probe'], (args, paths) => standaloneRun(args, paths));
         console.log(JSON.stringify({ resources: process.env.LOGINOM_AI_AGENT_RESOURCES }));
-      `],
+      `,
+      ],
       {
         cwd: resolve(import.meta.dir, "../.."),
         env: {
@@ -140,6 +144,8 @@ test("actual standalone status launches bundled Node and releases the isolated p
         "./src/standalone.ts",
         "run",
         "--headless",
+        "--command",
+        "loginom-automation",
         "--format",
         "json",
         "Do not execute without Loginom setup",
