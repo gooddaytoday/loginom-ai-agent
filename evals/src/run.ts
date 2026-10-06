@@ -5,7 +5,7 @@ import { EvalFailure } from "./fail"
 import { evaluationContractHash, rubricSnapshot } from "./evaluation"
 import { agentInputsHash, buildAgentPrompt, loadTasks, rubricHash, taskTimeoutMs, type Task } from "./task"
 import { agentCommand, runAgent, type AgentCommand } from "./cli"
-import { cleanupArtifact, fetchArtifact, listStorage, parseArtifactSource, type ArtifactSource } from "./artifact"
+import { cleanupArtifact, cleanupOrphanResult, fetchArtifact, listStorage, parseArtifactSource, type ArtifactSource } from "./artifact"
 import { preflight } from "./preflight"
 import { assertAuth, ensureProfile, managementRuntimeDirectories, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
 import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
@@ -262,8 +262,10 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const artifact = fetched && !("error" in fetched) ? fetched : undefined
   const { status, stop } = artifactError ? { status: "harness_error" as const, stop: false } : statusFor(run, artifact !== undefined)
   const cleanupError =
-    artifact && !config.keepStorage
-      ? await cleanupArtifact(input.source, artifact).then(
+    !config.keepStorage && (artifact || !config.dryRun)
+      ? await (artifact ? cleanupArtifact(input.source, artifact) : cleanupOrphanResult({
+          source: input.source, name: `${name}.result.csv`, outDir,
+        })).then(
           () => null,
           (error: unknown) => describe(error),
         )

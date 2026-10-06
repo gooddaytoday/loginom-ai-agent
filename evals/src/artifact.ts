@@ -121,6 +121,14 @@ export async function cleanupArtifact(source: ArtifactSource, artifact: Artifact
   if (removed.exitCode !== 0) throw new Error(`docker exec rm: ${removed.stderr.toString().trim()}`)
 }
 
+export async function cleanupOrphanResult(input: { source: ArtifactSource; name: string; outDir: string }) {
+  if (path.basename(input.name) !== input.name) throw Error("Unsafe result filename")
+  const entries = await listStorage(input.source)
+  if (!entries.some(entry => entry.name === input.name)) return
+  await mkdir(path.join(input.outDir, "storage-outputs"), { recursive: true })
+  await copyOut(input.source, input.name, path.join(input.outDir, "storage-outputs", input.name))
+}
+
 function belongsToAttempt(name: string, prefix: string) {
   return !name.includes("/") && (name.startsWith(`${prefix}.`) || name.startsWith(`${prefix}-`))
 }

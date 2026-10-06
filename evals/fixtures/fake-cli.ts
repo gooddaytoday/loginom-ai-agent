@@ -104,6 +104,11 @@ if (command === "loginom") {
 }
 
 if (process.env.EVAL_FAKE_SLEEP_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_SLEEP_MS))
+if (command === "run" && process.env.EVAL_FAKE_ORPHAN_STORAGE) {
+  const name = Bun.argv.at(-1)?.match(/назови его `([^`]+)`/)?.[1]
+  if (!name || path.basename(name) !== name) throw Error("Fixture result filename required")
+  await Bun.write(path.join(process.env.EVAL_FAKE_ORPHAN_STORAGE, name), "Region,A,B\nN,7.5,7\nS,3,2\n")
+}
 const retryOutcomes: Record<string, string> = {
   "infra-retry-twice": "host-timeout", "infra-retry-no-artifact": "default",
   "infra-retry-failed": "transition-failed", "infra-retry-harness-error": "stop-case",
