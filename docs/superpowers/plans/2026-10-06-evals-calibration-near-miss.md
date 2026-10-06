@@ -61,6 +61,26 @@ Do not weaken rubrics, expected failures or thresholds. Semantic misses are not 
   results/near-miss-column-diagnostic/result.json. gpt-6-astra/high:
   score 57, export-columns=false, result-rows=false; other supplied items true.
 
+## Prompt correction and current acceptance run
+
+- Full original-prompt run completed: near-miss-final/20261006-065028-calibrate,
+  exit 1 after saving calibration.json and calibration.md; 183 rows, 112/113
+  near-misses detected, one warning (first-last-touch/filter), zero judge errors.
+  Positive 35x100/oracle=true; foreign 0..33. One prompt SHA256 1aa36ad...fbbf287c.
+- Semantic red-green: two general rules added to judge-prompt.md for all clauses
+  and XML selection/exclusion along the full result path. No case-specific hints,
+  rubric/corpus/threshold/expectation edits. Targeted live prompt-check now fails
+  two-aggregates and result-rows, score 63, with evidence about the XML rule.
+- Prompt source commit: ec9813bfee6e963a3ca7b7a74d7710afba5f1fe1.
+  Prompt SHA256: 6562edddd63d38ab7e8400795c6d1f1198bf2551e2b35baffe0b464248ab6daa.
+  Targeted harness tests: 58 pass, 0 fail; typecheck exit 0.
+- Current full rerun: results/near-miss-acceptance/20261006-092100-calibrate.
+  Session 71451; /tmp/calibration-live-acceptance.log. Do not modify the prompt
+  during this run. Full tests repeated in session 51382; logs
+  /tmp/calibration-ec9813-full-tests.log and /tmp/calibration-ec9813-typecheck.log.
+- Goal remains active. Final acceptance still requires every one of the 183 rows
+  under the new prompt to meet its gates and the final report/checkpoint updates.
+
 ## Remaining completion gates
 
 1. All 35 positive >=90 and oracle=true; all 35 foreign <=40.
