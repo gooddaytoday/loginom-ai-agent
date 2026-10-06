@@ -90,7 +90,9 @@ function serverFetch(
       void serverPath
       Flag.LOGINOM_AI_AGENT_SERVER_PASSWORD = input?.password
       Flag.LOGINOM_AI_AGENT_SERVER_USERNAME = input?.username
-      const baseUrl = HttpServer.formatAddress(server.address)
+      const baseUrl = new URL(HttpServer.formatAddress(server.address))
+      // layerTest binds to 0.0.0.0; the local SDK client connects over loopback.
+      baseUrl.hostname = "127.0.0.1"
       return Object.assign(
         async (request: RequestInfo | URL, init?: RequestInit) => {
           const source = request instanceof Request ? request : new Request(request, init)

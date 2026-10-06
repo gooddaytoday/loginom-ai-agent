@@ -1181,8 +1181,8 @@ assertions, затем зависают в teardown; 3/3 узких повтор
 iterator.return и дополнительный локальный scope не помогли; эти изменения
 удалены. Минимальный HTTP/SSE probe подтверждает: abort и финализаторы
 закончены, но NodeHttpServer teardown через 20s возвращает InterruptError.
-Гипотеза о неправильном порядке scope опровергнута; закрытие фактического
-соединения ещё исследуется. Полный этап не принят.
+Гипотеза о неправильном порядке scope опровергнута. Причина установлена и
+исправлена отдельной задачей ниже. Полный этап не принят.
 
 ## Сохранённая подзадача и продуктовый профиль
 
@@ -1215,16 +1215,37 @@ package-docs-attachment-full-final.log: **44 PASS**, 146 assertions (generator
 package-docs-original-attachment-matrix-final.log — **10 PASS**, 32 assertions;
 Agent typecheck и format/diff checks PASS. Общий этап 5 остаётся открыт.
 
+## HTTP/SSE fixture: адрес клиента и proxy
+
+Классификация: неверный адрес подключения тестового клиента, не регрессия
+TaskScope/metadata. NodeHttpServer.layerTest слушает 0.0.0.0; serverFetch
+использовал bind-address как destination. При исходном proxy окружении Bun
+отправлял этот запрос через proxy; abort клиента оставлял upstream SSE socket
+открытым до server shutdown deadline. Точный 0.0.0.0 отсутствует в NO_PROXY.
+
+Read-only transport A/B подтвердил: тот же 0.0.0.0 с NO_PROXY=* только
+в отдельном probe и тот же запрос к 127.0.0.1 завершаются за 30–47ms с закрытым
+socket. Нативный Node 24.19.0 также корректно закрывает соединение.
+Fixture serverFetch теперь направляет локальный SDK на 127.0.0.1.
+Proxy окружение, production listener, SSE assertions и SDK не изменялись.
+Исторический breaking SHA не установлен; изменения metadata route не являются
+причиной — минимальный transport probe обходится без него.
+
+http-signal/transport-{bun,loopback-bun,proxy-bypass-bun,node}.jsonl и
+scope-order-probe.log сохраняют diagnosis. httpapi-sdk-loopback-regression.log:
+**21 PASS**, 43 assertions; Agent typecheck и format/diff checks PASS.
+Список includes все четыре исходных HTTP/SSE teardown failures.
+
 ## Checkpoint
 
-- Исходный SHA `ce0634ead` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
+- Исходный SHA `0c4bc0c94` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 41 PASS; оригинальные файлы/permission/cancellation проверены отдельно.
 - BrowserStatus и key-only Help работают по sources; GUI/TTY и первый запуск ещё открыты.
-- TaskScope/metadata и persisted subtask denial: prompt 78 PASS / 1 SKIP, typecheck PASS; HTTP/SSE cleanup открыт.
+- TaskScope/persisted subtask: prompt 78 PASS / 1 SKIP; HTTP SDK 21 PASS; typecheck PASS; cleanup исправлен.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
