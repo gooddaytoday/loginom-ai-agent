@@ -3,7 +3,7 @@ import path from "node:path"
 import os from "node:os"
 import { mkdtemp, mkdir, rm } from "node:fs/promises"
 import { loadTasks } from "../src/task"
-import { prepareCalibrationCases } from "../src/calibration-cases"
+import { prepareCalibrationCases, type CalibrationCorpus } from "../src/calibration-cases"
 import { calibrate } from "../src/calibrate"
 import { evalsRoot, loadConfig } from "../src/config"
 
@@ -219,4 +219,13 @@ test("filter near-miss is rejected by checklist even when its CSV remains correc
     const report = await Bun.file(path.join(result.runDir, "calibration.json")).json()
     expect(report.rows.find((row: { case_id: string }) => row.case_id === "filter")).toMatchObject({ oracle_pass: true, expectations_met: false })
   } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("analytic corpus covers all 35 tasks and all 113 applicable defects", async () => {
+  const files = await Array.fromAsync(new Bun.Glob("*/cases.json").scan(path.join(evalsRoot, "calibration")))
+  const corpora = await Promise.all(files.map(async (file) => await Bun.file(path.join(evalsRoot, "calibration", file)).json() as CalibrationCorpus))
+  expect(files).toHaveLength(35)
+  const counts = Object.fromEntries(["sort", "aggregate", "threshold", "filter", "column"].map((kind) =>
+    [kind, corpora.flatMap((corpus) => corpus.cases).filter((item) => item.kind === kind).length]))
+  expect(counts).toEqual({ sort: 35, aggregate: 34, threshold: 6, filter: 3, column: 35 })
 })

@@ -1,0 +1,4 @@
+device,visits,conversions,conversion_pct,total_revenue,revenue_per_visit
+desktop,153,45,29.411765,51.076209,0.333831
+tablet,163,47,28.834356,47.687423,0.292561
+mobile,184,51,27.717391,48.992989,0.266266
