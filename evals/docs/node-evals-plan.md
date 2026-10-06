@@ -15,9 +15,10 @@ XML проверяется структурно: тип, единственны�
 
 - [x] Отдельный checkout, task env, preflight обоих Rich profiles и Playwright navigation.
 - [x] Три черновика вне коллекции; oracle на Decimal/stdlib до reference попыток; builder smoke подтверждён по БД.
-- [ ] Для каждого reference: CLI build, model/input/graph/result gate, холодное повторное выполнение через Playwright MCP, finalize.
-- [ ] TDD по публичному интерфейсу валидатора: один RED→минимальный GREEN, затем новые негативы по одному; реальные временные XML/CSV/events, без globalThis и внутренних моков.
-- [ ] TDD runner через штатные EVAL_CLI_MODE=fake и EVAL_ARTIFACT_SOURCE=dir; обязательный skip-judge и отдельный verdict.
-- [ ] `bun test` и `bun typecheck` из evals/; collection validation; по одному live-прогону каждого case (штатный infra retry сохранён).
-- [ ] README и sanitized evidence bundle с SHA256; conventional commit; ordinary push HEAD:evals с remote readback; заморозка SHA.
-- [ ] READY_FOR_BEN в той же карточке, затем завершение turn. Frozen SHA остаётся неизменным до независимого VERDICT_BEN.
+- [x] Для каждого reference: CLI build, model/input/graph/result gate, холодное повторное выполнение через Playwright MCP, finalize; полный code validator PASS 3/3.
+- [x] TDD по публичному интерфейсу валидатора: один RED→минимальный GREEN, затем новые негативы по одному; реальные временные XML/CSV/events, без globalThis и внутренних моков.
+- [x] TDD runner через штатные EVAL_CLI_MODE=fake и EVAL_ARTIFACT_SOURCE=dir; обязательный skip-judge и отдельный verdict.
+- [x] `bun test` 344/0 и `bun typecheck` exit0 из evals/; sensitivity 21/0, collection validation exit0; по одному live каждого case. fixed-sum ERROR cleanup сохранён; sliding-average PASS и reconfigure FAIL/no_artifact измерены после завершения unit, оба cleanup confirmed. Quality retries не выполнялись.
+- [x] README, checkpoint и delivery layout с manifest SHA256 подготовлены; финальный clean SHA публикуется ordinary push HEAD:evals и remote readback, затем READY_FOR_BEN с attachment в той же карточке.
+- [ ] Независимый VERDICT_BEN на frozen SHA: собственный расчёт, reference/negative/unit/typecheck и три fresh live в отдельном профиле, unit/live последовательно. До вердикта frozen SHA неизменяем.
+- [ ] Rich wrap-up после ACCEPT; in_review, done только человек.
