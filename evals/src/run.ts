@@ -266,6 +266,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     !config.keepStorage && (artifact || !config.dryRun)
       ? await (artifact ? cleanupArtifact(input.source, artifact) : cleanupOrphanResult({
           source: input.source, name: `${name}.result.csv`, outDir, existingNames: storageBefore,
+          processesConfirmed: run.processCleanup.status === "confirmed",
         })).then(
           () => null,
           (error: unknown) => describe(error),
