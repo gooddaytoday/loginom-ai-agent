@@ -141,3 +141,18 @@ test("versioned sort corpus creates a matching ZIP and unpacked mutation", async
     expect(entry!.oracle.passed).toBe(false)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("missing export column keeps CSV and explicit export schema consistent", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-column-"))
+  try {
+    const tasks = await loadTasks(path.join(evalsRoot, "fixtures/calibration"), ["sales-by-category"])
+    const result = await prepareCalibrationCases(tasks, root, path.join(evalsRoot, "calibration"))
+    const entry = result.prepared.find((item) => item.mutation.kind === "column")
+    expect(entry).toBeDefined()
+    expect(await Bun.file(path.join(entry!.artifactDir, "results/calibration.result.csv")).text()).not.toContain("avg_unit_price")
+    const xml = await Bun.file(path.join(entry!.artifactDir, "unpacked/Unit_0/Unit.xml")).text()
+    expect(xml).toContain('SyncThroughColumns="false"')
+    expect(entry!.mutation.expected_failed).toEqual(["export-columns", "result-rows"])
+    expect(entry!.oracle.passed).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
