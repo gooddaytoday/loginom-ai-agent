@@ -5,8 +5,44 @@ import { tmpdir } from "node:os"
 import { pathToFileURL } from "node:url"
 import { join } from "node:path"
 import { extractPackage } from "../src/package-docs/extract"
+import { renderSkeleton } from "../src/package-docs/skeleton"
 
 const fixtures = join(import.meta.dir, "fixtures/package-docs")
+
+test("Markdown skeleton matches the saved Python report apart from its timestamp", async () => {
+  const report = renderSkeleton(await extractPackage(join(fixtures, "demo.lgp")))
+  const normalize = (text: string) => text.replace(/\(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\)/, "(timestamp)")
+  expect(normalize(report)).toBe(normalize(await readFile(join(fixtures, "skeleton.md"), "utf8")))
+})
+
+for (const name of ["nested", "notes", "references", "views"]) {
+  test(`Markdown skeleton preserves ${name} fixture statistics and descriptions`, async () => {
+    const normalize = (text: string) => text.replace(/\(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\)/, "(timestamp)")
+    expect(normalize(renderSkeleton(await extractPackage(join(fixtures, name + ".lgp")))))
+      .toBe(normalize(await readFile(join(fixtures, name + ".skeleton.md"), "utf8")))
+  })
+}
+
+test("the skeleton writer runs under bundled Node with no Bun or Python", async () => {
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
+  const output = await mkdtemp(join(tmpdir(), "loginom-docs-skeleton-node-"))
+  try {
+    const build = await Bun.build({ entrypoints: [join(import.meta.dir, "../src/package-docs/skeleton.ts")],
+      outdir: output, naming: "skeleton.mjs", target: "node", packages: "bundle", splitting: false })
+    expect(build.success).toBe(true)
+    const child = Bun.spawn([node, "--input-type=module", "--eval",
+      "import {readFile} from 'node:fs/promises'; const {renderSkeleton} = await import(process.argv[1]); process.stdout.write(renderSkeleton(JSON.parse(await readFile(process.argv[2], 'utf8'))))",
+      pathToFileURL(join(output, "skeleton.mjs")).href, join(fixtures, "references.structure.json")],
+      { env: { LANG: "C.UTF-8" }, stdout: "pipe", stderr: "pipe" })
+    const stdout = new Response(child.stdout).text()
+    const stderr = new Response(child.stderr).text()
+    expect(await child.exited).toBe(0)
+    expect(await stderr).toBe("")
+    expect((await stdout).replace(/\(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\)/, "(timestamp)"))
+      .toBe((await readFile(join(fixtures, "references.skeleton.md"), "utf8")).replace(/\(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\)/, "(timestamp)"))
+  } finally { await rm(output, { recursive: true, force: true }) }
+}, 20_000)
 
 test("Node extraction matches the saved Python structure of a Cyrillic two-node package", async () => {
   const source = join(fixtures, "demo.lgp")

@@ -330,6 +330,15 @@ GREEN — ссылки сохраняют Name/DisplayName/Path, дублика�
 tdd-node-extract-references-green.log и node-extract-metadata-regression.log.
 Skeleton/emit и product tool остаются открытыми; этап 2 не завершён.
 
+Node skeleton: RED — renderSkeleton выдавал SKELETON_UNSUPPORTED.
+GREEN — русский шаблон, статистика и placeholders совпадают с сохранённым
+Python skeleton после нормализации времени. Ещё четыре регрессионных oracle
+получены неизменённым baseline render_report_skeleton.py (SHA-256
+0bbb539bc8981f0b7eb7ca712ee84873df230a173844b596620186be9d89e0a9).
+Подмодели/notes/references/views и реальный bundled Node проверены; 15 PASS
+(40 assertions), Host typecheck PASS. Логи tdd-node-skeleton-{red,green}.log,
+node-skeleton-regression.log. Writers/tool ещё открыты; требования плана не менялись.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -343,6 +352,6 @@ Skeleton/emit и product tool остаются открытыми; этап 2 н
 - Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
-- Этап 2: ZIP/XML, вложенность, notes/references/views и bundled Node 9 PASS; writer/tool ещё открыты.
-- Следующий шаг — skeleton/emit; 35 baseline source-map mismatches остаются live gate.
+- Этап 2: ZIP/XML и Markdown skeleton parity, bundled Node 15 PASS; writer/tool ещё открыты.
+- Следующий шаг — emit; 35 baseline source-map mismatches остаются live gate.
 - Живая приёмка и удаление серверного skill остаются открытыми.

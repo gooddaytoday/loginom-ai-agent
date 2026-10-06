@@ -15,6 +15,8 @@ const portNames: Record<string, string> = {
   "78ce58f4-e818-3754-bc2e-6af868677420": "Connection",
 }
 
+export type PackageStructure = Awaited<ReturnType<typeof extractPackage>>
+
 export async function extractPackage(path: string) {
   // zip.js slices must own their buffers; Buffer.slice retains the original byte offset.
   const zip = new ZipReader(new Uint8ArrayReader(new Uint8Array(await readFile(path))), { useWebWorkers: false })
