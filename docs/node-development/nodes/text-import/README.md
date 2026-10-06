@@ -23,8 +23,8 @@ Fixtures и независимые ожидания: `acceptance/matrix/manifest
 Общий статус узла/этапа 1 этим назначением не повышается.
 
 В `settings.format` доступны optional `multiple_delimiters` (boolean),
-`date_format` (dd/mm/yyyy, dd/yyyy/mm, mm/dd/yyyy, mm/yyyy/dd, yyyy/dd/mm,
-yyyy/mm/dd) и `date_separator` (точка, slash, backslash, дефис).
+`date_format` (dd/mm/yyyy, mm/dd/yyyy, yyyy/mm/dd, dd/mm/yy, mm/dd/yy,
+yy/mm/dd) и `date_separator` (точка, slash, backslash, дефис).
 Матрица задаёт их явно; старые новые запросы без них сохраняют native defaults,
 частичный patch существующего узла сохраняет неуказанные настройки. Неполная
 первичная настройка, неизвестные ключи и неверные типы/значения отказываются.

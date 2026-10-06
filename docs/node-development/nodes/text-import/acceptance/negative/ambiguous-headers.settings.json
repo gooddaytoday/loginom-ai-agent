@@ -1,0 +1,32 @@
+{
+  "source": {
+    "encoding": "65001",
+    "rows_to_skip": 0,
+    "first_line_as_title": true
+  },
+  "format": {
+    "delimiter": ",",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "text_qualifier": "\"",
+    "multiple_delimiters": false
+  },
+  "columns": [
+    {
+      "source_name": "Name",
+      "name": "FirstName",
+      "label": "FirstName",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "source_name": "Name",
+      "name": "SecondName",
+      "label": "SecondName",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    }
+  ]
+}
