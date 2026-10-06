@@ -77,6 +77,33 @@ test('zero rows remains a complete empty page with an observed schema',async()=>
  const f=fixture();f.store.totalCount=0;f.paging.FTotalRowCount=0;f.store.data.map={};f.left.children=[];f.right.children=[];
  const r=await read(f);assert.equal(r.verified,true);assert.equal(r.row_total,0);assert.deepEqual(r.rows,[]);assert.equal(r.columns.length,3);
 });
+test('native string CRLF display correspondence preserves CRLF and LF as distinct values',async()=>{
+ for(const text of ['first\r\nsecond| "quoted"','first\nsecond| "quoted"','a\r\nb\r\nc','a\rb\r\nc']) {
+  const f=fixture();f.records[1].data.Text.ValueText=text;f.cells[4].textContent=text.replace(/\r\n/g,'\n');
+  const r=await read(f);assert.equal(r.verified,true,JSON.stringify(r));assert.equal(r.rows[1].cells[1].text,text);
+  assert.equal(r.rows[2].cells[1].is_null,true);
+ }
+});
+for(const [name,text,dom,type] of [
+ ['reverse conversion','a\nb','a\r\nb','dtString'],['bare CR conversion','a\rb','a\nb','dtString'],
+ ['stripped line break','a\r\nb','ab','dtString'],['changed quote','a\r\n"b"','a\n"c"','dtString'],
+ ['numeric CRLF','1\r\n2','1\n2','dtFloat'],['variant CRLF','a\r\nb','a\nb','dtVariant'],
+ ['oversized string','x'.repeat(16384)+'\r\n','x'.repeat(16384)+'\n','dtString'],
+])test('string CRLF display correspondence refuses '+name,async()=>{
+ const f=fixture();f.records[1].data.Text.ValueText=text;f.cells[4].textContent=dom;
+ f.columns[1].el.dom.attrs.class='bg-TBGDataType-'+type+'-before';
+ assert.equal((await read(f)).reason,'cell_render_mismatch');
+});
+for(const [name,change] of Object.entries({
+ foreign_node:f=>{f.readOutputs=async()=>({...f.outputs,node_context:{...f.node,node_id:'foreign'},verified:false});},
+ foreign_row:f=>{f.rows[1][1].attrs['data-recordid']='foreign';},
+ foreign_column:f=>{f.cells[4].attrs['data-tid']=f.columns[0].el.dom.attrs['data-tid']+'_1';},
+ hidden_cell:f=>{f.cells[4].box.width=0;},
+ null_with_text:f=>{f.records[2].data.Text.ValueText='a\r\nb';},
+}))test('matching CRLF display retains '+name+' refusal',async()=>{
+ const f=fixture();f.records[1].data.Text.ValueText='a\r\nb';f.cells[4].textContent='a\nb';change(f);
+ assert.equal((await read(f)).verified,false);
+});
 test('schema and row cursors describe a bounded page, not a full output claim',async()=>{
  const f=fixture();f.request.column_offset=1;f.request.column_limit=1;f.request.row_limit=1;
  const r=await read(f);assert.equal(r.verified,true);assert.equal(r.page.next_column_offset,2);assert.equal(r.page.next_row_offset,1);
