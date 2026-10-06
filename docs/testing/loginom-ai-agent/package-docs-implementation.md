@@ -1429,15 +1429,47 @@ AGENTS и progress standalone design фиксируют обязательный
 проверками **ещё не содержит эту последнюю правку**: новый native/installed
 прогон требует последующей сборки, её SHA не подменяется.
 
+## Обновлённый native candidate: lazy config exit и TUI
+
+Из чистого `05d3d144be2659a2d471e66bae9fd5262314861b` собран полный Linux CLI
+`candidate-05d3d144b/`: payload/resources/licenses/manifest/archive/checksum.
+Source tree SHA256 `df82150db66789e336f509f27d9621c88116bc24330a970544d22fa7e8a39855`;
+archive SHA256 `728378bc75b895be1d570bda2cae911269e971a73cd396d41b6ea4bc11bf7bcb`.
+Build integrity/roundtrip, independent verify-cli-candidate и archive checksum
+PASS; checksum сохранённого baseline archive также повторно PASS.
+
+Native `native-lazy-final`: actual skill(loginom-automation) → actual
+loginom_dock_prepare → LOGINOM_CONFIG_REQUIRED. Exit **2**, единственный
+canonical error в JSON stream, без runtime directory и оставшегося .writer.
+PATH=/nonexistent, без API key/DISPLAY, controlled local provider, без изменения
+resource manifest. Сохранены stdout/stderr/provider/result и внешний Python
+probe с hash; Python только в test driver. Транспорт возвращает два обновления
+одной completed skill part при записи applied grant: driver сводит их по part ID,
+не объявляет двумя вызовами. Первоначальный probe упал только на этом подсчёте;
+исходные stdout и result сохранены, final выполнен в новом собственном профиле.
+
+Native `pty-paste` и `pty-mention`: повторно **2 PASS** на этом же candidate
+после изменения CLI outcome. Точные file URL/MIME и структура, applied docs
+catalog, actual shipped Node extraction, штатный Ctrl+D, code 0, no force kill,
+no tool errors, no .writer/живые наблюдаемые children; Chromium не наблюдался.
+Process sampling имеет ту же границу, что описана выше, и не является exec audit.
+Оба драйвера и hashes сохранены рядом с новым candidate.
+
+Native missing-configuration и documentation/TUI mechanics подтверждены.
+Connection/recognized browser failure exit **1** пока проверен source subprocess
+и контролируемым runtime; natural activation, full reports, реальный first setup,
+installed Desktop/CLI и paired live evals ещё не приняты. Candidate intermediate:
+sourceCommit бинарника не подменять следующим doc-only checkpoint SHA.
+
 ## Checkpoint
 
-- Product candidate SHA `49008f794` (`docs-no-browser`); полный native CLI/resources/manifest/archive сохранены.
+- Product candidate SHA `05d3d144b` (`docs-no-browser`); полный native CLI/resources/manifest/archive сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 41 PASS; оригинальные файлы/permission/cancellation проверены отдельно.
-- BrowserStatus/key-only Help и lazy CLI exit 2/1 проверены по sources; GUI/TTY первого setup ещё открыты.
+- BrowserStatus/key-only Help: source; lazy CLI exit 2 подтверждён native, exit 1 source; first setup GUI/TTY открыт.
 - Scope/command/HTTP/Runner/revert: 168 PASS / 1 SKIP; offline skill regression 135 PASS / 1 SKIP; typecheck PASS.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
