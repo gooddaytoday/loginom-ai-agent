@@ -353,7 +353,7 @@ evals/
   results/<run-id>/          gitignored
 ```
 
-Runtime-зависимостей нет: Bun built-ins и внешние команды `docker`, `codex`, `unzip`, `git`, `pgrep`. Dev-зависимости (`typescript`, `@types/bun`) ставятся `bun install` внутри `evals/` — отдельный `evals/bun.lock`; каталог не входит в workspaces корня, root `package.json` не меняется. Команды выполняются из `evals/`: `bun run src/run.ts ...`, `bun test`, `bun typecheck`; Bun сам подхватывает `evals/.env`.
+Runtime-зависимостей нет: Bun built-ins и внешние команды `docker`, `codex`, `unzip`, `git`, `pgrep`; подготовка near-miss дополнительно требует `zip` и `xmllint`. Dev-зависимости (`typescript`, `@types/bun`) ставятся `bun install` внутри `evals/` — отдельный `evals/bun.lock`; каталог не входит в workspaces корня, root `package.json` не меняется. Команды выполняются из `evals/`: `bun run src/run.ts ...`, `bun test`, `bun typecheck`; Bun сам подхватывает `evals/.env`.
 
 Переменные `.env` (в `.env.example` — выбранные значения):
 
@@ -453,6 +453,8 @@ Ctrl+C в `--judge-only`: текущий вызов судьи убиваетс�
 run.ts --calibrate проверяет судью без агента, Loginom и docker. Positive с oracle получает синтетический CSV из oracle; проверяются result-пункты, requires_run исключены. Без oracle сохраняется прежнее исключение result-пунктов. Negative — следующий чужой эталон, result/run-пункты исключены; при одной задаче он пропускается. Пороги positive ≥90 и negative ≤40 сохраняются.
 
 Корпус evals/calibration/<task-id>/cases.json описывает источники (относительный путь → SHA256), случаи {id, kind, edits: [{file, from, to, count}], result_csv, expected_failed, expected_oracle_pass}. kind: sort/aggregate/threshold/filter/column. CSV и рецепты независимого пересчёта (reproduce: точные python_edits и/или sort/drop_last/exclude_channel) версионируются рядом. Проверка script/check-calibration-corpus.py воспроизводит исходный oracle и все мутанты в временных копиях, проверяет XML и неизменность топологии; Python при самой калибровке не нужен. Обязательные исходные хэши: task.json, reference, spec, inputs и oracle; corpus также закрепляет oracle.py. Источники, ID, пути, замены и фактический oracle проверяются до вызовов судьи; повреждение корпуса — EvalFailure/exit 2. Случаи готовятся из собственного reference, архив пересобирается; ожидания не передаются судье. calibrate(config, corpusDir?) сохраняет CLI и допускает отдельный каталог корпуса для проверок публичного интерфейса.
+
+После всех XML-замен каждого случая изменённые файлы проверяются системным `xmllint --nonet --noout` до пересборки ZIP и вызовов судьи. Ошибка XML или отсутствие `xmllint` — EvalFailure/exit 2; отказ судьи по всем пунктам из-за повреждённого XML не может засчитываться как обнаруженный near-miss. Задачи без случаев корпуса не требуют `zip`/`xmllint`.
 
 Near-miss требует провала всех expected_failed и совпадения oracle с expected_oracle_pass. Score не заменяет эти условия. calibration.json содержит calibration_hash, near_miss_coverage и строки с case_id, expected_failed, expected_oracle_pass, oracle_pass/error, expectations_met; calibration.md показывает те же проверки. Промахи/ошибки судьи дают exit 1 после отчёта, успешная калибровка — exit 0. summary.json не создаётся. Неописанные задачи сохраняют старую калибровку и явно имеют нулевое покрытие near-miss.
 
