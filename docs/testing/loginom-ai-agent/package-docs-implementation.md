@@ -993,9 +993,36 @@ Agent `bun typecheck`, format/diff checks прошли. Private-call контр�
 allowlist и согласованный Host/backend apply — следующий шаг. Этап 5 целиком
 не закрыт; Desktop/CLI/live evals остаются открытыми.
 
+## Каталог инструментов по сохранённому профилю
+
+`SessionTools.resolve` выводит task/profile из полной видимой истории и
+связывает его с имеющимся Host run до формирования каталога. Профиль захвачен
+на весь ход: последующее изменение переданного массива history не меняет
+доступные execute closures. Docs принимает только разрешённые ID с builtin
+origin; одноимённые custom tools не заменяют read/skill или исполнителя.
+`package_docs_run` инициализируется только в docs resolver с реальными
+Session/FS/Process сервисами, общей registry запись не добавлена.
+
+Default/docs отбрасывают prepare и браузерные определения даже из слишком
+широкого Host-каталога. Automation скрывает task и docs executor. Registry
+фильтруется до построения code-mode каталога; docs не запрашивает внешние
+MCP tools/resources. Code mode сохраняет verified Host Help. Session.permission
+не переписывается. Данные вложений по-прежнему передаются лениво.
+
+TDD RED → GREEN: `tdd-docs-catalog-real-services-red.log`,
+`tdd-backend-scope-bind-red.log`, `tdd-docs-code-mode-catalog-red.log`,
+`tdd-docs-code-mode-help-red.log`. Финальные исходные проверки в acceptance
+каталоге: `docs-profile-catalog-final-suite.log` — **67 PASS**, 246 assertions;
+Agent typecheck PASS; `docs-catalog-prompt-regression.log` — **11 PASS**,
+56 assertions. Каталог проверен на настоящих
+Session/ToolRegistry/Permission, а Host adapter и provider — контролируемые
+границы. Сам выбор skill моделью, producer applied activation и Linux
+installed acceptance ещё не доказаны. Требования и completion пункты плана
+не менялись; общий этап 5 пока открыт.
+
 ## Checkpoint
 
-- Исходный SHA `8dd713630` (`docs-no-browser`); Host scope и lazy backend admission реализованы выше.
+- Исходный SHA `4b786785e` (`docs-no-browser`); Host scope, lazy admission и profile catalogs реализованы выше.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -1010,6 +1037,6 @@ allowlist и согласованный Host/backend apply — следующи�
 - Полный Host 224 PASS / 7 SKIP; Agent history/tools/registry 30 PASS; typecheck обоих PASS.
 - Старый session package_docs/Python тест остаётся для замены при SessionTools integration.
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
-- Далее: actual bundled activation + provider-turn snapshots/allowlists и согласованный apply.
+- Catalog/docs executor: исходные service-тесты и Agent typecheck; pending/apply producer ещё открыт.
+- Далее: actual bundled activation, metadata provenance, согласованный apply и Task bypass guards.
 - Затем Linux Desktop/CLI/TTY, естественный выбор skill и парные live evals на принятом harness SHA.
-- Живая приёмка, серверное удаление, merge/release остаются отдельными открытыми границами.

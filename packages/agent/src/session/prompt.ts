@@ -42,6 +42,7 @@ import { LLM } from "./llm"
 import { Shell } from "@loginom-ai-agent/core/shell"
 import { ShellID } from "@/tool/shell/id"
 import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { AppProcess } from "@loginom-ai-agent/core/process"
 import { Truncate } from "@/tool/truncate"
 import { Image } from "@/image/image"
 import { decodeDataUrl } from "@/util/data-url"
@@ -129,6 +130,7 @@ const layer = Layer.effect(
     const config = yield* Config.Service
     const permission = yield* Permission.Service
     const fsys = yield* FSUtil.Service
+    const appProcess = yield* AppProcess.Service
     const mcp = yield* MCP.Service
     const lsp = yield* LSP.Service
     const registry = yield* ToolRegistry.Service
@@ -1292,6 +1294,10 @@ const layer = Layer.effect(
               Effect.provideService(MCP.Service, mcp),
               Effect.provideService(Truncate.Service, truncate),
               Effect.provideService(RuntimeFlags.Service, flags),
+              Effect.provideService(FSUtil.Service, fsys),
+              Effect.provideService(Session.Service, sessions),
+              Effect.provideService(Agent.Service, agents),
+              Effect.provideService(AppProcess.Service, appProcess),
             )
 
             if (lastUser.format?.type === "json_schema") {
@@ -1689,6 +1695,7 @@ export const node = LayerNode.make({
     Config.node,
     Permission.node,
     FSUtil.node,
+    AppProcess.node,
     MCP.node,
     LSP.node,
     ToolRegistry.node,

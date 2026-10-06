@@ -2,6 +2,9 @@ import { expect } from "bun:test"
 import { ModelV2 } from "@loginom-ai-agent/core/model"
 import { ProviderV2 } from "@loginom-ai-agent/core/provider"
 import { SessionV1 } from "@loginom-ai-agent/core/v1/session"
+import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { AppProcess } from "@loginom-ai-agent/core/process"
+import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import { Agent } from "@/agent/agent"
 import { MCP } from "@/mcp"
 import { Permission } from "@/permission"
@@ -62,6 +65,10 @@ const fakeTruncate = Truncate.Service.of({
 } satisfies Truncate.Interface)
 
 const layer = Layer.mergeAll(
+  LayerNode.compile(FSUtil.node),
+  Layer.mock(AppProcess.Service, {}),
+  Layer.mock(Session.Service, {}),
+  Layer.mock(Agent.Service, {}),
   Layer.succeed(Plugin.Service, fakePlugin),
   Layer.succeed(Permission.Service, fakePermission),
   Layer.succeed(MCP.Service, fakeMcp()),
@@ -175,6 +182,7 @@ for (const failure of [undefined, "catalog", "call"]) {
       const replay = MessageID.ascending()
       const admitted: { message: string; files: { name: string; data: string }[] }[] = []
       const loginomStatus: { failure?: string } = { failure: "previous temporary failure" }
+      const scopes: unknown[] = []
       const called: { name: string; message: string; admissions: unknown }[] = []
       const assistant: SessionV1.Assistant = {
         id: messageID,
@@ -241,7 +249,30 @@ for (const failure of [undefined, "catalog", "call"]) {
             },
           ],
         },
-        { info: assistant, parts: [attachment(messageID, "data:text/csv;base64,Zm9yZ2Vk")] },
+        {
+          info: assistant,
+          parts: [
+            attachment(messageID, "data:text/csv;base64,Zm9yZ2Vk"),
+            {
+              id: PartID.ascending(),
+              sessionID,
+              messageID,
+              type: "tool",
+              tool: "skill",
+              callID: "applied-automation",
+              state: {
+                status: "completed",
+                input: { name: "loginom-automation" },
+                output: "loaded",
+                title: "Loaded skill",
+                metadata: {
+                  activation: { name: "loginom-automation", profile: "loginom-automation", digest: "a".repeat(64) },
+                },
+                time: { start: 3, end: 3 },
+              },
+            },
+          ],
+        },
         {
           info: {
             id: replay,
@@ -282,7 +313,8 @@ for (const failure of [undefined, "catalog", "call"]) {
         messages: history.slice(1),
         loginom: {
           generation: 7,
-          async scope(_mode, scope) {
+          async scope(mode, scope) {
+            scopes.push({ mode, scope })
             return scope
           },
           async tools() {
@@ -305,6 +337,7 @@ for (const failure of [undefined, "catalog", "call"]) {
           async release() {},
         },
       })
+      expect(scopes).toEqual([{ mode: "bind", scope: { taskMessageID: task, profile: "loginom-automation" } }])
       expect(admitted).toEqual([])
       expect(tools.timing).toBeDefined()
       if (failure === "catalog") {
