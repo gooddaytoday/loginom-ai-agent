@@ -49,7 +49,9 @@ def processes(root_pid, observed):
             command = (directory / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
         except (FileNotFoundError, ProcessLookupError):
             continue
-        observed[(pid, snapshot[pid][1])] = command
+        key = (pid, snapshot[pid][1])
+        if command or key not in observed:
+            observed[key] = command
     return snapshot
 
 

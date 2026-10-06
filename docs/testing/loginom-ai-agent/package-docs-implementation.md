@@ -1334,16 +1334,78 @@ Native acceptance после пересборки ещё не заявлена. 
 не зависимость продукта; natural routing/full report/installed Desktop остаются
 отдельными воротами.
 
+## Native Linux TUI: локальные package-docs вложения
+
+Полный native candidate из чистого source `49008f7941842dd09e8dacf7a5aeacef5890f361`
+сохранён в acceptance `candidate-49008f794/`: executable, resources, licenses,
+manifest, tar.gz и sidecar. Source tree SHA256
+`8bafc4137a64e5a11fd8f2aad014a049bc1f1c56e5d0cbd9607a585b47c72bb7`;
+archive SHA256 `286b0d345f936d041473029a23c49f1f8d2a5f2ac7f94053d2e67d0df2102106`.
+Resource/manifest/roundtrip verifiers и независимый verify-cli-candidate PASS.
+Node 24.19.0 и browser resources взяты из закреплённых read-only источников;
+установленный launcher и чужие профили не менялись.
+
+`pty-paste-observed` и `pty-mention-observed`: **2 PASS** на этом native binary.
+Проверены bracketed paste абсолютного `Сценарий PTY.LGP` и реальный autocomplete
+`@sample` → Enter → `@sample.LGP`. В обоих случаях history содержит единственную
+file-part с абсолютным `file:` URL и `application/x-loginom-package`, а provider
+получает synthetic attached path. Actual tool calls — skill(package-docs),
+затем package_docs_run(extract); точный structure.json совпал с fixture,
+кроме ожидаемого имени скопированного файла. Docs provider catalog исключает
+bash/task/prepare. Read permission ask: дополнительного подтверждения для
+исходного вложения не потребовалось. PATH=/nonexistent и без DISPLAY.
+
+Оба TUI завершились через штатный Ctrl+D, code 0, без force kill, tool errors,
+оставшегося `.writer` или живого наблюдаемого descendant. /proc observer с
+периодом polling около 50ms зафиксировал native CLI, shipped Node Host и
+shipped Node extractor; Chromium не наблюдался. Последний пустой cmdline
+завершённого процесса больше не стирает ранее сохранённый command.
+Это периодическое наблюдение, не kernel exec audit. Final driver SHA256:
+`3e0a54bb8df36538d13dabc57f95816aa3521fa2f2eb10b28a9c492d171044df`;
+terminal/provider/actions/processes/result и hash сохранены рядом с candidate.
+
+Тот же исправленный driver на предыдущем c4dc5bd4c (`pty-paste-red-4`) штатно
+вышел и подтвердил исходный skill failure; проверка отсутствующего structure
+упала. Ранние попытки driver выявили его собственные ошибки: config нельзя
+создавать до public profile initialization; PTY EIO от закрытого renderer
+нужно дождаться process exit, поскольку cleanup ещё продолжается.
+Эти ошибки driver не объявлены дефектами продукта.
+
+Native picker Desktop оптимизацию передачи только пути пока не получил:
+renderer создаёт File из readPickedFile, а main ограничивает выбор/чтение
+суммарными **20 MiB**. Backend/App затем передают `.lgp` как file path.
+Ограничение сохранено явно; существующие picker tests **8 PASS**, 11 assertions
+(desktop-picker-limit-regression.log). Installed Desktop picker ещё не проверен.
+
+Повтор проверки из `packages/agent`, с неизменным испытуемым executable и
+новым родительским каталогом результатов для каждого приёмочного запуска:
+
+```bash
+skills_native_cli=/absolute/payload/bin/loginom-ai-agent-cli
+skills_tui_results=/absolute/new-native-tui-results
+mkdir -m 700 "$skills_tui_results"
+python3 test/cli/tui/package-docs-pty.py --binary "$skills_native_cli" \
+  --artifacts "$skills_tui_results/paste" --attachment paste
+python3 test/cli/tui/package-docs-pty.py --binary "$skills_native_cli" \
+  --artifacts "$skills_tui_results/mention" --attachment mention
+```
+
+Python нужен только внешнему test driver. Эти прогоны проверяют controlled
+provider transport/profile/attachment/extraction/exit, не natural model choice,
+полный report, установленный CLI или Desktop GUI. Финальный candidate для
+paired live evals остаётся открытым; новый SHA test/doc commit не подменяет
+sourceCommit сохранённого native binary.
+
 ## Checkpoint
 
-- Product candidate SHA `c4dc5bd4c` (`docs-no-browser`); полный native CLI/resources/manifest/archive сохранены.
+- Product candidate SHA `49008f794` (`docs-no-browser`); полный native CLI/resources/manifest/archive сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 41 PASS; оригинальные файлы/permission/cancellation проверены отдельно.
 - BrowserStatus и key-only Help работают по sources; GUI/TTY и первый запуск ещё открыты.
-- Общая source scope/command/HTTP/Runner/revert регрессия: 168 PASS / 1 SKIP; typecheck PASS; SSE cleanup исправлен.
+- Scope/command/HTTP/Runner/revert: 168 PASS / 1 SKIP; offline skill regression 135 PASS / 1 SKIP; typecheck PASS.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
@@ -1352,5 +1414,5 @@ Native acceptance после пересборки ещё не заявлена. 
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
-- CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS; attachment: 44 PASS; exit/cancel race закрыта; далее PTY/activation races.
-- Native docs extract PASS без system Node/Python; затем PTY/Desktop, естественный выбор и парные live evals.
+- CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS, native PTY paste/mention 2 PASS; attachment: 44 PASS.
+- Native docs extract/TUI PASS без system Node/Python; Desktop picker 20 MiB; далее GUI, natural routing/live evals.

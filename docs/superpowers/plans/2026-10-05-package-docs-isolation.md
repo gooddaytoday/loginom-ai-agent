@@ -796,7 +796,7 @@ TUI local attachment, HostPort/admission и продуктовый executor.
   `application/x-loginom-package`, включая `LOGINOM_AI_AGENT_CLI_ROOT`.
   Убрать кодирование `.lgp` в `data:`; согласовать MIME в `fs-util.ts` и
   распознавание в prompt. Прикреплённый путь — разрешение на чтение, не upload.
-- [ ] В TUI вставка пути и `@`-упоминание `.lgp` создают такую же `file:`-часть.
+- [x] В TUI вставка пути и `@`-упоминание `.lgp` создают такую же `file:`-часть.
   TUI не имеет `--file`/`--command`; тестировать реальные способы прикрепления.
   Желательно перевести native picker Desktop для `.lgp` на передачу только
   пути без чтения байтов в renderer и зависимости от общего лимита 20 MiB;
