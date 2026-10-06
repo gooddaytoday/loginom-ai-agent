@@ -177,6 +177,12 @@ Nested npm dependencies установлены закреплённым Node/npm
 во всех runtime-режимах, staging и отключение publisher остаются открытыми.
 Это source-only проверки; installed/live acceptance не выполнялась.
 
+Staging input safety: RED — destination внутри Product skills дошёл до запуска
+Node вместо отказа overlap; GREEN — 11 staging tests PASS, Host typecheck PASS.
+Канонический Product root включён в lexical/realpath input boundary до удаления
+или копирования. Логи `tdd-stage-product-overlap-{red,green}.log` и
+`stage-product-overlap-typecheck.log`. Копирование skills и общий inventory ещё открыты.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.

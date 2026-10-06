@@ -8,6 +8,7 @@ import { buildPhase } from "./build-phase"
 import { buildKeychain } from "./build-keychain"
 import release from "../../product/loginom-release.json"
 import catalogs from "../../product/loginom-catalogs.json"
+import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
 
 export function actionCatalogForPlatform(platform: string) {
   const target =
@@ -59,8 +60,8 @@ export async function stageResources(input: {
   const browsers = input.browsers
   const staging = destination + ".staging"
   for (const paths of [
-    [destination, staging, source, node, browsers],
-    await Promise.all([destination, staging, source, node, browsers].map(canonicalBuildPath)),
+    [destination, staging, source, node, browsers, productSkillsDirectory],
+    await Promise.all([destination, staging, source, node, browsers, productSkillsDirectory].map(canonicalBuildPath)),
   ]) {
     if (
       paths

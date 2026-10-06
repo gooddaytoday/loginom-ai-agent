@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { actionCatalogForPlatform, catalogForTarget, setLinuxSandboxMode, stageResources } from "../script/stage-resources"
 import release from "../../product/loginom-release.json"
+import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
 
 test("resource staging selects the signed action catalog for the target platform", () => {
   expect(actionCatalogForPlatform("linux")).toEqual({
@@ -36,6 +37,15 @@ test("native catalog selection retains Linux pins and admits only the reviewed m
 // These fixtures exercise POSIX paths and symlink semantics before input execution.
 const posixTest = test.skipIf(process.platform !== "linux" && process.platform !== "darwin")
 const target = { platform: process.platform, arch: process.arch }
+
+posixTest("resource outputs cannot overlap the canonical product skills input", async () => {
+  const original = await readFile(join(productSkillsDirectory, "loginom-automation/SKILL.md"), "utf8")
+  for (const destination of [productSkillsDirectory, join(productSkillsDirectory, "generated")]) {
+    await expect(stageResources({ destination, node: "/missing/node", browsers: "/missing/browser", target, flavor: "cli" }))
+      .rejects.toThrow("LOGINOM_BUILD_OUTPUT_OVERLAP")
+  }
+  expect(await readFile(join(productSkillsDirectory, "loginom-automation/SKILL.md"), "utf8")).toBe(original)
+})
 
 posixTest("resource staging fails closed for unpinned native targets and unsafe output paths", async () => {
   const input = {
