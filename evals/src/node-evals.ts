@@ -2,6 +2,7 @@ import path from "node:path"
 import type { RunSummary } from "./report"
 import { evalsRoot } from "./config"
 import { checkOracle } from "./oracle"
+import { readdir } from "node:fs/promises"
 
 export async function validateNodeAttempt(taskDir: string, attemptDir: string) {
   const task = await Bun.file(path.join(taskDir, "task.json")).json() as { checklist: { id: string; required?: boolean }[] }
@@ -11,6 +12,9 @@ export async function validateNodeAttempt(taskDir: string, attemptDir: string) {
   if (task.checklist.some((item) => item.required && item.id === "result")) {
     const result = await checkOracle({ dir: taskDir, oracle: "oracle.csv", oracleTolerance: 0 }, path.join(attemptDir, "artifact"))
     if (!result.passed) failures.push(`result: ${result.error}`)
+    const files = (await readdir(path.join(attemptDir, "artifact/results")).catch(() => [])).filter((name) => name.endsWith(".result.csv"))
+    if (files.length === 1 && !(await Bun.file(path.join(attemptDir, "artifact/results", files[0]!)).text()).split(/\r?\n/)[0]?.includes(","))
+      failures.push("result: comma delimiter required")
   }
   return { errors, failures }
 }
