@@ -469,7 +469,7 @@ test("a killed runtime is replaced for the next call in the same run", async () 
   }
 }, 15000)
 
-test("a chat runtime restarts at most twice in one turn", async () => {
+test.each(["after-call", "during-admission"])("a chat runtime restarts at most twice in one turn: %s", async (exitAt) => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "loginom-advisory-relaunch-limit-"))
@@ -511,13 +511,31 @@ test("a chat runtime restarts at most twice in one turn", async () => {
   const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
   const requests = new EventEmitter()
   const replies = new EventEmitter()
+  const admission = { exit: false }
   const port = loginomHostPort(
     {
       postMessage: (value) => replies.emit("message", { data: value }),
       on: requests.on.bind(requests),
       start() {},
     },
-    host,
+    {
+      ...host,
+      journal: {
+        ...host.journal,
+        async begin(chat, generation) {
+          const id = await host.journal.begin(chat, generation)
+          if (admission.exit) {
+            // Force a real child exit after durable admission, before the port's
+            // second runtime lookup. No synthetic runtime refusal is supplied.
+            admission.exit = false
+            const runtime = await host.runtime(generation, chat)
+            await runtime.request("call", { arguments: { action: "kill" } }).catch(() => undefined)
+            await runtime.exited
+          }
+          return id
+        },
+      },
+    },
   )
   const client = transport({
     postMessage: (value) => requests.emit("message", { data: value }),
@@ -531,7 +549,11 @@ test("a chat runtime restarts at most twice in one turn", async () => {
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
     await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
     await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
-    await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+    if (exitAt === "during-admission") {
+      admission.exit = true
+      await expect(call("one", "finish")).rejects.toThrow("LOGINOM_RUNTIME_UNAVAILABLE")
+    }
+    if (exitAt === "after-call") await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
     await expect(call("one", "finish")).rejects.toThrow("LOGINOM_RUNTIME_UNAVAILABLE")
     expect(
       (await readFile(calls, "utf8"))

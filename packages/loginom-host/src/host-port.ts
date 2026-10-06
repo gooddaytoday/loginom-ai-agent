@@ -139,7 +139,15 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           await service.runtime(run.lease.generation, run.chat)
           recovery.id = await service.journal.begin(run.chat, run.lease.generation)
           run.active.add(recovery.id)
-          const runtime = await service.runtime(run.lease.generation, run.chat)
+          const runtime = await service.runtime(run.lease.generation, run.chat).catch(async (error: unknown) => {
+            // Exit can land during journal.begin. A relaunch-limit refusal from
+            // this lookup precedes dispatch, so settle only this unused admission.
+            if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE" && recovery.id) {
+              await service.journal.settle(recovery.id, true)
+              run.active.delete(recovery.id)
+            }
+            throw error
+          })
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
           const result = await runtime.request("call", {
             name: input.name,
