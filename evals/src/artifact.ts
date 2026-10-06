@@ -121,6 +121,21 @@ export async function cleanupArtifact(source: ArtifactSource, artifact: Artifact
   if (removed.exitCode !== 0) throw new Error(`docker exec rm: ${removed.stderr.toString().trim()}`)
 }
 
+export async function storageEntryExists(source: ArtifactSource, name: string) {
+  if (path.basename(name) !== name) throw Error("Unsafe result filename")
+  if (source.kind === "dir") {
+    if (!(await stat(source.dir)).isDirectory()) throw Error("Storage directory unavailable")
+    return lstat(path.join(source.dir, name)).then(() => true, (error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return false
+      throw error
+    })
+  }
+  // The normal file listing excludes links/directories; it cannot prove absence.
+  const found = await Bun.$`docker exec ${source.container} sh -c ${'test -d "$2" && test -r "$2" && test -x "$2" || exit 2; test -e "$1" || test -L "$1"'} eval-entry ${`${source.storageDir}/${name}`} ${source.storageDir}`.quiet().nothrow()
+  if (![0, 1].includes(found.exitCode)) throw Error(`Storage entry inspection failed: ${found.stderr.toString().trim()}`)
+  return found.exitCode === 0
+}
+
 export async function cleanupOrphanResult(input: { source: ArtifactSource; name: string; outDir: string; existingNames: readonly string[] | null; processesConfirmed: boolean }) {
   const evidence: { status: string; name: string; existed_before: boolean | null; removed: boolean;
     verified_absent: boolean; archived?: { path: string; bytes: number; sha256: string }; error?: string } = {
@@ -132,8 +147,7 @@ export async function cleanupOrphanResult(input: { source: ArtifactSource; name:
     if (path.basename(input.name) !== input.name) throw Error("Unsafe result filename")
     if (input.existingNames === null) throw Error("Storage ownership baseline unavailable")
     if (evidence.existed_before) throw Error("Result ownership unconfirmed: pre-existing filename")
-    const entries = await listStorage(input.source)
-    if (entries.some(entry => entry.name === input.name)) {
+    if (await storageEntryExists(input.source, input.name)) {
       if (input.source.kind === "dir") {
         const info = await lstat(path.join(input.source.dir, input.name))
         if (!info.isFile()) throw Error("Result is not a regular file")
@@ -155,7 +169,7 @@ export async function cleanupOrphanResult(input: { source: ArtifactSource; name:
       }
       evidence.removed = true
     }
-    if ((await listStorage(input.source)).some(entry => entry.name === input.name)) throw Error("Result storage cleanup unconfirmed")
+    if (await storageEntryExists(input.source, input.name)) throw Error("Result storage cleanup unconfirmed")
     evidence.verified_absent = true
     evidence.status = "confirmed"
   } catch (error) {
