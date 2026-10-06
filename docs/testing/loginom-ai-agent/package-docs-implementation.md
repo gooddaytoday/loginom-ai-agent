@@ -569,6 +569,24 @@ tdd-product-discovery-completeness-red, product-discovery-completeness-green.log
 Flags берут единый staged root; CLI_BUNDLE не меняет verifier discovery.
 Actual installed run/TUI проверки ещё остаются открытыми.
 
+Knowledge client foundation: первый RED — отдельного клиента не было.
+GREEN использует настоящий StreamableHTTPClientTransport с Bearer и
+redirect:error, connectRemote/readCatalog, семь Help схем из MCP и общий
+catalog digest. Далее отдельные RED/GREEN: typed closed вместо Not connected,
+interrupt одного run, close с abort/drain вместо Connection closed, отсутствие
+ключа до сети и отказ readiness при неполном Help catalog. Никаких Browser
+session/bridge, Playwright или child_process imports: это проверено Node
+resolve hook во время настоящего authenticated HTTP MCP read.
+Регрессии проверили неизменность route allowlist после внешнего изменения
+tools, запрет write/prepare/browser, pre-abort и ownership повторного request ID.
+Два настоящих конкурентных requests сохранили второй run при отмене первого.
+9 новых wire tests + 5 catalog regressions = 14 PASS, pinned Node 24.19.0;
+tdd-knowledge-client-{read,closed,interrupt,close-drain,missing-key,catalog}-*,
+knowledge-client-regression.log. Существующие catalog helpers не изменялись.
+Это фундамент этапа 4: private knowledge entry/IPC, supervision, Host routing,
+startup и UI/CLI settings ещё не интегрированы; Help продукта пока остаётся
+в прежнем browser runtime. Пункты этапа 4 не отмечены как выполненные.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -587,4 +605,5 @@ Actual installed run/TUI проверки ещё остаются открыты
 - Старый session package_docs/Python тест требует замены при SessionTools integration.
 - Reserved skill/command policy и пользовательские предупреждения проверены по sources.
 - Linux artifact completeness/shared closure проверены; Host suite 184 PASS / 6 SKIP.
+- Knowledge client: 14 PASS; следующий шаг — private process и Host integration.
 - Живая приёмка и удаление серверного skill остаются открытыми.
