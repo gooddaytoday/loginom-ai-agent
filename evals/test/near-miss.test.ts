@@ -249,3 +249,40 @@ test("missing mutant CSV is a corpus error with exit 2", async () => {
     await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toMatchObject({ exitCode: 2 })
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+for (const failed of [
+  ["result-rows"],
+  ["import-csv", "group-category", "export-columns", "chain-links", "result-rows"],
+]) test("other failed items never compensate for a missed sort: " + failed.join(","), async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-missed-item-"))
+  try {
+    const fixture = await sortCorpus(root)
+    const answers = path.join(root, "answers.json")
+    await Bun.write(answers, JSON.stringify({ sort: failed }))
+    const config = loadConfig(["--calibrate", "--tasks", path.join(evalsRoot, "fixtures/calibration"), "--only", "sales-by-category"], {
+      JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: "bun " + path.join(evalsRoot, "fixtures/fake-codex.ts") + " --failed-by-case " + answers, EVAL_RESULTS_DIR: path.join(root, "results"),
+    })
+    const result = await calibrate(config, fixture.corpusDir)
+    expect(result.code).toBe(1)
+    const report = await Bun.file(path.join(result.runDir, "calibration.json")).json()
+    expect(report.rows.find((row: { kind: string }) => row.kind === "near-miss")).toMatchObject({ failed, expectations_met: false })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("passing oracle plus detected filter defect is a successful calibration case", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-filter-detected-"))
+  try {
+    const answers = path.join(root, "answers.json")
+    await Bun.write(answers, JSON.stringify({ sort: ["sort-ratio-id", "result-rows"], column: ["export-columns", "result-rows"], filter: ["filter-ratio"] }))
+    const config = loadConfig(["--calibrate", "--tasks", path.join(evalsRoot, "fixtures/calibration"), "--only", "low-liquidity-companies"], {
+      JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: "bun " + path.join(evalsRoot, "fixtures/fake-codex.ts") + " --failed-by-case " + answers, EVAL_RESULTS_DIR: path.join(root, "results"),
+    })
+    const result = await calibrate(config)
+    expect(result.code).toBe(0)
+    const report = await Bun.file(path.join(result.runDir, "calibration.json")).json()
+    expect(report.rows.find((row: { case_id: string }) => row.case_id === "filter")).toMatchObject({ oracle_pass: true, expected_oracle_pass: true, failed: ["filter-ratio"], expectations_met: true })
+    const judgeDir = path.join(result.runDir, "low-liquidity-companies/near-miss/filter/judge")
+    expect(await Array.fromAsync(new Bun.Glob("**/cases.json").scan(judgeDir))).toEqual([])
+    expect(await Bun.file(path.join(result.runDir, "summary.json")).exists()).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
