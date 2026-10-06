@@ -57,8 +57,10 @@ export async function prepareCalibrationCases(tasks: Task[], runDir: string, cor
         await Bun.write(target, xml.replaceAll(edit.from, edit.to))
       }
       const xmlFiles = [...new Set(mutation.edits.map((edit) => edit.file))]
-      const validation = Bun.spawn(["xmllint", "--nonet", "--noout", ...xmlFiles], { cwd: unpacked, stdout: "ignore", stderr: "ignore" })
-      if (await validation.exited !== 0)
+      const validation = Bun.spawn(["xmllint", "--nonet", "--noout", ...xmlFiles], { cwd: unpacked, stdout: "ignore", stderr: "pipe" })
+      // xmllint reports namespace errors on stderr even when its exit code is zero.
+      const diagnostics = await new Response(validation.stderr).text()
+      if (await validation.exited !== 0 || diagnostics.trim())
         throw new EvalFailure(task.id + "/" + mutation.id + ": XML корпуса невалиден " + xmlFiles.join(", "), 2)
       await rm(archive)
       const zipped = Bun.spawn(["zip", "-q", "-r", archive, "."], { cwd: unpacked, stdout: "ignore", stderr: "pipe" })
