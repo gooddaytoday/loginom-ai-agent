@@ -237,3 +237,12 @@ test("saved CSV recipes independently reproduce the representative corpus", asyn
   expect({ code: await proc.exited, errors }).toEqual({ code: 0, errors: "" })
   expect(output).toContain("10 cases")
 })
+
+test("missing mutant CSV is a corpus error with exit 2", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-missing-csv-"))
+  try {
+    const fixture = await sortCorpus(root)
+    await rm(path.join(fixture.dir, "sort.csv"))
+    await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toMatchObject({ exitCode: 2 })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
