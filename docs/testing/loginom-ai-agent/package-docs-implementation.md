@@ -1832,6 +1832,33 @@ roots и отдельные verification JSON; hashes приёмочных drive
 отчёт с live Help, TUI, update и A/B evals не приняты. Этапы 6/7/8 остаются
 открытыми; требования плана не пересмотрены и новые ticks здесь не добавлены.
 
+## Первая native настройка Help при недоступном Loginom
+
+Actual установленный CLI C6 в собственном Ubuntu22 container, UID 1200,
+штатный launcher и profile: `loginom setup --stdin-json --format json --headless`
+с действительным Help key и намеренно недоступным Loginom
+`http://127.0.0.1:9/` вернул **exit 0**, `state: ready`, `hasApiKey: true`,
+`hasPassword: false`, отдельный
+`browser: { state: failed, failure: LOGINOM_LOGIN_UNAVAILABLE }`.
+Таким образом, настоящая первая CLI настройка key-only Help сохраняется
+при отказе web login; это не контролируемый Help stub. Пароль не передавался.
+Эта проверка относится к non-TTY stdin-json; интерактивный TTY мастер,
+Desktop мастер и весь этап 4 ещё открыты. Browser validation после Help
+разрешена этим setup сценарием, отсутствие Chromium при документации
+проверяется отдельно и не выводится из результата setup.
+
+Source CLI credential record прочитан без изменения через публичный codec;
+ключ передан только private stdin/IPC и собственному temporary profile.
+Сохранены redacted stdout/result, install receipt и container state,
+профиль с ключом не экспортировался. Контейнер удалён после проверки;
+ключ/пароль отсутствуют в result/logs/git. Унаследованы явные proxy settings,
+использован network host; другие profiles, launcher и стенд не изменялись.
+Evidence `cli-live-help-setup-stdin-6c24f8de7/` и соответствующий `.log`.
+Предварительный adapter запуск без Docker `-i` закрыл stdin и получил
+ожидаемый `CLI_SETUP_INVALID`, exit 2; это ошибка driver, не продуктовый отказ.
+Его evidence сохранён отдельно, контейнер также удалён. Требования плана
+не пересматривались и setup gate всего этапа не отмечался выполненным.
+
 ## Checkpoint
 
 - Product candidates: Desktop `8dc7bdccb`, CLI `6c24f8de7`; полные artifacts/manifest/archive сохранены, SHA различаются.
