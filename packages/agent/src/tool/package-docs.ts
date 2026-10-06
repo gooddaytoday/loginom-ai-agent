@@ -105,43 +105,12 @@ export const PackageDocsTool = Tool.define(
             ],
             metadata: { filepath: emission?.output ?? join(work, "structure.json") },
           })
-          const resources = flags.loginomResources
-          if (!resources) return yield* Effect.die(Error("PACKAGE_DOCS_RESOURCES_MISSING: переустановите приложение."))
-          const root = yield* fs.realPath(resources)
-          yield* Effect.tryPromise(() => verifyBundledSkills(root)).pipe(
-            Effect.catch(() =>
-              Effect.die(
-                Error("PACKAGE_DOCS_RESOURCES_INVALID: встроенный skill повреждён; переустановите приложение."),
-              ),
-            ),
-          )
-          const manifest = yield* Schema.decodeUnknownEffect(
-            Schema.Struct({
-              protocol: Schema.Literal(1),
-              node: Schema.Literal("bin/node"),
-              files: Schema.Array(Schema.Struct({ path: Schema.String, sha256: Schema.String })),
-            }),
-          )(yield* fs.readJson(join(root, "resource-manifest.json")))
-          const node = yield* fs.realPath(join(root, "bin/node"))
-          const inside = relative(root, node)
-          const entry = manifest.files.find((file) => file.path === "bin/node")
-          if (
-            !entry ||
-            isAbsolute(inside) ||
-            inside === ".." ||
-            inside.startsWith(".." + sep) ||
-            createHash("sha256")
-              .update(yield* fs.readFile(node))
-              .digest("hex") !== entry.sha256
-          )
-            return yield* Effect.die(
-              Error("PACKAGE_DOCS_RESOURCES_INVALID: встроенный Node повреждён; переустановите приложение."),
-            )
+          const executor = yield* requireExecutor(fs, flags.loginomResources)
           const result = yield* appProcess.run(
             ChildProcess.make(
-              node,
+              executor.node,
               [
-                join(root, "skills/package-docs/scripts/package-docs.mjs"),
+                executor.script,
                 params.operation,
                 "--lgp",
                 lgp,
@@ -166,9 +135,28 @@ export const PackageDocsTool = Tool.define(
                   : "PACKAGE_DOCS_FAILED",
               ),
             )
+          const response = yield* Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)(
+            result.stdout.toString("utf8"),
+          ).pipe(Effect.catch(() => Effect.die(Error("PACKAGE_DOCS_OUTPUT_INVALID"))))
+          const paths = yield* Schema.decodeUnknownEffect(Schema.Record(Schema.String, Schema.String))(response).pipe(
+            Effect.catch(() => Effect.die(Error("PACKAGE_DOCS_OUTPUT_INVALID"))),
+          )
+          const expected = {
+            structure: join(work, "structure.json"),
+            ...(params.operation !== "extract" ? { report: join(work, "report.md") } : {}),
+            ...(emission ? { output: emission.output } : {}),
+          }
+          if (Object.entries(expected).some(([key, path]) => paths[key] !== path))
+            return yield* Effect.die(Error("PACKAGE_DOCS_OUTPUT_INVALID"))
+          yield* Effect.forEach(Object.values(expected), (path) =>
+            Effect.gen(function* () {
+              if ((yield* fs.stat(path)).type !== "File" || (yield* fs.realPath(path)) !== path)
+                return yield* Effect.die(Error("PACKAGE_DOCS_OUTPUT_INVALID"))
+            }),
+          ).pipe(Effect.catch(() => Effect.die(Error("PACKAGE_DOCS_OUTPUT_INVALID"))))
           return {
             title: "Документация: " + params.operation,
-            output: result.stdout.toString("utf8").trim(),
+            output: JSON.stringify(expected),
             metadata: { truncated: false },
           }
         }).pipe(Effect.orDie),
@@ -186,4 +174,47 @@ const availableReport = Effect.fn("PackageDocs.availableReport")(function* (
   let index = 1
   while (names.has(stem + ".lgp_report" + (index > 1 ? "-" + index : "") + "." + format)) index++
   return join(directory, stem + ".lgp_report" + (index > 1 ? "-" + index : "") + "." + format)
+})
+
+const requireExecutor = Effect.fn("PackageDocs.requireExecutor")(function* (fs: FSUtil.Interface, resources?: string) {
+  if (!resources) return yield* Effect.die(Error("PACKAGE_DOCS_RESOURCES_MISSING: переустановите приложение."))
+  const root = yield* fs.realPath(resources)
+  const skills = yield* Effect.tryPromise(() => verifyBundledSkills(root)).pipe(
+    Effect.catch(() =>
+      Effect.die(Error("PACKAGE_DOCS_RESOURCES_INVALID: встроенный skill повреждён; переустановите приложение.")),
+    ),
+  )
+  if (
+    !skills.some(
+      (skill) =>
+        skill.name === "package-docs" &&
+        skill.files.some((file) => file.path === "skills/package-docs/scripts/package-docs.mjs"),
+    )
+  )
+    return yield* Effect.die(
+      Error("PACKAGE_DOCS_RESOURCES_INVALID: отсутствует встроенный генератор; переустановите приложение."),
+    )
+  const manifest = yield* Schema.decodeUnknownEffect(
+    Schema.Struct({
+      protocol: Schema.Literal(1),
+      node: Schema.Literal("bin/node"),
+      files: Schema.Array(Schema.Struct({ path: Schema.String, sha256: Schema.String })),
+    }),
+  )(yield* fs.readJson(join(root, "resource-manifest.json")))
+  const node = yield* fs.realPath(join(root, "bin/node"))
+  const inside = relative(root, node)
+  const entry = manifest.files.find((file) => file.path === "bin/node")
+  if (
+    !entry ||
+    isAbsolute(inside) ||
+    inside === ".." ||
+    inside.startsWith(".." + sep) ||
+    createHash("sha256")
+      .update(yield* fs.readFile(node))
+      .digest("hex") !== entry.sha256
+  )
+    return yield* Effect.die(
+      Error("PACKAGE_DOCS_RESOURCES_INVALID: встроенный Node повреждён; переустановите приложение."),
+    )
+  return { node, script: join(root, "skills/package-docs/scripts/package-docs.mjs") }
 })

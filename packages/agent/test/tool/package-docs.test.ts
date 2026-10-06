@@ -128,6 +128,38 @@ const prepare = Effect.fn("PackageDocsTest.prepare")(function* (
   return { ctx, requests, tool }
 })
 
+// Replace the external Node program in this test's bundle, preserving its exact
+// bytes and manifest afterwards. Runtime services and process spawning stay real.
+const withScript = <A, E, R>(content: string | undefined, body: Effect.Effect<A, E, R>) =>
+  Effect.gen(function* () {
+    const fs = yield* FSUtil.Service
+    const script = join(resources, "skills/package-docs/scripts/package-docs.mjs")
+    const manifest = join(resources, "resource-manifest.json")
+    return yield* Effect.acquireUseRelease(
+      Effect.gen(function* () {
+        return { script: yield* fs.readFileString(script), manifest: yield* fs.readFileString(manifest) }
+      }),
+      () =>
+        Effect.gen(function* () {
+          if (content === undefined) yield* fs.remove(script)
+          else yield* fs.writeFileString(script, content)
+          yield* fs.writeFileString(
+            manifest,
+            JSON.stringify({
+              protocol: 1,
+              node: "bin/node",
+              files: yield* Effect.promise(() => resourceInventory(resources)),
+            }),
+          )
+          return yield* body
+        }),
+      (original) =>
+        Effect.all([fs.writeFileString(script, original.script), fs.writeFileString(manifest, original.manifest)]).pipe(
+          Effect.orDie,
+        ),
+    )
+  })
+
 it.instance(
   "extracts an original user attachment with bundled Node and requests only session writes",
   () =>
@@ -566,6 +598,122 @@ it.instance(
       expect(Exit.isFailure(result)).toBe(true)
       if (Exit.isFailure(result)) expect(Cause.squash(result.cause)).toBeInstanceOf(PermissionV1.DeniedError)
       expect(input.requests.map((request) => request.permission)).toEqual(["external_directory"])
+    }),
+  20_000,
+)
+
+it.instance(
+  "a missing generated bundle is diagnosed as damaged resources",
+  () =>
+    Effect.gen(function* () {
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const result = yield* withScript(
+        undefined,
+        input.tool.execute({ operation: "extract", lgp: fixture }, input.ctx).pipe(Effect.exit),
+      )
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) expect(String(Cause.squash(result.cause))).toContain("PACKAGE_DOCS_RESOURCES_INVALID")
+    }),
+  20_000,
+)
+
+it.instance(
+  "a zero exit with malformed executor output is an error, not a completed operation",
+  () =>
+    Effect.gen(function* () {
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const result = yield* withScript(
+        "process.stdout.write('not-json')",
+        input.tool.execute({ operation: "extract", lgp: fixture }, input.ctx).pipe(Effect.exit),
+      )
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) expect(String(Cause.squash(result.cause))).toContain("PACKAGE_DOCS_OUTPUT_INVALID")
+    }),
+  20_000,
+)
+
+it.instance(
+  "a successful executor cannot substitute a path outside the backend-selected workspace",
+  () =>
+    Effect.gen(function* () {
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const result = yield* withScript(
+        'process.stdout.write(JSON.stringify({structure: "/tmp/foreign.json"}))',
+        input.tool.execute({ operation: "extract", lgp: fixture }, input.ctx).pipe(Effect.exit),
+      )
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) expect(String(Cause.squash(result.cause))).toContain("PACKAGE_DOCS_OUTPUT_INVALID")
+    }),
+  20_000,
+)
+
+it.instance(
+  "an executor cannot claim completion without creating its acknowledged file",
+  () =>
+    Effect.gen(function* () {
+      const fs = yield* FSUtil.Service
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const initial = yield* input.tool.execute({ operation: "extract", lgp: fixture }, input.ctx)
+      yield* fs.remove(JSON.parse(initial.output).structure)
+      const result = yield* withScript(
+        "process.stdout.write(" + JSON.stringify(initial.output) + ")",
+        input.tool.execute({ operation: "extract", lgp: fixture }, input.ctx).pipe(Effect.exit),
+      )
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) expect(String(Cause.squash(result.cause))).toContain("PACKAGE_DOCS_OUTPUT_INVALID")
+    }),
+  20_000,
+)
+
+it.instance(
+  "a Node hash mismatch is rejected without falling back to a system interpreter",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const fs = yield* FSUtil.Service
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const path = join(resources, "resource-manifest.json")
+      const result = yield* Effect.acquireUseRelease(
+        fs.readFileString(path),
+        (original) =>
+          Effect.gen(function* () {
+            const manifest = JSON.parse(original)
+            manifest.files.find((file: { path: string }) => file.path === "bin/node").sha256 = "0".repeat(64)
+            yield* fs.writeFileString(path, JSON.stringify(manifest))
+            return yield* input.tool.execute({ operation: "extract", lgp: fixture }, input.ctx).pipe(Effect.exit)
+          }),
+        (original) => fs.writeFileString(path, original).pipe(Effect.orDie),
+      )
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) expect(String(Cause.squash(result.cause))).toContain("PACKAGE_DOCS_RESOURCES_INVALID")
+      expect(yield* fs.exists(join(instance.directory, ".work"))).toBe(false)
+    }),
+  20_000,
+)
+
+it.instance(
+  "even the correctly hashed pinned Node cannot be a symlink outside resources",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const fs = yield* FSUtil.Service
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const path = join(resources, "bin/node"),
+        backup = join(resources, "bin/node.original")
+      const source = process.env.LOGINOM_AI_AGENT_TEST_NODE
+      if (!source) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
+      const result = yield* Effect.acquireUseRelease(
+        fs.rename(path, backup),
+        () =>
+          Effect.gen(function* () {
+            yield* fs.symlink(source, path)
+            return yield* input.tool.execute({ operation: "extract", lgp: fixture }, input.ctx).pipe(Effect.exit)
+          }),
+        () => fs.remove(path, { force: true }).pipe(Effect.andThen(fs.rename(backup, path)), Effect.orDie),
+      )
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) expect(String(Cause.squash(result.cause))).toContain("PACKAGE_DOCS_RESOURCES_INVALID")
+      expect(yield* fs.exists(join(instance.directory, ".work"))).toBe(false)
     }),
   20_000,
 )

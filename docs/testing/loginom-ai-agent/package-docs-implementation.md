@@ -467,6 +467,19 @@ FS service, захваченный при init, без новых сервисо
 19 PASS (73 assertions), Agent typecheck PASS; tdd-agent-docs-emit-*,
 agent-docs-emit-final.log. Lifecycle, строгий ответ executor и TaskScope ещё открыты.
 
+Executor contract: отдельные RED/GREEN — отсутствующий generated script,
+нулевой exit с плохим JSON, подмена ожидаемого пути, ложное подтверждение
+создания отсутствующего файла. GREEN сверяет ответ с backend paths и
+существованием обычных файлов без symlink; возвращает только ожидаемые поля.
+RequireExecutor выделяет integrity boundary: skill closure, наличие bundle,
+Node SHA и realpath containment. Регрессии Node hash/symlink исключают fallback.
+Контролируемые внешние Node-программы находятся только в тестовом resource
+bundle; Session, Permission, FS и process spawning настоящие. Fixture сохраняет
+и восстанавливает точные script/manifest bytes, включая ошибки/отмену в body.
+25 PASS (87 assertions), Agent typecheck PASS; tdd-agent-docs-{missing-bundle,
+output-json,output-path,output-exists}-*, agent-docs-executor-final.log.
+Lifecycle/TaskScope и установленная приёмка остаются открытыми.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
