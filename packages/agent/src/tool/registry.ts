@@ -255,7 +255,10 @@ const layer = Layer.effect(
 
     const all: Interface["all"] = Effect.fn("ToolRegistry.all")(function* () {
       const s = yield* InstanceState.get(state)
-      return [...s.builtin, ...s.custom] as Tool.Def[]
+      return [
+        ...s.builtin.map((tool) => ({ ...tool, origin: "builtin" as const })),
+        ...s.custom.map((tool) => ({ ...tool, origin: "external" as const })),
+      ]
     })
 
     const ids: Interface["ids"] = Effect.fn("ToolRegistry.ids")(function* () {
@@ -322,6 +325,7 @@ const layer = Layer.effect(
               : undefined
           return {
             id: tool.id,
+            origin: tool.origin,
             description: [
               output.description,
               tool.id === TaskTool.id ? yield* describeTask(input.agent) : undefined,

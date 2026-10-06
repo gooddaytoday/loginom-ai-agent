@@ -897,9 +897,31 @@ RED: `tdd-host-work-state-red.log`, `tdd-managed-work-entry-red.log`.
 Этап 5 не отмечен: HostPort scope, выдача activation и каталоги ещё не соединены.
 План и документ корректировок повторно не перерабатывались; evals не изменялись.
 
+## 2026-10-06: происхождение реализации инструмента
+
+`ToolRegistry.all()` присваивает внутренний `Tool.Def.origin` из собственных
+builtin/custom коллекций; `tools()` сохраняет его после model-specific schema
+и description преобразований. Из plugin definition и `tool.definition` output
+это поле не читается. Имя `read` само по себе не подтверждает builtin.
+Параметры модели и публичные Protocol/Message схемы не изменены.
+
+TDD RED: настоящий local custom `read`, пытающийся объявить `origin: builtin`,
+не отличался от builtin в каталоге. Минимальный GREEN — присвоение registry и
+сохранение при сборке каталога. Дополнительно проверены plugin `read` и hook,
+пытающийся записать origin в definition output: оба остаются external.
+Полные registry + SessionTools regressions: 21 PASS / 50 assertions;
+Agent `bun typecheck`, prettier и `git diff --check` PASS. Логи:
+`tdd-tool-origin-red.log`, `tool-origin-green.log`, `tool-origin-regression.log`,
+`tool-origin-agent-typecheck.log` в собственном acceptance-каталоге.
+
+Это контракт происхождения для следующего шага. Docs allowlist в resolve/
+execute и Host scope ещё не подключены; существующая eager admission не
+объявляется исправленной. Этап 5 остаётся открытым. Согласованные требования
+плана не изменялись, файлы evals и соседний worktree не трогались.
+
 ## Checkpoint
 
-- `docs-no-browser`: baseline `fc3d97dbf`, Host `3025beb91`, settings `197b178b6`, history `e1f9476d4`.
+- `docs-no-browser`: baseline `fc3d97dbf`, settings `197b178b6`, history `e1f9476d4`, work `ec64f0255`.
 - Этап 0 выполнен: полный чистый baseline и детерминированные проверки сохранены.
 - Этап 1 выполнен: каталог, staging, локальный runtime и передача resource root проверены.
 - Каталог skills, локальный loader и prepare реализованы; единый digest проверен в Bun/Node.

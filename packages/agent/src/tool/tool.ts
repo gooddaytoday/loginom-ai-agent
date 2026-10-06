@@ -57,6 +57,8 @@ export interface Def<
   M extends Metadata = Metadata,
 > {
   id: string
+  /** Assigned by the backend registry, never by a model or plugin definition. */
+  origin?: "builtin" | "external"
   description: string
   parameters: Parameters
   jsonSchema?: JSONSchema7
