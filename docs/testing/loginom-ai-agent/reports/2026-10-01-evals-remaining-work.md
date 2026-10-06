@@ -180,6 +180,13 @@ filter 3, column 35). Источники закреплены SHA256. Прове
 прогон gpt-6-astra/high от c1e606017: near-miss-final/20261006-065028-calibrate;
 живая приёмка ещё не завершена. Целевой missing-column diagnostic для sales дал 57:
 export-columns и result-rows провалены. Это не заменяет приёмку всех 183 случаев.
+Полный прогон исходным промптом завершился exit 1: все 70 контрольных оценок
+прошли пороги, 112/113 near-miss обнаружены. Единственный пропуск — two-aggregates
+у first-last-touch/filter. Два общих правила проверки всех условий пункта и
+настроек отбора в XML исправили адресную живую проверку; рубрики и ожидания
+не менялись. Полный повтор от ec9813bfe идёт в
+near-miss-acceptance/20261006-092100-calibrate. Задача ещё не закрыта.
+
 Checkpoint: ../../../superpowers/plans/2026-10-06-evals-calibration-near-miss.md.
 
 
