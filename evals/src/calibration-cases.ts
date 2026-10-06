@@ -23,11 +23,15 @@ export async function prepareCalibrationCases(tasks: Task[], runDir: string, cor
     const file = Bun.file(path.join(dir, "cases.json"))
     if (!(await file.exists())) continue
     const source = await file.text()
-    const corpus = JSON.parse(source) as CalibrationCorpus
+    const raw: unknown = await file.json().catch(() => { throw new EvalFailure(task.id + ": неверный JSON корпуса", 2) })
+    const corpus = requireCorpus(raw, task.id)
     for (const [name, digest] of Object.entries(corpus.sources)) {
       const actual = new Bun.CryptoHasher("sha256").update(await Bun.file(path.join(task.dir, name)).bytes()).digest("hex")
       if (actual !== digest) throw new EvalFailure(task.id + ": устаревший источник " + name, 2)
     }
+    for (const name of ["task.json", task.reference, task.spec, ...task.inputs, ...(task.oracle ? [task.oracle] : [])])
+      if (!corpus.sources[name]) throw new EvalFailure(task.id + ": отсутствует source hash " + name, 2)
+    if (corpus.cases.length && !Bun.which("zip")) throw new EvalFailure("Не найдена команда zip", 2)
     hasher.update(task.id + "\n" + source)
     for (const mutation of corpus.cases) {
       const unavailable = mutation.expected_failed.filter((id) => !task.checklist.some((item) => item.id === id && !item.requiresRun))
@@ -59,4 +63,39 @@ export async function prepareCalibrationCases(tasks: Task[], runDir: string, cor
     }
   }
   return { prepared, hash: hasher.digest("hex") }
+}
+
+function requireCorpus(raw: unknown, task: string): CalibrationCorpus {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw))
+    throw new EvalFailure(task + ": корпус должен быть объектом", 2)
+  const corpus = raw as CalibrationCorpus
+  if (typeof corpus.sources !== "object" || corpus.sources === null || Array.isArray(corpus.sources) ||
+    !Array.isArray(corpus.cases)) throw new EvalFailure(task + ": неверные sources/cases", 2)
+  for (const [name, hash] of Object.entries(corpus.sources)) {
+    requireRelativePath(name, task)
+    if (typeof hash !== "string" || !/^[a-f0-9]{64}$/.test(hash)) throw new EvalFailure(task + ": неверный SHA256 " + name, 2)
+  }
+  const ids = new Set<string>()
+  for (const item of corpus.cases) {
+    if (!item || typeof item.id !== "string" || !/^[a-z0-9][a-z0-9-]*$/.test(item.id) || ids.has(item.id) ||
+      !["sort", "aggregate", "threshold", "filter", "column"].includes(item.kind) ||
+      !Array.isArray(item.edits) || !item.edits.length || !Array.isArray(item.expected_failed) ||
+      !item.expected_failed.every((id) => typeof id === "string") || new Set(item.expected_failed).size !== item.expected_failed.length ||
+      typeof item.expected_oracle_pass !== "boolean") throw new EvalFailure(task + ": неверный или дублирующийся случай", 2)
+    ids.add(item.id)
+    requireRelativePath(item.result_csv, task)
+    for (const edit of item.edits) {
+      if (!edit || typeof edit.from !== "string" || !edit.from || typeof edit.to !== "string" || edit.from === edit.to ||
+        !Number.isInteger(edit.count) || edit.count <= 0) throw new EvalFailure(task + "/" + item.id + ": неверная XML-замена", 2)
+      requireRelativePath(edit.file, task)
+      if (!edit.file.endsWith("/Unit.xml")) throw new EvalFailure(task + ": редактируется только Unit.xml", 2)
+    }
+  }
+  return corpus
+}
+
+function requireRelativePath(value: unknown, task: string) {
+  if (typeof value !== "string" || !value || path.isAbsolute(value) || value.includes("\\") ||
+    value.split("/").some((part) => !part || part === "." || part === ".."))
+    throw new EvalFailure(task + ": неверный относительный путь " + String(value), 2)
 }

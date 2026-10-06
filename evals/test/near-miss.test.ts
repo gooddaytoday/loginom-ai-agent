@@ -116,3 +116,14 @@ test("calibration refuses CSV that contradicts its oracle expectation", async ()
     await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toThrow("oracle")
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("calibration rejects a result path escaping its corpus", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-path-"))
+  try {
+    const fixture = await sortCorpus(root)
+    fixture.corpus.cases[0]!.result_csv = "../outside.csv"
+    await Bun.write(path.join(fixture.corpusDir, "outside.csv"), await Bun.file(path.join(fixture.dir, "sort.csv")).text())
+    await Bun.write(path.join(fixture.dir, "cases.json"), JSON.stringify(fixture.corpus))
+    await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toMatchObject({ exitCode: 2 })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
