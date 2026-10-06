@@ -6,8 +6,10 @@ import { parseArtifactSource, unzip } from "./artifact"
 import { preflight } from "./preflight"
 import { judgeInfo, judgeTask, type JudgeSettings } from "./judge"
 import { describe, redact, stamp } from "./run"
+import { evalsRoot } from "./config"
+import { prepareCalibrationCases } from "./calibration-cases"
 
-export async function calibrate(config: EvalConfig) {
+export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsRoot, "calibration")) {
   const tasks = await loadTasks(config.tasksDir, config.only)
   await preflight(config, parseArtifactSource("docker", config.loginom))
   const judge = await judgeInfo(config)
@@ -22,7 +24,13 @@ export async function calibrate(config: EvalConfig) {
     timeoutMs: config.judgeTimeoutMs,
     passThreshold: config.passThreshold,
   }
-  const rows: { task: string; kind: "positive" | "negative"; reference: string; score: number | null; failed: string[]; error: string | null }[] = []
+  const cases = await prepareCalibrationCases(tasks, runDir, corpusDir)
+  const rows: {
+    task: string; kind: "positive" | "negative" | "near-miss"; reference: string
+    score: number | null; failed: string[]; error: string | null
+    case_id?: string; expected_failed?: string[]; expected_oracle_pass?: boolean
+    oracle_pass?: boolean | null; oracle_error?: string | null; expectations_met?: boolean
+  }[] = []
   for (const [index, task] of tasks.entries()) {
     const checklist = task.checklist.filter((item) => !item.requiresResultFile && !item.requiresRun)
     if (!checklist.length) {
@@ -75,6 +83,24 @@ export async function calibrate(config: EvalConfig) {
       console.error(`[calibrate ${task.id}/${kind}] score=${judged.ok ? judged.score : "error"}`)
     }
   }
+  for (const entry of cases.prepared) {
+    const judged = await judgeTask({
+      task: entry.task, artifactDir: entry.artifactDir, prompt: entry.task.prompt,
+      outDir: path.join(path.dirname(entry.artifactDir), "judge"), judge: settings,
+      checklist: entry.task.checklist.filter((item) => !item.requiresRun),
+    }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
+    const failed = judged.ok ? judged.items.filter((item) => !item.passed).map((item) => item.id) : []
+    rows.push({
+      task: entry.task.id, kind: "near-miss", reference: entry.task.id,
+      case_id: entry.mutation.id, expected_failed: entry.mutation.expected_failed,
+      expected_oracle_pass: entry.mutation.expected_oracle_pass,
+      oracle_pass: entry.oracle.passed, oracle_error: entry.oracle.error,
+      expectations_met: judged.ok && entry.mutation.expected_failed.every((id) => failed.includes(id)) &&
+        entry.oracle.passed === entry.mutation.expected_oracle_pass,
+      score: judged.ok ? judged.score : null, failed, error: judged.ok ? null : judged.error,
+    })
+    console.error("[calibrate " + entry.task.id + "/" + entry.mutation.id + "] score=" + (judged.ok ? judged.score : "error"))
+  }
   const { positiveMin, negativeMax } = config.calibration
   const warnings = rows.flatMap((row) => {
     if (row.score === null && row.error === "чеклист пуст после исключения пунктов requires_result_file/requires_run — судья не вызывался")
@@ -84,11 +110,14 @@ export async function calibrate(config: EvalConfig) {
       return [`${row.task}/positive: ${row.score} < ${positiveMin}; непройдены: ${row.failed.join(", ") || "—"}`]
     if (row.kind === "negative" && row.score > negativeMax)
       return [`${row.task}/negative (эталон ${row.reference}): ${row.score} > ${negativeMax} — судья не заметил подмену`]
+    if (row.kind === "near-miss" && !row.expectations_met)
+      return [row.task + "/" + row.case_id + ": не выполнены ожидания; ожидаемые провалы: " + row.expected_failed?.join(", ") +
+        "; фактические: " + row.failed.join(", ") + "; oracle=" + row.oracle_pass + " (ожидание " + row.expected_oracle_pass + ")"]
     return []
   })
   await Bun.write(
     path.join(runDir, "calibration.json"),
-    JSON.stringify({ run_id: runId, judge, rubric_hash: await rubricHash(tasks), thresholds: config.calibration, rows, warnings }, null, 2),
+    JSON.stringify({ run_id: runId, judge, rubric_hash: await rubricHash(tasks), thresholds: config.calibration, calibration_hash: cases.hash, near_miss_coverage: Object.fromEntries(tasks.map((task) => [task.id, cases.prepared.filter((entry) => entry.task.id === task.id).length])), rows, warnings }, null, 2),
   )
   const report = [
     `# Калибровка судьи ${runId}`,

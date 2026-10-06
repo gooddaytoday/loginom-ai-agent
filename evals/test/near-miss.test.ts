@@ -1,0 +1,40 @@
+import { expect, test } from "bun:test"
+import path from "node:path"
+import os from "node:os"
+import { mkdtemp, mkdir, rm } from "node:fs/promises"
+import { calibrate } from "../src/calibrate"
+import { evalsRoot, loadConfig } from "../src/config"
+
+test("calibration rejects a missed sort even when oracle rejects its CSV", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-near-miss-"))
+  try {
+    const taskDir = path.join(evalsRoot, "fixtures/calibration/sales-by-category")
+    const corpusDir = path.join(root, "corpus")
+    await mkdir(path.join(corpusDir, "sales-by-category"), { recursive: true })
+    const sources = Object.fromEntries(await Promise.all(
+      ["task.json", "reference.lgp", "SPEC.md", "oracle.csv", "data/dataset.csv"].map(async (file) =>
+        [file, new Bun.CryptoHasher("sha256").update(await Bun.file(path.join(taskDir, file)).bytes()).digest("hex")]),
+    ))
+    await Bun.write(path.join(corpusDir, "sales-by-category/cases.json"), JSON.stringify({
+      sources, cases: [{
+        id: "sort", kind: "sort",
+        edits: [{ file: "Unit_0/Unit.xml", from: 'Name="revenue" SortDirection="sdDesc"', to: 'Name="revenue" SortDirection="sdAsc"', count: 1 }],
+        result_csv: "sort.csv", expected_failed: ["sort-revenue", "result-rows"], expected_oracle_pass: false,
+      }],
+    }))
+    const lines = (await Bun.file(path.join(taskDir, "oracle.csv")).text()).trim().split("\n")
+    await Bun.write(path.join(corpusDir, "sales-by-category/sort.csv"), [lines[0], ...lines.slice(1).reverse()].join("\n") + "\n")
+    const config = loadConfig(["--calibrate", "--tasks", path.dirname(taskDir), "--only", "sales-by-category"], {
+      JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: "bun " + path.join(evalsRoot, "fixtures/fake-codex.ts"), EVAL_RESULTS_DIR: path.join(root, "results"),
+    })
+    const result = await calibrate(config, corpusDir)
+    const report = await Bun.file(path.join(result.runDir, "calibration.json")).json()
+    expect(result.code).toBe(1)
+    expect(report.rows.find((row: { kind: string }) => row.kind === "near-miss")).toMatchObject({
+      case_id: "sort", oracle_pass: false, failed: [], expectations_met: false,
+    })
+    expect(report.warnings.join("\n")).toContain("sort-revenue")
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
