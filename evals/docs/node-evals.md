@@ -1,6 +1,6 @@
 # Кросс-таблица: code-only eval
 
-LAB-16 содержит ровно три кейса: `crosstable-fixed-sum`, `crosstable-sliding-average`, `crosstable-reconfigure`. Каждый получает только prompt и `data/sales.csv` и сам создаёт импорт. Oracle, SPEC и `reference.lgp` остаются у проверяющего. Общий task-контракт и harness не изменены.
+LAB-16 содержит ровно три кейса: `crosstable-fixed-sum`, `crosstable-sliding-average`, `crosstable-reconfigure`. Каждый получает только prompt и `data/sales.csv` и сам создаёт импорт. Oracle, SPEC и `reference.lgp` остаются у проверяющего. Task-контракт, parseEvents, generic summary и кодовый валидатор сохранены. После BLOCKED первой приёмки пользователь разрешил узкое исправление общего harness: очистку собственного CSV при отсутствии пакета. Текущий checkpoint — `docs/LAB-16-cleanup-checkpoint.md`; исходный `docs/LAB-16-checkpoint.md` сохраняет историю первой заморозки.
 
 Из `evals/`, с назначенным приватным role env, выполнить:
 
@@ -8,6 +8,7 @@ LAB-16 содержит ровно три кейса: `crosstable-fixed-sum`, `c
 bun install --frozen-lockfile
 bun test
 bun typecheck
+with-env <role/eval.env> bun script/check-orphan-cleanup.ts <own-evidence>/storage
 with-env <role/eval.env> bun script/run-node-evals.ts --tasks ./tasks/node-evals --label lab-16-ben
 ```
 
@@ -23,6 +24,14 @@ Generic `summary.json` при skip-judge имеет null pass/score/oracle_pass.
 
 Unit и live выполнять последовательно: process-supervisor tests создают временные fake chrome в общем /proc и могут нарушить параллельное live cleanup. Сначала дождаться завершения bun test и fixture cleanup, затем выполнять live.
 
+## CSV без пакета и storage cleanup
+
+До dispatch harness проверяет существование точного `<attempt-name>.result.csv`, включая symlink и directory. Если пакет не найден, после подтверждённой очистки процессов он сохраняет только этот новый собственный CSV в `<attemptDir>/storage-outputs/`, записывает bytes/SHA256 в `storage-cleanup.json`, удаляет исходный файл и отдельно проверяет его отсутствие. Существовавший до попытки файл, неизвестный baseline, symlink, hardlink или неподтверждённая очистка процессов запрещают чтение/удаление. Чужие и соседние имена не выбираются.
+
+CSV не заменяет пакет: `no_artifact` сохраняется и даёт FAIL/1 при подтверждённой очистке. Ошибка сохранения evidence, удаления или проверки отсутствия записывается как штатный `cleanup_error`, останавливает следующий dispatch и даёт ERROR/2 в code-only validator. Process/profile cleanup остаётся отдельным доказательством. Исходные summary и verdict прошлых прогонов не переписываются после последующего исправления или ручного архивирования.
+
+`script/check-orphan-cleanup.ts` проверяет реальный Docker adapter на собственных временных файлах вне UserStorage: копирование/удаление, pre-existing, process-unconfirmed, symlink, hardlink и copy failure. Модельных попыток нет; fixture cleanup обязателен. Запускать после unit и до live. Env `LOGINOM_CONTAINER` берётся из назначенного role env. Каталог evidence должен быть новым.
+
 `input` проверяет неизменённые bytes/SHA256 CSV, native upload и импорт с верными типами. `crosstable` — настоящий TBGCrossTabEngine, ровно один, фиксированные/скользящие категории, роли и единственный агрегат. `graph` — настоящие data ports от импорта через CrossTable к экспорту; competing inputs и посторонние обработчики запрещены, TBGSortingEngine допустим. `export` — настройки CSV, свежая native выгрузка с фактическим hash и успешное сохранение пакета после чтения/экспорта. `result` вызывает штатный checkOracle с tolerance=0, сравнивая колонки по именам и строки по порядку. `sequence` для reconfigure проверяет полные sum/read → same-node avg/read с новым execution ID и конечный XML avg. dtFloat и dtInteger допустимы для числового Amount. Полный sample с sample_complete=true и точными числами допустим; native full требует точных байтов ячеек, matching binding/coverage и unchanged/exclusive owned static execution, документированные no_server_snapshot/unobserved_aba_risk не подменяют этот proof; частичный sample — FAIL. Pending apply связывается с terminal wait/resume по operation_id; порядок подтверждается start/end tool calls, включая запрет параллельного avg до initial read; повтор одного tool-part ID не создаёт стадию.
 
 Python3/stdlib читает native ZIP/XML без извлечения путей и сравнивает XML с реально собранным unpacked. Bun и Python3 нужны для локального валидатора. Неверный пакет — FAIL; сбой процесса инспектора — ERROR.
@@ -34,7 +43,7 @@ Python3/stdlib читает native ZIP/XML без извлечения путе�
 Проверки sensitivity без модели/судьи:
 
 ```sh
-bun test test/node-evals.test.ts test/node-xml.test.ts test/node-evidence.test.ts test/node-sequence.test.ts test/node-runner.test.ts
+bun test test/node-evals.test.ts test/node-xml.test.ts test/node-evidence.test.ts test/node-sequence.test.ts test/node-runner.test.ts test/no-artifact-cleanup.test.ts
 ```
 
 Проверка каждого reference evidence (каталог `reference/<id>` из архива содержит events и artifact) использует тот же валидатор:
