@@ -21,6 +21,11 @@ Electron, существующие ZIP/XML-форматы Loginom и шабло�
 плана через TDD, с отдельными коммитами и отметками фактически выполненных задач.
 Доказательства и точки продолжения: [журнал реализации](../../testing/loginom-ai-agent/package-docs-implementation.md).
 
+Текущая правка по corrections уточняет только план. Уже поставленные отметки
+выполнения сохраняются по журналу; правка требований сама по себе не закрывает
+задачи реализации. Незавершённые изменения продукта и соседней сессии не менять,
+код, сборки, runtime-тесты и evals при этой правке не запускать.
+
 ## 1. Что должно получиться
 
 - «Построй сценарий…» — агент выбирает skill `loginom-automation`, получает браузерные
@@ -120,16 +125,25 @@ bundled skill; одноимённые config-команда или MCP prompt и
 `loginom-generated: scripts/package-docs.mjs`. В skill явно сослаться на Golos
 TTF/OFL; отдельного списка этих файлов в сборочных скриптах не создавать.
 
-Для каждого skill `digest` — sha256 отсортированных пар «путь, хеш» его файлов
-(64 hex). Функция возвращает проверенные записи по именам; изменение docs
-не меняет revision automation. Один алгоритм использовать в backend и runtime,
-через общий Node-совместимый helper либо проверяемые staging-данные, не создавать
-две независимые реализации. Это значение используют `Skill.Info.digest` и
+Для каждого skill `digest` — sha256 UTF-8 JSON-массива пар `[путь, sha256]`
+всех его файлов, включая `SKILL.md`, references, скрипты и assets. Путь относителен
+корню данного skill, разделитель `/`; пары сортируются по байтам UTF-8 пути,
+без зависимости от locale и порядка записей manifest. Результат — 64 hex.
+Функция возвращает проверенные записи по именам; изменение docs не меняет
+revision automation. Один алгоритм использовать в backend и runtime через
+общий Node-совместимый helper, не создавать две независимые реализации.
+Зафиксировать тест равенства digest для одного bundle в Bun/backend и
+поставляемом Node/runtime. Это значение используют `Skill.Info.digest` и
 runtime `skillRevision`. Проверку вызывают
 backend при регистрации и `package_docs_run` перед запуском скрипта.
 Существующий runtime `verifyResources` здесь не подходит: он требует, чтобы
 текущий процесс был bundled Node. Сам managed runtime уже проверяет все файлы
 manifest через `verifyResources`, повторять в нём эту реализацию не требуется.
+Classic/diagnostic entrypoints не считать проверенными только из-за существования
+этой функции: они явно получают тот же абсолютный resource root и проверяют
+локальный skill до prepare/diagnostics. Отсутствие корня или ошибка manifest
+даёт локальный отказ, без обращения к Skills API. Общий helper вычисляет revision;
+проверка файлов не должна расходиться с manifest-контрактом backend.
 
 При ошибке skill не регистрируется; диагностика: «встроенный skill повреждён,
 переустановите приложение». Сетевого fallback и поиска запасной копии нет.
@@ -250,6 +264,11 @@ Help всегда направляется в knowledge, даже при отк�
 operation_inspect` обслуживает только runtime чата. `tools` возвращает каталог
 по scope, не создавая браузер. Ошибка Help не блокирует обычный локальный чат,
 но запрещает выпуск отчёта, которому нужен подтверждённый справкой контекст.
+Отсутствие DISPLAY/графической сессии, недоступность веб-страницы Loginom и
+непроверенный браузер показываются отдельно; они не делают готовую справку
+недоступной и не являются условием разрешения локального документирования.
+Проверка Skills API исключается из diagnostics во всех режимах, а наличие
+локального skill проверяется независимо от успешности `/health`.
 
 Knowledge поддерживает `start/list/call/interrupt/close`, конкурентные запросы
 и отмену по request/run. `interrupt` одного run не отменяет другие чаты,
@@ -459,17 +478,26 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
   `package.save_checkpoint`. Удалить неподдерживаемые raw UI/clipboard/Playwright,
   `node.add/link.create` через action API, model `budget_ms`, устаревший обязательный
   Save As. Сохранить `sources.md`, Help/E2E URI и атрибуцию материалов.
-- [ ] Реализовать Node-only Product export и базовую общую проверку/per-skill
-  digest из 2.3 уже здесь: runtime ниже не должен ждать этапа 3. `stageResources`
+- [ ] Довести связку Node-only Product export, общей проверки/per-skill
+  digest из 2.3 и staging уже здесь: runtime ниже не должен ждать этапа 3.
+  Переиспользовать уже реализованные export/verifier/discovery, не создавать
+  второй вариант. `stageResources`
   копирует весь `packages/product/skills/` в `resources/loginom/skills/` **до**
   inventory manifest. Electron-builder уже включает `resources/loginom`;
   добавлять второй путь поставки не нужно. Генерируемый docs bundle добавится
   отдельным TDD-циклом этапа 2 до финальной инвентаризации.
+  Каталог Product включить в проверку пересечения input/output до любых
+  удалений и копирования. Малые fixtures ресурсов для discovery строить тем же
+  выделенным inventory-кодом staging, без копирования Node/Chromium.
 - [ ] Во всех режимах runtime — managed `user-v1`, classic и diagnostic,
   используемых приёмкой, — заменить `createSkillLoader(skillTransport(config))`
   на локальный `<resources>/skills/loginom-automation`. Файлы проходят
-  `verifyResources`; `skillRevision` — единый per-skill digest (64 hex),
-  `skillPath` — локальная директория. Сетевого чтения Skills API нет.
+  проверку по 2.3; managed дополнительно сохраняет штатный `verifyResources`.
+  Передать root из private managed startup и явно в classic/diagnostic config
+  и fixtures; не выводить его из server URI, session cache или параметров модели.
+  `skillRevision` — единый per-skill digest (64 hex), `skillPath` — локальная
+  директория, не путь к `SKILL.md` и не `skill-<revision>` в профиле сессии.
+  Сетевого чтения Skills API нет ни при первом prepare, ни при повторе/resume.
 - [ ] Managed prepare больше не повторяет статические инструкции, перенесённые
   в SKILL.md. Сохранить `compactKnowledgeBundle`, `input_artifacts`, identities,
   readiness и динамические descriptions. Закреплённый action catalog загружается
@@ -483,37 +511,52 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
 - [ ] Отключить новые публикации из этого repo: удалить старую копию и
   `services/loginom-ai/deploy/loginom-dock/publish-skill.py` либо оставить скрипт,
   который только отказывает с объяснением. Общий серверный Skills API сохранить.
-  Обновить `tools/loginom-acceptance/audit.py`, `replacement_session_evidence.py`
-  (старый путь `skill-<revision>/SKILL.md`), `docs/migration/source-map.json`
+  Обновить `packages/loginom-runtime/tools/loginom-acceptance/audit.py` и
+  `packages/loginom-runtime/tools/loginom-acceptance/replacement_session_evidence.py`
+  (старый путь `skill-<revision>/SKILL.md`), их адресные тесты,
+  `docs/migration/source-map.json` и `docs/migration/source-transforms.json`
   и `services/loginom-ai/docs/loginom-dock/`. `verify-source-search.py`
   проверяет источник справки `ai-skills`, его не менять. Существующую запись
   на сервере пока не удалять: для этого отдельный этап 9.
-- [ ] На промежуточном dev-этапе добавить в `.loginom-ai-agent/loginom-ai-agent.jsonc`
-  `"skills": { "paths": ["packages/product/skills"] }`. Путь разрешается от
-  каталога сессии, поэтому мост работает при открытом корне repo. Это временное
-  обнаружение исходников, не доверенный bundled grant; удалить мост на этапе 3,
-  когда включаются manifest-only discovery и запрет зарезервированных имён
-  из других источников. Дедупликация — по realpath.
+  В source-map сохранить исходные SHA/объекты/атрибуцию Dock; преобразования
+  записать отдельно. Исходные несоответствия из baseline не скрывать массовой
+  заменой хэшей. Исторические отчёты дополнять актуальным checkpoint.
+- [ ] Проверить необходимость временного dev-моста из PR #29:
+  `"skills": { "paths": ["packages/product/skills"] }` в
+  `.loginom-ai-agent/loginom-ai-agent.jsonc`. Он разрешает путь от каталога
+  сессии и допустим только до включения reserved/manifest-only discovery,
+  без доверенной активации профилей. В текущем состоянии эта защита уже
+  реализована: внешние reserved skills игнорируются, поэтому такой мост
+  не устанавливать и исключение для него не вводить. Dev-запуск направить
+  на проверенный staged root через `LOGINOM_AI_AGENT_RESOURCES` (2.1);
+  если мост сохранился в другом переходном состоянии, удалить в этапе 3.
+  Проверку realpath-дедупликации сохранить для обычных `skills.paths`.
 - [ ] Статический тест разместить в `packages/agent/test/skill/bundled-skills.test.ts`:
   он использует настоящий `ConfigMarkdown.parse` и не создаёт цикл Product → Core.
   Проверить допустимые поля frontmatter (`name`, `description`, `license`,
   `allowed-tools`, `metadata`, `compatibility`), имя до 64 символов: строчные
   буквы/цифры/дефисы, без крайних/двойных дефисов, совпадает с каталогом.
   Description непустой и до 1024, compatibility до 500 символов.
+  `metadata` — строковые ключи и значения; generated exception действует
+  только для явно объявленных файлов и только до staging. После сборки каждый
+  такой файл обязателен, присутствует в manifest и участвует в digest.
   Проверить ссылки в SKILL.md/references, исключив только объявленные generated
   файлы до сборки, и совпадение каталогов с зарезервированными именами Product.
   Ошибки объясняют исправление. `skills-ref validate` не делать зависимостью CI;
   допустима разовая сверка версии по SHA с записью результата.
 - [ ] Runtime-тесты: локальный источник во всех режимах, отсутствие обращений
-  к `/api/v1/skills`, missing/tampered skill → локальная ошибка prepare,
-  diagnostics без удалённого manifest. Использовать настоящие bundle/внутренние
+  к `/api/v1/skills` (заглушка транспорта падает при любом таком запросе),
+  отсутствующий/относительный root, missing/tampered/unlisted skill → локальная
+  ошибка prepare без fallback; одинаковый digest в Bun и Node.
+  Diagnostics проверяет локальный skill и при недоступном Dock, не запрашивает
+  удалённый manifest. Использовать настоящие bundle/внутренние
   модули и заглушки только внешних MCP/browser границ; перенести fixtures
-  `client/test/support/{bridge-contract,package-cleanup-bridge}.mjs`.
+  `packages/loginom-runtime/client/test/support/{bridge-contract,package-cleanup-bridge}.mjs`.
   Покрыть `skill`, `bridge`, `diagnostics`, `workspace`, `user-results`,
   `managed-resources-links`, `resources` и staging.
 
 **Готово, когда:** по одной записи `loginom-automation` и `package-docs`, команды
-`/loginom-automation` и `/package-docs` обнаруживаются через временный dev-мост,
+`/loginom-automation` и `/package-docs` обнаруживаются из проверенного staged root,
 staging доставляет ресурсы, runtime не обращается к Skills API, статический
 тест проходит. Нет `loginom-scenario`, `/loginom` или alias `/package_docs`.
 Полная доверенная активация профилей появляется в этапах 3 и 5.
@@ -601,7 +644,9 @@ type PackageDocsRun =
   и коллизии config/MCP-команд; предупреждение видно пользователю.
   Одинаковое правило действует для skill, slash и `run --command`.
   Одноимённая локальная копия не заменяет встроенную даже как `default`.
-- [ ] Удалить временный `skills.paths` мост. Для dev использовать staged root.
+- [ ] Удалить временный `skills.paths` мост, если он был нужен в переходном
+  состоянии этапа 1; в текущем состоянии новый мост не добавлять. Для dev
+  использовать staged root, без обхода reserved policy.
   Новый skill — новая папка в Product и зелёный статический тест; список
   зарезервированных имён обновляется согласованно, staging/manifest и обязательные
   ресурсы выводятся из каталога и метаданных, не отдельного списка копирования.
@@ -674,6 +719,8 @@ CLI его не использует, отдельная V2-регистраци
   впервые настроить Help можно при недоступном Loginom, browser login failure
   предупреждает, локальный startup завершается без сетевого ожидания; lazy
   CLI ошибки сохраняют коды и не превращают обычный ответ в ошибку.
+  Проверить Help/diagnostics без DISPLAY и с недоступной веб-страницей: browser
+  status остаётся отдельным результатом, справочные запросы не блокируются.
 
 **Готово, когда:** отчёт работает при доступном Help и недоступном веб-сервере,
 включая первую настройку; каталог и диагностика доступны без готового браузера.
@@ -813,6 +860,10 @@ Scripted `oracle-provider.ts` оставить для механики; не в�
 из соседней сессии. До неё продолжать независимую разработку продукта и локальные
 тесты. Baseline CLI уже сохранён на этапе 0; candidate собрать и сохранить
 после изменений продукта. Оба живых прогона выполнить только после этой зависимости.
+Фраза corrections «доработки harness до baseline» относится к **живому прогону**,
+а не к сохранению исходной сборки: baseline CLI сохраняется до изменений продукта.
+Изменения harness выполнять только после отдельного согласования владения;
+этот план не разрешает правку файлов `calibration-near-miss`.
 
 Harness первоначально исследовался на `91984c36d`, к ревью дошёл до
 `f4fe42248`; обе отметки исторические, не pin приёмки. Перед запуском уточнить
@@ -877,13 +928,20 @@ Core имеет разметку осей, но без CSV oracle. По доку
   иметь одинаковый хэш. Секреты в manifest не включать.
 - [ ] Выделить собственные `EVAL_RESULTS_DIR`, `EVAL_PROFILE_DIR`,
   `EVAL_WORKSPACE_ROOT` и каталоги артефактов вне обоих соседних worktree.
-  Baseline/candidate получают отдельные profiles/workspaces и run directories
-  внутри нашего results root. Не копировать и не менять чужие `.env`, результаты,
+  Baseline/candidate получают отдельные results roots, profiles/workspaces и
+  каталоги артефактов. Для штатного compare подготовить отдельный каталог
+  с неизменёнными копиями двух `summary.json` под их фактическими run IDs;
+  проверить совпадение хэшей с оригиналами, исходные результаты сохранить.
+  Не копировать и не менять чужие `.env`, результаты,
   профили, launcher или lock-файлы. Сначала запустить сохранённый baseline,
   затем candidate на тех же закреплённых условиях.
 - [ ] Зафиксировать отдельный снимок suite и входных файлов с checksum manifest.
-  Текущее содержимое внешнего каталога может включать незакоммиченные кейсы;
-  не считать его неизменным только по Git SHA. Список кейсов должен совпадать
+  Для `agent-validation` выбрать принятый полный SHA и извлечь suite через
+  `git archive` в наш каталог; текущее рабочее дерево источника не копировать
+  целиком, оно может содержать незавершённые кейсы. Если требуется кейс вне
+  выбранного commit, сначала принять отдельный снимок с владельцем данных.
+  Проверить фактические хэши всех извлечённых файлов, не полагаться только на
+  Git SHA. Список кейсов должен совпадать
   между baseline и candidate. Не менять задачи, эталоны или judge после
   получения результатов кандидата ради прохождения проверки.
 - [ ] Перед каждым прогоном и перед compare проверить неизменность manifest
@@ -1062,6 +1120,9 @@ Core имеет разметку осей, но без CSV oracle. По доку
 
 Команды ниже запускаются из указанного каталога. Новые тестовые файлы появляются
 на соответствующих этапах; это команды будущей реализации, не результаты аудита.
+Уже выполненный baseline не пересобирать ради этой правки: его комплект и
+фактические команды сохранены в журнале. Примеры baseline ниже нужны для
+проверки воспроизводимости и не заменяют сохранённый исходный бинарник.
 
 ```bash
 # packages/agent
@@ -1078,6 +1139,7 @@ bun typecheck
 
 # packages/loginom-host
 # LOGINOM_AI_AGENT_TEST_NODE задаётся абсолютным путём к закреплённому Node.
+bun test test/bundled-skills.test.ts
 bun test test/package-docs.test.ts test/knowledge.test.ts test/stage-resources.test.ts
 bun test test/host-port.test.ts test/host.test.ts test/parallel-calls.test.ts
 bun test test/cli-manifest.test.ts test/cli-install.test.ts test/node-host.test.ts test/process.test.ts test/transport.test.ts test/inputs.test.ts test/recovery.test.ts
@@ -1215,8 +1277,9 @@ LOGINOM_AI_AGENT_CLI_PROFILE=/absolute/test/profile \
 ```bash
 set -euo pipefail
 
-# Заменить оба значения до запуска; каталог ещё не должен существовать.
+# Выбрать оба принятых SHA заново; каталог ещё не должен существовать.
 skill_eval_harness_sha='<FULL_ACCEPTED_POST_CALIBRATION_SHA>'
+skill_eval_tasks_sha='<FULL_ACCEPTED_AGENT_VALIDATION_SHA>'
 skill_eval_root=/absolute/new-skills-acceptance
 mkdir -m 700 "$skill_eval_root"
 skill_eval_harness="$skill_eval_root/harness"
@@ -1231,11 +1294,13 @@ cd "$skill_eval_harness/evals"
 
 mkdir -p "$skill_eval_root/artifacts/base" "$skill_eval_root/artifacts/candidate"
 cp -a "$skill_eval_harness/evals/tasks" "$skill_eval_root/core"
-cp -a /home/kiselev/git/agent-validation/sources/analytic-evals "$skill_eval_root/analytic"
+mkdir -p "$skill_eval_root/task-snapshot"
+git -C /home/kiselev/git/agent-validation archive "$skill_eval_tasks_sha" \
+  sources/analytic-evals | tar -x -C "$skill_eval_root/task-snapshot"
+skill_eval_analytic="$skill_eval_root/task-snapshot/sources/analytic-evals"
 
 # Перед продолжением записать snapshot/conditions manifest и проверить стенд/лимиты.
-# Results root общий только для нашей пары; каждый run имеет собственный каталог.
-export EVAL_RESULTS_DIR="$skill_eval_root/results"
+# Каждая сторона получает собственные results/profile/workspace/artifacts.
 export EVAL_AGENT_MODEL=openai/gpt-6-sol
 export EVAL_AGENT_VARIANT=default
 export JUDGE_MODEL=gpt-6-astra
@@ -1261,23 +1326,43 @@ export EVAL_AGENT_PROVIDER_ID=''
 
 EVAL_CLI_MODE=binary \
 EVAL_CLI_BIN=/absolute/baseline-payload/bin/loginom-ai-agent-cli \
+EVAL_RESULTS_DIR="$skill_eval_root/results/base" \
 EVAL_PROFILE_DIR="$skill_eval_root/profiles/base" \
 EVAL_WORKSPACE_ROOT="$skill_eval_root/work/base" \
-bun run src/run.ts --tasks "$skill_eval_root/analytic" --repeat 3 --label skills-base
+bun run src/run.ts --tasks "$skill_eval_analytic" --repeat 3 --label skills-base
 
 EVAL_CLI_MODE=binary \
 EVAL_CLI_BIN=/absolute/candidate-payload/bin/loginom-ai-agent-cli \
+EVAL_RESULTS_DIR="$skill_eval_root/results/candidate" \
 EVAL_PROFILE_DIR="$skill_eval_root/profiles/candidate" \
 EVAL_WORKSPACE_ROOT="$skill_eval_root/work/candidate" \
-bun run src/run.ts --tasks "$skill_eval_root/analytic" --repeat 3 --label skills-candidate
+bun run src/run.ts --tasks "$skill_eval_analytic" --repeat 3 --label skills-candidate
 
-bun run src/compare.ts BASE_RUN_ID CANDIDATE_RUN_ID --margin 0.5 --confidence 0.95 --k 3
+# После проверки неизменности условий: фактические run IDs из этих двух запусков.
+skill_eval_base_run_id='<BASE_RUN_ID_FROM_RUN_OUTPUT>'
+skill_eval_candidate_run_id='<CANDIDATE_RUN_ID_FROM_RUN_OUTPUT>'
+mkdir -p "$skill_eval_root/compare/$skill_eval_base_run_id" \
+  "$skill_eval_root/compare/$skill_eval_candidate_run_id"
+cp "$skill_eval_root/results/base/$skill_eval_base_run_id/summary.json" \
+  "$skill_eval_root/compare/$skill_eval_base_run_id/summary.json"
+cp "$skill_eval_root/results/candidate/$skill_eval_candidate_run_id/summary.json" \
+  "$skill_eval_root/compare/$skill_eval_candidate_run_id/summary.json"
+cmp "$skill_eval_root/results/base/$skill_eval_base_run_id/summary.json" \
+  "$skill_eval_root/compare/$skill_eval_base_run_id/summary.json"
+cmp "$skill_eval_root/results/candidate/$skill_eval_candidate_run_id/summary.json" \
+  "$skill_eval_root/compare/$skill_eval_candidate_run_id/summary.json"
+EVAL_RESULTS_DIR="$skill_eval_root/compare" \
+bun run src/compare.ts "$skill_eval_base_run_id" "$skill_eval_candidate_run_id" \
+  --margin 0.5 --confidence 0.95 --k 3
 ```
 
 В `artifacts/base` и `artifacts/candidate` хранить соответствующие manifests,
 checksums, ссылки на сохранённые полные CLI и результаты дополнительных
 адаптеров. Артефакты попыток harness остаются внутри собственных run directories
-в `EVAL_RESULTS_DIR`. Эти каталоги не совпадают с output калибровки, её profiles
+соответствующего `EVAL_RESULTS_DIR`; compare читает только копии summary и
+пишет отчёт в наш каталог `compare`. Перед запуском сверить этот контракт
+compare на принятом SHA, не изменяя harness ради расположения каталогов.
+Эти каталоги не совпадают с output калибровки, её profiles
 и workspace. Не устанавливать CLI для evals поверх текущего launcher; абсолютный
 `EVAL_CLI_BIN` должен указывать на сохранённый payload каждой стороны.
 
@@ -1340,6 +1425,10 @@ labels. Core прогнать отдельно через `--tasks "$skill_eval_
    Help и исполнение. TDD и локальные проверки Desktop/CLI/runtime продолжаются;
    совместно изменяемые продуктовые файлы распределять между исполнителями.
    Harness, near-miss корпус и judge prompt остаются у соседней сессии.
+   Контрольная точка перед этапом 5: готовы Node executor (2), trusted bundled
+   discovery/resource root (3) и раздельный Help/browser lifecycle (4).
+   До этой связки тестировать компоненты через их реальные публичные интерфейсы;
+   не включать `package_docs_run` в общую registry ради промежуточного запуска.
 3. **После изменений продукта:** сохранить полный candidate CLI отдельно от
    baseline. Этап 6 проверяет выбор skill/документы, локальные и установочные
    проверки этапа 8 идут независимо от калибровки. Для любых живых проверок на
@@ -1353,6 +1442,9 @@ labels. Core прогнать отдельно через `--tasks "$skill_eval_
    Linux Desktop/CLI результаты. При изменении условий старая пара несопоставима;
    повторить обе стороны после новой фиксации. Ожидание калибровки/стенда оставляет
    открытой живую приёмку, но не отменяет завершённую разработку и локальные тесты.
+   Если этап 6 или 8 потребовал правки кода/skill, собрать новый candidate,
+   записать новые хэши и повторить затронутые проверки. Уже завершённая A/B пара
+   относится только к прежнему candidate и не принимает другую сборку автоматически.
 6. **После выпуска:** этап 9 остаётся отдельным действием. Серверную запись
    не удалять до принятой A/B пары, проверки поддерживаемых клиентов и явного
    подтверждения пользователя. Не путать готовность продукта с выполнением
@@ -1362,6 +1454,30 @@ labels. Core прогнать отдельно через `--tasks "$skill_eval_
 review и отдельный conventional commit. В progress-разделе этого файла фиксировать
 выполненные пункты, фактические SHA и ограничения, чтобы продолжение не зависело
 от истории чата. Сборка кандидата не означает публикацию релиза.
+
+### Сверка с документом corrections
+
+Эта таблица показывает, где реализуется каждое решение ревью. Она не является
+отчётом о прохождении тестов: завершение подтверждается журналом и отдельными
+отметками этапов.
+
+| Решение corrections | Место в плане | Проверка при реализации |
+| --- | --- | --- |
+| Один локальный `loginom-automation`, без нового scenario skill и alias | 2.2; этап 1 | Два каталога/имени Product, статический каталог, runtime без Skills API |
+| Один абсолютный resource root, Product Node-only export | 2.1–2.3; этапы 1, 3 | Discovery вне checkout через RuntimeFlags; env Desktop/run/TUI; browser entrypoint не импортирует Node |
+| Reserved policy, порядок источников и realpath | 2.2; этапы 1, 3 | Внешние skills/config/MCP-команды игнорируются с диагностикой; обычный поздний source побеждает |
+| Ссылки, generated bundle, шрифты/OFL, единый digest | 2.3; этапы 1–3 | Полный manifest, missing/tampered/unlisted/escape отказы; равный per-skill digest в Bun и Node |
+| Эффективный workflow после rebase, динамические данные prepare | Этапы 0, 1 | CrossTable/node lifecycle/checkpoint в локальных references; prepare не дублирует инструкции |
+| Default/docs/automation и доверенная история активации | 2.4–2.5; этап 5 | Переходы, snapshot хода, pending отказ, slash/restart/compaction/replay/fork/revert; Host отказывает до побочных действий |
+| Help без браузера, отдельные validation/save/status | 2.6; этап 4 | Нет Chromium/пароля в knowledge; Help при недоступном Loginom; конкуренция, отмена и поколения |
+| `.lgp` путём в Desktop/run/TUI; admission только для построения | Этапы 2, 5 | MIME/file parts, доверенный исходный message ID, `.lgp` + PNG без admission/runtime, ранний CSV загружается один раз |
+| Node executor и итог в каталоге сессии | Этап 2 | Паритет структуры/скелета/PDF/DOCX, permissions/plan, placeholders, коллизии, timeout/cancel, неизменный вход |
+| Естественная активация, Help и разговор как отрицательные случаи | Этап 6 | Реальная модель: 20 запросов × 3 на Desktop/run; TUI smoke; документы и факты, tool calls/processes |
+| Сохранённый baseline, неизменный harness и судья | Этапы 0, 7; команды раздела 4 | Два полных CLI; заново принятый SHA; manifest условий, одинаковый snapshot; собственные results/profile/workspace |
+| Границы с калибровкой, отдельные структурный/replay адаптеры | Владение; этап 7; контрольные точки | Общие файлы не редактируются параллельно; harness-доработки приняты отдельно до живой пары |
+| Linux DEB/AppImage и установленный CLI/run/TUI | Этапы 3, 8 | Static integrity обоих Desktop артефактов, native AppImage smoke, `/proc`, oracle activation, sandbox/profile/update/cleanup |
+| Снятие серверной записи после выпуска | Этап 9 | Совместимость клиентов и baseline приняты; отдельное явное разрешение; Skills API и справка сохраняются |
+| Постоянные правила и TDD по одному поведению | TDD; этапы 1, 4, 8 | Owning AGENTS/runbooks/progress; для каждого изменения записаны ожидаемый RED и фактический GREEN |
 
 ## 6. Состояние плана
 
@@ -1386,3 +1502,14 @@ review и отдельный conventional commit. В progress-разделе э�
 - Реализация, сборки, runtime-тесты и live evals в рамках обновления плана
   не выполнялись. Проверки плана и чтение/хеширование fixtures не являются
   приёмкой продукта. Windows/macOS в текущую итерацию не входят.
+- 2026-10-06: повторно сверены все разделы corrections с актуальным планом и
+  наблюдаемыми файлами. Уточнены проверка локального skill в classic/diagnostic,
+  единый формат digest, невозможность dev-моста после reserved policy,
+  полные пути acceptance-скриптов и атрибуция source transforms. Приёмка получает
+  отдельные results roots и снимок задач из принятого commit; штатный compare
+  читает неизменённые копии summary. Добавлены зависимости компонентов,
+  повторная проверка изменённого candidate и таблица покрытия corrections.
+  В этой правке реализации и запусков продукта нет; прежние отметки сохранены.
+  Проверки документа: последовательность 10 этапов и прежние completed-пункты,
+  восемь ссылок, синтаксис шести bash-блоков через `bash -n`, `git diff --check`.
+  Незавершённые файлы runtime остались с прежними SHA-256.
