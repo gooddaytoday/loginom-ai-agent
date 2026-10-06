@@ -5,7 +5,7 @@ import { EvalFailure } from "./fail"
 import { evaluationContractHash, rubricSnapshot } from "./evaluation"
 import { agentInputsHash, buildAgentPrompt, loadTasks, rubricHash, taskTimeoutMs, type Task } from "./task"
 import { agentCommand, runAgent, type AgentCommand } from "./cli"
-import { cleanupArtifact, cleanupOrphanResult, fetchArtifact, listStorage, parseArtifactSource, type ArtifactSource } from "./artifact"
+import { cleanupArtifact, cleanupOrphanResult, fetchArtifact, listStorage, parseArtifactSource, storageEntryExists, type ArtifactSource } from "./artifact"
 import { preflight } from "./preflight"
 import { assertAuth, ensureProfile, managementRuntimeDirectories, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
 import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
@@ -227,7 +227,8 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const packagePath = `/${config.loginom.username}/${name}.lgp`
   const prompt = buildAgentPrompt(task.prompt, packagePath, `${name}.result.csv`)
   await Bun.write(path.join(outDir, "prompt.txt"), prompt)
-  const storageBefore = config.dryRun ? [] : await listStorage(input.source).then(entries => entries.map(entry => entry.name), () => null)
+  const storageBefore = config.dryRun ? [] : await storageEntryExists(input.source, `${name}.result.csv`)
+    .then(exists => exists ? [`${name}.result.csv`] : [], () => null)
   const since = Date.now()
   const run = await runAgent({
     command: input.command,
