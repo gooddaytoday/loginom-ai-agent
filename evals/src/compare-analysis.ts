@@ -213,18 +213,11 @@ export function parseComparisonSummary(value: unknown): RunSummary {
     metrics(object(task.metrics),true)
     if (!Array.isArray(task.attempts)) invalid()
     for (const raw of task.attempts as unknown[]) {
-      const attempt = object(raw)
-      text(attempt.task_id)
-      numeric(attempt.attempt,1,Infinity,true)
-      text(attempt.status)
-      for (const key of ["score","structural_score"]) if (attempt[key] != null) numeric(attempt[key],0,100)
-      for (const key of ["pass","oracle_pass"]) if (attempt[key] != null) boolean(attempt[key])
-      optionalText(attempt.evaluation_contract_hash)
-      if (typeof attempt.judge_status !== "string" || !["scored","no_artifact","skipped","error"].includes(attempt.judge_status)) invalid()
-      numeric(attempt.duration_ms,0,Infinity)
-      numeric(attempt.cost,0,Infinity)
-      numbers(object(attempt.tokens),["input","output","reasoning"],0,Infinity)
-      numbers(object(attempt.counters),["toolCalls","loginomToolCalls","toolErrors","memoryToolCalls"],0,Infinity)
+      const attempt = requireAttempt(raw)
+      if (attempt.infra_retry !== undefined) {
+        const initial = requireAttempt(object(attempt.infra_retry).initial)
+        if (initial.status !== "infra_error" || initial.task_id !== attempt.task_id || initial.attempt !== attempt.attempt || initial.infra_retry !== undefined) invalid()
+      }
     }
     if (task.rubric_snapshot !== undefined) {
       const snapshot = object(task.rubric_snapshot)
@@ -246,6 +239,21 @@ export function parseComparisonSummary(value: unknown): RunSummary {
   const parsed = value as RunSummary // Все используемые поля проверены; исторические необязательные поля допускаются.
   requireSummary(parsed)
   return parsed
+}
+function requireAttempt(value: unknown) {
+  const attempt = object(value)
+  text(attempt.task_id)
+  numeric(attempt.attempt,1,Infinity,true)
+  text(attempt.status)
+  for (const key of ["score","structural_score"]) if (attempt[key] != null) numeric(attempt[key],0,100)
+  for (const key of ["pass","oracle_pass"]) if (attempt[key] != null) boolean(attempt[key])
+  optionalText(attempt.evaluation_contract_hash)
+  if (typeof attempt.judge_status !== "string" || !["scored","no_artifact","skipped","error"].includes(attempt.judge_status)) invalid()
+  numeric(attempt.duration_ms,0,Infinity)
+  numeric(attempt.cost,0,Infinity)
+  numbers(object(attempt.tokens),["input","output","reasoning"],0,Infinity)
+  numbers(object(attempt.counters),["toolCalls","loginomToolCalls","toolErrors","memoryToolCalls"],0,Infinity)
+  return attempt
 }
 function invalid(): never { throw new EvalFailure("Некорректный summary: форма данных",2) }
 function object(value: unknown): Record<string,unknown> {

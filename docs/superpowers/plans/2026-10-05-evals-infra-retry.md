@@ -79,7 +79,7 @@ Quality-счётчики учитывают только итог, infra_error/c
 
 - [x] RED → GREEN: настоящий SIGINT во время архива сохраняет корневой result.json;
   копировать результат вместо переноса, остальные файлы переносить как прежде.
-- [ ] RED → GREEN: malformed infra_retry.initial даёт compare exit 2;
+- [x] RED → GREEN: malformed infra_retry.initial даёт compare exit 2;
   переиспользовать проверку полей попытки для initial, сохранить legacy summary.
 - [ ] Проверить профильные тесты, полный bun test, bun typecheck и git diff --check;
   записать фактический результат в checkpoint и remaining-work.
