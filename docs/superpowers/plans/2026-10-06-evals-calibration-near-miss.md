@@ -39,6 +39,12 @@ Do not weaken rubrics, expected failures or thresholds. Semantic misses are not 
   At 2026-10-06 07:43 UTC: all 70 controls completed; positive 35x100,
   positive oracle independently rechecked 35/35 true; foreign 0..33 (variant-conversion=33),
   all <=40, zero judge errors. Full run is now evaluating 113 near-misses.
+  First semantic miss: first-last-touch/filter. Judge fails result-rows but passes
+  two-aggregates, relying on absence of None in CSV despite the XML excluding Email.
+  Expected failures remain two-aggregates + result-rows. Finish this full run and
+  retain its failed report; then strengthen only the general rule for checking
+  every clause and XML selection/exclusion settings, and rerun all 183 rows.
+  Do not modify the prompt while the current run is active or retry this unchanged judgment.
 - Intermediate full tests: 319 pass, 0 fail, 1431 assertions, 21 files, 362.08s; typecheck exit 0.
   Final checks after c1e606017: 321 pass, 0 fail, 1433 assertions, 21 files, 358.15s;
   typecheck and git diff --check exit 0. Logs: /tmp/calibration-c1e606-full-tests.log
