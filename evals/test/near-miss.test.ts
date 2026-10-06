@@ -127,3 +127,17 @@ test("calibration rejects a result path escaping its corpus", async () => {
     await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toMatchObject({ exitCode: 2 })
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("versioned sort corpus creates a matching ZIP and unpacked mutation", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-corpus-zip-"))
+  try {
+    const tasks = await loadTasks(path.join(evalsRoot, "fixtures/calibration"), ["sales-by-category"])
+    const result = await prepareCalibrationCases(tasks, root, path.join(evalsRoot, "calibration"))
+    const entry = result.prepared.find((item) => item.mutation.kind === "sort")
+    expect(entry).toBeDefined()
+    const archive = Bun.spawn(["unzip", "-p", path.join(entry!.artifactDir, "package.lgp"), "Unit_0/Unit.xml"], { stdout: "pipe" })
+    expect(await new Response(archive.stdout).text()).toBe(await Bun.file(path.join(entry!.artifactDir, "unpacked/Unit_0/Unit.xml")).text())
+    expect(await archive.exited).toBe(0)
+    expect(entry!.oracle.passed).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
