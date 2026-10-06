@@ -199,3 +199,24 @@ test("calculator threshold mutation recomputes downstream class totals", async (
     expect(entry!.oracle.passed).toBe(false)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("filter near-miss is rejected by checklist even when its CSV remains correct", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-filter-boundary-"))
+  try {
+    const tasks = await loadTasks(path.join(evalsRoot, "fixtures/calibration"), ["low-liquidity-companies"])
+    const prepared = await prepareCalibrationCases(tasks, root, path.join(evalsRoot, "calibration"))
+    const entry = prepared.prepared.find((item) => item.mutation.kind === "filter")
+    expect(entry).toBeDefined()
+    expect(entry!.oracle.passed).toBe(true)
+    expect(entry!.mutation.expected_failed).toEqual(["filter-ratio"])
+    const answers = path.join(root, "answers.json")
+    await Bun.write(answers, JSON.stringify({ sort: ["sort-ratio-id", "result-rows"], column: ["export-columns", "result-rows"] }))
+    const config = loadConfig(["--calibrate", "--tasks", path.join(evalsRoot, "fixtures/calibration"), "--only", "low-liquidity-companies"], {
+      JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: "bun " + path.join(evalsRoot, "fixtures/fake-codex.ts") + " --failed-by-case " + answers, EVAL_RESULTS_DIR: path.join(root, "results"),
+    })
+    const result = await calibrate(config)
+    expect(result.code).toBe(1)
+    const report = await Bun.file(path.join(result.runDir, "calibration.json")).json()
+    expect(report.rows.find((row: { case_id: string }) => row.case_id === "filter")).toMatchObject({ oracle_pass: true, expectations_met: false })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
