@@ -36,6 +36,9 @@ Do not weaken rubrics, expected failures or thresholds. Semantic misses are not 
   Session 68631, log /tmp/calibration-live-final.log. Original prompt remains fixed
   (SHA256 1aa36ad41f999d999526edd387b014f2b232d27617fba2d9503787b8fbbf287c).
   Do not edit the prompt while a full run is active.
+  At 2026-10-06 07:43 UTC: all 70 controls completed; positive 35x100,
+  positive oracle independently rechecked 35/35 true; foreign 0..33 (variant-conversion=33),
+  all <=40, zero judge errors. Full run is now evaluating 113 near-misses.
 - Intermediate full tests: 319 pass, 0 fail, 1431 assertions, 21 files, 362.08s; typecheck exit 0.
   Final checks after c1e606017: 321 pass, 0 fail, 1433 assertions, 21 files, 358.15s;
   typecheck and git diff --check exit 0. Logs: /tmp/calibration-c1e606-full-tests.log
