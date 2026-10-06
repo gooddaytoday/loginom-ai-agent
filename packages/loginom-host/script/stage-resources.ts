@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
-import { cp, mkdir, readdir, readFile, readlink, realpath, rename, rm, stat } from "node:fs/promises"
+import { cp, mkdir, readFile, realpath, rename, rm, stat } from "node:fs/promises"
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { $ } from "bun"
 import { nativeResourceCandidates } from "./native-resource-candidates"
@@ -9,6 +9,7 @@ import { buildKeychain } from "./build-keychain"
 import release from "../../product/loginom-release.json"
 import catalogs from "../../product/loginom-catalogs.json"
 import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
+import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 
 export function actionCatalogForPlatform(platform: string) {
   const target =
@@ -96,6 +97,7 @@ export async function stageResources(input: {
   }
   await rm(staging, { recursive: true, force: true })
   await mkdir(join(staging, "bin"), { recursive: true })
+  await cp(productSkillsDirectory, join(staging, "skills"), { recursive: true, verbatimSymlinks: true })
   await cp(node, join(staging, pins.node))
   await cp(browsers, join(staging, "browsers"), {
     recursive: true,
@@ -173,35 +175,7 @@ export async function stageResources(input: {
   The active Dock JavaScript sources are included in runtime/.
   `,
   )
-  // Windows package isolation can expose a path through a virtualized alias.
-  // Compare canonical paths on both sides so a legitimate staged file does
-  // not look like an escape while real symlinks/junctions still fail closed.
-  const canonicalStaging = await realpath(staging)
-  const files: Array<{ path: string; sha256: string; link?: string; directory?: boolean }> = []
-  async function collect(directory: string): Promise<void> {
-    const entries = await readdir(directory, { withFileTypes: true })
-    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-      const path = join(directory, entry.name)
-      if (entry.isDirectory()) {
-        await collect(path)
-        continue
-      }
-      const link = entry.isSymbolicLink() ? await readlink(path) : undefined
-      const targetPath = relative(canonicalStaging, await realpath(path))
-      if (targetPath === ".." || targetPath.startsWith(".." + sep) || isAbsolute(targetPath))
-        throw Error("LOGINOM_BUILD_RESOURCE_ESCAPE")
-      const directoryLink = link !== undefined && (await stat(path)).isDirectory()
-      files.push({
-        path: relative(staging, path).split(sep).join("/"),
-        sha256: createHash("sha256")
-          .update(directoryLink ? link! : await readFile(path))
-          .digest("hex"),
-        ...(link !== undefined ? { link } : {}),
-        ...(directoryLink ? { directory: true } : {}),
-      })
-    }
-  }
-  await buildPhase(`${input.flavor}-resource-inventory`, () => collect(staging))
+  const files = await buildPhase(`${input.flavor}-resource-inventory`, () => resourceInventory(staging))
   await Bun.write(
     join(staging, "resource-manifest.json"),
     JSON.stringify(

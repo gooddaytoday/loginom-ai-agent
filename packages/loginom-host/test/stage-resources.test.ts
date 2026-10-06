@@ -5,6 +5,7 @@ import { join, resolve } from "node:path"
 import { actionCatalogForPlatform, catalogForTarget, setLinuxSandboxMode, stageResources } from "../script/stage-resources"
 import release from "../../product/loginom-release.json"
 import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
+import { verifyBundledSkills } from "../src/bundled-skills"
 
 test("resource staging selects the signed action catalog for the target platform", () => {
   expect(actionCatalogForPlatform("linux")).toEqual({
@@ -115,3 +116,34 @@ test.skipIf(process.platform !== "linux")("linux sandbox mode keeps the setuid b
     await rm(root, { recursive: true, force: true })
   }
 })
+
+// Full staging uses the same pinned Node distribution and Chromium as release builds.
+// Release/acceptance runners provide these paths; the small boundary tests above do not need them.
+test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_AGENT_TEST_BROWSERS)(
+  "full resource staging delivers the canonical product skills before inventory",
+  async () => {
+    const node = process.env.LOGINOM_AI_AGENT_TEST_NODE!
+    const browsers = process.env.LOGINOM_AI_AGENT_TEST_BROWSERS!
+    const root = await mkdtemp(join(tmpdir(), "loginom-stage-product-skills-"))
+    try {
+      const destination = join(root, "resources")
+      await stageResources({ destination, node, browsers, target, flavor: "cli" })
+      const skills = await verifyBundledSkills(destination)
+      expect(skills.map((skill) => skill.name).toSorted()).toEqual(["loginom-automation", "package-docs"])
+      const manifest = await Bun.file(join(destination, "resource-manifest.json")).json()
+      for (const path of [
+        "loginom-automation/SKILL.md",
+        "loginom-automation/references/workflow.md",
+        "package-docs/SKILL.md",
+        "package-docs/assets/fonts/OFL.txt",
+      ]) {
+        expect(await readFile(join(destination, "skills", path)))
+          .toEqual(await readFile(join(productSkillsDirectory, path)))
+        expect(manifest.files.some((file: { path: string }) => file.path === "skills/" + path)).toBe(true)
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  },
+  300000,
+)

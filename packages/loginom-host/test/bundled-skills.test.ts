@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test"
-import { createHash } from "node:crypto"
 import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join } from "node:path"
 import { verifyBundledSkills } from "../src/bundled-skills"
+import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 
 async function fixture(files: Record<string, string>) {
   const root = await mkdtemp(join(tmpdir(), "loginom-skill-integrity-"))
@@ -12,10 +12,7 @@ async function fixture(files: Record<string, string>) {
     join(root, "resource-manifest.json"),
     JSON.stringify({
       protocol: 1,
-      files: Object.entries(files).map(([path, content]) => ({
-        path: "skills/" + path,
-        sha256: createHash("sha256").update(content).digest("hex"),
-      })),
+      files: await resourceInventory(root),
     }),
   )
   return { root, [Symbol.asyncDispose]: () => rm(root, { recursive: true, force: true }) }

@@ -183,6 +183,22 @@ Node вместо отказа overlap; GREEN — 11 staging tests PASS, Host ty
 или копирования. Логи `tdd-stage-product-overlap-{red,green}.log` и
 `stage-product-overlap-typecheck.log`. Копирование skills и общий inventory ещё открыты.
 
+Полный staging: RED — реальный release staging вернул пустой каталог skills;
+GREEN — 12 staging PASS с закреплёнными Node/Chromium и настоящим npm closure.
+Копируется весь Product skills до manifest; проверены оба skill, workflow и OFL
+по фактическим байтам. Browser input читается из сохранённой установки CLI,
+launcher/profile не менялись, Chromium не запускался. Логи
+`tdd-stage-product-delivery-{red,green}.log`.
+После GREEN выделен общий Node-compatible `resourceInventory`; staging и
+fixtures Host/Agent/runtime используют его. Сохранены internal directory links,
+canonical escape guard и исключение собственного manifest из inventory.
+Agent fixture содержит оба настоящих skills без Node/Chromium: 8 PASS.
+Host staging+integrity: 20 PASS; после перевода Host fixtures integrity 8 PASS;
+Node client targeted regression 23 PASS; inventory/resources 9 PASS.
+Host/Agent typecheck PASS. Логи `stage-shared-inventory-*.log`.
+Этот staging доставляет текущие Python assets; generated Node docs bundle будет
+добавлен на этапе 2. Установленная приёмка остаётся открытой.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -190,5 +206,6 @@ Node вместо отказа overlap; GREEN — 11 staging tests PASS, Host ty
 - Начата проверенная TDD-связка discovery/integrity, этап 1 остаётся открытым.
 - Каталог skills перенесён и адаптирован; source-only проверки перечислены выше.
 - Локальный loader и динамический prepare реализованы; единый digest проверен в Bun/Node.
-- Следующий шаг: shared inventory/staging, полный runtime verifier и отключение publisher; затем Node executor.
+- Shared inventory и полный staging реализованы, два настоящих bundled skills найдены вне checkout.
+- Следующий шаг: полный runtime verifier и отключение publisher; затем Node executor.
 - Живая приёмка и удаление серверного skill остаются открытыми.

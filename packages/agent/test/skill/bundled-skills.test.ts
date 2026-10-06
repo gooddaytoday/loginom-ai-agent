@@ -1,6 +1,5 @@
 import { afterAll, expect, test } from "bun:test"
-import { createHash } from "node:crypto"
-import { mkdtemp, readdir, rm, symlink } from "node:fs/promises"
+import { cp, mkdtemp, readFile, readdir, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect, Layer } from "effect"
@@ -12,6 +11,7 @@ import { provideTmpdirInstance, testInstanceStoreLayer } from "../fixture/fixtur
 import { testEffect } from "../lib/effect"
 import { productSkillsDirectory, reservedSkillNames } from "@loginom-ai-agent/product/skills"
 import { ConfigMarkdown } from "../../src/config/markdown"
+import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
 
 test("the product has one canonical directory for each shipped skill", async () => {
   const directories = (await readdir(productSkillsDirectory, { withFileTypes: true }))
@@ -38,13 +38,13 @@ test("shipped skill metadata conforms to the Agent Skills specification", async 
 })
 
 const resources = await mkdtemp(join(tmpdir(), "loginom-bundled-skills-"))
-const content = "---\nname: package-docs\ndescription: Документация локального пакета Loginom.\n---\n\n# Документация\n"
-await Bun.write(join(resources, "skills/package-docs/SKILL.md"), content)
+const content = await readFile(join(productSkillsDirectory, "package-docs/SKILL.md"), "utf8")
+await cp(productSkillsDirectory, join(resources, "skills"), { recursive: true })
 await Bun.write(
   join(resources, "resource-manifest.json"),
   JSON.stringify({
     protocol: 1,
-    files: [{ path: "skills/package-docs/SKILL.md", sha256: createHash("sha256").update(content).digest("hex") }],
+    files: await resourceInventory(resources),
   }),
 )
 afterAll(() => rm(resources, { recursive: true, force: true }))
@@ -61,12 +61,18 @@ it.live("discovers a verified bundled skill outside the source checkout", () =>
   provideTmpdirInstance(() =>
     Effect.gen(function* () {
       const skills = yield* Skill.Service
+      for (const name of reservedSkillNames) {
+        const skill = yield* skills.require(name)
+        expect(skill.source).toBe("bundled")
+        expect(skill.location).toBe(join(resources, "skills", name, "SKILL.md"))
+        expect(skill.digest).toMatch(/^[a-f0-9]{64}$/)
+      }
       const docs = (yield* skills.all()).find((skill) => skill.name === "package-docs")
       expect(docs).toBeDefined()
       expect(docs?.location).toBe(join(resources, "skills/package-docs/SKILL.md"))
       expect(docs?.source).toBe("bundled")
       expect(docs?.digest).toMatch(/^[a-f0-9]{64}$/)
-      expect(docs?.content).toContain("# Документация")
+      expect(docs?.content).toContain("# package-docs")
       expect(yield* skills.dirs()).toContain(join(resources, "skills/package-docs"))
     }),
   ),
@@ -105,7 +111,7 @@ it.live("the same skill realpath is discovered only once through two configured 
       )
       const skills = yield* Skill.Service
       expect((yield* skills.all()).filter((skill) => skill.name === "sample")).toHaveLength(1)
-      expect(yield* skills.dirs()).toHaveLength(2)
+      expect(yield* skills.dirs()).toHaveLength(3)
       expect((yield* skills.require("sample")).location).toBe(join(source, "sample/SKILL.md"))
     }),
   ),

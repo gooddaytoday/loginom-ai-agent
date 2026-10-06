@@ -495,7 +495,7 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
   `package.save_checkpoint`. Удалить неподдерживаемые raw UI/clipboard/Playwright,
   `node.add/link.create` через action API, model `budget_ms`, устаревший обязательный
   Save As. Сохранить `sources.md`, Help/E2E URI и атрибуцию материалов.
-- [ ] Довести связку Node-only Product export, общей проверки/per-skill
+- [x] Довести связку Node-only Product export, общей проверки/per-skill
   digest из 2.3 и staging уже здесь: runtime ниже не должен ждать этапа 3.
   Переиспользовать уже реализованные export/verifier/discovery, не создавать
   второй вариант. `stageResources`

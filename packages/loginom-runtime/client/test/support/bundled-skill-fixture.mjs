@@ -1,7 +1,7 @@
-import { createHash } from 'node:crypto';
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, relative, sep } from 'node:path';
+import { join } from 'node:path';
+import { resourceInventory } from '../../../src/resource-inventory.mjs';
 
 // Real product instructions and references, in an independent resource root.
 export async function createBundledSkillFixture(t) {
@@ -15,12 +15,7 @@ export async function createBundledSkillFixture(t) {
 }
 
 export async function refreshSkillFixtureManifest(resources) {
-  const entries = await readdir(join(resources, 'skills'), { recursive: true, withFileTypes: true });
-  const files = await Promise.all(entries.filter(entry => entry.isFile()).map(async entry => {
-    const path = join(entry.parentPath, entry.name);
-    return { path: relative(resources, path).split(sep).join('/'),
-      sha256: createHash('sha256').update(await readFile(path)).digest('hex') };
-  }));
+  const files = await resourceInventory(resources);
   await writeFile(join(resources, 'resource-manifest.json'), JSON.stringify({ protocol: 1, files }));
   return files;
 }
