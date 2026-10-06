@@ -30,6 +30,9 @@ export async function prepareCalibrationCases(tasks: Task[], runDir: string, cor
     }
     hasher.update(task.id + "\n" + source)
     for (const mutation of corpus.cases) {
+      const unavailable = mutation.expected_failed.filter((id) => !task.checklist.some((item) => item.id === id && !item.requiresRun))
+      if (!mutation.expected_failed.length || unavailable.length)
+        throw new EvalFailure(task.id + "/" + mutation.id + ": недоступные expected_failed " + unavailable.join(", "), 2)
       const artifactDir = path.join(runDir, task.id, "near-miss", mutation.id, "artifact")
       await mkdir(path.join(artifactDir, "results"), { recursive: true })
       const archive = path.join(artifactDir, "package.lgp")

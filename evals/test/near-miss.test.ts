@@ -96,3 +96,13 @@ test("calibration refuses an XML edit that no longer matches", async () => {
     await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toThrow("sort")
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("calibration refuses expectations on unavailable run evidence", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-case-id-"))
+  try {
+    const fixture = await sortCorpus(root)
+    fixture.corpus.cases[0]!.expected_failed = ["honest-report"]
+    await Bun.write(path.join(fixture.dir, "cases.json"), JSON.stringify(fixture.corpus))
+    await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toThrow("honest-report")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
