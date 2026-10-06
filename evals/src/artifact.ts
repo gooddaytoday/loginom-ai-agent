@@ -135,10 +135,12 @@ export async function cleanupOrphanResult(input: { source: ArtifactSource; name:
     const entries = await listStorage(input.source)
     if (entries.some(entry => entry.name === input.name)) {
       if (input.source.kind === "dir") {
-        if (!(await lstat(path.join(input.source.dir, input.name))).isFile()) throw Error("Result is not a regular file")
+        const info = await lstat(path.join(input.source.dir, input.name))
+        if (!info.isFile()) throw Error("Result is not a regular file")
+        if (info.nlink !== 1) throw Error("Result ownership unconfirmed: hardlink")
       } else {
-        const regular = await Bun.$`docker exec ${input.source.container} sh -c ${'test -f "$1" && ! test -L "$1"'} eval-orphan ${`${input.source.storageDir}/${input.name}`}`.quiet().nothrow()
-        if (regular.exitCode !== 0) throw Error("Result is not a regular file")
+        const regular = await Bun.$`docker exec ${input.source.container} sh -c ${'test -f "$1" && ! test -L "$1" && test "$(stat -c %h -- "$1")" = 1'} eval-orphan ${`${input.source.storageDir}/${input.name}`}`.quiet().nothrow()
+        if (regular.exitCode !== 0) throw Error("Result ownership unconfirmed: expected singly linked regular file")
       }
       await mkdir(path.join(input.outDir, "storage-outputs"), { recursive: true })
       const local = path.join(input.outDir, "storage-outputs", input.name)
