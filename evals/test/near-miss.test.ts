@@ -106,3 +106,13 @@ test("calibration refuses expectations on unavailable run evidence", async () =>
     await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toThrow("honest-report")
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("calibration refuses CSV that contradicts its oracle expectation", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-oracle-expect-"))
+  try {
+    const fixture = await sortCorpus(root)
+    fixture.corpus.cases[0]!.expected_oracle_pass = true
+    await Bun.write(path.join(fixture.dir, "cases.json"), JSON.stringify(fixture.corpus))
+    await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toThrow("oracle")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})

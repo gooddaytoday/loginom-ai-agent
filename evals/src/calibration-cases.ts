@@ -52,7 +52,10 @@ export async function prepareCalibrationCases(tasks: Task[], runDir: string, cor
       const csv = await Bun.file(path.join(dir, mutation.result_csv)).text()
       hasher.update(mutation.id + "\n" + csv)
       await Bun.write(path.join(artifactDir, "results", "calibration.result.csv"), csv)
-      prepared.push({ task, mutation, artifactDir, oracle: await checkOracle(task, artifactDir) })
+      const oracle = await checkOracle(task, artifactDir)
+      if (oracle.passed !== mutation.expected_oracle_pass)
+        throw new EvalFailure(task.id + "/" + mutation.id + ": CSV противоречит expected oracle", 2)
+      prepared.push({ task, mutation, artifactDir, oracle })
     }
   }
   return { prepared, hash: hasher.digest("hex") }
