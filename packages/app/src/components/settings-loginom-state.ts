@@ -25,6 +25,13 @@ export function loginomError(value: unknown) {
   }
 }
 
+export function loginomBrowserMessage(browser?: Loginom.BrowserStatus) {
+  if (browser?.state === "verified") return "loginom.browserVerified"
+  if (browser?.state !== "failed") return "loginom.browserUnknown"
+  if (browser.failure === "LOGINOM_ACCOUNT_MISMATCH") return "loginom.browserAccountMismatch"
+  return loginomError(new Error(browser.failure))
+}
+
 const delay = () => new Promise<void>((resolve) => setTimeout(resolve, 1000))
 
 // This promise intentionally outlives the settings dialog. Only redacted views
@@ -32,7 +39,7 @@ const delay = () => new Promise<void>((resolve) => setTimeout(resolve, 1000))
 export async function watchLoginomApplication(
   api: Loginom.API,
   saved: Loginom.View,
-  notify: (result: "ready" | "failed" | "unknown" | "superseded") => void,
+  notify: (result: "ready" | "failed" | "unknown" | "superseded", current?: Loginom.View) => void,
   wait = delay,
 ) {
   try {
@@ -41,7 +48,7 @@ export async function watchLoginomApplication(
       const current = await api.status()
       if (current.revision !== saved.revision) return notify("superseded")
       if (current.failure || current.state === "recoverable-error") return notify("failed")
-      if (current.state === "ready") return notify(current.generation > saved.generation ? "ready" : "failed")
+      if (current.state === "ready") return notify(current.generation > saved.generation ? "ready" : "failed", current)
       if (current.state === "unconfigured") return notify("failed")
     }
   } catch {
@@ -59,7 +66,14 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
     password: "",
     passwordMode: "empty" as "preserve" | "replace" | "empty",
     phase: "idle" as "idle" | "checking" | "saving" | "applying",
-    message: undefined as ReturnType<typeof loginomError> | "loginom.checked" | "loginom.checkedSaved" | undefined,
+    message: undefined as
+      | ReturnType<typeof loginomError>
+      | "loginom.checked"
+      | "loginom.checkedSaved"
+      | "loginom.helpChecked"
+      | "loginom.helpCheckedSaved"
+      | undefined,
+    checkedBrowser: undefined as Loginom.BrowserStatus | undefined,
     failed: false,
     confirmClose: false,
   })
@@ -93,6 +107,7 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
       apiKey: "",
       password: "",
       message: undefined,
+      checkedBrowser: undefined,
       failed: false,
       confirmClose: false,
     })
@@ -128,7 +143,7 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
     }
   }
   function edit(values: Partial<Pick<typeof state, "url" | "username" | "apiKey" | "password" | "passwordMode">>) {
-    setState({ ...values, message: undefined, failed: false })
+    setState({ ...values, message: undefined, checkedBrowser: undefined, failed: false })
   }
   function requestClose() {
     if (busy()) return false
@@ -138,7 +153,7 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
   }
   async function submit(save: boolean) {
     if (!api || disabled() || (save && !canSave())) return
-    setState({ phase: "checking", message: undefined, failed: false })
+    setState({ phase: "checking", message: undefined, checkedBrowser: undefined, failed: false })
     try {
       const candidate: Loginom.Candidate = {
         revision: state.baseline!.revision,
@@ -152,8 +167,18 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
       }
       const validation = await api.check(candidate)
       if (disposed) return
+      setState("checkedBrowser", validation.browser ? { ...validation.browser } : undefined)
       if (!save) {
-        setState("message", dirty() ? "loginom.checked" : "loginom.checkedSaved")
+        setState(
+          "message",
+          validation.browser && validation.browser.state !== "verified"
+            ? dirty()
+              ? "loginom.helpChecked"
+              : "loginom.helpCheckedSaved"
+            : dirty()
+              ? "loginom.checked"
+              : "loginom.checkedSaved",
+        )
         return
       }
       setState("phase", "saving")

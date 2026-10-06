@@ -790,6 +790,44 @@ validation-shutdown}-red.log. Изменённые runtime src/knowledge-client 
 Пункт плана validation/save/status/UI не отмечен: Desktop/CLI отображение
 и установленная/живая проверка пока впереди. Требования плана не менялись.
 
+## 2026-10-06 — Desktop/CLI: отображение Help и браузера
+
+TDD RED → GREEN в реальном Solid settings controller: successful Help с
+BrowserStatus failed не сообщает об успешном входе и не блокирует Save.
+Проверенный draft хранится отдельно от активного View, редактирование сбрасывает
+результат. Проверка несохранённых и сохранённых настроек использует новые Help
+сообщения, баннер показывает Help и browser отдельно. Save/deferred toast
+сохраняет предупреждение из фактически применённого поколения; account mismatch
+больше не использует текст «подключение не сохранено». Новые EN/RU ключи через
+обычный typed i18n; все 47 существующих LOGINOM_ENGLISH values сохранены точно.
+
+CLI check декодирует Validation, возвращает Help-ready и BrowserStatus отдельно,
+не выводит token/credentials. JSON state/code остаются машинным контрактом.
+Два новых actual standalone/compiled Node Host процесса с реальным HTTP MCP
+проверяют setup/check/status без DISPLAY: хороший ключ + web warning — exit 0,
+неверный ключ — exit 1 и отсутствие браузерной проверки. Profile .writer снят,
+валидационный Node завершён, chat runtime не создаётся. Оригинальный код
+LOGINOM_CONNECTION_VALID сохранён, дополнительные поля разделяют готовность.
+
+Полный App browser suite: 59 PASS / 174 assertions; settings controller — 19
+случаев. CLI focused preflight/management: 9 PASS / 63 assertions, 30.70 s.
+App/Agent typecheck PASS, prettier и diff check PASS. Логи acceptance:
+app-help-browser-status-{suite,typecheck}.log, cli-help-browser-status-regression.log,
+agent-help-browser-status-typecheck.log; RED tdd-{app,cli}-help-browser-status-red.log.
+Controller/процессные fixtures не доказывают визуальную установленную Desktop
+приёмку, CLI TTY мастер или естественную активацию skill; эти gates ещё открыты.
+Пункт validation/save/status/UI пока не отмечен до приёмки мастеров.
+
+RU терминология сверена с независимыми корпусами [Firefox preferences](https://raw.githubusercontent.com/mozilla-l10n/firefox-l10n/main/ru/browser/browser/preferences/preferences.ftl)
+и [VS Code RU](https://github.com/microsoft/vscode-loc/blob/main/i18n/vscode-language-pack-ru/translations/main.i18n.json)
+(полученный content SHA256 50bd007ada2e281483edc7ff37929c1edf96c6ccb17836d72702fe0c3760e25f),
+со [справочником Грамоты](https://gramota.ru/biblioteka/spravochniki/pismovnik/kak-pisat-slova-svyazannye-s-internetom)
+и [CLDR](https://www.unicode.org/cldr/charts/48/supplemental/language_plural_rules.html).
+Новые фразы целиком; числовые формы не добавлены. Microsoft Russian guide найден,
+но его PDF retrieval через web tool неуспешен — чтение PDF не заявляется.
+Help в RU — «справка»; слова browser/unknown/verified/failed в JSON — кодовые значения.
+Требования плана и исходный документ корректировок не менялись.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -808,5 +846,5 @@ validation-shutdown}-red.log. Изменённые runtime src/knowledge-client 
 - Linux artifact completeness/shared closure проверены; Host suite 184 PASS / 6 SKIP.
 - Host local run/knowledge и отдельный BrowserStatus; full Host 207 PASS / 7 SKIP.
 - Desktop source lifecycle 36 PASS, lease 4 PASS; CLI preflight 12 PASS и local-run 6 PASS.
-- Host validation/save реализованы; далее Desktop/CLI UI, TaskScope и lazy tool exit contract.
+- Host validation/save и Desktop/CLI статусы реализованы; далее GUI/TTY, TaskScope и lazy exits.
 - Живая приёмка и удаление серверного skill остаются открытыми.

@@ -4,6 +4,15 @@ export const dict = {
   "loginom.applying": "Применяем настройки…",
   "loginom.saved": "Настройки Loginom сохранены",
   "loginom.ready": "Подключение готово к работе.",
+  "loginom.helpReady": "Справка готова к работе.",
+  "loginom.helpNotReady": "Справка ещё не готова.",
+  "loginom.helpChecked": "Справка доступна. Настройки ещё не сохранены.",
+  "loginom.helpCheckedSaved": "Справка доступна.",
+  "loginom.browserUnknown": "Вход в браузере ещё не проверен.",
+  "loginom.browserVerified": "Вход в браузере подтверждён.",
+  "loginom.browserAccountMismatch": "Открыта сессия другого пользователя Loginom. Проверьте имя пользователя.",
+  "loginom.savedBrowserWarning":
+    "Справка доступна. Вход в Loginom не подтверждён. Проверьте адрес и данные входа перед построением сценария.",
   "loginom.savedPending":
     "Изменения сохранены и будут применены после завершения текущих задач Loginom и восстановления незавершённых операций.",
   "loginom.applyFailed":
@@ -463,7 +472,8 @@ export const dict = {
 
   "prompt.toast.pasteUnsupported.title": "Неподдерживаемое вложение",
   "prompt.toast.attachmentDuplicate.title": "Этот файл уже загружен",
-  "prompt.toast.pasteUnsupported.description": "Здесь можно прикрепить только изображения, PDF, текстовые файлы или пакеты Loginom (.lgp).",
+  "prompt.toast.pasteUnsupported.description":
+    "Здесь можно прикрепить только изображения, PDF, текстовые файлы или пакеты Loginom (.lgp).",
   "prompt.toast.modelAgentRequired.title": "Выберите агента и модель",
   "prompt.toast.modelAgentRequired.description": "Выберите агента и модель перед отправкой запроса.",
   "prompt.toast.worktreeCreateFailed.title": "Не удалось создать worktree",
@@ -972,7 +982,8 @@ export const dict = {
   "settings.general.row.language.title": "Язык",
   "settings.general.row.language.description": "Изменить язык отображения Loginom AI Agent",
   "systemProxy.settings.title": "Использовать системный прокси",
-  "systemProxy.settings.description": "Отправлять запросы к моделям и вход через прокси операционной системы. Приложение перезапустится.",
+  "systemProxy.settings.description":
+    "Отправлять запросы к моделям и вход через прокси операционной системы. Приложение перезапустится.",
   "systemProxy.state.off": "Выключено",
   "systemProxy.state.environment": "Используются уже заданные переменные прокси",
   "systemProxy.state.direct": "Системный прокси не задан",
@@ -982,12 +993,15 @@ export const dict = {
   "systemProxy.notice.read-failed": "Не удалось прочитать системный прокси. Приложение работает без него.",
   "systemProxy.notice.timeout": "Чтение системного прокси заняло слишком много времени. Приложение работает без него.",
   "systemProxy.notice.internal": "Не удалось применить системный прокси. Приложение работает без него.",
-  "systemProxy.notice.unreachable": "Системный прокси {{address}} недоступен. Запросы завершаются ошибкой, пока он не ответит.",
+  "systemProxy.notice.unreachable":
+    "Системный прокси {{address}} недоступен. Запросы завершаются ошибкой, пока он не ответит.",
   "systemProxy.notice.socks-only": "Системный прокси работает только по SOCKS и не применён.",
-  "systemProxy.notice.auth-required": "Системный прокси требует пароль. Учётные данные операционной системы не копируются.",
+  "systemProxy.notice.auth-required":
+    "Системный прокси требует пароль. Учётные данные операционной системы не копируются.",
   "systemProxy.notice.automatic-unsupported": "Автоматическую настройку прокси применить не удалось.",
   "systemProxy.notice.environment-socks": "ALL_PROXY указывает на SOCKS, а этот runtime его не применяет.",
-  "systemProxy.notice.routes-merged": "Для разных адресов найдены разные прокси ({{address}}). Для запросов к моделям используется один.",
+  "systemProxy.notice.routes-merged":
+    "Для разных адресов найдены разные прокси ({{address}}). Для запросов к моделям используется один.",
   "settings.general.row.shell.title": "Оболочка терминала",
   "settings.general.row.shell.description":
     "Выберите оболочку для терминала. Совместимые оболочки также используются агентом при вызове инструментов.",

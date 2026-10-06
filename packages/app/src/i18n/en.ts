@@ -8,6 +8,15 @@ export const LOGINOM_ENGLISH = {
   "loginom.applying": "Applying settings…",
   "loginom.saved": "Loginom settings saved",
   "loginom.ready": "The connection is ready to use.",
+  "loginom.helpReady": "Help is ready to use.",
+  "loginom.helpNotReady": "Help is not ready yet.",
+  "loginom.helpChecked": "Help is accessible. Settings have not been saved yet.",
+  "loginom.helpCheckedSaved": "Help is accessible.",
+  "loginom.browserUnknown": "Browser sign-in has not been checked yet.",
+  "loginom.browserVerified": "Browser sign-in is verified.",
+  "loginom.browserAccountMismatch": "Loginom is open under another account in the browser. Check your username.",
+  "loginom.savedBrowserWarning":
+    "Help is accessible. Loginom sign-in is not verified. Check the address and sign-in details before building a scenario.",
   "loginom.savedPending": "Changes are saved and will apply after active Loginom tasks and operation recovery finish.",
   "loginom.applyFailed": "Saved Loginom settings could not be applied. Open Loginom settings to review the connection.",
   "loginom.statusUnavailable":
@@ -368,7 +377,8 @@ export const dict = {
   "prompt.action.stop": "Stop",
 
   "prompt.toast.pasteUnsupported.title": "Unsupported attachment",
-  "prompt.toast.pasteUnsupported.description": "Only images, PDFs, text files, or Loginom packages (.lgp) can be attached here.",
+  "prompt.toast.pasteUnsupported.description":
+    "Only images, PDFs, text files, or Loginom packages (.lgp) can be attached here.",
   "prompt.toast.attachmentDuplicate.title": "This file has already been uploaded",
   "prompt.toast.modelAgentRequired.title": "Select an agent and model",
   "prompt.toast.modelAgentRequired.description": "Choose an agent and model before sending a prompt.",
@@ -968,7 +978,8 @@ export const dict = {
   "settings.general.row.language.title": "Language",
   "settings.general.row.language.description": "Change the display language for Loginom AI Agent",
   "systemProxy.settings.title": "Use system proxy",
-  "systemProxy.settings.description": "Send model and sign-in requests through the operating system proxy. Restarts the app.",
+  "systemProxy.settings.description":
+    "Send model and sign-in requests through the operating system proxy. Restarts the app.",
   "systemProxy.state.off": "Turned off",
   "systemProxy.state.environment": "Using proxy variables already set in the environment",
   "systemProxy.state.direct": "No system proxy",
@@ -980,10 +991,12 @@ export const dict = {
   "systemProxy.notice.internal": "The system proxy could not be applied. The app is running without it.",
   "systemProxy.notice.unreachable": "System proxy {{address}} is not reachable. Requests fail until it is available.",
   "systemProxy.notice.socks-only": "The system proxy is SOCKS-only and was not applied.",
-  "systemProxy.notice.auth-required": "The system proxy requires a password. Credentials from the operating system are not copied.",
+  "systemProxy.notice.auth-required":
+    "The system proxy requires a password. Credentials from the operating system are not copied.",
   "systemProxy.notice.automatic-unsupported": "Automatic proxy configuration could not be applied.",
   "systemProxy.notice.environment-socks": "ALL_PROXY uses SOCKS, which this runtime does not apply.",
-  "systemProxy.notice.routes-merged": "Different proxies were found for {{address}}. One proxy is used for all model requests.",
+  "systemProxy.notice.routes-merged":
+    "Different proxies were found for {{address}}. One proxy is used for all model requests.",
   "settings.general.row.shell.title": "Terminal shell",
   "settings.general.row.shell.description": "Shell used by the terminal and agent tools",
   "settings.general.row.shell.autoDefault": "Auto (Default)",

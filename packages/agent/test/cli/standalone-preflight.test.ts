@@ -153,6 +153,113 @@ test("strict recovery still blocks an ordinary request before the model and pres
   }
 }, 30_000)
 
+test.each(["valid-help", "invalid-key"])(
+  "standalone management separates Help from browser validation: %s",
+  async (mode) => {
+    await using fixture = await standaloneFixture()
+    const cleanup: (() => void | Promise<void>)[] = []
+    const server = await knowledgeServer({ after: (callback) => cleanup.push(callback) })
+    const marker = join(fixture.directory, "browser-validation")
+    await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
+    await symlink(
+      resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
+      join(fixture.bundle, "runtime/src/knowledge-entry.mjs"),
+    )
+    await writeFile(
+      join(fixture.bundle, "runtime/src/managed-entry.mjs"),
+      `
+    import { writeFileSync } from 'node:fs';
+    process.on('disconnect', () => process.exit(0));
+    process.on('message', m => {
+      if (m.operation === 'start') {
+        writeFileSync(${JSON.stringify(marker)}, JSON.stringify({validation:m.input.validation,pid:process.pid}));
+        process.send({id:m.id,error:'LOGINOM_LOGIN_UNAVAILABLE'});
+      }
+      if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+    });`,
+    )
+    const manifest = JSON.parse(await readFile(join(fixture.bundle, "resource-manifest.json"), "utf8"))
+    await writeFile(
+      join(fixture.bundle, "resource-manifest.json"),
+      JSON.stringify({ ...manifest, endpoint: server.endpoint }),
+    )
+    async function command(args: string[], input?: object) {
+      const child = Bun.spawn([process.execPath, "run", "./src/standalone.ts", "loginom", ...args, "--format=json"], {
+        cwd: resolve(import.meta.dir, "../.."),
+        env: {
+          ...process.env,
+          BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+          LOGINOM_AI_AGENT_CHANNEL: "dev",
+          LOGINOM_AI_AGENT_CLI_PROFILE: fixture.profile,
+          LOGINOM_AI_AGENT_CLI_BUNDLE: fixture.bundle,
+          LOGINOM_AI_AGENT_SYSTEM_PROXY: "off",
+          LOGINOM_AI_AGENT_STRICT_RECOVERY: "0",
+          DISPLAY: "",
+          WAYLAND_DISPLAY: "",
+        },
+        stdin: input ? new Blob([JSON.stringify(input)]) : "ignore",
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      const output = new Response(child.stdout).text()
+      const errors = new Response(child.stderr).text()
+      const timer = setTimeout(() => child.kill("SIGKILL"), 10_000)
+      try {
+        const exit = await child.exited
+        const text = await output
+        expect(text).not.toContain("PRIVATE-NONSECRET")
+        expect(await readdir(fixture.profile)).not.toContain(".writer")
+        return { exit, errors: await errors, result: JSON.parse(text) }
+      } finally {
+        clearTimeout(timer)
+        child.kill()
+        await child.exited
+      }
+    }
+    try {
+      const setup = await command(["setup", "--stdin-json"], {
+        apiKey: mode === "valid-help" ? "UNIT-NONSECRET" : "WRONG-NONSECRET",
+        url: "http://127.0.0.1:1/app/",
+        username: "user",
+        password: "PRIVATE-NONSECRET",
+      })
+      if (mode === "invalid-key") {
+        expect(setup).toMatchObject({ exit: 1, result: { ok: false, code: "LOGINOM_KNOWLEDGE_AUTH_FAILED" } })
+        await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
+        expect((await command(["status"])).result).toMatchObject({ state: "unconfigured", hasApiKey: false })
+        return
+      }
+      expect(setup).toMatchObject({
+        exit: 0,
+        errors: "",
+        result: {
+          generation: 1,
+          hasApiKey: true,
+          browser: { state: "failed", failure: "LOGINOM_LOGIN_UNAVAILABLE" },
+        },
+      })
+      expect((await command(["status"])).result.browser).toEqual({ state: "unknown" })
+      expect(await command(["check"])).toMatchObject({
+        exit: 0,
+        errors: "",
+        result: {
+          ok: true,
+          help: { state: "ready" },
+          browser: { state: "failed", failure: "LOGINOM_LOGIN_UNAVAILABLE" },
+        },
+      })
+      const browser = JSON.parse(await readFile(marker, "utf8"))
+      expect(browser.validation).toBe(true)
+      if (process.platform === "linux")
+        await expect(access(`/proc/${browser.pid}`)).rejects.toMatchObject({ code: "ENOENT" })
+      expect(await readdir(join(fixture.profile, "loginom"))).not.toContain("runtime")
+    } finally {
+      for (const callback of cleanup) await callback()
+    }
+  },
+  30_000,
+)
+
 async function standaloneFixture() {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
