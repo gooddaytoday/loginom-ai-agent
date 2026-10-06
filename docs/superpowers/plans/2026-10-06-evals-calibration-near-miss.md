@@ -83,6 +83,11 @@ Do not weaken rubrics, expected failures or thresholds. Semantic misses are not 
 - Subsequent checker import rename (34a62f215) follows the no-alias project rule;
   it changes no calculations or runtime calibration behavior. Full independent
   reproduction remains 35 tasks / 113 cases; representative integration test passes.
+- Current rerun milestone: 35 positive (all 100), 35 foreign (0..33),
+  52 near-misses; no judge errors or missing expected IDs, one prompt hash.
+  first-last-touch/filter now fails both two-aggregates and result-rows in
+  the full rerun. Evidence checks the XML filter along the export path,
+  independently of the absence of None in the saved CSV.
 - Goal remains active. Final acceptance still requires every one of the 183 rows
   under the new prompt to meet its gates and the final report/checkpoint updates.
 
