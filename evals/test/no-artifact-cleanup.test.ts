@@ -94,7 +94,7 @@ test("cleanupOrphanResult удаляет только точный собств�
     await Bun.write(path.join(storage, name), "csv bytes\n")
     await Bun.write(path.join(storage, "eval-run-case-10.result.csv"), "other attempt\n")
     await Bun.write(path.join(storage, "personal.csv"), "other user\n")
-    await cleanupOrphanResult({ source: parseArtifactSource(`dir:${storage}`, { container: "", storageDir: "" }), name, outDir: directory, existingNames: [] })
+    await cleanupOrphanResult({ source: parseArtifactSource(`dir:${storage}`, { container: "", storageDir: "" }), name, outDir: directory, existingNames: [], processesConfirmed: true })
     expect(await Bun.file(path.join(storage, name)).exists()).toBe(false)
     expect(await Bun.file(path.join(directory, "storage-outputs", name)).text()).toBe("csv bytes\n")
     expect(await Bun.file(path.join(storage, "eval-run-case-10.result.csv")).text()).toBe("other attempt\n")
@@ -108,9 +108,22 @@ test("cleanupOrphanResult отказывает ownership для существо
     const name = "eval-run-case-1.result.csv"
     await Bun.write(path.join(directory, name), "pre-existing bytes\n")
     await expect(cleanupOrphanResult({ source: parseArtifactSource(`dir:${directory}`, { container: "", storageDir: "" }),
-      name, outDir: path.join(directory, "evidence"), existingNames: [name] })).rejects.toThrow("pre-existing")
+      name, outDir: path.join(directory, "evidence"), existingNames: [name], processesConfirmed: true })).rejects.toThrow("pre-existing")
     expect(await Bun.file(path.join(directory, name)).text()).toBe("pre-existing bytes\n")
     expect(await Bun.file(path.join(directory, "evidence", "storage-outputs", name)).exists()).toBe(false)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("cleanupOrphanResult оставляет CSV при неподтверждённой очистке процессов", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "eval-orphan-"))
+  try {
+    const name = "eval-run-case-1.result.csv"
+    await Bun.write(path.join(directory, name), "owned bytes\n")
+    await expect(cleanupOrphanResult({ source: parseArtifactSource(`dir:${directory}`, { container: "", storageDir: "" }),
+      name, outDir: path.join(directory, "evidence"), existingNames: [], processesConfirmed: false })).rejects.toThrow("Process cleanup unconfirmed")
+    expect(await Bun.file(path.join(directory, name)).text()).toBe("owned bytes\n")
+    expect(await Bun.file(path.join(directory, "evidence/storage-outputs", name)).exists()).toBe(false)
+    expect(await Bun.file(path.join(directory, "evidence/storage-cleanup.json")).json()).toMatchObject({ status: "failed", removed: false })
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
@@ -121,7 +134,7 @@ test("cleanupOrphanResult не читает и не удаляет symlink на 
     await Bun.write(path.join(directory, "foreign.csv"), "foreign bytes\n")
     await symlink("foreign.csv", path.join(directory, name))
     await expect(cleanupOrphanResult({ source: parseArtifactSource(`dir:${directory}`, { container: "", storageDir: "" }),
-      name, outDir: path.join(directory, "evidence"), existingNames: [] })).rejects.toThrow("regular file")
+      name, outDir: path.join(directory, "evidence"), existingNames: [], processesConfirmed: true })).rejects.toThrow("regular file")
     expect(await Bun.file(path.join(directory, name)).text()).toBe("foreign bytes\n")
     expect(await Bun.file(path.join(directory, "evidence", "storage-outputs", name)).exists()).toBe(false)
   } finally { await rm(directory, { recursive: true, force: true }) }
@@ -133,7 +146,7 @@ test("cleanupOrphanResult подтверждает byte/hash evidence и про�
     const name = "eval-run-case-1.result.csv", bytes = "csv bytes\n"
     await Bun.write(path.join(directory, name), bytes)
     await cleanupOrphanResult({ source: parseArtifactSource(`dir:${directory}`, { container: "", storageDir: "" }),
-      name, outDir: path.join(directory, "evidence"), existingNames: [] })
+      name, outDir: path.join(directory, "evidence"), existingNames: [], processesConfirmed: true })
     expect(await Bun.file(path.join(directory, "evidence/storage-cleanup.json")).json()).toMatchObject({
       status: "confirmed", name, existed_before: false, removed: true, verified_absent: true,
       archived: { path: `storage-outputs/${name}`, bytes: Buffer.byteLength(bytes), sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex") },

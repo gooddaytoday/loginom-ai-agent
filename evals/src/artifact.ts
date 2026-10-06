@@ -121,13 +121,14 @@ export async function cleanupArtifact(source: ArtifactSource, artifact: Artifact
   if (removed.exitCode !== 0) throw new Error(`docker exec rm: ${removed.stderr.toString().trim()}`)
 }
 
-export async function cleanupOrphanResult(input: { source: ArtifactSource; name: string; outDir: string; existingNames: readonly string[] | null }) {
+export async function cleanupOrphanResult(input: { source: ArtifactSource; name: string; outDir: string; existingNames: readonly string[] | null; processesConfirmed: boolean }) {
   const evidence: { status: string; name: string; existed_before: boolean | null; removed: boolean;
     verified_absent: boolean; archived?: { path: string; bytes: number; sha256: string }; error?: string } = {
     status: "failed", name: input.name, existed_before: input.existingNames?.includes(input.name) ?? null,
     removed: false, verified_absent: false,
   }
   try {
+    if (!input.processesConfirmed) throw Error("Process cleanup unconfirmed; orphan result preserved")
     if (path.basename(input.name) !== input.name) throw Error("Unsafe result filename")
     if (input.existingNames === null) throw Error("Storage ownership baseline unavailable")
     if (evidence.existed_before) throw Error("Result ownership unconfirmed: pre-existing filename")
