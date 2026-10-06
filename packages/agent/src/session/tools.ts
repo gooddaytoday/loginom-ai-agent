@@ -21,6 +21,7 @@ import { type Tool as AITool, type JSONSchema7, tool, jsonSchema, type ToolExecu
 import { Effect } from "effect"
 import { MessageV2 } from "./message-v2"
 import { Session } from "./session"
+import { TaskScope } from "./task-scope"
 import { SessionProcessor } from "./processor"
 import { PartID } from "./schema"
 import { EffectBridge } from "@/effect/bridge"
@@ -34,6 +35,7 @@ const MCP_RESOURCE_TOOLS = {
   listTemplates: "list_mcp_resource_templates",
   read: "read_mcp_resource",
 } as const
+const LOGINOM_LOCAL_TOOLS = new Set(["find", "search", "read", "grep", "glob", "list", "tree", "dock_diagnostics"])
 const MAX_MCP_RESOURCE_BLOB_BYTES = 10 * 1024 * 1024
 const SUPPORTED_MCP_RESOURCE_ATTACHMENT_MIMES = new Set([
   "application/pdf",
@@ -52,6 +54,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   processor: Pick<SessionProcessor.Handle, "message" | "updateToolCall" | "completeToolCall">
   bypassAgentCheck: boolean
   messages: SessionV1.WithParts[]
+  history: SessionV1.WithParts[]
   promptOps: TaskPromptOps
 }) {
   const tools: Record<string, AITool> = {}
@@ -526,27 +529,30 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         }),
     )
     if (!catalog) return tools
-    const user = input.messages.findLast((message) => message.info.role === "user")
-    if (user) {
-      const files = user.parts.flatMap((part) => {
-        if (part.type !== "file" || !part.url.startsWith("data:") || !part.filename) return []
-        const match = part.url.match(/^data:[^,]*;base64,([A-Za-z0-9+/=]*)$/)
-        return match ? [{ name: part.filename, data: match[1] }] : []
-      })
-      if (files.length) {
-        const admitted = yield* Effect.promise(() =>
-          loginom.admit(user.info.id, files).then(
-            () => true,
-            (error) => {
-              failed("admission", error)
-              return false
-            },
-          ),
+    const history = TaskScope.visible({
+      sessionID: input.session.id,
+      messages: input.history,
+      revert: input.session.revert,
+    })
+    const task = TaskScope.derive({ sessionID: input.session.id, messages: history })
+    const admissions = history.flatMap((message) => {
+      if (message.info.role !== "user" || TaskScope.replayOf(message)) return []
+      const files = message.parts.flatMap((part) => {
+        if (
+          part.type !== "file" ||
+          !part.url.startsWith("data:") ||
+          !part.filename ||
+          part.filename.toLowerCase().endsWith(".lgp") ||
+          part.mime.toLowerCase().split(";")[0] === "application/x-loginom-package"
         )
-        if (!admitted) return tools
-      }
-    }
-    if (user && catalog)
+          return []
+        const match = part.url.match(/^data:([^,]*);base64,([A-Za-z0-9+/=]*)$/)
+        if (!match || match[1].toLowerCase().split(";")[0] === "application/x-loginom-package") return []
+        return [{ name: part.filename, data: match[2] }]
+      })
+      return files.length ? [{ userMessage: message.info.id, files }] : []
+    })
+    if (task && catalog)
       for (const definition of catalog.tools) {
         const key = `loginom_${definition.name}`
         tools[key] = tool({
@@ -574,7 +580,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
                 const result = yield* Effect.promise(async () =>
                   CallToolResultSchema.parse(
-                    await loginom.call(definition.name, args, user.info.id, options.abortSignal),
+                    await loginom.call(
+                      definition.name,
+                      args,
+                      task.taskMessageID,
+                      options.abortSignal,
+                      LOGINOM_LOCAL_TOOLS.has(definition.name) ? undefined : admissions,
+                    ),
                   ),
                 )
                 yield* plugin.trigger(

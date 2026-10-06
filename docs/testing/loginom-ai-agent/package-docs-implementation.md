@@ -965,9 +965,37 @@ execute и убрать eager admission; backend пока не создаёт а
 Общий пункт этапа 5 не отмечен выполненным. Требования плана и документ
 корректировок не менялись; evals и соседний worktree не изменялись.
 
+## Backend: ленивый admission и полная исходная история
+
+Убран eager `admit` из `SessionTools.resolve`: каталог не передаёт байты.
+Приватные группы исходных вложений идут только вместе со сценарным вызовом;
+все семь Help routes и диагностика получают `undefined`. Отказ Host при
+передаче становится ошибкой вызова; ошибка каталога сохраняет redacted status.
+V1 перечитывает Session и полную историю на границе хода, затем выводит из
+этой же истории compacted model window. Общая `TaskScope.visible` граница
+учитывает revert и принадлежность частей; ранний CSV сохраняет исходный ID,
+даже когда его уже нет в окне модели. Replay, assistant и чужие parts не
+авторизуют группы. `.lgp` исключён по расширению, MIME части и MIME data URL.
+Task ID захвачен чистой функцией; model args не выбирают admission IDs/пути.
+
+TDD RED → GREEN сохранены: `tdd-backend-lazy-admission-red.log`,
+`tdd-backend-package-exclusion-red.log`, `tdd-backend-history-admission-red.log`.
+`backend-lazy-admission-history-suite.log`: **128 PASS / 1 SKIP**, 404 assertions
+(tools, task scope, compaction, revert-compact, messages pagination).
+`backend-history-prompt-regression.log`: **11 PASS**, 56 assertions — actual
+loop, local provider, instance context и новое сообщение во время работы.
+Agent `bun typecheck`, format/diff checks прошли. Private-call контракт здесь
+проверен контролируемым Host adapter; естественный выбор skill и установленная
+сборка этим не доказаны. Старый package_docs/Python prompt-тест ещё требует замены.
+
+В плане изменён только completion checkbox eager-admission подзадачи этапа 5;
+согласованные требования не перерабатывались. Bundled activation, provider-turn
+allowlist и согласованный Host/backend apply — следующий шаг. Этап 5 целиком
+не закрыт; Desktop/CLI/live evals остаются открытыми.
+
 ## Checkpoint
 
-- Исходный SHA `77c8c5180` (`docs-no-browser`); Host scope/admission реализованы выше.
+- Исходный SHA `8dd713630` (`docs-no-browser`); Host scope и lazy backend admission реализованы выше.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -975,13 +1003,13 @@ execute и убрать eager admission; backend пока не создаёт а
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 41 PASS; оригинальные файлы/permission/cancellation проверены отдельно.
 - BrowserStatus и key-only Help работают по sources; GUI/TTY и первый запуск ещё открыты.
-- TaskScope full-history/replay/revert/fork и защита public metadata проверены.
-- ToolRegistry назначает origin сам, независимо от plugin IDs и definition hooks.
+- TaskScope history/replay/revert/fork, public metadata и registry origin проверены.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
 - Полный Host 224 PASS / 7 SKIP; Agent history/tools/registry 30 PASS; typecheck обоих PASS.
 - Старый session package_docs/Python тест остаётся для замены при SessionTools integration.
-- Далее: actual bundled activation + provider-turn snapshots/allowlists и lazy admission.
+- Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
+- Далее: actual bundled activation + provider-turn snapshots/allowlists и согласованный apply.
 - Затем Linux Desktop/CLI/TTY, естественный выбор skill и парные live evals на принятом harness SHA.
 - Живая приёмка, серверное удаление, merge/release остаются отдельными открытыми границами.

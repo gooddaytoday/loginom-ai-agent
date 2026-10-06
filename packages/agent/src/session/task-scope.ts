@@ -7,18 +7,20 @@ export type Profile = HostTaskScope.Profile
 export type Info = { sessionID: SessionID; taskMessageID: MessageID; profile: Profile }
 type History = Schema.Schema.Type<typeof SessionV1.WithParts>
 
-export function derive(input: {
+type Input = {
   sessionID: SessionID
   messages: readonly History[]
   revert?: { messageID: MessageID; partID?: PartID }
-}): Info | undefined {
+}
+
+export function visible(input: Input) {
   const messages = input.messages
     .filter((message) => message.info.sessionID === input.sessionID)
     .toSorted(
       (left, right) => left.info.time.created - right.info.time.created || left.info.id.localeCompare(right.info.id),
     )
   const end = input.revert ? messages.findIndex((message) => message.info.id === input.revert?.messageID) : -1
-  const visible = messages.slice(0, end < 0 ? messages.length : end + (input.revert?.partID ? 1 : 0)).map((message) => {
+  return messages.slice(0, end < 0 ? messages.length : end + (input.revert?.partID ? 1 : 0)).map((message) => {
     const parts = message.parts.filter(
       (part) => part.sessionID === input.sessionID && part.messageID === message.info.id,
     )
@@ -26,9 +28,12 @@ export function derive(input: {
     const part = parts.findIndex((part) => part.id === input.revert?.partID)
     return { ...message, parts: part < 0 ? parts : parts.slice(0, part) }
   })
+}
+
+export function derive(input: Input): Info | undefined {
   const tasks = new Map<MessageID, MessageID | undefined>()
   let scope: Info | undefined
-  for (const message of visible) {
+  for (const message of visible(input)) {
     if (message.info.role === "user") {
       const replay = replayOf(message)
       if (

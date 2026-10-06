@@ -1136,15 +1136,13 @@ const layer = Layer.effect(
         const ctx = yield* InstanceState.context
         let structured: unknown
         let step = 0
-        const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
-
         while (true) {
+          const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
           yield* status.set(sessionID, { type: "busy" })
           yield* Effect.logInfo("loop", { "session.id": sessionID, step })
 
-          let msgs = yield* MessageV2.filterCompactedEffect(sessionID).pipe(
-            Effect.provideService(Database.Service, database),
-          )
+          const history = yield* sessions.messages({ sessionID }).pipe(Effect.orDie)
+          let msgs = MessageV2.filterCompacted(history.toReversed())
 
           const { user: lastUser, assistant: lastAssistant, finished: lastFinished, tasks } = MessageV2.latest(msgs)
 
@@ -1285,6 +1283,7 @@ const layer = Layer.effect(
               processor: handle,
               bypassAgentCheck,
               messages: msgs,
+              history,
               promptOps,
             }).pipe(
               Effect.provideService(Plugin.Service, plugin),

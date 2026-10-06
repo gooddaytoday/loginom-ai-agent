@@ -779,7 +779,7 @@ TUI local attachment, HostPort/admission и продуктовый executor.
   снимку. Добавить Host-контракт текущего `activeWork/hasUnsettledWork` и
   recovery-состояния: переход в docs не обходит незавершённую операцию.
   Ошибочный/stale инструмент отклоняется до runtime, журнала и upload.
-- [ ] Удалить eager `admit` из `SessionTools.resolve`. Сканировать настоящие
+- [x] Удалить eager `admit` из `SessionTools.resolve`. Сканировать настоящие
   user messages сессии на ещё не загруженные `data:`-вложения с исходным
   message ID; replay сводить к этому ID, а не допускать повторную загрузку.
   Исключить `.lgp` по MIME/расширению, включая старые `data:`-части из истории.
