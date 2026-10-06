@@ -216,7 +216,8 @@ no_artifact с confirmed cleanup и прежними quality scores=0. Подр�
   Число и порядок строк и текстовые значения совпадают; числа сравниваются по
   абсолютному допуску `oracle_tolerance` (неотрицательное число, по умолчанию `0.01`).
   Результат записывается отдельно в `oracle_pass`/`oracle_error`. В калибровке
-  экспорт и oracle не проверяются, поскольку агент не выполнялся.
+  positive с oracle и near-miss проверяют синтетический CSV без исполнения агента;
+  result/run-пункты исключены только согласно разделу «Калибровка судьи».
 - Непройденная калибровка сохраняет отчёт и завершается кодом 1.
 - Агент получает явный `--variant` из `EVAL_AGENT_VARIANT` (`default`, если
   не задан). Summary фиксирует переданный вариант; CLI пока не возвращает
@@ -298,7 +299,7 @@ no_artifact с confirmed cleanup и прежними quality scores=0. Подр�
 
 `evals/tasks/<id>/`:
 
-- `task.json` — `id`, `title`, `prompt` (краткая формулировка для агента), `inputs` (относительные пути данных, передаются через `--file`; может быть пустым — тогда `--file` не передаётся), `reference` (`reference.lgp`), `spec` (`SPEC.md`), `checklist` (массив `{id, text, weight?, requires_result_file?}`; вес по умолчанию 1; `requires_result_file` по умолчанию `false` — помечает пункты, проверяемые по файлу экспорта, и исключает их из чеклиста при `--calibrate`; входит в `rubric_hash` как часть `checklist`), `expected_output` (текстовое описание oracle, например «2 строки: A=15, B=25»), `timeout_ms` (необязательно).
+- `task.json` — `id`, `title`, `prompt` (краткая формулировка для агента), `inputs` (относительные пути данных, передаются через `--file`; может быть пустым — тогда `--file` не передаётся), `reference` (`reference.lgp`), `spec` (`SPEC.md`), `checklist` (массив `{id, text, weight?, requires_result_file?}`; вес по умолчанию 1; `requires_result_file` по умолчанию `false` — помечает пункты, проверяемые по файлу экспорта, и исключает их при `--calibrate` только для чужого эталона или positive без oracle; входит в `rubric_hash` как часть `checklist`), `expected_output` (текстовое описание oracle, например «2 строки: A=15, B=25»), `timeout_ms` (необязательно).
 - `SPEC.md` — полное ТЗ; перенос README из `agent-validation`.
 - `reference.lgp`, `data/*` — копии из `agent-validation`, чтобы eval был воспроизводим по SHA этого репозитория.
 
@@ -451,7 +452,7 @@ Ctrl+C в `--judge-only`: текущий вызов судьи убиваетс�
 
 run.ts --calibrate проверяет судью без агента, Loginom и docker. Positive с oracle получает синтетический CSV из oracle; проверяются result-пункты, requires_run исключены. Без oracle сохраняется прежнее исключение result-пунктов. Negative — следующий чужой эталон, result/run-пункты исключены; при одной задаче он пропускается. Пороги positive ≥90 и negative ≤40 сохраняются.
 
-Корпус evals/calibration/<task-id>/cases.json описывает источники (относительный путь → SHA256), случаи {id, kind, edits: [{file, from, to, count}], result_csv, expected_failed, expected_oracle_pass}. kind: sort/aggregate/threshold/filter/column. CSV и рецепты независимого пересчёта версионируются рядом. Источники, ID, пути, замены и фактический oracle проверяются до вызовов судьи; повреждение корпуса — EvalFailure/exit 2. Случаи готовятся из собственного reference, архив пересобирается; ожидания не передаются судье. calibrate(config, corpusDir?) сохраняет CLI и допускает отдельный каталог корпуса для проверок публичного интерфейса.
+Корпус evals/calibration/<task-id>/cases.json описывает источники (относительный путь → SHA256), случаи {id, kind, edits: [{file, from, to, count}], result_csv, expected_failed, expected_oracle_pass}. kind: sort/aggregate/threshold/filter/column. CSV и рецепты независимого пересчёта (reproduce: точные python_edits и/или sort/drop_last/exclude_channel) версионируются рядом. Проверка script/check-calibration-corpus.py воспроизводит исходный oracle и все мутанты в временных копиях, проверяет XML и неизменность топологии; Python при самой калибровке не нужен. Обязательные исходные хэши: task.json, reference, spec, inputs и oracle; corpus также закрепляет oracle.py. Источники, ID, пути, замены и фактический oracle проверяются до вызовов судьи; повреждение корпуса — EvalFailure/exit 2. Случаи готовятся из собственного reference, архив пересобирается; ожидания не передаются судье. calibrate(config, corpusDir?) сохраняет CLI и допускает отдельный каталог корпуса для проверок публичного интерфейса.
 
 Near-miss требует провала всех expected_failed и совпадения oracle с expected_oracle_pass. Score не заменяет эти условия. calibration.json содержит calibration_hash, near_miss_coverage и строки с case_id, expected_failed, expected_oracle_pass, oracle_pass/error, expectations_met; calibration.md показывает те же проверки. Промахи/ошибки судьи дают exit 1 после отчёта, успешная калибровка — exit 0. summary.json не создаётся. Неописанные задачи сохраняют старую калибровку и явно имеют нулевое покрытие near-miss.
 
