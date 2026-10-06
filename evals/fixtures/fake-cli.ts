@@ -1,6 +1,6 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
-import { mkdir, rm } from "node:fs/promises"
+import { chmod, mkdir, rm } from "node:fs/promises"
 
 const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
@@ -104,10 +104,14 @@ if (command === "loginom") {
 }
 
 if (process.env.EVAL_FAKE_SLEEP_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_SLEEP_MS))
-if (command === "run" && process.env.EVAL_FAKE_ORPHAN_STORAGE) {
+const orphanFile = command === "run" ? Bun.argv.find((arg, index) => Bun.argv[index - 1] === "--file" && path.basename(arg) === "fake-storage-export.json") : undefined
+const orphanFixture = orphanFile ? await Bun.file(orphanFile).json() as { storage: string; readonly?: boolean } : undefined
+const orphanStorage = process.env.EVAL_FAKE_ORPHAN_STORAGE ?? orphanFixture?.storage
+if (command === "run" && orphanStorage) {
   const name = Bun.argv.at(-1)?.match(/назови его `([^`]+)`/)?.[1]
   if (!name || path.basename(name) !== name) throw Error("Fixture result filename required")
-  await Bun.write(path.join(process.env.EVAL_FAKE_ORPHAN_STORAGE, name), "Region,A,B\nN,7.5,7\nS,3,2\n")
+  await Bun.write(path.join(orphanStorage, name), "Region,A,B\nN,7.5,7\nS,3,2\n")
+  if (orphanFixture?.readonly) await chmod(orphanStorage, 0o500)
 }
 const retryOutcomes: Record<string, string> = {
   "infra-retry-twice": "host-timeout", "infra-retry-no-artifact": "default",
