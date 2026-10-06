@@ -1,17 +1,14 @@
 import { expect, test } from "bun:test"
 import { ManagedRuntime } from "effect"
-import { access, cp, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises"
+import { access, mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
-import { tmpdir } from "node:os"
 import { TestLLMServer } from "../lib/llm-server"
 import { testProviderConfig } from "../lib/test-provider"
-import { copyProductSkillsFixture } from "../../../loginom-host/test/fixtures/product-skills"
-import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
 import { knowledgeServer } from "../../../loginom-runtime/client/test/support/knowledge-server.mjs"
 import { connectionStore } from "@loginom-ai-agent/loginom-host/connection/connection-store"
 import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
-import { acquireProfile } from "../../src/cli/profile"
+import { standaloneFixture, invoke } from "../fixture/standalone"
 
 test("ordinary standalone chat reaches the provider without configured Loginom and releases its profile", async () => {
   await using fixture = await standaloneFixture()
@@ -419,119 +416,3 @@ test.each(["valid-help", "invalid-key"])(
   },
   30_000,
 )
-
-async function standaloneFixture() {
-  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
-  if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
-  const directory = await realpath(await mkdtemp(join(tmpdir(), "standalone-lazy-preflight-")))
-  const bundle = join(directory, "bundle")
-  const profile = join(directory, "profile")
-  try {
-    await mkdir(join(bundle, "bin"), { recursive: true })
-    await cp(node, join(bundle, "bin/node"))
-    const builder = Bun.spawn(
-      [
-        process.execPath,
-        "run",
-        resolve(import.meta.dir, "../../../loginom-host/script/build-node-host.ts"),
-        join(bundle, "host"),
-      ],
-      { stdout: "pipe", stderr: "pipe" },
-    )
-    const [buildOutput, buildError, buildExit] = await Promise.all([
-      new Response(builder.stdout).text(),
-      new Response(builder.stderr).text(),
-      builder.exited,
-    ])
-    expect({ buildExit, buildError, buildOutput }).toEqual({ buildExit: 0, buildError: "", buildOutput: "" })
-    await copyProductSkillsFixture(bundle)
-    await writeFile(
-      join(bundle, "resource-manifest.json"),
-      JSON.stringify({
-        protocol: 1,
-        node: "bin/node",
-        endpoint: "http://127.0.0.1:1/mcp",
-        files: await resourceInventory(bundle),
-      }),
-    )
-    const initialized = await acquireProfile(profile, "dev")
-    await initialized.release()
-    return {
-      directory,
-      bundle,
-      profile,
-      async [Symbol.asyncDispose]() {
-        await rm(directory, { recursive: true, force: true })
-      },
-    }
-  } catch (error) {
-    await rm(directory, { recursive: true, force: true })
-    throw error
-  }
-}
-
-async function invoke(
-  fixture: Awaited<ReturnType<typeof standaloneFixture>>,
-  args: string[],
-  onStart?: (interrupt: () => void) => void,
-  environment?: NodeJS.ProcessEnv,
-) {
-  const child = Bun.spawn(
-    [
-      process.execPath,
-      "run",
-      "./src/standalone.ts",
-      "run",
-      "--format=json",
-      "--dir",
-      fixture.directory,
-      "--model",
-      "test/test-model",
-      ...args,
-    ],
-    {
-      cwd: resolve(import.meta.dir, "../.."),
-      env: {
-        ...process.env,
-        BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
-        LOGINOM_AI_AGENT_PURE: "1",
-        LOGINOM_AI_AGENT_CHANNEL: "dev",
-        LOGINOM_AI_AGENT_CLI_PROFILE: fixture.profile,
-        LOGINOM_AI_AGENT_CLI_BUNDLE: fixture.bundle,
-        LOGINOM_AI_AGENT_SYSTEM_PROXY: "off",
-        LOGINOM_AI_AGENT_STRICT_RECOVERY: "0",
-        DISPLAY: "",
-        WAYLAND_DISPLAY: "",
-        XDG_CONFIG_HOME: join(fixture.directory, "desktop-config"),
-        XDG_DATA_HOME: join(fixture.directory, "desktop-data"),
-        XDG_STATE_HOME: join(fixture.directory, "desktop-state"),
-        XDG_CACHE_HOME: join(fixture.directory, "desktop-cache"),
-        ...environment,
-      },
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "pipe",
-    },
-  )
-  const output = new Response(child.stdout).text()
-  const errors = new Response(child.stderr).text()
-  const timer = setTimeout(() => child.kill("SIGKILL"), 20_000)
-  try {
-    onStart?.(() => {
-      child.kill("SIGINT")
-    })
-    return {
-      exit: await child.exited,
-      errors: await errors,
-      events: (await output)
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .map((line) => JSON.parse(line)),
-    }
-  } finally {
-    clearTimeout(timer)
-    child.kill()
-    await child.exited
-  }
-}

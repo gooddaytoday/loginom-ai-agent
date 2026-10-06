@@ -1461,6 +1461,76 @@ Connection/recognized browser failure exit **1** пока проверен sourc
 installed Desktop/CLI и paired live evals ещё не приняты. Candidate intermediate:
 sourceCommit бинарника не подменять следующим doc-only checkpoint SHA.
 
+## Полный docs-конвейер через standalone CLI: source и native
+
+`test/cli/package-docs-pipeline.test.ts` запускает настоящий standalone backend,
+private Node host и поставляемый генератор. Управляемый HTTP-провайдер проходит
+skill → extract → read structure → skeleton → Help find/read → read draft →
+обычный write → emit. Пути берутся из фактических ответов инструментов; модель
+заполняет прочитанный скелет, а не подставляет подготовленный готовый документ.
+Проверены PDF, DOCX и Markdown, точная структура nested fixture с новым именем,
+кириллица/пробелы/uppercase `.LGP`, финальная ссылка, отсутствие placeholders,
+сохранение SHA входа и cleanup `.writer`. После skill в каждом catalog запрещены
+bash/task/prepare. Browser runtime directory отсутствует. Отдельный `/proc`
+монитор в эти новые тесты не добавлен; это не доказательство отсутствия любого
+кратковременного exec, наблюдение процессов ранее выполнено в native PTY.
+
+Проверки в `packages/agent`:
+
+```bash
+LOGINOM_AI_AGENT_TEST_NODE=/home/kiselev/.local/share/loginom-ai-agent-acceptance/package-docs-20261006/node-v24.19.0-linux-x64/bin/node bun test test/cli/package-docs-pipeline.test.ts
+LOGINOM_AI_AGENT_TEST_NODE=/home/kiselev/.local/share/loginom-ai-agent-acceptance/package-docs-20261006/node-v24.19.0-linux-x64/bin/node bun test test/cli/standalone-preflight.test.ts test/cli/run-outcome.test.ts
+bun typecheck
+```
+
+Source: **3 PASS / 60 assertions**; regression shared standalone fixture:
+**23 PASS / 111 assertions**; typecheck PASS. Общая fixture вынесена в
+`test/fixture/standalone.ts`, повторно используется preflight и pipeline tests;
+HOME, XDG и profile принадлежат одному запуску. Native-режим копирует полный
+shipped resource tree в собственный временный bundle, меняя только endpoint
+на локальный HTTP MCP fixture. Оригинальный candidate не изменяется.
+`PATH=/nonexistent`, без DISPLAY и без пропуска permissions; read/edit/skill
+явно разрешены в собственном тестовом профиле. Help проходит реальный MCP
+транспорт и schema discovery, ответы и выбор инструментов контролируются.
+
+Native-команда из `packages/agent` (каталог артефактов создать новым заранее):
+
+```bash
+LOGINOM_AI_AGENT_TEST_CLI_BIN=/home/kiselev/.local/share/loginom-ai-agent-acceptance/package-docs-20261006/candidate-05d3d144b/payload/bin/loginom-ai-agent-cli LOGINOM_AI_AGENT_TEST_ARTIFACTS=/home/kiselev/.local/share/loginom-ai-agent-acceptance/package-docs-20261006/candidate-05d3d144b/full-docs-pipeline bun test test/cli/package-docs-pipeline.test.ts
+```
+
+Native **3 PASS / 57 assertions** на sourceCommit `05d3d144b`. Сохранены все три
+документа, draft/structure, provider requests, действия, MCP calls и CLI events,
+driver hashes и artifact manifest. SHA входного nested.lgp:
+`73bca886d6010637becf6cb41ad2fd69ba64269e8251426c4e0a7e7ad2de483c`.
+Повторный `verifyCliManifest` всего оригинального payload подтвердил его hashes,
+modes и source identity после этих прогонов; JSON сохранён рядом с candidate.
+
+Визуально просмотрены обе страницы native PDF и одна страница DOCX, экспортированная
+LibreOffice с отдельным собственным профилем. Кириллица и стрелки читаются, текст
+не обрезан и не перекрывается; последние две строки статистики PDF продолжаются
+на второй странице. PNG/pdfinfo/версии сохранены в `full-docs-pipeline/*/qa`.
+Для QA использованы системные Poppler 22.02.0 и LibreOffice 7.3.7.2: bundled
+Poppler требует отсутствующую GLIBC_2.38. Эти программы нужны только проверке;
+CI читает PDF/ToUnicode и word/document.xml без них. Word ZIP reader получает
+копию Uint8Array, учитывая offset pooled Buffer.
+
+Матрица генератора/разрешений/процессов повторена для завершения соответствующего
+пункта этапа 2: Host pipeline **41 PASS / 158 assertions**, Agent tool + TaskScope
+**44 PASS / 146 assertions**. Проверены плохие вход/шрифт/скелет, plan/read/edit
+запреты, коллизии, отсутствие final после ошибки, неизменный вход и реальные
+cancel/60-second timeout с завершением Node PID. Логи:
+`full-docs-{generator,permission-process}-acceptance.log`.
+
+Добавлена приёмка уже реализованного пути, без изменения продуктового кода.
+Начальные ошибки новых fixtures сохранены: ожидание текста, которого провайдер
+не написал; endpoint override, удаляемый штатным environment allowlist; Buffer
+в ZIP reader. Это ошибки тестовой инфраструктуры, не продуктовые TDD RED.
+Source/native полные scripted документы подтверждают механику, но не качество
+narrative, выбор реальной моделью, live Help или установленный Desktop/CLI.
+Эти выпускные gates остаются открыты. Требования плана не переработаны; отмечены
+только выполненные deterministic pipeline и matrix/visual QA пункты.
+
 ## Checkpoint
 
 - Product candidate SHA `05d3d144b` (`docs-no-browser`); полный native CLI/resources/manifest/archive сохранены.
@@ -1480,4 +1550,4 @@ sourceCommit бинарника не подменять следующим doc-o
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS, native PTY paste/mention 2 PASS; attachment: 44 PASS.
-- Native docs extract/TUI PASS без system Node/Python; Desktop picker 20 MiB; далее GUI, natural routing/live evals.
+- Native docs PDF/DOCX/MD 3 PASS, visual QA PASS; TUI 2 PASS; Desktop picker 20 MiB; далее GUI/natural/live evals.
