@@ -1,13 +1,15 @@
 import { createHash } from 'node:crypto';
 
-export async function connectRemote(create) {
+export async function connectRemote(create, { signal } = {}) {
   for (let attempt = 0; attempt < 2; attempt++) {
+    signal?.throwIfAborted();
     const { client, transport } = create();
     try {
-      await client.connect(transport, { timeout: 25000 });
+      await client.connect(transport, { timeout: 25000, ...(signal ? { signal } : {}) });
       return client;
     } catch (error) {
       await client.close().catch(() => {});
+      signal?.throwIfAborted();
       const transient = (error instanceof TypeError && error.message === 'fetch failed')
         || [502, 503, 504].includes(error.code ?? error.status);
       if (attempt || !transient) throw error;
@@ -15,12 +17,13 @@ export async function connectRemote(create) {
   }
 }
 
-export async function readCatalog(client) {
+export async function readCatalog(client, { signal } = {}) {
   const tools = [];
   const seen = new Set();
   let cursor;
   do {
-    const page = await client.listTools(cursor ? { cursor } : {});
+    signal?.throwIfAborted();
+    const page = await client.listTools(cursor ? { cursor } : {}, signal ? { signal } : undefined);
     tools.push(...page.tools);
     cursor = page.nextCursor;
     if (cursor && seen.has(cursor)) throw new Error('Repeated MCP tools cursor');

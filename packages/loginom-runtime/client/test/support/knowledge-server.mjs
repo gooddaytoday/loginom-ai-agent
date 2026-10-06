@@ -26,11 +26,14 @@ export async function knowledgeServer(t, options = {}) {
       }
       let session = state.sessions.get(request.headers['mcp-session-id']);
       if (!session && isInitializeRequest(body)) {
+        if (options.initialize) await options.initialize();
+        if (response.destroyed) return;
         const protocol = new Server({ name: 'knowledge-fixture', version: '1.0.0' }, { capabilities: { tools: {} } });
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: randomUUID, enableJsonResponse: true,
           onsessioninitialized: id => state.sessions.set(id, { protocol, transport }),
         });
-        protocol.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: state.tools }));
+        protocol.setRequestHandler(ListToolsRequestSchema, async request =>
+          options.list ? options.list(request.params) : { tools: state.tools });
         protocol.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
           state.calls.push(request.params);
           return options.call ? options.call(request.params, extra)

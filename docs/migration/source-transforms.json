@@ -2143,5 +2143,10 @@
     "baseHash": "dfd25ae4a119c9fb558d553c6f4f91441848f1e45525f143960948afb370110e",
     "hash": "91a370918aee82bdc93541a25d832abd8f4911701d2f51d3dcb14394ac650fea",
     "reason": "Use a local resource bundle with a pinned manifest; cover altered manifests/skill bytes, legacy paths and the pinned Node digest golden value."
+  },
+  "packages/loginom-runtime/client/lib/catalog.mjs": {
+    "baseHash": "bf8946cdbbb55b78cac4f4f8631db1ce7a206f9eaea7a41263138b8263f3dc92",
+    "hash": "e2eebfd9666b1e096f0b14ce984268e193b34d0c5371f60d42e71d02dc497e96",
+    "reason": "Propagate an optional startup AbortSignal through existing MCP initialization and paginated catalog reads for the independent knowledge process; preserve default calls and the bounded one-time transient retry."
   }
 }

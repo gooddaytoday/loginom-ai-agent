@@ -5,16 +5,17 @@ import { combineCatalogs, connectRemote, readCatalog } from './catalog.mjs';
 
 const names = new Set(['find', 'search', 'read', 'grep', 'glob', 'list', 'tree']);
 
-export async function createKnowledgeClient({ endpoint, apiKey }) {
+export async function createKnowledgeClient({ endpoint, apiKey }, signal) {
+  signal?.throwIfAborted();
   if (typeof apiKey !== 'string' || !apiKey.trim()) throw Error('LOGINOM_CONFIG_REQUIRED');
   const remote = await connectRemote(() => ({
     client: new Client({ name: 'loginom-ai-agent-knowledge', version: '0.1.0' }),
     transport: new StreamableHTTPClientTransport(new URL(endpoint), {
       requestInit: { headers: { Authorization: `Bearer ${apiKey}` }, redirect: 'error' },
     }),
-  }));
+  }), { signal });
   try {
-    const catalog = combineCatalogs({ remote: (await readCatalog(remote)).filter(tool => names.has(tool.name)) });
+    const catalog = combineCatalogs({ remote: (await readCatalog(remote, { signal })).filter(tool => names.has(tool.name)) });
     if (catalog.tools.length !== names.size) throw Error('LOGINOM_KNOWLEDGE_CATALOG_INVALID');
     const state = { closed: false, closing: undefined };
     const pending = new Map();

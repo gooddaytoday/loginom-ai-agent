@@ -142,3 +142,42 @@ test('a concurrent duplicate request id cannot overwrite the first cancellation 
   await rejected;
   assert.equal(server.calls.length, 1);
 });
+
+test('startup cancellation interrupts a pending remote catalog read', async t => {
+  const started = Promise.withResolvers();
+  const finish = Promise.withResolvers();
+  const server = await knowledgeServer(t, { list: async () => {
+    started.resolve();
+    return finish.promise;
+  } });
+  t.after(() => finish.resolve({ tools: server.tools }));
+  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
+  const controller = new AbortController();
+  const starting = createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' }, controller.signal);
+  void starting.then(knowledge => knowledge.close(), () => {});
+  const rejected = assert.rejects(starting, /STARTUP_STOPPED/);
+  void rejected.catch(() => {});
+  await started.promise;
+  controller.abort(Error('STARTUP_STOPPED'));
+  await rejected;
+});
+
+test('startup cancellation also interrupts a pending MCP initialization', async t => {
+  const started = Promise.withResolvers();
+  const finish = Promise.withResolvers();
+  const server = await knowledgeServer(t, { initialize: async () => {
+    started.resolve();
+    await finish.promise;
+  } });
+  t.after(() => finish.resolve());
+  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
+  const controller = new AbortController();
+  const starting = createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' }, controller.signal);
+  void starting.then(knowledge => knowledge.close(), () => {});
+  const rejected = assert.rejects(starting, /INITIALIZATION_STOPPED/);
+  void rejected.catch(() => {});
+  await started.promise;
+  controller.abort(Error('INITIALIZATION_STOPPED'));
+  await rejected;
+  assert.equal(server.calls.length, 0);
+});

@@ -587,6 +587,20 @@ knowledge-client-regression.log. Существующие catalog helpers не �
 startup и UI/CLI settings ещё не интегрированы; Help продукта пока остаётся
 в прежнем browser runtime. Пункты этапа 4 не отмечены как выполненные.
 
+Knowledge startup cancellation: RED — отмена во время MCP tools/list не
+завершала startup до тестового deadline. GREEN протягивает необязательный
+AbortSignal через connectRemote/readCatalog и прекращает попытки подключения
+после отмены; поведение существующих callers и однократный transient retry
+сохранены. Настоящие HTTP MCP проверки отменяют отдельно initialize и чтение
+каталога; 16 PASS вместе с прежними catalog regressions. Полная pinned-Node
+client suite: 2561 PASS / 10 SKIP / 0 FAIL, 163.15 s;
+tdd-knowledge-startup-abort-red.log, knowledge-startup-regression.log,
+stage4-client-suite.log. Для изменённого imported catalog.mjs проверены точные
+original object/hash и отдельный transform: targeted verify_sources PASS,
+knowledge-catalog-source-verification.log. Исходные 35 attribution mismatches
+не скрыты и остаются отдельным открытым gate. Private process/Host routing
+ещё не интегрированы; этап 4 остаётся открытым.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -605,5 +619,5 @@ startup и UI/CLI settings ещё не интегрированы; Help прод
 - Старый session package_docs/Python тест требует замены при SessionTools integration.
 - Reserved skill/command policy и пользовательские предупреждения проверены по sources.
 - Linux artifact completeness/shared closure проверены; Host suite 184 PASS / 6 SKIP.
-- Knowledge client: 14 PASS; следующий шаг — private process и Host integration.
+- Knowledge client: 16 PASS, full client 2561 PASS / 10 SKIP; далее private process и Host.
 - Живая приёмка и удаление серверного skill остаются открытыми.
