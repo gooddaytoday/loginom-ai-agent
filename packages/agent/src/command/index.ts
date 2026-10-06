@@ -160,6 +160,7 @@ const layer = Layer.effect(
           name: item.name,
           description: item.description,
           source: "skill",
+          subtask: item.source === "bundled" && isReservedSkillName(item.name) ? false : undefined,
           get template() {
             if (!dir) return item.content
             return [
@@ -194,6 +195,10 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = LayerNode.make({ service: Service, layer: layer, deps: [Config.node, MCP.node, Skill.node, EventV2Bridge.node] })
+export const node = LayerNode.make({
+  service: Service,
+  layer: layer,
+  deps: [Config.node, MCP.node, Skill.node, EventV2Bridge.node],
+})
 
 export * as Command from "."

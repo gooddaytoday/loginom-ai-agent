@@ -1059,6 +1059,32 @@ const bundledResources = await mkdtemp(path.join(tmpdir(), "loginom-prompt-bundl
 afterAll(() => rm(bundledResources, { recursive: true, force: true }))
 const bundled = testEffect(makeHttp({ resources: bundledResources }))
 
+const stageBundledResources = Effect.gen(function* () {
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
+  yield* Effect.promise(() => cp(productSkillsDirectory, path.join(bundledResources, "skills"), { recursive: true }))
+  yield* Effect.promise(() => cp(node, path.join(bundledResources, "bin/node")))
+  const builder = Bun.spawn(
+    [
+      process.execPath,
+      path.join(import.meta.dir, "../../../loginom-host/script/build-package-docs.ts"),
+      path.join(bundledResources, "skills/package-docs/scripts"),
+    ],
+    { stdout: "pipe", stderr: "pipe" },
+  )
+  const stdout = new Response(builder.stdout).text(),
+    stderr = new Response(builder.stderr).text()
+  expect(yield* Effect.promise(() => builder.exited)).toBe(0)
+  expect(yield* Effect.promise(() => stderr)).toBe("")
+  yield* Effect.promise(() => stdout)
+  yield* Effect.promise(async () =>
+    Bun.write(
+      path.join(bundledResources, "resource-manifest.json"),
+      JSON.stringify({ protocol: 1, node: "bin/node", files: await resourceInventory(bundledResources) }),
+    ),
+  )
+})
+
 for (const failure of [undefined, "request", "apply", "revert"]) {
   const denied = !!failure
   const reverted = failure === "revert"
@@ -1068,31 +1094,7 @@ for (const failure of [undefined, "request", "apply", "revert"]) {
       : "bundled package-docs applies at the next provider boundary and executes through the restricted tool",
     () =>
       Effect.gen(function* () {
-        const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
-        if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
-        yield* Effect.promise(() =>
-          cp(productSkillsDirectory, path.join(bundledResources, "skills"), { recursive: true }),
-        )
-        yield* Effect.promise(() => cp(node, path.join(bundledResources, "bin/node")))
-        const builder = Bun.spawn(
-          [
-            process.execPath,
-            path.join(import.meta.dir, "../../../loginom-host/script/build-package-docs.ts"),
-            path.join(bundledResources, "skills/package-docs/scripts"),
-          ],
-          { stdout: "pipe", stderr: "pipe" },
-        )
-        const stdout = new Response(builder.stdout).text(),
-          stderr = new Response(builder.stderr).text()
-        expect(yield* Effect.promise(() => builder.exited)).toBe(0)
-        expect(yield* Effect.promise(() => stderr)).toBe("")
-        yield* Effect.promise(() => stdout)
-        yield* Effect.promise(async () =>
-          Bun.write(
-            path.join(bundledResources, "resource-manifest.json"),
-            JSON.stringify({ protocol: 1, node: "bin/node", files: await resourceInventory(bundledResources) }),
-          ),
-        )
+        yield* stageBundledResources
         const requests: { method: string; input: unknown }[] = []
         const bridge = yield* EffectBridge.make()
         const sessions = yield* Session.Service
@@ -1230,6 +1232,145 @@ for (const failure of [undefined, "request", "apply", "revert"]) {
     30_000,
   )
 }
+
+for (const scenario of [
+  { agent: "build" },
+  { agent: "general" },
+  { agent: "build", failure: "request" },
+  { agent: "build", failure: "apply" },
+  { agent: "build", failure: "permission" },
+])
+  bundled.instance(
+    scenario.failure
+      ? `bundled slash command rejects ${scenario.failure} without a pending or applied grant`
+      : `bundled slash command applies docs before its first provider turn (${scenario.agent}) and persists the grant`,
+    () =>
+      Effect.gen(function* () {
+        yield* stageBundledResources
+        const requests: { method: string; input: unknown }[] = []
+        let receive: ((event: { data: unknown }) => void) | undefined
+        LoginomHost.connect({
+          start() {},
+          on(_event, listener) {
+            receive = listener
+          },
+          postMessage(value) {
+            if (!isRecord(value) || typeof value.method !== "string") throw Error("Invalid Host request")
+            requests.push({ method: value.method, input: value.input })
+            const result =
+              value.method === "acquire"
+                ? { generation: 9 }
+                : value.method === "scope" && isRecord(value.input)
+                  ? value.input.scope
+                  : value.method === "tools"
+                    ? { tools: [] }
+                    : {}
+            receive?.({
+              data: {
+                id: value.id,
+                generation: 9,
+                ...(value.method === "scope" && isRecord(value.input) && value.input.mode === scenario.failure
+                  ? { error: "LOGINOM_SCOPE_DENIED" }
+                  : { result }),
+              },
+            })
+          },
+        })
+        yield* Effect.addFinalizer(() => Effect.sync(() => LoginomHost.disconnect()))
+        const { dir, llm } = yield* useServerConfig(providerCfg)
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const skills = yield* Skill.Service
+        const lgp = path.join(dir, "slash demo.lgp")
+        yield* Effect.promise(() =>
+          cp(path.join(import.meta.dir, "../../../loginom-host/test/fixtures/package-docs/demo.lgp"), lgp),
+        )
+        const session = yield* sessions.create({
+          permission: [
+            { permission: "*", pattern: "*", action: "allow" },
+            ...(scenario.failure === "permission"
+              ? [{ permission: "skill", pattern: "package-docs", action: "deny" as const }]
+              : []),
+          ],
+        })
+        if (!scenario.failure) {
+          yield* llm.tool("package_docs_run", { operation: "extract", lgp })
+          yield* llm.text("Получена структура")
+        }
+        const result = yield* prompt
+          .command({
+            sessionID: session.id,
+            command: "package-docs",
+            arguments: "",
+            agent: scenario.agent,
+            parts: [
+              {
+                type: "file",
+                mime: "application/x-loginom-package",
+                filename: "slash demo.lgp",
+                url: pathToFileURL(lgp).href,
+              },
+            ],
+          })
+          .pipe(Effect.exit)
+        const history = yield* sessions.messages({ sessionID: session.id })
+        const user = history.find((message) => message.info.role === "user")
+        const info = yield* skills.require("package-docs")
+        const body = user?.parts.find((part) => part.type === "text" && part.text.includes(info.content.trim()))
+        if (scenario.failure) {
+          expect(Exit.isFailure(result)).toBe(true)
+          if (Exit.isFailure(result))
+            expect(String(Cause.squash(result.cause))).toContain(
+              scenario.failure === "permission" ? "permission" : "LOGINOM_SCOPE_DENIED",
+            )
+          expect(body?.type === "text" && body.metadata?.skill_activation).toBeUndefined()
+          expect(body?.type === "text" && body.metadata?.skill_activation_pending).toBeUndefined()
+          expect(TaskScope.derive({ sessionID: session.id, messages: history })?.profile).toBe("default")
+          expect(yield* llm.inputs).toEqual([])
+          expect((yield* sessions.get(session.id)).permission).toEqual(session.permission)
+          expect(requests.some((request) => request.method === "call" || request.method === "admit")).toBe(false)
+          return
+        }
+        expect(Exit.isSuccess(result)).toBe(true)
+        expect(body?.type).toBe("text")
+        if (body?.type === "text") {
+          expect(body.metadata?.skill_activation).toEqual({
+            name: "package-docs",
+            profile: "package-docs",
+            digest: info.digest,
+          })
+          expect(body.metadata?.skill_activation_pending).toBeUndefined()
+        }
+        expect(TaskScope.derive({ sessionID: session.id, messages: history })?.profile).toBe("package-docs")
+        const extracted = history
+          .flatMap((message) => message.parts)
+          .find((part) => part.type === "tool" && part.tool === "package_docs_run")
+        expect(extracted?.type === "tool" && extracted.state.status).toBe("completed")
+        const catalogs = (yield* llm.inputs)
+          .filter((input) => Array.isArray(input.tools))
+          .map((input) =>
+            Array.isArray(input.tools)
+              ? input.tools.flatMap((item) =>
+                  isRecord(item) && isRecord(item.function) && typeof item.function.name === "string"
+                    ? [item.function.name]
+                    : [],
+                )
+              : [],
+          )
+        expect(catalogs[0]).toContain("package_docs_run")
+        expect(catalogs[0]).not.toContain("bash")
+        expect(catalogs[0]).not.toContain("task")
+        expect(
+          requests
+            .filter((request) => request.method === "scope")
+            .map((request) => (isRecord(request.input) ? request.input.mode : undefined)),
+        ).toEqual(["bind", "request", "apply", "bind", "bind"])
+        expect(requests.filter((request) => request.method === "acquire")).toHaveLength(1)
+        expect(requests.some((request) => request.method === "call" || request.method === "admit")).toBe(false)
+        expect((yield* sessions.get(session.id)).permission).toEqual(session.permission)
+        expect(yield* sessions.children(session.id)).toEqual([])
+      }),
+  )
 
 it.instance("loop continues when finish is stop but assistant has tool parts", () =>
   Effect.gen(function* () {

@@ -53,7 +53,7 @@ export function derive(input: Input): Info | undefined {
     )
       continue
     for (const part of message.parts) {
-      const next = activationProfile(
+      const next = activation(
         message.info.role === "user" && part.type === "text"
           ? part.metadata?.skill_activation
           : message.info.role === "assistant" &&
@@ -63,7 +63,7 @@ export function derive(input: Input): Info | undefined {
             ? part.state.metadata.activation
             : undefined,
       )
-      if (next && HostTaskScope.permits(scope.profile, next)) scope = { ...scope, profile: next }
+      if (next && HostTaskScope.permits(scope.profile, next.profile)) scope = { ...scope, profile: next.profile }
     }
   }
   return scope
@@ -105,11 +105,10 @@ export function cleanMetadata(value: unknown): Record<string, unknown> {
 
 export function bundledActivation(skill: Skill.Info): Activation | undefined {
   if (skill.source !== "bundled" || !skill.digest) return
-  const profile = activationProfile({ name: skill.name, profile: skill.name, digest: skill.digest })
-  if (profile) return { name: profile, profile, digest: skill.digest }
+  return activation({ name: skill.name, profile: skill.name, digest: skill.digest })
 }
 
-function activationProfile(value: unknown): Exclude<Profile, "default"> | undefined {
+export function activation(value: unknown): Activation | undefined {
   if (
     !value ||
     typeof value !== "object" ||
@@ -123,7 +122,8 @@ function activationProfile(value: unknown): Exclude<Profile, "default"> | undefi
     value.name !== value.profile
   )
     return
-  if (value.profile === "package-docs" || value.profile === "loginom-automation") return value.profile
+  if (value.profile === "package-docs" || value.profile === "loginom-automation")
+    return { name: value.profile, profile: value.profile, digest: value.digest }
 }
 
 export * as TaskScope from "./task-scope"

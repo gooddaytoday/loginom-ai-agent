@@ -1087,9 +1087,36 @@ source skill part исключалась через Session revert, но backend
 checks прошли. Другие гонки pending/новой задачи/отмены, slash/run-command
 producer и Task bypass остаются следующими открытыми проверками.
 
+## Продуктовая slash-команда и исходная сессия
+
+Проверенный bundled skill в `Command` передаёт grant приватным аргументом
+внутреннего user-message constructor. Публичная схема prompt/command и SDK
+не менялись. После очистки metadata/hook результата backend ставит pending
+на текст тела skill. На границе текущей задачи проверяются обычные permissions
+`skill`, затем bind/request/apply того же Host run; applied `skill_activation`
+записывается только после успеха, перед первым provider turn. Непринятый или
+отменённый переход очищает pending. История восстанавливает applied профиль
+из существующего формата, без изменения Session.permission и новых таблиц.
+
+TDD также выявил стандартное превращение команды для `general` в subtask:
+product `Command.Info` теперь задаёт `subtask: false`. Обе команды выполняются
+в исходной сессии; исходный тест подтверждает отсутствие дочерних сессий.
+`tdd-bundled-command-activation-red.log` и
+`tdd-bundled-command-subtask-red.log` → `bundled-command-failures.log`:
+**5 PASS**, 62 assertions (build/general, request/apply/permission отказ).
+Положительные случаи включают настоящие bundle verification/Node extract;
+provider и Host IPC-ответы контролируемые.
+
+`bundled-command-final-suite.log`: **104 PASS / 1 SKIP**, 537 assertions
+(полный prompt, task scope, bundled skills, SkillTool). Agent typecheck и
+format/diff checks PASS. Source backend команды работает; установленный CLI,
+Desktop/TUI и естественный выбор моделью не приняты. Проверено, что CLI
+`run --command` пока теряет собранные `--file` части — это следующий TDD шаг,
+вместе с `.lgp` URL/MIME и оставшимися границами задачи. План не перерабатывался.
+
 ## Checkpoint
 
-- Исходный SHA `c8d309e01` (`docs-no-browser`); Host/catalogs/metadata/bundled loop и pending-revert проверены выше.
+- Исходный SHA `81bd15ff4` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -1103,7 +1130,7 @@ producer и Task bypass остаются следующими открытыми
 - Полный Host 224 PASS / 7 SKIP; Agent history/tools/registry 30 PASS; typecheck обоих PASS.
 - Старый package_docs/Python тест заменён actual bundled flow/Node executor без Host call/admit.
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
-- Bundled activation: полный prompt/инструменты 109 PASS / 1 SKIP; Agent typecheck PASS.
-- Pending-revert: 4 boundary tests и 87 PASS / 1 SKIP регрессий; typecheck PASS.
-- Далее: остальные races, slash/run-command, Task bypass и original-file acceptance.
+- Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
+- Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
+- Далее: CLI command attachments, `.lgp` URL/MIME, остальные races и Task bypass.
 - Затем Linux Desktop/CLI/TTY, естественный выбор skill и парные live evals на принятом harness SHA.
