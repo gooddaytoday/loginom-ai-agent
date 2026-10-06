@@ -2,22 +2,40 @@ import { createHash, randomUUID } from "node:crypto"
 import type { createLoginomHost } from "./host"
 import type { InputFile } from "./inputs"
 import { hostError } from "./errors"
+import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
 
-// Справка и диагностика остаются на скрытом readiness, пока окно чата не открыто.
-const readinessTools = new Set([
-  "find",
-  "search",
-  "read",
-  "grep",
-  "glob",
-  "list",
-  "tree",
-  "dock_diagnostics",
-  "dock_action_describe",
-  "dock_workspace_observe",
-  "dock_node_read",
-  "dock_operation_inspect",
-])
+const knowledgeTools = new Set(["find", "search", "read", "grep", "glob", "list", "tree"])
+const diagnosticTool = {
+  name: "dock_diagnostics",
+  description:
+    "Inspect local Loginom connection and Help readiness without opening a browser or querying the Skills API.",
+  inputSchema: {
+    type: "object",
+    properties: { checkConnections: { type: "boolean", default: true } },
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+}
+
+function catalogTools(input: unknown) {
+  if (
+    !input ||
+    typeof input !== "object" ||
+    !("tools" in input) ||
+    !Array.isArray(input.tools) ||
+    !input.tools.every(
+      (tool): tool is { name: string; inputSchema: { type: "object"; [key: string]: unknown } } =>
+        tool &&
+        typeof tool === "object" &&
+        typeof tool.name === "string" &&
+        tool.inputSchema &&
+        typeof tool.inputSchema === "object" &&
+        tool.inputSchema.type === "object",
+    )
+  )
+    throw Error("LOGINOM_REPLY_INVALID")
+  return input.tools
+}
 
 export type HostPort = {
   postMessage(value: unknown): void
@@ -110,8 +128,24 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       run.calls++
       try {
         if (data.method === "tools") {
-          const runtime = await service.runtime(run.lease.generation, "readiness")
-          reply({ id: data.id, result: await runtime.request("list") })
+          const knowledge = catalogTools(await service.catalog(run.lease.generation))
+          const browser = service.hasRuntime(run.lease.generation, run.chat)
+            ? catalogTools(await (await service.runtime(run.lease.generation, run.chat)).request("list"))
+            : []
+          reply({
+            id: data.id,
+            result: {
+              tools: [
+                ...knowledge,
+                prepareTool,
+                diagnosticTool,
+                ...browser.filter(
+                  (tool) =>
+                    !knowledgeTools.has(tool.name) && ![prepareTool.name, diagnosticTool.name].includes(tool.name),
+                ),
+              ],
+            },
+          })
           return
         }
         if (data.method === "admit") {
@@ -136,6 +170,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           return
         }
         if (data.method === "interrupt") {
+          await service.knowledge(run.lease.generation).request("interrupt", { run: `${owner}:${input.run}` })
           if (!service.hasRuntime(run.lease.generation, run.chat)) {
             reply({ id: data.id, result: true })
             return
@@ -153,18 +188,32 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           typeof input.userMessage !== "string"
         )
           throw new Error("LOGINOM_CALL_INVALID")
+        if (knowledgeTools.has(input.name)) {
+          const result = await service.knowledge(run.lease.generation).request("call", {
+            run: `${owner}:${input.run}`,
+            id: data.id,
+            name: input.name,
+            arguments: "args" in input ? input.args : undefined,
+          })
+          reply({ id: data.id, result })
+          return
+        }
+        if (input.name === "dock_diagnostics") {
+          const status = await service.api.status()
+          reply({
+            id: data.id,
+            result: { content: [{ type: "text", text: JSON.stringify(status) }], structuredContent: status },
+          })
+          return
+        }
         const recovery = { id: undefined as string | undefined }
-        const target =
-          service.hasRuntime(run.lease.generation, run.chat) || !readinessTools.has(input.name)
-            ? run.chat
-            : "readiness"
         try {
           // A dead runtime is replaced before admission. Past the relaunch limit this
           // is a known refusal, not an uncertain dispatch.
-          await service.runtime(run.lease.generation, target)
+          await service.runtime(run.lease.generation, run.chat)
           recovery.id = await service.journal.begin(run.chat, run.lease.generation)
           run.active.add(recovery.id)
-          const runtime = await service.runtime(run.lease.generation, target)
+          const runtime = await service.runtime(run.lease.generation, run.chat)
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
           const result = await runtime.request("call", {
             name: input.name,

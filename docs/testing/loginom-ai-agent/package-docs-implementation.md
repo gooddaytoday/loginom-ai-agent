@@ -661,6 +661,34 @@ tdd-knowledge-{shutdown-interrupt,startup-call-cancel}-red.log.
 Этот private all flag используется владельцем Host при shutdown; публичный
 HostPort строит только собственный run и игнорирует поданный caller all.
 
+Host switched to knowledge: RED — restored connection запускал запрещённый
+browser entry и становился recoverable-error. GREEN — один knowledge child
+на поколение, local ACK/settled отдельно от catalog readiness; browser readiness
+удалён. Catalog cached на поколении, возвращается clone после той же readiness
+promise; независимый list RPC не считается подтверждением lifecycle readiness.
+HostPort добавляет canonical prepare из runtime skill module и local diagnostics,
+возвращает реальные Help schemas, использует отдельный knowledge даже при
+существующем browser runtime. Help/diagnostics обходят mutation journal.
+Настоящий HTTP MCP/Node/HostPort тест подтвердил два чата, отмену только своего
+run при поданном caller all:true, сохранность второго, отсутствие browser marker
+и recovery файлов в strict режиме. Host shutdown interrupt охватывает knowledge.
+Ledger/serialization fixtures получили отдельный controlled knowledge child.
+Desktop lease tests initially упали на старом fake service; они переведены на
+настоящий Host, MessageChannel, supervised Node и held external operation,
+с сохранением утверждений о поколении до фактического завершения request.
+Full Host: 190 PASS / 7 SKIP / 0 FAIL, 1017 assertions, 68.29 s. Один SKIP —
+опциональный staging, выполненный отдельно с pinned inputs: 13 PASS (47 assertions).
+Остальные шесть — native Windows. Desktop source loginom: 36 PASS (109 assertions),
+оба typecheck PASS. stage4-host-knowledge-suite.log, stage4-knowledge-staging.log,
+stage4-desktop-host-{regression,typecheck}.log, host-knowledge-wire-concurrency.log.
+Host AGENTS описывает новый lifecycle; Protocol/API схемы не менялись.
+Полный этап 4 открыт: acquire ещё требует ready lease, standalone preflight
+ещё требует ready до модели и должен стать ленивым перед живыми CLI проверками;
+validation/save/browser status и первый разрешённый prepare остаются следующими.
+Installed Desktop/CLI и реальный model routing пока не проверены.
+Требования плана заморожены по указанию пользователя; повторного применения
+документа корректировок не выполнялось.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -679,5 +707,6 @@ HostPort строит только собственный run и игнорир�
 - Старый session package_docs/Python тест требует замены при SessionTools integration.
 - Reserved skill/command policy и пользовательские предупреждения проверены по sources.
 - Linux artifact completeness/shared closure проверены; Host suite 184 PASS / 6 SKIP.
-- Knowledge IPC/supervision и readiness service проверены; далее Host prepare/routing.
+- Host knowledge/catalog/Help реализованы; full Host 190 PASS / 7 SKIP, staging 13 PASS.
+- Desktop source lifecycle 36 PASS; далее local run и lazy CLI preflight, затем validation/UI.
 - Живая приёмка и удаление серверного skill остаются открытыми.

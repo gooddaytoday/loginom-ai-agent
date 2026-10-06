@@ -10,6 +10,7 @@ import { credentials } from "../src/connection/credentials"
 import { createLoginomHost } from "../src/host"
 import { loginomHostPort } from "../src/host-port"
 import { transport } from "../src/transport"
+import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
 
 test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnect", "other-chat", "direct"])(
   "parallel calls preserve ownership: %s",
@@ -19,6 +20,7 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
     const directory = await mkdtemp(join(tmpdir(), "loginom-parallel-"))
     const resources = join(directory, "resources")
     await mkdir(join(resources, "runtime/src"), { recursive: true })
+    await stageKnowledgeFixture(resources)
     await mkdir(join(resources, "bin"))
     await symlink(node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
     await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
@@ -90,7 +92,7 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
     const client = transport(connection)
     LoginomHost.connect(connection)
     try {
-      await host.settled()
+      await waitForKnowledge(host)
       const run = await LoginomHost.acquire("chat")
       expect(run).toBeDefined()
       if (!run) throw Error("missing run")

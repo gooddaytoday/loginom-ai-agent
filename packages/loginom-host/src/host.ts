@@ -2,7 +2,7 @@ import { inputStore, type InputFile } from "./inputs"
 import { readFile, rm } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
 import { randomUUID } from "node:crypto"
-import { supervise } from "./supervisor"
+import { supervise, superviseKnowledge } from "./supervisor"
 import { connectionService } from "./connection/connection-service"
 import { connectionStore, type ActiveConnection } from "./connection/connection-store"
 import type { CredentialCodec } from "./connection/credentials"
@@ -24,17 +24,19 @@ export async function createLoginomHost(options: {
   const journal = await recoveryStore(join(root, "recovery"), { strict: options.strictRecovery === true })
   const generations = new Map<
     number,
-    { connection: ActiveConnection; children: Map<string, Promise<Awaited<ReturnType<typeof supervise>>>> }
+    {
+      connection: ActiveConnection
+      knowledge: Awaited<ReturnType<typeof superviseKnowledge>>
+      catalog: Promise<unknown>
+      ready: Promise<void>
+      children: Map<string, Promise<Awaited<ReturnType<typeof supervise>>>>
+    }
   >()
   const restarts = new Map<string, number>()
   const lost = new Set<string>()
   const stale = new Set<string>()
   type Runtime = Awaited<ReturnType<typeof supervise>>
-  function retain(
-    generation: { children: Map<string, Promise<Runtime>> },
-    chat: string,
-    child: Promise<Runtime>,
-  ) {
+  function retain(generation: { children: Map<string, Promise<Runtime>> }, chat: string, child: Promise<Runtime>) {
     const tracked = child.then((runtime) => {
       void runtime.exited.then(() => {
         if (generation.children.get(chat) !== tracked) return
@@ -60,7 +62,7 @@ export async function createLoginomHost(options: {
       chat,
       connection,
       validation,
-      headless: validation || chat === "readiness" || options.headless === true,
+      headless: validation || options.headless === true,
       environment,
       endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
       actionManifestUri: manifest.actionManifestUri,
@@ -83,28 +85,39 @@ export async function createLoginomHost(options: {
         }
       },
       async prepare(connection) {
-        const child = await launch(connection, "readiness")
-        const generation = { connection, children: new Map<string, Promise<Runtime>>() }
+        const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
+        const knowledge = await superviseKnowledge({
+          node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
+          entry: join(resources, "runtime/src/knowledge-entry.mjs"),
+          stateDir: join(root, "knowledge", String(connection.generation)),
+          generation: connection.generation,
+          endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
+          apiKey: connection.apiKey,
+          environment,
+        })
+        const catalog = knowledge.request("list")
+        const ready = catalog.then(() => undefined)
+        const generation = { connection, knowledge, catalog, ready, children: new Map<string, Promise<Runtime>>() }
         generations.set(connection.generation, generation)
-        retain(generation, "readiness", Promise.resolve(child))
+        void ready.catch(() => undefined)
         return {
+          ready,
           async reset() {
             const results = await Promise.allSettled(
-              [...generation.children.entries()]
-                .filter(([chat]) => chat !== "readiness")
-                .map(async ([chat, child]) => {
-                  await (await child).close()
-                  generation.children.delete(chat)
-                }),
+              [...generation.children.entries()].map(async ([chat, child]) => {
+                await (await child).close()
+                generation.children.delete(chat)
+              }),
             )
             if (results.some((result) => result.status === "rejected"))
               throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
           },
           async close() {
             generations.delete(connection.generation)
-            const results = await Promise.allSettled(
-              [...generation.children.values()].map(async (child) => (await child).close()),
-            )
+            const results = await Promise.allSettled([
+              knowledge.close(),
+              ...[...generation.children.values()].map(async (child) => (await child).close()),
+            ])
             if (results.some((result) => result.status === "rejected"))
               throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
           },
@@ -126,6 +139,17 @@ export async function createLoginomHost(options: {
     },
     journal,
     recoveries,
+    knowledge(generation: number) {
+      const current = generations.get(generation)
+      if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
+      return current.knowledge
+    },
+    async catalog(generation: number) {
+      const current = generations.get(generation)
+      if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
+      await current.ready
+      return structuredClone(await current.catalog)
+    },
     resetRestarts(chat: string) {
       restarts.delete(chat)
       lost.delete(chat)
@@ -140,7 +164,14 @@ export async function createLoginomHost(options: {
         const child = generation.children.get(chat)
         if (!child) continue
         generation.children.delete(chat)
-        closing.push(child.then((runtime) => runtime.close()).then(() => undefined, () => undefined))
+        closing.push(
+          child
+            .then((runtime) => runtime.close())
+            .then(
+              () => undefined,
+              () => undefined,
+            ),
+        )
       }
       await Promise.all(closing)
       restarts.delete(chat)
@@ -148,11 +179,10 @@ export async function createLoginomHost(options: {
     },
     async interruptAll() {
       const results = await Promise.allSettled(
-        [...generations.values()].flatMap((generation) =>
-          [...generation.children.entries()]
-            .filter(([chat]) => chat !== "readiness")
-            .map(async ([, child]) => (await child).request("interrupt")),
-        ),
+        [...generations.values()].flatMap((generation) => [
+          generation.knowledge.request("interrupt", { all: true }),
+          ...[...generation.children.values()].map(async (child) => (await child).request("interrupt")),
+        ]),
       )
       if (results.some((result) => result.status === "rejected")) throw new Error("LOGINOM_RUNTIME_INTERRUPT_FAILED")
     },

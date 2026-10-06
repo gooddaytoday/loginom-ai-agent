@@ -10,6 +10,7 @@ import { transport } from "../src/transport"
 import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
 import { recoveryStore } from "../src/connection/recovery-store"
+import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
 
 test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
   "async operation journal retains ownership through waits: %s",
@@ -19,6 +20,7 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
     const directory = await mkdtemp(join(tmpdir(), "loginom-async-journal-"))
     const resources = join(directory, "resources")
     await mkdir(join(resources, "runtime/src"), { recursive: true })
+    await stageKnowledgeFixture(resources)
     await mkdir(join(resources, "bin"))
     await symlink(node, join(resources, "bin/node"))
     await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
@@ -76,7 +78,7 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
     const call = (action: string) =>
       client.request("call", { run: "one", name: "dock_node_wait", args: { action }, userMessage: "original" })
     try {
-      await host.settled()
+      await waitForKnowledge(host)
       expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
       expect(await call("start")).toEqual({ action: "start" })
       expect(host.journal.pending()).toEqual([])
@@ -135,7 +137,7 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
           strictRecovery: true,
         })
         try {
-          await reopened.settled()
+          await waitForKnowledge(reopened)
           const status = await reopened.api.status()
           expect(status.state).toBe("recoverable-error")
           expect(status.recoveries?.slice().sort()).toEqual(pending)
@@ -168,6 +170,7 @@ test("an uncertain call leaves the same run free to continue", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-advisory-call-"))
   const resources = join(directory, "resources")
   await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await stageKnowledgeFixture(resources)
   await mkdir(join(resources, "bin"))
   await symlink(node, join(resources, "bin/node"))
   await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
@@ -215,7 +218,7 @@ test("an uncertain call leaves the same run free to continue", async () => {
   const call = (action: string) =>
     client.request("call", { run: "one", name: "dock_node_wait", args: { action }, userMessage: "original" })
   try {
-    await host.settled()
+    await waitForKnowledge(host)
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
     expect(await call("uncertain")).toEqual({ action: "uncertain" })
     expect(await call("finish")).toEqual({ action: "finish" })
@@ -239,6 +242,7 @@ test("an uncertain run releases the chat and applies connection changes saved du
   const directory = await mkdtemp(join(tmpdir(), "loginom-advisory-release-"))
   const resources = join(directory, "resources")
   await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await stageKnowledgeFixture(resources)
   await mkdir(join(resources, "bin"))
   await symlink(node, join(resources, "bin/node"))
   await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
@@ -282,7 +286,7 @@ test("an uncertain run releases the chat and applies connection changes saved du
     start() {},
   })
   try {
-    await host.settled()
+    await waitForKnowledge(host)
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
     const validation = await host.api.check({
       revision: 1,
@@ -291,14 +295,21 @@ test("an uncertain run releases the chat and applies connection changes saved du
       apiKey: { operation: "preserve" },
       password: { operation: "preserve" },
     })
+    expect(await host.api.save({ revision: 1, validationId: validation.validationId })).toMatchObject({
+      state: "pending",
+      generation: 1,
+      username: "user",
+    })
     expect(
-      await host.api.save({ revision: 1, validationId: validation.validationId }),
-    ).toMatchObject({ state: "pending", generation: 1, username: "user" })
-    expect(
-      await client.request("call", { run: "one", name: "dock_node_wait", args: { action: "uncertain" }, userMessage: "original" }),
+      await client.request("call", {
+        run: "one",
+        name: "dock_node_wait",
+        args: { action: "uncertain" },
+        userMessage: "original",
+      }),
     ).toEqual({ action: "uncertain" })
     await client.request("release", { run: "one" })
-    await host.settled()
+    await waitForKnowledge(host)
     const status = await host.api.status()
     expect(status.recoveries).toBeUndefined()
     expect(status).toMatchObject({ state: "ready", generation: 2, username: "other" })
@@ -317,6 +328,7 @@ test("restarting the host drops an uncertain record without replaying it", async
   const directory = await mkdtemp(join(tmpdir(), "loginom-advisory-restart-"))
   const resources = join(directory, "resources")
   await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await stageKnowledgeFixture(resources)
   await mkdir(join(resources, "bin"))
   await symlink(node, join(resources, "bin/node"))
   await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
@@ -366,7 +378,7 @@ test("restarting the host drops an uncertain record without replaying it", async
     start() {},
   })
   try {
-    await host.settled()
+    await waitForKnowledge(host)
     const status = await host.api.status()
     expect(status.recoveries).toBeUndefined()
     expect(status.state).toBe("ready")
@@ -389,6 +401,7 @@ test("a killed runtime is replaced for the next call in the same run", async () 
   const launches = join(directory, "launches.jsonl")
   const calls = join(directory, "calls.jsonl")
   await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await stageKnowledgeFixture(resources)
   await mkdir(join(resources, "bin"))
   await symlink(node, join(resources, "bin/node"))
   await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
@@ -441,7 +454,7 @@ test("a killed runtime is replaced for the next call in the same run", async () 
   const call = (action: string) =>
     client.request("call", { run: "one", name: "dock_node_wait", args: { action }, userMessage: "original" })
   try {
-    await host.settled()
+    await waitForKnowledge(host)
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
     await expect(call("kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
     expect(await call("finish")).toEqual({ action: "finish" })
@@ -476,6 +489,7 @@ test("a chat runtime restarts at most twice in one turn", async () => {
   const resources = join(directory, "resources")
   const calls = join(directory, "calls.jsonl")
   await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await stageKnowledgeFixture(resources)
   await mkdir(join(resources, "bin"))
   await symlink(node, join(resources, "bin/node"))
   await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
@@ -527,7 +541,7 @@ test("a chat runtime restarts at most twice in one turn", async () => {
   const call = (run: string, action: string) =>
     client.request("call", { run, name: "dock_node_wait", args: { action }, userMessage: "original" })
   try {
-    await host.settled()
+    await waitForKnowledge(host)
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
     await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
     await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
@@ -560,6 +574,7 @@ test("the next turn replaces a runtime that cannot continue", async () => {
   const resources = join(directory, "resources")
   const launches = join(directory, "launches.jsonl")
   await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await stageKnowledgeFixture(resources)
   await mkdir(join(resources, "bin"))
   await symlink(node, join(resources, "bin/node"))
   await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
@@ -610,7 +625,7 @@ test("the next turn replaces a runtime that cannot continue", async () => {
   const call = (run: string, action: string) =>
     client.request("call", { run, name: "dock_node_wait", args: { action }, userMessage: "original" })
   try {
-    await host.settled()
+    await waitForKnowledge(host)
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
     expect(await call("one", "uncertain")).toEqual({ action: "uncertain" })
     await client.request("release", { run: "one" })
@@ -639,6 +654,7 @@ test("the next turn keeps a runtime that still has active work", async () => {
   const resources = join(directory, "resources")
   const launches = join(directory, "launches.jsonl")
   await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await stageKnowledgeFixture(resources)
   await mkdir(join(resources, "bin"))
   await symlink(node, join(resources, "bin/node"))
   await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
@@ -690,7 +706,7 @@ test("the next turn keeps a runtime that still has active work", async () => {
   const call = (run: string, action: string) =>
     client.request("call", { run, name: "dock_node_wait", args: { action }, userMessage: "original" })
   try {
-    await host.settled()
+    await waitForKnowledge(host)
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
     expect(await call("one", "pending")).toEqual({ action: "pending" })
     await client.request("release", { run: "one" })
@@ -711,7 +727,7 @@ test("the next turn keeps a runtime that still has active work", async () => {
   }
 }, 15000)
 
-test("help and diagnostics stay on readiness until the chat window is open", async () => {
+test("Help and diagnostics never use a browser runtime, including after chat preparation", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "loginom-readiness-tools-"))
@@ -719,6 +735,7 @@ test("help and diagnostics stay on readiness until the chat window is open", asy
   const launches = join(directory, "launches.jsonl")
   const calls = join(directory, "calls.jsonl")
   await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await stageKnowledgeFixture(resources)
   await mkdir(join(resources, "bin"))
   await symlink(node, join(resources, "bin/node"))
   await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
@@ -776,7 +793,12 @@ test("help and diagnostics stay on readiness until the chat window is open", asy
   const call = (name: string) => client.request("call", { run: "one", name, args: {}, userMessage: "original" })
   const chatStarts = async () => {
     const chat = createHash("sha256").update("chat").digest("hex")
-    return (await readFile(launches, "utf8"))
+    return (
+      await readFile(launches, "utf8").catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return ""
+        throw error
+      })
+    )
       .trim()
       .split("\n")
       .filter(Boolean)
@@ -784,16 +806,18 @@ test("help and diagnostics stay on readiness until the chat window is open", asy
       .filter((item) => item.chat === chat)
   }
   try {
-    await host.settled()
+    await waitForKnowledge(host)
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
     expect(await call("find")).toEqual({ name: "find" })
-    expect(await call("dock_diagnostics")).toEqual({ name: "dock_diagnostics" })
+    expect(await call("dock_diagnostics")).toMatchObject({ structuredContent: { generation: 1, state: "ready" } })
     expect(await client.request("interrupt", { run: "one" })).toBe(true)
     expect(await chatStarts()).toEqual([])
     expect(await call("dock_prepare")).toEqual({ name: "dock_prepare" })
     const opened = await chatStarts()
     expect(opened).toHaveLength(1)
     expect(await call("dock_action_describe")).toEqual({ name: "dock_action_describe" })
+    expect(await call("find")).toEqual({ name: "find" })
+    expect(await call("dock_diagnostics")).toMatchObject({ structuredContent: { generation: 1, state: "ready" } })
     expect(await chatStarts()).toEqual(opened)
     const chat = createHash("sha256").update("chat").digest("hex")
     expect(
@@ -802,8 +826,6 @@ test("help and diagnostics stay on readiness until the chat window is open", asy
         .split("\n")
         .map((line) => JSON.parse(line) as { chat: string; name: string }),
     ).toEqual([
-      { chat: "readiness", name: "find" },
-      { chat: "readiness", name: "dock_diagnostics" },
       { chat, name: "dock_prepare" },
       { chat, name: "dock_action_describe" },
     ])
