@@ -295,3 +295,14 @@ test("malformed CSV cannot masquerade as the intended near-miss", async () => {
     await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toMatchObject({ exitCode: 2 })
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+
+test("missing XML target is an inapplicable corpus edit with exit 2", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-missing-xml-"))
+  try {
+    const fixture = await sortCorpus(root)
+    fixture.corpus.cases[0]!.edits[0]!.file = "Unit_99/Unit.xml"
+    await Bun.write(path.join(fixture.dir, "cases.json"), JSON.stringify(fixture.corpus))
+    await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toMatchObject({ exitCode: 2 })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
