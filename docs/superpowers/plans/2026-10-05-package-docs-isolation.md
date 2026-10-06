@@ -666,7 +666,7 @@ type PackageDocsRun =
   и standalone launcher/worker, manifest-only discovery, `source/digest`,
   последовательный порядок, realpath-dedup. Базовые staging/integrity из этапа 1
   переиспользовать. `LOGINOM_AI_AGENT_CLI_BUNDLE` не отключает эту проверку.
-- [ ] Запретить зарезервированные/устаревшие имена из всех прочих skill-источников
+- [x] Запретить зарезервированные/устаревшие имена из всех прочих skill-источников
   и коллизии config/MCP-команд; предупреждение видно пользователю.
   Одинаковое правило действует для skill, slash и `run --command`.
   Одноимённая локальная копия не заменяет встроенную даже как `default`.

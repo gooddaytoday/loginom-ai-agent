@@ -10,6 +10,9 @@ import { Skill } from "../skill"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
 import { LegacyEvent } from "@loginom-ai-agent/schema/legacy-event"
+import { NamedError } from "@loginom-ai-agent/core/util/error"
+import { isReservedSkillName } from "@loginom-ai-agent/product/skills"
+import { EventV2Bridge } from "@/event-v2-bridge"
 
 type State = {
   commands: Record<string, Info>
@@ -61,6 +64,17 @@ const layer = Layer.effect(
     const config = yield* Config.Service
     const mcp = yield* MCP.Service
     const skill = yield* Skill.Service
+    const events = yield* EventV2Bridge.Service
+
+    const warnReserved = Effect.fn("Command.warnReserved")(function* (name: string, source: "config" | "MCP") {
+      yield* Effect.logWarning("ignored reserved product command from an external source", { name, source })
+      const { Session } = yield* Effect.promise(() => import("@/session/session"))
+      yield* events.publish(Session.Event.Error, {
+        error: new NamedError.Unknown({
+          message: `Ignored external command '${name}' from ${source}: this name is reserved for a bundled Loginom skill.`,
+        }).toObject(),
+      })
+    })
 
     const init = Effect.fn("Command.state")(function* (ctx: InstanceContext) {
       const cfg = yield* config.get()
@@ -88,6 +102,10 @@ const layer = Layer.effect(
       }
 
       for (const [name, command] of Object.entries(cfg.command ?? {})) {
+        if (isReservedSkillName(name)) {
+          yield* warnReserved(name, "config")
+          continue
+        }
         commands[name] = {
           name,
           agent: command.agent,
@@ -103,6 +121,10 @@ const layer = Layer.effect(
       }
 
       for (const [name, prompt] of Object.entries(yield* mcp.prompts())) {
+        if (isReservedSkillName(name)) {
+          yield* warnReserved(name, "MCP")
+          continue
+        }
         commands[name] = {
           name,
           source: "mcp",
@@ -172,6 +194,6 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = LayerNode.make({ service: Service, layer: layer, deps: [Config.node, MCP.node, Skill.node] })
+export const node = LayerNode.make({ service: Service, layer: layer, deps: [Config.node, MCP.node, Skill.node, EventV2Bridge.node] })
 
 export * as Command from "."

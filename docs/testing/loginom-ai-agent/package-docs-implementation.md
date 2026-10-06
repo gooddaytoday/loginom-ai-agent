@@ -521,6 +521,21 @@ legacy-docs-prompt-signal.log — ENOENT удалённого project skill. Е�
 suite не объявляется зелёной. Installed/live приёмка ещё не выполнена.
 Пункт SKILL.md этапа 2 отмечен; требования плана не переписывались.
 
+Reserved commands: настоящий RED после исправления event-listener fixture —
+config-команды вытесняли bundled skills и возвращали устаревшую package_docs.
+GREEN фильтрует reserved names до регистрации config/MCP команд, публикует
+Session.Error с пользовательской диагностикой и сохраняет обычный precedence.
+Реальный stdio MCP подтвердил namespace external:<prompt> и отсутствие подмены;
+такой namespace сейчас исключает точную коллизию, guard оставлен на границе
+регистрации для config и MCP. Повреждение bundle исключает и skill-, и command-
+fallback. Матрица проверила оба имени и obsolete из семи локальных roots
+(home/project Claude и Agents, оба config каталога, skills.paths) и настоящего
+HTTP skills.urls. 21 локальная диагностика наблюдалась через реальный EventV2.
+Catalog 17 PASS (102 assertions), Agent typecheck PASS; tdd-reserved-command-red,
+reserved-command-mcp-green, reserved-source-matrix-green.log. Все profiles,
+HTTP cache и процесс MCP принадлежат изолированным test fixtures.
+Первый пункт reserved policy этапа 3 отмечен; installed/Desktop/TUI ещё открыты.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -537,4 +552,5 @@ suite не объявляется зелёной. Installed/live приёмка 
 - Этап 2: pipeline 41 PASS, staging 13 PASS; Host suite 180 PASS / 6 SKIP.
 - Tool/SKILL Node workflow и lifecycle проверены; далее TaskScope и actual run permissions.
 - Старый session package_docs/Python тест требует замены при SessionTools integration.
+- Reserved skill/command policy и пользовательские предупреждения проверены по sources.
 - Живая приёмка и удаление серверного skill остаются открытыми.

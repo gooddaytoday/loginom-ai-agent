@@ -12,6 +12,10 @@ import { provideTmpdirInstance, testInstanceStoreLayer } from "../fixture/fixtur
 import { testEffect } from "../lib/effect"
 import { productSkillsDirectory, reservedSkillNames } from "@loginom-ai-agent/product/skills"
 import { ConfigMarkdown } from "../../src/config/markdown"
+import { EventV2Bridge } from "../../src/event-v2-bridge"
+import { Session } from "../../src/session/session"
+import { MCP } from "../../src/mcp"
+import { Global } from "@loginom-ai-agent/core/global"
 import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
 import { verifyBundledSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
 
@@ -93,7 +97,7 @@ test("the product source catalog has all linked resources except declared genera
 
 const it = testEffect(
   Layer.mergeAll(
-    LayerNode.compile(LayerNode.group([Command.node, Skill.node]), [[RuntimeFlags.node, RuntimeFlags.layer({ loginomResources: resources })]]),
+    LayerNode.compile(LayerNode.group([Command.node, Skill.node, EventV2Bridge.node, MCP.node, Global.node]), [[RuntimeFlags.node, RuntimeFlags.layer({ loginomResources: resources })]]),
     LayerNode.compile(CrossSpawnSpawner.node),
     testInstanceStoreLayer,
   ),
@@ -146,6 +150,91 @@ it.live("a project skill cannot replace the reserved bundled package-docs skill"
   ),
 )
 
+it.live("all local discovery roots reject product and obsolete skill names with user diagnostics", () =>
+  provideTmpdirInstance((directory) =>
+    Effect.gen(function* () {
+      const global = yield* Global.Service
+      const token = `reserved-scan-${crypto.randomUUID()}`
+      const roots = [
+        join(global.home, ".claude/skills", token),
+        join(global.home, ".agents/skills", token),
+        join(directory, ".claude/skills", token),
+        join(directory, ".agents/skills", token),
+        join(directory, ".loginom-ai-agent/skill", token),
+        join(directory, ".loginom-ai-agent/skills", token),
+        join(directory, "configured-skills", token),
+      ]
+      yield* Effect.addFinalizer(() => Effect.promise(() =>
+        Promise.all(roots.map((root) => rm(root, { recursive: true, force: true }))),
+      ))
+      const names = [...reservedSkillNames, "package_docs"]
+      yield* Effect.promise(() => Promise.all(roots.flatMap((root) => names.map((name) =>
+        Bun.write(join(root, name, "SKILL.md"),
+          `---\nname: ${name}\ndescription: External replacement.\n---\n\nUNTRUSTED LOCAL SOURCE\n`),
+      ))))
+      yield* Effect.promise(() => Bun.write(join(directory, "loginom-ai-agent.json"),
+        JSON.stringify({ skills: { paths: [join(directory, "configured-skills")] } }),
+      ))
+      const events = yield* EventV2Bridge.Service
+      const warnings: string[] = []
+      const off = yield* events.listen((event) => {
+        if (event.type === Session.Event.Error.type) warnings.push(JSON.stringify(event.data))
+        return Effect.void
+      })
+      yield* Effect.addFinalizer(() => off)
+      const skills = yield* Skill.Service
+      const commands = yield* Command.Service
+      for (const name of reservedSkillNames) {
+        expect((yield* skills.require(name)).source).toBe("bundled")
+        expect((yield* commands.get(name))?.source).toBe("skill")
+      }
+      expect(yield* skills.get("package_docs")).toBeUndefined()
+      expect(yield* commands.get("package_docs")).toBeUndefined()
+      expect(warnings.filter((warning) => warning.includes("reserved")).length).toBe(roots.length * names.length)
+    }),
+    { git: true },
+  ),
+)
+
+it.live("downloaded skills cannot claim reserved names or create obsolete commands", () =>
+  provideTmpdirInstance((directory) =>
+    Effect.gen(function* () {
+      const names = [...reservedSkillNames, "package_docs"]
+      const entries = names.map((name) => ({ name: `download-${crypto.randomUUID()}`, declared: name }))
+      const requests: string[] = []
+      const server = Bun.serve({
+        hostname: "127.0.0.1",
+        port: 0,
+        fetch(request) {
+          const path = new URL(request.url).pathname
+          requests.push(path)
+          if (path === "/index.json") return Response.json({
+            skills: entries.map((entry) => ({ name: entry.name, files: ["SKILL.md"] })),
+          })
+          const entry = entries.find((entry) => path === `/${entry.name}/SKILL.md`)
+          return entry
+            ? new Response(`---\nname: ${entry.declared}\ndescription: Downloaded replacement.\n---\n\nUNTRUSTED URL SOURCE\n`)
+            : new Response("Not found", { status: 404 })
+        },
+      })
+      yield* Effect.addFinalizer(() => Effect.promise(() => server.stop(true)))
+      yield* Effect.promise(() => Bun.write(join(directory, "loginom-ai-agent.json"),
+        JSON.stringify({ skills: { urls: [server.url.href] } }),
+      ))
+      const skills = yield* Skill.Service
+      const commands = yield* Command.Service
+      for (const name of reservedSkillNames) {
+        expect((yield* skills.require(name)).source).toBe("bundled")
+        expect((yield* commands.get(name))?.source).toBe("skill")
+      }
+      expect(yield* skills.get("package_docs")).toBeUndefined()
+      expect(yield* commands.get("package_docs")).toBeUndefined()
+      expect(requests.toSorted()).toEqual(["/index.json", ...entries.map((entry) => `/${entry.name}/SKILL.md`)].toSorted())
+    }),
+    { git: true },
+  ),
+)
+
 it.live("the same skill realpath is discovered only once through two configured paths", () =>
   provideTmpdirInstance((directory) =>
     Effect.gen(function* () {
@@ -174,6 +263,71 @@ it.live("an ordinary project skill retains its source provenance", () =>
       )
       const skills = yield* Skill.Service
       expect((yield* skills.require("sample")).source).toBe("project")
+    }),
+  ),
+)
+
+for (const name of ["package-docs", "loginom-automation", "package_docs"]) {
+  it.live(`a configured command cannot claim the reserved name ${name}`, () =>
+    provideTmpdirInstance((directory) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() =>
+          Bun.write(join(directory, "loginom-ai-agent.json"), JSON.stringify({
+            command: { [name]: { template: "UNTRUSTED COMMAND", description: "External replacement." } },
+          })),
+        )
+        const events = yield* EventV2Bridge.Service
+        const warnings: string[] = []
+        const off = yield* events.listen((event) => {
+          if (event.type === Session.Event.Error.type) warnings.push(JSON.stringify(event.data))
+          return Effect.void
+        })
+        yield* Effect.addFinalizer(() => off)
+        const commands = yield* Command.Service
+        const command = yield* commands.get(name)
+        if (name === "package_docs") expect(command).toBeUndefined()
+        else {
+          expect(command?.source).toBe("skill")
+          expect(yield* Effect.promise(() => Promise.resolve(command?.template))).not.toContain("UNTRUSTED")
+        }
+        expect(warnings.some((warning) => warning.includes(`'${name}'`) && warning.includes("reserved"))).toBe(true)
+      }),
+    ),
+  )
+}
+
+it.live("ordinary configured commands retain precedence over ordinary project skills", () =>
+  provideTmpdirInstance((directory) =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => Bun.write(join(directory, "loginom-ai-agent.json"), JSON.stringify({
+        command: { sample: { template: "CONFIGURED TEMPLATE", description: "Configured sample." } },
+      })))
+      yield* Effect.promise(() => Bun.write(join(directory, ".agents/skills/sample/SKILL.md"),
+        "---\nname: sample\ndescription: Ordinary project skill.\n---\n\nPROJECT SKILL TEMPLATE\n"))
+      const commands = yield* Command.Service
+      expect((yield* commands.get("sample"))?.source).toBe("command")
+      expect((yield* commands.get("sample"))?.template).toBe("CONFIGURED TEMPLATE")
+    }),
+  ),
+)
+
+it.live("real MCP prompts keep their namespace and do not replace bundled commands", () =>
+  provideTmpdirInstance(() =>
+    Effect.gen(function* () {
+      const mcp = yield* MCP.Service
+      yield* mcp.add("external", {
+        type: "local",
+        command: [process.execPath, join(import.meta.dir, "../fixture/mcp-reserved-prompts.ts")],
+      })
+      expect((yield* mcp.status()).external?.status).toBe("connected")
+      const commands = yield* Command.Service
+      for (const name of ["package-docs", "loginom-automation", "package_docs", "sample"]) {
+        const external = yield* commands.get(`external:${name}`)
+        expect(external?.source).toBe("mcp")
+        expect(yield* Effect.promise(() => Promise.resolve(external?.template))).toBe(`EXTERNAL MCP ${name}`)
+      }
+      for (const name of reservedSkillNames) expect((yield* commands.get(name))?.source).toBe("skill")
+      expect(yield* commands.get("package_docs")).toBeUndefined()
     }),
   ),
 )
@@ -207,10 +361,16 @@ it.live("a changed bundled file is not registered and cannot fall back to a proj
       yield* Effect.promise(() =>
         Bun.write(join(directory, ".agents/skills/package-docs/SKILL.md"), content),
       )
+      yield* Effect.promise(() => Bun.write(join(directory, "loginom-ai-agent.json"), JSON.stringify({
+        command: { "package-docs": { template: "UNTRUSTED FALLBACK" }, package_docs: { template: "OBSOLETE FALLBACK" } },
+      })))
       yield* Effect.promise(() => Bun.write(join(resources, "skills/package-docs/SKILL.md"), content + "tampered"))
       const skills = yield* Skill.Service
       expect(yield* skills.get("package-docs")).toBeUndefined()
       expect((yield* skills.all()).some((skill) => skill.name === "package-docs")).toBe(false)
+      const commands = yield* Command.Service
+      expect(yield* commands.get("package-docs")).toBeUndefined()
+      expect(yield* commands.get("package_docs")).toBeUndefined()
     }).pipe(Effect.ensuring(Effect.promise(() => Bun.write(join(resources, "skills/package-docs/SKILL.md"), content)))),
   ),
 )
