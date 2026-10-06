@@ -88,7 +88,7 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
 // Both use the same private transport and acknowledged cleanup contract.
 export async function supervise(input: Launch) {
   if (!isAbsolute(input.resources)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
-  // Validation includes MCP initialization and browser navigation/authentication.
+  // Browser validation follows the separate key-only Help check in Host.
   const runtime = await superviseProcess(
     input, { ...input, environment: undefined, protocol: 1 }, input.validation ? 210_000 : 120_000,
   )

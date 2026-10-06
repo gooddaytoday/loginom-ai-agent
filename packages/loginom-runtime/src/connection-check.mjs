@@ -47,29 +47,6 @@ export async function loginPage(page, candidate) {
   return { authenticated: true }
 }
 
-export async function checkKnowledge(endpoint, apiKey) {
-  const { Client } = require("@modelcontextprotocol/sdk/client/index.js")
-  const { StreamableHTTPClientTransport } = require("@modelcontextprotocol/sdk/client/streamableHttp.js")
-  const client = new Client({ name: "loginom-ai-agent-connection-check", version: "0.1.0" })
-  try {
-    await client.connect(
-      new StreamableHTTPClientTransport(new URL(endpoint), {
-        requestInit: { headers: { Authorization: `Bearer ${apiKey}` }, redirect: "error" },
-      }),
-      { timeout: 30_000 },
-    )
-    // Initialize/authentication is sufficient; no user file requests are made here.
-  } catch (error) {
-    throw Error(
-      [401, 403].includes(error?.code ?? error?.status)
-        ? "LOGINOM_KNOWLEDGE_AUTH_FAILED"
-        : "LOGINOM_KNOWLEDGE_UNAVAILABLE",
-    )
-  } finally {
-    await client.close().catch(() => undefined)
-  }
-}
-
 export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false }) {
   const { chromium } = require("playwright-core")
   const launch = browserLaunch(headless)
@@ -119,9 +96,4 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED"].includes(error?.message)) throw error
     throw Error("LOGINOM_LOGIN_UNAVAILABLE")
   }
-}
-
-export async function checkConnection(options) {
-  await checkKnowledge(options.endpoint, options.candidate.apiKey)
-  return loginBrowser(options)
 }

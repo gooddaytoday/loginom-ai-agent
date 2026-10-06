@@ -2,6 +2,8 @@ import { inputStore, type InputFile } from "./inputs"
 import { readFile, rm } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
 import { randomUUID } from "node:crypto"
+import { Schema } from "effect"
+import { Loginom } from "@loginom-ai-agent/schema/loginom"
 import { supervise, superviseKnowledge } from "./supervisor"
 import { connectionService } from "./connection/connection-service"
 import { connectionStore, type ActiveConnection } from "./connection/connection-store"
@@ -72,16 +74,49 @@ export async function createLoginomHost(options: {
   const service = await connectionService(
     connectionStore(join(root, "connection"), options.codec),
     {
-      async check(connection) {
+      async check(connection, signal) {
+        signal?.throwIfAborted()
         const chat = randomUUID()
         try {
-          const child = await launch(connection, chat, true)
-          await child.close()
-        } finally {
-          await rm(join(root, "validation", "generations", String(connection.generation), "chats", chat), {
-            recursive: true,
-            force: true,
+          const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
+          const knowledge = await superviseKnowledge({
+            node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
+            entry: join(resources, "runtime/src/knowledge-entry.mjs"),
+            stateDir: join(root, "validation", "knowledge", chat),
+            generation: connection.generation,
+            endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
+            apiKey: connection.apiKey,
+            environment,
           })
+          const cancel = () => {
+            void knowledge.close().catch(() => undefined)
+          }
+          signal?.addEventListener("abort", cancel, { once: true })
+          try {
+            signal?.throwIfAborted()
+            await knowledge.request("list")
+            signal?.throwIfAborted()
+          } finally {
+            signal?.removeEventListener("abort", cancel)
+            await knowledge.close()
+          }
+          signal?.throwIfAborted()
+          const child = await launch(connection, chat, true).catch((error: unknown) => {
+            if (error instanceof Error && Schema.is(Loginom.BrowserFailure)(error.message))
+              return { state: "failed" as const, failure: error.message }
+            throw error
+          })
+          if ("state" in child) return child
+          await child.close()
+          return { state: "verified" as const }
+        } finally {
+          await Promise.all([
+            rm(join(root, "validation", "generations", String(connection.generation), "chats", chat), {
+              recursive: true,
+              force: true,
+            }),
+            rm(join(root, "validation", "knowledge", chat), { recursive: true, force: true }),
+          ])
         }
       },
       async prepare(connection) {
@@ -205,7 +240,21 @@ export async function createLoginomHost(options: {
         restarts.set(chat, count + 1)
         lost.delete(chat)
       }
-      return retain(current, chat, launch(current.connection, chat))
+      return retain(
+        current,
+        chat,
+        launch(current.connection, chat).then(
+          (child) => {
+            service.browserStatus(generation, { state: "verified" })
+            return child
+          },
+          (error: unknown) => {
+            if (error instanceof Error && Schema.is(Loginom.BrowserFailure)(error.message))
+              service.browserStatus(generation, { state: "failed", failure: error.message })
+            throw error
+          },
+        ),
+      )
     },
   }
 }

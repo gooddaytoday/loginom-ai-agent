@@ -13,7 +13,11 @@ export async function createKnowledgeClient({ endpoint, apiKey }, signal) {
     transport: new StreamableHTTPClientTransport(new URL(endpoint), {
       requestInit: { headers: { Authorization: `Bearer ${apiKey}` }, redirect: 'error' },
     }),
-  }), { signal });
+  }), { signal }).catch(error => {
+    signal?.throwIfAborted();
+    throw Error([401, 403].includes(error?.code ?? error?.status)
+      ? 'LOGINOM_KNOWLEDGE_AUTH_FAILED' : 'LOGINOM_KNOWLEDGE_UNAVAILABLE');
+  });
   try {
     const catalog = combineCatalogs({ remote: (await readCatalog(remote, { signal })).filter(tool => names.has(tool.name)) });
     if (catalog.tools.length !== names.size) throw Error('LOGINOM_KNOWLEDGE_CATALOG_INVALID');

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
-import { loginBrowser, checkConnection, loginomAddress } from "./connection-check.mjs"
+import { loginBrowser, loginomAddress } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts } from "../client/lib/artifacts.mjs"
 import { createBridge } from "../client/lib/bridge.mjs"
@@ -97,7 +97,7 @@ async function handle(message) {
         headless: input.headless === true,
       }
       if (input.validation === true) {
-        await checkConnection({ ...login, endpoint: input.endpoint })
+        await loginBrowser(login)
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }

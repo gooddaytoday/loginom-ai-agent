@@ -759,6 +759,37 @@ TaskScope, каталог по профилям, lazy natural-tool exit contract
 Один dangling alias собственного SIGKILL RED fixture удалён после подтверждения
 отсутствия target; чужие profiles, worktrees и launcher не менялись.
 
+## 2026-10-06 — Host: отдельная проверка Help и веб-входа
+
+TDD RED → GREEN: рабочий ключ Help больше не блокируется ошибкой веб-входа.
+Host проверяет реальный key-only knowledge entry и полный MCP-каталог перед
+запуском браузерной проверки. Четыре разрешённых кода веб-ошибок дают отдельный
+BrowserStatus `failed` и одноразовый validationId; успешный вход даёт `verified`.
+Неверный ключ, недоступный Help и неизвестные/cleanup ошибки не дают save token.
+Повторная MCP-проверка удалена из browser managed-entry; секреты и чужие сообщения
+не добавлены в View. Общие optional View/Validation совместимы со старыми views.
+
+Статус браузера относится к активному поколению, после restore — `unknown`.
+Несохранённый draft и старое поколение его не меняют; явный check неизменённого
+подключения и запуск чата обновляют его. View возвращает отдельную копию статуса.
+Закрытие Host отменяет ожидающую MCP Help проверку и дожидается её cleanup.
+Приёмка отмены уже начавшейся браузерной навигации остаётся открытой.
+
+13 новых Host regression cases через реальные Node/HTTP MCP и контролируемую
+внешнюю браузерную границу; новые contract tests — 2 PASS / 13 assertions.
+Полный Host: 207 PASS / 7 SKIP / 0 FAIL / 1128 assertions, 78.32 s.
+Desktop connection exports: 36 PASS / 109 assertions. Runtime entry/page: 16 PASS;
+knowledge client: 11 PASS. Host, Schema и Agent typecheck PASS; diff check PASS.
+Логи: host-validation-browser-suite.log, desktop-validation-browser-regression.log,
+runtime-validation-browser-regression.log, client-validation-browser-regression.log,
+agent-validation-browser-typecheck.log в сохранённом acceptance каталоге.
+RED: tdd-host-{browser-warning,validation-key,browser-status,chat-browser-status,
+validation-shutdown}-red.log. Изменённые runtime src/knowledge-client не числятся
+импортированными файлами source-map; baseline attribution debt не переписан.
+Публичные Protocol/HttpApi не используют эти View/Validation и не менялись.
+Пункт плана validation/save/status/UI не отмечен: Desktop/CLI отображение
+и установленная/живая проверка пока впереди. Требования плана не менялись.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -775,7 +806,7 @@ TaskScope, каталог по профилям, lazy natural-tool exit contract
 - Старый session package_docs/Python тест требует замены при SessionTools integration.
 - Reserved skill/command policy и пользовательские предупреждения проверены по sources.
 - Linux artifact completeness/shared closure проверены; Host suite 184 PASS / 6 SKIP.
-- Host local run/lazy lease и knowledge реализованы; full Host 194 PASS / 7 SKIP.
+- Host local run/knowledge и отдельный BrowserStatus; full Host 207 PASS / 7 SKIP.
 - Desktop source lifecycle 36 PASS, lease 4 PASS; CLI preflight 12 PASS и local-run 6 PASS.
-- Далее TaskScope/lazy tool exit contract, validation/save/browser status/UI; staging 13 PASS.
+- Host validation/save реализованы; далее Desktop/CLI UI, TaskScope и lazy tool exit contract.
 - Живая приёмка и удаление серверного skill остаются открытыми.
