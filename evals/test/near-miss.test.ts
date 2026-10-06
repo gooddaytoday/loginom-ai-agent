@@ -286,3 +286,12 @@ test("passing oracle plus detected filter defect is a successful calibration cas
     expect(await Bun.file(path.join(result.runDir, "summary.json")).exists()).toBe(false)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("malformed CSV cannot masquerade as the intended near-miss", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-invalid-csv-"))
+  try {
+    const fixture = await sortCorpus(root)
+    await Bun.write(path.join(fixture.dir, "sort.csv"), 'category,revenue\n"unclosed,1')
+    await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toMatchObject({ exitCode: 2 })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
