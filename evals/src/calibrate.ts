@@ -8,6 +8,7 @@ import { judgeInfo, judgeTask, type JudgeSettings } from "./judge"
 import { describe, redact, stamp } from "./run"
 import { evalsRoot } from "./config"
 import { prepareCalibrationCases } from "./calibration-cases"
+import { checkOracle } from "./oracle"
 
 export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsRoot, "calibration")) {
   const tasks = await loadTasks(config.tasksDir, config.only)
@@ -32,7 +33,7 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
     oracle_pass?: boolean | null; oracle_error?: string | null; expectations_met?: boolean
   }[] = []
   for (const [index, task] of tasks.entries()) {
-    const checklist = task.checklist.filter((item) => !item.requiresResultFile && !item.requiresRun)
+    const checklist = task.checklist.filter((item) => !item.requiresRun && (!item.requiresResultFile || !!task.oracle))
     if (!checklist.length) {
       rows.push({
         task: task.id,
@@ -64,18 +65,22 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
         console.error(`[calibrate ${task.id}/${kind}] score=error`)
         continue
       }
+      if (kind === "positive" && task.oracle)
+        await cp(path.join(task.dir, task.oracle), path.join(artifactDir, "results", "calibration.result.csv"))
+      const oracle = kind === "positive" && task.oracle ? await checkOracle(task, artifactDir) : { passed: null, error: null }
       const judged = await judgeTask({
         task,
         artifactDir,
         prompt: task.prompt,
         outDir: path.join(attemptDir, "judge"),
         judge: settings,
-        checklist,
+        checklist: kind === "negative" ? checklist.filter((item) => !item.requiresResultFile) : checklist,
       }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
       rows.push({
         task: task.id,
         kind,
         reference: reference.id,
+        oracle_pass: oracle.passed, oracle_error: oracle.error,
         score: judged.ok ? judged.score : null,
         failed: judged.ok ? judged.items.filter((item) => !item.passed).map((item) => item.id) : [],
         error: judged.ok ? null : judged.error,
@@ -108,6 +113,8 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
     if (row.score === null) return [`${row.task}/${row.kind}: судья не дал вердикт (${row.error})`]
     if (row.kind === "positive" && row.score < positiveMin)
       return [`${row.task}/positive: ${row.score} < ${positiveMin}; непройдены: ${row.failed.join(", ") || "—"}`]
+    if (row.kind === "positive" && row.oracle_pass === false)
+      return [row.task + "/positive: oracle не пройден (" + row.oracle_error + ")"]
     if (row.kind === "negative" && row.score > negativeMax)
       return [`${row.task}/negative (эталон ${row.reference}): ${row.score} > ${negativeMax} — судья не заметил подмену`]
     if (row.kind === "near-miss" && !row.expectations_met)
