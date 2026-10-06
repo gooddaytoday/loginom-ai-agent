@@ -55,8 +55,8 @@ try:
   except ValueError:continue
   if event.get('type')=='tool_use' and event.get('part',{}).get('state',{}).get('status') in ['completed','error']:
    part=event['part'];state=part['state']
-   try:terminal.append({'tool':part['tool'],'input':state['input'],'result':json.loads(state.get('output',state.get('error')))})
-   except (ValueError,TypeError):pass
+   try:terminal.append({'tool':part['tool'],'input':state['input'],'result':json.JSONDecoder().raw_decode(state.get('output',state.get('error')))[0]})
+   except (ValueError,TypeError):raise RuntimeError('AUDIT_UNPARSEABLE_TOOL_REPLY')
  if any(t['result'].get('status') in ['AMBIGUOUS','TIMED_OUT'] for t in terminal):raise RuntimeError('UNKNOWN_EFFECT_PRESERVED')
  if any(t['result'].get('state')=='settled' and t['result'].get('cleanup_complete') is False for t in terminal):raise RuntimeError('UNCONFIRMED_OPERATION_CLEANUP_PRESERVED')
  # Expected full data and administrative credentials are made available only
@@ -81,8 +81,8 @@ try:
  if not successes:raise RuntimeError('WARM_IMPORT_MISSING')
  warm=successes[-1]
  if warm['cleanup_complete'] is not True:raise RuntimeError('WARM_CLEANUP_UNCONFIRMED')
- native=warm['output']['configuration']['readback'];oracle_module.settings(case,native,cold['cli_delivery']['destination'])
- ports=warm['output']['output']['ports']
+ native=warm['configuration']['readback'];oracle_module.settings(case,native,cold['cli_delivery']['destination'])
+ ports=warm['output']['ports']
  if len(ports)!=1:raise RuntimeError('WARM_OUTPUT_INCOMPLETE')
  result['cli_full_values']=oracle_module.compare(case,ports[0])
  if result['cli_exit']!=0 or result['oracle_exit']!=0 or not all(result['cleanup'].get(k) is True for k in ['package_closed','logged_out']):raise RuntimeError('FULL_ACCEPTANCE_REQUIRED')

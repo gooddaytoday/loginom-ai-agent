@@ -108,7 +108,7 @@ try{
   const precision=await configureTablePrecision(channel,opened.table);
   const readSettings=await prepareTableRead(channel,opened.table);
   const raw=await readTableOutputPages(channel,opened.table,{sampleRows:10});
-  const data=decodeTableOutput(raw,{formatProof:precision,readSettings,expectedColumns:precision.fields.map(f=>({name:f.key,label:f.label,type:f.type})),requireExactNumbers:true});
+  const data=decodeTableOutput(raw,{formatProof:precision,readSettings,expectedColumns:precision.fields.map(f=>({name:f.key,label:f.label,type:f.type,data_kind:fields.find(c=>c.name===f.key)?.data_kind})),requireExactNumbers:true});
   await returnFromOutputTable(channel,opened.table);
   const port={...data,fresh:true,execution_id:importExecution.execution_id};
   report={status:'CHECK_VALUES',case_id:expected.case_id,cli_delivery:transfer,package_path:saved.path,source:proofs.get(settings.source_path),configuration:{source:settings,format,columns:fields.map(f=>({...f,used:true}))},graph_verified:true,fresh_execution:importExecution,port};
