@@ -58,6 +58,38 @@ test("CLI compare: отсутствующая обязательная метр�
  } finally { await rm(directory,{recursive:true,force:true}) }
 })
 
+test("CLI compare: malformed infra_retry.initial даёт exit 2 и сохраняет входы", async () => {
+ const directory = await mkdtemp(path.join(os.tmpdir(),"evals-compare-retry-"))
+ try {
+  const original = await summaries(directory)
+  const run = comparisonSummary([{successes:3,attempts:3}])
+  const attempt = run.tasks[0]!.attempts[0]!
+  const initial = { ...attempt, status: "infra_error", score: null, pass: null, judge_status: "skipped" }
+  for (const retry of [null, [], {}, {initial:null}, {initial:{}},
+   {initial:{...initial,cost:"bad"}}, {initial:{...initial,duration_ms:-1}},
+   {initial:{...initial,tokens:null}}, {initial:{...initial,counters:{}}},
+   {initial:{...initial,judge_status:"bad"}}, {initial:{...initial,task_id:"other"}},
+   {initial:{...initial,attempt:2}}, {initial:{...initial,status:"completed"}},
+   {initial:{...initial,infra_retry:{initial}}}]) {
+   Object.assign(attempt, {infra_retry:retry})
+   const saved = JSON.stringify(run)
+   await Bun.write(path.join(directory,"a/summary.json"),saved)
+   const result = await runCompare(directory,["a","b"])
+   expect(result.code).toBe(2)
+   expect(result.stderr).toContain("Некорректный summary")
+   expect(await Bun.file(path.join(directory,"compare-a-vs-b.md")).exists()).toBe(false)
+   expect(await Bun.file(path.join(directory,"a/summary.json")).text()).toBe(saved)
+   expect(await Bun.file(path.join(directory,"b/summary.json")).text()).toBe(original)
+  }
+  Object.assign(attempt, {infra_retry:{initial}})
+  const saved = JSON.stringify(run)
+  await Bun.write(path.join(directory,"a/summary.json"),saved)
+  expect((await runCompare(directory,["a","b"])).code).toBe(0)
+  expect(await Bun.file(path.join(directory,"a/summary.json")).text()).toBe(saved)
+  expect(await Bun.file(path.join(directory,"b/summary.json")).text()).toBe(original)
+ } finally { await rm(directory,{recursive:true,force:true}) }
+})
+
 test("CLI compare: invalid policy, duplicates, unknown flags и extra args дают exit 2", async () => {
  const directory = await mkdtemp(path.join(os.tmpdir(),"evals-compare-policy-"))
  try {
