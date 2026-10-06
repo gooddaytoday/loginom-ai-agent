@@ -8,7 +8,7 @@ Spec: ../specs/2026-09-18-evals-design.md, calibration section.
 - [x] Expected checklist/oracle gates, corpus validation and compatibility.
 - [x] 35-task corpus: sort 35, aggregate 34, threshold 6, filter 3, column 35.
 - [x] Independent CSV reproduction.
-- [ ] Final full test/typecheck/diff-check.
+- [x] Final full test/typecheck/diff-check.
 - [ ] Live full acceptance; general judge prompt tuning if necessary.
 - [ ] Final single-prompt run and acceptance report; Goal completion audit.
 
@@ -37,9 +37,17 @@ Do not weaken rubrics, expected failures or thresholds. Semantic misses are not 
   (SHA256 1aa36ad41f999d999526edd387b014f2b232d27617fba2d9503787b8fbbf287c).
   Do not edit the prompt while a full run is active.
 - Intermediate full tests: 319 pass, 0 fail, 1431 assertions, 21 files, 362.08s; typecheck exit 0.
-  Final full checks restarted after the rounding fix: session 6428,
-  /tmp/calibration-c1e606-full-tests.log and /tmp/calibration-c1e606-typecheck.log.
+  Final checks after c1e606017: 321 pass, 0 fail, 1433 assertions, 21 files, 358.15s;
+  typecheck and git diff --check exit 0. Logs: /tmp/calibration-c1e606-full-tests.log
+  and /tmp/calibration-c1e606-typecheck.log.
 - Latest targeted tests: 22 pass, 0 fail. Missing XML now reports corpus exit 2.
+- Public CLI full-corpus fake run: results/near-miss-fake-full/20261006-065425-calibrate,
+  exit 0, 35 positive + 35 foreign + 113 near-miss, all expectations met, warnings empty.
+  JSON and Markdown fields/counts verified. Rubric hash:
+  02a57c7cec329b8dbfd0c8db93a6e0c04e444125efe55e3891fe1bcd3f90547b.
+- Targeted live boundary-filter diagnostic: results/near-miss-boundary-diagnostic/result.json,
+  score 86, only filter-ratio=false; prepared CSV oracle=true. Original prompt.
+  Diagnostics and fake acceptance do not replace the full live 183-row acceptance.
 - Targeted live sales missing-column diagnostic: result in
   results/near-miss-column-diagnostic/result.json. gpt-6-astra/high:
   score 57, export-columns=false, result-rows=false; other supplied items true.
