@@ -1054,10 +1054,10 @@ Core имеет разметку осей, но без CSV oracle. По доку
 **Файлы:** `.github/workflows/test.yml`, platform runbooks в
 `docs/testing/loginom-ai-agent/`, новый отчёт реализации/приёмки.
 
-- [ ] Включить формат skills, staging, Node pipeline и deterministic routing
+- [x] Включить формат skills, staging, Node pipeline и deterministic routing
   tests в обычный CI. Live-model проверки запускать отдельно с явной моделью
   и изолированным профилем; credentials не сохранять в отчёт.
-- [ ] Собрать новые кандидаты в отдельные каталоги, без публикации. До release
+- [x] Собрать новые кандидаты в отдельные каталоги, без публикации. До release
   manifest зафиксировать build inputs по действующему регламенту проекта.
 - [ ] Собрать Linux Desktop DEB/AppImage и полный standalone CLI tar.gz с общим staging,
   независимыми manifest и установленными launchers. Сборка одного backend

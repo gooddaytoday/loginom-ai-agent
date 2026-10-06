@@ -1583,9 +1583,48 @@ Product tests после удаления: **5 PASS / 20 assertions**, typecheck
 Host catalog/staging unit tests: **21 PASS / 1 SKIP / 44 assertions**;
 full resource staging пропущен без build inputs и будет выполнен новой сборкой.
 
+## Исправленный immutable candidate и CI staging gate
+
+Полные Desktop и CLI candidates собраны из чистого
+`8dc7bdccbaffc85b098cd730ce0c3638a197717c` в новых собственных каталогах.
+Desktop build/typecheck/packaging PASS; packaging tests **12 PASS / 2 macOS SKIP**.
+Финальный release manifest создан после завершения упаковки и содержит три
+артефакта: полный root source archive, DEB и AppImage. Оба Desktop artifact
+verifiers **PASS**, каждый проверил **4654 resources**. Исходная ошибка `.gitkeep`
+исчезла без изменения verifier; native/installed запуск этими отчётами не доказан
+(`executableNotRun: true`). Resource manifest SHA256:
+`eb08d52b2d8edcba4d3743431e2bb02998182289d7f8e44f305a9f6cc80ebbd8`.
+DEB SHA256 `dfe1bf5fa3b4d1625c87ca266e0d0a6c6b877a5e2a4bd28b04a9b8332008fd1a`;
+AppImage SHA256 `40434bfbe36cfa2f28977bca8e00c7ea197ee4bb6100ef06c6b16a94882d8e32`.
+
+CLI build/roundtrip и независимый source/manifest verifier PASS. Archive SHA256
+`c5045c6de395bf6f2a3130f059319af49ab3e40586fd85f35c4e6cc89c1519c8`,
+source tree SHA256 `909f755d183dc7fc895c5733e834fe40b48845d6442092db28af2b3e3c09b32a`.
+Native full docs pipeline на этом candidate: **3 PASS / 57 assertions**,
+PDF/DOCX/MD сохранены в `candidate-8dc7bdccb-cli/full-docs-pipeline`.
+Контролируемые provider/Help, собственный профиль, PATH=/nonexistent;
+это проверка механики, не естественного выбора или live Help.
+
+Полный source staging с закреплёнными Node/Chromium inputs: **13 PASS / 47 assertions**.
+Дополнительно выявлен пропуск этого gate через CI Turbo: при заданных обоих
+inputs дочерний Host получал только Node, результат **12 PASS / 1 SKIP**.
+`setup-loginom-inputs` теперь экспортирует `LOGINOM_AI_AGENT_TEST_BROWSERS`,
+а Host Turbo task передаёт его тестам. Повтор той же команды через Turbo:
+**13 PASS / 0 SKIP / 47 assertions**, включая генерацию PDF поставленным Node.
+Product catalog, Node pipeline и Agent deterministic tests уже входят в обычный
+workspace test; новая передача inputs закрывает пропущенный full staging.
+Prettier/diff-check PASS. GitHub workflow удалённо не запускался.
+
+Логи находятся в собственном acceptance-каталоге: `desktop-8dc7bdccb-*.log`,
+`cli-8dc7bdccb-{build-final,verify,pipeline}.log`, `host-8dc7bdccb-full-staging.log`,
+`ci-staging-env-{red,green}.log`. Неуспешный первый CLI build требовал создать
+родительский каталог destination; повтор выполнен до публикации candidate.
+Источник бинарников остаётся `8dc7bdccb`, последующие CI/doc commits его не заменяют.
+Требования плана не изменены; отмечены только CI inclusion и подготовка кандидатов.
+
 ## Checkpoint
 
-- Product candidate SHA `05d3d144b` (`docs-no-browser`); полный native CLI/resources/manifest/archive сохранены.
+- Product candidate SHA `8dc7bdccb` (`docs-no-browser`); полные Desktop/CLI artifacts/manifest/archive сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -1602,4 +1641,4 @@ full resource staging пропущен без build inputs и будет вып�
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS, native PTY paste/mention 2 PASS; attachment: 44 PASS.
-- Native docs PDF/DOCX/MD 3 PASS, visual QA PASS; TUI 2 PASS; routing corpus 20 готов/live 0; далее GUI/model/evals.
+- Desktop static DEB/AppImage PASS; native docs 3 PASS, TUI ранее 2 PASS; routing live 0; далее install/GUI/model/evals.

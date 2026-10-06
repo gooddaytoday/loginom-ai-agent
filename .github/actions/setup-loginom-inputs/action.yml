@@ -139,6 +139,7 @@ runs:
         {
           echo "LOGINOM_AI_AGENT_NODE_SOURCE=$NODE"
           echo "LOGINOM_AI_AGENT_TEST_NODE=$NODE"
+          echo "LOGINOM_AI_AGENT_TEST_BROWSERS=$BROWSERS"
           echo "LOGINOM_AI_AGENT_BROWSER_SOURCE=$BROWSERS"
           echo "PLAYWRIGHT_BROWSERS_PATH=$BROWSERS"
         } >> "$GITHUB_ENV"

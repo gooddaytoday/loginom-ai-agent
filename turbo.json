@@ -19,7 +19,7 @@
     },
     "@loginom-ai-agent/loginom-host#test": {
       "outputs": [],
-      "passThroughEnv": ["LOGINOM_AI_AGENT_TEST_NODE"]
+      "passThroughEnv": ["LOGINOM_AI_AGENT_TEST_NODE", "LOGINOM_AI_AGENT_TEST_BROWSERS"]
     },
     "@loginom-ai-agent/core#test": {
       "dependsOn": ["^build"],
