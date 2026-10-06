@@ -39,9 +39,34 @@ test("shipped skill metadata conforms to the Agent Skills specification", async 
   }
 })
 
+test("package documentation declares its generated Node executor and describes the restricted product workflow", async () => {
+  const skill = await ConfigMarkdown.parse(join(productSkillsDirectory, "package-docs/SKILL.md"))
+  expect(skill.data.metadata?.["loginom-generated"]).toBe("scripts/package-docs.mjs")
+  expect(skill.content).toContain("package_docs_run")
+  expect(skill.content).not.toMatch(/python3|scripts\/\S+\.py/)
+  expect(skill.content).toContain("assets/fonts/GolosText-Regular.ttf")
+  expect(skill.content).toContain("assets/fonts/GolosText-Bold.ttf")
+  expect(skill.content).toContain("assets/fonts/OFL.txt")
+  expect(skill.content.split("\n").length).toBeLessThan(500)
+  expect((await readdir(join(productSkillsDirectory, "package-docs"), { recursive: true })).filter((file) => file.endsWith(".py"))).toEqual([])
+})
+
 const resources = await mkdtemp(join(tmpdir(), "loginom-bundled-skills-"))
 const content = await readFile(join(productSkillsDirectory, "package-docs/SKILL.md"), "utf8")
 await cp(productSkillsDirectory, join(resources, "skills"), { recursive: true })
+const builder = Bun.spawn(
+  [
+    process.execPath,
+    join(import.meta.dir, "../../../loginom-host/script/build-package-docs.ts"),
+    join(resources, "skills/package-docs/scripts"),
+  ],
+  { stdout: "pipe", stderr: "pipe" },
+)
+const stdout = new Response(builder.stdout).text(),
+  stderr = new Response(builder.stderr).text()
+expect(await builder.exited).toBe(0)
+expect(await stderr).toBe("")
+expect(JSON.parse(await stdout).script).toBe(join(resources, "skills/package-docs/scripts/package-docs.mjs"))
 await Bun.write(
   join(resources, "resource-manifest.json"),
   JSON.stringify({
@@ -52,10 +77,18 @@ await Bun.write(
 afterAll(() => rm(resources, { recursive: true, force: true }))
 
 test("the product source catalog has all linked resources except declared generated files", async () => {
-  const skills = await verifyBundledSkills(resources, { mode: "source" }).catch((error: unknown) => {
-    throw Error("Product skills: fix SKILL.md fields and relative references inside each skill; add missing assets or declare the generated file in metadata.loginom-generated. " + String(error))
-  })
-  expect(skills.map((skill) => skill.name).toSorted()).toEqual([...reservedSkillNames].toSorted())
+  const source = await mkdtemp(join(tmpdir(), "loginom-source-skills-"))
+  try {
+    await cp(productSkillsDirectory, join(source, "skills"), { recursive: true })
+    await Bun.write(join(source, "resource-manifest.json"), JSON.stringify({ protocol: 1, files: await resourceInventory(source) }))
+    expect(await Bun.file(join(source, "skills/package-docs/scripts/package-docs.mjs")).exists()).toBe(false)
+    const skills = await verifyBundledSkills(source, { mode: "source" }).catch((error: unknown) => {
+      throw Error("Product skills: fix SKILL.md fields and relative references inside each skill; add missing assets or declare the generated file in metadata.loginom-generated. " + String(error))
+    })
+    expect(skills.map((skill) => skill.name).toSorted()).toEqual([...reservedSkillNames].toSorted())
+  } finally {
+    await rm(source, { recursive: true, force: true })
+  }
 })
 
 const it = testEffect(

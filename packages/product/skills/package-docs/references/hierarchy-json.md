@@ -31,7 +31,7 @@ Semantics:
 ## Nesting
 
 - Nodes with service name `Подмодель` contain nested workflows.
-- Extractor expands nested facts up to `max_depth=2` under `modules[].submodels[]`.
+- Extractor recursively expands all nested facts under `modules[].submodels[]`.
 - Nested modules also have their own `hierarchy`, `notes`, `workflow_nodes`, `links`.
 
 Readable links (for agent context, not for dumping into MD) live in

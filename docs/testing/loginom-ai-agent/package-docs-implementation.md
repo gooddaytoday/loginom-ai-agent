@@ -503,6 +503,24 @@ Agent typecheck PASS; tdd-agent-docs-read-hint-*, agent-docs-read-hint-final.log
 Process timeout ранее проверен отдельно; код управления процессом не изменён.
 Actual standalone rejection/exit marker ещё проверить через SessionTools/run.
 
+SKILL cutover: RED — metadata не объявляла generated Node bundle;
+отдельный RED показал четыре Python-файла в Product skill. GREEN —
+`package_docs_run` extract/skeleton/emit, session workspace, реальные пути
+результата, read/edit permissions, ошибки и отсутствие shell fallback;
+generated metadata, относительные ссылки Golos/OFL и полная рекурсия.
+Устаревшие четыре Python-файла удалены из поставки; замороженные baseline
+oracles сохранены в acceptance и Host fixtures. Installed fixture теперь
+собирает настоящий Node bundle до inventory; отдельный source fixture
+проверяет ровно разрешённое отсутствие generated файла, verifier не ослаблен.
+Catalog 10 PASS (64 assertions), tool 29 быстрых PASS (99 assertions),
+полный staging 13 PASS (47 assertions), Agent typecheck PASS. Логи:
+tdd-docs-skill-{node,python}-*, docs-skill-{catalog,tool,full-staging}-green.log.
+Обнаружен прежний session/prompt.test.ts кейс package_docs с Python/bash:
+legacy-docs-prompt-signal.log — ENOENT удалённого project skill. Его новая
+проверка через restricted SessionTools относится к этапу 5; полная Agent
+suite не объявляется зелёной. Installed/live приёмка ещё не выполнена.
+Пункт SKILL.md этапа 2 отмечен; требования плана не переписывались.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -517,5 +535,6 @@ Actual standalone rejection/exit marker ещё проверить через Ses
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
 - Этап 2: pipeline 41 PASS, staging 13 PASS; Host suite 180 PASS / 6 SKIP.
-- Tool extract/skeleton/emit и lifecycle проверены; далее --file hint, SKILL и TaskScope.
+- Tool/SKILL Node workflow и lifecycle проверены; далее TaskScope и actual run permissions.
+- Старый session package_docs/Python тест требует замены при SessionTools integration.
 - Живая приёмка и удаление серверного skill остаются открытыми.
