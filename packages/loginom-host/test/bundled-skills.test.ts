@@ -27,10 +27,9 @@ test("Host and pinned Node compute the same revision for a bundled skill", async
   })
   const verified = await verifyBundledSkills(resource.root)
   const child = Bun.spawn([node, "--input-type=module", "--eval", `
-    import { readFile } from "node:fs/promises";
-    import { bundledSkillInventory } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/bundled-skill-manifest.mjs", import.meta.url).href)};
-    const manifest = JSON.parse(await readFile(process.argv[1] + "/resource-manifest.json", "utf8"));
-    process.stdout.write(bundledSkillInventory(manifest.files)[0].digest);
+    import { verifyBundledSkills } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/bundled-skill-manifest.mjs", import.meta.url).href)};
+    const skills = await verifyBundledSkills(process.argv[1]);
+    process.stdout.write(skills[0].digest);
   `, resource.root], { env: {}, stdout: "pipe", stderr: "pipe" })
   const output = await new Response(child.stdout).text()
   expect(await child.exited).toBe(0)

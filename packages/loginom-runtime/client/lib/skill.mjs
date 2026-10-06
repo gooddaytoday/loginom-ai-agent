@@ -1,45 +1,19 @@
-import { createHash } from 'node:crypto';
-import { readFile, readdir, realpath } from 'node:fs/promises';
-import { isAbsolute, join, relative, sep } from 'node:path';
-import { bundledSkillInventory } from './bundled-skill-manifest.mjs';
-
-const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+import { verifyBundledSkills } from './bundled-skill-manifest.mjs';
 
 export function createSkillLoader({ resources }) {
   let pinned;
   let pending;
   async function load() {
-    if (typeof resources !== 'string' || !isAbsolute(resources)) throw Error('LOGINOM_SKILL_RESOURCES_INVALID');
-    const root = await realpath(resources);
-    const manifest = JSON.parse(await readFile(join(root, 'resource-manifest.json'), 'utf8'));
-    if (manifest.protocol !== 1 || !Array.isArray(manifest.files)) throw Error('LOGINOM_SKILL_MANIFEST_INVALID');
-    const bundle = bundledSkillInventory(manifest.files).find(skill => skill.name === 'loginom-automation');
+    const bundle = (await verifyBundledSkills(resources)).find(skill => skill.name === 'loginom-automation');
     if (!bundle) throw Error('LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING');
-    const directory = join(root, 'skills/loginom-automation');
-    const listed = new Set(bundle.files.map(file => file.path));
-    const content = new Map();
-    for (const file of await readdir(directory, { recursive: true, withFileTypes: true })) {
-      if (!file.isDirectory() && !listed.has(relative(root, join(file.parentPath, file.name)).split(sep).join('/')))
-        throw Error('LOGINOM_SKILL_UNMANIFESTED_FILE');
-    }
-    for (const file of bundle.files) {
-      if (file.path.includes('\\') || file.path.split('/').some(part => !part || part === '.' || part === '..'))
-        throw Error('LOGINOM_SKILL_MANIFEST_INVALID');
-      const absolute = await realpath(join(root, file.path));
-      const inside = relative(root, absolute);
-      if (isAbsolute(inside) || inside === '..' || inside.startsWith('..' + sep)) throw Error('LOGINOM_SKILL_RESOURCE_ESCAPE');
-      const bytes = await readFile(absolute);
-      if (hash(bytes) !== file.sha256) throw Error('LOGINOM_SKILL_HASH_MISMATCH');
-      if (file.path.endsWith('/SKILL.md')) content.set(file.path, bytes.toString('utf8'));
-    }
     if (pinned) {
       if (pinned.detail.revision !== bundle.digest) throw Error('LOGINOM_SKILL_REVISION_CHANGED');
       return pinned;
     }
-    const main = join(directory, 'SKILL.md');
-    pinned = { directory, main, detail: { revision: bundle.digest, source: 'bundled', files: bundle.files,
-      content_sha256: bundle.files.find(file => file.path.endsWith('/SKILL.md')).sha256,
-      content: content.get('skills/loginom-automation/SKILL.md') } };
+    pinned = { directory: bundle.directory, main: bundle.location,
+      detail: { revision: bundle.digest, source: 'bundled', files: bundle.files,
+        content_sha256: bundle.files.find(file => file.path === 'skills/loginom-automation/SKILL.md').sha256,
+        content: bundle.content } };
     return pinned;
   }
   return { prepare() {

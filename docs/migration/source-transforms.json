@@ -2046,8 +2046,8 @@
   },
   "packages/loginom-runtime/client/lib/skill.mjs": {
     "baseHash": "bcec7b42c0f2f5dff478afce54a202aa7c60a19f3c75207db9f32e06520c5310",
-    "hash": "22f1991b3d92590cc30942bff21e0e6e178493214d00b2da269411fc57f53559",
-    "reason": "Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests."
+    "hash": "20f77929108a466522da79a31d3a5530d7ebfdbef90759151aaaa0220abaebc7",
+    "reason": "Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests. Share the complete bundled skill verifier across Host and all runtime modes with the same pinned YAML parser; preserve local revision and reference/generated integrity."
   },
   "packages/loginom-runtime/client/lib/user-results.mjs": {
     "baseHash": "eac6f265dbc083c8be2e17331681a063d4b91d332c5e634dcb2204439962af9a",
@@ -2066,8 +2066,8 @@
   },
   "packages/loginom-runtime/client/test/skill.test.mjs": {
     "baseHash": "b0f04fac63c68cfa5b344c95069e927b7dd2762fca788b432482a5a748310719",
-    "hash": "1ec841dc1438ecf540d628dd9ee3ccc58c03802abd44dc1c9695e312ac12287c",
-    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks."
+    "hash": "15052a7133b6bca7d186c17bfd7d41f5cbf9c5476eb9d62198486fe0c4a354c1",
+    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks. Share the complete bundled skill verifier across Host and all runtime modes with the same pinned YAML parser; preserve local revision and reference/generated integrity."
   },
   "packages/loginom-runtime/client/test/support/bridge-contract.mjs": {
     "baseHash": "7a9ed0443eef7105eaef18878eaf6e9ca68c83840955278f88eecb3d6eadd5b6",
@@ -2083,5 +2083,15 @@
     "baseHash": "02402a080e354b966b4714ea3ad4f7cebd1d67bcb7056cd6680727f6b9edd58c",
     "hash": "b44812377efe90f9e61bdb45b2715c93e621a431cc622cc0f2f2c396dfd49993",
     "reason": "Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests."
+  },
+  "packages/loginom-runtime/client/package-lock.json": {
+    "baseHash": "e05c8ba33f055e321f04760d55eb9e23b00bfe011fe5a68a1118461cc2ae095a",
+    "reason": " Share the complete bundled skill verifier across Host and all runtime modes with the same pinned YAML parser; preserve local revision and reference/generated integrity.",
+    "hash": "1e9c65c695505bcc8e94afdee82b844da93c44bf937fbe4a80afe4a9cb784a93"
+  },
+  "packages/loginom-runtime/client/package.json": {
+    "baseHash": "4acacab41dea58cf19135522580a232165076718a39e7aaec9a88cc97126df56",
+    "reason": " Share the complete bundled skill verifier across Host and all runtime modes with the same pinned YAML parser; preserve local revision and reference/generated integrity.",
+    "hash": "b1634010630f2f427f5f30beda2cada925b6da38cc32eef69ed22543419d3e1f"
   }
 }

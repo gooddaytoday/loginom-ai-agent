@@ -506,7 +506,7 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
   Каталог Product включить в проверку пересечения input/output до любых
   удалений и копирования. Малые fixtures ресурсов для discovery строить тем же
   выделенным inventory-кодом staging, без копирования Node/Chromium.
-- [ ] Во всех режимах runtime — managed `user-v1`, classic и diagnostic,
+- [x] Во всех режимах runtime — managed `user-v1`, classic и diagnostic,
   используемых приёмкой, — заменить `createSkillLoader(skillTransport(config))`
   на локальный `<resources>/skills/loginom-automation`. Файлы проходят
   проверку по 2.3; managed дополнительно сохраняет штатный `verifyResources`.
@@ -565,7 +565,7 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
   файлы до сборки, и совпадение каталогов с зарезервированными именами Product.
   Ошибки объясняют исправление. `skills-ref validate` не делать зависимостью CI;
   допустима разовая сверка версии по SHA с записью результата.
-- [ ] Runtime-тесты: локальный источник во всех режимах, отсутствие обращений
+- [x] Runtime-тесты: локальный источник во всех режимах, отсутствие обращений
   к `/api/v1/skills` (заглушка транспорта падает при любом таком запросе),
   отсутствующий/относительный root, missing/tampered/unlisted skill → локальная
   ошибка prepare без fallback; одинаковый digest в Bun и Node.

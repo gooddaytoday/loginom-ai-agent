@@ -199,6 +199,27 @@ Host/Agent typecheck PASS. Логи `stage-shared-inventory-*.log`.
 Этот staging доставляет текущие Python assets; generated Node docs bundle будет
 добавлен на этапе 2. Установленная приёмка остаётся открытой.
 
+Общий verifier: RED — после удаления обязательного workflow reference и его
+manifest entry runtime успешно подготовился. GREEN — Node skill suite 8 PASS;
+Host теперь экспортирует тот же Node-compatible verifier, а loader использует
+проверенный content и полный reference/generated closure. Canonical containment
+проверяется внутри своего skill. Дополнительные font/generated/frontmatter и
+межskill symlink regressions: полный client suite 86 PASS. Classic bridge
+проверен реальным MCP transport: валидный bundle проходит, неполный отклоняется
+(2 дочерних кейса, 1 wrapper PASS). Первую ошибку отсутствующего ArtifactStore
+в новой fixture исправили; это дефект fixture, не RED продукта.
+Host/Bun и pinned Node выполняют полный общий verifier: 8 PASS; staging 12 PASS;
+Agent bundled 8 PASS; Product 5 PASS. Host/Agent/Product typecheck PASS.
+В npm closure добавлен только `yaml 2.9.1`, как у Host; прежние 97 пакетов не
+изменились. Обновлён только runtime lock hash в release pins:
+`1e9c65c695505bcc8e94afdee82b844da93c44bf937fbe4a80afe4a9cb784a93`.
+Node/Bun/Playwright/Chromium pins прежние. Source transforms четырёх изменённых
+импортированных файлов проверены. Полный аудит дошёл до исходного
+`IMPORTED_HASH_MISMATCH: client/lib/browser-geometry.mjs`; его байты совпадают
+с baseline (`0b7027db8db0e164659de33423ea122d791a9eabbcbf9691eac2c5eeba7df89f`).
+Массового пересчёта атрибуции не было. Логи `shared-verifier-*.log`, RED/GREEN
+`tdd-shared-skill-closure-{red,green}.log`; installed/live ещё не выполнялись.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -207,5 +228,6 @@ Host/Agent typecheck PASS. Логи `stage-shared-inventory-*.log`.
 - Каталог skills перенесён и адаптирован; source-only проверки перечислены выше.
 - Локальный loader и динамический prepare реализованы; единый digest проверен в Bun/Node.
 - Shared inventory и полный staging реализованы, два настоящих bundled skills найдены вне checkout.
-- Следующий шаг: полный runtime verifier и отключение publisher; затем Node executor.
+- Полный verifier общий для Host/runtime; reference/generated closure и classic bridge проверены.
+- Следующий шаг: тексты bootstrap, static catalog и отключение publisher; затем Node executor.
 - Живая приёмка и удаление серверного skill остаются открытыми.

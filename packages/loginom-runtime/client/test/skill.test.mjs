@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rm, readFile, writeFile, symlink } from 'node:fs/promises';
+import { mkdir, rm, readFile, writeFile, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createSkillLoader } from '../lib/skill.mjs';
 import { bundledSkillInventory } from '../lib/bundled-skill-manifest.mjs';
@@ -30,6 +30,38 @@ test('local preparation rejects a skill file not covered by the resource manifes
   const source = await createBundledSkillFixture(t);
   await writeFile(join(source.directory, 'unlisted.mjs'), 'unlisted');
   await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(), /LOGINOM_SKILL_UNMANIFESTED_FILE/);
+});
+
+test('local preparation rejects a required reference removed together with its manifest entry', async t => {
+  const source = await createBundledSkillFixture(t);
+  await rm(join(source.directory, 'references/workflow.md'));
+  await refreshSkillFixtureManifest(source.resources);
+  await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(), /LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING/);
+});
+
+test('local bundle verification enforces frontmatter, required assets and generated files', async t => {
+  for (const variant of ['frontmatter', 'font', 'generated']) {
+    const source = await createBundledSkillFixture(t);
+    const content = await readFile(source.main, 'utf8');
+    const changed = variant === 'frontmatter' ? content.replace('name: loginom-automation', 'name: wrong-name')
+      : variant === 'font' ? content + '\n[Font](assets/missing.ttf)\n'
+      : content.replace('\n---\n', '\nmetadata:\n  loginom-generated: scripts/missing.mjs\n---\n');
+    assert.notEqual(changed, content);
+    await writeFile(source.main, changed);
+    await refreshSkillFixtureManifest(source.resources);
+    await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(),
+      variant === 'frontmatter' ? /LOGINOM_SKILL_FRONTMATTER_INVALID/ : /LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING/);
+  }
+});
+
+test('a manifested symlink cannot read a different skill within the resource root', async t => {
+  const source = await createBundledSkillFixture(t);
+  await mkdir(join(source.resources, 'skills/other'));
+  await writeFile(join(source.resources, 'skills/other/SKILL.md'), '---\nname: other\ndescription: Other skill.\n---\n\n# Other\n');
+  await rm(join(source.directory, 'references/workflow.md'));
+  await symlink('../../other/SKILL.md', join(source.directory, 'references/workflow.md'));
+  await refreshSkillFixtureManifest(source.resources);
+  await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(), /LOGINOM_SKILL_RESOURCE_ESCAPE/);
 });
 
 test('pinned local bundle rejects modified bytes, missing files and escaping symlinks', async t => {
