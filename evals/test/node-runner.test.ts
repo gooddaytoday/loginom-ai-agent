@@ -36,4 +36,5 @@ test("runner отклоняет режимы с судьёй и сохранен
   for (const flag of ["--calibrate", "--judge-only", "--keep-storage", "--dry-run", "--reset-profile"]) {
     expect(await runNodeEvals([flag], {})).toMatchObject({ code: 2, runDir: null })
   }
+  expect(await runNodeEvals(["--unknown-flag"], {})).toMatchObject({ code: 2, runDir: null })
 })
