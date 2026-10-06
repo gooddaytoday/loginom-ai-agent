@@ -618,6 +618,20 @@ knowledge-entry-regression.log. Первый interrupt GREEN выявил SDK wr
 исправление проверено до фиксации результата. Host supervision/routing пока
 не подключены, полный этап 4 и его checklist остаются открытыми.
 
+Knowledge supervisor: RED — отдельного exported launcher не было. GREEN
+superviseKnowledge явно собирает четыре IPC поля, даже если структурно
+совместимый caller передал browser connection/resources; пароль, provider key
+и PATH не попали в argv/env/payload. Общий внутренний superviseProcess сохраняет
+прежние browser/validation handshake budgets, pending request rejection и
+close ack + clean exit contract. Проверены wrong generation, отсутствующий
+started, абсолютные пути и повторный close. Настоящий knowledge-entry с HTTP MCP
+подтвердил startup до разблокировки initialize, реальные schemas/call/Bearer
+и clean exit. Supervisor/process/environment: 6 PASS (34 assertions), wire
+дополнение 2 PASS (15 assertions), Host typecheck PASS;
+tdd-knowledge-supervisor-red.log, knowledge-supervisor-{regression,wire-green,typecheck}.log.
+Изменение транспорта проверено browser cleanup/disconnect regressions; никаких
+новых dependencies/pins. Browser readiness и HostPort ещё не переключены.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.

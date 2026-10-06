@@ -22,6 +22,9 @@ export type Launch = {
   acceptanceCleanupPackage?: string
 }
 
+type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment">
+export type KnowledgeLaunch = ProcessLaunch & Pick<Launch, "endpoint"> & { apiKey: string }
+
 export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = process.platform) {
   const env: NodeJS.ProcessEnv = {}
   const keys = [
@@ -81,9 +84,38 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
   return env
 }
 
-// One child per generation/chat. Credentials travel only through Node's private IPC pipe.
+// One browser child per generation/chat; knowledge has one child per generation.
+// Both use the same private transport and acknowledged cleanup contract.
 export async function supervise(input: Launch) {
-  if (![input.node, input.entry, input.resources, input.stateDir].every(isAbsolute))
+  if (!isAbsolute(input.resources)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
+  // Validation includes MCP initialization and browser navigation/authentication.
+  const runtime = await superviseProcess(
+    input, { ...input, environment: undefined, protocol: 1 }, input.validation ? 210_000 : 120_000,
+  )
+  const ready = runtime.ready
+  if (input.validation
+    ? !("checked" in ready) || ready.checked !== true
+    : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat) {
+    await runtime.close()
+    throw new Error("LOGINOM_HANDSHAKE_INVALID")
+  }
+  return runtime
+}
+
+export async function superviseKnowledge(input: KnowledgeLaunch) {
+  const runtime = await superviseProcess(input, {
+    protocol: 1, generation: input.generation, endpoint: input.endpoint, apiKey: input.apiKey,
+  })
+  const ready = runtime.ready
+  if (!("started" in ready) || ready.started !== true) {
+    await runtime.close()
+    throw new Error("LOGINOM_HANDSHAKE_INVALID")
+  }
+  return { ...runtime, ready }
+}
+
+async function superviseProcess(input: ProcessLaunch, start: unknown, timeout = 120_000) {
+  if (![input.node, input.entry, input.stateDir].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   await mkdir(input.stateDir, { recursive: true, mode: 0o700 })
   const child = fork(input.entry, [], {
@@ -166,14 +198,7 @@ export async function supervise(input: Launch) {
     })()
     return closing.promise
   }
-  // Connection validation can spend 30 seconds on MCP initialization and up
-  // to 150 seconds navigating/authenticating Loginom. Do not race that
-  // documented budget with the ordinary 120-second runtime handshake.
-  const ready = await request(
-    "start",
-    { ...input, environment: undefined, protocol: 1 },
-    input.validation ? 210_000 : 120_000,
-  ).catch(
+  const ready = await request("start", start, timeout).catch(
     async (error: Error) => {
       await close()
       throw error
@@ -185,10 +210,7 @@ export async function supervise(input: Launch) {
     !("protocol" in ready) ||
     ready.protocol !== 1 ||
     !("generation" in ready) ||
-    ready.generation !== input.generation ||
-    (input.validation
-      ? !("checked" in ready) || ready.checked !== true
-      : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat)
+    ready.generation !== input.generation
   ) {
     await close()
     throw new Error("LOGINOM_HANDSHAKE_INVALID")
