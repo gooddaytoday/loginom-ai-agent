@@ -77,3 +77,44 @@ test("a running Loginom retry does not fail the run", () => {
   outcome.observe(pending)
   expect(outcome.failed()).toBe(false)
 })
+
+test("only unresolved scenario connection admission preserves the lazy preflight failure", () => {
+  const outcome = runToolOutcome()
+  const help = part("loginom_read", {}, true)
+  if (help.state.status !== "error") throw Error("invalid fixture")
+  help.state.error = "LOGINOM_CONNECTION_NOT_READY"
+  outcome.observe(help)
+  expect(outcome.connectionFailure()).toBeUndefined()
+
+  const prepare = part("loginom_dock_prepare", {}, true)
+  if (prepare.state.status !== "error") throw Error("invalid fixture")
+  prepare.state.error = "LOGINOM_CONFIG_REQUIRED"
+  outcome.observe(prepare)
+  expect(outcome.connectionFailure()).toBe("LOGINOM_CONFIG_REQUIRED")
+  outcome.observe(part("loginom_dock_diagnostics", {}, false))
+  expect(outcome.connectionFailure()).toBe("LOGINOM_CONFIG_REQUIRED")
+  const pending = part("loginom_dock_prepare", {}, false)
+  if (pending.state.status !== "completed") throw Error("invalid fixture")
+  pending.state.metadata.loginomPending = true
+  outcome.observe(pending)
+  expect(outcome.connectionFailure()).toBe("LOGINOM_CONFIG_REQUIRED")
+  outcome.observe(part("loginom_dock_prepare", {}, false))
+  expect(outcome.connectionFailure()).toBeUndefined()
+  expect(outcome.failed()).toBe(false)
+})
+
+test.each([
+  "LOGINOM_LOGIN_REJECTED",
+  "LOGINOM_ACCOUNT_MISMATCH",
+  "LOGINOM_LOGIN_UNAVAILABLE",
+  "LOGINOM_BROWSER_START_FAILED",
+])("lazy browser admission keeps the connection failure contract: %s", (failure) => {
+  const outcome = runToolOutcome()
+  const prepare = part("loginom_dock_prepare", {}, true)
+  if (prepare.state.status !== "error") throw Error("invalid fixture")
+  prepare.state.error = failure
+  outcome.observe(prepare)
+  expect(outcome.connectionFailure()).toBe("LOGINOM_CONNECTION_NOT_READY")
+  outcome.observe(part("loginom_dock_prepare", {}, false))
+  expect(outcome.connectionFailure()).toBeUndefined()
+})

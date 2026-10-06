@@ -3259,3 +3259,24 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   Linux source checks не заменяют installed acceptance и live skill selection.
 - Открыто: TaskScope/catalog allowlists, natural-tool lazy exit codes,
   validation/save с раздельным browser status и установленные Linux кандидаты.
+
+
+### Package docs isolation: lazy connection exit contract (2026-10-07)
+
+- Natural run keeps strict recovery before the model and admits ordinary requests
+  without mandatory hasApiKey/ready. Explicit loginom-automation still uses Help
+  preflight. When actual lazy prepare is refused, source CLI now emits
+  LOGINOM_CONFIG_REQUIRED/2 or LOGINOM_CONNECTION_NOT_READY/1. The latter also
+  covers the four recognized browser login/start failures; the original tool
+  error stays in the event stream. Exact confirmed prepare retry clears the
+  failure; pending and unrelated calls do not.
+- Actual standalone source-process tests cover missing configuration, unavailable
+  Help and a controlled browser login refusal after valid Help. Ordinary chat
+  without configuration and with unavailable Help, cancellation, strict recovery
+  and management contracts pass. Outcome fixtures cover all four browser failure
+  codes, ordinary Help and scenario errors. 22 PASS, 103 assertions; additional
+  actual HTTP MCP Help-refusal/outcome control: 2 PASS, 14 assertions; RunCommand
+  and bootstrap regression: 26 PASS, 112 assertions. Agent final typecheck PASS.
+  Native/installed acceptance of this change remains open.
+- This supersedes the lazy exit-code item in the dated local-run progress above.
+  [Current implementation evidence](../../testing/loginom-ai-agent/package-docs-implementation.md).

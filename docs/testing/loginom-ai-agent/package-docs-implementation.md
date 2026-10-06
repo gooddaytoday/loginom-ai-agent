@@ -1396,6 +1396,39 @@ provider transport/profile/attachment/extraction/exit, не natural model choice
 paired live evals остаётся открытым; новый SHA test/doc commit не подменяет
 sourceCommit сохранённого native binary.
 
+## Lazy standalone connection exit: source contract
+
+TDD actual standalone subprocess подтвердил: после skill(loginom-automation)
+prepare возвращал LOGINOM_CONFIG_REQUIRED, но CLI завершался 0. Второй RED
+после valid Help и controlled runtime refusal LOGINOM_LOGIN_UNAVAILABLE также
+возвращал 0. Логи tdd-lazy-cli-{configuration,browser}-exit-red.log.
+
+Run outcome теперь отдельно учитывает незавершённый connection admission
+только loginom_dock_prepare. Configuration failure → LOGINOM_CONFIG_REQUIRED/2;
+неготовое подключение и четыре recognized browser failures →
+LOGINOM_CONNECTION_NOT_READY/1. Исходный tool error сохраняется, итоговый
+canonical run error добавляется в event stream. Подтверждённый successful retry
+с теми же аргументами снимает ошибку; pending/isError и unrelated tools — нет.
+Permission/cancel/recovery сохраняют приоритет и прежние коды. Обычные
+Loginom operation errors и Help не меняют прежнюю outcome-политику.
+
+lazy-cli-exit-regression.log: **22 PASS**, 103 assertions — outcomes + actual
+source standalone configuration/Help/browser-refusal, strict recovery,
+отмена, ordinary chat и management. lazy-cli-run-command-regression.log:
+**26 PASS**, 112 assertions — RunCommand subprocess/attachments/commands,
+errors, stdout/json, SIGINT и profile bootstrap/management/cancellation.
+Последний добавленный actual HTTP MCP Help refusal + outcome control:
+**2 PASS**, 14 assertions (lazy-cli-help-refusal-regression.log). Этот Help
+возвращает тот же LOGINOM_CONNECTION_NOT_READY, но обычный ответ «4» выходит 0,
+без runtime/browser и оставшегося .writer. Natural LLM choice не проверяется.
+Agent final typecheck PASS (lazy-cli-exit-final-typecheck.log).
+
+AGENTS и progress standalone design фиксируют обязательный strict recovery,
+ранний Help preflight только explicit automation и lazy connection exit.
+Это source-process evidence. Native candidate 49008f794 с успешными PTY
+проверками **ещё не содержит эту последнюю правку**: новый native/installed
+прогон требует последующей сборки, её SHA не подменяется.
+
 ## Checkpoint
 
 - Product candidate SHA `49008f794` (`docs-no-browser`); полный native CLI/resources/manifest/archive сохранены.
@@ -1404,7 +1437,7 @@ sourceCommit сохранённого native binary.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 41 PASS; оригинальные файлы/permission/cancellation проверены отдельно.
-- BrowserStatus и key-only Help работают по sources; GUI/TTY и первый запуск ещё открыты.
+- BrowserStatus/key-only Help и lazy CLI exit 2/1 проверены по sources; GUI/TTY первого setup ещё открыты.
 - Scope/command/HTTP/Runner/revert: 168 PASS / 1 SKIP; offline skill regression 135 PASS / 1 SKIP; typecheck PASS.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.

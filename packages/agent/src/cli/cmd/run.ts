@@ -883,6 +883,11 @@ export const RunCommand = effectCmd({
               }
             }
           }
+          const connectionFailure = outcome.connectionFailure()
+          if (process.env.LOGINOM_AI_AGENT_CLI_ROOT && connectionFailure && !error) {
+            error = connectionFailure
+            if (!emit("error", { error: { name: error, data: { message: error } } })) UI.error(error)
+          }
           if (process.env.LOGINOM_AI_AGENT_CLI_ROOT && outcome.failed() && !error) {
             error = "CLI_TOOL_FAILED"
             if (!emit("error", { error: { name: error, data: { message: error } } })) UI.error(error)
@@ -918,7 +923,7 @@ export const RunCommand = effectCmd({
           async function finish() {
             if (args.attach) return
             const error = await completed
-            if (error) process.exitCode = 1
+            if (error) process.exitCode = error === "LOGINOM_CONFIG_REQUIRED" ? 2 : 1
           }
           let rejected = false
 

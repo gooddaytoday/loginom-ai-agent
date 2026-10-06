@@ -33,6 +33,166 @@ test("ordinary standalone chat reaches the provider without configured Loginom a
   }
 }, 30_000)
 
+test.each(["unconfigured", "help-unavailable", "browser-unavailable"])(
+  "lazy scenario preparation preserves standalone connection exit: %s",
+  async (mode) => {
+    await using fixture = await standaloneFixture()
+    const provider = ManagedRuntime.make(TestLLMServer.layer)
+    const cleanup: (() => void | Promise<void>)[] = []
+    try {
+      const marker = join(fixture.directory, "browser-started")
+      if (mode !== "unconfigured") {
+        const server =
+          mode === "browser-unavailable"
+            ? await knowledgeServer({ after: (callback) => cleanup.push(callback) })
+            : undefined
+        await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
+        await symlink(
+          resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
+          join(fixture.bundle, "runtime/src/knowledge-entry.mjs"),
+        )
+        await writeFile(
+          join(fixture.bundle, "runtime/src/managed-entry.mjs"),
+          `
+        import {writeFileSync} from 'node:fs';
+        process.on('message', message => {
+          if (message.operation === 'start') {
+            writeFileSync(${JSON.stringify(marker)}, 'started');
+            process.send({id: message.id, error: 'LOGINOM_LOGIN_UNAVAILABLE'});
+          }
+          if (message.operation === 'close') process.send({id: message.id, result: {closed: true}}, () => process.disconnect());
+        });
+      `,
+        )
+        if (server) {
+          const manifest = JSON.parse(await readFile(join(fixture.bundle, "resource-manifest.json"), "utf8"))
+          await writeFile(
+            join(fixture.bundle, "resource-manifest.json"),
+            JSON.stringify({ ...manifest, endpoint: server.endpoint }),
+          )
+        }
+        const store = connectionStore(join(fixture.profile, "loginom/connection"), cliCredentials("linux"))
+        await store.stage({
+          generation: 1,
+          revision: 1,
+          apiKey: "UNIT-NONSECRET",
+          password: "PRIVATE-NONSECRET",
+          username: "user",
+          url: "http://127.0.0.1:1/app/",
+        })
+        await store.activate(1)
+      }
+      const llm = await provider.runPromise(TestLLMServer)
+      await provider.runPromise(
+        llm.toolMatch((hit) => JSON.stringify(hit.body.tools ?? []).includes('"name":"skill"'), "skill", {
+          name: "loginom-automation",
+        }),
+      )
+      await provider.runPromise(
+        llm.toolMatch(
+          (hit) => JSON.stringify(hit.body.tools ?? []).includes('"name":"loginom_dock_prepare"'),
+          "loginom_dock_prepare",
+          {},
+        ),
+      )
+      await provider.runPromise(
+        llm.textMatch(
+          (hit) => Array.isArray(hit.body.tools) && hit.body.tools.length > 0,
+          "Для построения нужно настроить подключение.",
+        ),
+      )
+      await writeFile(
+        join(fixture.profile, "config/loginom-ai-agent.json"),
+        JSON.stringify(testProviderConfig(llm.url)),
+      )
+      const result = await invoke(fixture, ["--dangerously-skip-permissions", "--", "Построй сценарий суммирования."])
+      expect(
+        result.events.find((event) => event.type === "tool_use" && event.part.tool === "loginom_dock_prepare")?.part
+          .state,
+      ).toMatchObject({
+        status: "error",
+        error:
+          mode === "unconfigured"
+            ? "LOGINOM_CONFIG_REQUIRED"
+            : mode === "help-unavailable"
+              ? "LOGINOM_CONNECTION_NOT_READY"
+              : "LOGINOM_LOGIN_UNAVAILABLE",
+      })
+      expect(result.exit).toBe(mode === "unconfigured" ? 2 : 1)
+      expect(result.events.filter((event) => event.type === "error").map((event) => event.error.name)).toContain(
+        mode === "unconfigured" ? "LOGINOM_CONFIG_REQUIRED" : "LOGINOM_CONNECTION_NOT_READY",
+      )
+      expect(await readdir(fixture.profile)).not.toContain(".writer")
+      if (mode === "browser-unavailable") expect(await readFile(marker, "utf8")).toBe("started")
+      else {
+        await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
+        expect(await readdir(join(fixture.profile, "loginom"))).not.toContain("runtime")
+      }
+    } finally {
+      await provider.dispose()
+      for (const callback of cleanup) await callback()
+    }
+  },
+  30_000,
+)
+
+test("a real Help refusal does not turn an ordinary standalone answer into a connection failure", async () => {
+  await using fixture = await standaloneFixture()
+  const provider = ManagedRuntime.make(TestLLMServer.layer)
+  const cleanup: (() => void | Promise<void>)[] = []
+  const server = await knowledgeServer(
+    { after: (callback) => cleanup.push(callback) },
+    {
+      call: async () => ({ isError: true, content: [{ type: "text", text: "LOGINOM_CONNECTION_NOT_READY" }] }),
+    },
+  )
+  try {
+    await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
+    await symlink(
+      resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
+      join(fixture.bundle, "runtime/src/knowledge-entry.mjs"),
+    )
+    const manifest = JSON.parse(await readFile(join(fixture.bundle, "resource-manifest.json"), "utf8"))
+    await writeFile(
+      join(fixture.bundle, "resource-manifest.json"),
+      JSON.stringify({ ...manifest, endpoint: server.endpoint }),
+    )
+    const store = connectionStore(join(fixture.profile, "loginom/connection"), cliCredentials("linux"))
+    await store.stage({
+      generation: 1,
+      revision: 1,
+      apiKey: "UNIT-NONSECRET",
+      password: "PRIVATE-NONSECRET",
+      username: "user",
+      url: "http://127.0.0.1:1/app/",
+    })
+    await store.activate(1)
+    const llm = await provider.runPromise(TestLLMServer)
+    await provider.runPromise(
+      llm.toolMatch((hit) => JSON.stringify(hit.body.tools ?? []).includes('"name":"loginom_read"'), "loginom_read", {
+        uri: "help://component",
+      }),
+    )
+    await provider.runPromise(
+      llm.textMatch((hit) => Array.isArray(hit.body.tools) && hit.body.tools.length > 0, "Ответ: 4."),
+    )
+    await writeFile(join(fixture.profile, "config/loginom-ai-agent.json"), JSON.stringify(testProviderConfig(llm.url)))
+    const result = await invoke(fixture, ["--dangerously-skip-permissions", "--", "Сколько будет 2 + 2?"])
+    expect(result.exit).toBe(0)
+    expect(result.events.filter((event) => event.type === "error")).toEqual([])
+    expect(
+      result.events.find((event) => event.type === "tool_use" && event.part.tool === "loginom_read")?.part.state,
+    ).toMatchObject({ status: "error", error: "LOGINOM_CONNECTION_NOT_READY" })
+    expect(result.events.find((event) => event.type === "text")?.part.text).toBe("Ответ: 4.")
+    expect(server.calls).toEqual([{ name: "read", arguments: { uri: "help://component" } }])
+    expect(await readdir(fixture.profile)).not.toContain(".writer")
+    expect(await readdir(join(fixture.profile, "loginom"))).not.toContain("runtime")
+  } finally {
+    await provider.dispose()
+    for (const callback of cleanup) await callback()
+  }
+}, 30_000)
+
 test.each(["ready", "cancel", "unavailable", "ordinary-unavailable"])(
   "standalone Help preflight stays independent of the browser: %s",
   async (mode) => {
