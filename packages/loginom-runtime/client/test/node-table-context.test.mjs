@@ -68,6 +68,7 @@ for(const [name,text,type,dom] of [
  ['different text','x','dtString','\u00a0'],['integer space',' ','dtInteger','\u00a0'],
  ['real space',' ','dtFloat','\u00a0'],['variant space',' ','dtVariant','\u00a0'],
  ['wrong empty render','','dtString',' '],['wrong space render',' ','dtString',''],
+ ['missing empty placeholder','','dtString',''],['unnormalized space placeholder',' ','dtString',' '],
 ])test('native whitespace equivalence refuses '+name,async()=>{
  const f=fixture();f.records[1].data.Text.ValueText=text;f.cells[4].textContent=dom;
  f.columns[1].el.dom.attrs.class='bg-TBGDataType-'+type+'-before';

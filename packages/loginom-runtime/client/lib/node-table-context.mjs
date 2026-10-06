@@ -150,7 +150,7 @@ export async function readNodeTable(page,binding,table,request,readOutputs=readO
         // observed display transformation; return the original cached text.
         const display=text===''||(field.type==='string'&&text===' ')?'\u00a0':text;
         if(typeof text!=='string'||text.length>16384
-          ||els[0].textContent!==display&&!(field.type==='string'&&els[0].textContent===text.replace(/\r\n/g,'\n')))
+          ||els[0].textContent!==display&&!(field.type==='string'&&text.includes('\r\n')&&els[0].textContent===text.replace(/\r\n/g,'\n')))
           return fail('cell_render_mismatch');
         cells.push({column:field.index,is_null:false,text});
       }
