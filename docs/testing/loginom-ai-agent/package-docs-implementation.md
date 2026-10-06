@@ -315,6 +315,13 @@ a9e18aa779dc48fe560a5790ba9275bb08f48df0080dd9b02e7d9f8a708c2bff.
 Deep/missing-unit expectations независимы от прежнего ограничения Python.
 Notes/views/references, skeleton, emit и product tool пока остаются открытыми.
 
+Node notes: RED — annotations отсутствовали, notes=0 вместо 2.
+GREEN — собственный текст элемента/атрибуты, порядок и дедупликация совпадают
+с Python; вложенные заметки участвуют в полной статистике. 7 PASS, Host typecheck
+PASS; четыре oracle fixtures проверены также собранным модулем в pinned Node.
+Логи tdd-node-extract-notes-{red,green}.log, node-extract-notes-node-regression.log.
+Открыты views/references, skeleton/emit и product tool; этап 2 не завершён.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -328,6 +335,6 @@ Notes/views/references, skeleton, emit и product tool пока остаются
 - Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
-- Этап 2: рекурсивный ZIP/XML parity и bundled Node 6 PASS; writer/tool ещё не подключены.
+- Этап 2: рекурсивный ZIP/XML/notes parity и bundled Node 7 PASS; writer/tool ещё не подключены.
 - Следующий шаг — подмодели, skeleton/emit; 35 baseline source-map mismatches остаются live gate.
 - Живая приёмка и удаление серверного skill остаются открытыми.

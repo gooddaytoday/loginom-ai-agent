@@ -12,3 +12,5 @@ statistics are asserted independently because the Python default depth limit
 omits the last descendants. All variants use ZIP deflate.
 `missing-unit.lgp` retains the indexed module while omitting its Unit.xml;
 this has an independent error expectation, not the permissive Python output.
+`notes.lgp` exercises direct annotation text, attributes, duplicate values and
+nested notes against the frozen Python oracle.

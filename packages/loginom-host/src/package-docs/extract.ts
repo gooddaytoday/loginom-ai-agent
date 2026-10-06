@@ -129,7 +129,25 @@ function workflow(root: Element | undefined, path: string, depth = 0): Workflow 
     const nested = path + "/" + entry.label
     return [{ label: entry.label, guid: entry.guid, depth: depth + 1, path: nested, ...workflow(inner, nested, depth + 1) }]
   })
-  return { workflow_nodes, links, hierarchy, notes: [], submodels }
+  const noteFields = ["Text", "Caption", "Comment", "Description"]
+  const notes = children(child(root, "Annotations")).flatMap((item) => {
+    const texts = [item, ...Array.from(item.getElementsByTagName("*"))].flatMap((element) => [
+      ...(noteFields.includes(element.localName) && leadingText(element) ? [leadingText(element)] : []),
+      ...noteFields.map((name) => element.getAttribute(name)?.trim() ?? "").filter(Boolean),
+    ])
+    if (leadingText(item)) texts.push(leadingText(item))
+    const text = [...new Set(texts)].join(" ").trim()
+    return text ? [text] : []
+  })
+  return { workflow_nodes, links, hierarchy, notes, submodels }
+}
+
+function leadingText(element: Element) {
+  // ElementTree .text excludes descendants and text following a child element.
+  const nodes = Array.from(element.childNodes)
+  const first = nodes.findIndex((node) => node.nodeType === 1)
+  return nodes.slice(0, first < 0 ? undefined : first).filter((node) => [3, 4].includes(node.nodeType))
+    .map((node) => node.nodeValue ?? "").join("").trim()
 }
 
 function workflowBodies(body: Workflow): Workflow[] { return [body, ...body.submodels.flatMap(workflowBodies)] }
