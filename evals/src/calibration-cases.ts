@@ -53,7 +53,9 @@ export async function prepareCalibrationCases(tasks: Task[], runDir: string, cor
       await rm(archive)
       const zipped = Bun.spawn(["zip", "-q", "-r", archive, "."], { cwd: unpacked, stdout: "ignore", stderr: "pipe" })
       if (await zipped.exited !== 0) throw new EvalFailure(task.id + ": zip failed", 2)
-      const csv = await Bun.file(path.join(dir, mutation.result_csv)).text()
+      const csv = await Bun.file(path.join(dir, mutation.result_csv)).text().catch(() => {
+        throw new EvalFailure(task.id + "/" + mutation.id + ": CSV корпуса недоступен", 2)
+      })
       hasher.update(mutation.id + "\n" + csv)
       await Bun.write(path.join(artifactDir, "results", "calibration.result.csv"), csv)
       const oracle = await checkOracle(task, artifactDir)
