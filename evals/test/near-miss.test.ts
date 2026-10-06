@@ -296,6 +296,22 @@ test("malformed CSV cannot masquerade as the intended near-miss", async () => {
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("malformed mutant XML is rejected with exit 2 before any judge assessment", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-invalid-xml-"))
+  try {
+    const fixture = await sortCorpus(root)
+    fixture.corpus.cases[0]!.edits[0]!.to = 'Name="revenue" SortDirection="sdAsc'
+    await Bun.write(path.join(fixture.dir, "cases.json"), JSON.stringify(fixture.corpus))
+    const answers = path.join(root, "answers.json")
+    await Bun.write(answers, JSON.stringify({ sort: fixture.tasks[0]!.checklist.filter((item) => !item.requiresRun).map((item) => item.id) }))
+    const config = loadConfig(["--calibrate", "--tasks", path.join(evalsRoot, "fixtures/calibration"), "--only", "sales-by-category"], {
+      JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: "bun " + path.join(evalsRoot, "fixtures/fake-codex.ts") + " --failed-by-case " + answers, EVAL_RESULTS_DIR: path.join(root, "results"),
+    })
+    await expect(calibrate(config, fixture.corpusDir)).rejects.toMatchObject({ exitCode: 2 })
+    expect(await Array.fromAsync(new Bun.Glob("**/judge/PROMPT.md").scan(config.resultsDir))).toEqual([])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 
 test("missing XML target is an inapplicable corpus edit with exit 2", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-missing-xml-"))
