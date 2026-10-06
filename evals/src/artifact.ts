@@ -121,8 +121,10 @@ export async function cleanupArtifact(source: ArtifactSource, artifact: Artifact
   if (removed.exitCode !== 0) throw new Error(`docker exec rm: ${removed.stderr.toString().trim()}`)
 }
 
-export async function cleanupOrphanResult(input: { source: ArtifactSource; name: string; outDir: string }) {
+export async function cleanupOrphanResult(input: { source: ArtifactSource; name: string; outDir: string; existingNames: readonly string[] | null }) {
   if (path.basename(input.name) !== input.name) throw Error("Unsafe result filename")
+  if (input.existingNames === null) throw Error("Storage ownership baseline unavailable")
+  if (input.existingNames.includes(input.name)) throw Error("Result ownership unconfirmed: pre-existing filename")
   const entries = await listStorage(input.source)
   if (!entries.some(entry => entry.name === input.name)) return
   await mkdir(path.join(input.outDir, "storage-outputs"), { recursive: true })

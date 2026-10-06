@@ -40,10 +40,22 @@ test("cleanupOrphanResult удаляет только точный собств�
     await Bun.write(path.join(storage, name), "csv bytes\n")
     await Bun.write(path.join(storage, "eval-run-case-10.result.csv"), "other attempt\n")
     await Bun.write(path.join(storage, "personal.csv"), "other user\n")
-    await cleanupOrphanResult({ source: parseArtifactSource(`dir:${storage}`, { container: "", storageDir: "" }), name, outDir: directory })
+    await cleanupOrphanResult({ source: parseArtifactSource(`dir:${storage}`, { container: "", storageDir: "" }), name, outDir: directory, existingNames: [] })
     expect(await Bun.file(path.join(storage, name)).exists()).toBe(false)
     expect(await Bun.file(path.join(directory, "storage-outputs", name)).text()).toBe("csv bytes\n")
     expect(await Bun.file(path.join(storage, "eval-run-case-10.result.csv")).text()).toBe("other attempt\n")
     expect(await Bun.file(path.join(storage, "personal.csv")).text()).toBe("other user\n")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("cleanupOrphanResult отказывает ownership для существовавшего до попытки CSV", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "eval-orphan-"))
+  try {
+    const name = "eval-run-case-1.result.csv"
+    await Bun.write(path.join(directory, name), "pre-existing bytes\n")
+    await expect(cleanupOrphanResult({ source: parseArtifactSource(`dir:${directory}`, { container: "", storageDir: "" }),
+      name, outDir: path.join(directory, "evidence"), existingNames: [name] })).rejects.toThrow("pre-existing")
+    expect(await Bun.file(path.join(directory, name)).text()).toBe("pre-existing bytes\n")
+    expect(await Bun.file(path.join(directory, "evidence", "storage-outputs", name)).exists()).toBe(false)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })

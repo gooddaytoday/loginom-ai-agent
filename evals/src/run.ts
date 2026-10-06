@@ -227,6 +227,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const packagePath = `/${config.loginom.username}/${name}.lgp`
   const prompt = buildAgentPrompt(task.prompt, packagePath, `${name}.result.csv`)
   await Bun.write(path.join(outDir, "prompt.txt"), prompt)
+  const storageBefore = config.dryRun ? [] : await listStorage(input.source).then(entries => entries.map(entry => entry.name), () => null)
   const since = Date.now()
   const run = await runAgent({
     command: input.command,
@@ -264,7 +265,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const cleanupError =
     !config.keepStorage && (artifact || !config.dryRun)
       ? await (artifact ? cleanupArtifact(input.source, artifact) : cleanupOrphanResult({
-          source: input.source, name: `${name}.result.csv`, outDir,
+          source: input.source, name: `${name}.result.csv`, outDir, existingNames: storageBefore,
         })).then(
           () => null,
           (error: unknown) => describe(error),
