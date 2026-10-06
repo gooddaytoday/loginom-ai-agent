@@ -919,23 +919,69 @@ execute и Host scope ещё не подключены; существующая
 объявляется исправленной. Этап 5 остаётся открытым. Согласованные требования
 плана не изменялись, файлы evals и соседний worktree не трогались.
 
+## Приватный Host scope и подготовка исходных вложений
+
+HostPort теперь хранит действующий и pending-профиль на существующем run.
+Default/docs не перечисляют браузер и отклоняют его вызовы/admission до lease,
+runtime, записи журнала и файлов. Запрос активации сохраняет прежние права;
+apply проверяет точное совпадение pending, безопасное текущее work/recovery
+состояние и применяет профиль. Docs → automation в той же задаче запрещён.
+Новый настоящий task ID начинает default, сохраняя браузер и его работу.
+Поэтому даже default → docs повторно проверяет оставшуюся работу старой задачи.
+Во время окончательного apply сырой браузерный вызов/admission запрещены.
+Adapter сериализует scope, admission и вызовы, не прерывая чужую активную работу
+при отмене ещё не начавшегося вызова.
+
+Первый разрешённый prepare создаёт runtime, передаёт исходные byte groups с
+настоящими message IDs, подтверждает admission и только затем готовит workspace.
+Дедупликация повторно проверяет byte identity; новый runtime получает вложения
+снова. Help/diagnostics не используют этот путь, отдельный admit не запускает
+runtime, `.lgp` filenames запрещены. Остальные Dock-вызовы требуют известного
+каталога подготовленного runtime. Приватный list действительного managed entry
+добавляет `prepared` из собственного workspace metadata, перекрывая MCP-поле:
+неудачный первый prepare не выдаёт остальные инструменты.
+
+TDD RED → GREEN сохранены для исходного scope, порядка admission, повторной
+передачи после замены runtime, отказа prepare, перехода новой default-задачи
+при живой работе и гонки apply/сырого browser call. Логи в собственном
+acceptance-каталоге: `tdd-host-task-scope-red.log`,
+`tdd-prepare-admission-order-red.log`, `tdd-replacement-admission-red.log`,
+`tdd-unprepared-catalog-red.log`, `tdd-managed-prepared-catalog-red.log`,
+`tdd-new-task-live-work-red.log`, `tdd-scope-application-race-red.log`.
+
+Проверки: полный Host — **224 PASS / 7 SKIP, 0 FAIL**, 1231 assertions;
+`task-scope` + actual managed entry + parallel calls — **20 PASS**, 131 assertions;
+Agent history/tools/registry — **30 PASS**, 77 assertions. Host и Agent
+`bun typecheck`, pinned Node syntax check и `git diff --check` прошли.
+Сохранены `host-task-scope-final-suite.log`, `host-scope-application-race-green.log`,
+`agent-host-scope-regression.log` и соответствующие final-typecheck логи.
+Runtime lock SHA-256 остаётся `1e9c65c695505bcc8e94afdee82b844da93c44bf937fbe4a80afe4a9cb784a93`.
+
+Это source/IPC проверки с настоящим pinned Node, контролируемой внешней
+browser/bridge-границей и отдельной проверкой byte-identical managed entry.
+Реальные Linux Desktop/CLI и выбор skill моделью ещё не приняты. Следующий шаг —
+подключить scopes/activation к provider-turn, ограничить SessionTools resolve/
+execute и убрать eager admission; backend пока не создаёт активацию сам.
+Общий пункт этапа 5 не отмечен выполненным. Требования плана и документ
+корректировок не менялись; evals и соседний worktree не изменялись.
+
 ## Checkpoint
 
-- `docs-no-browser`: baseline `fc3d97dbf`, settings `197b178b6`, history `e1f9476d4`, work `ec64f0255`.
-- Этап 0 выполнен: полный чистый baseline и детерминированные проверки сохранены.
-- Этап 1 выполнен: каталог, staging, локальный runtime и передача resource root проверены.
-- Каталог skills, локальный loader и prepare реализованы; единый digest проверен в Bun/Node.
-- Shared inventory/staging: два bundled skills вне checkout; общий verifier и closure проверены.
-- Publisher отключён без чтения файлов/сети; серверная запись сохранена для baseline/старых клиентов.
-- Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
-- Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
-- Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
-- Этап 2: pipeline 41 PASS, staging 13 PASS; Host suite 180 PASS / 6 SKIP.
-- Tool/SKILL Node workflow и lifecycle проверены; TaskScope history 82 PASS / 1 SKIP.
-- Старый session package_docs/Python тест требует замены при SessionTools integration.
-- Reserved skill/command policy и пользовательские предупреждения проверены по sources.
-- Linux artifact completeness/shared closure проверены; Host suite 184 PASS / 6 SKIP.
-- Host local run/knowledge, BrowserStatus и workState; full Host 212 PASS / 7 SKIP.
-- Desktop source lifecycle 36 PASS, lease 4 PASS; CLI preflight 12 PASS и local-run 6 PASS.
-- Host validation/save и статусы реализованы; далее Host scopes/activation, GUI/TTY и lazy exits.
-- Живая приёмка и удаление серверного skill остаются открытыми.
+- Исходный SHA `77c8c5180` (`docs-no-browser`); Host scope/admission реализованы выше.
+- Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
+- Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
+- Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
+- Shared inventory, dependency closure и source/installed generated exception проверены.
+- Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
+- Docs Node pipeline 41 PASS; оригинальные файлы/permission/cancellation проверены отдельно.
+- BrowserStatus и key-only Help работают по sources; GUI/TTY и первый запуск ещё открыты.
+- TaskScope full-history/replay/revert/fork и защита public metadata проверены.
+- ToolRegistry назначает origin сам, независимо от plugin IDs и definition hooks.
+- Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
+- Первый prepare: scope → runtime → original bytes admission → workspace call.
+- Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
+- Полный Host 224 PASS / 7 SKIP; Agent history/tools/registry 30 PASS; typecheck обоих PASS.
+- Старый session package_docs/Python тест остаётся для замены при SessionTools integration.
+- Далее: actual bundled activation + provider-turn snapshots/allowlists и lazy admission.
+- Затем Linux Desktop/CLI/TTY, естественный выбор skill и парные live evals на принятом harness SHA.
+- Живая приёмка, серверное удаление, merge/release остаются отдельными открытыми границами.

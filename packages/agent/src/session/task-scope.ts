@@ -1,8 +1,9 @@
 import type { SessionV1 } from "@loginom-ai-agent/core/v1/session"
 import type { Schema } from "effect"
+import { HostTaskScope } from "@loginom-ai-agent/loginom-host/task-scope"
 import { MessageID, type PartID, type SessionID } from "./schema"
 
-export type Profile = "default" | "package-docs" | "loginom-automation"
+export type Profile = HostTaskScope.Profile
 export type Info = { sessionID: SessionID; taskMessageID: MessageID; profile: Profile }
 type History = Schema.Schema.Type<typeof SessionV1.WithParts>
 
@@ -55,8 +56,7 @@ export function derive(input: {
             ? part.state.metadata.activation
             : undefined,
       )
-      if (next && !(scope.profile === "package-docs" && next === "loginom-automation"))
-        scope = { ...scope, profile: next }
+      if (next && HostTaskScope.permits(scope.profile, next)) scope = { ...scope, profile: next }
     }
   }
   return scope

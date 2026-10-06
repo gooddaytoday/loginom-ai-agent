@@ -193,7 +193,10 @@ async function handle(message) {
       return
     }
     if (message.operation === "list") {
-      send({ id: message.id, result: await state.client.listTools() })
+      send({
+        id: message.id,
+        result: { ...(await state.client.listTools()), prepared: state.session.metadata.workspaceReady === true },
+      })
       return
     }
     if (message.operation === "interrupt") {

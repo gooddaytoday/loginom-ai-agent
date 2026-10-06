@@ -33,7 +33,7 @@ test("an unconfigured local run exposes diagnostics and defers connection errors
     await host.settled()
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 0 })
     expect(await client.request("tools", { run: "one" })).toMatchObject({
-      tools: [expect.objectContaining({ name: "dock_prepare" }), expect.objectContaining({ name: "dock_diagnostics" })],
+      tools: [expect.objectContaining({ name: "dock_diagnostics" })],
     })
     expect(
       await client.request("call", { run: "one", name: "dock_diagnostics", args: {}, userMessage: "original" }),

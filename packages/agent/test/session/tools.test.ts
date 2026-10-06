@@ -227,6 +227,9 @@ for (const failure of [undefined, "catalog", "admission"]) {
         ],
         loginom: {
           generation: 7,
+          async scope(_mode, scope) {
+            return scope
+          },
           async tools() {
             if (failure === "catalog") throw Error("LOGINOM_KNOWLEDGE_UNAVAILABLE")
             return { tools: [{ name: "dock_prepare", inputSchema: { type: "object", properties: {} } }] }

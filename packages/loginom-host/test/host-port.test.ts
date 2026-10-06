@@ -13,6 +13,16 @@ import { credentials } from "../src/connection/credentials"
 import { recoveryStore } from "../src/connection/recovery-store"
 import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
 
+async function prepareRun(client: ReturnType<typeof transport>, run: string) {
+  await client.request("scope", {
+    run,
+    mode: "bind",
+    scope: { taskMessageID: "msg_original", profile: "loginom-automation" },
+  })
+  await client.request("call", { run, name: "dock_prepare", args: {}, userMessage: "msg_original" })
+  await client.request("tools", { run })
+}
+
 test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
   "async operation journal retains ownership through waits: %s",
   async (ending) => {
@@ -33,7 +43,8 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
       process.on('message', m => {
         if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
         if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
-        if (m.operation === 'list') process.send({id:m.id,result:{tools:[]}});
+        if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
+        if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
         if (m.operation !== 'call') return;
         const action = m.input.arguments.action;
         appendFileSync(${JSON.stringify(join(directory, "calls.jsonl"))}, JSON.stringify({ action }) + '\\n');
@@ -81,6 +92,7 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
     try {
       await waitForKnowledge(host)
       expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
+      await prepareRun(client, "one")
       expect(await call("start")).toEqual({ action: "start" })
       expect(host.journal.pending()).toEqual([])
       expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toHaveLength(1)
@@ -182,6 +194,8 @@ test("an uncertain call leaves the same run free to continue", async () => {
     process.on('message', m => {
       if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
+      if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
       if (m.operation !== 'call') return;
       const action = m.input.arguments.action;
       appendFileSync(${JSON.stringify(join(directory, "calls.jsonl"))}, JSON.stringify({ action }) + '\\n');
@@ -221,6 +235,7 @@ test("an uncertain call leaves the same run free to continue", async () => {
   try {
     await waitForKnowledge(host)
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
+    await prepareRun(client, "one")
     expect(await call("uncertain")).toEqual({ action: "uncertain" })
     expect(await call("finish")).toEqual({ action: "finish" })
     expect(
@@ -255,6 +270,8 @@ test.each(["local", "leased"])(
     process.on('message', m => {
       if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true,checked:true}});
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
+      if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
       if (m.operation !== 'call') return;
       const action = m.input.arguments.action;
       process.send({id:m.id,result:{result:{action},recoveryPending:action!=='finish',activeWork:false}});
@@ -297,8 +314,10 @@ test.each(["local", "leased"])(
       await waitForKnowledge(host)
       const local = mode === "local" ? await LoginomHost.acquire("chat") : undefined
       if (mode === "local") expect(local?.generation).toBe(1)
-      if (mode === "leased")
+      if (mode === "leased") {
         expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
+        await prepareRun(client, "one")
+      }
       if (mode === "leased") {
         expect(
           await client.request("call", {
@@ -375,6 +394,8 @@ test("restarting the host drops an uncertain record without replaying it", async
     process.on('message', m => {
       if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
+      if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
       if (m.operation !== 'call') return;
       appendFileSync(${JSON.stringify(join(directory, "calls.jsonl"))}, JSON.stringify({ action: m.input.arguments.action }) + '\\n');
       process.send({id:m.id,result:{result:{action:m.input.arguments.action},recoveryPending:false,activeWork:false}});
@@ -429,7 +450,7 @@ test("restarting the host drops an uncertain record without replaying it", async
   }
 }, 15000)
 
-test("a killed runtime is replaced for the next call in the same run", async () => {
+test("a killed runtime requires an explicit prepare before the next scenario call", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "loginom-advisory-restart-runtime-"))
@@ -452,6 +473,8 @@ test("a killed runtime is replaced for the next call in the same run", async () 
         return;
       }
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
+      if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
       if (m.operation !== 'call') return;
       const action = m.input.arguments.action;
       appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ action }) + '\\n');
@@ -492,7 +515,10 @@ test("a killed runtime is replaced for the next call in the same run", async () 
   try {
     await waitForKnowledge(host)
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
+    await prepareRun(client, "one")
     await expect(call("kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+    await expect(call("finish")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    await prepareRun(client, "one")
     expect(await call("finish")).toEqual({ action: "finish" })
     const started = (await readFile(launches, "utf8"))
       .trim()
@@ -539,6 +565,8 @@ test("a chat runtime restarts at most twice in one turn", async () => {
         return;
       }
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
+      if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
       if (m.operation !== 'call') return;
       const action = m.input.arguments.action;
       appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ action }) + '\\n');
@@ -579,10 +607,14 @@ test("a chat runtime restarts at most twice in one turn", async () => {
   try {
     await waitForKnowledge(host)
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
+    await prepareRun(client, "one")
     await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+    await prepareRun(client, "one")
     await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+    await prepareRun(client, "one")
     await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
-    await expect(call("one", "finish")).rejects.toThrow("LOGINOM_RUNTIME_UNAVAILABLE")
+    await expect(call("one", "finish")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    await expect(prepareRun(client, "one")).rejects.toThrow("LOGINOM_RUNTIME_UNAVAILABLE")
     expect(
       (await readFile(calls, "utf8"))
         .trim()
@@ -592,6 +624,7 @@ test("a chat runtime restarts at most twice in one turn", async () => {
     expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toEqual([])
     await client.request("release", { run: "one" })
     expect(await client.request("acquire", { run: "two", session: "chat" })).toEqual({ generation: 1 })
+    await prepareRun(client, "two")
     expect(await call("two", "finish")).toEqual({ action: "finish" })
   } finally {
     client.close()
@@ -625,6 +658,8 @@ test("the next turn replaces a runtime that cannot continue", async () => {
         return;
       }
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
+      if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
       if (m.operation !== 'call') return;
       const action = m.input.arguments.action;
       process.send({id:m.id,result:{result:{action},recoveryPending:action!=='finish',activeWork:false}});
@@ -663,9 +698,11 @@ test("the next turn replaces a runtime that cannot continue", async () => {
   try {
     await waitForKnowledge(host)
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
+    await prepareRun(client, "one")
     expect(await call("one", "uncertain")).toEqual({ action: "uncertain" })
     await client.request("release", { run: "one" })
     expect(await client.request("acquire", { run: "two", session: "chat" })).toEqual({ generation: 1 })
+    await prepareRun(client, "two")
     expect(await call("two", "finish")).toEqual({ action: "finish" })
     const chat = createHash("sha256").update("chat").digest("hex")
     const session = (await readFile(launches, "utf8"))
@@ -705,6 +742,8 @@ test("the next turn keeps a runtime that still has active work", async () => {
         return;
       }
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
+      if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
       if (m.operation !== 'call') return;
       const action = m.input.arguments.action;
       const active = action === 'pending';
@@ -744,9 +783,11 @@ test("the next turn keeps a runtime that still has active work", async () => {
   try {
     await waitForKnowledge(host)
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
+    await prepareRun(client, "one")
     expect(await call("one", "pending")).toEqual({ action: "pending" })
     await client.request("release", { run: "one" })
     expect(await client.request("acquire", { run: "two", session: "chat" })).toEqual({ generation: 1 })
+    await prepareRun(client, "two")
     expect(await call("two", "finish")).toEqual({ action: "finish" })
     const chat = createHash("sha256").update("chat").digest("hex")
     const session = (await readFile(launches, "utf8"))
@@ -793,6 +834,7 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
         process.send({id:m.id,result:true});
         return;
       }
+      if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation !== 'call') return;
       appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ chat, name: m.input.name }) + '\\n');
       process.send({id:m.id,result:{result:{name:m.input.name},recoveryPending:false,activeWork:false}});
@@ -848,9 +890,15 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
     expect(await call("dock_diagnostics")).toMatchObject({ structuredContent: { generation: 1, state: "ready" } })
     expect(await client.request("interrupt", { run: "one" })).toBe(true)
     expect(await chatStarts()).toEqual([])
+    await client.request("scope", {
+      run: "one",
+      mode: "bind",
+      scope: { taskMessageID: "msg_original", profile: "loginom-automation" },
+    })
     expect(await call("dock_prepare")).toEqual({ name: "dock_prepare" })
     const opened = await chatStarts()
     expect(opened).toHaveLength(1)
+    await client.request("tools", { run: "one" })
     expect(await call("dock_action_describe")).toEqual({ name: "dock_action_describe" })
     expect(await call("find")).toEqual({ name: "find" })
     expect(await call("dock_diagnostics")).toMatchObject({ structuredContent: { generation: 1, state: "ready" } })

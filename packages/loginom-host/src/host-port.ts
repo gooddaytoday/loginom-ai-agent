@@ -2,9 +2,17 @@ import { createHash, randomUUID } from "node:crypto"
 import type { createLoginomHost } from "./host"
 import type { InputFile } from "./inputs"
 import { hostError } from "./errors"
+import { HostTaskScope } from "./task-scope"
+import { Schema } from "effect"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
 
 const knowledgeTools = new Set(["find", "search", "read", "grep", "glob", "list", "tree"])
+const Admissions = Schema.Array(
+  Schema.Struct({
+    userMessage: HostTaskScope.Info.fields.taskMessageID,
+    files: Schema.Array(Schema.Struct({ name: Schema.String, data: Schema.String })),
+  }),
+)
 const diagnosticTool = {
   name: "dock_diagnostics",
   description:
@@ -55,6 +63,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       dispatching: boolean
       released: boolean
       active: Set<string>
+      scope?: HostTaskScope.Info
+      pendingScope?: HostTaskScope.Info
+      scopes: Promise<void>
+      browserDispatching: boolean
+      applyingScope: boolean
+      catalog: Set<string>
+      admitted: Set<string>
     }
   >()
   const acquiring = new Map<string, string>()
@@ -126,7 +141,18 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           await service.retireRuntime(chat)
           service.resetRestarts(chat)
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
-          runs.set(input.run, { chat, calls: 0, dispatching: false, released: false, active: new Set() })
+          runs.set(input.run, {
+            chat,
+            calls: 0,
+            dispatching: false,
+            released: false,
+            active: new Set(),
+            scopes: Promise.resolve(),
+            browserDispatching: false,
+            applyingScope: false,
+            catalog: new Set([prepareTool.name]),
+            admitted: new Set(),
+          })
           reply({ id: data.id, result: { generation: status.generation } })
         } finally {
           acquiring.delete(input.run)
@@ -143,35 +169,126 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         reply({ id: data.id, result: true })
         return
       }
+      if (data.method === "scope") {
+        const previous = run.scopes
+        const next = Promise.withResolvers<void>()
+        run.scopes = next.promise
+        await previous
+        run.calls++
+        try {
+          if (state.closed || run.released) throw new Error("LOGINOM_SCOPE_DENIED")
+          const request = Schema.decodeUnknownSync(HostTaskScope.Request)(input)
+          const idle = async () => {
+            if (run.browserDispatching || service.journal.pending().length || service.recoveries.has(run.chat))
+              throw new Error("LOGINOM_SCOPE_DENIED")
+            const generation = run.lease?.generation ?? (await service.api.status()).generation
+            const work = await service.workState(generation, run.chat).catch(() => undefined)
+            if (!work || work.activeWork || work.unsettledWork || work.dispatching || run.browserDispatching)
+              throw new Error("LOGINOM_SCOPE_DENIED")
+          }
+          if (request.mode === "bind") {
+            if (
+              run.calls > 1 ||
+              run.browserDispatching ||
+              (run.scope &&
+                (run.scope.taskMessageID === request.scope.taskMessageID
+                  ? run.scope.profile !== request.scope.profile
+                  : request.scope.profile !== "default"))
+            )
+              throw new Error("LOGINOM_SCOPE_DENIED")
+            run.scope = request.scope
+            run.pendingScope = undefined
+          }
+          if (request.mode === "request") {
+            if (
+              !run.scope ||
+              run.scope.taskMessageID !== request.scope.taskMessageID ||
+              request.scope.profile === "default" ||
+              !HostTaskScope.permits(run.pendingScope?.profile ?? run.scope.profile, request.scope.profile)
+            )
+              throw new Error("LOGINOM_SCOPE_DENIED")
+            if (request.scope.profile === "package-docs") await idle()
+            run.pendingScope = request.scope
+          }
+          if (request.mode === "apply") {
+            run.applyingScope = true
+            const pending = run.pendingScope
+            run.pendingScope = undefined
+            if (
+              !run.scope ||
+              !pending ||
+              pending.taskMessageID !== request.scope.taskMessageID ||
+              pending.profile !== request.scope.profile ||
+              run.calls > 1 ||
+              run.browserDispatching
+            )
+              throw new Error("LOGINOM_SCOPE_DENIED")
+            if (pending.profile === "package-docs") await idle()
+            run.scope = pending
+          }
+          reply({ id: data.id, result: request.scope }, run.lease?.generation)
+        } catch {
+          throw new Error("LOGINOM_SCOPE_DENIED")
+        } finally {
+          run.applyingScope = false
+          next.resolve()
+          run.calls--
+          if (run.released && !run.calls) await release(input.run, run)
+        }
+        return
+      }
+      const browserCall =
+        data.method === "call" &&
+        "name" in input &&
+        typeof input.name === "string" &&
+        !knowledgeTools.has(input.name) &&
+        input.name !== diagnosticTool.name
+      if (
+        (data.method === "admit" || browserCall) &&
+        (run.applyingScope ||
+          run.scope?.profile !== "loginom-automation" ||
+          (data.method === "admit" && !service.hasRuntime(run.lease?.generation ?? -1, run.chat)) ||
+          (browserCall && "name" in input && typeof input.name === "string" && !run.catalog.has(input.name)))
+      )
+        throw new Error("LOGINOM_SCOPE_DENIED")
       if (data.method !== "interrupt" && service.journal.pending().length) throw new Error("LOGINOM_RECOVERY_REQUIRED")
       // Refuse competing calls before durable admission. The active call keeps its
       // own journal and lease; a known no-dispatch refusal is not uncertainty.
       if (data.method === "call" && run.dispatching) throw new Error("LOGINOM_CALL_BUSY")
       if (data.method === "call") run.dispatching = true
+      if (browserCall) run.browserDispatching = true
       run.calls++
       try {
         if (data.method === "tools") {
           const status = await service.api.status()
+          const automation = run.scope?.profile === "loginom-automation"
           const generation = run.lease?.generation ?? status.generation
           const knowledge =
             run.lease || status.state === "ready"
-              ? catalogTools(await service.catalog(generation).catch(() => ({ tools: [] })))
+              ? catalogTools(await service.catalog(generation).catch(() => ({ tools: [] }))).filter((tool) =>
+                  knowledgeTools.has(tool.name),
+                )
               : []
           // Listing an existing browser is an external operation; an empty local
           // catalog must remain usable when that connection cannot be leased.
-          if (!run.lease && service.hasRuntime(generation, run.chat))
+          if (automation && !run.lease && service.hasRuntime(generation, run.chat))
             await connectionLease(input.run, run).catch(() => undefined)
+          const listed =
+            automation && run.lease && service.hasRuntime(run.lease.generation, run.chat)
+              ? await (await service.runtime(run.lease.generation, run.chat)).request("list")
+              : undefined
           const browser =
-            run.lease && service.hasRuntime(run.lease.generation, run.chat)
-              ? catalogTools(await (await service.runtime(run.lease.generation, run.chat)).request("list"))
+            listed && typeof listed === "object" && "prepared" in listed && listed.prepared === true
+              ? catalogTools(listed)
               : []
+          run.catalog = new Set([prepareTool.name, ...browser.map((tool) => tool.name)])
           reply(
             {
               id: data.id,
               result: {
                 tools: [
                   ...knowledge,
-                  prepareTool,
+                  ...(automation ? [prepareTool] : []),
                   diagnosticTool,
                   ...browser.filter(
                     (tool) =>
@@ -196,14 +313,22 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             )
           )
             throw new Error("LOGINOM_INPUT_INVALID")
+          if (input.files.some((file) => file.name.toLowerCase().endsWith(".lgp")))
+            throw new Error("LOGINOM_SCOPE_DENIED")
           const lease = await connectionLease(input.run, run)
           const runtime = await service.runtime(lease.generation, run.chat)
           const files = await service.inputs(lease.generation, run.chat, input.userMessage, input.files)
+          if (run.admitted.has(input.userMessage)) {
+            reply({ id: data.id, result: [] }, lease.generation)
+            return
+          }
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
+          const result = await runtime.request("admit", { files, userMessage: input.userMessage })
+          run.admitted.add(input.userMessage)
           reply(
             {
               id: data.id,
-              result: await runtime.request("admit", { files, userMessage: input.userMessage }),
+              result,
             },
             lease.generation,
           )
@@ -258,15 +383,31 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           )
           return
         }
+        const admissions = Schema.decodeUnknownSync(Admissions)(
+          "admissions" in input && input.admissions !== undefined ? input.admissions : [],
+        )
+        if (admissions.some((admission) => admission.files.some((file) => file.name.toLowerCase().endsWith(".lgp"))))
+          throw new Error("LOGINOM_SCOPE_DENIED")
         const lease = await connectionLease(input.run, run)
+        if (input.name !== prepareTool.name && !service.hasRuntime(lease.generation, run.chat))
+          throw new Error("LOGINOM_SCOPE_DENIED")
         const recovery = { id: undefined as string | undefined }
         try {
           // A dead runtime is replaced before admission. Past the relaunch limit this
           // is a known refusal, not an uncertain dispatch.
-          await service.runtime(lease.generation, run.chat)
+          if (!service.hasRuntime(lease.generation, run.chat)) {
+            run.admitted.clear()
+            run.catalog = new Set([prepareTool.name])
+          }
+          const runtime = await service.runtime(lease.generation, run.chat)
+          for (const admission of admissions) {
+            const files = await service.inputs(lease.generation, run.chat, admission.userMessage, [...admission.files])
+            if (run.admitted.has(admission.userMessage)) continue
+            await runtime.request("admit", { files, userMessage: admission.userMessage })
+            run.admitted.add(admission.userMessage)
+          }
           recovery.id = await service.journal.begin(run.chat, lease.generation)
           run.active.add(recovery.id)
-          const runtime = await service.runtime(lease.generation, run.chat)
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
           const result = await runtime.request("call", {
             name: input.name,
@@ -299,13 +440,14 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
           // A journal write failure precedes runtime dispatch and cannot establish
           // an uncertain external operation without an admitted journal identity.
-          if (!recovery.id) throw new Error("LOGINOM_HOST_REQUEST_FAILED")
+          if (!recovery.id) throw new Error(hostError(error))
           await abandon(run)
           service.markRuntimeStale(run.chat)
           throw new Error("LOGINOM_CALL_UNCERTAIN")
         }
       } finally {
         if (data.method === "call") run.dispatching = false
+        if (browserCall) run.browserDispatching = false
         run.calls--
         if (run.released && !run.calls) {
           await release(input.run, run)

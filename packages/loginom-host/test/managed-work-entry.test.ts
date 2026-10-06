@@ -25,8 +25,12 @@ test("actual managed entry reads live bridge work and dispatching over private I
       export const loginBrowser = async () => ({ context: { close: async () => {} } });`,
     "runtime/client/package.json": JSON.stringify({ type: "module" }),
     "runtime/client/lib/session.mjs": `
+      import { readFileSync } from 'node:fs';
       export async function createSession() {
-        return { browserConfig: ${JSON.stringify(work)}, metadata: { clientRevision: 'fixture' } };
+        return { browserConfig: ${JSON.stringify(work)}, metadata: {
+          clientRevision: 'fixture',
+          get workspaceReady() { return JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8')).prepared === true; }
+        } };
       }`,
     "runtime/client/lib/artifacts.mjs":
       'export async function admitStartupArtifacts() { throw Error("unexpected admission") }',
@@ -41,6 +45,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
     "runtime/client/node_modules/@modelcontextprotocol/sdk/client/index.js": `
       exports.Client = class {
         async connect() {} async close() {}
+        async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }] }; }
         async callTool(input, _unused, { signal }) {
           if (!input.arguments.hold) return { content: [] };
           await new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(Error('aborted')), { once: true }));
@@ -74,6 +79,13 @@ test("actual managed entry reads live bridge work and dispatching over private I
     expect(await readFile(join(src, "managed-entry.mjs"), "utf8")).toBe(
       await readFile(new URL("../../loginom-runtime/src/managed-entry.mjs", import.meta.url), "utf8"),
     )
+    for (const prepared of [false, true, false]) {
+      await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared }))
+      expect(await runtime.request("list")).toEqual({
+        prepared,
+        tools: [{ name: "fixture", inputSchema: { type: "object" } }],
+      })
+    }
     for (const state of [
       { activeWork: true, unsettledWork: true },
       { activeWork: false, unsettledWork: true },

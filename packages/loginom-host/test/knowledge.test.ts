@@ -149,7 +149,7 @@ test("restored Host starts only knowledge and local settled does not wait for th
     await entered.promise
     expect(await client.request("acquire", { run: "before-ready", session: "local-chat" })).toEqual({ generation: 1 })
     expect(await client.request("tools", { run: "before-ready" })).toMatchObject({
-      tools: [expect.objectContaining({ name: "dock_prepare" }), expect.objectContaining({ name: "dock_diagnostics" })],
+      tools: [expect.objectContaining({ name: "dock_diagnostics" })],
     })
     expect(
       await client.request("call", {
@@ -178,7 +178,6 @@ test("restored Host starts only knowledge and local settled does not wait for th
           name: "read",
           inputSchema: server.tools.find((tool) => tool.name === "read")?.inputSchema,
         }),
-        expect.objectContaining({ name: "dock_prepare" }),
         expect.objectContaining({ name: "dock_diagnostics" }),
       ]),
     })

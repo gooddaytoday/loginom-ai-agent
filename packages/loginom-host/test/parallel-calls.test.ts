@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { SessionV1 } from "@loginom-ai-agent/schema/v1/session"
 import { createHash } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { mkdir, mkdtemp, readdir, rm, symlink } from "node:fs/promises"
@@ -39,6 +40,7 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
           started = m.id;
           return;
         }
+        if (m.operation === 'list') return reply(m.id, { prepared: true, tools: ['upload','describe','save-description','independent'].map(name => ({ name, inputSchema: { type: 'object' } })) });
         if (m.operation === 'inspect') return reply(m.id, calls);
         if (m.operation === 'interrupts') return reply(m.id, interrupts);
         if (m.operation === 'interrupt' || m.operation === 'finish') {
@@ -97,6 +99,11 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
       expect(run).toBeDefined()
       if (!run) throw Error("missing run")
       const runtime = await host.runtime(1, createHash("sha256").update("chat").digest("hex"))
+      await run.scope("bind", {
+        taskMessageID: SessionV1.MessageID.make("msg_original"),
+        profile: "loginom-automation",
+      })
+      await run.tools()
       const controller = new AbortController()
       const first = run.call("upload", {}, "original", ending === "interrupt" ? controller.signal : undefined)
       await runtime.request("started")
@@ -131,7 +138,14 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
       await Bun.sleep(100)
       if (ending === "other-chat") {
         const other = await LoginomHost.acquire("other")
-        expect(await other?.call("independent", {}, "original")).toEqual({ name: "independent" })
+        if (!other) throw Error("missing other run")
+        await host.runtime(1, createHash("sha256").update("other").digest("hex"))
+        await other.scope("bind", {
+          taskMessageID: SessionV1.MessageID.make("msg_original"),
+          profile: "loginom-automation",
+        })
+        await other.tools()
+        expect(await other.call("independent", {}, "original")).toEqual({ name: "independent" })
         await other?.release()
       }
       if (ending === "cancel" || ending === "interrupt") controller.abort()

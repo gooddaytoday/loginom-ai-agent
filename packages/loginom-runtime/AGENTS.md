@@ -17,6 +17,8 @@
 
 - Private call replies expose `activeWork` and `recoveryPending`/unsettled state. Retained ambiguous operations keep the current owner's host lease active so its bounded status/resume tools remain available even without a running worker. Durable admission records remain until uncertainty is reconciled; owner loss or release still requires recovery. Safe pre-upload checkpoints with confirmed cleanup and no required inspection are settled and do not retain an active lease. Active work is not proof of successful completion.
 
+- Private `list` IPC adds `prepared` from the managed session's `workspaceReady` metadata, overriding any field returned by MCP. Host uses it to withhold other Dock tools until explicit workspace preparation succeeds. This proof is private supervision data, not a model parameter or an additional public MCP schema.
+
 - Private `work` IPC reads the current bridge's active/unsettled work and whether a tool call is dispatching. It does not call a model-facing MCP tool, interrupt work, admit files or create a new browser. Keep dispatching separate from asynchronous work; the existing completed call response retains its previous semantics.
 
 - Artifact delivery may refresh a destination-folder lookup after a matched UI_EPOCH_CHANGED receipt only when status is NOT_APPLIED, phase is preconditions, effect_possible is false and cleanup_complete is true. Use a new observation/ref/action ID, revalidate the same document/workflow/tab/parent directory and verified folder, and stop after three attempts or cancellation. This does not authorize retrying upload, verification, uncertain navigation, or a prior settled delivery/recovery record.
