@@ -809,11 +809,12 @@ CLI check декодирует Validation, возвращает Help-ready и Br
 валидационный Node завершён, chat runtime не создаётся. Оригинальный код
 LOGINOM_CONNECTION_VALID сохранён, дополнительные поля разделяют готовность.
 
-Полный App browser suite: 59 PASS / 174 assertions; settings controller — 19
+Полный App browser suite: 60 PASS / 181 assertions; settings controller — 20
 случаев. CLI focused preflight/management: 9 PASS / 63 assertions, 30.70 s.
-App/Agent typecheck PASS, prettier и diff check PASS. Логи acceptance:
+App/Agent/Desktop typecheck PASS, prettier и diff check PASS. Логи acceptance:
 app-help-browser-status-{suite,typecheck}.log, cli-help-browser-status-regression.log,
-agent-help-browser-status-typecheck.log; RED tdd-{app,cli}-help-browser-status-red.log.
+agent-help-browser-status-typecheck.log, desktop-help-browser-status-typecheck.log;
+RED tdd-{app,cli}-help-browser-status-red.log.
 Controller/процессные fixtures не доказывают визуальную установленную Desktop
 приёмку, CLI TTY мастер или естественную активацию skill; эти gates ещё открыты.
 Пункт validation/save/status/UI пока не отмечен до приёмки мастеров.
@@ -830,7 +831,7 @@ Help в RU — «справка»; слова browser/unknown/verified/failed в
 
 ## Checkpoint
 
-- Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
+- `docs-no-browser`: baseline `fc3d97dbf`, Host `3025beb91`, settings `197b178b6`.
 - Этап 0 выполнен: полный чистый baseline и детерминированные проверки сохранены.
 - Этап 1 выполнен: каталог, staging, локальный runtime и передача resource root проверены.
 - Каталог skills, локальный loader и prepare реализованы; единый digest проверен в Bun/Node.
