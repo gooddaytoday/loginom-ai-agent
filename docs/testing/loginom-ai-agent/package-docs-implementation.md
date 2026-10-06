@@ -112,6 +112,14 @@ generated executable, выход за границы skill и symlink escape, н
 digest двух skills. Host typecheck PASS; Agent bundled discovery 2 PASS.
 Lock изменился только добавлением прямой зависимости Host, без обновления версий.
 
+Discovery: RED для realpath — два configured пути одного файла дали три
+директории вместо двух (включая bundled). GREEN: 3 PASS после canonical dedup.
+RED для provenance — project skill имел source=config. GREEN: 4 PASS после
+сохранения источника при scan. Чтение skills теперь последовательное; glob
+matches отсортированы. Дополнительные регрессии подтверждают поздний source
+для обычного имени и отсутствие fallback при повреждении bundled файла.
+Полный выбранный discovery/tool/attachment suite: 34 PASS, Agent typecheck PASS.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.

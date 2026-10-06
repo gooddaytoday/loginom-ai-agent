@@ -441,6 +441,10 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
   Это начальная связка этапов 1–3; полный перенос и проверка ресурсов ещё открыты.
 - [x] TDD-проверка manifest: неучтённый файл skill отклоняется общим
   `verifyBundledSkills`, не регистрируется как часть встроенного skill.
+- [x] TDD-проверка discovery: один realpath регистрируется один раз; обычный
+  проектный skill сохраняет source, источники загружаются последовательно,
+  более поздний configured source побеждает для незарезервированного имени.
+  Проверено отсутствие fallback после повреждения bundled файла.
 - [ ] Перенести существующий `loginom-automation` с сохранением имени и нужных
   references в Product; `.loginom-ai-agent/skills/package_docs/` перенести в
   `packages/product/skills/package-docs/`, изменив каталог/frontmatter.

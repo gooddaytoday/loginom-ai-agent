@@ -1,5 +1,6 @@
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import path from "path"
+import { realpath } from "node:fs/promises"
 import { Effect, Layer, Context, Schema } from "effect"
 import { NamedError } from "@loginom-ai-agent/core/util/error"
 import type { Agent } from "@/agent/agent"
@@ -86,16 +87,15 @@ export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Ski
 type State = {
   skills: Record<string, Info>
   dirs: Set<string>
+  paths: Set<string>
 }
 
 type DiscoveryState = {
-  matches: string[]
-  dirs: string[]
+  matches: { location: string; source: NonNullable<Info["source"]> }[]
 }
 
 type ScanState = {
-  matches: Set<string>
-  dirs: Set<string>
+  matches: Map<string, NonNullable<Info["source"]>>
 }
 
 export interface Interface {
@@ -108,10 +108,15 @@ export interface Interface {
 
 const add = Effect.fnUntraced(function* (
   state: State,
-  match: string,
+  location: string,
   events: EventV2Bridge.Service["Service"],
   origin: { source: Info["source"]; digest?: string } = { source: "config" },
 ) {
+  const match = yield* Effect.tryPromise(() => realpath(location)).pipe(
+    Effect.catch(() => Effect.succeed(undefined)),
+  )
+  if (!match || state.paths.has(match)) return
+  state.paths.add(match)
   const md = yield* Effect.tryPromise({
     try: () => ConfigMarkdown.parse(match),
     catch: (err) => err,
@@ -164,7 +169,7 @@ const scan = Effect.fnUntraced(function* (
   state: ScanState,
   root: string,
   pattern: string,
-  opts?: { dot?: boolean; scope?: string },
+  opts?: { dot?: boolean; scope?: string; source?: NonNullable<Info["source"]> },
 ) {
   const matches = yield* Effect.tryPromise({
     try: () =>
@@ -185,9 +190,8 @@ const scan = Effect.fnUntraced(function* (
     }),
   )
 
-  for (const match of matches) {
-    state.matches.add(match)
-    state.dirs.add(path.dirname(match))
+  for (const match of matches.toSorted()) {
+    state.matches.set(match, opts?.source ?? "config")
   }
 })
 
@@ -201,7 +205,7 @@ const discoverSkills = Effect.fnUntraced(function* (
   directory: string,
   worktree: string,
 ) {
-  const state: ScanState = { matches: new Set(), dirs: new Set() }
+  const state: ScanState = { matches: new Map() }
 
   const externalDirs: string[] = []
   if (!disableExternalSkills) {
@@ -211,7 +215,7 @@ const discoverSkills = Effect.fnUntraced(function* (
     for (const dir of externalDirs) {
       const root = path.join(global.home, dir)
       if (!(yield* fsys.isDir(root))) continue
-      yield* scan(state, root, EXTERNAL_SKILL_PATTERN, { dot: true, scope: "global" })
+      yield* scan(state, root, EXTERNAL_SKILL_PATTERN, { dot: true, scope: "global", source: "external" })
     }
 
     const upDirs = yield* fsys
@@ -219,7 +223,7 @@ const discoverSkills = Effect.fnUntraced(function* (
       .pipe(Effect.catch(() => Effect.succeed([] as string[])))
 
     for (const root of upDirs) {
-      yield* scan(state, root, EXTERNAL_SKILL_PATTERN, { dot: true, scope: "project" })
+      yield* scan(state, root, EXTERNAL_SKILL_PATTERN, { dot: true, scope: "project", source: "project" })
     }
   }
 
@@ -243,13 +247,12 @@ const discoverSkills = Effect.fnUntraced(function* (
   for (const url of cfg.skills?.urls ?? []) {
     const pulledDirs = yield* discovery.pull(url)
     for (const dir of pulledDirs) {
-      yield* scan(state, dir, SKILL_PATTERN)
+      yield* scan(state, dir, SKILL_PATTERN, { source: "url" })
     }
   }
 
   return {
-    matches: Array.from(state.matches),
-    dirs: Array.from(state.dirs),
+    matches: Array.from(state.matches, ([location, source]) => ({ location, source })),
   }
 })
 
@@ -258,10 +261,9 @@ const loadSkills = Effect.fnUntraced(function* (
   discovered: DiscoveryState,
   events: EventV2Bridge.Service["Service"],
 ) {
-  yield* Effect.forEach(discovered.matches, (match) => add(state, match, events), {
-    concurrency: "unbounded",
-    discard: true,
-  })
+  // Declared source order determines overrides. Parallel reads must not decide
+  // which skill wins when different files declare the same ordinary name.
+  for (const match of discovered.matches) yield* add(state, match.location, events, { source: match.source })
 
   yield* Effect.logInfo("init", { count: Object.keys(state.skills).length })
 })
@@ -293,7 +295,7 @@ const layer = Layer.effect(
     )
     const state = yield* InstanceState.make(
       Effect.fn("Skill.state")(function* () {
-        const s: State = { skills: {}, dirs: new Set() }
+        const s: State = { skills: {}, dirs: new Set(), paths: new Set() }
         // Register the built-in skill BEFORE disk discovery so a user-disk
         // skill with the same name can override it.
         s.skills[CUSTOMIZE_OPENCODE_SKILL_NAME] = {
@@ -343,7 +345,7 @@ const layer = Layer.effect(
     })
 
     const dirs = Effect.fn("Skill.dirs")(function* () {
-      return [...new Set([...(yield* InstanceState.get(discovered)).dirs, ...(yield* InstanceState.get(state)).dirs])]
+      return [...(yield* InstanceState.get(state)).dirs]
     })
 
     const available = Effect.fn("Skill.available")(function* (agent?: Agent.Info) {
