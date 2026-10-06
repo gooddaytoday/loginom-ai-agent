@@ -9,6 +9,7 @@ import os
 parser=argparse.ArgumentParser()
 for key in ['worktree','config','out']:parser.add_argument('--'+key,required=True,type=Path)
 parser.add_argument('--case',required=True)
+parser.add_argument('--matrix',choices=['matrix','csv-matrix'],default='matrix')
 args=parser.parse_args()
 sys.dont_write_bytecode=True
 import importlib.util
@@ -23,8 +24,8 @@ if verify_candidate(root,payload).returncode:raise RuntimeError('INVALID_CANDIDA
 manifest=json.loads((payload/'cli-manifest.json').read_text());meta=manifest['metadata'];assert not meta['sourceDirty'];prepare_profile(profile,meta['channel'],cfg.get('model_cache_file'))
 cli=payload/'bin/loginom-ai-agent-cli';resources=payload/'resources/loginom';node=resources/'bin/node';s=cfg['loginom'];package='/'+s['username']+'/node-text-import-'+attempt.name+'.lgp'
 acceptance=root/'docs/node-development/nodes/text-import/acceptance'
-case=next(c for c in json.loads((acceptance/'matrix/manifest.json').read_text())['cases'] if c['case_id']==args.case)
-source=acceptance/'matrix/fixtures'/case['source']['name']
+case=next(c for c in json.loads((acceptance/args.matrix/'manifest.json').read_text())['cases'] if c['case_id']==args.case)
+source=acceptance/args.matrix/'fixtures'/case['source']['name']
 if hashlib.sha256(source.read_bytes()).hexdigest()!=case['source']['sha256'] or source.stat().st_size!=case['source']['bytes']:raise RuntimeError('SOURCE_IDENTITY_DIFFERS')
 shutil.copyfile(source,work/source.name)
 instructions=f"""Создай новый пакет {package}. Импортируй исходное приложенное {source.name}, загрузи ровно один раз с проверкой серверных байтов. Не изменяй файл. Один узел text import с меткой {case['case_id']}, без связей и вычислений.
@@ -34,7 +35,7 @@ instructions=f"""Создай новый пакет {package}. Импортир�
 Настрой технические имена, метки, типы, виды и использование всех полей; входные имена бери из фактического определения полей (для файла без заголовков не угадывай их). Не теряй строки, NULL, пустые значения, ведущие нули, кавычки и переносы. Выполни импорт, прочитай всю небольшую таблицу (до 10 строк) с точными числами. Сохрани новый пакет после успеха. При неизвестном эффекте остановись, не повторяй загрузку или создание.
 """
 (work/'task.md').write_text(instructions)
-result={'status':'FAIL','node':'text-import','case_id':case['case_id'],'role':cfg['role'],**owner,'source_sha':meta['sourceCommit'],'source_tree_sha256':meta['sourceTreeSha256'],'cli_manifest_sha256':hashlib.sha256((payload/'cli-manifest.json').read_bytes()).hexdigest(),'ops':ops_identity(),'model':cfg['model'],'variant':cfg['variant'],'cli_exit':None,'oracle_exit':None,'timed_out':False,'package_path':package,'oracle':{'status':'not_run'},'cleanup':{'package_closed':False,'logged_out':False},'desktop':'not_checked','cli_manifest_metadata':meta}
+result={'status':'FAIL','node':'text-import','case_id':case['case_id'],'matrix':args.matrix,'input_source':case['source'],'role':cfg['role'],**owner,'source_sha':meta['sourceCommit'],'source_tree_sha256':meta['sourceTreeSha256'],'cli_manifest_sha256':hashlib.sha256((payload/'cli-manifest.json').read_bytes()).hexdigest(),'ops':ops_identity(),'model':cfg['model'],'variant':cfg['variant'],'cli_exit':None,'oracle_exit':None,'timed_out':False,'package_path':package,'oracle':{'status':'not_run'},'cleanup':{'package_closed':False,'logged_out':False},'desktop':'not_checked','cli_manifest_metadata':meta}
 started=time.monotonic();kw=dict(attempt=attempt,payload=payload,profile=profile,cwd=work,auth=Path(cfg['provider_auth_file']),pass_fds=(lock,))
 def invoke(command,stdout,stderr,**more):
  with stdout.open('wb') as out,stderr.open('wb') as err:return run(command,stdout=out,stderr=err,**more)

@@ -25,7 +25,8 @@ CASES=[
  ('multiline_lf',',','"','utf-8',False,False,True,0,'.','\n'),
 ]
 SCHEMA=[{'name':n,'label':l,'type':t,'data_kind':k,'used':True} for n,l,t,k in [('Id','Идентификатор','string','Дискретный'),('Name','Название','string','Дискретный'),('Amount','Сумма','real','Непрерывный'),('Date','Дата','datetime','Дискретный'),('Note','Текст','string','Дискретный')]]
-def prepare():
+def prepare(base=BASE, extension="txt"):
+ BASE=base
  BASE.mkdir(exist_ok=True);(BASE/'fixtures').mkdir(exist_ok=True)
  result=[]
  for case,delimiter,quote,encoding,bom,merge,header,skip,dec,multiline in CASES:
@@ -42,7 +43,7 @@ def prepare():
   if merge:text=text.replace(delimiter,delimiter*2)
   text=('SERVICE LINE\r\n'*skip)+text
   prefix={'utf-8':b'\xef\xbb\xbf','utf-16-le':b'\xff\xfe','utf-16-be':b'\xfe\xff'}.get(encoding,b'') if bom else b''
-  raw=prefix+text.encode(encoding);path=BASE/'fixtures'/(case+'.txt');path.write_bytes(raw)
+  raw=prefix+text.encode(encoding);path=BASE/'fixtures'/(case+'.'+extension);path.write_bytes(raw)
   # Independently parse pinned bytes, respecting physical preamble and logical CSV records.
   decoded=raw[len(prefix):].decode(encoding,errors='strict');decoded=decoded.split('\r\n',skip)[-1] if skip else decoded
   parsed=list(csv.reader(io.StringIO(decoded,newline=''),delimiter=delimiter,quotechar=quote or None,quoting=csv.QUOTE_MINIMAL if quote else csv.QUOTE_NONE,strict=True))
@@ -54,11 +55,17 @@ def prepare():
    amount=str(decimal.Decimal(r[2].replace(dec,'.')));date=datetime.datetime.strptime(r[3],'%Y-%m-%d').isoformat(timespec='milliseconds')
    expected.append([r[0],r[1],amount,date,None if r[4]=='?' else r[4]])
   native={'utf-8':65001,'cp1251':1251,'cp1252':1252,'utf-16-le':1200,'utf-16-be':1201}[encoding]
-  result.append({'case_id':case,'source':{'name':path.name,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'encoding':encoding,'bom':bom},'settings':{'source':{'encoding':str(native),'rows_to_skip':skip,'first_line_as_title':header},'format':{'delimiter':delimiter,'text_qualifier':quote,'decimal_separator':dec,'null_marker':'?','multiple_delimiters':merge,'date_format':'yyyy/mm/dd','date_separator':'-'}},'source_headers':labels if header else None,'columns':SCHEMA,'expected_rows':expected,'row_count':len(expected),'status':'NOT_RUN'})
+  result.append({'case_id':case,**({'lab15_case_id':case} if extension=='csv' else {}),'source':{'name':path.name,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'encoding':encoding,'bom':bom},'settings':{'source':{'encoding':str(native),'rows_to_skip':skip,'first_line_as_title':header},'format':{'delimiter':delimiter,'text_qualifier':quote,'decimal_separator':dec,'null_marker':'?','multiple_delimiters':merge,'date_format':'yyyy/mm/dd','date_separator':'-'}},'source_headers':labels if header else None,'columns':SCHEMA,'expected_rows':expected,'row_count':len(expected),'status':'NOT_RUN'})
  # Negative bytes have separate expectations: never accept a complete, correct table from them.
  negatives=[('unclosed_quote',b'Id,Name\r\n001,"unfinished\r\n002,next\r\n','documented warning; incomplete logical table must not pass'),('wrong_encoding','Id,Name\r\n001,Привет\r\n'.encode('cp1251'),'UTF-8 settings must not certify CP1251 source'),('wrong_delimiter',b'Id|Name\r\n001|value\r\n','comma settings must not certify two columns'),('ambiguous_headers',b'Name,Name\r\nleft,right\r\n','duplicate source labels must refuse ambiguous binding')]
  for case,raw,rule in negatives:
-  p=BASE/'fixtures'/(case+'.txt');p.write_bytes(raw);result.append({'case_id':case,'negative':True,'source':{'name':p.name,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()},'expected_outcome':rule,'status':'NOT_RUN'})
+  p=BASE/'fixtures'/(case+'.'+extension);p.write_bytes(raw);result.append({'case_id':case,**({'lab15_case_id':case} if extension=='csv' else {}),'negative':True,'source':{'name':p.name,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()},'expected_outcome':rule,'status':'NOT_RUN'})
  (BASE/'manifest.json').write_text(json.dumps({'generator':'matrix-fixtures.py','cases':result},ensure_ascii=False,indent=2)+'\n')
  print(json.dumps({'positive_cases':len(CASES),'negative_cases':len(negatives),'manifest_sha256':hashlib.sha256((BASE/'manifest.json').read_bytes()).hexdigest()}))
-if __name__=='__main__':prepare()
+if __name__=='__main__':
+ import argparse
+ parser=argparse.ArgumentParser()
+ parser.add_argument('--out',type=Path,default=BASE)
+ parser.add_argument('--extension',choices=['txt','csv'],default='txt')
+ args=parser.parse_args()
+ prepare(args.out,args.extension)

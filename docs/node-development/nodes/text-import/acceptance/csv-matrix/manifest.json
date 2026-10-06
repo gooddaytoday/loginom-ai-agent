@@ -1,0 +1,1769 @@
+{
+  "generator": "matrix-fixtures.py",
+  "cases": [
+    {
+      "case_id": "comma_utf8",
+      "lab15_case_id": "comma_utf8",
+      "source": {
+        "name": "comma_utf8.csv",
+        "bytes": 200,
+        "sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19",
+        "encoding": "utf-8",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "left,right \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "semicolon_cp1251_decimal",
+      "lab15_case_id": "semicolon_cp1251_decimal",
+      "source": {
+        "name": "semicolon_cp1251_decimal.csv",
+        "bytes": 150,
+        "sha256": "94821af546f6454601f5338d6fe32b8bf7a85bf7208b34df2bc522e55e2ab4dd",
+        "encoding": "cp1251",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "1251",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ";",
+          "text_qualifier": "\"",
+          "decimal_separator": ",",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "left;right \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "tab_utf16le",
+      "lab15_case_id": "tab_utf16le",
+      "source": {
+        "name": "tab_utf16le.csv",
+        "bytes": 302,
+        "sha256": "9cd38e66c97356d2b768f7d212a9772c720e0365f83375dba7a37ba58e795a04",
+        "encoding": "utf-16-le",
+        "bom": true
+      },
+      "settings": {
+        "source": {
+          "encoding": "1200",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": "\t",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "left\tright \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "tab_utf16be",
+      "lab15_case_id": "tab_utf16be",
+      "source": {
+        "name": "tab_utf16be.csv",
+        "bytes": 302,
+        "sha256": "cc726e1b706dd86c90af4f5763fae0300a618eba43935747f82bde49fa08a72b",
+        "encoding": "utf-16-be",
+        "bom": true
+      },
+      "settings": {
+        "source": {
+          "encoding": "1201",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": "\t",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "left\tright \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "space",
+      "lab15_case_id": "space",
+      "source": {
+        "name": "space.csv",
+        "bytes": 200,
+        "sha256": "c5d6de495d9373b2596b171085441eff904b95c3d8be52a7fdff9a9dfc2bbb58",
+        "encoding": "utf-8",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": " ",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "left right \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "pipe_multiline",
+      "lab15_case_id": "pipe_multiline",
+      "source": {
+        "name": "pipe_multiline.csv",
+        "bytes": 204,
+        "sha256": "586ac210d58bc0025c019b0e3669fc03807b13202320eef0de0aba2713f7b927",
+        "encoding": "utf-8",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": "|",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "first\r\nsecond| \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "merge_on",
+      "lab15_case_id": "merge_on",
+      "source": {
+        "name": "merge_on.csv",
+        "bytes": 222,
+        "sha256": "d055de93eac3be3686acc5f542e1f92c69c9ab92b4ca71bc11dc807e8db23061",
+        "encoding": "utf-8",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ";",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": true,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          "first"
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "left;;right \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "merge_off",
+      "lab15_case_id": "merge_off",
+      "source": {
+        "name": "merge_off.csv",
+        "bytes": 188,
+        "sha256": "8f0e40c946b3b722144bee7dcf78d2252c8b999132e5d0b89b843894f6ef8b74",
+        "encoding": "utf-8",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ";",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "left;right \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "single_quote",
+      "lab15_case_id": "single_quote",
+      "source": {
+        "name": "single_quote.csv",
+        "bytes": 200,
+        "sha256": "b4db01539f6f8118dd093fd2b68bcdbceef5c8d8ba3c81aba4c19d5f32bdd3e9",
+        "encoding": "utf-8",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ";",
+          "text_qualifier": "'",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "left;right 'quoted'"
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "backtick_quote",
+      "lab15_case_id": "backtick_quote",
+      "source": {
+        "name": "backtick_quote.csv",
+        "bytes": 200,
+        "sha256": "cc0dfcc437dbb75eab166f593104df83b23c7daf4d3dd1a5f3c0dedfe7295f0a",
+        "encoding": "utf-8",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": "|",
+          "text_qualifier": "`",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "left|right `quoted`"
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "no_quote",
+      "lab15_case_id": "no_quote",
+      "source": {
+        "name": "no_quote.csv",
+        "bytes": 190,
+        "sha256": "692e656e78ed7822342870237688a5314bedf72a1b2c49dbcd760dcfd27806b2",
+        "encoding": "utf-8",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "text_qualifier": "",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "literal\"quote"
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "no_header",
+      "lab15_case_id": "no_header",
+      "source": {
+        "name": "no_header.csv",
+        "bytes": 124,
+        "sha256": "7a59c76bcc09ed052a2e0f0c4de4472b77af9a0ed2b3ee07795e23571dd8569c",
+        "encoding": "utf-8",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": false
+        },
+        "format": {
+          "delimiter": ";",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": null,
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "left;right \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "skip_header",
+      "lab15_case_id": "skip_header",
+      "source": {
+        "name": "skip_header.csv",
+        "bytes": 228,
+        "sha256": "fa082af1d7c57d6a2304a493d60814f9d33d9d82c48b708f5e44b00c77b2a8c5",
+        "encoding": "utf-8",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 2,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "left,right \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "no_header_skip",
+      "lab15_case_id": "no_header_skip",
+      "source": {
+        "name": "no_header_skip.csv",
+        "bytes": 152,
+        "sha256": "6ac4739e92e7756cb8396407beee792d01c89e8a06aa8d1e232e972bb1d32f31",
+        "encoding": "utf-8",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 2,
+          "first_line_as_title": false
+        },
+        "format": {
+          "delimiter": "|",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": null,
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "left|right \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "utf8_bom",
+      "lab15_case_id": "utf8_bom",
+      "source": {
+        "name": "utf8_bom.csv",
+        "bytes": 203,
+        "sha256": "e525330244d5ab399e53b1216c9da23648ad3660a83190185427123016c80c8a",
+        "encoding": "utf-8",
+        "bom": true
+      },
+      "settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "left,right \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "cp1252",
+      "lab15_case_id": "cp1252",
+      "source": {
+        "name": "cp1252.csv",
+        "bytes": 147,
+        "sha256": "93139ce398d5c2bd220b25b26da74ec83e4df48cc335c7d9e145e000df199416",
+        "encoding": "cp1252",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "1252",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ";",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Reference",
+        "Libelle",
+        "Montant",
+        "Date",
+        "Texte"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "café",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "garçon",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "naïve",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "left;right \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "multiline_crlf",
+      "lab15_case_id": "multiline_crlf",
+      "source": {
+        "name": "multiline_crlf.csv",
+        "bytes": 204,
+        "sha256": "3b55bdd5b6fdfbacbb84fa63287272cad12a8b6d5bf27d6f4d1e1b8e2773e299",
+        "encoding": "utf-8",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "first\r\nsecond, \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "multiline_lf",
+      "lab15_case_id": "multiline_lf",
+      "source": {
+        "name": "multiline_lf.csv",
+        "bytes": 203,
+        "sha256": "9abcbfaef88b3bd01797b85cda8da40ca09b303a9fa130b6cd986c786b9de369",
+        "encoding": "utf-8",
+        "bom": false
+      },
+      "settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "source_headers": [
+        "Идентификатор",
+        "Название",
+        "Сумма",
+        "Дата",
+        "Текст"
+      ],
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_rows": [
+        [
+          "0001",
+          "Привет",
+          "12.25",
+          "2026-10-05T00:00:00.000",
+          ""
+        ],
+        [
+          "0002",
+          "Мир",
+          "0",
+          "2026-10-06T00:00:00.000",
+          null
+        ],
+        [
+          "0003",
+          "Юникод",
+          "-2.5",
+          "2026-10-07T00:00:00.000",
+          "first\nsecond, \"quoted\""
+        ]
+      ],
+      "row_count": 3,
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "unclosed_quote",
+      "lab15_case_id": "unclosed_quote",
+      "negative": true,
+      "source": {
+        "name": "unclosed_quote.csv",
+        "bytes": 36,
+        "sha256": "e8eda3b3c2a61603838a9b3eaf3dc6fbac6c7bde4ab966452cfb3fa292d76f2c"
+      },
+      "expected_outcome": "documented warning; incomplete logical table must not pass",
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "wrong_encoding",
+      "lab15_case_id": "wrong_encoding",
+      "negative": true,
+      "source": {
+        "name": "wrong_encoding.csv",
+        "bytes": 21,
+        "sha256": "97f88be2af869453bc726e51889dcb10c5bd1d2a8fd7b96cca6f125b888d3ee6"
+      },
+      "expected_outcome": "UTF-8 settings must not certify CP1251 source",
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "wrong_delimiter",
+      "lab15_case_id": "wrong_delimiter",
+      "negative": true,
+      "source": {
+        "name": "wrong_delimiter.csv",
+        "bytes": 20,
+        "sha256": "92441055dd7d146da19c049e44e6632d6977eb67ae06d7237786ea4439515cbb"
+      },
+      "expected_outcome": "comma settings must not certify two columns",
+      "status": "NOT_RUN"
+    },
+    {
+      "case_id": "ambiguous_headers",
+      "lab15_case_id": "ambiguous_headers",
+      "negative": true,
+      "source": {
+        "name": "ambiguous_headers.csv",
+        "bytes": 23,
+        "sha256": "c7519031b5932dc11febfd15807c8205d9892229ab7913321eea7d96eabd7bba"
+      },
+      "expected_outcome": "duplicate source labels must refuse ambiguous binding",
+      "status": "NOT_RUN"
+    }
+  ]
+}

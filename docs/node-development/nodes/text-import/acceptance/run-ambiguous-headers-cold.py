@@ -7,7 +7,7 @@ p=argparse.ArgumentParser();p.add_argument('--attempt',required=True,type=Path);
 payload=root/'.multica-node/current';assert verify_candidate(root,payload).returncode==0
 resources=payload/'resources/loginom';node=resources/'bin/node';tmp=attempt/'tmp';s=cfg['loginom'];lock=artifact_lock(root/'.multica-node')
 acceptance=root/'docs/node-development/nodes/text-import/acceptance'
-case=next(c for c in json.loads((acceptance/'matrix/manifest.json').read_text())['cases'] if c['case_id']=='ambiguous_headers');scenario=json.loads((acceptance/'negative/ambiguous-headers.settings.json').read_text());case['columns']=scenario['columns']
+case=next(c for c in json.loads((acceptance/res.get('matrix','matrix')/'manifest.json').read_text())['cases'] if c['case_id']=='ambiguous_headers');scenario=json.loads((acceptance/'negative/ambiguous-headers.settings.json').read_text());case['columns']=scenario['columns']
 write_private(tmp/'expected-negative.json',case);write_private(tmp/'cold-config.json',{'api_key':s['api_key'],'loginom_url':s['url'],'workflow_profile':{'passwordless_login':s['password']=='','loginom_user':s['username'],'password':s['password']}});write_private(tmp/'saved.json',{'path':res['package_path']});operator=read_private(Path(cfg['operator_file']));write_private(tmp/'admin.json',{k:operator[k] for k in ['url','admin_user','admin_password']})
 def invoke(command,where,timeout,**kw):
  where.mkdir(mode=0o700)

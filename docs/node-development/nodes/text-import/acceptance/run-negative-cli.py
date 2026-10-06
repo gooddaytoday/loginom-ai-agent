@@ -9,6 +9,7 @@ import os
 parser=argparse.ArgumentParser()
 for key in ['worktree','config','out']:parser.add_argument('--'+key,required=True,type=Path)
 parser.add_argument('--case',required=True)
+parser.add_argument('--matrix',choices=['matrix','csv-matrix'],default='matrix')
 args=parser.parse_args()
 sys.dont_write_bytecode=True
 root=args.worktree.resolve();cfgpath=args.config.resolve();cfg=read_private(cfgpath)
@@ -21,13 +22,13 @@ if verify_candidate(root,payload).returncode:raise RuntimeError('INVALID_CANDIDA
 manifest=json.loads((payload/'cli-manifest.json').read_text());meta=manifest['metadata'];assert not meta['sourceDirty'];prepare_profile(profile,meta['channel'],cfg.get('model_cache_file'))
 cli=payload/'bin/loginom-ai-agent-cli';resources=payload/'resources/loginom';node=resources/'bin/node';s=cfg['loginom'];package='/'+s['username']+'/node-text-import-'+attempt.name+'.lgp'
 acceptance=root/'docs/node-development/nodes/text-import/acceptance'
-case=next(c for c in json.loads((acceptance/'matrix/manifest.json').read_text())['cases'] if c['case_id']==args.case)
+case=next(c for c in json.loads((acceptance/args.matrix/'manifest.json').read_text())['cases'] if c['case_id']==args.case)
 case['settings']={'source':{'encoding':'65001','rows_to_skip':0,'first_line_as_title':True},'format':{'delimiter':',','decimal_separator':'.','null_marker':'?','text_qualifier':'"','multiple_delimiters':False,'date_format':'yyyy/mm/dd','date_separator':'-'}}
 case['settings']['format'].pop('date_format');case['settings']['format'].pop('date_separator')
 case['columns']=[{'name':n,'label':n,'type':'string','data_kind':'Дискретный','used':True} for n in ['Id','Name']]
 if args.case=='ambiguous_headers':
  scenario=json.loads((acceptance/'negative/ambiguous-headers.settings.json').read_text());case['settings']={k:scenario[k] for k in ['source','format']};case['columns']=scenario['columns']
-source=acceptance/'matrix/fixtures'/case['source']['name']
+source=acceptance/args.matrix/'fixtures'/case['source']['name']
 if hashlib.sha256(source.read_bytes()).hexdigest()!=case['source']['sha256'] or source.stat().st_size!=case['source']['bytes']:raise RuntimeError('SOURCE_IDENTITY_DIFFERS')
 shutil.copyfile(source,work/source.name)
 instructions=f"""Проверь импорт оригинального приложенного {source.name} в новый пакет {package}, один узел с меткой {case['case_id']}. Файл не изменяй, доставь ровно один раз с проверкой серверных байтов.
@@ -39,9 +40,9 @@ instructions=f"""Проверь импорт оригинального прил
 Не угадывай привязку повторяющихся заголовков и не выбирай их по позиции. Если мастер или выполнение откажет, зафиксируй точную причину/предупреждение без повторного создания, доставки или изменения настроек. После только известного отказа с подтверждённым закрытием черновика сохрани собственный диагностический пакет в указанном пути с текущим исходом и остановись. Если импорт применится, прочитай всю малую таблицу и сохрани пакет, но не объявляй повреждённые/неполные значения правильно проверенной таблицей. Зафиксируй наблюдённое предупреждение, если оно есть; не придумывай его. При неизвестном эффекте немедленно остановись.
 """
 if args.case=='ambiguous_headers':
- instructions=(acceptance/'negative/ambiguous-headers.task.md').read_text().replace('{{PACKAGE_PATH}}',package).replace('{{OPERATION_ID}}',attempt.name+'-import').replace('{{SETTINGS}}',json.dumps({**case['settings'],'columns':case['columns']},ensure_ascii=False,indent=2))
+ instructions=(acceptance/'negative/ambiguous-headers.task.md').read_text().replace('ambiguous_headers.txt',source.name).replace('{{PACKAGE_PATH}}',package).replace('{{OPERATION_ID}}',attempt.name+'-import').replace('{{SETTINGS}}',json.dumps({**case['settings'],'columns':case['columns']},ensure_ascii=False,indent=2))
 (work/'task.md').write_text(instructions)
-result={'status':'FAIL','node':'text-import','case_id':case['case_id'],'role':cfg['role'],**owner,'source_sha':meta['sourceCommit'],'source_tree_sha256':meta['sourceTreeSha256'],'cli_manifest_sha256':hashlib.sha256((payload/'cli-manifest.json').read_bytes()).hexdigest(),'ops':ops_identity(),'model':cfg['model'],'variant':cfg['variant'],'cli_exit':None,'oracle_exit':None,'timed_out':False,'package_path':package,'oracle':{'status':'not_run'},'cleanup':{'package_closed':False,'logged_out':False},'desktop':'not_checked','cli_manifest_metadata':meta}
+result={'status':'FAIL','node':'text-import','case_id':case['case_id'],'matrix':args.matrix,'input_source':case['source'],'role':cfg['role'],**owner,'source_sha':meta['sourceCommit'],'source_tree_sha256':meta['sourceTreeSha256'],'cli_manifest_sha256':hashlib.sha256((payload/'cli-manifest.json').read_bytes()).hexdigest(),'ops':ops_identity(),'model':cfg['model'],'variant':cfg['variant'],'cli_exit':None,'oracle_exit':None,'timed_out':False,'package_path':package,'oracle':{'status':'not_run'},'cleanup':{'package_closed':False,'logged_out':False},'desktop':'not_checked','cli_manifest_metadata':meta}
 started=time.monotonic();kw=dict(attempt=attempt,payload=payload,profile=profile,cwd=work,auth=Path(cfg['provider_auth_file']),pass_fds=(lock,))
 def invoke(command,stdout,stderr,**more):
  with stdout.open('wb') as out,stderr.open('wb') as err:return run(command,stdout=out,stderr=err,**more)
