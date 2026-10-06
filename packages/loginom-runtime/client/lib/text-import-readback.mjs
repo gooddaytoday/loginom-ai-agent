@@ -23,10 +23,10 @@ export function textImportConfigurationReadback({node,phases,operation_id}) {
     return [name,f.value];
   }));
   const source=fields(c.source,['source_path','connection','encoding','rows_to_skip','first_line_as_title']);
-  const format=fields(c.format,['delimiter','text_qualifier','null_marker','decimal_separator']);
+  const format=fields(c.format,['delimiter','text_qualifier','null_marker','decimal_separator',...['multiple_delimiters','date_format','date_separator'].filter(k=>Object.hasOwn(c.format?.fields??{},k))]);
   requireValue(typeof source.first_line_as_title==='boolean'
     &&Object.entries(source).every(([k,v])=>k==='first_line_as_title'||typeof v==='string')
-    &&Object.values(format).every(v=>typeof v==='string'),'invalid observed field types');
+    &&Object.entries(format).every(([k,v])=>typeof v===(k==='multiple_delimiters'?'boolean':'string')),'invalid observed field types');
   requireValue(Array.isArray(c.columns)&&c.columns.length>0&&c.columns.length<=1000
     &&c.columns.every((f,i)=>f.status==='observed'&&f.index===i&&typeof f.used==='boolean'
       &&['name','label','type','data_kind'].every(k=>typeof f[k]==='string'&&f[k].length<=120))

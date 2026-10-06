@@ -32,7 +32,7 @@ const boundedFields=items=>({...array(items),maxItems:1000});
 const importConfigurationReadback=object({kind:values('text_import'),scope:values('observed_before_verified_finish'),node:ref,
  receipt_ids:{...array(str),minItems:3,maxItems:3},values_are:values('observed_ui_values'),
  source:object({source_path:str,connection:str,encoding:str,rows_to_skip:str,first_line_as_title:bool}),
- format:object({delimiter:str,text_qualifier:str,null_marker:str,decimal_separator:str}),
+ format:object({delimiter:str,text_qualifier:str,null_marker:str,decimal_separator:str,multiple_delimiters:bool,date_format:str,date_separator:str},['delimiter','text_qualifier','null_marker','decimal_separator']),
  columns:boundedFields(readbackColumn),output_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(readbackMappingField)}),
  package_persistence_verified:{type:'boolean',const:false}});
 const calculatorConfigurationReadback=object({kind:values('calculator'),scope:values('observed_before_verified_finish'),node:ref,

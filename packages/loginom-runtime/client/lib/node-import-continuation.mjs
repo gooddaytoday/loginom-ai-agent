@@ -58,12 +58,15 @@ export function readRetainedImportFormatBrowser({rootTid}) {
   const roots=exact(rootTid);if(roots.length!==1)return fail('wizard_root');
   const root=roots[0],base=rootTid+';ImportTextFileParamsWizard;';
   const values={};
-  for(const [key,suffix] of Object.entries({delimiter:'edtDelimiterChar',text_qualifier:'edtTextQualifier',null_marker:'edtValueNull',decimal_separator:'edtDecimalSeparator'})) {
+  for(const [key,suffix] of Object.entries({delimiter:'edtDelimiterChar',text_qualifier:'edtTextQualifier',null_marker:'edtValueNull',decimal_separator:'edtDecimalSeparator',date_format:'edtDateFormat',date_separator:'edtDateSeparator'})) {
     const owners=exact(base+suffix+';ValueControl'),inputs=owners.length===1?[...owners[0].querySelectorAll('input:not([type="hidden"]):not([type="password"]),textarea')]:[];
     if(owners.length!==1||!root.contains(owners[0])||inputs.length!==1)return fail('format_control');
     const value=inputs[0].value;if(typeof value!=='string'||value.length>256||/[\0\r\n]/.test(value))return fail('format_value');
     values[key]=value;
   }
+  const checkboxOwners=exact(base+'edtMultipleDelimiters;ValueControl'),displays=exact(base+'edtMultipleDelimiters;ValueControl;DisplayEl');
+  if(checkboxOwners.length!==1||displays.length!==1||!root.contains(checkboxOwners[0])||!checkboxOwners[0].contains(displays[0])||!displays[0].matches('.x-form-checkbox'))return fail('format_checkbox');
+  values.multiple_delimiters=checkboxOwners[0].classList.contains('x-form-cb-checked');
   const gridTid=base+'ColumnDefsTuning;grdSettings;grd-1',grids=exact(gridTid),containers=exact(gridTid+';normalHeaderCt'),bodies=exact(gridTid+';tbl');
   if(grids.length!==1||containers.length!==1||bodies.length!==1||!root.contains(grids[0])||!grids[0].contains(containers[0])||!grids[0].contains(bodies[0]))return fail('definition_grid');
   const columnBase=gridTid+';normalHeaderCt;',headers=[...containers[0].querySelectorAll('.x-column-header')];
@@ -94,7 +97,7 @@ export function verifyMappedImportContinuation({node,configured,source,retained,
   const sourceKeys=['source_path','connection','encoding','rows_to_skip','first_line_as_title'];
   if(!sourceKeys.every(k=>configured.source?.fields?.[k]?.status==='observed'&&!configured.source.fields[k].truncated
     &&source.values?.[k]===configured.source.fields[k].value))return false;
-  if(!['delimiter','text_qualifier','null_marker','decimal_separator'].every(k=>configured.format?.fields?.[k]?.status==='observed'
+  if(!Object.keys(configured.format?.fields??{}).every(k=>configured.format?.fields?.[k]?.status==='observed'
     &&!configured.format.fields[k].truncated&&retained.values?.[k]===configured.format.fields[k].value))return false;
   const canonical=v=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
   const same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
