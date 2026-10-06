@@ -66,3 +66,33 @@ test("calibration refuses a stale reference fingerprint before judging", async (
     await expect(prepareCalibrationCases(tasks, path.join(root, "run"), path.dirname(corpusDir))).rejects.toThrow("reference.lgp")
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+async function sortCorpus(root: string) {
+  const taskDir = path.join(evalsRoot, "fixtures/calibration/sales-by-category")
+  const corpusDir = path.join(root, "corpus")
+  const dir = path.join(corpusDir, "sales-by-category")
+  await mkdir(dir, { recursive: true })
+  const sources = Object.fromEntries(await Promise.all(
+    ["task.json", "reference.lgp", "SPEC.md", "oracle.csv", "data/dataset.csv"].map(async (file) =>
+      [file, new Bun.CryptoHasher("sha256").update(await Bun.file(path.join(taskDir, file)).bytes()).digest("hex")]),
+  ))
+  const corpus = { sources, cases: [{
+    id: "sort", kind: "sort",
+    edits: [{ file: "Unit_0/Unit.xml", from: 'Name="revenue" SortDirection="sdDesc"', to: 'Name="revenue" SortDirection="sdAsc"', count: 1 }],
+    result_csv: "sort.csv", expected_failed: ["sort-revenue", "result-rows"], expected_oracle_pass: false,
+  }] }
+  await Bun.write(path.join(dir, "cases.json"), JSON.stringify(corpus))
+  const lines = (await Bun.file(path.join(taskDir, "oracle.csv")).text()).trim().split("\n")
+  await Bun.write(path.join(dir, "sort.csv"), [lines[0], ...lines.slice(1).reverse()].join("\n") + "\n")
+  return { corpusDir, dir, corpus, tasks: await loadTasks(path.dirname(taskDir), ["sales-by-category"]) }
+}
+
+test("calibration refuses an XML edit that no longer matches", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-edit-count-"))
+  try {
+    const fixture = await sortCorpus(root)
+    fixture.corpus.cases[0]!.edits[0]!.from = "nonexistent XML"
+    await Bun.write(path.join(fixture.dir, "cases.json"), JSON.stringify(fixture.corpus))
+    await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toThrow("sort")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})

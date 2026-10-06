@@ -38,7 +38,10 @@ export async function prepareCalibrationCases(tasks: Task[], runDir: string, cor
       if (!(await unzip(archive, unpacked))) throw new EvalFailure(task.id + ": reference не распакован", 2)
       for (const edit of mutation.edits) {
         const target = path.join(unpacked, edit.file)
-        await Bun.write(target, (await Bun.file(target).text()).replaceAll(edit.from, edit.to))
+        const xml = await Bun.file(target).text()
+        if (!edit.from || edit.from === edit.to || xml.split(edit.from).length - 1 !== edit.count)
+          throw new EvalFailure(task.id + "/" + mutation.id + ": неверное число XML-замен", 2)
+        await Bun.write(target, xml.replaceAll(edit.from, edit.to))
       }
       await rm(archive)
       const zipped = Bun.spawn(["zip", "-q", "-r", archive, "."], { cwd: unpacked, stdout: "ignore", stderr: "pipe" })
