@@ -302,6 +302,19 @@ node-extract-pinned-node.log, node-extract-host-typecheck.log.
 обе уже были в bun.lock; изменены только dependency edges Host, не версии closure.
 Oracle fixtures перенесены из сохранённого baseline, происхождение указано в README.
 
+Node tree extraction: RED — nested workflow отклонялся как SUBMODEL_UNSUPPORTED.
+GREEN — рекурсивные identities/path/depth, links/hierarchy и агрегаты соответствуют
+замороженному Python oracle для двух уровней. ZIP case/backslash и deflate
+проверены в Bun и в собранном модуле под pinned Node (три oracle fixtures).
+Независимые регрессии: за прежним пределом два уровня считаются все 8 узлов,
+3 подмодели и 4 workflow-уровня; отсутствующий индексированный Unit.xml даёт
+PACKAGE_DOCS_UNIT_MISSING, а не пустой модуль. 6 PASS, Host typecheck PASS.
+Логи tdd-node-extract-nested-{red,green}.log и node-extract-tree-regression.log.
+Оракулы вариантов получены неизменённым Python исходником baseline fc3d97dbf:
+a9e18aa779dc48fe560a5790ba9275bb08f48df0080dd9b02e7d9f8a708c2bff.
+Deep/missing-unit expectations независимы от прежнего ограничения Python.
+Notes/views/references, skeleton, emit и product tool пока остаются открытыми.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -315,6 +328,6 @@ Oracle fixtures перенесены из сохранённого baseline, п�
 - Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
-- Начат этап 2: ZIP/XML parity и bundled Node 2 PASS; writer/tool ещё не подключены.
+- Этап 2: рекурсивный ZIP/XML parity и bundled Node 6 PASS; writer/tool ещё не подключены.
 - Следующий шаг — подмодели, skeleton/emit; 35 baseline source-map mismatches остаются live gate.
 - Живая приёмка и удаление серверного skill остаются открытыми.

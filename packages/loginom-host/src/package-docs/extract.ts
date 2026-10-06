@@ -43,7 +43,7 @@ export async function extractPackage(path: string) {
       const unit = await xml(base + "/Unit.xml")
       if (!unit) throw Error("PACKAGE_DOCS_UNIT_MISSING")
       const body = workflow(child(unit, "WorkFlow"), base)
-      const stats = statistics(body.workflow_nodes)
+      const stats = statistics(body)
       return { id: base.split("/").at(-1)!, index: number + 1,
         name: metadata?.getAttribute("Name") ?? `Unit${number + 1}`,
         display_name: metadata?.getAttribute("DisplayName") ?? `Модуль${number + 1}`,
@@ -56,7 +56,7 @@ export async function extractPackage(path: string) {
         application_version: info.getAttribute("ApplicationVersion") ?? "", guid: info.getAttribute("Guid") ?? "", external_references: [] },
       stats: { modules: modules.length, notes: total("notes"), nodes: total("nodes"), submodels: total("submodels"),
         programming_nodes: total("programming_nodes"), reference_nodes: total("reference_nodes"), derived_nodes: total("derived_nodes") },
-      modules, unique_engine_types: [...new Set(modules.flatMap((module) => module.workflow_nodes.map((node) => node.engine_type)).filter(Boolean))].toSorted(),
+      modules, unique_engine_types: [...new Set(modules.flatMap((module) => workflowBodies(module).flatMap((body) => body.workflow_nodes.map((node) => node.engine_type))).filter(Boolean))].toSorted(),
     }
   } finally { await zip.close() }
 }
@@ -69,7 +69,7 @@ function children(parent?: Element) {
 function child(parent: Element | undefined, name: string) { return children(parent).find((node) => node.localName === name) }
 function items(parent?: Element) { return children(parent).filter((node) => node.localName === "Item") }
 
-function nodeEntry(node: Element, path: string) {
+function nodeEntry(node: Element, path: string, depth: number) {
   const component = child(node, "Component")
   const engine = child(component, "Engine") ?? component
   const engine_type = engine?.getAttributeNS("http://www.w3.org/2001/XMLSchema-instance", "type") || engine?.getAttribute("type") || ""
@@ -78,7 +78,6 @@ function nodeEntry(node: Element, path: string) {
   const display_name = node.getAttribute("DisplayName") ?? ""
   const label = display_name || name || engine_type || guid.slice(0, 8)
   const service_name = engine_type === "TBGModelGenericComponentEngine" ? "Подмодель" : engine_type.replace(/^TBG/, "") || name || "Узел"
-  if (engine_type === "TBGModelGenericComponentEngine") throw Error("PACKAGE_DOCS_SUBMODEL_UNSUPPORTED")
   const ports = (section: string) => items(child(node, section)).map((port) => {
     const guid = port.getAttribute("Guid") ?? ""
     const name = port.getAttribute("Name") || portNames[guid.toLowerCase()] || ""
@@ -89,11 +88,21 @@ function nodeEntry(node: Element, path: string) {
     settings_main: Object.fromEntries(Array.from(engine?.attributes ?? []).filter((attribute) =>
       !["type", "Guid"].includes(attribute.localName) && attribute.namespaceURI !== "http://www.w3.org/2000/xmlns/" && attribute.value && attribute.value.length < 500)
       .map((attribute) => [attribute.localName, attribute.value])),
-    path, depth: 0, hierarchy_token: `${label}:${service_name}:${guid}` }
+    path, depth, hierarchy_token: `${label}:${service_name}:${guid}` }
 }
 
-function workflow(root: Element | undefined, path: string) {
-  const workflow_nodes = items(child(root, "Nodes")).map((node) => nodeEntry(node, path))
+type Workflow = {
+  workflow_nodes: ReturnType<typeof nodeEntry>[]
+  links: { source_node_guid: string; source_port_guid: string; target_node_guid: string; target_port_guid: string;
+    source_label: string; target_label: string; source_port_name: string; target_port_name: string; readable: string }[]
+  hierarchy: { Source: string | null; Target: string | null }[]
+  notes: string[]
+  submodels: (Workflow & { label: string; guid: string; depth: number; path: string })[]
+}
+
+function workflow(root: Element | undefined, path: string, depth = 0): Workflow {
+  const raw = items(child(root, "Nodes"))
+  const workflow_nodes = raw.map((node) => nodeEntry(node, path, depth))
   const nodes = new Map(workflow_nodes.map((node) => [node.guid, node]))
   const portName = (node: ReturnType<typeof nodeEntry> | undefined, guid: string) =>
     node && [...node.input_ports, ...node.output_ports, ...node.service_input_ports, ...node.service_output_ports].find((port) => port.guid.toLowerCase() === guid.toLowerCase())?.display_name || portNames[guid.toLowerCase()] || ""
@@ -113,12 +122,25 @@ function workflow(root: Element | undefined, path: string) {
     if (!targets.has(node.hierarchy_token)) hierarchy.push({ Source: null, Target: node.hierarchy_token })
     if (!sources.has(node.hierarchy_token)) hierarchy.push({ Source: node.hierarchy_token, Target: null })
   }
-  return { workflow_nodes, links, hierarchy, notes: [], submodels: [] }
+  const submodels = raw.flatMap((node, index) => {
+    const entry = workflow_nodes[index]
+    if (entry.engine_type !== "TBGModelGenericComponentEngine") return []
+    const inner = child(child(child(child(node, "Component"), "Engine"), "ModelUnit"), "WorkFlow")
+    const nested = path + "/" + entry.label
+    return [{ label: entry.label, guid: entry.guid, depth: depth + 1, path: nested, ...workflow(inner, nested, depth + 1) }]
+  })
+  return { workflow_nodes, links, hierarchy, notes: [], submodels }
 }
 
-function statistics(nodes: ReturnType<typeof nodeEntry>[]) {
-  return { notes: 0, nodes: nodes.length, submodels: 0,
+function workflowBodies(body: Workflow): Workflow[] { return [body, ...body.submodels.flatMap(workflowBodies)] }
+
+function statistics(body: Workflow) {
+  const bodies = workflowBodies(body)
+  const nodes = bodies.flatMap((body) => body.workflow_nodes)
+  return { notes: bodies.reduce((sum, body) => sum + body.notes.length, 0), nodes: nodes.length,
+    submodels: bodies.reduce((sum, body) => sum + body.submodels.length, 0),
     programming_nodes: nodes.filter((node) => /JavaScript|Python|JS$/.test(node.engine_type)).length,
     reference_nodes: nodes.filter((node) => /Reference|LinkNode/.test(node.engine_type)).length,
-    derived_nodes: nodes.filter((node) => node.engine_type.includes("Derived")).length, nesting_depth: nodes.length ? 1 : 0 }
+    derived_nodes: nodes.filter((node) => node.engine_type.includes("Derived")).length,
+    nesting_depth: Math.max(nodes.length ? 1 : 0, ...bodies.flatMap((body) => body.submodels.map((submodel) => submodel.depth + 1))) }
 }
