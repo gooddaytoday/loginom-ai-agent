@@ -559,6 +559,16 @@ Product/root AGENTS зафиксировали catalog/generated/integrity/до�
 временного Product skills.paths моста в исходниках нет. Соответствующие пункты
 этапа 3 отмечены; installed run/TUI и единый knowledge lifecycle ещё открыты.
 
+Discovery completeness: RED — при честном inventory без automation/SKILL.md
+backend всё ещё показывал package-docs из неполного Product каталога.
+GREEN — discovery использует тот же verifyProductSkills, что Linux артефакты,
+и сообщает о недоступности bundle; ни один reserved skill/slash не появляется.
+Fixture восстанавливает точные исходные header/manifest bytes. Catalog и обычные
+skill regressions: 35 PASS (155 assertions), Agent typecheck PASS;
+tdd-product-discovery-completeness-red, product-discovery-completeness-green.log.
+Flags берут единый staged root; CLI_BUNDLE не меняет verifier discovery.
+Actual installed run/TUI проверки ещё остаются открытыми.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.

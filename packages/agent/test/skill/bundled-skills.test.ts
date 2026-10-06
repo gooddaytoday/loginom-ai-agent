@@ -374,3 +374,38 @@ it.live("a changed bundled file is not registered and cannot fall back to a proj
     }).pipe(Effect.ensuring(Effect.promise(() => Bun.write(join(resources, "skills/package-docs/SKILL.md"), content)))),
   ),
 )
+
+it.live("discovery rejects an incomplete Product catalog even when its remaining inventory is accurate", () =>
+  provideTmpdirInstance(() =>
+    Effect.acquireUseRelease(
+      Effect.promise(() => Promise.all([
+        readFile(join(resources, "skills/loginom-automation/SKILL.md"), "utf8"),
+        readFile(join(resources, "resource-manifest.json"), "utf8"),
+      ])),
+      () => Effect.gen(function* () {
+        yield* Effect.promise(() => rm(join(resources, "skills/loginom-automation/SKILL.md")))
+        yield* Effect.promise(async () => Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({
+          protocol: 1, files: await resourceInventory(resources),
+        })))
+        const events = yield* EventV2Bridge.Service
+        const errors: string[] = []
+        const off = yield* events.listen((event) => {
+          if (event.type === Session.Event.Error.type) errors.push(JSON.stringify(event.data))
+          return Effect.void
+        })
+        yield* Effect.addFinalizer(() => off)
+        const skills = yield* Skill.Service
+        const commands = yield* Command.Service
+        for (const name of reservedSkillNames) {
+          expect(yield* skills.get(name)).toBeUndefined()
+          expect(yield* commands.get(name)).toBeUndefined()
+        }
+        expect(errors.some((error) => error.includes("Bundled skills are unavailable"))).toBe(true)
+      }),
+      (original) => Effect.promise(() => Promise.all([
+        Bun.write(join(resources, "skills/loginom-automation/SKILL.md"), original[0]),
+        Bun.write(join(resources, "resource-manifest.json"), original[1]),
+      ])),
+    ),
+  ),
+)

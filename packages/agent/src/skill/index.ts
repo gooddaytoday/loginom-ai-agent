@@ -18,7 +18,7 @@ import { Glob } from "@loginom-ai-agent/core/util/glob"
 import { Discovery } from "./discovery"
 import { isRecord } from "@/util/record"
 import { escapeHtml } from "@/util/html"
-import { verifyBundledSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
+import { verifyProductSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
 import { isReservedSkillName } from "@loginom-ai-agent/product/skills"
 
 const CLAUDE_EXTERNAL_DIR = ".claude"
@@ -306,7 +306,7 @@ const layer = Layer.effect(
           source: "builtin",
         }
         if (flags.loginomResources) {
-          const bundled = yield* Effect.tryPromise(() => verifyBundledSkills(flags.loginomResources!)).pipe(
+          const bundled = yield* Effect.tryPromise(() => verifyProductSkills(flags.loginomResources!)).pipe(
             Effect.catch(
               Effect.fnUntraced(function* () {
                 const { Session } = yield* Effect.promise(() => import("@/session/session"))
