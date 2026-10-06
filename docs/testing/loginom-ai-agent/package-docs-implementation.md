@@ -421,6 +421,18 @@ tdd-docs-{builder,staging,staging-source-guard}-*, docs-staged-node-regression.l
 Node pipeline fixtures строятся тем же product builder в отдельном Bun процессе.
 Пункт сборки/staging этапа 2 отмечен; agent tool, permissions и отмена ещё открыты.
 
+Node publication permission boundary: RED — emit отвергал backend-only --output.
+GREEN — CLI принимает только точное имя отчёта внутри session directory;
+коллизия возвращает PACKAGE_DOCS_OUTPUT_COLLISION, не выбирает другой путь
+после разрешения. Параметры модели по-прежнему не содержат output. Без этого
+внутреннего аргумента совместимый CLI сохраняет автоматические -2/-3.
+Регрессии проверяют внешние/вложенные/посторонние/относительные имена,
+неизменность занятого файла и отсутствие final/temp после отказа.
+41 PASS (158 assertions), Host typecheck PASS; tdd-docs-fixed-output-*,
+docs-fixed-output-regression.log. Полный Host suite после staging: 180 PASS,
+6 Windows-only SKIP, 0 FAIL (186 тестов, 947 assertions); stage2-host-suite.log.
+Ограниченный агентский tool и permissions ещё не подключены.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -434,6 +446,6 @@ Node pipeline fixtures строятся тем же product builder в отде�
 - Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
-- Этап 2: pipeline 39 PASS, staging 13 PASS; agent tool/permissions/отмена ещё открыты.
+- Этап 2: pipeline 41 PASS, staging 13 PASS; Host suite 180 PASS / 6 SKIP.
 - Следующий шаг — ограниченный tool; 35 baseline source-map mismatches остаются live gate.
 - Живая приёмка и удаление серверного skill остаются открытыми.

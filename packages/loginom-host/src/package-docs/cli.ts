@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto"
 import { constants } from "node:fs"
 import { link, lstat, mkdir, open, realpath, rename, unlink, writeFile } from "node:fs/promises"
-import { basename, extname, isAbsolute, join } from "node:path"
+import { basename, extname, isAbsolute, join, relative } from "node:path"
 import { pathToFileURL } from "node:url"
 import { extractPackage } from "./extract"
 import { renderSkeleton } from "./skeleton"
@@ -10,7 +10,7 @@ export { extractPackage } from "./extract"
 export { renderSkeleton } from "./skeleton"
 export { renderReport } from "./emit"
 
-export async function runPackageDocs(input: { operation: "extract" | "skeleton" | "emit"; lgp: string; directory: string; format?: string }) {
+export async function runPackageDocs(input: { operation: "extract" | "skeleton" | "emit"; lgp: string; directory: string; format?: string; output?: string }) {
   if (!isAbsolute(input.lgp) || !isAbsolute(input.directory)) throw Error("PACKAGE_DOCS_ABSOLUTE_PATH_REQUIRED")
   if (extname(input.lgp).toLowerCase() !== ".lgp") throw Error("PACKAGE_DOCS_LGP_REQUIRED")
   const lgp = await realpath(input.lgp)
@@ -42,7 +42,13 @@ export async function runPackageDocs(input: { operation: "extract" | "skeleton" 
   const format = requested === "docx" || requested === "word" ? "docx" : requested === "md" || requested === "markdown" ? "md" : "pdf"
   validateReport(markdown, structure)
   const payload = await renderReport(markdown, format)
-  let output = join(directory, `${stem}.lgp_report.${format}`)
+  let output = input.output ?? join(directory, `${stem}.lgp_report.${format}`)
+  if (input.output) {
+    const name = relative(directory, output), prefix = stem + ".lgp_report", suffix = "." + format
+    const number = name.slice(prefix.length, -suffix.length)
+    if (!isAbsolute(output) || !name.startsWith(prefix) || !name.endsWith(suffix) ||
+        (number !== "" && !/^-(?:[2-9]|[1-9]\d+)$/.test(number))) throw Error("PACKAGE_DOCS_OUTPUT_ESCAPE")
+  }
   const temporaryReport = join(directory, ".package-docs-" + randomUUID() + ".tmp")
   try {
     await writeFile(temporaryReport, payload, { flag: "wx", mode: 0o600 })
@@ -50,6 +56,7 @@ export async function runPackageDocs(input: { operation: "extract" | "skeleton" 
     for (let suffix = 2; ; suffix++) {
       const published = await link(temporaryReport, output).then(() => true, (error: unknown) => {
         if (!isErrno(error, "EEXIST")) throw error
+        if (input.output) throw Error("PACKAGE_DOCS_OUTPUT_COLLISION")
         return false
       })
       if (published) break
@@ -73,13 +80,13 @@ async function main(argv: string[]) {
   const options = new Map<string, string>()
   for (let index = 1; index < argv.length; index += 2) {
     const key = argv[index], value = argv[index + 1]
-    if (!["--lgp", "--directory", ...(operation === "emit" ? ["--format"] : [])].includes(key) || options.has(key) || !value || value.startsWith("--"))
+    if (!["--lgp", "--directory", ...(operation === "emit" ? ["--format", "--output"] : [])].includes(key) || options.has(key) || !value || value.startsWith("--"))
       throw Error("PACKAGE_DOCS_ARGUMENTS_INVALID")
     options.set(key, value)
   }
   const lgp = options.get("--lgp"), directory = options.get("--directory")
   if (!lgp || !directory) throw Error("PACKAGE_DOCS_ARGUMENTS_INVALID")
-  process.stdout.write(JSON.stringify(await runPackageDocs({ operation, lgp, directory, format: options.get("--format") })) + "\n")
+  process.stdout.write(JSON.stringify(await runPackageDocs({ operation, lgp, directory, format: options.get("--format"), output: options.get("--output") })) + "\n")
 }
 
 function isErrno(error: unknown, code: string) {

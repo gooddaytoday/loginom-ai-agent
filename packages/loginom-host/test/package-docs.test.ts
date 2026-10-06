@@ -220,6 +220,53 @@ test("CLI placeholder failure leaves no final report or publication temporary fi
   } finally { await rm(directory, { recursive: true, force: true }) }
 }, 20_000)
 
+test("backend-selected output is exclusive and never silently moves after a collision", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-fixed-output-"))
+  try {
+    const options = ["--lgp", join(fixtures, "demo.lgp"), "--directory", directory]
+    const skeleton = await docsCommand(["skeleton", ...options], directory)
+    expect(skeleton.code).toBe(0)
+    const report = JSON.parse(skeleton.stdout).report
+    await writeFile(report, (await readFile(report, "utf8")).replace(/PLACEHOLDER_[A-Z_0-9]+/g, "Готовое описание."))
+    const path = join(directory, "demo.lgp_report-2.md")
+    const args = ["emit", ...options, "--format", "md", "--output", path]
+    const first = await docsCommand(args, directory)
+    expect(first.code).toBe(0)
+    expect(JSON.parse(first.stdout).output).toBe(path)
+    const bytes = await readFile(path)
+    const collision = await docsCommand(args, directory)
+    expect(collision.code).toBe(1)
+    expect(collision.stderr).toBe("PACKAGE_DOCS_OUTPUT_COLLISION\n")
+    expect(await readFile(path)).toEqual(bytes)
+    expect(await Bun.file(join(directory, "demo.lgp_report-3.md")).exists()).toBe(false)
+    expect((await readdir(directory)).some((name) => name.endsWith(".tmp"))).toBe(false)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 20_000)
+
+test("backend-selected output cannot escape the session or target an unrelated file", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-output-boundary-"))
+  const outside = await mkdtemp(join(tmpdir(), "loginom-docs-output-outside-"))
+  try {
+    const options = ["--lgp", join(fixtures, "demo.lgp"), "--directory", directory]
+    const skeleton = await docsCommand(["skeleton", ...options], directory)
+    expect(skeleton.code).toBe(0)
+    const report = JSON.parse(skeleton.stdout).report
+    await writeFile(report, (await readFile(report, "utf8")).replace(/PLACEHOLDER_[A-Z_0-9]+/g, "Готовое описание."))
+    for (const path of [join(outside, "demo.lgp_report.md"), join(directory, "nested/demo.lgp_report.md"),
+      join(directory, "other.md"), join(directory, "demo.lgp_report-1.md"), "demo.lgp_report.md"]) {
+      const result = await docsCommand(["emit", ...options, "--format", "md", "--output", path], directory)
+      expect(result.code).toBe(1)
+      expect(result.stderr).toBe("PACKAGE_DOCS_OUTPUT_ESCAPE\n")
+      expect(result.stdout).toBe("")
+    }
+    expect(await readdir(directory)).toEqual([".work"])
+    expect(await readdir(outside)).toEqual([])
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+    await rm(outside, { recursive: true, force: true })
+  }
+}, 20_000)
+
 test("PDF defaults to embedded Golos fonts and preserves baseline Cyrillic text through ToUnicode", async () => {
   const bytes = await renderReport(await readFile(join(fixtures, "demo.report.md"), "utf8"), undefined, fonts)
   expect(Buffer.from(bytes).subarray(0, 8).toString()).toBe("%PDF-1.4")
