@@ -1046,7 +1046,12 @@ const layer = Layer.effect(
       })
 
       const resolvedParts = yield* Effect.forEach(input.parts, resolvePart, { concurrency: "unbounded" }).pipe(
-        Effect.map((x) => x.flat().map(assign).map(TaskScope.sanitize)),
+        Effect.map((x) =>
+          x
+            .flat()
+            .map(assign)
+            .map((part) => TaskScope.sanitize(part)),
+        ),
       )
 
       yield* plugin.trigger(
@@ -1061,15 +1066,17 @@ const layer = Layer.effect(
         { message: info, parts: resolvedParts },
       )
 
-      const parts = yield* Effect.forEach(resolvedParts.map(TaskScope.sanitize), (part) =>
-        part.type === "file" && part.mime.startsWith("image/")
-          ? image.normalize(part).pipe(
-              Effect.catchIf(
-                (error) => error instanceof Image.ResizerUnavailableError,
-                () => Effect.succeed(part),
-              ),
-            )
-          : Effect.succeed(part),
+      const parts = yield* Effect.forEach(
+        resolvedParts.map((part) => TaskScope.sanitize(part)),
+        (part) =>
+          part.type === "file" && part.mime.startsWith("image/")
+            ? image.normalize(part).pipe(
+                Effect.catchIf(
+                  (error) => error instanceof Image.ResizerUnavailableError,
+                  () => Effect.succeed(part),
+                ),
+              )
+            : Effect.succeed(part),
       )
 
       if (grant) {

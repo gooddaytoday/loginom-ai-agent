@@ -181,6 +181,8 @@ Plain async code should pass explicit context or stay inside an Effect fiber; do
 
 - Strip reserved activation/pending/replay keys from ordinary tool metadata, both running updates and completed outputs after `tool.execute.after`; external MCP metadata follows the same rule. Preserve unrelated metadata. Applied task grants must be written separately by the backend only after an accepted Host transition, never copied from tool or plugin output.
 
+- Public `part.update` sanitizes both top-level and tool-state metadata. Fetch the existing part through Session and retain its backend-reserved values; incoming metadata cannot add, replace or erase those values. Ordinary metadata and text edits still work. Do not accept a caller-provided part as the preserved original. This does not change the public schema.
+
 - For standalone run, bootstrap owns the SIGINT handler through profile release. The shared cancellation signal survives startup/import boundaries; stdin admission and provider dispatch check it before starting work. Command-specific interruption still aborts active sessions. Repeated signals must not force an exit during acknowledged host cleanup, and failed cleanup must still retain the guard.
 
 - Standalone native builds can select exactly one `--target=linux-x64`, `--target=darwin-arm64` or `--target=win32-x64`; do not combine with --single/--baseline. Cross-compilation requires matching optional native build packages from the existing lockfile. A produced PE/Mach-O binary alone is not a complete Loginom resource distribution or native runtime acceptance.

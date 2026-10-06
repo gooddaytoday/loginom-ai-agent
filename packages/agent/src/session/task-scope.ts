@@ -8,6 +8,13 @@ export type Profile = HostTaskScope.Profile
 export type Info = { sessionID: SessionID; taskMessageID: MessageID; profile: Profile }
 export type Activation = { name: Exclude<Profile, "default">; profile: Exclude<Profile, "default">; digest: string }
 type History = Schema.Schema.Type<typeof SessionV1.WithParts>
+const reservedMetadata = [
+  "activation",
+  "activation_pending",
+  "skill_activation",
+  "skill_activation_pending",
+  "compaction_replay_of",
+]
 
 type Input = {
   sessionID: SessionID
@@ -79,28 +86,39 @@ export function replayOf(message: History): MessageID | undefined {
 }
 
 /** Public inputs and plugin hooks cannot issue backend task grants. */
-export function sanitize(part: SessionV1.Part): SessionV1.Part {
-  if (!("metadata" in part) || !part.metadata) return part
-  return {
+export function sanitize(part: SessionV1.Part, original?: SessionV1.Part): SessionV1.Part {
+  const previous = original?.type === part.type && "metadata" in original ? original.metadata : undefined
+  const next = {
     ...part,
-    metadata: cleanMetadata(part.metadata),
+    ...("metadata" in part || previous
+      ? { metadata: publicMetadata("metadata" in part ? part.metadata : undefined, previous) }
+      : {}),
+  }
+  if (next.type !== "tool" || next.state.status === "pending") return next
+  return {
+    ...next,
+    state: {
+      ...next.state,
+      metadata: publicMetadata(
+        next.state.metadata,
+        original?.type === "tool" && original.state.status !== "pending" ? original.state.metadata : undefined,
+      ),
+    },
+  }
+}
+
+// Only the persisted backend part may supply reserved values during a public edit.
+function publicMetadata(value: unknown, original: unknown) {
+  if (!original || typeof original !== "object" || Array.isArray(original)) return cleanMetadata(value)
+  return {
+    ...cleanMetadata(value),
+    ...Object.fromEntries(Object.entries(original).filter(([key]) => reservedMetadata.includes(key))),
   }
 }
 
 export function cleanMetadata(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {}
-  return Object.fromEntries(
-    Object.entries(value).filter(
-      ([key]) =>
-        ![
-          "activation",
-          "activation_pending",
-          "skill_activation",
-          "skill_activation_pending",
-          "compaction_replay_of",
-        ].includes(key),
-    ),
-  )
+  return Object.fromEntries(Object.entries(value).filter(([key]) => !reservedMetadata.includes(key)))
 }
 
 export function bundledActivation(skill: Skill.Info): Activation | undefined {

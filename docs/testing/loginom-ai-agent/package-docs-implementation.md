@@ -1161,16 +1161,35 @@ PDF и изображения. Existing image/PDF/SVG поведение сох�
 Это helper/source proof, не действие пользователя в смонтированном UI/PTY.
 Полный пункт TUI в плане оставлен открытым до фактической терминальной проверки.
 
+## Публичное редактирование частей и grants
+
+Три последовательных TDD случая закрыли обход через SDK `part.update`:
+подделку user metadata, стирание/замену применённого backend grant при
+редактировании текста и подделку activation в completed skill tool-state.
+Route берёт исходную часть через Session; общий sanitizer удаляет входящие
+reserved keys, сохраняет reserved values именно из persisted original и
+обычные metadata из запроса. Схема HTTP/SDK не менялась.
+
+`tdd-public-part-grants-red.log`, `tdd-public-part-preserve-grant-red.log`,
+`tdd-public-tool-state-grant-red.log` → `public-part-all-metadata-green.log`:
+**3 PASS**, 7 assertions; расширен случай сохранения backend tool grant.
+Agent typecheck и format/diff checks PASS. Общий regression дал
+**110 PASS / 1 SKIP / 4 FAIL**: четыре HTTP/SSE теста успешно выполняют тело
+assertions, затем зависают в teardown; 3/3 узких повторов стабильны.
+При 30s виден InterruptError после server shutdown deadline 20s.
+Это открытая ошибка cleanup тестовой инфраструктуры; следующие действия —
+abort до iterator.return и повторный общий прогон. Полный этап не принят.
+
 ## Checkpoint
 
-- Исходный SHA `75d37fcd3` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
+- Исходный SHA `2a450e7dd` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 41 PASS; оригинальные файлы/permission/cancellation проверены отдельно.
 - BrowserStatus и key-only Help работают по sources; GUI/TTY и первый запуск ещё открыты.
-- TaskScope history/replay/revert/fork, registry origin и reserved tool/hook metadata проверены.
+- TaskScope/registry/tool/hook metadata проверены; public part grants: 3 PASS, typecheck PASS; HTTP/SSE cleanup открыт.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
