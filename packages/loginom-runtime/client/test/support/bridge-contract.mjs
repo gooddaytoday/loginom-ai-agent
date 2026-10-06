@@ -7,25 +7,32 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client as ProtocolClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import * as actionCatalog from '../../lib/action-catalog.mjs';
-import * as skill from '../../lib/skill.mjs';
 import * as workspace from '../../lib/workspace.mjs';
-import { actions, selectors, build, Page, nodeParameters } from './executor-fixture.mjs';
+import { Page, nodeParameters } from './executor-fixture.mjs';
+import { createBundledSkillFixture } from './bundled-skill-fixture.mjs';
+import { createActionCatalogFixture } from './action-catalog-fixture.mjs';
 
 // Exercise the actual bridge request handler and MCP Server/Client protocol.
 // Only external services, catalog delivery and browser transport are replaced;
 // no localhost listener, real browser, credentials or model is involved.
-test('MCP application refusals remain typed normal content and the same connection can create a node afterwards', async () => {
+test('MCP application refusals remain typed normal content and the same connection can create a node afterwards', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'dock-bridge-contract-'));
+  const resources = await createBundledSkillFixture(t);
   const page = new Page(); let browserCalls = 0;
-  const compatibility = { profile_id: 'unit-macos-chromium', loginom_build: build, platform: 'macos', browser: 'chromium' };
-  const pinned = { actions, selectors, pins: {}, compatibility, manifest: { compatibility } };
+  const catalog = await createActionCatalogFixture();
+  const compatibility = catalog.compatibility;
   class ExternalClient {
     constructor(identity) { this.browser = identity.name === 'loginom-dock-browser'; }
     async connect(transport) { this.transport = transport; }
     async close() { this.transport?.onclose?.(); }
     async listTools() { return { tools: [{ name: this.browser ? 'browser_run_code_unsafe' : 'read', inputSchema: { type: 'object', additionalProperties: true } }] }; }
     async callTool(request) {
+      if (!this.browser) {
+        assert.equal(request.name, 'read');
+        const text = catalog.files.get(request.arguments.uris[0]);
+        assert.equal(typeof text, 'string');
+        return { content: [{ type: 'text', text }] };
+      }
       assert.equal(this.browser, true);
       assert.equal(request.name, 'browser_run_code_unsafe');
       browserCalls++;
@@ -43,21 +50,17 @@ test('MCP application refusals remain typed normal content and the same connecti
   mock.module('@modelcontextprotocol/sdk/client/index.js', { namedExports: { Client: ExternalClient } });
   mock.module('@modelcontextprotocol/sdk/client/stdio.js', { namedExports: { StdioClientTransport: ExternalTransport, getDefaultEnvironment: () => ({}) } });
   mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js', { namedExports: { StreamableHTTPClientTransport: ExternalTransport } });
-  mock.module(new URL('../../lib/action-catalog.mjs', import.meta.url).href, { namedExports: { ...actionCatalog, pinActionCatalog: async () => pinned } });
   // The external browser fixture represents the pinned Mac target even when
   // this protocol test runs on the Linux build host. Keep real preparation and
   // target validation; supply only that explicit simulated client platform.
   mock.module(new URL('../../lib/workspace.mjs', import.meta.url).href, { namedExports: { ...workspace,
     makeWorkspacePrepareCode: options => workspace.makeWorkspacePrepareCode({ ...options, platform: 'darwin' }),
   } });
-  mock.module(new URL('../../lib/skill.mjs', import.meta.url).href, { namedExports: { ...skill,
-    skillTransport: () => ({}), createSkillLoader: () => ({ prepare: async () => ({ main: '/unit/skill', directory: '/unit/skill',
-      detail: { revision: 'unit-skill', source: 'unit-source', content: 'Legacy skill context without the new recovery tools.' } }) }),
-  } });
   const { createBridge } = await import('../../lib/bridge.mjs');
   const session = { directory, browserCli: '/unit/browser.mjs', browserConfig: '/unit/browser.json', browserRoot: '/unit/browser',
     metadata: { client: '0.1.0-test', clientRevision: 'd'.repeat(64), sessionId: 'unit-bridge-session' }, async save() {} };
-  const config = { endpoint: 'https://dock.invalid/mcp', apiKey: 'UNIT-NONSECRET', loginomUrl: 'https://loginom.invalid/?testable=true', mode: 'executor-replay' };
+  const config = { resources: resources.resources, endpoint: 'https://dock.invalid/mcp', apiKey: 'UNIT-NONSECRET', loginomUrl: 'https://loginom.invalid/?testable=true', mode: 'executor-replay',
+    actionManifestUri: catalog.manifestUri, actionManifestSha256: catalog.manifestSha256 };
   let bridge, client;
   try {
     session.artifactStore=await createArtifactStore({directory:join(directory,'input')});
@@ -113,14 +116,19 @@ test('MCP application refusals remain typed normal content and the same connecti
     assert.equal(session.metadata.workspacePreparation,undefined);
     assert.equal(browserCalls,1);
     const prepared = await client.callTool({ name: 'dock_prepare', arguments: {} });
-    assert.notEqual(prepared.isError, true);
+    assert.notEqual(prepared.isError, true, JSON.stringify(prepared));
     const metadata = JSON.parse(prepared.content[0].text);
     assert.equal(metadata.prepared, true);
+    assert.equal(metadata.source, 'bundled');
+    assert.match(metadata.skillRevision, /^[a-f0-9]{64}$/);
+    assert.equal(session.metadata.skillPath, resources.directory);
     assert.equal(metadata.workspace.browser_geometry.source,'prepare_same_browser_page');
     assert.deepEqual(metadata.input_artifacts,[admitted]);
     assert.equal(JSON.stringify(metadata.input_artifacts).includes(sourcePath),false);
     assert.deepEqual(metadata.executor.available_actions, ['node.add', 'link.create', 'package.save_as', 'node.configure_text_import', 'package.save_checkpoint']);
-    assert.ok(prepared.content.some(block => block.type === 'text' && block.text.includes('dock_ui_action') && block.text.includes('supersede')));
+    assert.equal(prepared.content.length, 1);
+    assert.equal(metadata.skillPath, resources.directory);
+    assert.equal(Object.hasOwn(metadata, 'skillUri'), false);
     const beforeInvalid = browserCalls;
     assert.ok(metadata.executor.candidate_operation_tools.includes('dock_node_apply'));
     assert.ok(metadata.executor.candidate_operation_tools.includes('dock_artifact_deliver'));

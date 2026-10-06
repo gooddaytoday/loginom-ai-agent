@@ -6,8 +6,8 @@
   },
   "packages/loginom-runtime/client/lib/bridge.mjs": {
     "baseHash": "c56450b8f4db74c4ccfbf3162d1a7d6dc7422bab3ac35704f7d45923282630c3",
-    "hash": "9fc063185cfd888c807325e4da4c1f29efdd31505d4441295b19914d8d95dfee",
-    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets."
+    "hash": "0ec5d1aa8b7028f5602a6bcfcd73ad4fd60d10b62f177ff71ee60e50fd23a906",
+    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests."
   },
   "packages/loginom-runtime/client/lib/executor.mjs": {
     "baseHash": "df21720858bb89bb40d6c4fe46620728b1d6e86b0d9d7aafa4992c8f2cf93a6e",
@@ -2033,5 +2033,55 @@
     "baseHash": "a43862d340aae90097fbf16d88a47aa2c9f73a5150359774e1134830490affe3",
     "hash": "389bffb12e37462b89b2452e9eb9c6d22d910dbc0fb56a10ad46458496370b6d",
     "reason": "Deliver the canonical product skill locally; adapt the entrypoint and references to the current managed user-v1 workflow, including CrossTable, result verification, cancellation and checkpoint saves; preserve upstream attribution."
+  },
+  "packages/loginom-runtime/client/lib/config.mjs": {
+    "baseHash": "3b4ae9857acbcd1032ae92e6893ff20ac4380a03cd984ccdaf3f60fa272d55b5",
+    "hash": "1c395e69e708830b4461718d108e39ac78106d2c59fd5758b50b71217387a201",
+    "reason": "Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests."
+  },
+  "packages/loginom-runtime/client/lib/diagnostics.mjs": {
+    "baseHash": "1a2c07de162ec3a5cd011f1d96bd5f10da656f53b41809165d125d1094d8d07c",
+    "hash": "c3afd76c4507bf5f1ed40b586108cdae21baa6ab30f769efc3ee6f2abbb2d822",
+    "reason": "Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests."
+  },
+  "packages/loginom-runtime/client/lib/skill.mjs": {
+    "baseHash": "bcec7b42c0f2f5dff478afce54a202aa7c60a19f3c75207db9f32e06520c5310",
+    "hash": "22f1991b3d92590cc30942bff21e0e6e178493214d00b2da269411fc57f53559",
+    "reason": "Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests."
+  },
+  "packages/loginom-runtime/client/lib/user-results.mjs": {
+    "baseHash": "eac6f265dbc083c8be2e17331681a063d4b91d332c5e634dcb2204439962af9a",
+    "hash": "695073f2a2362a75900b86bc109115d2d55443e44ecadc735a5883103b1efc78",
+    "reason": "Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests."
+  },
+  "packages/loginom-runtime/client/test/config.test.mjs": {
+    "baseHash": "82b4eefb01f40e0966b7305300eb43cb28f514e6e1a3aace3805dafc164ca99c",
+    "hash": "00e9f7ac8922a57954d8a6efffe8d896106279c0423e31c18a60a4d6e2836369",
+    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks."
+  },
+  "packages/loginom-runtime/client/test/diagnostics.test.mjs": {
+    "baseHash": "a10508de667544133812c59d62b8ea3498c0b021f7d96eb7e5700415874a5b9e",
+    "hash": "0949a87720def0408b65b5ef2e96c8c02c095926a76b4bb3d838b93516d5d319",
+    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks."
+  },
+  "packages/loginom-runtime/client/test/skill.test.mjs": {
+    "baseHash": "b0f04fac63c68cfa5b344c95069e927b7dd2762fca788b432482a5a748310719",
+    "hash": "1ec841dc1438ecf540d628dd9ee3ccc58c03802abd44dc1c9695e312ac12287c",
+    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks."
+  },
+  "packages/loginom-runtime/client/test/support/bridge-contract.mjs": {
+    "baseHash": "7a9ed0443eef7105eaef18878eaf6e9ca68c83840955278f88eecb3d6eadd5b6",
+    "hash": "0aacb41f8c2f5b06448b8f20eb4c32733a3068a601d64f034ed6be2cf9271fb4",
+    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks."
+  },
+  "packages/loginom-runtime/client/test/support/package-cleanup-bridge.mjs": {
+    "baseHash": "f2e051aa0b71c34f3f8a704bb8944506026f10ba0414189bb921f7277da215bd",
+    "hash": "318b3a3de64df7b792c7acc4c02cd5e403073340085c582e1c5dc33460eb8ce4",
+    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/date-time-current-pins.mjs": {
+    "baseHash": "02402a080e354b966b4714ea3ad4f7cebd1d67bcb7056cd6680727f6b9edd58c",
+    "hash": "b44812377efe90f9e61bdb45b2715c93e621a431cc622cc0f2f2c396dfd49993",
+    "reason": "Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests."
   }
 }

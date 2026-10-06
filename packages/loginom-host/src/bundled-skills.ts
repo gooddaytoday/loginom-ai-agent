@@ -3,6 +3,7 @@ import { readFile, readdir, realpath, stat } from "node:fs/promises"
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { Option, Schema } from "effect"
 import { parseDocument } from "yaml"
+import { bundledSkillInventory } from "../../loginom-runtime/client/lib/bundled-skill-manifest.mjs"
 
 const manifest = Schema.Struct({
   protocol: Schema.Literal(1),
@@ -71,21 +72,11 @@ export async function verifyBundledSkills(resources: string) {
       }
     }
   }
-  return entries
-    .filter((file) => /^skills\/[^/]+\/SKILL\.md$/.test(file.path))
-    .map((file) => {
-      const prefix = file.path.slice(0, -"SKILL.md".length)
-      const files = entries.filter((entry) => entry.path.startsWith(prefix)).toSorted((a, b) => a.path.localeCompare(b.path))
-      return {
-        name: file.path.split("/")[1],
-        directory: join(root, prefix),
-        location: join(root, file.path),
-        files,
-        digest: createHash("sha256")
-          .update(JSON.stringify(files.map((entry) => [entry.path.slice(prefix.length), entry.sha256])))
-          .digest("hex"),
-      }
-    })
+  return bundledSkillInventory(entries).map((skill) => ({
+    ...skill,
+    directory: join(root, "skills", skill.name),
+    location: join(root, "skills", skill.name, "SKILL.md"),
+  }))
 }
 
 function requireResource(root: string, skill: string, parent: string, target: string, listed: Set<string>) {

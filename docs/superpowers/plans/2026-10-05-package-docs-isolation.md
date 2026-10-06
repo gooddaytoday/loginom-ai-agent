@@ -519,7 +519,7 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
   повторный проверяет целостность и не принимает новую revision молча.
   При смене файлов/manifest возвращается локальная ошибка, а новая revision
   принимается только новым runtime после штатного завершения прежней работы.
-- [ ] Managed prepare больше не повторяет статические инструкции, перенесённые
+- [x] Managed prepare больше не повторяет статические инструкции, перенесённые
   в SKILL.md. Сохранить `compactKnowledgeBundle`, `input_artifacts`, identities,
   readiness и динамические descriptions. Закреплённый action catalog загружается
   независимо: это данные runtime, не источник текста skill.

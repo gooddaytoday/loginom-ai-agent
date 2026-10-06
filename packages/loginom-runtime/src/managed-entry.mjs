@@ -104,6 +104,7 @@ async function handle(message) {
       const authenticated = await loginBrowser({ ...login, keepOpen: true })
       state.browser = authenticated.context
       const config = {
+        resources: input.resources,
         endpoint: input.endpoint,
         apiKey: input.connection.apiKey,
         // Preparation must bind to the same canonical path used by private login.

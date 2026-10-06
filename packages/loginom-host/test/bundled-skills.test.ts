@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { isAbsolute, join } from "node:path"
 import { verifyBundledSkills } from "../src/bundled-skills"
 
 async function fixture(files: Record<string, string>) {
@@ -20,6 +20,25 @@ async function fixture(files: Record<string, string>) {
   )
   return { root, [Symbol.asyncDispose]: () => rm(root, { recursive: true, force: true }) }
 }
+
+test("Host and pinned Node compute the same revision for a bundled skill", async () => {
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node || !isAbsolute(node)) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
+  await using resource = await fixture({
+    "loginom-automation/SKILL.md": "---\nname: loginom-automation\ndescription: Build.\n---\n\n[Справка](references/связь.md)\n",
+    "loginom-automation/references/связь.md": "Русская справка\n",
+  })
+  const verified = await verifyBundledSkills(resource.root)
+  const child = Bun.spawn([node, "--input-type=module", "--eval", `
+    import { readFile } from "node:fs/promises";
+    import { bundledSkillInventory } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/bundled-skill-manifest.mjs", import.meta.url).href)};
+    const manifest = JSON.parse(await readFile(process.argv[1] + "/resource-manifest.json", "utf8"));
+    process.stdout.write(bundledSkillInventory(manifest.files)[0].digest);
+  `, resource.root], { env: {}, stdout: "pipe", stderr: "pipe" })
+  const output = await new Response(child.stdout).text()
+  expect(await child.exited).toBe(0)
+  expect(output).toBe(verified[0].digest)
+})
 
 test("bundled skill verification rejects files omitted from the resource manifest", async () => {
   await using resource = await fixture({

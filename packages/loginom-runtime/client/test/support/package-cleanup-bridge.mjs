@@ -6,9 +6,9 @@ import {join} from 'node:path';
 import {Client as AgentClient} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import * as executor from '../../lib/executor.mjs';
-import * as catalog from '../../lib/action-catalog.mjs';
-import * as skill from '../../lib/skill.mjs';
 import * as workspace from '../../lib/workspace.mjs';
+import {createBundledSkillFixture} from './bundled-skill-fixture.mjs';
+import {createActionCatalogFixture} from './action-catalog-fixture.mjs';
 
 // Bridge lifecycle test: external services and the action executor are fixtures.
 // The serialized Loginom close body is exercised separately in package-cleanup.test.
@@ -20,7 +20,13 @@ class ExternalClient {
   async connect(t){this.transport=t;}
   async close(){this.f.events.push(this.browser?'browser-close':'remote-close');this.transport?.onclose?.();}
   async listTools(){return {tools:[{name:this.browser?'browser_run_code_unsafe':'read',inputSchema:{type:'object'}}]};}
-  async callTool({arguments:{code}}){
+  async callTool(request){
+    if(!this.browser){
+      assert.equal(request.name,'read');
+      const text=this.f.catalog.files.get(request.arguments.uris[0]);assert.equal(typeof text,'string');
+      return {content:[{type:'text',text}]};
+    }
+    const code=request.arguments.code;
     let value;
     if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,
       target,document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
@@ -43,8 +49,6 @@ class ExternalTransport{}
 mock.module('@modelcontextprotocol/sdk/client/index.js',{namedExports:{Client:ExternalClient}});
 mock.module('@modelcontextprotocol/sdk/client/stdio.js',{namedExports:{StdioClientTransport:ExternalTransport,getDefaultEnvironment:()=>({})}});
 mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js',{namedExports:{StreamableHTTPClientTransport:ExternalTransport}});
-mock.module(new URL('../../lib/action-catalog.mjs',import.meta.url).href,{namedExports:{...catalog,pinActionCatalog:async()=>({pins:{},compatibility:target,manifest:{compatibility:target},actions:new Map()})}});
-mock.module(new URL('../../lib/skill.mjs',import.meta.url).href,{namedExports:{...skill,skillTransport:()=>({}),createSkillLoader:()=>({prepare:async()=>({main:'/test/skill',directory:'/test',detail:{revision:'test',source:'test',content:'test'}})})}});
 mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExports:{...workspace,
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>{
@@ -54,15 +58,17 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
 
-for(const scenario of ['success','unprepared','no-save','native-blocked','busy','dirty-after-save','state-unavailable'])test('isolated shutdown lifecycle: '+scenario,async()=>{
+for(const scenario of ['success','unprepared','no-save','native-blocked','busy','dirty-after-save','state-unavailable'])test('isolated shutdown lifecycle: '+scenario,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-bridge-'));
-  const f=current={scenario,events:[],busy:false,saves:0};
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  const f=current={scenario,events:[],busy:false,saves:0,catalog};
   const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
     metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
     artifactStore:{list:()=>[],async releaseUploads(){f.events.push('release-uploads');}}};
   let bridge,client;
   try{
-    bridge=await createBridge({mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+    bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+      mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
       loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',acceptanceCleanupPackage:path},session);
     client=new AgentClient({name:'test',version:'1'});const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
     if(scenario!=='unprepared'){

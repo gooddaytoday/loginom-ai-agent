@@ -143,11 +143,46 @@ attribution manifest, не PASS общего аудита; устранение 
 Client generated не изменился (другой API); legacy SDK получил только `source`
 и `digest` в AppSkillsResponses, SDK typecheck PASS. Generated вручную не редактировался.
 
+## Этап 1: локальный runtime skill и динамический prepare
+
+| Поведение | Наблюдавшийся RED | GREEN |
+| --- | --- | --- |
+| Локальный skill без Skills API | Старый loader вызвал запрещённый transport | Первый локальный prepare проходит без сетевого skill transport |
+| Неучтённый файл запрещён | Отсутствовал ожидаемый reject | Локальный prepare отклоняет unlisted файл |
+| Classic/diagnostic resource root | Config не передал root; prepare отказал | Абсолютный private root передаётся в loader |
+| Diagnostics без удалённого skill manifest | Один удалённый manifest request вместо нуля | Локальная revision доступна даже при недоступном Dock |
+| Managed prepare без повторных инструкций | В ответе отсутствовал source=bundled | Реальный Product bundle, action catalog и динамическая knowledge; instructions отсутствует |
+
+`createSkillLoader` теперь читает только Product resources, проверяет байты и
+manifest, закрепляет per-skill revision и отказывает при её смене в том же runtime.
+Digest вычисляет один Node-совместимый helper, используемый Host и runtime;
+отдельный тест запускает закреплённый Node и сопоставляет digest с Bun/Host.
+Удалены remote skill transport и дублирующий `userWorkflowInstructions`;
+workflow остаётся в Product references. Classic/diagnostic prepare возвращает
+динамический JSON с локальным directory/source/revision. В managed-entry root
+передаётся из private startup, в source config — явным параметром/окружением.
+Read-only acceptance helper также переведён на локальный bundle.
+
+Fixtures bridge используют настоящий Product skill и реальное чтение/проверку
+action catalog; внешние MCP/browser заменены на тестовые границы. User-v1
+дополнительно проверен через реальный MCP bridge/transport и action runtime.
+Результаты: 83 Node PASS, 32 Agent discovery PASS, 8 Host PASS;
+Host `bun typecheck` PASS. Атрибуция 11 изменённых импортированных файлов PASS;
+исходные SHA/object сохранены. Логи — `local-skill-runtime-regression.log`,
+`shared-skill-*-regression.log`, `shared-skill-host-typecheck.log`, RED — `tdd-local-*`
+и `tdd-user-profile-local-skill-red.log` в собственном каталоге baseline.
+Nested npm dependencies установлены закреплённым Node/npm, browser download
+отключён; package-lock не менялся. Первую ошибку отсутствующего MCP SDK считать
+ошибкой окружения, не RED продукта. Полная проверка reference/generated closure
+во всех runtime-режимах, staging и отключение publisher остаются открытыми.
+Это source-only проверки; installed/live acceptance не выполнялась.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
 - Этап 0 выполнен: полный чистый baseline и детерминированные проверки сохранены.
 - Начата проверенная TDD-связка discovery/integrity, этап 1 остаётся открытым.
 - Каталог skills перенесён и адаптирован; source-only проверки перечислены выше.
-- Следующий шаг: staging, локальный runtime loader и отключение публикации; затем Node executor.
+- Локальный loader и динамический prepare реализованы; единый digest проверен в Bun/Node.
+- Следующий шаг: shared inventory/staging, полный runtime verifier и отключение publisher; затем Node executor.
 - Живая приёмка и удаление серверного skill остаются открытыми.
