@@ -24,9 +24,9 @@ export async function createKnowledgeClient({ endpoint, apiKey }, signal) {
       catalogSha256: catalog.sha256,
       async call(input, signal) {
         if (state.closed) throw Error('LOGINOM_KNOWLEDGE_CLOSED');
-        if (!catalog.routes.has(input.name)) throw Error('LOGINOM_KNOWLEDGE_TOOL_DENIED');
-        if (typeof input.run !== 'string' || !input.run || typeof input.id !== 'string' || !input.id)
+        if (!input || typeof input.run !== 'string' || !input.run || typeof input.id !== 'string' || !input.id)
           throw Error('LOGINOM_KNOWLEDGE_REQUEST_INVALID');
+        if (!catalog.routes.has(input.name)) throw Error('LOGINOM_KNOWLEDGE_TOOL_DENIED');
         signal?.throwIfAborted();
         const key = JSON.stringify([input.run, input.id]);
         if (pending.has(key)) throw Error('LOGINOM_KNOWLEDGE_REQUEST_BUSY');
@@ -36,9 +36,16 @@ export async function createKnowledgeClient({ endpoint, apiKey }, signal) {
           entry.promise = remote.callTool({ name: input.name, arguments: input.arguments ?? {} }, CallToolResultSchema,
             { signal: AbortSignal.any([entry.controller.signal, ...(signal ? [signal] : [])]), timeout: 60000 });
           return await entry.promise;
+        } catch (error) {
+          entry.controller.signal.throwIfAborted();
+          signal?.throwIfAborted();
+          throw error;
         } finally { pending.delete(key); }
       },
       interrupt(input) {
+        if (!input || typeof input.run !== 'string' || !input.run
+          || (input.id !== undefined && (typeof input.id !== 'string' || !input.id)))
+          throw Error('LOGINOM_KNOWLEDGE_REQUEST_INVALID');
         for (const entry of pending.values())
           if (entry.run === input.run && (input.id === undefined || input.id === entry.id))
             entry.controller.abort(Error('LOGINOM_KNOWLEDGE_INTERRUPTED'));
@@ -54,6 +61,7 @@ export async function createKnowledgeClient({ endpoint, apiKey }, signal) {
     };
   } catch (error) {
     await remote.close();
+    signal?.throwIfAborted();
     throw error;
   }
 }

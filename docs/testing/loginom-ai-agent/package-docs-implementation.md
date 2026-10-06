@@ -601,6 +601,23 @@ knowledge-catalog-source-verification.log. Исходные 35 attribution misma
 не скрыты и остаются отдельным открытым gate. Private process/Host routing
 ещё не интегрированы; этап 4 остаётся открытым.
 
+Private knowledge entry: отдельные RED/GREEN прошли для local startup ack,
+read-only call, interrupt и private validation. IPC start принимает только
+protocol/generation/endpoint/apiKey; password-bearing payload и URL с credentials
+отклоняются до сети. list наблюдает фоновую readiness и возвращает реальные
+схемы/digest; call допускает конкурентные run/request owners. SDK оборачивает
+abort reason, поэтому клиент возвращает собственный точный код отмены после
+проверки сигнала вместо утечки транспортного сообщения. close отменяет startup
+и active calls, ждёт drain и clean exit; потеря IPC owner также дала exit 0
+без сигнала. Отдельный Node resolve hook запрещает Playwright, child_process,
+browser session/bridge/check во всех entry tests; env пустой, DISPLAY отсутствует.
+Ошибки внешнего MCP не раскрывают тестовый секрет; пустой ключ не создаёт HTTP.
+9 real-process entry tests + 16 client/catalog regressions = 25 PASS;
+tdd-knowledge-entry-{start,call,interrupt,invalid,guards}-*,
+knowledge-entry-regression.log. Первый interrupt GREEN выявил SDK wrapping;
+исправление проверено до фиксации результата. Host supervision/routing пока
+не подключены, полный этап 4 и его checklist остаются открытыми.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -619,5 +636,5 @@ knowledge-catalog-source-verification.log. Исходные 35 attribution misma
 - Старый session package_docs/Python тест требует замены при SessionTools integration.
 - Reserved skill/command policy и пользовательские предупреждения проверены по sources.
 - Linux artifact completeness/shared closure проверены; Host suite 184 PASS / 6 SKIP.
-- Knowledge client: 16 PASS, full client 2561 PASS / 10 SKIP; далее private process и Host.
+- Knowledge entry/client: 25 PASS; full client 2561 PASS / 10 SKIP; далее Host integration.
 - Живая приёмка и удаление серверного skill остаются открытыми.
