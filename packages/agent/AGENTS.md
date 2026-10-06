@@ -171,6 +171,8 @@ Plain async code should pass explicit context or stay inside an Effect fiber; do
 
 - `ToolRegistry` assigns the internal `Tool.Def.origin` from its owned builtin/custom collections and preserves it when constructing the model-specific catalog. Plugin definitions and `tool.definition` hooks cannot assign this provenance. A matching tool ID alone does not establish a builtin implementation; docs allowlists must check origin as well. This field is not a model parameter or a public Protocol change.
 
+- Strip reserved activation/pending/replay keys from ordinary tool metadata, both running updates and completed outputs after `tool.execute.after`; external MCP metadata follows the same rule. Preserve unrelated metadata. Applied task grants must be written separately by the backend only after an accepted Host transition, never copied from tool or plugin output.
+
 - For standalone run, bootstrap owns the SIGINT handler through profile release. The shared cancellation signal survives startup/import boundaries; stdin admission and provider dispatch check it before starting work. Command-specific interruption still aborts active sessions. Repeated signals must not force an exit during acknowledged host cleanup, and failed cleanup must still retain the guard.
 
 - Standalone native builds can select exactly one `--target=linux-x64`, `--target=darwin-arm64` or `--target=win32-x64`; do not combine with --single/--baseline. Cross-compilation requires matching optional native build packages from the existing lockfile. A produced PE/Mach-O binary alone is not a complete Loginom resource distribution or native runtime acceptance.

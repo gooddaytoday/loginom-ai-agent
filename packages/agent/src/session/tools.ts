@@ -108,7 +108,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           ...match,
           state: {
             title: val.title,
-            metadata: val.metadata,
+            metadata: val.metadata ? TaskScope.cleanMetadata(val.metadata) : undefined,
             status: "running",
             input: args,
             time: match.state.status === "running" ? match.state.time : { start: Date.now() },
@@ -185,6 +185,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args },
               output,
             )
+            output.metadata = TaskScope.cleanMetadata(output.metadata)
             if (options.abortSignal?.aborted) {
               yield* input.processor.completeToolCall(options.toolCallId, output)
             }
@@ -526,7 +527,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
 
           const truncated = yield* truncate.output(textParts.join("\n\n"), {}, input.agent)
           const metadata = {
-            ...result.metadata,
+            ...TaskScope.cleanMetadata(result.metadata),
             truncated: truncated.truncated,
             ...(truncated.truncated && { outputPath: truncated.outputPath }),
           }

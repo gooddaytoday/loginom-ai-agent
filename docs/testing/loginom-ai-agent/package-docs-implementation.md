@@ -1020,6 +1020,24 @@ Session/ToolRegistry/Permission, а Host adapter и provider — контрол�
 installed acceptance ещё не доказаны. Требования и completion пункты плана
 не менялись; общий этап 5 пока открыт.
 
+## Происхождение metadata инструментов
+
+Фактический RED показал две границы подмены: custom tool с ID `skill`
+возвращал применённый grant, а обычный инструмент сохранял его в running
+metadata. Общая `TaskScope.cleanMetadata` удаляет пять зарезервированных
+activation/pending/replay ключей, сохраняя остальные. Она применяется к
+public part metadata, ctx.metadata, результату builtin/custom после
+`tool.execute.after` и metadata внешнего MCP результата. Отдельная проверка
+подтверждает удаление grant, добавленного after-hook; обычная metadata и
+исходное время запуска не теряются.
+
+`tdd-tool-grant-metadata-red.log` → `tool-grant-metadata-suite.log`:
+**38 PASS**, 146 assertions на настоящих сервисах и контролируемых внешних
+границах. Agent typecheck PASS; `tool-metadata-prompt-regression.log`:
+**6 PASS**, 21 assertion. Это защита consumer от чужой отметки;
+штатный pending/apply producer ещё не подключён. План не перерабатывался,
+соседние evals/harness и рабочее дерево калибровки не изменялись.
+
 ## Checkpoint
 
 - Исходный SHA `4b786785e` (`docs-no-browser`); Host scope, lazy admission и profile catalogs реализованы выше.
@@ -1030,7 +1048,7 @@ installed acceptance ещё не доказаны. Требования и compl
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 41 PASS; оригинальные файлы/permission/cancellation проверены отдельно.
 - BrowserStatus и key-only Help работают по sources; GUI/TTY и первый запуск ещё открыты.
-- TaskScope history/replay/revert/fork, public metadata и registry origin проверены.
+- TaskScope history/replay/revert/fork, registry origin и reserved tool/hook metadata проверены.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.

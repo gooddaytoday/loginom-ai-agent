@@ -81,19 +81,24 @@ export function sanitize(part: SessionV1.Part): SessionV1.Part {
   if (!("metadata" in part) || !part.metadata) return part
   return {
     ...part,
-    metadata: Object.fromEntries(
-      Object.entries(part.metadata).filter(
-        ([key]) =>
-          ![
-            "activation",
-            "activation_pending",
-            "skill_activation",
-            "skill_activation_pending",
-            "compaction_replay_of",
-          ].includes(key),
-      ),
-    ),
+    metadata: cleanMetadata(part.metadata),
   }
+}
+
+export function cleanMetadata(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {}
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([key]) =>
+        ![
+          "activation",
+          "activation_pending",
+          "skill_activation",
+          "skill_activation_pending",
+          "compaction_replay_of",
+        ].includes(key),
+    ),
+  )
 }
 
 function activationProfile(value: unknown): Exclude<Profile, "default"> | undefined {

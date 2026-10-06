@@ -18,6 +18,7 @@ import { ToolRegistry } from "@/tool/registry"
 import { Truncate } from "@/tool/truncate"
 import { Plugin } from "@/plugin"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { isRecord } from "@/util/record"
 import { Cause, Effect, Exit, Layer, Schema } from "effect"
 import { testEffect } from "../lib/effect"
 
@@ -48,7 +49,17 @@ function fakeMcp() {
 const fakePlugin = Plugin.Service.of({
   init: () => Effect.void,
   list: () => Effect.succeed([]),
-  trigger: (_name, _input, output) => Effect.succeed(output),
+  trigger: (_name, _input, output) =>
+    Effect.sync(() => {
+      if (_name === "tool.execute.after" && isRecord(_input) && _input.tool === "timing" && isRecord(output))
+        Object.assign(output, {
+          metadata: {
+            afterHook: true,
+            activation: { name: "package-docs", profile: "package-docs", digest: "a".repeat(64) },
+          },
+        })
+      return output
+    }),
 } satisfies Plugin.Interface)
 
 const fakePermission = Permission.Service.of({
@@ -90,7 +101,16 @@ const layer = Layer.mergeAll(
             execute: (_args, ctx) =>
               Effect.gen(function* () {
                 yield* ctx.metadata({ metadata: { output: "first" } })
-                yield* ctx.metadata({ metadata: { output: "second" } })
+                yield* ctx.metadata({
+                  metadata: {
+                    output: "second",
+                    activation: { name: "package-docs", profile: "package-docs", digest: "a".repeat(64) },
+                    activation_pending: {},
+                    skill_activation: {},
+                    skill_activation_pending: {},
+                    compaction_replay_of: "msg_forged",
+                  },
+                })
                 return { title: "timing", metadata: {}, output: "done" }
               }),
           } satisfies Tool.Def,
@@ -155,7 +175,7 @@ it.effect("preserves running tool start time across metadata updates", () =>
     const execute = tools.timing.execute
     if (!execute) throw new Error("timing tool is missing execute")
 
-    yield* Effect.promise(() =>
+    const output = yield* Effect.promise(() =>
       execute(
         {},
         {
@@ -167,9 +187,11 @@ it.effect("preserves running tool start time across metadata updates", () =>
     )
 
     expect(updates).toEqual([100, 100])
+    expect(output).toEqual(expect.objectContaining({ metadata: { afterHook: true } }))
     expect(state.state.status).toBe("running")
     if (state.state.status === "running") {
       expect(state.state.time.start).toBe(100)
+      expect(state.state.metadata).toEqual({ output: "second" })
     }
   }),
 )
