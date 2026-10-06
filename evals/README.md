@@ -99,8 +99,11 @@ oracle не заменяют обнаружение дефекта судьёй.
 python3 script/check-calibration-corpus.py --tasks /home/kiselev/git/agent-validation/sources/analytic-evals
 JUDGE_MODEL=gpt-6-astra JUDGE_REASONING=high bun run src/run.ts --calibrate --tasks /home/kiselev/git/agent-validation/sources/analytic-evals
 ```
-При подготовке мутаций требуются zip и unzip; Python нужен только инструменту
-независимого пересчёта. calibration.json и calibration.md показывают ожидания,
+При подготовке мутаций требуются zip, unzip и xmllint. После всех замен
+изменённые XML проверяются командой `xmllint --nonet --noout` до пересборки ZIP
+и вызовов судьи. Невалидный XML или отсутствие xmllint дают код 2.
+Python нужен только инструменту независимого пересчёта.
+calibration.json и calibration.md показывают ожидания,
 фактические провалы, oracle и покрытие. Неописанные задачи сохраняют прежнюю
 калибровку и явно имеют нулевое покрытие near-miss.
 
