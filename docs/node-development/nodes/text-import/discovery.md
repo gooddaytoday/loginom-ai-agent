@@ -157,6 +157,6 @@ Name/Name_1 and therefore demonstrated only a missing-field refusal. It is kept
 separately, and does not pass ambiguous_headers. The reproducible replacement
 under acceptance/negative requests source_name=Name twice with unique output
 names. Its expected boundary is the existing preflight Duplicate source column
-names validator before node creation or Execute; live CLI and independent cold
+names validator before node creation or Execute (structured request.validate receipt); live CLI and independent cold
 zero-import graph/source/cleanup evidence remain mandatory on the final SHA.
 No general runtime guard or handler is changed by this correction.

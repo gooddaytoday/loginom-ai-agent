@@ -55,7 +55,8 @@ try{
   need(graph.links.length===0&&graph.nodes.every(n=>n.type==='bg-vendor-icon-modelvariables'),'PREFLIGHT_MUST_LEAVE_NO_IMPORT_NODE');
   const creations=terminal.filter(e=>e.tool==='loginom_dock_node_apply');
   need(creations.length===1&&creations[0].input.parameters.settings.columns.every(c=>c.source_name==='Name'),'REPEATED_SOURCE_REFERENCE_REQUIRED');
-  need(creations[0].result?.tool_error?.trim()==='Error: Duplicate source column names'||creations[0].result?.tool_error?.trim()==='Duplicate source column names','EXACT_PREFLIGHT_REFUSAL_REQUIRED');
+  const refusal=creations[0].result;
+  need(refusal.state==='settled'&&refusal.status==='NOT_APPLIED'&&refusal.action_key==='request.validate'&&refusal.phase==='request_rejected'&&refusal.request_rejected===true&&refusal.effect_possible===false&&refusal.cleanup_complete===true&&refusal.error?.message==='Duplicate source column names','EXACT_PREFLIGHT_REFUSAL_REQUIRED');
   const catalog=JSON.parse(await readFile(join(root,'runtime/executor/catalog/actions.json'),'utf8')),selectors=JSON.parse(await readFile(join(root,'runtime/executor/catalog/selectors.json'),'utf8'));
   const store=await createArtifactStore({directory:join(output,'artifacts'),sessionId:session,storageDirectories});
   const runtime=createActionRuntime({pinned:{actions:new Map(catalog.actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.selectors.map(s=>[s.symbol,s])),pins:{}},execute,onRecord:record,targetOrigin:origin,targetBuild:'7.4.2',allowCandidate:true,artifactStore:store,...createCandidateNodeSupport({targetOrigin:origin,targetBuild:'7.4.2',storageDirectories})});
@@ -64,7 +65,7 @@ try{
   const columns=expected.columns.map(({name,label,type})=>({name,label,type}));
   const sources={imports:[{configuration:{source:{source_path:transfer.destination},output_mapping:{fields:columns}}}]};
   const proofs=await verifyStaticSourceBytes({load,runtime,execute,sources,allowed:[{...expected.source,columns}],account,origin,output});
-  report={status:'OBSERVED_NEGATIVE',case_id:expected.case_id,cli_delivery:transfer,package_path:saved.path,source:proofs.get(transfer.destination),graph_verified:true,import_nodes:0,graph_links:0,cold_execute_requested:false,execute_started:false};
+  report={status:'OBSERVED_NEGATIVE',case_id:expected.case_id,cli_delivery:transfer,package_path:saved.path,source:proofs.get(transfer.destination),graph_verified:true,import_nodes:0,graph_links:0,cold_execute_requested:false,execute_started:false,original_refusal:refusal};
   await writeFile(join(output,'readback.json'),JSON.stringify(report,null,2));
  });
 }catch(error){report={...report,status:'FAIL',error:String(error.message).slice(0,1000)};}

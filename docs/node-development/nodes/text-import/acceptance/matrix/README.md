@@ -23,7 +23,7 @@ then, only after its CHECK_NEGATIVE and exact preflight refusal audit, run
 The tracked task/settings under `../negative/` request distinct outputs
 FirstName/SecondName with source_name=Name twice. The oracle requires the exact
 Duplicate source column names refusal, a single verified original upload, no
-allocated import operation, no alternate mutation and an independently reopened
+started import operation, no alternate mutation and an independently reopened
 saved graph with zero imports/links. Cold native storage downloads confirm the
 original bytes/SHA; native package closure/logout are mandatory. This proves
 repeated references are refused before Execute; it does not claim that Loginom
