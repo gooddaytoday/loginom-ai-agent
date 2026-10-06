@@ -338,7 +338,10 @@ async function archiveInfraAttempt(outDir: string) {
   const files = await readdir(outDir)
   const archive = path.join(outDir, "infra-error")
   await mkdir(archive)
-  await Promise.all(files.map((file) => rename(path.join(outDir, file), path.join(archive, file))))
+  // Корневой результат нужен и при прерывании до повторного запуска.
+  await Promise.all(files.map((file) => file === "result.json"
+    ? cp(path.join(outDir, file), path.join(archive, file))
+    : rename(path.join(outDir, file), path.join(archive, file))))
 }
 
 async function prepareProfile(config: EvalConfig, command: AgentCommand) {
