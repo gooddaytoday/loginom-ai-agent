@@ -1554,6 +1554,35 @@ namespace и сбор доказательств для каждого повт�
 Пункт подготовки 20 запросов отмечен в плане. Общий evals harness, corpus
 near-miss, judge prompt, профили и launcher соседней сессии не изменялись.
 
+## Desktop inventory: служебный placeholder в release payload
+
+На чистом `953608c3d313333e64a09a237dabaf4a3ec172a1` сохранены новые полные
+CLI и Desktop candidates в собственных `candidate-953608c3d-{cli,desktop}`.
+CLI build/roundtrip и независимый `verify-cli-candidate` PASS; archive SHA256
+`c5c78be0ddb1e6172429183cba54b0b88cc654785ddd437635849cd7483a6f89`.
+Desktop build/typecheck PASS, packaging tests **12 PASS / 2 macOS SKIP**;
+DEB/AppImage packaging и release manifest созданы. Проверка самих артефактов
+**FAIL**: manifest требует `skills/package-docs/assets/fixtures/.gitkeep`,
+а electron-builder исключает это служебное имя. DEB воспроизводит ошибку
+**3/3**, AppImage **1/1**. Сверка всех 4655 записей `linux-unpacked` показала
+ровно один отсутствующий файл. Дальнейшие проверки verifier не выполнены.
+
+Классификация: реальная регрессия поставки, без flaky-признаков. Placeholder
+внесён `90d8100da` при переносе skill, имеет нулевой размер и не используется
+skill/references/тестами. Минимальная правка удаляет его из canonical skill.
+Inventory и проверки целостности не ослабляются. Существующий artifact verifier
+служит regression gate: выше зафиксирован RED, GREEN требует полной новой
+сборки DEB/AppImage из нового чистого SHA. Старые candidates сохранены.
+
+Подготовка локального Electron 42.3.3 выполнена штатным `install.js` в зависимостях
+этого worktree с отдельным acceptance-cache; общий cache и соседнее дерево
+не изменялись. Root source archive пересоздан из корня репозитория до manifest.
+Это подготовка сборки, не установленная или живая приёмка. Логи диагностики:
+`desktop-dotfile-signal/`, `desktop-953608c3d-*.log`, `cli-953608c3d-verify.log`.
+Product tests после удаления: **5 PASS / 20 assertions**, typecheck PASS.
+Host catalog/staging unit tests: **21 PASS / 1 SKIP / 44 assertions**;
+full resource staging пропущен без build inputs и будет выполнен новой сборкой.
+
 ## Checkpoint
 
 - Product candidate SHA `05d3d144b` (`docs-no-browser`); полный native CLI/resources/manifest/archive сохранены.
