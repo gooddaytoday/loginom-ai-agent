@@ -306,3 +306,9 @@ test("missing XML target is an inapplicable corpus edit with exit 2", async () =
     await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toMatchObject({ exitCode: 2 })
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+
+test("first-touch aggregate CSV retains downstream rounding to two decimals", async () => {
+  const csv = await Bun.file(path.join(evalsRoot, "calibration/first-last-touch/aggregate.csv")).text()
+  expect(csv.trim().split("\n")[1]!.split(",")[2]).toBe("2496.84")
+})

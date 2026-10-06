@@ -53,7 +53,7 @@
         "python_edits": [
           {
             "from": "[channel, first[channel][0], first[channel][1], last[channel][0], last[channel][1]]",
-            "to": "[channel, first[channel][0], first[channel][1] / first[channel][0], last[channel][0], last[channel][1]]",
+            "to": "[channel, first[channel][0], round(first[channel][1] / first[channel][0], 2), last[channel][0], last[channel][1]]",
             "count": 1
           }
         ]
