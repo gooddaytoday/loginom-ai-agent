@@ -7,8 +7,32 @@ import { describe, expect } from "bun:test"
 import { Effect } from "effect"
 import { reply } from "../../lib/llm-server"
 import { cliIt } from "../../lib/cli-process"
+import { testProviderConfig } from "../../lib/test-provider"
 
 describe("opencode run (non-interactive subprocess)", () => {
+  cliIt.live(
+    "forwards --file attachments when running a command",
+    ({ llm, opencode, home }) =>
+      Effect.gen(function* () {
+        const file = `${home}/attached.txt`
+        yield* Effect.promise(() => Bun.write(file, "command-attachment-unique-content"))
+        yield* llm.text("attachment received")
+        const result = yield* opencode.run("inspect the attachment", {
+          command: "inspect-file",
+          extraArgs: ["--file", file, "--"],
+          env: {
+            LOGINOM_AI_AGENT_CONFIG_CONTENT: JSON.stringify({
+              ...testProviderConfig(llm.url),
+              command: { "inspect-file": { template: "Explain the attached text." } },
+            }),
+          },
+        })
+        opencode.expectExit(result, 0)
+        expect(JSON.stringify(yield* llm.inputs)).toContain("command-attachment-unique-content")
+      }),
+    60_000,
+  )
+
   // Happy path: prompt completes, output reaches stdout, process exits 0.
   // If this fails, all the others likely will too — debug here first.
   cliIt.concurrent(

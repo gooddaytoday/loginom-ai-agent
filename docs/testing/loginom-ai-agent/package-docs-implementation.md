@@ -1114,9 +1114,22 @@ Desktop/TUI и естественный выбор моделью не прин�
 `run --command` пока теряет собранные `--file` части — это следующий TDD шаг,
 вместе с `.lgp` URL/MIME и оставшимися границами задачи. План не перерабатывался.
 
+## Вложения CLI command
+
+Actual subprocess RED подтвердил, что `run --command` завершался успешно,
+но содержимое `--file` отсутствовало в provider request. CLI теперь передаёт
+собранные части через существующее поле SDK `command.parts`; публичная схема
+не менялась. Проверка использует обычную настроенную команду, настоящий CLI,
+backend и чтение файла, с контролируемым HTTP provider.
+
+`tdd-command-cli-attachment-red.log` → `command-cli-attachment-suite.log`:
+**14 PASS**, 48 assertions (весь CLI run-process файл). Agent typecheck и
+format/diff checks PASS. Это source subprocess proof; установленный
+`run --command package-docs`, Desktop/TUI и `.lgp` path/MIME ещё не приняты.
+
 ## Checkpoint
 
-- Исходный SHA `81bd15ff4` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
+- Исходный SHA `6e66a4f24` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -1132,5 +1145,5 @@ Desktop/TUI и естественный выбор моделью не прин�
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
-- Далее: CLI command attachments, `.lgp` URL/MIME, остальные races и Task bypass.
+- CLI command attachments: 14 PASS, typecheck PASS; далее `.lgp` URL/MIME, остальные races и Task bypass.
 - Затем Linux Desktop/CLI/TTY, естественный выбор skill и парные live evals на принятом harness SHA.

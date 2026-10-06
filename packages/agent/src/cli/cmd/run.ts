@@ -921,6 +921,7 @@ export const RunCommand = effectCmd({
                 command: args.command,
                 arguments: message,
                 variant: args.variant,
+                parts: files,
               })
               if (result.error) {
                 if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
