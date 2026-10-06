@@ -2,7 +2,7 @@ import path from "node:path"
 import { cp, mkdir, rm } from "node:fs/promises"
 import type { Task } from "./task"
 import { unzip } from "./artifact"
-import { checkOracle } from "./oracle"
+import { checkOracle, compareCsv } from "./oracle"
 import { EvalFailure } from "./fail"
 
 export type CalibrationCase = {
@@ -26,7 +26,10 @@ export async function prepareCalibrationCases(tasks: Task[], runDir: string, cor
     const raw: unknown = await file.json().catch(() => { throw new EvalFailure(task.id + ": неверный JSON корпуса", 2) })
     const corpus = requireCorpus(raw, task.id)
     for (const [name, digest] of Object.entries(corpus.sources)) {
-      const actual = new Bun.CryptoHasher("sha256").update(await Bun.file(path.join(task.dir, name)).bytes()).digest("hex")
+      const bytes = await Bun.file(path.join(task.dir, name)).bytes().catch(() => {
+        throw new EvalFailure(task.id + ": источник корпуса недоступен " + name, 2)
+      })
+      const actual = new Bun.CryptoHasher("sha256").update(bytes).digest("hex")
       if (actual !== digest) throw new EvalFailure(task.id + ": устаревший источник " + name, 2)
     }
     for (const name of ["task.json", task.reference, task.spec, ...task.inputs, ...(task.oracle ? [task.oracle] : [])])
@@ -56,6 +59,7 @@ export async function prepareCalibrationCases(tasks: Task[], runDir: string, cor
       const csv = await Bun.file(path.join(dir, mutation.result_csv)).text().catch(() => {
         throw new EvalFailure(task.id + "/" + mutation.id + ": CSV корпуса недоступен", 2)
       })
+      requireCsv(csv, task.id + "/" + mutation.id)
       hasher.update(mutation.id + "\n" + csv)
       await Bun.write(path.join(artifactDir, "results", "calibration.result.csv"), csv)
       const oracle = await checkOracle(task, artifactDir)
@@ -100,4 +104,13 @@ function requireRelativePath(value: unknown, task: string) {
   if (typeof value !== "string" || !value || path.isAbsolute(value) || value.includes("\\") ||
     value.split("/").some((part) => !part || part === "." || part === ".."))
     throw new EvalFailure(task + ": неверный относительный путь " + String(value), 2)
+}
+
+// compareCsv rejects a malformed reference through an exception.
+function requireCsv(csv: string, context: string) {
+  try {
+    compareCsv(csv, csv)
+  } catch {
+    throw new EvalFailure(context + ": CSV корпуса невалиден", 2)
+  }
 }
