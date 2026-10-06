@@ -163,6 +163,21 @@ summary не мигрировались. При неподтверждённой
 
 ### 4. Near-miss в калибровке судьи
 
+**Реализация и offline-проверка — 2026-10-06, живая приёмка продолжается.**
+В ветке calibration-near-miss реализован корпус всех 35 analytic-задач:
+113 согласованных XML/CSV-мутаций (sort 35, aggregate 34, threshold 6,
+filter 3, column 35). Источники закреплены SHA256. Проверка ожидаемых ID
+независима от score и требует соответствия oracle; неправильный корпус
+отклоняется до судьи с exit 2. Positive с oracle получает синтетический CSV.
+Неизменность graph topology и независимый пересчёт всех CSV проверены.
+
+Полный начальный набор — 314 tests pass, typecheck pass; затем добавлены
+дополнительные адресные проверки. Живой полный прогон gpt-6-astra/high начат,
+но ещё не завершён. Целевой missing-column diagnostic для sales дал 57:
+export-columns и result-rows провалены. Это не заменяет приёмку всех 183 случаев.
+Checkpoint: ../../../superpowers/plans/2026-10-06-evals-calibration-near-miss.md.
+
+
 **Сейчас.** `evals/src/calibrate.ts` для positive кладёт собственный
 `reference.lgp`, для negative — эталон следующей задачи. Это ловит судью,
 который принимает что угодно, и не ловит судью, который пропускает почти

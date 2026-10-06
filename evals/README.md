@@ -63,7 +63,7 @@ bun run script/check-compare-noise.ts > /tmp/evals-compare-noise.json # offline 
 
 Несовместимы (отклоняются с кодом 2): `--judge-only` с `--skip-judge`, `--dry-run` или `--calibrate`; `--calibrate` с `--skip-judge` или `--dry-run`.
 
-Пункт чеклиста с `"requires_run": true` (как `honest-report`) не проверяется на калибровке: без прогона агента его нельзя оценить. То же для `"requires_result_file": true`.
+Пункт чеклиста с `"requires_run": true` (как `honest-report`) не проверяется на калибровке: без прогона агента его нельзя оценить. Пункты `requires_result_file` включаются для positive с oracle.csv и near-miss с синтетическим CSV; для чужого эталона и positive без oracle они исключены.
 
 ## Что означают статусы
 
@@ -87,8 +87,22 @@ bun run script/check-compare-noise.ts > /tmp/evals-compare-noise.json # offline 
 Неверный CSV блокирует pass при любом score судьи. `oracle_pass_rate` — отдельная
 ось результата; score остаётся оценкой чеклиста. Для oracle требуется ровно один
 `*.result.csv`; отсутствие или несколько файлов дают провал проверки.
-Калибровка исключает run/result-пункты и oracle; предупреждения дают код 1 после
-сохранения отчёта.
+Калибровка исключает run-пункты; positive с oracle.csv и near-miss проверяют
+синтетический экспорт и oracle. У near-miss должны провалиться все заданные ID,
+а oracle — совпасть с ожидаемым исходом, включая true. Score и один лишь отказ
+oracle не заменяют обнаружение дефекта судьёй. Предупреждения дают код 1 после
+сохранения отчёта; повреждённый корпус даёт код 2 до вызовов судьи.
+
+Корпус из 35 analytic-задач / 113 мутаций хранится в calibration/; источники
+закреплены SHA256. Команды выполняются из evals/:
+```bash
+python3 script/check-calibration-corpus.py --tasks /home/kiselev/git/agent-validation/sources/analytic-evals
+JUDGE_MODEL=gpt-6-astra JUDGE_REASONING=high bun run src/run.ts --calibrate --tasks /home/kiselev/git/agent-validation/sources/analytic-evals
+```
+При подготовке мутаций требуются zip и unzip; Python нужен только инструменту
+независимого пересчёта. calibration.json и calibration.md показывают ожидания,
+фактические провалы, oracle и покрытие. Неописанные задачи сохраняют прежнюю
+калибровку и явно имеют нулевое покрытие near-miss.
 
 `judge_status`: с `--skip-judge` у **всех** попыток `skipped` (score `null`), независимо от артефакта; oracle тоже пропущен. Без `--skip-judge` попытка без `.lgp` получает score 0 и `judge_status: no_artifact`. `scored` — валидный вердикт; `error` — отказ, таймаут или невалидный вердикт судьи после повтора (или убийство судьи по Ctrl+C). `harness_error` / `infra_error` / `interrupted` и Ctrl+C до старта судьи тоже дают `skipped`.
 
