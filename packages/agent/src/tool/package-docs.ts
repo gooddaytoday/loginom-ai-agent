@@ -12,6 +12,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { Session } from "@/session/session"
+import { TaskScope } from "@/session/task-scope"
 import { Tool } from "./tool"
 import { assertExternalDirectoryEffect } from "./external-directory"
 
@@ -48,8 +49,8 @@ export const PackageDocsTool = Tool.define(
           const lgp = yield* fs.realPath(requested)
           if (extname(lgp).toLowerCase() !== ".lgp") return yield* Effect.die(Error("PACKAGE_DOCS_LGP_REQUIRED"))
           const history = yield* sessions.messages({ sessionID: ctx.sessionID })
-          const attachments = history
-            .filter((message) => message.info.role === "user")
+          const attachments = TaskScope.visible({ sessionID: ctx.sessionID, messages: history, revert: session.revert })
+            .filter((message) => message.info.role === "user" && !TaskScope.replayOf(message))
             .flatMap((message) => message.parts.filter((part) => part.type === "file"))
           const attached = yield* Effect.forEach(attachments, (part) =>
             Effect.gen(function* () {

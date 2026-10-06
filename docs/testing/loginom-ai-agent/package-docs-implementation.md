@@ -1199,9 +1199,25 @@ Agent typecheck и format/diff checks PASS. Это восстановленны�
 и контролируемый provider, не доказательство естественного выбора skill.
 Общий этап 5 остаётся открыт до остальных переходов и гонок.
 
+## Разрешение чтения пакета после revert и compaction
+
+Два TDD случая показали, что generator принимал отменённый файл и standalone
+replay-копию как исходное пользовательское вложение. Теперь он использует
+TaskScope.visible с ownership и revert boundary, исключая replay-сообщения
+из источников разрешения. Если исходного вложения нет, обычный read permission
+запрашивается до executor; отказ не создаёт .work. Видимый original и реальный
+Session.fork сохраняют разрешение; явные read/external_directory deny действуют.
+
+tdd-package-docs-reverted-attachment-red.log и
+tdd-package-docs-orphaned-replay-red.log фиксируют отсутствие нового read grant.
+package-docs-attachment-full-final.log: **44 PASS**, 146 assertions (generator
+и TaskScope). После приведения error channel тестового Tool.Context к контракту:
+package-docs-original-attachment-matrix-final.log — **10 PASS**, 32 assertions;
+Agent typecheck и format/diff checks PASS. Общий этап 5 остаётся открыт.
+
 ## Checkpoint
 
-- Исходный SHA `d89fe334d` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
+- Исходный SHA `ce0634ead` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -1217,5 +1233,5 @@ Agent typecheck и format/diff checks PASS. Это восстановленны�
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
-- CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS; далее attachment history, actual PTY и races.
+- CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS; attachment/TaskScope: 44 PASS; далее actual PTY и races.
 - Затем Linux Desktop/CLI/TTY, естественный выбор skill и парные live evals на принятом harness SHA.

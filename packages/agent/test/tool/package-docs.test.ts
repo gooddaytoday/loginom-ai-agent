@@ -180,6 +180,141 @@ it.instance(
   20_000,
 )
 
+for (const state of ["reverted", "message-reverted", "replayed"] as const) {
+  it.instance(
+    "a " + state + " attachment must request fresh read permission before extracting a package",
+    () =>
+      Effect.gen(function* () {
+        const instance = yield* TestInstance
+        const fs = yield* FSUtil.Service
+        const sessions = yield* Session.Service
+        const permissions = yield* Permission.Service
+        const input = yield* prepare({
+          attachment: pathToFileURL(fixture).href,
+          permission: [
+            { permission: "external_directory", pattern: "*", action: "allow" },
+            { permission: "read", pattern: "*", action: "ask" },
+            { permission: "edit", pattern: "*", action: "allow" },
+          ],
+        })
+        if (state === "reverted" || state === "message-reverted") {
+          const history = yield* sessions.messages({ sessionID: input.ctx.sessionID })
+          yield* sessions.setRevert({
+            sessionID: input.ctx.sessionID,
+            revert: {
+              messageID: input.ctx.messageID,
+              ...(state === "reverted" ? { partID: history[0].parts[0].id } : {}),
+            },
+            summary: undefined,
+          })
+        }
+        if (state === "replayed")
+          yield* sessions.updatePart({
+            id: PartID.ascending(),
+            sessionID: input.ctx.sessionID,
+            messageID: input.ctx.messageID,
+            type: "text",
+            text: "Replayed prompt",
+            metadata: { compaction_replay_of: MessageID.ascending() },
+          })
+        const fiber = yield* input.tool
+          .execute({ operation: "extract", lgp: fixture }, input.ctx)
+          .pipe(Effect.exit, Effect.forkScoped)
+        const outcome = yield* Effect.race(
+          pollWithTimeout(
+            permissions
+              .list()
+              .pipe(
+                Effect.map((requests) =>
+                  requests.find(
+                    (request) => request.sessionID === input.ctx.sessionID && request.permission === "read",
+                  ),
+                ),
+              ),
+            "package read permission request did not appear",
+          ).pipe(Effect.map((request) => ({ type: "permission" as const, request }))),
+          Fiber.join(fiber).pipe(Effect.map((exit) => ({ type: "completed" as const, exit }))),
+        )
+        expect(outcome.type).toBe("permission")
+        if (outcome.type !== "permission") throw Error("package extraction completed without fresh read permission")
+        yield* permissions.reply({ requestID: outcome.request.id, reply: "reject" })
+        const result = yield* Fiber.join(fiber)
+        expect(Exit.isFailure(result)).toBe(true)
+        if (Exit.isFailure(result)) expect(Cause.squash(result.cause)).toBeInstanceOf(PermissionV1.RejectedError)
+        expect(yield* fs.exists(join(instance.directory, ".work"))).toBe(false)
+      }),
+    { git: true },
+    20_000,
+  )
+}
+
+it.instance(
+  "a compaction replay preserves the visible original attachment's read authorization",
+  () =>
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const history = yield* sessions.messages({ sessionID: input.ctx.sessionID })
+      const replayID = MessageID.ascending()
+      yield* sessions.updateMessage({ ...history[0].info, id: replayID, time: { created: Date.now() } })
+      yield* sessions.updatePart({
+        ...history[0].parts[0],
+        id: PartID.ascending(),
+        messageID: replayID,
+      })
+      yield* sessions.updatePart({
+        id: PartID.ascending(),
+        sessionID: input.ctx.sessionID,
+        messageID: replayID,
+        type: "text",
+        text: "Replayed prompt",
+        metadata: { compaction_replay_of: input.ctx.messageID },
+      })
+      const result = yield* input.tool.execute({ operation: "extract", lgp: fixture }, input.ctx)
+      const fs = yield* FSUtil.Service
+      expect(yield* fs.exists(JSON.parse(result.output).structure)).toBe(true)
+      expect(input.requests.map((request) => request.permission)).toEqual(["edit"])
+    }),
+  { git: true },
+  20_000,
+)
+
+it.instance(
+  "forked original attachments keep read authorization in the new session",
+  () =>
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      const permissions = yield* Permission.Service
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const fork = yield* sessions.fork({ sessionID: input.ctx.sessionID })
+      const history = yield* sessions.messages({ sessionID: fork.id })
+      const result = yield* input.tool.execute(
+        { operation: "extract", lgp: fixture },
+        {
+          ...input.ctx,
+          sessionID: fork.id,
+          messageID: history[0].info.id,
+          ask: (request) =>
+            Effect.gen(function* () {
+              input.requests.push(request)
+              yield* permissions
+                .ask({
+                  ...request,
+                  sessionID: fork.id,
+                  ruleset: [{ permission: "*", pattern: "*", action: "allow" }],
+                })
+                .pipe(Effect.orDie)
+            }),
+        },
+      )
+      const fs = yield* FSUtil.Service
+      expect(yield* fs.exists(JSON.parse(result.output).structure)).toBe(true)
+      expect(input.requests.map((request) => request.permission)).toEqual(["edit"])
+    }),
+  { git: true },
+  20_000,
+)
+
 it.instance(
   "an original attachment does not override the user's explicit read deny",
   () =>

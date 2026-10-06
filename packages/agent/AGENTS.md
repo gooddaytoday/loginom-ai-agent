@@ -185,6 +185,8 @@ Plain async code should pass explicit context or stay inside an Effect fiber; do
 
 - Persisted subtask parts must pass the current task profile before initialization or child-session creation. Derive that profile from fresh full history and the Session revert boundary; both product profiles reject subtask dispatch even when it bypasses the provider tool catalog. Default-profile subtask behavior remains available.
 
+- PackageDocs attachment authorization uses owned parts from visible original user messages, honoring Session revert. A compaction replay copy cannot authorize a package when its original is absent; visible originals and their forked copies retain authorization. Ordinary read/external-directory permissions still apply, including explicit denies, before the bundled executor starts.
+
 - For standalone run, bootstrap owns the SIGINT handler through profile release. The shared cancellation signal survives startup/import boundaries; stdin admission and provider dispatch check it before starting work. Command-specific interruption still aborts active sessions. Repeated signals must not force an exit during acknowledged host cleanup, and failed cleanup must still retain the guard.
 
 - Standalone native builds can select exactly one `--target=linux-x64`, `--target=darwin-arm64` or `--target=win32-x64`; do not combine with --single/--baseline. Cross-compilation requires matching optional native build packages from the existing lockfile. A produced PE/Mach-O binary alone is not a complete Loginom resource distribution or native runtime acceptance.
