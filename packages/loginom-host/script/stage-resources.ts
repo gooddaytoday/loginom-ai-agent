@@ -6,6 +6,8 @@ import { $ } from "bun"
 import { nativeResourceCandidates } from "./native-resource-candidates"
 import { buildPhase } from "./build-phase"
 import { buildKeychain } from "./build-keychain"
+import { buildPackageDocs } from "./build-package-docs"
+import { collectBuildNotices } from "./collect-build-notices"
 import release from "../../product/loginom-release.json"
 import catalogs from "../../product/loginom-catalogs.json"
 import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
@@ -56,13 +58,14 @@ export async function stageResources(input: {
   if (![input.destination, input.node, input.browsers].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const source = resolve(import.meta.dir, "../../loginom-runtime")
+  const docsSource = resolve(import.meta.dir, "../src/package-docs")
   const destination = resolve(input.destination)
   const node = input.node
   const browsers = input.browsers
   const staging = destination + ".staging"
   for (const paths of [
-    [destination, staging, source, node, browsers, productSkillsDirectory],
-    await Promise.all([destination, staging, source, node, browsers, productSkillsDirectory].map(canonicalBuildPath)),
+    [destination, staging, source, node, browsers, productSkillsDirectory, docsSource],
+    await Promise.all([destination, staging, source, node, browsers, productSkillsDirectory, docsSource].map(canonicalBuildPath)),
   ]) {
     if (
       paths
@@ -157,6 +160,10 @@ export async function stageResources(input: {
   }
   if (process.platform === "darwin" && input.flavor === "cli") await buildKeychain(join(staging, "bin"))
   await mkdir(join(staging, "licenses"))
+  const docs = await buildPhase(`${input.flavor}-package-docs`, () =>
+    buildPackageDocs(join(staging, "skills/package-docs/scripts")))
+  await collectBuildNotices(join(staging, "licenses/package-docs"), [{ root: docs.root, metafile: docs.metafile }])
+  await cp(join(productSkillsDirectory, "package-docs/assets/fonts/OFL.txt"), join(staging, "licenses/Golos-OFL.txt"))
   await cp(resolve(source, "../../LICENSE"), join(staging, "licenses/OpenCode-MIT.txt"))
   await cp(
     resolve(dirname(node), process.platform === "win32" ? "LICENSE" : "../LICENSE"),
@@ -170,6 +177,8 @@ export async function stageResources(input: {
   Loginom AI Agent includes code derived from OpenCode (MIT) and Loginom Dock (AGPL-3.0).
   The original copyright/license notices are preserved in licenses/.
   Node.js license and bundled dependency notices are in licenses/Node.txt.
+  Package documentation uses Golos Text under the SIL Open Font License (licenses/Golos-OFL.txt).
+  Its emitted npm dependency notices are in licenses/package-docs/.
   Playwright, MCP and their dependency license files are included alongside their package sources in runtime/client/node_modules/.
   ${input.flavor === "desktop" ? "Electron notices are included at the application root by electron-builder; the managed Chromium also exposes chrome://credits/." : "The bundled Chromium exposes its notices at chrome://credits/. Linux CLI archives also export them under licenses/chromium/ at the archive root. Browser-side license files remain under browsers/. Electron is not included."}
   The active Dock JavaScript sources are included in runtime/.

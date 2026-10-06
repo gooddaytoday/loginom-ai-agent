@@ -17,12 +17,12 @@ const bundle = await mkdtemp(join(tmpdir(), "loginom-docs-node-"))
 const output = join(bundle, "scripts")
 
 beforeAll(async () => {
-  // Stage one fixture bundle for all Node checks, as the product build does.
-  const build = await Bun.build({
-    entrypoints: [join(import.meta.dir, "../src/package-docs/cli.ts")],
-    outdir: output, naming: "package-docs.mjs", target: "node", packages: "bundle", splitting: false,
-  })
-  expect(build.success).toBe(true)
+  const builder = Bun.spawn([process.execPath, join(import.meta.dir, "../script/build-package-docs.ts"), output],
+    { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" })
+  const stdout = new Response(builder.stdout).text(), stderr = new Response(builder.stderr).text()
+  expect(await builder.exited).toBe(0)
+  expect(await stderr).toBe("")
+  expect(JSON.parse(await stdout).script).toBe(join(output, "package-docs.mjs"))
   await cp(fonts, join(bundle, "assets/fonts"), { recursive: true })
 })
 afterAll(() => rm(bundle, { recursive: true, force: true }))
@@ -31,6 +31,28 @@ test("Markdown writer preserves the baseline report and terminates it with a new
   const markdown = await readFile(join(fixtures, "demo.report.md"), "utf8")
   expect(new TextDecoder().decode(await renderReport(markdown.trimEnd(), "md"))).toBe(markdown)
 })
+
+test("the product builder emits a standalone Node script and its actual license dependency graph", async () => {
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
+  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-builder-"))
+  try {
+    const builder = Bun.spawn([process.execPath, join(import.meta.dir, "../script/build-package-docs.ts"), join(directory, "scripts")],
+      { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" })
+    const stdout = new Response(builder.stdout).text(), stderr = new Response(builder.stderr).text()
+    expect(await builder.exited).toBe(0)
+    expect(await stderr).toBe("")
+    const build = JSON.parse(await stdout)
+    expect(build.script).toBe(join(directory, "scripts/package-docs.mjs"))
+    expect(Object.keys(build.metafile.inputs).some((name) => name.includes("@zip.js"))).toBe(true)
+    expect(Object.keys(build.metafile.inputs).some((name) => name.includes("@xmldom"))).toBe(true)
+    const child = Bun.spawn([node, build.script, "extract", "--lgp", join(fixtures, "demo.lgp"), "--directory", directory],
+      { cwd: directory, env: { LANG: "C.UTF-8" }, stdout: "pipe", stderr: "pipe" })
+    const result = new Response(child.stdout).text()
+    expect(await child.exited).toBe(0)
+    expect(await Bun.file(JSON.parse(await result).structure).json()).toEqual(await Bun.file(join(fixtures, "structure.json")).json())
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 20_000)
 
 test("Node CLI extracts an unchanged package into a session-owned work directory", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE

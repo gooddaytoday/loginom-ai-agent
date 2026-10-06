@@ -406,6 +406,21 @@ typecheck PASS. Логи tdd-node-docs-{cli-emit,emit-sections,emit-collision}-*
 node-cli-publication-regression.log. Staging и агентская авторизация/timeout
 ещё открыты; этот CLI не является установленной сборкой продукта.
 
+Node build/staging: RED — отдельный product builder был BUILD_UNSUPPORTED;
+RED — полный stageResources не включал package-docs.mjs в manifest.
+GREEN — build-package-docs.ts делает target=node bundle и возвращает настоящий
+metafile. Staging генерирует его после копирования skill, до inventory;
+collect-build-notices сохраняет license graph ZIP/XML, Golos OFL включён
+в licenses и THIRD_PARTY_NOTICES. Настоящий resources/bin/node выполняет
+skeleton → default PDF из staged skill с минимальным env и без Python.
+Отдельный RED выявил отсутствие нового source path в overlap preflight;
+GREEN добавляет src/package-docs к lexical/canonical inputs до запуска Node.
+Генераторный source SHA/bytes сохранён. 39 pipeline tests PASS (132 assertions),
+13 staging tests PASS (47 assertions), Host typecheck PASS. Логи
+tdd-docs-{builder,staging,staging-source-guard}-*, docs-staged-node-regression.log.
+Node pipeline fixtures строятся тем же product builder в отдельном Bun процессе.
+Пункт сборки/staging этапа 2 отмечен; agent tool, permissions и отмена ещё открыты.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -419,6 +434,6 @@ node-cli-publication-regression.log. Staging и агентская автори�
 - Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
-- Этап 2: writers и все три Node CLI команды 38 PASS; staging/tool ещё открыты.
-- Следующий шаг — build/staging; 35 baseline source-map mismatches остаются live gate.
+- Этап 2: pipeline 39 PASS, staging 13 PASS; agent tool/permissions/отмена ещё открыты.
+- Следующий шаг — ограниченный tool; 35 baseline source-map mismatches остаются live gate.
 - Живая приёмка и удаление серверного skill остаются открытыми.

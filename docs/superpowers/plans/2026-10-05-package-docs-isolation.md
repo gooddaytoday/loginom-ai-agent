@@ -624,7 +624,7 @@ type PackageDocsRun =
   без shell, `cwd` — каталог сессии, минимальное окружение, timeout и AbortSignal.
   Проверить integrity перед исполнением по 2.3. Произвольные output/script/
   executable параметры модели не принимать. Не требуется Loginom lease/браузер.
-- [ ] Собрать TS через `Bun.build({ target: "node" })` по образцу `build-node-host.ts`.
+- [x] Собрать TS через `Bun.build({ target: "node" })` по образцу `build-node-host.ts`.
   `stageResources` кладёт bundle в skill до inventory. Шрифты искать от
   `import.meta.url` (`../assets/fonts`). Metafile передать в
   `collect-build-notices.ts`, Golos OFL включить в `THIRD_PARTY_NOTICES`.

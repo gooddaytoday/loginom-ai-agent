@@ -48,6 +48,16 @@ posixTest("resource outputs cannot overlap the canonical product skills input", 
   expect(await readFile(join(productSkillsDirectory, "loginom-automation/SKILL.md"), "utf8")).toBe(original)
 })
 
+posixTest("resource staging cannot overwrite the package-docs generator source", async () => {
+  const source = resolve(import.meta.dir, "../src/package-docs")
+  const before = await readFile(join(source, "extract.ts"))
+  for (const destination of [source, join(source, "generated")]) {
+    await expect(stageResources({ destination, node: "/missing/node", browsers: "/missing/browser", target, flavor: "cli" }))
+      .rejects.toThrow("LOGINOM_BUILD_OUTPUT_OVERLAP")
+  }
+  expect(await readFile(join(source, "extract.ts"))).toEqual(before)
+})
+
 posixTest("resource staging fails closed for unpinned native targets and unsafe output paths", async () => {
   const input = {
     destination: "/tmp/loginom-resource-test",
@@ -131,6 +141,31 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
       const skills = await verifyBundledSkills(destination)
       expect(skills.map((skill) => skill.name).toSorted()).toEqual(["loginom-automation", "package-docs"])
       const manifest = await Bun.file(join(destination, "resource-manifest.json")).json()
+      expect(manifest.files.some((file: { path: string }) => file.path === "skills/package-docs/scripts/package-docs.mjs")).toBe(true)
+      expect(await Bun.file(join(destination, "THIRD_PARTY_NOTICES.md")).text()).toContain("Golos")
+      const notices = await Bun.file(join(destination, "licenses/package-docs/inventory.json")).json()
+      expect(notices.packages.some((pkg: { name: string }) => pkg.name === "@zip.js/zip.js")).toBe(true)
+      expect(notices.packages.some((pkg: { name: string }) => pkg.name === "@xmldom/xmldom")).toBe(true)
+      expect(await readFile(join(destination, "licenses/Golos-OFL.txt")))
+        .toEqual(await readFile(join(productSkillsDirectory, "package-docs/assets/fonts/OFL.txt")))
+      const script = join(destination, "skills/package-docs/scripts/package-docs.mjs")
+      const skeleton = Bun.spawn([join(destination, manifest.node), script, "skeleton", "--lgp",
+        join(import.meta.dir, "fixtures/package-docs/demo.lgp"), "--directory", root],
+        { cwd: root, env: { LANG: "C.UTF-8" }, stdout: "pipe", stderr: "pipe" })
+      const paths = new Response(skeleton.stdout).json()
+      const errors = new Response(skeleton.stderr).text()
+      expect(await skeleton.exited).toBe(0)
+      expect(await errors).toBe("")
+      const report = (await paths).report
+      await writeFile(report, (await readFile(report, "utf8")).replace(/PLACEHOLDER_[A-Z_0-9]+/g, "Описание сценария."))
+      const emit = Bun.spawn([join(destination, manifest.node), script, "emit", "--lgp",
+        join(import.meta.dir, "fixtures/package-docs/demo.lgp"), "--directory", root],
+        { cwd: root, env: { LANG: "C.UTF-8" }, stdout: "pipe", stderr: "pipe" })
+      const result = new Response(emit.stdout).json()
+      const failure = new Response(emit.stderr).text()
+      expect(await emit.exited).toBe(0)
+      expect(await failure).toBe("")
+      expect((await readFile((await result).output)).subarray(0, 8).toString()).toBe("%PDF-1.4")
       for (const path of [
         "loginom-automation/SKILL.md",
         "loginom-automation/references/workflow.md",
