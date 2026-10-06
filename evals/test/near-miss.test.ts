@@ -312,6 +312,16 @@ test("malformed mutant XML is rejected with exit 2 before any judge assessment",
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("unbound XML namespace in a mutant is a corpus error with exit 2", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-invalid-namespace-"))
+  try {
+    const fixture = await sortCorpus(root)
+    fixture.corpus.cases[0]!.edits[0]!.to += ' unbound:flag="1"'
+    await Bun.write(path.join(fixture.dir, "cases.json"), JSON.stringify(fixture.corpus))
+    await expect(prepareCalibrationCases(fixture.tasks, path.join(root, "run"), fixture.corpusDir)).rejects.toMatchObject({ exitCode: 2 })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 
 test("missing XML target is an inapplicable corpus edit with exit 2", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-missing-xml-"))
