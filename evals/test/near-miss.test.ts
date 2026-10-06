@@ -229,3 +229,11 @@ test("analytic corpus covers all 35 tasks and all 113 applicable defects", async
     [kind, corpora.flatMap((corpus) => corpus.cases).filter((item) => item.kind === kind).length]))
   expect(counts).toEqual({ sort: 35, aggregate: 34, threshold: 6, filter: 3, column: 35 })
 })
+
+test("saved CSV recipes independently reproduce the representative corpus", async () => {
+  const proc = Bun.spawn(["python3", path.join(evalsRoot, "script/check-calibration-corpus.py"), "--tasks", path.join(evalsRoot, "fixtures/calibration"), "--only", "sales-by-category,abc-pareto-groups,low-liquidity-companies"], { stdout: "pipe", stderr: "pipe" })
+  const output = await new Response(proc.stdout).text()
+  const errors = await new Response(proc.stderr).text()
+  expect({ code: await proc.exited, errors }).toEqual({ code: 0, errors: "" })
+  expect(output).toContain("10 cases")
+})
