@@ -171,3 +171,19 @@ test("wrong aggregation preserves exported names with recomputed values", async 
     expect(entry!.oracle.passed).toBe(false)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("calibration accepts a judge that fails every expected near-miss item", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-correct-judge-"))
+  try {
+    const fixture = await sortCorpus(root)
+    const answers = path.join(root, "answers.json")
+    await Bun.write(answers, JSON.stringify({ sort: ["sort-revenue", "result-rows"] }))
+    const config = loadConfig(["--calibrate", "--tasks", path.join(evalsRoot, "fixtures/calibration"), "--only", "sales-by-category"], {
+      JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: "bun " + path.join(evalsRoot, "fixtures/fake-codex.ts") + " --failed-by-case " + answers, EVAL_RESULTS_DIR: path.join(root, "results"),
+    })
+    const result = await calibrate(config, fixture.corpusDir)
+    expect(result.code).toBe(0)
+    const report = await Bun.file(path.join(result.runDir, "calibration.json")).json()
+    expect(report.rows.find((row: { kind: string }) => row.kind === "near-miss")).toMatchObject({ expectations_met: true })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})

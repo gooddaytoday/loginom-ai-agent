@@ -1,7 +1,7 @@
 import path from "node:path"
 
 const args = Bun.argv.slice(2)
-if (args[0] === "--version") {
+if (args.includes("--version")) {
   process.stdout.write("fake-codex 0.0.0\n")
   process.exit(0)
 }
@@ -25,11 +25,14 @@ if (mode.startsWith("file:")) {
   process.exit(0)
 }
 const checklist = (await Bun.file(path.join(dir, "checklist.json")).json()) as { id: string }[]
+const failures = args.includes("--failed-by-case")
+  ? ((await Bun.file(args[args.indexOf("--failed-by-case") + 1]!).json()) as Record<string, string[]>)[path.basename(path.dirname(dir))] ?? []
+  : []
 const passed = (index: number) => (mode === "pass" ? true : mode === "fail" ? false : index % 2 === 0)
 await Bun.write(
   out,
   JSON.stringify({
-    checklist: checklist.map((item, index) => ({ id: item.id, passed: passed(index), evidence: `fake ${mode}` })),
+    checklist: checklist.map((item, index) => ({ id: item.id, passed: !failures.includes(item.id) && passed(index), evidence: `fake ${mode}` })),
     summary: `fake verdict (${mode})${process.env.FAKE_CODEX_ECHO ?? ""}`,
     confidence: "high",
   }),
