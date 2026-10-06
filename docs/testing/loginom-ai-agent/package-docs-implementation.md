@@ -1147,9 +1147,23 @@ TDD подтвердил `data:text/plain` вместо локального п�
 Agent/Core typecheck и format/diff checks PASS. В плане отмечен только
 реализованный пункт CLI path/MIME; installed/TTY/GUI acceptance открыта.
 
+## `.lgp` в TUI: source реализация
+
+Вставка локального `.lgp` теперь проверяет тип файла и добавляет path attachment,
+без чтения текста/байтов. Prompt передаёт `file:` URL с MIME пакета;
+`@` autocomplete выставляет тот же MIME. Виртуальная метка различает пакет,
+PDF и изображения. Existing image/PDF/SVG поведение сохранено.
+
+`tdd-tui-lgp-paste-path-red.log` → `tui-lgp-prompt-regression.log`:
+**12 PASS**, 18 assertions (local attachment, part, history). Новый тест
+работает с реальным файлом с пробелами/кириллицей; отдельная IO-boundary
+проверка запрещает чтение bytes/text. TUI typecheck и format/diff checks PASS.
+Это helper/source proof, не действие пользователя в смонтированном UI/PTY.
+Полный пункт TUI в плане оставлен открытым до фактической терминальной проверки.
+
 ## Checkpoint
 
-- Исходный SHA `1912397cf` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
+- Исходный SHA `75d37fcd3` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -1165,5 +1179,5 @@ Agent/Core typecheck и format/diff checks PASS. В плане отмечен т
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
-- CLI command attachments и `.lgp` path/MIME: 94 PASS / 1 SKIP; Agent/Core typecheck PASS; далее TUI, races, Task bypass.
+- CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS; typecheck PASS; далее actual PTY, races, Task bypass.
 - Затем Linux Desktop/CLI/TTY, естественный выбор skill и парные live evals на принятом harness SHA.

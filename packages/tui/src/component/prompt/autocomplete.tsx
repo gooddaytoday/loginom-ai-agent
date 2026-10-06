@@ -261,7 +261,12 @@ export function Autocomplete(props: {
       filename,
       part: {
         type: "file" as const,
-        mime: item.type === "directory" ? "application/x-directory" : "text/plain",
+        mime:
+          item.type === "directory"
+            ? "application/x-directory"
+            : filePath.toLowerCase().endsWith(".lgp")
+              ? "application/x-loginom-package"
+              : "text/plain",
         filename,
         url: urlObj.href,
         source: {

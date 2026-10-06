@@ -12,7 +12,7 @@ import type { CommandContext } from "@opentui/keymap"
 import { createEffect, createMemo, onMount, createSignal, onCleanup, on, Show, Switch, Match } from "solid-js"
 import { registerOpencodeSpinner } from "../register-spinner"
 import path from "path"
-import { fileURLToPath } from "url"
+import { fileURLToPath, pathToFileURL } from "url"
 import { useLocal } from "../../context/local"
 import { Flag } from "@loginom-ai-agent/core/flag/flag"
 import { tint, useTheme } from "../../context/theme"
@@ -51,7 +51,13 @@ import { createFadeIn } from "../../util/signal"
 import { DialogSkill } from "../dialog-skill"
 import { DialogWorkspaceUnavailable } from "../dialog-workspace-unavailable"
 import { useArgs } from "../../context/args"
-import { LOGINOM_AI_AGENT_BASE_MODE, useBindings, useCommandShortcut, useLeaderActive, useOpencodeKeymap } from "../../keymap"
+import {
+  LOGINOM_AI_AGENT_BASE_MODE,
+  useBindings,
+  useCommandShortcut,
+  useLeaderActive,
+  useOpencodeKeymap,
+} from "../../keymap"
 import { useTuiConfig } from "../../config"
 import { usePromptWorkspace } from "./workspace"
 import { usePromptMove } from "./move"
@@ -1188,6 +1194,15 @@ export function Prompt(props: PromptProps) {
     if (!isUrl) {
       const attachment = await readLocalAttachment(filepath)
       const filename = path.basename(filepath)
+      if (attachment?.type === "path") {
+        await pasteAttachment({
+          filename,
+          filepath: attachment.path,
+          mime: attachment.mime,
+          url: pathToFileURL(attachment.path).href,
+        })
+        return
+      }
       if (attachment?.type === "text") {
         pasteText(attachment.content, `[SVG: ${filename ?? "image"}]`)
         return
@@ -1221,16 +1236,20 @@ export function Prompt(props: PromptProps) {
     }, 0)
   }
 
-  async function pasteAttachment(file: { filename?: string; filepath?: string; content: string; mime: string }) {
+  async function pasteAttachment(
+    file: { filename?: string; filepath?: string; mime: string } & ({ content: string } | { url: string }),
+  ) {
     const currentOffset = input.cursorOffset
     const extmarkStart = currentOffset
     const pdf = file.mime === "application/pdf"
+    const lgp = file.mime === "application/x-loginom-package"
     const count = store.prompt.parts.filter((x) => {
       if (x.type !== "file") return false
       if (pdf) return x.mime === "application/pdf"
+      if (lgp) return x.mime === "application/x-loginom-package"
       return x.mime.startsWith("image/")
     }).length
-    const virtualText = pdf ? `[PDF ${count + 1}]` : `[Image ${count + 1}]`
+    const virtualText = lgp ? `[Loginom ${count + 1}]` : pdf ? `[PDF ${count + 1}]` : `[Image ${count + 1}]`
     const extmarkEnd = extmarkStart + virtualText.length
     const textToInsert = virtualText + " "
 
@@ -1248,7 +1267,7 @@ export function Prompt(props: PromptProps) {
       type: "file" as const,
       mime: file.mime,
       filename: file.filename,
-      url: `data:${file.mime};base64,${file.content}`,
+      url: "url" in file ? file.url : `data:${file.mime};base64,${file.content}`,
       source: {
         type: "file",
         path: file.filepath ?? file.filename ?? "",
