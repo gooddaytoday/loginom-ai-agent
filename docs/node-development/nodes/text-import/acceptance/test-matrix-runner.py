@@ -10,6 +10,32 @@ start=next(i for i,n in enumerate(boundary.body) if isinstance(n,ast.Assign) and
 selected=copy.deepcopy(boundary);selected.body=selected.body[start:]
 code=compile(ast.fix_missing_locations(ast.Module(body=[selected,*tree.body[tree.body.index(boundary)+1:]],type_ignores=[])),'matrix-runner-gate','exec')
 case=json.loads((root/'matrix/manifest.json').read_text())['cases'][0]
+parse_start=next(i for i,n in enumerate(boundary.body) if isinstance(n,ast.Assign) and ast.unparse(n.targets[0])=='lines')
+parse_end=next(i for i,n in enumerate(boundary.body[parse_start:],parse_start) if isinstance(n,ast.Expr) and isinstance(n.value,ast.Call) and ast.unparse(n.value.func)=='write_private')
+parse_code=compile(ast.fix_missing_locations(ast.Module(body=copy.deepcopy(boundary.body[parse_start:parse_end]),type_ignores=[])),'matrix-runner-native-receipts','exec')
+selected.body=copy.deepcopy(boundary.body[parse_start:parse_end])+selected.body
+code=compile(ast.fix_missing_locations(ast.Module(body=[selected,*tree.body[tree.body.index(boundary)+1:]],type_ignores=[])),'matrix-runner-parse-and-gate','exec')
+def tool_event(tool,reply,status='completed'):
+ return json.dumps({'type':'tool_use','part':{'tool':tool,'state':{'status':status,'input':{'operation_id':'import'},'output':reply}}})
+class NativeReceipts(unittest.TestCase):
+ def parse(self,events):
+  with tempfile.TemporaryDirectory() as directory:
+   rawout=Path(directory)/'stdout';rawout.write_text('\n'.join(events));scope={'rawout':rawout,'json':json}
+   exec(parse_code,scope);return scope['terminal']
+ def test_todowrite_json_list_is_not_a_native_receipt(self):
+  native={'operation_id':'import','state':'settled','status':'SUCCEEDED','cleanup_complete':True}
+  events=[tool_event('todowrite',json.dumps([{'id':'csv','content':'Import CP1252','status':'completed','priority':'high'}])),tool_event('loginom_dock_node_apply',json.dumps(native))]
+  receipts=self.parse(events);self.assertEqual(receipts,[{'tool':'loginom_dock_node_apply','input':{'operation_id':'import'},'result':native}])
+ def test_non_native_reply_does_not_need_native_json_shape(self):
+  self.assertEqual(self.parse([tool_event('bash','plain text'),tool_event('todowrite','[]')]),[])
+ def test_invalid_native_replies_fail_closed(self):
+  for reply in ['[]','null','"text"','not JSON']:
+   with self.subTest(reply=reply),self.assertRaisesRegex(RuntimeError,'AUDIT_'):
+    self.parse([tool_event('loginom_dock_node_apply',reply)])
+ def test_unknown_effect_and_unconfirmed_cleanup_are_preserved(self):
+  for native,error in [({'status':'AMBIGUOUS'},'UNKNOWN_EFFECT_PRESERVED'),({'status':'TIMED_OUT'},'UNKNOWN_EFFECT_PRESERVED'),({'state':'settled','cleanup_complete':False},'UNCONFIRMED_OPERATION_CLEANUP_PRESERVED')]:
+   with self.subTest(native=native),self.assertRaisesRegex(RuntimeError,error):
+    self.parse([tool_event('todowrite','[]'),tool_event('loginom_dock_node_apply',json.dumps(native))])
 def port():
  return {'schema':case['columns'],'row_count':3,'sample_rows':3,'sample_complete':True,'fresh':True,'execution_id':'owned',
          'sample':[[{'type':c['type'],'is_null':v is None,'value':v} for c,v in zip(case['columns'],row)] for row in case['expected_rows']]}
@@ -20,12 +46,13 @@ class MatrixGate(unittest.TestCase):
    native={'source':{'source_path':'/owned/source.txt','connection':'Локальное',**case['settings']['source']},'format':case['settings']['format'],'columns':case['columns']}
    cold={'status':'CHECK_VALUES','cleanup':{'package_closed':True,'logged_out':True},'cli_delivery':{'destination':'/owned/source.txt'},'configuration':native,'port':port()}
    warm={'operation_id':'import','state':'settled','status':'SUCCEEDED','cleanup_complete':True,'configuration':{'readback':native},'output':{'ports':[port()]}}
-   result={'status':'FAIL','source_sha':'sha','cli_exit':0,'oracle_exit':0,'oracle':{'status':'NOT_RUN'}}
+   result={'status':'FAIL','source_sha':'sha','cli_exit':0,'oracle_exit':0,'oracle':{'status':'NOT_RUN'},'cleanup':{'package_closed':False,'logged_out':False}}
    if mutation:mutation(cold,warm,result)
    (cold_dir/'result.json').write_text(json.dumps(cold));rawout=attempt/'stdout';rawerr=attempt/'stderr'
-   terminal=[{'tool':'loginom_dock_node_apply','input':{'target':{'type':'imports.text'},'operation_id':'import'},'result':warm}]
+   native_event=json.dumps({'type':'tool_use','part':{'tool':'loginom_dock_node_apply','state':{'status':'completed','input':{'target':{'type':'imports.text'},'operation_id':'import'},'output':json.dumps(warm)}}})
+   rawout.write_text('\n'.join([tool_event('todowrite',json.dumps([{'id':'csv','content':'Import CP1252','status':'completed','priority':'high'}])),native_event]))
    closed=[]
-   scope=dict(case=case,cold=None,oracle=cold_dir,oracle_module=oracle,terminal=terminal,result=result,evidence=evidence,attempt=attempt,
+   scope=dict(case=case,cold=None,oracle=cold_dir,oracle_module=oracle,result=result,evidence=evidence,attempt=attempt,
               rawout=rawout,rawerr=rawerr,json=json,time=time,started=time.monotonic(),lock=1,sys=sys,
               os=type('OS',(),{'close':staticmethod(closed.append)}),write_private=lambda p,v:p.write_text(json.dumps(v)))
    exit_code=0

@@ -60,10 +60,12 @@ try:
  for line in lines:
   try:event=json.loads(line)
   except ValueError:continue
-  if event.get('type')=='tool_use' and event.get('part',{}).get('state',{}).get('status') in ['completed','error']:
+  if event.get('type')=='tool_use' and event.get('part',{}).get('tool','').startswith('loginom_dock_') and event.get('part',{}).get('state',{}).get('status') in ['completed','error']:
    part=event['part'];state=part['state']
-   try:terminal.append({'tool':part['tool'],'input':state['input'],'result':json.JSONDecoder().raw_decode(state.get('output',state.get('error')))[0]})
+   try:receipt=json.JSONDecoder().raw_decode(state.get('output',state.get('error')))[0]
    except (ValueError,TypeError):raise RuntimeError('AUDIT_UNPARSEABLE_TOOL_REPLY')
+   if not isinstance(receipt,dict):raise RuntimeError('AUDIT_NATIVE_RECEIPT_NOT_OBJECT')
+   terminal.append({'tool':part['tool'],'input':state['input'],'result':receipt})
  if any(t['result'].get('status') in ['AMBIGUOUS','TIMED_OUT'] for t in terminal):raise RuntimeError('UNKNOWN_EFFECT_PRESERVED')
  if any(t['result'].get('state')=='settled' and t['result'].get('cleanup_complete') is False for t in terminal):raise RuntimeError('UNCONFIRMED_OPERATION_CLEANUP_PRESERVED')
  # Expected full data and administrative credentials are made available only
