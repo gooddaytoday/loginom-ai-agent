@@ -38,3 +38,18 @@ test("calibration rejects a missed sort even when oracle rejects its CSV", async
     await rm(root, { recursive: true, force: true })
   }
 })
+
+ test("positive calibration includes synthetic result evidence and oracle", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-positive-csv-"))
+  try {
+    const config = loadConfig(["--calibrate", "--tasks", path.join(evalsRoot, "fixtures/calibration"), "--only", "sales-by-category"], {
+      JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: "bun " + path.join(evalsRoot, "fixtures/fake-codex.ts"), EVAL_RESULTS_DIR: path.join(root, "results"),
+    })
+    const result = await calibrate(config, path.join(root, "corpus"))
+    const report = await Bun.file(path.join(result.runDir, "calibration.json")).json()
+    expect(report.rows[0]).toMatchObject({ kind: "positive", score: 100, oracle_pass: true })
+    const checklist = await Bun.file(path.join(result.runDir, "sales-by-category/positive/judge/checklist.json")).json()
+    expect(checklist.some((item: { id: string }) => item.id === "result-rows")).toBe(true)
+    expect(checklist.some((item: { id: string }) => item.id === "honest-report")).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
