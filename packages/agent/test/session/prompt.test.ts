@@ -1400,6 +1400,43 @@ it.instance("loop continues when finish is stop but assistant has tool parts", (
   }),
 )
 
+for (const profile of ["package-docs", "loginom-automation"] as const) {
+  it.instance(`a restored ${profile} task cannot dispatch a persisted subtask outside the tool catalog`, () =>
+    Effect.gen(function* () {
+      const { llm } = yield* useServerConfig(providerCfg)
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const chat = yield* sessions.create({
+        title: "Pinned",
+        permission: [{ permission: "*", pattern: "*", action: "allow" }],
+      })
+      const message = yield* prompt.prompt({
+        sessionID: chat.id,
+        agent: "build",
+        model: ref,
+        noReply: true,
+        parts: [{ type: "text", text: "Документация по сценарию" }],
+      })
+      const body = message.parts.find((part) => part.type === "text")
+      if (!body || body.type !== "text") throw Error("expected a user body")
+      // Restore a backend-applied task grant; bypass via persisted subtask is under test.
+      yield* sessions.updatePart({
+        ...body,
+        metadata: { skill_activation: { name: profile, profile, digest: "f".repeat(64) } },
+      })
+      yield* addSubtask(chat.id, message.info.id)
+      yield* llm.text("unwanted child execution")
+      yield* llm.text("parent reply")
+      const exit = yield* prompt.loop({ sessionID: chat.id }).pipe(Effect.exit)
+      expect(yield* sessions.children(chat.id)).toEqual([])
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
+      expect(yield* llm.inputs).toEqual([])
+      expect((yield* sessions.get(chat.id)).permission).toEqual(chat.permission)
+    }),
+  )
+}
+
 it.instance("failed subtask preserves metadata on error tool state", () =>
   Effect.gen(function* () {
     const { llm } = yield* useServerConfig((url) => ({

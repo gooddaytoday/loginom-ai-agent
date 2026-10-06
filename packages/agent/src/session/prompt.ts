@@ -273,7 +273,9 @@ const layer = Layer.effect(
       sessionID: SessionID
       session: Session.Info
       msgs: SessionV1.WithParts[]
+      profile: TaskScope.Profile
     }) {
+      if (input.profile !== "default") return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
       const { task, model, lastUser, sessionID, session, msgs } = input
       const ctx = yield* InstanceState.context
       const promptOps = yield* ops()
@@ -1335,7 +1337,15 @@ const layer = Layer.effect(
           const task = tasks.pop()
 
           if (task?.type === "subtask") {
-            yield* handleSubtask({ task, model, lastUser, sessionID, session, msgs })
+            yield* handleSubtask({
+              task,
+              model,
+              lastUser,
+              sessionID,
+              session,
+              msgs,
+              profile: TaskScope.derive({ sessionID, messages: history, revert: session.revert })?.profile ?? "default",
+            })
             continue
           }
 
