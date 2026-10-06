@@ -1,0 +1,4 @@
+segment,customers,avg_total_spent,avg_transactions
+active,70,5923.118571,15.128571
+at_risk,77,5738.43961,15.571429
+churned,453,6119.778786,14.869757

@@ -1,0 +1,6 @@
+category,products,total_stock,total_demand,turnover
+Clothing,63,142315,6313,0.044359
+Tools,74,179550,7485,0.041688
+Food,46,117384,4601,0.039196
+Electronics,69,196546,6852,0.034862
+Books,48,127157,4894,0.038488

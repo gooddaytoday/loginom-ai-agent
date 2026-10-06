@@ -1,0 +1,4 @@
+customer_tier,respondents,avg_nps_score,promoters_pct
+basic,185,6.345946,56.756757
+premium,159,5.874214,50.314465
+enterprise,56,5.321429,50

@@ -1,0 +1,5 @@
+price_test_group,products,units,margin_pct,avg_satisfaction
+control,87,20620,33.186207,5.321839
+test_dynamic,86,22858,33.783721,5.601163
+test_decrease_10,88,27696,36.477273,5.619318
+test_increase_10,89,16945,37.631461,5.314607

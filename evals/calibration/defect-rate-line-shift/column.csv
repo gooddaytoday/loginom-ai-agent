@@ -1,0 +1,10 @@
+production_line,shift,batches,total_produced,defects
+Line_C,Morning,64,34850,145
+Line_B,Morning,56,28027,114
+Line_B,Night,56,28668,112
+Line_A,Morning,51,28287,108
+Line_C,Night,48,25439,94
+Line_C,Afternoon,61,32421,115
+Line_A,Afternoon,63,35295,123
+Line_A,Night,39,22859,75
+Line_B,Afternoon,62,36597,119

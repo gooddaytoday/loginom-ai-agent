@@ -1,0 +1,5 @@
+variant,users,conversions,conversion_pct,avg_page_views
+Variant_B,158,0.278481,0.176254,10.303797
+Variant_C,140,0.214286,0.153061,9.85
+Variant_A,147,0.176871,0.12032,9.965986
+Control,155,0.16129,0.104058,9.6

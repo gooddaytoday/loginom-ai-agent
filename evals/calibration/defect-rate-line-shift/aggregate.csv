@@ -1,0 +1,10 @@
+production_line,shift,batches,total_produced,defects,defect_rate_pct
+Line_A,Night,39,22859,1.923077,0.008413
+Line_C,Night,48,25439,1.958333,0.007698
+Line_A,Morning,51,28287,2.117647,0.007486
+Line_B,Morning,56,28027,2.035714,0.007263
+Line_B,Night,56,28668,2,0.006976
+Line_C,Morning,64,34850,2.265625,0.006501
+Line_C,Afternoon,61,32421,1.885246,0.005815
+Line_A,Afternoon,63,35295,1.952381,0.005532
+Line_B,Afternoon,62,36597,1.919355,0.005245

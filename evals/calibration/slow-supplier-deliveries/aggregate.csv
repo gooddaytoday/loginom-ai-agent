@@ -1,0 +1,6 @@
+supplier,orders,slow_orders,slow_pct,avg_quality,total_cost
+Supplier_C,40,33,82.5,5.4825,257713.25
+Supplier_E,47,35,74.468085,5.431915,266522.382979
+Supplier_D,57,42,73.684211,5.284211,255826.754386
+Supplier_B,56,39,69.642857,5.258929,231260
+Supplier_A,50,33,66,5.64,239933.08
