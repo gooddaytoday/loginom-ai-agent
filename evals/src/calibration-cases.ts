@@ -34,7 +34,8 @@ export async function prepareCalibrationCases(tasks: Task[], runDir: string, cor
     }
     for (const name of ["task.json", task.reference, task.spec, ...task.inputs, ...(task.oracle ? [task.oracle] : [])])
       if (!corpus.sources[name]) throw new EvalFailure(task.id + ": отсутствует source hash " + name, 2)
-    if (corpus.cases.length && !Bun.which("zip")) throw new EvalFailure("Не найдена команда zip", 2)
+    for (const command of ["zip", "xmllint"])
+      if (corpus.cases.length && !Bun.which(command)) throw new EvalFailure("Не найдена команда " + command, 2)
     hasher.update(task.id + "\n" + source)
     for (const mutation of corpus.cases) {
       const unavailable = mutation.expected_failed.filter((id) => !task.checklist.some((item) => item.id === id && !item.requiresRun))
@@ -55,6 +56,10 @@ export async function prepareCalibrationCases(tasks: Task[], runDir: string, cor
           throw new EvalFailure(task.id + "/" + mutation.id + ": неверное число XML-замен", 2)
         await Bun.write(target, xml.replaceAll(edit.from, edit.to))
       }
+      const xmlFiles = [...new Set(mutation.edits.map((edit) => edit.file))]
+      const validation = Bun.spawn(["xmllint", "--nonet", "--noout", ...xmlFiles], { cwd: unpacked, stdout: "ignore", stderr: "ignore" })
+      if (await validation.exited !== 0)
+        throw new EvalFailure(task.id + "/" + mutation.id + ": XML корпуса невалиден " + xmlFiles.join(", "), 2)
       await rm(archive)
       const zipped = Bun.spawn(["zip", "-q", "-r", archive, "."], { cwd: unpacked, stdout: "ignore", stderr: "pipe" })
       if (await zipped.exited !== 0) throw new EvalFailure(task.id + ": zip failed", 2)
