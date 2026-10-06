@@ -45,6 +45,16 @@ test("annotations preserve direct text, attributes, deduplication and nested not
   expect(await extractPackage(join(fixtures, "notes.lgp"))).toEqual(expected)
 })
 
+test("external references retain names, display names, paths and XML order", async () => {
+  const expected: Awaited<ReturnType<typeof extractPackage>> = await Bun.file(join(fixtures, "references.structure.json")).json()
+  expect(await extractPackage(join(fixtures, "references.lgp"))).toEqual(expected)
+})
+
+test("visualizers keep their identities and labels without affecting workflow statistics", async () => {
+  const expected: Awaited<ReturnType<typeof extractPackage>> = await Bun.file(join(fixtures, "views.structure.json")).json()
+  expect(await extractPackage(join(fixtures, "views.lgp"))).toEqual(expected)
+})
+
 test("the bundled extractor runs under the product-pinned Node without Bun or Python", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
@@ -59,7 +69,7 @@ test("the bundled extractor runs under the product-pinned Node without Bun or Py
       splitting: false,
     })
     expect(build.success).toBe(true)
-    for (const name of ["demo", "nested", "aliases", "notes"]) {
+    for (const name of ["demo", "nested", "aliases", "notes", "references", "views"]) {
       const child = Bun.spawn([node, "--input-type=module", "--eval",
         "const {extractPackage} = await import(process.argv[1]); console.log(JSON.stringify(await extractPackage(process.argv[2])))",
         pathToFileURL(join(output, "extract.mjs")).href, join(fixtures, name + ".lgp")],

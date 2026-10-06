@@ -14,3 +14,6 @@ omits the last descendants. All variants use ZIP deflate.
 this has an independent error expectation, not the permissive Python output.
 `notes.lgp` exercises direct annotation text, attributes, duplicate values and
 nested notes against the frozen Python oracle.
+`references.lgp` exercises external dependency names, display names, paths,
+duplicates and XML order. `views.lgp` adds visualizer identities and labels;
+visualizers do not change workflow statistics. Both use the same frozen oracle.

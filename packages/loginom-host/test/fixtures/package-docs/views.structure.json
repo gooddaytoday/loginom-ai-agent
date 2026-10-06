@@ -1,0 +1,151 @@
+{
+  "schema_version": "package_docs.structure.v1",
+  "package": {
+    "file_name": "views.lgp",
+    "name": "demo",
+    "application_version": "7.4.0",
+    "guid": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    "external_references": [
+      "Справочник & данные",
+      "Другой пакет",
+      "packages/third.lgp",
+      "Справочник & данные"
+    ]
+  },
+  "stats": {
+    "modules": 1,
+    "notes": 0,
+    "nodes": 2,
+    "submodels": 0,
+    "programming_nodes": 0,
+    "reference_nodes": 0,
+    "derived_nodes": 0
+  },
+  "modules": [
+    {
+      "id": "Unit_0",
+      "index": 1,
+      "name": "Unit1",
+      "display_name": "Демо",
+      "guid": "11111111-1111-1111-1111-111111111111",
+      "stats": {
+        "notes": 0,
+        "nodes": 2,
+        "submodels": 0,
+        "programming_nodes": 0,
+        "reference_nodes": 0,
+        "derived_nodes": 0,
+        "nesting_depth": 1
+      },
+      "view_nodes": [
+        {
+          "guid": "chart-guid",
+          "label": "Диаграмма",
+          "engine_type": "TBGChart",
+          "service_name": "Chart"
+        },
+        {
+          "guid": "report-guid",
+          "label": "Отчёт",
+          "engine_type": "TBGReport",
+          "service_name": "Report"
+        },
+        {
+          "guid": "fallback-guid",
+          "label": "fallback",
+          "engine_type": "",
+          "service_name": "Узел"
+        }
+      ],
+      "workflow_nodes": [
+        {
+          "guid": "aaaaaaaa-0000-0000-0000-000000000001",
+          "name": "",
+          "display_name": "Источник",
+          "label": "Источник",
+          "service_name": "ImportNative",
+          "engine_type": "TBGImportNative",
+          "vendor_guid": "35a6e054-ee0c-42f6-bda6-af10b57a36aa",
+          "input_ports": [],
+          "output_ports": [
+            {
+              "guid": "58f7e6c3-511e-39d7-8853-036e0a1a7612",
+              "name": "DataSet",
+              "display_name": "DataSet"
+            }
+          ],
+          "service_input_ports": [],
+          "service_output_ports": [],
+          "settings_main": {
+            "FileName": "data.lgd"
+          },
+          "path": "Unit_0",
+          "depth": 0,
+          "hierarchy_token": "Источник:ImportNative:aaaaaaaa-0000-0000-0000-000000000001"
+        },
+        {
+          "guid": "aaaaaaaa-0000-0000-0000-000000000002",
+          "name": "",
+          "display_name": "Калькулятор",
+          "label": "Калькулятор",
+          "service_name": "CalcData",
+          "engine_type": "TBGCalcData",
+          "vendor_guid": "c7b69712-557f-4e51-bba5-db9cc2659e7a",
+          "input_ports": [
+            {
+              "guid": "9dc72a3f-56bf-3bfc-84ec-f979daf4da6b",
+              "name": "DataSource",
+              "display_name": "DataSource"
+            }
+          ],
+          "output_ports": [
+            {
+              "guid": "58f7e6c3-511e-39d7-8853-036e0a1a7612",
+              "name": "DataSet",
+              "display_name": "DataSet"
+            }
+          ],
+          "service_input_ports": [],
+          "service_output_ports": [],
+          "settings_main": {},
+          "path": "Unit_0",
+          "depth": 0,
+          "hierarchy_token": "Калькулятор:CalcData:aaaaaaaa-0000-0000-0000-000000000002"
+        }
+      ],
+      "links": [
+        {
+          "source_node_guid": "aaaaaaaa-0000-0000-0000-000000000001",
+          "source_port_guid": "58f7e6c3-511e-39d7-8853-036e0a1a7612",
+          "target_node_guid": "aaaaaaaa-0000-0000-0000-000000000002",
+          "target_port_guid": "9dc72a3f-56bf-3bfc-84ec-f979daf4da6b",
+          "source_label": "Источник",
+          "target_label": "Калькулятор",
+          "source_port_name": "DataSet",
+          "target_port_name": "DataSource",
+          "readable": "Источник.DataSet → Калькулятор.DataSource"
+        }
+      ],
+      "hierarchy": [
+        {
+          "Source": "Источник:ImportNative:aaaaaaaa-0000-0000-0000-000000000001",
+          "Target": "Калькулятор:CalcData:aaaaaaaa-0000-0000-0000-000000000002"
+        },
+        {
+          "Source": null,
+          "Target": "Источник:ImportNative:aaaaaaaa-0000-0000-0000-000000000001"
+        },
+        {
+          "Source": "Калькулятор:CalcData:aaaaaaaa-0000-0000-0000-000000000002",
+          "Target": null
+        }
+      ],
+      "notes": [],
+      "submodels": []
+    }
+  ],
+  "unique_engine_types": [
+    "TBGCalcData",
+    "TBGImportNative"
+  ]
+}

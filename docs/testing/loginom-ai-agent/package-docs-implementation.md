@@ -322,6 +322,14 @@ PASS; четыре oracle fixtures проверены также собранн�
 Логи tdd-node-extract-notes-{red,green}.log, node-extract-notes-node-regression.log.
 Открыты views/references, skeleton/emit и product tool; этап 2 не завершён.
 
+Node metadata: RED — external_references и view_nodes были пустыми.
+GREEN — ссылки сохраняют Name/DisplayName/Path, дубликаты и XML-порядок;
+визуализаторы сохраняют GUID/label/engine/service, не меняя статистику workflow.
+9 PASS (31 assertions), Host typecheck PASS; шесть oracle fixtures проверены
+также в собранном модуле под pinned Node. Логи tdd-node-extract-{references,views}-red.log,
+tdd-node-extract-references-green.log и node-extract-metadata-regression.log.
+Skeleton/emit и product tool остаются открытыми; этап 2 не завершён.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -335,6 +343,6 @@ PASS; четыре oracle fixtures проверены также собранн�
 - Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
-- Этап 2: рекурсивный ZIP/XML/notes parity и bundled Node 7 PASS; writer/tool ещё не подключены.
-- Следующий шаг — подмодели, skeleton/emit; 35 baseline source-map mismatches остаются live gate.
+- Этап 2: ZIP/XML, вложенность, notes/references/views и bundled Node 9 PASS; writer/tool ещё открыты.
+- Следующий шаг — skeleton/emit; 35 baseline source-map mismatches остаются live gate.
 - Живая приёмка и удаление серверного skill остаются открытыми.

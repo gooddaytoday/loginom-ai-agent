@@ -31,6 +31,11 @@ export async function extractPackage(path: string) {
     }
     const info = await xml("PackageInfo.xml")
     if (!info) throw Error("PACKAGE_DOCS_PACKAGE_INFO_MISSING")
+    const references = await xml("References.xml")
+    const external = [references, ...Array.from(references?.getElementsByTagName("*") ?? [])]
+      .filter((element): element is Element => !!element && element.localName === "Item")
+      .map((element) => element.getAttribute("Name") || element.getAttribute("DisplayName") || element.getAttribute("Path") || "")
+      .filter(Boolean)
     const index = await xml("PackageIndex.xml")
     const indexed = items(child(index, "Units")).map((unit) => (unit.getAttribute("BasePath") ?? "").replaceAll("\\", "/").replace(/^\/+|\/+$/g, ""))
       .filter(Boolean)
@@ -44,16 +49,20 @@ export async function extractPackage(path: string) {
       if (!unit) throw Error("PACKAGE_DOCS_UNIT_MISSING")
       const body = workflow(child(unit, "WorkFlow"), base)
       const stats = statistics(body)
+      const views = items(child(child(unit, "ModelViews"), "Nodes")).map((node) => {
+        const entry = nodeEntry(node, base, 0)
+        return { guid: entry.guid, label: entry.label, engine_type: entry.engine_type, service_name: entry.service_name }
+      })
       return { id: base.split("/").at(-1)!, index: number + 1,
         name: metadata?.getAttribute("Name") ?? `Unit${number + 1}`,
         display_name: metadata?.getAttribute("DisplayName") ?? `Модуль${number + 1}`,
-        guid: metadata?.getAttribute("Guid") ?? "", stats, view_nodes: [], ...body }
+        guid: metadata?.getAttribute("Guid") ?? "", stats, view_nodes: views, ...body }
     }))
     const total = (key: keyof ReturnType<typeof statistics>) => modules.reduce((sum, module) => sum + module.stats[key], 0)
     return {
       schema_version: "package_docs.structure.v1",
       package: { file_name: basename(path), name: info.getAttribute("Name") ?? basename(path, extname(path)),
-        application_version: info.getAttribute("ApplicationVersion") ?? "", guid: info.getAttribute("Guid") ?? "", external_references: [] },
+        application_version: info.getAttribute("ApplicationVersion") ?? "", guid: info.getAttribute("Guid") ?? "", external_references: external },
       stats: { modules: modules.length, notes: total("notes"), nodes: total("nodes"), submodels: total("submodels"),
         programming_nodes: total("programming_nodes"), reference_nodes: total("reference_nodes"), derived_nodes: total("derived_nodes") },
       modules, unique_engine_types: [...new Set(modules.flatMap((module) => workflowBodies(module).flatMap((body) => body.workflow_nodes.map((node) => node.engine_type))).filter(Boolean))].toSorted(),
