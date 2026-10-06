@@ -3,12 +3,24 @@ import type { RunSummary } from "./report"
 import { evalsRoot } from "./config"
 import { checkOracle } from "./oracle"
 import { readdir } from "node:fs/promises"
+import { checkNodeXml, readNodeXml } from "./node-xml"
+import { checkNodeEvidence } from "./node-evidence"
 
-export async function validateNodeAttempt(taskDir: string, attemptDir: string) {
+export async function validateNodeAttempt(taskDir: string, attemptDir: string, packagePath?: string) {
   const task = await Bun.file(path.join(taskDir, "task.json")).json() as { checklist: { id: string; required?: boolean }[] }
   const known = ["input", "crosstable", "graph", "export", "result", "sequence"]
   const errors = task.checklist.filter((item) => item.required && !known.includes(item.id)).map((item) => `unknown required ID: ${item.id}`)
   const failures = await Bun.file(path.join(attemptDir, "artifact/package.lgp")).exists() ? [] : ["missing artifact/package.lgp"]
+  const required = new Set(task.checklist.filter(i => i.required).map(i => i.id))
+  if (!failures.length && ["input", "crosstable", "graph", "export", "sequence"].some(id => required.has(id))) {
+    const xml = await readNodeXml(path.join(attemptDir, "artifact"))
+    if ("invalid" in xml) failures.push(`package: ${xml.invalid}`)
+    else {
+      const id = (task as { id?: string }).id ?? ""
+      failures.push(...checkNodeXml(xml, id, required).failures)
+      if (["input", "export", "sequence"].some(id => required.has(id))) failures.push(...await checkNodeEvidence(taskDir, attemptDir, id, required, xml, packagePath))
+    }
+  }
   if (task.checklist.some((item) => item.required && item.id === "result")) {
     const result = await checkOracle({ dir: taskDir, oracle: "oracle.csv", oracleTolerance: 0 }, path.join(attemptDir, "artifact"))
     if (!result.passed) failures.push(`result: ${result.error}`)
@@ -20,6 +32,11 @@ export async function validateNodeAttempt(taskDir: string, attemptDir: string) {
 }
 
 export async function validateNodeRun(runDir: string, taskIds: string[], tasksDir = path.join(evalsRoot, "tasks/node-evals")) {
+  try { return await validateRun(runDir, taskIds, tasksDir) }
+  catch (error) { return { verdict: "ERROR", code: 2, errors: [`validator: ${error instanceof Error ? error.message : String(error)}`], failures: [], attempts: [] } }
+}
+
+async function validateRun(runDir: string, taskIds: string[], tasksDir: string) {
   const summary = await Bun.file(path.join(runDir, "summary.json")).json() as RunSummary
   const errors = [
     ...(summary.interrupted || summary.stopped_reason ? ["interrupted/stopped run"] : []),
@@ -33,16 +50,40 @@ export async function validateNodeRun(runDir: string, taskIds: string[], tasksDi
       return []
     })
   })]
+  if (summary.config.repeat !== 1 || !taskIds.length || new Set(taskIds).size !== taskIds.length ||
+    summary.tasks.length !== taskIds.length || summary.tasks.some(t => !taskIds.includes(t.id)) || new Set(summary.tasks.map(t => t.id)).size !== taskIds.length)
+    errors.push("incomplete/unexpected task collection or repeat")
+  for (const id of taskIds) {
+    const task = await Bun.file(path.join(tasksDir, id, "task.json")).json()
+    for (const item of task.checklist) if (item.required && !["input", "crosstable", "graph", "export", "result", "sequence"].includes(item.id))
+      errors.push(`${id}: unknown required ID: ${item.id}`)
+  }
+  for (const task of summary.tasks) for (const attempt of task.attempts) {
+    if (attempt.attempt !== 1 || !["completed", "failed", "timeout", "no_artifact", "infra_error", "harness_error", "interrupted"].includes(attempt.status))
+      errors.push(`${task.id}: invalid attempt number/status`)
+    const evidence = Bun.file(path.join(runDir, task.id, String(attempt.attempt), "cleanup.json"))
+    if (!(await evidence.exists())) { errors.push(`${task.id}: cleanup.json missing`); continue }
+    const cleanup = await evidence.json()
+    if (cleanup.result?.status !== "confirmed" || cleanup.result?.error || cleanup.processes?.status !== "confirmed" ||
+      !["processes", "diagnostics", "writer", "ready", "pruning"].every(stage => cleanup.stages?.some((s: { stage: string; status: string }) => s.stage === stage && s.status === "confirmed")))
+      errors.push(`${task.id}: cleanup evidence unconfirmed`)
+  }
   const failures = summary.tasks.flatMap((task) => task.attempts.flatMap((attempt) =>
     ["failed", "timeout", "no_artifact"].includes(attempt.status) ? [`${task.id}#${attempt.attempt}: ${attempt.status}`] : []))
   if (!errors.length) {
     for (const task of summary.tasks) {
       for (const attempt of task.attempts.filter((item) => item.status === "completed")) {
-        const result = await validateNodeAttempt(path.join(tasksDir, task.id), path.join(runDir, task.id, String(attempt.attempt)))
+        const result = await validateNodeAttempt(path.join(tasksDir, task.id), path.join(runDir, task.id, String(attempt.attempt)), attempt.package_path ?? undefined)
         errors.push(...result.errors.map((error) => `${task.id}#${attempt.attempt}: ${error}`))
         failures.push(...result.failures.map((failure) => `${task.id}#${attempt.attempt}: ${failure}`))
       }
     }
   }
-  return { verdict: errors.length ? "ERROR" : failures.length ? "FAIL" : "PASS", code: errors.length ? 2 : failures.length ? 1 : 0, errors, failures }
+  const attempts = summary.tasks.flatMap(task => task.attempts.map(attempt => {
+    const prefix = `${task.id}#${attempt.attempt}:`
+    return { task_id: task.id, attempt: attempt.attempt, status: attempt.status, session_id: attempt.session_id,
+      cleanup: attempt.environment_cleanup?.status, infra_retry_initial: attempt.infra_retry?.initial ?? null,
+      verdict: errors.length ? "ERROR" : failures.some(f => f.startsWith(prefix)) ? "FAIL" : "PASS" }
+  }))
+  return { verdict: errors.length ? "ERROR" : failures.length ? "FAIL" : "PASS", code: errors.length ? 2 : failures.length ? 1 : 0, errors, failures, attempts }
 }

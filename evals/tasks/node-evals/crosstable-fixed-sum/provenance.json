@@ -1,0 +1,62 @@
+{
+  "task_id": "crosstable-fixed-sum",
+  "dataset_sha256": {
+    "sales.csv": "7bb5c56a3d2655ef4e200be6fe1fa4202359993b27c433923ed9ab97786b43f0"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "8eb7ba008c2e8c3bfaa91165b398b65dcc246dafa18b366b3360c6cbfe3cf8b9"
+  },
+  "reference_sha256": "d0dd5496f2938b4189090e71acbc713cfa71a4695053a7116e0040c6d5c51f47",
+  "cli": {
+    "binary": "/home/kiselev/.local/share/loginom-multica-node-evals/cli-904f7f85/bin/loginom-ai-agent-cli",
+    "version": "0.0.0-dev-202610061514",
+    "profile": "reference-profile"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/node-evals-crosstable-fixed-sum-3.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/sales.csv",
+        "storage": "/user/af0c66a0a925fb5c79bd2a8addd6736f10155bf93a892ef0010192be5708ec15-0-sales.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 3,
+    "total": 3,
+    "assisted": true,
+    "hint": "Техническая подсказка только reference builder: два первых запуска остановились на чтении CrossTable с coverage=full: NODE_APPLY_STOPPED, \"F3 is restricted to an observed graph table output\". Не повторяй этот путь. Для этого маленького источника используй coverage=sample с sample_rows=10 и require_exact_numbers=true; проверь полную таблицу и явную полноту чтения. Если нужно, сначала применяй конфигурацию finish=done с read.ports=[], затем используй dock_node_read с новым operation_id и source_operation_id успешной исходной операции. Имена итоговых колонок задавай штатным собственным output mapping. Не создавай ручную таблицу и не подставляй ожидаемые значения. Параметры задания и oracle не меняются.",
+    "session_id": "ses_eee1452b0ffegxLk76SMHknm8S",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-06T18:53:32+03:00",
+    "duration_s": 302,
+    "tokens": {
+      "input": 37448,
+      "output": 2495,
+      "reasoning": 437
+    },
+    "tool_calls": 16,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/#packages/user/node-evals-crosstable-fixed-sum-3.lgp/Unit1/workflow",
+  "oracle_program_sha256": "4bc5382cae5007a7b8ec4756b431be1a69173492f9cc04fd9afe29945f9d78ce"
+}
