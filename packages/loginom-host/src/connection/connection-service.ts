@@ -5,7 +5,7 @@ import { Product } from "@loginom-ai-agent/product"
 import { connectionStore, type ActiveConnection } from "./connection-store"
 import type { recoveryStore } from "./recovery-store"
 
-export type RuntimeHandle = { close(): Promise<void>; reset?(): Promise<void> }
+export type RuntimeHandle = { close(): Promise<void>; reset?(): Promise<void>; ready?: Promise<void> }
 export type ConnectionRuntime = {
   check(candidate: ActiveConnection): Promise<void>
   prepare(candidate: ActiveConnection): Promise<RuntimeHandle>
@@ -24,12 +24,13 @@ export async function connectionService(
     generation: number
     pending?: ActiveConnection
     phase: Loginom.View["state"]
+    readiness: "starting" | "ready" | "recoverable-error"
     applying?: Promise<void>
     failure?: string
     writing?: boolean
     closing?: boolean
     recovering?: Promise<void>
-  } = { revision: 0, generation: 0, phase: "unconfigured" }
+  } = { revision: 0, generation: 0, phase: "unconfigured", readiness: "starting" }
   const validations = new Map<
     string,
     { candidate: ActiveConnection; expiresAt: number; timer: ReturnType<typeof setTimeout> }
@@ -64,7 +65,7 @@ export async function connectionService(
       .then(
         (handle) => {
           state.handle = handle
-          state.phase = state.pending ? "pending" : "ready"
+          observeReadiness(handle)
         },
         () => {
           state.phase = "recoverable-error"
@@ -74,6 +75,25 @@ export async function connectionService(
         state.applying = undefined
         progress()
       })
+  }
+
+  function observeReadiness(handle: RuntimeHandle) {
+    state.readiness = handle.ready ? "starting" : "ready"
+    state.phase = state.pending ? "pending" : state.readiness
+    if (!handle.ready) return
+    void handle.ready.then(
+      () => {
+        if (state.closing || state.handle !== handle) return
+        state.readiness = "ready"
+        state.phase = state.pending ? "pending" : "ready"
+      },
+      () => {
+        if (state.closing || state.handle !== handle) return
+        state.readiness = "recoverable-error"
+        state.failure = "LOGINOM_RUNTIME_START_FAILED"
+        state.phase = state.pending ? "pending" : "recoverable-error"
+      },
+    )
   }
 
   function clearValidations() {
@@ -109,10 +129,12 @@ export async function connectionService(
       if (!prepared) {
         if (state.pending === candidate) {
           state.pending = undefined
-          state.phase = state.handle ? "ready" : "recoverable-error"
+          state.phase = state.handle ? state.readiness : "recoverable-error"
         }
         return
       }
+      // Local activation may commit before the background catalog request settles.
+      void prepared.ready?.catch(() => undefined)
       if (state.pending !== candidate) {
         await prepared.close().catch(() => undefined)
         return
@@ -152,14 +174,14 @@ export async function connectionService(
         state.failure = "LOGINOM_STORE_WRITE_FAILED"
         await prepared.close().catch(() => undefined)
         state.pending = undefined
-        state.phase = state.handle ? "ready" : "recoverable-error"
+        state.phase = state.handle ? state.readiness : "recoverable-error"
         return
       }
       const previous = state.handle
       state.active = candidate
       state.handle = prepared
       state.pending = undefined
-      state.phase = "ready"
+      observeReadiness(prepared)
       await store.clearPending().catch(() => {
         state.failure = "LOGINOM_STORE_WRITE_FAILED"
       })
@@ -296,7 +318,7 @@ export async function connectionService(
       state.pending = undefined
       state.revision++
       clearValidations()
-      state.phase = state.handle ? "ready" : state.active ? "recoverable-error" : "unconfigured"
+      state.phase = state.handle ? state.readiness : state.active ? "recoverable-error" : "unconfigured"
       return view()
     },
   }

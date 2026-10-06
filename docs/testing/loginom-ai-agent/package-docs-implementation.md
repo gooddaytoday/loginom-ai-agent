@@ -632,6 +632,23 @@ tdd-knowledge-supervisor-red.log, knowledge-supervisor-{regression,wire-green,ty
 Изменение транспорта проверено browser cleanup/disconnect regressions; никаких
 новых dependencies/pins. Browser readiness и HostPort ещё не переключены.
 
+Connection readiness boundary: RED — service выставлял ready после local prepare,
+игнорируя незавершённое чтение каталога. GREEN — RuntimeHandle содержит отдельный
+optional ready promise; settled ждёт локальное применение, phase ready — Help.
+Наблюдатель связан с текущим handle, игнорирует закрытые/заменённые поколения;
+cancel/failure восстанавливают фактическую readiness старого handle. Background
+ошибка сохраняет credentials/URL и делает recoverable-error; shutdown отменяет
+сеть через close вместо ожидания readiness. Четыре проверки используют реальный
+Node knowledge-entry, HTTP MCP и durable store. Новое поколение закрывает
+ожидающий старый клиент и публикует только собственную готовность.
+Host readiness/migration/recovery: 16 PASS (104 assertions); Desktop exports
+connection service/store/recovery: 25 PASS (77 assertions); оба typecheck PASS.
+tdd-connection-knowledge-readiness-red.log, connection-readiness-{regression,
+desktop-regression,host-typecheck,desktop-typecheck}.log. Existing RuntimeHandle
+без background promise сохраняет прежний synchronous-ready контракт.
+Это изменение общего lifecycle; createLoginomHost ещё использует browser
+readiness, его переключение и HostPort routing остаются следующей задачей.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -650,5 +667,5 @@ tdd-knowledge-supervisor-red.log, knowledge-supervisor-{regression,wire-green,ty
 - Старый session package_docs/Python тест требует замены при SessionTools integration.
 - Reserved skill/command policy и пользовательские предупреждения проверены по sources.
 - Linux artifact completeness/shared closure проверены; Host suite 184 PASS / 6 SKIP.
-- Knowledge entry/client: 25 PASS; full client 2561 PASS / 10 SKIP; далее Host integration.
+- Knowledge IPC/supervision и readiness service проверены; далее Host prepare/routing.
 - Живая приёмка и удаление серверного skill остаются открытыми.
