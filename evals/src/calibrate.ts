@@ -126,14 +126,23 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
     path.join(runDir, "calibration.json"),
     JSON.stringify({ run_id: runId, judge, rubric_hash: await rubricHash(tasks), thresholds: config.calibration, calibration_hash: cases.hash, near_miss_coverage: Object.fromEntries(tasks.map((task) => [task.id, cases.prepared.filter((entry) => entry.task.id === task.id).length])), rows, warnings }, null, 2),
   )
+  const coverage = Object.fromEntries(tasks.map((task) => [task.id, cases.prepared.filter((entry) => entry.task.id === task.id).length]))
+  const uncovered = tasks.filter((task) => !coverage[task.id]).map((task) => task.id)
   const report = [
     `# Калибровка судьи ${runId}`,
     "",
     `Судья: ${judge.model}/${judge.reasoning} (${judge.codex_version ?? "?"}). Пороги: positive ≥ ${positiveMin}, negative ≤ ${negativeMax}.`,
     "",
-    "| Задача | Вид | Эталон | score | Непройдено |",
-    "|---|---|---|---|---|",
-    ...rows.map((row) => `| ${row.task} | ${row.kind} | ${row.reference} | ${row.score ?? "—"} | ${row.failed.join(", ") || "—"} |`),
+    "Корпус: " + cases.hash + ". Near-miss: " + cases.prepared.length + ". Без near-miss: " + (uncovered.join(", ") || "—") + ".",
+    "",
+    "| Задача | Вид | Эталон | score | Ожидаемые провалы | Непройдено | oracle факт/ожидание | Проверка |",
+    "|---|---|---|---|---|---|---|---|",
+    ...rows.map((row) => "| " + [
+      row.task, row.case_id ? row.kind + "/" + row.case_id : row.kind, row.reference, row.score ?? "—",
+      row.expected_failed?.join(", ") || "—", row.failed.join(", ") || "—",
+      (row.oracle_pass ?? "—") + "/" + (row.expected_oracle_pass ?? "—"),
+      row.expectations_met === undefined ? "—" : row.expectations_met ? "PASS" : "FAIL",
+    ].join(" | ") + " |"),
     "",
     warnings.length ? "## Предупреждения" : "## Пороги выполнены",
     "",
