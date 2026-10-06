@@ -374,6 +374,16 @@ Host typecheck PASS. Логи tdd-node-pdf-*, node-docs-writers-final.log.
 те же Node PDF. Это инструменты визуальной приёмки, не зависимости продукта/CI.
 Два writer/parity пункта этапа 2 отмечены; bundle staging и product tool открыты.
 
+Node CLI extract: RED — собранный package-docs.mjs завершался с
+PACKAGE_DOCS_CLI_UNSUPPORTED. GREEN — команда extract принимает только явные
+--lgp/--directory, пишет атомарный structure.json в session/.work/package-docs/
+<stem>-<8 hex realpath>; SHA входа неизменен. Компоненты workspace проверяются
+lstat и не проходят через symlink. Скрипт запускается настоящим pinned Node,
+с минимальным env и cwd вне checkout. Все Node проверки используют именно
+этот единый bundle, а не отдельные тестовые entrypoints. 30 PASS (80 assertions),
+Host typecheck PASS; tdd-node-docs-cli-extract-*.log. Skeleton/emit commands,
+staging и ограниченный агентский инструмент ещё открыты.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -387,6 +397,6 @@ Host typecheck PASS. Логи tdd-node-pdf-*, node-docs-writers-final.log.
 - Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
-- Этап 2: extraction/skeleton/MD/DOCX/PDF parity, bundled Node 29 PASS; staging/tool ещё открыты.
-- Следующий шаг — CLI генератора и staging; 35 baseline source-map mismatches остаются live gate.
+- Этап 2: writers и Node CLI extract 30 PASS; skeleton/emit CLI, staging/tool ещё открыты.
+- Следующий шаг — skeleton/emit CLI; 35 baseline source-map mismatches остаются live gate.
 - Живая приёмка и удаление серверного skill остаются открытыми.

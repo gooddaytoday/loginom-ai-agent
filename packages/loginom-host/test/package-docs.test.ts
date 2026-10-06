@@ -19,8 +19,8 @@ const output = join(bundle, "scripts")
 beforeAll(async () => {
   // Stage one fixture bundle for all Node checks, as the product build does.
   const build = await Bun.build({
-    entrypoints: ["extract", "skeleton", "emit"].map((name) => join(import.meta.dir, "../src/package-docs/" + name + ".ts")),
-    outdir: output, naming: "[name].mjs", target: "node", packages: "bundle", splitting: false,
+    entrypoints: [join(import.meta.dir, "../src/package-docs/cli.ts")],
+    outdir: output, naming: "package-docs.mjs", target: "node", packages: "bundle", splitting: false,
   })
   expect(build.success).toBe(true)
   await cp(fonts, join(bundle, "assets/fonts"), { recursive: true })
@@ -31,6 +31,25 @@ test("Markdown writer preserves the baseline report and terminates it with a new
   const markdown = await readFile(join(fixtures, "demo.report.md"), "utf8")
   expect(new TextDecoder().decode(await renderReport(markdown.trimEnd(), "md"))).toBe(markdown)
 })
+
+test("Node CLI extracts an unchanged package into a session-owned work directory", async () => {
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
+  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-session-"))
+  try {
+    const lgp = join(fixtures, "demo.lgp")
+    const before = createHash("sha256").update(await readFile(lgp)).digest("hex")
+    const child = Bun.spawn([node, join(output, "package-docs.mjs"), "extract", "--lgp", lgp, "--directory", directory],
+      { cwd: directory, env: { LANG: "C.UTF-8" }, stdout: "pipe", stderr: "pipe" })
+    const stdout = new Response(child.stdout).text(), stderr = new Response(child.stderr).text()
+    expect(await child.exited).toBe(0)
+    expect(await stderr).toBe("")
+    const result = JSON.parse(await stdout)
+    expect(result.structure).toBe(join(directory, ".work/package-docs", "demo-" + createHash("sha256").update(lgp).digest("hex").slice(0, 8), "structure.json"))
+    expect(await Bun.file(result.structure).json()).toEqual(await Bun.file(join(fixtures, "structure.json")).json())
+    expect(createHash("sha256").update(await readFile(lgp)).digest("hex")).toBe(before)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 20_000)
 
 test("PDF defaults to embedded Golos fonts and preserves baseline Cyrillic text through ToUnicode", async () => {
   const bytes = await renderReport(await readFile(join(fixtures, "demo.report.md"), "utf8"), undefined, fonts)
@@ -89,7 +108,7 @@ test("bundled Node PDF writer resolves sibling skill fonts and preserves all ora
   for (const name of ["demo", "formatting", "nested"]) {
     const child = Bun.spawn([node, "--input-type=module", "--eval",
       "import {readFile} from 'node:fs/promises'; const {renderReport} = await import(process.argv[1]); process.stdout.write(await renderReport(await readFile(process.argv[2], 'utf8')))",
-      pathToFileURL(join(output, "emit.mjs")).href, join(fixtures, name + ".report.md")],
+      pathToFileURL(join(output, "package-docs.mjs")).href, join(fixtures, name + ".report.md")],
       { env: { LANG: "C.UTF-8" }, stdout: "pipe", stderr: "pipe" })
     const stdout = new Response(child.stdout).arrayBuffer()
     const stderr = new Response(child.stderr).text()
@@ -143,7 +162,7 @@ test("the DOCX writer runs under bundled Node without Bun or Python", async () =
   if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
   const child = Bun.spawn([node, "--input-type=module", "--eval",
     "import {readFile} from 'node:fs/promises'; const {renderReport} = await import(process.argv[1]); process.stdout.write(await renderReport(await readFile(process.argv[2], 'utf8'), 'docx'))",
-    pathToFileURL(join(output, "emit.mjs")).href, join(fixtures, "formatting.report.md")],
+    pathToFileURL(join(output, "package-docs.mjs")).href, join(fixtures, "formatting.report.md")],
     { env: { LANG: "C.UTF-8" }, stdout: "pipe", stderr: "pipe" })
   const stdout = new Response(child.stdout).arrayBuffer()
   const stderr = new Response(child.stderr).text()
@@ -175,7 +194,7 @@ test("the skeleton writer runs under bundled Node with no Bun or Python", async 
   if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
   const child = Bun.spawn([node, "--input-type=module", "--eval",
     "import {readFile} from 'node:fs/promises'; const {renderSkeleton} = await import(process.argv[1]); process.stdout.write(renderSkeleton(JSON.parse(await readFile(process.argv[2], 'utf8'))))",
-    pathToFileURL(join(output, "skeleton.mjs")).href, join(fixtures, "references.structure.json")],
+    pathToFileURL(join(output, "package-docs.mjs")).href, join(fixtures, "references.structure.json")],
     { env: { LANG: "C.UTF-8" }, stdout: "pipe", stderr: "pipe" })
   const stdout = new Response(child.stdout).text()
   const stderr = new Response(child.stderr).text()
@@ -238,7 +257,7 @@ test("the bundled extractor runs under the product-pinned Node without Bun or Py
   for (const name of ["demo", "nested", "aliases", "notes", "references", "views"]) {
     const child = Bun.spawn([node, "--input-type=module", "--eval",
       "const {extractPackage} = await import(process.argv[1]); console.log(JSON.stringify(await extractPackage(process.argv[2])))",
-      pathToFileURL(join(output, "extract.mjs")).href, join(fixtures, name + ".lgp")],
+      pathToFileURL(join(output, "package-docs.mjs")).href, join(fixtures, name + ".lgp")],
       { env: { LANG: "C.UTF-8" }, stdout: "pipe", stderr: "pipe" })
     const stdout = new Response(child.stdout).text()
     const stderr = new Response(child.stderr).text()
