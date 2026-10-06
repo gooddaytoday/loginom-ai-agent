@@ -1038,9 +1038,41 @@ public part metadata, ctx.metadata, результату builtin/custom посл
 штатный pending/apply producer ещё не подключён. План не перерабатывался,
 соседние evals/harness и рабочее дерево калибровки не изменялись.
 
+## Активация bundled skill в V1 provider loop
+
+Builtin `skill` получает приватный callback после проверки origin; custom
+реализация с тем же ID его не получает. После разрешения `skill` и успешного
+чтения списка ресурсов callback принимает только verified bundled origin,
+зарезервированное имя и inventory digest. Host получает pending request
+на существующем run, а текущий каталог остаётся прежним.
+
+На следующей границе V1 перечитывает историю, проверяет исходную задачу и
+завершённый вызов skill, затем применяет переход Host. Только после успеха
+backend записывает `{name, profile, digest}` в activation. Применение и
+DB-запись защищены от разрыва отменой; ошибка записи останавливает цикл.
+Отказ request становится tool error; отказ apply заменяет завершённую часть
+явной ошибкой `LOGINOM_SCOPE_DENIED`, оставляя прежний профиль без grant.
+
+Устаревший package_docs/Python prompt-тест заменён фактическим flow-тестом:
+проверенный staged skill → смена каталога следующего хода → реальный pinned
+Node executor → структура fixture `.lgp`. Проверены один acquire на цикл,
+неизменные session permissions и отсутствие Host call/admit для docs.
+Добавлены отдельные проверки отказов request и apply.
+`tdd-bundled-provider-boundary-red.log` →
+`bundled-boundary-request-apply.log`: **3 PASS**, 48 assertions.
+`bundled-activation-prompt-suite.log`: **109 PASS / 1 SKIP**, 472 assertions
+(полный prompt файл, profile/tools/task-scope, SkillTool и registry).
+Agent typecheck и diff/format checks прошли.
+
+Provider и IPC-ответы Host здесь контролируемые; Session/Skill/ToolRegistry,
+проверка bundle и Node executor настоящие. Естественный выбор skill моделью,
+Desktop/CLI installed acceptance и парные live evals остаются открытыми.
+Следующий шаг — граничные race/revert случаи, slash/run-command producer и
+Task bypass guards. Общий этап 5 ещё не выполнен; план не перерабатывался.
+
 ## Checkpoint
 
-- Исходный SHA `4b786785e` (`docs-no-browser`); Host scope, lazy admission и profile catalogs реализованы выше.
+- Исходный SHA `a369811c9` (`docs-no-browser`); Host scope, catalogs, metadata guards и bundled loop activation выше.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -1053,8 +1085,8 @@ public part metadata, ctx.metadata, результату builtin/custom посл
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
 - Полный Host 224 PASS / 7 SKIP; Agent history/tools/registry 30 PASS; typecheck обоих PASS.
-- Старый session package_docs/Python тест остаётся для замены при SessionTools integration.
+- Старый package_docs/Python тест заменён actual bundled flow/Node executor без Host call/admit.
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
-- Catalog/docs executor: исходные service-тесты и Agent typecheck; pending/apply producer ещё открыт.
-- Далее: actual bundled activation, metadata provenance, согласованный apply и Task bypass guards.
+- Bundled activation: полный prompt/инструменты 109 PASS / 1 SKIP; Agent typecheck PASS.
+- Далее: race/revert, slash/run-command activation, Task bypass guards и original-file acceptance.
 - Затем Linux Desktop/CLI/TTY, естественный выбор skill и парные live evals на принятом harness SHA.

@@ -29,6 +29,8 @@ import { ProviderV2 } from "@loginom-ai-agent/core/provider"
 import { ModelV2 } from "@loginom-ai-agent/core/model"
 import { isRecord } from "@/util/record"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import type { Skill } from "@/skill"
+import type { MessageID } from "./schema"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -68,6 +70,10 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   messages: SessionV1.WithParts[]
   history: SessionV1.WithParts[]
   promptOps: TaskPromptOps
+  activate?: (
+    skill: Skill.Info,
+    source: { scope: TaskScope.Info; messageID: MessageID; callID: string },
+  ) => Effect.Effect<void>
 }) {
   const tools: Record<string, AITool> = {}
   const run = yield* EffectBridge.make()
@@ -165,6 +171,10 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           Effect.gen(function* () {
             if (!permitsTool(profile, id, origin)) return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
             const ctx = context(args, options)
+            const activate = input.activate
+            if (id === "skill" && origin === "builtin" && task && activate)
+              ctx.activate = (skill) =>
+                activate(skill, { scope: task, messageID: input.processor.message.id, callID: options.toolCallId })
             yield* plugin.trigger(
               "tool.execute.before",
               { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },

@@ -2,7 +2,7 @@ import path from "path"
 import { Effect, Schema } from "effect"
 import { Ripgrep } from "@loginom-ai-agent/core/ripgrep"
 import { Skill } from "../skill"
-import * as Tool from "./tool"
+import { Tool } from "./tool"
 import DESCRIPTION from "./skill.txt"
 
 export const Parameters = Schema.Struct({
@@ -41,6 +41,7 @@ export const SkillTool = Tool.define(
             signal: ctx.abort,
             limit: 10,
           })
+          if (ctx.activate) yield* ctx.activate(info)
 
           return {
             title: `Loaded skill: ${info.name}`,

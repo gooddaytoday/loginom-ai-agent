@@ -1137,6 +1137,9 @@ const layer = Layer.effect(
         )
         const ctx = yield* InstanceState.context
         let structured: unknown
+        let activation:
+          | { scope: TaskScope.Info; grant: TaskScope.Activation; messageID: MessageID; callID: string }
+          | undefined
         let step = 0
         while (true) {
           const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
@@ -1144,6 +1147,46 @@ const layer = Layer.effect(
           yield* Effect.logInfo("loop", { "session.id": sessionID, step })
 
           const history = yield* sessions.messages({ sessionID }).pipe(Effect.orDie)
+          const pending = activation
+          activation = undefined
+          if (pending && loginom) {
+            const task = TaskScope.derive({ sessionID, messages: history, revert: session.revert })
+            const message = history.find((message) => message.info.id === pending.messageID)
+            const part = message?.parts.find(
+              (part) => part.type === "tool" && part.tool === "skill" && part.callID === pending.callID,
+            )
+            if (
+              task?.taskMessageID === pending.scope.taskMessageID &&
+              part?.type === "tool" &&
+              part.state.status === "completed"
+            ) {
+              const state = part.state
+              const updated = yield* Effect.gen(function* () {
+                const applied = yield* Effect.promise((signal) =>
+                  loginom.scope("apply", { taskMessageID: task.taskMessageID, profile: pending.grant.profile }, signal),
+                ).pipe(
+                  Effect.map(() => true),
+                  Effect.catchCause(() => Effect.succeed(false)),
+                )
+                return yield* sessions.updatePart({
+                  ...part,
+                  state: applied
+                    ? {
+                        ...state,
+                        metadata: { ...TaskScope.cleanMetadata(state.metadata), activation: pending.grant },
+                      }
+                    : {
+                        status: "error",
+                        input: state.input,
+                        error: "LOGINOM_SCOPE_DENIED",
+                        metadata: TaskScope.cleanMetadata(state.metadata),
+                        time: { start: state.time.start, end: Date.now() },
+                      },
+                })
+              }).pipe(Effect.uninterruptible)
+              if (message) message.parts = message.parts.map((part) => (part.id === updated.id ? updated : part))
+            }
+          }
           let msgs = MessageV2.filterCompacted(history.toReversed())
 
           const { user: lastUser, assistant: lastAssistant, finished: lastFinished, tasks } = MessageV2.latest(msgs)
@@ -1287,6 +1330,27 @@ const layer = Layer.effect(
               messages: msgs,
               history,
               promptOps,
+              activate: (skill, source) =>
+                Effect.gen(function* () {
+                  const grant = TaskScope.bundledActivation(skill)
+                  if (!grant) return
+                  if (!loginom) return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
+                  yield* Effect.promise((signal) =>
+                    loginom
+                      .scope(
+                        "request",
+                        {
+                          taskMessageID: source.scope.taskMessageID,
+                          profile: grant.profile,
+                        },
+                        signal,
+                      )
+                      .catch(() => {
+                        throw Error("LOGINOM_SCOPE_DENIED")
+                      }),
+                  )
+                  activation = { ...source, grant }
+                }),
             }).pipe(
               Effect.provideService(Plugin.Service, plugin),
               Effect.provideService(Permission.Service, permission),

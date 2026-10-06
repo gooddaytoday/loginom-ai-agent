@@ -2,9 +2,11 @@ import type { SessionV1 } from "@loginom-ai-agent/core/v1/session"
 import type { Schema } from "effect"
 import { HostTaskScope } from "@loginom-ai-agent/loginom-host/task-scope"
 import { MessageID, type PartID, type SessionID } from "./schema"
+import type { Skill } from "../skill"
 
 export type Profile = HostTaskScope.Profile
 export type Info = { sessionID: SessionID; taskMessageID: MessageID; profile: Profile }
+export type Activation = { name: Exclude<Profile, "default">; profile: Exclude<Profile, "default">; digest: string }
 type History = Schema.Schema.Type<typeof SessionV1.WithParts>
 
 type Input = {
@@ -99,6 +101,12 @@ export function cleanMetadata(value: unknown): Record<string, unknown> {
         ].includes(key),
     ),
   )
+}
+
+export function bundledActivation(skill: Skill.Info): Activation | undefined {
+  if (skill.source !== "bundled" || !skill.digest) return
+  const profile = activationProfile({ name: skill.name, profile: skill.name, digest: skill.digest })
+  if (profile) return { name: profile, profile, digest: skill.digest }
 }
 
 function activationProfile(value: unknown): Exclude<Profile, "default"> | undefined {
