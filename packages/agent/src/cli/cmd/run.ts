@@ -415,6 +415,8 @@ export const RunCommand = effectCmd({
           })()
           const detected = FSUtil.mimeType(resolvedPath)
           const text = content?.toString("utf8")
+          // Retain non-UTF8 snapshots verbatim with their detected MIME. Model
+          // serialization may describe CSV, but admission receives this data URL.
           const mime =
             content === undefined
               ? isDirectory

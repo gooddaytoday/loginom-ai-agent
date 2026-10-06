@@ -219,7 +219,7 @@ for (const failure of [undefined, "catalog", "admission"]) {
               time: { created: 1 },
             },
             parts: [
-              attachment(original, "data:text/csv;base64,QTsxCg=="),
+              attachment(original, "data:text/csv;base64,QTsxCs/w6OLl8go="),
               attachment(original, "file:///private/key.json"),
             ],
           },
@@ -243,7 +243,7 @@ for (const failure of [undefined, "catalog", "admission"]) {
         },
       })
       expect(admitted).toEqual(
-        failure === "catalog" ? [] : [{ message: original, files: [{ name: "sales.csv", data: "QTsxCg==" }] }],
+        failure === "catalog" ? [] : [{ message: original, files: [{ name: "sales.csv", data: "QTsxCs/w6OLl8go=" }] }],
       )
       expect(tools.timing).toBeDefined()
       if (failure) {
