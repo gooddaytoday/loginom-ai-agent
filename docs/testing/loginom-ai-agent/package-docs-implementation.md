@@ -447,6 +447,14 @@ Permission rules; проверки project-relative patterns запускают�
 Инструмент не внесён в общую registry и пока не подключён к SessionTools:
 skeleton/emit, проверки lifecycle и TaskScope activation остаются открытыми.
 
+Agent tool skeleton: RED — операция skeleton не поддерживалась.
+GREEN — фиксированный Node executor создаёт report.md, а ctx.ask edit включает
+оба файла: structure.json и report.md. Реальные правила Permission блокируют
+все записи при deny на черновик; повторный skeleton сохраняет заполненный файл.
+Сверены oracle JSON и неизменные bytes входного пакета. 12 PASS (42 assertions),
+Agent typecheck PASS; tdd-agent-docs-skeleton-*, agent-docs-skeleton-regression.log.
+Emit и lifecycle остаются открытыми; SessionTools пока не подключён.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.

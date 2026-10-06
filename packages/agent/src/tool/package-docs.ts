@@ -39,7 +39,7 @@ export const PackageDocsTool = Tool.define(
       parameters: Parameters,
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         Effect.gen(function* () {
-          if (params.operation !== "extract") return yield* Effect.die(Error("PACKAGE_DOCS_TOOL_UNSUPPORTED"))
+          if (params.operation === "emit") return yield* Effect.die(Error("PACKAGE_DOCS_TOOL_UNSUPPORTED"))
           const instance = yield* InstanceState.context
           const session = yield* sessions.get(ctx.sessionID)
           const directory = yield* fs.realPath(session.directory)
@@ -81,7 +81,10 @@ export const PackageDocsTool = Tool.define(
           )
           yield* ctx.ask({
             permission: "edit",
-            patterns: [relative(instance.worktree, join(work, "structure.json"))],
+            patterns: [
+              join(work, "structure.json"),
+              ...(params.operation === "skeleton" ? [join(work, "report.md")] : []),
+            ].map((path) => relative(instance.worktree, path)),
             always: [relative(instance.worktree, work) + "/*"],
             metadata: { filepath: join(work, "structure.json") },
           })

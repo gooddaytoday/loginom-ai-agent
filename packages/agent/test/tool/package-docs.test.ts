@@ -308,3 +308,62 @@ it.instance(
     }),
   20_000,
 )
+
+it.instance(
+  "creates a session skeleton with edit authorization for both generated files",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const fs = yield* FSUtil.Service
+      const before = yield* fs.readFile(fixture)
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const result = yield* input.tool.execute({ operation: "skeleton", lgp: fixture }, input.ctx)
+      const output = JSON.parse(result.output)
+      expect(output.report.startsWith(join(instance.directory, ".work/package-docs/"))).toBe(true)
+      expect(yield* fs.readFileString(output.report)).toContain("PLACEHOLDER_PACKAGE_DESCRIPTION")
+      expect(yield* fs.readJson(output.structure)).toEqual(
+        yield* fs.readJson(join(import.meta.dir, "../../../loginom-host/test/fixtures/package-docs/structure.json")),
+      )
+      expect(input.requests.map((request) => request.permission)).toEqual(["edit"])
+      expect(input.requests[0].patterns).toContain(output.report.slice(instance.directory.length + 1))
+      expect(input.requests[0].patterns).toContain(output.structure.slice(instance.directory.length + 1))
+      expect(yield* fs.readFile(fixture)).toEqual(before)
+    }),
+  { git: true },
+  20_000,
+)
+
+it.instance(
+  "a deny on the skeleton prevents all generated writes",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const fs = yield* FSUtil.Service
+      const input = yield* prepare({
+        attachment: pathToFileURL(fixture).href,
+        permission: [{ permission: "edit", pattern: ".work/package-docs/*/report.md", action: "deny" }],
+      })
+      const result = yield* input.tool.execute({ operation: "skeleton", lgp: fixture }, input.ctx).pipe(Effect.exit)
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) expect(Cause.squash(result.cause)).toBeInstanceOf(PermissionV1.DeniedError)
+      expect(yield* fs.exists(join(instance.directory, ".work"))).toBe(false)
+    }),
+  { git: true },
+  20_000,
+)
+
+it.instance(
+  "repeating the skeleton operation preserves a filled draft",
+  () =>
+    Effect.gen(function* () {
+      const fs = yield* FSUtil.Service
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const first = yield* input.tool.execute({ operation: "skeleton", lgp: fixture }, input.ctx)
+      const output = JSON.parse(first.output)
+      yield* fs.writeFileString(output.report, "# Заполненный пользователем черновик\n")
+      const repeated = yield* input.tool.execute({ operation: "skeleton", lgp: fixture }, input.ctx)
+      expect(JSON.parse(repeated.output).report).toBe(output.report)
+      expect(yield* fs.readFileString(output.report)).toBe("# Заполненный пользователем черновик\n")
+    }),
+  20_000,
+)
