@@ -17,6 +17,48 @@ test("незавершённый run получает ERROR/2, даже если
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+test("каждая ячейка CSV проверяется с tolerance=0 даже при существующем пакете", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
+  try {
+    await Bun.write(path.join(directory, "task.json"), JSON.stringify({
+      id: "crosstable-fixed-sum", oracle_tolerance: 0, checklist: [{ id: "result", required: true }],
+    }))
+    await Bun.write(path.join(directory, "oracle.csv"), "Region,A,B\nN,15,7\nS,3,2\n")
+    await Bun.write(path.join(directory, "attempt/artifact/package.lgp"), "package placeholder for isolated CSV test")
+    await Bun.write(path.join(directory, "attempt/artifact/results/table.result.csv"), "Region,A,B\nN,15.0001,7\nS,3,2\n")
+    const result = await validateNodeAttempt(directory, path.join(directory, "attempt"))
+    expect(result.failures.join(" ")).toContain("result:")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("итог completed с подтверждённым cleanup всё равно проверяет обязательный локальный пакет", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
+  try {
+    await Bun.write(path.join(directory, "summary.json"), JSON.stringify({
+      interrupted: false, stopped_reason: null, task_ids: ["crosstable-fixed-sum"],
+      config: { repeat: 1 }, storage_leftovers: [], tasks: [{ id: "crosstable-fixed-sum", attempts: [
+        { attempt: 1, status: "completed", cleanup_error: null, environment_cleanup: { status: "confirmed" } },
+      ] }],
+    }))
+    await Bun.write(path.join(directory, "cases/crosstable-fixed-sum/task.json"), JSON.stringify({
+      id: "crosstable-fixed-sum", checklist: [{ id: "crosstable", required: true }],
+    }))
+    expect(await validateNodeRun(directory, ["crosstable-fixed-sum"], path.join(directory, "cases"))).toMatchObject({ verdict: "FAIL", code: 1 })
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("отсутствующий локальный пакет является FAIL, а не успешным пустым чеклистом", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
+  try {
+    await Bun.write(path.join(directory, "task.json"), JSON.stringify({
+      id: "crosstable-fixed-sum", checklist: [{ id: "crosstable", required: true }],
+    }))
+    const result = await validateNodeAttempt(directory, path.join(directory, "attempt"))
+    expect(result.errors).toEqual([])
+    expect(result.failures.join(" ")).toContain("package.lgp")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test("неизвестный required checklist ID — ошибка валидатора, даже при отсутствующем артефакте", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
   try {
