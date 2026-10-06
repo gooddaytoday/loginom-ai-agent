@@ -367,3 +367,205 @@ it.instance(
     }),
   20_000,
 )
+
+it.instance(
+  "publishes a completed PDF only after authorizing its exact session filename",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const fs = yield* FSUtil.Service
+      const before = yield* fs.readFile(fixture)
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const skeleton = JSON.parse(
+        (yield* input.tool.execute({ operation: "skeleton", lgp: fixture }, input.ctx)).output,
+      )
+      yield* fs.writeFileString(
+        skeleton.report,
+        (yield* fs.readFileString(skeleton.report)).replace(/PLACEHOLDER_[A-Z_0-9]+/g, "Описание сценария."),
+      )
+      const result = yield* input.tool.execute({ operation: "emit", lgp: fixture }, input.ctx)
+      const output = JSON.parse(result.output)
+      expect(output.output).toBe(join(instance.directory, "demo.lgp_report.pdf"))
+      expect(
+        Buffer.from(yield* fs.readFile(output.output))
+          .subarray(0, 8)
+          .toString(),
+      ).toBe("%PDF-1.4")
+      expect(input.requests.filter((request) => request.permission === "edit").at(-1)?.patterns).toContain(
+        "demo.lgp_report.pdf",
+      )
+      expect(input.requests.filter((request) => request.permission === "read").at(-1)?.patterns).toContain(
+        skeleton.report.slice(instance.directory.length + 1),
+      )
+      expect(yield* fs.readFile(fixture)).toEqual(before)
+    }),
+  { git: true },
+  20_000,
+)
+
+it.instance(
+  "chooses the next free name before permission and preserves existing reports",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const fs = yield* FSUtil.Service
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const skeleton = JSON.parse(
+        (yield* input.tool.execute({ operation: "skeleton", lgp: fixture }, input.ctx)).output,
+      )
+      const markdown = (yield* fs.readFileString(skeleton.report)).replace(
+        /PLACEHOLDER_[A-Z_0-9]+/g,
+        "Описание сценария.",
+      )
+      yield* fs.writeFileString(skeleton.report, markdown)
+      yield* fs.writeFileString(join(instance.directory, "demo.lgp_report.md"), "Существующий отчёт")
+      yield* fs.symlink(join(instance.directory, "absent.md"), join(instance.directory, "demo.lgp_report-2.md"))
+      const result = yield* input.tool.execute({ operation: "emit", lgp: fixture, format: "md" }, input.ctx)
+      expect(JSON.parse(result.output).output).toBe(join(instance.directory, "demo.lgp_report-3.md"))
+      expect(yield* fs.readFileString(join(instance.directory, "demo.lgp_report-3.md"))).toBe(markdown)
+      expect(yield* fs.readFileString(join(instance.directory, "demo.lgp_report.md"))).toBe("Существующий отчёт")
+      expect(input.requests.filter((request) => request.permission === "edit").at(-1)?.patterns).toContain(
+        "demo.lgp_report-3.md",
+      )
+      const word = yield* input.tool.execute({ operation: "emit", lgp: fixture, format: "docx" }, input.ctx)
+      expect(JSON.parse(word.output).output).toBe(join(instance.directory, "demo.lgp_report.docx"))
+      expect(
+        Buffer.from(yield* fs.readFile(JSON.parse(word.output).output))
+          .subarray(0, 2)
+          .toString(),
+      ).toBe("PK")
+    }),
+  { git: true },
+  20_000,
+)
+
+it.instance(
+  "an explicit deny on the final filename prevents publication",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const fs = yield* FSUtil.Service
+      const input = yield* prepare({
+        attachment: pathToFileURL(fixture).href,
+        permission: [{ permission: "edit", pattern: "demo.lgp_report.md", action: "deny" }],
+      })
+      const skeleton = JSON.parse(
+        (yield* input.tool.execute({ operation: "skeleton", lgp: fixture }, input.ctx)).output,
+      )
+      yield* fs.writeFileString(
+        skeleton.report,
+        (yield* fs.readFileString(skeleton.report)).replace(/PLACEHOLDER_[A-Z_0-9]+/g, "Описание сценария."),
+      )
+      const result = yield* input.tool
+        .execute({ operation: "emit", lgp: fixture, format: "md" }, input.ctx)
+        .pipe(Effect.exit)
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) expect(Cause.squash(result.cause)).toBeInstanceOf(PermissionV1.DeniedError)
+      expect((yield* fs.readDirectory(instance.directory)).toSorted()).toEqual([".git", ".work"])
+    }),
+  { git: true },
+  20_000,
+)
+
+it.instance(
+  "a filename occupied during approval is rejected without moving the authorized output",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const fs = yield* FSUtil.Service
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const skeleton = JSON.parse(
+        (yield* input.tool.execute({ operation: "skeleton", lgp: fixture }, input.ctx)).output,
+      )
+      yield* fs.writeFileString(
+        skeleton.report,
+        (yield* fs.readFileString(skeleton.report)).replace(/PLACEHOLDER_[A-Z_0-9]+/g, "Описание сценария."),
+      )
+      const ctx: Tool.Context = {
+        ...input.ctx,
+        ask: (request) =>
+          input.ctx.ask(request).pipe(
+            Effect.tap(() =>
+              request.permission === "edit"
+                ? fs.writeFileString(join(instance.directory, "demo.lgp_report.md"), "Другой автор")
+                : Effect.void,
+            ),
+            Effect.orDie,
+          ),
+      }
+      const result = yield* input.tool.execute({ operation: "emit", lgp: fixture, format: "md" }, ctx).pipe(Effect.exit)
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) expect(String(Cause.squash(result.cause))).toContain("PACKAGE_DOCS_OUTPUT_COLLISION")
+      expect(yield* fs.readFileString(join(instance.directory, "demo.lgp_report.md"))).toBe("Другой автор")
+      expect((yield* fs.readDirectory(instance.directory)).toSorted()).toEqual([".git", ".work", "demo.lgp_report.md"])
+    }),
+  { git: true },
+  20_000,
+)
+
+it.instance(
+  "emit preserves an explicit read deny on the filled draft",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const fs = yield* FSUtil.Service
+      const input = yield* prepare({
+        attachment: pathToFileURL(fixture).href,
+        permission: [{ permission: "read", pattern: ".work/package-docs/*/report.md", action: "deny" }],
+      })
+      const skeleton = JSON.parse(
+        (yield* input.tool.execute({ operation: "skeleton", lgp: fixture }, input.ctx)).output,
+      )
+      yield* fs.writeFileString(
+        skeleton.report,
+        (yield* fs.readFileString(skeleton.report)).replace(/PLACEHOLDER_[A-Z_0-9]+/g, "Описание сценария."),
+      )
+      const result = yield* input.tool.execute({ operation: "emit", lgp: fixture }, input.ctx).pipe(Effect.exit)
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) expect(Cause.squash(result.cause)).toBeInstanceOf(PermissionV1.DeniedError)
+      expect((yield* fs.readDirectory(instance.directory)).toSorted()).toEqual([".git", ".work"])
+    }),
+  { git: true },
+  20_000,
+)
+
+it.instance(
+  "unfilled placeholders fail explicitly without a published report in any format",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const fs = yield* FSUtil.Service
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      yield* input.tool.execute({ operation: "skeleton", lgp: fixture }, input.ctx)
+      for (const format of ["pdf", "docx", "md"] as const) {
+        const result = yield* input.tool
+          .execute({ operation: "emit", lgp: fixture, format }, input.ctx)
+          .pipe(Effect.exit)
+        expect(Exit.isFailure(result)).toBe(true)
+        if (Exit.isFailure(result)) expect(String(Cause.squash(result.cause))).toContain("PACKAGE_DOCS_PLACEHOLDER")
+      }
+      expect((yield* fs.readDirectory(instance.directory)).toSorted()).toEqual([".git", ".work"])
+    }),
+  { git: true },
+  20_000,
+)
+
+it.instance(
+  "attachments from another session in the model context do not authorize a path",
+  () =>
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      const other = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const input = yield* prepare({ permission: [{ permission: "external_directory", pattern: "*", action: "deny" }] })
+      const result = yield* input.tool
+        .execute(
+          { operation: "extract", lgp: fixture },
+          { ...input.ctx, messages: yield* sessions.messages({ sessionID: other.ctx.sessionID }) },
+        )
+        .pipe(Effect.exit)
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) expect(Cause.squash(result.cause)).toBeInstanceOf(PermissionV1.DeniedError)
+      expect(input.requests.map((request) => request.permission)).toEqual(["external_directory"])
+    }),
+  20_000,
+)

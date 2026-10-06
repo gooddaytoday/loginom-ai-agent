@@ -39,7 +39,6 @@ export const PackageDocsTool = Tool.define(
       parameters: Parameters,
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         Effect.gen(function* () {
-          if (params.operation === "emit") return yield* Effect.die(Error("PACKAGE_DOCS_TOOL_UNSUPPORTED"))
           const instance = yield* InstanceState.context
           const session = yield* sessions.get(ctx.sessionID)
           const directory = yield* fs.realPath(session.directory)
@@ -79,14 +78,32 @@ export const PackageDocsTool = Tool.define(
             "package-docs",
             stem + "-" + createHash("sha256").update(lgp).digest("hex").slice(0, 8),
           )
+          const emission =
+            params.operation === "emit"
+              ? {
+                  format: params.format ?? "pdf",
+                  output: yield* availableReport(fs, directory, stem, params.format ?? "pdf"),
+                }
+              : undefined
+          if (emission)
+            yield* ctx.ask({
+              permission: "read",
+              patterns: [relative(instance.worktree, join(work, "report.md"))],
+              always: ["*"],
+              metadata: { filepath: join(work, "report.md") },
+            })
           yield* ctx.ask({
             permission: "edit",
             patterns: [
               join(work, "structure.json"),
               ...(params.operation === "skeleton" ? [join(work, "report.md")] : []),
+              ...(emission ? [emission.output] : []),
             ].map((path) => relative(instance.worktree, path)),
-            always: [relative(instance.worktree, work) + "/*"],
-            metadata: { filepath: join(work, "structure.json") },
+            always: [
+              relative(instance.worktree, work) + "/*",
+              ...(emission ? [relative(instance.worktree, emission.output)] : []),
+            ],
+            metadata: { filepath: emission?.output ?? join(work, "structure.json") },
           })
           const resources = flags.loginomResources
           if (!resources) return yield* Effect.die(Error("PACKAGE_DOCS_RESOURCES_MISSING: переустановите приложение."))
@@ -130,6 +147,7 @@ export const PackageDocsTool = Tool.define(
                 lgp,
                 "--directory",
                 directory,
+                ...(emission ? ["--format", emission.format, "--output", emission.output] : []),
               ],
               { cwd: directory, env: { LANG: "C.UTF-8" }, extendEnv: false },
             ),
@@ -157,3 +175,15 @@ export const PackageDocsTool = Tool.define(
     }
   }),
 )
+
+const availableReport = Effect.fn("PackageDocs.availableReport")(function* (
+  fs: FSUtil.Interface,
+  directory: string,
+  stem: string,
+  format: string,
+) {
+  const names = new Set(yield* fs.readDirectory(directory))
+  let index = 1
+  while (names.has(stem + ".lgp_report" + (index > 1 ? "-" + index : "") + "." + format)) index++
+  return join(directory, stem + ".lgp_report" + (index > 1 ? "-" + index : "") + "." + format)
+})

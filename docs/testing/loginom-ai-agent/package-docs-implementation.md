@@ -455,6 +455,18 @@ GREEN — фиксированный Node executor создаёт report.md, а 
 Agent typecheck PASS; tdd-agent-docs-skeleton-*, agent-docs-skeleton-regression.log.
 Emit и lifecycle остаются открытыми; SessionTools пока не подключён.
 
+Agent tool emit: RED — операция emit не поддерживалась.
+GREEN — backend выбирает свободное имя (включая занятые dangling symlink),
+запрашивает read на собственный report.md и edit на точный output/structure.
+В Node передаются фиксированные --format/--output; коллизия во время разрешения
+возвращает ошибку, не меняет имя. Проверены PDF default, DOCX/MD, сохранение
+старого отчёта и исходного пакета, deny на output/черновик, placeholders во
+всех форматах, чужие вложения из ctx.messages. Регрессии сортируют readdir,
+поскольку порядок файлов не является контрактом. AvailableReport использует
+FS service, захваченный при init, без новых сервисов в execute.
+19 PASS (73 assertions), Agent typecheck PASS; tdd-agent-docs-emit-*,
+agent-docs-emit-final.log. Lifecycle, строгий ответ executor и TaskScope ещё открыты.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
