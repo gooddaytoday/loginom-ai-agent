@@ -1,6 +1,7 @@
 import path from "path"
 import { Effect, Schema } from "effect"
 import { Ripgrep } from "@loginom-ai-agent/core/ripgrep"
+import { FSUtil } from "@loginom-ai-agent/core/fs-util"
 import { Skill } from "../skill"
 import { Tool } from "./tool"
 import DESCRIPTION from "./skill.txt"
@@ -14,6 +15,7 @@ export const SkillTool = Tool.define(
   Effect.gen(function* () {
     const skill = yield* Skill.Service
     const ripgrep = yield* Ripgrep.Service
+    const fs = yield* FSUtil.Service
 
     return {
       description: DESCRIPTION,
@@ -33,14 +35,21 @@ export const SkillTool = Tool.define(
 
           const dir = path.dirname(info.location)
           const base = dir
-          const files = yield* ripgrep.find({
-            cwd: dir,
-            pattern: "!**/SKILL.md",
-            hidden: true,
-            follow: false,
-            signal: ctx.abort,
-            limit: 10,
-          })
+          // Shipped skill resources must load offline without downloading an external search executable.
+          const files =
+            info.source === "bundled"
+              ? (yield* fs.glob("**/*", { cwd: dir, dot: true, symlink: false }))
+                  .filter((file) => path.basename(file) !== "SKILL.md")
+                  .toSorted()
+                  .slice(0, 10)
+              : (yield* ripgrep.find({
+                  cwd: dir,
+                  pattern: "!**/SKILL.md",
+                  hidden: true,
+                  follow: false,
+                  signal: ctx.abort,
+                  limit: 10,
+                })).map((file) => file.path)
           if (ctx.activate) yield* ctx.activate(info)
 
           return {
@@ -56,7 +65,7 @@ export const SkillTool = Tool.define(
               "Note: file list is sampled.",
               "",
               "<skill_files>",
-              files.map((file) => `<file>${path.resolve(dir, file.path)}</file>`).join("\n"),
+              files.map((file) => `<file>${path.resolve(dir, file)}</file>`).join("\n"),
               "</skill_files>",
               "</skill_content>",
             ].join("\n"),

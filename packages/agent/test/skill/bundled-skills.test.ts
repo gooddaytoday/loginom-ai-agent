@@ -16,6 +16,13 @@ import { EventV2Bridge } from "../../src/event-v2-bridge"
 import { Session } from "../../src/session/session"
 import { MCP } from "../../src/mcp"
 import { Global } from "@loginom-ai-agent/core/global"
+import { Ripgrep } from "@loginom-ai-agent/core/ripgrep"
+import { SkillTool } from "../../src/tool/skill"
+import type { Tool } from "../../src/tool/tool"
+import { Truncate } from "../../src/tool/truncate"
+import { Agent } from "../../src/agent/agent"
+import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { MessageID, SessionID } from "../../src/session/schema"
 import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
 import { verifyBundledSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
 
@@ -97,7 +104,7 @@ test("the product source catalog has all linked resources except declared genera
 
 const it = testEffect(
   Layer.mergeAll(
-    LayerNode.compile(LayerNode.group([Command.node, Skill.node, EventV2Bridge.node, MCP.node, Global.node]), [[RuntimeFlags.node, RuntimeFlags.layer({ loginomResources: resources })]]),
+    LayerNode.compile(LayerNode.group([Command.node, Skill.node, EventV2Bridge.node, MCP.node, Global.node, Truncate.node, Agent.node, FSUtil.node]), [[RuntimeFlags.node, RuntimeFlags.layer({ loginomResources: resources })]]),
     LayerNode.compile(CrossSpawnSpawner.node),
     testInstanceStoreLayer,
   ),
@@ -128,6 +135,55 @@ it.live("discovers a verified bundled skill outside the source checkout", () =>
       expect(docs?.content).toContain("# package-docs")
       expect(yield* skills.dirs()).toContain(join(resources, "skills/package-docs"))
     }),
+  ),
+)
+
+it.live("loads bundled skill resources without an external search executable", () =>
+  provideTmpdirInstance(() =>
+    Effect.gen(function* () {
+      const permissions: string[] = []
+      const activated: Skill.Info[] = []
+      const info = yield* SkillTool
+      const tool = yield* info.init()
+      const context: Tool.Context = {
+        sessionID: SessionID.make("ses_bundled"),
+        messageID: MessageID.make("msg_bundled"),
+        agent: "build",
+        abort: AbortSignal.any([]),
+        messages: [],
+        metadata: () => Effect.void,
+        ask: (request) =>
+          Effect.sync(() => {
+            permissions.push(request.permission)
+          }),
+        activate: (skill) =>
+          Effect.sync(() => {
+            activated.push(skill)
+          }),
+      }
+      const result = yield* tool.execute({ name: "package-docs" }, context)
+      expect(permissions).toEqual(["skill"])
+      expect(activated.map((skill) => skill.name)).toEqual(["package-docs"])
+      expect(activated[0]?.source).toBe("bundled")
+      expect(result.output).toContain('<skill_content name="package-docs">')
+      expect(result.output).toContain(`<file>${join(resources, "skills/package-docs/assets/fonts/OFL.txt")}</file>`)
+      expect(result.output).not.toContain(`<file>${join(resources, "skills/package-docs/SKILL.md")}</file>`)
+      expect(result.output.match(/<file>/g)?.length).toBeLessThanOrEqual(10)
+      const automation = yield* tool.execute({ name: "loginom-automation" }, context)
+      expect(permissions).toEqual(["skill", "skill"])
+      expect(activated.map((skill) => skill.name)).toEqual(["package-docs", "loginom-automation"])
+      expect(automation.output).toContain('<skill_content name="loginom-automation">')
+      expect(automation.output).toContain(
+        `<file>${join(resources, "skills/loginom-automation/references/browser.md")}</file>`,
+      )
+      expect(automation.output.match(/<file>/g)?.length).toBeLessThanOrEqual(10)
+    }).pipe(
+      Effect.provide(
+        Layer.mock(Ripgrep.Service, {
+          find: () => Effect.die(Error("External ripgrep must not be required to load a bundled skill")),
+        }),
+      ),
+    ),
   ),
 )
 

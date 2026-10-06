@@ -1302,6 +1302,38 @@ Chromium PID observation здесь не выполнен. Дальнейшие 
 нового candidate; исходный SHA этого комплекта не заменять SHA doc checkpoint.
 Рабочее дерево чисто после удаления только собственного smoke output.
 
+## Загрузка комплектных skills без внешнего search executable
+
+Native TUI smoke на c4dc5bd4c выявил cold-cache зависимость загрузки skill
+от скачивания ripgrep и системных tar/gzip. Вставленный путь с кириллицей,
+пробелом и верхним `.LGP` уже сохранялся как `file:`/Loginom MIME, но skill
+не доходил до profile activation. Это не браузерная зависимость: read-only
+минимальный probe RipgrepBinary/Ripgrep воспроизвёл ENOENT tar **3/3**;
+control с tar+gzip без rg и cached rg с пустым PATH проходят.
+Исходники ripgrep совпадают с c4dc5bd4c; новый breaking SHA не установлен.
+
+Для backend-verified source=bundled resource sample теперь использует локальный
+filesystem glob без symlink following, исключает SKILL.md и ограничен 10 файлами.
+Permission остаётся перед listing, private activation — после него.
+External/project skills сохраняют прежний Ripgrep path.
+
+TDD: tdd-bundled-skill-external-search-red.log с недоступным search executable
+→ bundled-skill-external-search-green.log. Проверены оба комплектных skills,
+ресурсы, permission и activation; source/ordinary skill regression:
+**135 PASS / 1 SKIP**, 697 assertions; Agent typecheck PASS.
+Логи: bundled-skill-offline-{regression,typecheck}.log и ripgrep-signal/.
+
+Новый внешний Linux PTY driver `agent/test/cli/tui/package-docs-pty.py` принимает
+absolute binary, новый artifacts root и paste/mention; использует public CLI
+для первичной инициализации профиля, actual shipped Node extractor,
+scripted provider, terminal readiness signals, readonly persisted evidence
+и наблюдение только своих descendants. Read permission остаётся ask;
+PATH пуст и DISPLAY отсутствует только у тестируемого CLI.
+Provider прекращает вызовы после одной ошибки skill, вместо бесконечных повторов.
+Native acceptance после пересборки ещё не заявлена. Драйвер — тестовый Python,
+не зависимость продукта; natural routing/full report/installed Desktop остаются
+отдельными воротами.
+
 ## Checkpoint
 
 - Product candidate SHA `c4dc5bd4c` (`docs-no-browser`); полный native CLI/resources/manifest/archive сохранены.
