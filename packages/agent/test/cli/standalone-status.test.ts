@@ -107,6 +107,32 @@ test("actual standalone status launches bundled Node and releases the isolated p
     expect((await readdir(directory)).sort()).toEqual(["bundle", "profile"])
     expect(await readdir(join(directory, "profile"))).not.toContain(".writer")
     expect(await readdir(join(directory, "profile", "loginom"))).not.toContain("runtime")
+    const resourceProbe = Bun.spawn(
+      [process.execPath, "--eval", `
+        import { standalone } from './src/cli/standalone.ts';
+        import { standaloneRun } from './src/cli/standalone-run.ts';
+        await standalone(['run', 'probe'], (args, paths) => standaloneRun(args, paths));
+        console.log(JSON.stringify({ resources: process.env.LOGINOM_AI_AGENT_RESOURCES }));
+      `],
+      {
+        cwd: resolve(import.meta.dir, "../.."),
+        env: {
+          ...process.env,
+          BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+          LOGINOM_AI_AGENT_CLI_PROFILE: join(directory, "profile"),
+          LOGINOM_AI_AGENT_CLI_BUNDLE: bundle,
+          LOGINOM_AI_AGENT_RESOURCES: "/untrusted/shell/resources",
+        },
+        stdin: "ignore",
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    )
+    const probeOutput = new Response(resourceProbe.stdout).text()
+    const probeErrors = new Response(resourceProbe.stderr).text()
+    expect(await resourceProbe.exited).toBe(2)
+    expect(await probeErrors).toBe("LOGINOM_CONFIG_REQUIRED\n")
+    expect(JSON.parse(await probeOutput)).toEqual({ resources: bundle })
     const run = Bun.spawn(
       [
         process.execPath,

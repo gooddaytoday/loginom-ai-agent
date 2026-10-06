@@ -71,12 +71,13 @@ export function withoutProxyEnvironment(base: NodeJS.ProcessEnv) {
   return env
 }
 
-export function sidecarEnvironment(base: NodeJS.ProcessEnv, proxy?: Record<string, string>) {
+export function sidecarEnvironment(base: NodeJS.ProcessEnv, proxy?: Record<string, string>, resources?: string) {
   const env = Object.fromEntries(
     Object.entries(base).flatMap(([key, value]) => (value === undefined ? [] : [[key, String(value)]])),
   )
   delete env.DEBUG
   if (process.platform === "linux") delete env.LD_PRELOAD
-  if (!proxy) return env
-  return { ...env, ...proxy }
+  Object.assign(env, proxy)
+  if (resources) env.LOGINOM_AI_AGENT_RESOURCES = resources
+  return env
 }

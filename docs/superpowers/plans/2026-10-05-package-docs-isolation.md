@@ -542,7 +542,7 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
   В source-map сохранить исходные SHA/объекты/атрибуцию Dock; преобразования
   записать отдельно. Исходные несоответствия из baseline не скрывать массовой
   заменой хэшей. Исторические отчёты дополнять актуальным checkpoint.
-- [ ] Проверить необходимость временного dev-моста из PR #29:
+- [x] Проверить необходимость временного dev-моста из PR #29:
   `"skills": { "paths": ["packages/product/skills"] }` в
   `.loginom-ai-agent/loginom-ai-agent.jsonc`. Он разрешает путь от каталога
   сессии и допустим только до включения reserved/manifest-only discovery,

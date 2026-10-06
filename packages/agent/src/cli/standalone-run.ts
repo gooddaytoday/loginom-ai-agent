@@ -45,6 +45,7 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     return undefined
   })
   if (!bundle) return
+  process.env.LOGINOM_AI_AGENT_RESOURCES = bundle.resources
   if (signal?.aborted) {
     failure("CLI_CANCELLED", 130)
     return

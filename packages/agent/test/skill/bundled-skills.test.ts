@@ -6,6 +6,7 @@ import { Effect, Layer } from "effect"
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import { CrossSpawnSpawner } from "@loginom-ai-agent/core/cross-spawn-spawner"
 import { Skill } from "../../src/skill"
+import { Command } from "../../src/command"
 import { RuntimeFlags } from "../../src/effect/runtime-flags"
 import { provideTmpdirInstance, testInstanceStoreLayer } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
@@ -59,7 +60,7 @@ test("the product source catalog has all linked resources except declared genera
 
 const it = testEffect(
   Layer.mergeAll(
-    LayerNode.compile(Skill.node, [[RuntimeFlags.node, RuntimeFlags.layer({ loginomResources: resources })]]),
+    LayerNode.compile(LayerNode.group([Command.node, Skill.node]), [[RuntimeFlags.node, RuntimeFlags.layer({ loginomResources: resources })]]),
     LayerNode.compile(CrossSpawnSpawner.node),
     testInstanceStoreLayer,
   ),
@@ -75,6 +76,13 @@ it.live("discovers a verified bundled skill outside the source checkout", () =>
         expect(skill.location).toBe(join(resources, "skills", name, "SKILL.md"))
         expect(skill.digest).toMatch(/^[a-f0-9]{64}$/)
       }
+      const commands = yield* Command.Service
+      for (const name of reservedSkillNames) {
+        const command = yield* commands.get(name)
+        expect(command?.source).toBe("skill")
+        expect(command?.template).toContain(`Base directory for this skill: ${join(resources, "skills", name)}`)
+      }
+      for (const name of ["loginom-scenario", "loginom", "package_docs"]) expect(yield* commands.get(name)).toBeUndefined()
       const docs = (yield* skills.all()).find((skill) => skill.name === "package-docs")
       expect(docs).toBeDefined()
       expect(docs?.location).toBe(join(resources, "skills/package-docs/SKILL.md"))

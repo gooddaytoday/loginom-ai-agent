@@ -270,6 +270,21 @@ pin отклоняются; живой приёмочный адаптер до�
 отдельный разбор истории. Изменения Product/публикации записаны отдельно,
 исходная атрибуция Dock в source-map сохранена.
 
+Единый root: RED — sidecar наследовал root shell вместо application root;
+RED — настоящий standaloneRun с реальным Node Host сохранял подставленный root.
+GREEN — Desktop Host и createSidecarEnv используют loginomResources; proxy и
+shell не меняют этот root. Standalone передаёт standaloneBundle().resources
+до импорта backend. Существующий TUI worker наследует это окружение без нового
+механизма передачи. Dev skills.paths мост отсутствует и не добавлен.
+Desktop environment tests 15 PASS; реальный CLI startup/status/cleanup 1 PASS;
+bundled discovery и Command.get вне checkout 9 PASS (52 assertions): обе команды
+имеют source=skill, лишних loginom-scenario/loginom/package_docs нет.
+Agent/Desktop typecheck PASS. Логи tdd-{desktop,cli}-resource-root-*,
+resource-root-bundled-commands.log и *resource-root*typecheck.log.
+При расширении Command fixture сначала не был экспортирован dependency Skill;
+исправлена fixture через штатный LayerNode.group, без изменения реализации.
+Полный client suite запущен отдельно; итог ещё ожидается. Installed/live не проверены.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -282,5 +297,5 @@ pin отклоняются; живой приёмочный адаптер до�
 - Publisher отключён без чтения файлов/сети; серверная запись сохранена для baseline/старых клиентов.
 - Static catalog и source/installed generated exception проверены; этап 1 остаётся открытым.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
-- Следующий шаг: staged dev root, Node executor; разбор атрибуции остаётся gate живой приёмки.
+- Resource root Desktop/CLI и обе bundled команды проверены; следующий шаг — Node executor.
 - Живая приёмка и удаление серверного skill остаются открытыми.

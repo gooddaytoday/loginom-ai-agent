@@ -1,5 +1,5 @@
 import { loginomHostPort } from "./loginom/host-port"
-import type { desktopLoginom } from "./loginom/desktop-service"
+import { loginomResources, type desktopLoginom } from "./loginom/desktop-service"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { app, utilityProcess, MessageChannelMain } from "electron"
@@ -226,7 +226,7 @@ export async function checkHealth(url: string, password?: string | null): Promis
 
 function createSidecarEnv(proxy?: Record<string, string>, withoutProxy?: boolean): Record<string, string> {
   const base = withoutProxy ? withoutProxyEnvironment(process.env) : process.env
-  return sidecarEnvironment(base, withoutProxy ? undefined : proxy)
+  return sidecarEnvironment(base, withoutProxy ? undefined : proxy, loginomResources())
 }
 
 function serializeError(error: unknown) {
