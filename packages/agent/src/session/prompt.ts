@@ -1639,7 +1639,7 @@ const layer = Layer.effect(
         template = template + "\n\n" + input.arguments
       }
 
-      const shellMatches = ConfigMarkdown.shell(template)
+      const shellMatches = commandGrant ? [] : ConfigMarkdown.shell(template)
       if (shellMatches.length > 0) {
         const cfg = yield* config.get()
         const sh = Shell.preferred(cfg.shell)

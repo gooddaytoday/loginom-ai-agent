@@ -1236,16 +1236,30 @@ scope-order-probe.log сохраняют diagnosis. httpapi-sdk-loopback-regress
 **21 PASS**, 43 assertions; Agent typecheck и format/diff checks PASS.
 Список includes все четыре исходных HTTP/SSE teardown failures.
 
+## Буквальные аргументы встроенных slash-команд
+
+TDD выявил выполнение shell expression из аргументов package-docs до отказа
+skill permission. Для verified bundled product command shell expansion теперь
+пропускается: текст аргументов передаётся модели буквально, без побочного файла.
+Обычные configured commands сохраняют существующее выполнение shell template.
+
+tdd-bundled-command-shell-expansion-red.log → bundled-command-shell-green.log.
+Проверены docs с разрешением/отказом и automation с отказом, сохранение текста,
+отсутствие shell side effect, обычные command/attachment/shell flows.
+product-scope-command-regression.log: **132 PASS / 1 SKIP**, 588 assertions
+(prompt, TaskScope, SessionTools, registry, весь HTTP SDK).
+Agent typecheck и format/diff checks PASS. Installed/live выбор не проверен.
+
 ## Checkpoint
 
-- Исходный SHA `0c4bc0c94` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
+- Исходный SHA `9fc5dfa1e` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 41 PASS; оригинальные файлы/permission/cancellation проверены отдельно.
 - BrowserStatus и key-only Help работают по sources; GUI/TTY и первый запуск ещё открыты.
-- TaskScope/persisted subtask: prompt 78 PASS / 1 SKIP; HTTP SDK 21 PASS; typecheck PASS; cleanup исправлен.
+- Общая source scope/command/HTTP регрессия: 132 PASS / 1 SKIP; typecheck PASS; SSE cleanup исправлен.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.

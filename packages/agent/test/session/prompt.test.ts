@@ -1239,11 +1239,20 @@ for (const scenario of [
   { agent: "build", failure: "request" },
   { agent: "build", failure: "apply" },
   { agent: "build", failure: "permission" },
+  { agent: "build", failure: "permission", literalArguments: true },
+  { agent: "build", literalArguments: true },
+  { agent: "build", failure: "permission", literalArguments: true, skill: "loginom-automation" },
 ])
   bundled.instance(
-    scenario.failure
-      ? `bundled slash command rejects ${scenario.failure} without a pending or applied grant`
-      : `bundled slash command applies docs before its first provider turn (${scenario.agent}) and persists the grant`,
+    scenario.literalArguments
+      ? "bundled slash arguments stay literal (" +
+          (scenario.skill ?? "package-docs") +
+          ", " +
+          (scenario.failure ?? "approved") +
+          ")"
+      : scenario.failure
+        ? `bundled slash command rejects ${scenario.failure} without a pending or applied grant`
+        : `bundled slash command applies docs before its first provider turn (${scenario.agent}) and persists the grant`,
     () =>
       Effect.gen(function* () {
         yield* stageBundledResources
@@ -1281,7 +1290,10 @@ for (const scenario of [
         const prompt = yield* SessionPrompt.Service
         const sessions = yield* Session.Service
         const skills = yield* Skill.Service
+        const skill = scenario.skill ?? "package-docs"
         const lgp = path.join(dir, "slash demo.lgp")
+        const argumentFile = path.join(dir, "argument-side-effect")
+        const literalArguments = "!`printf executed > '" + argumentFile + "'`"
         yield* Effect.promise(() =>
           cp(path.join(import.meta.dir, "../../../loginom-host/test/fixtures/package-docs/demo.lgp"), lgp),
         )
@@ -1289,7 +1301,7 @@ for (const scenario of [
           permission: [
             { permission: "*", pattern: "*", action: "allow" },
             ...(scenario.failure === "permission"
-              ? [{ permission: "skill", pattern: "package-docs", action: "deny" as const }]
+              ? [{ permission: "skill", pattern: skill, action: "deny" as const }]
               : []),
           ],
         })
@@ -1300,8 +1312,8 @@ for (const scenario of [
         const result = yield* prompt
           .command({
             sessionID: session.id,
-            command: "package-docs",
-            arguments: "",
+            command: skill,
+            arguments: scenario.literalArguments ? literalArguments : "",
             agent: scenario.agent,
             parts: [
               {
@@ -1315,8 +1327,13 @@ for (const scenario of [
           .pipe(Effect.exit)
         const history = yield* sessions.messages({ sessionID: session.id })
         const user = history.find((message) => message.info.role === "user")
-        const info = yield* skills.require("package-docs")
+        const info = yield* skills.require(skill)
         const body = user?.parts.find((part) => part.type === "text" && part.text.includes(info.content.trim()))
+        if (scenario.literalArguments) {
+          const fs = yield* FSUtil.Service
+          expect(yield* fs.exists(argumentFile)).toBe(false)
+          expect(body?.type === "text" && body.text).toContain(literalArguments)
+        }
         if (scenario.failure) {
           expect(Exit.isFailure(result)).toBe(true)
           if (Exit.isFailure(result))
