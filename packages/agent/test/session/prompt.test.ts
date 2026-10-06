@@ -2677,7 +2677,29 @@ noLLMServer.instance(
   { config: cfg },
 )
 
-noLLMServer.instance("keeps an attached lgp as a path and does not inline the package", () =>
+noLLMServer.instance(
+  "resolves a Loginom package mention to its dedicated local file type",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const file = path.join(instance.directory, "Сценарий.LGP")
+      yield* Effect.promise(() => Bun.write(file, "<Package>mention-private-marker</Package>"))
+      const prompt = yield* SessionPrompt.Service
+      const parts = yield* prompt.resolvePromptParts("Документация по @Сценарий.LGP")
+      expect(parts.filter((part) => part.type === "file")).toEqual([
+        {
+          type: "file",
+          mime: "application/x-loginom-package",
+          url: pathToFileURL(file).href,
+          filename: "Сценарий.LGP",
+        },
+      ])
+      expect(JSON.stringify(parts)).not.toContain("mention-private-marker")
+    }),
+  { git: true, config: cfg },
+)
+
+noLLMServer.instance("normalizes a legacy text/plain lgp attachment without inlining the package", () =>
   Effect.gen(function* () {
     const { directory: dir } = yield* TestInstance
     const file = path.join(dir, "demo.lgp")
@@ -2693,7 +2715,7 @@ noLLMServer.instance("keeps an attached lgp as a path and does not inline the pa
         { type: "text", text: "Сформируй ИИ Отчет" },
         {
           type: "file",
-          mime: "application/x-loginom-package",
+          mime: "text/plain",
           url: pathToFileURL(file).href,
           filename: "demo.lgp",
         },
@@ -2706,6 +2728,7 @@ noLLMServer.instance("keeps an attached lgp as a path and does not inline the pa
     const files = stored.parts.filter((part) => part.type === "file")
     expect(files).toHaveLength(1)
     if (files[0]?.type === "file") {
+      expect(files[0].mime).toBe("application/x-loginom-package")
       expect(files[0].url.startsWith("file:")).toBe(true)
       expect(files[0].url.includes("base64")).toBe(false)
     }

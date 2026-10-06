@@ -222,6 +222,7 @@ export namespace FSUtil {
 
   // Pure helpers that don't need Effect (path manipulation, sync operations)
   export function mimeType(p: string): string {
+    if (p.toLowerCase().endsWith(".lgp")) return "application/x-loginom-package"
     return lookup(p) || "application/octet-stream"
   }
 

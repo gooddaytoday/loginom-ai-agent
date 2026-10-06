@@ -406,6 +406,21 @@ export const RunCommand = effectCmd({
             exitCli(1)
           }
 
+          const detected = FSUtil.mimeType(resolvedPath)
+          if (!args.attach && detected === "application/x-loginom-package") {
+            if (!stat?.isFile()) {
+              UI.error(`Cannot attach a non-regular Loginom package: ${filePath}`)
+              exitCli(1)
+            }
+            files.push({
+              type: "file",
+              url: pathToFileURL(resolvedPath).href,
+              filename: path.basename(resolvedPath),
+              mime: detected,
+            })
+            continue
+          }
+
           const content = await (async () => {
             if (!args.attach && !process.env.LOGINOM_AI_AGENT_CLI_ROOT) return
             return fileSnapshot(resolvedPath).catch((error: Error) => {
@@ -413,7 +428,6 @@ export const RunCommand = effectCmd({
               return exitCli(1)
             })
           })()
-          const detected = FSUtil.mimeType(resolvedPath)
           const text = content?.toString("utf8")
           const mime =
             content === undefined

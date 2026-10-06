@@ -792,7 +792,7 @@ TUI local attachment, HostPort/admission и продуктовый executor.
   вложения перед операцией. Help и `loginom_dock_diagnostics` никогда не
   вызывают admission. Неподготовленный chat-runtime требует prepare,
   остальные Dock-вызовы его молча не создают.
-- [ ] `run --file x.lgp` создаёт `file:`-часть с абсолютным путём и MIME
+- [x] `run --file x.lgp` создаёт `file:`-часть с абсолютным путём и MIME
   `application/x-loginom-package`, включая `LOGINOM_AI_AGENT_CLI_ROOT`.
   Убрать кодирование `.lgp` в `data:`; согласовать MIME в `fs-util.ts` и
   распознавание в prompt. Прикреплённый путь — разрешение на чтение, не upload.

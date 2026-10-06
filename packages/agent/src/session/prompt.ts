@@ -191,7 +191,12 @@ const layer = Layer.effect(
             type: "file",
             url: pathToFileURL(filepath).href,
             filename: name,
-            mime: stat.type === "Directory" ? "application/x-directory" : "text/plain",
+            mime:
+              stat.type === "Directory"
+                ? "application/x-directory"
+                : FSUtil.mimeType(filepath) === "application/x-loginom-package"
+                  ? "application/x-loginom-package"
+                  : "text/plain",
           })
         }),
         { concurrency: "unbounded", discard: true },
@@ -833,6 +838,7 @@ const layer = Layer.effect(
                   },
                   {
                     ...part,
+                    mime: "application/x-loginom-package",
                     filename: part.filename ?? path.basename(filepath),
                     messageID: info.id,
                     sessionID: input.sessionID,

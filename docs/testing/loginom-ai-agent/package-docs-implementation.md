@@ -1127,9 +1127,29 @@ backend и чтение файла, с контролируемым HTTP provide
 format/diff checks PASS. Это source subprocess proof; установленный
 `run --command package-docs`, Desktop/TUI и `.lgp` path/MIME ещё не приняты.
 
+## Локальный `.lgp` в CLI и backend
+
+TDD подтвердил `data:text/plain` вместо локального пути при `CLI_ROOT`.
+`run --file` теперь сохраняет URL регулярного `.lgp` и MIME
+`application/x-loginom-package`, пропуская byte snapshot. Core MIME helper
+распознаёт `.lgp` без учёта регистра. Backend нормализует старые file-части
+с `text/plain`, а template `@`-упоминания получают тот же MIME. Удалённый
+`--attach` сохраняет отдельную семантику передачи клиентских байтов.
+
+Проверки настоящим source CLI охватывают обычный prompt/command,
+с/без `CLI_ROOT`, кириллицу и пробелы. История прочитана через CLI `export`:
+точный `file:` URL/MIME сохранён, marker байтов отсутствует в provider request.
+`tdd-cli-lgp-path-red.log`, `tdd-prompt-lgp-mime-red.log` и
+`tdd-prompt-lgp-mention-red.log` фиксируют исходные ошибки.
+Первый общий запуск не задал обязательный TEST_NODE и выявил ошибку настройки
+нового mention fixture; после исправления fixture и закрепления Node:
+`lgp-cli-prompt-final.log` — **94 PASS / 1 SKIP**, 453 assertions.
+Agent/Core typecheck и format/diff checks PASS. В плане отмечен только
+реализованный пункт CLI path/MIME; installed/TTY/GUI acceptance открыта.
+
 ## Checkpoint
 
-- Исходный SHA `6e66a4f24` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
+- Исходный SHA `1912397cf` (`docs-no-browser`); bundled tool/slash activation и pending-revert проверены выше.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -1145,5 +1165,5 @@ format/diff checks PASS. Это source subprocess proof; установленн�
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
-- CLI command attachments: 14 PASS, typecheck PASS; далее `.lgp` URL/MIME, остальные races и Task bypass.
+- CLI command attachments и `.lgp` path/MIME: 94 PASS / 1 SKIP; Agent/Core typecheck PASS; далее TUI, races, Task bypass.
 - Затем Linux Desktop/CLI/TTY, естественный выбор skill и парные live evals на принятом harness SHA.
