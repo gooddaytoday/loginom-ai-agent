@@ -433,6 +433,20 @@ docs-fixed-output-regression.log. Полный Host suite после staging: 18
 6 Windows-only SKIP, 0 FAIL (186 тестов, 947 assertions); stage2-host-suite.log.
 Ограниченный агентский tool и permissions ещё не подключены.
 
+Agent tool extract: RED — package_docs_run не выполнял извлечение.
+GREEN — отдельное определение Tool использует настоящие Session/Permission,
+полную историю user file parts и фиксированный bundled Node argv; никаких
+LoginomHost acquire/lease/call. Resource hashes/closure и Node SHA/containment
+проверяются перед запуском, окружение минимально, AppProcess владеет отменой.
+Отдельные RED/GREEN: явный read deny для вложения, edit deny относительно
+корня проекта при вложенном session directory, read deny на symlink-имя,
+external_directory deny. Регрессии: plan, путь только от модели, range URL,
+повреждённый script до запуска. Fixture использует SessionProjector и реальные
+Permission rules; проверки project-relative patterns запускаются в git fixture.
+9 PASS (30 assertions), Agent typecheck PASS; tdd-agent-docs-*, agent-docs-extract-final.log.
+Инструмент не внесён в общую registry и пока не подключён к SessionTools:
+skeleton/emit, проверки lifecycle и TaskScope activation остаются открытыми.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -447,5 +461,5 @@ docs-fixed-output-regression.log. Полный Host suite после staging: 18
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
 - Этап 2: pipeline 41 PASS, staging 13 PASS; Host suite 180 PASS / 6 SKIP.
-- Следующий шаг — ограниченный tool; 35 baseline source-map mismatches остаются live gate.
+- Tool extract проверен; следующий шаг — skeleton/emit и lifecycle, затем TaskScope.
 - Живая приёмка и удаление серверного skill остаются открытыми.
