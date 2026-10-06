@@ -127,6 +127,9 @@ export async function cleanupOrphanResult(input: { source: ArtifactSource; name:
   if (!entries.some(entry => entry.name === input.name)) return
   await mkdir(path.join(input.outDir, "storage-outputs"), { recursive: true })
   await copyOut(input.source, input.name, path.join(input.outDir, "storage-outputs", input.name))
+  if (input.source.kind === "dir") return rm(path.join(input.source.dir, input.name))
+  const removed = await Bun.$`docker exec ${input.source.container} rm -f -- ${`${input.source.storageDir}/${input.name}`}`.quiet().nothrow()
+  if (removed.exitCode !== 0) throw Error(`docker exec rm: ${removed.stderr.toString().trim()}`)
 }
 
 function belongsToAttempt(name: string, prefix: string) {

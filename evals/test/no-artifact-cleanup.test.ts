@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import os from "node:os"
 import path from "node:path"
 import { mkdir, mkdtemp, rm } from "node:fs/promises"
-import { parseArtifactSource } from "../src/artifact"
+import { cleanupOrphanResult, parseArtifactSource } from "../src/artifact"
 import { agentCommand } from "../src/cli"
 import { loadConfig } from "../src/config"
 import { runAttempt } from "../src/run"
@@ -30,3 +30,20 @@ test("runAttempt сохраняет CSV без LGP как evidence, не пре�
       .toBe("Region,A,B\nN,7.5,7\nS,3,2\n")
   } finally { await rm(directory, { recursive: true, force: true }) }
 }, 30_000)
+
+test("cleanupOrphanResult удаляет только точный собственный CSV после сохранения evidence", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "eval-orphan-"))
+  try {
+    const storage = path.join(directory, "storage")
+    await mkdir(storage)
+    const name = "eval-run-case-1.result.csv"
+    await Bun.write(path.join(storage, name), "csv bytes\n")
+    await Bun.write(path.join(storage, "eval-run-case-10.result.csv"), "other attempt\n")
+    await Bun.write(path.join(storage, "personal.csv"), "other user\n")
+    await cleanupOrphanResult({ source: parseArtifactSource(`dir:${storage}`, { container: "", storageDir: "" }), name, outDir: directory })
+    expect(await Bun.file(path.join(storage, name)).exists()).toBe(false)
+    expect(await Bun.file(path.join(directory, "storage-outputs", name)).text()).toBe("csv bytes\n")
+    expect(await Bun.file(path.join(storage, "eval-run-case-10.result.csv")).text()).toBe("other attempt\n")
+    expect(await Bun.file(path.join(storage, "personal.csv")).text()).toBe("other user\n")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
