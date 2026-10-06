@@ -435,6 +435,12 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
 из **этого runtime после rebase**, включая CrossTable в `user-results.mjs`.
 Тексты Codex/Hermes-плагинов Dock не подставлять вместо этого контракта.
 
+- [x] Первая TDD-связка: `Skill.all()` находит проверенный bundled skill вне
+  checkout через `RuntimeFlags.layer({ loginomResources })`; источник и digest
+  сохранены, одноимённый проектный `.agents` skill не вытесняет bundled.
+  Это начальная связка этапов 1–3; полный перенос и проверка ресурсов ещё открыты.
+- [x] TDD-проверка manifest: неучтённый файл skill отклоняется общим
+  `verifyBundledSkills`, не регистрируется как часть встроенного skill.
 - [ ] Перенести существующий `loginom-automation` с сохранением имени и нужных
   references в Product; `.loginom-ai-agent/skills/package_docs/` перенести в
   `packages/product/skills/package-docs/`, изменив каталог/frontmatter.

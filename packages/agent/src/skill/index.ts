@@ -17,6 +17,8 @@ import { Glob } from "@loginom-ai-agent/core/util/glob"
 import { Discovery } from "./discovery"
 import { isRecord } from "@/util/record"
 import { escapeHtml } from "@/util/html"
+import { verifyBundledSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
+import { isReservedSkillName } from "@loginom-ai-agent/product/skills"
 
 const CLAUDE_EXTERNAL_DIR = ".claude"
 const AGENTS_EXTERNAL_DIR = ".agents"
@@ -39,6 +41,8 @@ export const Info = Schema.Struct({
   description: Schema.optional(Schema.String),
   location: Schema.String,
   content: Schema.String,
+  source: Schema.optional(Schema.Literals(["builtin", "bundled", "external", "project", "config", "url"])),
+  digest: Schema.optional(Schema.String),
 })
 export type Info = Schema.Schema.Type<typeof Info>
 
@@ -102,7 +106,12 @@ export interface Interface {
   readonly available: (agent?: Agent.Info) => Effect.Effect<Info[]>
 }
 
-const add = Effect.fnUntraced(function* (state: State, match: string, events: EventV2Bridge.Service["Service"]) {
+const add = Effect.fnUntraced(function* (
+  state: State,
+  match: string,
+  events: EventV2Bridge.Service["Service"],
+  origin: { source: Info["source"]; digest?: string } = { source: "config" },
+) {
   const md = yield* Effect.tryPromise({
     try: () => ConfigMarkdown.parse(match),
     catch: (err) => err,
@@ -122,6 +131,17 @@ const add = Effect.fnUntraced(function* (state: State, match: string, events: Ev
 
   if (!isSkillFrontmatter(md.data)) return
 
+  if (origin.source !== "bundled" && isReservedSkillName(md.data.name)) {
+    yield* Effect.logWarning("ignored reserved product skill from an untrusted source", { skill: match })
+    const { Session } = yield* Effect.promise(() => import("@/session/session"))
+    yield* events.publish(Session.Event.Error, {
+      error: new NamedError.Unknown({
+        message: `Ignored external skill '${md.data.name}': this name is reserved for a bundled Loginom skill.`,
+      }).toObject(),
+    })
+    return
+  }
+
   if (state.skills[md.data.name]) {
     yield* Effect.logWarning("duplicate skill name", {
       name: md.data.name,
@@ -136,6 +156,7 @@ const add = Effect.fnUntraced(function* (state: State, match: string, events: Ev
     description: md.data.description,
     location: match,
     content: md.content,
+    ...origin,
   }
 })
 
@@ -280,6 +301,24 @@ const layer = Layer.effect(
           description: CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION,
           location: "<built-in>",
           content: CUSTOMIZE_OPENCODE_SKILL_BODY,
+          source: "builtin",
+        }
+        if (flags.loginomResources) {
+          const bundled = yield* Effect.tryPromise(() => verifyBundledSkills(flags.loginomResources!)).pipe(
+            Effect.catch(
+              Effect.fnUntraced(function* () {
+                const { Session } = yield* Effect.promise(() => import("@/session/session"))
+                yield* events.publish(Session.Event.Error, {
+                  error: new NamedError.Unknown({
+                    message: "Bundled skills are unavailable. Verify the Loginom resource path or reinstall the application.",
+                  }).toObject(),
+                })
+                yield* Effect.logWarning("bundled skill verification failed")
+                return []
+              }),
+            ),
+          )
+          for (const skill of bundled) yield* add(s, skill.location, events, { source: "bundled", digest: skill.digest })
         }
         yield* loadSkills(s, yield* InstanceState.get(discovered), events)
         return s
@@ -304,7 +343,7 @@ const layer = Layer.effect(
     })
 
     const dirs = Effect.fn("Skill.dirs")(function* () {
-      return (yield* InstanceState.get(discovered)).dirs
+      return [...new Set([...(yield* InstanceState.get(discovered)).dirs, ...(yield* InstanceState.get(state)).dirs])]
     })
 
     const available = Effect.fn("Skill.available")(function* (agent?: Agent.Info) {

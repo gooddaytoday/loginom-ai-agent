@@ -84,10 +84,26 @@ Dock: clean `83c52ebb653e6bd7df294d4e24fc5545cb955b14`, полный катал�
 состояние и пересчитать хэши окончательного snapshot; текущие refs не доказывают
 принятую калибровку.
 
+## Этап 1: первые TDD-связки
+
+| Поведение | RED | GREEN |
+| --- | --- | --- |
+| Bundled skill вне checkout через RuntimeFlags | `Skill.all()` не вернул package-docs | 1 PASS |
+| Зарезервированное имя не подменяется проектным `.agents` skill | Вернулся source=config и проектный текст | 2 PASS |
+| Неучтённый файл skill запрещён | verifyBundledSkills успешно принял unlisted.mjs | 1 Host PASS |
+
+Логи RED/GREEN находятся в каталоге baseline с префиксом `tdd-`.
+Добавлен Node-only Product export `./skills`, базовый общий verifier и trusted
+manifest source V1. Первые проверки выполняются на маленьком реальном каталоге
+ресурсов без Chromium/Node stub и без изменения `process.env`.
+Все исходные skill/tool/attachment-preview проверки вместе с новыми: 30 PASS;
+typecheck Agent, Host и Product — PASS. Полная проверка assets/metadata,
+классификация источников и их порядок, runtime/staging ещё открыты.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
 - Этап 0 выполнен: полный чистый baseline и детерминированные проверки сохранены.
-- Продуктовые изменения пока не начинались.
-- Следующий шаг: первый RED → GREEN для bundled skill вне checkout через RuntimeFlags.
+- Начата проверенная TDD-связка discovery/integrity, этап 1 остаётся открытым.
+- Следующий шаг: ссылки/metadata assets, realpath-dedup, перенос каталога skills и staging/runtime.
 - Живая приёмка и удаление серверного skill остаются открытыми.
