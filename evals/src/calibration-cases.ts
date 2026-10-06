@@ -24,6 +24,10 @@ export async function prepareCalibrationCases(tasks: Task[], runDir: string, cor
     if (!(await file.exists())) continue
     const source = await file.text()
     const corpus = JSON.parse(source) as CalibrationCorpus
+    for (const [name, digest] of Object.entries(corpus.sources)) {
+      const actual = new Bun.CryptoHasher("sha256").update(await Bun.file(path.join(task.dir, name)).bytes()).digest("hex")
+      if (actual !== digest) throw new EvalFailure(task.id + ": устаревший источник " + name, 2)
+    }
     hasher.update(task.id + "\n" + source)
     for (const mutation of corpus.cases) {
       const artifactDir = path.join(runDir, task.id, "near-miss", mutation.id, "artifact")
