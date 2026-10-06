@@ -1728,9 +1728,60 @@ Native regression driver проверяет original archive installer, installe
 установка и соседний evals worktree не затрагиваются. Driver не доказывает
 естественный выбор skill, документацию, обновление истории или live Loginom.
 
+## Исправленный Linux CLI: actual archive installer gate
+
+Новый полный CLI tar.gz собран из чистого
+`6c24f8de700aa8a09aaead9a2e2d392fde8d8284`, source tree SHA256
+`fbe776b329fe343155ec89deb2033e89a2742915682c3a0e4edf52d65a6feb79`.
+Сборка, full manifest verification, archive roundtrip и повторный `sha256sum -c`
+PASS. Archive SHA256:
+`d50f2789c6f64304af1f5505a126fcaf930312b9095b16a30e102e1d84cadd5e`;
+CLI manifest SHA256:
+`21614876222fff71599382995e051660af5c753da4de4048f7cbb93f36bc1351`;
+resource manifest SHA256:
+`22bc431ddc8464f9178af9aaa9e3302bed2bc4e6f844d85dc81bfe6d93f4af52`.
+Пины Node/Bun/Chromium/PW и версия 0.1.17 prod сохранены. Исходный C8 и baseline
+не изменены; установленный Desktop остаётся проверенным C8, SHA не смешиваются.
+
+В отдельной Ubuntu22 image
+`loginom-package-docs:6c24f8de7-cli-20261007` (SHA
+`a5d2c58880e72a93378316b3c44e4de0a6c33c94233cde56bd28a45cbe4558c0`)
+финальный native installer driver **PASS**, UID 1200, `network none`, init.
+Штатный CLI создал собственный profile до установки; install выполнил original
+archive entry, launcher без override вернул unconfigured status. Sandbox
+root:root/**4755**; Chromium запущен с sandbox именно установленным Node,
+`verifyResources` подтвердил привязку его `process.execPath` к этому payload.
+Штатный uninstall удалил payload/launcher/receipt, сохранив profile sentinel.
+Собственный контейнер удалён после копирования evidence.
+
+Две промежуточные ошибки driver исправлены без изменения продукта: ручное
+создание profile обходило его публичную инициализацию и выставляло 0755;
+затем runtime verifier правильно отказал `LOGINOM_NODE_PATH_MISMATCH`, когда
+его вызвали архивным Node для установленного tree. Эти runs не засчитываются
+как полная приёмка. Финальный driver использует публичный `loginom status`
+для инициализации и отдельный child установленного Node для browser probe.
+Driver hash записан отдельно от source SHA проверяемого binary.
+Этот же финальный driver повторно получил RED на неизменённом C8 archive:
+profile-init прошёл, original install entry вернул `CLI_INSTALL_FAILED`.
+Права sudo в обеих тестовых средах разрешали chown и chmod; архивы не подменялись.
+Evidence `cli-install-native-final-driver-red-{evidence,container.json}`.
+
+На том же неизменном CLI candidate полный PDF/DOCX/MD pipeline:
+**3 PASS / 57 assertions** с actual compiled CLI, своим контролируемым Help/provider,
+private profiles и PATH без глобального Node. Это механика полного результата,
+не live Help или natural selection. Evidence:
+`candidate-6c24f8de7-cli/{native-install-accepted,full-docs-pipeline}/`,
+`native-install-accepted-container.json`, `native-install-driver.sha256`,
+логи `cli-6c24f8de7-{build,docker-build,pipeline}.log` и
+`cli-install-native-6c24f8de7-accepted.log`.
+Обновление/история, CLI run/TUI cold discovery и другие Linux-среды ещё открыты.
+В плане отмечен только пункт сборки полных Desktop/CLI artifacts, их manifest,
+static Desktop verification и native AppImage/installed launchers. Требования
+плана не пересматривались; этап 8 остаётся открытым.
+
 ## Checkpoint
 
-- Product candidate SHA `8dc7bdccb` (`docs-no-browser`); полные Desktop/CLI artifacts/manifest/archive сохранены.
+- Product candidates: Desktop `8dc7bdccb`, CLI `6c24f8de7`; полные artifacts/manifest/archive сохранены, SHA различаются.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -1747,5 +1798,5 @@ Native regression driver проверяет original archive installer, installe
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS, native PTY paste/mention 2 PASS; attachment: 44 PASS.
-- CLI installer C8 RED 3/3: chown сбрасывал setuid; source fix GREEN, Host 226 PASS / 6 SKIP; новый binary gate открыт.
+- CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Desktop static/native AppImage/Ubuntu22 installed cold PASS; native docs 3 PASS; routing live 0; далее CLI/model/evals.

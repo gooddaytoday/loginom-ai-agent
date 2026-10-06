@@ -1059,7 +1059,7 @@ Core имеет разметку осей, но без CSV oracle. По доку
   и изолированным профилем; credentials не сохранять в отчёт.
 - [x] Собрать новые кандидаты в отдельные каталоги, без публикации. До release
   manifest зафиксировать build inputs по действующему регламенту проекта.
-- [ ] Собрать Linux Desktop DEB/AppImage и полный standalone CLI tar.gz с общим staging,
+- [x] Собрать Linux Desktop DEB/AppImage и полный standalone CLI tar.gz с общим staging,
   независимыми manifest и установленными launchers. Сборка одного backend
   `--standalone` без Node/runtime/skills не считается кандидатом CLI.
   Статически проверить оба Desktop-артефакта через общую integrity-функцию.

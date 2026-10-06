@@ -2,7 +2,6 @@ import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
 import { lstat, mkdir, mkdtemp, readFile, readlink, rm, writeFile } from "node:fs/promises"
-import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { isAbsolute, join } from "node:path"
 import { promisify } from "node:util"
@@ -26,6 +25,7 @@ const env = {
   TMPDIR: home,
   LANG: "C.UTF-8",
   LOGINOM_AI_AGENT_SYSTEM_PROXY: "off",
+  LOGINOM_AI_AGENT_CLI_PROFILE: join(home, "profile"),
 }
 const execute = promisify(execFile)
 const result = { status: "FAIL", uid: process.getuid(), artifact, home }
@@ -49,9 +49,12 @@ try {
   const originalSandbox = await lstat(join(artifact, sandboxRelative))
   assert.equal(originalSandbox.mode & 0o7777, 0o4755)
   assert.notEqual(originalSandbox.uid, 0, "archive extraction must reproduce user-owned sandbox")
-  const profile = join(env.XDG_CONFIG_HOME, "com.loginom.aiagent/cli/profiles/default")
-  await mkdir(profile, { recursive: true })
-  await writeFile(join(profile, "keep"), "existing CLI profile")
+  const initial = JSON.parse(
+    await run("profile-init", join(artifact, "bin/loginom-ai-agent-cli"), ["loginom", "status", "--format", "json"]),
+  )
+  assert.equal(initial.state, "unconfigured")
+  const profile = env.LOGINOM_AI_AGENT_CLI_PROFILE
+  await writeFile(join(profile, "data/keep"), "existing CLI profile", { mode: 0o600 })
   const installed = JSON.parse(await run("install", join(artifact, "install.sh")))
   const launcher = join(home, ".local/bin/loginom-ai-agent-cli")
   assert.equal(installed.launcher, launcher)
@@ -69,25 +72,31 @@ try {
   assert.equal(status.state, "unconfigured")
   assert.equal(status.hasApiKey, false)
   const resources = join(installed.destination, "resources/loginom")
-  const require = createRequire(join(resources, "runtime/client/package.json"))
-  const { chromium } = require("playwright-core")
-  const { verifyResources } = await import(join(resources, "runtime/src/resources.mjs"))
-  const verified = await verifyResources(resources)
-  const browser = await chromium.launch({
-    executablePath: verified.browserPath,
-    headless: true,
-    chromiumSandbox: true,
-    env,
-  })
-  try {
-    const page = await browser.newPage()
-    await page.setContent("<title>Installed CLI browser</title>")
-    assert.equal(await page.title(), "Installed CLI browser")
-  } finally {
-    await browser.close()
-  }
+  // verifyResources binds process.execPath to this installed tree, not the archive's Node.
+  await run("browser", join(resources, "bin/node"), [
+    "--input-type=module",
+    "-e",
+    `import assert from "node:assert/strict"
+import { createRequire } from "node:module"
+import { join } from "node:path"
+const resources = process.argv[1]
+const require = createRequire(join(resources, "runtime/client/package.json"))
+const { chromium } = require("playwright-core")
+const { verifyResources } = await import(join(resources, "runtime/src/resources.mjs"))
+const verified = await verifyResources(resources)
+const browser = await chromium.launch({ executablePath: verified.browserPath, headless: true, chromiumSandbox: true })
+try {
+  const page = await browser.newPage()
+  await page.setContent("<title>Installed CLI browser</title>")
+  assert.equal(await page.title(), "Installed CLI browser")
+  console.log(JSON.stringify({ status: "PASS", node: process.execPath, manifestHash: verified.manifestHash, browserSandbox: true }))
+} finally {
+  await browser.close()
+}`,
+    resources,
+  ])
   await run("uninstall", join(artifact, "uninstall.sh"))
-  assert.equal(await readFile(join(profile, "keep"), "utf8"), "existing CLI profile")
+  assert.equal(await readFile(join(profile, "data/keep"), "utf8"), "existing CLI profile")
   for (const file of [launcher, installed.destination, join(home, ".local/share/loginom-ai-agent-cli/current.json")]) {
     assert.equal(
       await lstat(file).then(
