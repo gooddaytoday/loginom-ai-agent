@@ -1,10 +1,11 @@
-import { Effect, Schema } from "effect"
+import { Cause, Effect, Schema } from "effect"
 import { ChildProcess } from "effect/unstable/process"
 import { createHash } from "node:crypto"
 import { basename, dirname, extname, isAbsolute, join, relative, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { AppProcess } from "@loginom-ai-agent/core/process"
 import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
 import { verifyBundledSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { InstanceState } from "@/effect/instance-state"
@@ -59,19 +60,27 @@ export const PackageDocsTool = Tool.define(
           )
           const rules = Permission.merge((yield* agents.get(ctx.agent)).permission, session.permission ?? [])
           const readPatterns = [...new Set([requested, lgp].map((path) => relative(instance.worktree, path)))]
-          if (
-            !attached.some(Boolean) ||
-            Permission.evaluate("external_directory", join(dirname(lgp), "*").replaceAll("\\", "/"), rules).action ===
-              "deny"
-          ) {
-            yield* assertExternalDirectoryEffect(ctx, lgp)
-          }
-          if (
-            !attached.some(Boolean) ||
-            readPatterns.some((pattern) => Permission.evaluate("read", pattern, rules).action === "deny")
-          ) {
-            yield* ctx.ask({ permission: "read", patterns: readPatterns, always: ["*"], metadata: { filepath: lgp } })
-          }
+          yield* Effect.gen(function* () {
+            if (
+              !attached.some(Boolean) ||
+              Permission.evaluate("external_directory", join(dirname(lgp), "*").replaceAll("\\", "/"), rules).action ===
+                "deny"
+            ) {
+              yield* assertExternalDirectoryEffect(ctx, lgp)
+            }
+            if (
+              !attached.some(Boolean) ||
+              readPatterns.some((pattern) => Permission.evaluate("read", pattern, rules).action === "deny")
+            ) {
+              yield* ctx.ask({ permission: "read", patterns: readPatterns, always: ["*"], metadata: { filepath: lgp } })
+            }
+          }).pipe(
+            Effect.catchCause((cause) => {
+              if (Cause.squash(cause) instanceof PermissionV1.RejectedError)
+                return Effect.die(new PackageReadRejected({}))
+              return Effect.failCause(cause)
+            }),
+          )
           const stem = basename(lgp, extname(lgp))
           const work = join(
             directory,
@@ -164,6 +173,12 @@ export const PackageDocsTool = Tool.define(
     }
   }),
 )
+
+class PackageReadRejected extends PermissionV1.RejectedError {
+  override get message() {
+    return super.message + " Для CLI передайте пакет через --file; в Desktop/TUI приложите файл к сообщению."
+  }
+}
 
 const availableReport = Effect.fn("PackageDocs.availableReport")(function* (
   fs: FSUtil.Interface,

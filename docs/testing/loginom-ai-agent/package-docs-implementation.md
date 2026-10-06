@@ -493,6 +493,16 @@ timeout-process,process-environment,lifecycle-regression}.log.
 Пункт Node executor этапа 2 отмечен. Read rejection --file hint, SKILL.md,
 TaskScope/SessionTools и установленная приёмка ещё открыты.
 
+Package read rejection: RED — стандартный RejectedError не объяснял --file.
+GREEN — только отклонённый read/external_directory для входного пакета
+получает подсказку CLI --file / Desktop/TUI attachment. Ошибка остаётся
+instanceof PermissionV1.RejectedError; policy DeniedError и прочие причины
+сохраняются без подмены. Проверка использует настоящие Permission list/reply,
+fork/join и опубликованный pending request. 29 быстрых PASS (99 assertions),
+Agent typecheck PASS; tdd-agent-docs-read-hint-*, agent-docs-read-hint-final.log.
+Process timeout ранее проверен отдельно; код управления процессом не изменён.
+Actual standalone rejection/exit marker ещё проверить через SessionTools/run.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.

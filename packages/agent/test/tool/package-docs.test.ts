@@ -800,3 +800,29 @@ it.instance(
     }),
   20_000,
 )
+
+it.instance(
+  "rejected package access remains typed and tells CLI users to attach it with --file",
+  () =>
+    Effect.gen(function* () {
+      const permissions = yield* Permission.Service
+      const input = yield* prepare()
+      const fiber = yield* input.tool
+        .execute({ operation: "extract", lgp: fixture }, input.ctx)
+        .pipe(Effect.exit, Effect.forkScoped)
+      const request = yield* pollWithTimeout(
+        permissions
+          .list()
+          .pipe(Effect.map((requests) => requests.find((request) => request.sessionID === input.ctx.sessionID))),
+        "package permission request did not appear",
+      )
+      yield* permissions.reply({ requestID: request.id, reply: "reject" })
+      const result = yield* Fiber.join(fiber)
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) {
+        expect(Cause.squash(result.cause)).toBeInstanceOf(PermissionV1.RejectedError)
+        expect(String(Cause.squash(result.cause))).toContain("--file")
+      }
+    }),
+  20_000,
+)
