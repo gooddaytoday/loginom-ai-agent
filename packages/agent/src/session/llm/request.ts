@@ -9,6 +9,7 @@ import type { MessageV2 } from "../message-v2"
 import type { Provider } from "@/provider/provider"
 import { ProviderTransform } from "@/provider/transform"
 import { SystemPrompt } from "../system"
+import { Product } from "@loginom-ai-agent/product"
 import { InstallationVersion } from "@loginom-ai-agent/core/installation/version"
 import { Effect, Record } from "effect"
 import { jsonSchema, tool as aiTool, type ModelMessage, type Tool } from "ai"
@@ -191,7 +192,7 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
             "x-opencode-session": input.sessionID,
             "x-opencode-request": input.user.id,
             "x-opencode-client": input.flags.client,
-            "User-Agent": USER_AGENT,
+            "User-Agent": `opencode/${Product.opencodeCompatibilityVersion}`,
           }
         : {
             "x-session-affinity": input.sessionID,

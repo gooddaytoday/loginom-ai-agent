@@ -372,3 +372,14 @@ managed/MCP 2 PASS. Изолированный текущий runtime на на�
 пакетов. DPR=1, viewport1920×966. Устаревший oracle потребовал временного удаления
 запрещённого `budgets`; автоматический resume в диагностической копии отключён.
 Подробности и хеши — в browser-scale отчёте. Официальные установщики не пересобраны.
+
+## 2026-10-06 — локальная совместимость OpenCode на Mac
+
+- База `f6f9b0106`; ветка `opencode-compatibility`; совместимость провайдера отделена от версии Loginom.
+- LLM tests: 32 PASS; macOS source checks: все этапы PASS.
+- Кандидат SHA `108aa93fc`, `0.1.17-opencode.1`, dev, macOS arm64, обычный backend v1.
+- UI PASS: два завершённых FREE-OK в одном постоянном чате `opencode/ling-3.1-flash-free`; ошибки версии нет.
+- DMG/ZIP signatures, CLI archive roundtrip и offline smoke PASS. Production 0.1.16 не заменён.
+- Полный pipeline FAIL: завис CLI source snapshot; остаточные проверки завершены отдельно штатными helpers.
+- Dev оставлен открытым; evidence, ограничения и путь — [отчёт](../testing/loginom-ai-agent/reports/2026-10-06-opencode-compatibility/report.md).
+- Следующий шаг: ручная проверка Dev; перед выпуском устранить зависание и повторить pipeline. Push/PR/релиза не было.

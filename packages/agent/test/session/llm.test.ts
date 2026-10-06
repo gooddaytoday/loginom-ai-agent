@@ -28,6 +28,7 @@ import { AppNodeBuilder } from "@loginom-ai-agent/core/effect/app-node-builder"
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import { LayerNodePlatform } from "@loginom-ai-agent/core/effect/app-node-platform"
 import { ProviderError } from "@/provider/error"
+import { InstallationVersion } from "@loginom-ai-agent/core/installation/version"
 
 type ConfigModel = NonNullable<NonNullable<ConfigV1.Info["provider"]>[string]["models"]>[string]
 
@@ -756,71 +757,102 @@ describe("session.llm.stream", () => {
   const vivgridFixture = { providerID: "vivgrid", modelID: "gemini-3.1-pro-preview" }
   const opencodeFixture = { providerID: "opencode-test", modelID: vivgridFixture.modelID }
 
-  it.instance(
-    "sends the parent session header for opencode providers",
-    () =>
-      Effect.gen(function* () {
-        const fixture = loadFixture(vivgridFixture.providerID, vivgridFixture.modelID)
-        const request = waitRequest(
-          "/chat/completions",
-          new Response(createChatStream("Hello"), {
-            status: 200,
-            headers: { "Content-Type": "text/event-stream" },
-          }),
-        )
-        const resolved = yield* Provider.use.getModel(
-          ProviderV2.ID.make(opencodeFixture.providerID),
-          ModelV2.ID.make(opencodeFixture.modelID),
-        )
-        const sessionID = SessionID.make("session-child")
-        const parentSessionID = SessionID.make("session-parent")
-        const agent = {
-          name: "test",
-          mode: "primary",
-          options: {},
-          permission: [{ permission: "*", pattern: "*", action: "allow" }],
-        } satisfies Agent.Info
-        const user = {
-          id: MessageID.make("msg_user-parent-header"),
-          sessionID,
-          role: "user",
-          time: { created: Date.now() },
-          agent: agent.name,
-          model: {
-            providerID: ProviderV2.ID.make(opencodeFixture.providerID),
-            modelID: resolved.id,
-          },
-        } satisfies SessionV1.User
-
-        yield* drain({
-          user,
-          sessionID,
-          parentSessionID,
-          model: resolved,
-          agent,
-          system: ["You are a helpful assistant."],
-          messages: [{ role: "user", content: "Hello" }],
-          tools: {},
-        })
-
-        expect((yield* Effect.promise(() => request)).headers.get("x-parent-session-id")).toBe(parentSessionID)
-      }),
+  ;[
+    { name: "compatibility version", modelHeader: undefined, pluginHeader: undefined, expected: "opencode/1.18.31" },
+    { name: "model header override", modelHeader: "custom/model", pluginHeader: undefined, expected: "custom/model" },
     {
-      config: () => {
-        const fixture = loadFixture(vivgridFixture.providerID, vivgridFixture.modelID)
-        return {
-          enabled_providers: [opencodeFixture.providerID],
-          provider: {
-            [opencodeFixture.providerID]: {
-              name: "OpenCode Test",
-              npm: "@ai-sdk/openai-compatible",
-              models: { [fixture.model.id]: configModel(fixture.model) as ConfigModel },
-              options: { apiKey: "test-key", baseURL: `${state.server!.url.origin}/v1` },
-            },
-          },
-        }
-      },
+      name: "plugin header precedence",
+      modelHeader: "custom/model",
+      pluginHeader: "custom/plugin",
+      expected: "custom/plugin",
     },
+  ].forEach((scenario) =>
+    it.instance(
+      `sends OpenCode ${scenario.name} and session headers`,
+      () =>
+        Effect.gen(function* () {
+          const fixture = loadFixture(vivgridFixture.providerID, vivgridFixture.modelID)
+          const request = waitRequest(
+            "/chat/completions",
+            new Response(createChatStream("Hello"), {
+              status: 200,
+              headers: { "Content-Type": "text/event-stream" },
+            }),
+          )
+          const resolved = yield* Provider.use.getModel(
+            ProviderV2.ID.make(opencodeFixture.providerID),
+            ModelV2.ID.make(opencodeFixture.modelID),
+          )
+          const sessionID = SessionID.make("session-child")
+          const parentSessionID = SessionID.make("session-parent")
+          const agent = {
+            name: "test",
+            mode: "primary",
+            options: {},
+            permission: [{ permission: "*", pattern: "*", action: "allow" }],
+          } satisfies Agent.Info
+          const user = {
+            id: MessageID.make("msg_user-parent-header"),
+            sessionID,
+            role: "user",
+            time: { created: Date.now() },
+            agent: agent.name,
+            model: {
+              providerID: ProviderV2.ID.make(opencodeFixture.providerID),
+              modelID: resolved.id,
+            },
+          } satisfies SessionV1.User
+
+          yield* drain({
+            user,
+            sessionID,
+            parentSessionID,
+            model: { ...resolved, headers: scenario.modelHeader ? { "User-Agent": scenario.modelHeader } : {} },
+            agent,
+            system: ["You are a helpful assistant."],
+            messages: [{ role: "user", content: "Hello" }],
+            tools: {},
+          })
+
+          const headers = (yield* Effect.promise(() => request)).headers
+          expect(headers.get("user-agent")?.split(" ")[0]).toBe(scenario.expected)
+          expect(headers.get("x-parent-session-id")).toBe(parentSessionID)
+          expect(headers.get("x-opencode-session")).toBe(sessionID)
+          expect(headers.get("x-opencode-request")).toBe(user.id)
+          expect(headers.get("x-opencode-project")).toBeTruthy()
+          expect(headers.get("x-opencode-client")).not.toBeNull()
+        }),
+      {
+        init: (directory) =>
+          Effect.promise(async () => {
+            if (!scenario.pluginHeader) return
+            await Bun.write(
+              path.join(directory, "header-plugin.ts"),
+              `export default {
+          id: "test.header-precedence",
+          server: async () => ({ "chat.headers": async (_input, output) => {
+            output.headers["User-Agent"] = ${JSON.stringify(scenario.pluginHeader)}
+          } }),
+        }`,
+            )
+          }),
+        config: () => {
+          const fixture = loadFixture(vivgridFixture.providerID, vivgridFixture.modelID)
+          return {
+            enabled_providers: [opencodeFixture.providerID],
+            plugin: scenario.pluginHeader ? ["./header-plugin.ts"] : [],
+            provider: {
+              [opencodeFixture.providerID]: {
+                name: "OpenCode Test",
+                npm: "@ai-sdk/openai-compatible",
+                models: { [fixture.model.id]: configModel(fixture.model) as ConfigModel },
+                options: { apiKey: "test-key", baseURL: `${state.server!.url.origin}/v1` },
+              },
+            },
+          }
+        },
+      },
+    ),
   )
 
   it.instance(
@@ -877,6 +909,7 @@ describe("session.llm.stream", () => {
         expect(url.pathname.startsWith("/v1/")).toBe(true)
         expect(url.pathname.endsWith("/chat/completions")).toBe(true)
         expect(headers.get("Authorization")).toBe("Bearer test-key")
+        expect(headers.get("user-agent")?.split(" ")[0]).toBe(`opencode/${InstallationVersion}`)
 
         expect(body.model).toBe(resolved.api.id)
         expect(body.temperature).toBe(0.4)
