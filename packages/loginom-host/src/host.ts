@@ -229,6 +229,25 @@ export async function createLoginomHost(options: {
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
     },
+    async workState(generation: number, chat: string) {
+      // Inspect only the existing owner. Losing it is uncertainty, not evidence of idle work.
+      if (lost.has(chat) || stale.has(chat)) throw new Error("LOGINOM_RUNTIME_UNAVAILABLE")
+      const child = generations.get(generation)?.children.get(chat)
+      if (!child) return { activeWork: false, unsettledWork: false, dispatching: false }
+      const result = await (await child).request("work", undefined, 5000)
+      if (
+        !result ||
+        typeof result !== "object" ||
+        !("activeWork" in result) ||
+        typeof result.activeWork !== "boolean" ||
+        !("unsettledWork" in result) ||
+        typeof result.unsettledWork !== "boolean" ||
+        !("dispatching" in result) ||
+        typeof result.dispatching !== "boolean"
+      )
+        throw new Error("LOGINOM_REPLY_INVALID")
+      return { activeWork: result.activeWork, unsettledWork: result.unsettledWork, dispatching: result.dispatching }
+    },
     async runtime(generation: number, chat: string) {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")

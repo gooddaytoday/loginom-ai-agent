@@ -168,6 +168,17 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (message.operation === "work") {
+      send({
+        id: message.id,
+        result: {
+          activeWork: state.bridge.hasActiveWork(),
+          unsettledWork: state.bridge.hasUnsettledWork(),
+          dispatching: state.controller !== undefined,
+        },
+      })
+      return
+    }
     if (message.operation === "admit") {
       if (typeof message.input.userMessage !== "string" || !message.input.userMessage)
         throw Error("LOGINOM_INPUT_INVALID")
@@ -200,9 +211,14 @@ async function handle(message) {
         signal: controller.signal,
         timeout: 105_000,
       })
-      send({ id: message.id, result: {
-        result, recoveryPending: state.bridge.hasUnsettledWork(), activeWork: state.bridge.hasActiveWork(),
-      } })
+      send({
+        id: message.id,
+        result: {
+          result,
+          recoveryPending: state.bridge.hasUnsettledWork(),
+          activeWork: state.bridge.hasActiveWork(),
+        },
+      })
     } finally {
       state.controller = undefined
     }

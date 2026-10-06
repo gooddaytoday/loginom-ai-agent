@@ -865,9 +865,41 @@ pending-переходы на границе provider-turn и проверки H
 естественный выбор skill, установленный Desktop/CLI или живую приёмку.
 Требования плана и документ корректировок повторно не перерабатывались.
 
+## 2026-10-06: текущая работа существующего runtime
+
+Добавлен приватный `work` запрос managed entry: текущие active/unsettled flags
+bridge и отдельный dispatching flag текущего вызова. Семантика завершённого
+`call` reply не менялась. Host `workState(generation, chat)` обращается только
+к уже существующему владельцу; отсутствие runtime — локальный idle, потерянный
+или stale владелец и неверный ответ — отказ. Контрольный запрос ограничен 5 s,
+не перезапускает процесс, не создаёт браузер, не вызывает admission и не пишет
+в recovery journal. Подключение к pending/apply scopes ещё впереди.
+
+TDD: отсутствие Host метода дало RED; первые дополнительные process fixtures
+имели неверно экранированный перевод строки — эта ошибка fixture исправлена
+и не считается проверкой продукта. После этого 5 process cases PASS / 24
+assertions: local/no child, свежие состояния, malformed, lost и stale.
+Actual managed entry проверен отдельно: байты entry и start-input совпадают
+с источниками, внешние browser/MCP/bridge boundaries контролируются. Снятие
+нового `work` обработчика дало `LOGINOM_REQUEST_INVALID` RED; возврат минимального
+обработчика — GREEN. Проверены реальные Node IPC, три live состояния bridge,
+незавершённый dispatch, interrupt, исчезновение dispatch и acknowledged exit 0.
+Это не реальная браузерная или установленная приёмка.
+
+Полный Host suite: 212 PASS / 7 SKIP / 1152 assertions, 78.30 s (до добавления
+отдельного actual-entry теста); focused work+actual-entry: 6 PASS / 33 assertions.
+Host/Agent `bun typecheck` PASS; pinned Node syntax и start-input/connection
+regression: 22 PASS. `git diff --check` и форматирование PASS.
+Логи в собственном acceptance-каталоге: `host-work-state-suite.log`,
+`managed-work-state-green.log`, `host-work-state-typecheck.log`,
+`agent-work-state-typecheck.log`, `runtime-work-state-regression.log`;
+RED: `tdd-host-work-state-red.log`, `tdd-managed-work-entry-red.log`.
+Этап 5 не отмечен: HostPort scope, выдача activation и каталоги ещё не соединены.
+План и документ корректировок повторно не перерабатывались; evals не изменялись.
+
 ## Checkpoint
 
-- `docs-no-browser`: baseline `fc3d97dbf`, Host `3025beb91`, settings `197b178b6`.
+- `docs-no-browser`: baseline `fc3d97dbf`, Host `3025beb91`, settings `197b178b6`, history `e1f9476d4`.
 - Этап 0 выполнен: полный чистый baseline и детерминированные проверки сохранены.
 - Этап 1 выполнен: каталог, staging, локальный runtime и передача resource root проверены.
 - Каталог skills, локальный loader и prepare реализованы; единый digest проверен в Bun/Node.
@@ -881,7 +913,7 @@ pending-переходы на границе provider-turn и проверки H
 - Старый session package_docs/Python тест требует замены при SessionTools integration.
 - Reserved skill/command policy и пользовательские предупреждения проверены по sources.
 - Linux artifact completeness/shared closure проверены; Host suite 184 PASS / 6 SKIP.
-- Host local run/knowledge и отдельный BrowserStatus; full Host 207 PASS / 7 SKIP.
+- Host local run/knowledge, BrowserStatus и workState; full Host 212 PASS / 7 SKIP.
 - Desktop source lifecycle 36 PASS, lease 4 PASS; CLI preflight 12 PASS и local-run 6 PASS.
 - Host validation/save и статусы реализованы; далее Host scopes/activation, GUI/TTY и lazy exits.
 - Живая приёмка и удаление серверного skill остаются открытыми.
