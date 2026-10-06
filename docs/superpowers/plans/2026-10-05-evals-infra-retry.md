@@ -81,5 +81,14 @@ Quality-счётчики учитывают только итог, infra_error/c
   копировать результат вместо переноса, остальные файлы переносить как прежде.
 - [x] RED → GREEN: malformed infra_retry.initial даёт compare exit 2;
   переиспользовать проверку полей попытки для initial, сохранить legacy summary.
-- [ ] Проверить профильные тесты, полный bun test, bun typecheck и git diff --check;
+- [x] Проверить профильные тесты, полный bun test, bun typecheck и git diff --check;
   записать фактический результат в checkpoint и remaining-work.
+
+2026-10-06: оба замечания ревью исправлены. Коммиты `371c0665b` и `3d130458d`.
+Тест SIGINT во время архива сначала падал с ENOENT корневого результата,
+после копирования result.json прошёл. CLI-тест повреждённой retry-history
+сначала принимал некорректные данные, после проверки формы возвращает exit 2;
+корректный initial и legacy summary принимаются, входы не изменяются.
+Профильные тесты: **97 pass, 0 fail, 475 assertions, 6 файлов** (53.45 с).
+Полный `bun test`: **299 pass, 0 fail, 1380 assertions, 20 файлов** (349.02 с).
+`bun typecheck` и `git diff --check` прошли. Ограничения живого стенда прежние.
