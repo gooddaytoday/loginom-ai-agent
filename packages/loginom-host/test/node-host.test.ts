@@ -1,9 +1,12 @@
 import { afterAll, beforeAll, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { access, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { buildNodeHost } from "../script/build-node-host"
 import { launchNodeHost } from "../src/node-client"
+import { connectionStore } from "../src/connection/connection-store"
+import { cliCredentials } from "../src/connection/cli-credentials"
+import { knowledgeServer } from "../../loginom-runtime/client/test/support/knowledge-server.mjs"
 
 const fixture = { directory: "", entry: "", node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? "" }
 beforeAll(async () => {
@@ -54,7 +57,88 @@ test("a non-boolean recovery mode is rejected before the host starts", async () 
   ).rejects.toThrow("LOGINOM_HANDSHAKE_INVALID")
 }, 15_000)
 
-test("saved-connection readiness can finish after the former 30s startup deadline", async () => {
+test.each(["ready", "close"])(
+  "private Help preflight waits for the catalog or cancels on shutdown: %s",
+  async (mode) => {
+    const cleanup: (() => void | Promise<void>)[] = []
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const server = await knowledgeServer(
+      { after: (callback) => cleanup.push(callback) },
+      {
+        list: async () => {
+          entered.resolve()
+          await release.promise
+          return { tools: server.tools }
+        },
+      },
+    )
+    const resources = join(fixture.directory, "knowledge-resources-" + mode)
+    const root = join(fixture.directory, "knowledge-profile-" + mode)
+    const marker = join(root, "forbidden-browser")
+    await mkdir(join(resources, "bin"), { recursive: true })
+    await mkdir(join(resources, "runtime/src"), { recursive: true })
+    await symlink(fixture.node, join(resources, "bin/node"))
+    await symlink(
+      join(import.meta.dir, "../../loginom-runtime/src/knowledge-entry.mjs"),
+      join(resources, "runtime/src/knowledge-entry.mjs"),
+    )
+    await writeFile(
+      join(resources, "runtime/src/managed-entry.mjs"),
+      `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser forbidden');`,
+    )
+    await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
+    const store = connectionStore(join(root, "connection"), cliCredentials("linux"))
+    await store.stage({
+      generation: 1,
+      revision: 1,
+      apiKey: "UNIT-NONSECRET",
+      password: "PRIVATE-NONSECRET",
+      username: "user",
+      url: "http://127.0.0.1:1/app/?custom=preserve",
+    })
+    await store.activate(1)
+    const host = await launchNodeHost({
+      node: fixture.node,
+      entry: fixture.entry,
+      root,
+      resources,
+      headless: true,
+      environment: {},
+    })
+    try {
+      expect(await host.request("connection.status", {})).toMatchObject({
+        state: "starting",
+        generation: 1,
+        url: "http://127.0.0.1:1/app/?custom=preserve",
+      })
+      await entered.promise
+      const settled = { value: false }
+      const readiness = host.request("connection.ready", {}).finally(() => {
+        settled.value = true
+      })
+      void readiness.catch(() => {})
+      await host.request("connection.status", {})
+      expect(settled.value).toBe(false)
+      if (mode === "ready") {
+        release.resolve()
+        expect(await readiness).toMatchObject({ state: "ready", generation: 1, hasApiKey: true })
+      } else {
+        await host.close()
+        await expect(readiness).rejects.toThrow("LOGINOM_HOST_CLOSED")
+        expect(await host.exited).toEqual({ code: 0, signal: null })
+      }
+      await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
+    } finally {
+      release.resolve()
+      await host.close().catch(() => {})
+      for (const callback of cleanup) await callback()
+    }
+  },
+  45_000,
+)
+
+test("private host handshake retains its upper budget beyond the former 30s deadline", async () => {
   const entry = join(fixture.directory, "slow-readiness.mjs")
   await writeFile(
     entry,

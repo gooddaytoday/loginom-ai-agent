@@ -11,6 +11,7 @@ if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
 const events = new EventEmitter()
 const operations = new Set<Promise<void>>()
+const stopped = Promise.withResolvers<void>()
 const state: {
   starting?: Promise<void>
   host?: Awaited<ReturnType<typeof createLoginomHost>>
@@ -128,6 +129,22 @@ async function dispatch(message: unknown) {
 
 async function management(method: string, input: unknown, host: Awaited<ReturnType<typeof createLoginomHost>>) {
   if (method === "connection.status" || method === "connection.read") return host.api.status()
+  if (method === "connection.ready") {
+    const before = await host.api.status()
+    if (!before.hasApiKey) throw new Error("LOGINOM_CONFIG_REQUIRED")
+    await Promise.race([
+      host.catalog(before.generation),
+      stopped.promise.then(() => {
+        throw new Error("LOGINOM_HOST_CLOSED")
+      }),
+    ]).catch(() => {
+      throw new Error(state.closed ? "LOGINOM_HOST_CLOSED" : "LOGINOM_CONNECTION_NOT_READY")
+    })
+    const after = await host.api.status()
+    if (after.generation !== before.generation || after.state !== "ready")
+      throw new Error("LOGINOM_CONNECTION_NOT_READY")
+    return after
+  }
   if (method === "connection.check") {
     const value = candidate(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_CANDIDATE_INVALID")
@@ -156,6 +173,7 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
 function stop() {
   if (state.stopping) return state.stopping
   state.closed = true
+  stopped.resolve()
   events.emit("close")
   state.stopping = (async () => {
     await state.starting

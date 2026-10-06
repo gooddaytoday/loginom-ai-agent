@@ -71,8 +71,8 @@ export async function launchNodeHost(input: {
         headless: input.headless,
         ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
       },
-      // Startup restores the saved connection and waits for browser/MCP readiness.
-      // Use the normal bounded RPC budget; browser login alone can exceed 30s.
+      // Restored startup acknowledges local activation independently of the Help catalog.
+      // Preserve the bounded private-host budget; explicit Help preflight is a separate request.
       180_000,
     )
     .catch(async (error: unknown) => {

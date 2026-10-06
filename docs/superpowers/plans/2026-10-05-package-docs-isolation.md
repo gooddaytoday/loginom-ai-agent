@@ -706,7 +706,7 @@ CLI его не использует, отдельная V2-регистраци
 `packages/agent/src/cli/standalone-run.ts`, общие схемы Loginom View/Validation,
 настройки Desktop/CLI, уведомления и i18n.
 
-- [ ] Реализовать 2.6: knowledge только с API key, без Playwright/пароля,
+- [x] Реализовать 2.6: knowledge только с API key, без Playwright/пароля,
   отдельный от браузера lifecycle. Переиспользовать `StreamableHTTPClientTransport`,
   Bearer c `redirect: error`, `connectRemote/readCatalog`; схемы Help брать
   из настоящего каталога, prepare descriptor — статический.
@@ -718,7 +718,7 @@ CLI его не использует, отдельная V2-регистраци
   Help/diagnostics. Без настройки должны оставаться каталог и диагностика,
   а ошибки доступа приходить на конкретной операции. Credentials/generation
   lease для внешней операции получать лениво, сохраняя recovery и изоляцию.
-- [ ] Разделить локальный startup ack и фоновую knowledge readiness:
+- [x] Разделить локальный startup ack и фоновую knowledge readiness:
   `host.settled()`/handshake больше не ждут сеть и loginBrowser. При этом
   `phase: ready` наступает только после чтения Help catalog. Бюджет 180 с в
   `node-client.ts` оставить верхней границей; сохранить восстановление URL как есть.
@@ -738,7 +738,7 @@ CLI его не использует, отдельная V2-регистраци
   или 1 `LOGINOM_CONNECTION_NOT_READY`, как раньше. Обычный чат без Loginom
   работает. Обновить правило mandatory preflight в `packages/agent/AGENTS.md`
   и progress standalone CLI design.
-- [ ] Проверить конкурентную справку двух чатов, отмену только своего request/run,
+- [x] Проверить конкурентную справку двух чатов, отмену только своего request/run,
   смену поколения и cleanup. Help-ошибки не создают uncertain mutation records,
   credentials не пересекают поколения, knowledge IPC не содержит пароль.
 - [ ] TDD-проверки старта и сохранения: нет Chromium при старте/каталоге/Help,

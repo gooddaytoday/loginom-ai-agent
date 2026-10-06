@@ -689,6 +689,22 @@ Installed Desktop/CLI и реальный model routing пока не прове
 Требования плана заморожены по указанию пользователя; повторного применения
 документа корректировок не выполнялось.
 
+Private Help preflight: RED — `connection.ready` завершался до готовности
+каталога; после добавления ожидания shutdown зависал на management operation
+и завершался принудительно через 35 с. GREEN — private request ждёт настоящий
+catalog текущего поколения, проверяет его ready state и получает локальную
+отмену до drain при shutdown. Actual compiled Node host + HTTP MCP подтверждают
+local ACK при заблокированном catalog, сохранение URL и отсутствие browser entry;
+close отменяет pending readiness с `LOGINOM_HOST_CLOSED` и завершается exit 0.
+Бюджет handshake 180 с сохранён; комментарий и имя старого budget-теста уточнены.
+Allowlist дополнен `LOGINOM_CONFIG_REQUIRED` / `LOGINOM_CONNECTION_NOT_READY`.
+Node-host/knowledge/connection-readiness: 15 PASS (90 assertions), Host typecheck
+PASS; node-help-preflight-{regression,typecheck}.log. RED:
+tdd-node-help-preflight-{red,cancel-red}.log. Изменён только private IPC;
+публичные Protocol/HttpApi схемы и pins не менялись.
+В плане отмечены реализованные knowledge lifecycle, local startup/readiness
+и concurrency проверки. Этап 4 целиком остаётся открытым.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
