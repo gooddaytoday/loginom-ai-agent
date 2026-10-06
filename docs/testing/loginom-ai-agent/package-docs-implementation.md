@@ -384,6 +384,14 @@ lstat и не проходят через symlink. Скрипт запускае
 Host typecheck PASS; tdd-node-docs-cli-extract-*.log. Skeleton/emit commands,
 staging и ограниченный агентский инструмент ещё открыты.
 
+Node CLI skeleton: RED — команда skeleton не поддерживалась; следующий
+RED — повторный запрос выдавал ошибку вместо сохранения заполненного черновика.
+GREEN — report.md создаётся эксклюзивно в том же workspace; повторный вызов
+возвращает существующий обычный файл, не меняя его. Symlink/каталог вместо
+черновика отвергается. Команды проверены настоящим pinned Node; 32 PASS
+(87 assertions), Host typecheck PASS. Логи tdd-node-docs-cli-skeleton-*,
+node-cli-skeleton-regression.log. Emit/staging/product tool остаются открытыми.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -397,6 +405,6 @@ staging и ограниченный агентский инструмент ещ
 - Static catalog и source/installed generated exception проверены; installed/live ещё открыты.
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
-- Этап 2: writers и Node CLI extract 30 PASS; skeleton/emit CLI, staging/tool ещё открыты.
-- Следующий шаг — skeleton/emit CLI; 35 baseline source-map mismatches остаются live gate.
+- Этап 2: writers и Node CLI extract/skeleton 32 PASS; emit CLI, staging/tool ещё открыты.
+- Следующий шаг — emit CLI; 35 baseline source-map mismatches остаются live gate.
 - Живая приёмка и удаление серверного skill остаются открытыми.

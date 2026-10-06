@@ -51,6 +51,42 @@ test("Node CLI extracts an unchanged package into a session-owned work directory
   } finally { await rm(directory, { recursive: true, force: true }) }
 }, 20_000)
 
+test("Node CLI creates a Markdown skeleton in the same session work directory", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-skeleton-session-"))
+  try {
+    const result = await docsCommand(["skeleton", "--lgp", join(fixtures, "demo.lgp"), "--directory", directory], directory)
+    expect(result.code).toBe(0)
+    expect(result.stderr).toBe("")
+    const paths = JSON.parse(result.stdout)
+    expect(paths.report).toBe(join(directory, ".work/package-docs", "demo-" + createHash("sha256").update(join(fixtures, "demo.lgp")).digest("hex").slice(0, 8), "report.md"))
+    const normalize = (text: string) => text.replace(/\(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\)/, "(timestamp)")
+    expect(normalize(await readFile(paths.report, "utf8"))).toBe(normalize(await readFile(join(fixtures, "skeleton.md"), "utf8")))
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 20_000)
+
+async function docsCommand(args: string[], directory: string) {
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
+  const child = Bun.spawn([node, join(output, "package-docs.mjs"), ...args],
+    { cwd: directory, env: { LANG: "C.UTF-8" }, stdout: "pipe", stderr: "pipe" })
+  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  return { code, stdout, stderr }
+}
+
+test("repeating skeleton preserves the user's filled draft", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-repeat-skeleton-"))
+  try {
+    const args = ["skeleton", "--lgp", join(fixtures, "demo.lgp"), "--directory", directory]
+    const first = await docsCommand(args, directory)
+    expect(first.code).toBe(0)
+    const path = JSON.parse(first.stdout).report
+    await writeFile(path, "# Заполненный пользователем черновик\n")
+    const repeated = await docsCommand(args, directory)
+    expect(repeated.code).toBe(0)
+    expect(await readFile(path, "utf8")).toBe("# Заполненный пользователем черновик\n")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 20_000)
+
 test("PDF defaults to embedded Golos fonts and preserves baseline Cyrillic text through ToUnicode", async () => {
   const bytes = await renderReport(await readFile(join(fixtures, "demo.report.md"), "utf8"), undefined, fonts)
   expect(Buffer.from(bytes).subarray(0, 8).toString()).toBe("%PDF-1.4")

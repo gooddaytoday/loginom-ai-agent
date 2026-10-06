@@ -3,11 +3,12 @@ import { lstat, mkdir, realpath, rename, unlink, writeFile } from "node:fs/promi
 import { basename, extname, isAbsolute, join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { extractPackage } from "./extract"
+import { renderSkeleton } from "./skeleton"
 export { extractPackage } from "./extract"
 export { renderSkeleton } from "./skeleton"
 export { renderReport } from "./emit"
 
-export async function runPackageDocs(input: { operation: "extract"; lgp: string; directory: string }) {
+export async function runPackageDocs(input: { operation: "extract" | "skeleton"; lgp: string; directory: string }) {
   if (!isAbsolute(input.lgp) || !isAbsolute(input.directory)) throw Error("PACKAGE_DOCS_ABSOLUTE_PATH_REQUIRED")
   if (extname(input.lgp).toLowerCase() !== ".lgp") throw Error("PACKAGE_DOCS_LGP_REQUIRED")
   const lgp = await realpath(input.lgp)
@@ -25,12 +26,18 @@ export async function runPackageDocs(input: { operation: "extract"; lgp: string;
     await writeFile(temporary, JSON.stringify(structure, null, 2) + "\n", { flag: "wx", mode: 0o600 })
     await rename(temporary, destination)
   } finally { await unlink(temporary).catch((error: unknown) => { if (!isErrno(error, "ENOENT")) throw error }) }
-  return { structure: destination }
+  if (input.operation === "extract") return { structure: destination }
+  const report = join(work, "report.md")
+  await writeFile(report, renderSkeleton(structure), { flag: "wx", mode: 0o600 }).catch(async (error: unknown) => {
+    if (!isErrno(error, "EEXIST")) throw error
+    if (!(await lstat(report)).isFile()) throw Error("PACKAGE_DOCS_OUTPUT_ESCAPE")
+  })
+  return { structure: destination, report }
 }
 
 async function main(argv: string[]) {
   const operation = argv[0]
-  if (operation !== "extract") throw Error("PACKAGE_DOCS_CLI_UNSUPPORTED")
+  if (operation !== "extract" && operation !== "skeleton") throw Error("PACKAGE_DOCS_CLI_UNSUPPORTED")
   const options = new Map<string, string>()
   for (let index = 1; index < argv.length; index += 2) {
     const key = argv[index], value = argv[index + 1]
