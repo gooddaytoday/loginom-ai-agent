@@ -1640,6 +1640,53 @@ Prettier и diff-check PASS. Логи `oracle-skill-{red,green,final}.log` и
 `oracle-skill-{host,desktop}-typecheck.log`. Это приёмка adapter и типов;
 живые CSV55/101 через установленные продукты ещё не выполнены и не отмечены.
 
+## Linux cold Desktop: native AppImage и установленный DEB
+
+Actual AppImage `8dc7bdccb` запущен через FUSE на хосте, UID **1001**, Xvfb,
+явный `chromiumSandbox: true`, без `--no-sandbox`. Новый
+`test/loginom/product-skills-smoke.mjs` использует пустые HOME/workspace/profile
+в собственном `/tmp`, настоящий packaged preload/backend `/skill` и проверяет
+оба product skills как `source: bundled` с SHA256 digests. Штатный builtin
+`customize-opencode` допустим; внешних sources в чистой fixture нет.
+Screenshot мастера просмотрен: четыре поля, отдельные состояния справки и
+браузера, действия не обрезаны. Native smoke PASS, наблюдались **11 processes**,
+remaining **0**, отдельный Loginom Chromium не наблюдался.
+
+В собственной Ubuntu **22.04.5** image
+`loginom-package-docs:8dc7bdccb-ubuntu22-20261007` установлен actual DEB через apt.
+Image SHA `0886b94433c5d537b3158e9f6e7fd1b1d97ec008fd3181222db7071d44521991`.
+Контейнер запускался с **network none**, UID **1200** и штатным init. Поставляемый
+Node/Chromium с sandbox выполнил offline page probe, установленный Electron
+открыл unconfigured wizard; cold bundled discovery повторён через installed
+preload/backend. Оба smoke **PASS**, наблюдались **10 processes**, remaining **0**.
+`installed-smoke.mjs` теперь явно включает Electron sandbox, дополнительно
+к существующему browser sandbox. Наблюдатель проверяет PID/start-time identity,
+сохраняет cmdline и отклоняет `--no-sandbox`; polling **25 ms** не является
+полным exec audit и может пропустить очень короткий процесс.
+
+Отдельная installed metadata проверка PASS: dpkg `install ok installed 0.1.17`,
+launcher `/usr/bin/loginom-ai-agent` разрешается в `/opt/loginom-ai-agent/loginom-ai-agent`,
+desktop Name/Exec присутствуют. Оба `chrome-sandbox` имеют root:root/**4755**.
+Installed ASAR совпадает с packaged ASAR, SHA256
+`2b2ce7551599ef788495a44072b1cdcacd5f9ac87592563f0d69175060698b26`.
+Собственный контейнер удалён после сохранения evidence; пользовательская
+установка, launcher, профили и соседняя сессия не изменялись.
+
+Предварительные native runs не засчитываются: сначала fixture ошибочно ожидала
+ровно два skills, не учитывая builtin; workspace под реальным HOME также
+подхватывал skills родителей. Кроме того, default Playwright Electron launch
+добавлял `--no-sandbox`. Финальные runs используют изолированный `/tmp` и явный
+sandbox. Native result первоначально называл признак `offlineWizard`; он
+означал отсутствие Loginom config, не блокировку сети хоста. В драйвере поле
+переименовано в `unconfiguredWizard`; **network none** доказан только контейнером.
+Это ошибки нового driver, не продуктовые TDD RED.
+
+Evidence: `candidate-8dc7bdccb-desktop/native-appimage-source-driver/`,
+`installed-ubuntu22-evidence/`, `installed-ubuntu22-{metadata,container-state}.json`,
+`native-smoke-drivers.sha256`, `desktop-8dc7bdccb-docker-ubuntu22-{build,smoke}.log`.
+Подтверждены cold startup/resources/discovery/cleanup; docs/model/Help first setup,
+CSV oracle, CLI installation/update и остальные Linux-среды остаются открыты.
+
 ## Checkpoint
 
 - Product candidate SHA `8dc7bdccb` (`docs-no-browser`); полные Desktop/CLI artifacts/manifest/archive сохранены.
@@ -1659,4 +1706,4 @@ Prettier и diff-check PASS. Логи `oracle-skill-{red,green,final}.log` и
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS, native PTY paste/mention 2 PASS; attachment: 44 PASS.
-- Desktop static DEB/AppImage PASS; native docs 3 PASS, TUI ранее 2 PASS; routing live 0; далее install/GUI/model/evals.
+- Desktop static/native AppImage/Ubuntu22 installed cold PASS; native docs 3 PASS; routing live 0; далее CLI/model/evals.

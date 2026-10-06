@@ -21,6 +21,7 @@ try {
 const app = await _electron.launch({
   executablePath: join(root, "loginom-ai-agent"),
   args: [],
+  chromiumSandbox: true,
   timeout: 120_000,
   env: { ...process.env, LOGINOM_AI_AGENT_TEST_ONBOARDING: "1", LOGINOM_AI_AGENT_TEST_ROOT: profile },
 })
