@@ -3,7 +3,7 @@ import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
-import { Cause, Effect, Exit, Layer } from "effect"
+import { Cause, Effect, Exit, Fiber, Layer } from "effect"
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import { AppProcess } from "@loginom-ai-agent/core/process"
 import { FSUtil } from "@loginom-ai-agent/core/fs-util"
@@ -22,7 +22,7 @@ import { PackageDocsTool } from "@/tool/package-docs"
 import { Truncate } from "@/tool/truncate"
 import { Tool } from "@/tool/tool"
 import { TestInstance, provideInstance, testInstanceStoreLayer } from "../fixture/fixture"
-import { testEffect } from "../lib/effect"
+import { pollWithTimeout, testEffect } from "../lib/effect"
 
 const resources = await mkdtemp(join(tmpdir(), "loginom-docs-tool-resources-"))
 const fixture = join(import.meta.dir, "../../../loginom-host/test/fixtures/package-docs/demo.lgp")
@@ -714,6 +714,89 @@ it.instance(
       expect(Exit.isFailure(result)).toBe(true)
       if (Exit.isFailure(result)) expect(String(Cause.squash(result.cause))).toContain("PACKAGE_DOCS_RESOURCES_INVALID")
       expect(yield* fs.exists(join(instance.directory, ".work"))).toBe(false)
+    }),
+  20_000,
+)
+
+it.instance(
+  "a request cancelled before execution performs no permission or file operations",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const fs = yield* FSUtil.Service
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const result = yield* input.tool
+        .execute({ operation: "extract", lgp: fixture }, { ...input.ctx, abort: AbortSignal.abort() })
+        .pipe(Effect.exit)
+      expect(Exit.isFailure(result)).toBe(true)
+      expect(input.requests).toEqual([])
+      expect(yield* fs.exists(join(instance.directory, ".work"))).toBe(false)
+    }),
+  20_000,
+)
+
+for (const cancelled of [true, false]) {
+  it.instance(
+    cancelled
+      ? "abort terminates the running Node executor before returning an error"
+      : "timeout terminates the running Node executor before returning an error",
+    () =>
+      Effect.gen(function* () {
+        const instance = yield* TestInstance
+        const fs = yield* FSUtil.Service
+        const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+        const controller = new AbortController()
+        yield* withScript(
+          'import {writeFileSync} from "node:fs"; writeFileSync("executor.pid", String(process.pid)); setInterval(() => {}, 1000);',
+          Effect.gen(function* () {
+            const fiber = yield* input.tool
+              .execute({ operation: "extract", lgp: fixture }, { ...input.ctx, abort: controller.signal })
+              .pipe(Effect.exit, Effect.forkScoped)
+            const pid = yield* pollWithTimeout(
+              fs.readFileString(join(instance.directory, "executor.pid")).pipe(
+                Effect.map((value) => (Number(value) > 0 ? Number(value) : undefined)),
+                Effect.orElseSucceed(() => undefined),
+              ),
+              "Node executor did not become ready",
+              "5 seconds",
+            )
+            if (cancelled) controller.abort()
+            const result = yield* Fiber.join(fiber)
+            expect(Exit.isFailure(result)).toBe(true)
+            if (Exit.isFailure(result))
+              expect(String(Cause.squash(result.cause))).toMatch(cancelled ? /abort/i : /Timed out/)
+            expect(() => process.kill(pid, 0)).toThrow()
+            expect((yield* fs.readDirectory(instance.directory)).toSorted()).toEqual(["executor.pid"])
+          }),
+        )
+      }),
+    cancelled ? 20_000 : 70_000,
+  )
+}
+
+it.instance(
+  "the executor receives fixed argv, the session cwd and a minimal environment",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const fs = yield* FSUtil.Service
+      const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
+      const initial = yield* input.tool.execute({ operation: "extract", lgp: fixture }, input.ctx)
+      const structure = JSON.parse(initial.output).structure
+      const script =
+        'import {writeFileSync} from "node:fs"; writeFileSync(' +
+        JSON.stringify(structure) +
+        ", JSON.stringify({env: Object.keys(process.env).sort(), cwd: process.cwd(), argv: process.argv.slice(2), exe: process.execPath})); process.stdout.write(" +
+        JSON.stringify(initial.output) +
+        ");"
+      const result = yield* withScript(script, input.tool.execute({ operation: "extract", lgp: fixture }, input.ctx))
+      expect(JSON.parse(result.output).structure).toBe(structure)
+      expect(yield* fs.readJson(structure)).toEqual({
+        env: ["LANG"],
+        cwd: instance.directory,
+        argv: ["extract", "--lgp", yield* fs.realPath(fixture), "--directory", instance.directory],
+        exe: join(resources, "bin/node"),
+      })
     }),
   20_000,
 )

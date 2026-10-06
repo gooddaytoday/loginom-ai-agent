@@ -619,7 +619,7 @@ type PackageDocsRun =
   Запись проходит `ctx.ask({ permission: "edit", ... })`; запреты пользователя
   и агента `plan` сохраняются. Всё пишется внутри session directory (`--dir`),
   `--auto` не нужен.
-- [ ] Запускать `<resources>/bin/node` с проверенным
+- [x] Запускать `<resources>/bin/node` с проверенным
   `skills/package-docs/scripts/package-docs.mjs`: фиксированный argv массивом,
   без shell, `cwd` — каталог сессии, минимальное окружение, timeout и AbortSignal.
   Проверить integrity перед исполнением по 2.3. Произвольные output/script/

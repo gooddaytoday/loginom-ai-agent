@@ -480,6 +480,19 @@ bundle; Session, Permission, FS и process spawning настоящие. Fixture 
 output-json,output-path,output-exists}-*, agent-docs-executor-final.log.
 Lifecycle/TaskScope и установленная приёмка остаются открытыми.
 
+Executor lifecycle: RED — уже отменённый запрос всё ещё запрашивал edit.
+GREEN — pre-abort проверяется до работы. Настоящие PID прогоны показали,
+что AbortSignal и fixed 60-second timeout завершают дочерний Node до возврата
+ошибки; финальных файлов нет. Readiness через файл PID и pollWithTimeout,
+без sleeps/TestClock. Отдельный probe подтвердил fixed argv, session cwd,
+resources/bin/node и только LANG в env, без provider/Loginom credentials.
+28 быстрых тестов PASS (96 assertions); один timeout PASS отдельно (4 assertions,
+62.86 s). Все 29 выполнены; долгий тест не повторялся без изменений процесса.
+Agent typecheck PASS; tdd-agent-docs-preabort-*, agent-docs-{abort-process,
+timeout-process,process-environment,lifecycle-regression}.log.
+Пункт Node executor этапа 2 отмечен. Read rejection --file hint, SKILL.md,
+TaskScope/SessionTools и установленная приёмка ещё открыты.
+
 ## Checkpoint
 
 - Ветка `docs-no-browser`, исходный продуктовый SHA `fc3d97dbf`.
@@ -494,5 +507,5 @@ Lifecycle/TaskScope и установленная приёмка остаютс�
 - Bootstrap и локальные evidence checks проверены; общий source audit имеет 35 baseline mismatches.
 - Resource root Desktop/CLI и обе bundled команды проверены; client suite 2550 PASS / 10 SKIP.
 - Этап 2: pipeline 41 PASS, staging 13 PASS; Host suite 180 PASS / 6 SKIP.
-- Tool extract проверен; следующий шаг — skeleton/emit и lifecycle, затем TaskScope.
+- Tool extract/skeleton/emit и lifecycle проверены; далее --file hint, SKILL и TaskScope.
 - Живая приёмка и удаление серверного skill остаются открытыми.

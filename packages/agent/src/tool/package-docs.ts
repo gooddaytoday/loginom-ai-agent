@@ -39,6 +39,7 @@ export const PackageDocsTool = Tool.define(
       parameters: Parameters,
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         Effect.gen(function* () {
+          if (ctx.abort.aborted) return yield* Effect.die(AppProcess.abortError(ctx.abort))
           const instance = yield* InstanceState.context
           const session = yield* sessions.get(ctx.sessionID)
           const directory = yield* fs.realPath(session.directory)
