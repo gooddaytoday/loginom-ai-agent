@@ -145,6 +145,23 @@ Classic/diagnostic entrypoints не считать проверенными то
 даёт локальный отказ, без обращения к Skills API. Общий helper вычисляет revision;
 проверка файлов не должна расходиться с manifest-контрактом backend.
 
+Общий расчёт digest сам по себе не заменяет проверку обязательного набора.
+В backend и во всех runtime-режимах должны действовать одинаковые правила
+frontmatter, относительных ссылок, generated-файлов и границ каталога skill.
+Переиспользовать Node-совместимую реализацию проверки из владельца Host;
+не поддерживать отдельный облегчённый verifier для classic/diagnostic.
+Managed startup может переиспользовать штатную проверку байтов `verifyResources`,
+но она не доказывает наличие ресурса, отсутствующего одновременно на диске
+и в manifest, если на него всё ещё ссылается skill.
+
+Разделить два режима проверки: исходный каталог Product до сборки допускает
+отсутствие только явно объявленного generated-файла; staged/установленный bundle
+не допускает этого исключения. Одна и та же фикстура с удалённым reference,
+шрифтом или generated-файлом, после пересчёта manifest, должна отклоняться
+backend и runtime. Дополнительно проверить несовпадение имени с каталогом,
+повтор пути в manifest и ссылку/symlink за пределы своего skill. Успешный
+совместный пересчёт file hashes не должен скрывать неполноту установки.
+
 При ошибке skill не регистрируется; диагностика: «встроенный skill повреждён,
 переустановите приложение». Сетевого fallback и поиска запасной копии нет.
 Проверка защищает от повреждённой/неполной установки и случайной подмены;
@@ -498,6 +515,10 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
   `skillRevision` — единый per-skill digest (64 hex), `skillPath` — локальная
   директория, не путь к `SKILL.md` и не `skill-<revision>` в профиле сессии.
   Сетевого чтения Skills API нет ни при первом prepare, ни при повторе/resume.
+  Первый prepare закрепляет проверенный digest на время runtime чата;
+  повторный проверяет целостность и не принимает новую revision молча.
+  При смене файлов/manifest возвращается локальная ошибка, а новая revision
+  принимается только новым runtime после штатного завершения прежней работы.
 - [ ] Managed prepare больше не повторяет статические инструкции, перенесённые
   в SKILL.md. Сохранить `compactKnowledgeBundle`, `input_artifacts`, identities,
   readiness и динамические descriptions. Закреплённый action catalog загружается
@@ -554,6 +575,11 @@ bootstrap в `packages/agent/src/session/prompt.ts`, публикационны�
   `packages/loginom-runtime/client/test/support/{bridge-contract,package-cleanup-bridge}.mjs`.
   Покрыть `skill`, `bridge`, `diagnostics`, `workspace`, `user-results`,
   `managed-resources-links`, `resources` и staging.
+  Для backend и всех runtime-режимов использовать общие повреждённые fixtures:
+  обязательный файл удалён вместе с записью manifest, неверное frontmatter,
+  generated bundle отсутствует после staging, escape в соседний skill.
+  Проверить стабильность digest при перестановке manifest и изменении другого
+  skill, а также отказ при смене закреплённой revision в существующем runtime.
 
 **Готово, когда:** по одной записи `loginom-automation` и `package-docs`, команды
 `/loginom-automation` и `/package-docs` обнаруживаются из проверенного staged root,
@@ -926,6 +952,9 @@ Core имеет разметку осей, но без CSV oracle. По доку
   приёмки рядом с результатами. Закрепить также judge schema. Фактические
   per-attempt PROMPT.md сохранять, но они содержат разные артефакты и не обязаны
   иметь одинаковый хэш. Секреты в manifest не включать.
+  Разделить общий manifest условий и два manifest испытуемых сборок по таблице
+  раздела 4. Ожидаемая смена CLI/встроенного skill не должна маскировать изменение
+  внешнего Dock, серверной revision baseline или конфигурации судьи.
 - [ ] Выделить собственные `EVAL_RESULTS_DIR`, `EVAL_PROFILE_DIR`,
   `EVAL_WORKSPACE_ROOT` и каталоги артефактов вне обоих соседних worktree.
   Baseline/candidate получают отдельные results roots, profiles/workspaces и
@@ -1010,6 +1039,9 @@ Core имеет разметку осей, но без CSV oracle. По доку
   серверный `loginom-automation`: старый baseline продолжает читать его в
   prepare. Новый runtime/harness не требуют эту публикацию сами; они только
   фиксируют источник, фактически использованный соответствующим CLI.
+  До и после пары зафиксировать revision/hash серверной записи, прочитанной
+  baseline; не перепубликовывать её между повторами. При её изменении пару
+  считать несопоставимой, даже если candidate от Skills API уже не зависит.
 
 **Готово, когда:** есть сопоставимые отчёты двух сборок, артефакты и результаты
 повторного выполнения на одной принятой версии harness/судьи; условия пары
@@ -1168,7 +1200,7 @@ Runtime `.mjs` проверять закреплённым Node, а не слу�
 
 ```bash
 # packages/loginom-runtime/client
-"$LOGINOM_AI_AGENT_TEST_NODE" --test test/skill.test.mjs test/diagnostics.test.mjs test/bridge.test.mjs test/workspace.test.mjs test/user-results.test.mjs test/managed-resources-links.test.mjs test/managed-shutdown.test.mjs
+"$LOGINOM_AI_AGENT_TEST_NODE" --test test/skill.test.mjs test/config.test.mjs test/diagnostics.test.mjs test/bridge.test.mjs test/user-profile-bridge.test.mjs test/package-cleanup-bridge.test.mjs test/workspace.test.mjs test/user-results.test.mjs test/managed-resources-links.test.mjs test/managed-shutdown.test.mjs
 
 # packages/loginom-runtime
 "$LOGINOM_AI_AGENT_TEST_NODE" --test test/resources.test.mjs test/connection-check.test.mjs test/start-input.test.mjs test/knowledge-entry.test.mjs
@@ -1274,6 +1306,21 @@ LOGINOM_AI_AGENT_CLI_PROFILE=/absolute/test/profile \
 Пример не копирует чужой `.env`: настройки стенда, авторизацию отдельных профилей
 и исполняемый файл судьи задать для нашего запуска штатным способом.
 
+Manifest приёмки разделить на общие условия и сведения о каждой сборке.
+Хэшировать фактические файлы/артефакты, а не только записанные имена версий.
+
+| Где хранить | Обязательные сведения | Правило сопоставимости |
+| --- | --- | --- |
+| Общий manifest условий | Полный принятый harness SHA; hash lockfile; версии Bun/Node harness; hash общего judge prompt/schema и кода формирования; hash judge executable; agent model/variant и judge model/reasoning; effective timeouts/threshold/repeat/parallelism | Одинаковые до baseline, candidate и compare; новое значение требует новой полной пары |
+| Общий manifest условий | Принятый SHA и checksum snapshot задач; `agent_inputs_hash`, `rubric_hash`, hash near-miss корпуса; версия/image digest Loginom; внешний Dock/action catalog; revision/hash серверного automation для старого baseline; согласованное пространство серверных пакетов | Внешние условия не меняются между сторонами; индивидуальные имена выходных пакетов фиксируются отдельно |
+| `artifacts/base`, `artifacts/candidate` | Исходный SHA и clean state; hash полного CLI архива/бинарника, CLI/resource manifests, Node и встроенных skills; абсолютный путь сохранённого payload | Отличия продукта ожидаемы и описываются; payload не пересобирается во время пары |
+| `artifacts/base`, `artifacts/candidate` | Фактический run ID, `EVAL_RESULTS_DIR`, `EVAL_PROFILE_DIR`, `EVAL_WORKSPACE_ROOT`, source/revision из prepare, отчёты наших structural/replay адаптеров | Каталоги разные, suite и проверки одинаковые; каждый отчёт привязан к своей сборке |
+
+Секреты и полный dump окружения в эти файлы не помещать: сохранять только
+разрешённые поля эффективной конфигурации и хэши общих условий. В отчёте
+указать, какие внешние условия удалось проверить, а какие подтверждены
+владельцем стенда; непроверенную неизменность не объявлять доказанной.
+
 ```bash
 set -euo pipefail
 
@@ -1288,13 +1335,14 @@ git -C /home/kiselev/.codex/worktrees/2f7c/loginom-ai-agent \
   worktree add --detach "$skill_eval_harness" "$skill_eval_harness_sha"
 cd "$skill_eval_harness"
 bun install --frozen-lockfile
-git diff --exit-code
-git rev-parse HEAD
+test "$(git rev-parse HEAD)" = "$skill_eval_harness_sha"
+test -z "$(git status --porcelain --untracked-files=all)"
 cd "$skill_eval_harness/evals"
 
 mkdir -p "$skill_eval_root/artifacts/base" "$skill_eval_root/artifacts/candidate"
 cp -a "$skill_eval_harness/evals/tasks" "$skill_eval_root/core"
 mkdir -p "$skill_eval_root/task-snapshot"
+git -C /home/kiselev/git/agent-validation cat-file -e "$skill_eval_tasks_sha^{commit}"
 git -C /home/kiselev/git/agent-validation archive "$skill_eval_tasks_sha" \
   sources/analytic-evals | tar -x -C "$skill_eval_root/task-snapshot"
 skill_eval_analytic="$skill_eval_root/task-snapshot/sources/analytic-evals"
@@ -1365,6 +1413,11 @@ compare на принятом SHA, не изменяя harness ради расп
 Эти каталоги не совпадают с output калибровки, её profiles
 и workspace. Не устанавливать CLI для evals поверх текущего launcher; абсолютный
 `EVAL_CLI_BIN` должен указывать на сохранённый payload каждой стороны.
+После обоих прогонов ещё раз проверить HEAD и чистоту harness теми же командами,
+которые стоят после установки зависимостей. Любая правка отслеживаемого файла
+или дополнительный неотслеживаемый исходник требует выяснения причины до compare;
+не удалять его автоматически ради прохождения проверки. Results/profiles/workspaces
+из примера находятся вне harness и не должны нарушать эту проверку.
 
 Модель/судья выше соответствуют конфигурации при первоначальном исследовании;
 перед запуском согласовать их с принятой калибровкой. При необходимости выбрать
@@ -1467,6 +1520,7 @@ review и отдельный conventional commit. В progress-разделе э�
 | Один абсолютный resource root, Product Node-only export | 2.1–2.3; этапы 1, 3 | Discovery вне checkout через RuntimeFlags; env Desktop/run/TUI; browser entrypoint не импортирует Node |
 | Reserved policy, порядок источников и realpath | 2.2; этапы 1, 3 | Внешние skills/config/MCP-команды игнорируются с диагностикой; обычный поздний source побеждает |
 | Ссылки, generated bundle, шрифты/OFL, единый digest | 2.3; этапы 1–3 | Полный manifest, missing/tampered/unlisted/escape отказы; равный per-skill digest в Bun и Node |
+| Одинаковая полнота проверки backend/runtime | 2.3; этап 1 | Удаление обязательного файла вместе с записью manifest всё равно отклоняется; generated exception только до staging; revision не меняется молча |
 | Эффективный workflow после rebase, динамические данные prepare | Этапы 0, 1 | CrossTable/node lifecycle/checkpoint в локальных references; prepare не дублирует инструкции |
 | Default/docs/automation и доверенная история активации | 2.4–2.5; этап 5 | Переходы, snapshot хода, pending отказ, slash/restart/compaction/replay/fork/revert; Host отказывает до побочных действий |
 | Help без браузера, отдельные validation/save/status | 2.6; этап 4 | Нет Chromium/пароля в knowledge; Help при недоступном Loginom; конкуренция, отмена и поколения |
@@ -1474,6 +1528,7 @@ review и отдельный conventional commit. В progress-разделе э�
 | Node executor и итог в каталоге сессии | Этап 2 | Паритет структуры/скелета/PDF/DOCX, permissions/plan, placeholders, коллизии, timeout/cancel, неизменный вход |
 | Естественная активация, Help и разговор как отрицательные случаи | Этап 6 | Реальная модель: 20 запросов × 3 на Desktop/run; TUI smoke; документы и факты, tool calls/processes |
 | Сохранённый baseline, неизменный harness и судья | Этапы 0, 7; команды раздела 4 | Два полных CLI; заново принятый SHA; manifest условий, одинаковый snapshot; собственные results/profile/workspace |
+| Общие условия отдельно от отличий продукта | Этап 7; таблица manifest в разделе 4 | Неизменные effective config, внешний catalog и серверный skill baseline; разные payload/skill digests явно описаны |
 | Границы с калибровкой, отдельные структурный/replay адаптеры | Владение; этап 7; контрольные точки | Общие файлы не редактируются параллельно; harness-доработки приняты отдельно до живой пары |
 | Linux DEB/AppImage и установленный CLI/run/TUI | Этапы 3, 8 | Static integrity обоих Desktop артефактов, native AppImage smoke, `/proc`, oracle activation, sandbox/profile/update/cleanup |
 | Снятие серверной записи после выпуска | Этап 9 | Совместимость клиентов и baseline приняты; отдельное явное разрешение; Skills API и справка сохраняются |
@@ -1513,3 +1568,13 @@ review и отдельный conventional commit. В progress-разделе э�
   Проверки документа: последовательность 10 этапов и прежние completed-пункты,
   восемь ссылок, синтаксис шести bash-блоков через `bash -n`, `git diff --check`.
   Незавершённые файлы runtime остались с прежними SHA-256.
+- 2026-10-06: уточнены оставшиеся условия corrections: общий digest не заменяет
+  проверку обязательных ссылок/frontmatter/generated во всех runtime-режимах;
+  исходный и staged каталоги проверяются с разными generated-исключениями.
+  Добавлены фиксация revision runtime, manifest общих условий отдельно от двух
+  сборок, неизменность серверного skill baseline и строгая проверка чистоты
+  закреплённого harness. Расширены команды целевого runtime-набора.
+  Эта доработка изменяет только план; отметки реализации не добавляются.
+  Проверены 10 этапов, неизменность 97 отметок выполнения, семь локальных ссылок,
+  синтаксис шести bash-блоков и `git diff --check`. SHA-256 всех 21 исходных
+  незавершённых файлов сохранены; тесты продукта, сборки и evals не запускались.
