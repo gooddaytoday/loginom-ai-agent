@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { watch } from "node:fs"
 import { cp, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
@@ -104,6 +105,42 @@ test("CLI SIGINT во время cleanup первого infra_error запрещ
     expect(summary.tasks[0]!.attempts[0]!.infra_retry).toBeUndefined()
     expect(await Bun.file(path.join(context.directory, "workspace", summary.run_id, id, "1/fake-launches.json")).json()).toBe(1)
   } finally {
+    if (child.exitCode === null) child.kill("SIGKILL")
+    await child.exited
+    await context.close()
+  }
+}, 30_000)
+
+test("CLI SIGINT во время архива infra_error сохраняет корневой result.json", async () => {
+  const id = "infra-retry-success"
+  const context = await fixture([id])
+  const child = Bun.spawn([process.execPath, path.join(evalsRoot, "src/run.ts"), "--skip-judge", "--tasks", context.tasks], {
+    env: { PATH: process.env.PATH, ...context.env }, stdout: "pipe", stderr: "pipe",
+  })
+  const watcher = { close() {} }
+  const signal = { sent: false }
+  try {
+    const out = path.dirname(await waitForFile(context.directory, `results/*/${id}/1/prompt.txt`))
+    // Реальные файлы удерживают архивирование открытым до доставки SIGINT.
+    await Promise.all(Array.from({ length: 2000 }, (_, i) => Bun.write(path.join(out, `archive-${i}.txt`), "fixture")))
+    const observed = watch(out, (_, file) => {
+      if (file !== "infra-error" || signal.sent) return
+      signal.sent = true
+      child.kill("SIGINT")
+    })
+    watcher.close = () => observed.close()
+    expect(await child.exited).toBe(0)
+    const summary = await Bun.file(path.resolve(out, "../../summary.json")).json() as RunSummary
+    expect(signal.sent).toBe(true)
+    expect(summary.interrupted).toBe(true)
+    const result = summary.tasks[0]!.attempts[0]!
+    expect(result).toMatchObject({ status: "infra_error", environment_cleanup: { status: "confirmed" } })
+    expect(result.infra_retry).toBeUndefined()
+    expect(await Bun.file(path.join(out, "result.json")).json()).toEqual(result)
+    expect(await Bun.file(path.join(out, "infra-error/result.json")).json()).toEqual(result)
+    expect(await Bun.file(path.join(context.directory, "workspace", summary.run_id, id, "1/fake-launches.json")).json()).toBe(1)
+  } finally {
+    watcher.close()
     if (child.exitCode === null) child.kill("SIGKILL")
     await child.exited
     await context.close()
