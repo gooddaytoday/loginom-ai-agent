@@ -1,0 +1,36 @@
+{
+  "sources": {
+    "task.json": "4125ef4fc9c7223ee2ff0f7450fadb8e7ee42632a90655a4b5d5bd710b292f26",
+    "reference.lgp": "ad9e8e3b8e63597d724a26fc88f1fa17dc0c9b396ada0624a2756d13238b3790",
+    "SPEC.md": "2189c220a9af7f821830e6986ba2a30c0041d71afba9d84d942249ed6fdbf81a",
+    "oracle.csv": "ba7e5d7f0d7e3c1f2483505483ec8ce8d2f3bcdbb52686cb9814f4ea496ba115",
+    "oracle.py": "982ff1abc8b77ffd957832e978e9537526f5162363b692500aeb151b199d2876",
+    "data/dataset.csv": "673fc3a6482c19baf96a2221a3964c151716a9c5e66837601df3d8de6316d1a8"
+  },
+  "cases": [
+    {
+      "id": "sort",
+      "kind": "sort",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Guid=\"770a65bc-5ea0-47f2-80f8-ab900e5e43c2\" DisplayName=\"По убыванию выручки\" VendorGuid=\"62a25d53-677f-45ef-abe7-537dfdc2ea4b\" GenerateNodeTitle=\"false\">\n\t\t\t\t<InputPorts>\n\t\t\t\t\t<Item Guid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\" Name=\"DataSource\" DisplayName=\"Входной источник данных\"/>\n\t\t\t\t</InputPorts>\n\t\t\t\t<OutputPorts>\n\t\t\t\t\t<Item Guid=\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\" Name=\"DataSource\" DisplayName=\"Выходной набор данных\"/>\n\t\t\t\t</OutputPorts>\n\t\t\t\t<ServiceInputPorts>\n\t\t\t\t\t<Item Guid=\"00bd0b43-e4b5-3ac1-b95a-ac1bee14f858\" Name=\"SynchronizationInputPort\" DisplayName=\"Порядок выполнения\"/>\n\t\t\t\t\t<Item Guid=\"455b65c3-0587-3a9c-b47e-9b0d285bff3c\" Name=\"ControlVariables\" DisplayName=\"Управляющие переменные\"/>\n\t\t\t\t</ServiceInputPorts>\n\t\t\t\t<ServiceOutputPorts>\n\t\t\t\t\t<Item Guid=\"ca080ff0-2342-32b0-b480-586f9747bace\" Name=\"SynchronizationOutputPort\" DisplayName=\"Порядок выполнения\"/>\n\t\t\t\t\t<Item Guid=\"e98be5ba-c627-3a55-af82-a399dd13c73b\" Name=\"ComponentOutputPort\" DisplayName=\"Компонент\"/>\n\t\t\t\t\t<Item Guid=\"58922a98-d1ea-36de-9099-3ce26fe160e2\" Name=\"DependentNodeOutputPort\" DisplayName=\"Зависимые узлы\"/>\n\t\t\t\t</ServiceOutputPorts>\n\t\t\t\t<Component>\n\t\t\t\t\t<InputSockets>\n\t\t\t\t\t\t<Item Guid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\" Name=\"DataSource\" DisplayName=\"Входной источник данных\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneDataSourceSocket\">\n\t\t\t\t\t\t\t\t<Constraints/>\n\t\t\t\t\t\t\t\t<DataSource SyncThroughColumns=\"true\">\n\t\t\t\t\t\t\t\t\t<ColumnDefs>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"revenue\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utActive\" InputColumnInfoName=\"revenue\"/>\n\t\t\t\t\t\t\t\t\t</ColumnDefs>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t<Item Guid=\"455b65c3-0587-3a9c-b47e-9b0d285bff3c\" Name=\"ControlVariables\" DisplayName=\"Управляющие переменные\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneVariablesSocket\" Virgin=\"true\">\n\t\t\t\t\t\t\t\t<Constraints/>\n\t\t\t\t\t\t\t\t<Variables SyncThroughVariables=\"true\">\n\t\t\t\t\t\t\t\t\t<Elements/>\n\t\t\t\t\t\t\t\t</Variables>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t</InputSockets>\n\t\t\t\t\t<OutputSockets>\n\t\t\t\t\t\t<Item Guid=\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\" Name=\"DataSource\" DisplayName=\"Выходной набор данных\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGDerivedDataSourceOutputSocket\">\n\t\t\t\t\t\t\t\t<DataSource SyncThroughColumns=\"true\">\n\t\t\t\t\t\t\t\t\t<ColumnDefs/>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t</OutputSockets>\n\t\t\t\t\t<Engine xsi:type=\"TBGSortingEngine\">\n\t\t\t\t\t\t<SortingColumns>\n\t\t\t\t\t\t\t<Item Name=\"revenue\" SortDirection=\"sdDesc\"/>\n\t\t\t\t\t\t</SortingColumns>\n\t\t\t\t\t</Engine>\n\t\t\t\t</Component>\n\t\t\t\t<Position Left=\"400\" Top=\"208\"/>\n\t\t\t</Item>",
+          "to": "<Item xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" Guid=\"770a65bc-5ea0-47f2-80f8-ab900e5e43c2\" DisplayName=\"По убыванию выручки\" VendorGuid=\"62a25d53-677f-45ef-abe7-537dfdc2ea4b\" GenerateNodeTitle=\"false\">\n\t\t\t\t<InputPorts>\n\t\t\t\t\t<Item Guid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\" Name=\"DataSource\" DisplayName=\"Входной источник данных\" />\n\t\t\t\t</InputPorts>\n\t\t\t\t<OutputPorts>\n\t\t\t\t\t<Item Guid=\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\" Name=\"DataSource\" DisplayName=\"Выходной набор данных\" />\n\t\t\t\t</OutputPorts>\n\t\t\t\t<ServiceInputPorts>\n\t\t\t\t\t<Item Guid=\"00bd0b43-e4b5-3ac1-b95a-ac1bee14f858\" Name=\"SynchronizationInputPort\" DisplayName=\"Порядок выполнения\" />\n\t\t\t\t\t<Item Guid=\"455b65c3-0587-3a9c-b47e-9b0d285bff3c\" Name=\"ControlVariables\" DisplayName=\"Управляющие переменные\" />\n\t\t\t\t</ServiceInputPorts>\n\t\t\t\t<ServiceOutputPorts>\n\t\t\t\t\t<Item Guid=\"ca080ff0-2342-32b0-b480-586f9747bace\" Name=\"SynchronizationOutputPort\" DisplayName=\"Порядок выполнения\" />\n\t\t\t\t\t<Item Guid=\"e98be5ba-c627-3a55-af82-a399dd13c73b\" Name=\"ComponentOutputPort\" DisplayName=\"Компонент\" />\n\t\t\t\t\t<Item Guid=\"58922a98-d1ea-36de-9099-3ce26fe160e2\" Name=\"DependentNodeOutputPort\" DisplayName=\"Зависимые узлы\" />\n\t\t\t\t</ServiceOutputPorts>\n\t\t\t\t<Component>\n\t\t\t\t\t<InputSockets>\n\t\t\t\t\t\t<Item Guid=\"9dc72a3f-56bf-3bfc-84ec-f979daf4da6b\" Name=\"DataSource\" DisplayName=\"Входной источник данных\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneDataSourceSocket\">\n\t\t\t\t\t\t\t\t<Constraints />\n\t\t\t\t\t\t\t\t<DataSource SyncThroughColumns=\"true\">\n\t\t\t\t\t\t\t\t\t<ColumnDefs>\n\t\t\t\t\t\t\t\t\t\t<Item Name=\"revenue\" DataType=\"dtFloat\" DataKind=\"dkContinuous\" UsageType=\"utActive\" InputColumnInfoName=\"revenue\" />\n\t\t\t\t\t\t\t\t\t</ColumnDefs>\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t\t<Item Guid=\"455b65c3-0587-3a9c-b47e-9b0d285bff3c\" Name=\"ControlVariables\" DisplayName=\"Управляющие переменные\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGTuneVariablesSocket\" Virgin=\"true\">\n\t\t\t\t\t\t\t\t<Constraints />\n\t\t\t\t\t\t\t\t<Variables SyncThroughVariables=\"true\">\n\t\t\t\t\t\t\t\t\t<Elements />\n\t\t\t\t\t\t\t\t</Variables>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t</InputSockets>\n\t\t\t\t\t<OutputSockets>\n\t\t\t\t\t\t<Item Guid=\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\" Name=\"DataSource\" DisplayName=\"Выходной набор данных\">\n\t\t\t\t\t\t\t<Socket xsi:type=\"TBGDerivedDataSourceOutputSocket\">\n\t\t\t\t\t\t\t\t<DataSource SyncThroughColumns=\"true\">\n\t\t\t\t\t\t\t\t\t<ColumnDefs />\n\t\t\t\t\t\t\t\t</DataSource>\n\t\t\t\t\t\t\t</Socket>\n\t\t\t\t\t\t</Item>\n\t\t\t\t\t</OutputSockets>\n\t\t\t\t\t<Engine xsi:type=\"TBGSortingEngine\">\n\t\t\t\t\t\t<SortingColumns>\n\t\t\t\t\t\t\t<Item Name=\"revenue\" SortDirection=\"sdAsc\" />\n\t\t\t\t\t\t</SortingColumns>\n\t\t\t\t\t</Engine>\n\t\t\t\t</Component>\n\t\t\t\t<Position Left=\"400\" Top=\"208\" />\n\t\t\t</Item>",
+          "count": 1
+        }
+      ],
+      "result_csv": "sort.csv",
+      "expected_failed": [
+        "sort-revenue",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "reproduce": {
+        "sort": {
+          "column": "revenue",
+          "descending": false
+        }
+      }
+    }
+  ]
+}
