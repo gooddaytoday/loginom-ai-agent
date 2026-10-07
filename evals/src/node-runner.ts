@@ -3,6 +3,7 @@ import { main } from "./run"
 import { evalsRoot, loadConfig } from "./config"
 import { loadTasks } from "./task"
 import { validateNodeRun } from "./node-evals"
+import { nodeCaseIds } from "./node-cases"
 
 export async function runNodeEvals(argv: string[], env: Record<string, string | undefined>) {
   try { return await executeNodeEvals(argv, env) }
@@ -16,7 +17,7 @@ async function executeNodeEvals(argv: string[], env: Record<string, string | und
   const config = loadConfig(args, env)
   const tasks = await loadTasks(config.tasksDir, config.only)
   for (const task of tasks) {
-    if (!["crosstable-fixed-sum", "crosstable-sliding-average", "crosstable-reconfigure"].includes(task.id)) throw Error(`unsupported node case: ${task.id}`)
+    if (!(nodeCaseIds as readonly string[]).includes(task.id)) throw Error(`unsupported node case: ${task.id}`)
     for (const item of task.checklist) if (item.required && !["input", "crosstable", "graph", "export", "result", "sequence"].includes(item.id))
       throw Error(`unknown required ID: ${item.id}`)
   }

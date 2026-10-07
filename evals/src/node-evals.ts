@@ -5,9 +5,11 @@ import { checkOracle } from "./oracle"
 import { readdir } from "node:fs/promises"
 import { checkNodeXml, readNodeXml } from "./node-xml"
 import { checkNodeEvidence } from "./node-evidence"
+import { nodeCaseIds } from "./node-cases"
 
 export async function validateNodeAttempt(taskDir: string, attemptDir: string, packagePath?: string) {
-  const task = await Bun.file(path.join(taskDir, "task.json")).json() as { checklist: { id: string; required?: boolean }[] }
+  const task = await Bun.file(path.join(taskDir, "task.json")).json() as { id: string; checklist: { id: string; required?: boolean }[] }
+  if (!(nodeCaseIds as readonly string[]).includes(task.id)) return { errors: [`unsupported node case: ${task.id}`], failures: [] }
   const known = ["input", "crosstable", "graph", "export", "result", "sequence"]
   const errors = task.checklist.filter((item) => item.required && !known.includes(item.id)).map((item) => `unknown required ID: ${item.id}`)
   const failures = await Bun.file(path.join(attemptDir, "artifact/package.lgp")).exists() ? [] : ["missing artifact/package.lgp"]
