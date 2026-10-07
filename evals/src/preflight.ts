@@ -56,11 +56,16 @@ export async function checkIsolatedLoginom(source: ArtifactSource) {
   const read = await Bun.$`docker exec ${storage.containerId} cat /workdir/.loginom-evals-isolated.json`.quiet().nothrow()
   const marker = await Promise.resolve(read.text()).then((text) => JSON.parse(text)).catch(() => undefined) as
     { previous_container_id?: unknown } | undefined
-  if (typeof marker?.previous_container_id !== "string" || !/^[0-9a-f]{64}$/.test(marker.previous_container_id) || marker.previous_container_id === storage.containerId)
+  if (!marker || typeof marker !== "object" || Array.isArray(marker))
     throw new EvalFailure("Маркер подготовки не определяет прежний сервер Loginom", 2)
-  const previous = await Bun.$`docker inspect --format ${"{{.State.Running}}\t{{.HostConfig.RestartPolicy.Name}}"} ${marker.previous_container_id}`.quiet().nothrow()
-  if (previous.exitCode !== 0 || previous.text().trim() !== "false\tno")
-    throw new EvalFailure("Изолированный eval запрещён: прежний сервер не остановлен или его автоперезапуск включён", 2)
+  // A fresh dedicated host has no predecessor; a declared predecessor still needs retirement proof.
+  if (marker.previous_container_id !== undefined) {
+    if (typeof marker.previous_container_id !== "string" || !/^[0-9a-f]{64}$/.test(marker.previous_container_id) || marker.previous_container_id === storage.containerId)
+      throw new EvalFailure("Маркер подготовки не определяет прежний сервер Loginom", 2)
+    const previous = await Bun.$`docker inspect --format ${"{{.State.Running}}\t{{.HostConfig.RestartPolicy.Name}}"} ${marker.previous_container_id}`.quiet().nothrow()
+    if (previous.exitCode !== 0 || previous.text().trim() !== "false\tno")
+      throw new EvalFailure("Изолированный eval запрещён: прежний сервер не остановлен или его автоперезапуск включён", 2)
+  }
   const components = await Bun.$`docker exec ${storage.containerId} cat /workdir/Components.cfg`.quiet().nothrow()
   const disabled = components.exitCode === 0 && Bun.which("xmllint")
     ? await Bun.$`printf %s ${components.text()} | xmllint --xpath ${"boolean(/ComponentSettings/Item[@Guid='70a6c99d-a725-4309-b05c-898c8072c3cd']/Settings[@Disabled='true'])"} -`.quiet().nothrow()
