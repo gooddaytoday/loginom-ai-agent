@@ -3426,6 +3426,20 @@ scenario/multi-turn/installed transitions/CLI Linux matrix и парные evals
 остаются открыты. Соседние harness/worktree/.env/профили/launcher не изменялись;
 основной план и corrections заморожены.
 
+
+## Exact attachment path: минимальная инструкция после model2 RED
+
+В локальный вход `package-docs` добавлено правило: показанный точный путь
+вложения сразу передавать в extract, не искать его glob и не читать родительский
+каталог. Права на вложение не превращаются в права обзора каталога. Контракты
+runtime/инструментов и permissions не менялись. RED — сохранённый natural
+`mimo-v2.5` CLI PDF на source239; Desktop counterpart прошёл.
+Source после инструкции: Host integrity **9PASS/16 assertions**, Agent
+bundled/discovery **36PASS/167 assertions**. Это проверки ресурсов/доставки,
+не live GREEN. Требуется новый clean CLI/Desktop candidate и повтор исходного
+model2 запроса. Linear3 Word RED — отдельный следующий цикл, ещё не исправлен.
+План и corrections не перерабатывались.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `2396e78f2`, clean source/artifacts/manifests/installed CLI seed PASS; предыдущие candidates сохранены.
