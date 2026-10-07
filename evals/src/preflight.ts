@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, stat, realpath, statfs } from "node:fs/promises"
 import type { EvalConfig } from "./config"
 import { evalsRoot, repoRoot } from "./config"
 import { EvalFailure } from "./fail"
-import { listStorage, type ArtifactSource } from "./artifact"
+import { assertIsolatedStorageEmpty, listStorage, type ArtifactSource } from "./artifact"
 import { agentCommand } from "./cli"
 import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
 import { superviseProcess } from "./process-supervisor"
@@ -29,6 +29,7 @@ export async function preflight(config: EvalConfig, source: ArtifactSource): Pro
   if (config.agent.cliMode === "source")
     throw new EvalFailure("Изолированный live eval требует EVAL_CLI_MODE=binary и EVAL_CLI_BIN установленного CLI", 2)
   if (config.agent.cliMode === "binary") {
+    await assertIsolatedStorageEmpty(source)
     await assertNoDebuggers()
     await checkSandbox(config)
   }

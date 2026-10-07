@@ -5,7 +5,7 @@ import { EvalFailure } from "./fail"
 import { evaluationContractHash, rubricSnapshot } from "./evaluation"
 import { agentInputsHash, buildAgentPrompt, loadTasks, rubricHash, taskTimeoutMs, type Task } from "./task"
 import { agentCommand, runAgent, type AgentCommand } from "./cli"
-import { cleanupArtifact, cleanupOrphanResult, fetchArtifact, listStorage, parseArtifactSource, storageEntryExists, type ArtifactSource } from "./artifact"
+import { assertIsolatedStorageEmpty, cleanupArtifact, cleanupIsolatedStorage, cleanupOrphanResult, fetchArtifact, listStorage, parseArtifactSource, storageEntryExists, type ArtifactSource } from "./artifact"
 import { preflight } from "./preflight"
 import { archiveProfileHistory, assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
 import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
@@ -216,6 +216,8 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const outDir = path.join(input.runDir, task.id, String(attempt))
   const workdir = path.join(config.agent.workspaceRoot, input.runId, task.id, String(attempt))
   await mkdir(outDir, { recursive: true })
+  if (!config.dryRun && config.agent.cliMode === "binary")
+    await assertIsolatedStorageEmpty(input.source).catch((error: unknown) => { throw new SandboxFailure(describe(error)) })
   await mkdir(workdir, { recursive: true })
   const files = await Promise.all(
     task.inputs.map(async (rel) => {
@@ -379,6 +381,10 @@ export async function afterAttempt(config: EvalConfig, command: AgentCommand, re
     const archive = await archiveProfileHistory(config.profileDir,
       `${path.basename(path.dirname(path.dirname(outDir)))}-${result.task_id}-${result.attempt}-${result.session_id ?? "no-session"}`)
     evidence.stages.push({ stage: "profile_history", status: "confirmed", path: archive })
+    if (!config.dryRun && config.agent.cliMode === "binary" && !config.keepStorage) {
+      await cleanupIsolatedStorage(parseArtifactSource(config.artifactSource, config.loginom))
+      evidence.stages.push({ stage: "storage", status: "confirmed" })
+    }
     result.environment_cleanup = { status: "confirmed", evidence: "cleanup.json", error: null }
     return { recovered: result.profile_recovered }
   } catch (error) {

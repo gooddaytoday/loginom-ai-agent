@@ -15,6 +15,16 @@ test("preflight: live source отклонён до обращения к Loginom
     .rejects.toThrow("EVAL_CLI_MODE=binary")
 })
 
+test("preflight: live binary требует выделенный storage до проверки endpoint и запуска CLI", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-preflight-storage-"))
+  try {
+    const config = loadConfig(["--skip-judge"], { LOGINOM_DOCK_API_KEY: "fixture", EVAL_AGENT_MODEL: "m/x",
+      EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/usr/bin/false", EVAL_PROFILE_DIR: path.join(dir, "profile"),
+      EVAL_WORKSPACE_ROOT: path.join(dir, "workspace"), LOGINOM_URL: "http://127.0.0.1:1", EVAL_ARTIFACT_SOURCE: `dir:${dir}` })
+    await expect(preflight(config, parseArtifactSource(config.artifactSource, config.loginom))).rejects.toThrow("выделенный Docker-контейнер")
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
 test("checkSandbox: не допускает executable без установленного CLI manifest", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-preflight-boundary-"))
   try {

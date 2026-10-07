@@ -10,6 +10,51 @@ export function parseArtifactSource(value: string, docker: { container: string; 
 }
 export type ArtifactSource = ReturnType<typeof parseArtifactSource>
 
+export async function checkIsolatedStorage(source: ArtifactSource) {
+  if (source.kind !== "docker") throw new EvalFailure("Широкая очистка требует выделенный Docker-контейнер с маркером", 2)
+  if (!/^\/workdir\/UserStorage\/[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(source.storageDir))
+    throw new EvalFailure("Неверный корень выделенного Loginom storage", 2)
+  const inspected = await Bun.$`docker inspect --format ${"{{json .}}"} ${source.container}`.quiet().nothrow()
+  if (inspected.exitCode !== 0) throw new EvalFailure("Выделенный Loginom-контейнер недоступен", 2)
+  const container = inspected.json() as { Id?: unknown; State?: { Running?: unknown }; Mounts?: { Type?: unknown }[] }
+  if (typeof container.Id !== "string" || !/^[0-9a-f]{64}$/.test(container.Id) || container.State?.Running !== true || !Array.isArray(container.Mounts))
+    throw new EvalFailure("Не подтверждено состояние выделенного Loginom-контейнера", 2)
+  if (container.Mounts.some((mount) => mount.Type === "bind"))
+    throw new EvalFailure("Широкая очистка запрещена: у контейнера есть host bind mounts", 2)
+  const read = await Bun.$`docker exec ${container.Id} cat /workdir/.loginom-evals-isolated.json`.quiet().nothrow()
+  const marker = read.exitCode === 0 ? await Promise.resolve(read.text()).then((text) => JSON.parse(text)).catch(() => undefined) as
+    { kind?: unknown; version?: unknown; container_id?: unknown; storage_dir?: unknown; roots?: unknown } | undefined : undefined
+  const roots = ["/workdir/UserStorage", "/workdir/SessionBackup"]
+  if (!marker || marker.kind !== "loginom-evals-isolated" || marker.version !== 1 || marker.container_id !== container.Id ||
+    marker.storage_dir !== source.storageDir || JSON.stringify(marker.roots) !== JSON.stringify(roots))
+    throw new EvalFailure("Широкая очистка запрещена: маркер, container ID или корни не подтверждены", 2)
+  const directories = await Bun.$`docker exec ${container.Id} sh -c ${'for root do test -d "$root" && ! test -L "$root" || exit 1; done'} eval-roots ${roots}`.quiet().nothrow()
+  if (directories.exitCode !== 0) throw new EvalFailure("Корни выделенного storage отсутствуют или являются symlink", 2)
+  return { containerId: container.Id, roots }
+}
+
+export async function cleanupIsolatedStorage(source: ArtifactSource) {
+  // Validate immediately before deletion; execute by immutable ID, never a reused name.
+  const storage = await checkIsolatedStorage(source)
+  const script = 'find /workdir/UserStorage -mindepth 2 -maxdepth 2 -exec rm -rf -- {} + && ' +
+    'find /workdir/UserStorage -mindepth 1 -maxdepth 1 ! -type d -exec rm -f -- {} + && ' +
+    'find /workdir/SessionBackup -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +'
+  const removed = await Bun.$`docker exec ${storage.containerId} sh -c ${script}`.quiet().nothrow()
+  if (removed.exitCode !== 0) throw new EvalFailure("Очистка выделенного Loginom storage не выполнена", 2)
+  await assertIsolatedStorageEmpty(source)
+}
+
+export async function assertIsolatedStorageEmpty(source: ArtifactSource) {
+  const storage = await checkIsolatedStorage(source)
+  const checked = await Bun.$`docker exec ${storage.containerId} sh -c ${
+    'find /workdir/UserStorage -mindepth 2 -print -quit && ' +
+    'find /workdir/UserStorage -mindepth 1 -maxdepth 1 ! -type d -print -quit && ' +
+    'find /workdir/SessionBackup -mindepth 1 -print -quit'
+  }`.quiet().nothrow()
+  if (checked.exitCode !== 0) throw new EvalFailure("Проверка пустоты выделенного Loginom storage не выполнена", 2)
+  if (checked.stdout.length) throw new EvalFailure("В Loginom остались материалы прошлой попытки; admission запрещён", 2)
+}
+
 export function parseFindOutput(text: string) {
   return text
     .split("\n")

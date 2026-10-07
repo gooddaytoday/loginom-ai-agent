@@ -9,6 +9,26 @@ import { afterAttempt, main, redact, runAttempt, stamp } from "../src/run"
 import type { RunSummary } from "../src/report"
 import { loadTasks } from "../src/task"
 
+test("runAttempt: live binary без выделенного Loginom останавливается до агента и судьи", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-storage-admission-run-"))
+  try {
+    await mkdir(path.join(directory, "profile"))
+    const dry = loadConfig(["--dry-run"], { EVAL_WORKSPACE_ROOT: path.join(directory, "workspace") })
+    const config = { ...dry, dryRun: false, profileDir: path.join(directory, "profile"),
+      agent: { ...dry.agent, cliMode: "binary" as const, cliBin: "/usr/bin/false" } }
+    const [task] = await loadTasks(path.join(evalsRoot, "tasks"), ["group-sum-qty"])
+    const { result, stop } = await runAttempt({ config, command: agentCommand(config),
+      source: parseArtifactSource(`dir:${directory}`, config.loginom), task: task!, attempt: 1,
+      runId: "storage", runDir: path.join(directory, "results"), signal: new AbortController().signal,
+      profileRecovered: false, skipJudge: false })
+    expect(result.status).toBe("harness_error")
+    expect(result.harness_error).toContain("выделенный Docker-контейнер")
+    expect(result.judge_attempts).toBe(0)
+    expect(result.session_id).toBeNull()
+    expect(stop).toBe(true)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test("runAttempt: отказ подготовки границы до dispatch даёт harness_error и stop без судьи", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "evals-boundary-admission-"))
   try {
