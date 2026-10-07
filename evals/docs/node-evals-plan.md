@@ -11,8 +11,8 @@
 
 - [x] Добавить в `test/node-evidence.test.ts` отрицательный случай: убрать из native fixture создание/настройку CrossTable, сохранить mapping/read/export/save; `validateNodeAttempt` должен дать FAIL. RED: пустой failures вместо creation.
 - [x] В `src/node-events.ts` связать успешное создание с тем же владельцем и последующими apply/read; GREEN: evidence/sequence 6 pass, 0 fail.
-- [ ] Добавить в `test/node-sequence.test.ts` случай раннего avg, замаскированного поздним mapping, и подтвердить RED. Проверять тот же публичный `checkNodeSequence`.
-- [ ] Связать переход с фактическим avg request и проверить все успешные avg starts; сохранить положительный sum/read → avg/read → mapping/read. Подтвердить GREEN.
+- [x] Добавить в `test/node-sequence.test.ts` случай раннего avg, замаскированного поздним mapping, и подтвердить RED. Проверяется публичный `checkNodeSequence`.
+- [x] Связать переход с фактическим avg request и проверить все успешные avg starts; сохранить положительный sum/read → avg/read → mapping/read. Отдельный RED→GREEN проверяет отсутствующий фактический переход при avg readback. GREEN: evidence/sequence 8 pass, 0 fail.
 - [ ] Запустить весь `bun test` и `bun typecheck` из `evals/`, повторно проверить сохранённые reference evidence без новых модельных попыток, обновить документацию и checkpoint (не больше 20 строк).
 
 ## Интерфейсы и ограничения
