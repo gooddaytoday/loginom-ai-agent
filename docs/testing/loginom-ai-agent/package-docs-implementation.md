@@ -3730,8 +3730,8 @@ Oracle HTTP tests 3 PASS / 20 assertions; Host typecheck и diff check PASS.
 
 ## Checkpoint
 
-- Resume c50d/OpenAI6.1 medium: Desktop formats9/9 facts/layout PASS (MD source read), CLI PDF3/3 и Word1 PASS; Desktop routing11×3 и остальные CLI formats выполняются. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
-- Product candidates: Desktop/CLI `c50d220c1`, clean full builds/manifests/static/installed CLI seed PASS; Ubuntu22 installed PASS; прежние candidates сохранены.
+- Resume c50d/OpenAI6.1 medium: formats9/9 на Desktop и CLI facts/layout PASS (MD source read), Desktop local-path3/3 PASS; routing частично прерван exit143, negative продолжаются. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
+- Product candidates: Desktop/CLI `c50d220c1`, clean full builds/manifests/static/installed CLI seed PASS; Desktop Ubuntu22/24 installed PASS; CLI Ubuntu22 native installer PASS; прежние candidates сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.

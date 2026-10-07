@@ -21,8 +21,8 @@ Models snapshot:
 | Кейс | Desktop | Standalone CLI run |
 | --- | --- | --- |
 | `docs-attached-pdf` | 3/3 mechanics, facts, layout PASS; 9 страниц просмотрены | 3/3 mechanics, facts, layout PASS; 6 страниц просмотрены |
-| `docs-attached-word` | 3/3 mechanics, facts, layout PASS; 6 страниц просмотрены | первый прогон PASS, обе страницы просмотрены; остальные выполняются |
-| `docs-markdown` | 3/3 mechanics, facts PASS; весь Markdown прочитан | ожидает предыдущие кейсы |
+| `docs-attached-word` | 3/3 mechanics, facts, layout PASS; 6 страниц просмотрены | 3/3 mechanics, facts, layout PASS; 6 страниц просмотрены |
+| `docs-markdown` | 3/3 mechanics, facts PASS; весь Markdown прочитан | 3/3 mechanics, facts PASS; весь Markdown прочитан |
 
 Проверенные PDF сохраняют версию 7.4.0, модуль «Демо», шесть узлов, две
 подмодели, глубину три и единственную связь Источник → Калькулятор. `data.lgd`
@@ -37,14 +37,19 @@ Models snapshot:
 Desktop formats driver завершился exit0, failures пуст. По каждому из девяти
 прогонов сохранён отдельный manual-quality receipt; просмотрены 15 страниц
 PDF/Word и прочитаны все три Markdown. Для Markdown проверены исходный текст
-и структура, визуальный рендер страниц не заявляется. Дополнительно CLI Word
-attempt1 PASS с двумя просмотренными страницами. Проверка acceptance runner
+и структура, визуальный рендер страниц не заявляется. CLI formats driver также завершился exit0: все девять
+прогонов приняты по фактам; просмотрены все 12 страниц PDF/Word, прочитаны
+три Markdown. По каждому сохранён `manual-quality.json`. Проверка acceptance runner
 после возобновления: 8 PASS / 35 assertions, pinned Node24.19.0.
 
 В новом `desktop-openai-routing-c50d220c1-resume` начаты ×3 остальные
 11 single-turn кейсов: local path, LGP+PNG, внешний путь, отсутствующий файл,
 отсутствие входа, только серверная ссылка и пять default-кейсов. Условия
-модели/catalog/candidate сохранены; результаты ещё не приняты. Сценарные и
+модели/catalog/candidate сохранены; driver завершился exit143 на external attempt2; причина неизвестна.
+Семь завершённых mechanics receipts сохранены, local-path3/3 facts/layout PASS
+(шесть страниц просмотрены). Остальные четыре отчёта требуют ручной проверки.
+Незавершённые случаи не засчитаны; debugger/дочерних процессов не осталось.
+Negative-кейсы продолжены отдельным запуском с прежними conditions. Сценарные и
 многоходовые кейсы требуют отдельных адаптеров и этим запуском не покрываются.
 
 ## Воспроизводимость и границы
@@ -70,8 +75,15 @@ Word рендерится отдельным контейнером без се�
 Ubuntu22 installed Desktop ранее прошёл offline smoke c50d. Ubuntu24 и первый
 CLI Ubuntu22 build завершились exit143 во время apt install, до smoke. Причина
 не установлена, логи и `matrix-interrupted-20261007-resume.json` сохранены;
-images и installed results не получены, PASS не заявляется. Для Ubuntu24 начата
-одна последовательная v2 сборка с process/signal trace в новом каталоге.
+images и installed results не получены, PASS не заявляется. Ubuntu24 v2 с process/signal trace завершилась PASS,
+exit0: installed non-root offline launch. Native CLI installer на Ubuntu22
+также PASS: manifest/source чистые, sandbox root:root/4755, настоящий Chromium,
+launcher unconfigured, profile sentinel сохранён, uninstall выполнен.
+Первый CLI native запуск смонтировал архив другого UID и получил EACCES на
+двух файлах Chromium с mode0600; результат сохранён. V2 распаковал тот же
+архив от имени тестового UID1200 и прошёл без изменения artifact.
+Evidence: `desktop-c50d220c1-linux-matrix-ubuntu24-v2/linux-matrix.json` и
+`cli-c50d220c1-native-installed-v2/evidence/result/result.json`.
 Отдельная CLI matrix Ubuntu22/24/26, Debian12/13 использует
 существующий `test/cli-install-native.mjs`, сохранённый archive и собственные
 images/каталоги: установку UID1200, root:root/4755 sandbox, настоящий Chromium,
