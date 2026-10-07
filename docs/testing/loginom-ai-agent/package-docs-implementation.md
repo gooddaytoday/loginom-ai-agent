@@ -3307,6 +3307,31 @@ Evidence: `cli-live-formats-5a99b75f4/`,
 в предыдущем разделе; проверка старого source pin против изменённого checkout
 не выдаётся за подтверждение текущего source.
 
+## 2026-10-07 — instruction correction по двум живым RED
+
+Adapter/test infrastructure сохранена коммитом `f7324b715`. Основной план
+и документ corrections не перерабатывались. На сохранённых natural prompts
+получены два воспроизводимых quality сигнала: CLI Word приписывает неизвестному
+DerivedReference роль Reference; Desktop server-only иногда вызывает локальный
+read и после permission reject заканчивает без просьбы предоставить пакет.
+
+В description/SKILL `package-docs` серверный путь теперь прямо требует сразу
+локальный экспорт: проверять его как local read/glob/extract запрещено,
+даже если путь абсолютный. Narrative отдельно различает TBGDerivedReference
+и TBGReference: совпадение суффикса/имени и справка обычного Reference не
+устанавливают базовый обработчик; неизвестный тип описывается по структуре.
+Новых форматов, каталогов данных, NLP фильтров или runtime-контрактов не добавлено.
+Это исправление существующих требований к фактам и локальному входу.
+
+Static/source после изменения: Host bundled integrity **9 PASS / 16 assertions**,
+Agent catalog/discovery **26 PASS / 144 assertions**. Живой GREEN новой версии
+ещё не получен: сохранённые артефакты имеют source 5a99b75f4 и старые инструкции.
+Их не подменять новой revision на месте. Следующий шаг — новый полный candidate
+из чистого SHA и повторение natural Word/server prompts с ручной проверкой,
+затем оставшийся routing и installed gate. Source metadata PASS не заменяет
+поведение модели. Необъяснённый CLI status LOGINOM_HOST_CLEANUP_FAILED
+остаётся отдельным открытым сигналом.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `5a99b75f4`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.
@@ -3328,4 +3353,4 @@ Evidence: `cli-live-formats-5a99b75f4/`,
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- Далее: DerivedReference/серверный путь — instruction RED→GREEN; CLI status cleanup failure; полный routing/installed переходы и Linux matrix. A/B ждёт harness owner; план не перерабатывать.
+- Далее: новая чистая сборка и live GREEN Word/server instructions; CLI status cleanup failure; полный routing/installed переходы и Linux matrix. A/B ждёт harness owner; план не перерабатывать.
