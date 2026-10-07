@@ -65,7 +65,8 @@ async function validateRun(runDir: string, taskIds: string[], tasksDir: string) 
     if (!(await evidence.exists())) { errors.push(`${task.id}: cleanup.json missing`); continue }
     const cleanup = await evidence.json()
     if (cleanup.result?.status !== "confirmed" || cleanup.result?.error || cleanup.processes?.status !== "confirmed" ||
-      !["processes", "diagnostics", "writer", "ready", "pruning"].every(stage => cleanup.stages?.some((s: { stage: string; status: string }) => s.stage === stage && s.status === "confirmed")))
+      !["processes", "diagnostics", "writer", "ready"].every(stage => cleanup.stages?.some((s: { stage: string; status: string }) => s.stage === stage && s.status === "confirmed")) ||
+      !cleanup.stages?.some((s: { stage: string; status: string }) => ["pruning", "profile_history"].includes(s.stage) && s.status === "confirmed"))
       errors.push(`${task.id}: cleanup evidence unconfirmed`)
   }
   const failures = summary.tasks.flatMap((task) => task.attempts.flatMap((attempt) =>
