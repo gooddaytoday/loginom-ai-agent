@@ -1,12 +1,70 @@
 import { expect, test } from "bun:test"
 import { spawn } from "node:child_process"
-import { cp, mkdtemp, readFile, readlink, stat } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, readFile, readlink, rm, stat } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
 import { agentCommand, runAgent } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
-import { signalProcess, type ProcessIdentity } from "../src/process-supervisor"
+import { signalProcess, superviseProcess, type ProcessIdentity } from "../src/process-supervisor"
 import { archiveDiagnostics } from "../src/diagnostics"
+
+test("trusted unit: native commands cannot request observation after exit", async () => {
+  await expect(superviseProcess({ cmd: [process.execPath, "-e", "process.exit(0)"], cwd: evalsRoot,
+    env: { PATH: process.env.PATH ?? "" }, timeoutMs: 1000, observationMode: "unit_after_exit" })).rejects.toThrow("Trusted unit observation requires")
+})
+
+test("trusted unit: protected fixture ends before unit exit and final drain confirms cleanup", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-trusted-unit-"))
+  const cwd = path.join(root, "evals")
+  await mkdir(cwd)
+  await Bun.write(path.join(cwd, "protected.test.ts"), `
+    import {test,expect} from 'bun:test';
+    import {spawn} from 'node:child_process';
+    test('owned protected fixture',async()=>{
+      const child=spawn(process.execPath,['-e',${JSON.stringify("const {dlopen}=await import('bun:ffi');const library=dlopen('libc.so.6',{prctl:{args:['i32','u64','u64','u64','u64'],returns:'i32'}});if(library.symbols.prctl(4,0,0,0,0)!==0)process.exit(2);setTimeout(()=>process.exit(0),200);")}],{stdio:'ignore'});
+      expect(await new Promise(resolve=>child.once('exit',resolve))).toBe(0);
+    });
+  `)
+  try {
+    const run = await superviseProcess({ cmd: [process.execPath, "test"], cwd, env: { PATH: process.env.PATH ?? "" },
+      timeoutMs: 5_000, observationMode: "unit_after_exit" })
+    expect(run.exitCode).toBe(0)
+    expect(run.processCleanup.observation_mode).toBe("unit_after_exit")
+    expect(run.processCleanup.capture_complete).toBe(true)
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 10_000)
+
+test("trusted unit: protected leftover fails strict drain and is never signaled as unknown", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-trusted-leftover-"))
+  const cwd = path.join(root, "evals")
+  await mkdir(cwd)
+  const pidFile = path.join(root, "owned.pid")
+  await Bun.write(path.join(cwd, "protected.test.ts"), `
+    import {test,expect} from 'bun:test';
+    import {spawn} from 'node:child_process';
+    test('owned protected leftover',async()=>{
+      const child=spawn(process.execPath,['-e',${JSON.stringify(`const {dlopen}=await import('bun:ffi');const library=dlopen('libc.so.6',{prctl:{args:['i32','u64','u64','u64','u64'],returns:'i32'}});if(library.symbols.prctl(4,0,0,0,0)!==0)process.exit(2);await Bun.write(${JSON.stringify(pidFile)},String(process.pid));setTimeout(()=>process.exit(0),3_000);`)}],{detached:true,stdio:'ignore'});
+      child.unref();
+      while(!await Bun.file(${JSON.stringify(pidFile)}).exists())await Bun.sleep(5);
+      expect(child.exitCode).toBeNull();
+    });
+  `)
+  try {
+    const run = await superviseProcess({ cmd: [process.execPath, "test"], cwd, env: { PATH: process.env.PATH ?? "" },
+      timeoutMs: 5_000, observationMode: "unit_after_exit" })
+    expect(run.exitCode).toBe(0)
+    expect(run.processCleanup.observation_mode).toBe("unit_after_exit")
+    expect(run.processCleanup.status).toBe("failed")
+    expect(run.processCleanup.error).toContain("Cannot inspect process identity")
+    const pid = Number(await Bun.file(pidFile).text())
+    expect((await readFile(`/proc/${pid}/stat`, "utf8")).split(") ")[1]!.split(" ")[0]).not.toBe("Z")
+    process.kill(pid, 0)
+    // The fixture expires itself; its unreadable identity never authorizes a kill.
+    await Bun.sleep(3_100)
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 10_000)
 
 test("signalProcess: краткий запрет чтения собственного /proc пережидается без ослабления identity", async () => {
   const child = spawn(process.execPath, ["-e", `

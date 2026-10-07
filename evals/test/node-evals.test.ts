@@ -185,6 +185,24 @@ test("completed без подтверждённого cleanup получает E
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+test("unit_after_exit не подтверждает очистку node-run даже при confirmed stages", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
+  try {
+    await writeSummary(path.join(directory, "summary.json"), JSON.stringify({
+      interrupted: false, stopped_reason: null, task_ids: ["crosstable-fixed-sum"],
+      config: { repeat: 1 }, storage_leftovers: [], tasks: [{ id: "crosstable-fixed-sum", attempts: [
+        { attempt: 1, status: "failed", cleanup_error: null, environment_cleanup: { status: "confirmed" } },
+      ] }],
+    }))
+    const evidence = Bun.file(path.join(directory, "crosstable-fixed-sum/1/cleanup.json"))
+    const cleanup = await evidence.json()
+    await Bun.write(evidence, JSON.stringify({ ...cleanup, processes: { ...cleanup.processes, observation_mode: "unit_after_exit" } }))
+    const result = await validateNodeRun(directory, ["crosstable-fixed-sum"], path.join(directory, "cases"))
+    expect(result).toMatchObject({ verdict: "ERROR", code: 2 })
+    expect(result.errors.join(" ")).toContain("unit_after_exit")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test("infra_error при полном наборе попыток получает ERROR/2 и сохраняет исходный infra retry", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
   try {
