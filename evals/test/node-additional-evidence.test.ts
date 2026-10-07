@@ -59,10 +59,12 @@ test("min/max собственный native output mapping и mask12; swapped so
   const native=await Bun.file(new URL("fixtures/node-evals/min-max-native.json",import.meta.url)).json()
   await Bun.write(path.join(root,"native-crosstable.json"),JSON.stringify(native))
   expect(await validateNodeAttempt(root,root)).toEqual({errors:[],failures:[]})
-  const corrupted=structuredClone(native)
-  for(const observation of corrupted.observations) observation.node_crosstable.input_fields.find((f:any)=>f.label==="Amount").functions=13
-  await Bun.write(path.join(root,"native-crosstable.json"),JSON.stringify(corrupted))
-  expect((await validateNodeAttempt(root,root)).failures.join(" ")).toContain("mask")
+  for (const mask of [4,8,13]) {
+   const corrupted=structuredClone(native)
+   for(const observation of corrupted.observations) observation.node_crosstable.input_fields.find((f:any)=>f.label==="Amount").functions=mask
+   await Bun.write(path.join(root,"native-crosstable.json"),JSON.stringify(corrupted))
+   expect((await validateNodeAttempt(root,root)).failures.join(" ")).toContain("mask")
+  }
   await Bun.write(path.join(root,"native-crosstable.json"),JSON.stringify(native))
   await packageXml(xml.replace('Mapping Source="A_Amount_Min"','Mapping Source="A_Amount_Max"'))
   expect((await validateNodeAttempt(root,root)).failures.join(" ")).toContain("mapping")
