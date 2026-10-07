@@ -3380,6 +3380,52 @@ Evidence: `skills-acceptance-external-run-{red,green,typecheck}.log`,
 `cli-canonical-regressions-2396e78f2/`, `desktop-canonical-regressions-2396e78f2/`,
 `cli-status-probe-5a99b75f4/`, `node-host-cold-close-processes-2396e78f2/`.
 
+
+## 2026-10-07 — natural239: server GREEN, Word и model2 сохраняют RED
+
+Product artifacts остаются source2396e78f2; adapter external-run из16e54d4fb.
+Основной `mimo-v2.5-pro/default`, browser mode с окном: CLI regressions
+**12/12 mechanics**, Native AppImage **6/6 mechanics**. Server-only **3/3**
+на каждом интерфейсе, полный финальный запрос локального экспорта PASS;
+только skill, без local lookup server path/отчёта/Chromium. CLI unconfigured
+arithmetic3/3 exact102 и translation3/3 PASS, без skills/Loginom tools.
+
+Все шесть Word (12 страниц) прочитаны и просмотрены. Desktop facts/layout
+**3/3 PASS**, CLI layout **3/3 PASS**, facts **2/3**: attempt1 во вводной строке
+называет модуль линейным сценарием из трёх верхних узлов, хотя третий узел
+изолирован; подробный граф затем описан правильно. Противоречие сохранено
+как **FAIL**, без снижения quality gate. Неизвестному DerivedReference в этих
+шести отчётах уже не приписана роль ordinary Reference. Counts/links/вложенность,
+пустые формулы/код и реальные Help handler reads сопоставлены с nested.lgp;
+SHA исходных пакетов и Word не изменены. Render watcher завершился143 после
+четырёх Word, причина не установлена; два оставшихся Word и следующий PDF
+успешно отрендерены отдельным own offline one-shot, originals readonly.
+
+External CLI textual path **3/3 PASS**: actual CLI_PERMISSION_REJECTED,
+permissionDenied ошибка extract содержит подсказку `--file`, exit1, нет отчёта
+или Chromium, исходный SHA неизменен. Финальный assistant text пуст — это
+записано, не заменено искусственным ответом. Для этого corpus case ожидается
+отказ с подсказкой; её реальный источник — ошибка инструмента. README уточнён:
+текст инструкции skill сам по себе не подтверждает пользовательскую подсказку.
+
+Вторая поддерживаемая модель `xiaomi-token-plan-sgp/mimo-v2.5`, variantdefault:
+CLI arithmetic PASS, PDF **FAIL**: после правильной activation модель вызвала
+`glob` родительского каталога приложенного `.lgp`; штатный external_directory
+reject завершил запрос без отчёта. Прикреплённый файл не авторизует каталог;
+расширять права ради зелёного теста нельзя. Desktop PDF facts/layout PASS
+(обе страницы просмотрены), arithmetic PASS. Второй smoke целиком не принят.
+Все conditions/corpus/driver hashes, errors, requests, process traces и manual
+JSON сохранены в `*-canonical-regressions-2396e78f2`,
+`cli-canonical-external-path-2396e78f2`, `*-model2-smoke-2396e78f2`.
+
+Следующий TDD цикл: exact attached path сразу в extract, без directory glob,
+повторить failed model2 prompt на новом clean candidate. Отдельный цикл —
+согласовать вводное описание со связными компонентами графа по links, повторить
+Word. Старый HOST_CLEANUP_FAILED/SIGKILL пока не объяснён. Полный корпус20×3,
+scenario/multi-turn/installed transitions/CLI Linux matrix и парные evals
+остаются открыты. Соседние harness/worktree/.env/профили/launcher не изменялись;
+основной план и corrections заморожены.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `2396e78f2`, clean source/artifacts/manifests/installed CLI seed PASS; предыдущие candidates сохранены.
@@ -3387,7 +3433,7 @@ Evidence: `skills-acceptance-external-run-{red,green,typecheck}.log`,
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node48 PASS; CLI5a PDF3/3 PASS, Word facts2/3 FAIL/layout3/3 PASS, MD3/3 PASS; Desktop5a PDF/Word/MD3/3 facts PASS; quoted lists public6/6 GREEN.
+- Docs Node48 PASS; CLI239 Word facts2/3 FAIL/layout3/3 PASS; Desktop239 Word3/3 facts/layout PASS; прежние PDF/MD и quoted-list6/6 результаты сохранены.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
 - Scope/history/prompt/revert/docs: 200 PASS / 2 V2 SKIP; Host scope11 PASS; пять implementation подпунктов этапа 5 отмечены; installed переходы ещё открыты.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
@@ -3401,4 +3447,4 @@ Evidence: `skills-acceptance-external-run-{red,green,typecheck}.log`,
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- Далее: live239 Word/Desktop server/ordinary; external CLI path×3; CLI cleanup signal; полный routing/installed переходы/CLI matrix. Desktop5a Linux5 PASS. A/B ждёт harness owner; план заморожен.
+- Далее: exact-attachment model2 RED → GREEN, затем linear3 Word RED; CLI cleanup signal; полный20 routing/installed переходы/CLI matrix. Server2396/6 и externalCLI3/3 PASS; A/B ждёт owner; план заморожен.
