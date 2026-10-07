@@ -3500,7 +3500,8 @@ RED подтверждён сохранённым `cli-canonical-regressions-239
 последовательность, подтверждённую цепочку описывать отдельно от изолированных
 узлов и подмоделей. Новых runtime/permissions/эвристического маршрутизатора нет.
 Host integrity **9PASS/16 assertions**, Agent discovery/bundled
-**36PASS/167 assertions**, Prettier PASS. Source checks не доказывают качество
+**43PASS/289 assertions** (включая семь standalone discovery проверок),
+Prettier PASS. Source checks не доказывают качество
 модельного текста. Следующий шаг — новый clean CLI candidate и исходный natural
 Word prompt×3 с полным facts/layout review; live GREEN пока не заявлен.
 
