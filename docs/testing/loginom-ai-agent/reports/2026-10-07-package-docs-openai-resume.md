@@ -1,6 +1,7 @@
 # Возобновлённая приёмка package-docs на OpenAI
 
-Статус: частичная приёмка; обязательная матрица ещё выполняется.
+Статус: частичная приёмка; bc6 live-матрица завершена с native/infra отказами.
+Desktop3ece доставляет готовые документы, Linux-проверки продолжаются.
 Основная модель: `openai/gpt-6.1-sol`, variant `medium`.
 Source первоначальных clean candidates: `c50d220c186a1ef0332b15c4a3e9fb1bc7e42efc`.
 
@@ -17,6 +18,10 @@ Models snapshot:
 Используются сохранённые сборки; текущий SHA документации не приписывается бинарникам.
 
 ## Результаты
+
+Исторические результаты ниже привязаны к указанным сборкам. Новая AppImage3ece
+не получает автоматически live PASS предыдущей модели/сборки; её проверка
+открытия описана в конце отчёта.
 
 | Кейс | Desktop | Standalone CLI run |
 | --- | --- | --- |
@@ -276,3 +281,49 @@ execution/save/physical GUID/link по прежним messages. Оригинал
 Desktop253 Linux5/5 PASS. CLI253 Ubuntu22/Debian13 timeout случился на archive
 manifest до установки; это не доказанный отказ installed launcher. Остальные
 три CLI Linux PASS; идёт ровно одна offline-проба, исходные FAIL сохранены.
+
+## Завершение bc6 и новая доставка Desktop3ece
+
+Четыре bc6 batch штатно закончились с исходными receipts, без quality retries.
+Desktop/CLI routing18×3 и modify/execute-save2×3 не прошли полный gate:
+поздние configured-кейсы получили LOGINOM_KNOWLEDGE_UNAVAILABLE до модели.
+Отдельный HTTPS health probe тоже отказал с TLS unexpected EOF/HTTP000.
+Это не доказанная модельная ошибка выбора skill. Пока Help недоступен, новые
+live/model попытки не запускаются; unconfigured арифметика/перевод завершились.
+
+CLI attached-PDF: все7 страниц, полные тексты и ответы проверены, facts/layout
+PASS. Attempt2 оставил готовый отчёт, но превысил native deadline480s:
+interrupted=true, wall576135ms, исходный mechanics FAIL сохранён. Готовый PDF
+не превращает этот запуск в успешный. Остальные два mechanics PASS.
+Desktop local-path3/3: все6 страниц/ответы проверены, PASS. Desktop Word3/3:
+все6 страниц/тексты/ответы проверены, facts/layout PASS; Markdown3/3: исходные
+тексты и ответы прочитаны, facts PASS без заявления page rendering.
+
+Desktop execute-save3/3 mechanics PASS. Modify2/3 native execution/save
+подтвердили20/40/50; исходные adapter footer FAIL не переписаны. Modify1 native
+output_mapping FAIL остаётся. CLI modify3/3 открыли пакет read-only и не
+завершили нужное изменение; владелец/причина server lock не установлены.
+Полный signal report `scenario-modify-signal-20261007-v2/report.md` сверяет
+все32 исходных hashes. Recovery/ownership/handler guards не ослаблялись.
+
+Отдельный offline Ubuntu22 CLI253 full-integrity probe PASS167781ms;
+первый stdout167441ms, Host стартовал167372ms. IO pressure наблюдалась,
+причинность не доказана. Remaining0/forced signals0/container removed.
+Это самостоятельная диагностика прежней сборки, исходные180s matrix FAIL
+на Ubuntu22/Debian13 сохраняются.
+
+Чистая AppImage3ece19aff SHA256
+`c20dcfa21abdb14d33136150d702f764d3d05e3d0f7cdc833ff0d49b69ba934f`
+и DEB `d43c710aa7dd62816a21effee22c4556390a893a1c8eb63b455a8fd595a48cf2`
+прошли manifest/static verification. Resources digest совпадает с bc6.
+Новая UI кнопка у completed package_docs_run emit проверена native replay:
+2 PDF, Word, Markdown —4/4 PASS через настоящий open-local-file IPC и окна
+Evince/LibreOffice/gedit. Подмена local handler отсутствует; внешний browser
+handler изолированного приложения отключён и не вызывался. Раздельные Session
+ID/directories, private HOME/runtime, D-Bus внутри Xvfb, Loginom unconfigured,
+live model calls0; после закрытия Desktop и просмотрщиков remaining0.
+Receipts/screenshots/hashes — `native-document-link-3ece-green-v6/verification.json`.
+Source tests3 и regression17/55 assertions/typecheck PASS; эта проверка новой
+UI доставки не подменяет живой выбор skill и полную installed/model матрицу.
+Старый bc6 RED и промежуточные ошибки private probe сохранены отдельно.
+Linux matrix3ece, CLI/TUI и A/B gate остаются самостоятельными проверками.

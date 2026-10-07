@@ -4081,10 +4081,45 @@ Offline Ubuntu22 CLI253 full-integrity probe PASS167781ms на прежней с
 причинность/стабильность таймаута не установлены. Own container штатно завершён,
 remaining[]/forcedsignals[]/absent; исходные Linux matrix FAIL не менялись.
 
+## 2026-10-07 — native открытие документа в Desktop3ece
+
+Чистая сборка `3ece19aff72f5d95f88347564bb61566029cae52`: manifest,
+static DEB/AppImage PASS. DEB SHA256
+`d43c710aa7dd62816a21effee22c4556390a893a1c8eb63b455a8fd595a48cf2`,
+AppImage `c20dcfa21abdb14d33136150d702f764d3d05e3d0f7cdc833ff0d49b69ba934f`.
+Resources digest `17190acc75cfdc1eb3d67f7d98bcab0c07b9a1fa9741add639d5f567e74b421e`
+совпадает с bc6; продуктовые Agent/Host/runtime/skills не менялись.
+
+Native replay сохранённых bc6 messages/documents: два PDF, Word, Markdown —
+4/4 PASS. Кнопка completed emit отправила точный file URI через настоящий
+`open-local-file` IPC; открылись Evince, LibreOffice Writer и gedit с окном
+соответствующего документа. Локальный native handler не подменялся. Отключён
+только внешний browser handler изолированного приложения; таких вызовов нет.
+Каждый fixture получил отдельные session directory и Session ID. Loginom
+unconfigured, live model calls0. Desktop и собственные просмотрщики закрыты
+с проверкой PID/start-time, private HOME/DISPLAY; remaining и viewerRemaining
+пусты. Evidence `native-document-link-3ece-green-v6/verification.json` содержит
+хэши receipts, документов, screenshots и probe. Это проверка доставки уже
+готового документа новой AppImage, не повтор живой матрицы модели.
+
+Предыдущие probe failures сохранены. Их причины: заменяемый Button атрибут,
+onboarding modal в accessibility tree, неподходящее наблюдение shell API,
+порядок D-Bus/Xvfb и ожидание внешних просмотрщиков при закрытии Electron.
+В окончательной проверке D-Bus запускается внутри Xvfb, HOME/runtime private;
+полученный IPC и настоящие окна проверены до cleanup. Замеры render2012–12449ms
+включают ожидание onboarding и не считаются общим performance benchmark.
+Старые ссылки в Markdown не переписываются; доставка идёт кнопкой результата.
+
+Дополнительная ручная QA bc6: Desktop Word3/3 — все6 страниц/полные тексты/
+финальные ответы проверены, facts/layout PASS; Markdown3/3 — все исходные тексты
+и ответы прочитаны, facts PASS (page rendering не заявляется). По каждому есть
+manual-quality с хэшами, настоящей Help, неизменным входом, Chromium0/remaining0.
+Открытие этих старых model-generated ссылок не приписывается QA.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
-- Product candidates253 clean/manifest/static/CLI seed PASS; Linux253 Desktop5/5 PASS; CLI Ubuntu24/26/Debian12 PASS, Ubuntu22+Debian13 archive manifest180s FAIL до установки сохранены. CLI/Desktopbc6 source/manifest/static/CLI seed PASS; installed live fix идёт.
+- Product253 и bc6 clean/manifest/static/CLI seed PASS; Linux253 Desktop5/5 PASS, CLI Ubuntu24/26/Debian12 PASS, Ubuntu22+Debian13 archive manifest180s FAIL сохранены. Desktop3ece clean/manifest/static PASS; собственная offline Linux matrix идёт.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -4102,4 +4137,4 @@ remaining[]/forcedsignals[]/absent; исходные Linux matrix FAIL не ме
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- RESUMED: QA36:33 docs+3 CLI denials, один исходный layout FAIL; Desktop/CLI default30/30 PASS; CLI local scenario-create2/3 PASS+1 UI_EPOCH_CHANGED FAIL; Desktop scenario3/3 PASS, физические GUID/link сохранены, remaining0. Desktop+CLI253 build→docs3/3,12 PDF-страниц QA PASS; CLI attempt2 link destination отличается от output, native click не проверен. Mixed253/bc6 cold SUM1 PASS/unchanged/logout/remaining0. bc6 corpus20×3 завершён с native/infra FAIL, gate открыт; документ delivery RED, UI source3tests/17regression/typecheck PASS; native GREEN нужен. TUI/Linux5/A-B открыты.
+- RESUMED: bc6 corpus20×3 Desktop/CLI завершён с native/infra FAIL; Help TLS недоступен, новые live не запускать. Desktop3ece completed-document opening4/4 native PASS; UI3tests/17regression/typecheck PASS. Дополнительные bc6 Word6 страниц и MD3 проверены. Полная матрица/TUI/Linux5/A-B и холодные повторы открыты; результаты и ограничения — в OpenAI resume report.
