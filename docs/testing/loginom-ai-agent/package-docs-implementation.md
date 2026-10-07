@@ -3083,14 +3083,61 @@ Docker matrix runner принимает необязательный собст�
 DEB70 Ubuntu22 прогон запущен с `loginom-package-docs-70a2d5a93:ubuntu22`;
 его результат пока не принят, полная Linux матрица остаётся открытой.
 
+## Общий source pin 3ccc3b4c9: bullet fix и оставшийся facts RED
+
+Полные CLI и Desktop собраны на clean source
+`3ccc3b4c9e50b73b9c51af1d0a9e7a8c9ebf4fd0`, prod 0.1.17, Node 24.19.0.
+CLI archive/roundtrip/source verification PASS; tree
+`185e47f99edfb17d3f7e68c470801183eca03e74ee03201e82df34cb222a9bc6`, archive
+`4b852e04e9ad85f7d699a8339cbc8b205f02e795085aa26d866775b7d5a8df99`.
+Desktop DEB/AppImage static **4654 resources PASS**; resource manifest
+`f85488c897e2bca127514275e77b3e62293125035eca6bf3f7a6cca932ce0e71`.
+
+| Desktop artifact | SHA-256 |
+| --- | --- |
+| AppImage | `f4ab491e2fce051bee15925cc0da5b26c1e9849d5b4fa8d9b2c4fbd9117f9dd5` |
+| DEB | `6108effe6a1cd3b6ad7567918551addd30e217b5ec10572fc2aeb155e9e5bdc0` |
+| Source archive | `eed5200a8cb882cdf5e83ea68081050fc7ed7172b48b9b8ac5d79297fb3f3883` |
+
+CLI PDF `--no-headless`: **3/3 mechanics/Help B/layout PASS**,
+150.877 / 131.212 / 183.530 s, input SHA неизменён, Chromium exec0,
+один PDF на попытку. Просмотрены все шесть страниц: нумерация 1/2 и читаемая
+кириллица. Facts **2/3 PASS**: третья попытка снова описала `DerivedReference`
+как создаваемый на базе другого узла после generic derived-component Help.
+Полный quality gate остаётся FAIL; узкий verifier проходит все три раза.
+Evidence: `cli-live-pdf-3ccc3b4c9/`, отдельные manual review JSON.
+
+Исследование actual tool transcript исключило неверную подпись экстрактора:
+service_name получается из исходного Engine без выдуманной расшифровки.
+Модель получила актуальный SKILL полностью (`truncated: false`), прочитала
+narrative и повторно прочитала заполненный черновик перед emit. Наблюдаемый
+сбой — перенос общей справки после расширения поиска неизвестного типа.
+Контракт структуры и требования основного плана не менялись.
+
+CLI Word mechanics **3/3 PASS**, 73.652 / 97.116 / 140.410 s,
+`--no-headless`, Chromium exec0. Первое описание проверено относительно
+структуры/actual Help; полная facts/layout серия ещё не принята.
+Поставляемый documents renderer 26.904.11930 на текущем хосте не запускает
+LibreOffice: требуются GLIBC 2.38 / GLIBCXX 3.4.31. Ошибка записана в
+`word-render.log`; проверяется тот же bundled renderer в собственном Ubuntu24
+контейнере. Первой контейнерной попытке не хватило libcurl/liblcms;
+её log сохранён. Пользовательский LibreOffice не запускался.
+
+Независимые серии запущены с отдельными roots: CLI Markdown, три CLI docs
+case без локального входа и 13 single-turn Desktop case ×3. Desktop adapter
+явно отказывает для сценарных/multiturn/внешних permission case; для запросов
+без входа workspace пуст. Эти незавершённые серии не являются приёмкой
+всего корпуса. Ubuntu22 DEB70 diagnostic ещё выполняется; чужие tags,
+профили, результаты, launcher и соседний worktree не изменены.
+
 ## Checkpoint
 
-- Product candidates: Desktop/CLI `70a2d5a93`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.
+- Product candidates: Desktop/CLI `3ccc3b4c9`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node pipeline45/catalog26/integrity9 PASS; CLI70 PDF facts3/3, layout2/3 FAIL, nested bullet fix source GREEN; Desktop70 backend PDF3/3 полный PASS. Обычные CLI704 cases 2×3 PASS.
+- Docs Node pipeline45/catalog26/integrity9 PASS; CLI3ccc PDF mechanics/layout3/3, facts2/3 FAIL; nested bullet fix public6/6 GREEN; Desktop70 backend PDF3/3 полный PASS. Обычные CLI704 cases 2×3 PASS.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
 - Scope/history/prompt/revert/docs: 200 PASS / 2 V2 SKIP; Host scope11 PASS; пять implementation подпунктов этапа 5 отмечены; installed переходы ещё открыты.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
@@ -3104,4 +3151,4 @@ DEB70 Ubuntu22 прогон запущен с `loginom-package-docs-70a2d5a93:ub
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- Далее: clean candidate с bullet fix, полный routing gate и installed переходы; A/B ждёт согласованной harness задачи из handoff. Требования плана не перерабатывать.
+- Далее: unknown type grounding facts RED→GREEN, полный routing gate и installed переходы; A/B ждёт согласованной harness задачи из handoff. Требования плана не перерабатывать.
