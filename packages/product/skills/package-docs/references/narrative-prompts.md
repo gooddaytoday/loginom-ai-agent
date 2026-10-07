@@ -7,6 +7,10 @@ Help may explain capabilities of an identified handler, not `.lgp` internals.
 настройках неизвестны формулы и код; при отсутствии портов или связей нельзя
 утверждать передачу данных через них. Пустой `external_references` не означает
 отсутствие файловых зависимостей: импорт `data.lgd` требует этого файла.
+Во всех описаниях сохраняй направление каждого ребра из `links`: выход
+`source_label.source_port_name` передаёт данные на вход
+`target_label.target_port_name`. Сверяй с ним и краткое описание пакета,
+и подробное описание модуля перед выпуском отчёта.
 
 ## Package description (`PLACEHOLDER_PACKAGE_DESCRIPTION`)
 

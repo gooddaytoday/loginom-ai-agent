@@ -3189,6 +3189,15 @@ missing/server cases не принята. Контракт exit code подтв�
 **11 PASS / 27 assertions**; product CLI не менялся.
 Основной план не редактировался, требования не перерабатывались.
 
+## Направление связей в кратком описании
+
+По Word2 facts RED в narrative добавлена проверка направления `links` для
+краткого описания пакета и подробного описания модуля: source output → target
+input. Контракты extractor/emit не менялись. Resource integrity **9 PASS /
+16 assertions** с pinned Node, skill/discovery **24 PASS / 73 assertions**;
+новый live текст ещё не проверен. Первый integrity запуск без обязательного
+Node env дал configuration failure; корректный запуск сохранён отдельно.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `3ccc3b4c9`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.
