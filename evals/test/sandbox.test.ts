@@ -19,7 +19,9 @@ test("sandboxCommand: proxy включает штатный Node env proxy не�
       profileDir: path.join(dir, "profile"), workdir: path.join(dir, "workspace"),
       env: { HTTP_PROXY: "http://127.0.0.1:3128", NODE_USE_ENV_PROXY: "0" },
     })
-    const proc = spawn(boundary.cmd[0]!, boundary.cmd.slice(1), { cwd: boundary.cwd, env: boundary.env, stdio: ["ignore", "pipe", "pipe", "pipe"] })
+    // Mount probes do not consume status metadata; FD3 needs no extra pipe.
+    const proc = spawn(boundary.cmd[0]!, boundary.cmd.slice(1), { cwd: boundary.cwd, env: boundary.env, stdio: ["ignore", "pipe", "pipe", "ignore"] })
+    proc.stderr!.resume()
     const output = await Promise.all([Array.fromAsync(proc.stdout!), new Promise<number | null>(resolve => proc.once("close", resolve))])
     expect(output[1]).toBe(0)
     expect(JSON.parse(Buffer.concat(output[0]).toString())).toEqual({ proxy: "http://127.0.0.1:3128", node_proxy: "1" })
@@ -49,11 +51,11 @@ test("sandboxCommand: Python читает только входы и writable-п
       "print(json.dumps({'hidden':[os.path.exists(x) for x in sys.argv[2:]],'refresh':p.read_text(),'home':os.environ['HOME'],'leak':os.getenv('ANSWER')}))"
     const command = await sandboxCommand({ cmd: [path.join(installation, "bin/cli"), "-c", script, path.join(profile, "cli-profile.json"), ...hidden],
       profileDir: profile, workdir: workspace, env: { ...process.env, ANSWER: "10", NODE_OPTIONS: "--inspect=0" } })
-    const proc = spawn(command.cmd[0]!, command.cmd.slice(1), { cwd: command.cwd, env: command.env, stdio: ["ignore", "pipe", "pipe", "pipe"] })
+    const proc = spawn(command.cmd[0]!, command.cmd.slice(1), { cwd: command.cwd, env: command.env, stdio: ["ignore", "pipe", "pipe", "ignore"] })
     let stdout = "", stderr = ""
     proc.stdout!.on("data", (data) => { stdout += data.toString() })
     proc.stderr!.on("data", (data) => { stderr += data.toString() })
-    const code = await new Promise<number | null>((resolve) => proc.once("exit", resolve))
+    const code = await new Promise<number | null>((resolve) => proc.once("close", resolve))
     expect(stderr).toBe("")
     expect(code).toBe(0)
     expect(JSON.parse(stdout)).toEqual({ hidden: hidden.map(() => false), refresh: "refreshed", home: "/home/eval", leak: null })
@@ -79,6 +81,7 @@ test("superviseProcess: сбой mount обёртки отличается от 
     const cli = await superviseProcess({ cmd, cwd: boundary.cwd, env: boundary.env, sandbox: boundary.cmd, timeoutMs: 5_000 })
     expect(cli.exitCode).toBe(1)
     expect(cli.sandboxError).toBeNull()
+    expect(cli.processCleanup.error).toBeNull()
     expect(cli.processCleanup.status).toBe("confirmed")
     expect(cli.processCleanup.selectedCli?.executable).toBe(cmd[0]!)
   } finally {
@@ -123,6 +126,7 @@ test.each(["abort", "timeout"])("superviseProcess: %s даёт CLI выполн�
       controller.abort()
     }
     const run = await pending
+    expect(run.processCleanup.error).toBeNull()
     expect(run.interrupted).toBe(trigger === "abort")
     expect(run.timedOut).toBe(trigger === "timeout")
     expect(await Bun.file(path.join(dir, "workspace/cleaned")).exists()).toBe(true)
