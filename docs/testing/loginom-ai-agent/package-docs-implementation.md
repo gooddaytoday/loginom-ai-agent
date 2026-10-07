@@ -3440,9 +3440,47 @@ bundled/discovery **36PASS/167 assertions**. Это проверки ресур�
 model2 запроса. Linear3 Word RED — отдельный следующий цикл, ещё не исправлен.
 План и corrections не перерабатывались.
 
+## 2026-10-07 — exact attachment GREEN и внешний путь Desktop
+
+Новые clean candidates на `091103ef966abc8cbdeafc6add1d82281b5fa321`:
+CLI full build/archive/source verifier PASS, archive
+`9e539e92dfc341a61ddc74d3dd846261809110f18e4e33ff723c20693879f690`;
+Desktop full build/source archive и static DEB/AppImage PASS, по 4654 ресурса.
+DEB `f6a2ddb66e03e0a77ff5dd47e9f30ff6708ec72e9c75bb1a1e658bfaf41d73b1`,
+AppImage `0a7dccab6c1fc759f03853645b35ac673af333847c4d435fdc0a808c93fd0dad`,
+resource tree `ff810b05ff27da7d34277c727d0c211f98ca912ae8be46ca0b55998cdcdcb00d`.
+Installed CLI seed `sha256:95b187713a4cf4ddf04aef6d6e66f26969f7e854fbab67e28a330fb21c6e8ed1`
+прошёл установку/version/sandbox проверку. Эти результаты не закрывают
+installed live DEB, upgrade и Linux-матрицу нового candidate.
+
+Повтор исходного failed model2 prompt на этом CLI: `mimo-v2.5/default`,
+PDF **3/3 mechanics, facts и layout PASS**. Каждый раз exact attached path
+сразу передан в extract; directory glob отсутствует. Все шесть страниц
+просмотрены и тексты прочитаны; граф, обе вложенные подмодели и неизвестные
+настройки описаны верно, выполнены настоящие handler Help reads.
+Chromium=0, исходные SHA неизменны, owned processes remaining=0.
+Первый private-wrapper запуск указал несуществующий artifact path и завершился
+до модели; исходный лог сохранён, продуктовым RED не считается. Исправленный
+повтор — `cli-exact-attachment-091103ef9-v2`, manual-quality JSON по каждому
+attempt. Отдельный прежний CLI239 linear3 Word facts RED пока не исправлен.
+
+TDD следующего независимого adapter: внешний текстовый путь Desktop.
+Public preflight test сначала **6PASS/1FAIL** из-за отсутствующего адаптера,
+после минимальной поддержки **7PASS/28 assertions**, Host typecheck и Node
+syntax check PASS. Файл с пробелами/кириллицей копируется вне workspace,
+file part не передаётся. Own GUI session показывает штатный permission prompt;
+«Разрешить один раз» доступно адаптеру только для exact owned input filepath
+и ожидаемых read/external_directory patterns. Иные запросы отклоняются.
+Сохраняются решения и скриншоты; положительный gate требует permission и PDF.
+Natural Desktop external-path ×3 запущен на clean091; live GREEN ещё не заявлен.
+Evidence: `skills-acceptance-external-desktop-{red,green,typecheck}.log`,
+`desktop-canonical-external-path-091103ef9/`, `desktop-091103ef9-build.log`,
+`candidate-091103ef9-{cli,desktop}/`, seed receipt. Соседний harness не менялся;
+требования основного плана и corrections не перерабатывались.
+
 ## Checkpoint
 
-- Product candidates: Desktop/CLI `2396e78f2`, clean source/artifacts/manifests/installed CLI seed PASS; предыдущие candidates сохранены.
+- Product candidates: Desktop/CLI `091103ef9`, clean full builds/manifests/static/installed CLI seed PASS; предыдущие candidates сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -3461,4 +3499,4 @@ model2 запроса. Linear3 Word RED — отдельный следующи�
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- Далее: exact-attachment model2 RED → GREEN, затем linear3 Word RED; CLI cleanup signal; полный20 routing/installed переходы/CLI matrix. Server2396/6 и externalCLI3/3 PASS; A/B ждёт owner; план заморожен.
+- Далее: Desktop external-path live; linear3 Word RED; CLI cleanup signal; полный20 routing/installed переходы/CLI matrix. Exact-attachment model2 CLI0913/3 quality PASS; A/B ждёт owner; план заморожен.

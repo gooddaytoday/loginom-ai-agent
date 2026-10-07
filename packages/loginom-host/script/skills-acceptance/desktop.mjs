@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { createRequire } from "node:module"
 import { createHash } from "node:crypto"
 import { mkdir, mkdtemp, readFile, writeFile, readdir, cp, rm, chmod } from "node:fs/promises"
-import { join, basename } from "node:path"
+import { join, basename, relative } from "node:path"
 import { pathToFileURL } from "node:url"
 import { setTimeout } from "node:timers/promises"
 import { observeProcesses } from "./processes.mjs"
@@ -34,7 +34,8 @@ for (const testcase of input.cases) {
       external = join(filesRoot, "Исходный сценарий.LGP")
     const png = join(filesRoot, "Контекст.png")
     if (testcase.input === "workspace-path") await cp(input.fixtures.lgp, local)
-    if (["lgp-attachment", "lgp-and-png-attachments"].includes(testcase.input)) await cp(input.fixtures.lgp, external)
+    if (["lgp-attachment", "lgp-and-png-attachments", "external-text-path"].includes(testcase.input))
+      await cp(input.fixtures.lgp, external)
     if (testcase.input === "lgp-and-png-attachments") await cp(input.fixtures.png, png)
     const originalPath = testcase.input === "workspace-path" ? local : external
     const originalSha = await readFile(originalPath).then(sha, () => undefined)
@@ -132,6 +133,29 @@ for (const testcase of input.cases) {
       }
       await call("/auth/" + providerID, "PUT", input.auth)
       sessionID = (await call("/session", "POST", { title: testcase.id + " " + attempt })).id
+      if (testcase.input === "external-text-path") {
+        // The permission must be visible in the same session before approving it in the GUI.
+        const route = "/" + Buffer.from(workspace).toString("base64url") + "/session/" + sessionID
+        await page.evaluate(async (route) => {
+          const id = await window.api.getWindowID()
+          localStorage.setItem(`loginom-ai-agent.desktop.window.${id}.last-active-url`, route)
+        }, route)
+        const agentsReady = page.waitForResponse(
+          (response) => {
+            const url = new URL(response.url())
+            return response.request().method() === "GET" && ["/agent", "/api/agent"].includes(url.pathname)
+          },
+          { timeout: 60000 },
+        )
+        const [agentResponse] = await Promise.all([agentsReady, page.reload()])
+        assert.ok(agentResponse.ok(), "GUI_AGENT_CATALOG_FAILED")
+        await agentResponse.finished()
+        await form.waitFor({ timeout: 120000 })
+        await form.locator('[data-component="icon-button"][data-icon="close"]').click()
+        await form.waitFor({ state: "hidden", timeout: 30000 })
+        await page.locator('[data-component="prompt-input"][contenteditable="true"]').waitFor({ timeout: 60000 })
+        await save("permission-view.json", { route, sessionID })
+      }
       const files =
         testcase.input === "lgp-attachment"
           ? [external]
@@ -166,10 +190,28 @@ for (const testcase of input.cases) {
         await save("messages.json", messages)
         await save("session-status.json", status[sessionID] ?? { type: "idle" })
         for (const request of pending.filter((request) => request.sessionID === sessionID)) {
-          permissions.push({ request, reply: "reject" })
+          const approve =
+            testcase.input === "external-text-path" &&
+            request.metadata?.filepath === external &&
+            request.patterns.length === 1 &&
+            ((request.permission === "external_directory" && request.patterns[0] === join(filesRoot, "*")) ||
+              (request.permission === "read" && request.patterns[0] === relative(workspace, external)))
+          const decision = {
+            request,
+            reply: approve ? "once" : "reject",
+            via: approve ? "GUI" : "HTTP",
+            acknowledged: false,
+          }
+          permissions.push(decision)
           await save("permissions.json", permissions)
-          // These cases authorize local attachments only, never arbitrary external paths.
-          await call(`/permission/${request.id}/reply`, "POST", { reply: "reject" })
+          if (approve) {
+            const dock = page.locator('[data-component="dock-prompt"][data-kind="permission"]')
+            await dock.waitFor({ timeout: 30000 })
+            await page.screenshot({ path: join(evidence, `permission-${permissions.length}.png`) })
+            await dock.getByRole("button", { name: /^(Allow once|Разрешить один раз)$/ }).click()
+          } else await call(`/permission/${request.id}/reply`, "POST", { reply: "reject" })
+          decision.acknowledged = true
+          await save("permissions.json", permissions)
         }
         const latest = messages.filter((message) => message.info.role === "assistant").at(-1)
         const idleCompleted =
@@ -246,10 +288,20 @@ for (const testcase of input.cases) {
           ),
         )
       if (testcase.expected.profile === "default") assert.ok(!tools.some((part) => part.state.metadata?.activation))
-      if (["pdf", "docx", "md"].includes(testcase.expected.result)) {
-        assert.equal(permissions.length, 0, "UNEXPECTED_PERMISSION_FOR_ADMITTED_ATTACHMENT")
+      const format = testcase.input === "external-text-path" ? "pdf" : testcase.expected.result
+      if (["pdf", "docx", "md"].includes(format)) {
+        if (testcase.input === "external-text-path") {
+          assert.ok(
+            permissions.some((row) => row.request.permission === "external_directory"),
+            "NO_EXTERNAL_PERMISSION",
+          )
+          assert.ok(
+            permissions.every((row) => row.reply === "once" && row.acknowledged),
+            "UNEXPECTED_EXTERNAL_PERMISSION",
+          )
+        } else assert.equal(permissions.length, 0, "UNEXPECTED_PERMISSION_FOR_ADMITTED_ATTACHMENT")
         assert.equal(reports.length, 1)
-        assert.ok(reports[0].endsWith("." + testcase.expected.result))
+        assert.ok(reports[0].endsWith("." + format))
         assert.ok(
           tools.some(
             (part) =>

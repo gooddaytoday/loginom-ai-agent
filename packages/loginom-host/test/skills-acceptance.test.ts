@@ -9,7 +9,7 @@ const linuxTest = test.skipIf(process.platform !== "linux" || process.arch !== "
 linuxTest.each([
   ["desktop", "docs-after-build", "SKILLS_ACCEPTANCE_MULTITURN_SCENARIO_ADAPTER_REQUIRED"],
   ["desktop", "scenario-create", "SKILLS_ACCEPTANCE_MULTITURN_SCENARIO_ADAPTER_REQUIRED"],
-  ["desktop", "docs-external-unicode-path", "SKILLS_ACCEPTANCE_PERMISSION_ADAPTER_REQUIRED"],
+  ["desktop", "docs-external-unicode-path", "release-manifest.json"],
   ["desktop", "docs-no-input,docs-no-input", "SKILLS_ACCEPTANCE_DUPLICATE_CASE"],
   ["desktop", "not-in-corpus", "SKILLS_ACCEPTANCE_UNKNOWN_CASE"],
   ["run", "docs-external-unicode-path", "cli-manifest.json"],
