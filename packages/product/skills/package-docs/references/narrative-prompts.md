@@ -3,6 +3,10 @@
 Use these instructions when filling `PLACEHOLDER_*` in the skeleton.
 Answer **only in Russian**. Do not invent package facts that contradict
 `structure.json`. Help blurbs may explain node capabilities, not `.lgp` internals.
+Не превращай общую возможность обработчика в факт его настройки. При пустых
+настройках неизвестны формулы и код; при отсутствии портов или связей нельзя
+утверждать передачу данных через них. Пустой `external_references` не означает
+отсутствие файловых зависимостей: импорт `data.lgd` требует этого файла.
 
 ## Package description (`PLACEHOLDER_PACKAGE_DESCRIPTION`)
 
