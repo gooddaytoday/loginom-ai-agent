@@ -10,8 +10,11 @@ import { loadTasks } from "../src/task"
 import { checkIsolatedLoginom, preflight } from "../src/preflight"
 
 // Real Docker adapter, no Loginom/model execution and no host data mounts.
-const image = "sha256:5e3c79877de937aae168ecdcaf70c837bbbcf04e8f4262c2a976ac283ea394c2"
+const requestedImage = process.env.EVAL_TEST_LOGINOM_IMAGE
+const image = requestedImage ?? "sha256:5e3c79877de937aae168ecdcaf70c837bbbcf04e8f4262c2a976ac283ea394c2"
 const available = Boolean(Bun.which("docker")) && (await Bun.$`docker image inspect ${image}`.quiet().nothrow()).exitCode === 0
+if (requestedImage !== undefined && !available)
+  throw new Error("EVAL_TEST_LOGINOM_IMAGE указан, но fixture image недоступен через Docker")
 
 test.skipIf(!available)("checkIsolatedLoginom: доступный прежний сервер запрещает изолированный eval", async () => {
   const container = (await Bun.$`docker run --rm -d --network none --entrypoint /bin/sh ${image} -c ${"sleep 120"}`.quiet()).text().trim()
@@ -97,6 +100,7 @@ test.skipIf(!available)("afterAttempt: широкая очистка выдел�
     const runDir = path.join(dir, "results", "storage")
     const { result } = await runAttempt({ config, command, source: parseArtifactSource(config.artifactSource, config.loginom),
       task: task!, attempt: 1, runId: "storage", runDir, signal: new AbortController().signal, profileRecovered: false, skipJudge: true })
+    expect(result.harness_error).toBeNull()
     const out = path.join(runDir, task!.id, "1")
     const live = { ...config, dryRun: false, artifactSource: "docker", loginom: { ...config.loginom, container, storageDir },
       agent: { ...config.agent, cliMode: "binary" as const } }
