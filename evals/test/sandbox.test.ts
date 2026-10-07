@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, realpath, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { spawn } from "node:child_process"
@@ -137,7 +137,7 @@ test.each(["abort", "timeout"])("superviseProcess: %s даёт CLI выполн�
 }, 20_000)
 
 test("debuggerEndpoints: находит Node inspector на случайном порту --inspect=0", async () => {
-  const proc = spawn("/usr/bin/node", ["--inspect=0", "-e", "setInterval(() => {}, 1000)"], { stdio: ["ignore", "ignore", "pipe"] })
+  const proc = spawn("node", ["--inspect=0", "-e", "setInterval(() => {}, 1000)"], { stdio: ["ignore", "ignore", "pipe"] })
   try {
     const port = await new Promise<number>((resolve, reject) => {
       const timer = setTimeout(() => reject(Error("Inspector startup timeout")), 5_000)
@@ -163,7 +163,7 @@ test("superviseProcess: усыновление неизвестного helper �
     await Promise.all([mkdir(path.join(dir, "installation/bin"), { recursive: true }), mkdir(path.join(dir, "installation/resources/loginom"), { recursive: true }),
       mkdir(path.join(dir, "profile")), mkdir(path.join(dir, "workspace"))])
     await cp("/usr/bin/python3", path.join(dir, "installation/bin/cli"), { dereference: true })
-    await cp("/usr/bin/true", path.join(dir, "installation/resources/loginom/chrome"))
+    await cp("/usr/bin/true", path.join(dir, "installation/resources/loginom/chrome"), { dereference: true })
     await Bun.write(path.join(dir, "installation/resources/loginom/resource-manifest.json"), '{"browser":"chrome"}')
     await Bun.write(path.join(dir, "installation/cli-manifest.json"), "{}")
     const script = "import subprocess,time\ntime.sleep(0.5)\nsubprocess.run(['/bin/sh','-c','sleep 60 &'])\ntime.sleep(0.5)\n"
@@ -172,6 +172,6 @@ test("superviseProcess: усыновление неизвестного helper �
     const boundary = await sandboxCommand({ cmd, profileDir, workdir: path.join(dir, "workspace"), env: {} })
     const run = await superviseProcess({ cmd, cwd: boundary.cwd, env: boundary.env, sandbox: boundary.cmd, profileDir, timeoutMs: 5_000 })
     expect(run.processCleanup.status).toBe("failed")
-    expect(run.processCleanup.unknownProcesses?.some((entry) => entry.executable === "/usr/bin/sleep")).toBe(true)
+    expect(run.processCleanup.unknownProcesses?.map((entry) => entry.executable)).toContain(await realpath("/usr/bin/sleep"))
   } finally { await rm(dir, { recursive: true, force: true }) }
 }, 15_000)
