@@ -101,8 +101,8 @@ Preflight отказывает до модели при отсутствии bwr
 
 - [x] Пункт 1: реальный CLI/Chromium в выбранных mounts, без модели — exit 0, `LOGINOM_CONNECTION_VALID`.
 - [x] Пункт 2: контракт (`858faf33d`), 35 задач / 280 файлов перенесены побайтно; `task.test.ts`: RED → 22 PASS, выбор only и оба контрольных хэша сохранены. Corpus checker: 35/113 PASS; `bun typecheck` PASS. README использует локальный корпус и запрещает сравнение разных условий изоляции.
-- [ ] Пункт 3: обёртка, supervisor, preflight и остановка при ошибке границы.
+- [ ] Пункт 3: обёртка, supervisor, preflight и остановка при ошибке границы. Выполнены TDD-циклы файловой границы, mount failure против CLI exit 1, cleanup по Ctrl+C, классификации `harness_error/stop`, source refusal, отказа до dispatch и случайного inspector-порта. Внедрены fixed mounts/minimal env и служебный status FD bwrap; original CLI/manifest identity сохранены, bwrap получает сигналы после CLI. Native `loginom check` под новым supervisor: exit 0, cleanup confirmed, 2 browser bindings, unknown=0. Релевантные группы: 35/35 и 57/57 PASS; новые sandbox/report/preflight: 34/34 PASS; typecheck PASS. Остались приёмка timeout и окончательные gates профиля/стенда из пункта 4.
 - [ ] Пункт 4: закрытый архив профиля и защищённое чистое Loginom-хранилище.
 - [ ] Пункт 5: отрицательные проверки, suite/typecheck и один live smoke.
 
-Checkpoint: код изоляции ещё не реализован; текущий перенос сам по себе не закрывает чтение ответов. Следующий шаг — TDD фактической файловой границы в пункте 3. Чужой `local.env` сохранён.
+Checkpoint: корпус — `55fc9edfe`; граница запуска внедрена, но изоляция eval ещё не принята: требуется архив профиля, чистый Loginom и итоговый smoke. Следующий шаг — TDD архива в пункте 4 и оставшаяся проверка timeout. Чужой `local.env` сохранён; платных запусков нет.

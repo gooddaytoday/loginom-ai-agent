@@ -5,9 +5,24 @@ import os from "node:os"
 import { evalsRoot, loadConfig } from "../src/config"
 import { parseArtifactSource } from "../src/artifact"
 import { EvalFailure } from "../src/fail"
-import { agentInfo, checkFreeSpace, checkStorage, dockSkillRevision, preflight } from "../src/preflight"
+import { agentInfo, checkFreeSpace, checkStorage, checkSandbox, dockSkillRevision, preflight } from "../src/preflight"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
+
+test("preflight: live source отклонён до обращения к Loginom с инструкцией binary", async () => {
+  const config = loadConfig(["--skip-judge"], { LOGINOM_DOCK_API_KEY: "fixture", EVAL_AGENT_MODEL: "m/x", LOGINOM_URL: "http://127.0.0.1:1" })
+  await expect(preflight(config, parseArtifactSource(config.artifactSource, config.loginom)))
+    .rejects.toThrow("EVAL_CLI_MODE=binary")
+})
+
+test("checkSandbox: не допускает executable без установленного CLI manifest", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-preflight-boundary-"))
+  try {
+    const config = loadConfig(["--skip-judge"], { LOGINOM_DOCK_API_KEY: "fixture", EVAL_AGENT_MODEL: "m/x",
+      EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/usr/bin/python3", EVAL_PROFILE_DIR: path.join(dir, "profile"), EVAL_WORKSPACE_ROOT: path.join(dir, "workspace") })
+    await expect(checkSandbox(config)).rejects.toThrow("Изоляция")
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
 
 test("agentInfo: binary идентифицируется по реальному файлу и манифесту сборки", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-agent-identity-"))

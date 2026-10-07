@@ -9,6 +9,26 @@ import { afterAttempt, main, redact, runAttempt, stamp } from "../src/run"
 import type { RunSummary } from "../src/report"
 import { loadTasks } from "../src/task"
 
+test("runAttempt: отказ подготовки границы до dispatch даёт harness_error и stop без судьи", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-boundary-admission-"))
+  try {
+    await mkdir(path.join(directory, "profile"))
+    const dry = loadConfig(["--dry-run"], { EVAL_WORKSPACE_ROOT: path.join(directory, "workspace") })
+    const config = { ...dry, profileDir: path.join(directory, "profile"),
+      agent: { ...dry.agent, cliMode: "binary" as const, cliBin: path.join(directory, "missing-cli") } }
+    const [task] = await loadTasks(path.join(evalsRoot, "tasks"), ["group-sum-qty"])
+    const { result, stop } = await runAttempt({ config, command: agentCommand(config),
+      source: parseArtifactSource(config.artifactSource, config.loginom), task: task!, attempt: 1,
+      runId: "boundary", runDir: path.join(directory, "results"), signal: new AbortController().signal,
+      profileRecovered: false, skipJudge: false })
+    expect(result.status).toBe("harness_error")
+    expect(result.judge_status).toBe("skipped")
+    expect(result.judge_attempts).toBe(0)
+    expect(stop).toBe(true)
+    expect(result.harness_error).toContain("Изоляция")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test("main --dry-run --repeat 2: статусы по фикстурам, попытки в подпапках, summary без судьи", async () => {
   const result = await main(["--dry-run", "--repeat", "2", "--label", "dry"])
   const runDir = result.runDir

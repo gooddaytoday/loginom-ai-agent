@@ -1,10 +1,13 @@
 import path from "node:path"
 import os from "node:os"
-import { mkdir, stat, realpath, statfs } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, stat, realpath, statfs } from "node:fs/promises"
 import type { EvalConfig } from "./config"
 import { evalsRoot, repoRoot } from "./config"
 import { EvalFailure } from "./fail"
 import { listStorage, type ArtifactSource } from "./artifact"
+import { agentCommand } from "./cli"
+import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
+import { superviseProcess } from "./process-supervisor"
 
 export type Environment = {
   git: { sha: string; dirty: boolean } | null
@@ -23,6 +26,12 @@ export async function preflight(config: EvalConfig, source: ArtifactSource): Pro
   if (!config.skipJudge) environment.codex = await codexInfo(config.judge.command)
   // --judge-only и --calibrate не запускают агента: Loginom, docker, Dock и bundle не нужны.
   if (config.judgeOnly !== undefined || config.calibrate) return environment
+  if (config.agent.cliMode === "source")
+    throw new EvalFailure("Изолированный live eval требует EVAL_CLI_MODE=binary и EVAL_CLI_BIN установленного CLI", 2)
+  if (config.agent.cliMode === "binary") {
+    await assertNoDebuggers()
+    await checkSandbox(config)
+  }
   for (const tool of source.kind === "docker" ? ["unzip", "git", "pgrep", "ps", "docker"] : ["unzip", "git", "pgrep", "ps"]) {
     if (!Bun.which(tool)) throw new EvalFailure(`Не найдена команда ${tool}`, 2)
   }
@@ -32,15 +41,6 @@ export async function preflight(config: EvalConfig, source: ArtifactSource): Pro
   if (source.kind === "docker") environment.loginom = { imageDigest: await containerDigest(source.container) }
   await checkStorage(source)
   environment.dock = { skillRevision: await dockSkillRevision(config.dock) }
-  if (config.agent.cliMode === "source") {
-    for (const file of ["bin/node", "host/node-host.mjs", "resource-manifest.json"]) {
-      if (!(await Bun.file(path.join(config.agent.bundle, file)).exists()))
-        throw new EvalFailure(
-          `Dev-bundle неполный: нет ${file} в ${config.agent.bundle}. Выполните: bun run prepare-bundle`,
-          2,
-        )
-    }
-  }
   if (config.agent.cliMode === "binary" && !(await Bun.file(config.agent.cliBin ?? "").exists()))
     throw new EvalFailure(`EVAL_CLI_BIN не найден: ${config.agent.cliBin}`, 2)
   environment.agent = await agentInfo(config)
@@ -48,6 +48,23 @@ export async function preflight(config: EvalConfig, source: ArtifactSource): Pro
   await checkFreeSpace(evalsRoot)
   await checkFreeSpace(config.agent.workspaceRoot)
   return environment
+}
+
+export async function checkSandbox(config: EvalConfig) {
+  await mkdir(config.profileDir, { recursive: true })
+  await mkdir(config.agent.workspaceRoot, { recursive: true })
+  const workdir = await mkdtemp(path.join(config.agent.workspaceRoot, ".sandbox-check-"))
+  try {
+    const command = agentCommand(config)
+    const cmd = [...command.cmd, "--version"]
+    const boundary = await sandboxCommand({ cmd, profileDir: config.profileDir, workdir, env: command.env })
+    const run = await superviseProcess({ cmd, cwd: boundary.cwd, env: boundary.env, sandbox: boundary.cmd, timeoutMs: 10_000 })
+    if (run.exitCode !== 0 || run.sandboxError || run.processCleanup.status !== "confirmed")
+      throw new SandboxFailure("проверка команды запуска bubblewrap не пройдена")
+  } catch (error) {
+    if (error instanceof SandboxFailure) throw error
+    throw new SandboxFailure("не удалось подготовить установленный CLI и точные mounts")
+  } finally { await rm(workdir, { recursive: true, force: true }) }
 }
 
 export async function checkFreeSpace(dir: string, minBytes = 1024 ** 3) {
