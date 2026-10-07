@@ -3198,14 +3198,51 @@ input. Контракты extractor/emit не менялись. Resource integri
 новый live текст ещё не проверен. Первый integrity запуск без обязательного
 Node env дал configuration failure; корректный запуск сохранён отдельно.
 
+## Чистый candidate 5a99b75f4 и первый live GREEN
+
+Общие Desktop/CLI build inputs зафиксированы на
+`5a99b75f42e73ed4addf8432251816c6a0844ca3`, dirty=false. Полный CLI archive
+roundtrip/source verification PASS: archive
+`296e29b7d85c22756cd9af53f450ead407a5c950040f8f991b907847a261978b`,
+source tree `2f0f4e4dc866b185f43fee3dfe969501cdce95cba196ed2c9ba609b848d71657`.
+Desktop DEB/AppImage static **4654 resources PASS**:
+DEB `75d1e1c9e2f81f8d8af91f99f9fdd2bda23ff841eeb247e9acec36e1f14af177`,
+AppImage `3aabb2d89f82717825b3cf6f2ce03946fda05fb34d74ad6b31b8fe06e833a39e`;
+resource manifest `11c53aa80b1cdb667aafca3d57b8a0984775f1764746ec4f1a86cc28325d4b8e`.
+Source archive/manifest сохранены в `candidate-5a99b75f4-desktop/`.
+
+CLI установлен один раз в собственном frozen seed image
+`loginom-package-docs-cli-installed:5a99b75f4`, image
+`sha256:c05e46ad5541439c59a457d4cf33d6664f05bfdbe4f3874ab9a670785c899b00`.
+В образ не передавались credentials/профили; каждая модельная попытка — новый
+контейнер с отдельным профилем/workspace. Installed version 0.1.17 и sandbox
+root:root4755 подтверждены. Это убрало повторную установку из каждой попытки.
+
+CLI5a PDF **3/3 mechanics/facts/layout PASS** на исходном естественном запросе,
+Mimo-v2.5-pro/default, `--no-headless`, Chromium exec0, input hash unchanged.
+Все шесть PDF страниц просмотрены; неизвестному DerivedReference теперь не
+приписано неподтверждённое поведение, направление source→target корректно.
+Одна мелкая опечатка отмечена в manual JSON. Это GREEN предыдущего facts RED
+на ограниченном кейсе, не весь routing gate. Evidence:
+`cli-live-formats-5a99b75f4/docs-attached-pdf/`.
+
+CLI5a no-input **3/3 PASS**. Missing-file ответы корректны и дают штатный exit1
+как после `extract`, так и после обычного `read`. Два prototype adapters
+ошибочно ограничивали допустимый tool либо формулировку просьбы; ошибки и
+ответы сохранены. Новый frozen negative-v3 adapter проверяет механику,
+семантика ответа требует ручного просмотра. Активный formats adapter не
+редактировался. Desktop13 single-turn×3, CLI Word/MD/negative и новая Desktop
+Linux5 matrix ещё выполняются. Матрица использует собственный image prefix.
+Требования основного плана заморожены; соседняя evals сессия не изменялась.
+
 ## Checkpoint
 
-- Product candidates: Desktop/CLI `3ccc3b4c9`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.
+- Product candidates: Desktop/CLI `5a99b75f4`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node48 PASS; CLI3ccc PDF facts2/3, Word facts1/3/layout2/3 FAIL, MD3/3 PASS; quoted list fix public6/6 GREEN; Desktop70 PDF3/3 PASS.
+- Docs Node48 PASS; CLI5a PDF3/3 facts/layout GREEN; CLI3ccc Word facts1/3/layout2/3 FAIL, MD3/3 PASS; quoted lists public6/6 GREEN.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
 - Scope/history/prompt/revert/docs: 200 PASS / 2 V2 SKIP; Host scope11 PASS; пять implementation подпунктов этапа 5 отмечены; installed переходы ещё открыты.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
