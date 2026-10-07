@@ -3,6 +3,18 @@
 Цель: три небольших CSV-only кейса настройки Кросс-таблицы и независимый кодовый verdict поверх существующего harness.
 Дизайн утверждён карточкой LAB-16 и NODE-EVAL-OVERRIDES.md; повторное подтверждение не требуется. Все изменения ограничены evals/.
 
+## Исправления доказательств после review, 2026-10-07
+
+Пользователь поручил исправить оба найденных ложных PASS. Используем успешные native request/receipt из полного events.jsonl; новые поля task/summary и LLM-судья не нужны.
+Создание должно относиться к конечному document/workflow/node и предшествовать его настройкам/чтению. Одного readback готового узла с пустыми parameters недостаточно.
+Для reconfigure нужен явный успешный вызов изменения Amount на avg после полного sum/read. Все успешные avg-конфигурации этого узла должны начинаться после sum/read; последующий output mapping допускается, но не заменяет переход агрегата.
+
+- [x] Добавить в `test/node-evidence.test.ts` отрицательный случай: убрать из native fixture создание/настройку CrossTable, сохранить mapping/read/export/save; `validateNodeAttempt` должен дать FAIL. RED: пустой failures вместо creation.
+- [x] В `src/node-events.ts` связать успешное создание с тем же владельцем и последующими apply/read; GREEN: evidence/sequence 6 pass, 0 fail.
+- [ ] Добавить в `test/node-sequence.test.ts` случай раннего avg, замаскированного поздним mapping, и подтвердить RED. Проверять тот же публичный `checkNodeSequence`.
+- [ ] Связать переход с фактическим avg request и проверить все успешные avg starts; сохранить положительный sum/read → avg/read → mapping/read. Подтвердить GREEN.
+- [ ] Запустить весь `bun test` и `bun typecheck` из `evals/`, повторно проверить сохранённые reference evidence без новых модельных попыток, обновить документацию и checkpoint (не больше 20 строк).
+
 ## Интерфейсы и ограничения
 
 `script/run-node-evals.ts` вызывает `main(argv, env)` из `src/run.ts` с `--skip-judge`, явным `--tasks` и repeat=1. `src/node-evals.ts` читает локальный summary и attempt evidence, возвращает PASS/0, FAIL/1 или ERROR/2 и сохраняет отдельные `code-verdict.json`/`code-report.md`. Generic summary, parseEvents, формат task и core harness не изменяются.
