@@ -2,6 +2,7 @@ import path from "node:path"
 import type { EvalConfig } from "./config"
 import { evalsRoot, repoRoot } from "./config"
 import { superviseProcess } from "./process-supervisor"
+import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
 
 const saveActions = new Set(["package.save_as", "package.save_checkpoint"])
 const nodeTools = new Set(["loginom_dock_node_apply", "loginom_dock_node_resume", "loginom_dock_node_wait"])
@@ -97,7 +98,9 @@ export type FailureKind = ReturnType<typeof failureKind>
 
 const droppedChildEnv = /^(LOGINOM_|EVAL_|JUDGE_|FAKE_CODEX_)/
 
-export function agentCommand(config: EvalConfig, env: Record<string, string | undefined> = process.env) {
+export function agentCommand(config: EvalConfig, env: Record<string, string | undefined> = process.env): {
+  mode: EvalConfig["agent"]["cliMode"]; cmd: string[]; cwd: string; env: Record<string, string>
+} {
   const inherited = Object.entries(env).flatMap(([key, value]) =>
     value === undefined || droppedChildEnv.test(key) ? [] : [[key, value] as const],
   )
@@ -110,12 +113,13 @@ export function agentCommand(config: EvalConfig, env: Record<string, string | un
   }
   if (config.agent.cliMode === "source")
     return {
+      mode: "source" as const,
       cmd: ["bun", "run", "src/standalone.ts"],
       cwd: path.join(repoRoot, "packages", "agent"),
       env: { ...isolated, LOGINOM_AI_AGENT_CLI_BUNDLE: config.agent.bundle },
     }
-  if (config.agent.cliMode === "binary") return { cmd: [config.agent.cliBin ?? "loginom-ai-agent-cli"], cwd: evalsRoot, env: isolated }
-  return { cmd: ["bun", path.join(evalsRoot, "fixtures", "fake-cli.ts")], cwd: evalsRoot, env: isolated }
+  if (config.agent.cliMode === "binary") return { mode: "binary" as const, cmd: [config.agent.cliBin ?? "loginom-ai-agent-cli"], cwd: evalsRoot, env: isolated }
+  return { mode: "fake" as const, cmd: ["bun", path.join(evalsRoot, "fixtures", "fake-cli.ts")], cwd: evalsRoot, env: isolated }
 }
 export type AgentCommand = ReturnType<typeof agentCommand> & { cleanupDir?: string; cleanupSecrets?: string[] }
 
@@ -147,11 +151,20 @@ export async function runAgent(input: {
     "--",
     input.prompt,
   ]
+  if (input.command.mode === "source") throw new SandboxFailure("требуются EVAL_CLI_MODE=binary и EVAL_CLI_BIN")
+  if (input.command.mode === "binary") await assertNoDebuggers()
+  const cmd = [...input.command.cmd, ...args]
+  const boundary = input.command.mode === "binary" ? await sandboxCommand({ cmd,
+    profileDir: input.profileDir ?? input.command.env.LOGINOM_AI_AGENT_CLI_PROFILE!, workdir: input.workdir, env: input.command.env })
+    .catch(() => { throw new SandboxFailure("не удалось подготовить binary CLI, профиль или mounts") }) : undefined
   const processRun = await superviseProcess({
-    cmd: [...input.command.cmd, ...args], cwd: input.command.cwd,
-    env: { ...input.command.env, EVAL_TASK_ID: input.taskId },
+    cmd, cwd: boundary?.cwd ?? input.command.cwd,
+    env: boundary?.env ?? { ...input.command.env, EVAL_TASK_ID: input.taskId }, sandbox: boundary?.cmd,
     profileDir: input.profileDir, outDir: input.outDir,
     timeoutMs: input.timeoutMs, signal: input.signal,
+  }).catch((error: unknown) => {
+    if (boundary) throw new SandboxFailure("не удалось запустить или проверить процессы границы")
+    throw error
   })
   const stdout = processRun.stdout
   const stderr = processRun.stderr
@@ -165,6 +178,7 @@ export async function runAgent(input: {
     durationMs: processRun.durationMs,
     ...parsed,
     processCleanup: processRun.processCleanup,
+    sandboxError: processRun.sandboxError,
     failureKind: failureKind({ exitCode, errors: parsed.errors, errorTexts: parsed.errorTexts, stderr }),
     stderrHead: stderr.split("\n").slice(0, 20).join("\n"),
   }

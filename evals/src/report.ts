@@ -15,10 +15,11 @@ export function statusFor(
   run: {
     exitCode: number | null; timedOut: boolean; interrupted: boolean
     sessionId?: string; tokens?: { input: number; output: number; reasoning: number }
-    counters?: { toolCalls: number }; stderrHead?: string
+    counters?: { toolCalls: number }; stderrHead?: string; sandboxError?: string | null
   },
   hasArtifact: boolean,
 ): { status: Status; stop: boolean } {
+  if (run.sandboxError) return { status: "harness_error", stop: true }
   if (run.interrupted) return { status: "interrupted", stop: true }
   if (run.timedOut) return { status: "timeout", stop: false }
   if (run.exitCode === 0) return { status: hasArtifact ? "completed" : "no_artifact", stop: false }

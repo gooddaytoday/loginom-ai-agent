@@ -12,6 +12,7 @@ import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { archiveDiagnostics } from "./diagnostics"
 import type { ProcessCleanup } from "./process-supervisor"
 import { acquireHarnessLease } from "./lease"
+import { SandboxFailure } from "./sandbox"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
 export async function main(argv: string[], env: Record<string, string | undefined> = process.env) {
@@ -206,7 +207,7 @@ export async function runAttempt(input: {
       : { ...base, status: "harness_error", judge_status: "skipped", harness_error: describe(error) }
     await Bun.write(path.join(input.runDir, input.task.id, String(input.attempt), "result.json"), JSON.stringify(result, null, 2))
       .catch(() => { console.error("Не удалось сохранить attempt result; исход сохранится в summary") })
-    return { result, stop: measured }
+    return { result, stop: measured || error instanceof SandboxFailure }
   })
 }
 
@@ -328,7 +329,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     errors: run.errors,
     stderr_head: run.stderrHead.trim() ? run.stderrHead : null,
     harness_error:
-      artifactError ??
+      artifactError ?? run.sandboxError ??
       (status === "harness_error"
         ? `CLI exit ${run.exitCode}: ${firstNonEmptyLine(run.stderrHead) ?? run.errors.join(", ") ?? "—"}`
         : null),

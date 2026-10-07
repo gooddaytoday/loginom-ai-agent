@@ -4,6 +4,13 @@ import os from "node:os"
 import path from "node:path"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "../src/report"
 
+test("statusFor: ошибка изоляции останавливает запуск даже при exit 1 или timeout", () => {
+  const run = { exitCode: 1, timedOut: false, interrupted: false, sandboxError: "SANDBOX_EXECUTION_FAILED" }
+  expect(statusFor(run, false)).toEqual({ status: "harness_error", stop: true })
+  expect(statusFor({ ...run, timedOut: true }, false)).toEqual({ status: "harness_error", stop: true })
+  expect(statusFor({ ...run, sandboxError: null }, false)).toEqual({ status: "failed", stop: false })
+})
+
 test("statusFor: таблица кодов выхода и приоритет timed_out/interrupted", () => {
   const run = (exitCode: number | null, extra: Partial<{ timedOut: boolean; interrupted: boolean }> = {}) => ({
     exitCode,
