@@ -2895,6 +2895,43 @@ build/manifest/archive roundtrip/source verification PASS, dirty false.
 назначение владельца этой задачи согласно правилу параллельной работы;
 её код, чужие worktree/профили/.env/результаты не изменялись. Это ещё не pin A/B.
 
+## CLI704: два качественных PDF, один неподтверждённый тип
+
+Три native live PDF завершились за 159.412/125.550/65.259 s:
+механика/Help B **3/3 PASS**, Chromium exec0, input SHA неизменён, один документ
+на попытку, все шесть страниц просмотрены и читаемы. Полный facts/layout gate
+**2/3 PASS**. В третьем тексте DerivedReference назван «производной ссылкой
+на внешний справочник», хотя settings пусты и цель не установлена.
+Actual Help read в этой попытке содержит только Calc/Python документы.
+Минимальный Help B был соблюдён, но он не подтверждает семантику остальных типов.
+Отдельные mechanical и manual facts JSON не скрывают этот FAIL.
+
+По сохранённому RED уточнены existing SKILL/narrative: общую возможность типа
+добавлять только из прочитанной справки этого типа; неизвестный тип описывать
+по структуре без догадки о справочнике/источнике. Порог B остаётся прежним;
+контракты extractor/emit и требования плана не менялись. Host integrity
+**9 PASS / 16 assertions**, Agent catalog/skill **21 PASS / 132 assertions**;
+`docs-type-guidance-{integrity,discovery}.log`. Новая инструкция ещё требует
+своей clean сборки/live gate, старые результаты ей не приписываются.
+
+## CLI704: обычные естественные запросы без подключения
+
+Два точных corpus case на основной модели **xiaomi-token-plan-sgp/mimo-v2.5-pro**,
+variant default: `default-unconfigured-arithmetic` и `default-translation`,
+по три раза, итого **6/6 PASS**. Ответы соответственно `102` и
+`Documentation is ready.`. Ни одного tool call/skill activation, ни output,
+ни Chromium exec; `.writer` освобождён. Вопрос с цитатой «Документация готова»
+не активировал документацию. Все HOME/profile/workspace новые; настройки
+Loginom не добавлялись, шесть временных roots удалены после проверки.
+
+Evidence: `cli-live-default-704d441d5/{conditions,verification}.json`, отдельные
+case/attempt events/result/roots/strace; driver SHA
+`44151a6dbf8cdfd889a9c12abfcc8529af0e86c3d34ee3b1ec2ab8d8744d04e6`.
+Это два из 20 кейсов на CLI, без Desktop или второй модели; strace browser exec
+audit не является самостоятельной переписью surviving processes.
+Модельный ключ читался из существующего auth без изменения, затем сохранялся
+только в собственных временных private profiles; в git/conditions его нет.
+
 ## Checkpoint
 
 - Product candidates: Desktop `2aa3a3284`, CLI `704d441d5`, clean source/artifacts/manifests; Desktop и TUI83 diagnostics 5/5 stable PASS; разные source pins.
@@ -2902,7 +2939,7 @@ build/manifest/archive roundtrip/source verification PASS, dirty false.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node pipeline 43 PASS; catalog21/integrity9 PASS; CLIc721 PDF 3/3 layout/mechanics PASS, 0/3 facts; CLI704 новая guidance ждёт live gate.
+- Docs Node pipeline43/catalog21/integrity9 PASS; CLI704 PDF 3/3 mechanics, 2/3 facts; unknown-type guidance ждёт нового live gate. Обычные CLI corpus cases 2×3 PASS.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
 - Scope/history/prompt/revert/docs: 200 PASS / 2 V2 SKIP; Host scope11 PASS; пять implementation подпунктов этапа 5 отмечены; installed переходы ещё открыты.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
@@ -2916,4 +2953,4 @@ build/manifest/archive roundtrip/source verification PASS, dirty false.
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; static DEB/AppImage2aa PASS; GUI2aa 5 permissions и missing/modified/unlisted cases PASS; TUI typecheck PASS; report/corpus/evals и остальные Linux gates открыты.
-- Далее: CLI704 facts gate, installed переходы и routing корпус; для A/B требуется согласованная отдельная harness задача из handoff. Требования плана не перерабатывать.
+- Далее: clean candidate с unknown-type guidance, полный facts/routing gate и installed переходы; A/B ждёт согласованной harness задачи из handoff. Требования плана не перерабатывать.
