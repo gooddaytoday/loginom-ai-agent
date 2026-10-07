@@ -1,7 +1,8 @@
 # Общая OAuth-авторизация параллельных CLI
 
 Opt-in контракт `shared-oauth-v1` поддержан только standalone Linux x64/glibc.
-Каждому запуску принадлежат отдельные CLI profile, DB, Host, браузеры,
+Общий каталог передавать только окружению конкретного CLI, а не всем Bun-тестам
+или native Codex. Каждому запуску принадлежат отдельные CLI profile, DB, Host, браузеры,
 Loginom-аккаунт, рабочие файлы и история. Общей является только сессия OpenAI.
 Авторизация native Codex Multica хранится отдельно и этим контрактом не меняется.
 
@@ -21,7 +22,12 @@ manifest до профиля, включая providers login; development bundle
 атомарная замена файла должна быть видна всем процессам. Каталог и его inode
 не заменяют во время работы. Inline `LOGINOM_AI_AGENT_AUTH_CONTENT` запрещён.
 
-Выполнить один свежий `providers login openai` с методом headless в отдельном
+На mas launcher — `~/.local/bin/loginom-ai-agent-cli`; общий каталог —
+`~/.local/state/loginom-cli-oauth/shared-oauth-v1`. Постоянные файлы не относятся
+к task checkout. Ожидавший вход остановлен перед обновлением кандидата; новый
+вход запускают в новом onboarding profile, старую `.writer` не удаляют.
+
+Выполнить один свежий `providers login --provider openai --method "ChatGPT Pro/Plus (headless)"` в отдельном
 профиле и этом каталоге. OAuth callback сохраняет новый login generation;
 авторизации Desktop/native Codex/старых карточек не импортировать. Каждый
 последующий запуск задаёт собственный `LOGINOM_AI_AGENT_CLI_PROFILE` и тот же
@@ -63,14 +69,19 @@ Lock освобождается до модельного запроса, поэ
 
 ## Проверка и текущий checkpoint — 07.10.2026
 
-- База отдельной ветки shared-oauth: loginom@f9bf332cc491baa784e6e04fdfda7c0f09151cb7.
-- Реальные subprocess + fake provider проверяют 8 overlapping requests/1 refresh,
-  SIGKILL/uncertainty, exact commit, generic-set обход, identity/generation и cancellation.
-- Локально Bun1.3.14: 97 локальных тестов PASS; на mas исходная версия — 101 PASS, 0 SKIP.
-- Agent/Host/Product typecheck PASS на Bun1.3.14.
-- Исправления review FIFO/manifest проверены локально; повтор Linux и сборка идут.
-- Настоящий OAuth и восемь реальных циклов: NOT_RUN; стенды/MCP отложены владельцем.
-- Полная приёмка LGD/XLSX: NOT_RUN; Stage 0 не объявляет принятым обработчик.
+- База shared-oauth: loginom@f9bf332cc491baa784e6e04fdfda7c0f09151cb7; PR40 в loginom, draft.
+- Проверенный и установленный source SHA: bd4951803532db3f51c1b5a66a864038d88865c3, clean.
+- Linux x64/glibc, Bun1.3.14; версия 0.0.0-dev-202610071848, executable/manifest shared-oauth-v1.
+- Archive SHA256: 61fe7a03766ca8aa406e66ca11aaf0b6ca3330a7ce9c96ee783649b5282932d2; roundtrip PASS.
+- На mas exact bd4951803: Agent124 + Host6/Product3 = 133 PASS, 0 FAIL/skip; typechecks PASS.
+- Fake provider: 8 concurrent requests/1 refresh, real 60/30 sec, SIGKILL/uncertainty,
+  exact transaction, generic-set bypass, identity/generation, cancellation, FIFO/lock release PASS.
+- Manifest guards: 4 negative fixtures PASS на ba919629f; current strict installed integrity PASS.
+- Browser localhost/installed CLI rejection: sandbox=true, alive=[], rejection guard=false; cleanup PASS.
+- Независимый source/runtime LAB28 PASS: legacy dconf исправлен; 17 адресных tests/installed checks PASS.
+- Ожидавший ChatGPT login отменён перед пересборкой; auth.json не создан, свежий вход NOT_RUN.
+- Стенды/MCP, Loginom-аккаунты и 8 реальных циклов/queue9 отложены владельцем: NOT_RUN.
+- LGD/XLSX Stage0 и полная приёмка NOT_RUN; merge/release не выполнены.
 
 Общая сессия сохраняет общую квоту, отзыв и неопределённый refresh как общие
 причины отказа. Устойчивость native авторизации Multica квалифицируется отдельно.
