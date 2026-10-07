@@ -66,10 +66,12 @@ def main():
     input_kind.add_argument("--text-permission", choices=["allow", "deny"])
     parser.add_argument("--reserved-diagnostics", choices=["skills", "commands"])
     parser.add_argument("--modified-skill", action="store_true")
+    parser.add_argument("--full-report", action="store_true")
     args = parser.parse_args()
     assert sys.platform == "linux", "This acceptance driver requires Linux /proc and PTY"
     assert args.binary.is_absolute() and args.binary.is_file()
     assert args.artifacts.is_absolute()
+    assert not args.full_report or (args.attachment and not args.modified_skill), "Full report requires an intact bundle and attachment"
     args.artifacts.mkdir(mode=0o700)  # Never reuse another run's profile or results.
     # Discovery walks ancestors outside git. Keep the workspace outside the user's home.
     with tempfile.TemporaryDirectory(prefix="loginom-package-docs-pty-", dir="/tmp") as temporary:
@@ -148,6 +150,32 @@ def run(args, workspace):
                     "function": {"name": "package_docs_run" if docs else "skill",
                         "arguments": json.dumps({"operation": "extract", "lgp": str(lgp)} if docs else {"name": "package-docs"})}}]}
                 finish = "tool-calls"
+            emitted = any(message.get("tool_call_id") == "emit" for message in body.get("messages", []))
+            if not title and extracted and args.full_report:
+                responses = {message["tool_call_id"]: message.get("content", "")
+                    for message in body.get("messages", []) if message.get("role") == "tool"}
+                action = None
+                if "skeleton" not in responses:
+                    action = ("skeleton", "package_docs_run", {"operation": "skeleton", "lgp": str(lgp)})
+                elif "draft" not in responses:
+                    action = ("draft", "read", {"filePath": json.loads(responses["skeleton"])["report"]})
+                elif "fill" not in responses:
+                    draft = "\n".join(re.findall(r"^\d+: (.*)$", responses["draft"], re.M))
+                    assert "PLACEHOLDER_PACKAGE_DESCRIPTION" in draft, "Read must return the generated draft"
+                    content = draft.replace("PLACEHOLDER_PACKAGE_DESCRIPTION",
+                        "Бизнес-назначение не указано. Источник читает data.lgd и передаёт таблицу Калькулятору. Формулы не указаны; результат выполнения неизвестен.").replace("PLACEHOLDER_MODULE_1_DESCRIPTION",
+                        "Общая структура: Источник → Калькулятор. Источник настроен на файл data.lgd. Формулы Калькулятора не указаны. Описание подмоделей: подмодели отсутствуют.")
+                    action = ("fill", "write", {"filePath": json.loads(responses["skeleton"])["report"], "content": content})
+                elif "emit" not in responses:
+                    action = ("emit", "package_docs_run", {"operation": "emit", "lgp": str(lgp), "format": "pdf"})
+                if action:
+                    delta = {"tool_calls": [{"index": 0, "id": action[0], "type": "function",
+                        "function": {"name": action[1], "arguments": json.dumps(action[2])}}]}
+                    finish = "tool-calls"
+                else:
+                    receipt = json.loads(responses["emit"])
+                    assert pathlib.Path(receipt["output"]).is_file(), "Emit must return an existing report"
+                    delta = {"content": "Отчёт опубликован: " + receipt["output"]}
             chunks = [{"id": "pty-docs", "object": "chat.completion.chunk", "choices": [
                 {"index": 0, "delta": value, "finish_reason": reason}]} for value, reason in [(delta, None), ({}, finish)]]
             data = ("".join("data: " + json.dumps(chunk) + "\n\n" for chunk in chunks) + "data: [DONE]\n\n").encode()
@@ -156,7 +184,7 @@ def run(args, workspace):
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
-            if not title and (extracted or activation_failed):
+            if not title and (activation_failed or (emitted if args.full_report else extracted)):
                 finished.set()
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Provider)
@@ -232,6 +260,8 @@ def run(args, workspace):
             elif step == "read" and "Read " in rendered and "Path: " in rendered and lgp.name in rendered:
                 (args.artifacts / "read-view.txt").write_text(rendered)
                 send(b"\r", "submitted")
+            elif step == "submitted" and args.full_report and "Read " in rendered and "Path: " in rendered and "report.md" in rendered:
+                send(b"\r", "submitted")
             elif step == "rejected":
                 database = profile / "data/loginom-ai-agent.db"
                 if database.exists():
@@ -239,7 +269,7 @@ def run(args, workspace):
                         parts = [json.loads(row[0]) for row in db.execute("select data from part")]
                     if any(part.get("type") == "tool" and part.get("tool") == "package_docs_run" and part.get("state", {}).get("status") == "error" for part in parts):
                         send(b"\x04", "exit")
-            elif step == "submitted" and finished.is_set() and ("Skill недоступен." if args.modified_skill else "Структура извлечена.") in rendered:
+            elif step == "submitted" and finished.is_set() and ("Skill недоступен." if args.modified_skill else "Отчёт опубликован:" if args.full_report else "Структура извлечена.") in rendered:
                 send(b"\x04", "exit")
         forced = child.poll() is None
     finally:
@@ -280,6 +310,7 @@ def run(args, workspace):
         "chromiumObserved": chromium, "catalogs": catalogs, "structures": [str(p) for p in structures],
         "files": files, "systemNodePythonUnavailable": True, "readPermission": "ask",
         "reservedDiagnostics": args.reserved_diagnostics, "modifiedSkill": args.modified_skill, "visibleWarnings": warnings,
+        "reports": [str(p) for p in workspace.glob("*.lgp_report.pdf")], "fullReport": args.full_report,
         "toolErrors": [part["state"]["error"] for part in parts if part.get("type") == "tool" and part.get("state", {}).get("status") == "error"]}
     (args.artifacts / "result.json").write_text(json.dumps(result, ensure_ascii=False))
     print(json.dumps(result, ensure_ascii=False))
@@ -331,6 +362,10 @@ def run(args, workspace):
             assert not {"bash", "task", "loginom_dock_prepare"}.intersection(catalog)
     assert any(part.get("tool") == "skill" and part.get("state", {}).get("status") == "completed" for part in parts)
     assert any(part.get("tool") == "package_docs_run" and part.get("state", {}).get("status") == "completed" for part in parts)
+    if args.full_report:
+        reports = list(workspace.glob("*.lgp_report.pdf"))
+        assert len(reports) == 1, "TUI must publish a complete PDF, not just extract the package"
+        assert reports[0].read_bytes().startswith(b"%PDF-")
 
 
 if __name__ == "__main__":

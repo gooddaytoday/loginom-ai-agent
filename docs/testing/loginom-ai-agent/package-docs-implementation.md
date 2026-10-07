@@ -3728,6 +3728,23 @@ Oracle HTTP tests 3 PASS / 20 assertions; Host typecheck и diff check PASS.
 Продуктовый код и замороженный план не менялись. TUI allow/restart/once/always
 этим циклом пока не приняты.
 
+## 2026-10-07 — полный PDF через TUI
+
+TDD actual CLI c50d: `--attachment paste --full-report` сначала RED — native
+TUI штатно завершился после extract, готового PDF не было. После минимального
+расширения scripted provider GREEN для paste и `@` mention: реальные tool calls
+extract → skeleton → read → write → emit, PDF опубликован в workspace,
+exit0, forced=false, guard=false, Chromium0, remaining0, исходный `.lgp`
+не изменён. PATH=/nonexistent; глобальные Node/Python продуктом не использованы.
+Оба PDF открыты, полностью прочитаны и просмотрены (по одной странице),
+факты сверены с demo fixture; receipts сохраняют SHA. Evidence вне Git:
+`tui-c50d220c1-full-report-{red,green,mention}`. Старый extract-only путь
+повторно проверен отдельно: `tui-c50d220c1-extract-regression`.
+Это scripted mechanics/report QA; настоящая модель и Help этим TUI-прогоном
+не проверены. Общая TUI матрица и этап 6 остаются открытыми. Agent typecheck
+и diff check PASS. Native TUI permission reject также PASS: skill applied,
+prepare denied, exit0 и writer отсутствует (`/tmp/loginom-cli-permission-jivY3z`).
+
 ## Checkpoint
 
 - Resume c50d/OpenAI6.1 medium: formats9/9 на Desktop и CLI facts/layout PASS (MD source read), Desktop local-path3/3 PASS; routing частично прерван exit143, negative продолжаются. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
