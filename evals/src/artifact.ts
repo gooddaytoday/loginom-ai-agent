@@ -53,6 +53,7 @@ export async function assertIsolatedStorageEmpty(source: ArtifactSource) {
   }`.quiet().nothrow()
   if (checked.exitCode !== 0) throw new EvalFailure("Проверка пустоты выделенного Loginom storage не выполнена", 2)
   if (checked.stdout.length) throw new EvalFailure("В Loginom остались материалы прошлой попытки; admission запрещён", 2)
+  return storage
 }
 
 export function parseFindOutput(text: string) {

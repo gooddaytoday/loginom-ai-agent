@@ -7,10 +7,47 @@ import { agentCommand } from "../src/cli"
 import { loadConfig } from "../src/config"
 import { afterAttempt, runAttempt } from "../src/run"
 import { loadTasks } from "../src/task"
+import { checkIsolatedLoginom, preflight } from "../src/preflight"
 
 // Real Docker adapter, no Loginom/model execution and no host data mounts.
 const image = "sha256:5e3c79877de937aae168ecdcaf70c837bbbcf04e8f4262c2a976ac283ea394c2"
 const available = Boolean(Bun.which("docker")) && (await Bun.$`docker image inspect ${image}`.quiet().nothrow()).exitCode === 0
+
+test.skipIf(!available)("checkIsolatedLoginom: доступный прежний сервер запрещает изолированный eval", async () => {
+  const container = (await Bun.$`docker run --rm -d --network none --entrypoint /bin/sh ${image} -c ${"sleep 120"}`.quiet()).text().trim()
+  const previous = (await Bun.$`docker run -d --network none --entrypoint /bin/sh ${image} -c ${"sleep 120"}`.quiet()).text().trim()
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-loginom-endpoint-"))
+  try {
+    await Bun.$`docker exec ${container} mkdir -p /workdir/UserStorage/user /workdir/SessionBackup`.quiet()
+    const marker = path.join(dir, "marker.json")
+    await Bun.write(marker, JSON.stringify({ kind: "loginom-evals-isolated", version: 1, container_id: container,
+      storage_dir: "/workdir/UserStorage/user", roots: ["/workdir/UserStorage", "/workdir/SessionBackup"], previous_container_id: previous }))
+    await Bun.$`docker cp ${marker} ${`${container}:/workdir/.loginom-evals-isolated.json`}`.quiet()
+    await expect(checkIsolatedLoginom({ kind: "docker", container, storageDir: "/workdir/UserStorage/user" })).rejects.toThrow("прежний сервер")
+    const dry = loadConfig(["--dry-run"], { EVAL_PROFILE_DIR: path.join(dir, "profile"), EVAL_WORKSPACE_ROOT: path.join(dir, "workspace") })
+    await mkdir(dry.profileDir)
+    const live = { ...dry, dryRun: false, agent: { ...dry.agent, cliMode: "binary" as const, cliBin: "/usr/bin/false" } }
+    const [task] = await loadTasks(live.tasksDir, ["calc-data-double"])
+    const { result, stop } = await runAttempt({ config: live, command: agentCommand(live),
+      source: { kind: "docker", container, storageDir: "/workdir/UserStorage/user" }, task: task!, attempt: 1,
+      runId: "server-guard", runDir: path.join(dir, "results"), signal: new AbortController().signal, profileRecovered: false, skipJudge: true })
+    expect(result.harness_error).toContain("прежний сервер")
+    expect(result.exit_code).toBeNull()
+    expect(stop).toBe(true)
+    await expect(preflight(live, { kind: "docker", container, storageDir: "/workdir/UserStorage/user" })).rejects.toThrow("прежний сервер")
+    await Bun.$`docker stop -t 1 ${previous}`.quiet()
+    const components = path.join(dir, "Components.cfg")
+    await Bun.write(components, '<ComponentSettings><Item Guid="70a6c99d-a725-4309-b05c-898c8072c3cd"><Settings Disabled="false"/></Item></ComponentSettings>')
+    await Bun.$`docker cp ${components} ${`${container}:/workdir/Components.cfg`}`.quiet()
+    await expect(checkIsolatedLoginom({ kind: "docker", container, storageDir: "/workdir/UserStorage/user" })).rejects.toThrow("Python")
+    await Bun.write(components, '<ComponentSettings><Item Guid="70a6c99d-a725-4309-b05c-898c8072c3cd"><Settings Disabled="true"/></Item></ComponentSettings>')
+    await Bun.$`docker cp ${components} ${`${container}:/workdir/Components.cfg`}`.quiet()
+    await expect(checkIsolatedLoginom({ kind: "docker", container, storageDir: "/workdir/UserStorage/user" })).rejects.toThrow("alias")
+  } finally {
+    await Bun.$`docker rm -f ${container} ${previous}`.quiet().nothrow()
+    await rm(dir, { recursive: true, force: true })
+  }
+}, 20_000)
 
 test.skipIf(!available)("afterAttempt: широкая очистка выделенного storage идёт после подтверждённого recovery и архива", async () => {
   const container = (await Bun.$`docker run --rm -d --network none --entrypoint /bin/sh ${image} -c ${"sleep 120"}`.quiet()).text().trim()
