@@ -4,6 +4,7 @@ import { evalsRoot, loadConfig } from "./config"
 import { loadTasks } from "./task"
 import { validateNodeRun } from "./node-evals"
 import { nodeCaseIds } from "./node-cases"
+import { collectNodeNativeEvidence } from "./node-native"
 
 export async function runNodeEvals(argv: string[], env: Record<string, string | undefined>) {
   try { return await executeNodeEvals(argv, env) }
@@ -22,6 +23,11 @@ async function executeNodeEvals(argv: string[], env: Record<string, string | und
       throw Error(`unknown required ID: ${item.id}`)
   }
   const run = await main(args, env)
+  const summary=await Bun.file(path.join(run.runDir,"summary.json")).json()
+  for(const task of summary.tasks) if(task.id==="crosstable-min-max") for(const attempt of task.attempts) {
+    if(attempt.status==="completed" && attempt.environment_cleanup?.status==="confirmed")
+      await collectNodeNativeEvidence(path.join(run.runDir,task.id,String(attempt.attempt)),config.profileDir)
+  }
   const verdict = await validateNodeRun(run.runDir, tasks.map((task) => task.id), config.tasksDir)
   await Bun.write(path.join(run.runDir, "code-verdict.json"), JSON.stringify(verdict, null, 2) + "\n")
   await Bun.write(path.join(run.runDir, "code-report.md"), [
