@@ -9,7 +9,9 @@ Loginom-аккаунт, рабочие файлы и история. Общей 
 
 `loginom-ai-agent-cli --capabilities` возвращает JSON без backend, Host,
 модели или создания профиля. Executable и `metadata.capabilities` manifest
-должны совпадать и содержать `shared-oauth-v1`. Musl, другая архитектура,
+должны совпадать и содержать `shared-oauth-v1`. Opt-in проверяет установленный
+manifest до профиля, включая providers login; development bundle override запрещён.
+Проверка кандидата: `verify-cli-candidate.ts <artifact> <repo> --shared-oauth`. Musl, другая архитектура,
 необъявленный ABI и старый executable не допускаются; serial fallback нет.
 
 `LOGINOM_AI_AGENT_SHARED_AUTH_DIR` — canonical абсолютный каталог владельца,
@@ -64,9 +66,10 @@ Lock освобождается до модельного запроса, поэ
 - База отдельной ветки shared-oauth: loginom@f9bf332cc491baa784e6e04fdfda7c0f09151cb7.
 - Реальные subprocess + fake provider проверяют 8 overlapping requests/1 refresh,
   SIGKILL/uncertainty, exact commit, generic-set обход, identity/generation и cancellation.
-- Локально Bun1.3.14: 95 целевых тестов PASS; 6 Linux plugin tests SKIP на macOS.
+- Локально Bun1.3.14: 97 локальных тестов PASS; на mas исходная версия — 101 PASS, 0 SKIP.
 - Agent/Host/Product typecheck PASS на Bun1.3.14.
-- Установленная Linux сборка, настоящий OAuth и восемь реальных циклов: NOT_RUN.
+- Исправления review FIFO/manifest проверены локально; повтор Linux и сборка идут.
+- Настоящий OAuth и восемь реальных циклов: NOT_RUN; стенды/MCP отложены владельцем.
 - Полная приёмка LGD/XLSX: NOT_RUN; Stage 0 не объявляет принятым обработчик.
 
 Общая сессия сохраняет общую квоту, отзыв и неопределённый refresh как общие

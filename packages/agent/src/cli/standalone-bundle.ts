@@ -2,9 +2,12 @@ import { access } from "node:fs/promises"
 import { dirname, isAbsolute, join, resolve } from "node:path"
 import { verifyCliManifest } from "@loginom-ai-agent/loginom-host/cli-manifest"
 import { InstallationVersion } from "@loginom-ai-agent/core/installation/version"
+import { requireCliCapabilities } from "@loginom-ai-agent/product/cli-capabilities"
 
-export async function standaloneBundle() {
+export async function standaloneBundle(expectedCapabilities?: readonly string[]) {
   const installed = resolve(dirname(process.execPath), "..")
+  if (expectedCapabilities && process.env.LOGINOM_AI_AGENT_CLI_BUNDLE)
+    throw new Error("SHARED_AUTH_INSTALLED_BUNDLE_REQUIRED")
   const root =
     process.env.LOGINOM_AI_AGENT_CLI_BUNDLE ??
     (await verifyCliManifest(installed, {
@@ -12,7 +15,10 @@ export async function standaloneBundle() {
       arch: process.arch,
       version: InstallationVersion,
     }).then(
-      () => join(installed, "resources/loginom"),
+      (metadata) => {
+        if (expectedCapabilities) requireCliCapabilities(metadata.capabilities, expectedCapabilities)
+        return join(installed, "resources/loginom")
+      },
       () => {
         throw new Error("LOGINOM_BUNDLE_INCOMPLETE")
       },

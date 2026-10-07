@@ -79,7 +79,7 @@ async function validateDirectory(dir: string) {
 
 async function readFile(dir: string, name: string): Promise<Store | undefined> {
   const handle = await fs
-    .open(path.join(dir, name), constants.O_RDONLY | constants.O_NOFOLLOW)
+    .open(path.join(dir, name), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
     .catch((error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT") return
       throw new Error("SHARED_AUTH_READ_FAILED")

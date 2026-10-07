@@ -60,6 +60,10 @@ async function executeProfile(
     throw new Error("SHARED_AUTH_CONTENT_CONFLICT")
   if (process.env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR && !capabilities().includes("shared-oauth-v1"))
     throw new Error("SHARED_AUTH_PLATFORM_UNSUPPORTED")
+  if (process.env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR) {
+    const { standaloneBundle } = await import("./standalone-bundle")
+    await standaloneBundle(capabilities())
+  }
   const profile = await acquireProfile(
     cliProfile({
       channel,
