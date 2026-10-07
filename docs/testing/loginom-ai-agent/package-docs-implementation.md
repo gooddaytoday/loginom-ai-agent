@@ -3973,10 +3973,53 @@ GREEN19 tests/71 assertions, Host typecheck/Prettier PASS. CLI build → docs
 ещё идёт; другие два перехода пока source-only. `scenario-modify` и
 `scenario-execute-save` остаются явно неподдержанными адаптером.
 
+## 2026-10-07 — полный набор адаптеров и первый cold readback
+
+CLI253 `docs-after-build` завершён3/3 exit0; прочитаны оба полных ответа и
+просмотрены все6 PDF-страниц, факты и layout PASS. Тот же Session ID,
+точная копия собственного пакета, docs без нового Chromium и cleanup подтверждены.
+Нативный клик не проверен: attempt2 содержит лишние пробелы внутри destination;
+реальный Marked сохраняет их как %20, ссылка отличается от output. Эта часть
+приёмки остаётся открытой, исходный ответ сохранён.
+
+Отдельный `cold.mjs` открыл Desktop253 scenario-create/attempt1 в новой сессии
+через установленный runtimebc6, выполнил без настройки и получил точные35/20.
+Оригинальный пакет83a9e8fc… остался неизменным; закрытие пакета/logout и
+PID/start-time remaining[] подтверждены. Evidence:
+`cold-bc6-desktop-scenario-create-253-attempt-1/cold-evidence/result.json`.
+Это смешанная warm253/coldbc6 проверка одного SUM-пакета, а не cold-приёмка
+всех пакетов/исходного runtime253. Исходный warm proof не переписан.
+
+Добавлены отдельные adapters `scenario-modify`/`scenario-execute-save`:
+первый ход импортирует реальный CSV, второй использует собственный серверный
+пакет без повторного вложения. Проверяются исходный GUID, точные3 строки,
+тип поля калькулятора, formula/readback и save после execution; физическая
+структура проверяет GUID/link. Подготовительный импорт честно сохраняет
+numbers_verified=false как ограничение; конечный результат требует true.
+Общий turn planner сохраняет остальные переходы. Unit calculator fixture —
+синтетическая MCP-граница поверх реального import receipt, не live-доказательство.
+RED/GREEN ownership/import/activation/source/execution/schema/preflight сохранены.
+
+Повтор suite выявил flaky observer test (сигнал3/5 FAIL): ребёнок завершался
+через250ms до окончания /proc scan. Добавлен notification собственного наблюдения;
+тест ждёт PID/start-time/command перед завершением. RED OWNED_PROCESS_NOT_OBSERVED,
+GREEN5/5; assertion отсутствия оставшихся и чужого sibling сохранён.
+Это исправление тестовой синхронизации, не доказанная неисправность shutdown.
+Итоговая целевая suite31 PASS/110 assertions; Host typecheck/Prettier PASS.
+
+CLIbc6 установлен в собственном immutable seed62c79d67…; полный manifest совпал.
+CLIarchive0f3f8397…; Desktop DEB95f7c978…/AppImage10a21c24…; sourcebc6e7e164
+clean и sourceTree928cd84b…; versions/pins прежние. На этих сохранённых сборках
+начаты20×3 Desktop/run двумя отдельными batch:18 случаев и2 новых, main
+openai/gpt-6.1-sol/medium. Текущие результаты не объявляются полным gate.
+Linux253 Desktop Ubuntu22/24/26+Debian12 PASS, Debian13 ещё идёт;
+CLI Ubuntu24/26+Debian12 PASS, Ubuntu22+Debian13 native180s FAIL сохранены.
+Общий evals/harness/judge/near-miss и чужие процессы не изменены.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
-- Product candidates253 clean/manifest/static/CLI seed PASS; Linux5 идут: Desktop Ubuntu22/24/26 PASS, CLI Ubuntu24/26/Debian12 PASS, Ubuntu22 native180s FAIL сохранён. CLI/Desktopbc6 source/manifest/static PASS; installed fix ещё открыт.
+- Product candidates253 clean/manifest/static/CLI seed PASS; Linux5 идут: Desktop Ubuntu22/24/26 PASS, CLI Ubuntu24/26/Debian12 PASS, Ubuntu22+Debian13 native180s FAIL сохранены. Desktop Debian12 PASS, Debian13 идёт. CLI/Desktopbc6 source/manifest/static/CLI seed PASS; installed live fix идёт.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -3987,11 +4030,11 @@ GREEN19 tests/71 assertions, Host typecheck/Prettier PASS. CLI build → docs
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
-- Полный Host238 PASS/7 SKIP; acceptance adapters19 PASS/71, OAuth/medium/local endpoint/CSV oracle и typecheck PASS; Agent history/tools/registry30 PASS.
+- Полный Host238 PASS/7 SKIP; acceptance adapters20 cases supported; final31 PASS/110 assertions/typecheck PASS, OAuth/medium/local endpoint/CSV oracle и typecheck PASS; Agent history/tools/registry30 PASS.
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- RESUMED: QA36:33 docs+3 CLI denials, один исходный layout FAIL; Desktop/CLI default30/30 PASS; CLI local scenario-create2/3 PASS+1 UI_EPOCH_CHANGED FAIL; Desktop scenario3/3 PASS, физические GUID/link сохранены, remaining0. Desktop build→docs3/3 с6 страницами QA PASS; CLI идёт. Cold/остальные compound/transitions/corpus20/TUI/Linux5/A-B открыты.
+- RESUMED: QA36:33 docs+3 CLI denials, один исходный layout FAIL; Desktop/CLI default30/30 PASS; CLI local scenario-create2/3 PASS+1 UI_EPOCH_CHANGED FAIL; Desktop scenario3/3 PASS, физические GUID/link сохранены, remaining0. Desktop+CLI253 build→docs3/3,12 PDF-страниц QA PASS; CLI attempt2 link destination отличается от output, native click не проверен. Mixed253/bc6 cold SUM1 PASS/unchanged/logout/remaining0. bc6 corpus20×3 идёт; TUI/Linux5/A-B открыты.

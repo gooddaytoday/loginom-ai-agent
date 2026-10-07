@@ -108,7 +108,10 @@ linuxTest.each([
   ["run", "docs-after-build", "cli-manifest.json"],
   ["desktop", "scenario-then-docs", "release-manifest.json"],
   ["run", "scenario-after-docs", "cli-manifest.json"],
-  ["run", "scenario-modify", "SKILLS_ACCEPTANCE_MULTITURN_SCENARIO_ADAPTER_REQUIRED"],
+  ["run", "scenario-modify", "cli-manifest.json"],
+  ["desktop", "scenario-modify", "release-manifest.json"],
+  ["run", "scenario-execute-save", "cli-manifest.json"],
+  ["desktop", "scenario-execute-save", "release-manifest.json"],
   ["desktop", "scenario-create", "release-manifest.json"],
   ["desktop", "docs-external-unicode-path", "release-manifest.json"],
   ["desktop", "docs-no-input,docs-no-input", "SKILLS_ACCEPTANCE_DUPLICATE_CASE"],
@@ -170,11 +173,18 @@ linuxTest(
       import { spawn } from 'node:child_process'
       import { setTimeout } from 'node:timers/promises'
       import { observeProcesses } from ${JSON.stringify(new URL("../script/skills-acceptance/processes.mjs", import.meta.url).href)}
-      const observer = observeProcesses()
       const owned = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 15000)'], { stdio: 'ignore' })
-      await setTimeout(250)
-      owned.kill('SIGTERM')
-      await new Promise(resolve => owned.once('exit', resolve))
+      let captured
+      const observed = new Promise(resolve => { captured = resolve })
+      const observer = observeProcesses({ onObserved: row => {
+        if (row.pid === owned.pid && row.start && row.command.includes(process.execPath)) captured()
+      } })
+      try {
+        await Promise.race([observed, setTimeout(5000, undefined, { ref: false }).then(() => { throw Error('OWNED_PROCESS_NOT_OBSERVED') })])
+      } finally {
+        owned.kill('SIGTERM')
+        await new Promise(resolve => owned.once('exit', resolve))
+      }
       console.log(JSON.stringify({ owned: owned.pid, evidence: await observer.close() }))
     `,
         ],

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto"
 import { chmod, cp, mkdir, readFile, readdir, realpath, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { parseArgs } from "node:util"
+import { acceptanceTurns } from "./skills-acceptance/turns.mjs"
 import { verifyCliManifest } from "../src/cli-manifest"
 import { verifyProductSkills } from "../src/bundled-skills"
 import { decodeManifest, fileHash, verifyResourceTree } from "../../desktop/scripts/release/manifest"
@@ -76,8 +77,9 @@ if (new Set(ids).size !== ids.length) throw Error("SKILLS_ACCEPTANCE_DUPLICATE_C
 const cases = ids.map((id) => {
   const value = corpus.cases.find((item) => item.id === id)
   if (!value) throw Error("SKILLS_ACCEPTANCE_UNKNOWN_CASE")
-  const scenario = ["scenario-create", "scenario-then-docs", "scenario-after-docs"].includes(value.id)
-  const transition = ["docs-after-build", "scenario-then-docs", "scenario-after-docs"].includes(value.id)
+  const turns = acceptanceTurns(value)
+  const scenario = turns.some((turn) => turn.scenario)
+  const transition = turns.length > 1
   if ((!scenario && !["docs", "default"].includes(value.group)) || (!transition && (value.setup || value.followup)))
     throw Error("SKILLS_ACCEPTANCE_MULTITURN_SCENARIO_ADAPTER_REQUIRED")
   if (
@@ -91,6 +93,7 @@ const cases = ids.map((id) => {
       "external-text-path",
       ...(transition ? ["created-lgp-attachment"] : []),
       ...(scenario ? ["csv-attachment"] : []),
+      ...(scenario && transition ? ["own-created-server-package"] : []),
     ].includes(value.input)
   )
     throw Error("SKILLS_ACCEPTANCE_PERMISSION_ADAPTER_REQUIRED")
@@ -456,12 +459,14 @@ async function verifySavedPackage(testcase: (typeof cases)[number], attempt: num
   await Bun.write(join(evidence, "built.structure.json"), JSON.stringify(structure, null, 2))
   const nodes = structure.modules.flatMap((module) => module.workflow_nodes)
   const links = structure.modules.flatMap((module) => module.links)
-  const ids = result.builtNodes as { source: string; grouping: string }
+  const ids = result.builtNodes as { source: string; grouping?: string; calculator?: string }
+  const target = ids.grouping ?? ids.calculator
   const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
   if (
     !nodes.some((node) => same(node.guid, ids.source)) ||
-    !nodes.some((node) => same(node.guid, ids.grouping)) ||
-    !links.some((link) => same(link.source_node_guid, ids.source) && same(link.target_node_guid, ids.grouping))
+    (target &&
+      (!nodes.some((node) => same(node.guid, target)) ||
+        !links.some((link) => same(link.source_node_guid, ids.source) && same(link.target_node_guid, target))))
   )
     throw Error("SKILLS_ACCEPTANCE_SAVED_GRAPH_MISMATCH")
   await Bun.write(
@@ -471,11 +476,23 @@ async function verifySavedPackage(testcase: (typeof cases)[number], attempt: num
         packagePath,
         sha256: await fileHash(saved),
         nodes: ids,
-        linked: true,
-        expectedRows: [
-          ["Alpha", 35],
-          ["Beta", 20],
-        ],
+        linked: target ? true : undefined,
+        expectedRows: ids.calculator
+          ? [
+              ["Alpha", 10, 20],
+              ["Beta", 20, 40],
+              ["Alpha", 25, 50],
+            ]
+          : ids.grouping
+            ? [
+                ["Alpha", 35],
+                ["Beta", 20],
+              ]
+            : [
+                ["Alpha", 10],
+                ["Beta", 20],
+                ["Alpha", 25],
+              ],
         coldReexecutionVerified: false,
       },
       null,

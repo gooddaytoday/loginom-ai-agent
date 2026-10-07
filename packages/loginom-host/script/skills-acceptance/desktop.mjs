@@ -9,6 +9,8 @@ import { setTimeout } from "node:timers/promises"
 import { promisify } from "node:util"
 import { observeProcesses } from "./processes.mjs"
 import { verifySalesScenario } from "./scenario.mjs"
+import { verifyImportBuild, verifyCalculatorModification, verifyImportExecution } from "./scenario-import.mjs"
+import { acceptanceTurns } from "./turns.mjs"
 
 const chunks = []
 for await (const chunk of process.stdin) chunks.push(chunk)
@@ -28,8 +30,9 @@ const failures = []
 
 for (const testcase of input.cases) {
   const docsFirst = testcase.id === "scenario-after-docs"
-  const transition = ["docs-after-build", "scenario-then-docs"].includes(testcase.id) || docsFirst
-  const scenario = testcase.id === "scenario-create" || transition
+  const turns = acceptanceTurns(testcase)
+  const transition = turns.length > 1
+  const scenario = turns.some((turn) => turn.scenario)
   await mkdir(join(input.output, testcase.id), { mode: 0o700 })
   for (let attempt = 1; attempt <= input.repeat; attempt++) {
     const evidence = join(input.output, testcase.id, "attempt-" + attempt)
@@ -181,21 +184,6 @@ for (const testcase of input.cases) {
         await page.locator('[data-component="prompt-input"][contenteditable="true"]').waitFor({ timeout: 60000 })
         await save("permission-view.json", { route, sessionID })
       }
-      const turns = docsFirst
-        ? [
-            { ...testcase.setup, expected: { profile: "package-docs", result: "pdf" }, scenario: false },
-            { ...testcase, scenario: true },
-          ]
-        : transition
-          ? [
-              {
-                ...(testcase.setup ?? testcase),
-                expected: { profile: "loginom-automation", result: "saved-executed-package" },
-                scenario: true,
-              },
-              { ...(testcase.setup ? testcase : testcase.followup), input: "lgp-attachment", scenario: false },
-            ]
-          : [{ ...testcase, scenario }]
       let built
       for (const [turnIndex, turn] of turns.entries()) {
         const scenario = turn.scenario
@@ -209,10 +197,13 @@ for (const testcase of input.cases) {
             ? [external]
             : turn.input === "lgp-and-png-attachments"
               ? [external, png]
-              : scenario
+              : turn.input === "csv-attachment"
                 ? [csv]
                 : []
-        const csvUrl = scenario ? `data:text/plain;base64,${(await readFile(csv)).toString("base64")}` : undefined
+        const csvUrl =
+          turn.input === "csv-attachment"
+            ? `data:text/plain;base64,${(await readFile(csv)).toString("base64")}`
+            : undefined
         const parts = [
           { type: "text", text: prompt },
           ...files.map((path) => ({
@@ -316,7 +307,8 @@ for (const testcase of input.cases) {
           wallMs: Date.now() - started,
           timeoutMs,
           ...(scenario || transition ? { packagePath: bindings.server_package } : {}),
-          ...(built ? { builtNodes: built.builtNodes, createdPackageSha256: originalSha } : {}),
+          ...(built ? { builtNodes: built.builtNodes } : {}),
+          ...(built && !scenario ? { createdPackageSha256: originalSha } : {}),
           modelError: answer.info.error,
           tools: tools.map((part) => ({
             id: part.id,
@@ -338,13 +330,29 @@ for (const testcase of input.cases) {
         }
         await save("result.json", result)
         assert.ok(!answer.info.error, "MODEL_ERROR")
-        assert.ok(scenario ? execs.length > 0 : execs.length === 0, "EXPECTED_BROWSER_EXEC_SCOPE")
+        assert.ok(
+          scenario ? (turnIndex === 0 || docsFirst ? execs.length > 0 : true) : execs.length === 0,
+          "EXPECTED_BROWSER_EXEC_SCOPE",
+        )
         if (scenario) {
           const csvSha256 = sha(await readFile(input.fixtures.csv))
           assert.equal(originalSha, csvSha256)
+          const verify =
+            turn.verification === "import"
+              ? verifyImportBuild
+              : turn.verification === "calculator"
+                ? verifyCalculatorModification
+                : turn.verification === "execution"
+                  ? verifyImportExecution
+                  : verifySalesScenario
           Object.assign(
             result,
-            verifySalesScenario(tools, { skills: input.skills, csvSha256, packagePath: bindings.server_package }),
+            verify(tools, {
+              skills: input.skills,
+              csvSha256,
+              packagePath: bindings.server_package,
+              sourceNode: built?.builtNodes.source,
+            }),
           )
           await save("result.json", result)
         }
@@ -397,6 +405,7 @@ for (const testcase of input.cases) {
           await save("turn-" + (turnIndex + 1) + "/messages.json", messages)
           if (turnIndex === 0 && scenario) {
             built = result
+            if (turns[1].input !== "lgp-attachment") continue
             // The path is owned by this output/case/attempt, never supplied by the model.
             await promisify(execFile)(
               "docker",

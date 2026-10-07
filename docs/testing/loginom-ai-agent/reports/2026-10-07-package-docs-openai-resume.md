@@ -228,3 +228,33 @@ Desktop253 build → docs3/3 принят: один Session ID, физическ
 нового Chromium/browser calls, remaining0. CLI переход ещё идёт. Source
 adapters трёх multi-turn случаев19 PASS/71, typecheck/Prettier PASS; живое
 прохождение остальных переходов и cold replay ещё не заявляется.
+
+## 16:07 UTC — самостоятельные adapters и новые кандидаты
+
+Сохранённый CLIbc6 установлен в собственный seed
+`sha256:62c79d67f45550e79bf03f944f5e80c0eb641cbb5355dcf5256328351fb5127a`;
+архив SHA256 `0f3f8397ce7babfcc66f6f502b5620f85207fc1df69859b1ece892d20c65e056`.
+Desktop DEB SHA256 `95f7c9784cbaafc955e74e7715a7a90252f67a2c39e33f336d22afd92a6e79a4`,
+AppImage `10a21c24fad06e6a6d5e3d8b934426e9953ac021a5e248cf94333a31df9c4052`.
+Оба из clean `bc6e7e1648e211bcf411fbfd86564b950a2aaf75` с tree digest
+`928cd84bc77371a00d8136b016f95aadfe72b3b1204b49faa6ec109c67ad4cd7`.
+Полный20×3 Desktop/run идёт двумя batches18+2, immutable models snapshot прежний.
+
+CLI253 build→docs3/3 mechanics/facts/layout PASS,6 страниц и6 полных ответов
+проверены. Native link click не проверен; attempt2 destination имеет лишние
+пробелы, Marked сохраняет их как %20. Ссылка не равна точному output; ограничение
+записано в manual-quality.json, исходные events/result не переписаны.
+
+Cold readback одного собственного Desktop253 scenario-create/attempt1 через
+установленный runtimebc6 PASS: сохранённый GUID, execution.owner_verified,
+точные Alpha35/Beta20, без settings reapply. Пакет SHA83a9e8fc… неизменен,
+package close/logout и процессы remaining[] подтверждены. Evidence
+`cold-bc6-desktop-scenario-create-253-attempt-1/cold-evidence/result.json`.
+Не заявляется cold приёмка остальных пакетов, Linux5 или same-build253.
+
+Новые adapters поддерживают сценарий изменения и выполнения отдельным ходом;
+CSV не прикладывается повторно, точность/тип/сохранение проверяются независимо.
+Observer test flaky3/5 на250ms: после explicit capture notification GREEN5/5;
+короткая задержка убрана, прежние assertions сохранены. Итоговый regression31 PASS/110 assertions и Host typecheck/Prettier PASS. Linux253 CLI180s FAIL на Ubuntu22 и Debian13
+сохранены; первопричина timeout ещё не установлена. Desktop Debian12 PASS,
+Debian13 ещё выполняется. Общие evals файлы и соседние ресурсы не изменены.

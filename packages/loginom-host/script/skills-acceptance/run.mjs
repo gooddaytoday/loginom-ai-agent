@@ -6,6 +6,8 @@ import { join } from "node:path"
 import { scheduler } from "node:timers/promises"
 import { observeProcesses } from "./processes.mjs"
 import { verifySalesScenario } from "./scenario.mjs"
+import { verifyImportBuild, verifyCalculatorModification, verifyImportExecution } from "./scenario-import.mjs"
+import { acceptanceTurns } from "./turns.mjs"
 const chunks = []
 for await (const chunk of process.stdin) chunks.push(chunk)
 const input = JSON.parse(Buffer.concat(chunks).toString())
@@ -16,8 +18,9 @@ const secrets = [
 ]
 const testcase = input.testcase
 const docsFirst = testcase.id === "scenario-after-docs"
-const transition = ["docs-after-build", "scenario-then-docs"].includes(testcase.id) || docsFirst
-const scenario = testcase.id === "scenario-create" || transition
+const turns = acceptanceTurns(testcase)
+const transition = turns.length > 1
+const scenario = turns.some((turn) => turn.scenario)
 assert.ok(["docs", "default"].includes(testcase.group) || scenario)
 assert.ok(transition || (!testcase.setup && !testcase.followup), "MULTITURN_ADAPTER_REQUIRED")
 const evidence = "/home/tester/evidence"
@@ -109,21 +112,6 @@ const bindPrompt = (text) =>
     assert.ok(bindings[key], "UNKNOWN_BINDING")
     return bindings[key]
   })
-const turns = docsFirst
-  ? [
-      { ...testcase.setup, expected: { profile: "package-docs", result: "pdf" }, scenario: false },
-      { ...testcase, scenario: true },
-    ]
-  : transition
-    ? [
-        {
-          ...(testcase.setup ?? testcase),
-          expected: { profile: "loginom-automation", result: "saved-executed-package" },
-          scenario: true,
-        },
-        { ...(testcase.setup ? testcase : testcase.followup), input: "lgp-attachment", scenario: false },
-      ]
-    : [{ ...testcase, scenario }]
 let sessionID, built
 for (const [turnIndex, turn] of turns.entries()) {
   const evidence = transition ? "/home/tester/evidence/turn-" + (turnIndex + 1) : "/home/tester/evidence"
@@ -136,13 +124,14 @@ for (const [turnIndex, turn] of turns.entries()) {
     () => undefined,
   )
   const prompt = bindPrompt(turn.prompt)
-  const attachments = scenario
-    ? [csv]
-    : turn.input === "lgp-attachment"
-      ? [lgp]
-      : turn.input === "lgp-and-png-attachments"
-        ? [lgp, png]
-        : []
+  const attachments =
+    turn.input === "csv-attachment"
+      ? [csv]
+      : turn.input === "lgp-attachment"
+        ? [lgp]
+        : turn.input === "lgp-and-png-attachments"
+          ? [lgp, png]
+          : []
   const args = [
     cli,
     "run",
@@ -233,7 +222,8 @@ for (const [turnIndex, turn] of turns.entries()) {
     browserExecs,
     reports,
     ...(scenario || transition ? { packagePath: input.packagePath } : {}),
-    ...(built ? { builtNodes: built.builtNodes, createdPackageSha256: original } : {}),
+    ...(built ? { builtNodes: built.builtNodes } : {}),
+    ...(built && !scenario ? { createdPackageSha256: original } : {}),
   }
   await writeFile(join(evidence, "result.json"), JSON.stringify(result, null, 2))
   await cp("/home/tester/workspace", join(evidence, "workspace"), { recursive: true })
@@ -247,9 +237,22 @@ for (const [turnIndex, turn] of turns.entries()) {
         .digest("hex"),
       csvSha256,
     )
+    const verify =
+      turn.verification === "import"
+        ? verifyImportBuild
+        : turn.verification === "calculator"
+          ? verifyCalculatorModification
+          : turn.verification === "execution"
+            ? verifyImportExecution
+            : verifySalesScenario
     Object.assign(
       result,
-      verifySalesScenario(tools, { skills: input.skills, csvSha256, packagePath: input.packagePath }),
+      verify(tools, {
+        skills: input.skills,
+        csvSha256,
+        packagePath: input.packagePath,
+        sourceNode: built?.builtNodes.source,
+      }),
     )
   }
   await writeFile(join(evidence, "result.json"), JSON.stringify(result, null, 2))
@@ -301,6 +304,7 @@ for (const [turnIndex, turn] of turns.entries()) {
     sessionID = ids[0]
     if (turnIndex === 0 && scenario) {
       built = result
+      if (turns[1].input !== "lgp-attachment") continue
       console.log(
         JSON.stringify({
           event: "saved-package-input-required",

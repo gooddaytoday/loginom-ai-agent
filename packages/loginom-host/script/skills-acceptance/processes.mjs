@@ -2,7 +2,7 @@ import { readFile, readdir } from "node:fs/promises"
 import { setTimeout } from "node:timers/promises"
 
 // Follow only this adapter's descendants, retaining PID/start-time identity.
-export function observeProcesses() {
+export function observeProcesses({ onObserved } = {}) {
   const observations = new Map()
   let stopped = false
   const monitor = (async () => {
@@ -38,6 +38,7 @@ export function observeProcesses() {
           const key = `${row.pid}:${row.start}`,
             prior = observations.get(key)
           observations.set(key, prior ? { ...prior, command: row.command || prior.command, lastAt: row.at } : row)
+          onObserved?.(observations.get(key))
         })
       await setTimeout(25)
     }
