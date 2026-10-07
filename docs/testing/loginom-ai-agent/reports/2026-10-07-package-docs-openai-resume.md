@@ -90,6 +90,37 @@ Evidence: `cli-openai-negative-2530143dd` и
 внутренняя трассировка и продуктовые байты не менялись. Live RED c50d → GREEN
 2530143dd для выбора skill закрыт. Полная обязательная матрица остаётся открытой.
 
+## Обычные CLI-запросы и построение на локальном стенде
+
+На CLI253 пять default-кейсов ×3 прошли 15/15 mechanics/semantics PASS:
+назначение узла, настройка, справка UI, арифметика без подключения и перевод.
+Все ответы прочитаны, активации skills нет; Chromium0, reports0, remaining0.
+Evidence `cli-openai-default-2530143dd`, individual manual-quality receipts.
+
+`scenario-create` теперь имеет отдельный CLI adapter с настоящим CSV attachment,
+проверкой SUM, выполнения и сохранённого `.lgp`. Секреты идут через private
+stdin; публичная preflight-проверка допускает только local endpoint и отдельный
+тестовый аккаунт/пакет. Тесты границ и verifier:15 PASS/55 assertions; typecheck PASS.
+Live `cli-openai-scenario-create-2530143dd-local`, http://localhost/app/:
+попытки1/3 PASS, исходный CSV неизменен, Alpha35/Beta20, GUID и связь
+Источник→Группировка проверены по фактическим `.lgp`; attempt2 FAIL из-за
+UI_EPOCH_CHANGED при настройке импорта. Grouping/save отсутствуют, модель
+честно сообщает отказ. Batch exit1; своих процессов0 во всех попытках.
+Холодное повторное выполнение ещё не проверено. 2/3 не закрывают gate.
+
+После отказа старый adapter потерял result.json из-за TypeError. Raw events,
+trace/process evidence сохранены; отдельно создан recovered-result.json,
+исходный FAIL оставлен. Исправленный driver пишет receipt до assertions,
+а verifier выдаёт явную причину отсутствия группировки. TDD не ослабляет oracle.
+
+Два предшествующих сценарных запуска ошибочно использовали saved remote URL
+https://app.loginom.ai. Они сохранены как deadline FAIL/NOT_LOCAL_ACCEPTANCE;
+результаты не смешиваются с local серией. При обнаружении неверного endpoint
+наш parent v2 остановлен, уже начатый container штатно завершён exit0,
+скопирован и удалён; попытки2/3 не запускались. Пользовательские настройки
+не менялись. Исправление private wrapper и public endpoint guard выполнены
+до local series. Полные formats/routing на новой сборке ещё предстоят.
+
 ## Воспроизводимость и границы
 
 Acceptance root вне Git:
@@ -134,3 +165,10 @@ Evals read-only SHA `dfe47cce65c9186aaae8e7d4e0d8de68e09972bb` принят со
 задачей. Общий harness, near-miss и judge не редактировались. Замороженный
 план не перерабатывался повторно. TUI, сценарные переходы, полный корпус20,
 вторая модель, A/B и остальные installation gates ещё не приняты.
+
+Новая Linux253 matrix: Desktop Ubuntu22 PASS, CLI Ubuntu22 native FAIL по
+исходному180s deadline команды profile-init/status (SIGTERM, пустой вывод).
+Отдельные startup/strace diagnostics сохранены; подтверждено чтение artifact
+manifest/Chromium до запуска Host, причина задержки ещё исследуется.
+Высокая IO pressure наблюдалась, причинность не доказана. Повышенный deadline
+диагностики не меняет критерий native smoke и не заменяет исходный FAIL.

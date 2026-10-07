@@ -4,15 +4,18 @@ import { createHash } from "node:crypto"
 import { mkdir, readFile, writeFile, appendFile, cp, readdir } from "node:fs/promises"
 import { join } from "node:path"
 import { observeProcesses } from "./processes.mjs"
+import { verifySalesScenario } from "./scenario.mjs"
 const chunks = []
 for await (const chunk of process.stdin) chunks.push(chunk)
 const input = JSON.parse(Buffer.concat(chunks).toString())
 const secrets = [
   input.apiKey,
+  ...(input.connection?.password ? [input.connection.password] : []),
   ...(input.auth.type === "api" ? [input.auth.key] : [input.auth.access, input.auth.refresh]),
 ]
 const testcase = input.testcase
-assert.ok(["docs", "default"].includes(testcase.group))
+const scenario = testcase.id === "scenario-create"
+assert.ok(["docs", "default"].includes(testcase.group) || scenario)
 assert.ok(!testcase.setup && !testcase.followup, "MULTITURN_ADAPTER_REQUIRED")
 const evidence = "/home/tester/evidence"
 await mkdir(evidence, { mode: 0o700 })
@@ -22,20 +25,25 @@ if (testcase.connection !== "unconfigured" && testcase.id !== "default-translati
   const setup = spawn(cli, ["loginom", "setup", "--stdin-json", "--format", "json", "--headless"], {
     stdio: ["pipe", "pipe", "pipe"],
   })
-  setup.stdin.end(JSON.stringify({ apiKey: input.apiKey, password: "", url: "http://127.0.0.1:9/", username: "user" }))
+  setup.stdin.end(
+    JSON.stringify({
+      apiKey: input.apiKey,
+      ...(scenario ? input.connection : { password: "", url: "http://127.0.0.1:9/", username: "user" }),
+    }),
+  )
   let out = "",
     err = ""
   setup.stdout.on("data", (chunk) => (out += chunk))
   setup.stderr.on("data", (chunk) => (err += chunk))
   const code = await new Promise((resolve) => setup.once("exit", resolve))
-  assert.ok(!out.includes(input.apiKey) && !err.includes(input.apiKey))
+  assert.ok(!secrets.some((secret) => (out + err).includes(secret)))
   await writeFile(join(evidence, "setup.json"), out)
   await writeFile(join(evidence, "setup-stderr.log"), err)
   assert.equal(code, 0)
   const view = JSON.parse(out)
   // Save confirms activation; the generation's Help catalog may still be loading.
   assert.ok(["starting", "ready"].includes(view.state))
-  assert.equal(view.browser.state, "failed")
+  assert.equal(view.browser.state, scenario ? "verified" : "failed")
 } else {
   // Let the public CLI create its profile marker before adding model auth.
   const initialize = spawn(
@@ -81,6 +89,8 @@ await mkdir("/home/tester/input", { mode: 0o700 })
 const local = "/home/tester/workspace/Сценарий.LGP",
   lgp = "/home/tester/input/Исходный сценарий.LGP",
   png = "/home/tester/input/Контекст.png"
+const csv = "/home/tester/input/sales.csv"
+if (scenario) await cp(input.fixtures.csv, csv)
 if (testcase.input === "workspace-path") await cp(input.fixtures.lgp, local)
 if (["lgp-attachment", "lgp-and-png-attachments", "external-text-path"].includes(testcase.input))
   await cp(input.fixtures.lgp, lgp)
@@ -94,14 +104,19 @@ const bindings = {
   local_lgp: local,
   unicode_lgp: lgp,
   missing_lgp: "/home/tester/workspace/Отсутствующий.LGP",
-  server_package: "/user/package-docs-acceptance/not-opened/missing.lgp",
+  server_package: scenario ? input.packagePath : "/user/package-docs-acceptance/not-opened/missing.lgp",
 }
 const prompt = testcase.prompt.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
   assert.ok(bindings[key], "UNKNOWN_BINDING")
   return bindings[key]
 })
-const attachments =
-  testcase.input === "lgp-attachment" ? [lgp] : testcase.input === "lgp-and-png-attachments" ? [lgp, png] : []
+const attachments = scenario
+  ? [csv]
+  : testcase.input === "lgp-attachment"
+    ? [lgp]
+    : testcase.input === "lgp-and-png-attachments"
+      ? [lgp, png]
+      : []
 const args = [
   cli,
   "run",
@@ -113,6 +128,7 @@ const args = [
   input.model,
   ...(input.variant !== "default" ? ["--variant", input.variant] : []),
   ...(input.headless ? ["--headless"] : ["--no-headless"]),
+  ...(scenario ? ["--auto"] : []),
   ...(attachments.length ? ["--file", ...attachments] : []),
   "--",
   prompt,
@@ -140,10 +156,11 @@ run.stdout.on("data", (chunk) => {
 run.stderr.on("data", (chunk) => {
   writes = writes.then(() => appendFile(join(evidence, "stderr.log"), chunk))
 })
+const timeoutMs = scenario ? 1200000 : 480000
 const timer = setTimeout(() => {
   interrupted = true
   run.kill("SIGINT")
-}, 480000)
+}, timeoutMs)
 const started = Date.now()
 const exit = await new Promise((resolve) => run.once("exit", (code, signal) => resolve({ code, signal })))
 clearTimeout(timer)
@@ -161,6 +178,7 @@ const reports = files.filter((file) => /lgp_report\.(pdf|docx|md)$/.test(file))
 const result = {
   ...exit,
   interrupted,
+  timeoutMs,
   model: input.model,
   variant: input.variant,
   headless: input.headless,
@@ -187,9 +205,23 @@ const result = {
     .join("\n"),
   browserExecs,
   reports,
+  ...(scenario ? { packagePath: input.packagePath } : {}),
 }
 await writeFile(join(evidence, "result.json"), JSON.stringify(result, null, 2))
 await cp("/home/tester/workspace", join(evidence, "workspace"), { recursive: true })
+if (scenario) {
+  const csvSha256 = createHash("sha256")
+    .update(await readFile(input.fixtures.csv))
+    .digest("hex")
+  assert.equal(
+    createHash("sha256")
+      .update(await readFile(csv))
+      .digest("hex"),
+    csvSha256,
+  )
+  Object.assign(result, verifySalesScenario(tools, { skills: input.skills, csvSha256, packagePath: input.packagePath }))
+}
+await writeFile(join(evidence, "result.json"), JSON.stringify(result, null, 2))
 console.log(
   JSON.stringify({ code: exit.code, interrupted, reports, browserExecs: browserExecs.length, wallMs: result.wallMs }),
 )
@@ -200,9 +232,10 @@ assert.ok(
   "CLI_EXIT_CONTRACT",
 )
 assert.equal(interrupted, false)
-assert.equal(browserExecs.length, 0)
+assert.ok(scenario ? browserExecs.length > 0 : browserExecs.length === 0)
 assert.equal(result.afterSha256, original)
-assert.ok(!tools.some((t) => t.tool.startsWith("loginom_dock_") && t.tool !== "loginom_dock_diagnostics"))
+if (!scenario)
+  assert.ok(!tools.some((t) => t.tool.startsWith("loginom_dock_") && t.tool !== "loginom_dock_diagnostics"))
 if (testcase.expected.profile === "package-docs")
   assert.ok(
     tools.some(

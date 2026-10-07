@@ -3827,10 +3827,50 @@ Evidence `tui-2530143dd-slash-{red,green,mention}` вне Git. Это scripted
 mechanics/report QA, не natural routing и не настоящая Help. Agent typecheck
 PASS; общая TUI/installed матрица остаётся открытой.
 
+## 2026-10-07 — обычные CLI-запросы и реальное построение по CSV
+
+CLI253/OpenAI6.1 medium: пять default-кейсов ×3 завершены 15/15 PASS.
+Все ответы прочитаны; activation отсутствует, Chromium0, reports0,
+remaining0. Arithmetic102 и перевод подтверждены. Evidence
+`cli-openai-default-2530143dd`; ручной review подтверждает routing/семантику,
+но не заявляет независимую экспертизу каждого справочного утверждения.
+
+Для `scenario-create` добавлен отдельный CLI adapter: original CSV через
+настоящий --file, private local connection, automation activation/digest,
+readback SUM, выполнение, save checkpoint и физический ZIP/XML `.lgp`.
+TDD preflight RED→GREEN; отдельный verifier RED→GREEN проверяет отказ
+частичного импорта, фактические идентификаторы, подмену hash/result/path.
+Объединённая проверка 15 PASS / 55 assertions, pinned Node24.19.0;
+Host typecheck PASS. Полный corpus20/многоходовые случаи ещё не поддержаны.
+
+Local live `cli-openai-scenario-create-2530143dd-local`: попытки1/3 PASS,
+Alpha35/Beta20, сохранённые пакеты и прямая связь подтверждены;
+attempt2 FAIL: UI_EPOCH_CHANGED в настройке импорта, grouping/save не выполнены.
+Модель честно сообщила отказ. Driver затем получил TypeError на отсутствующей
+успешной группировке; terminal summary восстановлена из сохранённых events
+отдельно, исходный FAIL не заменён. Новый driver пишет receipt до assertions
+и возвращает SCENARIO_GROUPING_NOT_VERIFIED. Весь batch exit1, remaining0.
+Холодное повторное выполнение пакетов не проверялось.
+
+Первый сценарный private wrapper ошибочно взял сохранённый remote URL
+https://app.loginom.ai. Его результаты `...-green` (deadline FAIL) и `...-v2`
+не засчитаны как локальная приёмка. V2 parent остановлен нашим SIGTERM после
+обнаружения ошибки, начатый container штатно завершился exit0, evidence
+скопирован, container удалён; следующие попытки не запускались. Private wrapper
+теперь явно использует http://localhost/app/; public preflight отклоняет
+remote endpoint до dispatch. Пользовательская конфигурация не изменялась.
+
+Linux253 Desktop Ubuntu22 PASS. CLI Ubuntu22 native FAIL: profile-init
+loginom status превысил исходные180s, SIGTERM; stdout/stderr пусты. Отдельный
+240s diagnostic также не завершился до SIGINT, Host не запускался. Strace
+показывает проверку manifest/чтение bundled Chromium, причина задержки пока
+не установлена. Наблюдалась высокая IO pressure; причинность не доказана.
+Матрицы следующих дистрибутивов и диагностика продолжаются, gate открыт.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
-- Product candidates: 2530143dd clean Desktop/CLI builds/manifests/static/installed CLI seed PASS; новые Linux5 матрицы выполняются. c50d Desktop Ubuntu22/24/26 и CLI Ubuntu22 native PASS сохранены.
+- Product candidates253 clean/manifest/static/CLI seed PASS; Linux5 идут: Desktop Ubuntu22 PASS, CLI Ubuntu22 native180s FAIL, причина задержки исследуется; c50d установки сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -3841,11 +3881,11 @@ PASS; общая TUI/installed матрица остаётся открытой.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
-- Полный Host 238 PASS / 7 SKIP; acceptance adapters8 PASS/35, OAuth/medium/catalog, typecheck PASS; Agent history/tools/registry30 PASS.
+- Полный Host238 PASS/7 SKIP; acceptance adapters15 PASS/55, OAuth/medium/local endpoint/CSV oracle и typecheck PASS; Agent history/tools/registry30 PASS.
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- RESUMED по явной просьбе владельца: frozen план сохраняется; compound/transitions/corpus20/TUI/Linux5/A-B ещё открыты; CLI scenario-create adapter проходит отдельный TDD цикл.
+- RESUMED: CLI default15/15 PASS; local scenario-create2/3 PASS+1 UI_EPOCH_CHANGED FAIL, batch exit1/remaining0. Compound/transitions/corpus20/TUI/Linux5/A-B открыты; frozen план не перерабатывался.

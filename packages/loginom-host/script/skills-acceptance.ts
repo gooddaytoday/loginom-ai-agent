@@ -19,6 +19,7 @@ const args = parseArgs({
     cases: { type: "string" },
     repeat: { type: "string", default: "3" },
     "cli-image": { type: "string" },
+    "package-container": { type: "string" },
     headless: { type: "boolean", default: false },
   },
   strict: true,
@@ -75,7 +76,8 @@ if (new Set(ids).size !== ids.length) throw Error("SKILLS_ACCEPTANCE_DUPLICATE_C
 const cases = ids.map((id) => {
   const value = corpus.cases.find((item) => item.id === id)
   if (!value) throw Error("SKILLS_ACCEPTANCE_UNKNOWN_CASE")
-  if (!["docs", "default"].includes(value.group) || value.setup || value.followup)
+  const scenario = args.interface === "run" && value.id === "scenario-create"
+  if ((!scenario && !["docs", "default"].includes(value.group)) || value.setup || value.followup)
     throw Error("SKILLS_ACCEPTANCE_MULTITURN_SCENARIO_ADAPTER_REQUIRED")
   if (
     ![
@@ -86,6 +88,7 @@ const cases = ids.map((id) => {
       "none",
       "server-reference-only",
       "external-text-path",
+      ...(scenario ? ["csv-attachment"] : []),
     ].includes(value.input)
   )
     throw Error("SKILLS_ACCEPTANCE_PERMISSION_ADAPTER_REQUIRED")
@@ -129,12 +132,32 @@ const privateInput = await new Response(Bun.stdin.stream())
             enterpriseUrl: Schema.optional(Schema.String),
           }),
         ]),
+        connection: Schema.optional(
+          Schema.Struct({
+            url: Schema.NonEmptyString,
+            username: Schema.NonEmptyString,
+            password: Schema.String,
+          }),
+        ),
       }),
     ),
   )
   .catch(() => {
     throw Error("SKILLS_ACCEPTANCE_PRIVATE_INPUT_INVALID")
   })
+if (cases.some((testcase) => testcase.group === "scenario")) {
+  if (!privateInput.connection || !args["package-container"])
+    throw Error("SKILLS_ACCEPTANCE_SCENARIO_CONNECTION_REQUIRED")
+  const address = new URL(privateInput.connection.url)
+  if (
+    !["http:", "https:"].includes(address.protocol) ||
+    !["localhost", "127.0.0.1"].includes(address.hostname) ||
+    address.username ||
+    address.password ||
+    !/^[A-Za-z0-9_-]+$/.test(privateInput.connection.username)
+  )
+    throw Error("SKILLS_ACCEPTANCE_SCENARIO_CONNECTION_INVALID")
+}
 const image =
   args.interface === "run"
     ? (await command(["docker", "image", "inspect", "--format", "{{.Id}}", args["cli-image"]!])).trim()
@@ -190,6 +213,11 @@ await writeFile(
       cases,
       headless: args.headless,
       image,
+      packageContainer: args["package-container"],
+      connection:
+        cases.some((testcase) => testcase.group === "scenario") && privateInput.connection
+          ? { url: privateInput.connection.url, username: privateInput.connection.username }
+          : undefined,
       corpusSha256: sha(corpusBytes),
       driverSha256: sha(await readFile(driver)),
       driverFiles: await Promise.all(
@@ -209,6 +237,7 @@ await writeFile(
 )
 const payload = {
   apiKey: privateInput.apiKey,
+  connection: cases.some((testcase) => testcase.group === "scenario") ? privateInput.connection : undefined,
   auth: privateInput.auth,
   artifact,
   resources,
@@ -280,6 +309,9 @@ if (args.interface === "run") {
               testcase,
               attempt,
               installed,
+              packagePath:
+                privateInput.connection &&
+                `/${privateInput.connection.username}/skills-acceptance-${sha(output).slice(0, 12)}-${testcase.id}-${attempt}.lgp`,
               modelsPath: modelsPath && "/inputs/models.json",
               fixtures: Object.fromEntries(
                 Object.entries(fixtures).map(([key, path]) => [key, "/inputs/" + basename(path)]),
@@ -300,6 +332,44 @@ if (args.interface === "run") {
         await writeFile(join(runRoot, "driver.log"), out + err)
         await writeFile(join(runRoot, "exit.json"), JSON.stringify({ code }))
         await command(["docker", "cp", container + ":/home/tester/evidence", runRoot])
+        if (code === 0 && testcase.group === "scenario") {
+          const result = await Bun.file(join(runRoot, "evidence/result.json")).json()
+          const packagePath = `/${privateInput.connection!.username}/skills-acceptance-${sha(output).slice(0, 12)}-${testcase.id}-${attempt}.lgp`
+          if (result.packagePath !== packagePath) throw Error("SKILLS_ACCEPTANCE_PACKAGE_IDENTITY_MISMATCH")
+          const saved = join(runRoot, "evidence/built.lgp")
+          await command(["docker", "cp", args["package-container"] + ":/workdir/UserStorage" + packagePath, saved])
+          const { extractPackage } = await import("../src/package-docs/extract")
+          const structure = await extractPackage(saved)
+          await Bun.write(join(runRoot, "evidence/built.structure.json"), JSON.stringify(structure, null, 2))
+          const nodes = structure.modules.flatMap((module) => module.workflow_nodes)
+          const links = structure.modules.flatMap((module) => module.links)
+          const ids = result.builtNodes as { source: string; grouping: string }
+          const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
+          if (
+            !nodes.some((node) => same(node.guid, ids.source)) ||
+            !nodes.some((node) => same(node.guid, ids.grouping)) ||
+            !links.some((link) => same(link.source_node_guid, ids.source) && same(link.target_node_guid, ids.grouping))
+          )
+            throw Error("SKILLS_ACCEPTANCE_SAVED_GRAPH_MISMATCH")
+          await Bun.write(
+            join(runRoot, "evidence/package-proof.json"),
+            JSON.stringify(
+              {
+                packagePath,
+                sha256: await fileHash(saved),
+                nodes: ids,
+                linked: true,
+                expectedRows: [
+                  ["Alpha", 35],
+                  ["Beta", 20],
+                ],
+                coldReexecutionVerified: false,
+              },
+              null,
+              2,
+            ),
+          )
+        }
       } finally {
         await command(["docker", "rm", container])
       }
@@ -315,6 +385,7 @@ function requireRedacted(text: string) {
   if (
     [
       privateInput.apiKey,
+      ...(privateInput.connection?.password ? [privateInput.connection.password] : []),
       ...(privateInput.auth.type === "api"
         ? [privateInput.auth.key]
         : [privateInput.auth.access, privateInput.auth.refresh]),

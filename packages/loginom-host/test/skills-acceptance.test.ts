@@ -9,9 +9,16 @@ import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.
 const script = resolve(import.meta.dir, "../script/skills-acceptance.ts")
 const linuxTest = test.skipIf(process.platform !== "linux" || process.arch !== "x64")
 
-linuxTest.skipIf(!Bun.which("docker"))(
-  "live acceptance accepts saved OAuth before checking the installed image",
-  async () => {
+linuxTest.skipIf(!Bun.which("docker")).each([
+  { id: "default-translation", connection: undefined, error: "SKILLS_ACCEPTANCE_COMMAND_FAILED" },
+  {
+    id: "scenario-create",
+    connection: { url: "https://app.loginom.ai", username: "user", password: "private-loginom-password" },
+    error: "SKILLS_ACCEPTANCE_SCENARIO_CONNECTION_INVALID",
+  },
+])(
+  "live acceptance validates private OAuth and $id endpoint before checking the installed image",
+  async (testcase) => {
     const root = await mkdtemp(join(tmpdir(), "loginom-acceptance-oauth-"))
     try {
       const artifact = join(root, "artifact")
@@ -37,7 +44,7 @@ linuxTest.skipIf(!Bun.which("docker"))(
         sourceDirty: false,
         dependencies: {},
       })
-      const secrets = ["private-help-key", "private-oauth-access", "private-oauth-refresh"]
+      const secrets = ["private-help-key", "private-oauth-access", "private-oauth-refresh", "private-loginom-password"]
       const child = Bun.spawn(
         [
           process.execPath,
@@ -57,12 +64,15 @@ linuxTest.skipIf(!Bun.which("docker"))(
           "--models-path",
           resolve(import.meta.dir, "../../product/models.json"),
           "--cases",
-          "default-translation",
+          testcase.id,
+          "--package-container",
+          "unused-preflight-server",
         ],
         {
           stdin: new Blob([
             JSON.stringify({
               apiKey: secrets[0],
+              connection: testcase.connection,
               auth: {
                 type: "oauth",
                 access: secrets[1],
@@ -82,7 +92,7 @@ linuxTest.skipIf(!Bun.which("docker"))(
         new Response(child.stderr).text(),
       ])
       expect(code).not.toBe(0)
-      expect(stdout + stderr).toContain("SKILLS_ACCEPTANCE_COMMAND_FAILED")
+      expect(stdout + stderr).toContain(testcase.error)
       expect(stdout + stderr).not.toContain("SKILLS_ACCEPTANCE_PRIVATE_INPUT_INVALID")
       for (const secret of secrets) expect(stdout + stderr).not.toContain(secret)
       expect(await Bun.file(join(root, "results/conditions.json")).exists()).toBe(false)
@@ -100,6 +110,7 @@ linuxTest.each([
   ["desktop", "docs-no-input,docs-no-input", "SKILLS_ACCEPTANCE_DUPLICATE_CASE"],
   ["desktop", "not-in-corpus", "SKILLS_ACCEPTANCE_UNKNOWN_CASE"],
   ["run", "docs-external-unicode-path", "cli-manifest.json"],
+  ["run", "scenario-create", "cli-manifest.json"],
 ])("live acceptance validates %s case %s before creating results", async (interfaceName, cases, error) => {
   const root = await mkdtemp(join(tmpdir(), "loginom-acceptance-preflight-"))
   try {
