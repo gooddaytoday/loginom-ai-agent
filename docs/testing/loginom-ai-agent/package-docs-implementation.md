@@ -4116,6 +4116,26 @@ onboarding modal в accessibility tree, неподходящее наблюде�
 manual-quality с хэшами, настоящей Help, неизменным входом, Chromium0/remaining0.
 Открытие этих старых model-generated ссылок не приписывается QA.
 
+## 2026-10-07 — наблюдение процессов и сохранённый calculator3
+
+Implementation подпункт наблюдения этапа 8 отмечен выполненным. Desktop/CLI
+adapters запускают `/proc` observer до своего клиента/настройки, сохраняют
+PID/start-time/команды с user-data-dir и историю уже завершившихся потомков;
+запуски настоящего Chromium дополнительно фиксируются strace execve.
+Electron отделён от Loginom Chromium. Source observer regression входит в
+ранее выполненные31 PASS/110 assertions; критерий ожидает подтверждённое
+наблюдение, не фиксированную задержку. Полная installed/live матрица остаётся
+открытой; один implementation подпункт её не закрывает.
+
+Из прежних Desktop modify/attempt3 messages исправленный decoder также
+подтвердил20/40/50 и native save. Точная собственная серверная копия `.lgp`
+прочитана без открытия Loginom-клиента; source/calculator GUID и прямая связь
+проверены настоящим extractor. SHA256
+`ac3a4f66202802dafe4ff9a7082a7659567b8079b3c1728ec10f2ae12765b1f6`.
+Evidence `desktop-openai-modify-execute-bc6e7e164/scenario-modify/attempt-3/offline-parser-recovery`.
+Исходный FAIL сохранён; новой model attempt/recovery не было, cold reexecution
+не заявляется. Это дополняет отдельную offline-проверку attempt2.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
