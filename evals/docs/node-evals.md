@@ -77,4 +77,4 @@ bun script/check-node-artifacts.ts ./tasks/node-evals/crosstable-reconfigure <ev
 bun script/check-node-run.ts <runDir> crosstable-fixed-sum,crosstable-reconfigure,crosstable-sliding-average
 ```
 
-Вернуть VERDICT_BEN качества eval (ACCEPT/REJECT/BLOCKED), SHA, собственный расчёт, команды и product PASS/FAIL/ERROR с подтверждённым cleanup. Product FAIL допустим при ACCEPT качества измерения. Handoff и возврат остаются в LAB-16; status in_review ставит Rich после ACCEPT, done — человек.
+Вернуть VERDICT_BEN качества eval (ACCEPT/REJECT/BLOCKED), SHA, собственный расчёт, команды и product PASS/FAIL/ERROR с подтверждённым cleanup. Product FAIL допустим при ACCEPT качества измерения. Ben публикует один обычный итоговый комментарий без mentions в текущую ветку карточки; он автоматически будит лидера Evaler. Передачи этапов и статусы ведёт Evaler по [контракту оркестрации](evaler-orchestration.md); done остаётся человеку. Прежняя схема Rich → Ben → Rich сохранена только в исторических отчётах.
