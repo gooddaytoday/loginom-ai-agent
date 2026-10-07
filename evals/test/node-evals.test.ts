@@ -4,6 +4,15 @@ import os from "node:os"
 import { mkdtemp, rm } from "node:fs/promises"
 import { validateNodeAttempt, validateNodeRun } from "../src/node-evals"
 
+test("неизвестный case ID получает ERROR до проверки артефакта", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-unknown-case-"))
+  try {
+    await Bun.write(path.join(directory, "task.json"), JSON.stringify({ id: "crosstable-unregistered", checklist: [] }))
+    const result = await validateNodeAttempt(directory, directory)
+    expect(result.errors.join(" ")).toContain("unsupported node case")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 async function writeSummary(file: string, source: string) {
   await Bun.write(file, source)
   const summary = JSON.parse(source)
