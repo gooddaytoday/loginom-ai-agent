@@ -1,6 +1,6 @@
 /** Stage-0 diagnostic prototype only: no product bridge/admission/model preview changes.
  * Caller must independently open the exact package, read persisted wizard settings,
- * download current original server bytes, capture baseline process IDs BEFORE its
+ * obtain current original server bytes by the authorized native diagnostic path, capture baseline process IDs BEFORE its
  * native execute gesture, wait for completion, and open this exact output preview.
  * Initial preview cache changes fail closed; stabilize before a new audit.
  * No atomic server snapshot guarantee is claimed.
