@@ -722,7 +722,7 @@ CLI его не использует, отдельная V2-регистраци
   `host.settled()`/handshake больше не ждут сеть и loginBrowser. При этом
   `phase: ready` наступает только после чтения Help catalog. Бюджет 180 с в
   `node-client.ts` оставить верхней границей; сохранить восстановление URL как есть.
-- [ ] Разделить validation/save: успешный Help key позволяет сохранить настройки,
+- [x] Разделить validation/save: успешный Help key позволяет сохранить настройки,
   неудачный веб-вход даёт отдельное предупреждение. Обновить View/Validation
   и `settings-loginom-state.ts`, мастера обоих продуктов, готовность и
   `loginom status`: Help-ready и browser `unknown/verified/failed` показываются
