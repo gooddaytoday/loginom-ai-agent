@@ -404,3 +404,34 @@ PDF SHA256 `d0991e68c12c115d909289027e2bc08ab3866f4cc9f2f3d733d647f55fc95d6d`.
 сохранён harness failure, использован `/usr/bin/pdftoppm`. Продуктовый executor
 успешен до QA и не использует системный Python/Poppler. Это source-only proof;
 артефакты3ece/bc6 не relabelled, новый installed candidate ещё необходим.
+
+## Дополнительная QA сохранённых bc6 прогонов
+
+Все сохранённые положительные docs-кейсы bc6 теперь прочитаны: документы,
+полные финальные ответы и каждая PDF/Word страница. Desktop `.lgp`+PNG3/3
+PASS (7 страниц); CLI local-path3/3 PASS (7 страниц). CLI `.lgp`+PNG факты/
+mechanics3/3, layout2/3 (6 страниц): attempt1 воспроизводит тот же orphan label,
+по которому выполнен TDD fix выше. Его FAIL сохранён; final Markdown destination
+также имеет лишние пробелы внутри angle brackets, native click не заявляется.
+Из PNG не придуманы формулы, Python-код, цель ссылки или результаты выполнения.
+
+Desktopbc6 build→docs3/3 mechanics/facts/layout PASS: все6 PDF-страниц и оба
+ответа каждой попытки проверены. Первый ход построил, выполнил и сохранил
+SUM35/20; граф/source/grouping GUID и bytes подтверждены package-proof.
+Второй ход в том же Session ID документирует точную локальную копию пакета,
+читает настоящую Help, не вызывает browser tools/новый Chromium; input unchanged
+и remaining0. Отчёты отделяют названия узлов от отсутствующих детальных настроек
+группировки и численных результатов. Cold replay этих трёх пакетов не заявляется.
+
+Desktop negative missing/no-input/server3×3: правильный запрос локального `.lgp`,
+нет отчёта и ложного объявления готовности; applied docs activation/Chromium0/
+remaining0. CLI missing3/3 сохраняет exit1 и честно сообщает об отсутствующем
+файле. CLI external-path3/3 — безопасный отказ external_directory с подсказкой
+передать `--file`, исходный exit1 сохранён; это не успешная генерация документа.
+Обычные арифметика/перевод Desktop/CLI2×3×2 дают корректный ответ без выбора
+skill, отчёта или Chromium. Эти27 semantic receipts не закрывают остальные
+configured cases, где модель не запускалась из-за Help TLS.
+
+Повторный read-only direct health probe без изменения global proxy/environment
+также не получил HTTP: connection refused, exit7/HTTP000. Доступность Help не
+подтверждена; новые live/model attempts не запускались.

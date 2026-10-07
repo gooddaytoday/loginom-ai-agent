@@ -4180,6 +4180,23 @@ GREEN: PDF держит heading либо полностью жирную отд�
 Это source-only GREEN; уже принятые Linux артефакты3ece/bc6 не содержат fix.
 Для installed gate потребуется новый сохранённый candidate.
 
+## 2026-10-07 — завершение ручной QA сохранённых bc6 docs
+
+Все имеющиеся bc6 положительные документы/полные ответы просмотрены.
+Дополнительно: Desktop `.lgp`+PNG7 страниц PASS; CLI local-path7 страниц PASS;
+CLI `.lgp`+PNG6 страниц facts/mechanics PASS, layout2/3, ещё один исходный
+orphan label FAIL сохранён. Этот случай покрыт тем же source TDD fix.
+Desktop build→docs3/3:6 страниц и оба ответа каждого прогона PASS; один Session
+ID, физический собственный пакет/source/grouping GUID, SUM35/20, точная копия,
+docs Help/input unchanged/Chromium0/remaining0. Cold этих пакетов не заявляется.
+
+Проверены27 финальных ответов negative/default cases: Desktop missing/no-input/
+server3×3 просит локальный пакет; CLI missing/external-path сохраняет exit1,
+безопасный отказ и отсутствие ложного готового отчёта; арифметика/перевод3×2
+на Desktop/CLI без skill activation/Chromium/reports. Per-attempt receipts
+содержат исходные result hashes. Direct health без global proxy changes тоже
+отказал: connection refused, exit7/HTTP000. Полный живой gate остаётся открытым.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
