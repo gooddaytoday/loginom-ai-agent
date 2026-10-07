@@ -1,5 +1,24 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-07 — package-docs, изолированные кандидаты 0.1.17
+
+В `docs-no-browser` Desktop из `3ece19aff72f5d95f88347564bb61566029cae52`
+и CLI из `bc6e7e1648e211bcf411fbfd86564b950a2aaf75` прошли автономную
+установленную матрицу Ubuntu22/24/26, Debian12/13:5/5 каждый. Полные manifests,
+настоящий Chromium sandbox и запуск от обычного пользователя проверены;
+CLI install/status/uninstall сохраняет профиль. Все собственные контейнеры
+удалены, сеть отключена. Native Desktop открытие двух PDF, Word и Markdown
+прошло4/4 на новой AppImage через настоящий local-file IPC и просмотрщики.
+
+Сборки unsigned и не опубликованы; установленный launcher и профиль пользователя
+не менялись. Live матрица основной модели `openai/gpt-6.1-sol/medium` завершена
+с сохранёнными native/infra отказами; Help TLS сейчас недоступен. Полные
+corpus/TUI/cold/A-B gates остаются открытыми; Windows/macOS не проверялись.
+SHA256, исходные ошибки и границы доказательств:
+[отчёт приёмки](../testing/loginom-ai-agent/reports/2026-10-07-package-docs-openai-resume.md),
+[checkpoint](../testing/loginom-ai-agent/package-docs-implementation.md#checkpoint).
+Это не новый release PASS и не переустановка рабочей версии ниже.
+
 ## 2026-09-25 — scale-fix Desktop 0.1.16 установлен локально
 
 Из `scale-fix` commit `9b68f346d6784cd0a7ad65ee211a568810c78e91`

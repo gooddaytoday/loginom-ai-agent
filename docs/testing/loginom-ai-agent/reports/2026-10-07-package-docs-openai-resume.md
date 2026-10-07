@@ -1,7 +1,8 @@
 # Возобновлённая приёмка package-docs на OpenAI
 
 Статус: частичная приёмка; bc6 live-матрица завершена с native/infra отказами.
-Desktop3ece доставляет готовые документы, Linux-проверки продолжаются.
+Desktop3ece доставляет готовые документы; автономная Linux-матрица Desktop/CLI
+5/5 PASS для каждой сборки. Живые corpus/TUI/cold/A-B gates остаются открытыми.
 Основная модель: `openai/gpt-6.1-sol`, variant `medium`.
 Source первоначальных clean candidates: `c50d220c186a1ef0332b15c4a3e9fb1bc7e42efc`.
 
@@ -327,3 +328,55 @@ Source tests3 и regression17/55 assertions/typecheck PASS; эта провер�
 UI доставки не подменяет живой выбор skill и полную installed/model матрицу.
 Старый bc6 RED и промежуточные ошибки private probe сохранены отдельно.
 Linux matrix3ece, CLI/TUI и A/B gate остаются самостоятельными проверками.
+
+## Linux: новые Desktop и CLI, автономная приёмка
+
+Desktop из `3ece19aff72f5d95f88347564bb61566029cae52` и CLI из
+`bc6e7e1648e211bcf411fbfd86564b950a2aaf75` прошли Ubuntu 22/24/26,
+Debian 12/13: **5/5 PASS каждый**. Это отдельные установленные артефакты,
+не перенесённый результат прежней сборки253. App UI — единственное изменение
+продукта после bc6; SHA CLI не заменяется SHA последующих doc commits.
+
+Все контейнеры работали с `--network none`, без модели и Loginom endpoint.
+Desktop: прежний DEB удалён в собственном контейнере, точный новый DEB
+установлен через dpkg; настоящий Electron запущен от tester UID1200.
+Проверены полный resources manifest, onboarding/unconfigured, поля настроек
+и настоящий headless Chromium с sandbox. CLI: исходный архив распакован
+заново, выполнены profile-init/install/installed status/browser/uninstall;
+полный manifest, root:root4755 sandbox, сохранение profile sentinel и удаление
+launcher подтверждены. Штатный180s срок CLI не увеличивался. Все10 собственных
+контейнеров удалены после exit0. Установка и профиль пользователя не менялись.
+
+Evidence root:
+`/home/kiselev/.local/share/loginom-ai-agent-acceptance/package-docs-20261006`.
+В `desktop-3ece19aff-linux-matrix-v2/linux-matrix.json` сохранены artifact/source,
+пять immutable image IDs, removal и hashes smoke/controller;
+в `cli-bc6e7e164-linux-matrix/linux-matrix.json` — соответствующие CLI receipts,
+image IDs, manifest и hashes controller/driver. Проверки запускаются private
+контроллерами `run-desktop-3ece-linux-offline-v2.py` и
+`run-cli-bc6-linux-offline.py` через Python3; это зависимости тестирования,
+не установленного приложения. Их SHA256:
+`60591b3a99627133019c41adba6ef2b303e8a3baa87add81d57069097b83f5d3` и
+`172be20ab213e528a58c4d40b9bdfc68834d4c2d8d3820d6f115db73ded345d8`.
+CLI archive SHA256 `0f3f8397ce7babfcc66f6f502b5620f85207fc1df69859b1ece892d20c65e056`;
+manifest `afe9348fb5476cc522d685d3e568b0b47d40c142e005b72ffb21f40f41f708b6`.
+Desktop artifact hashes приведены выше и совпадают с matrix receipt.
+
+Первоначальный private Desktop builder некорректно передал raw image ID
+в Dockerfile FROM: Docker попытался загрузить `docker.io/library/sha256`.
+Этот harness FAIL сохранён; зависший собственный controller/Docker client
+завершён с проверкой PID/start-time, exit130 (`driver-abort.json`). Исправленный
+контроллер использовал `docker run` с immutable image ID и прошёл5/5.
+Это ошибка тестового запуска, не Desktop regression. Прежние CLI253 archive
+manifest180s FAIL остаются исходными FAIL; новая тихая offline матрица не
+доказывает их причину и не объявляет исправление производительности.
+
+CLIbc6 Word3/3: все6 страниц, полные тексты и финальные ответы проверены;
+mechanics/facts/layout PASS. Исходные DOCX при QA не изменялись. Markdown3/3:
+полные исходные документы и ответы прочитаны, mechanics/facts PASS; рендеринг
+страниц и native click не заявляются. Каждый manual-quality содержит hashes,
+настоящую Help, неизменный `.lgp`, Chromium0 и remaining0.
+
+Повторный bounded Help health probe вновь завершился TLS unexpected EOF,
+exit35/HTTP000 (`help-health-20261007-resume.json`). Новые live/model прогоны
+не начинались. Эти автономные и ручные проверки не закрывают этапы6–8 целиком.

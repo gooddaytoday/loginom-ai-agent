@@ -4136,15 +4136,34 @@ Evidence `desktop-openai-modify-execute-bc6e7e164/scenario-modify/attempt-3/offl
 Исходный FAIL сохранён; новой model attempt/recovery не было, cold reexecution
 не заявляется. Это дополняет отдельную offline-проверку attempt2.
 
+## 2026-10-07 — автономная Linux-матрица и CLI formats
+
+Desktop3ece установлен и запущен от UID1200 на Ubuntu22/24/26, Debian12/13:
+5/5 PASS. CLIbc6 из точного архива на тех же ОС:5/5 PASS, настоящий sandbox,
+полный manifest, install/status/uninstall и сохранение профиля. Сеть отключена;
+все10 собственных контейнеров удалены. Пользовательская установка не менялась.
+Evidence `desktop-3ece19aff-linux-matrix-v2/linux-matrix.json` и
+`cli-bc6e7e164-linux-matrix/linux-matrix.json` фиксирует точные артефакты,
+исходные SHA, immutable images и hashes drivers. Первоначальный Desktop
+Dockerfile FROM с raw image ID дал сохранённый harness FAIL; правильный
+docker run этого image ID прошёл. Прежние CLI253 timeout FAIL не переписаны.
+
+CLIbc6 Word3/3:6 страниц/полные тексты/ответы просмотрены, mechanics/facts/layout
+PASS; Markdown3/3 полностью прочитан, mechanics/facts PASS, без заявления
+page rendering/native click. Manual-quality содержит hashes и доказательства
+Help/input unchanged/Chromium0/remaining0. Повторный Help health probe —
+TLS unexpected EOF, exit35/HTTP000; новых live/model attempts нет.
+Подробности — в OpenAI resume report; full corpus/TUI/cold/A-B остаются открыты.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
-- Product253 и bc6 clean/manifest/static/CLI seed PASS; Linux253 Desktop5/5 PASS, CLI Ubuntu24/26/Debian12 PASS, Ubuntu22+Debian13 archive manifest180s FAIL сохранены. Desktop3ece clean/manifest/static PASS; собственная offline Linux matrix идёт.
+- Product253/bc6/3ece clean/manifest/static PASS. Offline installed Linux: Desktop3ece5/5, CLIbc65/5 PASS на Ubuntu22/24/26, Debian12/13; все containers removed. Исторические CLI253 Ubuntu22+Debian13 archive manifest180s FAIL сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node50 PASS/typecheck;253 Word6/6+MD6/6 PASS; Desktop attached-PDF attempt3 facts PASS/layout FAIL сохранён и воспроизведён RED→GREEN. Source PDF3 страницы и installedbc6 attached-PDF8 страниц просмотрены, fix PASS; native click открыт.
+- Docs Node50 PASS/typecheck;253 Word6/6+MD6/6 PASS; Desktop attached-PDF attempt3 layout FAIL сохранён/RED→GREEN. Source PDF3 и installedbc6 attached-PDF8 страниц просмотрены, fix PASS; Desktop3ece native delivery4/4 PASS.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
 - Scope/history/prompt/revert/docs: 200 PASS / 2 V2 SKIP; Host scope11 PASS; пять implementation подпунктов этапа 5 отмечены; installed переходы ещё открыты.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
@@ -4157,4 +4176,4 @@ Evidence `desktop-openai-modify-execute-bc6e7e164/scenario-modify/attempt-3/offl
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- RESUMED: bc6 corpus20×3 Desktop/CLI завершён с native/infra FAIL; Help TLS недоступен, новые live не запускать. Desktop3ece completed-document opening4/4 native PASS; UI3tests/17regression/typecheck PASS. Дополнительные bc6 Word6 страниц и MD3 проверены. Полная матрица/TUI/Linux5/A-B и холодные повторы открыты; результаты и ограничения — в OpenAI resume report.
+- RESUMED: bc6 corpus20×3 Desktop/CLI завершён с native/infra FAIL; Help TLS недоступен, новые live не запускать. Desktop3ece native opening4/4/UI17/typecheck PASS. Bc6 Desktop/CLI Word12 страниц и MD6 проверены. Полный corpus/TUI/cold/A-B открыты; evals ownership/stand — отдельные зависимости. Подробности в OpenAI resume report.
