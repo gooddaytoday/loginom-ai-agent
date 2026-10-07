@@ -3505,9 +3505,52 @@ Prettier PASS. Source checks не доказывают качество
 модельного текста. Следующий шаг — новый clean CLI candidate и исходный natural
 Word prompt×3 с полным facts/layout review; live GREEN пока не заявлен.
 
+## 2026-10-07 — clean bd0d candidates и текущая live-приёмка
+
+После уточнения графа оба кандидата построены с clean source
+`bd0d7abc2bd88717210bfd67453ce93b60d9b35c`, версия0.1.17 prod.
+CLI full archive/roundtrip/source verifier PASS: archive
+`1942856bcef27b22458ac40e8fef68e1557ebbf5457f5fad9d289255c70532a1`,
+source tree `12cf9747c9f0674df2fe5000e079a8bc6d4385a79e02224d12549d7308c28332`.
+Installed seed `sha256:b1b44dba423d4acdaaa9f4ca81e4260c53799177b5b027aa6386db320873af20`
+PASS: manifest bytes совпадают с payload, version0.1.17, sandbox root0:0:4755.
+Desktop full build/source archive/static DEB/AppImage PASS, по4654 ресурса:
+DEB `4e0234da814a915d9501840ef1cfbcee54e6af20c14c9c76ee86fc251a5a74e5`,
+AppImage `8b50a94758f0a84a26825b369f7d170f4348184059226d5aa5260d4150272805`,
+resources `6b17146008645b8b40ca1eefb10c2820d036ac73c808c61e025634c331d1d847`.
+Штатная DEB Linux5 matrix запущена с собственным prefix
+`loginom-package-docs-bd0d7abc2` и каталогом `desktop-bd0d7abc2-linux-matrix`.
+Она пока не завершена и не доказывает CLI Linux5 или native AppImage gate.
+
+Natural Word на CLIbd0d: attempt1 mechanics/facts/layout PASS; оба листа
+прочитаны и просмотрены после offline readonly-render в own Ubuntu24 image
+`sha256:8d4553ce9058f138e9092a5a00dc34f162cc96f0e3894b6c09e56ffa0f319034`.
+Изолированная подмодель отделена от цепочки, ложной линейности всего модуля
+нет; DerivedReference остаётся неизвестным, реальные handler Help reads есть.
+Attempt2/3 ещё выполняются; общий Word3/3 GREEN не заявлен. Новый Desktopbd0d
+Word×3 также запущен. Evidence — `*-canonical-word-bd0d7abc2/`.
+
+Первый Desktop external-path091 snapshot завершился **3/3 adapter FAIL** до
+модельного запроса из-за неверного ожидания onboarding после configured reload;
+cleanup каждого attempt remaining0. Исправленный snapshot `*-external-path-091103ef9-v2`
+attempt1 **mechanics/facts/layout/GUI permission PASS**. Оригинальный файл без
+вложения находится вне workspace, три настоящих external_directory prompts
+для extract/skeleton/emit одобрены кнопкой «Разрешить один раз» в своей GUI
+сессии. Просмотрены screenshot первого prompt и оба листа PDF; SHA исходного
+пакета/документа неизменны, Chromium0 и remaining0. Attempt2/3 ещё идут.
+Повтор не стирает историю первого failed adapter. Product permission rules
+ради теста не расширялись.
+
+Соседняя calibration сессия проверена read-only compact snapshot: последний
+turn завершён, но последний отчёт явно говорит, что live judge после XML guard
+не повторялся. Это не доказательство принятой новой live-калибровки. Владение
+harness по-прежнему требует согласованной отдельной задачи; сообщения,
+редактирование чужого worktree/профилей/.env и A/B не выполнялись.
+Требования плана не менялись; новые абстракции или настройки продукта не добавлены.
+
 ## Checkpoint
 
-- Product candidates: Desktop/CLI `091103ef9`, clean full builds/manifests/static/installed CLI seed PASS; предыдущие candidates сохранены.
+- Product candidates: Desktop/CLI `bd0d7abc2`, clean full builds/manifests/static/installed CLI seed PASS; предыдущие candidates сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -3526,4 +3569,4 @@ Word prompt×3 с полным facts/layout review; live GREEN пока не з�
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- Далее: Desktop external-path live; linear3 Word RED; CLI cleanup signal; полный20 routing/installed переходы/CLI matrix. Exact-attachment model2 CLI0913/3 quality PASS; A/B ждёт owner; план заморожен.
+- Далее: Wordbd0d и external Desktop091 повторы2/3, DEB Linux5 matrix; затем полный20/installed переходы/CLI matrix и cleanup signal. Exact-attachment model2 CLI0913/3 quality PASS; A/B ждёт owner; план заморожен.
