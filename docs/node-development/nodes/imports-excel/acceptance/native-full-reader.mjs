@@ -6,7 +6,7 @@
  * No atomic server snapshot guarantee is claimed.
  */
 export async function readFullNative(page, binding) {
- if (!binding || !/^MF;TF-\d+$/.test(binding.prefix) || !binding.nodeId || !binding.portGuid
+ if (!binding || !/^MF;TF(?:-\d+)?$/.test(binding.prefix) || !binding.nodeId || !binding.portGuid
      || !binding.packagePath?.startsWith('/') || !Array.isArray(binding.baseline)
      || !Number.isInteger(binding.rowCount) || binding.rowCount < 0 || !Array.isArray(binding.schema))
    throw Error('EXACT_DIAGNOSTIC_BINDING_REQUIRED');

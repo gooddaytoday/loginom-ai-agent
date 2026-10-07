@@ -63,7 +63,8 @@ def compare(actual, expected, node_id):
     assert actual['port'] == 0, 'WRONG_PORT'
     assert actual['execution']['status'] == 3 and actual['execution']['error'] == ''
     assert actual['binding_rechecked'] is True
-    assert actual['coverage'] == dict(rows=20789, cells=103945, complete=True, ordered=True)
+    assert actual['coverage'] == dict(rows=expected['row_count'],
+        cells=expected['row_count'] * len(expected['schema']), complete=True, ordered=True)
     assert actual['row_count'] == expected['row_count']
     assert actual['schema'] == expected['schema'], 'SCHEMA_MISMATCH'
     assert len(actual['rows']) == len(expected['rows']), 'MISSING_ROWS'
@@ -79,6 +80,8 @@ def main():
     parser.add_argument('--fixtures', type=Path, default=ROOT / 'fixtures')
     parser.add_argument('--actual', type=Path, action='append', default=[])
     parser.add_argument('--node-id')
+    parser.add_argument('--case-bindings', type=Path,
+        help='Independent list of {case, node_id, actual}; paths relative to binding file')
     parser.add_argument('--server-source', type=Path, action='append', default=[])
     args = parser.parse_args()
     manifest = verify_fixtures(args.fixtures)
@@ -88,7 +91,14 @@ def main():
     for path in args.actual:
         assert args.node_id, 'EXACT_NODE_REQUIRED'
         compare(json.loads(path.read_text()), expected, args.node_id)
-    print(json.dumps({'status': 'PASS', 'fixtures': len(manifest['files']),
+    small_audits = 0
+    if args.case_bindings:
+        cases = json.loads((ROOT / 'expected-small-cases.json').read_text())
+        for binding in json.loads(args.case_bindings.read_text()):
+            actual_path = args.case_bindings.parent / binding['actual']
+            compare(json.loads(actual_path.read_text()), cases[binding['case']], binding['node_id'])
+            small_audits += 1
+    print(json.dumps({'status': 'PASS', 'small_audits': small_audits, 'fixtures': len(manifest['files']),
                       'audits': len(args.actual), 'rows_per_audit': 20789,
                       'cells_per_audit': 103945, 'server_sources': len(args.server_source)}))
 
