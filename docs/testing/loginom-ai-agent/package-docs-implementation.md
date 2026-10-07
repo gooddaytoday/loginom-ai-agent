@@ -2468,9 +2468,27 @@ Logs `cli-global-diagnostic-{source-green,matrix-source-green,run-source-green,t
 Native исправление ещё требует новой чистой сборки; native RED из прежнего binary
 не объявляется GREEN по одним source tests. Desktop/TUI consumers не менялись.
 
+## Native CLI diagnostics GREEN: `6cfda621f`
+
+Новая полная clean сборка, archive roundtrip, manifest verification и checksum
+**PASS**. Source `6cfda621f830db948ced6aac602bfb717b8e2e61`, tree SHA-256
+`045266116220e5a2239b5c14005499659cdc39fe9819556bd8d1f23531221126`,
+`sourceDirty: false`; pins prod 0.1.17 / Bun 1.3.14 / Node 24.19.0 неизменны.
+Archive SHA-256 `8d3946036622a10d3ee7119f3f6cc81a23e86ee3fde2f1bed9c4b3b727188abe`.
+Candidate `candidate-6cfda621f-cli/`; logs `cli-6cfda621f-{build,verified}.log/json`.
+
+Native public discovery matrix **7 PASS / 115 assertions**, включая stderr
+diagnostics для canonical/obsolete skills, config-команд и bad bundle. Healthy
+cases exit 0, повреждения exit 1 без fallback, wrong root отвергнут до модели;
+JSON stdout разобран без warning records, writer released. RED `a8912ccbd` →
+GREEN `6cfda621f` на неизменных assertions. Evidence
+`cli-6cfda621f-diagnostic-green/` и одноимённый `.log`.
+Модель scripted; TS runner не выполняет процессную выборку. Desktop/TUI
+user-facing диагностики этой серией не проверяются; весь этап 3 ещё открыт.
+
 ## Checkpoint
 
-- Product candidates: Desktop `aeef6c2c3`, CLI `a8912ccbd`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef; разные source pins.
+- Product candidates: Desktop `aeef6c2c3`, CLI `6cfda621f`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef; разные source pins.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–2 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -2486,6 +2504,6 @@ Native исправление ещё требует новой чистой сб
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
-- CLI `.lgp`: 94 PASS / 1 SKIP; CLIa891 discovery 7 PASS и pipeline/permissions 5 PASS; clean HOME CLI938 PTY 4 PASS, read path GREEN; TUI suite 197 PASS / 1 SKIP; CLI diagnostics source GREEN, native RED до новой сборки.
+- CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cfd discovery/diagnostics 7 PASS, CLIa891 pipeline/permissions 5 PASS; clean HOME CLI938 PTY 4 PASS, read path GREEN; TUI suite 197 PASS / 1 SKIP; Desktop diagnostics ещё не приняты.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUIaeef 5 permissions cases PASS; TUI typecheck PASS; report/corpus/evals и остальные Linux gates открыты.
