@@ -2,7 +2,7 @@
 
 Статус: частичная приёмка; обязательная матрица ещё выполняется.
 Основная модель: `openai/gpt-6.1-sol`, variant `medium`.
-Source обоих clean candidates: `c50d220c186a1ef0332b15c4a3e9fb1bc7e42efc`.
+Source первоначальных clean candidates: `c50d220c186a1ef0332b15c4a3e9fb1bc7e42efc`.
 
 CLI archive SHA-256:
 `cef60cbddcb8ea2794fb43adaf66b212bc448c8256203c24cfd2ccfd1808d852`.
@@ -59,6 +59,36 @@ CLI negative batch прерван exit143; уже начатый own конте�
 mechanics PASS (CLI exit1 ожидаем при ошибке отсутствующего файла); остальная
 матрица не выполнена. Причина прекращения родителя не установлена. Сценарные и
 многоходовые кейсы требуют отдельных адаптеров и этим запуском не покрываются.
+
+## Исправление выбора без локального файла: 2530143dd
+
+После server-reference FAIL в Desktop c50d bootstrap требует активации
+`package-docs` и для отсутствующего файла, отсутствующего входа или только
+серверного пути. Новые clean Desktop/CLI имеют source
+`2530143dd70f3b87ac80a0d294d03b9856bd5253`; их manifest, source archive,
+ресурсы и installed CLI seed проверены отдельно в журнале реализации.
+
+| Кейс | Desktop | Standalone CLI run |
+| --- | --- | --- |
+| `docs-missing-file` | 3/3 PASS | 3/3 PASS; exit1 после ошибки отсутствующего файла |
+| `docs-no-input` | 3/3 PASS | 3/3 PASS |
+| `docs-current-server-package` | 3/3 PASS | 3/3 PASS |
+
+Все 18 финальных ответов полностью прочитаны: агент просит существующий
+локальный `.lgp`, честно сообщает отсутствие документа, серверный путь
+не использует как локальный вход. Фактическая activation/digest подтверждена
+в каждом случае; Chromium0, reports0, remaining processes0. Отдельные
+`manual-quality.json` закрепляют SHA результата и условия каждого повтора.
+Evidence: `cli-openai-negative-2530143dd` и
+`desktop-openai-negative-2530143dd-v2` в общем собственном acceptance root.
+Модель и frozen catalog прежние: `openai/gpt-6.1-sol/medium`.
+
+Первый запуск Desktop отказал до модельного хода: добавленный внешний
+`strace -f` конфликтовал с внутренним `strace` Electron. Причина воспроизведена
+на вложенных strace с `/bin/true` (`PTRACE_TRACEME: Operation not permitted`).
+Сохранён `launch-failure.json`; v2 трассирует только родительский процесс,
+внутренняя трассировка и продуктовые байты не менялись. Live RED c50d → GREEN
+2530143dd для выбора skill закрыт. Полная обязательная матрица остаётся открытой.
 
 ## Воспроизводимость и границы
 

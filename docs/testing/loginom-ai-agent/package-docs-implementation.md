@@ -3794,10 +3794,28 @@ OpenAI6.1 medium/catalog/corpus, output `*-openai-negative-2530143dd`.
 Родительские сигналы пишутся в отдельные traces. Live GREEN ещё не объявлен;
 c50d документы/установки остаются результатами своей сборки.
 
+## 2026-10-07 — live GREEN выбора без локального файла
+
+На clean 2530143dd завершены missing-file/no-input/server-reference ×3
+через Desktop и standalone CLI: 18/18 PASS. Все финальные ответы прочитаны,
+activation/digest подтверждены; запрошен существующий локальный `.lgp`,
+Chromium0, reports0, remaining0. CLI exit1 при NotFound сохранён как
+ожидаемый негативный исход, не как созданный документ. По каждому повтору
+записан manual-quality receipt с source/model/result SHA.
+Evidence `cli-openai-negative-2530143dd` и
+`desktop-openai-negative-2530143dd-v2` собственного acceptance root.
+Первый Desktop отказал до модели из-за nested strace; воспроизведение
+с `/bin/true` подтвердило PTRACE_TRACEME refusal. V2 убирает только `-f`
+у внешнего наблюдателя сигналов. Product bytes и внутренний trace не менялись.
+Source RED c50d server-reference → live GREEN 2530143dd закрыт;
+старые неполные/failed прогоны сохранены. Полный corpus20 остаётся открытым.
+Запущены Linux5 offline installed матрицы новой сборки Desktop и CLI;
+их незавершённые результаты пока не объявляются принятыми.
+
 ## Checkpoint
 
-- Resume c50d/OpenAI6.1 medium: formats9/9 на Desktop и CLI facts/layout PASS (MD source read), Desktop local-path3/3 PASS; routing частично прерван exit143; server negative2/3 PASS, attempt3 FAIL на выборе; 2530143dd negative×3 ждёт live GREEN. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
-- Product candidates: Desktop/CLI `c50d220c1`, clean full builds/manifests/static/installed CLI seed PASS; Desktop Ubuntu22/24 installed PASS; CLI Ubuntu22 native installer PASS; прежние candidates сохранены.
+- Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
+- Product candidates: 2530143dd clean Desktop/CLI builds/manifests/static/installed CLI seed PASS; новые Linux5 матрицы выполняются. c50d Desktop Ubuntu22/24/26 и CLI Ubuntu22 native PASS сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -3815,4 +3833,4 @@ c50d документы/установки остаются результата
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- RESUMED по явной просьбе владельца: c50d, OpenAI gpt-6.1-sol/medium, formats×3 Desktop/CLI запущены; natural quality/полный20/installed переходы/Linux5/A-B открыты; план заморожен.
+- RESUMED по явной просьбе владельца: frozen план сохраняется; compound/transitions/corpus20/TUI/Linux5/A-B ещё открыты; CLI scenario-create adapter проходит отдельный TDD цикл.
