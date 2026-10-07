@@ -3071,6 +3071,18 @@ PASS; `docs-hyphen-list-{red,green}.log`, `host-hyphen-list-typecheck.log`.
 Порог проверки качества сохранён; новая сборка и live приёмка после исправления
 ещё нужны. Требования основного плана не пересматриваются.
 
+Перед новым общим build публичный Node CLI повторно обработал точный сохранённый
+неудачный черновик CLI70: PDF и DOCX по три раза, **6/6 PASS**, нумерация 1/2,
+exit0/empty stderr, неизменный LGP SHA. Evidence:
+`pdf-numbering-public-green-fb9b2e396/{build,results}.json` и готовые документы.
+Это source bundle с исправлением, не новый установленный candidate.
+
+Docker matrix runner принимает необязательный собственный `--image-prefix`;
+прежний default сохранён. Linux runbook описывает отдельный output/tag и
+сохранение чужих images. Desktop `bun typecheck` PASS. Диагностический installed
+DEB70 Ubuntu22 прогон запущен с `loginom-package-docs-70a2d5a93:ubuntu22`;
+его результат пока не принят, полная Linux матрица остаётся открытой.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `70a2d5a93`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.

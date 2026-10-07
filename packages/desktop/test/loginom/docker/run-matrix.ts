@@ -7,12 +7,17 @@ import { createHash } from "node:crypto"
 
 const args = parseArgs({
   args: process.argv.slice(2),
-  options: { artifact: { type: "string" }, output: { type: "string" }, only: { type: "string" } },
+  options: {
+    artifact: { type: "string" },
+    output: { type: "string" },
+    only: { type: "string" },
+    "image-prefix": { type: "string" },
+  },
   strict: true,
 }).values
 if (!args.artifact || !args.output)
   throw Error(
-    "Required: --artifact <deb> --output <report-directory> [--only ubuntu22|ubuntu24|ubuntu26|debian12|debian13]",
+    "Required: --artifact <deb> --output <report-directory> [--only ubuntu22|ubuntu24|ubuntu26|debian12|debian13] [--image-prefix <own-prefix>]",
   )
 const targets = {
   ubuntu22: "ubuntu:22.04",
@@ -34,7 +39,7 @@ try {
   await copyFile(join(import.meta.dir, "Dockerfile"), join(context, "Dockerfile"))
   for (const [name, base] of Object.entries(targets)) {
     if (args.only && args.only !== name) continue
-    const image = `loginom-agent-linux:${name}`
+    const image = `${args["image-prefix"] ?? "loginom-agent-linux"}:${name}`
     const buildLog = openSync(join(output, `${name}-build.log`), "w")
     const build = Bun.spawn(["docker", "build", "--build-arg", `BASE=${base}`, "--tag", image, context], {
       stdout: buildLog,
