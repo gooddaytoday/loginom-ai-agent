@@ -208,3 +208,17 @@ GUID и прямая связь; холодное выполнение ещё н
 ответы полностью прочитаны. Test adapter15 PASS/55, typecheck/Prettier PASS.
 CLI positive253 batch также завершён exit0/18 mechanics; QA последних
 LGP+PNG и external-path отчётов продолжается, Desktop positive ещё идёт.
+
+## Завершение positive QA253
+
+Обе серии завершились exit0/18 mechanics. LGP+PNG через каждый интерфейс и
+Desktop external-path3/3 приняты после просмотра всех18 дополнительных страниц
+и чтения финальных ответов. CLI external-path3/3 даёт штатный permission refusal
+с `--file` в фактической ошибке, без отчёта. Все33 документа и3 отказа проверены;
+один исходный Desktop attached-PDF layout FAIL сохранён. Click verification
+ссылок остаётся открытой. Новый чистый CLIbc6 собран/manifest/source PASS;
+Desktopbc6 построен, manifest/static DEB/AppImage PASS после установки
+закреплённого Electron dependency. Новые артефакты ещё не приняты installed/live.
+Linux253: Desktop Ubuntu22/24/26, CLI Ubuntu24/26/Debian12 PASS, Ubuntu22 CLI
+исходный180s FAIL; остальные дистрибутивы ещё идут. Desktop/CLI docs-after-build
+проверяются отдельными адаптерами в собственной инфраструктуре.

@@ -3920,10 +3920,40 @@ CLI positive253 завершился exit0: все18 mechanics receipts сохр
 QA последних LGP+PNG и внешних путей ещё выполняется; Desktop batch продолжается.
 Испытуемые253 не включают последующее исправление пагинации из244fe6ab7.
 
+
+## 2026-10-07 — завершение QA253 и новая чистая сборка
+
+CLI и Desktop positive batches завершились exit0, по18 mechanics receipts.
+LGP+PNG3/3 через каждый интерфейс и Desktop external-path3/3 приняты:
+все18 дополнительных PDF-страниц просмотрены, полные ответы прочитаны,
+факты сверены с fixture, настоящая Help прочитана, Chromium0/remaining0.
+CLI external-path3/3 — ожидаемый permission refusal, exit1: error содержит
+подсказку `--file`, reports0, пакет неизменен. Финальный текст модели сам
+подсказку не содержит; это не результат документирования. Individual receipts
+сохранены, исходные результаты и один Desktop layout FAIL не заменены.
+Итого QA36 взаимодействий:33 документа и3 штатных отказа CLI; общий gate
+не закрывается из-за исходного PDF layout FAIL и открытых переходов.
+
+Новый собственный managed worktree `docs-build` закреплён на чистом
+`bc6e7e1648e211bcf411fbfd86564b950a2aaf75`. CLI с pagination fix собран,
+архив/manifest/source verification PASS. Первая попытка не имела client npm
+зависимостей; установлены по lockfile, исходники не менялись. Desktop артефакты
+собраны; manifest первоначально отказал из-за отсутствующего dependency
+Electron executable. Закреплённый Electron42.3.3 установлен; manifest и static verification
+DEB/AppImage PASS. Установка/live новой сборки пока не заявляются.
+
+Linux253: Desktop Ubuntu22/24/26 и CLI Ubuntu24/26/Debian12 PASS.
+CLI Ubuntu22 исходный180s FAIL сохранён; Debian13 и Desktop Debian идут.
+TDD multi-turn adapters начаты независимо от evals: первый Desktop ход
+создал пакет SUM и подтвердил35/20; второй документирует локальную копию
+того же пакета в той же сессии. CLI adapter использует `--session` и передаёт
+только точный собственный пакет через parent/container bridge; live идёт.
+Переход и полный corpus gate ещё не приняты.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
-- Product candidates253 clean/manifest/static/CLI seed PASS; Linux5 идут: Desktop Ubuntu22/24 PASS, CLI Ubuntu24/26 PASS, Ubuntu22 native180s FAIL сохранён. PDF pagination исправлен source-only; новая сборка ещё нужна.
+- Product candidates253 clean/manifest/static/CLI seed PASS; Linux5 идут: Desktop Ubuntu22/24/26 PASS, CLI Ubuntu24/26/Debian12 PASS, Ubuntu22 native180s FAIL сохранён. CLI/Desktopbc6 source/manifest/static PASS; installed fix ещё открыт.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -3941,4 +3971,4 @@ QA последних LGP+PNG и внешних путей ещё выполня
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- RESUMED: Desktop/CLI default30/30 PASS; CLI local scenario-create2/3 PASS+1 UI_EPOCH_CHANGED FAIL; Desktop scenario3/3 PASS, физические GUID/link сохранены, remaining0. Cold/compound/transitions/corpus20/TUI/Linux5/A-B открыты.
+- RESUMED: QA36:33 docs+3 CLI denials, один исходный layout FAIL; Desktop/CLI default30/30 PASS; CLI local scenario-create2/3 PASS+1 UI_EPOCH_CHANGED FAIL; Desktop scenario3/3 PASS, физические GUID/link сохранены, remaining0. Cold/compound/transitions/corpus20/TUI/Linux5/A-B открыты.
