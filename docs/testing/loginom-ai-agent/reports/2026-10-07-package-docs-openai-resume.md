@@ -21,8 +21,8 @@ Models snapshot:
 | Кейс | Desktop | Standalone CLI run |
 | --- | --- | --- |
 | `docs-attached-pdf` | 3/3 mechanics, facts, layout PASS; 9 страниц просмотрены | 3/3 mechanics, facts, layout PASS; 6 страниц просмотрены |
-| `docs-attached-word` | выполняется; первый отчёт: facts/layout PASS, обе страницы просмотрены | выполняется |
-| `docs-markdown` | ожидает предыдущие кейсы | ожидает предыдущие кейсы |
+| `docs-attached-word` | 3/3 mechanics, facts, layout PASS; 6 страниц просмотрены | первый прогон PASS, обе страницы просмотрены; остальные выполняются |
+| `docs-markdown` | 3/3 mechanics, facts PASS; весь Markdown прочитан | ожидает предыдущие кейсы |
 
 Проверенные PDF сохраняют версию 7.4.0, модуль «Демо», шесть узлов, две
 подмодели, глубину три и единственную связь Источник → Калькулятор. `data.lgd`
@@ -33,6 +33,19 @@ Models snapshot:
 сохранили исходный SHA; docs не запускал Chromium и не оставил своих процессов.
 Каждый PDF имеет отдельный `manual-quality.json` с hashes документа и страниц.
 Проверка mechanics сама по себе не заменяет ручную проверку фактов и страниц.
+
+Desktop formats driver завершился exit0, failures пуст. По каждому из девяти
+прогонов сохранён отдельный manual-quality receipt; просмотрены 15 страниц
+PDF/Word и прочитаны все три Markdown. Для Markdown проверены исходный текст
+и структура, визуальный рендер страниц не заявляется. Дополнительно CLI Word
+attempt1 PASS с двумя просмотренными страницами. Проверка acceptance runner
+после возобновления: 8 PASS / 35 assertions, pinned Node24.19.0.
+
+В новом `desktop-openai-routing-c50d220c1-resume` начаты ×3 остальные
+11 single-turn кейсов: local path, LGP+PNG, внешний путь, отсутствующий файл,
+отсутствие входа, только серверная ссылка и пять default-кейсов. Условия
+модели/catalog/candidate сохранены; результаты ещё не приняты. Сценарные и
+многоходовые кейсы требуют отдельных адаптеров и этим запуском не покрываются.
 
 ## Воспроизводимость и границы
 
@@ -54,8 +67,12 @@ Word рендерится отдельным контейнером без се�
 Проверяется неизменность DOCX после рендера. LibreOffice/Python не являются
 зависимостями продукта: продуктовые генераторы работают на bundled Node.
 
-Ubuntu22 installed Desktop ранее прошёл offline smoke c50d; Ubuntu24 сейчас
-выполняется. Отдельная CLI matrix Ubuntu22/24/26, Debian12/13 использует
+Ubuntu22 installed Desktop ранее прошёл offline smoke c50d. Ubuntu24 и первый
+CLI Ubuntu22 build завершились exit143 во время apt install, до smoke. Причина
+не установлена, логи и `matrix-interrupted-20261007-resume.json` сохранены;
+images и installed results не получены, PASS не заявляется. Для Ubuntu24 начата
+одна последовательная v2 сборка с process/signal trace в новом каталоге.
+Отдельная CLI matrix Ubuntu22/24/26, Debian12/13 использует
 существующий `test/cli-install-native.mjs`, сохранённый archive и собственные
 images/каталоги: установку UID1200, root:root/4755 sandbox, настоящий Chromium,
 uninstall и сохранность profile sentinel. Общий Linux gate пока открыт.

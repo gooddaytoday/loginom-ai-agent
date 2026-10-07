@@ -3713,6 +3713,7 @@ OpenAI gpt-6.1-sol/medium, проверить стенд и новый immutable
 
 ## Checkpoint
 
+- Resume c50d/OpenAI6.1 medium: Desktop formats9/9 facts/layout PASS (MD source read), CLI PDF3/3 и Word1 PASS; Desktop routing11×3 и остальные CLI formats выполняются. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
 - Product candidates: Desktop/CLI `c50d220c1`, clean full builds/manifests/static/installed CLI seed PASS; Ubuntu22 installed PASS; прежние candidates сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
@@ -3725,7 +3726,6 @@ OpenAI gpt-6.1-sol/medium, проверить стенд и новый immutable
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
 - Полный Host 238 PASS / 7 SKIP; acceptance adapters8 PASS/35, OAuth/medium/catalog, typecheck PASS; Agent history/tools/registry30 PASS.
-- Старый package_docs/Python тест заменён actual bundled flow/Node executor без Host call/admit.
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
