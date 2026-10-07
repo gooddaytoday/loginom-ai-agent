@@ -366,8 +366,8 @@ test("multipage PDF retains every paragraph across page boundaries", async () =>
     .toBe(("Многостраничный отчёт" + paragraphs.join("")).replace(/\s+/g, ""))
 })
 
-test("PDF and DOCX keep ordered submodel numbers across blank lines and nested bullets", async () => {
-  const markdown = "# Подмодели\n\n1. Первая модель\n   * Вход первой модели\n\n2. Вторая модель\n   * Вход второй модели\n"
+test.each(["*", "-", "+"])("PDF and DOCX keep ordered submodel numbers across nested %s bullets", async (marker) => {
+  const markdown = `# Подмодели\n\n1. Первая модель\n   ${marker} Вход первой модели\n\n2. Вторая модель\n   ${marker} Вход второй модели\n`
   expect(pdfText(await renderReport(markdown, "pdf", fonts)).join(" ").replace(/\s+/g, " ")).toContain("2. Вторая модель")
   const zip = new ZipReader(new Uint8ArrayReader(await renderReport(markdown, "docx")), { useWebWorkers: false })
   try {

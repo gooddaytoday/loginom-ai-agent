@@ -3013,14 +3013,72 @@ native Electron sandbox. Process sampling 25 ms и cleanup — в
 `desktop-67-cold-discovery/{result,processes,roots}.json`; test root удалён.
 Это не model routing/полный отчёт/installed DEB приёмка.
 
+## Общий source pin 70a2d5a93: статистические группы и реальный Desktop
+
+CLI и Desktop собраны на clean source
+`70a2d5a93ba9a4d6a0292528893227e045b4c0ed`, prod 0.1.17, Node 24.19.0.
+CLI tree `07096167dd15c0e5d5d313283d4cd81c8a5f6927f5d4efce414b954e65e3fd24`,
+archive `21c6460c31105f1f813e70d2a60b61d2f26c4e6c1ad230bcc1f0c46d2380cbbb`;
+полный archive/roundtrip/source verification PASS. Desktop static DEB/AppImage
+**4654 resources PASS**; resource manifest
+`c2fe6d0e82f1039b94310631ff7504f0d06949423ff14506e24ca557ae114d00`.
+
+| Desktop artifact | SHA-256 |
+| --- | --- |
+| AppImage | `f56ae105a89efd3cc3b9f2495f2ae685d07abe667c67e88c253d2011921d865c` |
+| DEB | `03e99c2d8250618c9107db74e7fe3812dbacaf9ea3fcdef83898c3456b3f1e66` |
+| Source archive | `aaf49186c24c3fedf207fa7182f925e6e23f1ab98be17626fff212ce19d8e389` |
+
+CLI PDF: **3/3 mechanics/Help B/facts PASS**, 144.828 / 122.791 / 159.948 s,
+Chromium exec0, исходный input SHA неизменён. Все шесть PDF страниц просмотрены.
+Layout **2/3 PASS**: второй документ показывает подмодели как 1/1 вместо 1/2
+из-за вложенных `-` bullets. Facts guidance прошёл эту серию, но весь live gate
+остаётся FAIL. Evidence: `cli-live-pdf-70a2d5a93/attempt-*/`, отдельные narrow
+и `manual-facts-verification.json`; три собственных контейнера удалены.
+
+Native Desktop AppImage: **3/3 mechanics/Help B/facts/layout PASS**,
+118.300 / 165.338 / 199.245 s. Основная модель/variant/fixture/prompt те же;
+отдельные HOME/workspace/profile, UID 1001, Xvfb, Electron sandbox включён.
+Вложения и естественные запросы переданы настоящему Desktop backend через
+HTTP; это не проверка живого GUI composer или всего корпуса. Выбран
+`package-docs`, один PDF на попытку, исходный input неизменён, Chromium exec0
+после начала модельной работы. Все шесть PDF страниц просмотрены;
+process census/cleanup: remaining0, собственные временные roots удалены.
+Evidence: `desktop-live-routing-extracted-70a2d5a93/`, conditions,
+messages/result, process trace/census/cleanup и manual review JSON.
+
+Первый Desktop driver с strace поверх FUSE AppImage завершился до Electron:
+fusermount exit1, AppImage exit127, модель не запускалась. Сохранился собственный
+пустой test root из `roots.json`; его cleanup не подтверждён. Принятая серия
+использует разрешённый Linux runbook `APPIMAGE_EXTRACT_AND_RUN=1` и тот же
+AppImage, без отключения sandbox. Первоначальная ошибка не скрыта и не
+приписывается модели. CLI первый build остановился на отсутствующем parent
+directory; после создания своего parent полная сборка прошла, оба logs сохранены.
+
+## PDF/DOCX: вложенные Markdown bullets, TDD
+
+Сохранённый CLI70 layout RED изолирован на immutable Node bundle: вложенный
+`-` превращался в обычный абзац и сбрасывал счётчик внешнего списка.
+Минимальный пример даёт 1/1 **3/3** в PDF и DOCX, в том числе через публичный
+Node `emit`; exit0 не означал правильную нумерацию. Контроль со `*` — **3/3 PASS**.
+Evidence: `pdf-numbering-signal-70a2d5a93-collector/`.
+
+Сначала существующий регрессионный тест расширен на `*`, `-`, `+`:
+**1 PASS / 2 FAIL**, фактические PDF text и DOCX XML показывают 1/1.
+Затем одна строка parser принимает все три Markdown bullet markers.
+Полный Node pipeline suite **45 PASS / 173 assertions**, Host `bun typecheck`
+PASS; `docs-hyphen-list-{red,green}.log`, `host-hyphen-list-typecheck.log`.
+Порог проверки качества сохранён; новая сборка и live приёмка после исправления
+ещё нужны. Требования основного плана не пересматриваются.
+
 ## Checkpoint
 
-- Product candidates: Desktop/CLI `67c3898c3`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.
+- Product candidates: Desktop/CLI `70a2d5a93`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node pipeline43/catalog21/integrity9 PASS; CLI67 PDF 3/3 mechanics/layout, 2/3 facts FAIL; statistical type grouping требует guidance fix. Обычные CLI704 cases 2×3 PASS.
+- Docs Node pipeline45/catalog26/integrity9 PASS; CLI70 PDF facts3/3, layout2/3 FAIL, nested bullet fix source GREEN; Desktop70 backend PDF3/3 полный PASS. Обычные CLI704 cases 2×3 PASS.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
 - Scope/history/prompt/revert/docs: 200 PASS / 2 V2 SKIP; Host scope11 PASS; пять implementation подпунктов этапа 5 отмечены; installed переходы ещё открыты.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
@@ -3034,4 +3092,4 @@ native Electron sandbox. Process sampling 25 ms и cleanup — в
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- Далее: statistical grouping guidance RED→GREEN, полный facts/routing gate и installed переходы; A/B ждёт согласованной harness задачи из handoff. Требования плана не перерабатывать.
+- Далее: clean candidate с bullet fix, полный routing gate и installed переходы; A/B ждёт согласованной harness задачи из handoff. Требования плана не перерабатывать.

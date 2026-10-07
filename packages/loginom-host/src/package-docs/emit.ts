@@ -44,7 +44,7 @@ function parseBlocks(markdown: string) {
       blocks.push({ kind: "quote", runs: inlineRuns(quote[1]), depth: 0, marker: "" })
       continue
     }
-    const bullet = /^(\s*)\*\s+(.*)$/.exec(line)
+    const bullet = /^(\s*)[*+-]\s+(.*)$/.exec(line)
     const number = /^(\s*)\d+\.\s+(.*)$/.exec(line)
     const match = bullet || number
     if (match) {
