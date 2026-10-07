@@ -89,12 +89,19 @@ resources и CLI_BUNDLE. Python — внешний test driver; продукт �
 поставляемый Node. Provider управляемый, естественная активация проверяется
 отдельно; sampling процессов и profile cleanup сохраняются в evidence.
 
-Ленивые CLI exit2/exit1 проверить из `packages/agent` командой
-`bun test test/cli/standalone-preflight.test.ts -t 'lazy scenario preparation'`
+CLI startup/Help/exit проверить из `packages/agent` командой
+`bun test test/cli/standalone-preflight.test.ts -t 'ordinary standalone chat reaches|real Help refusal|lazy scenario preparation|Help preflight stays'`
 с абсолютными `LOGINOM_AI_AGENT_TEST_CLI_BIN` и `LOGINOM_AI_AGENT_TEST_NODE`.
-Native режим покрывает unconfigured/help-unavailable через compiled ресурсы;
-endpoint меняется только в собственной копии manifest. Остальные source cases,
-включая искусственный browser refusal, этот выбор не запускает.
+Native режим покрывает восемь случаев через compiled ресурсы: обычный чат без
+Loginom, Help refusal при обычном ответе, lazy exit2/exit1, явный automation
+preflight ready/cancel/unavailable и обычный ответ при unavailable Help.
+Endpoint меняется только в собственной копии manifest; browser/knowledge entry
+сохраняются настоящими, PATH продукта `/nonexistent`, DISPLAY отсутствует.
+Проверяются результаты, profile release и отсутствие runtime directory;
+этот адаптер не делает process sampling и не заменяет browser cleanup gate.
+Остальные source cases, включая искусственный browser refusal, strict recovery
+и management validation, этот выбор не запускает. Без CLI_BIN весь файл
+остаётся source regression suite.
 
 `test/loginom/gui-smoke.mjs` запускается закреплённым Node под Xvfb либо в отдельной Wayland-сессии. `LOGINOM_AI_AGENT_TEST_EXECUTABLE` указывает установленный бинарник; без переменной проверяется локальная сборка. `LOGINOM_AI_AGENT_TEST_CONFIG` — абсолютный путь к приватному тестовому конфигу Dock с разрешённой passwordless учётной записью. Значение ключа не передаётся в аргументах процесса или выводе. Проверка использует отдельный временный профиль, выполняет check/save, проверяет plaintext/0600 и повторный запуск без мастера.
 

@@ -2762,15 +2762,55 @@ Product Agent Skills metadata validator принимает поле и прош�
 с прежними model/variant/input, проверкой фактов и PDF layout. GREEN полного
 качества пока не заявляется; старые evidence сохранены.
 
+## CLI startup и Help: native exit/cancellation regression
+
+Полный clean CLI `c7213af4ce1512b97a62d755b6bb4bb84bff872d` собран с
+Node 24.19.0 и прежними release pins. Source verification, manifest, archive
+roundtrip и checksum **PASS**, dirty false; tree
+`f678375bad2bd76148b8449b5d9da428cafe66d9dec8f39f612a147b0546da17`, archive
+`ad67451846c9afaaa8a131db14ee753b39c19d5a270aade9eecc5ec9e530c633`.
+SKILL `f6a1015e…` и narrative `4fae816c…` включают последнюю правку port/null.
+Старые кандидаты и baseline не изменены.
+
+Existing standalone-preflight tests расширены на native binary без замены
+compiled knowledge/browser entry. Каждый case получает собственную копию
+ресурсов, profile/HOME/XDG; только endpoint собственного manifest направлен
+на контролируемый MCP. PATH продукта `/nonexistent`, DISPLAY/Wayland пустые.
+Обычный запрос без настройки: сохранённый baseline `fc3d97dbf` **RED**, exit2
+`LOGINOM_CONFIG_REQUIRED`; CLIc721 **GREEN**, реальный публичный run reaches
+scripted provider, exit0, ответ и profile release. Это регрессия механики,
+не natural model selection.
+
+Общий native выбор **8 PASS / 48 assertions**: обычный чат, реальный MCP
+isError Help refusal при успешном ответе, lazy unconfigured/help-unavailable,
+явный automation preflight ready/cancel/unavailable, ordinary-unavailable.
+Отмена возвращает 130, Help preflight отказ — 1, lazy config — 2; обычные
+ответы — 0. `.writer` снят, browser runtime directory отсутствует.
+Полный source файл **12 PASS / 88 assertions**, Agent typecheck **PASS**.
+Драйвер не выполняет process sampling; отсутствие directory не объявляется
+доказательством полного browser exec/cleanup. Остальные management/recovery
+cases при native выборе отфильтрованы, их source результаты выделены отдельно.
+Evidence: `cli-ordinary-baseline-native.log`,
+`cli-c7213af4c-{ordinary,help-refusal,help-preflight,all-preflight}-native.log`,
+`cli-preflight-adapters-source.log`, `agent-preflight-adapters-typecheck.log`.
+
+Новая live PDF серия с прежними fixture/model/variant начата отдельно:
+`cli-live-pdf-c7213af4c-r2/`. Первая попытка в
+`cli-live-pdf-c7213af4c/` завершилась **до модели** из-за mode0700 у
+несекретного bind-mounted test context, недоступного container UID1200.
+Container удалён; failure evidence сохранены. Context получил mode0755,
+driver bytes не менялись. Новая серия имеет отдельные имена и results root;
+факты/качество отчётов пока не объявляются GREEN.
+
 ## Checkpoint
 
-- Product candidates: Desktop `2aa3a3284`, CLI `83a2aff26`, clean source/artifacts/manifests; Desktop и TUI diagnostics 5/5 stable PASS; разные source pins.
+- Product candidates: Desktop `2aa3a3284`, CLI `c7213af4c`, clean source/artifacts/manifests; Desktop и TUI83 diagnostics 5/5 stable PASS; разные source pins.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–3 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 43 PASS; port/null narrative clarification и catalog 21 PASS / integrity 9 PASS; прежний live report gate RED, новый candidate/live GREEN ещё нужен.
-- BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; lazy CLI exit 2 и 1 native PASS; весь этап 4 открыт.
+- BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; весь этап 4 пока открыт.
 - Scope/command/HTTP/Runner/revert: 168 PASS / 1 SKIP; offline skill regression 135 PASS / 1 SKIP; typecheck PASS.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.

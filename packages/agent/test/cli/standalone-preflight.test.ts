@@ -11,13 +11,18 @@ import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recover
 import { standaloneFixture, invoke } from "../fixture/standalone"
 
 test("ordinary standalone chat reaches the provider without configured Loginom and releases its profile", async () => {
-  await using fixture = await standaloneFixture()
+  await using fixture = await standaloneFixture(process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN)
   const provider = ManagedRuntime.make(TestLLMServer.layer)
   try {
     const llm = await provider.runPromise(TestLLMServer)
     await provider.runPromise(llm.text("Ответ: 4."))
     await writeFile(join(fixture.profile, "config/loginom-ai-agent.json"), JSON.stringify(testProviderConfig(llm.url)))
-    const result = await invoke(fixture, ["--", "Сколько будет 2 + 2?"])
+    const result = await invoke(
+      fixture,
+      ["--", "Сколько будет 2 + 2?"],
+      undefined,
+      fixture.binary ? { PATH: "/nonexistent" } : undefined,
+    )
     expect(result).toMatchObject({ exit: 0 })
     expect(result.events.find((event) => event.type === "text")?.part.text).toBe("Ответ: 4.")
     expect(await provider.runPromise(llm.calls)).toBeGreaterThan(0)
@@ -147,7 +152,7 @@ test.each(
 )
 
 test("a real Help refusal does not turn an ordinary standalone answer into a connection failure", async () => {
-  await using fixture = await standaloneFixture()
+  await using fixture = await standaloneFixture(process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN)
   const provider = ManagedRuntime.make(TestLLMServer.layer)
   const cleanup: (() => void | Promise<void>)[] = []
   const server = await knowledgeServer(
@@ -157,11 +162,13 @@ test("a real Help refusal does not turn an ordinary standalone answer into a con
     },
   )
   try {
-    await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
-    await symlink(
-      resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
-      join(fixture.bundle, "runtime/src/knowledge-entry.mjs"),
-    )
+    if (!fixture.binary) {
+      await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
+      await symlink(
+        resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
+        join(fixture.bundle, "runtime/src/knowledge-entry.mjs"),
+      )
+    }
     const manifest = JSON.parse(await readFile(join(fixture.bundle, "resource-manifest.json"), "utf8"))
     await writeFile(
       join(fixture.bundle, "resource-manifest.json"),
@@ -187,7 +194,12 @@ test("a real Help refusal does not turn an ordinary standalone answer into a con
       llm.textMatch((hit) => Array.isArray(hit.body.tools) && hit.body.tools.length > 0, "Ответ: 4."),
     )
     await writeFile(join(fixture.profile, "config/loginom-ai-agent.json"), JSON.stringify(testProviderConfig(llm.url)))
-    const result = await invoke(fixture, ["--dangerously-skip-permissions", "--", "Сколько будет 2 + 2?"])
+    const result = await invoke(
+      fixture,
+      ["--dangerously-skip-permissions", "--", "Сколько будет 2 + 2?"],
+      undefined,
+      fixture.binary ? { PATH: "/nonexistent" } : undefined,
+    )
     expect(result.exit).toBe(0)
     expect(result.events.filter((event) => event.type === "error")).toEqual([])
     expect(
@@ -206,7 +218,7 @@ test("a real Help refusal does not turn an ordinary standalone answer into a con
 test.each(["ready", "cancel", "unavailable", "ordinary-unavailable"])(
   "standalone Help preflight stays independent of the browser: %s",
   async (mode) => {
-    await using fixture = await standaloneFixture()
+    await using fixture = await standaloneFixture(process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN)
     const provider = ManagedRuntime.make(TestLLMServer.layer)
     const cleanup: (() => void | Promise<void>)[] = []
     const entered = Promise.withResolvers<void>()
@@ -223,18 +235,20 @@ test.each(["ready", "cancel", "unavailable", "ordinary-unavailable"])(
       },
     )
     try {
-      // Source-process acceptance of the actual entry/client over HTTP MCP;
-      // installed completeness and natural skill selection have separate gates.
-      await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
-      await symlink(
-        resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
-        join(fixture.bundle, "runtime/src/knowledge-entry.mjs"),
-      )
       const marker = join(fixture.directory, "forbidden-browser")
-      await writeFile(
-        join(fixture.bundle, "runtime/src/managed-entry.mjs"),
-        `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser forbidden');`,
-      )
+      // The native path retains the compiled knowledge and browser resources.
+      // The source-only marker rejects accidental browser dispatch early.
+      if (!fixture.binary) {
+        await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
+        await symlink(
+          resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
+          join(fixture.bundle, "runtime/src/knowledge-entry.mjs"),
+        )
+        await writeFile(
+          join(fixture.bundle, "runtime/src/managed-entry.mjs"),
+          `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser forbidden');`,
+        )
+      }
       const manifest = JSON.parse(await readFile(join(fixture.bundle, "resource-manifest.json"), "utf8"))
       await writeFile(
         join(fixture.bundle, "resource-manifest.json"),
@@ -266,6 +280,7 @@ test.each(["ready", "cancel", "unavailable", "ordinary-unavailable"])(
               void entered.promise.then(interrupt)
             }
           : undefined,
+        fixture.binary ? { PATH: "/nonexistent" } : undefined,
       )
       void state.result.catch(() => {})
       if (mode === "ordinary-unavailable") {
@@ -294,6 +309,7 @@ test.each(["ready", "cancel", "unavailable", "ordinary-unavailable"])(
       }
       await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
       expect(await readdir(fixture.profile)).not.toContain(".writer")
+      expect(await readdir(join(fixture.profile, "loginom"))).not.toContain("runtime")
     } finally {
       release.resolve()
       await state.result?.catch(() => {})
