@@ -696,7 +696,7 @@ type PackageDocsRun =
 заменяет их. V2 (`LOGINOM_AI_AGENT_SIDECAR_V2=1`) не входит в критерий готовности:
 CLI его не использует, отдельная V2-регистрация не требуется этому плану.
 
-### Этап 4. Справка и подключение без Chromium
+### Этап 4. Справка и подключение без Chromium — выполнен
 
 **Создать:** `packages/loginom-runtime/src/knowledge-entry.mjs`,
 `client/lib/knowledge-client.mjs`, runtime `test/knowledge-entry.test.mjs`
@@ -710,10 +710,10 @@ CLI его не использует, отдельная V2-регистраци
   отдельный от браузера lifecycle. Переиспользовать `StreamableHTTPClientTransport`,
   Bearer c `redirect: error`, `connectRemote/readCatalog`; схемы Help брать
   из настоящего каталога, prepare descriptor — статический.
-- [ ] Удалить browser readiness и маршрутизацию справки через runtime чата.
+- [x] Удалить browser readiness и маршрутизацию справки через runtime чата.
   Help всегда идёт в knowledge, диагностика остаётся безбраузерной; остальные
   Dock-инструменты требуют разрешённый runtime чата. `tools` браузер не создаёт.
-- [ ] Отделить локальное создание run/scope от успешного connection lease:
+- [x] Отделить локальное создание run/scope от успешного connection lease:
   сейчас `acquire` требует `phase: ready`, и при отказе backend теряет даже
   Help/diagnostics. Без настройки должны оставаться каталог и диагностика,
   а ошибки доступа приходить на конкретной операции. Credentials/generation
@@ -741,7 +741,7 @@ CLI его не использует, отдельная V2-регистраци
 - [x] Проверить конкурентную справку двух чатов, отмену только своего request/run,
   смену поколения и cleanup. Help-ошибки не создают uncertain mutation records,
   credentials не пересекают поколения, knowledge IPC не содержит пароль.
-- [ ] TDD-проверки старта и сохранения: нет Chromium при старте/каталоге/Help,
+- [x] TDD-проверки старта и сохранения: нет Chromium при старте/каталоге/Help,
   впервые настроить Help можно при недоступном Loginom, browser login failure
   предупреждает, локальный startup завершается без сетевого ожидания; lazy
   CLI ошибки сохраняют коды и не превращают обычный ответ в ошибку.

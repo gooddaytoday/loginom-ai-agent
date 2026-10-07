@@ -2834,15 +2834,34 @@ PDF первого запуска: две A4 страницы просмотре
 Это зависимость внешней проверки, не продукта. Layout PASS не снимает
 фактографический FAIL.
 
+## Этап 4: справка и локальный startup подтверждены
+
+Свежая проверка `knowledge/host-port/connection-readiness/connection-validation`
+**35 PASS / 318 assertions**, runtime actual knowledge entry/client
+**22 PASS**, pinned Node 24.19.0. Повторно проверены local startup до каталога,
+ленивый lease, Help маршрутизация отдельно от уже подготовленного браузера,
+собственная отмена request/run, shutdown, поколения/ключи и состояние browser.
+Evidence: `host-knowledge-stage4-final.log`, `runtime-knowledge-stage4-final.log`.
+Они дополняют CLI native8/source12 и прежние actual GUI/TTY first-setup checks.
+
+Два настоящих CLIc721 PDF прогона подтвердили готовность отчёта при Help-ready
+и намеренно недоступном Loginom web: native первая настройка сохранила key-only
+connection с `browser: failed`, затем Help B и emit без Chromium exec.
+Открытый дефект текста относится к качеству отчётов этапа 6, не скрывается
+успешной механикой. В плане этап 4 и три оставшихся implementation/test пункта
+отмечены выполненными; ни одно требование не перерабатывалось. Полная Linux
+матрица одного финального кандидата и browser cleanup/cancellation остаётся
+в этапе 8; этот checkpoint её не заменяет.
+
 ## Checkpoint
 
 - Product candidates: Desktop `2aa3a3284`, CLI `c7213af4c`, clean source/artifacts/manifests; Desktop и TUI83 diagnostics 5/5 stable PASS; разные source pins.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
-- Этапы 0–3 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
+- Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 43 PASS; port/null и template fact guidance, catalog 21 PASS / integrity 9 PASS; первый CLIc721 PDF layout/mechanics PASS, facts RED; новая guidance ждёт отдельный live gate.
-- BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; весь этап 4 пока открыт.
+- BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
 - Scope/command/HTTP/Runner/revert: 168 PASS / 1 SKIP; offline skill regression 135 PASS / 1 SKIP; typecheck PASS.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
