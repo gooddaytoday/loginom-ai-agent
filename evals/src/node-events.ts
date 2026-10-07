@@ -1,4 +1,5 @@
 import { compareCsv } from "./oracle"
+import { nodeCase } from "./node-cases"
 
 // Public tool protocol is heterogeneous; inspect complete raw tool-parts, never truncated nodeReceipts.
 type ObjectValue = Record<string, any>
@@ -76,7 +77,8 @@ function identity(node: ObjectValue | undefined) {
     ? JSON.stringify([node.document_id, node.workflow_id, node.node_id]) : null
 }
 
-function tableCsv(output: ObjectValue, execution: string, node: ObjectValue): string | null {
+function tableCsv(output: ObjectValue, execution: string, node: ObjectValue, id: string): string | null {
+  const contract = nodeCase(id)
   if (output.status !== "complete" || output.execution_id !== execution || !Array.isArray(output.ports)) return null
   const port = output.ports.find((p: ObjectValue) => p.port === 0)
   if (!port || port.fresh !== true || port.execution_id !== execution || port.precision?.numbers_verified !== true || !Array.isArray(port.schema)) return null
@@ -85,7 +87,15 @@ function tableCsv(output: ObjectValue, execution: string, node: ObjectValue): st
   const rows = port.exact_table?.complete === true ? port.exact_table.rows : port.sample_complete === true ? port.sample : null
   if (!Array.isArray(rows) || rows.length !== port.row_count || (!port.exact_table && port.sample_rows !== rows.length)) return null
   const names = port.schema.map((c: ObjectValue) => c.name)
-  if (names.length !== 3 || new Set(names).size !== 3 || !["Region", "A", "B"].every(n => names.includes(n))) return null
+  if (new Set(names).size !== names.length || !contract.keys.every(n => names.includes(n))) return null
+  if (contract.native) {
+    if (!native || port.sample_complete!==true || port.sample_rows!==port.row_count || port.sample?.length!==port.row_count ||
+      port.schema.some((c:ObjectValue)=>c.type!==(contract.keys.includes(c.name)?"string":"real"))) return null
+    const categories=id==="crosstable-sliding-source-refresh" && names.includes("C")?["B","C"]:["A","B"]
+    const fields=categories.flatMap(category=>contract.functions.map(fn=>({category,fn,field:contract.functions.length>1?`${category}_${fn}`:category})))
+    if (names.length!==contract.keys.length+fields.length || !fields.every(f=>names.includes(f.field)) || port.category_fields?.length!==fields.length ||
+      !fields.every(f=>port.category_fields.filter((c:ObjectValue)=>c.category===f.category && c.category_kind==="value" && c.fact==="Amount" && c.function===f.fn && c.field===f.field && c.type==="real" && c.label===port.schema.find((s:ObjectValue)=>s.name===f.field)?.label).length===1)) return null
+  } else if(names.length!==3 || !["Region","A","B"].every(n=>names.includes(n))) return null
   if (native && (identity(port.binding) !== identity(node) || port.binding?.port_guid !== port.port_guid ||
     port.binding?.execution?.execution_id !== execution || port.binding?.execution?.status !== "completed" ||
     port.read_coverage?.table_complete !== true || port.read_coverage.rows_read !== rows.length ||
@@ -101,7 +111,7 @@ function tableCsv(output: ObjectValue, execution: string, node: ObjectValue): st
       if (native) {
         const proof = cell.native
         if (cell.precision !== "exact_native" || !proof) return null
-        if (proof.encoding !== (names[cells.length] === "Region" ? "utf8" : "ieee754-binary64-le")) return null
+        if (proof.encoding !== (contract.keys.includes(names[cells.length]) ? "utf8" : "ieee754-binary64-le")) return null
         if (proof.encoding === "utf8") {
           if (typeof proof.utf8_hex !== "string" || !/^(?:[\da-f]{2})*$/i.test(proof.utf8_hex) || Buffer.from(proof.utf8_hex, "hex").toString("utf8") !== cell.value) return null
         } else if (proof.encoding === "ieee754-binary64-le" && proof.bits === 64 && /^[\da-f]{16}$/i.test(proof.bytes_le ?? "")) {
@@ -117,6 +127,7 @@ function tableCsv(output: ObjectValue, execution: string, node: ObjectValue): st
 }
 
 export function checkNodeSequence(events: NodeEvents, id: string, crossId: string, finalCsv: string, initialCsv?: string) {
+  const contract = nodeCase(id)
   const { receipts, failures } = operationReceipts(events)
   const applications = receipts.filter(pair => pair.request.tool.endsWith("node_apply") && pair.request.input.target?.type === "transform.cross_table")
   const creation = applications.find(pair => {
@@ -145,16 +156,18 @@ export function checkNodeSequence(events: NodeEvents, id: string, crossId: strin
       request.operation_id !== creation.request.input.operation_id && !after(application!.request, creation.receipt)) continue
     if (application?.receipt.output.execution?.status !== "completed" || r.output?.execution_id !== execution) continue
     if (pair.request.tool.endsWith("node_apply") && config.execution_id && config.execution_id !== execution) continue
-    const csv = tableCsv(r.output ?? {}, execution, node)
+    const csv = tableCsv(r.output ?? {}, execution, node, id)
     if (csv && application) reads.push({ ...pair, application, config, execution, csv })
   }
-  const aggregate = id === "crosstable-fixed-sum" ? "sum" : "avg"
-  const mode = id === "crosstable-sliding-average" ? "sliding" : "fixed"
-  function matches(read: typeof reads[number], expectedAggregate: string, expected: string) {
+  const aggregate = contract.functions
+  const mode = contract.mode
+  function matches(read: typeof reads[number], expectedAggregate: string | string[], expected: string) {
     const c = read.config
-    return c.category_mode === mode && c.row_keys?.length === 1 && c.row_keys[0].name === "Region" &&
+    const functions=typeof expectedAggregate==="string"?[expectedAggregate]:expectedAggregate
+    return c.category_mode === mode && c.row_keys?.length === contract.keys.length && c.row_keys.every((key:ObjectValue,index:number)=>key.name===contract.keys[index] && (!contract.native || key.type==="string" && key.order===index)) &&
       c.column?.name === "Category" && c.facts?.length === 1 && c.facts[0].name === "Amount" &&
-      JSON.stringify(c.facts[0].functions) === JSON.stringify([expectedAggregate]) &&
+      JSON.stringify([...c.facts[0].functions].sort()) === JSON.stringify([...functions].sort()) &&
+      (!contract.native || c.column.type==="string" && c.columns?.length===1 && c.columns[0].name==="Category" && c.facts[0].type==="real") &&
       c.options?.include_null === false && c.options?.include_other === false &&
       Object.keys(c.options?.variable_bindings ?? {}).length === 0 && compareCsv(expected, read.csv, 0).passed
   }
