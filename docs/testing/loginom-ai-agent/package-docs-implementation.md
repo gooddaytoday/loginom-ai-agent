@@ -3490,6 +3490,20 @@ Evidence: `skills-acceptance-external-desktop-{red,green,typecheck}.log`,
 Начатый snapshot прогон остаётся отдельным неуспешным запуском; его результат
 не заменять последующим GREEN. Новый live повтор — после его завершения.
 
+## Narrative connected components: минимальная инструкция после Word RED
+
+RED подтверждён сохранённым `cli-canonical-regressions-2396e78f2/`
+`docs-attached-word/attempt-1/evidence/manual-quality.json`: вводная строка
+объявляет линейным весь модуль из трёх верхних узлов, хотя подробный граф
+правильно описывает изолированную подмодель. В `narrative-prompts.md` добавлено
+только правило согласования краткого описания с links: список узлов не задаёт
+последовательность, подтверждённую цепочку описывать отдельно от изолированных
+узлов и подмоделей. Новых runtime/permissions/эвристического маршрутизатора нет.
+Host integrity **9PASS/16 assertions**, Agent discovery/bundled
+**36PASS/167 assertions**, Prettier PASS. Source checks не доказывают качество
+модельного текста. Следующий шаг — новый clean CLI candidate и исходный natural
+Word prompt×3 с полным facts/layout review; live GREEN пока не заявлен.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `091103ef9`, clean full builds/manifests/static/installed CLI seed PASS; предыдущие candidates сохранены.
