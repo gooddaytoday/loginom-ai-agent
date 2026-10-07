@@ -171,6 +171,46 @@ test("provider management uses the CLI profile without Loginom configuration or 
   expect(await fs.readdir(path.join(root, "profile", "loginom"))).toEqual([])
 }, 30_000)
 
+test.skipIf(process.platform !== "linux" || !Bun.which("gsettings"))(
+  "real gsettings keeps writable cache and runtime inside the CLI profile",
+  async () => {
+    const root = await temporary()
+    const result = await run(
+      root,
+      `import { standalone } from './src/cli/standalone.ts';
+      await standalone(['models'], async () => {
+        const { applyCliSystemProxy } = await import('./src/cli/standalone-proxy.ts');
+        await applyCliSystemProxy();
+        console.log(JSON.stringify({ config: process.env.XDG_CONFIG_HOME,
+          cache: process.env.XDG_CACHE_HOME, runtime: process.env.XDG_RUNTIME_DIR }));
+      });`,
+      {
+        XDG_CURRENT_DESKTOP: "GNOME",
+        XDG_RUNTIME_DIR: path.join(root, "desktop-runtime"),
+        LOGINOM_AI_AGENT_SYSTEM_PROXY: undefined,
+        HTTP_PROXY: undefined,
+        HTTPS_PROXY: undefined,
+        ALL_PROXY: undefined,
+        NO_PROXY: undefined,
+        http_proxy: undefined,
+        https_proxy: undefined,
+        all_proxy: undefined,
+        no_proxy: undefined,
+      },
+    )
+    expect(result.code).toBe(0)
+    expect(result.error).not.toContain("SYSTEM_PROXY_NOT_APPLIED")
+    expect(JSON.parse(result.out)).toEqual({
+      config: path.join(root, "desktop-config"),
+      cache: path.join(root, "profile", "cache"),
+      runtime: path.join(root, "profile", "cache", "tmp"),
+    })
+    expect(await fs.readdir(root)).toEqual(["profile"])
+    expect(await fs.readdir(path.join(root, "profile"))).not.toContain(".writer")
+  },
+  15_000,
+)
+
 test("bootstrap carries an early signal into stdin admission and releases its handler", async () => {
   const root = await temporary()
   const result = await run(

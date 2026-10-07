@@ -92,6 +92,9 @@ export function profileEnvironment(paths: ReturnType<typeof profilePaths>, env: 
     LOGINOM_AI_AGENT_CLI_ROOT: paths.root,
     LOGINOM_AI_AGENT_CONFIG_DIR: paths.config,
     LOGINOM_AI_AGENT_DB: path.join(paths.data, Product.database),
+    // gsettings/dconf can write cache even when only reading the system proxy.
+    // Retain XDG_CONFIG_HOME for OS settings, but isolate writable Linux paths.
+    ...(process.platform === "linux" ? { XDG_CACHE_HOME: paths.cache, XDG_RUNTIME_DIR: paths.tmp } : {}),
     TMPDIR: paths.tmp,
     TMP: paths.tmp,
     TEMP: paths.tmp,
