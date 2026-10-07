@@ -198,3 +198,13 @@ Pagination fixture воспроизводит живой отказ. RED→GREEN
 Полный source suite генератора50 PASS/193 assertions, Host typecheck PASS;
 все3 страницы исправленного PDF просмотрены. Это изменение ещё не входит
 в сохранённые сборки253 и требует новой чистой сборки и installed проверки.
+
+Desktop scenario-create253 v3 принят3/3, exit0. Корректное обычное CSV-вложение
+использует исходные bytes/text/plain data:, как native UI. Ранее использованные
+text/csv и file:-ссылка дали adapter RED; обе серии сохранены отдельно.
+Во всех трёх v3 модель выбрала automation, импорт/группировка выполнены,
+подтверждены Alpha35/Beta20 и сохранение. По физическим `.lgp` проверены
+GUID и прямая связь; холодное выполнение ещё не проверено. remaining0,
+ответы полностью прочитаны. Test adapter15 PASS/55, typecheck/Prettier PASS.
+CLI positive253 batch также завершён exit0/18 mechanics; QA последних
+LGP+PNG и external-path отчётов продолжается, Desktop positive ещё идёт.

@@ -6,12 +6,14 @@ import { join, basename, relative } from "node:path"
 import { pathToFileURL } from "node:url"
 import { setTimeout } from "node:timers/promises"
 import { observeProcesses } from "./processes.mjs"
+import { verifySalesScenario } from "./scenario.mjs"
 
 const chunks = []
 for await (const chunk of process.stdin) chunks.push(chunk)
 const input = JSON.parse(Buffer.concat(chunks).toString())
 const secrets = [
   input.apiKey,
+  ...(input.connection?.password ? [input.connection.password] : []),
   ...(input.auth.type === "api" ? [input.auth.key] : [input.auth.access, input.auth.refresh]),
 ]
 const executable = join(input.artifact, "loginom-ai-agent-linux-x86_64.AppImage")
@@ -23,6 +25,7 @@ const sha = (bytes) => createHash("sha256").update(bytes).digest("hex")
 const failures = []
 
 for (const testcase of input.cases) {
+  const scenario = testcase.id === "scenario-create"
   await mkdir(join(input.output, testcase.id), { mode: 0o700 })
   for (let attempt = 1; attempt <= input.repeat; attempt++) {
     const evidence = join(input.output, testcase.id, "attempt-" + attempt)
@@ -36,18 +39,22 @@ for (const testcase of input.cases) {
     await Promise.all([home, workspace, filesRoot].map((path) => mkdir(path, { mode: 0o700 })))
     const local = join(workspace, "Сценарий.LGP"),
       external = join(filesRoot, "Исходный сценарий.LGP")
-    const png = join(filesRoot, "Контекст.png")
+    const png = join(filesRoot, "Контекст.png"),
+      csv = join(filesRoot, "sales.csv")
+    if (scenario) await cp(input.fixtures.csv, csv)
     if (testcase.input === "workspace-path") await cp(input.fixtures.lgp, local)
     if (["lgp-attachment", "lgp-and-png-attachments", "external-text-path"].includes(testcase.input))
       await cp(input.fixtures.lgp, external)
     if (testcase.input === "lgp-and-png-attachments") await cp(input.fixtures.png, png)
-    const originalPath = testcase.input === "workspace-path" ? local : external
+    const originalPath = scenario ? csv : testcase.input === "workspace-path" ? local : external
     const originalSha = await readFile(originalPath).then(sha, () => undefined)
     const bindings = {
       local_lgp: local,
       unicode_lgp: external,
       missing_lgp: join(workspace, "Отсутствующий.LGP"),
-      server_package: "/user/package-docs-acceptance/" + basename(root) + "/missing.lgp",
+      server_package: scenario
+        ? `/${input.connection.username}/skills-acceptance-${sha(input.output).slice(0, 12)}-${testcase.id}-${attempt}.lgp`
+        : "/user/package-docs-acceptance/" + basename(root) + "/missing.lgp",
     }
     const prompt = testcase.prompt.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
       assert.ok(bindings[key], "UNKNOWN_BINDING")
@@ -96,28 +103,36 @@ for (const testcase of input.cases) {
       const form = page.locator('[data-component="settings-loginom"]')
       await form.waitFor({ timeout: 120000 })
       if (testcase.connection !== "unconfigured" && testcase.id !== "default-translation") {
-        const saved = await page.evaluate(async (apiKey) => {
-          const current = await window.api.loginom.read()
-          const validation = await window.api.loginom.check({
-            revision: current.revision,
-            url: "http://127.0.0.1:9/",
-            username: "user",
-            apiKey: { operation: "replace", value: apiKey },
-            password: { operation: "empty" },
-          })
-          await window.api.loginom.save({ revision: current.revision, validationId: validation.validationId })
-          const deadline = Date.now() + 120000
-          while (Date.now() < deadline) {
-            const view = await window.api.loginom.status()
-            if (view.state === "ready") return view
-            if (view.failure) throw Error(view.failure)
-            await new Promise((resolve) => setTimeout(resolve, 200))
-          }
-          throw Error("HELP_READY_TIMEOUT")
-        }, input.apiKey)
+        const saved = await page.evaluate(
+          async (connection) => {
+            const current = await window.api.loginom.read()
+            const validation = await window.api.loginom.check({
+              revision: current.revision,
+              url: connection.url,
+              username: connection.username,
+              apiKey: { operation: "replace", value: connection.apiKey },
+              password: connection.password
+                ? { operation: "replace", value: connection.password }
+                : { operation: "empty" },
+            })
+            await window.api.loginom.save({ revision: current.revision, validationId: validation.validationId })
+            const deadline = Date.now() + 120000
+            while (Date.now() < deadline) {
+              const view = await window.api.loginom.status()
+              if (view.state === "ready") return view
+              if (view.failure) throw Error(view.failure)
+              await new Promise((resolve) => setTimeout(resolve, 200))
+            }
+            throw Error("HELP_READY_TIMEOUT")
+          },
+          {
+            apiKey: input.apiKey,
+            ...(scenario ? input.connection : { url: "http://127.0.0.1:9/", username: "user", password: "" }),
+          },
+        )
         assert.equal(saved.state, "ready")
-        assert.equal(saved.hasPassword, false)
-        assert.equal(saved.browser.state, "failed")
+        assert.equal(saved.hasPassword, scenario ? Boolean(input.connection.password) : false)
+        assert.equal(saved.browser.state, scenario ? "verified" : "failed")
         await save("connection-status.json", saved)
       } else assert.equal((await page.evaluate(() => window.api.loginom.read())).state, "unconfigured")
       await form.locator('[data-component="icon-button"][data-icon="close"]').click()
@@ -168,16 +183,25 @@ for (const testcase of input.cases) {
           ? [external]
           : testcase.input === "lgp-and-png-attachments"
             ? [external, png]
-            : []
+            : scenario
+              ? [csv]
+              : []
+      const csvUrl = scenario ? `data:text/plain;base64,${(await readFile(csv)).toString("base64")}` : undefined
       const parts = [
         { type: "text", text: prompt },
         ...files.map((path) => ({
           type: "file",
-          filename: basename(path),
-          mime: path.endsWith(".png") ? "image/png" : "application/x-loginom-package",
-          url: pathToFileURL(path).href,
+          filename: path.endsWith(".csv") ? path : basename(path),
+          mime: path.endsWith(".png")
+            ? "image/png"
+            : path.endsWith(".csv")
+              ? "text/plain"
+              : "application/x-loginom-package",
+          // Native Desktop uploads preserve original bytes; file: denotes a path reference.
+          url: path.endsWith(".csv") ? csvUrl : pathToFileURL(path).href,
         })),
       ]
+      const timeoutMs = scenario ? 1200000 : 480000
       const started = Date.now()
       await save("submission.json", { sessionID, model: input.model, variant: input.variant, prompt, parts, started })
       // Keep HTTP requests short and retain each projected snapshot while tools await permission.
@@ -188,7 +212,7 @@ for (const testcase of input.cases) {
         parts,
       })
       let messages, answer, idleCompletedID
-      while (Date.now() - started < 480000) {
+      while (Date.now() - started < timeoutMs) {
         const [current, status, pending] = await Promise.all([
           call(`/session/${sessionID}/message`),
           call("/session/status"),
@@ -258,6 +282,8 @@ for (const testcase of input.cases) {
         sessionID,
         prompt,
         wallMs: Date.now() - started,
+        timeoutMs,
+        ...(scenario ? { packagePath: bindings.server_package } : {}),
         modelError: answer.info.error,
         tools: tools.map((part) => ({
           id: part.id,
@@ -279,12 +305,22 @@ for (const testcase of input.cases) {
       }
       await save("result.json", result)
       assert.ok(!answer.info.error, "MODEL_ERROR")
-      assert.equal(execs.length, 0, "DOCS_DEFAULT_BROWSER_EXEC")
+      assert.ok(scenario ? execs.length > 0 : execs.length === 0, "EXPECTED_BROWSER_EXEC_SCOPE")
+      if (scenario) {
+        const csvSha256 = sha(await readFile(input.fixtures.csv))
+        assert.equal(originalSha, csvSha256)
+        Object.assign(
+          result,
+          verifySalesScenario(tools, { skills: input.skills, csvSha256, packagePath: bindings.server_package }),
+        )
+        await save("result.json", result)
+      }
       assert.ok(result.text.trim(), "NO_FINAL_ANSWER_AFTER_TERMINAL_TURN")
       assert.equal(result.inputShaAfter, originalSha)
-      assert.ok(
-        !tools.some((part) => part.tool.startsWith("loginom_dock_") && part.tool !== "loginom_dock_diagnostics"),
-      )
+      if (!scenario)
+        assert.ok(
+          !tools.some((part) => part.tool.startsWith("loginom_dock_") && part.tool !== "loginom_dock_diagnostics"),
+        )
       if (testcase.expected.profile === "package-docs")
         assert.ok(
           tools.some(

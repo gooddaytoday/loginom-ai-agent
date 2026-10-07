@@ -3895,6 +3895,31 @@ diagnostics также не уложились в180s; полный CLI с ди�
 override проходит3/3, но это не штатная integrity-проверка и не замена FAIL.
 Матрицы Debian и установленная приёмка исправленного кандидата ещё открыты.
 
+## 2026-10-07 — Desktop scenario-create: исходное вложение и физический пакет
+
+Desktop adapter допускает scenario-create с тем же SUM verifier, что CLI.
+RED первая серия отклоняла text/csv до модели. V2 text/plain file: прошла
+выбор automation, но все3 prepare получили пустой input_artifacts: это ссылка
+на путь, а не контракт обычного Desktop-вложения. Все отказы сохранены.
+Минимальный GREEN использует text/plain data: с исходными CSV-байтами и
+filename/sourcePath, как `buildAttachmentParts` обычной UI-загрузки.
+Идентичность файла и SHA проверяются отдельно; модель пути не авторизует.
+
+`desktop-openai-scenario-create-2530143dd-v3` завершился exit0:3/3 PASS.
+Модель естественно выбрала automation; CSV98aa522b неизменен, импорт и SUM
+выполнены, Alpha35/Beta20, save checkpoint подтверждён. Public runner прочитал
+только три точных собственных файла из локального server UserStorage,
+проверил сохранённые GUID и связь Источник→Группировка. Per-attempt receipts,
+tool calls, графы, hashes и полные итоговые ответы сохранены. remaining0.
+Общий verifier физического пакета теперь используется Desktop и CLI;
+успешные результаты проверяются и при отказе другой попытки batch.
+Холодное повторное выполнение не заявляется. Тесты15 PASS/55 assertions,
+Host typecheck и Prettier PASS. Другие пять многоходовых адаптеров ещё открыты.
+
+CLI positive253 завершился exit0: все18 mechanics receipts сохранены.
+QA последних LGP+PNG и внешних путей ещё выполняется; Desktop batch продолжается.
+Испытуемые253 не включают последующее исправление пагинации из244fe6ab7.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
@@ -3916,4 +3941,4 @@ override проходит3/3, но это не штатная integrity-пров
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- RESUMED: Desktop/CLI default30/30 PASS; CLI local scenario-create2/3 PASS+1 UI_EPOCH_CHANGED FAIL, exit1/remaining0. Desktop scenario adapter в проверке; compound/transitions/corpus20/TUI/Linux5/A-B открыты; frozen план не перерабатывался.
+- RESUMED: Desktop/CLI default30/30 PASS; CLI local scenario-create2/3 PASS+1 UI_EPOCH_CHANGED FAIL; Desktop scenario3/3 PASS, физические GUID/link сохранены, remaining0. Cold/compound/transitions/corpus20/TUI/Linux5/A-B открыты.

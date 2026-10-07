@@ -76,7 +76,7 @@ if (new Set(ids).size !== ids.length) throw Error("SKILLS_ACCEPTANCE_DUPLICATE_C
 const cases = ids.map((id) => {
   const value = corpus.cases.find((item) => item.id === id)
   if (!value) throw Error("SKILLS_ACCEPTANCE_UNKNOWN_CASE")
-  const scenario = args.interface === "run" && value.id === "scenario-create"
+  const scenario = value.id === "scenario-create"
   if ((!scenario && !["docs", "default"].includes(value.group)) || value.setup || value.followup)
     throw Error("SKILLS_ACCEPTANCE_MULTITURN_SCENARIO_ADAPTER_REQUIRED")
   if (
@@ -264,6 +264,14 @@ if (args.interface === "desktop") {
   requireRedacted(out + err)
   await writeFile(join(output, "driver.log"), out + err)
   process.stdout.write(out)
+  for (const testcase of cases.filter((value) => value.group === "scenario")) {
+    for (let attempt = 1; attempt <= repeat; attempt++) {
+      const evidence = join(output, testcase.id, "attempt-" + attempt)
+      const result = Bun.file(join(evidence, "result.json"))
+      if ((await result.exists()) && (await result.json()).status === "MECHANICS_PASS_MANUAL_REVIEW_REQUIRED")
+        await verifySavedPackage(testcase, attempt, evidence)
+    }
+  }
   process.exitCode = code
 }
 if (args.interface === "run") {
@@ -333,42 +341,7 @@ if (args.interface === "run") {
         await writeFile(join(runRoot, "exit.json"), JSON.stringify({ code }))
         await command(["docker", "cp", container + ":/home/tester/evidence", runRoot])
         if (code === 0 && testcase.group === "scenario") {
-          const result = await Bun.file(join(runRoot, "evidence/result.json")).json()
-          const packagePath = `/${privateInput.connection!.username}/skills-acceptance-${sha(output).slice(0, 12)}-${testcase.id}-${attempt}.lgp`
-          if (result.packagePath !== packagePath) throw Error("SKILLS_ACCEPTANCE_PACKAGE_IDENTITY_MISMATCH")
-          const saved = join(runRoot, "evidence/built.lgp")
-          await command(["docker", "cp", args["package-container"] + ":/workdir/UserStorage" + packagePath, saved])
-          const { extractPackage } = await import("../src/package-docs/extract")
-          const structure = await extractPackage(saved)
-          await Bun.write(join(runRoot, "evidence/built.structure.json"), JSON.stringify(structure, null, 2))
-          const nodes = structure.modules.flatMap((module) => module.workflow_nodes)
-          const links = structure.modules.flatMap((module) => module.links)
-          const ids = result.builtNodes as { source: string; grouping: string }
-          const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
-          if (
-            !nodes.some((node) => same(node.guid, ids.source)) ||
-            !nodes.some((node) => same(node.guid, ids.grouping)) ||
-            !links.some((link) => same(link.source_node_guid, ids.source) && same(link.target_node_guid, ids.grouping))
-          )
-            throw Error("SKILLS_ACCEPTANCE_SAVED_GRAPH_MISMATCH")
-          await Bun.write(
-            join(runRoot, "evidence/package-proof.json"),
-            JSON.stringify(
-              {
-                packagePath,
-                sha256: await fileHash(saved),
-                nodes: ids,
-                linked: true,
-                expectedRows: [
-                  ["Alpha", 35],
-                  ["Beta", 20],
-                ],
-                coldReexecutionVerified: false,
-              },
-              null,
-              2,
-            ),
-          )
+          await verifySavedPackage(testcase, attempt, join(runRoot, "evidence"))
         }
       } finally {
         await command(["docker", "rm", container])
@@ -404,4 +377,43 @@ async function command(argv: string[]) {
   if (code !== 0) throw Error("SKILLS_ACCEPTANCE_COMMAND_FAILED")
   requireRedacted(out + err)
   return out
+}
+
+async function verifySavedPackage(testcase: (typeof cases)[number], attempt: number, evidence: string) {
+  const result = await Bun.file(join(evidence, "result.json")).json()
+  const packagePath = `/${privateInput.connection!.username}/skills-acceptance-${sha(output).slice(0, 12)}-${testcase.id}-${attempt}.lgp`
+  if (result.packagePath !== packagePath) throw Error("SKILLS_ACCEPTANCE_PACKAGE_IDENTITY_MISMATCH")
+  const saved = join(evidence, "built.lgp")
+  await command(["docker", "cp", args["package-container"] + ":/workdir/UserStorage" + packagePath, saved])
+  const { extractPackage } = await import("../src/package-docs/extract")
+  const structure = await extractPackage(saved)
+  await Bun.write(join(evidence, "built.structure.json"), JSON.stringify(structure, null, 2))
+  const nodes = structure.modules.flatMap((module) => module.workflow_nodes)
+  const links = structure.modules.flatMap((module) => module.links)
+  const ids = result.builtNodes as { source: string; grouping: string }
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
+  if (
+    !nodes.some((node) => same(node.guid, ids.source)) ||
+    !nodes.some((node) => same(node.guid, ids.grouping)) ||
+    !links.some((link) => same(link.source_node_guid, ids.source) && same(link.target_node_guid, ids.grouping))
+  )
+    throw Error("SKILLS_ACCEPTANCE_SAVED_GRAPH_MISMATCH")
+  await Bun.write(
+    join(evidence, "package-proof.json"),
+    JSON.stringify(
+      {
+        packagePath,
+        sha256: await fileHash(saved),
+        nodes: ids,
+        linked: true,
+        expectedRows: [
+          ["Alpha", 35],
+          ["Beta", 20],
+        ],
+        coldReexecutionVerified: false,
+      },
+      null,
+      2,
+    ),
+  )
 }
