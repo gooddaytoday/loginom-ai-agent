@@ -2222,6 +2222,33 @@ Native text-allow TUI прошёл обе permissions и extraction с normal ex
 пока не исправлен, повторный signal выполняется отдельно. Evidence:
 `cli-aeef6c2c3-tui-text-allow-read-path/`. План по corrections не перерабатывался.
 
+## Standalone run: согласие на вход и стандартный plan
+
+`test/cli/package-docs-permissions.test.ts` проверяет публичный CLI в чистом
+HOME/profile и PATH=/nonexistent с управляемым provider. Без `--file` текстовый
+путь автоматически отклоняется: tool error содержит подсказку `--file`,
+`permissionDenied: true`, exit 1 и `CLI_PERMISSION_REJECTED`. Original пакет
+не изменён, `.work` отсутствует, writer released. Стандартный `--agent plan`
+с оригинальным `--file` также не получает право писать вне plans directory.
+
+Source **2 PASS / 24 assertions**, compiled CLIaeef **2 PASS / 22 assertions**,
+Agent typecheck **PASS**. Evidence `cli-aeef6c2c3-permissions-green/`, logs
+`cli-permissions-source-contract-green.log`, `cli-aeef6c2c3-permissions-green.log`.
+Выбор skill управляемый; natural selection и process sampling этим тестом
+не доказываются. Native PTY/GUI sampling приведены отдельно.
+
+Исходные ошибочные предпосылки нового теста сохранены в logs: отказ run даёт
+exit 1 по существующему контракту, а не 0; явный глобальный `edit: allow`
+переопределяет обычные defaults Agent, поэтому тест plan не задаёт этот override.
+User/CLI rejection останавливает provider loop (два requests), configured deny
+возвращается модели (три requests). Это действующие разные ветви processor;
+код permissions/Agent/run outcome ради теста не менялся. Новая проверка защищает
+применение стандартных запретов, не вводит отдельную политику переопределения Agent.
+
+TUI read-path RED подтверждён collector **STABLE FAIL 3/3**, **10.013 / 10.012 /
+10.213 s**: все три CLI exit 0, extraction выполнен, writer released,
+осталась только ошибка подписи запроса. Report `tui-read-path-signal-aeef6c2c3/`.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `aeef6c2c3`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef, static 4654 resources PASS.
