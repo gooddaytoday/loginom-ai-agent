@@ -8,6 +8,60 @@ import { evalsRoot, loadConfig } from "../src/config"
 import { signalProcess, type ProcessIdentity } from "../src/process-supervisor"
 import { archiveDiagnostics } from "../src/diagnostics"
 
+test("signalProcess: краткий запрет чтения собственного /proc пережидается без ослабления identity", async () => {
+  const child = spawn(process.execPath, ["-e", `
+    const {dlopen}=await import('bun:ffi');
+    const library=dlopen('libc.so.6',{prctl:{args:['i32','u64','u64','u64','u64'],returns:'i32'}});
+    process.on('SIGUSR1',()=>{
+      if(library.symbols.prctl(4,0,0,0,0)!==0)process.exit(2);
+      process.stdout.write('closed\\n');
+      setTimeout(()=>{library.symbols.prctl(4,1,0,0,0);},30);
+    });
+    setInterval(()=>{},1000);process.stdout.write('ready\\n');
+  `], { detached: true, stdio: ["ignore", "pipe", "ignore"] })
+  const exited = new Promise(resolve => child.once("exit", resolve))
+  try {
+    await new Promise<void>(resolve => child.stdout!.on("data", data => { if (data.toString().includes("ready")) resolve() }))
+    const pid = child.pid!
+    const fields = (await readFile(`/proc/${pid}/stat`, "utf8")).split(") ")[1]!.split(" ")
+    const info = await stat(`/proc/${pid}/exe`)
+    const identity: ProcessIdentity = { pid, starttime: fields[19]!, uid: process.getuid!(), parent: Number(fields[1]),
+      group: Number(fields[2]), session: Number(fields[3]), device: info.dev, inode: info.ino, executable: await readlink(`/proc/${pid}/exe`) }
+    const closed = new Promise<void>(resolve => child.stdout!.on("data", data => { if (data.toString().includes("closed")) resolve() }))
+    child.kill("SIGUSR1")
+    await closed
+    expect(await signalProcess(identity, "SIGTERM")).toBe(true)
+    await exited
+  } finally { child.kill("SIGKILL"); await exited }
+}, 5_000)
+
+test("signalProcess: постоянный запрет чтения собственного /proc остаётся отказом и не посылает сигнал", async () => {
+  const child = spawn(process.execPath, ["-e", `
+    const {dlopen}=await import('bun:ffi');
+    const library=dlopen('libc.so.6',{prctl:{args:['i32','u64','u64','u64','u64'],returns:'i32'}});
+    process.on('SIGUSR1',()=>{
+      if(library.symbols.prctl(4,0,0,0,0)!==0)process.exit(2);
+      process.stdout.write('closed\\n');
+    });
+    setInterval(()=>{},1000);process.stdout.write('ready\\n');
+  `], { detached: true, stdio: ["ignore", "pipe", "ignore"] })
+  const exited = new Promise(resolve => child.once("exit", resolve))
+  try {
+    await new Promise<void>(resolve => child.stdout!.on("data", data => { if (data.toString().includes("ready")) resolve() }))
+    const pid = child.pid!
+    const fields = (await readFile(`/proc/${pid}/stat`, "utf8")).split(") ")[1]!.split(" ")
+    const info = await stat(`/proc/${pid}/exe`)
+    const identity: ProcessIdentity = { pid, starttime: fields[19]!, uid: process.getuid!(), parent: Number(fields[1]),
+      group: Number(fields[2]), session: Number(fields[3]), device: info.dev, inode: info.ino, executable: await readlink(`/proc/${pid}/exe`) }
+    const closed = new Promise<void>(resolve => child.stdout!.on("data", data => { if (data.toString().includes("closed")) resolve() }))
+    child.kill("SIGUSR1")
+    await closed
+    await expect(signalProcess(identity, "SIGTERM")).rejects.toThrow("Cannot inspect process identity")
+    expect(child.exitCode).toBeNull()
+    process.kill(pid, 0)
+  } finally { child.kill("SIGKILL"); await exited }
+}, 5_000)
+
 test("signalProcess: другая birth или executable identity не разрешает сигнал", async () => {
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { detached: true, stdio: "ignore" })
   const exited = new Promise((resolve) => child.once("exit", resolve))

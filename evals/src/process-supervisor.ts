@@ -85,7 +85,10 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
     // /proc files are separate observations. Avoid recording pre-exec argv with
     // a post-exec executable, or a PGID sampled before detached spawn settles.
     if (finalExecutable.dev !== info.dev || finalExecutable.ino !== info.ino || final[1] !== fields[1] || final[2] !== fields[2] || final[3] !== fields[3]) {
-      if (retries) return processView(pid, relevant, owners, retries - 1)
+      if (retries) {
+        await Bun.sleep(20)
+        return processView(pid, relevant, owners, retries - 1)
+      }
       throw Error("Process identity did not settle during read")
     }
     return { pid, uid: owner.uid, starttime: fields[19]!, parent: Number(fields[1]),
@@ -94,7 +97,14 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
       cwd: await readlink(path.join(directory, "cwd")) }
   } catch (error) {
     if (gone(error)) return undefined
-    if (!relevant && ["EACCES", "EPERM"].includes((error as NodeJS.ErrnoException).code ?? "")) return undefined
+    const denied = ["EACCES", "EPERM"].includes((error as NodeJS.ErrnoException).code ?? "")
+    if (!relevant && denied) return undefined
+    // exec can briefly reset dumpability. A fresh complete read must still
+    // establish identity; persistent denial consumes the same bounded budget.
+    if (relevant && denied && retries) {
+      await Bun.sleep(20)
+      return processView(pid, relevant, owners, retries - 1)
+    }
     throw Error(`Cannot inspect process identity PID ${pid}`)
   }
 }
