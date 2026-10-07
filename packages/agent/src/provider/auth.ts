@@ -210,13 +210,13 @@ const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> = Layer.
 
       if ("refresh" in result) {
         const { type: _, provider: __, refresh, access, expires, ...extra } = result
-        yield* auth.set(input.providerID, {
+        yield* Auth.verifiedLogin(input.providerID, {
           type: "oauth",
           access,
           refresh,
           expires,
           ...extra,
-        })
+        }).pipe(Effect.provideService(Auth.Service, auth))
       }
     })
 

@@ -10,6 +10,8 @@ import { buildCliInstaller } from "./build-cli-installer"
 import { collectBuildNotices } from "./collect-build-notices"
 import { writeCliManifest, verifyCliManifest } from "../src/cli-manifest"
 import { cliSourceSnapshot } from "./cli-source-snapshot"
+import { cliCapabilities } from "@loginom-ai-agent/product/cli-capabilities"
+import { verifyCliCapabilities } from "./verify-cli-capabilities"
 import release from "../../product/loginom-release.json"
 import bunNotice from "../licenses/bun/source.json"
 import bunNativeNotices from "../licenses/bun/native/sources.json"
@@ -133,6 +135,9 @@ try {
   if (JSON.stringify(source) !== JSON.stringify(await buildPhase("cli-source-snapshot", () => cliSourceSnapshot(repo))))
     throw new Error("LOGINOM_SOURCE_CHANGED_DURING_BUILD")
   const pkg = await Bun.file(join(artifact, "package.json")).json()
+  await buildPhase("cli-capabilities", () =>
+    verifyCliCapabilities(join(artifact, "bin/loginom-ai-agent-cli"), cliCapabilities(process.platform, process.arch, "glibc")),
+  )
   await buildPhase("cli-manifest", () =>
     writeCliManifest(artifact, {
       version: pkg.version,
@@ -140,6 +145,7 @@ try {
       platform: process.platform,
       arch: process.arch,
       ...source,
+      capabilities: cliCapabilities(process.platform, process.arch, "glibc"),
       dependencies: {
         bun: process.versions.bun,
         node: release.nodeVersion,
