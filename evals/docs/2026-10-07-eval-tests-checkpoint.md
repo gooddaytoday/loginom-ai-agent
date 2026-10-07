@@ -11,8 +11,8 @@ Profiles inventory/setup/check/model smokes 4/4 PASS; actual DB reference 6.1-so
 Judge auth gpt-6-astra/high smoke PASS; analytic artifact judgment не выполнялся. LAB-22 third completed/PASS: actual Codex 0.159.2/6.1-sol/xhigh/companion, health+actor search isError=false, auto Git Peer.
 Stand/routes/Multica enabled/active; registration сохранена, max=1/no auto-update/reload; systemd verify PASS, reboot не проверен. Rich leader + Ben, squad ровно 2.
 License narrow forward к 10.200.1.87 TCP/UDP 3186/3187: container TCP оба PASS, UDP не проверен; остальной DROP сохранён.
-Xray exact 3 domains:443 → freedom UseIPv4, прочее VLESS; apps HTTP proxy 10.200.13.152:2080, MCP explicit env/upper+lower; temporary tinyproxy/2082/2083 removed.
-Routes dst/32 priority 8998 + nft TCP443 pins 62.113.108.18/151.244.228.56, остальной DROP сохранён; DNS pin требует сверки. Final HTTP catalog 4/4 PASS, default TLS1.3/PQ.
+VPN exceptions: logi-test-plan.bg.local/mcp.loginom.ai/app.loginom.ai direct HTTP/HTTPS; прежние mas/ov direct сохранены, прочее VLESS. Apps HTTP proxy 10.200.13.152:2080; scoped config/service checks PASS.
+Routes dst/32 priority 8998: 10.200.11.224/62.113.108.18/151.244.228.56/194.156.118.61; scoped nft 80/443, DROP сохранён. После restart curl direct+proxy и Node runtime 3 URL=200; внутренний HTTPS не поднят, HTTP работает. DNS pins требуют сверки.
 Final remote SHA63a: 386/386 PASS, 29 files/1666 expects/373.177 s; frozen install/typecheck 0, Python 35 tasks/113 mutations PASS без LLM. Native timeout/interrupt cleanup/recovery/history PASS.
 Корпус 35/280 unchanged vs import 55fc9/source d5fb803; input/rubric/calibration pins прежние, 210 source hashes PASS. Before-small-evals 904 corpus не содержит, старые 12 task files unchanged.
 Final tar 87676 bytes, SHA 067fca83da31b2ca87161b6409e676ee21e1f9690195b3d954b704717302b33b: 41 assets+manifest/COLD-RERUN, nested 18 records 340cce… unchanged; DELIVERED_VERIFIED: remote manifests и CLI re-download hash PASS, role runtime.md скопированы; LAB-16 paths опубликованы --no-start/in_review, attachment 01a11629-6d97-7dbd-8e61-683bcd1d616a. Archive delivery PENDING — исторический immutable snapshot.
