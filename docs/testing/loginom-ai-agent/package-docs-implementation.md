@@ -2853,16 +2853,58 @@ connection с `browser: failed`, затем Help B и emit без Chromium exec.
 матрица одного финального кандидата и browser cleanup/cancellation остаётся
 в этапе 8; этот checkpoint её не заменяет.
 
+## Профиль и вложения: сверка выполненных подпунктов этапа 5
+
+Текущий source regression `task-scope/profile-tools/prompt/revert-compact/
+compaction/package-docs` **200 PASS / 2 SKIP / 881 assertions**; два SKIP
+относятся к отключённому V2 projector. Host task-scope **11 PASS / 65 assertions**.
+Evidence: `agent-profile-stage5-final.log`, `host-task-scope-stage5-final.log`.
+Исполнение — реальные публичные prompt/tool/Host paths с scripted provider
+и собственными runtime fixtures; это не live классификация модели.
+
+Результаты дополняют прежние metadata/origin/HTTP, Task bypass и CLI attachment
+проверки из этого журнала. В плане отмечены уже реализованные reducer/history,
+resolve/execute allowlists, private pending/apply на текущем run, первый
+prepare/admission и V1 новый prompt во время работы. Проверены отказ apply,
+revert pending, новая задача/default, отмена release/resume, owned originals
+после compaction/fork, forbidden subtask и impersonation. История применяется
+до tool dispatch; Host остаётся authority до runtime/input/journal side effects.
+Требования плана не менялись. Комплексная установленная матрица переходов и
+build → docs semantic flow ещё не приняты; этап 5 целиком не отмечен выполненным.
+
+CLIc721 серия завершена: **3/3 mechanics/Help B PASS**, 114.269/190.124/172.915 s,
+Chromium exec0, неизменный input SHA, по одному PDF. Все шесть PDF страниц
+просмотрены: читаемая кириллица и правильная нумерация 1/2, layout PASS.
+Полный facts gate **0/3**, во всех описаниях неподтверждённая демонстрационная
+цель; последняя попытка добавляет предположение об учебном назначении.
+Отдельные `report-verification.json` и `manual-facts-verification.json`
+сохраняют различие механики/фактов. Старые контейнеры удалены.
+
+Новая clean сборка CLI `704d441d587ea3b537c35fd50fb56cc20052cc46`, tree
+`08aa67abf702f67bbf4d0fe121193d702bce600dcc1340af5385effe7cc94cd5`, archive
+`734e47376d38967c87420d3adbcf648ae5e40de8350264b84f50303ae7db5bd1`:
+build/manifest/archive roundtrip/source verification PASS, dirty false.
+`cli-live-pdf-704d441d5/` использует прежние driver/fixture/model/variant/image
+и отдельные контейнеры; результаты пока не приняты.
+
+Соседняя калибровка проверена read-only через thread snapshot и git refs:
+`calibration-near-miss` 64d634087, `evals` 904f7f85b; `evals/` совпадает.
+323 tests/typecheck/XML guard приняты владельцем, live judge после guard
+повторно не запускался. Наблюдаемые harness gaps и предлагаемая отдельная
+задача записаны в [handoff](package-docs-evals-handoff.md). Запрошено только
+назначение владельца этой задачи согласно правилу параллельной работы;
+её код, чужие worktree/профили/.env/результаты не изменялись. Это ещё не pin A/B.
+
 ## Checkpoint
 
-- Product candidates: Desktop `2aa3a3284`, CLI `c7213af4c`, clean source/artifacts/manifests; Desktop и TUI83 diagnostics 5/5 stable PASS; разные source pins.
+- Product candidates: Desktop `2aa3a3284`, CLI `704d441d5`, clean source/artifacts/manifests; Desktop и TUI83 diagnostics 5/5 stable PASS; разные source pins.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node pipeline 43 PASS; port/null и template fact guidance, catalog 21 PASS / integrity 9 PASS; первый CLIc721 PDF layout/mechanics PASS, facts RED; новая guidance ждёт отдельный live gate.
+- Docs Node pipeline 43 PASS; catalog21/integrity9 PASS; CLIc721 PDF 3/3 layout/mechanics PASS, 0/3 facts; CLI704 новая guidance ждёт live gate.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
-- Scope/command/HTTP/Runner/revert: 168 PASS / 1 SKIP; offline skill regression 135 PASS / 1 SKIP; typecheck PASS.
+- Scope/history/prompt/revert/docs: 200 PASS / 2 V2 SKIP; Host scope11 PASS; пять implementation подпунктов этапа 5 отмечены; installed переходы ещё открыты.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
@@ -2874,4 +2916,4 @@ connection с `browser: failed`, затем Help B и emit без Chromium exec.
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; static DEB/AppImage2aa PASS; GUI2aa 5 permissions и missing/modified/unlisted cases PASS; TUI typecheck PASS; report/corpus/evals и остальные Linux gates открыты.
-- Далее: оставшиеся Help/history boundaries, живые report/routing gates и парный evals gate; требования плана повторно не перерабатывать.
+- Далее: CLI704 facts gate, installed переходы и routing корпус; для A/B требуется согласованная отдельная harness задача из handoff. Требования плана не перерабатывать.

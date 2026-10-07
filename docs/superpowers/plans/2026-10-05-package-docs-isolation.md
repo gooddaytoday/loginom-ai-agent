@@ -763,15 +763,15 @@ Desktop renderer picker при оптимизации чтения пакета.
 **Тесты:** `agent/test/session/task-scope.test.ts`, `prompt.test.ts`, CLI file input,
 TUI local attachment, HostPort/admission и продуктовый executor.
 
-- [ ] Реализовать чистый вывод профиля, доверенные activation/replay metadata
+- [x] Реализовать чистый вывод профиля, доверенные activation/replay metadata
   и переходы 2.4. Полная история с учётом revert/fork, compaction-only,
   synthetic continuations, shell/subtask и overflow-replay. Slash-команда
   сохраняет activation для restart. Старые сессии начинают с `default`.
-- [ ] Применить явные наборы 2.5 в resolve и execute, проверяя происхождение
+- [x] Применить явные наборы 2.5 в resolve и execute, проверяя происхождение
   инструмента и обычные permissions. `task` скрыт и отклоняется в обоих
   продуктовых профилях; одноимённый plugin/MCP не обходит allowlist.
   `package_docs_run` существует только в docs-каталоге, не в общей registry.
-- [ ] Приватный `scope` действует на имеющемся run. При активации проверить
+- [x] Приватный `scope` действует на имеющемся run. При активации проверить
   pending-переход, учитывая предыдущие pending-запросы той же пачки;
   повторно проверить безопасность на следующей границе, затем применить и
   записать окончательную activation. Отказ не оставляет ложный grant в истории.
@@ -784,7 +784,7 @@ TUI local attachment, HostPort/admission и продуктовый executor.
   message ID; replay сводить к этому ID, а не допускать повторную загрузку.
   Исключить `.lgp` по MIME/расширению, включая старые `data:`-части из истории.
   CSV, приложенный до просьбы построить сценарий, сохраняет право на admission.
-- [ ] Зафиксировать порядок первого разрешённого prepare в
+- [x] Зафиксировать порядок первого разрешённого prepare в
   `loginom-automation`: проверка scope → создание runtime → admission исходных
   байтов → workspace preparation/ответ prepare с `input_artifacts`.
   Это одна сценарная подготовка; отдельный admit не должен стартовать браузер
@@ -801,7 +801,7 @@ TUI local attachment, HostPort/admission и продуктовый executor.
   Желательно перевести native picker Desktop для `.lgp` на передачу только
   пути без чтения байтов в renderer и зависимости от общего лимита 20 MiB;
   если отложено, явно указать этот предел Desktop.
-- [ ] Сохранить V1-поведение нового сообщения во время работы: сообщение
+- [x] Сохранить V1-поведение нового сообщения во время работы: сообщение
   сохраняется, текущий вызов не прерывается, следующий цикл начинает новую
   задачу с `default`; проверить гонку с выходом из цикла. «Очередь V2» сюда
   не переносить. Открытый браузер и recovery state сохраняются.
