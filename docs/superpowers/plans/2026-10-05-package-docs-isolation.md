@@ -653,7 +653,7 @@ type PackageDocsRun =
 в session directory, исходный `.lgp` и старые отчёты не изменяются,
 пользовательские запреты соблюдаются, ошибки не оставляют готовый на вид файл.
 
-### Этап 3. Bundled-источник в Desktop и standalone CLI
+### Этап 3. Bundled-источник в Desktop и standalone CLI — выполнен
 
 **Файлы:** `packages/product` export `./skills`,
 `packages/agent/src/{effect/runtime-flags,skill/index,command/index}.ts`,
@@ -682,7 +682,7 @@ type PackageDocsRun =
   и CLI payload. AppImage всегда собирается `package:linux` и статически
   проверяется release workflow; проверка DEB не заменяет его проверку.
   Чистый установленный запуск AppImage не покрыт Docker-матрицей и отмечается отдельно.
-- [ ] Проверить отсутствие/изменение/неучтённый файл, неверный root, обход через
+- [x] Проверить отсутствие/изменение/неучтённый файл, неверный root, обход через
   CLI_BUNDLE, локальные reserved/obsolete skills/команды, порядок обычных sources,
   работу в пустом каталоге вне git с чистыми отдельными profiles/HOME.
   Чистый HOME нужен: поиск вверх вне git доходит до `/`.

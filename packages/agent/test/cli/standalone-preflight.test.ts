@@ -30,10 +30,16 @@ test("ordinary standalone chat reaches the provider without configured Loginom a
   }
 }, 30_000)
 
-test.each(["unconfigured", "help-unavailable", "browser-unavailable"])(
+// Native coverage uses the copied compiled resource tree. The source-only browser
+// refusal fixture deliberately substitutes managed-entry and stays separate.
+test.each(
+  process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN
+    ? ["unconfigured", "help-unavailable"]
+    : ["unconfigured", "help-unavailable", "browser-unavailable"],
+)(
   "lazy scenario preparation preserves standalone connection exit: %s",
   async (mode) => {
-    await using fixture = await standaloneFixture()
+    await using fixture = await standaloneFixture(process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN)
     const provider = ManagedRuntime.make(TestLLMServer.layer)
     const cleanup: (() => void | Promise<void>)[] = []
     try {
@@ -43,14 +49,15 @@ test.each(["unconfigured", "help-unavailable", "browser-unavailable"])(
           mode === "browser-unavailable"
             ? await knowledgeServer({ after: (callback) => cleanup.push(callback) })
             : undefined
-        await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
-        await symlink(
-          resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
-          join(fixture.bundle, "runtime/src/knowledge-entry.mjs"),
-        )
-        await writeFile(
-          join(fixture.bundle, "runtime/src/managed-entry.mjs"),
-          `
+        if (!fixture.binary) {
+          await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
+          await symlink(
+            resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
+            join(fixture.bundle, "runtime/src/knowledge-entry.mjs"),
+          )
+          await writeFile(
+            join(fixture.bundle, "runtime/src/managed-entry.mjs"),
+            `
         import {writeFileSync} from 'node:fs';
         process.on('message', message => {
           if (message.operation === 'start') {
@@ -60,12 +67,13 @@ test.each(["unconfigured", "help-unavailable", "browser-unavailable"])(
           if (message.operation === 'close') process.send({id: message.id, result: {closed: true}}, () => process.disconnect());
         });
       `,
-        )
-        if (server) {
+          )
+        }
+        if (server || fixture.binary) {
           const manifest = JSON.parse(await readFile(join(fixture.bundle, "resource-manifest.json"), "utf8"))
           await writeFile(
             join(fixture.bundle, "resource-manifest.json"),
-            JSON.stringify({ ...manifest, endpoint: server.endpoint }),
+            JSON.stringify({ ...manifest, endpoint: server?.endpoint ?? "http://127.0.0.1:1/mcp" }),
           )
         }
         const store = connectionStore(join(fixture.profile, "loginom/connection"), cliCredentials("linux"))
@@ -102,7 +110,12 @@ test.each(["unconfigured", "help-unavailable", "browser-unavailable"])(
         join(fixture.profile, "config/loginom-ai-agent.json"),
         JSON.stringify(testProviderConfig(llm.url)),
       )
-      const result = await invoke(fixture, ["--dangerously-skip-permissions", "--", "Построй сценарий суммирования."])
+      const result = await invoke(
+        fixture,
+        ["--dangerously-skip-permissions", "--", "Построй сценарий суммирования."],
+        undefined,
+        fixture.binary ? { PATH: "/nonexistent" } : undefined,
+      )
       expect(
         result.events.find((event) => event.type === "tool_use" && event.part.tool === "loginom_dock_prepare")?.part
           .state,

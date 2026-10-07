@@ -2673,15 +2673,77 @@ Typecheck обнаружил недостающие event ID/explicit undefined 
 Логи `tui-bootstrap-diagnostic-{source,source-green,full,full-green,typecheck,typecheck-green}.log`.
 Native GREEN новой полной CLI-сборки ещё требуется; этап 3 остаётся открытым.
 
+## Native CLI83: TUI diagnostics и ленивые отказы
+
+Из clean source `83a2aff26ce793b9351e92a13042b1aa4759482b` построена полная CLI
+с ресурсами, installer и archive roundtrip. Candidate
+`candidate-83a2aff26-cli/payload/`, archive SHA-256
+`7a5920de3bee9efb90fcdd26fff07ae6a89dbe2cf3acc8f41028219f35f04e7d`,
+sourceTreeSha256
+`eed8d0e63cd63129112de9510b581cb8d64df88c94ea29222a71f6fc3d9acab0`,
+sourceDirty=false. Build, manifest/source verification и повторный checksum
+**PASS**; `cli-83a2aff26-{build.log,verified.json}`.
+
+Initial reserved-skills native TUI **GREEN**; collector подтвердил
+**STABLE 5/5 PASS**, 10.562 / 10.071 / 10.277 / 10.306 / 11.788 s.
+Warning `Ignored external skill 'package_docs'` присутствует в raw/plain
+terminal; каталог3, trusted locations, оригинальная MIME/file URI, SHA и
+extracted structure проверены. Writer absent, forced=false, own live=0,
+Chromium не наблюдался, temporary roots удалены. Bookend hashes совпали;
+evidence `tui-reserved-warning-stability-83a2aff26/report.md`.
+
+Driver далее получил отдельный `--reserved-diagnostics commands` и
+`--modified-skill`. Последний запускает compiled CLI с CLI_BUNDLE, указывающим
+на собственную полную reflink copy resources с изменённым SKILL.md; копия
+удаляется вместе с temporary root, изменённый Markdown сохраняется в evidence.
+Изменённый skill не принимается даже при внешних reserved copies: model
+catalog builtin-only, UNTRUSTED отсутствует, skill возвращает reinstall hint,
+package_docs_run и structure не появляются, оригинальное вложение сохраняется.
+Scripted provider явно отвечает об отсутствии skill. Product CLI/resources
+не меняются. Native command-collision и damaged-copy cases **2 PASS**,
+`tui-83a2aff26-{reserved-commands,modified-skill}-green/`; normal exit0,
+no Chromium / remaining0 / profile released.
+
+Окончательный driver повторно проверен в трёх fresh native запусках: clean,
+reserved skills, reserved commands — **3 PASS**,
+`tui-83a2aff26-final-{clean,reserved-skills,reserved-commands}/`.
+Серия 5/5 относится к предыдущей версии driver до добавления двух opt-in
+режимов; её hash закреплён в отчёте. Modified case выполнялся один раз.
+Python AST и `git diff --check` **PASS**.
+
+Native адаптер existing lazy-preflight test использует
+`LOGINOM_AI_AGENT_TEST_CLI_BIN`: unconfigured и help-unavailable выполняются
+через compiled binary и копию его настоящих Node/Host/knowledge resources.
+Source-only managed-entry replacement не используется; меняется только
+endpoint собственного resource manifest на недоступный loopback. PATH продукта
+`/nonexistent`; реальные пользовательские настройки/секреты не читаются.
+Оба native cases **PASS**, 12 assertions: конкретный prepare error, JSON terminal
+error/exit2 или exit1, writer release и отсутствие runtime directory.
+Остальные тесты файла для native gate отфильтрованы.
+Полный source файл **12 PASS / 84 assertions**, Agent `bun typecheck` **PASS**;
+`cli-83a2aff26-lazy-preflight-native.log`,
+`cli-lazy-preflight-adapter-source.log`,
+`agent-lazy-preflight-adapter-typecheck.log`.
+Эта проверка exit-контракта не делает process sampling и не заменяет весь
+knowledge/cancellation/Linux gate этапа 4.
+
+Этап 3 завершён совокупностью source integrity/precedence tests, native CLI
+discovery, Desktop clean/reserved/damaged cases и TUI positive/reserved/damaged
+проверок. Статическая проверка DEB/AppImage относится к Desktop2aa, новая CLI
+сборка — CLI83; весь установленный продукт на одном source pin, live natural
+routing/report quality и парный evals gate остаются отдельными открытыми этапами.
+Требования замороженного плана не перерабатывались: отмечен только выполненный
+этап и его последний подтверждённый подпункт.
+
 ## Checkpoint
 
-- Product candidates: Desktop `2aa3a3284`, CLI `6cfda621f`, clean source/artifacts/manifests; Desktop reserved diagnostics и damaged-bundle rejection 5/5 stable PASS; разные source pins.
+- Product candidates: Desktop `2aa3a3284`, CLI `83a2aff26`, clean source/artifacts/manifests; Desktop и TUI diagnostics 5/5 stable PASS; разные source pins.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
-- Этапы 0–2 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
+- Этапы 0–3 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 43 PASS; dependency wording и list numbers RED→GREEN; catalog 19 PASS, Host typecheck PASS; live report gate открыт.
-- BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; lazy CLI exit 2 native, exit 1 source; этап 4 открыт.
+- BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; lazy CLI exit 2 и 1 native PASS; весь этап 4 открыт.
 - Scope/command/HTTP/Runner/revert: 168 PASS / 1 SKIP; offline skill regression 135 PASS / 1 SKIP; typecheck PASS.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
@@ -2691,7 +2753,7 @@ Native GREEN новой полной CLI-сборки ещё требуется;
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
-- CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cfd discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI warning CLI6cf RED 3/3, source GREEN / suite 198 PASS / 1 SKIP; Desktop diagnostics 5/5 stable PASS.
+- CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; static DEB/AppImage2aa PASS; GUI2aa 5 permissions и missing/modified/unlisted cases PASS; TUI typecheck PASS; report/corpus/evals и остальные Linux gates открыты.
-- Далее: native TUI reserved diagnostics, native lazy Help exit 1 и живые report/routing gates; требования плана повторно не перерабатывать.
+- Далее: оставшиеся Help/history boundaries, живые report/routing gates и парный evals gate; требования плана повторно не перерабатывать.

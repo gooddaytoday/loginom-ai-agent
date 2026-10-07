@@ -64,7 +64,8 @@ def main():
     input_kind = parser.add_mutually_exclusive_group(required=True)
     input_kind.add_argument("--attachment", choices=["paste", "mention"])
     input_kind.add_argument("--text-permission", choices=["allow", "deny"])
-    parser.add_argument("--reserved-diagnostics", choices=["skills"])
+    parser.add_argument("--reserved-diagnostics", choices=["skills", "commands"])
+    parser.add_argument("--modified-skill", action="store_true")
     args = parser.parse_args()
     assert sys.platform == "linux", "This acceptance driver requires Linux /proc and PTY"
     assert args.binary.is_absolute() and args.binary.is_file()
@@ -77,7 +78,7 @@ def main():
         try:
             run(args, workspace)
         finally:
-            shutil.copytree(workspace, args.artifacts / "workspace")
+            shutil.copytree(workspace, args.artifacts / "workspace", ignore=shutil.ignore_patterns(".test-bundle"))
 
 
 def run(args, workspace):
@@ -105,6 +106,14 @@ def run(args, workspace):
     env = dict(os.environ, LOGINOM_AI_AGENT_PURE="1", LOGINOM_AI_AGENT_CLI_PROFILE=str(profile),
         TERM="xterm-256color", PATH="/nonexistent", HOME=str(home), XDG_CONFIG_HOME=str(home / "config"), XDG_DATA_HOME=str(home / "data"), XDG_CACHE_HOME=str(home / "cache"), XDG_STATE_HOME=str(home / "state"))
     env.pop("DISPLAY", None)
+    if args.modified_skill:
+        assert args.attachment and args.reserved_diagnostics == "skills", "Damage case requires attachment and reserved external copies"
+        bundle = workspace / ".test-bundle"
+        subprocess.run(["/usr/bin/cp", "--reflink=auto", "-a", str(args.binary.parent.parent / "resources/loginom"), str(bundle)], check=True)
+        skill = bundle / "skills/package-docs/SKILL.md"
+        skill.write_text(skill.read_text() + "\nMODIFIED PRODUCT SKILL\n")
+        shutil.copyfile(skill, args.artifacts / "modified-SKILL.md")
+        env["LOGINOM_AI_AGENT_CLI_BUNDLE"] = str(bundle)
     # Initialize profile metadata through the public CLI before adding model configuration.
     initialized = subprocess.run([str(args.binary), "loginom", "status", "--format", "json"],
         cwd=workspace, env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=30)
@@ -132,7 +141,7 @@ def run(args, workspace):
             )
             docs = any(tool["function"]["name"] == "package_docs_run" for tool in body.get("tools", []))
             activation_failed = activated and not docs
-            delta = {"content": "PTY docs title" if title else "Структура извлечена."}
+            delta = {"content": "PTY docs title" if title else "Skill недоступен." if activation_failed else "Структура извлечена."}
             finish = "stop"
             if not title and not extracted and not activation_failed:
                 delta = {"tool_calls": [{"index": 0, "id": "extract" if docs else "activate", "type": "function",
@@ -160,6 +169,8 @@ def run(args, workspace):
                 "reasoning": False, "temperature": False, "tool_call": True, "release_date": "2025-01-01",
                 "limit": {"context": 100000, "output": 10000}, "cost": {"input": 0, "output": 0}, "options": {}}},
             "options": {"apiKey": "test-key", "baseURL": f"http://127.0.0.1:{server.server_port}/v1"}}}}
+    if args.reserved_diagnostics == "commands":
+        config["command"] = {name: {"template": "UNTRUSTED replacement command"} for name in reserved}
     configuration = profile / "config/loginom-ai-agent.json"
     configuration.write_text(json.dumps(config))
     configuration.chmod(0o600)
@@ -228,7 +239,7 @@ def run(args, workspace):
                         parts = [json.loads(row[0]) for row in db.execute("select data from part")]
                     if any(part.get("type") == "tool" and part.get("tool") == "package_docs_run" and part.get("state", {}).get("status") == "error" for part in parts):
                         send(b"\x04", "exit")
-            elif step == "submitted" and finished.is_set() and "Структура извлечена." in rendered:
+            elif step == "submitted" and finished.is_set() and ("Skill недоступен." if args.modified_skill else "Структура извлечена.") in rendered:
                 send(b"\x04", "exit")
         forced = child.poll() is None
     finally:
@@ -268,7 +279,7 @@ def run(args, workspace):
         "forced": forced, "step": step, "guard": (profile / ".writer").exists(), "alive": alive,
         "chromiumObserved": chromium, "catalogs": catalogs, "structures": [str(p) for p in structures],
         "files": files, "systemNodePythonUnavailable": True, "readPermission": "ask",
-        "reservedDiagnostics": args.reserved_diagnostics, "visibleWarnings": warnings,
+        "reservedDiagnostics": args.reserved_diagnostics, "modifiedSkill": args.modified_skill, "visibleWarnings": warnings,
         "toolErrors": [part["state"]["error"] for part in parts if part.get("type") == "tool" and part.get("state", {}).get("status") == "error"]}
     (args.artifacts / "result.json").write_text(json.dumps(result, ensure_ascii=False))
     print(json.dumps(result, ensure_ascii=False))
@@ -279,10 +290,12 @@ def run(args, workspace):
     system = "\n".join(message["content"] for message in first["messages"]
         if message.get("role") == "system" and isinstance(message.get("content"), str))
     discovered = re.findall(r"<skill>\s*<name>(.*?)</name>.*?<location>(.*?)</location>\s*</skill>", system, re.S)
-    assert sorted(name for name, _ in discovered) == ["customize-opencode", "loginom-automation", "package-docs"], "Clean workspace must not discover ancestor/home skills"
+    expected_names = ["customize-opencode"] if args.modified_skill else ["customize-opencode", "loginom-automation", "package-docs"]
+    assert sorted(name for name, _ in discovered) == expected_names, "Workspace must expose only trusted, valid skills"
     assert "UNTRUSTED" not in system, "External reserved skill must not enter the model catalog"
-    if args.reserved_diagnostics == "skills":
-        assert any(kind == "skill" and name in reserved for kind, name in warnings), "Ignored skill diagnostic must be visible in the native TUI"
+    if args.reserved_diagnostics:
+        expected = "skill" if args.reserved_diagnostics == "skills" else "command"
+        assert any(kind == expected and name in reserved for kind, name in warnings), f"Ignored {expected} diagnostic must be visible in the native TUI"
     bundled = args.binary.parent.parent / "resources/loginom/skills"
     for name, location in discovered:
         if name != "customize-opencode":
@@ -291,6 +304,12 @@ def run(args, workspace):
     for catalog in catalogs:
         if "package_docs_run" in catalog:
             assert not {"bash", "task", "loginom_dock_prepare"}.intersection(catalog)
+    if args.modified_skill:
+        assert len(files) == 1 and files[0]["url"] == lgp.as_uri() and files[0]["mime"] == "application/x-loginom-package"
+        assert not structures and all("package_docs_run" not in catalog for catalog in catalogs)
+        assert any("Bundled skills are unavailable" in error for error in result["toolErrors"])
+        assert not any(part.get("tool") == "skill" and part.get("state", {}).get("status") == "completed" for part in parts)
+        return
     if mode == "text-deny":
         assert not files and not structures
         assert any("rejected permission" in error for error in result["toolErrors"])

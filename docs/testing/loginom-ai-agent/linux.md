@@ -79,6 +79,23 @@ reinstall diagnostic, отсутствие bundled skills/команд и вне
 Это контролируемая повреждённая копия native Desktop, отдельная от проверки
 неизменного установленного артефакта.
 
+Native TUI проверяет `packages/agent/test/cli/tui/package-docs-pty.py`:
+из `packages/agent` задать абсолютные `--binary`, новый `--artifacts` и
+`--attachment paste`/`mention` либо `--text-permission allow`/`deny`.
+`--reserved-diagnostics skills`/`commands` создаёт только собственные внешние
+коллизии и требует видимое предупреждение. `--modified-skill` вместе с paste
+и reserved skills проверяет отказ без fallback через собственную копию
+resources и CLI_BUNDLE. Python — внешний test driver; продукт использует
+поставляемый Node. Provider управляемый, естественная активация проверяется
+отдельно; sampling процессов и profile cleanup сохраняются в evidence.
+
+Ленивые CLI exit2/exit1 проверить из `packages/agent` командой
+`bun test test/cli/standalone-preflight.test.ts -t 'lazy scenario preparation'`
+с абсолютными `LOGINOM_AI_AGENT_TEST_CLI_BIN` и `LOGINOM_AI_AGENT_TEST_NODE`.
+Native режим покрывает unconfigured/help-unavailable через compiled ресурсы;
+endpoint меняется только в собственной копии manifest. Остальные source cases,
+включая искусственный browser refusal, этот выбор не запускает.
+
 `test/loginom/gui-smoke.mjs` запускается закреплённым Node под Xvfb либо в отдельной Wayland-сессии. `LOGINOM_AI_AGENT_TEST_EXECUTABLE` указывает установленный бинарник; без переменной проверяется локальная сборка. `LOGINOM_AI_AGENT_TEST_CONFIG` — абсолютный путь к приватному тестовому конфигу Dock с разрешённой passwordless учётной записью. Значение ключа не передаётся в аргументах процесса или выводе. Проверка использует отдельный временный профиль, выполняет check/save, проверяет plaintext/0600 и повторный запуск без мастера.
 
 Для Wayland указать `LOGINOM_AI_AGENT_TEST_WAYLAND=1`, `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, `XDG_SESSION_TYPE=wayland`, убрать `DISPLAY`. Проверка в headless Weston подтверждает использование протокола Wayland, но не заменяет пользовательский сеанс GNOME/KDE. Если Weston извлечён из пакетов без системной установки, его модули можно задать через `WESTON_MODULE_MAP` — пары `имя=путь`, разделённые `;` ([исходный загрузчик Weston](https://cgit.freedesktop.org/wayland/weston/tree/libweston/compositor.c)).
