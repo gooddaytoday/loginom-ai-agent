@@ -1,0 +1,62 @@
+{
+  "task_id": "nps-segments-by-tier",
+  "dataset_sha256": {
+    "dataset.csv": "14809c4e56dfe5edc82631135a9b74a3ee218bae394271eed69de4bed212f571"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "cd72c5023ffab7a8eebf66b209258102e3872a0930aea4d9039dfe60f54d1bc1"
+  },
+  "reference_sha256": "49a19978c9409f9445a6837689244f2131afa52c4271b979839ad38100953d7f",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-nps-segments-by-tier-3.lgp",
+    "package_origin": "instructed",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/ef653b76e6fee9e7ac7a1bbc91ae1ee539e60890645d972cb5a01ae729c66263-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 3,
+    "total": 3,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_f03c0b24dffe9Su4F0tP8Nvt66",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-02T13:53:14+03:00",
+    "duration_s": 543,
+    "tokens": {
+      "input": 58832,
+      "output": 3465,
+      "reasoning": 624
+    },
+    "tool_calls": 24,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-nps-segments-by-tier-3.lgp/Unit1/workflow",
+  "source_task": "sources/analitic-tasks/task35-nps-csat"
+}

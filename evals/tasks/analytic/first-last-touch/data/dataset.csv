@@ -1,0 +1,501 @@
+conversion_id,touchpoint_1,touchpoint_2,touchpoint_3,conversion_value,conversion_type,customer_segment,days_to_convert
+1,Direct,Facebook,Direct,4132.72,demo,returning,48
+2,Email,Organic Search,Facebook,1251.65,signup,new,39
+3,Google Ads,None,Google Ads,3296.18,download,new,17
+4,Organic Search,Email,Direct,2085.47,demo,returning,19
+5,Google Ads,Facebook,None,3020.61,download,new,51
+6,Organic Search,Email,Email,626.51,purchase,returning,49
+7,Facebook,None,Organic Search,182.87,demo,vip,6
+8,Google Ads,Google Ads,Facebook,4556.87,download,returning,29
+9,Facebook,Direct,Google Ads,1421.19,demo,new,11
+10,Google Ads,Facebook,Email,4116.42,purchase,returning,16
+11,Email,Organic Search,Organic Search,4996.82,demo,vip,30
+12,Direct,Google Ads,Email,1136.01,download,new,25
+13,Facebook,Facebook,Organic Search,1399.34,purchase,vip,40
+14,Organic Search,Google Ads,None,3348.01,signup,vip,11
+15,Email,Organic Search,Direct,4830.7,download,returning,7
+16,Google Ads,Facebook,Email,4587.49,download,vip,26
+17,Facebook,None,Email,2564.09,purchase,new,56
+18,Google Ads,None,Email,3996.04,purchase,vip,22
+19,Google Ads,Organic Search,Direct,765.15,signup,vip,25
+20,Google Ads,Email,Google Ads,4889.45,download,returning,19
+21,Direct,Organic Search,Organic Search,4825.33,purchase,vip,31
+22,Direct,Email,None,902.27,signup,returning,26
+23,Organic Search,Facebook,Email,1567.17,signup,returning,42
+24,Facebook,Email,Direct,590.76,purchase,new,41
+25,Email,Facebook,Google Ads,1431.42,download,new,36
+26,Email,Facebook,Organic Search,4098.18,demo,new,23
+27,Email,Direct,Direct,1953.75,demo,new,47
+28,Google Ads,Facebook,None,533.15,signup,returning,13
+29,Direct,Email,None,1776.91,demo,vip,25
+30,Facebook,Direct,Organic Search,4908.78,demo,new,2
+31,Google Ads,Direct,Email,3185.45,purchase,new,2
+32,Direct,Facebook,None,2139.19,signup,new,16
+33,Direct,Organic Search,Google Ads,916.04,download,vip,9
+34,Facebook,Organic Search,Direct,4932.27,signup,new,28
+35,Facebook,None,Google Ads,4122.16,purchase,vip,13
+36,Facebook,Direct,Email,1479.24,demo,returning,35
+37,Google Ads,Facebook,Google Ads,443.34,download,returning,41
+38,Organic Search,Organic Search,Google Ads,377.47,signup,returning,13
+39,Facebook,Facebook,Facebook,689.85,demo,vip,31
+40,Organic Search,Facebook,Google Ads,2945.77,signup,new,21
+41,Google Ads,Direct,Organic Search,4650.94,download,new,32
+42,Organic Search,None,Direct,2534.04,signup,new,54
+43,Email,Direct,Facebook,4230.43,signup,new,34
+44,Organic Search,Google Ads,Direct,2284.84,signup,new,8
+45,Facebook,Organic Search,Direct,3572.06,demo,vip,59
+46,Google Ads,Organic Search,Email,3686.18,download,returning,41
+47,Facebook,Organic Search,Email,952.42,download,new,48
+48,Email,Email,Facebook,1869.96,demo,returning,2
+49,Facebook,Facebook,None,3222.78,demo,vip,38
+50,Facebook,Direct,Email,446.41,demo,vip,32
+51,Facebook,Organic Search,Email,1871.55,purchase,new,54
+52,Direct,Google Ads,Email,2720.52,signup,vip,40
+53,Email,Organic Search,Direct,4981.5,signup,returning,58
+54,Facebook,None,Facebook,2425.21,download,new,28
+55,Facebook,Facebook,Direct,4098.68,signup,new,37
+56,Facebook,Facebook,Organic Search,2217.13,purchase,returning,41
+57,Google Ads,Direct,Direct,4002.31,demo,new,1
+58,Direct,Email,Organic Search,3017.53,download,new,41
+59,Google Ads,Direct,Google Ads,4444.32,download,returning,10
+60,Direct,Organic Search,Google Ads,2113.62,signup,new,55
+61,Facebook,None,Organic Search,3061.09,download,new,4
+62,Email,Google Ads,Organic Search,3187.09,demo,returning,35
+63,Organic Search,Direct,Direct,2145.18,download,vip,10
+64,Organic Search,Email,Organic Search,807.13,demo,returning,47
+65,Facebook,Direct,Facebook,558.44,purchase,new,11
+66,Google Ads,Facebook,Google Ads,181.69,purchase,returning,14
+67,Email,Organic Search,Google Ads,4380.32,demo,new,38
+68,Direct,Organic Search,None,1258.73,signup,new,12
+69,Facebook,Organic Search,Organic Search,1136.38,download,returning,45
+70,Email,Organic Search,Email,3706.57,signup,new,17
+71,Email,Organic Search,Email,1668.08,download,vip,16
+72,Direct,Organic Search,Organic Search,2579.62,purchase,new,35
+73,Email,Google Ads,Facebook,896.3,purchase,returning,2
+74,Google Ads,Email,Email,4802.75,purchase,vip,11
+75,Google Ads,Organic Search,None,4272.75,download,vip,41
+76,Google Ads,Email,Organic Search,4332.57,purchase,new,3
+77,Email,None,Facebook,2093.19,purchase,returning,29
+78,Google Ads,Organic Search,Facebook,3835.57,purchase,new,18
+79,Direct,Direct,Direct,804.99,purchase,new,20
+80,Email,Organic Search,Facebook,142.23,signup,returning,47
+81,Organic Search,Facebook,Email,197.87,purchase,returning,14
+82,Email,Google Ads,Email,2974.35,purchase,new,34
+83,Direct,Direct,Organic Search,2331.44,signup,vip,49
+84,Organic Search,Direct,Organic Search,2638.28,signup,new,54
+85,Email,Facebook,Facebook,136.57,download,vip,31
+86,Google Ads,Organic Search,None,2171.16,demo,new,58
+87,Facebook,Google Ads,Google Ads,3618.53,purchase,returning,40
+88,Facebook,Direct,Direct,2269.2,purchase,vip,42
+89,Google Ads,Google Ads,Google Ads,3687.87,purchase,returning,58
+90,Facebook,Direct,Facebook,1241.79,download,returning,18
+91,Facebook,Organic Search,Facebook,4084.4,purchase,returning,30
+92,Google Ads,None,Google Ads,2983.31,demo,returning,25
+93,Google Ads,Direct,Direct,1132.74,signup,returning,19
+94,Email,None,Google Ads,1259.93,download,new,8
+95,Email,Direct,Organic Search,3177.35,signup,vip,28
+96,Google Ads,Email,Email,4166.7,purchase,new,8
+97,Direct,Organic Search,None,2136.58,purchase,new,31
+98,Facebook,Facebook,Organic Search,1365.67,purchase,new,3
+99,Email,None,Email,4348.36,demo,returning,3
+100,Facebook,Facebook,None,3379.41,demo,new,44
+101,Organic Search,Organic Search,None,2295.62,download,vip,22
+102,Google Ads,Facebook,None,2490.71,signup,new,17
+103,Direct,Organic Search,Facebook,1100.86,purchase,returning,36
+104,Organic Search,Facebook,None,3171.33,purchase,vip,17
+105,Organic Search,None,Direct,1857.84,purchase,vip,14
+106,Organic Search,Email,Google Ads,4978.66,purchase,vip,51
+107,Google Ads,Facebook,Direct,2452.9,demo,vip,9
+108,Email,None,Google Ads,2480.84,signup,new,30
+109,Google Ads,Direct,Organic Search,2872.67,signup,returning,21
+110,Email,Organic Search,Organic Search,4592.1,download,vip,12
+111,Organic Search,Google Ads,Google Ads,4024.01,demo,vip,37
+112,Organic Search,Google Ads,Direct,2310.54,purchase,returning,32
+113,Direct,Organic Search,Google Ads,3621.63,signup,new,11
+114,Email,Email,None,2972.55,signup,vip,20
+115,Organic Search,Facebook,Facebook,2512.6,demo,new,35
+116,Facebook,Email,Organic Search,1042.35,download,new,53
+117,Direct,Google Ads,Facebook,2373.29,download,new,47
+118,Google Ads,None,None,1304.51,purchase,new,46
+119,Direct,Organic Search,None,4582.73,download,vip,11
+120,Facebook,Organic Search,Organic Search,1743.49,signup,vip,52
+121,Email,Email,Organic Search,4766.09,download,new,8
+122,Google Ads,None,None,2711.97,purchase,new,4
+123,Google Ads,Email,Email,3194.57,signup,returning,27
+124,Email,Facebook,Facebook,2760.41,download,returning,44
+125,Direct,Direct,Facebook,733.97,download,returning,40
+126,Organic Search,None,Email,1941.52,demo,vip,38
+127,Direct,Direct,Direct,585.82,purchase,returning,47
+128,Facebook,Facebook,Facebook,3152.47,download,vip,30
+129,Organic Search,Direct,Google Ads,2289.68,demo,vip,44
+130,Direct,Google Ads,None,3912.13,signup,vip,48
+131,Email,Direct,None,1180.31,demo,vip,48
+132,Facebook,Facebook,Email,906.37,demo,returning,27
+133,Facebook,Direct,Facebook,2091.03,download,new,21
+134,Facebook,Organic Search,Direct,4640.27,download,new,52
+135,Organic Search,Email,Facebook,3581.07,download,new,20
+136,Google Ads,Google Ads,None,2152.73,demo,returning,4
+137,Organic Search,Organic Search,Organic Search,2634.63,signup,new,11
+138,Direct,Organic Search,Google Ads,512.64,purchase,returning,13
+139,Google Ads,Facebook,Email,4924.42,demo,returning,9
+140,Direct,Email,Organic Search,3365.4,download,returning,4
+141,Google Ads,Email,Direct,1498.48,purchase,new,12
+142,Organic Search,None,Organic Search,2970.46,signup,new,9
+143,Facebook,Google Ads,Organic Search,636.46,purchase,new,13
+144,Email,Facebook,Direct,4832.6,download,vip,48
+145,Facebook,Google Ads,Organic Search,956.45,demo,returning,26
+146,Organic Search,None,Email,3275.35,demo,vip,38
+147,Google Ads,Direct,None,1302.73,download,returning,42
+148,Facebook,Organic Search,Facebook,3616.05,demo,new,13
+149,Organic Search,Google Ads,Organic Search,3906.42,download,returning,39
+150,Direct,Organic Search,Email,3399.76,demo,returning,28
+151,Email,Facebook,Facebook,3111.05,demo,vip,58
+152,Facebook,Direct,Facebook,4473.1,demo,returning,19
+153,Google Ads,Facebook,Organic Search,485.27,signup,new,24
+154,Direct,Direct,Email,1721.48,signup,returning,19
+155,Organic Search,Direct,None,1316.61,download,returning,49
+156,Email,Organic Search,Organic Search,4941.27,signup,returning,13
+157,Google Ads,Facebook,Direct,2008.01,download,vip,13
+158,Organic Search,Facebook,Facebook,3689.8,purchase,returning,58
+159,Organic Search,Google Ads,Organic Search,3455.15,purchase,returning,28
+160,Facebook,Facebook,Facebook,1139.2,signup,vip,53
+161,Facebook,Google Ads,Email,1271.09,purchase,vip,2
+162,Google Ads,Email,Google Ads,1478.29,purchase,vip,10
+163,Organic Search,Email,Organic Search,2114.52,demo,vip,22
+164,Facebook,Email,None,1248.19,demo,new,13
+165,Email,None,Organic Search,196.29,download,new,58
+166,Email,Facebook,Facebook,4409.03,purchase,returning,9
+167,Organic Search,None,Email,4831.49,download,new,33
+168,Facebook,Facebook,Direct,1773.69,download,returning,14
+169,Google Ads,Google Ads,None,1758.68,purchase,new,48
+170,Google Ads,None,Email,134.75,signup,vip,20
+171,Google Ads,None,Organic Search,3433.23,purchase,vip,15
+172,Email,None,Direct,4144.66,demo,new,32
+173,Facebook,Direct,Email,818.38,purchase,new,33
+174,Facebook,Google Ads,Google Ads,882.37,signup,returning,17
+175,Email,Email,None,3971.41,download,returning,24
+176,Google Ads,Google Ads,Facebook,3119.82,download,returning,30
+177,Google Ads,Direct,Email,319.82,demo,vip,13
+178,Organic Search,Facebook,Email,3150.48,demo,vip,59
+179,Direct,Google Ads,Google Ads,1613.7,demo,vip,47
+180,Facebook,None,Organic Search,1906.75,download,vip,48
+181,Facebook,Email,None,3871.68,demo,returning,16
+182,Facebook,Email,None,4073.58,purchase,vip,2
+183,Direct,Facebook,Facebook,2061.75,download,vip,17
+184,Organic Search,Google Ads,Email,4741.05,signup,vip,32
+185,Direct,Direct,Direct,2091.67,download,vip,43
+186,Google Ads,Facebook,Email,3882.0,purchase,new,8
+187,Google Ads,Google Ads,Facebook,2471.0,purchase,returning,52
+188,Facebook,Organic Search,Email,4497.91,demo,returning,3
+189,Email,Email,Google Ads,4548.03,download,vip,12
+190,Facebook,Direct,Email,528.34,download,new,20
+191,Email,None,Email,4688.82,download,returning,16
+192,Direct,Direct,Direct,4145.12,signup,returning,14
+193,Google Ads,None,Google Ads,3977.42,demo,vip,16
+194,Email,Direct,Google Ads,1084.47,purchase,vip,59
+195,Direct,Email,Email,4045.08,purchase,returning,53
+196,Google Ads,None,None,4265.65,demo,returning,49
+197,Email,Google Ads,Direct,1516.84,purchase,new,43
+198,Facebook,None,Email,4766.07,purchase,returning,49
+199,Facebook,Facebook,Email,344.31,demo,returning,51
+200,Facebook,Google Ads,Facebook,834.56,purchase,vip,54
+201,Direct,Facebook,Facebook,2734.15,download,returning,33
+202,Facebook,Direct,None,2921.38,signup,vip,30
+203,Organic Search,Google Ads,Direct,3261.24,demo,returning,59
+204,Google Ads,Direct,Organic Search,183.15,signup,returning,12
+205,Direct,Organic Search,Facebook,4805.8,purchase,returning,15
+206,Facebook,Direct,Organic Search,318.48,purchase,new,18
+207,Google Ads,Direct,Google Ads,801.0,download,vip,28
+208,Email,Facebook,Facebook,168.67,demo,new,23
+209,Facebook,None,Facebook,2877.61,purchase,returning,14
+210,Google Ads,Organic Search,Direct,4668.11,demo,new,30
+211,Organic Search,Direct,None,3363.14,demo,vip,33
+212,Email,Direct,Organic Search,4131.02,demo,returning,45
+213,Organic Search,Organic Search,Facebook,165.08,demo,new,15
+214,Google Ads,Organic Search,Facebook,2755.87,demo,new,7
+215,Organic Search,Google Ads,Direct,2351.86,signup,vip,15
+216,Google Ads,Facebook,Direct,2544.94,download,new,52
+217,Google Ads,Organic Search,None,453.84,demo,vip,42
+218,Organic Search,Organic Search,Organic Search,3453.73,signup,returning,46
+219,Google Ads,Email,Google Ads,2565.78,purchase,returning,38
+220,Facebook,None,None,3849.23,demo,new,46
+221,Google Ads,Organic Search,Google Ads,2477.92,purchase,returning,56
+222,Direct,Facebook,Email,831.97,demo,returning,57
+223,Google Ads,None,Facebook,3276.46,signup,new,54
+224,Direct,None,Organic Search,944.69,signup,returning,44
+225,Google Ads,Direct,None,4374.73,signup,new,11
+226,Google Ads,Direct,Facebook,3104.27,download,vip,29
+227,Organic Search,Direct,Organic Search,870.3,purchase,vip,31
+228,Facebook,Direct,Organic Search,4815.46,download,vip,25
+229,Facebook,Email,Organic Search,2639.99,demo,new,52
+230,Email,Organic Search,Facebook,457.2,purchase,new,54
+231,Organic Search,Direct,None,3171.48,signup,returning,24
+232,Organic Search,Google Ads,Direct,1340.67,purchase,returning,57
+233,Facebook,Direct,Facebook,4038.1,signup,returning,19
+234,Organic Search,Organic Search,Organic Search,4107.33,download,returning,2
+235,Facebook,Direct,None,4896.84,download,returning,22
+236,Organic Search,Email,Email,2559.16,signup,new,20
+237,Google Ads,Facebook,Google Ads,2329.29,signup,new,33
+238,Facebook,Facebook,Organic Search,3792.03,demo,vip,8
+239,Facebook,Organic Search,Email,749.11,download,vip,25
+240,Direct,Facebook,Direct,2779.89,download,vip,46
+241,Organic Search,Facebook,Organic Search,2776.61,demo,vip,9
+242,Organic Search,Google Ads,Email,538.42,download,new,34
+243,Facebook,Organic Search,Organic Search,2148.12,signup,new,57
+244,Google Ads,Organic Search,Facebook,4281.1,purchase,new,23
+245,Google Ads,Facebook,None,4295.15,purchase,returning,5
+246,Google Ads,Facebook,Email,586.26,download,returning,55
+247,Organic Search,Facebook,None,544.53,demo,vip,25
+248,Direct,None,Facebook,1387.21,signup,returning,8
+249,Facebook,Email,Facebook,4386.35,purchase,new,16
+250,Email,Direct,None,731.62,signup,vip,54
+251,Direct,Email,Email,3627.98,download,vip,48
+252,Email,Organic Search,None,595.71,download,returning,45
+253,Direct,Google Ads,None,3153.38,purchase,vip,52
+254,Google Ads,Direct,Google Ads,1844.73,download,returning,15
+255,Organic Search,Google Ads,Email,3965.68,demo,returning,1
+256,Email,None,Google Ads,1245.08,download,vip,22
+257,Direct,Organic Search,Organic Search,3232.09,download,returning,3
+258,Organic Search,None,None,1254.84,download,returning,38
+259,Email,Organic Search,Organic Search,3596.94,signup,returning,54
+260,Facebook,Google Ads,Email,4381.02,signup,returning,14
+261,Direct,Google Ads,None,721.33,purchase,vip,36
+262,Facebook,Google Ads,Organic Search,4346.32,purchase,new,18
+263,Google Ads,Organic Search,Direct,3008.52,purchase,new,47
+264,Facebook,Facebook,Facebook,722.84,download,returning,41
+265,Facebook,Google Ads,None,2194.96,signup,returning,18
+266,Direct,None,Facebook,888.22,demo,returning,3
+267,Google Ads,Direct,Google Ads,3531.7,download,new,10
+268,Facebook,Organic Search,Organic Search,3818.45,download,returning,49
+269,Organic Search,None,Google Ads,618.4,download,vip,39
+270,Email,Email,None,2580.09,demo,vip,47
+271,Facebook,Email,Facebook,4091.66,purchase,vip,1
+272,Google Ads,Direct,Facebook,4687.2,demo,new,27
+273,Facebook,Facebook,Organic Search,2616.24,purchase,returning,57
+274,Email,Google Ads,None,4756.37,demo,returning,27
+275,Google Ads,Organic Search,Direct,2724.88,signup,returning,11
+276,Direct,None,Direct,2031.53,download,new,49
+277,Google Ads,Google Ads,Organic Search,4256.2,download,new,5
+278,Direct,None,None,2515.62,download,new,7
+279,Google Ads,Organic Search,Organic Search,2412.32,purchase,new,19
+280,Email,Email,None,2502.53,demo,vip,57
+281,Email,Google Ads,Google Ads,4249.25,signup,new,56
+282,Google Ads,Direct,Organic Search,4176.51,demo,new,29
+283,Facebook,Facebook,None,2077.25,download,new,15
+284,Email,Direct,Direct,1733.17,signup,returning,35
+285,Direct,Facebook,None,2510.45,signup,returning,47
+286,Direct,None,None,2906.59,download,returning,37
+287,Organic Search,Google Ads,Organic Search,1267.85,demo,vip,55
+288,Direct,Google Ads,Google Ads,3990.38,download,vip,12
+289,Organic Search,Facebook,Google Ads,2483.77,demo,new,30
+290,Google Ads,Email,Google Ads,1736.82,signup,returning,20
+291,Google Ads,Organic Search,Google Ads,623.42,signup,vip,37
+292,Google Ads,Direct,Email,1270.34,download,returning,3
+293,Facebook,None,Organic Search,4751.48,signup,vip,9
+294,Facebook,Direct,Facebook,1594.99,purchase,vip,58
+295,Organic Search,Direct,Organic Search,927.41,signup,new,41
+296,Direct,None,Email,2357.3,purchase,new,39
+297,Direct,None,Google Ads,1604.73,signup,vip,26
+298,Google Ads,Google Ads,Email,272.28,download,new,2
+299,Email,Direct,Direct,1683.41,download,vip,23
+300,Facebook,Organic Search,Direct,2766.13,purchase,vip,23
+301,Facebook,Organic Search,Organic Search,2803.39,download,returning,59
+302,Google Ads,Facebook,Organic Search,1847.14,signup,new,21
+303,Facebook,None,Facebook,2291.78,signup,new,16
+304,Google Ads,Google Ads,Facebook,4831.04,download,new,9
+305,Organic Search,Organic Search,Direct,1949.01,signup,returning,13
+306,Direct,Email,Google Ads,1365.31,demo,returning,28
+307,Email,Google Ads,Email,1292.99,demo,returning,27
+308,Direct,Google Ads,Facebook,2343.05,signup,new,51
+309,Direct,Organic Search,None,3821.65,download,new,52
+310,Organic Search,Email,Facebook,1109.34,purchase,new,17
+311,Facebook,Facebook,Google Ads,3575.55,download,returning,38
+312,Email,Organic Search,Google Ads,203.63,purchase,returning,36
+313,Facebook,Email,Organic Search,2152.77,download,vip,1
+314,Direct,Google Ads,Email,3901.74,signup,returning,18
+315,Google Ads,Email,Google Ads,1759.79,demo,vip,51
+316,Direct,Google Ads,Facebook,2862.31,download,new,9
+317,Facebook,Organic Search,Facebook,1104.4,purchase,returning,13
+318,Direct,None,Direct,3735.78,demo,new,40
+319,Google Ads,Organic Search,Google Ads,356.17,purchase,new,55
+320,Organic Search,Direct,None,4277.46,signup,new,45
+321,Facebook,Direct,Organic Search,1071.16,demo,new,15
+322,Direct,Direct,Email,4384.55,purchase,returning,43
+323,Facebook,Organic Search,None,1827.39,download,new,44
+324,Organic Search,Facebook,Organic Search,3641.15,signup,vip,46
+325,Direct,Organic Search,Facebook,1664.2,signup,returning,4
+326,Direct,None,None,4538.97,signup,new,33
+327,Facebook,Email,Organic Search,720.52,download,returning,24
+328,Facebook,Organic Search,Facebook,974.75,download,vip,36
+329,Google Ads,Organic Search,Facebook,2515.85,demo,new,51
+330,Organic Search,Google Ads,Facebook,501.5,download,vip,41
+331,Google Ads,Google Ads,Facebook,1060.3,demo,new,10
+332,Direct,Google Ads,Facebook,4724.46,signup,vip,36
+333,Facebook,Organic Search,Direct,4884.8,demo,new,20
+334,Direct,Facebook,None,1943.67,purchase,returning,41
+335,Direct,Email,Organic Search,4624.1,signup,new,45
+336,Email,Email,Direct,2769.64,signup,returning,44
+337,Email,None,Direct,1421.74,demo,new,11
+338,Direct,Facebook,Google Ads,3541.75,signup,new,12
+339,Facebook,Facebook,Google Ads,3328.62,download,vip,18
+340,Direct,Email,Google Ads,4946.71,purchase,vip,30
+341,Email,Direct,Email,1398.73,demo,vip,44
+342,Facebook,Google Ads,Google Ads,3393.09,demo,new,48
+343,Direct,Google Ads,Organic Search,354.92,signup,new,37
+344,Organic Search,Email,Direct,656.87,download,new,20
+345,Organic Search,Facebook,Organic Search,119.2,signup,returning,25
+346,Direct,None,None,4997.36,signup,returning,12
+347,Facebook,Direct,Google Ads,4031.14,demo,new,21
+348,Direct,Email,Email,3954.94,signup,vip,25
+349,Direct,Google Ads,None,2597.66,purchase,vip,11
+350,Email,Organic Search,Email,1570.33,signup,vip,9
+351,Organic Search,Facebook,None,841.19,signup,new,50
+352,Email,Organic Search,Direct,1494.91,demo,vip,25
+353,Email,None,Organic Search,1942.26,signup,new,35
+354,Direct,Email,Facebook,3805.92,download,returning,52
+355,Email,Google Ads,Organic Search,2744.34,demo,vip,32
+356,Organic Search,Direct,Google Ads,479.67,signup,returning,49
+357,Email,Organic Search,Facebook,188.34,purchase,vip,14
+358,Organic Search,Direct,Email,601.43,purchase,new,1
+359,Email,None,Direct,2111.44,demo,new,17
+360,Organic Search,Google Ads,Direct,4672.65,demo,new,25
+361,Email,Organic Search,Email,3223.27,signup,new,59
+362,Email,None,Google Ads,4028.95,download,vip,8
+363,Facebook,Direct,Email,2385.24,signup,returning,5
+364,Organic Search,Direct,None,1872.16,purchase,new,5
+365,Organic Search,Organic Search,Google Ads,631.16,download,vip,41
+366,Organic Search,Google Ads,Facebook,4392.07,download,returning,35
+367,Google Ads,Direct,Email,3937.48,download,new,19
+368,Email,Email,Google Ads,923.78,signup,returning,23
+369,Organic Search,None,Facebook,2610.08,purchase,new,9
+370,Google Ads,Organic Search,Email,2488.14,demo,returning,54
+371,Facebook,Facebook,Direct,3162.95,signup,returning,30
+372,Organic Search,Facebook,Email,4736.32,demo,new,50
+373,Organic Search,Google Ads,Organic Search,2940.88,download,vip,16
+374,Google Ads,Email,Email,2747.06,download,returning,33
+375,Email,Direct,Organic Search,346.58,signup,new,2
+376,Facebook,Facebook,Facebook,408.25,purchase,returning,14
+377,Organic Search,Google Ads,Email,1018.0,download,returning,46
+378,Email,None,Facebook,259.11,demo,vip,1
+379,Facebook,Email,Facebook,3742.43,demo,returning,26
+380,Direct,Email,Google Ads,3644.32,signup,returning,58
+381,Direct,Google Ads,Facebook,766.68,demo,new,25
+382,Facebook,Google Ads,Facebook,4196.79,purchase,new,16
+383,Google Ads,Direct,Email,858.45,download,vip,15
+384,Facebook,Google Ads,Email,1575.76,demo,returning,26
+385,Facebook,Direct,Direct,1319.99,demo,returning,47
+386,Google Ads,Direct,Google Ads,1924.3,download,returning,44
+387,Google Ads,Organic Search,Facebook,1347.85,signup,vip,16
+388,Email,Email,Google Ads,2495.86,demo,returning,14
+389,Email,None,Organic Search,2096.3,signup,new,29
+390,Google Ads,Email,Facebook,4934.19,signup,vip,24
+391,Direct,Email,Google Ads,374.04,demo,new,47
+392,Direct,Organic Search,Direct,796.69,purchase,new,55
+393,Facebook,Direct,Direct,358.85,signup,vip,15
+394,Organic Search,Direct,Facebook,3166.62,demo,new,19
+395,Facebook,Google Ads,Organic Search,367.1,signup,returning,8
+396,Facebook,Organic Search,Direct,4198.55,download,vip,34
+397,Organic Search,Google Ads,Direct,2608.5,purchase,new,2
+398,Google Ads,Organic Search,Organic Search,2682.34,purchase,returning,27
+399,Direct,Google Ads,Google Ads,2851.81,download,returning,10
+400,Facebook,Facebook,Direct,936.99,download,new,35
+401,Organic Search,Email,Email,1068.68,signup,returning,23
+402,Email,Email,None,1662.2,download,vip,49
+403,Facebook,None,None,3008.13,purchase,new,8
+404,Direct,Direct,Direct,1129.58,download,returning,28
+405,Google Ads,None,Google Ads,670.03,demo,returning,23
+406,Facebook,Facebook,Google Ads,4853.57,demo,new,4
+407,Facebook,None,Facebook,207.71,signup,new,14
+408,Organic Search,Email,Email,4033.22,purchase,new,53
+409,Email,Direct,Google Ads,3961.37,demo,new,42
+410,Email,Facebook,Organic Search,1556.35,download,vip,29
+411,Google Ads,Email,Email,764.57,demo,new,1
+412,Direct,Google Ads,None,813.58,demo,vip,4
+413,Google Ads,Organic Search,Email,3517.41,signup,vip,32
+414,Facebook,Facebook,Organic Search,3249.75,download,new,33
+415,Facebook,Direct,Direct,3935.45,download,vip,49
+416,Email,None,Organic Search,4693.66,download,new,26
+417,Direct,None,Organic Search,3490.44,signup,new,17
+418,Organic Search,Facebook,Direct,863.67,download,returning,39
+419,Direct,Direct,Direct,1292.87,download,new,23
+420,Facebook,Facebook,Direct,4226.75,demo,returning,32
+421,Organic Search,Direct,Direct,1125.6,demo,vip,52
+422,Direct,None,Direct,455.36,download,returning,15
+423,Direct,Email,Organic Search,3546.07,purchase,vip,13
+424,Organic Search,Google Ads,Facebook,2072.38,purchase,new,2
+425,Facebook,Email,Facebook,4608.2,download,vip,19
+426,Direct,Google Ads,Google Ads,3286.25,purchase,vip,24
+427,Organic Search,None,Facebook,543.05,signup,new,45
+428,Facebook,Email,None,4744.5,demo,vip,24
+429,Organic Search,Email,Facebook,1366.93,signup,new,11
+430,Organic Search,Facebook,Organic Search,1752.34,demo,returning,59
+431,Direct,Organic Search,Direct,2071.08,purchase,new,22
+432,Facebook,None,Direct,351.0,purchase,new,15
+433,Direct,Direct,Organic Search,2532.93,download,vip,10
+434,Google Ads,None,None,704.26,purchase,returning,41
+435,Google Ads,Direct,Facebook,2064.75,purchase,new,27
+436,Facebook,Direct,Organic Search,1818.48,download,returning,9
+437,Organic Search,Google Ads,Google Ads,3886.92,download,returning,52
+438,Direct,Direct,Direct,4035.54,demo,vip,28
+439,Direct,Direct,Email,851.72,purchase,new,1
+440,Facebook,Facebook,Google Ads,1896.1,demo,vip,17
+441,Facebook,Email,None,1929.43,demo,new,31
+442,Google Ads,None,Google Ads,841.91,signup,returning,44
+443,Email,None,Organic Search,4012.42,purchase,new,10
+444,Facebook,Direct,Facebook,3565.42,purchase,new,37
+445,Email,Organic Search,Direct,1032.87,signup,returning,29
+446,Facebook,None,None,1896.94,demo,returning,18
+447,Organic Search,Direct,None,618.44,purchase,new,47
+448,Organic Search,Google Ads,Email,3178.21,demo,vip,38
+449,Google Ads,Google Ads,Google Ads,694.72,signup,new,39
+450,Google Ads,Google Ads,Email,4931.08,download,returning,49
+451,Email,Direct,Facebook,3925.34,demo,vip,6
+452,Facebook,Facebook,Facebook,2012.17,purchase,returning,40
+453,Direct,Organic Search,Email,2934.96,download,returning,12
+454,Google Ads,Direct,Direct,4565.57,demo,vip,53
+455,Direct,Facebook,Facebook,2815.09,demo,returning,14
+456,Direct,Facebook,Email,955.04,download,returning,44
+457,Facebook,None,Google Ads,1955.65,download,returning,55
+458,Email,Direct,Email,4231.41,download,returning,10
+459,Facebook,Direct,Email,3256.64,purchase,returning,54
+460,Google Ads,Facebook,Organic Search,3288.55,purchase,returning,20
+461,Direct,Facebook,Facebook,4347.43,demo,returning,15
+462,Facebook,Facebook,Direct,4480.47,demo,returning,31
+463,Facebook,None,Direct,4606.98,signup,returning,7
+464,Facebook,Direct,Organic Search,564.76,purchase,new,58
+465,Google Ads,Facebook,None,2766.22,demo,new,41
+466,Email,Google Ads,Direct,3728.5,download,returning,10
+467,Facebook,Direct,Email,3808.94,download,new,10
+468,Google Ads,None,Organic Search,3072.91,purchase,vip,48
+469,Direct,Google Ads,Google Ads,917.26,download,new,39
+470,Organic Search,Email,Facebook,4007.36,signup,returning,28
+471,Google Ads,Direct,Facebook,3628.55,demo,returning,30
+472,Organic Search,Email,Facebook,522.07,demo,new,37
+473,Facebook,Facebook,Email,2372.67,demo,returning,55
+474,Facebook,None,Google Ads,952.49,purchase,vip,3
+475,Google Ads,Facebook,Organic Search,1753.64,download,vip,50
+476,Organic Search,None,Organic Search,188.6,signup,returning,43
+477,Facebook,Organic Search,Facebook,2061.62,purchase,vip,15
+478,Direct,Facebook,Google Ads,2794.4,demo,vip,21
+479,Email,Email,Google Ads,3135.95,signup,new,52
+480,Email,None,Google Ads,3351.1,demo,vip,37
+481,Facebook,Facebook,Direct,4197.83,demo,new,56
+482,Organic Search,Direct,Direct,1155.77,purchase,returning,12
+483,Facebook,None,Facebook,690.36,demo,new,4
+484,Organic Search,None,Google Ads,4272.53,signup,returning,47
+485,Direct,Facebook,None,867.4,demo,returning,9
+486,Organic Search,Organic Search,Google Ads,4876.32,download,returning,39
+487,Facebook,Facebook,Organic Search,4228.44,demo,returning,42
+488,Direct,Email,Organic Search,2554.3,purchase,returning,28
+489,Google Ads,Email,Facebook,4908.96,signup,new,23
+490,Email,None,None,577.15,purchase,returning,45
+491,Facebook,None,Google Ads,1585.02,download,vip,40
+492,Facebook,Facebook,None,3227.3,demo,vip,44
+493,Facebook,Email,Facebook,1815.03,purchase,returning,22
+494,Direct,Email,Organic Search,4649.03,purchase,vip,24
+495,Google Ads,Organic Search,Organic Search,421.57,purchase,new,51
+496,Organic Search,Direct,Direct,2792.12,purchase,new,58
+497,Google Ads,Organic Search,Facebook,2995.24,download,returning,26
+498,Direct,Google Ads,Facebook,3298.37,download,returning,30
+499,Facebook,Organic Search,Google Ads,1352.76,demo,returning,33
+500,Email,Facebook,Google Ads,1886.38,demo,vip,16

@@ -1,0 +1,5 @@
+priority,tickets,avg_response_min,avg_resolution_hours,fcr_pct,avg_satisfaction
+critical,39,26.923077,8.233333,66.666667,2.923077
+high,73,28.408219,8.346575,60.273973,3.164384
+medium,162,31.28642,8,65.432099,2.907407
+low,126,28.419048,8.063492,61.904762,3.309524

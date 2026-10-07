@@ -1,0 +1,62 @@
+{
+  "task_id": "variant-conversion",
+  "dataset_sha256": {
+    "dataset.csv": "30727a966d0d6e8fb6df622c8794035534770d4b2700cf02c585efeb8ac69158"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "b52a847f6bfbf6355229389932f0aae1fd47bff03d509f3399c2fb5f25672348"
+  },
+  "reference_sha256": "49058066c1204ad257dd24561b5175b2fef791d2c42312344cca58480eeb14e8",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-variant-conversion-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/806d8254e2e9944de480adf86ed836d2898b386b9ce6a255e255ab7888fe10ed-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_ef366d4efffetdxKipaVGa0uak",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-05T18:05:15+03:00",
+    "duration_s": 529,
+    "tokens": {
+      "input": 53681,
+      "output": 2819,
+      "reasoning": 901
+    },
+    "tool_calls": 20,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-variant-conversion-1.lgp/Unit1/workflow",
+  "source_task": "sources/analitic-tasks/task30-ab-test-multi"
+}

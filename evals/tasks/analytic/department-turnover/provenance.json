@@ -1,0 +1,62 @@
+{
+  "task_id": "department-turnover",
+  "dataset_sha256": {
+    "dataset.csv": "3e8f64b3753452338a46a9ba3132e7572e705e7a5ed3832e9f8a81f905f56a07"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "0d6db9de43924282b15be80bfb159fab14ae17a2bceac544ac79eb12400fba5f"
+  },
+  "reference_sha256": "a8ebb459149915d9dc67dbf8bf6e88d7ee2b1633acf11d4ce026c0e26f78617e",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-department-turnover-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/657659b9dc31f22919c35014dd4e065511f094e76da8fb4b8ace6f15bc0ef5b2-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_f039b93f7ffezgmtaOvnjNdu6X",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-02T14:33:46+03:00",
+    "duration_s": 761,
+    "tokens": {
+      "input": 82237,
+      "output": 4109,
+      "reasoning": 2247
+    },
+    "tool_calls": 31,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-department-turnover-1.lgp/Unit1/workflow",
+  "source_task": "sources/analitic-tasks/task43-employee-turnover"
+}

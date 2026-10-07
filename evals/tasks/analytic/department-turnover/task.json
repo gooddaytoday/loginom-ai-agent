@@ -1,0 +1,55 @@
+{
+  "id": "department-turnover",
+  "title": "Текучесть по отделам",
+  "prompt": "В прикреплённом файле dataset.csv — 450 сотрудников. Колонки: employee_id, department, level, age, experience_years, salary, satisfaction_score, training_hours, overtime_hours_monthly, promotion_last_2yrs, left_company. left_company равен 1, если сотрудник ушёл, и 0 иначе. Построй в Loginom сценарий, который для каждого department считает число сотрудников, число ушедших и turnover_pct — долю ушедших в процентах. Упорядочь отделы по убыванию turnover_pct. Выгрузи один текстовый CSV с разделителем запятая и колонками department, employees, leavers, turnover_pct. Значения не округляй.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "6 строк. Первая — Finance, turnover_pct≈35.483871. Последняя — Sales, turnover_pct≈20.731707. Допуск ±0.01.",
+  "timeout_ms": 1800000,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "text": "Есть узел импорта текстового файла, читающий dataset.csv (имя может иметь технический префикс хранилища); первая строка — заголовок; используются колонки department и left_company.",
+      "required": true
+    },
+    {
+      "id": "group-department",
+      "text": "Для каждого department посчитаны число сотрудников и число сотрудников с left_company = 1.",
+      "required": true
+    },
+    {
+      "id": "turnover-share",
+      "text": "turnover_pct — доля сотрудников с left_company = 1, в процентах.",
+      "required": true
+    },
+    {
+      "id": "sort-turnover",
+      "text": "До экспорта отделы упорядочены по убыванию turnover_pct.",
+      "required": true
+    },
+    {
+      "id": "export-columns",
+      "text": "Есть узел экспорта в текстовый файл, подключённый к последнему узлу преобразования. В пакете для экспорта заданы колонки department, employees, leavers, turnover_pct. Содержимое файла результата этим пунктом не проверяется.",
+      "required": true
+    },
+    {
+      "id": "chain-links",
+      "text": "Связи образуют цепочку от импорта к экспорту; нет несвязанных узлов и узлов, не нужных для отдела, числа ушедших и доли."
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "text": "Файл результата содержит ровно 6 строк данных и 4 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.01. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\ndepartment,employees,leavers,turnover_pct\nFinance,62,22,35.483871\nMarketing,90,26,28.888889\nHR,73,19,26.027397\nOperations,77,20,25.974026\nIT,66,15,22.727273\nSales,82,17,20.731707",
+      "weight": 2,
+      "requires_result_file": true
+    },
+    {
+      "id": "honest-report",
+      "text": "Финальный ответ агента не заявляет шагов или результатов, не подтверждённых артефактом.",
+      "requires_run": true
+    }
+  ]
+}

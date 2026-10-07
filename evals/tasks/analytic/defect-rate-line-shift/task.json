@@ -1,0 +1,55 @@
+{
+  "id": "defect-rate-line-shift",
+  "title": "Уровень брака по линии и смене из сумм",
+  "prompt": "В прикреплённом файле dataset.csv — 500 производственных партий. Колонки: product_id, production_line, shift, defect_count, total_produced, defect_rate, inspection_score, temperature, humidity, operator_experience, material_batch. Построй в Loginom сценарий, который для каждой пары production_line и shift считает число партий, сумму total_produced, сумму defect_count и defect_rate_pct. defect_rate_pct = сумма defect_count / сумма total_produced × 100. Готовую колонку defect_rate не усредняй и в расчёт не бери. Упорядочь пары по убыванию defect_rate_pct. Выгрузи один текстовый CSV с разделителем запятая и колонками production_line, shift, batches, total_produced, defects, defect_rate_pct.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "9 строк. Первая — Line_C, Morning, defect_rate_pct≈0.416069. Последняя — Line_B, Afternoon, defect_rate_pct≈0.325163. Допуск ±0.01.",
+  "timeout_ms": 1800000,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "text": "Есть узел импорта текстового файла, читающий dataset.csv (имя может иметь технический префикс хранилища); первая строка — заголовок; production_line и shift — текст, defect_count и total_produced — целые.",
+      "required": true
+    },
+    {
+      "id": "group-line-shift",
+      "text": "Группировка имеет ровно два ключа, production_line и shift, и считает число партий, сумму total_produced и сумму defect_count.",
+      "required": true
+    },
+    {
+      "id": "rate-from-sums",
+      "text": "defect_rate_pct получен из сумм группы: сумма defect_count / сумма total_produced × 100; колонка defect_rate не усредняется.",
+      "required": true
+    },
+    {
+      "id": "sort-rate",
+      "text": "До экспорта строки упорядочены по defect_rate_pct по убыванию.",
+      "required": true
+    },
+    {
+      "id": "export-columns",
+      "text": "Есть узел экспорта в текстовый файл, подключённый к последнему узлу преобразования. В пакете для экспорта заданы колонки production_line, shift, batches, total_produced, defects, defect_rate_pct. Содержимое файла результата этим пунктом не проверяется.",
+      "required": true
+    },
+    {
+      "id": "chain-links",
+      "text": "Связи образуют цепочку от импорта к экспорту; нет несвязанных узлов и узлов, не нужных для двух ключей, доли из сумм и порядка строк."
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "text": "Файл результата содержит ровно 9 строк данных и 6 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.01. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\nproduction_line,shift,batches,total_produced,defects,defect_rate_pct\nLine_C,Morning,64,34850,145,0.416069\nLine_B,Morning,56,28027,114,0.406751\nLine_B,Night,56,28668,112,0.39068\nLine_A,Morning,51,28287,108,0.381801\nLine_C,Night,48,25439,94,0.369511\nLine_C,Afternoon,61,32421,115,0.354708\nLine_A,Afternoon,63,35295,123,0.348491\nLine_A,Night,39,22859,75,0.328098\nLine_B,Afternoon,62,36597,119,0.325163",
+      "weight": 2,
+      "requires_result_file": true
+    },
+    {
+      "id": "honest-report",
+      "text": "Финальный ответ агента не заявляет шагов или результатов, не подтверждённых артефактом.",
+      "requires_run": true
+    }
+  ]
+}

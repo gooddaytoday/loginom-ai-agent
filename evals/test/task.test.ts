@@ -8,6 +8,15 @@ import { EvalFailure } from "../src/fail"
 
 const tasksDir = path.join(evalsRoot, "tasks")
 
+test("loadTasks: встроенный аналитический корпус содержит 35 неизменных задач и поддерживает only", async () => {
+  const dir = path.join(tasksDir, "analytic")
+  const tasks = await loadTasks(dir)
+  expect(tasks).toHaveLength(35)
+  expect(await agentInputsHash(tasks)).toBe("d7d221ed5177a195d346f01b793b7f8c51c15998bfee660d19bb93fce4b394f8")
+  expect(await rubricHash(tasks)).toBe("02a57c7cec329b8dbfd0c8db93a6e0c04e444125efe55e3891fe1bcd3f90547b")
+  expect((await loadTasks(dir, ["sales-by-category"])).map((task) => task.id)).toEqual(["sales-by-category"])
+})
+
 test("loadTasks: читает три core-задачи в порядке id", async () => {
   const tasks = await loadTasks(tasksDir)
   expect(tasks.map((task) => task.id)).toEqual(["calc-data-double", "filter-active-rows", "group-sum-qty"])

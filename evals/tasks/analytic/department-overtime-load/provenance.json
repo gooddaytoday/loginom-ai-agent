@@ -1,0 +1,62 @@
+{
+  "task_id": "department-overtime-load",
+  "dataset_sha256": {
+    "dataset.csv": "a135e7406cd5e5ff1dfb1c2ca929281319a2ccca2b7e1856868e8015407ec975"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "3b05554c59e0d2ab17e8c3a3e2a70d69f06a8d9e790a37d74a5dededb1fbfb4d"
+  },
+  "reference_sha256": "d5796d5cf7bbd20e94c3c9c04af78564bcc05cd4e034641938670a50112a870d",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-department-overtime-load-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/08f7ea042c1bbf16d4c139e2ed9d0c713d0d3a1035aa251489fb7900c8e89d24-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_ef379fb64ffeckWu8o1j0ZW6xJ",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-05T17:44:23+03:00",
+    "duration_s": 647,
+    "tokens": {
+      "input": 76904,
+      "output": 3854,
+      "reasoning": 795
+    },
+    "tool_calls": 28,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-department-overtime-load-1.lgp/Unit1/workflow",
+  "source_task": "sources/analitic-tasks/task23-employee-performance"
+}

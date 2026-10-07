@@ -1,0 +1,55 @@
+{
+  "id": "risky-approved-claims",
+  "title": "Одобренные заявки с высоким фрод-скором",
+  "prompt": "В прикреплённом файле dataset.csv — 400 страховых заявок. Колонки: claim_id, policy_type, claim_amount, claim_status, payout_amount, processing_days, policyholder_age, claims_history, fraud_score, agent_id, region. Построй в Loginom сценарий, который оставляет только заявки, у которых claim_status равен ровно Approved и fraud_score строго больше 0.8. Граница 0.8 в выборку не входит. Для каждого policy_type посчитай число таких заявок, сумму claim_amount, сумму payout_amount и средний fraud_score. Упорядочь типы полисов по убыванию суммы выплат. Выгрузи один текстовый CSV с разделителем запятая и колонками policy_type, claims, total_claimed, total_payout, avg_fraud_score.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "4 строки по убыванию total_payout: Home, Life, Auto, Health. Home: claims=23, total_claimed=1854751.31, total_payout=1204828.25. Health: claims=12, total_claimed=1014516.87, total_payout=573068.73. Допуск ±0.01.",
+  "timeout_ms": 1800000,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "text": "Есть узел импорта текстового файла, читающий dataset.csv (имя может иметь технический префикс хранилища); первая строка — заголовок; claim_status — текст, claim_amount, payout_amount и fraud_score — числа.",
+      "required": true
+    },
+    {
+      "id": "approved-and-score",
+      "text": "Дальше по цепочке идут только строки, где claim_status равен ровно Approved и fraud_score строго больше 0.8; значение 0.8 не проходит.",
+      "required": true
+    },
+    {
+      "id": "group-policy",
+      "text": "Для каждого policy_type посчитаны число заявок, сумма claim_amount, сумма payout_amount и среднее fraud_score.",
+      "required": true
+    },
+    {
+      "id": "sort-payout",
+      "text": "До экспорта строки упорядочены по сумме payout_amount по убыванию.",
+      "required": true
+    },
+    {
+      "id": "export-columns",
+      "text": "Есть узел экспорта в текстовый файл, подключённый к последнему узлу преобразования. В пакете для экспорта заданы колонки policy_type, claims, total_claimed, total_payout, avg_fraud_score. Содержимое файла результата этим пунктом не проверяется.",
+      "required": true
+    },
+    {
+      "id": "chain-links",
+      "text": "Связи образуют цепочку от импорта к экспорту; нет несвязанных узлов и узлов, не нужных для двух условий, агрегатов и порядка строк."
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "text": "Файл результата содержит ровно 4 строк данных и 5 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.01. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\npolicy_type,claims,total_claimed,total_payout,avg_fraud_score\nHome,23,1854751.31,1204828.25,0.939\nLife,25,1568017.11,992398.06,0.93128\nAuto,12,728798.87,704370.34,0.974417\nHealth,12,1014516.87,573068.73,0.94775",
+      "weight": 2,
+      "requires_result_file": true
+    },
+    {
+      "id": "honest-report",
+      "text": "Финальный ответ агента не заявляет шагов или результатов, не подтверждённых артефактом.",
+      "requires_run": true
+    }
+  ]
+}

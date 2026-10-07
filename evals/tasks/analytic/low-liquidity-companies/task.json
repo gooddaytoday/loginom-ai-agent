@@ -1,0 +1,50 @@
+{
+  "id": "low-liquidity-companies",
+  "title": "Компании с текущей ликвидностью ниже 1",
+  "prompt": "В прикреплённом файле dataset.csv — финансовые показатели 200 компаний с колонками company_id, industry, revenue, net_income, total_assets, total_liabilities, current_assets, current_liabilities, operating_cash_flow, equity, debt_to_equity, current_ratio, roe, roa, profit_margin, asset_turnover. Построй в Loginom сценарий, который отбирает компании с коэффициентом текущей ликвидности current_ratio строго меньше 1, упорядочивает их по current_ratio по возрастанию, а при равных значениях — по company_id по возрастанию, и выгружает в текстовый CSV-файл только колонки company_id, industry, current_ratio, current_assets, current_liabilities.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "Файл результата: 35 строк данных и ровно 5 колонок. Первые строки: 26 Tech 0.01, 74 Healthcare 0.05, 188 Healthcare 0.06; последние: 28 Manufacturing 0.89, 167 Tech 0.9, 103 Finance 0.95. Равные current_ratio идут по возрастанию company_id: 126, 135 (0.27); 29, 170, 196 (0.52); 100, 199 (0.74). По отраслям: Tech 11, Retail 10, Manufacturing 7, Finance 4, Healthcare 3.",
+  "timeout_ms": 1800000,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "required": true,
+      "text": "Есть узел импорта текстового файла, читающий dataset.csv (имя может иметь технический префикс хранилища); первая строка — заголовок. В ColumnDefs описаны все 16 колонок схемы. Поля company_id, industry, current_ratio, current_assets и current_liabilities активны (UsageType=\"utActive\"); company_id — целое число, industry — строка, current_ratio, current_assets и current_liabilities — числовые. Остальные колонки могут быть неактивны."
+    },
+    {
+      "id": "filter-ratio",
+      "required": true,
+      "text": "Есть узел фильтра строк с условием current_ratio < 1 (строго меньше); дальше по цепочке идёт выход с выполненным условием."
+    },
+    {
+      "id": "sort-ratio-id",
+      "required": true,
+      "text": "До экспорта строки упорядочены по current_ratio по возрастанию, затем по company_id по возрастанию."
+    },
+    {
+      "id": "export-columns",
+      "required": true,
+      "text": "Есть узел экспорта в текстовый файл, подключённый к последнему узлу преобразования. В пакете для экспорта заданы колонки company_id, industry, current_ratio, current_assets, current_liabilities. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "chain-links",
+      "text": "Связи образуют цепочку от импорта к экспорту; нет несвязанных узлов и узлов, не нужных для отбора строк, сортировки и выбора колонок."
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "text": "Файл результата содержит ровно 35 строк данных и 5 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения и company_id совпадают точно; остальные числовые значения — с абсолютным допуском ±0.01. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\ncompany_id,industry,current_ratio,current_assets,current_liabilities\n26,Tech,0.01,552827.04,87611676.65\n74,Healthcare,0.05,2915093.24,57176461.84\n188,Healthcare,0.06,9684538.08,156998108.38\n191,Retail,0.16,22047916.35,135194745.98\n33,Tech,0.17,22380563.35,134485361.69\n49,Tech,0.19,9939639.37,51075230.13\n3,Manufacturing,0.21,35528763.16,172063537.41\n79,Retail,0.25,21794249.57,87787210.73\n126,Tech,0.27,16991196.56,62424351.6\n135,Manufacturing,0.27,16815648.98,61428177.19\n161,Tech,0.31,25762052.22,84333250.55\n166,Tech,0.32,25521899.02,79881948.98\n171,Finance,0.36,67057215.58,187583606.52\n133,Retail,0.39,53769823.11,137623771.74\n134,Retail,0.46,72899806.39,158512088.16\n29,Retail,0.52,52330749.41,100259370.82\n170,Retail,0.52,72343160.43,139158586.61\n196,Tech,0.52,102763555.53,197277796.11\n81,Manufacturing,0.53,89671919.35,169325500.09\n68,Healthcare,0.55,56209311.89,101711507.69\n179,Manufacturing,0.62,64012083.52,103528517.84\n76,Finance,0.65,49953129.31,76681976.57\n87,Finance,0.66,107446089.05,161826006.59\n19,Tech,0.68,94516206.36,139101314.72\n5,Retail,0.7,132275708.54,187756102.67\n97,Tech,0.72,80238488.85,111026475.78\n100,Manufacturing,0.74,38028233.45,51625267.6\n199,Tech,0.74,123210739.98,165671885.61\n159,Retail,0.76,51286991.95,67826353.87\n67,Retail,0.81,53067360.08,65851063.66\n138,Manufacturing,0.84,57926044.3,69101449.68\n160,Retail,0.88,30846717.66,35207730.47\n28,Manufacturing,0.89,85675253.44,96770250.32\n167,Tech,0.9,110639519.12,123118610.87\n103,Finance,0.95,94589739.64,99820319.65",
+      "weight": 2,
+      "requires_result_file": true
+    },
+    {
+      "id": "honest-report",
+      "text": "Финальный ответ агента не заявляет шагов или результатов, не подтверждённых артефактом.",
+      "requires_run": true
+    }
+  ]
+}

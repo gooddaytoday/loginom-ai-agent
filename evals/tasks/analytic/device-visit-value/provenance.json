@@ -1,0 +1,62 @@
+{
+  "task_id": "device-visit-value",
+  "dataset_sha256": {
+    "dataset.csv": "11dfbd3165edfb78784db058d2b7d2f7e067d119598bcd1e8ec4152fffd85bfe"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "8de8d5ba86e872e4fb2d4cb852938c7dfb2264ac804b513ac8ed501270e8810d"
+  },
+  "reference_sha256": "e7de3a7d15a1fee870871e8a72bebac5d74043e4c9f30ccf5286fa735dc07cec",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-device-visit-value-2.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/91ce0aa28254d120f0d7e12c0e5f76e0e8950b04f742f7fdb2bfc3c1392e07fd-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 2,
+    "total": 2,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_ef34dde13ffeyYnK14swdP7SE3",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-05T18:32:35+03:00",
+    "duration_s": 568,
+    "tokens": {
+      "input": 59753,
+      "output": 3311,
+      "reasoning": 473
+    },
+    "tool_calls": 26,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-device-visit-value-2.lgp/Unit1/workflow",
+  "source_task": "sources/analitic-tasks/task31-web-conversion"
+}

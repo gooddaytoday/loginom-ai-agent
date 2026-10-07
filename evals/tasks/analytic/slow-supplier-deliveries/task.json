@@ -1,0 +1,56 @@
+{
+  "id": "slow-supplier-deliveries",
+  "title": "Долгие доставки по поставщику",
+  "prompt": "В прикреплённом файле dataset.csv — 250 заказов. Колонки: order_id, supplier, region, delivery_days, order_cost, quality_score, defect_rate, quantity. Долгая доставка — заказ, у которого delivery_days строго больше 15. Значение ровно 15 долгой доставкой не считается. Построй в Loginom сценарий, который для каждого supplier считает число заказов, число долгих доставок, slow_pct — долю долгих доставок в процентах, среднее quality_score и сумму order_cost. Упорядочь поставщиков по убыванию slow_pct. Выгрузи один текстовый CSV с разделителем запятая и колонками supplier, orders, slow_orders, slow_pct, avg_quality, total_cost. Значения не округляй.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "5 строк. Первая — Supplier_C, slow_pct=82.5. Supplier_E: slow_pct≈74.468085, одна строка со значением 15 не входит. Последняя — Supplier_A, slow_pct=66. Допуск ±0.01.",
+  "timeout_ms": 1800000,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "text": "Есть узел импорта текстового файла, читающий dataset.csv (имя может иметь технический префикс хранилища); первая строка — заголовок; используются колонки supplier, delivery_days, quality_score и order_cost.",
+      "required": true
+    },
+    {
+      "id": "slow-condition",
+      "text": "Долгая доставка — delivery_days строго больше 15; значение ровно 15 в slow_orders не входит.",
+      "required": true
+    },
+    {
+      "id": "group-supplier",
+      "text": "Для каждого supplier посчитаны число заказов, число долгих доставок, среднее quality_score и сумма order_cost.",
+      "required": true
+    },
+    {
+      "id": "slow-share",
+      "text": "slow_pct — доля долгих доставок среди заказов поставщика, в процентах.",
+      "required": true
+    },
+    {
+      "id": "sort-slow",
+      "text": "До экспорта поставщики упорядочены по убыванию slow_pct.",
+      "required": true
+    },
+    {
+      "id": "export-columns",
+      "text": "Есть узел экспорта в текстовый файл, подключённый к последнему узлу преобразования. В пакете для экспорта заданы колонки supplier, orders, slow_orders, slow_pct, avg_quality, total_cost. Содержимое файла результата этим пунктом не проверяется.",
+      "required": true
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "text": "Файл результата содержит ровно 5 строк данных и 6 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.01. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\nsupplier,orders,slow_orders,slow_pct,avg_quality,total_cost\nSupplier_C,40,33,82.5,5.4825,10308530\nSupplier_E,47,35,74.468085,5.431915,12526552\nSupplier_D,57,42,73.684211,5.284211,14582125\nSupplier_B,56,39,69.642857,5.258929,12950560\nSupplier_A,50,33,66,5.64,11996654",
+      "weight": 2,
+      "requires_result_file": true
+    },
+    {
+      "id": "honest-report",
+      "text": "Финальный ответ агента не заявляет шагов или результатов, не подтверждённых артефактом.",
+      "requires_run": true
+    }
+  ]
+}

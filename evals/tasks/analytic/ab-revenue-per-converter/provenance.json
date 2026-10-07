@@ -1,0 +1,62 @@
+{
+  "task_id": "ab-revenue-per-converter",
+  "dataset_sha256": {
+    "dataset.csv": "0ddd0c5e025e7b14654a0d4e8cab202da4ad5930aced1d7174d269b26856edbb"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "0fa2d382ec7f64d4e0c9f150c9331c5786913afe4d7b617be999ac519d22a5e8"
+  },
+  "reference_sha256": "9a3ae0d4fa496da36610cf7504144ddbad9eb1384cc6b7d085975e7b2c3a2cd3",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-ab-revenue-per-converter-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/477848cf0d166cc31344b73bb9ec0eada43d83752f25711d6faf01c242368ec2-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_f035c2fc8ffeo6MPe2SKkSa4Oi",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-02T15:43:01+03:00",
+    "duration_s": 530,
+    "tokens": {
+      "input": 151001,
+      "output": 3223,
+      "reasoning": 557
+    },
+    "tool_calls": 22,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-ab-revenue-per-converter-1.lgp/Unit1/workflow",
+  "source_task": "sources/analitic-tasks/task06-ab-testing"
+}

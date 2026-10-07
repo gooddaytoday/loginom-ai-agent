@@ -1,0 +1,55 @@
+{
+  "id": "ab-revenue-per-converter",
+  "title": "Выручка на конверсию в A/B-тесте",
+  "prompt": "В прикреплённом файле dataset.csv — 2000 пользователей. Колонки: user_id, group, conversion, revenue, session_duration, pages_visited. group принимает значения A и B. conversion равен 1, если пользователь конвертировался, и 0 иначе. Построй в Loginom сценарий, который для каждой group считает число пользователей, число конверсий как сумму conversion, conversion_pct — число конверсий / число пользователей × 100, сумму revenue и revenue_per_converter — сумма revenue / число конверсий. Не дели сумму revenue на число всех пользователей. Упорядочь группы по убыванию conversion_pct. Выгрузи один текстовый CSV с разделителем запятая и колонками test_group, users, conversions, conversion_pct, total_revenue, revenue_per_converter. В test_group запиши значение group. Значения не округляй.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "2 строки. Первая — B: users=1013, conversions=157, conversion_pct≈15.498519, total_revenue≈9714.82, revenue_per_converter≈61.877834. Допуск ±0.01.",
+  "timeout_ms": 1800000,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "text": "Есть узел импорта текстового файла, читающий dataset.csv (имя может иметь технический префикс хранилища); первая строка — заголовок; используются колонки group, conversion и revenue.",
+      "required": true
+    },
+    {
+      "id": "group-test",
+      "text": "Для каждой group посчитаны число пользователей, сумма conversion и сумма revenue.",
+      "required": true
+    },
+    {
+      "id": "per-converter",
+      "text": "revenue_per_converter равен сумме revenue, делённой на сумму conversion, а не на число пользователей. conversion_pct — сумма conversion / число пользователей × 100.",
+      "required": true
+    },
+    {
+      "id": "sort-conversion",
+      "text": "До экспорта группы упорядочены по убыванию conversion_pct.",
+      "required": true
+    },
+    {
+      "id": "export-columns",
+      "text": "Есть узел экспорта в текстовый файл, подключённый к последнему узлу преобразования. В пакете для экспорта заданы колонки test_group, users, conversions, conversion_pct, total_revenue, revenue_per_converter. Содержимое файла результата этим пунктом не проверяется.",
+      "required": true
+    },
+    {
+      "id": "chain-links",
+      "text": "Связи образуют цепочку от импорта к экспорту; нет несвязанных узлов и узлов, не нужных для группы, конверсии и выручки на конверсию."
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "text": "Файл результата содержит ровно 2 строк данных и 6 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.01. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\ntest_group,users,conversions,conversion_pct,total_revenue,revenue_per_converter\nB,1013,157,15.498519,9714.82,61.877834\nA,987,113,11.448835,6509.16,57.603186",
+      "weight": 2,
+      "requires_result_file": true
+    },
+    {
+      "id": "honest-report",
+      "text": "Финальный ответ агента не заявляет шагов или результатов, не подтверждённых артефактом.",
+      "requires_run": true
+    }
+  ]
+}

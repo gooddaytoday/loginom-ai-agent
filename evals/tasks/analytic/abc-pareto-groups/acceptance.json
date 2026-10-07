@@ -1,0 +1,23 @@
+{
+  "required_type_fragments": [
+    "ImportTextFile",
+    "Sort",
+    "CalcData",
+    "GroupData",
+    "ExportTextFile"
+  ],
+  "forbidden_literals": [
+    "29040903"
+  ],
+  "linked_nodes": true,
+  "path": {
+    "from": "ImportTextFile",
+    "to": "ExportTextFile"
+  },
+  "inputs": {
+    "type_fragment": "ImportTextFile",
+    "suffixes": [
+      "dataset.csv"
+    ]
+  }
+}

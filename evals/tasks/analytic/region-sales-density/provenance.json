@@ -1,0 +1,62 @@
+{
+  "task_id": "region-sales-density",
+  "dataset_sha256": {
+    "dataset.csv": "5d82bd92a897e69c4ceb86588447aa10acbcc1f45beeeb1793ab5f833ed1b2bc"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "c0ca10d3a00df719bd107dadc8834c44e868a23980385202b8761f551f8b04cf"
+  },
+  "reference_sha256": "de356b7e4147caa515abfdbc7dfe08b98a21da9a5e39927e5007fdf5f4c6f274",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-region-sales-density-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/a39c96d21e792425fc966de83beee34ffd21469577259f5b52922ee8652b8179-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_f03e74ecbffevTM5Z54V1642p5",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-02T13:11:03+03:00",
+    "duration_s": 537,
+    "tokens": {
+      "input": 63072,
+      "output": 3041,
+      "reasoning": 305
+    },
+    "tool_calls": 22,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-region-sales-density-1.lgp/Unit1/workflow",
+  "source_task": "sources/analitic-tasks/task17-geographic"
+}

@@ -1,0 +1,62 @@
+{
+  "task_id": "language-repository-stars",
+  "dataset_sha256": {
+    "dataset.csv": "4505ad2a25e42a4b0c723b1bbbe3043b3028df0e16de4fc4cbe91fb9bd652eac"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "1a54341b38678cfe169a9cde64d3af75331a4b3475852c645c62a83046cf4f67"
+  },
+  "reference_sha256": "5a385f654033751a64ab98dcbe4afc029c21c5a977d6b7b182b9c1ca2e1449ba",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-language-repository-stars-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/d5eafb002168653fa9f97fd3f4d76f1ca321cb7ccd22af54ed6df267e0ce5a0f-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_f03a383d2ffeTS7A4L5LZFO3Gz",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-02T14:25:06+03:00",
+    "duration_s": 478,
+    "tokens": {
+      "input": 46366,
+      "output": 2626,
+      "reasoning": 607
+    },
+    "tool_calls": 18,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-language-repository-stars-1.lgp/Unit1/workflow",
+  "source_task": "sources/analitic-tasks/task59-github"
+}

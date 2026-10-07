@@ -1,0 +1,55 @@
+{
+  "id": "trial-dosage-outcomes",
+  "title": "Эффект и побочные эффекты по группе и дозе",
+  "prompt": "В прикреплённом файле dataset.csv — 300 пациентов. Колонки: patient_id, treatment_group, age, baseline_score, final_score, side_effects, improvement, dosage_mg, weeks_on_treatment. side_effects принимает значения None, Mild, Moderate и Severe. Текст None означает отсутствие побочного эффекта, это значение, а не пропуск. Построй в Loginom сценарий, который для каждой пары treatment_group и dosage_mg считает число пациентов, среднее improvement и side_effect_pct — долю пациентов, у которых side_effects не равно None, в процентах. dosage_mg сравнивай как число. Упорядочь строки по treatment_group по возрастанию, а внутри группы — по dosage_mg по возрастанию: 50, затем 100, затем 200. Выгрузи один текстовый CSV с разделителем запятая и колонками treatment_group, dosage_mg, patients, avg_improvement, side_effect_pct. Значения не округляй.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "6 строк: Placebo 50, 100, 200, затем Treatment 50, 100, 200. Placebo/50: patients=51, avg_improvement≈23.456863, side_effect_pct≈49.019608. Допуск ±0.01.",
+  "timeout_ms": 1800000,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "text": "Есть узел импорта текстового файла, читающий dataset.csv (имя может иметь технический префикс хранилища); первая строка — заголовок; используются колонки treatment_group, dosage_mg, improvement и side_effects.",
+      "required": true
+    },
+    {
+      "id": "group-dosage",
+      "text": "Группировка имеет ровно два ключа, treatment_group и dosage_mg, и считает число пациентов и среднее improvement.",
+      "required": true
+    },
+    {
+      "id": "side-effect-share",
+      "text": "side_effect_pct — доля пациентов, у которых side_effects не равно тексту None, в процентах. Значение None в эту долю не входит.",
+      "required": true
+    },
+    {
+      "id": "sort-dosage",
+      "text": "До экспорта строки упорядочены по treatment_group по возрастанию, а внутри группы — по dosage_mg по возрастанию как по числу: 50, 100, 200.",
+      "required": true
+    },
+    {
+      "id": "export-columns",
+      "text": "Есть узел экспорта в текстовый файл, подключённый к последнему узлу преобразования. В пакете для экспорта заданы колонки treatment_group, dosage_mg, patients, avg_improvement, side_effect_pct. Содержимое файла результата этим пунктом не проверяется.",
+      "required": true
+    },
+    {
+      "id": "chain-links",
+      "text": "Связи образуют цепочку от импорта к экспорту; нет несвязанных узлов и узлов, не нужных для группы, дозы, среднего эффекта и доли побочных эффектов."
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "text": "Файл результата содержит ровно 6 строк данных и 5 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.01. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\ntreatment_group,dosage_mg,patients,avg_improvement,side_effect_pct\nPlacebo,50,51,23.456863,49.019608\nPlacebo,100,49,19.814286,55.102041\nPlacebo,200,46,18.208696,56.521739\nTreatment,50,39,37.505128,43.589744\nTreatment,100,57,38.096491,50.877193\nTreatment,200,58,35.710345,37.931034",
+      "weight": 2,
+      "requires_result_file": true
+    },
+    {
+      "id": "honest-report",
+      "text": "Финальный ответ агента не заявляет шагов или результатов, не подтверждённых артефактом.",
+      "requires_run": true
+    }
+  ]
+}

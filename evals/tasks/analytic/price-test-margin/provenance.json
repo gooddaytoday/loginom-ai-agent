@@ -1,0 +1,62 @@
+{
+  "task_id": "price-test-margin",
+  "dataset_sha256": {
+    "dataset.csv": "ebc888de31aef1f4d35392b0dbc2e320e4cb2cee23037b42e8174e4a04988ced"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "8de761d45f7f5edb19bbcc3a83e5821d1a3340db7744a61c28575856a718d987"
+  },
+  "reference_sha256": "7422627762034a2f443bc2322a97e329d658a55030d6420715f1bc6b193a70cf",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-price-test-margin-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/8787fd7d96518a6abc33bd028a3b2d17842391c72558066489735f9f995875b4-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_ef32501a9ffeYZsCr8voric5rM",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-05T19:17:13+03:00",
+    "duration_s": 574,
+    "tokens": {
+      "input": 58023,
+      "output": 3027,
+      "reasoning": 286
+    },
+    "tool_calls": 21,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-price-test-margin-1.lgp/Unit1/workflow",
+  "source_task": "sources/analitic-tasks/task42-pricing-strategy"
+}

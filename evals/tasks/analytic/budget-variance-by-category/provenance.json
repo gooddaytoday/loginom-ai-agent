@@ -1,0 +1,51 @@
+{
+  "task_id": "budget-variance-by-category",
+  "source_task": "sources/analitic-tasks/task47-budget-variance",
+  "dataset_sha256": "835c1976b749a47c21c9fedeb1e1d3469afe6978b2ddb438985981c091ea4362",
+  "oracle_sha256": "18572890a55e0a441c2ce18579626bf802706941c98abcdfb483fe3d9f4bc623",
+  "reference_sha256": "354333e7df3e652128d5ed05313acd51f1a0308dc92ccb86e6c0aec112f71288",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/ref-budget-variance-by-category-3.lgp",
+    "result": "/user/ref-budget-variance-by-category-3.result.csv",
+    "input": "/user/18f7e017638bd3ff4bf65b1559cbb2a0974c024c9d2be4819ee8583d90bded4e-0-dataset.csv",
+    "input_matches_dataset": true
+  },
+  "attempt": {
+    "number": 3,
+    "total": 3,
+    "assisted": true,
+    "hint": "Перед сохранением сверь превью с заданием: avg_variance — среднее (actual − budgeted) по категории, over_budget_pct — среднее is_over_budget × 100, порядок строк по убыванию avg_variance, имена колонок ровно как в задании.",
+    "session_id": "ses_f13663c30ffeIrUfTx740YKVeK",
+    "exit_code": 0,
+    "started_at": "2026-09-29T12:58:07+03:00",
+    "duration_s": 490,
+    "tokens": {
+      "input": 52417,
+      "output": 3202,
+      "reasoning": 373
+    },
+    "tool_calls": 22,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "cli_result_vs_oracle": "PASS",
+    "structure": "PASS",
+    "browser_rerun_vs_oracle": "PASS"
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/ref-budget-variance-by-category-3.lgp/Unit1/workflow"
+}

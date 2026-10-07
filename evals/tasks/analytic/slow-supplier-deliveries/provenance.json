@@ -1,0 +1,62 @@
+{
+  "task_id": "slow-supplier-deliveries",
+  "dataset_sha256": {
+    "dataset.csv": "3ca42f93b7dcf83fc5d3dcf418d7573c75f8459e06f93a2bc344f9eedd135b2a"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "1bcb2f2551f4c8841920daf629e82949d7e24db1cc13487986f8e88b0d730bf3"
+  },
+  "reference_sha256": "d87bbe233e4007e5ea414eab48a571fef950610b2fb3b6897d05dc641b39d6a2",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-slow-supplier-deliveries-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/436d21776a95983de7f818d22e20ae9637c2f67391f7fdfd0e4d89849ac915ec-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_f03ae2982ffer3fUE4cMOwPWCC",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-02T14:13:28+03:00",
+    "duration_s": 637,
+    "tokens": {
+      "input": 68309,
+      "output": 3663,
+      "reasoning": 1074
+    },
+    "tool_calls": 29,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-slow-supplier-deliveries-1.lgp/Unit1/workflow",
+  "source_task": "sources/analitic-tasks/task22-supply-chain"
+}

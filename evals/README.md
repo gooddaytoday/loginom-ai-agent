@@ -53,6 +53,7 @@ bun test && bun typecheck                    # самопроверка harness
 bun run src/run.ts --dry-run --repeat 2      # весь цикл на фикстурах, без Loginom/модели/квоты
 bun run src/run.ts --calibrate               # калибровка судьи на эталонах (без агента)
 bun run src/run.ts --repeat 3 --label base   # живой прогон
+bun run src/run.ts --tasks tasks/analytic --only sales-by-category --repeat 1 # аналитический кейс
 bun run src/run.ts --judge-only <run-id>     # пересудить готовые артефакты
 bun run src/compare.ts <run-a> <run-b>       # сравнить два прогона
 bun run src/compare.ts <run-a> <run-b> --margin 0.5 --confidence 0.95 --k 3
@@ -96,8 +97,8 @@ oracle не заменяют обнаружение дефекта судьёй.
 Корпус из 35 analytic-задач / 113 мутаций хранится в calibration/; источники
 закреплены SHA256. Команды выполняются из evals/:
 ```bash
-python3 script/check-calibration-corpus.py --tasks /home/kiselev/git/agent-validation/sources/analytic-evals
-JUDGE_MODEL=gpt-6-astra JUDGE_REASONING=high bun run src/run.ts --calibrate --tasks /home/kiselev/git/agent-validation/sources/analytic-evals
+python3 script/check-calibration-corpus.py --tasks tasks/analytic
+JUDGE_MODEL=gpt-6-astra JUDGE_REASONING=high bun run src/run.ts --calibrate --tasks tasks/analytic
 ```
 При подготовке мутаций требуются zip, unzip и xmllint. После всех замен
 изменённые XML проверяются командой `xmllint --nonet --noout` до пересборки ZIP
@@ -142,6 +143,15 @@ Report показывает оба исхода, повтор помечен я�
 Известные причины `CLI_PERMISSION_REJECTED` (→ `failed/permission`): агент запросил `question`, зациклился (`doom_loop`) или обратился вне workspace (`external_directory`) — в headless-режиме такие запросы отклоняются автоматически.
 
 ## Сравнимость
+
+Нельзя использовать старый неизолированный и новый изолированный прогоны как
+контролируемое сравнение: `compare` сверяет модель, входы, рубрику и судью, но не
+режим изоляции или harness SHA. Для количественного сравнения обе стороны должны
+работать в одинаковой изоляции с одинаково очищенными профилем и Loginom.
+Существующие label и harness SHA позволяют вручную установить условия запуска.
+Перенос неизменного корпуса сам по себе не требует повторной полной калибровки:
+сначала проверяются хэши и сохранённые доказательства. Один smoke с расширенным
+prompt проверяет работоспособность, а не качество на 35 задачах.
 
 `compare` предупреждает, если различаются модель/variant агента, входы (включая
 хвост промпта), рубрика/oracle, модель/reasoning/промпт/схема судьи, лимиты задач
