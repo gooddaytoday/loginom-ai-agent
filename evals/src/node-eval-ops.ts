@@ -182,10 +182,11 @@ export async function runNodeUnitChecks(config: NodeOpsConfig, lease: NodeStandL
     const unit = path.join(directory(config), `unit-${crypto.randomUUID()}`)
     await mkdir(unit, { mode: 0o700 })
     for (const command of ["test", "typecheck"]) {
+      const outDir = await nodeProcessOutput(config, lease, command === "test" ? "unit-test" : "unit-typecheck")
       const run = await superviseProcess({ cmd: [process.execPath, command], cwd: path.join(config.roles[lease.role].checkout, "evals"),
         env: Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined &&
           /^(PATH|HOME|LANG|LC_[A-Z_]+|TMPDIR|https?_proxy|all_proxy|no_proxy|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|NODE_USE_ENV_PROXY|EVAL_TEST_LOGINOM_IMAGE)$/.test(entry[0]))),
-        timeoutMs: 900_000, outDir: path.join(unit, command) })
+        timeoutMs: 900_000, outDir })
       checks.push({ command: `bun ${command}`, exitCode: run.exitCode, processes: run.processCleanup })
       await verifyProcesses(run.processCleanup, lease)
     }
@@ -194,6 +195,15 @@ export async function runNodeUnitChecks(config: NodeOpsConfig, lease: NodeStandL
     await writeFile(evidence, JSON.stringify(completion), { mode: 0o600 })
     return { status: "COMPLETE", code: checks.some(check => check.exitCode !== 0) ? 1 : 0, evidence }
   })
+}
+
+/** superviseProcess opens capture files immediately; its caller owns their private directory. */
+export async function nodeProcessOutput(config: NodeOpsConfig, lease: NodeStandLease, kind: "unit-test" | "unit-typecheck" | "native-check") {
+  await assertNodeStandOwner(config, lease)
+  if (!["unit-test", "unit-typecheck", "native-check"].includes(kind)) throw new NodeOpsFailure("INVALID_CAPTURE_KIND")
+  const outDir = path.join(directory(config), `capture-${kind}-${crypto.randomUUID()}`)
+  await mkdir(outDir, { mode: 0o700 })
+  return outDir
 }
 
 export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStandLease, env: Record<string, string | undefined> = process.env) {
@@ -217,7 +227,7 @@ export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStand
     // Validate Loginom credentials, websocket and licence with the installed product's real browser.
     // No run/model command is admitted here, and no settings or credentials are replaced.
     const workdir = await mkdtemp(path.join(config.roles[lease.role].workRoots[0]!, ".ops-check-"))
-    const checkDir = path.join(directory(config), `native-check-${crypto.randomUUID()}`)
+    const checkDir = await nodeProcessOutput(config, lease, "native-check")
     const cmd = [...command.cmd, "loginom", "check", "--format", "json"]
     const boundary = await sandboxCommand({ cmd, profileDir: current.profileDir, workdir, env: command.env })
     const check = await superviseProcess({ cmd, cwd: boundary.cwd, env: boundary.env, sandbox: boundary.cmd, profileDir: current.profileDir, outDir: checkDir, timeoutMs: 120_000 })
