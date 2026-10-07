@@ -183,7 +183,7 @@ PASS исполнителя: CLI и применимый cold-check/соглас
 ## 6. Точка продолжения
 
 - **Подтверждено:** источники `loginom@dada8010e`, Help `353e506b`, E2E `486caef44`; обработчика нет. Документация не доказывает UI/CLI/E2E PASS.
-- **Назначение 2026-10-07:** `excel-import` → `loginom`, база `ef84e68a22bd46f3f24549edd829cfb293836703`; две последовательные карточки, один PR. Product Excel NOT_RUN.
+- **Назначение 2026-10-07:** `excel-import` → `loginom`, база `ef84e68a22bd46f3f24549edd829cfb293836703`; [LAB-20](https://mas.kartamyshev.dev/lab/issues/01a11594-7dcc-79a7-9cc4-3fc00eb89ba0) → [LAB-21](https://mas.kartamyshev.dev/lab/issues/01a11594-8c85-7c97-bc35-ffbdebf7d2cc), общий [draft PR #38](https://github.com/gooddaytoday/loginom-ai-agent/pull/38). Product Excel NOT_RUN.
 - **Генератор:** этап 0 отдельно; SHA, пара аккаунтов и Linux-среда; W1 согласован выше, W2/W3 отложены.
 - **Исполнитель:** discovery → fixtures/oracle/full reader qualification → независимая приёмка этапа 0 → этап 1 с W1 → тесты → CLI/независимый аудит 20 789 строк.
 - **Ловец:** независимая приёмка опубликованного SHA и полного узлового результата.
