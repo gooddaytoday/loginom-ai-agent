@@ -101,9 +101,23 @@ Cleanup `CONFIRMED`: браузер закрыт, browser processes после �
 
 Лицензионный endpoint: `10.200.1.87`, порты 3186 и 3187. В nft добавлены два узких forward-правила от server IP `172.18.0.2` через bridge `br-881d45d77a6b` только к этому адресу и TCP/UDP портам. TCP из контейнера прошёл на обоих портах; **UDP не пробовали**. Остальные правила и policy DROP сохранены.
 
-Для Dock/OpenViking прямой physical-route SDK и три параллельных catalog запроса прошли **4 / 4**, 258–323 ms, с default TLS 1.3/PQ. Никаких TLS/PQ ослаблений этот результат не требовал. После этого установлен постоянный узкий Xray route: только exact domains `mcp.loginom.ai`, `ov.kartamyshev.dev`, `mas.kartamyshev.dev`, port 443 → `freedom` с `UseIPv4`; остальные назначения сохраняют VLESS. Private backup — `config.json.before-loginom-evals-routing`; Xray config test прошёл, restart active.
+Для Dock/OpenViking прямой physical-route SDK и три параллельных catalog запроса прошли **4 / 4**, 258–323 ms, с default TLS 1.3/PQ. Никаких TLS/PQ ослаблений этот результат не требовал. Первоначальный постоянный Xray route: exact domains `mcp.loginom.ai`, `ov.kartamyshev.dev`, `mas.kartamyshev.dev`, port 443 → `freedom` с `UseIPv4`; остальные назначения сохраняют VLESS. Private backup — `config.json.before-loginom-evals-routing`; Xray config test прошёл, restart active.
 
-Scoped nft output разрешает TCP 443 только к двум IP `62.113.108.18` и `151.244.228.56`; `loginom-evals-routes.service` устанавливает две destination `/32` rules priority 8998 с `lookup main`. Глобальная policy DROP и остальные VPN ограничения не изменены. Это явные исключения по двум адресам, без автоматического обхода ограничений. DNS IP pin требует сверки; изменение разрешения имён требует согласованного обновления scoped routes/rules.
+Исходный scoped nft output разрешает TCP 443 к `62.113.108.18` и `151.244.228.56`. Дополнение ниже разрешает TCP 80/443 к `62.113.108.18` и `194.156.118.61`; внутренний адрес разрешён существующим private-network правилом. `loginom-evals-routes.service` теперь устанавливает четыре destination `/32` rules priority 8998 с `lookup main`: эти три публичных IP и `10.200.11.224`. Глобальная policy DROP и остальные VPN ограничения сохранены. DNS IP pin требует сверки; изменение разрешения имён требует обновления scoped routes/rules.
+
+2026-10-07 11:54 UTC по запросу владельца добавлены постоянные HTTP/HTTPS исключения VPN:
+
+| Домен | Проверенный IPv4 | Рабочий URL |
+| --- | --- | --- |
+| `logi-test-plan.bg.local` | `10.200.11.224` | `http://logi-test-plan.bg.local/app/` |
+| `mcp.loginom.ai` | `62.113.108.18` | `https://mcp.loginom.ai/health` |
+| `app.loginom.ai` | `194.156.118.61` | `https://app.loginom.ai/app/` |
+
+Для этих exact domains добавлены direct rule в sing-box и Xray rule TCP 80/443 → `loginom-services-direct`. Приложения продолжают использовать назначенный HTTP proxy; его запросы к перечисленным доменам выходят напрямую. Прежние Dock/Multica/OpenViking исключения сохранены. DNS внутреннего `bg.local` обслуживается существующим intranet resolver `10.200.0.3`.
+
+Проверки конфигурации Xray, sing-box, nft и systemd PASS. После restart sing-box, Xray и routes все службы, включая Multica, active/enabled. `ip route get` для всех трёх адресов показывает `enp3s0`, table `main`; curl напрямую и через HTTP proxy вернул 200 на трёх рабочих URL. Node 24.19.0 с настоящим runtime env и `NODE_USE_ENV_PROXY=1` также получил три ответа 200. HTTPS-порт внутреннего стенда не принимает соединения; его HTTP работает. Reboot по-прежнему не проверен.
+
+Private backup исходных конфигураций — `/etc/loginom-evals-vpn-backups/20261007-115442`. На сервере сохранены `R/evidence/vpn-domain-exceptions.json` и `vpn-domain-access.json`; API keys и provider credentials в них отсутствуют. Immutable support attachment и CLI-профили при этом не менялись.
 
 Ранее HTTP через VLESS давал TLS flakes, а короткая успешная TUN-проба не обеспечивала полный catalog. Эти исторические пробы не являются текущей приёмкой. **HTTP catalog через установленный постоянный scoped route PASS: 4 / 4**, 255–289 ms, exit 0, без timeout и TLS customizations. Evidence `probe-catalog-http-scoped-direct-summary.json` подтверждает default TLS 1.3 / HTTP 1.1 / `X25519MLKEM768`. OpenViking scope/network подтверждён новой настоящей Multica task отдельно; временные пробы 2082/2083 не являются используемым runtime путём.
 
