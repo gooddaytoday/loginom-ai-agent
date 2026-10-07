@@ -1,6 +1,26 @@
 # Linux: завершение реализации — 2026-09-16
 
-## 2026-10-07 — package-docs, изолированные кандидаты 0.1.17
+## 2026-10-07 — package-docs: новый единый кандидат669
+
+Desktop DEB/AppImage и полный CLI0.1.17 из чистого
+`669822296615accbd6579c09244dacb24f77a056` статически проверены. На каждом
+из Ubuntu22/24/26 и Debian12/13 установленные Desktop/CLI прошли автономную
+матрицу, network=none, nonroot/sandbox. Все10 containers removed. Installed
+Node docs executor подтвердил PDF label fix на обеих просмотренных страницах,
+неизменность `.lgp` и PDF/DOCX/MD outputs. AppImage native opening4/4 PASS,
+Evince/Writer/gedit и awaited process cleanup подтверждены без модели/справки.
+Три сохранённых Desktop bc6 SUM-пакета холодно выполнены установленным CLI669:
+точные35/20, настройки не применялись, файлы неизменны, пакеты закрыты/logout.
+Host collector EACCES/exit1 сохранён; native receipts восстановлены без повторов.
+
+Это новый установленный локальный gate, не полный release/model PASS. Help
+TLS/direct недоступны; corpus/TUI/upgrade/A-B остаются открытыми. Общий стенд,
+человеческие launcher/profile не менялись; Windows/macOS не проверялись.
+Hashes/команды/evidence — в
+[отчёте](../testing/loginom-ai-agent/reports/2026-10-07-package-docs-openai-resume.md)
+и [checkpoint](../testing/loginom-ai-agent/package-docs-implementation.md#checkpoint).
+
+## 2026-10-07 — прежние смешанные кандидаты 3ece/bc6
 
 В `docs-no-browser` Desktop из `3ece19aff72f5d95f88347564bb61566029cae52`
 и CLI из `bc6e7e1648e211bcf411fbfd86564b950a2aaf75` прошли автономную

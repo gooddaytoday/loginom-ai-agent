@@ -4197,15 +4197,79 @@ server3×3 просит локальный пакет; CLI missing/external-path
 содержат исходные result hashes. Direct health без global proxy changes тоже
 отказал: connection refused, exit7/HTTP000. Полный живой gate остаётся открытым.
 
+## 2026-10-07 — установленный кандидат 669822296 и холодные SUM-пакеты
+
+Desktop и standalone CLI построены из одного чистого SHA
+`669822296615accbd6579c09244dacb24f77a056`; version0.1.17, Node24.19.0,
+Bun1.3.14, Electron42.3.3, Playwright1.63.0-alpha-2026-08-31/MCP0.0.80,
+Chromium1243. Сборки не опубликованы, человеческие launcher/profile не менялись.
+
+| Артефакт/manifest | SHA256 |
+| --- | --- |
+| CLI tar.gz | `79c287c4cc70f8c62fd33353f1cd0699b3d8d870f31234cb6cf05b74cc8fb4b0` |
+| CLI manifest | `74a70dc771399a7edfe4936b8bb40388c44bd0ebca8dbe1fff64a9e48a7e709f` |
+| Desktop DEB | `ee8efecc6bbd2a23c25444f8db1f3672206c45733c757c92f6912a559481f42d` |
+| Desktop AppImage | `49bb5e5b18e71af29037a2c51e5451024e195e8a7f017639de25d29eabdfbded` |
+| Desktop release manifest | `fb38b8af638bb9270188ddbe2d6083dd5c18e43951213b33347f9a3b586c32a7` |
+
+В собственном acceptance root выполнены `run-cli-669822296-linux-offline.py`
+и `run-desktop-669822296-linux-offline.py`: CLI5/5 и Desktop5/5 PASS на
+Ubuntu22/24/26, Debian12/13. Каждый контейнер работал с network=none,
+исполнение от UID1200, реальный Chromium sandbox, полный manifest. Desktop
+проверял установленный DEB/Electron/onboarding, CLI — публичные install/status/
+browser/uninstall и сохранность profile sentinel. Все десять контейнеров удалены.
+Evidence: `cli-669822296-linux-matrix/linux-matrix.json` и
+`desktop-669822296-linux-matrix-v2/linux-matrix.json`.
+Это установка/локальный runtime; повторная живая модельная матрица не заявляется.
+
+`run-installed-pdf-669822296.py` использовал именно установленный Node и
+`skills/package-docs/scripts/package-docs.mjs`, network=none. PDF/DOCX/MD созданы;
+исходный nested.lgp сохранил SHA73bca886d. Обе страницы PDF просмотрены целиком:
+«Общая структура:» и текст теперь находятся вместе, потери/обрезки текста,
+пустых страниц нет. PDF SHA256
+`d0991e68c12c115d909289027e2bc08ab3866f4cc9f2f3d733d647f55fc95d6d`.
+Evidence: `cli-669822296-installed-pdf/{result,manual-quality}.json`;
+это installed GREEN ранее сохранённого label/layout FAIL. Модель/Help/Loginom
+не вызывались; факт формирования файла не заменяет проверку выбора skill.
+
+Новая AppImage прошла `run-native-document-669822296.py`: четыре сохранённых
+модельных результата bc6 (PDF2, DOCX1, MD1) показаны через штатный backend/UI.
+Настоящая кнопка отправляла `open-local-file`; наблюдались реальные окна
+Evince/LibreOffice/gedit. Внешний браузер не запускался, owned viewers/processes0.
+Evidence: `native-document-link-669822296/verification.json`, UI snapshots,
+IPC и PID/start-time; все4 PASS. Новых model/Help/Loginom calls0.
+
+Три собственных Desktop bc6 `docs-after-build` SUM-пакета независимо открыты
+новым установленным CLI/runtime669, с новой браузерной сессией на каждый пакет.
+Native3/3 PASS: известные GUID/type/label, fresh completed/owner_verified,
+два точных значения Alpha35/Beta20, settingsReapplied=false, SHA файла неизменен.
+Открытые пакеты закрыты, logout подтверждён, remaining processes0. Это смешанная
+проверка warm-model-bc6/cold-runtime669; она не подменяет warm gate новой сборки,
+calculator/import cold или полную A/B suite. Исходный сервер/клиент не переключались.
+
+Evidence: `cold-669822296-desktop-docs-after-build-bc6/collection-recovered.json`.
+Native driver и uninstall завершились PASS. Host collector сохранил исходный
+exit1: каталоги cold-1/2/3 имеют mode0700 и контейнерный UID1200. После завершения
+его собственного контейнера отдельный network=none container вернул владельца
+только нашему evidence (UID1001), сохранив bytes и ограничения доступа. Проверены
+уже записанные native receipts, cleanup и физические before/after SHA. Браузер/
+модель не повторялись; collector FAIL не переписан в первоначальный PASS.
+
+Свежий health на 2026-10-07T19:04Z: proxy TLS EOF/exit35 и direct connection
+refused/exit7, HTTP000 в обоих случаях. Глобальная среда не менялась, новые
+модельные прогоны не начаты. Необязательный вызов private auth wrapper без
+аргументов отказал на validation acceptance runner; это не доказательство отказа
+OAuth. Полные corpus/TUI/upgrade/A-B и сценарные live gates остаются открытыми.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
-- Product253/bc6/3ece clean/manifest/static PASS. Offline installed Linux: Desktop3ece5/5, CLIbc65/5 PASS на Ubuntu22/24/26, Debian12/13; все containers removed. Исторические CLI253 Ubuntu22+Debian13 archive manifest180s FAIL сохранены.
+- Clean candidate669: Desktop DEB/AppImage + CLI full tar/manifest/static PASS; installed Ubuntu22/24/26, Debian12/13 Desktop5/5+CLI5/5 PASS, containers removed. Исторические253 archive180s FAIL сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node56 PASS/675/typecheck;253 Word6/6+MD6/6 PASS. Старый stats layout FAIL и новыйbc6 external label FAIL сохранены/RED→GREEN; label fix пока source-only. Desktop3ece native delivery4/4 PASS.
+- Docs Node56 PASS/675/typecheck; label fix669 installed PDF2 pages PASS, input unchanged, PDF/DOCX/MD emitted; AppImage669 native opening4/4 PASS, processes/viewers0. Исторические layout/native FAIL сохранены.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
 - Scope/history/prompt/revert/docs: 200 PASS / 2 V2 SKIP; Host scope11 PASS; пять implementation подпунктов этапа 5 отмечены; installed переходы ещё открыты.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
@@ -4218,4 +4282,4 @@ server3×3 просит локальный пакет; CLI missing/external-path
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- RESUMED: bc6 corpus20×3 Desktop/CLI завершён с native/infra FAIL; Help TLS недоступен, новые live не запускать. Desktop3ece native opening4/4/UI17/typecheck PASS. Bc6 Desktop/CLI Word12 страниц и MD6 проверены. Полный corpus/TUI/cold/A-B открыты; evals ownership/stand — отдельные зависимости. Подробности в OpenAI resume report.
+- RESUMED: bc6 saved docs/negative/default QA завершена; SUM bc6→cold6693/3 PASS, input unchanged/logout/processes0, collector EACCES/exit1 сохранён и evidence восстановлен без retry. Help TLS/direct недоступны; full corpus/TUI/upgrade/A-B открыты, evals ownership/stand — отдельные зависимости.

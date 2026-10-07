@@ -1,8 +1,9 @@
 # Возобновлённая приёмка package-docs на OpenAI
 
 Статус: частичная приёмка; bc6 live-матрица завершена с native/infra отказами.
-Desktop3ece доставляет готовые документы; автономная Linux-матрица Desktop/CLI
-5/5 PASS для каждой сборки. Живые corpus/TUI/cold/A-B gates остаются открытыми.
+Новый candidate669: Desktop/CLI installed Linux5/5 для каждого; PDF layout и
+Desktop native opening4/4 PASS. SUM bc6→cold6693/3 PASS. Полные живые
+corpus/TUI/upgrade/A-B и остальные cold gates остаются открытыми.
 Основная модель: `openai/gpt-6.1-sol`, variant `medium`.
 Source первоначальных clean candidates: `c50d220c186a1ef0332b15c4a3e9fb1bc7e42efc`.
 
@@ -435,3 +436,67 @@ configured cases, где модель не запускалась из-за Help
 Повторный read-only direct health probe без изменения global proxy/environment
 также не получил HTTP: connection refused, exit7/HTTP000. Доступность Help не
 подтверждена; новые live/model attempts не запускались.
+
+## 2026-10-07 — установленный кандидат 669822296 и холодные SUM-пакеты
+
+Desktop и standalone CLI построены из одного чистого SHA
+`669822296615accbd6579c09244dacb24f77a056`; version0.1.17, Node24.19.0,
+Bun1.3.14, Electron42.3.3, Playwright1.63.0-alpha-2026-08-31/MCP0.0.80,
+Chromium1243. Сборки не опубликованы, человеческие launcher/profile не менялись.
+
+| Артефакт/manifest | SHA256 |
+| --- | --- |
+| CLI tar.gz | `79c287c4cc70f8c62fd33353f1cd0699b3d8d870f31234cb6cf05b74cc8fb4b0` |
+| CLI manifest | `74a70dc771399a7edfe4936b8bb40388c44bd0ebca8dbe1fff64a9e48a7e709f` |
+| Desktop DEB | `ee8efecc6bbd2a23c25444f8db1f3672206c45733c757c92f6912a559481f42d` |
+| Desktop AppImage | `49bb5e5b18e71af29037a2c51e5451024e195e8a7f017639de25d29eabdfbded` |
+| Desktop release manifest | `fb38b8af638bb9270188ddbe2d6083dd5c18e43951213b33347f9a3b586c32a7` |
+
+В собственном acceptance root выполнены `run-cli-669822296-linux-offline.py`
+и `run-desktop-669822296-linux-offline.py`: CLI5/5 и Desktop5/5 PASS на
+Ubuntu22/24/26, Debian12/13. Каждый контейнер работал с network=none,
+исполнение от UID1200, реальный Chromium sandbox, полный manifest. Desktop
+проверял установленный DEB/Electron/onboarding, CLI — публичные install/status/
+browser/uninstall и сохранность profile sentinel. Все десять контейнеров удалены.
+Evidence: `cli-669822296-linux-matrix/linux-matrix.json` и
+`desktop-669822296-linux-matrix-v2/linux-matrix.json`.
+Это установка/локальный runtime; повторная живая модельная матрица не заявляется.
+
+`run-installed-pdf-669822296.py` использовал именно установленный Node и
+`skills/package-docs/scripts/package-docs.mjs`, network=none. PDF/DOCX/MD созданы;
+исходный nested.lgp сохранил SHA73bca886d. Обе страницы PDF просмотрены целиком:
+«Общая структура:» и текст теперь находятся вместе, потери/обрезки текста,
+пустых страниц нет. PDF SHA256
+`d0991e68c12c115d909289027e2bc08ab3866f4cc9f2f3d733d647f55fc95d6d`.
+Evidence: `cli-669822296-installed-pdf/{result,manual-quality}.json`;
+это installed GREEN ранее сохранённого label/layout FAIL. Модель/Help/Loginom
+не вызывались; факт формирования файла не заменяет проверку выбора skill.
+
+Новая AppImage прошла `run-native-document-669822296.py`: четыре сохранённых
+модельных результата bc6 (PDF2, DOCX1, MD1) показаны через штатный backend/UI.
+Настоящая кнопка отправляла `open-local-file`; наблюдались реальные окна
+Evince/LibreOffice/gedit. Внешний браузер не запускался, owned viewers/processes0.
+Evidence: `native-document-link-669822296/verification.json`, UI snapshots,
+IPC и PID/start-time; все4 PASS. Новых model/Help/Loginom calls0.
+
+Три собственных Desktop bc6 `docs-after-build` SUM-пакета независимо открыты
+новым установленным CLI/runtime669, с новой браузерной сессией на каждый пакет.
+Native3/3 PASS: известные GUID/type/label, fresh completed/owner_verified,
+два точных значения Alpha35/Beta20, settingsReapplied=false, SHA файла неизменен.
+Открытые пакеты закрыты, logout подтверждён, remaining processes0. Это смешанная
+проверка warm-model-bc6/cold-runtime669; она не подменяет warm gate новой сборки,
+calculator/import cold или полную A/B suite. Исходный сервер/клиент не переключались.
+
+Evidence: `cold-669822296-desktop-docs-after-build-bc6/collection-recovered.json`.
+Native driver и uninstall завершились PASS. Host collector сохранил исходный
+exit1: каталоги cold-1/2/3 имеют mode0700 и контейнерный UID1200. После завершения
+его собственного контейнера отдельный network=none container вернул владельца
+только нашему evidence (UID1001), сохранив bytes и ограничения доступа. Проверены
+уже записанные native receipts, cleanup и физические before/after SHA. Браузер/
+модель не повторялись; collector FAIL не переписан в первоначальный PASS.
+
+Свежий health на 2026-10-07T19:04Z: proxy TLS EOF/exit35 и direct connection
+refused/exit7, HTTP000 в обоих случаях. Глобальная среда не менялась, новые
+модельные прогоны не начаты. Необязательный вызов private auth wrapper без
+аргументов отказал на validation acceptance runner; это не доказательство отказа
+OAuth. Полные corpus/TUI/upgrade/A-B и сценарные live gates остаются открытыми.
