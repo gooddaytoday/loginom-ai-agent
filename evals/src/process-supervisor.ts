@@ -358,7 +358,10 @@ export async function superviseProcess(input: {
       if (writer && cleanup.writer && JSON.stringify(writer) !== JSON.stringify(cleanup.writer)) cleanup.error ??= "Writer identity changed"
     }
     if (browser) {
-      const dataDir = (entry: ProcessView) => entry.args.find((arg) => arg.startsWith("--user-data-dir="))?.slice(16)
+      // Chromium rewrites argv into one space-separated process title. Read
+      // its explicit flags in both observed forms; keep the same identity gates.
+      const dataDir = (entry: ProcessView) => entry.args.find((arg) => arg.startsWith("--user-data-dir="))?.slice(16) ??
+        (entry.args.length === 1 ? entry.args[0]?.match(/(?:^|\s)--user-data-dir=(.*?)(?=\s--|$)/)?.[1] : undefined)
       const browserAncestor = (entry: ProcessEntry, requireBinding = true) => {
         let parent = entry.origin?.parent
         const visited = new Set<string>()
@@ -389,7 +392,8 @@ export async function superviseProcess(input: {
         const data = dataDir(current)
         const runtime = cleanup.runtimeDirectories.find((directory) => data === path.join(directory, "browser-profile"))
         const mainExecutable = current.device === browser.device && current.inode === browser.inode
-        const type = current.args.find((arg) => arg.startsWith("--type="))?.slice(7)
+        const type = current.args.find((arg) => arg.startsWith("--type="))?.slice(7) ??
+          (current.args.length === 1 ? current.args[0]?.match(/(?:^|\s)--type=(\S+)/)?.[1] : undefined)
         const knownType = type && ["zygote", "gpu-process", "utility", "renderer", "broker", ...(browser.fake ? ["parent", "helper"] : [])].includes(type)
         const knownExecutable = browser.helpers.some((helper) => current.device === helper.device && current.inode === helper.inode)
         if (!entry.origin) {
