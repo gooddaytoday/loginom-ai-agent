@@ -263,15 +263,16 @@ Node runner принудительно задаёт repeat 1 / skip-judge. Эт�
 
 При итоговом infrastructure ERROR, неизвестной ownership или неподтверждённом cleanup остановить ручной dispatch и сохранить safe evidence. Обычный `infra_error` допускает только один штатный автоматический infra retry текущего harness с initial/final evidence. `harness_error`, ошибка sandbox admission, interrupted и cleanup unknown не разрешают manual retry/fallback; после итогового ERROR не повторять quality попытки ради PASS и не ослаблять oracle/validator.
 
-После зелёного freeze необходимые локальные проверки выполняются из соответствующего checkout **в `evals/`**, без параллельного live:
+После зелёного freeze проверки выполняются из своего checkout **в `evals/`**, под общим lease и без параллельного live. Приобретение и освобождение lease описаны в [операторской инструкции](evaler/operations.md); перед командой ниже должен существовать собственный private receipt:
 
 ```bash
 R=/home/user/.local/share/loginom-evals-runtime
 cd "$R/checkouts/rich/loginom-ai-agent/evals"
 "$R/bin/with-env" "$R/runtime.env" bun install --frozen-lockfile
 "$R/bin/with-env" "$R/runtime.env" env \
-  EVAL_TEST_LOGINOM_IMAGE=sha256:fe20cd4a8c922cb1a94e80e4f2fae211cd1003dbccf34a232794e00b2ccba154 bun test
-"$R/bin/with-env" "$R/runtime.env" bun typecheck
+  EVAL_TEST_LOGINOM_IMAGE=sha256:fe20cd4a8c922cb1a94e80e4f2fae211cd1003dbccf34a232794e00b2ccba154 \
+  bun script/node-eval-ops.ts unit --config "$R/operations/node-eval-ops.json" \
+  --lease '<own private receipt>'
 python3 script/check-calibration-corpus.py --tasks tasks/analytic
 ```
 
