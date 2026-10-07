@@ -55,6 +55,24 @@ test("параллельный avg start до окончания initial read з
   expect(check(events).failures.length).toBeGreaterThan(0)
 })
 
+test("поздний mapping/read не скрывает avg, начатый до чтения суммы", () => {
+  const events = proof(), mapping = stage("mapping", "avg", "execution-3", 7.5)
+  mapping[0]!.part.state.input = { operation_id: "mapping", document_id: node.document_id,
+    workflow_ref: { workflow_id: node.workflow_id }, target: { type: "transform.cross_table", kind: "existing", ref: node },
+    parameters: {}, mappings: [{ direction: "output", port: 0, autosync: false }] }
+  expect(check([...events, ...mapping]).failures).toEqual([])
+  const overlap = [events[0]!, events[2]!, events[1]!, events[3]!, ...mapping]
+  overlap.forEach((event, index) => { event.part.state.time = { start: index * 10, end: index * 10 + 1 } })
+  expect(check(overlap).failures.join(" ")).toContain("initial")
+})
+
+test("avg readback без явного изменения агрегата не доказывает перенастройку", () => {
+  const events = proof()
+  events[2]!.part.state.input = { operation_id: "avg", document_id: node.document_id,
+    workflow_ref: { workflow_id: node.workflow_id }, target: { type: "transform.cross_table", kind: "existing", ref: node }, parameters: {} }
+  expect(check(events).failures.join(" ")).toContain("initial")
+})
+
 test("отдельный node_read разрешён после completed apply и сам выполняется с новым fresh execution", () => {
   const events = [] as ReturnType<typeof proof>
   for (const [op, aggregate, execution, value] of [["sum", "sum", "1", 15], ["avg", "avg", "2", 7.5]] as const) {

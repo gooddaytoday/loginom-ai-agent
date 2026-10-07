@@ -161,12 +161,15 @@ export function checkNodeSequence(events: NodeEvents, id: string, crossId: strin
   const final = reads.filter(read => matches(read, aggregate, finalCsv)).at(-1)
   if (!final) failures.push("sequence: complete fresh final CrossTable read missing")
   if (id === "crosstable-reconfigure") {
-    const avgApplications = applications.filter(a => a.receipt.output.configuration?.readback?.facts?.[0]?.functions?.[0] === "avg")
+    const avgApplications = applications.filter(a => identity(a.receipt.output.node) === identity(final?.config.node) &&
+      a.receipt.output.configuration?.readback?.facts?.some((fact: { functions?: string[] }) => fact.functions?.includes("avg")))
     const initial = reads.find(read => initialCsv && matches(read, "sum", initialCsv) && final &&
       after(final.request, read.receipt) && read.execution !== final.execution &&
       identity(read.receipt.output.node) === identity(final.receipt.output.node ?? final.config.node))
-    const avg = avgApplications.find(a => final && a.request.input.operation_id === final.application.request.input.operation_id)
-    if (!initial || !avg || !after(avg.request, initial.receipt) || avg.request.input.target?.kind !== "existing")
+    const avg = avgApplications[0]
+    const facts = avg?.request.input.parameters?.facts
+    if (!initial || !avg || avgApplications.some(a => !after(a.request, initial.receipt)) || avg.request.input.target?.kind !== "existing" ||
+      facts?.length !== 1 || facts[0].field?.name !== "Amount" || JSON.stringify(facts[0].functions) !== JSON.stringify(["avg"]))
       failures.push("sequence: initial sum/read before same-node avg with new execution required")
   }
   return { failures, final }
