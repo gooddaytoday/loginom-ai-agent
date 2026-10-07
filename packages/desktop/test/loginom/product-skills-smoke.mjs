@@ -104,6 +104,10 @@ try {
   if ((await form.locator("input:not([type=checkbox])").count()) !== 4) throw Error("FOUR_FIELDS_REQUIRED")
   const status = await page.evaluate(() => window.api.loginom.read())
   if (status.hasApiKey || status.state !== "unconfigured") throw Error("UNCONFIGURED_STATE_INVALID")
+  await page.screenshot({ path: join(evidence, "first-launch.png") })
+  await form.locator('[data-component="icon-button"][data-icon="close"]').click()
+  await form.waitFor({ state: "hidden", timeout: 30000 })
+  await page.locator('[data-component="prompt-input"][contenteditable="true"]').waitFor({ timeout: 60000 })
   const server = await page.evaluate(() => window.api.awaitInitialization())
   const response = await fetch(`${server.url}/skill?directory=${encodeURIComponent(workspace)}`, {
     headers: { authorization: `Basic ${Buffer.from(`${server.username}:${server.password}`).toString("base64")}` },
@@ -121,11 +125,20 @@ try {
   if (skills.some((skill) => skill.source !== "bundled" && skill.source !== "builtin"))
     throw Error("EXTERNAL_SKILL_IN_CLEAN_FIXTURE")
   const resources = await app.evaluate(() => process.resourcesPath)
-  await page.screenshot({ path: join(evidence, "first-launch.png") })
   if (collisions) {
+    const selector = '.toast-v2[data-visible="true"][data-removed="false"] [data-description]'
+    async function diagnostic(text) {
+      await page.waitForFunction(
+        ({ selector, text }) =>
+          [...document.querySelectorAll(selector)].filter((element) => element.textContent.includes(text)).length === 1,
+        { selector, text },
+        { timeout: 10000 },
+      )
+      await page.locator(selector).filter({ hasText: text }).waitFor({ timeout: 10000 })
+    }
     await writeFile(join(evidence, "discovery-body.txt"), await page.locator("body").innerText())
     for (const name of reservedNames) {
-      await page.getByText(`Ignored external skill '${name}':`, { exact: false }).waitFor({ timeout: 10000 })
+      await diagnostic(`Ignored external skill '${name}':`)
     }
     await page.screenshot({ path: join(evidence, "skill-diagnostics.png") })
     const commandsResponse = await fetch(`${server.url}/command?directory=${encodeURIComponent(workspace)}`, {
@@ -138,13 +151,10 @@ try {
     if (JSON.stringify(commands).includes("UNTRUSTED")) throw Error("RESERVED_COMMAND_REPLACED")
     if (commands.some((command) => command.name === "package_docs")) throw Error("OBSOLETE_COMMAND_REGISTERED")
     for (const name of reservedNames) {
-      await page.getByText(`Ignored external command '${name}' from config:`, { exact: false }).waitFor({ timeout: 10000 })
+      await diagnostic(`Ignored external command '${name}' from config:`)
     }
     await page.screenshot({ path: join(evidence, "command-diagnostics.png") })
   }
-  await form.locator('[data-component="icon-button"][data-icon="close"]').click()
-  await form.waitFor({ state: "hidden", timeout: 30000 })
-  await page.locator('[data-component="prompt-input"][contenteditable="true"]').waitFor({ timeout: 60000 })
   const fileTypes = await page.locator('input[type="file"]').getAttribute("accept")
   await writeFile(join(evidence, "composer-file-types.json"), JSON.stringify({ accept: fileTypes }, null, 2))
   if (!fileTypes?.split(",").includes(".lgp")) throw Error("LOGINOM_PACKAGE_NOT_SELECTABLE")

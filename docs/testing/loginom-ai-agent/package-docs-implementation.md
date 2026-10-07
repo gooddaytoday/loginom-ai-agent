@@ -2517,9 +2517,72 @@ check **PASS**. Logs `desktop-global-diagnostic-{app-tests,app-typecheck,
 desktop-typecheck,packaging-tests}.log`. Эти source checks не заменяют native
 GREEN: требуется новая clean Desktop сборка с этим UI handler.
 
+## Native Desktop diagnostics: `2aa3a3284`
+
+Новая полная clean сборка Linux Desktop: source
+`2aa3a3284d3cb7bf47c0d1050fdd42aa4c192352`, `source.dirty: false`;
+prod 0.1.17 / Bun 1.3.14 / Electron 42.3.3 / Electron Node 24.15.0 /
+bundled Node 24.19.0. DEB, AppImage и полный source archive сохранены в
+`candidate-2aa3a3284-desktop/`, предыдущие candidates сохранены.
+
+| Артефакт | SHA-256 |
+| --- | --- |
+| DEB | `896bcad6529e5b8bac726096883abeaddae474a3a58019da6b99c23201cfcf2b` |
+| AppImage | `646070601971b1645680e679e9323a66c22856f92d79770e587cbb4248fa88aa` |
+| Source archive | `51c037e5bdbfc7b9b230c8b658baf225cf63bfa3e73338c4ec41fb3792115576` |
+
+Оба static artifact verifier **PASS / 4654 resources** каждый. Resource manifest
+SHA-256 `f243b311f39abfdeb408521805549d700a1b0de437460227b7bce7c9345b10d8`;
+UI-only изменение не меняет bundled skills. Logs
+`desktop-global-diagnostic-build.log`, `desktop-2aa3a3284-package.log`,
+release manifest и static reports в каталоге candidate.
+
+Native AppImage clean smoke **PASS**: четыре поля unconfigured wizard,
+ровно три ожидаемые записи каталога, оба Product skills с `source: bundled`,
+64-hex digest и путями mounted ресурсов, `.lgp` доступен в composer.
+Evidence `desktop-2aa3a3284-clean-green/`: 10 observed processes, remaining 0.
+Native GUI permission suite **5 PASS**: text deny/allow, оригинальное вложение,
+explicit attachment read/edit deny. Input SHA не изменился; permission profile
+и original user parts проверены. Evidence
+`desktop-2aa3a3284-gui-permissions-green/`: 55 observed, remaining 0.
+Обе серии: собственные HOME/profile/workspace, sampling 25 ms, Chromium Loginom
+и `--no-sandbox` не наблюдались, свои temporary roots удалены. Permission suite
+использует scripted provider и реальный HTML composer; natural routing и
+OS file picker этой серией не проверены. DEB этой версии проверен статически,
+новая установка DEB и вся Linux-матрица ещё не выполнены.
+
+Первый native diagnostic run на новом UI handler ещё **FAIL**: после появления
+трёх skill warnings command locator находил два одинаковых текста. Collector
+подтвердил full smoke **3/3 FAIL**, конкретный package-docs locator
+**FLAKY: 1/3 FAIL, 2/3 PASS**; при его успехе следующий locator находил два
+loginom-automation warnings. Catalog/commands правильны, все свои процессы
+завершены. Report `desktop-toast-locator-signal-2aa3a3284/report.md`.
+Сохранённые body/screenshots показывают дубли; источник toast использует
+`data-visible`/`data-removed` и сохраняет node на выходе. Это согласуется с
+exit-transition hypothesis, точный lifecycle не установлен экспериментом;
+breaking commit через bisect не искался.
+
+Driver теперь требует ровно одно активное видимое уведомление с точным
+diagnostic text; ушедшие notifications не участвуют в locator. Wizard закрыт
+до запроса discovery. Повторные попытки запуска, `.first()`, произвольные sleeps
+и ослабление проверок текста не добавлены. Первичный native **PASS**:
+`desktop-2aa3a3284-active-diagnostic-green/`, все шесть skill/command diagnostics,
+trusted catalog, отсутствие UNTRUSTED/obsolete command. Screenshots проверены;
+15 observed processes / remaining 0, sampling 25 ms, own root удалён.
+Collector подтвердил **STABLE 5/5 PASS**, duration
+10.786 / 12.308 / 10.970 / 11.345 / 10.944 s, каждый exit 0, без retries.
+Во всех fresh HOME/workspace/profile: шесть diagnostics, trusted catalog/commands,
+no UNTRUSTED, own remaining 0 и temp roots removed. Driver/AppImage/Node и оба
+resource manifests до/после неизменны. Evidence
+`desktop-active-toast-stability-signal-2aa3a3284/`; продуктовые бинарники и
+resource manifests изменением теста не менялись. Diagnosis — flaky locator,
+native product integration REDaeef → GREEN2aa теперь подтверждена повторениями.
+Повреждения Desktop bundle и остальные Linux gates этой positive/reserved
+серией не проверяются; этап 3 целиком ещё открыт.
+
 ## Checkpoint
 
-- Product candidates: Desktop `aeef6c2c3`, CLI `6cfda621f`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef; разные source pins.
+- Product candidates: Desktop `2aa3a3284`, CLI `6cfda621f`, clean source/artifacts/manifests; Desktop diagnostics REDaeef→GREEN2aa и 5/5 stable PASS; разные source pins.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–2 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -2535,6 +2598,6 @@ GREEN: требуется новая clean Desktop сборка с этим UI h
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
-- CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cfd discovery/diagnostics 7 PASS, CLIa891 pipeline/permissions 5 PASS; clean HOME CLI938 PTY 4 PASS, read path GREEN; TUI suite 197 PASS / 1 SKIP; Desktop diagnostics ещё не приняты.
+- CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cfd discovery/diagnostics 7 PASS, CLIa891 pipeline/permissions 5 PASS; clean HOME CLI938 PTY 4 PASS, read path GREEN; TUI suite 197 PASS / 1 SKIP; Desktop diagnostics 5/5 stable PASS.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
-- Installed DEB85 smoke/metadata/ASAR PASS; GUIaeef 5 permissions cases PASS; TUI typecheck PASS; report/corpus/evals и остальные Linux gates открыты.
+- Installed DEB85 smoke/metadata/ASAR PASS; static DEB/AppImage2aa PASS; GUI2aa 5 permissions cases PASS; TUI typecheck PASS; report/corpus/evals и остальные Linux gates открыты.
