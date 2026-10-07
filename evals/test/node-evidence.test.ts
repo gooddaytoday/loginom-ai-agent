@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { mkdtemp, rm } from "node:fs/promises"
+import { cp, mkdtemp, rm } from "node:fs/promises"
 import { validateNodeAttempt } from "../src/node-evals"
 
 test("положительное native доказательство и negative input/hash/save checks", async () => {
@@ -35,5 +35,25 @@ test("положительное native доказательство и negative
     const saved = events.find((e: any) => e.part.tool.endsWith("action_run"))
     expect((await check([saved, ...events.filter((e: any) => e !== saved)])).failures.join(" ")).toContain("save")
     expect((await check(events.filter((e: any) => !e.part.tool.endsWith("artifact_deliver")))).failures.join(" ")).toContain("input")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("готовый CrossTable с mapping/read/export/save без создания в текущем прогоне получает FAIL", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "node-creation-"))
+  try {
+    const task = path.join(import.meta.dir, "../tasks/node-evals/crosstable-fixed-sum")
+    await cp(path.join(task, "reference.lgp"), path.join(root, "artifact/package.lgp"), { recursive: true })
+    const unpack = Bun.spawn(["unzip", "-q", path.join(root, "artifact/package.lgp"), "-d", path.join(root, "artifact/unpacked")])
+    expect(await unpack.exited).toBe(0)
+    await Bun.write(path.join(root, "artifact/results/node-evals-crosstable-fixed-sum-3.result.csv"), await Bun.file(path.join(task, "oracle.csv")).text())
+    const events = await Bun.file(new URL("fixtures/node-evals/fixed-sum-protocol.json", import.meta.url)).json()
+    await Bun.write(path.join(root, "events.jsonl"), events.map((event: unknown) => JSON.stringify(event)).join("\n"))
+    expect(await validateNodeAttempt(task, root, "/user/node-evals-crosstable-fixed-sum-3.lgp")).toEqual({ errors: [], failures: [] })
+    const existing = events.filter((event: { part: { state: { input: { operation_id?: string } } } }) =>
+      event.part.state.input.operation_id !== "cross-sales-3")
+    await Bun.write(path.join(root, "events.jsonl"), existing.map((event: unknown) => JSON.stringify(event)).join("\n"))
+    const result = await validateNodeAttempt(task, root, "/user/node-evals-crosstable-fixed-sum-3.lgp")
+    expect(result.errors).toEqual([])
+    expect(result.failures.join(" ")).toContain("creation")
   } finally { await rm(root, { recursive: true, force: true }) }
 })

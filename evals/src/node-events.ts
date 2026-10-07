@@ -119,6 +119,13 @@ function tableCsv(output: ObjectValue, execution: string, node: ObjectValue): st
 export function checkNodeSequence(events: NodeEvents, id: string, crossId: string, finalCsv: string, initialCsv?: string) {
   const { receipts, failures } = operationReceipts(events)
   const applications = receipts.filter(pair => pair.request.tool.endsWith("node_apply") && pair.request.input.target?.type === "transform.cross_table")
+  const creation = applications.find(pair => {
+    const node = pair.receipt.output.node, configuration = pair.receipt.output.configuration
+    return pair.request.input.target.kind === "new" && configuration?.status === "applied" && configuration.readback?.kind === "crosstable" &&
+      node?.node_id === crossId && identity(node) !== null && identity(node) === identity(configuration.readback.node) &&
+      pair.request.input.document_id === node.document_id && pair.request.input.workflow_ref?.workflow_id === node.workflow_id
+  })
+  if (!creation) failures.push("sequence: fresh CrossTable creation proof required")
   const reads: { request: NodeCall; receipt: NodeCall; application: { request: NodeCall; receipt: NodeCall }; config: ObjectValue; execution: string; csv: string }[] = []
   for (const pair of receipts) {
     const r = pair.receipt.output
@@ -134,6 +141,8 @@ export function checkNodeSequence(events: NodeEvents, id: string, crossId: strin
       request.target?.kind === "existing" && identity(request.target.ref) !== identity(node)) {
       failures.push("sequence: request/receipt owner differs"); continue
     }
+    if (!creation || identity(node) !== identity(creation.receipt.output.node) ||
+      request.operation_id !== creation.request.input.operation_id && !after(application!.request, creation.receipt)) continue
     if (application?.receipt.output.execution?.status !== "completed" || r.output?.execution_id !== execution) continue
     if (pair.request.tool.endsWith("node_apply") && config.execution_id && config.execution_id !== execution) continue
     const csv = tableCsv(r.output ?? {}, execution, node)
