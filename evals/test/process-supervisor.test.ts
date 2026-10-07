@@ -162,7 +162,7 @@ test("supervisor: новый противоречащий profile после bin
   const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-browser-rebinding-bundle-"))
   await cp(Bun.which("node")!, path.join(bundle, "chrome"), { dereference: true })
   const script = path.join(bundle, "browser.mjs")
-  await Bun.write(script, "process.on('SIGTERM',()=>{}); setTimeout(()=>{process.title='--user-data-dir=/tmp/foreign-profile'},300); setInterval(()=>{},1000)")
+  await Bun.write(script, "process.on('SIGTERM',()=>{}); setTimeout(()=>{process.title=process.execPath+' --user-data-dir=/tmp/foreign-profile --remote-debugging-pipe'},300); setInterval(()=>{},1000)")
   await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
   const command = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: out })
   const pidFile = path.join(out, "browser.pid")
