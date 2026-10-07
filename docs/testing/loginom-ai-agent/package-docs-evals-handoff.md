@@ -14,6 +14,22 @@
 XML validation прошли; живой judge после XML guard повторно не запускался.
 Эти SHA — проверенная база предложения, не автоматический pin будущей A/B пары.
 
+Повторная read-only проверка после возобновления 2026-10-07: `evals` находится
+на `dfe47cce65c9186aaae8e7d4e0d8de68e09972bb`. Принята изоляция установленного
+CLI через bubblewrap и перенос 35 задач в `evals/tasks/analytic`; отчёт
+`evals/docs/2026-10-07-analytic-evals-isolation-plan.md` на этом SHA фиксирует
+386 PASS, сохранённые hashes калибровки и один live smoke baseline
+`fc3d97dbf` на `openai/gpt-6-sol/default` (score/oracle PASS).
+Это не A/B и не приёмка нашей основной модели `openai/gpt-6.1-sol/medium`.
+Исходный Loginom восстановлен; harness требует отдельного подготовленного
+изолированного стенда и отсутствия внешних debugger endpoints. Переключение
+общего исходного сервера этой задачей не выполнялось.
+
+В проверенном `dfe47cce6` безусловный `dockSkillRevision` и разбор legacy
+`skillRevision` сохранены. Предложенные ниже изменения совместимости по-прежнему
+не реализованы. Новые isolation guards сохранять; запускать A/B только на
+свежем принятом SHA после отдельного согласования владения изменениями harness.
+
 Наблюдаемые несовместимости:
 
 - `evals/src/preflight.ts` безусловно вызывает `dockSkillRevision`, включая
