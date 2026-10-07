@@ -3812,6 +3812,21 @@ Source RED c50d server-reference → live GREEN 2530143dd закрыт;
 Запущены Linux5 offline installed матрицы новой сборки Desktop и CLI;
 их незавершённые результаты пока не объявляются принятыми.
 
+## 2026-10-07 — native TUI slash перед первым provider-turn
+
+TDD actual CLI253: новая проверка first catalog сначала RED — обычный
+PTY input активировал skill позднее. GREEN после ввода `/package-docs`
+перед paste/`@`: command grant/digest сохранён в пользовательском сообщении,
+docs catalog действует уже на первом provider-turn. Реальные extract →
+skeleton → read → write → emit публикуют PDF; exit0, forced=false,
+writer=false, Chromium0, remaining0, исходный `.lgp` не изменён.
+Два PDF полностью прочитаны и просмотрены (по странице), demo facts/layout
+PASS; отдельные SHA receipts сохранены. В mention дополнительно проверено
+игнорирование внешней подмены `/package-docs` и видимое предупреждение.
+Evidence `tui-2530143dd-slash-{red,green,mention}` вне Git. Это scripted
+mechanics/report QA, не natural routing и не настоящая Help. Agent typecheck
+PASS; общая TUI/installed матрица остаётся открытой.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.

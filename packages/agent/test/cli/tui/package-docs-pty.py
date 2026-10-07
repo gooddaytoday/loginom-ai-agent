@@ -67,11 +67,13 @@ def main():
     parser.add_argument("--reserved-diagnostics", choices=["skills", "commands"])
     parser.add_argument("--modified-skill", action="store_true")
     parser.add_argument("--full-report", action="store_true")
+    parser.add_argument("--slash", action="store_true")
     args = parser.parse_args()
     assert sys.platform == "linux", "This acceptance driver requires Linux /proc and PTY"
     assert args.binary.is_absolute() and args.binary.is_file()
     assert args.artifacts.is_absolute()
     assert not args.full_report or (args.attachment and not args.modified_skill), "Full report requires an intact bundle and attachment"
+    assert not args.slash or (args.attachment and not args.modified_skill), "Slash requires an intact bundle and attachment"
     args.artifacts.mkdir(mode=0o700)  # Never reuse another run's profile or results.
     # Discovery walks ancestors outside git. Keep the workspace outside the user's home.
     with tempfile.TemporaryDirectory(prefix="loginom-package-docs-pty-", dir="/tmp") as temporary:
@@ -245,9 +247,16 @@ def run(args, workspace):
             if step == "setup" and "Настроить Loginom сейчас?" in rendered:
                 send(b"\r", "ready")  # The public wizard defaults to continuing without setup.
             elif step == "ready" and "Ask anything" in rendered:
-                if mode.startswith("text-"):
+                if args.slash:
+                    send(b"/package-docs ", "slash-prefixed")
+                elif mode.startswith("text-"):
                     send(f"Напиши документацию по локальному пакету {lgp}\r".encode(), "submitted")
                 elif mode == "paste":
+                    send(b"\x1b[200~" + str(lgp).encode() + b"\x1b[201~", "attached")
+                else:
+                    send(b"@sample", "autocomplete")
+            elif step == "slash-prefixed" and "/package-docs" in rendered:
+                if mode == "paste":
                     send(b"\x1b[200~" + str(lgp).encode() + b"\x1b[201~", "attached")
                 else:
                     send(b"@sample", "autocomplete")
@@ -302,6 +311,8 @@ def run(args, workspace):
         with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as db:
             parts = [json.loads(row[0]) for row in db.execute("select data from part")]
     files = [part for part in parts if part.get("type") == "file"]
+    command_activation = next((part.get("metadata", {}).get("skill_activation") for part in parts
+        if part.get("type") == "text" and part.get("metadata", {}).get("skill_activation")), None)
     terminal_plain = re.sub(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))", "", output.decode(errors="replace"))
     (args.artifacts / "terminal-plain.txt").write_text(terminal_plain)
     warnings = re.findall(r"Ignored external (skill|command) '([^']+)'", terminal_plain)
@@ -311,6 +322,7 @@ def run(args, workspace):
         "files": files, "systemNodePythonUnavailable": True, "readPermission": "ask",
         "reservedDiagnostics": args.reserved_diagnostics, "modifiedSkill": args.modified_skill, "visibleWarnings": warnings,
         "reports": [str(p) for p in workspace.glob("*.lgp_report.pdf")], "fullReport": args.full_report,
+        "slash": args.slash, "commandActivation": command_activation,
         "toolErrors": [part["state"]["error"] for part in parts if part.get("type") == "tool" and part.get("state", {}).get("status") == "error"]}
     (args.artifacts / "result.json").write_text(json.dumps(result, ensure_ascii=False))
     print(json.dumps(result, ensure_ascii=False))
@@ -318,6 +330,8 @@ def run(args, workspace):
     assert not result["guard"] and not alive and not chromium
     assert hashlib.sha256(lgp.read_bytes()).hexdigest() == original
     first = next(body for body in requests if body.get("tools"))
+    if args.slash:
+        assert any(tool["function"]["name"] == "package_docs_run" for tool in first["tools"]), "Native slash must apply docs before the first provider turn"
     system = "\n".join(message["content"] for message in first["messages"]
         if message.get("role") == "system" and isinstance(message.get("content"), str))
     discovered = re.findall(r"<skill>\s*<name>(.*?)</name>.*?<location>(.*?)</location>\s*</skill>", system, re.S)
@@ -360,7 +374,11 @@ def run(args, workspace):
     for catalog in catalogs:
         if "package_docs_run" in catalog:
             assert not {"bash", "task", "loginom_dock_prepare"}.intersection(catalog)
-    assert any(part.get("tool") == "skill" and part.get("state", {}).get("status") == "completed" for part in parts)
+    if args.slash:
+        assert command_activation and command_activation["name"] == "package-docs" and command_activation["profile"] == "package-docs"
+        assert re.fullmatch(r"[0-9a-f]{64}", command_activation["digest"])
+    else:
+        assert any(part.get("tool") == "skill" and part.get("state", {}).get("status") == "completed" for part in parts)
     assert any(part.get("tool") == "package_docs_run" and part.get("state", {}).get("status") == "completed" for part in parts)
     if args.full_report:
         reports = list(workspace.glob("*.lgp_report.pdf"))
