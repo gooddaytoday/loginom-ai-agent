@@ -105,7 +105,9 @@ const provider = createServer(async (request, response) => {
 await new Promise((resolve) => provider.listen(0, "127.0.0.1", resolve))
 const results = []
 try {
-  for (const kind of ["text-deny", "text-allow", "attachment"]) {
+  for (const kind of ["text-deny", "text-allow", "attachment", "attachment-read-deny", "attachment-edit-deny"]) {
+    const attached = kind.startsWith("attachment")
+    const denied = kind.endsWith("deny")
     const output = join(evidence, kind)
     await mkdir(output, { mode: 0o700 })
     const root = await mkdtemp("/tmp/loginom-docs-gui-permissions-")
@@ -125,7 +127,12 @@ try {
       enabled_providers: ["test"],
       formatter: false,
       lsp: false,
-      permission: { skill: "allow", edit: "allow", read: "ask", external_directory: "ask" },
+      permission: {
+        skill: "allow",
+        edit: kind === "attachment-edit-deny" ? "deny" : "allow",
+        read: kind === "attachment-read-deny" ? "deny" : "ask",
+        external_directory: "ask",
+      },
       provider: {
         test: {
           name: "Test",
@@ -195,19 +202,29 @@ try {
         const id = await window.api.getWindowID()
         localStorage.setItem(`loginom-ai-agent.desktop.window.${id}.last-active-url`, route)
       }, route)
-      await page.reload()
+      const agentsReady = page.waitForResponse(
+        (response) => {
+          const url = new URL(response.url())
+          return response.request().method() === "GET" && ["/agent", "/api/agent"].includes(url.pathname)
+        },
+        { timeout: 60000 },
+      )
+      const [agentResponse] = await Promise.all([agentsReady, page.reload()])
+      assert.ok(agentResponse.ok(), "renderer agent catalog must load before submission")
+      await agentResponse.finished()
       await form.waitFor({ timeout: 120000 })
       await form.locator('[data-component="icon-button"][data-icon="close"]').click()
       await form.waitFor({ state: "hidden", timeout: 30000 })
       const editor = page.locator('[data-component="prompt-input"][contenteditable="true"]')
       await editor.waitFor({ timeout: 60000 })
+      await page.getByText("Test Model", { exact: true }).waitFor({ timeout: 60000 })
       await writeFile(
         join(output, "restored-view.json"),
         JSON.stringify({ text: await page.locator("body").innerText(), route }, null, 2),
       )
       const attachment = page.locator('input[type="file"]')
       assert.ok((await attachment.getAttribute("accept"))?.split(",").includes(".lgp"))
-      if (kind === "attachment") {
+      if (attached) {
         assert.equal(await attachment.count(), 1)
         await attachment.setInputFiles(source)
         await page
@@ -264,9 +281,8 @@ try {
           await dock.getByRole("button", { name: /^(Allow once|Разрешить один раз)$/ }).click()
         }
       }
-      if (kind !== "text-deny")
-        await page.getByText("Проверка чтения завершена.", { exact: true }).waitFor({ timeout: 60000 })
-      if (kind === "text-deny") {
+      if (!denied) await page.getByText("Проверка чтения завершена.", { exact: true }).waitFor({ timeout: 60000 })
+      if (denied) {
         await dock.waitFor({ state: "hidden", timeout: 30000 })
         const deadline = Date.now() + 30000
         while (true) {
@@ -286,23 +302,23 @@ try {
       assert.ok(
         tools.some((part) => part.tool === "skill" && part.state.metadata?.activation?.profile === "package-docs"),
       )
-      assert.equal(extracted.state.status, kind === "text-deny" ? "error" : "completed")
+      assert.equal(extracted.state.status, denied ? "error" : "completed")
       const originalFiles = messages
         .filter((message) => message.info.role === "user")
         .flatMap((message) => message.parts)
         .filter((part) => part.type === "file")
-      if (kind === "text-deny") {
-        assert.equal(originalFiles.length, 0)
+      if (denied) {
+        assert.ok(extracted.state.metadata?.permissionDenied)
         assert.ok(!(await readdir(workspace)).includes(".work"))
       }
-      if (kind === "text-allow") assert.equal(originalFiles.length, 0)
-      if (kind === "attachment") {
+      if (!attached) assert.equal(originalFiles.length, 0)
+      if (attached) {
         assert.equal(originalFiles.length, 1)
         assert.equal(originalFiles[0].mime, "application/x-loginom-package")
         assert.equal(originalFiles[0].url, pathToFileURL(source).href)
       }
       assert.equal((await call("/permission")).filter((permission) => permission.sessionID === session.id).length, 0)
-      if (kind !== "text-deny") {
+      if (!denied) {
         const structure = JSON.parse(extracted.state.output).structure
         assert.ok(structure.startsWith(join(workspace, ".work/package-docs/")))
         assert.equal(JSON.parse(await readFile(structure, "utf8")).schema_version, "package_docs.structure.v1")

@@ -2176,6 +2176,52 @@ directory, original file parts у текстового пути отсутств
 Явные read/edit deny, TUI permission dialog и plan сохраняют отдельные
 незавершённые native критерии. Этап 2 пока не отмечается.
 
+## Native Desktop: явные read/edit deny и синхронизация driver
+
+Canonical GUI driver дополнен двумя отдельными циклами: original `.LGP`
+вложен, но `read: deny` либо `edit: deny` по-прежнему запрещает extraction.
+Первый цикл **4 PASS**, второй итоговый **5 PASS** на immutable AppImageaeef.
+У обоих deny сохраняется original file part, `permissionDenied: true`,
+`.work` отсутствует, SHA256 исходника неизменен; pending permissions отсутствуют.
+В окончательном полном прогоне **56 observed processes, remaining 0**,
+Loginom Chromium не наблюдался, sandbox не отключён. Evidence:
+`desktop-aeef6c2c3-gui-read-deny-ready/`, `desktop-aeef6c2c3-gui-agent-ready/`.
+
+Прежнее неверное ожидание финальной фразы после GUI reject подтвердилось
+**STABLE FAIL 3/3**: ровно два provider requests, третий отсутствует,
+каждый root удалён, live owned processes 0. Это штатное прекращение loop,
+а не ошибка продукта; report `gui-deny-signal-85d3889b8/report.md`.
+
+Отдельный ранний Send дал отсутствие POST и текста у provider. Signal collector
+повторил предыдущий committed driver **3/3 PASS** на том же artifact;
+с исходным отказом это **FLAKY**, точная причина не доказана. Screenshot раннего
+restored-view без модели сам по себе причины не устанавливает. Одно ожидание
+видимого Test Model было недостаточно: следующий отказ произошёл на пятом case
+до POST. Driver теперь ждёт завершения renderer GET agent catalog после reload
+и видимого Test Model. После этой синхронизации полный suite 5 PASS; отдельная
+серия signal collector **STABLE PASS 5/5**, **9.812 / 10.014 / 9.812 / 9.612 /
+9.813 s**, два provider requests и normal cleanup каждый раз. Все исходные
+отказы/копии/hashes сохранены, retries и произвольные sleeps не добавлялись.
+Reports: `gui-submit-signal-aeef6c2c3/`, `gui-submit-ready-signal-aeef6c2c3/`.
+
+Native TUI внешнего текстового пути действительно показывает permission
+`Access external directory`; Esc отклоняет его, файловые parts и outputs
+отсутствуют. Первый driver ожидал невидимый в свёрнутом UI текст ошибки и
+был принудительно остановлен; второй неправильно считал накопленный ANSI
+transcript текущим кадром и также не послал exit. Эти отказы сохранены.
+Драйвер, ожидающий persisted settled error в read-only evidence, штатно завершил
+TUI через Ctrl+D: **exit 0, forced false, writer released, remaining 0**,
+Chromium не наблюдался. Это дополнительный persisted oracle: у standalone нет
+export команды, оно не подменяет UI-решение об отказе. Все profiles/HOME собственные.
+Промежуточный adapter с ошибочным database path остановлен вручную; он не принят.
+Evidence: `cli-aeef6c2c3-tui-text-deny-settled-correct/`.
+
+Native text-allow TUI прошёл обе permissions и extraction с normal exit 0,
+но новая проверка подписи read permission **RED**: title `Read` без пути,
+`Path:` отсутствует. Сам файл/структура и cleanup корректны; production TUI
+пока не исправлен, повторный signal выполняется отдельно. Evidence:
+`cli-aeef6c2c3-tui-text-allow-read-path/`. План по corrections не перерабатывался.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `aeef6c2c3`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef, static 4654 resources PASS.
@@ -2196,4 +2242,4 @@ directory, original file parts у текстового пути отсутств
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS, native PTY paste/mention 2 PASS; attachment: 44 PASS.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
-- Installed DEB85 smoke/metadata/ASAR PASS; GUIaeef original attachment + text deny 2 PASS, 0 remaining; full report quality/corpus/evals открыты.
+- Installed DEB85 smoke/metadata/ASAR PASS; GUIaeef 5 permissions cases PASS, Send driver 5/5 stable; TUI read path RED, report/corpus/evals открыты.

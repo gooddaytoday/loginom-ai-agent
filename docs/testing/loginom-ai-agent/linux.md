@@ -56,8 +56,8 @@ Docker запускается с `--init` для корректного Xvfb sta
 
 `test/loginom/product-skills-smoke.mjs` проверяет холодное обнаружение bundled
 skills и фильтр `.lgp` в composer. `test/loginom/package-docs-permissions.mjs`
-проверяет отправленное оригинальное вложение и отказ чтения текстового пути
-через GUI. Для каждого запуска задать абсолютные `LOGINOM_AI_AGENT_TEST_EXECUTABLE`,
+проверяет отправленное оригинальное вложение, разрешение/отказ чтения текстового
+пути и явные read/edit deny через GUI. Для каждого запуска задать абсолютные `LOGINOM_AI_AGENT_TEST_EXECUTABLE`,
 `LOGINOM_AI_AGENT_TEST_RESOURCES` и новый `LOGINOM_AI_AGENT_TEST_ARTIFACTS`, затем
 из `packages/desktop` выполнить `xvfb-run -a <pinned-node> <test-path>` как nonroot.
 Второй тест использует управляемый provider и проверяет механику прав доступа;
