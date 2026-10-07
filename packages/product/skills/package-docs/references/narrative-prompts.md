@@ -47,7 +47,8 @@ Hierarchy rules (also in `hierarchy-json.md`):
 2. `Source = null` → у `Target` нет входящего ребра на этом уровне.
 3. `Target = null` → у `Source` нет исходящего ребра на этом уровне.
 4. Value shape: `label:service_name:guid`.
-5. Label is the user name; service name is operational essence.
+5. Label is the user name; service name is a key for looking up the node type,
+   not proof of its behavior without matching Help or package settings.
 6. GUID is for uniqueness only — omit from prose.
 7. Nested structures use service name `Подмодель`.
 8. Отсутствие ребра не доказывает наличие внешнего порта или передачи данных.
@@ -74,6 +75,11 @@ User intent:
 внешнего справочника: опиши узел «Ссылка» и неизвестную цель. Общее назначение
 типа можно добавить только по прочитанному документу этого типа; успешное
 чтение справки Калькулятора не подтверждает назначение узла-ссылки.
+Статистика reference/derived не доказывает наследование незнакомого Engine.
+Например, общая справка о производных компонентах не подтверждает, что
+`DerivedReference` с пустыми настройками создан на базе другого узла.
+При таком входе достаточно: «Содержит узел „Ссылка“; настройки и целевой
+узел не указаны». Не восстанавливай поведение по части имени типа.
 
 ## Forbidden in final MD
 

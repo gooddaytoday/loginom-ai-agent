@@ -2991,6 +2991,28 @@ Evidence: `desktop-67-crash-logging{,-short-tmp}.log`,
 `desktop-crash-driver-typecheck.log`. Пользовательская установка, profiles,
 launcher, соседний worktree и основной план не изменены.
 
+## Statistical grouping guidance: новый RED→GREEN цикл
+
+RED: третий неизменный CLI67 PDF report использовал generic derived-component
+Help для определения неизвестного `DerivedReference`. Другие две попытки
+прошли, поэтому наблюдаемый сбой модели — **1/3**, не стабильный deterministic
+failure. SKILL и narrative теперь явно отделяют statistical grouping и
+частичное совпадение имени от доказательства поведения/наследования узла.
+В narrative исправлена прежняя подсказка `service name is operational essence`:
+имя служит поисковым ключом, а назначение требует подтверждения.
+Help B, extractor, tool/catalog и emit contracts не менялись.
+
+Source integrity **9 PASS / 16 assertions**; skill/discovery **26 PASS /
+144 assertions**; `git diff --check` PASS. Тесты проверяют настоящую загрузку
+ресурсов, не дублируют новые фразы. Live GREEN ещё требует отдельной clean
+сборки и полной серии; прежний FAIL остаётся в evidence.
+
+Дополнительный immutable AppImage67 cold smoke **PASS**: собственный пустой
+HOME/workspace, unconfigured wizard, `.lgp` picker, два bundled skills с digest,
+native Electron sandbox. Process sampling 25 ms и cleanup — в
+`desktop-67-cold-discovery/{result,processes,roots}.json`; test root удалён.
+Это не model routing/полный отчёт/installed DEB приёмка.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `67c3898c3`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.
