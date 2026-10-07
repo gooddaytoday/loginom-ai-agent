@@ -79,7 +79,8 @@ const cases = ids.map((id) => {
       "missing-path",
       "none",
       "server-reference-only",
-    ].includes(value.input)
+    ].includes(value.input) &&
+    !(args.interface === "run" && value.input === "external-text-path")
   )
     throw Error("SKILLS_ACCEPTANCE_PERMISSION_ADAPTER_REQUIRED")
   return value

@@ -7,12 +7,13 @@ const script = resolve(import.meta.dir, "../script/skills-acceptance.ts")
 const linuxTest = test.skipIf(process.platform !== "linux" || process.arch !== "x64")
 
 linuxTest.each([
-  ["docs-after-build", "SKILLS_ACCEPTANCE_MULTITURN_SCENARIO_ADAPTER_REQUIRED"],
-  ["scenario-create", "SKILLS_ACCEPTANCE_MULTITURN_SCENARIO_ADAPTER_REQUIRED"],
-  ["docs-external-unicode-path", "SKILLS_ACCEPTANCE_PERMISSION_ADAPTER_REQUIRED"],
-  ["docs-no-input,docs-no-input", "SKILLS_ACCEPTANCE_DUPLICATE_CASE"],
-  ["not-in-corpus", "SKILLS_ACCEPTANCE_UNKNOWN_CASE"],
-])("live acceptance rejects unsupported case %s before creating results", async (cases, error) => {
+  ["desktop", "docs-after-build", "SKILLS_ACCEPTANCE_MULTITURN_SCENARIO_ADAPTER_REQUIRED"],
+  ["desktop", "scenario-create", "SKILLS_ACCEPTANCE_MULTITURN_SCENARIO_ADAPTER_REQUIRED"],
+  ["desktop", "docs-external-unicode-path", "SKILLS_ACCEPTANCE_PERMISSION_ADAPTER_REQUIRED"],
+  ["desktop", "docs-no-input,docs-no-input", "SKILLS_ACCEPTANCE_DUPLICATE_CASE"],
+  ["desktop", "not-in-corpus", "SKILLS_ACCEPTANCE_UNKNOWN_CASE"],
+  ["run", "docs-external-unicode-path", "cli-manifest.json"],
+])("live acceptance validates %s case %s before creating results", async (interfaceName, cases, error) => {
   const root = await mkdtemp(join(tmpdir(), "loginom-acceptance-preflight-"))
   try {
     const artifact = join(root, "artifact")
@@ -24,7 +25,8 @@ linuxTest.each([
         process.execPath,
         script,
         "--interface",
-        "desktop",
+        interfaceName,
+        ...(interfaceName === "run" ? ["--cli-image", "unused-preflight-image"] : []),
         "--artifact",
         artifact,
         "--output",

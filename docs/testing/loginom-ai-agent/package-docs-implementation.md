@@ -3332,9 +3332,57 @@ Agent catalog/discovery **26 PASS / 144 assertions**. Живой GREEN ново�
 поведение модели. Необъяснённый CLI status LOGINOM_HOST_CLEANUP_FAILED
 остаётся отдельным открытым сигналом.
 
+
+## 2026-10-07 — чистый 2396e78f2 и внешний текстовый путь CLI
+
+Основной план и corrections не перерабатывались. Новые полные CLI/Desktop
+собраны из clean `2396e78f26a373e7a125b38d0af500a418e6c64e` до изменений
+тестовой инфраструктуры ниже. CLI builder/archive roundtrip/source verifier PASS:
+archive `e146740d0251191c938fa5b0179bb24bbfb30efb15aeb3fc72f29f28bc9e01eb`,
+source tree `00dfb50c300e312ba58d4753b37e9908ccfc81f859a2bcdb65c52a5be6152e6c`.
+Первый build указал payload на уровень выше нужного и получил EEXIST архива;
+его лог/partial payload сохранены, полный candidate — только `-cli-v2/payload`.
+В own installed seed `sha256:1c79a20267c59ec36d4b4d1e3250f06b7f1c972a142de0496ef515ace6dd48cc`
+проверены версия0.1.17 и root:root4755 sandbox, без credentials в image.
+
+Desktop build/source archive/manifest/static DEB+AppImage PASS:
+DEB `e3e815c8fc871e2170931c7bfcd0a1c3181b49575fb5446fefd920adfce1f104`,
+AppImage `4b90bfa27b244871fb5d1575d6c15d6b09b66f4cd782a38d49f726ba9c70eca1`,
+resource manifest `4bf0bc5e58f55c6153cc99ddf8521dad0f958ff2396f7136b00b39d92bb5498e`.
+Это отдельные артефакты `candidate-2396e78f2-*`; старые не заменялись.
+CLI natural server-only **3/3** mechanics и полный финальный запрос PASS:
+только загрузка skill, просьба локального экспорта, без read/glob серверного
+пути, отчёта или Chromium. Desktop server/Word, CLI Word и ordinary ещё идут;
+новый formatter/quality gate не объявляется пройденным.
+
+Старый Desktop5a negative-v4 завершён: **11/12** mechanics и ручная семантика,
+server attempt1 FAIL no final answer. Arithmetic3/3 exact102, missing/noinput3/3,
+server2/3. Все финальные тексты просмотрены; partial failures сохранены.
+Linux DEB5a offline installed non-root matrix завершена **5/5 PASS**:
+Ubuntu22/24/26, Debian12/13. Её source5a не подменять новым239;
+CLI matrix, upgrade и другие installed gates она не подтверждает.
+CLI5a cold public status **12/12 PASS** (6direct+6strace), source NodeHost
+public handshake/status/acquire/release/close — **12/12 PASS** отдельными Bun
+процессами. Попытка `--rerun-each12` дала 1PASS и 11 ошибок повторной загрузки
+модулей/EBADF до теста; лог сохранён, за Host failures эти ошибки не выдаются.
+Исходный LOGINOM_HOST_CLEANUP_FAILED/SIGKILL остаётся необъяснённым.
+
+TDD внешнего текстового пути: новый public runner test сначала **6PASS/1FAIL**
+из-за SKILLS_ACCEPTANCE_PERMISSION_ADAPTER_REQUIRED для CLI. Минимальное
+изменение разрешает только `run` input external-text-path; existing CLI driver
+уже копирует исходный файл, не прикладывает его через `--file` и требует
+отсутствия отчёта/Chromium. Desktop пока требует отдельного permission adapter.
+GREEN **7PASS/28 assertions**, Host `bun typecheck` и Prettier check PASS.
+Это preflight guard, не доказательство настоящего permission refusal: следующий
+шаг — natural case×3 с проверкой итоговой подсказки `--file` вручную.
+Corpora/evals harness/neighbor files и работающие snapshots не менялись.
+Evidence: `skills-acceptance-external-run-{red,green,typecheck}.log`,
+`cli-canonical-regressions-2396e78f2/`, `desktop-canonical-regressions-2396e78f2/`,
+`cli-status-probe-5a99b75f4/`, `node-host-cold-close-processes-2396e78f2/`.
+
 ## Checkpoint
 
-- Product candidates: Desktop/CLI `5a99b75f4`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.
+- Product candidates: Desktop/CLI `2396e78f2`, clean source/artifacts/manifests/installed CLI seed PASS; предыдущие candidates сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -3345,7 +3393,7 @@ Agent catalog/discovery **26 PASS / 144 assertions**. Живой GREEN ново�
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
-- Полный Host 238 PASS / 7 SKIP; acceptance adapters6 PASS; Agent history/tools/registry30 PASS; typecheck PASS.
+- Полный Host 238 PASS / 7 SKIP; acceptance adapters7 PASS/28 и typecheck PASS; Agent history/tools/registry30 PASS.
 - Старый package_docs/Python тест заменён actual bundled flow/Node executor без Host call/admit.
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
@@ -3353,4 +3401,4 @@ Agent catalog/discovery **26 PASS / 144 assertions**. Живой GREEN ново�
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- Далее: новая чистая сборка и live GREEN Word/server instructions; CLI status cleanup failure; полный routing/installed переходы и Linux matrix. A/B ждёт harness owner; план не перерабатывать.
+- Далее: live239 Word/Desktop server/ordinary; external CLI path×3; CLI cleanup signal; полный routing/installed переходы/CLI matrix. Desktop5a Linux5 PASS. A/B ждёт harness owner; план заморожен.
