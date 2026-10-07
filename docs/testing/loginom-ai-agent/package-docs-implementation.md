@@ -1996,9 +1996,104 @@ workspace, `.lgp` неизменен, 0 exec Chromium, контейнеры уд
 полного отчёта**, не успешная приёмка качества. Во время следующей серии
 условия и старые документы сохраняются неизменными.
 
+## Справка B и ручная проверка серии `520d4f53b`
+
+Три installed CLI PDF запуска с усиленными инструкциями skill завершились
+**3/3** по механике: exit 0, сохранён PDF, исходный `.lgp` неизменен, ноль
+exec Chromium. Время **134.939 / 163.162 / 142.830 s**. Все три действительно
+прочитали документы обработчиков через `loginom_read` и упомянули `data.lgd`,
+не отрицая все файловые зависимости. Узкий verifier **3/3 PASS**; его SHA256
+`62638b226433bf0a6d88f350c6ad0ae7990d8a4874210a78637cc3c22c0683de`.
+Driver SHA256 `2887ed675d66d541078c794e7862ec984d3c010cbcbbe1e8d0b191426a789779`.
+Source/archive/model/variant закреплены в `cli-live-pdf-520d4f53b/conditions.json`.
+
+Все шесть страниц отрендерены системным Poppler и просмотрены. Кириллица,
+поля и переносы читаемы; нумерация 1/1 в прежнем writer остаётся в этих старых
+документах. Ручная проверка не заменяется verifier: третий отчёт утверждает
+поступление данных и передачу результатов в подмодели с пустыми портами и
+связями, а для узла-ссылки описывает фактический источник при пустых настройках.
+Во втором тексте вложенная подмодель описана внутри родительской без отдельного
+разбора её входа/выхода; первый также содержит общие формулировки о портах.
+**Полный report gate не принят**, этап 6 открыт. Исходные результаты не правились.
+
+## Общий source pin `85d3889b8`: упаковка и CLI
+
+Полные Desktop и CLI собраны из чистого
+`85d3889b863d6d1de950552b83bb7722ae446825`. Desktop source archive подтверждён
+`git get-tar-commit-id`; release manifest содержит sourceDirty=false,
+Node 24.19.0, Electron 42.3.3, Electron Node 24.15.0. SHA256:
+
+- DEB `693779584f398ad929c8c0f091ce912df92d2ae4e6e3b9627120f43b56d6ac23`;
+- AppImage `62734c4d8c74f55bca87eb9bf3a1a449089a1285fc4e0c2f6fc96612ce6ecaea`;
+- source archive `91768d8796214d16642f91509b95c9d437343ed0826d2f9f01b74d9bca606cb1`;
+- CLI TAR.GZ `b987801c611f2a4efb1ceb435e7fa263eaa2db55c723f9da1a7277e48fa0170d`;
+- CLI source tree `b55976bd8626f563b32c194a7b57347d769659d29036ac0e331eee43521fccdb`.
+
+Desktop DEB/AppImage static checks **PASS**, по **4654** resource files.
+Native AppImage cold discovery в отдельном HOME/profile/workspace **PASS**:
+оба bundled skills с digests, unconfigured wizard, Electron sandbox;
+`/proc` sampling 25 ms, **10 processes, remaining 0**, отдельный Chromium
+не наблюдался. Этот исходный smoke ещё не проверял composer `.lgp`.
+Первые команды указали ошибочные versioned filenames: hash check/launch отказали
+до исполнения продукта. Повтор использует фактические имена из manifest;
+первоначальные logs/evidence сохранены, собственные временные roots удалены.
+Установленный DEB и GUI вложения этой записью не принимаются.
+
+CLI archive roundtrip/source verification/checksums **PASS**. Native controlled
+pipeline создаёт PDF/DOCX/MD: **3 PASS / 57 assertions**, Help find/read,
+PATH=/nonexistent, input SHA и cleanup проверены. Первый полный запуск получил
+ENOENT только при экспорте evidence после всех 57 бизнес-проверок: artifacts
+parent не был создан. Signal collector воспроизвёл PDF отказ **3/3**, контроль
+с существующим parent **1/1 PASS**. После создания нового собственного parent
+полные три формата проходят; код/тесты не менялись, assertions не ослаблялись.
+Диагноз — конфигурация запуска, не продуктовая регрессия и не flakiness.
+Evidence `pipeline-signal-85d3889b8/`, `candidate-85d3889b8-cli/full-docs-pipeline/`,
+logs `cli-85d3889b8-pipeline{-green,}.log` сохранены отдельно.
+
+Actual native PTY `paste` и `@mention` на CLI85 **2 PASS**: исходные `file:`
+части с MIME `application/x-loginom-package`, extraction, exit 0, no forced kill,
+writer released, remaining processes 0, Chromium не наблюдался. PATH=/nonexistent;
+Python — только внешний driver. Это управляемые mechanics tests, не natural routing.
+
+Один дополнительный installed CLI85 live PDF smoke с той же primary моделью,
+fixture и недоступным Loginom — **159.263 s**, exit 0, Help B, известная файловая
+зависимость, `.lgp` неизменен, ноль exec Chromium. Обе A4 страницы просмотрены:
+нумерация подмоделей теперь **1/2**, кириллица и layout читаемы. Ручная проверка
+всё ещё видит неподтверждённые выводы о демонстрационном назначении по пустым
+портам и общие возможности узла-ссылки как фактическую настройку. Полный report
+quality gate не принят; один smoke не заменяет три повтора и весь corpus.
+Evidence `cli-live-pdf-85d3889b8-smoke/`; контейнер штатно удалён, secrets не экспортировались.
+Generated docs scripts Desktop/CLI отличаются Bun комментариями путей (разный
+build cwd); код после удаления этих комментариев побайтно одинаков. Сверяются
+фактические per-artifact digests, а не искусственно одинаковый checksum.
+
+## V2 composer: отсутствующий `.lgp` в фильтре
+
+Actual AppImage85 после закрытия мастера показывает один `input[type=file]`,
+accept которого заканчивается `.zsh`. Signal collector: **3/3 stable FAIL**
+по требованию выбрать `.lgp`, при неизменных source/artifact/manifest hashes;
+GUI assertion одинаков, только третий Xvfb cleanup дал отдельный код оболочки 5.
+Приёмочные probe сначала столкнулись с двумя одинаковыми Close buttons и
+ошибочно использовали URL navigation вместо Desktop MemoryRouter. Эти adapter
+отказы сохранены отдельно; итоговая проверка использует настоящий composer.
+
+Причина — дублирование списка: `session-ui/v2/prompt-input/attachments.ts`
+уже принимает `.lgp` и передаёт его native picker, но `index.tsx` задаёт отдельную
+старую строку accept. Это не дефект provenance/сборки и не отсутствие MIME поддержки.
+Общий существующий список экспортирован и используется также HTML file input;
+новых Product зависимостей и параметров UI не добавлено. Native cold smoke
+расширен проверкой composer фильтра и screenshot, и дал **RED** на immutable85
+с `LOGINOM_PACKAGE_NOT_SELECTABLE`. GREEN предстоит проверить после новой сборки.
+Attachment tests **6 PASS / 13 assertions**, App и Session UI typecheck **PASS**,
+Prettier для трёх изменённых code/test files **PASS**. Первый Bun filter без `./`
+не выбрал tests; засчитан только отдельный повтор с явным path, его log сохранён.
+Native picker, фактическое отправленное вложение и диалог чтения ещё открыты.
+Evidence `composer-signal-85d3889b8/`, `desktop-85d3889b8-composer-red/`.
+План по corrections повторно не перерабатывается; соседний evals не изменялся.
+
 ## Checkpoint
 
-- Product candidates: Desktop `8dc7bdccb`, CLI `6c24f8de7`; полные artifacts/manifest/archive сохранены, SHA различаются.
+- Product candidates: Desktop/CLI `85d3889b8`, полные artifacts/source/manifest; Desktop composer .lgp RED 3/3, fix готовится к native GREEN.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -2016,4 +2111,4 @@ workspace, `.lgp` неизменен, 0 exec Chromium, контейнеры уд
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS, native PTY paste/mention 2 PASS; attachment: 44 PASS.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
-- Desktop static/native/Ubuntu22 cold PASS; docs mechanics 3 PASS; natural no-input CLI/Desktop 3/3 + secondary CLI smoke; остальные 19 кейсов/TUI/evals открыты.
+- Desktop85 static/cold и CLI85 docs 3 формата/PTY 2 PASS; installed85/live GUI ещё открыты; full report quality/corpus/evals не приняты.

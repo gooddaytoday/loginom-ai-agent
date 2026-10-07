@@ -2,7 +2,7 @@ import { onMount } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import type { PromptInputV2Attachment, PromptInputV2Prompt } from "./types"
 
-const accepted = [
+export const acceptedFileTypes = [
   "image/png",
   "image/jpeg",
   "image/gif",
@@ -221,7 +221,7 @@ export function createPromptInputV2Attachments(
         return
       }
       void input
-        .picker({ defaultPath: input.directory(), multiple: true, accept: accepted }, (file) => add(file))
+        .picker({ defaultPath: input.directory(), multiple: true, accept: acceptedFileTypes }, (file) => add(file))
         .catch(input.onError)
     },
   }

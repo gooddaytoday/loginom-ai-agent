@@ -103,6 +103,13 @@ try {
     throw Error("EXTERNAL_SKILL_IN_CLEAN_FIXTURE")
   const resources = await app.evaluate(() => process.resourcesPath)
   await page.screenshot({ path: join(evidence, "first-launch.png") })
+  await form.locator('[data-component="icon-button"][data-icon="close"]').click()
+  await form.waitFor({ state: "hidden", timeout: 30000 })
+  await page.locator('[data-component="prompt-input"][contenteditable="true"]').waitFor({ timeout: 60000 })
+  const fileTypes = await page.locator('input[type="file"]').getAttribute("accept")
+  await writeFile(join(evidence, "composer-file-types.json"), JSON.stringify({ accept: fileTypes }, null, 2))
+  if (!fileTypes?.split(",").includes(".lgp")) throw Error("LOGINOM_PACKAGE_NOT_SELECTABLE")
+  await page.screenshot({ path: join(evidence, "composer.png") })
   result = {
     status: "PASS",
     executable,
@@ -110,6 +117,7 @@ try {
     uid: process.getuid(),
     node: process.version,
     unconfiguredWizard: true,
+    loginomPackageSelectable: true,
     skills: skills.map(({ name, source, digest, location }) => ({ name, source, digest, location })),
   }
 } finally {
