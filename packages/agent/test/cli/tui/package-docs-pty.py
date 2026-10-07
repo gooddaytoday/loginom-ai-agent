@@ -5,6 +5,7 @@ Python is the external test driver; the product executes the shipped Node script
 """
 
 import argparse
+import hashlib
 import fcntl
 import json
 import os
@@ -59,8 +60,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=pathlib.Path, required=True)
     parser.add_argument("--artifacts", type=pathlib.Path, required=True)
-    parser.add_argument("--attachment", choices=["paste", "mention"], required=True)
+    input_kind = parser.add_mutually_exclusive_group(required=True)
+    input_kind.add_argument("--attachment", choices=["paste", "mention"])
+    input_kind.add_argument("--text-permission", choices=["allow", "deny"])
     args = parser.parse_args()
+    mode = args.attachment if args.attachment else "text-" + args.text_permission
     assert sys.platform == "linux", "This acceptance driver requires Linux /proc and PTY"
     assert args.binary.is_absolute() and args.binary.is_file()
     assert args.artifacts.is_absolute()
@@ -69,12 +73,19 @@ def main():
     fixtures = repo / "packages/loginom-host/test/fixtures/package-docs"
     workspace = args.artifacts / "workspace"
     workspace.mkdir(mode=0o700)
-    lgp = workspace / ("Сценарий PTY.LGP" if args.attachment == "paste" else "sample.LGP")
+    lgp = workspace / ("Сценарий PTY.LGP" if mode == "paste" else "sample.LGP")
+    if mode.startswith("text-"):
+        source = args.artifacts / "input"
+        source.mkdir(mode=0o700)
+        lgp = source / "Исходный сценарий.LGP"
     shutil.copyfile(fixtures / "demo.lgp", lgp)
+    original = hashlib.sha256(lgp.read_bytes()).hexdigest()
+    home = args.artifacts / "home"
+    home.mkdir(mode=0o700)
     profile = args.artifacts / "profile"
     profile.mkdir(mode=0o700)
     env = dict(os.environ, LOGINOM_AI_AGENT_PURE="1", LOGINOM_AI_AGENT_CLI_PROFILE=str(profile),
-        TERM="xterm-256color", PATH="/nonexistent")
+        TERM="xterm-256color", PATH="/nonexistent", HOME=str(home), XDG_CONFIG_HOME=str(home / "config"), XDG_DATA_HOME=str(home / "data"), XDG_CACHE_HOME=str(home / "cache"), XDG_STATE_HOME=str(home / "state"))
     env.pop("DISPLAY", None)
     # Initialize profile metadata through the public CLI before adding model configuration.
     initialized = subprocess.run([str(args.binary), "loginom", "status", "--format", "json"],
@@ -125,7 +136,7 @@ def main():
     server.daemon_threads = True
     threading.Thread(target=server.serve_forever, daemon=True).start()
     config = {"model": "test/test-model", "formatter": False, "lsp": False,
-        "permission": {"skill": "allow", "edit": "allow", "read": "ask"},
+        "permission": {"skill": "allow", "edit": "allow", "read": "ask", "external_directory": "ask"},
         "provider": {"test": {"name": "Test", "id": "test", "env": [], "npm": "@ai-sdk/openai-compatible",
             "models": {"test-model": {"id": "test-model", "name": "Test Model", "attachment": False,
                 "reasoning": False, "temperature": False, "tool_call": True, "release_date": "2025-01-01",
@@ -177,14 +188,28 @@ def main():
             if step == "setup" and "Настроить Loginom сейчас?" in rendered:
                 send(b"\r", "ready")  # The public wizard defaults to continuing without setup.
             elif step == "ready" and "Ask anything" in rendered:
-                if args.attachment == "paste":
+                if mode.startswith("text-"):
+                    send(f"Напиши документацию по локальному пакету {lgp}\r".encode(), "submitted")
+                elif mode == "paste":
                     send(b"\x1b[200~" + str(lgp).encode() + b"\x1b[201~", "attached")
                 else:
                     send(b"@sample", "autocomplete")
             elif step == "autocomplete" and lgp.name in rendered:
                 send(b"\r", "attached")
-            elif step == "attached" and ("[Loginom 1]" if args.attachment == "paste" else "@" + lgp.name) in rendered:
+            elif step == "attached" and ("[Loginom 1]" if mode == "paste" else "@" + lgp.name) in rendered:
                 send(" Напиши документацию по приложенному пакету\r".encode(), "submitted")
+            elif step == "submitted" and mode.startswith("text-") and "Access external directory" in rendered and "Allow once" in rendered:
+                send(b"\x1b" if mode == "text-deny" else b"\r", "rejected" if mode == "text-deny" else "read")
+            elif step == "read" and "Permission required" in rendered and "Read " in rendered:
+                (args.artifacts / "read-view.txt").write_text(rendered)
+                send(b"\r", "submitted")
+            elif step == "rejected":
+                database = profile / "data/loginom-ai-agent.db"
+                if database.exists():
+                    with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as db:
+                        parts = [json.loads(row[0]) for row in db.execute("select data from part")]
+                    if any(part.get("type") == "tool" and part.get("tool") == "package_docs_run" and part.get("state", {}).get("status") == "error" for part in parts):
+                        send(b"\x04", "exit")
             elif step == "submitted" and finished.is_set() and "Структура извлечена." in rendered:
                 send(b"\x04", "exit")
         forced = child.poll() is None
@@ -218,7 +243,7 @@ def main():
         with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as db:
             parts = [json.loads(row[0]) for row in db.execute("select data from part")]
     files = [part for part in parts if part.get("type") == "file"]
-    result = {"binary": str(args.binary), "attachment": args.attachment, "code": child.returncode,
+    result = {"binary": str(args.binary), "attachment": mode, "inputSha256": original, "code": child.returncode,
         "forced": forced, "step": step, "guard": (profile / ".writer").exists(), "alive": alive,
         "chromiumObserved": chromium, "catalogs": catalogs, "structures": [str(p) for p in structures],
         "files": files, "systemNodePythonUnavailable": True, "readPermission": "ask",
@@ -227,7 +252,22 @@ def main():
     print(json.dumps(result, ensure_ascii=False))
     assert child.returncode == 0 and not forced and step == "exit", "TUI must exit normally after the rendered result"
     assert not result["guard"] and not alive and not chromium
-    assert len(files) == 1 and files[0]["url"] == lgp.as_uri() and files[0]["mime"] == "application/x-loginom-package"
+    assert hashlib.sha256(lgp.read_bytes()).hexdigest() == original
+    # No public standalone export API; settled permission evidence is read-only.
+    for catalog in catalogs:
+        if "package_docs_run" in catalog:
+            assert not {"bash", "task", "loginom_dock_prepare"}.intersection(catalog)
+    if mode == "text-deny":
+        assert not files and not structures
+        assert any("rejected permission" in error for error in result["toolErrors"])
+        assert "Access external directory" in (args.artifacts / "terminal.txt").read_text(errors="replace")
+        return
+    if mode == "text-allow":
+        assert not files and len(structures) == 1
+        view = (args.artifacts / "read-view.txt").read_text()
+        assert "Path: " in view and lgp.name in view, "Read permission must show the actual package path"
+    else:
+        assert len(files) == 1 and files[0]["url"] == lgp.as_uri() and files[0]["mime"] == "application/x-loginom-package"
     assert len(structures) == 1
     expected = json.loads((fixtures / "structure.json").read_text())
     expected["package"]["file_name"] = lgp.name

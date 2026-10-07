@@ -2249,6 +2249,32 @@ TUI read-path RED подтверждён collector **STABLE FAIL 3/3**, **10.013
 10.213 s**: все три CLI exit 0, extraction выполнен, writer released,
 осталась только ошибка подписи запроса. Report `tui-read-path-signal-aeef6c2c3/`.
 
+## TUI: путь пакета в запросе разрешения на чтение
+
+Канонический `test/cli/tui/package-docs-pty.py --text-permission allow`
+повторил RED на immutable CLIaeef: extraction успешен, exit 0, forced false,
+writer released, remaining 0, исходный SHA не изменён, но `Path:` в read dialog
+отсутствует. Evidence `cli-aeef6c2c3-tui-read-path-canonical-red/` и одноимённый log.
+Предыдущая отдельная серия collector установила стабильность отказа 3/3.
+
+Причина в `packages/tui/src/routes/session/permission.tsx`: read dialog использовал
+только `input.filePath`, которого у `package_docs_run` нет. Backend уже передаёт
+реальный путь в `request.metadata.filepath`. Добавлен этот fallback с сохранением
+приоритета `filePath` обычного инструмента read. Новые PTY режимы используют
+собственные HOME/XDG/profile, показывают внешний путь и нажимают реальные
+Allow once / Esc. Отказ сверяется с read-only persisted settled state перед
+Ctrl+D, поскольку standalone не имеет public export; выбор пользователя делает UI.
+В обоих положительных вариантах вложений сохранена проверка полного parity
+структуры, дополнительно проверяется неизменность SHA входа.
+
+TUI typecheck **PASS**. Полный исходный TUI suite пока **188 PASS / 1 SKIP /
+9 FAIL**, log `tui-read-path-source-tests.log`: четыре theme tests используют
+отсутствующий `DEFAULT_THEMES.opencode`, один tree test ожидает старое имя
+`opencode/src`, четыре snapshots отличаются переносами длинной branded строки.
+Их signal/history проверяются отдельно; snapshots автоматически не обновлялись.
+Native GREEN для изменения permission renderer требует нового чистого CLI
+candidate; до этого read-path gate остаётся открытым. Требования плана не менялись.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `aeef6c2c3`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef, static 4654 resources PASS.
@@ -2269,4 +2295,4 @@ TUI read-path RED подтверждён collector **STABLE FAIL 3/3**, **10.013
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS, native PTY paste/mention 2 PASS; attachment: 44 PASS.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
-- Installed DEB85 smoke/metadata/ASAR PASS; GUIaeef 5 permissions cases PASS, Send driver 5/5 stable; TUI read path RED, report/corpus/evals открыты.
+- Installed DEB85 smoke/metadata/ASAR PASS; GUIaeef 5 permissions cases PASS; TUI read path RED→source fix, native GREEN ещё нужен; full TUI 9 FAIL; report/corpus/evals открыты.
