@@ -56,7 +56,9 @@ async function validateRun(runDir: string, taskIds: string[], tasksDir: string) 
     summary.tasks.length !== taskIds.length || summary.tasks.some(t => !taskIds.includes(t.id)) || new Set(summary.tasks.map(t => t.id)).size !== taskIds.length)
     errors.push("incomplete/unexpected task collection or repeat")
   for (const id of taskIds) {
+    if (!(nodeCaseIds as readonly string[]).includes(id)) errors.push(`unsupported node case: ${id}`)
     const task = await Bun.file(path.join(tasksDir, id, "task.json")).json()
+    if (task.id !== id) errors.push(`${id}: task identity differs`)
     for (const item of task.checklist) if (item.required && !["input", "crosstable", "graph", "export", "result", "sequence"].includes(item.id))
       errors.push(`${id}: unknown required ID: ${item.id}`)
   }

@@ -28,6 +28,18 @@ async function writeSummary(file: string, source: string) {
   }
 }
 
+test("неизвестный case ID остаётся ERROR/2 при failed попытке", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-unknown-run-"))
+  try {
+    const id = "crosstable-unregistered"
+    await writeSummary(path.join(directory, "summary.json"), JSON.stringify({ config: { repeat: 1 }, storage_leftovers: [],
+      tasks: [{ id, attempts: [{ attempt: 1, status: "failed", environment_cleanup: { status: "confirmed" } }] }] }))
+    const result = await validateNodeRun(directory, [id], path.join(directory, "cases"))
+    expect(result).toMatchObject({ verdict: "ERROR", code: 2 })
+    expect(result.errors.join(" ")).toContain("unsupported node case")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test("незавершённый run получает ERROR/2, даже если generic harness завершился успешно", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-evals-"))
   try {
