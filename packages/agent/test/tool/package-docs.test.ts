@@ -486,6 +486,9 @@ it.instance(
       const input = yield* prepare({ attachment: pathToFileURL(fixture).href })
       const result = yield* input.tool.execute({ operation: "skeleton", lgp: fixture }, input.ctx)
       const output = JSON.parse(result.output)
+      expect(output.narrativeInstructions).toBe(
+        yield* fs.readFileString(join(resources, "skills/package-docs/references/narrative-prompts.md")),
+      )
       expect(output.report.startsWith(join(instance.directory, ".work/package-docs/"))).toBe(true)
       expect(yield* fs.readFileString(output.report)).toContain("PLACEHOLDER_PACKAGE_DESCRIPTION")
       expect(yield* fs.readJson(output.structure)).toEqual(

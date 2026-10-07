@@ -3562,6 +3562,38 @@ checks **7PASS/28 assertions**, pinned Node syntax и Prettier PASS. Требу�
 2/3 запуск не объявлять полным GREEN. Desktop external-path091-v2 mechanics
 **3/3 PASS**, но facts/layout review attempt2/3 пока не завершён.
 
+## 2026-10-07 — narrative в результате skeleton и завершённые live snapshots
+
+Desktop external-path091-v2 закончил **3/3 mechanics PASS**: настоящие GUI
+«Разрешить один раз», SHA исходного файла неизменён, Chromium0 и remaining0.
+Attempt1 facts/layout PASS; attempt2 facts **FAIL**: модель не прочитала
+narrative reference и выдумала учебное назначение «Демо» и заданные формулы
+пустого Calculator. Attempt3 manual review ещё открыт. Mechanics не заменяет
+проверку содержания; общий quality3/3 GREEN не заявлен.
+
+Минимальное исправление передаёт текст уже проверенного bundled
+`references/narrative-prompts.md` прямо в ответ `skeleton` как
+`narrativeInstructions`. Инструкция skill ссылается на этот результат.
+Не добавлены новые смысловые фильтры, настройки или отдельные abstractions.
+TDD через настоящий публичный `package_docs.skeleton`: **RED 1FAIL** — поле
+undefined; **GREEN 35PASS/120 assertions** всей tool/Node suite. Agent
+`bun typecheck`, исходный CLI PDF/DOCX/MD flow **3PASS/60 assertions** PASS.
+После правки SKILL каталог/целостность **19PASS/119 assertions**, diff и
+Prettier PASS. Сохранённые bd0d/091 бинарники ещё не содержат этот tool fix;
+новый clean build и natural facts/layout×3 остаются обязательными.
+
+CLI Wordbd0d исходный snapshot: attempt1 mechanics/facts/layout PASS,
+attempt2 mechanics PASS, manual review открыт, attempt3 adapter FAIL до
+модели (starting после save), исправлен в ea4. Повтор CLI Wordbd0d-v2 и
+Desktop Wordbd0d завершились **3/3 FAIL**: Xiaomi вернул HTTP429
+`quota exhausted`, документов нет. Это не успешная приёмка продукта;
+старые результаты сохранены, повторять запросы при исчерпанной квоте не нужно.
+
+DEB matrix bd0d остановилась с exit143 при сборке первого Ubuntu22 image;
+completed image и linux-matrix.json отсутствуют. Причина не установлена.
+Этот запуск не подтверждает ни DEB Linux5, ни CLI Linux5; старый matrix5a
+относится только к прежнему артефакту. Не выполнять чужой cleanup или prune.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `bd0d7abc2`, clean full builds/manifests/static/installed CLI seed PASS; предыдущие candidates сохранены.
@@ -3583,4 +3615,4 @@ checks **7PASS/28 assertions**, pinned Node syntax и Prettier PASS. Требу�
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- Далее: Wordbd0d и external Desktop091 повторы2/3, DEB Linux5 matrix; затем полный20/installed переходы/CLI matrix и cleanup signal. Exact-attachment model2 CLI0913/3 quality PASS; A/B ждёт owner; план заморожен.
+- Далее: новый clean candidate с narrative в skeleton, OpenAI gpt-6.1-sol/medium по указанию владельца, natural quality×3/полный20/installed переходы/Linux5. Xiaomi quota429; DEB matrixbd0d exit143 без результата; A/B ждёт owner; план заморожен.

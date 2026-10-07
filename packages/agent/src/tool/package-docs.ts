@@ -167,7 +167,16 @@ export const PackageDocsTool = Tool.define(
           ).pipe(Effect.catch(() => Effect.die(Error("PACKAGE_DOCS_OUTPUT_INVALID"))))
           return {
             title: "Документация: " + params.operation,
-            output: JSON.stringify(expected),
+            output: JSON.stringify({
+              ...expected,
+              ...(params.operation === "skeleton"
+                ? {
+                    narrativeInstructions: yield* fs.readFileString(
+                      join(dirname(executor.script), "../references/narrative-prompts.md"),
+                    ),
+                  }
+                : {}),
+            }),
             metadata: { truncated: false },
           }
         }).pipe(Effect.orDie),

@@ -135,8 +135,9 @@ Engine неидентифицированным. Расширение запро
 
 ## 4. Описание сценария
 
-Прочитай [правила narrative](references/narrative-prompts.md),
-[структуру связей и подмоделей](references/hierarchy-json.md) и
+Применяй [правила narrative](references/narrative-prompts.md): `skeleton`
+возвращает их текст в `narrativeInstructions` вместе с путями черновика.
+Прочитай [структуру связей и подмоделей](references/hierarchy-json.md) и
 [шаблон отчёта](references/report-template.md).
 
 Заполни все `PLACEHOLDER_*` в возвращённом `report.md` обычными `edit/write`
