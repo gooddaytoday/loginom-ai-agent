@@ -1,0 +1,304 @@
+import assert from "node:assert/strict"
+import { createRequire } from "node:module"
+import { createHash } from "node:crypto"
+import { mkdir, mkdtemp, readFile, writeFile, readdir, cp, rm, chmod } from "node:fs/promises"
+import { join, basename } from "node:path"
+import { pathToFileURL } from "node:url"
+import { setTimeout } from "node:timers/promises"
+import { observeProcesses } from "./processes.mjs"
+
+const chunks = []
+for await (const chunk of process.stdin) chunks.push(chunk)
+const input = JSON.parse(Buffer.concat(chunks).toString())
+const executable = join(input.artifact, "loginom-ai-agent-linux-x86_64.AppImage")
+const require = createRequire(join(input.resources, "runtime/client/package.json"))
+const { _electron } = require("playwright-core")
+const providerID = input.model.slice(0, input.model.indexOf("/"))
+const modelID = input.model.slice(input.model.indexOf("/") + 1)
+const sha = (bytes) => createHash("sha256").update(bytes).digest("hex")
+const failures = []
+
+for (const testcase of input.cases) {
+  await mkdir(join(input.output, testcase.id), { mode: 0o700 })
+  for (let attempt = 1; attempt <= input.repeat; attempt++) {
+    const evidence = join(input.output, testcase.id, "attempt-" + attempt)
+    await mkdir(evidence, { mode: 0o700 })
+    const root = await mkdtemp("/tmp/loginom-live-gui-")
+    const temporary = await mkdtemp("/tmp/la-")
+    const home = join(root, "home"),
+      workspace = join(root, "workspace"),
+      profile = join(root, "profile")
+    const filesRoot = join(root, "input")
+    await Promise.all([home, workspace, filesRoot].map((path) => mkdir(path, { mode: 0o700 })))
+    const local = join(workspace, "Сценарий.LGP"),
+      external = join(filesRoot, "Исходный сценарий.LGP")
+    const png = join(filesRoot, "Контекст.png")
+    if (testcase.input === "workspace-path") await cp(input.fixtures.lgp, local)
+    if (["lgp-attachment", "lgp-and-png-attachments"].includes(testcase.input)) await cp(input.fixtures.lgp, external)
+    if (testcase.input === "lgp-and-png-attachments") await cp(input.fixtures.png, png)
+    const originalPath = testcase.input === "workspace-path" ? local : external
+    const originalSha = await readFile(originalPath).then(sha, () => undefined)
+    const bindings = {
+      local_lgp: local,
+      unicode_lgp: external,
+      missing_lgp: join(workspace, "Отсутствующий.LGP"),
+      server_package: "/user/package-docs-acceptance/" + basename(root) + "/missing.lgp",
+    }
+    const prompt = testcase.prompt.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+      assert.ok(bindings[key], "UNKNOWN_BINDING")
+      return bindings[key]
+    })
+    const trace = join(evidence, "process.trace")
+    const wrapper = join(root, "electron")
+    const quote = (value) => "'" + value.replaceAll("'", "'\\''") + "'"
+    await writeFile(
+      wrapper,
+      `#!/bin/sh\nexec /usr/bin/strace -f -ttt -e trace=process -o ${quote(trace)} ${quote(executable)} "$@"\n`,
+    )
+    await chmod(wrapper, 0o700)
+    await save("roots.json", { root, temporary, home, workspace, profile, filesRoot, bindings })
+    const observer = observeProcesses()
+    let application, result, call, sessionID
+    const permissions = []
+    try {
+      application = await _electron.launch({
+        executablePath: wrapper,
+        args: [],
+        chromiumSandbox: true,
+        cwd: workspace,
+        timeout: 120000,
+        env: {
+          ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("LOGINOM_AI_AGENT_"))),
+          APPIMAGE_EXTRACT_AND_RUN: "1",
+          HOME: home,
+          XDG_CONFIG_HOME: join(home, "config"),
+          XDG_DATA_HOME: join(home, "data"),
+          XDG_CACHE_HOME: join(home, "cache"),
+          TMPDIR: temporary,
+          TMP: temporary,
+          TEMP: temporary,
+          LOGINOM_AI_AGENT_TEST_ONBOARDING: "1",
+          LOGINOM_AI_AGENT_TEST_ROOT: profile,
+          ...(input.headless ? { LOGINOM_AI_AGENT_TEST_HEADLESS: "1" } : {}),
+          LOGINOM_AI_AGENT_PURE: "1",
+          LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG: "1",
+          LOGINOM_AI_AGENT_CONFIG_CONTENT: JSON.stringify({ model: input.model, enabled_providers: [providerID] }),
+        },
+      })
+      const page = await application.firstWindow()
+      const form = page.locator('[data-component="settings-loginom"]')
+      await form.waitFor({ timeout: 120000 })
+      if (testcase.connection !== "unconfigured" && testcase.id !== "default-translation") {
+        const saved = await page.evaluate(async (apiKey) => {
+          const current = await window.api.loginom.read()
+          const validation = await window.api.loginom.check({
+            revision: current.revision,
+            url: "http://127.0.0.1:9/",
+            username: "user",
+            apiKey: { operation: "replace", value: apiKey },
+            password: { operation: "empty" },
+          })
+          await window.api.loginom.save({ revision: current.revision, validationId: validation.validationId })
+          const deadline = Date.now() + 120000
+          while (Date.now() < deadline) {
+            const view = await window.api.loginom.status()
+            if (view.state === "ready") return view
+            if (view.failure) throw Error(view.failure)
+            await new Promise((resolve) => setTimeout(resolve, 200))
+          }
+          throw Error("HELP_READY_TIMEOUT")
+        }, input.apiKey)
+        assert.equal(saved.state, "ready")
+        assert.equal(saved.hasPassword, false)
+        assert.equal(saved.browser.state, "failed")
+        await save("connection-status.json", saved)
+      } else assert.equal((await page.evaluate(() => window.api.loginom.read())).state, "unconfigured")
+      await form.locator('[data-component="icon-button"][data-icon="close"]').click()
+      await form.waitFor({ state: "hidden", timeout: 30000 })
+      const backend = await page.evaluate(() => window.api.awaitInitialization())
+      call = async (path, method = "GET", body) => {
+        const response = await fetch(`${backend.url}${path}?directory=${encodeURIComponent(workspace)}`, {
+          method,
+          headers: {
+            "content-type": "application/json",
+            authorization: `Basic ${Buffer.from(`${backend.username}:${backend.password}`).toString("base64")}`,
+          },
+          ...(body ? { body: JSON.stringify(body) } : {}),
+          signal: AbortSignal.timeout(20000),
+        })
+        if (!response.ok) throw Error(`HTTP_${response.status}_${method}_${path}`)
+        const text = await response.text()
+        return text ? JSON.parse(text) : undefined
+      }
+      await call("/auth/" + providerID, "PUT", input.auth)
+      sessionID = (await call("/session", "POST", { title: testcase.id + " " + attempt })).id
+      const files =
+        testcase.input === "lgp-attachment"
+          ? [external]
+          : testcase.input === "lgp-and-png-attachments"
+            ? [external, png]
+            : []
+      const parts = [
+        { type: "text", text: prompt },
+        ...files.map((path) => ({
+          type: "file",
+          filename: basename(path),
+          mime: path.endsWith(".png") ? "image/png" : "application/x-loginom-package",
+          url: pathToFileURL(path).href,
+        })),
+      ]
+      const started = Date.now()
+      await save("submission.json", { sessionID, model: input.model, variant: "default", prompt, parts, started })
+      // Keep HTTP requests short and retain each projected snapshot while tools await permission.
+      await call(`/session/${sessionID}/prompt_async`, "POST", {
+        agent: "build",
+        model: { providerID, modelID },
+        parts,
+      })
+      let messages, answer, idleCompletedID
+      while (Date.now() - started < 480000) {
+        const [current, status, pending] = await Promise.all([
+          call(`/session/${sessionID}/message`),
+          call("/session/status"),
+          call("/permission"),
+        ])
+        messages = current
+        await save("messages.json", messages)
+        await save("session-status.json", status[sessionID] ?? { type: "idle" })
+        for (const request of pending.filter((request) => request.sessionID === sessionID)) {
+          permissions.push({ request, reply: "reject" })
+          await save("permissions.json", permissions)
+          // These cases authorize local attachments only, never arbitrary external paths.
+          await call(`/permission/${request.id}/reply`, "POST", { reply: "reject" })
+        }
+        const latest = messages.filter((message) => message.info.role === "assistant").at(-1)
+        const idleCompleted =
+          (!status[sessionID] || status[sessionID].type === "idle") &&
+          latest &&
+          (latest.info.error || latest.info.time.completed) &&
+          !messages
+            .flatMap((message) => message.parts)
+            .some((part) => part.type === "tool" && ["pending", "running"].includes(part.state.status))
+        if (idleCompleted && idleCompletedID === latest.info.id) {
+          answer = latest
+          break
+        }
+        idleCompletedID = idleCompleted ? latest.info.id : undefined
+        await setTimeout(1000)
+      }
+      assert.ok(answer, "MODEL_COMPLETION_TIMEOUT")
+      const tools = messages.flatMap((message) => message.parts).filter((part) => part.type === "tool")
+      const reports = (await readdir(workspace)).filter((file) => /lgp_report(?:-\d+)?\.(pdf|docx|md)$/.test(file))
+      const execs = (await readFile(trace, "utf8"))
+        .split("\n")
+        .filter(
+          (line) =>
+            Number(line.trim().split(/\s+/)[1]) * 1000 >= started &&
+            /execve\(/.test(line) &&
+            /chromium-\d+\/|chrome-linux64\/chrome/.test(line),
+        )
+      result = {
+        status: "MECHANICS_PASS_MANUAL_REVIEW_REQUIRED",
+        case: testcase.id,
+        attempt,
+        interface: "native AppImage backend HTTP",
+        model: input.model,
+        variant: "default",
+        headless: input.headless,
+        sessionID,
+        prompt,
+        wallMs: Date.now() - started,
+        modelError: answer.info.error,
+        tools: tools.map((part) => ({
+          id: part.id,
+          name: part.tool,
+          status: part.state.status,
+          input: part.state.input,
+          metadata: part.state.metadata,
+          error: part.state.error,
+        })),
+        text: answer.parts
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("\n"),
+        reports,
+        browserExecs: execs,
+        permissions,
+        inputShaBefore: originalSha,
+        inputShaAfter: await readFile(originalPath).then(sha, () => undefined),
+      }
+      await save("result.json", result)
+      assert.ok(!answer.info.error, "MODEL_ERROR")
+      assert.equal(execs.length, 0, "DOCS_DEFAULT_BROWSER_EXEC")
+      assert.ok(result.text.trim(), "NO_FINAL_ANSWER_AFTER_TERMINAL_TURN")
+      assert.equal(result.inputShaAfter, originalSha)
+      assert.ok(
+        !tools.some((part) => part.tool.startsWith("loginom_dock_") && part.tool !== "loginom_dock_diagnostics"),
+      )
+      if (testcase.expected.profile === "package-docs")
+        assert.ok(
+          tools.some(
+            (part) =>
+              part.tool === "skill" &&
+              part.state.metadata?.activation?.profile === "package-docs" &&
+              part.state.metadata.activation.digest ===
+                input.skills.find((skill) => skill.name === "package-docs").digest,
+          ),
+        )
+      if (testcase.expected.profile === "default") assert.ok(!tools.some((part) => part.state.metadata?.activation))
+      if (["pdf", "docx", "md"].includes(testcase.expected.result)) {
+        assert.equal(permissions.length, 0, "UNEXPECTED_PERMISSION_FOR_ADMITTED_ATTACHMENT")
+        assert.equal(reports.length, 1)
+        assert.ok(reports[0].endsWith("." + testcase.expected.result))
+        assert.ok(
+          tools.some(
+            (part) =>
+              part.tool === "package_docs_run" &&
+              part.state.input.operation === "emit" &&
+              part.state.status === "completed",
+          ),
+        )
+        assert.ok(tools.some((part) => part.tool === "loginom_read" && part.state.status === "completed"))
+      } else assert.equal(reports.length, 0)
+      if (testcase.id === "default-unconfigured-arithmetic") assert.equal(result.text.trim(), "102")
+      if (testcase.id === "default-translation") assert.match(result.text, /documentation.{0,12}ready/i)
+    } catch (error) {
+      failures.push(testcase.id + ":" + attempt)
+      if (result) {
+        result.status = "MECHANICS_FAIL"
+        result.failure = error.message
+        await save("result.json", result)
+      }
+      await save("failure.json", { message: error.message, resultAvailable: Boolean(result), sessionID })
+      if (sessionID && call) await call(`/session/${sessionID}/abort`, "POST").catch(() => {})
+    } finally {
+      await cp(workspace, join(evidence, "workspace"), { recursive: true })
+      if (application) await application.close()
+      const processes = await observer.close()
+      await save("processes.json", processes)
+      assert.equal(processes.remaining.length, 0, "OWNED_PROCESS_SURVIVED")
+      assert.ok(!processes.processes.some((row) => row.command.split(" ").includes("--no-sandbox")))
+      await rm(root, { recursive: true, force: true })
+      await rm(temporary, { recursive: true, force: true })
+      await save("cleanup.json", { rootRemoved: true, temporaryRemoved: true, remaining: 0 })
+    }
+    console.log(
+      JSON.stringify({
+        case: testcase.id,
+        attempt,
+        failed: failures.includes(testcase.id + ":" + attempt),
+        reports: result?.reports,
+        browserExecs: result?.browserExecs.length,
+        manualReviewRequired: true,
+      }),
+    )
+
+    async function save(name, value) {
+      const text = JSON.stringify(value, null, 2)
+      assert.ok(![input.apiKey, input.auth.key].some((secret) => text.includes(secret)), "SECRET_IN_RESULT")
+      await writeFile(join(evidence, name), text)
+    }
+  }
+}
+await writeFile(join(input.output, "summary.json"), JSON.stringify({ failures, manualReviewRequired: true }, null, 2))
+if (failures.length) process.exitCode = 1

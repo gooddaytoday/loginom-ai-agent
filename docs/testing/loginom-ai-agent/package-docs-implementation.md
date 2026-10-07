@@ -3235,6 +3235,78 @@ CLI5a no-input **3/3 PASS**. Missing-file ответы корректны и д�
 Linux5 matrix ещё выполняются. Матрица использует собственный image prefix.
 Требования основного плана заморожены; соседняя evals сессия не изменялась.
 
+## 2026-10-07 — воспроизводимые adapters и полная проверка форматов 5a99b75f4
+
+Требования основного плана остаются заморожены; его текст не перерабатывался.
+Соседний evals worktree/harness/корпус/промпт судьи не изменялись.
+Добавлены `packages/loginom-host/script/skills-acceptance.ts` и собственные
+CLI/Desktop adapters с инструкцией запуска. Это пока 13 single-turn cases,
+а не выполненный этап 6: scenario, multi-turn, permission approval, TUI,
+команды и smoke второй модели ещё нужны. Unsupported cases отклоняются
+до создания результатов. Артефакт проверяется штатными manifest verifiers;
+CLI seed запускается по immutable image ID. Каждый повтор имеет собственный
+профиль/контейнер либо HOME/XDG/TMPDIR Desktop. Сохраняются корпус, fixtures,
+код adapters и их хэши, model/variant, активация и digest skill, messages/tools,
+документы, исходный/итоговый SHA, strace и PID/start-time observations.
+Механика не заменяет ручную проверку фактов, страниц и просьбы предоставить файл.
+
+Source проверки: **6 PASS / 24 assertions**, включая реальные дочерние процессы
+и исключение sibling process, **Host 238 PASS / 7 SKIP / 1289 assertions**,
+`bun typecheck` PASS. После форматирования targeted 6 и typecheck повторно PASS;
+Node syntax checks PASS. Логи в acceptance root `package-docs-20261006`.
+TDD сигналы adapters: старые проверки отклоняли правильный negative CLI exit 1;
+сохранённые сообщения позволили проверять фактическую ошибку и просьбу отдельно.
+Bind fixture mode 700 дал реальный EACCES под UID 1200; отдельный доступ после
+исправления подтвердил исходный SHA `73bca886...de483c`, публичный CLI PDF smoke
+прошёл механику, факты и обе страницы (211394 ms). Недоступный input не подменялся.
+
+Для clean product artifact source `5a99b75f42e73ed4addf8432251816c6a0844ca3`
+и `xiaomi-token-plan-sgp/mimo-v2.5-pro`, variant default:
+
+- CLI formats: PDF3/3 facts/layout PASS (ранее записаны); Word mechanics3/3,
+  layout3/3, **facts2/3**. Во втором Word неизвестному DerivedReference приписано
+  «позволяет получить результаты выполнения другого узла» после чтения Help
+  обычного Reference. Этот результат FAIL; им нельзя закрыть quality gate.
+  Markdown3/3 прочитаны полностью, факты/структура PASS.
+- Native Desktop AppImage: PDF3/3 и Word3/3 — все 12 страниц просмотрены,
+  факты/оформление PASS; Markdown3/3 прочитаны полностью, факты/структура PASS.
+  Help handler reads фактически присутствуют, LGP SHA неизменен, managed
+  Chromium во время модельных docs-ходов не запускался. Word render выполнялся
+  в собственном offline Ubuntu24 контейнере; оригинальные DOCX не изменены.
+  Эти частные результаты не доказывают полный routing gate.
+- CLI canonical negative-v1: missing/no-input/server-path **9/9** mechanics и
+  просьба предоставить локальный пакет PASS, отчётов и Chromium нет. Arithmetic
+  не дошёл до модели: adapter записал auth до создания profile marker, получил
+  PROFILE_FORMAT_INVALID. Исправлен публичным `loginom status` до записи auth.
+  В unconfigured-v3 arithmetic2/3 и translation3/3 прошли; первый status получил
+  **LOGINOM_HOST_CLEANUP_FAILED**, strace фиксирует SIGKILL Host. Сигнал не скрыт
+  повторным запуском и ещё требует расследования; ordinary gate не закрыт.
+- Desktop canonical server-v2: **2/3 PASS**, один запросил external_directory
+  для серверного пути. После reject backend стал idle без финального ответа.
+  Новый adapter сохраняет messages/permission/reply и фиксирует
+  NO_FINAL_ANSWER_AFTER_TERMINAL_TURN, вместо ожидания HTTP headers 300s.
+  Это product/instruction failure, не успешный negative кейс.
+- Параллельные native prototypes использовали один каталог распаковки AppImage;
+  оба прервались с Process failed to launch. Причинную связь ещё не доказали.
+  В canonical Desktop теперь отдельный короткий TMPDIR на каждый повтор;
+  negative-v4 продолжается, первый server case повторил no-final-answer FAIL,
+  второй PASS. Старые partial результаты сохранены; завершённая очистка не
+  приписывается прервавшимся процессам.
+- Linux DEB offline non-root matrix: Ubuntu22/24/26 PASS; Debian12/13 ещё идут.
+  Это отдельно от живых моделей, upgrade, профилей и полной установленной приёмки.
+
+Evidence: `cli-live-formats-5a99b75f4/`,
+`desktop-live-routing-extracted-5a99b75f4/` (partial), per-attempt
+`manual-quality.json`, Word/PDF renders; `cli-canonical-pdf-5a99b75f4-v2/`,
+`cli-canonical-negative-5a99b75f4-v1/`,
+`cli-canonical-unconfigured-5a99b75f4-v3/`,
+`desktop-canonical-server-5a99b75f4-v2/`,
+`desktop-canonical-negative-5a99b75f4-v4/` и
+`desktop-5a99b75f4-linux-matrix/`. Разные revisions adapters записаны в snapshots;
+это не парный A/B evals прогон. Полная source/artifact provenance 5a сохранена
+в предыдущем разделе; проверка старого source pin против изменённого checkout
+не выдаётся за подтверждение текущего source.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `5a99b75f4`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.
@@ -3242,13 +3314,13 @@ Linux5 matrix ещё выполняются. Матрица использует
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node48 PASS; CLI5a PDF3/3 facts/layout GREEN; CLI3ccc Word facts1/3/layout2/3 FAIL, MD3/3 PASS; quoted lists public6/6 GREEN.
+- Docs Node48 PASS; CLI5a PDF3/3 PASS, Word facts2/3 FAIL/layout3/3 PASS, MD3/3 PASS; Desktop5a PDF/Word/MD3/3 facts PASS; quoted lists public6/6 GREEN.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
 - Scope/history/prompt/revert/docs: 200 PASS / 2 V2 SKIP; Host scope11 PASS; пять implementation подпунктов этапа 5 отмечены; installed переходы ещё открыты.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
-- Полный Host 224 PASS / 7 SKIP; Agent history/tools/registry 30 PASS; typecheck обоих PASS.
+- Полный Host 238 PASS / 7 SKIP; acceptance adapters6 PASS; Agent history/tools/registry30 PASS; typecheck PASS.
 - Старый package_docs/Python тест заменён actual bundled flow/Node executor без Host call/admit.
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
@@ -3256,4 +3328,4 @@ Linux5 matrix ещё выполняются. Матрица использует
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- Далее: unknown type grounding facts RED→GREEN, полный routing gate и installed переходы; A/B ждёт согласованной harness задачи из handoff. Требования плана не перерабатывать.
+- Далее: DerivedReference/серверный путь — instruction RED→GREEN; CLI status cleanup failure; полный routing/installed переходы и Linux matrix. A/B ждёт harness owner; план не перерабатывать.

@@ -1,0 +1,60 @@
+# Проверки skills настоящей моделью
+
+Запускать `bun script/skills-acceptance.ts` из `packages/loginom-host`.
+Корпус — `packages/agent/test/cli/package-docs-routing/cases.json`.
+Результаты, профили, контейнеры и рабочие каталоги принадлежат этому запуску.
+Пользовательский launcher и профили не изменяются.
+
+```bash
+bun script/skills-acceptance.ts \
+  --interface run \
+  --artifact /absolute/verified-cli-payload \
+  --cli-image '<installed-seed-image>' \
+  --output /absolute/new-results-directory \
+  --model provider/model \
+  --cases docs-missing-file,docs-no-input,docs-current-server-package \
+  --repeat 3
+```
+
+Для Desktop передать `--interface desktop --artifact /absolute/desktop-dist`
+без `--cli-image`. Нужны Linux x64, `xvfb-run`, `strace`; для CLI — Docker.
+`--headless` выбирает режим браузера; режим по умолчанию — с окном.
+Desktop использует настоящий backend AppImage под изолированным Electron;
+это отдельно от установленного DEB и матрицы дистрибутивов.
+
+Секреты передаются только через stdin JSON:
+`{ "apiKey": "<Help key>", "auth": { "type": "api", "key": "<provider key>" } }`.
+Подавать их из собственного приватного источника; не вводить ключи в argv,
+окружение, git или shell history. Подключение здесь проверяется явно до
+модельного хода: Help доступен по ключу, web login намеренно не настроен.
+Обычные unconfigured-кейсы обходятся без настройки Loginom.
+
+CLI seed image должен содержать полную установленную Linux-сборку под
+`/home/tester/.local/share/loginom-ai-agent-cli/<version>-<channel>`, пользователя
+`tester`, `/usr/bin/strace` и пустой профиль. Сначала использовать штатный
+installer в собственном build stage. Копировать установленное дерево в final
+stage без `--chown`, сохраняя root-owned `chrome-sandbox` с mode `4755`.
+Не включать credentials или пользовательский профиль в image. Адаптер
+сверяет установленный manifest с полным проверенным payload и запускает
+immutable image ID. Каждый повтор получает новый контейнер и профиль.
+
+Скрипт сохраняет снимок корпуса, fixtures и собственного кода, версии и хэши,
+активацию/digest skill, tool calls, исходный и итоговый SHA `.lgp`, документы,
+`strace` и PID/start-time наблюдения. В Desktop асинхронный prompt позволяет
+сохранять промежуточные сообщения; неожиданные разрешения внешних путей
+отклоняются только в своей сессии и записываются. Такая проверка не заменяет
+проверку штатного одобрения пути в отдельном permission-кейсе.
+
+CLI может закончить негативный кейс с exit 1 после зафиксированной ошибки
+чтения отсутствующего файла. Адаптер сохраняет этот код и все ошибки tools;
+это не считается готовым отчётом. Итоговую просьбу предоставить файл нужно
+проверить вручную, как и содержимое каждого документа. `summary.json`
+содержит **только результат механики**. PDF/Word надо открыть, просмотреть
+все страницы и сопоставить факты с fixture и прочитанной Help. Для Markdown
+прочитать весь текст. Успешный запуск с ошибкой фактов не проходит приёмку.
+
+Сейчас реализованы 13 single-turn кейсов docs/default. Scenario, multi-turn
+и внешние текстовые пути отклоняются до создания результатов. Полный корпус
+20 × 3, TUI, команды, переходы профилей, второй model smoke и установленная
+Linux-матрица остаются самостоятельными проверками основного плана.
+Этот скрипт не редактирует evals harness, near-miss корпус или промпт судьи.
