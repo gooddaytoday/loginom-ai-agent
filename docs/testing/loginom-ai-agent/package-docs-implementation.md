@@ -1938,6 +1938,42 @@ Bundled catalog после изменения **19 PASS / 119 assertions**, diff
 Живая GREEN-проверка потребует следующей immutable сборки; текущий candidate
 и его отчёты не исправляются задним числом. Требования плана не пересмотрены.
 
+## Первая GUI и интерактивная TTY настройка Help
+
+Настоящий мастер AppImage Desktop C8, UID 1001, отдельные HOME/profile/workspace,
+Electron sandbox включён. Действительный Help key введён через GUI, пароль
+пустой, Loginom `http://127.0.0.1:9/` недоступен. Кнопка проверки показывает
+«Справка готова к работе» и отдельное предупреждение о веб-приложении;
+revision/hasApiKey до сохранения не меняются. Штатное сохранение закрывает
+мастер и даёт **ready**, key=true, password=false,
+browser=failed/LOGINOM_LOGIN_UNAVAILABLE. После открытия настроек ключ
+пустой и замаскирован placeholder; screenshot предупреждения просмотрен.
+После полного перезапуска того же собственного профиля Help снова **ready**,
+browser=unknown. Наблюдение `/proc` каждые 25 ms: **43 processes, remaining 0**,
+`--no-sandbox` отсутствует. Browser validation здесь ожидаемо запускала
+Chromium; это не тест отсутствия браузера при документировании.
+Собственный профиль с ключом удалён после подтверждённого завершения процессов.
+Evidence `desktop-live-help-only-8dc7bdccb/`, отдельные Node/Bun drivers.
+
+Установленный CLI `8791660db` в собственном Ubuntu22 container, UID 1200:
+первое `loginom setup --format json --headless` с настоящим PTY последовательно
+прошло API-ключ, URL, username, выбор «Пустой пароль» и завершилось **exit 0**,
+Help-ready с LOGINOM_LOGIN_UNAVAILABLE. Ключ получен private stdin и введён
+через PTY, его отсутствие в terminal output проверено до сохранения log.
+Public `loginom status` после перезапуска подтверждает key=true, password=false,
+сохранённый URL и username, browser=unknown. Его немедленное **starting**
+допустимо: локальный handshake не ждёт фоновый Help catalog. Первый driver
+ошибочно требовал ready от этого отдельного status-процесса и дал FAIL;
+продуктовый setup уже был успешен. Исправленный driver в новом container дал
+**PASS**. Оба evidence сохранены, контейнеры удалены, ключевые профили не
+экспортированы. Испытуемый CLI подключён полным новым архивом read-only;
+старый binary в prerequisite image не запускался. `@lydell/node-pty`
+1.2.0-beta.12 используется только внешним тестовым driver.
+Evidence `cli-live-tty-corrected-8791660db/`, исходный adapter отказ —
+`cli-live-tty-8791660db/`. Setup gate проверен в GUI/TTY/stdin-json, но весь
+этап 4 (включая остальные lazy/cancellation/runtime проверки) ещё открыт.
+План не переписывался; это дополнительные доказательства выполнения.
+
 ## Checkpoint
 
 - Product candidates: Desktop `8dc7bdccb`, CLI `6c24f8de7`; полные artifacts/manifest/archive сохранены, SHA различаются.
@@ -1946,7 +1982,7 @@ Bundled catalog после изменения **19 PASS / 119 assertions**, diff
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 42 PASS; dependency wording RED→GREEN; catalog 19 PASS, Host typecheck PASS; нужен новый live PDF.
-- BrowserStatus/key-only Help: source; lazy CLI exit 2 подтверждён native, exit 1 source; first setup GUI/TTY открыт.
+- BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; lazy CLI exit 2 native, exit 1 source; этап 4 открыт.
 - Scope/command/HTTP/Runner/revert: 168 PASS / 1 SKIP; offline skill regression 135 PASS / 1 SKIP; typecheck PASS.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
