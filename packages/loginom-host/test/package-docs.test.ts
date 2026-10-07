@@ -9,7 +9,7 @@ import { join } from "node:path"
 import { extractPackage } from "../src/package-docs/extract"
 import { renderSkeleton } from "../src/package-docs/skeleton"
 import { renderReport } from "../src/package-docs/emit"
-import { pdfText } from "./package-docs-pdf"
+import { pdfPages, pdfText } from "./package-docs-pdf"
 
 const fixtures = join(import.meta.dir, "fixtures/package-docs")
 const fonts = new URL("../../product/skills/package-docs/assets/fonts/", import.meta.url)
@@ -30,6 +30,22 @@ afterAll(() => rm(bundle, { recursive: true, force: true }))
 test("Markdown writer preserves the baseline report and terminates it with a newline", async () => {
   const markdown = await readFile(join(fixtures, "demo.report.md"), "utf8")
   expect(new TextDecoder().decode(await renderReport(markdown.trimEnd(), "md"))).toBe(markdown)
+})
+
+test("PDF keeps a short statistics list with its heading on the same page", async () => {
+  const pages = pdfPages(await renderReport(await readFile(join(fixtures, "pagination.report.md"), "utf8"), "pdf", fonts))
+    .map((page) => page.join(""))
+  const statistics = pages.find((page) => page.includes("Статистика модуля"))
+  expect(statistics).toBeDefined()
+  for (const label of [
+    "Глубина вложенности сценария:",
+    "Количество заметок:",
+    "Количество узлов:",
+    "Количество подмоделей:",
+    "Количество узлов программирования:",
+    "Количество узлов-ссылок:",
+    "Количество производных узлов:",
+  ]) expect(statistics).toContain(label)
 })
 
 test("the product builder emits a standalone Node script and its actual license dependency graph", async () => {
@@ -364,6 +380,15 @@ test("multipage PDF retains every paragraph across page boundaries", async () =>
   expect(Number(pages[1])).toBeGreaterThan(1)
   expect(pdfText(bytes).join(" ").replace(/\s+/g, ""))
     .toBe(("Многостраничный отчёт" + paragraphs.join("")).replace(/\s+/g, ""))
+})
+
+test("PDF lets a long list span pages without losing items or creating blank pages", async () => {
+  const items = Array.from({ length: 80 }, (_, index) => `Узел ${index + 1}: описание обработки данных.`)
+  const pages = pdfPages(await renderReport("## Узлы\n\n" + items.map((item) => "* " + item).join("\n"), "pdf", fonts))
+  expect(pages.length).toBeGreaterThan(1)
+  expect(pages.every((page) => page.length > 0)).toBe(true)
+  expect(pages.flat().join("").replace(/\s+/g, ""))
+    .toBe(("Узлы" + items.map((item) => "•" + item).join("")).replace(/\s+/g, ""))
 })
 
 test.each(["*", "-", "+"])("PDF and DOCX keep ordered submodel numbers across nested %s bullets", async (marker) => {

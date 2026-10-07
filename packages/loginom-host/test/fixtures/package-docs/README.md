@@ -28,3 +28,8 @@ emit_report.py (source SHA-256 098deb4455a5e428c4aab6544bbeaa13dc0c2081525675ee3
 DOCX archive timestamps/bytes are not compared.
 PDF variants retain the same baseline writer and bundled Golos fonts. Tests
 decode page text through ToUnicode and compare runs, not compressed PDF bytes.
+
+`pagination.report.md` retains the reviewed narrative from the installed Desktop
+2530143dd live run (2026-10-07). Its final statistics item was orphaned on page 3.
+The regression reads actual PDF pages and requires the short statistics list to
+stay with its heading. This is a pagination fixture, not a new Python oracle.

@@ -3867,15 +3867,43 @@ loginom status превысил исходные180s, SIGTERM; stdout/stderr п�
 не установлена. Наблюдалась высокая IO pressure; причинность не доказана.
 Матрицы следующих дистрибутивов и диагностика продолжаются, gate открыт.
 
+## 2026-10-07 — проверка документов253 и исправление пагинации PDF
+
+В `cli-openai-positive-2530143dd` приняты local-path3/3, attached-pdf3/3,
+Word3/3 и Markdown3/3: прочитаны все тексты и просмотрены18 страниц PDF/Word.
+Desktop253: local-path3/3, Word3/3, Markdown3/3 приняты; attached-pdf3/3
+по фактам, но attempt3 FAIL по вёрстке — последний пункт статистики один
+на странице3. Все19 страниц Desktop PDF/Word просмотрены. `.lgp` неизменен,
+Chromium0, remaining0. Отдельные manual-quality receipts сохраняют исходный FAIL.
+Открытие ссылок из финального ответа в native UI не заявляется; у двух
+Desktop-ссылок наблюдались пробелы в href. Остальные positive-кейсы ещё идут.
+
+Минимальное исправление `src/package-docs/emit.ts` удерживает заголовок и
+следующий список вместе, если группа целиком помещается на странице.
+Фактический заполненный Markdown сохранён как pagination fixture. Тест по
+декодированным страницам: RED отсутствует последний пункт на странице заголовка;
+GREEN весь короткий список вместе. Длинный список продолжает разбиваться,
+без потерь и пустых страниц. Полный генератор50 PASS/193 assertions,
+Host typecheck PASS; все3 страницы исправленного PDF просмотрены.
+Логи `tdd-pdf-statistics-pagination-{red,green,regression}.log` сохранены вне Git.
+Это source-only fix: сборки253 его ещё не содержат; нужна новая чистая сборка.
+
+Desktop default15/15 PASS: все финальные ответы прочитаны, skills/Chromium/reports0,
+remaining0. CLI default15/15 остаётся PASS. Linux253: Desktop Ubuntu22/24 PASS,
+CLI Ubuntu24/26 PASS; Ubuntu22 CLI180s FAIL сохранён. Отдельные Node/Bun manifest
+diagnostics также не уложились в180s; полный CLI с диагностическим bundle
+override проходит3/3, но это не штатная integrity-проверка и не замена FAIL.
+Матрицы Debian и установленная приёмка исправленного кандидата ещё открыты.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
-- Product candidates253 clean/manifest/static/CLI seed PASS; Linux5 идут: Desktop Ubuntu22 PASS, CLI Ubuntu22 native180s FAIL, причина задержки исследуется; c50d установки сохранены.
+- Product candidates253 clean/manifest/static/CLI seed PASS; Linux5 идут: Desktop Ubuntu22/24 PASS, CLI Ubuntu24/26 PASS, Ubuntu22 native180s FAIL сохранён. PDF pagination исправлен source-only; новая сборка ещё нужна.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node48 PASS; CLI239 Word facts2/3 FAIL/layout3/3 PASS; Desktop239 Word3/3 facts/layout PASS; прежние PDF/MD и quoted-list6/6 результаты сохранены.
+- Docs Node50 PASS/typecheck;253 Word6/6+MD6/6 PASS; Desktop attached-PDF attempt3 facts PASS/layout FAIL сохранён и воспроизведён RED→GREEN. Source PDF все3 страницы просмотрены; installed fix ещё не проверен.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
 - Scope/history/prompt/revert/docs: 200 PASS / 2 V2 SKIP; Host scope11 PASS; пять implementation подпунктов этапа 5 отмечены; installed переходы ещё открыты.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
@@ -3888,4 +3916,4 @@ loginom status превысил исходные180s, SIGTERM; stdout/stderr п�
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- RESUMED: CLI default15/15 PASS; local scenario-create2/3 PASS+1 UI_EPOCH_CHANGED FAIL, batch exit1/remaining0. Compound/transitions/corpus20/TUI/Linux5/A-B открыты; frozen план не перерабатывался.
+- RESUMED: Desktop/CLI default30/30 PASS; CLI local scenario-create2/3 PASS+1 UI_EPOCH_CHANGED FAIL, exit1/remaining0. Desktop scenario adapter в проверке; compound/transitions/corpus20/TUI/Linux5/A-B открыты; frozen план не перерабатывался.

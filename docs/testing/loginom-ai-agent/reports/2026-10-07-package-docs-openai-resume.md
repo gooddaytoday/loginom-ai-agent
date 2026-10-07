@@ -172,3 +172,29 @@ Evals read-only SHA `dfe47cce65c9186aaae8e7d4e0d8de68e09972bb` принят со
 manifest/Chromium до запуска Host, причина задержки ещё исследуется.
 Высокая IO pressure наблюдалась, причинность не доказана. Повышенный deadline
 диагностики не меняет критерий native smoke и не заменяет исходный FAIL.
+
+## Дополнительная проверка253 и source-only исправление PDF
+
+Desktop default15/15 принят, все ответы прочитаны; вместе с CLI default это
+30/30 без активации skills, browser/report/remaining0. Linux253 Desktop
+Ubuntu24 и CLI Ubuntu24/26 также прошли штатный установленный smoke.
+Ubuntu22 CLI FAIL сохранён: самостоятельная проверка manifest и в Node,
+и в Bun превысила180s. Bundle override даёт3/3 public CLI status PASS,
+но обходит проверку manifest и остаётся только диагностикой.
+
+На253 приняты Word3/3 через каждый интерфейс (все12 страниц просмотрены),
+Markdown3/3 через каждый интерфейс (все тексты прочитаны), local-path3/3
+Desktop/CLI и attached-pdf3/3 CLI. Во всех этих кейсах пакет неизменен,
+настоящая Help прочитана, Chromium0, remaining0. Positive batches ещё идут.
+
+Desktop attached-pdf: факты3/3 PASS, вёрстка2/3 PASS. В attempt3 последний
+пункт статистики оказался один на странице3; исходный PDF и отдельный
+`LIVE_DOCS_FACTS_PASS_LAYOUT_FAIL` сохранены. Общий gate не закрывается.
+Открытие ссылок из финальных сообщений в native UI не проверено; встречались
+href с пробелами. Это отмечено отдельно от содержимого и вёрстки документа.
+
+Pagination fixture воспроизводит живой отказ. RED→GREEN: короткий список
+статистики остаётся с заголовком, длинные списки сохраняют обычную пагинацию.
+Полный source suite генератора50 PASS/193 assertions, Host typecheck PASS;
+все3 страницы исправленного PDF просмотрены. Это изменение ещё не входит
+в сохранённые сборки253 и требует новой чистой сборки и installed проверки.

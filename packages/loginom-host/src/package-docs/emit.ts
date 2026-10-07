@@ -129,19 +129,30 @@ function layoutPdf(blocks: Block[], regular: ReportFont, bold: ReportFont) {
     if (current.commands.length && y - amount < 56) { newPage(); return }
     y -= amount
   }
-  for (const block of blocks) {
+  const measured = blocks.map((block) => {
     const style = pdfStyle(block)
     const chars = block.runs.flatMap((run) => [...run.text].map((text) => ({ text, bold: block.kind.startsWith("h") || run.bold })))
     const marker = block.marker ? block.marker + " " : ""
     const markerWidth = [...marker].reduce((sum, char) => sum + regular.width(char, style.size), 0)
     const wrapped = wrapText(chars, 595.28 - 112 - style.indent - markerWidth, style.size, regular, bold)
+    return { block, style, marker, markerWidth, wrapped }
+  })
+  for (const [index, row] of measured.entries()) {
+    // Keep a heading and its list together when the complete group fits one page.
+    if (row.block.kind.startsWith("h") && measured[index + 1]?.block.kind === "li") {
+      const end = measured.findIndex((item, offset) => offset > index && item.block.kind !== "li")
+      const height = measured.slice(index, end < 0 ? undefined : end).reduce((sum, item) =>
+        sum + item.style.before + Math.max(1, item.wrapped.length) * item.style.size * 1.35 + item.style.after, 0)
+      if (height <= 841.89 - 112 && y - height < 56) newPage()
+    }
+    const style = row.style
     gap(style.before)
     const ascent = regular.ascent * style.size / regular.units, leading = style.size * 1.35
-    for (const [index, line] of (wrapped.length ? wrapped : [[]]).entries()) {
+    for (const [index, line] of (row.wrapped.length ? row.wrapped : [[]]).entries()) {
       if (y - leading < 56) newPage()
       const baseline = y - ascent, x = 56 + style.indent
-      if (!index && marker) current.commands.push(pdfTextCommand(regular, "F1", marker, style.size, x, baseline, current.glyphs))
-      current.commands.push(pdfLine(line, style.size, x + (!index ? markerWidth : 0), baseline, regular, bold, current.glyphs))
+      if (!index && row.marker) current.commands.push(pdfTextCommand(regular, "F1", row.marker, style.size, x, baseline, current.glyphs))
+      current.commands.push(pdfLine(line, style.size, x + (!index ? row.markerWidth : 0), baseline, regular, bold, current.glyphs))
       y -= leading
     }
     gap(style.after)
