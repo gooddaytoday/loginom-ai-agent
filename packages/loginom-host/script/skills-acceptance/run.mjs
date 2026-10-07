@@ -29,7 +29,8 @@ if (testcase.connection !== "unconfigured" && testcase.id !== "default-translati
   await writeFile(join(evidence, "setup-stderr.log"), err)
   assert.equal(code, 0)
   const view = JSON.parse(out)
-  assert.equal(view.state, "ready")
+  // Save confirms activation; the generation's Help catalog may still be loading.
+  assert.ok(["starting", "ready"].includes(view.state))
   assert.equal(view.browser.state, "failed")
 } else {
   // Let the public CLI create its profile marker before adding model auth.

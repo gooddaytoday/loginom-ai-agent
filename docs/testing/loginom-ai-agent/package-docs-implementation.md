@@ -3548,6 +3548,20 @@ harness по-прежнему требует согласованной отде
 редактирование чужого worktree/профилей/.env и A/B не выполнялись.
 Требования плана не менялись; новые абстракции или настройки продукта не добавлены.
 
+## CLI live adapter: сохранённая активация может быть starting
+
+CLI Wordbd0d завершился **2/3 mechanics PASS**, attempt3 — adapter FAIL до
+модели: setup exit0 вернул state starting, browser failed, hasApiKey true.
+Адаптер ошибочно требовал ready непосредственно после save. Контракт Host
+подтверждает durable activation, пока каталог Help нового поколения может
+загружаться. Проверка теперь принимает только starting или ready, без нового
+polling/helper; реальное completed Help read остаётся обязательным для docs.
+Продукт/runtime не менялись. RED сохранён в исходном attempt3; public source
+checks **7PASS/28 assertions**, pinned Node syntax и Prettier PASS. Требуется
+новый natural Word×3 snapshot с тем же product artifact/model/corpus; старый
+2/3 запуск не объявлять полным GREEN. Desktop external-path091-v2 mechanics
+**3/3 PASS**, но facts/layout review attempt2/3 пока не завершён.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `bd0d7abc2`, clean full builds/manifests/static/installed CLI seed PASS; предыдущие candidates сохранены.
