@@ -19,6 +19,7 @@ import sqlite3
 import struct
 import subprocess
 import sys
+import tempfile
 import termios
 import threading
 import time
@@ -64,15 +65,24 @@ def main():
     input_kind.add_argument("--attachment", choices=["paste", "mention"])
     input_kind.add_argument("--text-permission", choices=["allow", "deny"])
     args = parser.parse_args()
-    mode = args.attachment if args.attachment else "text-" + args.text_permission
     assert sys.platform == "linux", "This acceptance driver requires Linux /proc and PTY"
     assert args.binary.is_absolute() and args.binary.is_file()
     assert args.artifacts.is_absolute()
     args.artifacts.mkdir(mode=0o700)  # Never reuse another run's profile or results.
+    # Discovery walks ancestors outside git. Keep the workspace outside the user's home.
+    with tempfile.TemporaryDirectory(prefix="loginom-package-docs-pty-", dir="/tmp") as temporary:
+        workspace = pathlib.Path(temporary)
+        (args.artifacts / "roots.json").write_text(json.dumps({"workspace": str(workspace)}))
+        try:
+            run(args, workspace)
+        finally:
+            shutil.copytree(workspace, args.artifacts / "workspace")
+
+
+def run(args, workspace):
+    mode = args.attachment if args.attachment else "text-" + args.text_permission
     repo = pathlib.Path(__file__).resolve().parents[5]
     fixtures = repo / "packages/loginom-host/test/fixtures/package-docs"
-    workspace = args.artifacts / "workspace"
-    workspace.mkdir(mode=0o700)
     lgp = workspace / ("Сценарий PTY.LGP" if mode == "paste" else "sample.LGP")
     if mode.startswith("text-"):
         source = args.artifacts / "input"
@@ -200,7 +210,7 @@ def main():
                 send(" Напиши документацию по приложенному пакету\r".encode(), "submitted")
             elif step == "submitted" and mode.startswith("text-") and "Access external directory" in rendered and "Allow once" in rendered:
                 send(b"\x1b" if mode == "text-deny" else b"\r", "rejected" if mode == "text-deny" else "read")
-            elif step == "read" and "Permission required" in rendered and "Read " in rendered:
+            elif step == "read" and "Read " in rendered and "Path: " in rendered and lgp.name in rendered:
                 (args.artifacts / "read-view.txt").write_text(rendered)
                 send(b"\r", "submitted")
             elif step == "rejected":
@@ -253,6 +263,15 @@ def main():
     assert child.returncode == 0 and not forced and step == "exit", "TUI must exit normally after the rendered result"
     assert not result["guard"] and not alive and not chromium
     assert hashlib.sha256(lgp.read_bytes()).hexdigest() == original
+    first = next(body for body in requests if body.get("tools"))
+    system = "\n".join(message["content"] for message in first["messages"]
+        if message.get("role") == "system" and isinstance(message.get("content"), str))
+    discovered = re.findall(r"<skill>\s*<name>(.*?)</name>.*?<location>(.*?)</location>\s*</skill>", system, re.S)
+    assert sorted(name for name, _ in discovered) == ["customize-opencode", "loginom-automation", "package-docs"], "Clean workspace must not discover ancestor/home skills"
+    bundled = args.binary.parent.parent / "resources/loginom/skills"
+    for name, location in discovered:
+        if name != "customize-opencode":
+            assert location == str(bundled / name / "SKILL.md"), "Both product skills must come from the installed bundle"
     # No public standalone export API; settled permission evidence is read-only.
     for catalog in catalogs:
         if "package_docs_run" in catalog:

@@ -2330,6 +2330,38 @@ Desktop GUI permission cases закрыт критерий этапа 2. В пл
 его отметка завершения и checkbox авторизации чтения. Этапы 3–9 открыты;
 полный живой отчёт и A/B evals остаются отдельными условиями приёмки.
 
+## PTY: изоляция ancestor discovery и синхронизация read pane
+
+Чистый HOME сам по себе не изолирует workspace внутри `/home/kiselev`:
+discovery вне git ищет `.agents` вверх до `/`. Первые PTY прогоны из собственного
+acceptance directory находили также пользовательские ancestor skills.
+Их permission/input/structure результаты сохраняются, но это не доказательство
+чистого каталога skills. Новое утверждение «только builtin и два bundled skills»
+дало RED в `cli-938b2cf67-tui-ancestor-discovery-red/` при успешном extraction.
+
+Driver теперь создаёт workspace в отдельном `TemporaryDirectory` под `/tmp`,
+HOME/XDG/profile остаются собственными. `roots.json` фиксирует фактический путь;
+до удаления workspace копируется в evidence. Первый paste **GREEN** проверил
+ровно `customize-opencode`, `loginom-automation`, `package-docs`; оба Product
+пути ведут в immutable CLI938. Затем isolated mention и Esc reject **PASS**,
+temp roots удалены, guard released, remaining processes 0.
+
+Isolated text-allow первоначально завис на guard `Permission required` и был
+принудительно остановлен: native exit 1, writer сохранился; этот запуск не принят.
+Signal **FLAKY**: три точных повтора дали PASS / PASS / FAIL, 10.081 / 9.836 /
+92.375 s. Read-only cursor replay доказал полноценный экранный heading и путь;
+его differential terminal writes после stripping ANSI дают `Permssion required`.
+Это ошибка синхронизации adapter, а не отсутствие read permission в продукте.
+Report `tui-isolated-read-pane-signal-938b2cf67/report.md`.
+
+Read guard теперь ждёт `Read `, `Path: ` и имя конкретного входного пакета;
+финальное утверждение actual path сохранено. Новая отдельная серия **STABLE
+PASS 5/5**, 9.383 / 10.058 / 10.078 / 9.621 / 10.064 s, без retries/sleeps:
+exit 0, forced false, guard false, expected structure, четыре requests,
+ровно три skills, SHA входа неизменён, remaining 0, temp workspace удалён.
+Evidence `tui-isolated-read-pane-ready-signal-938b2cf67/`. Driver/binary/Node/
+manifest hashes серии неизменны. Новые source changes не участвовали в binary938.
+
 ## Checkpoint
 
 - Product candidates: Desktop `aeef6c2c3`, CLI `938b2cf67`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef; разные source pins.
