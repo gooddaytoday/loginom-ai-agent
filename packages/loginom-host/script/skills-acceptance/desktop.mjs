@@ -150,9 +150,10 @@ for (const testcase of input.cases) {
         const [agentResponse] = await Promise.all([agentsReady, page.reload()])
         assert.ok(agentResponse.ok(), "GUI_AGENT_CATALOG_FAILED")
         await agentResponse.finished()
-        await form.waitFor({ timeout: 120000 })
-        await form.locator('[data-component="icon-button"][data-icon="close"]').click()
-        await form.waitFor({ state: "hidden", timeout: 30000 })
+        if (await form.isVisible()) {
+          await form.locator('[data-component="icon-button"][data-icon="close"]').click()
+          await form.waitFor({ state: "hidden", timeout: 30000 })
+        }
         await page.locator('[data-component="prompt-input"][contenteditable="true"]').waitFor({ timeout: 60000 })
         await save("permission-view.json", { route, sessionID })
       }

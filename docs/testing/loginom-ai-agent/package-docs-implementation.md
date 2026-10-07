@@ -3478,6 +3478,18 @@ Evidence: `skills-acceptance-external-desktop-{red,green,typecheck}.log`,
 `candidate-091103ef9-{cli,desktop}/`, seed receipt. Соседний harness не менялся;
 требования основного плана и corrections не перерабатывались.
 
+## Desktop permission adapter: исправлено ожидание после reload
+
+Первый natural external-path091 attempt остановился до model submission:
+после уже успешной настройки Help адаптер ошибочно ожидал onboarding dialog
+после reload. Реальный configured GUI его повторно не показывает.
+Сохранены `failure.json` и cleanup первого attempt; это adapter RED, не отказ
+продукта документировать пакет. После agent catalog reload закрывать dialog,
+только если он видим, затем ждать editor текущей сессии. Source preflight
+**7PASS/28 assertions**, pinned Node syntax и Prettier check PASS.
+Начатый snapshot прогон остаётся отдельным неуспешным запуском; его результат
+не заменять последующим GREEN. Новый live повтор — после его завершения.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `091103ef9`, clean full builds/manifests/static/installed CLI seed PASS; предыдущие candidates сохранены.
