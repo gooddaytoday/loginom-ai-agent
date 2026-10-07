@@ -77,7 +77,7 @@ function identity(node: ObjectValue | undefined) {
     ? JSON.stringify([node.document_id, node.workflow_id, node.node_id]) : null
 }
 
-function tableCsv(output: ObjectValue, execution: string, node: ObjectValue, id: string): string | null {
+function tableCsv(output: ObjectValue, execution: string, node: ObjectValue, id: string, completeReread=false): string | null {
   const contract = nodeCase(id)
   if (output.status !== "complete" || output.execution_id !== execution || !Array.isArray(output.ports)) return null
   const port = output.ports.find((p: ObjectValue) => p.port === 0)
@@ -89,13 +89,16 @@ function tableCsv(output: ObjectValue, execution: string, node: ObjectValue, id:
   const names = port.schema.map((c: ObjectValue) => c.name)
   if (new Set(names).size !== names.length || !contract.keys.every(n => names.includes(n))) return null
   if (contract.native) {
-    if (!native || port.sample_complete!==true || port.sample_rows!==port.row_count || port.sample?.length!==port.row_count ||
+    // dock_node_read has no coverage=full option. Its complete fresh sample is
+    // used only after the initial native full read, source change and same-node checks below.
+    if ((!native && !completeReread) || port.sample_complete!==true || port.sample_rows!==port.row_count || port.sample?.length!==port.row_count ||
       port.schema.some((c:ObjectValue)=>c.type!==(contract.keys.includes(c.name)?"string":"real"))) return null
     const categories=id==="crosstable-sliding-source-refresh" && names.includes("C")?["B","C"]:["A","B"]
     const fields=categories.flatMap(category=>contract.functions.map(fn=>({category,fn,field:contract.functions.length>1?`${category}_${fn}`:category})))
     if (names.length!==contract.keys.length+fields.length || !fields.every(f=>names.includes(f.field)) || port.category_fields?.length!==fields.length ||
       !fields.every(f=>port.category_fields.filter((c:ObjectValue)=>c.category===f.category && c.category_kind==="value" && c.fact==="Amount" && c.function===f.fn && c.field===f.field && c.type==="real" && c.label===port.schema.find((s:ObjectValue)=>s.name===f.field)?.label).length===1)) return null
   } else if(names.length!==3 || !["Region","A","B"].every(n=>names.includes(n))) return null
+  if(completeReread && !native && (output.workflow_returned!==true || !port.port_guid || port.table?.port_guid!==port.port_guid)) return null
   if (native && (identity(port.binding) !== identity(node) || port.binding?.port_guid !== port.port_guid ||
     port.binding?.execution?.execution_id !== execution || port.binding?.execution?.status !== "completed" ||
     port.read_coverage?.table_complete !== true || port.read_coverage.rows_read !== rows.length ||
@@ -156,7 +159,9 @@ export function checkNodeSequence(events: NodeEvents, id: string, crossId: strin
       request.operation_id !== creation.request.input.operation_id && !after(application!.request, creation.receipt)) continue
     if (application?.receipt.output.execution?.status !== "completed" || r.output?.execution_id !== execution) continue
     if (pair.request.tool.endsWith("node_apply") && config.execution_id && config.execution_id !== execution) continue
-    const csv = tableCsv(r.output ?? {}, execution, node, id)
+    const completeReread=id==="crosstable-sliding-source-refresh" && pair.request.tool.endsWith("node_read") && pair.request.input.read?.require_exact_numbers===true &&
+      r.execution?.status==="completed" && r.output?.ports?.[0]?.port_guid===creation?.receipt.output.output?.ports?.[0]?.port_guid
+    const csv = tableCsv(r.output ?? {}, execution, node, id, completeReread)
     if (csv && application) reads.push({ ...pair, application, config, execution, csv })
   }
   const aggregate = contract.functions
@@ -184,6 +189,20 @@ export function checkNodeSequence(events: NodeEvents, id: string, crossId: strin
     if (!initial || !avg || avgApplications.some(a => !after(a.request, initial.receipt)) || avg.request.input.target?.kind !== "existing" ||
       facts?.length !== 1 || facts[0].field?.name !== "Amount" || JSON.stringify(facts[0].functions) !== JSON.stringify(["avg"]))
       failures.push("sequence: initial sum/read before same-node avg with new execution required")
+  }
+  if(id==="crosstable-sliding-source-refresh") {
+    const initial=reads.find(read=>initialCsv && matches(read,"sum",initialCsv) && read.application===creation)
+    const imported=receipts.find(p=>p.request.input.target?.type==="imports.text" && p.request.input.target.kind==="new" &&
+      p.receipt.output.execution?.status==="completed" && p.receipt.output.node?.document_id===creation?.receipt.output.node?.document_id && p.receipt.output.node?.workflow_id===creation?.receipt.output.node?.workflow_id)
+    const changed=receipts.find(p=>p.request.input.target?.type==="imports.text" && p.request.input.target.kind==="existing" &&
+      identity(p.request.input.target.ref)===identity(imported?.receipt.output.node) && identity(p.receipt.output.node)===identity(imported?.receipt.output.node) &&
+      p.receipt.output.execution?.status==="completed" && p.request.input.parameters?.source &&
+      p.receipt.output.configuration?.readback?.source?.source_path!==imported?.receipt.output.configuration?.readback?.source?.source_path)
+    const repeats=events.calls.filter(c=>c.tool.endsWith("node_apply") && c.input.target?.type==="transform.cross_table" && initial && after(c,initial.receipt))
+    if(!initial || !imported || !changed || !final || !after(creation!.request,imported.receipt) || !after(changed.request,initial.receipt) || !after(final.request,changed.receipt) ||
+      final.execution===initial.execution || !final.request.tool.endsWith("node_read") || final.request.input.source_operation_id!==creation?.request.input.operation_id || repeats.length ||
+      reads.some(read=>read.config.options?.unique_names!==true || read.config.output_mapping))
+      failures.push("sequence: initial full read → same import source change → new same CrossTable reread without apply required")
   }
   return { failures, final }
 }
