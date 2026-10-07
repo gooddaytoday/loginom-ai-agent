@@ -35,8 +35,12 @@ def inspect(package, unpacked):
                     for col in (engine if engine.get(TYPE) == "TBGImportTextFile" else item).findall(column_path):
                         ext = col.find("./Extensions/Item/Extension[@" + TYPE + "='TBGCrossTabColumnDefExtension']")
                         columns.append({**col.attrib, "extension": ext.attrib if ext is not None else {}})
+                    output_columns = []
+                    for col in item.findall("./Component/OutputSockets/Item[@Name='DataSource']/Socket/DataSource/ColumnDefs/Item"):
+                        mapping = col.find("./Extensions/Item/Extension[@" + TYPE + "='TBGColumnDefMappingExtension']/Mapping")
+                        output_columns.append({**col.attrib, "source": mapping.get("Source") if mapping is not None else None})
                     nodes.append({"scope": scope, "id": item.get("Guid"), "type": engine.get(TYPE),
-                                  "engine": engine.attrib, "columns": columns,
+                                  "engine": engine.attrib, "columns": columns, "output_columns": output_columns,
                                   "inputs": {p.get("Guid"): p.get("Name") for p in item.findall("./InputPorts/Item")},
                                   "outputs": {p.get("Guid"): p.get("Name") for p in item.findall("./OutputPorts/Item")},
                                   "variables": [v.attrib for v in item.findall("./Component/InputSockets/Item[@Name='ControlVariables']/Socket/Variables/Elements/Item")]})

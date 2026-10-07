@@ -43,6 +43,33 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
     const initialCsv = id === "crosstable-reconfigure" ? await Bun.file(path.join(taskDir, "initial-oracle.csv")).text() : undefined
     const sequence = checkNodeSequence(events, id, cross?.id ?? "", finalCsv, initialCsv)
     failures.push(...sequence.failures)
+    if (id === "crosstable-min-max") {
+      const final=sequence.final, c=final?.config, mapping=c?.output_mapping
+      const sameOwner=(a:Record<string,any>|undefined,b:Record<string,any>|undefined)=>!!a && !!b && ["document_id","workflow_id","node_id"].every(k=>typeof a[k]==="string" && a[k]===b[k])
+      const file=Bun.file(path.join(attemptDir,"native-crosstable.json"))
+      const observations=(await file.exists() ? await file.json() : {}).observations ?? []
+      const frame=observations.findLast((o:Record<string,any>)=>o.operation_id===final?.application.request.input.operation_id && sameOwner(o.node_crosstable?.node_context,c?.node))?.node_crosstable
+      if (!frame?.verified || !frame.inventory_complete || frame.node_context.verified!==true || frame.input_fields?.length!==3 ||
+        !["Region","Category","Amount"].every((label,index)=>{
+          const f=frame.input_fields.find((f:Record<string,any>)=>f.label===label)
+          return f?.type===(index===2?"real":"string") && f.disposition===[2,1,3][index] && f.order===0 && f.functions===(index===2?12:0)
+        })) failures.push("crosstable: owned native min/max mask 12 proof required")
+      const expected=["Region","A_min","A_max","B_min","B_max"]
+      const sources=mapping?.source_fields, targets=mapping?.target_fields
+      const valid=mapping?.verified===true && mapping.inventory_complete===true && mapping.source_identity_verified===true &&
+        mapping.node_context?.verified===true && mapping.node_context.output_port?.port===0 && sameOwner(mapping.node_context,c?.node) &&
+        sources?.length===5 && targets?.length===5 && new Set(sources.map((s:Record<string,any>)=>s.record_id)).size===5 &&
+        new Set(targets.map((t:Record<string,any>)=>t.source?.record_id)).size===5 && expected.every(name=>{
+          const ts=targets.filter((t:Record<string,any>)=>t.name===name), t=ts[0], source=t?.source
+          const sourceMatches=sources.filter((s:Record<string,any>)=>s.required===true && ["record_id","name","label","type"].every(k=>s[k]===source?.[k]))
+          const column=cross?.output_columns?.find(col=>col.Name===name)
+          const parts=name.split("_"), key=name==="Region", fn=parts[1], label=fn==="min"?"Минимум":"Максимум"
+          return ts.length===1 && !t.excluded && t.type===(key?"string":"real") && sourceMatches.length===1 && source.type===t.type &&
+            (key ? source.name==="Region" && source.label==="Region" : source.label===`${parts[0]}${c!.options.separator}Amount${c!.options.separator}${label}` && new RegExp(`_Amount_${fn==="min"?"Min":"Max"}(?:_[1-9][0-9]*)?$`).test(source.name)) &&
+            column?.source===source.name && column.DataType===(key?"dtString":"dtFloat")
+        }) && cross?.output_columns?.length===5
+      if (!valid) failures.push("crosstable: complete owned native output mapping and XML sources required")
+    }
     if (required.has("export")) {
       const out = exports[0]
       const files = await readdir(path.join(attemptDir, "artifact/results")).catch((error: NodeJS.ErrnoException) => {
