@@ -19,7 +19,7 @@ import { Discovery } from "./discovery"
 import { isRecord } from "@/util/record"
 import { escapeHtml } from "@/util/html"
 import { verifyProductSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
-import { isReservedSkillName } from "@loginom-ai-agent/product/skills"
+import { isReservedSkillName, reservedSkillNames } from "@loginom-ai-agent/product/skills"
 
 const CLAUDE_EXTERNAL_DIR = ".claude"
 const AGENTS_EXTERNAL_DIR = ".agents"
@@ -80,7 +80,10 @@ export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Ski
   available: Schema.Array(Schema.String),
 }) {
   override get message() {
-    return `Skill "${this.name}" not found. Available skills: ${this.available.join(", ") || "none"}`
+    const hint = reservedSkillNames.some((name) => name === this.name)
+      ? " Bundled skills are unavailable. Verify the Loginom resource path or reinstall the application."
+      : ""
+    return `Skill "${this.name}" not found. Available skills: ${this.available.join(", ") || "none"}${hint}`
   }
 }
 

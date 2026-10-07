@@ -2362,6 +2362,46 @@ exit 0, forced false, guard false, expected structure, четыре requests,
 Evidence `tui-isolated-read-pane-ready-signal-938b2cf67/`. Driver/binary/Node/
 manifest hashes серии неизменны. Новые source changes не участвовали в binary938.
 
+## CLI discovery: публичный каталог, команды и повреждённый bundle
+
+Новый `test/cli/bundled-skills.test.ts` запускает public standalone CLI с
+контролируемым provider в изначально пустом workspace под `/tmp`, вне git,
+с отдельными HOME/XDG/profile. Проверяет каталог, фактические пути skills,
+последнюю applied activation/digest и ограничения следующего provider turn.
+Первый вариант ошибочно проверял первый completed tool event: он ещё предшествует
+применению pending-профиля. Тест использует последний public `tool_use` event,
+сохраняя строгое требование к applied metadata; продукт ради этой предпосылки
+не менялся. Evidence раннего отказа `cli-938b2cf67-discovery-clean.log`.
+
+Native CLI938 **3 PASS / 47 assertions**: штатный resource resolver без
+`CLI_BUNDLE`, reserved collisions и `run --command package-docs` при попытке
+config-command подмены. Проверены `.claude`/`.agents` в проекте и HOME,
+config skills и явно заданные paths, obsolete имя, обычный later-source winner
+и realpath alias. Both Product paths/digest принадлежат нужному bundle;
+UNTRUSTED content отсутствует. Evidence `cli-938b2cf67-discovery-installed-command/`.
+Другой native modified-bundle case доказал отказ регистрации и отсутствие
+fallback даже при наличии всех локальных копий, exit 1 / CLI_TOOL_FAILED.
+
+В этом отказе обнаружен пробел diagnostics: public tool error говорил только
+«Skill not found», глобальная diagnostic в выводе run отсутствовала. Новое
+assertion о reinstall hint дало **RED** на CLI938, log/evidence
+`cli-938b2cf67-discovery-reinstall-red/`. Existing `Skill.NotFoundError` теперь
+добавляет инструкцию проверить resource path или переустановить приложение
+только для двух canonical Product names. Обычные неизвестные skills сохраняют
+прежний текст; новый error type/Protocol и повторный verifier не создавались.
+Это подсказка при попытке загрузить недоступный skill, не доказательство
+показа всех глобальных discovery warnings в интерфейсах.
+
+Source **28 PASS / 233 assertions**, Agent typecheck **PASS**: семь CLI cases
+(clean/reserved/command/modified/missing/unlisted/wrong-root), 19 bundled tests
+и два skill tool tests. Corruption checks используют собственный dev-override
+bundle: override не разрешает локальную подмену. Wrong root отвергнут до модели,
+writer released; остальные bad cases не применили docs scope и вернули явный
+отказ с reinstall hint. Logs `cli-discovery-matrix-source-green.log`,
+`agent-discovery-matrix-typecheck.log`. Native семь cases с новой подсказкой
+потребуют отдельной чистой сборки; пока Source GREEN не объявляется Native GREEN.
+Выбор модели управляемый. Этап 3 в целом и live routing остаются открытыми.
+
 ## Checkpoint
 
 - Product candidates: Desktop `aeef6c2c3`, CLI `938b2cf67`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef; разные source pins.
