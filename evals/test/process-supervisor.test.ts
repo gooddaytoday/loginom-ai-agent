@@ -11,7 +11,55 @@ import { archiveDiagnostics } from "../src/diagnostics"
 test("trusted unit: native commands cannot request observation after exit", async () => {
   await expect(superviseProcess({ cmd: [process.execPath, "-e", "process.exit(0)"], cwd: evalsRoot,
     env: { PATH: process.env.PATH ?? "" }, timeoutMs: 1000, observationMode: "unit_after_exit" })).rejects.toThrow("Trusted unit observation requires")
+  await expect(superviseProcess({ cmd: ["/installed/bin/loginom-ai-agent-cli", "run", "--model", "openai/gpt-6-sol"], cwd: evalsRoot,
+    profileDir: "/private/eval-profile", sandbox: ["bwrap"], env: {}, timeoutMs: 1000,
+    observationMode: "unit_after_exit" })).rejects.toThrow("Trusted unit observation requires")
+  for (const boundary of [{ profileDir: "/private/eval-profile" }, { sandbox: ["bwrap"] }])
+    await expect(superviseProcess({ cmd: [process.execPath, "test"], cwd: evalsRoot,
+      env: {}, timeoutMs: 1000, observationMode: "unit_after_exit", ...boundary })).rejects.toThrow("Trusted unit observation requires")
 })
+
+for (const stop of ["timeout", "interrupt"] as const) test(`trusted unit: ${stop} drains an owned detached fixture with confirmed final proof`, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), `evals-trusted-${stop}-`))
+  const cwd = path.join(root, "evals")
+  await mkdir(cwd)
+  const pidFile = path.join(root, "owned.pid")
+  await Bun.write(path.join(cwd, "waiting.test.ts"), `
+    import {test} from 'bun:test';
+    import {spawn} from 'node:child_process';
+    test('waiting owned fixture',async()=>{
+      const child=spawn(process.execPath,['-e',${JSON.stringify(`setTimeout(()=>process.exit(0),3_000);await Bun.write(${JSON.stringify(pidFile)},String(process.pid));`)}],{detached:true,stdio:'ignore'});
+      while(!await Bun.file(${JSON.stringify(pidFile)}).exists())await Bun.sleep(5);
+      await Bun.sleep(3_000);
+    },5_000);
+  `)
+  const signal = new AbortController()
+  const pending = superviseProcess({ cmd: [process.execPath, "test"], cwd, env: { PATH: process.env.PATH ?? "" },
+    timeoutMs: stop === "timeout" ? 500 : 5_000, signal: signal.signal, observationMode: "unit_after_exit" })
+  try {
+    if (stop === "interrupt") {
+      const readyDeadline = Date.now() + 2_000
+      while (!await Bun.file(pidFile).exists() && Date.now() < readyDeadline) await Bun.sleep(5)
+      expect(await Bun.file(pidFile).exists()).toBe(true)
+      await Bun.sleep(100)
+      signal.abort()
+    }
+    const run = await pending
+    const pid = Number(await Bun.file(pidFile).text())
+    expect(run.timedOut).toBe(stop === "timeout")
+    expect(run.interrupted).toBe(stop === "interrupt")
+    expect(run.exitCode).not.toBe(0)
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.processCleanup.capture_complete).toBe(true)
+    expect(run.processCleanup.processes.some(process => process.pid === pid)).toBe(true)
+    expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
+    const remaining = await readFile(`/proc/${pid}/stat`, "utf8").catch(error => {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return ""
+      throw error
+    })
+    expect(remaining === "" || remaining.split(") ")[1]!.split(" ")[0] === "Z").toBe(true)
+  } finally { signal.abort(); await pending; await rm(root, { recursive: true, force: true }) }
+}, 10_000)
 
 test("trusted unit: protected fixture ends before unit exit and final drain confirms cleanup", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-trusted-unit-"))
