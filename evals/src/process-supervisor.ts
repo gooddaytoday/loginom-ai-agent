@@ -119,10 +119,10 @@ function sameIdentity(current: ProcessIdentity, saved: ProcessIdentity) {
  */
 export async function signalProcess(saved: ProcessIdentity, signal: NodeJS.Signals) {
   const current = await processView(saved.pid)
-  if (!current) return
+  if (!current) return false
   if (!sameIdentity(current, saved))
     throw Error(`Process identity changed PID ${saved.pid}`)
-  try { process.kill(current.pid, signal) } catch (error) { if (!gone(error)) throw error }
+  try { process.kill(current.pid, signal); return true } catch (error) { if (!gone(error)) throw error; return false }
 }
 
 async function runtimeDirectories(profile: string): Promise<string[]> {
@@ -469,6 +469,7 @@ export async function superviseProcess(input: {
       pollPending = false
     })
   }, 10)
+  let sandboxTerminated = false
   const signalOwned = async (signal: NodeJS.Signals, wrappers = false) => {
     // A fresh full pass before each syscall checks membership as well as birth.
     // Newly admitted descendants are handled by the next shutdown pass.
@@ -485,7 +486,8 @@ export async function superviseProcess(input: {
       if (isWrapper(saved) !== wrappers) continue
       try {
         // Individual signals avoid signaling a recycled PGID or an unknown member.
-        await signalProcess(saved, signal)
+        const signaled = await signalProcess(saved, signal)
+        if (wrappers && saved.pid === cliPid && signaled) sandboxTerminated = true
       } catch (error) {
         if (!gone(error)) { tracked.admission = "refused"; cleanup.error ??= message(error) }
       }
@@ -562,7 +564,9 @@ export async function superviseProcess(input: {
     exitCode: cliExitCode ?? proc.exitCode ?? -1, timedOut, interrupted, startedAt, durationMs: Date.now() - startedAt,
     processCleanup: cleanup,
     sandboxError: input.sandbox ? sandboxError ?? (!sandboxStarted ||
-      !timedOut && !interrupted && (sandboxExitCode === null || sandboxExitCode !== cliExitCode) ? "SANDBOX_EXECUTION_FAILED" : null) : null }
+      (sandboxExitCode === null || sandboxExitCode !== cliExitCode) &&
+      !(sandboxTerminated && (timedOut || interrupted) && cliExitCode !== undefined && cliExitCode >= 128)
+      ? "SANDBOX_EXECUTION_FAILED" : null) : null }
   if (input.outDir) {
     await Bun.write(path.join(input.outDir, "process-cleanup.json"), JSON.stringify(cleanup, null, 2)).catch(() => {
       cleanup.status = "failed"; cleanup.error ??= "Process evidence persistence failed"

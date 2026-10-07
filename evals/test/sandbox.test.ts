@@ -6,6 +6,7 @@ import { spawn } from "node:child_process"
 import { sandboxCommand, debuggerEndpoints } from "../src/sandbox"
 import { evalsRoot } from "../src/config"
 import { superviseProcess } from "../src/process-supervisor"
+import { statusFor } from "../src/report"
 
 test("sandboxCommand: Python читает только входы и writable-профиль, внешние ответы недоступны", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-sandbox-"))
@@ -62,6 +63,22 @@ test("superviseProcess: сбой mount обёртки отличается от 
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+}, 15_000)
+
+test("superviseProcess: ошибка mount при timeout остаётся harness_error и останавливает dispatch", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-sandbox-timeout-error-"))
+  try {
+    await Promise.all([mkdir(path.join(dir, "installation/bin"), { recursive: true }), mkdir(path.join(dir, "profile")), mkdir(path.join(dir, "workspace"))])
+    await cp("/usr/bin/python3", path.join(dir, "installation/bin/cli"), { dereference: true })
+    await Bun.write(path.join(dir, "installation/cli-manifest.json"), "{}")
+    const cmd = [path.join(dir, "installation/bin/cli"), "-c", "import time; time.sleep(60)"]
+    const boundary = await sandboxCommand({ cmd, profileDir: path.join(dir, "profile"), workdir: path.join(dir, "workspace"), env: {} })
+    boundary.cmd.splice(boundary.cmd.indexOf("--"), 0, "--ro-bind", path.join(dir, "missing"), "/missing")
+    const run = await superviseProcess({ cmd, cwd: boundary.cwd, env: boundary.env, sandbox: boundary.cmd, timeoutMs: 1 })
+    expect(run.timedOut).toBe(true)
+    expect(run.sandboxError).toBe("SANDBOX_EXECUTION_FAILED")
+    expect(statusFor(run, false)).toEqual({ status: "harness_error", stop: true })
+  } finally { await rm(dir, { recursive: true, force: true }) }
 }, 15_000)
 
 test.each(["abort", "timeout"])("superviseProcess: %s даёт CLI выполнить cleanup до завершения bwrap", async (trigger) => {
