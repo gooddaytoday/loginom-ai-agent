@@ -4045,6 +4045,42 @@ formula/schema/precision/save и физического source→calculator гр
 содержит отдельное доказательство. Исходный FAIL не переписан, новой model attempt
 не было; cold reexecution этого calculator ещё не проверено.
 
+## 2026-10-07 — завершение bc6 matrix и доставка отчётов
+
+Четыре batch завершены со всеми исходными receipts, без quality retries.
+Desktop routing18×3 и CLI routing18×3: поздние настроенные кейсы отказали
+LOGINOM_KNOWLEDGE_UNAVAILABLE до модели; отдельный TLS /health check тоже
+неуспешен. Unconfigured арифметика/перевод завершились. Новые live-попытки
+не запускаются до доступности Help. Полная матрица не принята.
+Desktop execute-save3/3 mechanics PASS. Modify Desktop2/3 завершили native
+calculator/save; их adapter footer FAIL не переписаны. Desktop1 native FAIL
+сохранён. CLI modify3/3 открыли свой пакет «только чтение»; первые два ещё
+использовали workflow reference прежнего browser runtime. Причина/владелец
+server lock не доказаны. Отказы и финальные ограничения честны.
+Evidence: `scenario-modify-signal-20261007-v2/report.md`, исходные32 hashes
+перепроверены. Никакой handler/recovery/ownership guard не ослаблен.
+
+CLIbc6 attached-PDF: все7 страниц/полные тексты/ответы прочитаны, facts/layout
+PASS; attempt2 native deadline exceeded/interrupted=true — исходный mechanics
+FAIL остаётся, несмотря на готовый PDF. Остальные два mechanics PASS.
+Desktopbc6 local-path3/3 дополнительно проверены6 страниц/Help/ответы, PASS.
+
+Изолированный AppImagebc6 без Loginom/model воспроизвёл непригодные ссылки:
+relative href разрешается в loginom-ai-agent-app://renderer, file:href удалён
+санитизатором; shell.openPath не вызван. Evidence `native-document-link-bc6-red-v2`.
+Recorded production render timings1601/11993ms включают onboarding wait;
+это baseline диагностики данного fixture, не общий throughput benchmark.
+Готовится узкая App UI кнопка у completed emit, которая открывает его точный
+PDF/Word/Markdown из session directory через существующий openLocalFile API.
+Внешний backend/неуспешный emit/чужой путь не дают кнопку. Общий sanitizer
+и Markdown navigation не меняются. RED→GREEN3 tests, regression17 PASS,
+55 assertions; App typecheck/Prettier PASS. Native GREEN новой сборки ещё нужен.
+
+Offline Ubuntu22 CLI253 full-integrity probe PASS167781ms на прежней сборке,
+первый stdout167441ms; Host стартовал167372ms. Cgroup IO pressure значительная,
+причинность/стабильность таймаута не установлены. Own container штатно завершён,
+remaining[]/forcedsignals[]/absent; исходные Linux matrix FAIL не менялись.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
@@ -4066,4 +4102,4 @@ formula/schema/precision/save и физического source→calculator гр
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- RESUMED: QA36:33 docs+3 CLI denials, один исходный layout FAIL; Desktop/CLI default30/30 PASS; CLI local scenario-create2/3 PASS+1 UI_EPOCH_CHANGED FAIL; Desktop scenario3/3 PASS, физические GUID/link сохранены, remaining0. Desktop+CLI253 build→docs3/3,12 PDF-страниц QA PASS; CLI attempt2 link destination отличается от output, native click не проверен. Mixed253/bc6 cold SUM1 PASS/unchanged/logout/remaining0. bc6 corpus20×3 идёт; TUI/Linux5/A-B открыты.
+- RESUMED: QA36:33 docs+3 CLI denials, один исходный layout FAIL; Desktop/CLI default30/30 PASS; CLI local scenario-create2/3 PASS+1 UI_EPOCH_CHANGED FAIL; Desktop scenario3/3 PASS, физические GUID/link сохранены, remaining0. Desktop+CLI253 build→docs3/3,12 PDF-страниц QA PASS; CLI attempt2 link destination отличается от output, native click не проверен. Mixed253/bc6 cold SUM1 PASS/unchanged/logout/remaining0. bc6 corpus20×3 завершён с native/infra FAIL, gate открыт; документ delivery RED, UI source3tests/17regression/typecheck PASS; native GREEN нужен. TUI/Linux5/A-B открыты.

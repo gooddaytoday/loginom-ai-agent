@@ -1,5 +1,8 @@
 import type { FilePart, Project, UserMessage, VcsFileDiff } from "@loginom-ai-agent/sdk/v2"
+import { registerTool } from "@loginom-ai-agent/session-ui/message-part"
+import { PackageDocsTool } from "@/components/package-docs-tool"
 import { getFilename } from "@loginom-ai-agent/core/util/path"
+
 import { useDialog } from "@loginom-ai-agent/ui/context/dialog"
 import { createQuery, skipToken, useMutation, useQueryClient } from "@tanstack/solid-query"
 import {
@@ -103,6 +106,8 @@ import { legacySessionHref, requireServerKey, sessionHref } from "@/utils/sessio
 import { useUsageExceededDialogs } from "./session/usage-exceeded-dialogs"
 import { createSessionOwnership } from "./session/session-ownership"
 import { createSessionLineage } from "./session/session-lineage"
+
+registerTool({ name: "package_docs_run", render: PackageDocsTool })
 
 type FollowupItem = FollowupDraft & { id: string }
 type FollowupEdit = Pick<FollowupItem, "id" | "prompt" | "context">
