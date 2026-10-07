@@ -1,5 +1,5 @@
 """Exercise the actual matrix runner's complete comparison/final gate and exit."""
-import ast,copy,json,sys,time,unittest,tempfile,importlib.util,subprocess,contextlib,io
+import ast,copy,json,sys,time,argparse,unittest,tempfile,importlib.util,subprocess,contextlib,io
 from pathlib import Path
 from unittest.mock import patch
 sys.dont_write_bytecode=True
@@ -17,6 +17,21 @@ selected.body=copy.deepcopy(boundary.body[parse_start:parse_end])+selected.body
 code=compile(ast.fix_missing_locations(ast.Module(body=[selected,*tree.body[tree.body.index(boundary)+1:]],type_ignores=[])),'matrix-runner-parse-and-gate','exec')
 def tool_event(tool,reply,status='completed'):
  return json.dumps({'type':'tool_use','part':{'tool':tool,'state':{'status':status,'input':{'operation_id':'import'},'output':reply}}})
+class CorrectionTask(unittest.TestCase):
+ def test_single_existing_apply_requires_full_delivered_source(self):
+  # Render the actual task builder; do not maintain a second prompt in the test.
+  start=next(i for i,n in enumerate(tree.body) if isinstance(n,ast.Assign) and ast.unparse(n.targets[0])=='instructions')
+  end=next(i for i,n in enumerate(tree.body[start:],start) if isinstance(n,ast.Expr) and ast.unparse(n.value.func)=="(work / 'task.md').write_text")
+  builder=compile(ast.fix_missing_locations(ast.Module(body=copy.deepcopy(tree.body[start:end]),type_ignores=[])),'matrix-runner-task','exec')
+  pipe=next(c for c in json.loads((root/'csv-matrix/manifest.json').read_text())['cases'] if c['case_id']=='pipe_multiline')
+  scope={'case':pipe,'source':Path(pipe['source']['name']),'package':'/owned/test.lgp','json':json,'args':argparse.Namespace(same_node_correction=True)}
+  exec(builder,scope);task=scope['instructions']
+  self.assertIn(json.dumps(pipe['settings']['source'],ensure_ascii=False),task)
+  self.assertIn('ровно один existing apply',task)
+  self.assertIn('полный settings.source со всеми заданными выше свойствами и source_path',task)
+  self.assertIn('точному destination из уже подтверждённой исходной доставки',task)
+  self.assertIn('ровно два apply',task)
+  self.assertIn('Не создавай второй узел и не загружай файл снова',task)
 class NativeReceipts(unittest.TestCase):
  def parse(self,events):
   with tempfile.TemporaryDirectory() as directory:
