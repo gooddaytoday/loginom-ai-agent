@@ -5,8 +5,8 @@ import { EvalFailure } from "./fail"
 import { evaluationContractHash, rubricSnapshot } from "./evaluation"
 import { agentInputsHash, buildAgentPrompt, loadTasks, rubricHash, taskTimeoutMs, type Task } from "./task"
 import { agentCommand, runAgent, type AgentCommand } from "./cli"
-import { assertIsolatedStorageEmpty, cleanupArtifact, cleanupIsolatedStorage, cleanupOrphanResult, fetchArtifact, listStorage, parseArtifactSource, storageEntryExists, type ArtifactSource } from "./artifact"
-import { preflight } from "./preflight"
+import { cleanupArtifact, cleanupIsolatedStorage, cleanupOrphanResult, fetchArtifact, listStorage, parseArtifactSource, storageEntryExists, type ArtifactSource } from "./artifact"
+import { checkIsolatedLoginom, preflight } from "./preflight"
 import { archiveProfileHistory, assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
 import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { archiveDiagnostics } from "./diagnostics"
@@ -217,7 +217,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const workdir = path.join(config.agent.workspaceRoot, input.runId, task.id, String(attempt))
   await mkdir(outDir, { recursive: true })
   if (!config.dryRun && config.agent.cliMode === "binary")
-    await assertIsolatedStorageEmpty(input.source).catch((error: unknown) => { throw new SandboxFailure(describe(error)) })
+    await checkIsolatedLoginom(input.source).catch((error: unknown) => { throw new SandboxFailure(describe(error)) })
   await mkdir(workdir, { recursive: true })
   const files = await Promise.all(
     task.inputs.map(async (rel) => {

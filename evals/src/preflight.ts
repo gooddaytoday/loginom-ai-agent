@@ -29,7 +29,7 @@ export async function preflight(config: EvalConfig, source: ArtifactSource): Pro
   if (config.agent.cliMode === "source")
     throw new EvalFailure("Изолированный live eval требует EVAL_CLI_MODE=binary и EVAL_CLI_BIN установленного CLI", 2)
   if (config.agent.cliMode === "binary") {
-    await assertIsolatedStorageEmpty(source)
+    await checkIsolatedLoginom(source)
     await assertNoDebuggers()
     await checkSandbox(config)
   }
@@ -49,6 +49,28 @@ export async function preflight(config: EvalConfig, source: ArtifactSource): Pro
   await checkFreeSpace(evalsRoot)
   await checkFreeSpace(config.agent.workspaceRoot)
   return environment
+}
+
+export async function checkIsolatedLoginom(source: ArtifactSource) {
+  const storage = await assertIsolatedStorageEmpty(source)
+  const read = await Bun.$`docker exec ${storage.containerId} cat /workdir/.loginom-evals-isolated.json`.quiet().nothrow()
+  const marker = await Promise.resolve(read.text()).then((text) => JSON.parse(text)).catch(() => undefined) as
+    { previous_container_id?: unknown } | undefined
+  if (typeof marker?.previous_container_id !== "string" || !/^[0-9a-f]{64}$/.test(marker.previous_container_id) || marker.previous_container_id === storage.containerId)
+    throw new EvalFailure("Маркер подготовки не определяет прежний сервер Loginom", 2)
+  const previous = await Bun.$`docker inspect --format ${"{{.State.Running}}\t{{.HostConfig.RestartPolicy.Name}}"} ${marker.previous_container_id}`.quiet().nothrow()
+  if (previous.exitCode !== 0 || previous.text().trim() !== "false\tno")
+    throw new EvalFailure("Изолированный eval запрещён: прежний сервер не остановлен или его автоперезапуск включён", 2)
+  const components = await Bun.$`docker exec ${storage.containerId} cat /workdir/Components.cfg`.quiet().nothrow()
+  const disabled = components.exitCode === 0 && Bun.which("xmllint")
+    ? await Bun.$`printf %s ${components.text()} | xmllint --xpath ${"boolean(/ComponentSettings/Item[@Guid='70a6c99d-a725-4309-b05c-898c8072c3cd']/Settings[@Disabled='true'])"} -`.quiet().nothrow()
+    : undefined
+  if (disabled?.exitCode !== 0 || disabled.text().trim() !== "true")
+    throw new EvalFailure("Изолированный eval требует явно выключенный Python в Components.cfg (проверка xmllint)", 2)
+  const inspected = await Bun.$`docker inspect --format ${'{{json (index .NetworkSettings.Networks "loginom-net")}}'} ${storage.containerId}`.quiet().nothrow()
+  const network = inspected.exitCode === 0 ? inspected.json() as { Aliases?: string[] } | null : null
+  if (!network?.Aliases?.includes("loginom-server-7.4.2-test"))
+    throw new EvalFailure("Изолированный Loginom требует network alias loginom-server-7.4.2-test в loginom-net для Studio", 2)
 }
 
 export async function checkSandbox(config: EvalConfig) {

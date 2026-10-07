@@ -4,8 +4,8 @@
 
 ## Предпосылки
 
-- Bun ≥ 1.3; Linux; установленный binary CLI и bubblewrap; preflight требует `unzip`, `git`, `pgrep`, `ps` и `docker` (когда источник артефакта — `docker`), минимум 1 GiB свободного места для evals и workspace.
-- Локальный стенд Loginom в docker (`loginom-server-master`, `http://localhost/app/`, пользователь `user`).
+- Bun ≥ 1.3; Linux; установленный binary CLI и bubblewrap; preflight требует `unzip`, `git`, `pgrep`, `ps`, `docker` и `xmllint` для live, минимум 1 GiB свободного места для evals и workspace.
+- Выделенный чистый Loginom в docker (`http://localhost/app/`, пользователь `user`), подготовленный ниже. Default `loginom-server-master` не разрешает широкую очистку.
 - Отдельный API-ключ Dock для eval (не ключ Desktop): память OpenViking привязана к ключу. Dock должен отвечать этим ключом; preflight забирает манифест skill с `include_integrity=true`.
 - Codex CLI с входом по подписке (`codex login`); судья — `gpt-6-astra`/`high`.
 - Live использует `EVAL_CLI_MODE=binary`, `EVAL_CLI_BIN` установленного `loginom-ai-agent-cli` с соседним `cli-manifest.json`. Source остаётся доступен для management/dev, но его live-выполнение запрещено. Binary несёт Node, Chromium и остальные ресурсы продукта; dev-bundle ему не нужен.
@@ -32,6 +32,74 @@ infra retry сохраняет отдельный архив. Токены, `cli
 connection, каталог моделей и настройки модели остаются в рабочем профиле.
 При pending recovery/writer или отказе переноса следующий dispatch запрещён.
 Архив содержит приватные данные: не копировать его в публикуемый evidence/results.
+
+### Выделенный Loginom: одно окружение на всё окно eval
+
+Подготовка относится к текущему Linux-стенду Loginom 7.4.2. Сначала освободите
+endpoint для всего окна, включая приёмки LAB-16, и закройте внешние inspector/CDP.
+Harness проверяет реальные listening-порты, включая случайные `--inspect=0` и
+`--remote-debugging-port=0`; чужие приложения сам не закрывает.
+
+Один раз создайте `loginom-evals-isolated` из того же образа, **без mounts**:
+
+```bash
+docker create --name loginom-evals-isolated --restart=no \
+  --network loginom-net --network-alias loginom-server-7.4.2-test \
+  sha256:5e3c79877de937aae168ecdcaf70c837bbbcf04e8f4262c2a976ac283ea394c2
+```
+
+Пустой bind `/workdir` скрыл бы конфиги образа. Не копируйте writable layer,
+UserStorage, backups, testdata и socket volume исходного сервера. Для этого
+образа нужны `/app/libxml2.so.16` и `/app/libxml2.so.16.1.2`: перенесите только эти
+два runtime-файла через `docker cp` из прежнего сервера в новый, сохранив symlink.
+В `/workdir/Components.cfg` нового контейнера явно установите `Disabled="true"`
+для Python (`Item Guid="70a6c99d-a725-4309-b05c-898c8072c3cd"`,
+`Settings xsi:type="TBGPythonComponentSettings"`). Прочие конфиги образа сохраните.
+
+Создайте `/workdir/.loginom-evals-isolated.json` **только в новом чистом контейнере**:
+`kind="loginom-evals-isolated"`, `version=1`, `container_id` и
+`previous_container_id` — полные ID из `docker inspect`; `storage_dir` —
+`/workdir/UserStorage/user`; `roots` — ровно
+`["/workdir/UserStorage", "/workdir/SessionBackup"]`. Сохраните в этом же маркере
+`previous_restart_policy` из `HostConfig.RestartPolicy` прежнего сервера для
+возврата стенда (на проверенном стенде `Name="always"`). Закрытая локальная копия
+маркера в `.profile/isolated-loginom/marker.json` позволяет восстановиться при
+неудачном старте; она не входит в mounts агента.
+
+Перед каждым окном временно отключите автоперезапуск исходного сервера, остановите
+его и запустите уже подготовленный контейнер:
+
+```bash
+docker update --restart=no loginom-server-7.4.2-test
+docker stop loginom-server-7.4.2-test
+docker start loginom-evals-isolated
+LOGINOM_CONTAINER=loginom-evals-isolated bun run src/run.ts --tasks tasks/analytic --only sales-by-category --repeat 1
+```
+
+Studio проксирует WebSocket на этот network alias. После смены адреса проверьте
+штатный `loginom check`; если Apache сохранил старый upstream, перезапустите
+существующий `loginom-client-7.4.2-test` в этом же эксклюзивном окне.
+Preflight и каждый live admission проверяют маркер, отсутствие host binds,
+пустоту storage/backups, остановку прежнего сервера с `restart=no`, отключение
+Python и alias. Ошибка запрещает dispatch без неизолированного fallback.
+
+После извлечения результатов и подтверждённого process/recovery/profile cleanup
+harness очищает все файлы выделенного storage и backups, сохраняя каталоги
+пользователей и настройки. Перед удалением повторно проверяются маркер/ID/mounts,
+после — пустота. `--keep-storage` сохраняет файлы, но запрещает следующий admission
+до очистки. На остальных источниках прежняя адресная очистка сохраняется.
+
+Закончив окно (также после неудачного eval), остановите выделенный сервер,
+восстановите сохранённую restart policy и исходный сервер:
+
+```bash
+docker stop loginom-evals-isolated
+docker update --restart=always loginom-server-7.4.2-test # значение из сохранённого маркера
+docker start loginom-server-7.4.2-test
+```
+
+Контейнер eval сохраняется для следующих окон; профиль и пользователь на каждую
+попытку не создаются. Пользовательские данные исходного сервера не удаляются.
 
 В режиме `source` harness засевает каталог моделей `.profile/agent/cache/models.json` из `packages/product/models.json` (native-сборка несёт его внутри).
 
