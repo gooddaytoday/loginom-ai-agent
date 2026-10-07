@@ -47,9 +47,17 @@ PDF/Word и прочитаны все три Markdown. Для Markdown пров�
 отсутствие входа, только серверная ссылка и пять default-кейсов. Условия
 модели/catalog/candidate сохранены; driver завершился exit143 на external attempt2; причина неизвестна.
 Семь завершённых mechanics receipts сохранены, local-path3/3 facts/layout PASS
-(шесть страниц просмотрены). Остальные четыре отчёта требуют ручной проверки.
+(шесть страниц просмотрены). Все семь готовых отчётов проверены: local-path3/3, LGP+PNG3/3 и external1/1
+facts/layout PASS, просмотрены все 14 страниц. External2/3 не завершены.
 Незавершённые случаи не засчитаны; debugger/дочерних процессов не осталось.
-Negative-кейсы продолжены отдельным запуском с прежними conditions. Сценарные и
+Negative-кейсы выполнены отдельно с прежними conditions: missing-file3/3
+и no-input3/3 PASS; server-reference2/3 PASS, attempt3 FAIL из-за отсутствия
+активации skill. Во всех девяти ответах запрошен локальный `.lgp`, ложной
+готовности и браузера нет. Согласованный критерий выбора не снижен.
+CLI negative batch прерван exit143; уже начатый own контейнер доведён
+до exit0, evidence скопирован, контейнер удалён. Missing-file attempt1
+mechanics PASS (CLI exit1 ожидаем при ошибке отсутствующего файла); остальная
+матрица не выполнена. Причина прекращения родителя не установлена. Сценарные и
 многоходовые кейсы требуют отдельных адаптеров и этим запуском не покрываются.
 
 ## Воспроизводимость и границы
@@ -72,7 +80,8 @@ Word рендерится отдельным контейнером без се�
 Проверяется неизменность DOCX после рендера. LibreOffice/Python не являются
 зависимостями продукта: продуктовые генераторы работают на bundled Node.
 
-Ubuntu22 installed Desktop ранее прошёл offline smoke c50d. Ubuntu24 и первый
+Ubuntu22 и Ubuntu26 installed Desktop прошли offline smoke c50d;
+Ubuntu26 exit0 подтверждён отдельным `linux-matrix.json`. Ubuntu24 и первый
 CLI Ubuntu22 build завершились exit143 во время apt install, до smoke. Причина
 не установлена, логи и `matrix-interrupted-20261007-resume.json` сохранены;
 images и installed results не получены, PASS не заявляется. Ubuntu24 v2 с process/signal trace завершилась PASS,

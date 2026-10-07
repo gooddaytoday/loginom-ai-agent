@@ -3745,9 +3745,34 @@ exit0, forced=false, guard=false, Chromium0, remaining0, исходный `.lgp`
 и diff check PASS. Native TUI permission reject также PASS: skill applied,
 prepare denied, exit0 и writer отсутствует (`/tmp/loginom-cli-permission-jivY3z`).
 
+## 2026-10-07 — RED выбора skill при серверном входе
+
+Desktop c50d OpenAI gpt-6.1-sol/medium negative ×3: missing-file3/3 и
+no-input3/3 PASS; server-reference2/3 PASS, attempt3 FAIL. Последний ответ
+корректно запросил локальный `.lgp`, но tools пусты и docs profile не применён.
+Ни браузера, ни отчёта, ни оставшихся процессов во всех девяти случаях нет.
+Evidence `desktop-openai-negative-c50d220c1-resume` сохранён полностью,
+включая FAIL manual receipt; этот запуск не переименовывается в успешный.
+
+Минимальная правка bootstrap: для запроса только документации сначала
+активировать package-docs и при missing local input/server-only reference,
+затем запросить файл без поиска в браузере. Составные build → docs не названы
+немедленной docs-задачей; модель по-прежнему выбирает skill, backend проверяет
+права. Regex/intent router, новые профили и изменения генератора не добавлены.
+Source regression: prompt/task-scope/package-docs128 PASS / 1 V2 SKIP,
+612 assertions, Agent typecheck PASS. Live GREEN требует новых clean сборок
+Desktop/CLI; прежние c50d receipts относятся только к прежним бинарникам.
+
+CLI negative parent прерван exit143 с неизвестной причиной. Уже начатый own
+container доведён до exit0; result/evidence скопированы, контейнер удалён.
+Missing-file attempt1 корректно активировал docs, запросил существующий `.lgp`,
+CLI exit1 ожидаем для отсутствующего файла; полный batch не выполнен.
+Desktop Ubuntu26 offline installed smoke c50d PASS, exit0; теперь пройдены
+Ubuntu22/24/26, Debian12/13 остаются открытыми. План не перерабатывался.
+
 ## Checkpoint
 
-- Resume c50d/OpenAI6.1 medium: formats9/9 на Desktop и CLI facts/layout PASS (MD source read), Desktop local-path3/3 PASS; routing частично прерван exit143, negative продолжаются. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
+- Resume c50d/OpenAI6.1 medium: formats9/9 на Desktop и CLI facts/layout PASS (MD source read), Desktop local-path3/3 PASS; routing частично прерван exit143; server negative2/3 FAIL на выборе, новая bootstrap правка ждёт live GREEN. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
 - Product candidates: Desktop/CLI `c50d220c1`, clean full builds/manifests/static/installed CLI seed PASS; Desktop Ubuntu22/24 installed PASS; CLI Ubuntu22 native installer PASS; прежние candidates сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
