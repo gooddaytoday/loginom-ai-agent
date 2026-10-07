@@ -3158,6 +3158,37 @@ UID 1001, readonly input/runtime. Добавлены системные библ
 Первый Word facts/layout PASS; остальные Word/MD ещё требуют своей проверки.
 Неуспешные host/v1 renderer logs сохранены рядом с успешным v2 log.
 
+## Quoted Markdown lists: Word live RED → public Node GREEN
+
+Закончена CLI3ccc серия Word/Markdown. Word mechanics **3/3**, facts **1/3**,
+layout **2/3**: второй отчёт ошибочно связал два выхода в описании пакета;
+третий приписал неизвестному Engine возможности Reference Node без чтения
+справки этого обработчика. Обе страницы каждого исходного Word открыты
+bundled renderer и просмотрены. Третий Word также печатал literal `*`
+внутри quoted nested list. Полные Markdown outputs **3/3 PASS** по fixture,
+actual Help B, отсутствию placeholders, равенству draft/output и input hash.
+Evidence: `cli-live-formats-3ccc3b4c9/`, manual review JSON в каждой попытке.
+
+Регрессионный тест quoted list сначала дал **3 FAIL** для `*`, `-`, `+`.
+После распознавания heading/list внутри quote pipeline **48 PASS / 182
+assertions**, Host typecheck PASS. Обычные quote paragraphs и frozen legacy
+outputs проходят прежние проверки. Фактический третий Word draft повторён
+через публичный Node CLI: frozen3ccc **PDF/DOCX RED**, исправленный source
+bundle **6/6 GREEN**. Две PDF и две Word страницы результата просмотрены:
+markers/numbering исправлены, clipping/overlap нет. Это проверка formatter,
+а не приёмка качества прежнего текста. Evidence:
+`quoted-list-public-64fcf578e-v3/`, `docs-quoted-lists-{red,green}.log`.
+Ошибки настройки standalone verifier (module resolution/Buffer/assertion)
+сохранены отдельно; итоговый v3 replay завершён успешно.
+
+CLI3ccc без входа **3/3 PASS**: запрос локального файла, нет отчёта/Chromium.
+Missing-file attempt1 также дал корректный запрос `.lgp`, без отчёта/браузера;
+его exit1 соответствует исходному `runToolOutcome` для unresolved tool error.
+Prototype ошибочно требовал exit0 и остановил оставшиеся прогоны: серия
+missing/server cases не принята. Контракт exit code подтверждён source
+**11 PASS / 27 assertions**; product CLI не менялся.
+Основной план не редактировался, требования не перерабатывались.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `3ccc3b4c9`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.
@@ -3165,7 +3196,7 @@ UID 1001, readonly input/runtime. Добавлены системные библ
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node pipeline45/catalog26/integrity9 PASS; CLI3ccc PDF mechanics/layout3/3, facts2/3 FAIL; nested bullet fix public6/6 GREEN; Desktop70 backend PDF3/3 полный PASS. Обычные CLI704 cases 2×3 PASS.
+- Docs Node48 PASS; CLI3ccc PDF facts2/3, Word facts1/3/layout2/3 FAIL, MD3/3 PASS; quoted list fix public6/6 GREEN; Desktop70 PDF3/3 PASS.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
 - Scope/history/prompt/revert/docs: 200 PASS / 2 V2 SKIP; Host scope11 PASS; пять implementation подпунктов этапа 5 отмечены; installed переходы ещё открыты.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.

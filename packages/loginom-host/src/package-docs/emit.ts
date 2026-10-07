@@ -31,21 +31,17 @@ function parseBlocks(markdown: string) {
   const blocks: Block[] = []
   const counters = new Map<number, number>()
   for (const line of markdown.split(/\r?\n/)) {
-    if (!line.trim()) continue
-    const heading = /^(#{1,4})\s+(.*)$/.exec(line.trim())
+    const quote = /^>\s?(.*)$/.exec(line.trim())
+    const content = quote ? quote[1] : line
+    if (!content.trim()) continue
+    const heading = /^(#{1,4})\s+(.*)$/.exec(content.trim())
     if (heading) {
       counters.clear()
       blocks.push({ kind: "h" + heading[1].length, runs: inlineRuns(heading[2]), depth: 0, marker: "" })
       continue
     }
-    const quote = /^>\s?(.*)$/.exec(line.trim())
-    if (quote) {
-      counters.clear()
-      blocks.push({ kind: "quote", runs: inlineRuns(quote[1]), depth: 0, marker: "" })
-      continue
-    }
-    const bullet = /^(\s*)[*+-]\s+(.*)$/.exec(line)
-    const number = /^(\s*)\d+\.\s+(.*)$/.exec(line)
+    const bullet = /^(\s*)[*+-]\s+(.*)$/.exec(content)
+    const number = /^(\s*)\d+\.\s+(.*)$/.exec(content)
     const match = bullet || number
     if (match) {
       const depth = Math.floor(match[1].length / 2) + 1
@@ -55,7 +51,7 @@ function parseBlocks(markdown: string) {
       continue
     }
     counters.clear()
-    blocks.push({ kind: "p", runs: inlineRuns(line.trim()), depth: 0, marker: "" })
+    blocks.push({ kind: quote ? "quote" : "p", runs: inlineRuns(content.trim()), depth: 0, marker: "" })
   }
   return blocks
 }

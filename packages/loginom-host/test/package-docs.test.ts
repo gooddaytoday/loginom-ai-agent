@@ -378,6 +378,19 @@ test.each(["*", "-", "+"])("PDF and DOCX keep ordered submodel numbers across ne
   } finally { await zip.close() }
 })
 
+test.each(["*", "-", "+"])("quoted submodel lists render nested %s bullets in PDF and DOCX", async (marker) => {
+  const markdown = `> **Описание подмоделей**\n>\n> 1. Первая модель\n>    ${marker} Вход первой модели\n>\n> 2. Вторая модель\n>    ${marker} Выход второй модели\n`
+  const text = pdfText(await renderReport(markdown, "pdf", fonts)).join(" ").replace(/\s+/g, " ")
+  expect(text).toContain("1. Первая модель • Вход первой модели 2. Вторая модель • Выход второй модели")
+  const zip = new ZipReader(new Uint8ArrayReader(await renderReport(markdown, "docx")), { useWebWorkers: false })
+  try {
+    const entry = (await zip.getEntries()).find((entry) => entry.filename === "word/document.xml")!
+    const xml = await entry.getData!(new TextWriter())
+    expect(xml.match(/<w:t xml:space="preserve">• <\/w:t>/g)).toHaveLength(2)
+    expect(xml).toContain('<w:t xml:space="preserve">2. </w:t>')
+  } finally { await zip.close() }
+})
+
 test("DOCX writer preserves the baseline Word XML and package relationships", async () => {
   const bytes = await renderReport(await readFile(join(fixtures, "demo.report.md"), "utf8"), "docx")
   const zip = new ZipReader(new Uint8ArrayReader(bytes), { useWebWorkers: false })
