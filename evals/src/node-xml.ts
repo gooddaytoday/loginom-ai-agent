@@ -3,8 +3,8 @@ import { evalsRoot } from "./config"
 import { nodeCase } from "./node-cases"
 
 export type NodeXml = { scope: string; id: string; type: string; engine: Record<string, string>;
-  columns: (Record<string, string> & { extension: Record<string, string> })[];
-  output_columns?: (Record<string, string> & { source: string | null })[];
+  columns: { Name?: string; InputColumnInfoName?: string; DataType?: string; DataKind?: string; UsageType?: string; extension: Record<string, string> }[];
+  output_columns?: { Name?: string; DataType?: string; source: string | null }[];
   inputs: Record<string, string>; outputs: Record<string, string>; variables: unknown[] }
 export type PackageXml = { nodes: NodeXml[]; links: { scope: string; source: Record<string, string>; target: Record<string, string> }[] }
 export const numericType = (type: string | undefined) => type !== undefined && ["dtFloat", "dtInteger"].includes(type)
