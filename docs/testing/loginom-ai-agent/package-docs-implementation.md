@@ -3770,9 +3770,33 @@ CLI exit1 ожидаем для отсутствующего файла; пол�
 Desktop Ubuntu26 offline installed smoke c50d PASS, exit0; теперь пройдены
 Ubuntu22/24/26, Debian12/13 остаются открытыми. План не перерабатывался.
 
+## 2026-10-07 — clean candidates для проверки выбора без локального файла
+
+Desktop/CLI собраны из clean `2530143dd70f3b87ac80a0d294d03b9856bd5253`;
+CLI archive/roundtrip/source verify PASS, SHA
+`8ca3b9b58b84a52947adc7a2d76d525450a956e9eda92168c99deb1707a7159c`,
+source tree `e2fd7f68ce3d63a4a8ea2e05e2f1c0c7c3e66e4130905d1c1ec61c41b4a2e8b7`.
+Installed CLI seed PASS: image
+`sha256:0200bf103bb8ef9f5389d70eb4a145ba8345422a6b805ad38af4565e8de6d5a1`,
+manifest `6db0cf707bb96e0e6ad45d01c1d9e01baf308cf701e9b4fa4403dcba2e1775e0`,
+UID1200, sandbox root:root/4755, profile отсутствует. Первая команда Docker
+FROM local image ID отказала до install; v2 использует собственный alias,
+проверенный по immutable base ID. Исходный failed log сохранён.
+
+Desktop DEB `c8da808490a0d971a72a23b88668f5d3b840f549b9cf3cad92aa2d2bfcacfec9`,
+AppImage `339042d6c2e83ec860ede9d1705b53189c7215bd243f3f313551f325247609d3`;
+source archive `d7a99ef57b425e2f927c6ddb2afc4714af16051992460a130fe0274a90d553d5`.
+Оба static verifiers PASS, 4654 resources; runtime resource SHA прежний
+`4c194ae16f8c001429aa7e64912c51eec61ed3418a853ffa1357b1b8aebcfd25`.
+
+На новых binaries начаты отдельные negative ×3 Desktop/CLI с теми же
+OpenAI6.1 medium/catalog/corpus, output `*-openai-negative-2530143dd`.
+Родительские сигналы пишутся в отдельные traces. Live GREEN ещё не объявлен;
+c50d документы/установки остаются результатами своей сборки.
+
 ## Checkpoint
 
-- Resume c50d/OpenAI6.1 medium: formats9/9 на Desktop и CLI facts/layout PASS (MD source read), Desktop local-path3/3 PASS; routing частично прерван exit143; server negative2/3 FAIL на выборе, новая bootstrap правка ждёт live GREEN. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
+- Resume c50d/OpenAI6.1 medium: formats9/9 на Desktop и CLI facts/layout PASS (MD source read), Desktop local-path3/3 PASS; routing частично прерван exit143; server negative2/3 PASS, attempt3 FAIL на выборе; 2530143dd negative×3 ждёт live GREEN. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
 - Product candidates: Desktop/CLI `c50d220c1`, clean full builds/manifests/static/installed CLI seed PASS; Desktop Ubuntu22/24 installed PASS; CLI Ubuntu22 native installer PASS; прежние candidates сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
