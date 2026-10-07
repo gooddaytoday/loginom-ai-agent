@@ -1,13 +1,16 @@
 import { createRequire } from "node:module"
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
+import { constants } from "node:fs"
+import { access, appendFile, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { isAbsolute, join } from "node:path"
+import { basename, dirname, isAbsolute, join } from "node:path"
 import { setTimeout } from "node:timers/promises"
 
 const executable = process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE
 const driverResources = process.env.LOGINOM_AI_AGENT_TEST_RESOURCES
 const evidence = process.env.LOGINOM_AI_AGENT_TEST_ARTIFACTS
-const collisions = process.env.LOGINOM_AI_AGENT_TEST_RESERVED_SKILLS === "1"
+const damage = process.env.LOGINOM_AI_AGENT_TEST_SKILL_DAMAGE
+if (damage && !["modified", "missing", "unlisted"].includes(damage)) throw Error("UNKNOWN_SKILL_DAMAGE")
+const collisions = process.env.LOGINOM_AI_AGENT_TEST_RESERVED_SKILLS === "1" || !!damage
 if (![executable, driverResources, evidence].every((path) => path && isAbsolute(path)))
   throw Error("ABSOLUTE_TEST_PATHS_REQUIRED")
 if (process.platform !== "linux") throw Error("LINUX_TEST_REQUIRED")
@@ -17,6 +20,7 @@ const root = await mkdtemp(join(tmpdir(), "loginom-product-skills-smoke-"))
 const home = join(root, "home")
 const workspace = join(root, "workspace")
 const profile = join(root, "profile")
+const application = damage ? join(root, "application", basename(executable)) : executable
 await writeFile(join(evidence, "roots.json"), JSON.stringify({ root, home, workspace, profile }, null, 2))
 await mkdir(home, { mode: 0o700 })
 await mkdir(workspace, { mode: 0o700 })
@@ -74,8 +78,18 @@ const monitor = (async () => {
 let app
 let result
 try {
+  if (damage) {
+    // Damage only our copy of an unpacked artifact, never the retained candidate.
+    if (basename(executable) !== "loginom-ai-agent") throw Error("UNPACKED_DESKTOP_REQUIRED")
+    await access(join(dirname(executable), "resources/app.asar"))
+    await cp(dirname(executable), dirname(application), { recursive: true, mode: constants.COPYFILE_FICLONE })
+    const skill = join(dirname(application), "resources/loginom/skills/package-docs/SKILL.md")
+    if (damage === "modified") await appendFile(skill, "\nTAMPERED\n")
+    if (damage === "missing") await rm(skill)
+    if (damage === "unlisted") await writeFile(join(dirname(skill), "not-indexed.txt"), "UNLISTED")
+  }
   app = await _electron.launch({
-    executablePath: executable,
+    executablePath: application,
     args: [],
     chromiumSandbox: true,
     cwd: workspace,
@@ -118,9 +132,10 @@ try {
   await writeFile(join(evidence, "catalog.json"), JSON.stringify(skills, null, 2))
   const bundled = skills.filter((skill) => skill.source === "bundled")
   if (
-    JSON.stringify(bundled.map((skill) => skill.name).sort()) !== JSON.stringify(["loginom-automation", "package-docs"])
+    JSON.stringify(bundled.map((skill) => skill.name).sort()) !==
+    JSON.stringify(damage ? [] : ["loginom-automation", "package-docs"])
   )
-    throw Error("PRODUCT_SKILLS_REQUIRED")
+    throw Error(damage ? "DAMAGED_BUNDLE_ACCEPTED" : "PRODUCT_SKILLS_REQUIRED")
   if (bundled.some((skill) => !/^[a-f0-9]{64}$/.test(skill.digest))) throw Error("BUNDLED_PROVENANCE_REQUIRED")
   if (skills.some((skill) => skill.source !== "bundled" && skill.source !== "builtin"))
     throw Error("EXTERNAL_SKILL_IN_CLEAN_FIXTURE")
@@ -137,8 +152,48 @@ try {
       await page.locator(selector).filter({ hasText: text }).waitFor({ timeout: 10000 })
     }
     await writeFile(join(evidence, "discovery-body.txt"), await page.locator("body").innerText())
-    for (const name of reservedNames) {
-      await diagnostic(`Ignored external skill '${name}':`)
+    await writeFile(
+      join(evidence, "discovery-toasts.json"),
+      JSON.stringify(
+        await page.locator(".toast-v2").evaluateAll((elements) =>
+          elements.map((element) => ({ text: element.textContent, attributes: element.outerHTML })),
+        ),
+        null,
+        2,
+      ),
+    )
+    if (damage) {
+      if (resources !== join(dirname(application), "resources")) throw Error("WRONG_TEST_RESOURCE_ROOT")
+      // The UI exposes three stacked toasts. Read and dismiss the front one
+      // as a user would, rather than require all diagnostics at once.
+      const remaining = new Set([
+        "Bundled skills are unavailable. Verify the Loginom resource path or reinstall the application.",
+        ...reservedNames.map((name) => `Ignored external skill '${name}':`),
+      ])
+      const acknowledged = []
+      const front = page.locator('.toast-v2[data-front="true"][data-visible="true"][data-removed="false"]')
+      await front.hover()
+      while (remaining.size) {
+        await front.waitFor({ timeout: 10000 })
+        const id = await front.getAttribute("data-testid")
+        if (!id) throw Error("DIAGNOSTIC_ID_REQUIRED")
+        // New warnings may reorder the stack between reading and clicking.
+        const current = page.getByTestId(id)
+        await current.hover()
+        const text = await current.locator("[data-description]").innerText()
+        acknowledged.push(text)
+        for (const expected of remaining) {
+          if (text.includes(expected)) remaining.delete(expected)
+        }
+        await writeFile(join(evidence, "acknowledged-diagnostics.json"), JSON.stringify(acknowledged, null, 2))
+        await page.screenshot({ path: join(evidence, `acknowledged-diagnostic-${acknowledged.length}.png`) })
+        await current.locator("[data-close-button]").click()
+      }
+    }
+    if (!damage) {
+      for (const name of reservedNames) {
+        await diagnostic(`Ignored external skill '${name}':`)
+      }
     }
     await page.screenshot({ path: join(evidence, "skill-diagnostics.png") })
     const commandsResponse = await fetch(`${server.url}/command?directory=${encodeURIComponent(workspace)}`, {
@@ -150,6 +205,9 @@ try {
     await writeFile(join(evidence, "commands.json"), JSON.stringify(commands, null, 2))
     if (JSON.stringify(commands).includes("UNTRUSTED")) throw Error("RESERVED_COMMAND_REPLACED")
     if (commands.some((command) => command.name === "package_docs")) throw Error("OBSOLETE_COMMAND_REGISTERED")
+    const productCommands = commands.filter((command) => ["loginom-automation", "package-docs"].includes(command.name))
+    if (productCommands.length !== (damage ? 0 : 2) || productCommands.some((command) => command.source !== "skill"))
+      throw Error("PRODUCT_COMMAND_SOURCE_INVALID")
     for (const name of reservedNames) {
       await diagnostic(`Ignored external command '${name}' from config:`)
     }
@@ -161,7 +219,9 @@ try {
   await page.screenshot({ path: join(evidence, "composer.png") })
   result = {
     status: "PASS",
-    executable,
+    executable: application,
+    sourceExecutable: executable,
+    skillDamage: damage ?? null,
     resources,
     uid: process.getuid(),
     node: process.version,

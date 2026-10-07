@@ -2580,9 +2580,68 @@ native product integration REDaeef → GREEN2aa теперь подтвержд�
 Повреждения Desktop bundle и остальные Linux gates этой positive/reserved
 серией не проверяются; этап 3 целиком ещё открыт.
 
+## Native Desktop: повреждение skill в собственной копии
+
+Cold GUI driver получил opt-in `LOGINOM_AI_AGENT_TEST_SKILL_DAMAGE`:
+`modified`, `missing`, `unlisted`. Он требует unpacked Desktop executable,
+копирует весь `linux-unpacked` в свой `/tmp/application`, меняет только copied
+skill tree, запускает именно этот executable и проверяет actual resource root.
+Reserved external skills/config остаются в своём fixture. Исходные
+DEB/AppImage/ASAR/resources не меняются. Это native compiled Desktop с
+контролируемым повреждением resources, не новая installed-artifact сборка.
+
+Первый modified case не прошёл GUI warning assertion; повторения **3/3 FAIL**,
+29.362 / 30.760 / 25.878 s, exit 1. Immediate DOM во всех содержит правильную
+reinstall diagnostic с `data-visible=false`, index 3; visible limit штатного
+toaster — три. Правильный builtin-only catalog и no external fallback уже
+подтверждены. Report `desktop-damaged-toast-signal-2aa3a3284/report.md`;
+snapshot driver показывает, что timeout в repeats пришёл из следующего
+reserved-skill loop после ожидания reinstall message. Начальный primary run
+остановился на самом reinstall wait. Это ошибочная последовательность ожиданий
+в тесте, не установленная product regression; bisect не выполнялся.
+
+Driver читает и закрывает передние notifications как пользователь, требуя
+все четыре текста независимо от порядка. Hover использует actual toast:
+первый вариант с region без собственной visible box дал timeout, log
+`desktop-2aa3a3284-modified-skill-acknowledged-green.log` несмотря на имя — **FAIL**.
+После этого modified case **PASS**, но missing case обнаружил race между
+чтением и закрытием динамического front locator; log
+`desktop-2aa3a3284-missing-skill-green.log` — **FAIL**. Теперь ID конкретного
+уведомления закреплён до чтения/close, acknowledgement сохраняется сразу.
+Forced clicks, sleeps и retries не добавлены; все required texts обязательны.
+
+Missing case **PASS**: `desktop-2aa3a3284-missing-skill-pinned-toast-green/`;
+unlisted case **PASS**: `desktop-2aa3a3284-unlisted-skill-green/`.
+Оба native catalog builtin-only, Product/config replacement commands отсутствуют,
+reinstall и все reserved diagnostics прочитаны, `.lgp` selectable, sampling
+25 ms / no Loginom Chromium / no `--no-sandbox` / own remaining 0 и root removed.
+Modified case с final driver **STABLE 5/5 PASS**, durations
+17.518 / 19.664 / 18.835 / 18.340 / 19.790 s, все exit 0, без retries.
+Evidence `desktop-damaged-toast-stability-signal-2aa3a3284/`: каждый раз
+reinstall + три reserved texts прочитаны/acknowledged, внешние команды
+игнорированы, own remaining 0, temporary root удалён. Исходные executable,
+ASAR/manifest/SKILL, Node и driver hashes до/после серии совпали.
+Результаты не доказывают natural skill selection, качество отчёта или полную
+матрицу установленного Linux продукта.
+
+Окончательный source driver повторно прошёл unchanged AppImage: clean и reserved
+smokes **2 PASS**, evidence `desktop-2aa3a3284-final-smoke-{0,1}/`.
+Оба bundled source/digest/path, composer и wizard сохранены; reserved commands
+проверены с `source: skill`, no UNTRUSTED/obsolete alias. Native syntax check
+поставляемым Node и `git diff --check` **PASS**. Product source/binaries этой
+test-only задачей не менялись; новые сборки по одному изменению driver не создавались.
+Native TUI diagnostics ещё не проверены, поэтому весь этап 3 не закрыт.
+
+Сохранённые ASAR/resource manifest/SKILL SHA-256:
+`c7a73eb96617fb05b0cd87f4297547b234bd740a8c1c5de9747a6d9994331bac`,
+`f243b311f39abfdeb408521805549d700a1b0de437460227b7bce7c9345b10d8`,
+`d6792becbc643affd729bc269a3aef72b5d7e85cadb43dab22a682c67570037d`.
+Bookend file `desktop-2aa3a3284-damage-source-before.sha256`;
+сохранённые candidate checksums проверены после initial runs, без изменений.
+
 ## Checkpoint
 
-- Product candidates: Desktop `2aa3a3284`, CLI `6cfda621f`, clean source/artifacts/manifests; Desktop diagnostics REDaeef→GREEN2aa и 5/5 stable PASS; разные source pins.
+- Product candidates: Desktop `2aa3a3284`, CLI `6cfda621f`, clean source/artifacts/manifests; Desktop reserved diagnostics и damaged-bundle rejection 5/5 stable PASS; разные source pins.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–2 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -2600,4 +2659,5 @@ native product integration REDaeef → GREEN2aa теперь подтвержд�
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cfd discovery/diagnostics 7 PASS, CLIa891 pipeline/permissions 5 PASS; clean HOME CLI938 PTY 4 PASS, read path GREEN; TUI suite 197 PASS / 1 SKIP; Desktop diagnostics 5/5 stable PASS.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
-- Installed DEB85 smoke/metadata/ASAR PASS; static DEB/AppImage2aa PASS; GUI2aa 5 permissions cases PASS; TUI typecheck PASS; report/corpus/evals и остальные Linux gates открыты.
+- Installed DEB85 smoke/metadata/ASAR PASS; static DEB/AppImage2aa PASS; GUI2aa 5 permissions и missing/modified/unlisted cases PASS; TUI typecheck PASS; report/corpus/evals и остальные Linux gates открыты.
+- Далее: native TUI reserved diagnostics, native lazy Help exit 1 и живые report/routing gates; требования плана повторно не перерабатывать.

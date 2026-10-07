@@ -69,6 +69,16 @@ skills и фильтр `.lgp` в composer. `test/loginom/package-docs-permission
 внешние copies/config, требует trusted catalog и активные уведомления для
 canonical/obsolete имён, сохраняет screenshots и удаляет свой temporary root.
 
+Проверку целостности в GUI тот же driver запускает с
+`LOGINOM_AI_AGENT_TEST_SKILL_DAMAGE=modified`, `missing` или `unlisted`.
+В этом режиме EXECUTABLE должен указывать `linux-unpacked/loginom-ai-agent`:
+driver копирует весь unpacked artifact в свой temporary root и повреждает
+только эту копию. Исходные DEB/AppImage/resources не изменяются. Проверяются
+reinstall diagnostic, отсутствие bundled skills/команд и внешнего fallback;
+видимые передние уведомления читаются и закрываются обычными GUI-действиями.
+Это контролируемая повреждённая копия native Desktop, отдельная от проверки
+неизменного установленного артефакта.
+
 `test/loginom/gui-smoke.mjs` запускается закреплённым Node под Xvfb либо в отдельной Wayland-сессии. `LOGINOM_AI_AGENT_TEST_EXECUTABLE` указывает установленный бинарник; без переменной проверяется локальная сборка. `LOGINOM_AI_AGENT_TEST_CONFIG` — абсолютный путь к приватному тестовому конфигу Dock с разрешённой passwordless учётной записью. Значение ключа не передаётся в аргументах процесса или выводе. Проверка использует отдельный временный профиль, выполняет check/save, проверяет plaintext/0600 и повторный запуск без мастера.
 
 Для Wayland указать `LOGINOM_AI_AGENT_TEST_WAYLAND=1`, `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, `XDG_SESSION_TYPE=wayland`, убрать `DISPLAY`. Проверка в headless Weston подтверждает использование протокола Wayland, но не заменяет пользовательский сеанс GNOME/KDE. Если Weston извлечён из пакетов без системной установки, его модули можно задать через `WESTON_MODULE_MAP` — пары `имя=путь`, разделённые `;` ([исходный загрузчик Weston](https://cgit.freedesktop.org/wayland/weston/tree/libweston/compositor.c)).
