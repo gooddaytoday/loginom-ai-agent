@@ -3130,6 +3130,34 @@ case без локального входа и 13 single-turn Desktop case ×3. 
 всего корпуса. Ubuntu22 DEB70 diagnostic ещё выполняется; чужие tags,
 профили, результаты, launcher и соседний worktree не изменены.
 
+## Unknown Engine: решение перед переносом Help, новый цикл
+
+По сохранённому CLI3ccc facts RED изменён порядок анализа в SKILL/narrative:
+сначала установить соответствие точного Engine обработчику Help, затем
+объяснять возможности идентифицированного типа. Если найдена только общая
+категория или похожий обработчик, неизвестный тип описывается по структуре.
+Первая фраза narrative теперь требует подтверждённых фактов, а не только
+отсутствия противоречия структуре. Статистика и контракт extractor/emit прежние.
+Integrity **9 PASS / 16 assertions**, discovery **26 PASS / 144 assertions**;
+`docs-grounding-decision-{integrity,discovery}.log`. Семантический live GREEN
+новой инструкции ещё не проверен; текущие серии используют immutable 3ccc.
+
+Ubuntu22 diagnostic DEB70 **PASS**: offline nonroot Chromium/Electron launch,
+sandbox, resource hashes и четыре поля мастера. Использован собственный tag
+`loginom-package-docs-70a2d5a93:ubuntu22`, image
+`sha256:609fba83b043725e2fb3fea7fa65b27012237e9bfcf41c32cfdc24399d8a9615`.
+Evidence: `desktop-70-prefix-ubuntu22/{linux-matrix.json,ubuntu22-smoke.log}`.
+Это один старый artifact на одной ОС; не полная матрица финального candidate.
+
+Первый CLI3ccc Word успешно открыт и отрендерен **без изменения исходного DOCX**
+тем же bundled documents renderer/Python/LibreOffice 26.904.11930 в собственном
+Ubuntu24 контейнере `loginom-package-docs-word-render:20261007-v2`, network none,
+UID 1001, readonly input/runtime. Добавлены системные библиотеки только своего
+контейнера; пользовательская ОС и LibreOffice не менялись. Обе страницы
+просмотрены: кириллица, все разделы, нумерация 1/2, без clipping/overlap.
+Первый Word facts/layout PASS; остальные Word/MD ещё требуют своей проверки.
+Неуспешные host/v1 renderer logs сохранены рядом с успешным v2 log.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `3ccc3b4c9`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.
