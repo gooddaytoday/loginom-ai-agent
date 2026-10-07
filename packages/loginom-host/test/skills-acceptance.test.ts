@@ -2,9 +2,96 @@ import { expect, test } from "bun:test"
 import { mkdtemp, mkdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { writeCliManifest } from "../src/cli-manifest"
+import { copyProductSkillsFixture } from "./fixtures/product-skills"
+import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 
 const script = resolve(import.meta.dir, "../script/skills-acceptance.ts")
 const linuxTest = test.skipIf(process.platform !== "linux" || process.arch !== "x64")
+
+linuxTest.skipIf(!Bun.which("docker"))(
+  "live acceptance accepts saved OAuth before checking the installed image",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "loginom-acceptance-oauth-"))
+    try {
+      const artifact = join(root, "artifact")
+      const resources = join(artifact, "resources/loginom")
+      for (const path of [
+        "bin/loginom-ai-agent-cli",
+        "resources/loginom/bin/node",
+        "resources/loginom/host/node-host.mjs",
+      ])
+        await Bun.write(join(artifact, path), "fixture")
+      await copyProductSkillsFixture(resources)
+      await Bun.write(
+        join(resources, "resource-manifest.json"),
+        JSON.stringify({ protocol: 1, files: await resourceInventory(resources) }),
+      )
+      await writeCliManifest(artifact, {
+        version: "test",
+        channel: "dev",
+        platform: "linux",
+        arch: "x64",
+        sourceCommit: "a".repeat(40),
+        sourceTreeSha256: "b".repeat(64),
+        sourceDirty: false,
+        dependencies: {},
+      })
+      const secrets = ["private-help-key", "private-oauth-access", "private-oauth-refresh"]
+      const child = Bun.spawn(
+        [
+          process.execPath,
+          script,
+          "--interface",
+          "run",
+          "--cli-image",
+          "loginom-acceptance-missing-" + root.split("-").at(-1),
+          "--artifact",
+          artifact,
+          "--output",
+          join(root, "results"),
+          "--model",
+          "openai/gpt-6.1-sol",
+          "--variant",
+          "medium",
+          "--models-path",
+          resolve(import.meta.dir, "../../product/models.json"),
+          "--cases",
+          "default-translation",
+        ],
+        {
+          stdin: new Blob([
+            JSON.stringify({
+              apiKey: secrets[0],
+              auth: {
+                type: "oauth",
+                access: secrets[1],
+                refresh: secrets[2],
+                expires: Date.now() + 60000,
+                accountId: "test-account",
+              },
+            }),
+          ]),
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      )
+      const [code, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ])
+      expect(code).not.toBe(0)
+      expect(stdout + stderr).toContain("SKILLS_ACCEPTANCE_COMMAND_FAILED")
+      expect(stdout + stderr).not.toContain("SKILLS_ACCEPTANCE_PRIVATE_INPUT_INVALID")
+      for (const secret of secrets) expect(stdout + stderr).not.toContain(secret)
+      expect(await Bun.file(join(root, "results/conditions.json")).exists()).toBe(false)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  },
+  30000,
+)
 
 linuxTest.each([
   ["desktop", "docs-after-build", "SKILLS_ACCEPTANCE_MULTITURN_SCENARIO_ADAPTER_REQUIRED"],

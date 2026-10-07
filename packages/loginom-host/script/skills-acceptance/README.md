@@ -12,6 +12,8 @@ bun script/skills-acceptance.ts \
   --cli-image '<installed-seed-image>' \
   --output /absolute/new-results-directory \
   --model provider/model \
+  --variant medium \
+  --models-path /absolute/frozen-models.json \
   --cases docs-missing-file,docs-no-input,docs-current-server-package \
   --repeat 3
 ```
@@ -24,10 +26,22 @@ Desktop использует настоящий backend AppImage под изол
 
 Секреты передаются только через stdin JSON:
 `{ "apiKey": "<Help key>", "auth": { "type": "api", "key": "<provider key>" } }`.
+Для существующего OAuth вместо API auth передать
+`{ "type": "oauth", "access": "<access>", "refresh": "<refresh>", "expires": <milliseconds>, "accountId": "<optional account>" }`.
+Авторизация копируется только в собственный профиль прогона; access и refresh
+участвуют в проверке отсутствия секретов в результатах.
 Подавать их из собственного приватного источника; не вводить ключи в argv,
 окружение, git или shell history. Подключение здесь проверяется явно до
 модельного хода: Help доступен по ключу, web login намеренно не настроен.
 Обычные unconfigured-кейсы обходятся без настройки Loginom.
+
+`--variant` передаётся в реальный CLI/HTTP prompt и записывается в результаты;
+без него используется стандартный уровень модели. `--models-path` принимает
+неизменный JSON каталога по абсолютному пути, сохраняет его копию и SHA256.
+Без него используется каталог испытуемой сборки. Фоновое обновление каталога
+отключено в обоих интерфейсах. Для текущих OpenAI прогонов использовать
+`--model openai/gpt-6.1-sol --variant medium` и один снимок каталога.
+Сравнение с прежними моделями не заменяет повтор обязательной матрицы.
 
 CLI seed image должен содержать полную установленную Linux-сборку под
 `/home/tester/.local/share/loginom-ai-agent-cli/<version>-<channel>`, пользователя

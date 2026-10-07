@@ -10,6 +10,10 @@ import { observeProcesses } from "./processes.mjs"
 const chunks = []
 for await (const chunk of process.stdin) chunks.push(chunk)
 const input = JSON.parse(Buffer.concat(chunks).toString())
+const secrets = [
+  input.apiKey,
+  ...(input.auth.type === "api" ? [input.auth.key] : [input.auth.access, input.auth.refresh]),
+]
 const executable = join(input.artifact, "loginom-ai-agent-linux-x86_64.AppImage")
 const require = createRequire(join(input.resources, "runtime/client/package.json"))
 const { _electron } = require("playwright-core")
@@ -82,6 +86,8 @@ for (const testcase of input.cases) {
           LOGINOM_AI_AGENT_TEST_ROOT: profile,
           ...(input.headless ? { LOGINOM_AI_AGENT_TEST_HEADLESS: "1" } : {}),
           LOGINOM_AI_AGENT_PURE: "1",
+          LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "1",
+          ...(input.modelsPath ? { LOGINOM_AI_AGENT_MODELS_PATH: input.modelsPath } : {}),
           LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG: "1",
           LOGINOM_AI_AGENT_CONFIG_CONTENT: JSON.stringify({ model: input.model, enabled_providers: [providerID] }),
         },
@@ -173,11 +179,12 @@ for (const testcase of input.cases) {
         })),
       ]
       const started = Date.now()
-      await save("submission.json", { sessionID, model: input.model, variant: "default", prompt, parts, started })
+      await save("submission.json", { sessionID, model: input.model, variant: input.variant, prompt, parts, started })
       // Keep HTTP requests short and retain each projected snapshot while tools await permission.
       await call(`/session/${sessionID}/prompt_async`, "POST", {
         agent: "build",
         model: { providerID, modelID },
+        ...(input.variant !== "default" ? { variant: input.variant } : {}),
         parts,
       })
       let messages, answer, idleCompletedID
@@ -246,7 +253,7 @@ for (const testcase of input.cases) {
         attempt,
         interface: "native AppImage backend HTTP",
         model: input.model,
-        variant: "default",
+        variant: input.variant,
         headless: input.headless,
         sessionID,
         prompt,
@@ -348,7 +355,7 @@ for (const testcase of input.cases) {
 
     async function save(name, value) {
       const text = JSON.stringify(value, null, 2)
-      assert.ok(![input.apiKey, input.auth.key].some((secret) => text.includes(secret)), "SECRET_IN_RESULT")
+      assert.ok(!secrets.some((secret) => text.includes(secret)), "SECRET_IN_RESULT")
       await writeFile(join(evidence, name), text)
     }
   }

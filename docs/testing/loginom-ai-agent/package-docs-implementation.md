@@ -3594,6 +3594,36 @@ completed image и linux-matrix.json отсутствуют. Причина не
 Этот запуск не подтверждает ни DEB Linux5, ни CLI Linux5; старый matrix5a
 относится только к прежнему артефакту. Не выполнять чужой cleanup или prune.
 
+## 2026-10-07 — существующий OpenAI OAuth и закреплённый medium
+
+По уточнению владельца дальнейшие OpenAI прогоны используют строго
+`openai/gpt-6.1-sol / medium`. В пользовательском профиле уже сохранён OAuth,
+но прежний live adapter принимал только API auth. Авторизация не менялась;
+срок access в прочитанной записи — 2026-10-15. Токены через приватный stdin
+копируются только в отдельный профиль, проверки redaction включают access
+и refresh. Public adapter TDD: OAuth **RED PRIVATE_INPUT_INVALID → GREEN**;
+variant и snapshot flag по отдельности **RED unknown option → GREEN**.
+Полный adapter suite **8PASS/35 assertions**, Host `bun typecheck`, pinned
+Node syntax, Prettier и diff PASS. Продуктовый Auth contract не менялся.
+
+В bundled snapshot нет gpt-6.1-sol; использован неизменный отдельный снимок
+существующего пользовательского model cache с реальной записью модели и
+medium: `openai-models-20261007.json`, SHA256
+`e47bd31afb882a62655a5783b4b37fb47bbd7652ab71b1ab0a85cfecfd33aacd`.
+Адаптер сохраняет копию каталога/hash, передаёт variant в настоящий prompt
+и отключает фоновое обновление каталога для обоих интерфейсов. Этот snapshot
+не является изменением bundled Product models или чужого evals каталога.
+
+Desktop bd0d короткий actual smoke **PASS**: unconfigured arithmetic →102,
+Chromium0, remaining0. В user и assistant projected messages подтверждены
+`gpt-6.1-sol` и `medium`; SHA пользовательского auth.json не изменился.
+Evidence: `desktop-openai-medium-smoke-bd0d7abc2/`. Короткий smoke не доказывает
+полный корпус docs, новую narrative correction или 3 повторения приёмки.
+CLI smoke запущен с теми же model/variant/snapshot и прежним bd0d installed
+immutable seed. Xiaomi результаты сохраняются отдельно; старые и новые
+модели не объединять в общий GREEN или A/B. Судья/harness соседней задачи
+этим решением не изменяются.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `bd0d7abc2`, clean full builds/manifests/static/installed CLI seed PASS; предыдущие candidates сохранены.
@@ -3607,7 +3637,7 @@ completed image и linux-matrix.json отсутствуют. Причина не
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
-- Полный Host 238 PASS / 7 SKIP; acceptance adapters7 PASS/28 и typecheck PASS; Agent history/tools/registry30 PASS.
+- Полный Host 238 PASS / 7 SKIP; acceptance adapters8 PASS/35, OAuth/medium/catalog, typecheck PASS; Agent history/tools/registry30 PASS.
 - Старый package_docs/Python тест заменён actual bundled flow/Node executor без Host call/admit.
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.

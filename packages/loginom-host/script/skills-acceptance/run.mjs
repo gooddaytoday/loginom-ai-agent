@@ -7,6 +7,10 @@ import { observeProcesses } from "./processes.mjs"
 const chunks = []
 for await (const chunk of process.stdin) chunks.push(chunk)
 const input = JSON.parse(Buffer.concat(chunks).toString())
+const secrets = [
+  input.apiKey,
+  ...(input.auth.type === "api" ? [input.auth.key] : [input.auth.access, input.auth.refresh]),
+]
 const testcase = input.testcase
 assert.ok(["docs", "default"].includes(testcase.group))
 assert.ok(!testcase.setup && !testcase.followup, "MULTITURN_ADAPTER_REQUIRED")
@@ -55,7 +59,7 @@ if (testcase.connection !== "unconfigured" && testcase.id !== "default-translati
   initialize.stdout.on("data", (chunk) => (out += chunk))
   initialize.stderr.on("data", (chunk) => (err += chunk))
   const code = await new Promise((resolve) => initialize.once("exit", resolve))
-  assert.ok(![input.apiKey, input.auth.key].some((key) => (out + err).includes(key)))
+  assert.ok(!secrets.some((key) => (out + err).includes(key)))
   await writeFile(join(evidence, "initialize.json"), out)
   await writeFile(join(evidence, "initialize-stderr.log"), err)
   assert.equal(code, 0)
@@ -107,6 +111,7 @@ const args = [
   "json",
   "--model",
   input.model,
+  ...(input.variant !== "default" ? ["--variant", input.variant] : []),
   ...(input.headless ? ["--headless"] : ["--no-headless"]),
   ...(attachments.length ? ["--file", ...attachments] : []),
   "--",
@@ -119,6 +124,8 @@ const run = spawn("/usr/bin/strace", ["-f", "-e", "trace=process", "-o", join(ev
   env: {
     ...process.env,
     LOGINOM_AI_AGENT_PURE: "1",
+    LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "1",
+    ...(input.modelsPath ? { LOGINOM_AI_AGENT_MODELS_PATH: input.modelsPath } : {}),
     LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG: "1",
     LOGINOM_AI_AGENT_CONFIG_CONTENT: JSON.stringify({ model: input.model, enabled_providers: [providerID] }),
   },
@@ -144,7 +151,7 @@ await writes
 const processEvidence = await observer.close()
 await writeFile(join(evidence, "processes.json"), JSON.stringify(processEvidence, null, 2))
 const raw = Buffer.concat(events).toString()
-assert.ok(!raw.includes(input.apiKey) && !raw.includes(input.auth.key))
+assert.ok(!secrets.some((secret) => raw.includes(secret)))
 const parsed = raw.trim().split("\n").filter(Boolean).map(JSON.parse)
 const tools = [...new Map(parsed.filter((e) => e.type === "tool_use").map((e) => [e.part.id, e.part])).values()]
 const trace = await readFile(join(evidence, "process.trace"), "utf8")
@@ -155,7 +162,7 @@ const result = {
   ...exit,
   interrupted,
   model: input.model,
-  variant: "default",
+  variant: input.variant,
   headless: input.headless,
   case: testcase.id,
   prompt: testcase.prompt,

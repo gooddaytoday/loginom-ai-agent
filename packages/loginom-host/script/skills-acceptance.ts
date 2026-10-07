@@ -14,6 +14,8 @@ const args = parseArgs({
     artifact: { type: "string" },
     output: { type: "string" },
     model: { type: "string" },
+    variant: { type: "string", default: "default" },
+    "models-path": { type: "string" },
     cases: { type: "string" },
     repeat: { type: "string", default: "3" },
     "cli-image": { type: "string" },
@@ -41,6 +43,10 @@ if (args.interface === "run" && !args["cli-image"]) throw Error("SKILLS_ACCEPTAN
 const repo = resolve(import.meta.dir, "../../..")
 const artifact = await realpath(args.artifact)
 const output = join(await realpath(dirname(args.output)), basename(args.output))
+if (args["models-path"] && !isAbsolute(args["models-path"]))
+  throw Error("SKILLS_ACCEPTANCE_MODELS_PATH_ABSOLUTE_REQUIRED")
+const models = args["models-path"] ? await readFile(args["models-path"]) : undefined
+if (models) JSON.parse(models.toString())
 const contains = (root: string, path: string) =>
   relative(root, path) === "" ||
   (!relative(root, path).startsWith(".." + sep) && relative(root, path) !== ".." && !isAbsolute(relative(root, path)))
@@ -112,7 +118,17 @@ const privateInput = await new Response(Bun.stdin.stream())
     Schema.decodeUnknownSync(
       Schema.Struct({
         apiKey: Schema.NonEmptyString,
-        auth: Schema.Struct({ type: Schema.Literal("api"), key: Schema.NonEmptyString }),
+        auth: Schema.Union([
+          Schema.Struct({ type: Schema.Literal("api"), key: Schema.NonEmptyString }),
+          Schema.Struct({
+            type: Schema.Literal("oauth"),
+            access: Schema.NonEmptyString,
+            refresh: Schema.NonEmptyString,
+            expires: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+            accountId: Schema.optional(Schema.String),
+            enterpriseUrl: Schema.optional(Schema.String),
+          }),
+        ]),
       }),
     ),
   )
@@ -155,6 +171,8 @@ const fixtures = Object.fromEntries(
     }),
   ),
 )
+const modelsPath = models ? join(output, "inputs/models.json") : undefined
+if (modelsPath) await writeFile(modelsPath, models!)
 const driver = join(import.meta.dir, "skills-acceptance", args.interface + ".mjs")
 await cp(join(import.meta.dir, "skills-acceptance"), join(output, "driver"), { recursive: true, errorOnExist: true })
 await cp(import.meta.filename, join(output, "driver/runner.ts"), { errorOnExist: true })
@@ -166,7 +184,8 @@ await writeFile(
       interface: args.interface,
       source,
       model: args.model,
-      variant: "default",
+      variant: args.variant,
+      modelsSha256: models && sha(models),
       repeat,
       cases,
       headless: args.headless,
@@ -194,6 +213,8 @@ const payload = {
   artifact,
   resources,
   model: args.model,
+  variant: args.variant,
+  modelsPath,
   repeat,
   cases,
   fixtures,
@@ -259,6 +280,7 @@ if (args.interface === "run") {
               testcase,
               attempt,
               installed,
+              modelsPath: modelsPath && "/inputs/models.json",
               fixtures: Object.fromEntries(
                 Object.entries(fixtures).map(([key, path]) => [key, "/inputs/" + basename(path)]),
               ),
@@ -290,7 +312,14 @@ if (args.interface === "run") {
 }
 
 function requireRedacted(text: string) {
-  if ([privateInput.apiKey, privateInput.auth.key].some((key) => text.includes(key)))
+  if (
+    [
+      privateInput.apiKey,
+      ...(privateInput.auth.type === "api"
+        ? [privateInput.auth.key]
+        : [privateInput.auth.access, privateInput.auth.refresh]),
+    ].some((key) => text.includes(key))
+  )
     throw Error("SKILLS_ACCEPTANCE_SECRET_IN_RESULT")
 }
 
