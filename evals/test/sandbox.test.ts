@@ -8,6 +8,24 @@ import { evalsRoot } from "../src/config"
 import { superviseProcess } from "../src/process-supervisor"
 import { statusFor } from "../src/report"
 
+test("sandboxCommand: proxy включает штатный Node env proxy независимо от окружения вызывающего процесса", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-sandbox-proxy-"))
+  try {
+    await Promise.all([mkdir(path.join(dir, "installation/bin"), { recursive: true }), mkdir(path.join(dir, "profile")), mkdir(path.join(dir, "workspace"))])
+    await cp("/usr/bin/python3", path.join(dir, "installation/bin/cli"), { dereference: true })
+    await Bun.write(path.join(dir, "installation/cli-manifest.json"), "{}")
+    const boundary = await sandboxCommand({
+      cmd: [path.join(dir, "installation/bin/cli"), "-c", "import json,os; print(json.dumps({'proxy':os.getenv('HTTP_PROXY'),'node_proxy':os.getenv('NODE_USE_ENV_PROXY')}))"],
+      profileDir: path.join(dir, "profile"), workdir: path.join(dir, "workspace"),
+      env: { HTTP_PROXY: "http://127.0.0.1:3128", NODE_USE_ENV_PROXY: "0" },
+    })
+    const proc = spawn(boundary.cmd[0]!, boundary.cmd.slice(1), { cwd: boundary.cwd, env: boundary.env, stdio: ["ignore", "pipe", "pipe", "pipe"] })
+    const output = await Promise.all([Array.fromAsync(proc.stdout!), new Promise<number | null>(resolve => proc.once("close", resolve))])
+    expect(output[1]).toBe(0)
+    expect(JSON.parse(Buffer.concat(output[0]).toString())).toEqual({ proxy: "http://127.0.0.1:3128", node_proxy: "1" })
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
 test("sandboxCommand: Python читает только входы и writable-профиль, внешние ответы недоступны", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-sandbox-"))
   try {
@@ -20,7 +38,10 @@ test("sandboxCommand: Python читает только входы и writable-п
     await Bun.write(path.join(workspace, "dataset.csv"), "category,value\nA,10\n")
     await Bun.write(path.join(profile, "cli-profile.json"), "{}")
     const hidden = [path.join(dir, "oracle.csv"), path.join(evalsRoot, "tasks/analytic/sales-by-category/reference.lgp"),
-      path.join(evalsRoot, "tasks/analytic/sales-by-category/task.json"), path.join(evalsRoot, "calibration"),
+      path.join(evalsRoot, "tasks/analytic/sales-by-category/task.json"), path.join(evalsRoot, "tasks/analytic/sales-by-category/SPEC.md"),
+      path.join(evalsRoot, "tasks/analytic/sales-by-category/oracle.csv"), path.join(evalsRoot, "tasks/analytic/sales-by-category/oracle.py"),
+      "/home/kiselev/git/agent-validation/sources/analytic-evals/sales-by-category/reference.lgp",
+      path.join(evalsRoot, "results"), path.join(evalsRoot, ".profile/agent.history"), path.join(evalsRoot, "calibration"),
       path.join(path.dirname(evalsRoot), ".git"), `/proc/${process.pid}/root`, "/run", "/var/run/docker.sock"]
     await Bun.write(hidden[0]!, "answer\n10\n")
     const script = "import json,os,pathlib,sys; p=pathlib.Path(sys.argv[1]); " +

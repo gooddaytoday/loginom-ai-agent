@@ -36,6 +36,9 @@ export async function sandboxCommand(input: {
   const inherited = Object.fromEntries(Object.entries(input.env).flatMap(([name, value]) =>
     value !== undefined && /^(?:https?_proxy|all_proxy|no_proxy|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|LOGINOM_AI_AGENT_(?:CLI_PROFILE|PURE|DISABLE_PROJECT_CONFIG|DISABLE_CLAUDE_CODE_PROMPT))$/.test(name)
       ? [[name, value]] : []))
+  // Bundled Node needs this startup switch to use the inherited proxy settings.
+  if (Object.entries(inherited).some(([name, value]) => /^(?:https?_proxy|all_proxy)$/i.test(name) && value !== ""))
+    inherited.NODE_USE_ENV_PROXY = "1"
   return { cmd, cwd: workspace, env: { ...inherited, PATH: "/usr/bin:/bin", HOME: "/home/eval", LANG: "C.UTF-8", TMPDIR: "/tmp" } }
 }
 
