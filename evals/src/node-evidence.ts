@@ -3,9 +3,11 @@ import { createHash } from "node:crypto"
 import { readdir } from "node:fs/promises"
 import { after, checkNodeSequence, operationReceipts, readNodeEvents, successful } from "./node-events"
 import { checkNodeXml, numericType, type PackageXml } from "./node-xml"
+import { nodeCase } from "./node-cases"
 
 const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex")
 export async function checkNodeEvidence(taskDir: string, attemptDir: string, id: string, required: Set<string>, xml: PackageXml, packagePath?: string) {
+  const contract = nodeCase(id)
   const failures: string[] = []
   const raw = Bun.file(path.join(attemptDir, "events.jsonl"))
   if (!(await raw.exists())) return ["events: full events.jsonl missing"]
@@ -26,9 +28,14 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
       receipt.output.configuration?.readback?.source?.first_line_as_title === true &&
       receipt.output.configuration?.readback?.format?.delimiter === ",")
     const columns = imp?.columns.map(c => `${c.Name}:${numericType(c.DataType) ? "numeric" : c.DataType}:${c.UsageType}`).sort()
+    const expectedColumns=["Amount:numeric:utActive", "Category:dtString:utActive", ...contract.keys.map(k=>`${k}:dtString:utActive`)].sort()
+    const rb=imported?.receipt.output.configuration?.readback
+    const nativeColumns=[...contract.keys,"Category","Amount"]
     if (imports.length !== 1 || !delivery || !imported || !after(imported.request, delivery) ||
       imp?.engine.CodePage !== "65001" || imp?.engine.DelimiterChar !== "," ||
-      JSON.stringify(columns) !== JSON.stringify(["Amount:numeric:utActive", "Category:dtString:utActive", "Region:dtString:utActive"]))
+      JSON.stringify(columns) !== JSON.stringify(expectedColumns) || contract.native && (
+        imp?.columns.some(c=>c.DataType!==(c.Name==="Amount"?"dtFloat":"dtString") || c.DataKind!==(c.Name==="Amount"?"dkContinuous":"dkDiscrete")) ||
+        rb?.columns?.length!==nativeColumns.length || !nativeColumns.every((name,index)=>rb.columns[index].name===name && rb.columns[index].type===(name==="Amount"?"real":"string") && rb.columns[index].used===true && rb.columns[index].data_kind===(name==="Amount"?"Непрерывный":"Дискретный"))))
       failures.push("input: original bytes and native CSV import proof required")
   }
   if (required.has("export") || required.has("sequence")) {
