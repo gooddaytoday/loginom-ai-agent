@@ -1,8 +1,12 @@
 # LGD: исследование этапа 0
 
-Статус: `blocked`, не `ready_for_development`. Наблюдения 2026-10-07 на
-Loginom 7.4.2, исходный SHA `ef84e68a22bd46f3f24549edd829cfb293836703`.
-Клиент — Linux x64/Chromium; редакция и ОС сервера не определены.
+Статус: исследование этапа 0 подготовлено к независимой приёмке;
+`ready_for_development` не объявляется. Наблюдения 2026-10-07: исходная база
+`ef84e68a22bd46f3f24549edd829cfb293836703`, продолжение native cold/property
+проверок на `8d5309c668d0b171ae7a788b65b7c60f72071fb4`.
+Loginom Enterprise 7.4.2 подтверждён штатным «О программе» под worker account.
+Клиент — Linux x64/Chromium. ОС сервера в доступном About UI не показана;
+редакция клиента и надпись «64-битная система» файла не доказывают ОС сервера.
 Это исследование native UI и контракт будущей приёмки. Полная CLI/model
 приёмка и независимая приёмка обработчика — `NOT_RUN`.
 
@@ -95,8 +99,18 @@ preview/toast сообщает: «Файл не является Loginom Data ф
 Cold-open в новых профилях подтвердил сохранённый baseline: 8 узлов,
 3 связи FixtureInput/Empty/Replace → соответствующие native writers,
 NativeLGD с прежним node_id, сохранённый абсолютный replace.lgd и checksum ON.
-После открытия его мастера свежий preview имел 7 строк. Выход cold-open
-был неактивен, новый fresh execution не заявляется. Baseline настройки
+Раннее открытие мастера показывало семь строк preview при неактивном выходе;
+этот ранний результат не объявлялся fresh execution. В продолжении выполнен
+новый cold execution до открытия мастера и без configure/восстановления:
+execution_id `1791374503336-66r6clbrfqq:159:1`, root 159, group 1, process 1.1.
+Launch подтверждён штатным жестом, completion — verified/owner_verified,
+cleanup_complete=true. Node `1d86c3ba-a6bf-4239-9a13-883dc5de8fa7`, output 0,
+port `58f7e6c3-511e-39d7-8853-036e0a1a7612`, table view
+`7ca7c4fc-e1d0-4c0c-94c9-c81c2eb83e28`. Все семь строк/35 ячеек независимо
+сверены с replace-values.csv. После чтения проверены все пять имён, меток,
+типов, видов, назначений «Не задано» и used=true; output mapping context
+подтвердил тот же node/port. Последующий просмотр native source settings
+подтвердил сохранённый абсолютный replace.lgd и checksum ON, без применения. Baseline настройки
 не применялись, пакет после просмотра не перезаписывался. Открытие мастера
 активного диагностического узла требует отдельной deactivation confirmation.
 
@@ -107,7 +121,7 @@ UNKNOWN и FAIL не преобразованы в PASS. Таймаут доба
 сверен двумя complete graph reads: дополнительного узла не было; повтор
 разрешён только после этой сверки и cleanup, в новой сессии.
 
-## Блокеры и границы W1
+## Границы будущего W1 и handler
 
 Реальный createArtifactStore admission исходных 334 байт принят, но штатный
 deliverArtifact на том же runtime дал ARTIFACT_VERIFICATION_UNSUPPORTED,
@@ -116,13 +130,74 @@ server-copy verification поддерживает только CSV/TSV/TXT. За
 подавалась. Native доставка не заменяет artifact_id/upload_operation_id
 и server-copy proof будущего CLI-контракта.
 
-Нужны решение владельца по W1 и отдельное назначение общих изменений:
+Эта граница не блокирует приёмку исследования этапа 0: модельный импорт
+до реализации handler не требуется. Для будущей реализации нужны решение
+владельца по расширению W1 на LGD и отдельное назначение общих изменений:
 бинарная доставка LGD с bytes/digest/destination, durable source lineage,
 persisted source при cold-open без старых receipts, cold reader для нового
 type. До этого полный CLI/model и подходящий cold oracle невозможны на базе.
 Общие runtime/config, guards, registry и план не менялись.
 
-Variant, разные имена/метки, DDF, 32-bit, другие compression и управляющие
-переменные — NOT_RUN; их нельзя выводить из пяти stock полей. Fixture/byte
-audit ниже не проверяет происхождение произвольного JSON readback. Приёмка
-первого среза закреплена в `acceptance/contract.md`, а не объявлена пройденной.
+Предлагаемый владелец общего W1 — исполнитель согласованного XLSX W1
+в LAB-21. Файлы, порядок закрепления SHA и адресная регрессия перечислены
+в `acceptance/contract.md`; второй механизм доставки не создаётся.
+
+## Различающиеся свойства и inventory
+
+Отдельный собственный NativeProperties импортировал source.lgd: autosync
+выключен, Id штатно переименован в RecordId с меткой «Идентификатор», Active
+перенесён кнопкой «Добавить в исключенные» в группу «Исключенные».
+Связанные четыре target поля и исключённое Active (used=false, source=null)
+подтверждены видимым mapping UI и ограниченным чтением его cached stores
+между двумя verified node contexts. Это значение used в native mapping,
+не доказательство неизвестного бинарного флага LGD. Legacy readNodeMapping
+отказал с mapping_record / mapping_filtered_store для исключённой группы;
+guard не исправлялся и не обходился в handler. Будущая адаптация readback
+обязана отдельно квалифицировать группировку и полноту.
+
+Полный typed output дал пять строк и четыре поля. Stock writer создал
+properties-stage0.lgd: 359 bytes, SHA256
+`d12e5ed680c0213be32eccf5b1257f002ccf525a420ec2b1f184d3f2595a8d13`.
+После установленного observer открыто меню собственного файла и ровно один
+раз выбран «Скачать»; получены реальные bytes. Повторный native picker этого
+файла подтвердил источник, checksum ON и source schema из четырёх полей:
+RecordId/«Идентификатор», Text, Amount, Occurred. Active отсутствует.
+Новое исполнение и все 20 ячеек совпали с properties-values.csv.
+Исходный сохранённый baseline не перезаписан; диагностические изменения
+отброшены при package_closed/logged_out=true, child exit=0.
+
+В EditColumnDefForm имя/метка доступны, type_label «Целый» и data_kind
+disabled. Создание/конверсия Variant через этот редактор —
+UNSUPPORTED_IN_OBSERVED_UI; Variant LGD fixture и чтение его подтипов —
+NOT_RUN. Это предел обследованного UI, а не запрет Variant в формате.
+DDF, 32-bit, другие compression и variables остаются отдельным NOT_RUN
+inventory; матрица этапа 2 не расширена.
+
+Добавление нового NativePropertiesFile завершилось AMBIGUOUS timeout.
+Две complete graph сверки подтвердили отсутствие дополнительного узла,
+диалогов и масок; добавление не повторялось. Для проверки файла использован
+существующий собственный диагностический узел с отдельным подтверждённым
+источником и явной deactivation confirmation. Ошибка возврата после stock
+writer drag сверена фактическим единственным writer/link; drag не повторялся.
+Оригинальные AMBIGUOUS/FAIL/UNKNOWN сохранены, не заменены PASS.
+
+`oracle.py` проверяет bytes и все typed значения, `cold-audit.py` отдельно
+сопоставляет execution/node/port, свойства, сохранённые source settings и
+cleanup квалифицированных native наблюдений. Они не удостоверяют
+происхождение произвольного JSON, remote byte lineage или будущий handler.
+Полный CLI/model и handler cold oracle остаются NOT_RUN. Исследование,
+fixtures/oracle и контракт передаются на независимую проверку именно в
+этом объёме; этап 1, registry readiness и общие изменения не назначены.
+
+## Проверки комплекта
+
+Byte/value audit всех семи LGD fixtures и cold semantic crosscheck — PASS.
+Десять отрицательных проверок отвергают старое execution, другую node/port
+identity, неверный путь/ячейку/метку, purpose/used и неполный cleanup.
+`validate.py` — FAIL только по evidence hash text-import-handler и
+text-import-parameters. Git object сверка подтвердила, что оба runtime файла
+и записанные registry hashes уже расходятся на исходном исследуемом
+`8d5309c668d0b171ae7a788b65b7c60f72071fb4`; эта карточка их не меняла.
+Это известное ограничение общего validator, не PASS; исправление общего
+registry/runtime находится вне этапа 0. Проверка LGD fixtures/oracle отдельно
+проходит. Полная CLI/model приёмка и handler cold oracle остаются NOT_RUN.

@@ -53,12 +53,12 @@ def audit_readback(manifest, name, receipt, checksum_off=False):
     entries = [entry for entry in manifest["files"] if entry["name"] == name]
     require(len(entries) == 1, "Unknown fixture")
     if name == "corrupt-block.lgd":
-        require(checksum_off, "Checksum ON must refuse corrupt-block; no successful value audit")
+        require(checksum_off, "Checksum ON preview refusal qualified; successful value audit is not defined")
     else:
         require(not checksum_off, "Checksum-off diagnostic is only defined for corrupt-block")
     require(receipt.get("ok") is True, "Read failed")
     read = receipt["result"]
-    columns = manifest["schema"]
+    columns = entries[0].get("schema", manifest["schema"])
     keys = ["name", "label", "type", "data_kind"]
     require([[column.get(key) for key in keys] for column in read["schema"]] ==
             [[column[key] for key in keys] for column in columns], "Schema differs")
