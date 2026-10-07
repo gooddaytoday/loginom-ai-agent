@@ -2275,6 +2275,28 @@ TUI typecheck **PASS**. Полный исходный TUI suite пока **188 P
 Native GREEN для изменения permission renderer требует нового чистого CLI
 candidate; до этого read-path gate остаётся открытым. Требования плана не менялись.
 
+## TUI: устаревшие фикстуры после переименования продукта
+
+Signal collector повторил три проблемных файла **STABLE FAIL 3/3**:
+каждый запуск **38 PASS / 9 FAIL**, 3.354 / 3.948 / 2.066 s, изолированные
+HOME/XDG, исходные hashes неизменны. Report `tui-source-signal-36f7cdf82/report.md`.
+Read-only history связывает значения со старым identity commit `d848db933`:
+ключ темы уже `loginom-ai-agent`, пути уже `packages/agent`, а ожидания остались
+прежними; текстовые замены в snapshots не пересчитали переносы при width=72.
+Это диагноз устаревших тестов. Старые SHA не запускались, поэтому этот commit
+не объявляется экспериментально установленным первым падающим SHA.
+
+Исправлены только fixtures: реальный ключ темы и ожидаемый `agent/src`.
+По одному циклу RED→GREEN: theme **8 PASS / 15 assertions**, tree **22 PASS /
+66 assertions**. В четырёх snapshots вручную сверены три строки длинного Grep
+вместо двух; остальные четыре записи в итоговом diff побайтно сохранены.
+Фильтрованный Bun update временно убрал неисполненные записи; полный запуск
+восстановил их с прежним содержимым. Поэтому после проверки diff выполнен
+ещё один полный запуск без update: **197 PASS / 1 SKIP / 0 FAIL**, все
+**8 snapshots сравнивались**, **476 assertions**, TUI typecheck **PASS**.
+Log `tui-source-identity-full-snapshots-green.log`. Skip существующего tree
+render test сохранён. Renderer/темы/дерево продукта ради тестов не менялись.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `aeef6c2c3`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef, static 4654 resources PASS.
