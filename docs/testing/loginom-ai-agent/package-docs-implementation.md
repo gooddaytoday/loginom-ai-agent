@@ -2091,9 +2091,88 @@ Native picker, фактическое отправленное вложение 
 Evidence `composer-signal-85d3889b8/`, `desktop-85d3889b8-composer-red/`.
 План по corrections повторно не перерабатывается; соседний evals не изменялся.
 
+## Installed DEB85: штатная политика sandbox и метаданные
+
+Actual DEB85 установлен `dpkg -i` в собственном Ubuntu 22.04.5 контейнере;
+UID приложения 1200, сеть отключена. Nonroot installed smoke **PASS**:
+комплектный Node 24.19.0, Chromium с `chromiumSandbox: true`, offline page,
+Electron с включённым sandbox и unconfigured wizard. Это не live Loginom.
+
+Первоначальный внешний metadata driver ожидал `root:root 4755` у обоих
+sandbox helpers и стабильно отказал **3/3**. Проверка штатного electron-builder
+26.15.2 `after-install.tpl` и фактического dpkg postinst установила причину:
+Electron helper намеренно получает `0755`, если `unshare --user true` работает,
+иначе `4755`. Root и UID1200 в этом контейнере дали status 0. Chromium helper
+остаётся `root:root 4755`. Это неверная предпосылка теста, не регрессия installer;
+chmod, упаковка и код продукта не менялись. Исходные отказавшие evidence сохранены.
+
+Новый отдельный metadata driver проверяет namespace probe, точную политику
+postinst, owner/group/mode каждого helper и точный launcher/menu Exec: **PASS**.
+Installed ASAR SHA256 `2b2ce7551599ef788495a44072b1cdcacd5f9ac87592563f0d69175060698b26`
+и resource manifest `f243b311f39abfdeb408521805549d700a1b0de437460227b7bce7c9345b10d8`
+совпадают с immutable85 payload. Dpkg: `install ok installed 0.1.17`.
+Evidence: `desktop-85d3889b8-ubuntu22-{smoke,metadata-userns-green}.log`,
+`installed-metadata-signal-85d3889b8/`, `installed-metadata-85d3889b8-userns.mjs`.
+Последний process inventory не содержит процессов продукта; контейнер удалён.
+Это замена собственного старого DEB той же версии в тестовом контейнере,
+не приёмка миграции пользовательской истории или N→N+1.
+
+## V2 composer GREEN: полный source pin `aeef6c2c3`
+
+Desktop и CLI собраны из чистого `aeef6c2c313dc8ed638430fd1dcf964119d7dd98`.
+Desktop source archive подтверждён `git get-tar-commit-id`, оба release manifests
+фиксируют sourceDirty=false. Node/Electron pins сохранены. SHA256:
+
+- DEB `ca30c45cd4f7615c40bcc328d4e1f3dd84e43e70a4d564a8fb57783f488d2f89`;
+- AppImage `cddacfa11b99df10ccb7c7fc8d63958832c30ceb0e0a9afc98e1a7a57f81c141`;
+- Desktop source archive `356b671c25d3dcae9c7d174eba0fb75b931a95abdcc2ee77e8a73320ef7e2042`;
+- CLI TAR.GZ `1a25e10b36fda79f2a2d987ed8a90f27beab415483093b35721d078ac8ff9002`;
+- CLI source tree `08f724f82b6b92fc1379683ad186f97d6bddf6611142315e364b135baf760d20`.
+
+DEB/AppImage static checks **PASS**, по **4654 resources**. CLI archive roundtrip,
+manifest/source checks и `sha256sum -c` **PASS**. Первый CLI запуск указал payload
+на уровень выше: guard отказал с EEXIST при публикации архива фиксированной версии;
+старый архив не перезаписан. Повтор использует новый отдельный parent и `payload/`.
+Оба logs сохранены; это конфигурация запуска, код продукта не менялся.
+
+Canonical native cold smoke на новой AppImage **GREEN**: два bundled skills,
+unconfigured wizard, accept `.lgp` в настоящем V2 composer. Screenshot просмотрен,
+Electron sandbox включён, `/proc` sampling 25 ms: **13 processes, remaining 0**,
+отдельный Loginom Chromium не наблюдался. Собственный root удалён после аудита.
+Evidence: `candidate-aeef6c2c3-{desktop,cli}/`, `desktop-aeef6c2c3-composer-green/`.
+Это завершает RED→GREEN исправления фильтра из `aeef6c2c3`; продуктовый код не
+меняется ради дальнейших проверок прав чтения.
+
+## Native Desktop: оригинальное вложение и отказ чтения
+
+`test/loginom/package-docs-permissions.mjs` выполняет два сценария через реальный
+AppImage GUI composer и permission dock в отдельном HOME/profile/workspace.
+Session fixture создаётся публичным API; маршрут задаётся через собственный
+persisted Desktop MemoryRouter. Модель/provider управляемые, поэтому это
+permissions/admission mechanics, не доказательство natural skill selection.
+
+**2 PASS** на AppImageaeef. Текстовый путь к внешнему `.LGP` вызывает
+`external_directory`; кнопка «Запретить» оставляет `package_docs_run` в error,
+без `.work` и отчёта. Агент штатно прекращает provider loop при отказе.
+Прежний внешний driver ошибочно ожидал следующую финальную фразу и получил
+timeout; исходный отказ сохранён. Новый тест ожидает settled error инструмента.
+
+Вложение добавлено через настоящий HTML file input с `.lgp` в accept;
+`setInputFiles` не проверяет OS dialog. Отправленный запрос и original user history
+содержат MIME `application/x-loginom-package` и исходный `file:` URL.
+Read/external permissions в ask; повторный запрос не появляется, комплектный
+Node извлекает `package_docs.structure.v1` внутри session directory. SHA256 `.lgp`
+в обоих случаях неизменен. Screenshots просмотрены. Sampling 25 ms:
+**22 processes, remaining 0**, Loginom Chromium не наблюдался, `--no-sandbox`
+отсутствует; оба собственных временных roots удалены. Prettier/diff check **PASS**.
+Evidence: `desktop-aeef6c2c3-gui-permissions-canonical/`; предшествующая внешняя
+проверка `desktop-gui-package-docs-permissions-aeef6c2c3-v3/` также 2 PASS.
+Разрешение текстового пути, явные read/edit deny, TUI permission dialog и plan
+сохраняют отдельные незавершённые native критерии. Этап 2 пока не отмечается.
+
 ## Checkpoint
 
-- Product candidates: Desktop/CLI `85d3889b8`, полные artifacts/source/manifest; Desktop composer .lgp RED 3/3, fix готовится к native GREEN.
+- Product candidates: Desktop/CLI `aeef6c2c3`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef, static 4654 resources PASS.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -2111,4 +2190,4 @@ Evidence `composer-signal-85d3889b8/`, `desktop-85d3889b8-composer-red/`.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS, native PTY paste/mention 2 PASS; attachment: 44 PASS.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
-- Desktop85 static/cold и CLI85 docs 3 формата/PTY 2 PASS; installed85/live GUI ещё открыты; full report quality/corpus/evals не приняты.
+- Installed DEB85 smoke/metadata/ASAR PASS; GUIaeef original attachment + text deny 2 PASS, 0 remaining; full report quality/corpus/evals открыты.

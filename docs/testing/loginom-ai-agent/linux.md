@@ -54,6 +54,16 @@ Docker запускается с `--init` для корректного Xvfb sta
 
 ## Нативные проверки
 
+`test/loginom/product-skills-smoke.mjs` проверяет холодное обнаружение bundled
+skills и фильтр `.lgp` в composer. `test/loginom/package-docs-permissions.mjs`
+проверяет отправленное оригинальное вложение и отказ чтения текстового пути
+через GUI. Для каждого запуска задать абсолютные `LOGINOM_AI_AGENT_TEST_EXECUTABLE`,
+`LOGINOM_AI_AGENT_TEST_RESOURCES` и новый `LOGINOM_AI_AGENT_TEST_ARTIFACTS`, затем
+из `packages/desktop` выполнить `xvfb-run -a <pinned-node> <test-path>` как nonroot.
+Второй тест использует управляемый provider и проверяет механику прав доступа;
+выбор skill живой моделью и OS file picker проверяются отдельно. Оба теста
+сохраняют sampling собственных процессов и запрещают `--no-sandbox`.
+
 `test/loginom/gui-smoke.mjs` запускается закреплённым Node под Xvfb либо в отдельной Wayland-сессии. `LOGINOM_AI_AGENT_TEST_EXECUTABLE` указывает установленный бинарник; без переменной проверяется локальная сборка. `LOGINOM_AI_AGENT_TEST_CONFIG` — абсолютный путь к приватному тестовому конфигу Dock с разрешённой passwordless учётной записью. Значение ключа не передаётся в аргументах процесса или выводе. Проверка использует отдельный временный профиль, выполняет check/save, проверяет plaintext/0600 и повторный запуск без мастера.
 
 Для Wayland указать `LOGINOM_AI_AGENT_TEST_WAYLAND=1`, `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, `XDG_SESSION_TYPE=wayland`, убрать `DISPLAY`. Проверка в headless Weston подтверждает использование протокола Wayland, но не заменяет пользовательский сеанс GNOME/KDE. Если Weston извлечён из пакетов без системной установки, его модули можно задать через `WESTON_MODULE_MAP` — пары `имя=путь`, разделённые `;` ([исходный загрузчик Weston](https://cgit.freedesktop.org/wayland/weston/tree/libweston/compositor.c)).
