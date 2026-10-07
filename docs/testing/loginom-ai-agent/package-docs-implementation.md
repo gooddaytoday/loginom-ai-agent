@@ -2402,9 +2402,47 @@ writer released; остальные bad cases не применили docs scope
 потребуют отдельной чистой сборки; пока Source GREEN не объявляется Native GREEN.
 Выбор модели управляемый. Этап 3 в целом и live routing остаются открытыми.
 
+## Native CLI `a8912ccbd`: ресурсный каталог и отказ целостности
+
+Полная новая сборка CLI, archive roundtrip, `verify-cli-candidate.ts` и checksum
+**PASS**. Source commit `a8912ccbd05f5b290ebeec83f99b32c38a9908cd`,
+source tree SHA-256 `3315ed85296b755a832fcbdd5ef5bcd5dad0714e6851e0daae828597ce547139`,
+`sourceDirty: false`. Архив SHA-256
+`73df7c25893034a7198d20086756536b61fa80dfe7e083015cb7756f08b79b4e`;
+сохранён в `candidate-a8912ccbd-cli/`, старые candidates не заменялись.
+Pins: prod 0.1.17, Bun 1.3.14, Node 24.19.0, Playwright
+1.63.0-alpha-2026-08-31, MCP 0.0.80, Chromium 1243. Logs
+`cli-a8912ccbd-build.log`, `cli-a8912ccbd-verified.json`.
+
+Native discovery matrix **7 PASS / 94 assertions**: empty `/tmp` workspace
+вне git, собственные HOME/XDG/profile, PATH без системных executable; clean case
+использует штатный resolver без CLI_BUNDLE. Остальные cases проверяют reserved
+skill/config-command copies, ordinary source precedence/realpath alias, modified,
+missing и unlisted файлы в отдельной копии bundle, явный неверный root.
+Повреждения не дают fallback; canonical skill errors теперь содержат reinstall
+hint. Wrong root отклонён до модели. Все profiles освобождены. Evidence
+`cli-a8912ccbd-discovery-created-green/` и одноимённый `.log`.
+Первый запуск `cli-a8912ccbd-discovery-green.log` дал 7 failures на сохранении
+evidence: я не создал родительский каталог ARTIFACTS. Это ошибка команды проверки;
+она исправлена созданием нового каталога, продукт и assertions не ослаблялись.
+
+Native pipeline/permissions **5 PASS / 79 assertions**: PDF/DOCX/MD с
+контролируемыми provider/Help, text-path auto-reject и standard plan edit-deny.
+Входные SHA неизменны, writer released; evidence
+`cli-a8912ccbd-pipeline-permissions-green/`. Это проверка реального конвейера
+со scripted provider, а не natural routing/качества свободно написанного отчёта.
+Процессная выборка этими TS tests не выполняется.
+
+Адресация `run` подтверждена этой сборкой, TUI — ранее CLI938 с чистым HOME и
+ровно тремя ожидаемыми skills. Отмечена только эта подзадача этапа 3.
+Весь этап ещё не закрыт: расширенный diagnostic assertion дал native RED
+`cli-a8912ccbd-diagnostic-red.log`: reserved-command выполнилась правильно,
+но stderr пуст и предупреждение пользователю не показано. Source/global event
+сам по себе не считается проверкой пользовательского вывода.
+
 ## Checkpoint
 
-- Product candidates: Desktop `aeef6c2c3`, CLI `938b2cf67`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef; разные source pins.
+- Product candidates: Desktop `aeef6c2c3`, CLI `a8912ccbd`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef; разные source pins.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–2 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -2420,6 +2458,6 @@ writer released; остальные bad cases не применили docs scope
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
-- CLI `.lgp`: 94 PASS / 1 SKIP; CLI938 pipeline/permissions 5 PASS; clean HOME native PTY 4 PASS, read path GREEN; TUI suite 197 PASS / 1 SKIP.
+- CLI `.lgp`: 94 PASS / 1 SKIP; CLIa891 discovery 7 PASS и pipeline/permissions 5 PASS; clean HOME CLI938 PTY 4 PASS, read path GREEN; TUI suite 197 PASS / 1 SKIP; глобальные CLI diagnostics RED.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUIaeef 5 permissions cases PASS; TUI typecheck PASS; report/corpus/evals и остальные Linux gates открыты.
