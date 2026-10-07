@@ -2802,6 +2802,38 @@ Container удалён; failure evidence сохранены. Context получ�
 driver bytes не менялись. Новая серия имеет отдельные имена и results root;
 факты/качество отчётов пока не объявляются GREEN.
 
+## Docs narrative: противоречивые примеры шаблона
+
+Первый настоящий CLIc721 PDF завершился за 114.269 s: actual installed launcher,
+Help B, extract/skeleton/emit, exit0, один PDF, исходный `.lgp` SHA не изменён,
+Chromium exec0. Узлы обеих подмоделей описаны отдельно; пустые порты и links,
+неизвестные Python/Reference настройки обозначены корректно. Механическая
+проверка **PASS**; полный фактографический gate **FAIL**: пакет и модуль названы
+демонстрационными по одному имени «Демо», хотя назначение/заметки отсутствуют.
+Actual events подтверждают чтение всех трёх references до написания отчёта.
+
+В `report-template.md` обнаружен старый пример «Нет внешних зависимостей»
+в разделе внешних пакетов, противоречащий SKILL/narrative и data.lgd fixture.
+Пример заменён точным утверждением об отсутствии ссылок на внешние пакеты;
+добавлен пример различения связи узлов и неизвестной формулы. Narrative
+исключает демонстрационную цель и в модульном описании; обе ссылки теперь
+одинаково трактуют null как отсутствие ребра. Это правка existing инструкций
+по этапу 6, без изменения требований плана, executor или инструментов.
+
+Перед правкой сохранён `attempt-1/manual-facts-verification.json` с конкретным
+RED. Host integrity **9 PASS / 16 assertions**, Agent skill/discovery
+**21 PASS / 132 assertions**; `docs-fact-guidance-{integrity,discovery}.log`.
+Эти static checks не проверяют смысл текста. CLIc721 серия продолжает
+использовать неизменный архив/driver; новая правка требует отдельной сборки
+и новых live результатов. Старую серию нельзя приписывать новым инструкциям.
+
+PDF первого запуска: две A4 страницы просмотрены после render системным
+`/usr/bin/pdftoppm`, русский текст читаем, вложенные списки нумеруются 1/2,
+обрезания/placeholder нет. Bare `pdfinfo` из bundled Codex runtime не запустился
+из-за GLIBC_2.38; использован уже установленный `/usr/bin/pdfinfo`.
+Это зависимость внешней проверки, не продукта. Layout PASS не снимает
+фактографический FAIL.
+
 ## Checkpoint
 
 - Product candidates: Desktop `2aa3a3284`, CLI `c7213af4c`, clean source/artifacts/manifests; Desktop и TUI83 diagnostics 5/5 stable PASS; разные source pins.
@@ -2809,7 +2841,7 @@ driver bytes не менялись. Новая серия имеет отдел�
 - Этапы 0–3 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node pipeline 43 PASS; port/null narrative clarification и catalog 21 PASS / integrity 9 PASS; прежний live report gate RED, новый candidate/live GREEN ещё нужен.
+- Docs Node pipeline 43 PASS; port/null и template fact guidance, catalog 21 PASS / integrity 9 PASS; первый CLIc721 PDF layout/mechanics PASS, facts RED; новая guidance ждёт отдельный live gate.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; весь этап 4 пока открыт.
 - Scope/command/HTTP/Runner/revert: 168 PASS / 1 SKIP; offline skill regression 135 PASS / 1 SKIP; typecheck PASS.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
