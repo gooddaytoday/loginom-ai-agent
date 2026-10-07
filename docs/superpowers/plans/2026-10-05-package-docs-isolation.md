@@ -587,7 +587,7 @@ staging доставляет ресурсы, runtime не обращается �
 тест проходит. Нет `loginom-scenario`, `/loginom` или alias `/package_docs`.
 Полная доверенная активация профилей появляется в этапах 3 и 5.
 
-### Этап 2. Генератор на Node и ограниченный package_docs_run
+### Этап 2. Генератор на Node и ограниченный package_docs_run — выполнен
 
 **Создать:** `packages/loginom-host/src/package-docs/{extract,skeleton,emit,cli}.ts`,
 `packages/loginom-host/script/build-package-docs.ts`,
@@ -612,7 +612,7 @@ type PackageDocsRun =
 Временный файл создаётся в том же каталоге и публикуется эксклюзивно, без
 перезаписи существующего. Ответ содержит фактический путь или явную ошибку.
 
-- [ ] Авторизовать чтение: путь вложенного `.lgp` из настоящих user messages
+- [x] Авторизовать чтение: путь вложенного `.lgp` из настоящих user messages
   этой сессии уже разрешён пользователем; одного пути от модели недостаточно.
   Для пути из текста применить `read`/`external_directory`. Desktop/TUI показывают
   запрос, standalone `run` автоматически отклоняет его и советует `--file`.

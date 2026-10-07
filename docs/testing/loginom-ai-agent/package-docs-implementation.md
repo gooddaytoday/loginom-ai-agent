@@ -2297,11 +2297,44 @@ Read-only history связывает значения со старым identity
 Log `tui-source-identity-full-snapshots-green.log`. Skip существующего tree
 render test сохранён. Renderer/темы/дерево продукта ради тестов не менялись.
 
+## Этап 2: native permission GREEN и три формата
+
+Полный чистый CLI candidate `938b2cf679e1b2783368883ca51848343c13c7a2`
+сохранён в `candidate-938b2cf67-cli/`: build, manifest/source verification,
+archive roundtrip и `sha256sum -c` **PASS**, `sourceDirty: false`.
+Archive SHA-256 `cd6b83d2c068ad24208464f446add6126c0395fe74e1c426da38bf7c941b2e88`;
+source tree `ec27914098b98a39e04b0b81a50079bb3f770ced228d074f824a0944cae40b03`.
+Pins остались прежними: Bun 1.3.14, Node 24.19.0, Chromium 1243.
+Это новый CLI source pin; Desktop остаётся aeef, совпадение их исходников
+не заявляется. Последующий commit 7746d5920 меняет только TUI tests и журнал.
+
+Канонический PTY driver на CLI938 дал **4 PASS**: внешний text path Allow once,
+его Esc reject, bracketed paste Unicode `.LGP` и `@sample.LGP`. Read-path
+**REDaeef→GREEN938**, в диалоге видны `Read` и `Path:` с именем исходного пакета.
+У каждого прогона отдельные чистые HOME/XDG/profile, PATH=/nonexistent;
+exit 0, forced false, writer released, remaining processes 0, Loginom Chromium
+не наблюдался, SHA входа сохранён. Положительные cases сравнили всю структуру
+с fixture; reject не создал file parts и `.work`. Logs/evidence:
+`cli-938b2cf67-tui-{read-path,text-deny,paste,mention}-green`.
+
+Actual compiled CLI pipeline/permissions **5 PASS / 79 assertions**:
+PDF, DOCX, MD через контролируемый Help/provider, text-path auto-reject
+с `--file` hint и обычный plan edit deny. Действительный bundled Node работает
+при отсутствии Node/Python в PATH; вход неизменён, guard освобождён,
+готовые файлы проверены по тексту PDF и DOCX XML. Evidence/log
+`cli-938b2cf67-pipeline-permissions-green/`. Эти проверки управляют вызовами
+модели и не доказывают natural activation или качество живого полного отчёта.
+
+Вместе с ранее принятыми Node parity/emit/error/cancel тестами и пятью native
+Desktop GUI permission cases закрыт критерий этапа 2. В плане изменены только
+его отметка завершения и checkbox авторизации чтения. Этапы 3–9 открыты;
+полный живой отчёт и A/B evals остаются отдельными условиями приёмки.
+
 ## Checkpoint
 
-- Product candidates: Desktop/CLI `aeef6c2c3`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef, static 4654 resources PASS.
+- Product candidates: Desktop `aeef6c2c3`, CLI `938b2cf67`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef; разные source pins.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
-- Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
+- Этапы 0–2 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
 - Docs Node pipeline 43 PASS; dependency wording и list numbers RED→GREEN; catalog 19 PASS, Host typecheck PASS; live report gate открыт.
@@ -2315,6 +2348,6 @@ render test сохранён. Renderer/темы/дерево продукта р
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
-- CLI `.lgp`: 94 PASS / 1 SKIP; TUI helpers: 12 PASS, native PTY paste/mention 2 PASS; attachment: 44 PASS.
+- CLI `.lgp`: 94 PASS / 1 SKIP; CLI938 pipeline/permissions 5 PASS; clean HOME native PTY 4 PASS, read path GREEN; TUI suite 197 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
-- Installed DEB85 smoke/metadata/ASAR PASS; GUIaeef 5 permissions cases PASS; TUI read path RED→source fix, native GREEN ещё нужен; full TUI 9 FAIL; report/corpus/evals открыты.
+- Installed DEB85 smoke/metadata/ASAR PASS; GUIaeef 5 permissions cases PASS; TUI typecheck PASS; report/corpus/evals и остальные Linux gates открыты.
