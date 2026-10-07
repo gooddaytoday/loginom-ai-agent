@@ -4155,6 +4155,31 @@ Help/input unchanged/Chromium0/remaining0. Повторный Help health probe 
 TLS unexpected EOF, exit35/HTTP000; новых live/model attempts нет.
 Подробности — в OpenAI resume report; full corpus/TUI/cold/A-B остаются открыты.
 
+## 2026-10-07 — PDF section labels, TDD
+
+Ручная QA Desktopbc6 external-unicode-path/attempt1: факты и mechanics PASS,
+layout FAIL — «Общая структура:» осталась внизу страницы1 без текста.
+Обе страницы/полный текст/ответ просмотрены; исходный PDF и FAIL сохранены.
+Attempts2/3 этого случая facts/mechanics/layout PASS. Native click не заявляется.
+
+Настоящий draft сохранён как `paragraph-pagination.report.md`, SHA256
+`66bafb6f9cfc7f936ca2bd21f8980403c5c31713626e8acda511bb6f50dd6c2a`.
+RED воспроизводит orphan label через настоящий renderReport/pdfPages.
+GREEN: PDF держит heading либо полностью жирную отдельную строку с первой
+строкой следующего блока. Прежняя защита короткой статистики сохранена.
+Дополнительно проверены160 сочетаний пяти видов заголовка, положения около
+границы страницы и короткого/длинного текста; строки/конец текста не теряются,
+пустых страниц нет. Regression56 PASS/675 assertions; Host typecheck PASS.
+Первый regression FAIL из-за склейки строк независимым PDF reader сохранён;
+проверка конца текста учитывает перенос пробела, продукт ради неё не менялся.
+
+Собранный public Node executor отрендерил тот же draft без модели/браузера;
+обе новые страницы просмотрены, label и текст теперь вместе. Evidence
+`paragraph-pagination-source-green`, PDF SHA256
+`d0991e68c12c115d909289027e2bc08ab3866f4cc9f2f3d733d647f55fc95d6d`.
+Это source-only GREEN; уже принятые Linux артефакты3ece/bc6 не содержат fix.
+Для installed gate потребуется новый сохранённый candidate.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
@@ -4163,7 +4188,7 @@ TLS unexpected EOF, exit35/HTTP000; новых live/model attempts нет.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node50 PASS/typecheck;253 Word6/6+MD6/6 PASS; Desktop attached-PDF attempt3 layout FAIL сохранён/RED→GREEN. Source PDF3 и installedbc6 attached-PDF8 страниц просмотрены, fix PASS; Desktop3ece native delivery4/4 PASS.
+- Docs Node56 PASS/675/typecheck;253 Word6/6+MD6/6 PASS. Старый stats layout FAIL и новыйbc6 external label FAIL сохранены/RED→GREEN; label fix пока source-only. Desktop3ece native delivery4/4 PASS.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
 - Scope/history/prompt/revert/docs: 200 PASS / 2 V2 SKIP; Host scope11 PASS; пять implementation подпунктов этапа 5 отмечены; installed переходы ещё открыты.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.

@@ -48,6 +48,27 @@ test("PDF keeps a short statistics list with its heading on the same page", asyn
   ]) expect(statistics).toContain(label)
 })
 
+test("PDF keeps a bold section label with the first line of its paragraph", async () => {
+  const pages = pdfPages(await renderReport(await readFile(join(fixtures, "paragraph-pagination.report.md"), "utf8"), "pdf", fonts))
+    .map((page) => page.join(""))
+  const section = pages.find((page) => page.includes("Общая структура:"))
+  expect(section).toBeDefined()
+  expect(section).toContain("Узел «Источник» настроен")
+})
+
+test.each(["#", "##", "###", "####", "**"])("PDF keeps %s section titles with short and oversized paragraphs across page boundaries", async (marker) => {
+  const title = marker === "**" ? "**Раздел проверки**" : `${marker} Раздел проверки`
+  for (const repeats of [1, 400]) {
+    for (let lines = 25; lines <= 40; lines++) {
+      const markdown = `${"Строка перед разделом.\n\n".repeat(lines)}${title}\n\n${"Начало описания. ".repeat(repeats)}Конец описания.`
+      const pages = pdfPages(await renderReport(markdown, "pdf", fonts)).map((page) => page.join(""))
+      expect(pages.find((page) => page.includes("Раздел проверки"))).toContain("Начало описания.")
+      expect(pages.join("").replace(/\s/g, "")).toContain("Конецописания.")
+      expect(pages.every((page) => page.length > 0)).toBe(true)
+    }
+  }
+})
+
 test("the product builder emits a standalone Node script and its actual license dependency graph", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")

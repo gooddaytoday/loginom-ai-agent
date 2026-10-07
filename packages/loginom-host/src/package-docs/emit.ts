@@ -145,6 +145,13 @@ function layoutPdf(blocks: Block[], regular: ReportFont, bold: ReportFont) {
         sum + item.style.before + Math.max(1, item.wrapped.length) * item.style.size * 1.35 + item.style.after, 0)
       if (height <= 841.89 - 112 && y - height < 56) newPage()
     }
+    const next = measured[index + 1]
+    // A standalone bold label is also a section title in model-written reports.
+    if (next && (row.block.kind.startsWith("h") || row.block.kind === "p" && row.block.runs.every((run) => run.bold))) {
+      const height = row.style.before + Math.max(1, row.wrapped.length) * row.style.size * 1.35 + row.style.after
+        + next.style.before + next.style.size * 1.35
+      if (height <= 841.89 - 112 && y - height < 56) newPage()
+    }
     const style = row.style
     gap(style.before)
     const ascent = regular.ascent * style.size / regular.units, leading = style.size * 1.35

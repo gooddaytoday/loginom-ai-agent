@@ -380,3 +380,27 @@ mechanics/facts/layout PASS. Исходные DOCX при QA не изменял
 Повторный bounded Help health probe вновь завершился TLS unexpected EOF,
 exit35/HTTP000 (`help-health-20261007-resume.json`). Новые live/model прогоны
 не начинались. Эти автономные и ручные проверки не закрывают этапы6–8 целиком.
+
+## PDF: отделившийся заголовок в сохранённом отчёте
+
+Desktopbc6 `docs-external-unicode-path` проверен3/3: факты/mechanics PASS,
+layout2/3. В attempt1 жирная строка «Общая структура:» завершает страницу1,
+текст начинается на странице2. Исходный PDF и manual-quality layout FAIL
+сохранены; attempts2/3 layout PASS. Все6 страниц/полные тексты/ответы прочитаны,
+настоящая Help, вход неизменен, Chromium0/remaining0. Клик старых ссылок не проверялся.
+
+По исходному draft выполнен RED→GREEN: PDF layout держит заголовки и отдельные
+полностью жирные labels с первой строкой следующего блока. Короткие списки
+статистики по-прежнему сохраняются целиком. Regression56 PASS/675 assertions,
+160 сочетаний heading/body/page boundary, Host typecheck PASS. Markdown/DOCX
+не менялись, прежний Word XML parity проходит. Первая ошибка расширенного
+теста была в склейке перенесённого пробела PDF reader; сохранена отдельно.
+
+Public Node executor собран из изменённого source; обе страницы результата
+того же draft просмотрены: заголовок и текст вместе, остальная структура
+сохранена. Evidence `paragraph-pagination-source-green/render-receipt.json`,
+PDF SHA256 `d0991e68c12c115d909289027e2bc08ab3866f4cc9f2f3d733d647f55fc95d6d`.
+Первоначальный QA renderer из PATH потребовал отсутствующую GLIBC2.38;
+сохранён harness failure, использован `/usr/bin/pdftoppm`. Продуктовый executor
+успешен до QA и не использует системный Python/Poppler. Это source-only proof;
+артефакты3ece/bc6 не relabelled, новый installed candidate ещё необходим.
