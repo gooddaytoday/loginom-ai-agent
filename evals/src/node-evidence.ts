@@ -15,32 +15,40 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
   failures.push(...operations.failures)
   const { imports, cross, exports } = checkNodeXml(xml, id, required)
   if (required.has("input")) {
-    const source = new Uint8Array(await Bun.file(path.join(taskDir, "data/sales.csv")).arrayBuffer())
-    const hash = digest(source), imp = imports[0]
-    const delivery = events.calls.find(call => call.tool.endsWith("artifact_deliver") && successful(call) &&
-      call.output.output?.destination === imp?.engine.FileName && call.output.output?.bytes === source.length &&
-      call.output.output?.sha256 === hash && call.output.output?.upload_completion_verified === true)
-    const imported = operations.receipts.find(({ request, receipt }) => request.input.target?.type === "imports.text" &&
-      receipt.output.node?.node_id === imp?.id && receipt.output.execution?.status === "completed" &&
-      request.input.parameters?.source?.upload_operation_id === delivery?.output.output?.upload_operation_id &&
-      request.input.parameters?.source?.bytes === source.length && request.input.parameters?.source?.sha256 === hash &&
-      receipt.output.configuration?.readback?.source?.source_path === imp?.engine.FileName &&
-      receipt.output.configuration?.readback?.source?.first_line_as_title === true &&
-      receipt.output.configuration?.readback?.format?.delimiter === ",")
+    const imp = imports[0]
+    const files = id === "crosstable-sliding-source-refresh" ? ["sales-initial.csv", "sales-updated.csv"] : ["sales.csv"]
     const columns = imp?.columns.map(c => `${c.Name}:${numericType(c.DataType) ? "numeric" : c.DataType}:${c.UsageType}`).sort()
-    const expectedColumns=["Amount:numeric:utActive", "Category:dtString:utActive", ...contract.keys.map(k=>`${k}:dtString:utActive`)].sort()
-    const rb=imported?.receipt.output.configuration?.readback
-    const nativeColumns=[...contract.keys,"Category","Amount"]
-    if (imports.length !== 1 || !delivery || !imported || !after(imported.request, delivery) ||
-      imp?.engine.CodePage !== "65001" || imp?.engine.DelimiterChar !== "," ||
-      JSON.stringify(columns) !== JSON.stringify(expectedColumns) || contract.native && (
-        imp?.columns.some(c=>c.DataType!==(c.Name==="Amount"?"dtFloat":"dtString") || c.DataKind!==(c.Name==="Amount"?"dkContinuous":"dkDiscrete")) ||
-        rb?.columns?.length!==nativeColumns.length || !nativeColumns.every((name,index)=>rb.columns[index].name===name && rb.columns[index].type===(name==="Amount"?"real":"string") && rb.columns[index].used===true && rb.columns[index].data_kind===(name==="Amount"?"Непрерывный":"Дискретный"))))
-      failures.push("input: original bytes and native CSV import proof required")
+    const expectedColumns = ["Amount:numeric:utActive", "Category:dtString:utActive", ...contract.keys.map(k => `${k}:dtString:utActive`)].sort()
+    const nativeColumns = [...contract.keys, "Category", "Amount"]
+    for (const [index, file] of files.entries()) {
+      const source = new Uint8Array(await Bun.file(path.join(taskDir, "data", file)).arrayBuffer()), hash = digest(source)
+      const finalSource = index === files.length - 1
+      const delivery = events.calls.find(call => call.tool.endsWith("artifact_deliver") && successful(call) &&
+        (!finalSource || call.output.output?.destination === imp?.engine.FileName) &&
+        call.output.output?.bytes === source.length && call.output.output?.sha256 === hash && call.output.output?.upload_completion_verified === true)
+      const imported = operations.receipts.find(({ request, receipt }) => {
+        const input = request.input, r = receipt.output, src = input.parameters?.source, rb = r.configuration?.readback
+        return delivery && input.target?.type === "imports.text" && r.node?.node_id === imp?.id && r.execution?.status === "completed" &&
+          src?.upload_operation_id === delivery.output.output.upload_operation_id &&
+          (src.bytes === source.length || contract.native && src.bytes === undefined) &&
+          (src.sha256 === hash || contract.native && src.sha256 === undefined) &&
+          rb?.source?.source_path === delivery.output.output.destination && rb?.source?.first_line_as_title === true && (rb?.format?.delimiter === "," || contract.native && rb?.format?.delimiter === "Запятая") &&
+          (!contract.native || input.document_id === r.node.document_id && input.workflow_ref?.workflow_id === r.node.workflow_id &&
+            (index === 0 ? input.target.kind === "new" : input.target.kind === "existing" &&
+              ["document_id", "workflow_id", "node_id"].every(k => input.target.ref?.[k] === r.node[k])))
+      })
+      const rb = imported?.receipt.output.configuration?.readback
+      if (imports.length !== 1 || !delivery || !imported || !after(imported.request, delivery) ||
+        imp?.engine.CodePage !== "65001" || imp?.engine.DelimiterChar !== "," || JSON.stringify(columns) !== JSON.stringify(expectedColumns) ||
+        contract.native && (imp?.columns.some(c => c.DataType !== (c.Name === "Amount" ? "dtFloat" : "dtString") || c.DataKind !== (c.Name === "Amount" ? "dkContinuous" : "dkDiscrete")) ||
+          rb?.columns?.length !== nativeColumns.length || !nativeColumns.every((name, i) => rb.columns[i].name === name && rb.columns[i].type === (name === "Amount" ? "real" : "string") &&
+            rb.columns[i].used === true && rb.columns[i].data_kind === (name === "Amount" ? "Непрерывный" : "Дискретный"))))
+        failures.push(`input: original bytes and native CSV import proof required (${file})`)
+    }
   }
   if (required.has("export") || required.has("sequence")) {
     const finalCsv = await Bun.file(path.join(taskDir, "oracle.csv")).text()
-    const initialCsv = id === "crosstable-reconfigure" ? await Bun.file(path.join(taskDir, "initial-oracle.csv")).text() : undefined
+    const initialCsv = ["crosstable-reconfigure", "crosstable-sliding-source-refresh"].includes(id) ? await Bun.file(path.join(taskDir, "initial-oracle.csv")).text() : undefined
     const sequence = checkNodeSequence(events, id, cross?.id ?? "", finalCsv, initialCsv)
     failures.push(...sequence.failures)
     if (id === "crosstable-min-max") {
