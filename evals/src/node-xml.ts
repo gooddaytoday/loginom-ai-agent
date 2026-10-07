@@ -1,5 +1,6 @@
 import path from "node:path"
 import { evalsRoot } from "./config"
+import { nodeCase } from "./node-cases"
 
 export type NodeXml = { scope: string; id: string; type: string; engine: Record<string, string>;
   columns: (Record<string, string> & { extension: Record<string, string> })[];
@@ -16,6 +17,7 @@ export async function readNodeXml(artifactDir: string): Promise<PackageXml | { i
 }
 
 export function checkNodeXml(xml: PackageXml, id: string, required: Set<string>) {
+  const contract = nodeCase(id)
   const failures: string[] = []
   const imports = xml.nodes.filter(n => n.type === "TBGImportTextFile")
   const crosses = xml.nodes.filter(n => n.type === "TBGCrossTabEngine")
@@ -25,12 +27,18 @@ export function checkNodeXml(xml: PackageXml, id: string, required: Set<string>)
     if (crosses.length !== 1) failures.push("crosstable: exactly one native CrossTable required")
     if (cross) {
       const mode = cross.engine.SlidingUniqueValues === "true" ? "sliding" : "fixed"
-      if (mode !== (id === "crosstable-sliding-average" ? "sliding" : "fixed")) failures.push("crosstable: category mode differs")
+      if (mode !== contract.mode) failures.push("crosstable: category mode differs")
       const roles = cross.columns.map(c => `${c.Name}:${c.InputColumnInfoName}:${c.UsageType}:${numericType(c.DataType) ? "numeric" : c.DataType}`).sort()
-      if (JSON.stringify(roles) !== JSON.stringify(["Amount:Amount:utValue:numeric", "Category:Category:utGroup:dtString", "Region:Region:utActive:dtString"]))
+      if (JSON.stringify(roles) !== JSON.stringify(["Amount:Amount:utValue:numeric", "Category:Category:utGroup:dtString", ...contract.keys.map(k=>`${k}:${k}:utActive:dtString`)].sort()))
         failures.push("crosstable: field roles/types differ")
+      const keys = cross.columns.filter(c=>c.UsageType === "utActive").sort((a,b)=>Number(a.extension.Order??0)-Number(b.extension.Order??0))
+      if (JSON.stringify(keys.map(c=>c.Name))!==JSON.stringify(contract.keys) || keys.some((c,index)=>Number(c.extension.Order??0)!==index))
+        failures.push("crosstable: ordered row keys differ")
       const amount = cross.columns.find(c => c.Name === "Amount")
-      if (amount?.extension.AggregationTypes !== (id === "crosstable-fixed-sum" ? "ctatSum" : "ctatAvg")) failures.push("crosstable: aggregate differs")
+      const aggregates:Record<string,string>={sum:"ctatSum",avg:"ctatAvg",min:"ctatMin",max:"ctatMax"}
+      if (JSON.stringify((amount?.extension.AggregationTypes??"").split(/\s+/).sort()) !== JSON.stringify(contract.functions.map(f=>aggregates[f]).sort())) failures.push("crosstable: aggregate differs")
+      if (contract.native && cross.columns.some(c=>c.DataType!==(c.Name==="Amount"?"dtFloat":"dtString") || c.DataKind!==(c.Name==="Amount"?"dkContinuous":"dkDiscrete")))
+        failures.push("crosstable: real fact and discrete string roles required")
       if (cross.variables.length || cross.columns.some(c => c.extension.NullGroup === "true" || c.extension.OtherGroup === "true"))
         failures.push("crosstable: unexpected variable or extra category")
     }
