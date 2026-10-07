@@ -162,9 +162,16 @@ test.each(["clean", "reserved", "reserved-command", "modified", "missing", "unli
         expect(system).toContain("Later source.")
         expect(system).not.toContain("Earlier source.")
         expect(discovered.find((match) => match[1] === "sample")?.[2]).toBe(join(later, "sample/SKILL.md"))
+        for (const name of ["package-docs", "loginom-automation", "package_docs"]) {
+          expect(result.errors).toContain(`Ignored external skill '${name}'`)
+          if (kind === "reserved-command") {
+            expect(result.errors).toContain(`Ignored external command '${name}' from config`)
+          }
+        }
       }
       expect(await readdir(fixture.profile)).not.toContain(".writer")
       if (broken) {
+        expect(result.errors).toContain("Bundled skills are unavailable")
         const skill = result.events.findLast((event) => event.type === "tool_use" && event.part.tool === "skill")
         expect(skill?.part.state.status).toBe("error")
         expect(skill?.part.state.error).toContain('Skill "package-docs" not found')

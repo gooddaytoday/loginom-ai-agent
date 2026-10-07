@@ -2440,6 +2440,34 @@ Native pipeline/permissions **5 PASS / 79 assertions**: PDF/DOCX/MD с
 но stderr пуст и предупреждение пользователю не показано. Source/global event
 сам по себе не считается проверкой пользовательского вывода.
 
+## CLI: глобальные diagnostics остаются предупреждениями
+
+Diagnosis: missing integration/code bug. Global `session.error` от discovery
+уже публикуется без sessionID, но старый CLI consumer принимал только событие
+текущей Session. `git blame` связывает этот фильтр с `61150f6391`; это происхождение
+строки, не экспериментально установленный breaking commit. Bisect не выполнялся:
+причина непосредственно видна в consumer и воспроизведена новым public test.
+
+Native `a8912ccbd` **STABLE 3/3 FAIL**: каждый испытуемый CLI завершился с exit 0,
+stderr 0 bytes, двумя provider requests и семью public events; runner exit 1
+только на diagnostic assertion. CLI/Node/manifests и driver inputs hashes серии
+не менялись. Собственные fixtures удалены, owned live 0. Report/evidence
+`cli-global-diagnostic-signal-a8912ccbd/report.md`.
+
+`run` теперь печатает global diagnostics как предупреждения в stderr и
+продолжает цикл. Ошибка другой Session игнорируется, текущей Session сохраняет
+прежний fatal путь; новые JSON event/schema/error type не вводились. Проверки
+stderr добавлены для всех canonical/obsolete reserved имён и config-команд;
+bad bundle требует видимую reinstall diagnostic, помимо tool error.
+
+Source **28 PASS / 254 assertions** (полная discovery matrix, bundled/catalog и
+skill tool), полный noninteractive `run` subprocess suite **18 PASS / 60 assertions**,
+Agent typecheck **PASS**, `git diff --check` **PASS**. Включены model error,
+provider continuation, JSON stdout, permissions, attach, SIGINT и release.
+Logs `cli-global-diagnostic-{source-green,matrix-source-green,run-source-green,typecheck}.log`.
+Native исправление ещё требует новой чистой сборки; native RED из прежнего binary
+не объявляется GREEN по одним source tests. Desktop/TUI consumers не менялись.
+
 ## Checkpoint
 
 - Product candidates: Desktop `aeef6c2c3`, CLI `a8912ccbd`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef; разные source pins.
@@ -2458,6 +2486,6 @@ Native pipeline/permissions **5 PASS / 79 assertions**: PDF/DOCX/MD с
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
-- CLI `.lgp`: 94 PASS / 1 SKIP; CLIa891 discovery 7 PASS и pipeline/permissions 5 PASS; clean HOME CLI938 PTY 4 PASS, read path GREEN; TUI suite 197 PASS / 1 SKIP; глобальные CLI diagnostics RED.
+- CLI `.lgp`: 94 PASS / 1 SKIP; CLIa891 discovery 7 PASS и pipeline/permissions 5 PASS; clean HOME CLI938 PTY 4 PASS, read path GREEN; TUI suite 197 PASS / 1 SKIP; CLI diagnostics source GREEN, native RED до новой сборки.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUIaeef 5 permissions cases PASS; TUI typecheck PASS; report/corpus/evals и остальные Linux gates открыты.

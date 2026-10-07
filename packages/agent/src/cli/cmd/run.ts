@@ -835,10 +835,15 @@ export const RunCommand = effectCmd({
 
             if (event.type === "session.error") {
               const props = event.properties
-              if (props.sessionID !== sessionID || !props.error) continue
+              if ((props.sessionID !== undefined && props.sessionID !== sessionID) || !props.error) continue
               let err = String(props.error.name)
               if ("data" in props.error && props.error.data && "message" in props.error.data) {
                 err = String(props.error.data.message)
+              }
+              if (props.sessionID === undefined) {
+                // Discovery diagnostics are global and do not fail the active run.
+                UI.println(UI.Style.TEXT_WARNING_BOLD + "!", UI.Style.TEXT_NORMAL, err)
+                continue
               }
               error = error ? error + EOL + err : err
               // Stop on the error event. Waiting for idle is the #27371 hang:
