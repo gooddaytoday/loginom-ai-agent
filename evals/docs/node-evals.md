@@ -24,6 +24,17 @@ Generic `summary.json` при skip-judge имеет null pass/score/oracle_pass.
 
 Unit и live выполнять последовательно: process-supervisor tests создают временные fake chrome в общем /proc и могут нарушить параллельное live cleanup. Сначала дождаться завершения bun test и fixture cleanup, затем выполнять live.
 
+LAB-16 вызывает общий `main()` и получает ту же обязательную Linux bubblewrap
+изоляцию binary CLI, проверку внешних debugger и чистого Loginom, что аналитические
+evals. Нужен эксклюзивный endpoint: параллельные live-приёмки на нём недопустимы.
+История каждой попытки, включая infra retry, переносится в закрытый sibling
+`${EVAL_PROFILE_DIR}.history/`; stage `profile_history` в `cleanup.json` содержит
+точный путь. Подтверждение модели по собственной БД CLI выполнять по архивной
+`data/loginom-ai-agent.db` вместе с сохранёнными WAL/SHM, выбирая соответствующую
+session ID из попытки. БД сохраняется, а следующему агенту она недоступна. Приватный
+архив не публиковать в evidence. Адресная очистка на других storage sources
+сохраняет прежний контракт; широкое удаление пользовательского хранилища запрещено.
+
 ## CSV без пакета и storage cleanup
 
 До dispatch harness проверяет существование точного `<attempt-name>.result.csv`, включая symlink и directory. Если пакет не найден, после подтверждённой очистки процессов он сохраняет только этот новый собственный CSV в `<attemptDir>/storage-outputs/`, записывает bytes/SHA256 в `storage-cleanup.json`, удаляет исходный файл и отдельно проверяет его отсутствие. Существовавший до попытки файл, неизвестный baseline, symlink, hardlink или неподтверждённая очистка процессов запрещают чтение/удаление. Чужие и соседние имена не выбираются.

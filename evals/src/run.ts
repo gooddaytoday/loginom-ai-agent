@@ -7,7 +7,7 @@ import { agentInputsHash, buildAgentPrompt, loadTasks, rubricHash, taskTimeoutMs
 import { agentCommand, runAgent, type AgentCommand } from "./cli"
 import { cleanupArtifact, cleanupOrphanResult, fetchArtifact, listStorage, parseArtifactSource, storageEntryExists, type ArtifactSource } from "./artifact"
 import { preflight } from "./preflight"
-import { assertAuth, ensureProfile, managementRuntimeDirectories, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
+import { archiveProfileHistory, assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
 import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { archiveDiagnostics } from "./diagnostics"
 import type { ProcessCleanup } from "./process-supervisor"
@@ -63,7 +63,7 @@ async function executeRun(config: EvalConfig) {
     stopped: null,
     interruptedCleanup: null,
   }
-  if (!config.dryRun) await prepareProfile(config, command).catch((error) => { state.stopped = describe(error) })
+  if (!config.dryRun) await prepareProfile(config, command, runId).catch((error) => { state.stopped = describe(error) })
   // Round-robin: сбой окружения размазывается по задачам, Ctrl+C после первого круга оставляет полное покрытие.
   outer: for (const attempt of Array.from({ length: config.repeat }, (_, index) => index + 1)) {
     for (const task of tasks) {
@@ -350,17 +350,17 @@ async function archiveInfraAttempt(outDir: string) {
     : rename(path.join(outDir, file), path.join(archive, file))))
 }
 
-async function prepareProfile(config: EvalConfig, command: AgentCommand) {
+async function prepareProfile(config: EvalConfig, command: AgentCommand, runId: string) {
   if (config.resetProfile) await resetProfile(config)
   await releaseStaleWriter(config.profileDir, null)
   await ensureProfile(config, command)
   await assertAuth(config, command)
   await recoverIfNeeded(command, 2)
-  await pruneRuntimeAttempts(config.profileDir, await managementRuntimeDirectories(command))
+  await archiveProfileHistory(config.profileDir, `${runId}-initial`)
 }
 
 export async function afterAttempt(config: EvalConfig, command: AgentCommand, result: AttemptResult, outDir?: string) {
-  const evidence: { processes?: ProcessCleanup; stages: { stage: string; status: string }[] } = { stages: [] }
+  const evidence: { processes?: ProcessCleanup; stages: { stage: string; status: string; path?: string }[] } = { stages: [] }
   try {
     if (!outDir) throw Error("Attempt cleanup evidence directory required")
     evidence.processes = (await Bun.file(path.join(outDir, "cleanup.json")).json()).processes as ProcessCleanup
@@ -376,8 +376,9 @@ export async function afterAttempt(config: EvalConfig, command: AgentCommand, re
     const recovery = await recoverIfNeeded(command, 1)
     result.profile_recovered = released || recovery.recovered
     evidence.stages.push({ stage: "ready", status: "confirmed" })
-    await pruneRuntimeAttempts(config.profileDir, [...evidence.processes.runtimeDirectories, ...await managementRuntimeDirectories(command)])
-    evidence.stages.push({ stage: "pruning", status: "confirmed" })
+    const archive = await archiveProfileHistory(config.profileDir,
+      `${path.basename(path.dirname(path.dirname(outDir)))}-${result.task_id}-${result.attempt}-${result.session_id ?? "no-session"}`)
+    evidence.stages.push({ stage: "profile_history", status: "confirmed", path: archive })
     result.environment_cleanup = { status: "confirmed", evidence: "cleanup.json", error: null }
     return { recovered: result.profile_recovered }
   } catch (error) {

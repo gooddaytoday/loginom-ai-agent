@@ -4,11 +4,11 @@
 
 ## Предпосылки
 
-- Bun ≥ 1.3; Linux; preflight требует `unzip`, `git`, `pgrep`, `ps` и `docker` (когда источник артефакта — `docker`), минимум 1 GiB свободного места для evals и workspace.
+- Bun ≥ 1.3; Linux; установленный binary CLI и bubblewrap; preflight требует `unzip`, `git`, `pgrep`, `ps` и `docker` (когда источник артефакта — `docker`), минимум 1 GiB свободного места для evals и workspace.
 - Локальный стенд Loginom в docker (`loginom-server-master`, `http://localhost/app/`, пользователь `user`).
 - Отдельный API-ключ Dock для eval (не ключ Desktop): память OpenViking привязана к ключу. Dock должен отвечать этим ключом; preflight забирает манифест skill с `include_integrity=true`.
 - Codex CLI с входом по подписке (`codex login`); судья — `gpt-6-astra`/`high`.
-- Dev-bundle: `bun run prepare-bundle` (полная копия ресурсов Desktop `packages/desktop/resources/loginom`, ~570 МБ, + сборка host). Симлинки не подходят: runtime проверяет, что realpath каждого файла манифеста лежит внутри bundle. Повторять после изменений в `packages/loginom-host` или ресурсах.
+- Live использует `EVAL_CLI_MODE=binary`, `EVAL_CLI_BIN` установленного `loginom-ai-agent-cli` с соседним `cli-manifest.json`. Source остаётся доступен для management/dev, но его live-выполнение запрещено. Binary несёт Node, Chromium и остальные ресурсы продукта; dev-bundle ему не нужен.
 
 ## Настройка
 
@@ -16,11 +16,22 @@
 cd evals
 bun install
 cp .env.example .env   # заполнить LOGINOM_DOCK_API_KEY
-bun run prepare-bundle
+# заполнить EVAL_CLI_BIN путём установленного CLI
 ```
 
 
 `--reset-profile` удаляет весь каталог eval-профиля, включая скопированный `auth.json`. После сброса скопируйте запись провайдера снова.
+
+Обычные попытки сохраняют профиль и OAuth на запись. После подтверждённого
+завершения процессов и recovery harness переносит историю каждой попытки,
+БД с WAL/SHM, inputs, tool outputs и runtime в `${EVAL_PROFILE_DIR}.history/`
+(по умолчанию `.profile/agent.history/`). Закрытый архив `0700` не входит в
+mounts агента; путь попытки записан в `cleanup.json`, stage `profile_history`.
+Первоначальная история имеет префикс `<run-id>-initial`, попытки — run/task/attempt/session;
+infra retry сохраняет отдельный архив. Токены, `cli-profile.json`, конфигурация,
+connection, каталог моделей и настройки модели остаются в рабочем профиле.
+При pending recovery/writer или отказе переноса следующий dispatch запрещён.
+Архив содержит приватные данные: не копировать его в публикуемый evidence/results.
 
 В режиме `source` harness засевает каталог моделей `.profile/agent/cache/models.json` из `packages/product/models.json` (native-сборка несёт его внутри).
 
