@@ -29,6 +29,28 @@ test("runAttempt: отказ подготовки границы до dispatch �
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+test("afterAttempt: сохраняет БД сессии в закрытом архиве перед следующим dispatch", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-attempt-history-"))
+  try {
+    const profileDir = path.join(directory, "profile")
+    await mkdir(profileDir)
+    const config = { ...loadConfig(["--dry-run"], { EVAL_WORKSPACE_ROOT: path.join(directory, "workspace") }), profileDir }
+    const command = agentCommand(config)
+    await Bun.write(path.join(profileDir, "data/loginom-ai-agent.db"), "session evidence")
+    const [task] = await loadTasks(config.tasksDir, ["calc-data-double"])
+    const runDir = path.join(directory, "results")
+    const { result } = await runAttempt({ config, command, source: parseArtifactSource(config.artifactSource, config.loginom),
+      task: task!, attempt: 1, runId: "history", runDir, signal: new AbortController().signal, profileRecovered: false, skipJudge: true })
+    const out = path.join(runDir, task!.id, "1")
+    expect(await afterAttempt(config, { ...command, cleanupDir: path.join(out, "management") }, result, out)).not.toHaveProperty("stop")
+    const cleanup = await Bun.file(path.join(out, "cleanup.json")).json()
+    const history = cleanup.stages.find((stage: { stage: string }) => stage.stage === "profile_history")
+    expect(history).toHaveProperty("path")
+    expect(await Bun.file(path.join(history.path, "data/loginom-ai-agent.db")).text()).toBe("session evidence")
+    expect(await Bun.file(path.join(profileDir, "data/loginom-ai-agent.db")).exists()).toBe(false)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test("main --dry-run --repeat 2: статусы по фикстурам, попытки в подпапках, summary без судьи", async () => {
   const result = await main(["--dry-run", "--repeat", "2", "--label", "dry"])
   const runDir = result.runDir

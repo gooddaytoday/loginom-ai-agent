@@ -64,7 +64,7 @@ test("superviseProcess: сбой mount обёртки отличается от 
   }
 }, 15_000)
 
-test("superviseProcess: Ctrl+C даёт CLI выполнить cleanup до завершения bwrap", async () => {
+test.each(["abort", "timeout"])("superviseProcess: %s даёт CLI выполнить cleanup до завершения bwrap", async (trigger) => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-sandbox-signal-"))
   try {
     await Promise.all([mkdir(path.join(dir, "installation/bin"), { recursive: true }), mkdir(path.join(dir, "profile")), mkdir(path.join(dir, "workspace"))])
@@ -76,12 +76,13 @@ test("superviseProcess: Ctrl+C даёт CLI выполнить cleanup до за
     const cmd = [path.join(dir, "installation/bin/cli"), "-c", script]
     const boundary = await sandboxCommand({ cmd, profileDir: path.join(dir, "profile"), workdir: path.join(dir, "workspace"), env: {} })
     const controller = new AbortController()
-    const pending = superviseProcess({ cmd, cwd: boundary.cwd, env: boundary.env, sandbox: boundary.cmd, timeoutMs: 10_000, signal: controller.signal })
+    const pending = superviseProcess({ cmd, cwd: boundary.cwd, env: boundary.env, sandbox: boundary.cmd, timeoutMs: 2_000, signal: controller.signal })
     const deadline = Date.now() + 5_000
     while (!await Bun.file(path.join(dir, "workspace/ready")).exists() && Date.now() < deadline) await Bun.sleep(20)
-    controller.abort()
+    if (trigger === "abort") controller.abort()
     const run = await pending
-    expect(run.interrupted).toBe(true)
+    expect(run.interrupted).toBe(trigger === "abort")
+    expect(run.timedOut).toBe(trigger === "timeout")
     expect(await Bun.file(path.join(dir, "workspace/cleaned")).exists()).toBe(true)
     expect(run.processCleanup.status).toBe("confirmed")
     expect(run.processCleanup.launcher?.cli_pid).not.toBeNull()

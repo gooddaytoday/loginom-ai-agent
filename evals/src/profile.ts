@@ -1,5 +1,5 @@
 import path from "node:path"
-import { mkdir, readdir, realpath, rm, rmdir, stat } from "node:fs/promises"
+import { mkdir, mkdtemp, lstat, readdir, realpath, rename, rm, rmdir, stat } from "node:fs/promises"
 import { repoRoot, type EvalConfig } from "./config"
 import type { AgentCommand } from "./cli"
 import { EvalFailure } from "./fail"
@@ -8,6 +8,82 @@ import { superviseProcess, writerIdentity, type ProcessCleanup, type WriterIdent
 import { archiveDiagnostics } from "./diagnostics"
 
 type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean }
+
+const retainedProfileFiles = new Set([
+  "cli-profile.json", "data/auth.json", "config/loginom-ai-agent.json", "config/loginom-ai-agent.jsonc",
+  "config/config.json", "config/.gitignore", "loginom/connection/connection.json", "cache/models.json", "state/model.json",
+])
+
+// Retain exact settings files, never whole data/cache/loginom directories.
+async function profileHistory(profile: string, directory = profile): Promise<string[]> {
+  return (await Promise.all((await readdir(directory, { withFileTypes: true })).map(async (entry) => {
+    const file = path.join(directory, entry.name)
+    const relative = path.relative(profile, file)
+    if (retainedProfileFiles.has(relative)) {
+      if (!entry.isFile() || entry.isSymbolicLink()) throw new EvalFailure("Постоянный файл профиля не является обычным файлом", 2)
+      return []
+    }
+    if ([...retainedProfileFiles].some((name) => name.startsWith(relative + "/"))) {
+      if (!entry.isDirectory() || entry.isSymbolicLink()) throw new EvalFailure("Каталог настроек профиля имеет неверный тип", 2)
+      return profileHistory(profile, file)
+    }
+    if (entry.isDirectory() && !(await readdir(file)).length) return []
+    return [file]
+  }))).flat()
+}
+
+export async function assertProfileClean(profileDir: string) {
+  const profile = await realpath(profileDir)
+  await assertProfileSettled(profile)
+  if ((await profileHistory(profile)).length)
+    throw new EvalFailure("В доступном профиле осталась история; admission запрещён", 2)
+}
+
+async function assertProfileSettled(profile: string) {
+  const recovery = await readdir(path.join(profile, "loginom/recovery")).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return []
+    throw error
+  })
+  const pending = await lstat(path.join(profile, "loginom/connection/pending.json")).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+  if (recovery.some((name) => /\.(json|tmp)$/.test(name)) || pending || await writerIdentity(profile) || !await waitProfileIdle(profile, 1_000))
+    throw new EvalFailure("Профиль имеет незавершённое состояние; перенос/admission запрещён", 2)
+}
+
+/** Move every attempt's durable evidence outside the single mounted profile. */
+export async function archiveProfileHistory(profileDir: string, archiveId: string) {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(archiveId)) throw new EvalFailure("Неверный ID архива профиля", 2)
+  const profile = await realpath(profileDir)
+  await assertProfileSettled(profile)
+  const files = await profileHistory(profile)
+  const root = `${profile}.history`
+  await mkdir(root, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => { if (error.code !== "EEXIST") throw error })
+  const info = await lstat(root)
+  if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || (info.mode & 0o077) !== 0)
+    throw new EvalFailure("Архив профиля не является закрытым каталогом", 2)
+  const archive = await mkdtemp(path.join(root, `${archiveId}-`))
+  const moved: { source: string; destination: string }[] = []
+  try {
+    for (const file of files) {
+      const destination = path.join(archive, path.relative(profile, file))
+      await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 })
+      const before = await lstat(file)
+      await rename(file, destination)
+      moved.push({ source: file, destination })
+      const after = await lstat(destination)
+      if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size)
+        throw new EvalFailure("Перенос истории профиля не подтверждён", 2)
+    }
+    await assertProfileClean(profile)
+    return archive
+  } catch (error) {
+    // A failed move must not split a database from its WAL/SHM at next admission.
+    for (const file of moved.reverse()) await rename(file.destination, file.source)
+    throw error
+  }
+}
 
 const exists = (file: string) =>
   stat(file).then(

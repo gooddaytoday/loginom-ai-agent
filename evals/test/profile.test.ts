@@ -1,13 +1,59 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdir, mkdtemp, readFile, stat, symlink, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, stat, symlink, writeFile, rm } from "node:fs/promises"
 import os from "node:os"
 import { spawn } from "node:child_process"
 import { loadConfig, repoRoot } from "../src/config"
 import { agentCommand } from "../src/cli"
-import { agentConfigJson, assertAuth, ensureProfile, management, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "../src/profile"
+import { agentConfigJson, archiveProfileHistory, assertProfileClean, assertAuth, ensureProfile, management, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "../src/profile"
 import { EvalFailure } from "../src/fail"
 import { writerIdentity } from "../src/process-supervisor"
+import { Database } from "bun:sqlite"
+
+test("archiveProfileHistory: история каждой попытки сохраняется вне mounts, OAuth и cli-profile остаются writable", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-profile-history-"))
+  const profile = path.join(dir, "profile")
+  try {
+    await mkdir(path.join(profile, "data"), { recursive: true })
+    await Bun.write(path.join(profile, "cli-profile.json"), "marker")
+    await Bun.write(path.join(profile, "data/auth.json"), '{"openai":{"refresh":"updated-token"}}')
+    for (const session of ["first", "retry"]) {
+      const db = new Database(path.join(profile, "data/loginom-ai-agent.db"), { create: true })
+      db.exec("CREATE TABLE session (id TEXT, model TEXT)")
+      db.query("INSERT INTO session VALUES (?, ?)").run(session, "openai/model")
+      db.close()
+      await Bun.write(path.join(profile, "loginom/inputs/dataset.csv"), `answer-${session}`)
+      await Bun.write(path.join(profile, "data/tool-output/result.txt"), "answer")
+      await expect(assertProfileClean(profile)).rejects.toThrow("история")
+      const archive = await archiveProfileHistory(profile, `run-task-1-${session}`)
+      expect(path.dirname(archive)).not.toBe(profile)
+      expect((await stat(archive)).mode & 0o077).toBe(0)
+      const evidence = new Database(path.join(archive, "data/loginom-ai-agent.db"), { readonly: true })
+      expect(evidence.query("SELECT id, model FROM session").get()).toEqual({ id: session, model: "openai/model" })
+      evidence.close()
+      expect(await Bun.file(path.join(archive, "loginom/inputs/dataset.csv")).text()).toBe(`answer-${session}`)
+      await assertProfileClean(profile)
+      expect(await Bun.file(path.join(profile, "data/loginom-ai-agent.db")).exists()).toBe(false)
+    }
+    expect(await Bun.file(path.join(profile, "cli-profile.json")).text()).toBe("marker")
+    expect(await Bun.file(path.join(profile, "data/auth.json")).text()).toContain("updated-token")
+    await Bun.write(path.join(profile, "data/auth.json"), '{"openai":{"refresh":"next-token"}}')
+    await assertProfileClean(profile)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test.each(["loginom/recovery/operation.json", "loginom/connection/pending.json", ".writer/owner"])(
+  "archiveProfileHistory: незавершённое состояние %s запрещает перенос БД", async (pending) => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "evals-profile-history-pending-"))
+    const profile = path.join(dir, "profile")
+    try {
+      await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), "unmoved")
+      await Bun.write(path.join(profile, pending), "pending")
+      await expect(archiveProfileHistory(profile, "blocked")).rejects.toThrow("незавершён")
+      expect(await Bun.file(path.join(profile, "data/loginom-ai-agent.db")).text()).toBe("unmoved")
+    } finally { await rm(dir, { recursive: true, force: true }) }
+  },
+)
 
 const stateFile = async (view: object) => {
   const file = path.join(await mkdtemp(path.join(os.tmpdir(), "evals-state-")), "view.json")
@@ -371,7 +417,7 @@ test("resetProfile: удаляет каталог профиля", async () => {
   expect(await stat(profileDir).catch(() => undefined)).toBeUndefined()
 })
 
-test("pruneRuntimeAttempts: очищает завершённые runtime и readiness, сохраняя долговечные данные профиля", async () => {
+test("pruneRuntimeAttempts: адресный pruning оставляет историю для отдельного закрытого архива", async () => {
   const profile = await mkdtemp(path.join(os.tmpdir(), "evals-profile-prune-"))
   const chat = path.join(profile, "loginom", "runtime", "generations", "1", "chats", "chat")
   const readiness = path.join(profile, "loginom", "runtime", "generations", "1", "chats", "readiness")

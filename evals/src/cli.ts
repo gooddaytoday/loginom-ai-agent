@@ -3,6 +3,7 @@ import type { EvalConfig } from "./config"
 import { evalsRoot, repoRoot } from "./config"
 import { superviseProcess } from "./process-supervisor"
 import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
+import { assertProfileClean } from "./profile"
 
 const saveActions = new Set(["package.save_as", "package.save_checkpoint"])
 const nodeTools = new Set(["loginom_dock_node_apply", "loginom_dock_node_resume", "loginom_dock_node_wait"])
@@ -152,7 +153,11 @@ export async function runAgent(input: {
     input.prompt,
   ]
   if (input.command.mode === "source") throw new SandboxFailure("требуются EVAL_CLI_MODE=binary и EVAL_CLI_BIN")
-  if (input.command.mode === "binary") await assertNoDebuggers()
+  if (input.command.mode === "binary") {
+    await assertProfileClean(input.profileDir ?? input.command.env.LOGINOM_AI_AGENT_CLI_PROFILE!)
+      .catch(() => { throw new SandboxFailure("профиль не очищен или имеет незавершённое состояние") })
+    await assertNoDebuggers()
+  }
   const cmd = [...input.command.cmd, ...args]
   const boundary = input.command.mode === "binary" ? await sandboxCommand({ cmd,
     profileDir: input.profileDir ?? input.command.env.LOGINOM_AI_AGENT_CLI_PROFILE!, workdir: input.workdir, env: input.command.env })
