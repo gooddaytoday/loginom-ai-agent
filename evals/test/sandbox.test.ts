@@ -110,3 +110,22 @@ test("debuggerEndpoints: находит Node inspector на случайном �
     await stopped
   }
 }, 10_000)
+
+test("superviseProcess: усыновление неизвестного helper внутри bwrap не обходит native admission", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-sandbox-adoption-"))
+  try {
+    await Promise.all([mkdir(path.join(dir, "installation/bin"), { recursive: true }), mkdir(path.join(dir, "installation/resources/loginom"), { recursive: true }),
+      mkdir(path.join(dir, "profile")), mkdir(path.join(dir, "workspace"))])
+    await cp("/usr/bin/python3", path.join(dir, "installation/bin/cli"), { dereference: true })
+    await cp("/usr/bin/true", path.join(dir, "installation/resources/loginom/chrome"))
+    await Bun.write(path.join(dir, "installation/resources/loginom/resource-manifest.json"), '{"browser":"chrome"}')
+    await Bun.write(path.join(dir, "installation/cli-manifest.json"), "{}")
+    const script = "import subprocess,time\ntime.sleep(0.5)\nsubprocess.run(['/bin/sh','-c','sleep 60 &'])\ntime.sleep(0.5)\n"
+    const cmd = [path.join(dir, "installation/bin/cli"), "-c", script]
+    const profileDir = path.join(dir, "profile")
+    const boundary = await sandboxCommand({ cmd, profileDir, workdir: path.join(dir, "workspace"), env: {} })
+    const run = await superviseProcess({ cmd, cwd: boundary.cwd, env: boundary.env, sandbox: boundary.cmd, profileDir, timeoutMs: 5_000 })
+    expect(run.processCleanup.status).toBe("failed")
+    expect(run.processCleanup.unknownProcesses?.some((entry) => entry.executable === "/usr/bin/sleep")).toBe(true)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+}, 15_000)
