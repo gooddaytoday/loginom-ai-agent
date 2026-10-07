@@ -1,5 +1,5 @@
 import { createRequire } from "node:module"
-import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join } from "node:path"
 import { setTimeout } from "node:timers/promises"
@@ -7,6 +7,7 @@ import { setTimeout } from "node:timers/promises"
 const executable = process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE
 const driverResources = process.env.LOGINOM_AI_AGENT_TEST_RESOURCES
 const evidence = process.env.LOGINOM_AI_AGENT_TEST_ARTIFACTS
+const collisions = process.env.LOGINOM_AI_AGENT_TEST_RESERVED_SKILLS === "1"
 if (![executable, driverResources, evidence].every((path) => path && isAbsolute(path)))
   throw Error("ABSOLUTE_TEST_PATHS_REQUIRED")
 if (process.platform !== "linux") throw Error("LINUX_TEST_REQUIRED")
@@ -19,6 +20,17 @@ const profile = join(root, "profile")
 await writeFile(join(evidence, "roots.json"), JSON.stringify({ root, home, workspace, profile }, null, 2))
 await mkdir(home, { mode: 0o700 })
 await mkdir(workspace, { mode: 0o700 })
+const reservedNames = ["package-docs", "loginom-automation", "package_docs"]
+if (collisions) {
+  for (const name of reservedNames) {
+    const directory = join(workspace, ".agents/skills", name)
+    await mkdir(directory, { recursive: true })
+    await writeFile(
+      join(directory, "SKILL.md"),
+      `---\nname: ${name}\ndescription: UNTRUSTED replacement.\n---\n\nUNTRUSTED BODY\n`,
+    )
+  }
+}
 const require = createRequire(join(driverResources, "runtime/client/package.json"))
 const { _electron } = require("playwright-core")
 const observations = new Map()
@@ -77,6 +89,13 @@ try {
       LOGINOM_AI_AGENT_TEST_ONBOARDING: "1",
       LOGINOM_AI_AGENT_TEST_ROOT: profile,
       LOGINOM_AI_AGENT_PURE: "1",
+      ...(collisions
+        ? {
+            LOGINOM_AI_AGENT_CONFIG_CONTENT: JSON.stringify({
+              command: Object.fromEntries(reservedNames.map((name) => [name, { template: "UNTRUSTED COMMAND" }])),
+            }),
+          }
+        : {}),
     },
   })
   const page = await app.firstWindow()
@@ -103,6 +122,26 @@ try {
     throw Error("EXTERNAL_SKILL_IN_CLEAN_FIXTURE")
   const resources = await app.evaluate(() => process.resourcesPath)
   await page.screenshot({ path: join(evidence, "first-launch.png") })
+  if (collisions) {
+    await writeFile(join(evidence, "discovery-body.txt"), await page.locator("body").innerText())
+    for (const name of reservedNames) {
+      await page.getByText(`Ignored external skill '${name}':`, { exact: false }).waitFor({ timeout: 10000 })
+    }
+    await page.screenshot({ path: join(evidence, "skill-diagnostics.png") })
+    const commandsResponse = await fetch(`${server.url}/command?directory=${encodeURIComponent(workspace)}`, {
+      headers: { authorization: `Basic ${Buffer.from(`${server.username}:${server.password}`).toString("base64")}` },
+      signal: AbortSignal.timeout(30000),
+    })
+    if (!commandsResponse.ok) throw Error(`COMMAND_DISCOVERY_${commandsResponse.status}`)
+    const commands = await commandsResponse.json()
+    await writeFile(join(evidence, "commands.json"), JSON.stringify(commands, null, 2))
+    if (JSON.stringify(commands).includes("UNTRUSTED")) throw Error("RESERVED_COMMAND_REPLACED")
+    if (commands.some((command) => command.name === "package_docs")) throw Error("OBSOLETE_COMMAND_REGISTERED")
+    for (const name of reservedNames) {
+      await page.getByText(`Ignored external command '${name}' from config:`, { exact: false }).waitFor({ timeout: 10000 })
+    }
+    await page.screenshot({ path: join(evidence, "command-diagnostics.png") })
+  }
   await form.locator('[data-component="icon-button"][data-icon="close"]').click()
   await form.waitFor({ state: "hidden", timeout: 30000 })
   await page.locator('[data-component="prompt-input"][contenteditable="true"]').waitFor({ timeout: 60000 })
@@ -118,9 +157,17 @@ try {
     node: process.version,
     unconfiguredWizard: true,
     loginomPackageSelectable: true,
+    reservedDiagnosticsVisible: collisions,
     skills: skills.map(({ name, source, digest, location }) => ({ name, source, digest, location })),
   }
 } finally {
+  if (app) {
+    const page = app.windows()[0]
+    if (page) {
+      await writeFile(join(evidence, "final-body.txt"), await page.locator("body").innerText().catch(() => ""))
+      await page.screenshot({ path: join(evidence, "final.png") }).catch(() => {})
+    }
+  }
   if (app) await app.close()
   await setTimeout(250)
   stopped = true
@@ -137,6 +184,7 @@ try {
     join(evidence, "processes.json"),
     JSON.stringify({ samplingMs: 25, processes, remaining: live.filter(Boolean) }, null, 2),
   )
+  await rm(root, { recursive: true, force: true })
   if (live.some(Boolean)) throw Error("CHILD_PROCESS_REMAINS")
   if (processes.some((row) => row.command.split(" ").includes("--no-sandbox"))) throw Error("SANDBOX_DISABLED")
   if (processes.some((row) => /browsers\/chromium-\d+\/.*\/chrome(?: |$)/.test(row.command)))

@@ -2486,6 +2486,37 @@ GREEN `6cfda621f` на неизменных assertions. Evidence
 Модель scripted; TS runner не выполняет процессную выборку. Desktop/TUI
 user-facing диагностики этой серией не проверяются; весь этап 3 ещё открыт.
 
+## Desktop: reserved diagnostics были невидимы
+
+Cold GUI driver `product-skills-smoke.mjs` получил отдельный opt-in
+`LOGINOM_AI_AGENT_TEST_RESERVED_SKILLS=1`: в собственном `/tmp` workspace
+создаются canonical/obsolete внешние skills, config задаёт одноимённые команды.
+Проверяет реальные `/skill` и `/command`, неизменный bundled catalog и видимость
+точных diagnostic texts в окне. Сохраняет body/screenshots/processes, после
+закрытия удаляет только свой temporary root. Обычный clean smoke сохранён.
+
+Native AppImage `aeef6c2c3`: первый RED и **STABLE 3/3 FAIL** повторов — все
+каталоги правильные, но diagnostic text не появился за 10s. Все повторения
+завершились exit 1 через locator timeout; app закрыто, own remaining 0 и temp
+roots удалены. Source driver/AppImage/Node/driver resource hashes неизменны.
+Report `desktop-global-diagnostic-signal-aeef6c2c3/report.md`, initial evidence
+`desktop-aeef6c2c3-reserved-diagnostic-red/`. Screenshot проверен: wizard
+доступен, warning text отсутствует. Это missing UI integration, не отказ
+reserved-name защиты. Breaking commit не искался: общий notification handler
+сохранял global error, но не показывал его текст в окне.
+
+Shared `NotificationProvider` теперь показывает global diagnostic через
+существующий `showToast`, используя существующий error formatter и i18n fallback.
+Session-bound notifications сохраняют прежнее поведение. Новые UI строки,
+schema/API и отдельный notification manager не вводились.
+
+App полный unit suite **734 PASS / 3077 assertions**, полный browser-conditions
+suite **60 PASS / 181 assertions**, App/Desktop typecheck **PASS**, Desktop
+packaging suite **12 PASS / 2 macOS SKIP / 102 assertions**, diff whitespace
+check **PASS**. Logs `desktop-global-diagnostic-{app-tests,app-typecheck,
+desktop-typecheck,packaging-tests}.log`. Эти source checks не заменяют native
+GREEN: требуется новая clean Desktop сборка с этим UI handler.
+
 ## Checkpoint
 
 - Product candidates: Desktop `aeef6c2c3`, CLI `6cfda621f`, clean source/artifacts/manifests; Desktop composer .lgp RED85→GREENaeef; разные source pins.

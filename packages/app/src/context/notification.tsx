@@ -17,6 +17,8 @@ import { ServerConnection, useServer } from "./server"
 import { type DraftTab, useTabs } from "./tabs"
 import { requireServerKey } from "@/utils/session-route"
 import type { ServerScope } from "@/utils/server-scope"
+import { errorMessage } from "@/pages/layout/helpers"
+import { showToast } from "@/utils/toast"
 
 type NotificationBase = {
   directory?: string
@@ -378,6 +380,12 @@ function createServerNotificationState(input: {
       }
 
       const error = "error" in event.properties ? event.properties.error : undefined
+      if (!sessionID) {
+        showToast({
+          variant: "error",
+          description: errorMessage(error, language.t("notification.session.error.fallbackDescription")),
+        })
+      }
       append({
         directory,
         time,
