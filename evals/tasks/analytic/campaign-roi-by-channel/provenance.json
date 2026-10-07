@@ -1,0 +1,51 @@
+{
+  "task_id": "campaign-roi-by-channel",
+  "source_task": "sources/analitic-tasks/task19-campaign-roi",
+  "dataset_sha256": "57ea09cd16bdcfac7b9e7954d243031d1c32a9bb14433de11027a7eb339d3eb5",
+  "oracle_sha256": "191597b4a750af2f01f747133ff9392326d67f7641e70500bb907d7ac46c3191",
+  "reference_sha256": "d4a178ccd17cf7c57569c4c7169363fff090bb6875c2fda1c344ba7e40f0a710",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/ref-campaign-roi-by-channel-1.lgp",
+    "result": "/user/ref-campaign-roi-by-channel-1.result.csv",
+    "input": "/user/6d5c9926a981189fbc2e26a9dae21a051a1926a3e5202d0a907d6c0d2015497a-0-dataset.csv",
+    "input_matches_dataset": true
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_f135b7a25ffeiUUTRd6QVE2EW8",
+    "exit_code": 0,
+    "started_at": "2026-09-29T13:09:52+03:00",
+    "duration_s": 440,
+    "tokens": {
+      "input": 62975,
+      "output": 2789,
+      "reasoning": 407
+    },
+    "tool_calls": 17,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "cli_result_vs_oracle": "PASS",
+    "structure": "PASS",
+    "browser_rerun_vs_oracle": "PASS"
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/ref-campaign-roi-by-channel-1.lgp/Unit1/workflow"
+}

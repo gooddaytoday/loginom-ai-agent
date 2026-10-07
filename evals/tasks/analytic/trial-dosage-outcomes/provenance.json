@@ -1,0 +1,62 @@
+{
+  "task_id": "trial-dosage-outcomes",
+  "dataset_sha256": {
+    "dataset.csv": "44dd8d1fe97b94651beeaf57bc7bd3126e3989b4619751777e3f2cfef1a10381"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "671af6148340bbc665b91afb17257cfc3533b50d3cbfb74c8e15e640bd49ead3"
+  },
+  "reference_sha256": "8661d42a69083ecc9bbaab53075228af24d3be30d34e3947b1834d4fcd2fb12b",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-trial-dosage-outcomes-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/d395ae0da93304b343c13f4ee806279afb62dad184bd42f65c8346c02c7759ff-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_f03dc702effe5hQXRgJ0jBqvpb",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-02T13:22:56+03:00",
+    "duration_s": 532,
+    "tokens": {
+      "input": 60194,
+      "output": 3207,
+      "reasoning": 1128
+    },
+    "tool_calls": 22,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-trial-dosage-outcomes-1.lgp/Unit1/workflow",
+  "source_task": "sources/analitic-tasks/task46-clinical-trial"
+}

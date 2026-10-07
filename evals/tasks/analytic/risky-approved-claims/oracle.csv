@@ -1,0 +1,5 @@
+policy_type,claims,total_claimed,total_payout,avg_fraud_score
+Home,23,1854751.31,1204828.25,0.939
+Life,25,1568017.11,992398.06,0.93128
+Auto,12,728798.87,704370.34,0.974417
+Health,12,1014516.87,573068.73,0.94775

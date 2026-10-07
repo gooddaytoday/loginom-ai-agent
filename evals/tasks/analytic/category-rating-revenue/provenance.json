@@ -1,0 +1,62 @@
+{
+  "task_id": "category-rating-revenue",
+  "dataset_sha256": {
+    "dataset.csv": "9e0707e361793045fb8c210d12172568b2f39a39159208afe526f5f8c05731a2"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "c30d0522e4d269657d121949acdcde8eea0f7c135a7a0999c8b60ab524590414"
+  },
+  "reference_sha256": "2fdcce94cf00f87bfeb60651737eec849108e5ee9096e493edbd0288528e96e9",
+  "cli": {
+    "binary": "/home/kiselev/.local/bin/loginom-ai-agent-cli",
+    "version": "0.1.17",
+    "profile": "analytic-evals"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-category-rating-revenue-3.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/f744da0beedb627d6e78ebeee96b3fc53ec8e2c4bc9c99ce549bd3dfd4a51c33-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 3,
+    "total": 3,
+    "assisted": true,
+    "hint": "Посчитай recommended_pct калькулятором после группировки как долю is_recommended = 1 в процентах. Не открывай редактор выходных колонок и не скрывай колонки: в выгрузке должны остаться число товаров, среднее rating и сумма revenue. Упорядочь категории по убыванию среднего rating.",
+    "session_id": "ses_ef32e0fbcffe4ivLe0e8ux23Wn",
+    "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+    "exit_code": 0,
+    "started_at": "2026-10-05T19:07:19+03:00",
+    "duration_s": 556,
+    "tokens": {
+      "input": 54825,
+      "output": 2978,
+      "reasoning": 437
+    },
+    "tool_calls": 20,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-category-rating-revenue-3.lgp/Unit1/workflow",
+  "source_task": "sources/analitic-tasks/task32-product-recommendations"
+}
