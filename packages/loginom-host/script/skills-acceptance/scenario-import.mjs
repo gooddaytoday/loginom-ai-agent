@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { completedDockReceipts } from "./receipts.mjs"
 
 export function verifyImportBuild(tools, input) {
   assert.ok(
@@ -10,9 +11,7 @@ export function verifyImportBuild(tools, input) {
     ),
     "SCENARIO_ACTIVATION_NOT_VERIFIED",
   )
-  const receipts = tools
-    .filter((t) => t.tool.startsWith("loginom_dock_") && t.state.status === "completed")
-    .flatMap((t) => t.state.output.split("\n\n").map(JSON.parse))
+  const receipts = completedDockReceipts(tools).map((receipt) => receipt.body)
   const prepared = receipts.find((r) => r.input_artifacts)
   assert.ok(prepared, "SCENARIO_PREPARE_NOT_VERIFIED")
   assert.equal(prepared.input_artifacts.length, 1)
@@ -64,9 +63,7 @@ export function verifyCalculatorModification(tools, input) {
     ),
     "SCENARIO_ACTIVATION_NOT_VERIFIED",
   )
-  const receipts = tools
-    .filter((t) => t.tool.startsWith("loginom_dock_") && t.state.status === "completed")
-    .flatMap((t) => t.state.output.split("\n\n").map(JSON.parse))
+  const receipts = completedDockReceipts(tools).map((receipt) => receipt.body)
   const calculator = receipts.findLast(
     (r) => r.status === "SUCCEEDED" && r.configuration?.readback?.kind === "calculator",
   )
@@ -113,9 +110,7 @@ export function verifyImportExecution(tools, input) {
     ),
     "SCENARIO_ACTIVATION_NOT_VERIFIED",
   )
-  const receipts = tools
-    .filter((t) => t.tool.startsWith("loginom_dock_") && t.state.status === "completed")
-    .flatMap((t) => t.state.output.split("\n\n").map(JSON.parse))
+  const receipts = completedDockReceipts(tools).map((receipt) => receipt.body)
   const executed = receipts.findLast(
     (r) => r.status === "SUCCEEDED" && r.node?.node_id === input.sourceNode && r.execution?.status === "completed",
   )

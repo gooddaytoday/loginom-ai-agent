@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { completedDockReceipts } from "./receipts.mjs"
 
 export function verifySalesScenario(tools, input) {
   assert.ok(
@@ -8,14 +9,7 @@ export function verifySalesScenario(tools, input) {
         t.state.metadata.activation.digest === input.skills.find((s) => s.name === "loginom-automation").digest,
     ),
   )
-  const receipts = tools
-    .filter((t) => t.tool.startsWith("loginom_dock_") && t.state.status === "completed")
-    .flatMap((t) =>
-      t.state.output
-        .split("\n\n")
-        .map(JSON.parse)
-        .map((body) => ({ tool: t, body })),
-    )
+  const receipts = completedDockReceipts(tools)
   const prepared = receipts.find((r) => r.tool.tool === "loginom_dock_prepare")?.body
   assert.ok(prepared, "SCENARIO_PREPARE_NOT_VERIFIED")
   assert.equal(prepared.input_artifacts.length, 1)

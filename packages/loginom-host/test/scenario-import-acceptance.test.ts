@@ -132,3 +132,17 @@ test("calculator acceptance rejects numeric-looking strings in the output schema
   expect(result.code).toBe(1)
   expect(result.stderr).toContain("SCENARIO_OUTPUT_SCHEMA_CHANGED")
 })
+
+test("operation inspection advice does not invalidate verified calculator output", async () => {
+  const { fixture } = await calculatorFixture()
+  fixture.tools.push({
+    tool: "loginom_dock_operation_inspect",
+    state: {
+      status: "completed",
+      output:
+        '{"operation_id":"calculator-inspection"}\n\nInspect the outcome and current state. Correct invalid parameters using the pinned schema; consult additional Dock knowledge only if needed.',
+    },
+  })
+  const result = await verify(fixture, "verifyCalculatorModification")
+  expect({ code: result.code, stderr: result.stderr }).toEqual({ code: 0, stderr: "" })
+})

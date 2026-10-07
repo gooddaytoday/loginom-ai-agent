@@ -4016,15 +4016,44 @@ Linux253 Desktop Ubuntu22/24/26+Debian12 PASS, Debian13 ещё идёт;
 CLI Ubuntu24/26+Debian12 PASS, Ubuntu22+Debian13 native180s FAIL сохранены.
 Общий evals/harness/judge/near-miss и чужие процессы не изменены.
 
+## 2026-10-07 — проверка installed PDF и разбор scenario-modify
+
+Desktopbc6 `docs-attached-pdf`3/3: прочитаны полные тексты и ответы,
+просмотрены все8 страниц. Факты/Help/неизменность `.lgp`/Chromium0/remaining0
+подтверждены; статистика на странице3 держится одним блоком в attempts1/3.
+Installed исправление пагинации244 проверено, `manual-quality.json` сохранены.
+Нативное открытие из ответа остаётся отдельной непроверенной частью приёмки.
+
+Desktop253 Linux matrix завершена5/5 PASS (Ubuntu22/24/26, Debian12/13).
+CLI253 Ubuntu22/Debian13 остановлены на полном archive manifest до установки,
+а не на installed launcher; исходные180s FAIL сохранены. Причина ещё исследуется
+одной offline-пробой network:none, без credentials/override/повторной модели.
+
+Desktopbc6 scenario-modify/attempt1: реальный NODE_APPLY_STOPPED в
+output_mapping, затем OUTPUT_MAPPING_RECOVERY_UNVERIFIED. Пакет не сохранён,
+ложный успех не заявлен. Проверенные10 runtime-файлов одинаковы253/bc6;
+причина отсутствия finish_wizard пока не доказана. Evidence:
+`scenario-modify-signal-20261007/report.md`. Blind recovery/handler fix не выполнен.
+
+Attempt2 завершил calculator execution/save с20/40/50, но parser адаптера
+пытался разобрать текстовую подсказку inspect как JSON. RED→GREEN отдельным
+тестом публичного verifier; общий decoder пропускает только текстовый footer
+operation_inspect, JSON остаётся строгим. Целевые12 PASS/typecheck/Prettier PASS.
+Из уже сохранённых messages выполнена offline-проверка second turn/source GUID,
+formula/schema/precision/save и физического source→calculator графа: PASS.
+`desktop-openai-modify-execute-bc6e7e164/scenario-modify/attempt-2/offline-parser-recovery`
+содержит отдельное доказательство. Исходный FAIL не переписан, новой model attempt
+не было; cold reexecution этого calculator ещё не проверено.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
-- Product candidates253 clean/manifest/static/CLI seed PASS; Linux5 идут: Desktop Ubuntu22/24/26 PASS, CLI Ubuntu24/26/Debian12 PASS, Ubuntu22+Debian13 native180s FAIL сохранены. Desktop Debian12 PASS, Debian13 идёт. CLI/Desktopbc6 source/manifest/static/CLI seed PASS; installed live fix идёт.
+- Product candidates253 clean/manifest/static/CLI seed PASS; Linux253 Desktop5/5 PASS; CLI Ubuntu24/26/Debian12 PASS, Ubuntu22+Debian13 archive manifest180s FAIL до установки сохранены. CLI/Desktopbc6 source/manifest/static/CLI seed PASS; installed live fix идёт.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node50 PASS/typecheck;253 Word6/6+MD6/6 PASS; Desktop attached-PDF attempt3 facts PASS/layout FAIL сохранён и воспроизведён RED→GREEN. Source PDF все3 страницы просмотрены; installed fix ещё не проверен.
+- Docs Node50 PASS/typecheck;253 Word6/6+MD6/6 PASS; Desktop attached-PDF attempt3 facts PASS/layout FAIL сохранён и воспроизведён RED→GREEN. Source PDF3 страницы и installedbc6 attached-PDF8 страниц просмотрены, fix PASS; native click открыт.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
 - Scope/history/prompt/revert/docs: 200 PASS / 2 V2 SKIP; Host scope11 PASS; пять implementation подпунктов этапа 5 отмечены; installed переходы ещё открыты.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.

@@ -258,3 +258,21 @@ Observer test flaky3/5 на250ms: после explicit capture notification GREEN
 короткая задержка убрана, прежние assertions сохранены. Итоговый regression31 PASS/110 assertions и Host typecheck/Prettier PASS. Linux253 CLI180s FAIL на Ubuntu22 и Debian13
 сохранены; первопричина timeout ещё не установлена. Desktop Debian12 PASS,
 Debian13 ещё выполняется. Общие evals файлы и соседние ресурсы не изменены.
+
+## Installed bc6: PDF и scenario-modify
+
+Основная модель прежняя `openai/gpt-6.1-sol/medium`, source сборкиbc6e7e164.
+Desktop attached-PDF3/3 facts/layout PASS, все8 страниц и полные ответы
+прочитаны; блок статистики не разрывается. Chromium0/remaining0/input unchanged.
+Нативное открытие ссылки из ответа ещё не проверено.
+
+Desktop modify/attempt1 реально остановился в output_mapping калькулятора,
+execution/save не завершены. Attempt2 выполнил20/40/50 и сохранил собственный
+пакет, но parser acceptance упал на текстовом footer inspect. Adapter исправлен
+RED→GREEN (12 tests/typecheck/Prettier PASS); отдельный offline receipt подтверждает
+execution/save/physical GUID/link по прежним messages. Оригинальные FAIL сохранены,
+качество не переигрывалось, полный gate не закрыт.
+
+Desktop253 Linux5/5 PASS. CLI253 Ubuntu22/Debian13 timeout случился на archive
+manifest до установки; это не доказанный отказ installed launcher. Остальные
+три CLI Linux PASS; идёт ровно одна offline-проба, исходные FAIL сохранены.
