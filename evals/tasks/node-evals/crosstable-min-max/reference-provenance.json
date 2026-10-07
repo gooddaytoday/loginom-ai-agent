@@ -1,0 +1,26 @@
+{
+  "builder_attempt": 1,
+  "builder_attempts_spent": 1,
+  "session_id": "ses_ee86ee310ffeVqaQCfrSfjEiHT",
+  "model": {
+    "providerID": "openai",
+    "modelID": "gpt-6.1-sol",
+    "variant": "xhigh"
+  },
+  "timeout_ms": 1800000,
+  "cli_source_sha": "904f7f85bf5450cbbfd48360d7dd9c483401face",
+  "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+  "action_manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+  "reference_sha256": "8ac58af5965ef907225492a547d6a0532ed7d7ca695ffd78af89443dadae2974",
+  "reference_code_check": {
+    "errors": [],
+    "failures": []
+  },
+  "cleanup_status": "confirmed",
+  "cold_status": "PASS",
+  "source_attachment_sha256": "2c3b17f1de317edf4cd9ce51d4b0b49488a650402966a8535062e0b34cbd11f1",
+  "cold_result_sha256": "733c7f3af9c88631f400729e493465346c13c4dc43f4b1330e8771526475f536",
+  "cold_checked_at": "2026-10-07T18:56:03.231030+00:00",
+  "cold_cleanup": "confirmed",
+  "cold_evidence": "cold/crosstable-min-max/"
+}
