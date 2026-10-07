@@ -21,7 +21,7 @@ export function renderSkeleton(structure: PackageStructure): string {
     "",
     ...(structure.package.external_references.length
       ? structure.package.external_references.map((reference) => `* \`${reference}\``)
-      : ["* Нет внешних зависимостей"]),
+      : ["* Ссылки на внешние пакеты отсутствуют"]),
     "",
     "### Статистика пакета",
     "",

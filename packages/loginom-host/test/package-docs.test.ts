@@ -95,6 +95,22 @@ async function docsCommand(args: string[], directory: string) {
   return { code, stdout, stderr }
 }
 
+test("a package using a local input file reports only the absence of external package references", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-file-dependency-"))
+  try {
+    const result = await docsCommand(["skeleton", "--lgp", join(fixtures, "nested.lgp"), "--directory", directory], directory)
+    expect(result.code).toBe(0)
+    expect(result.stderr).toBe("")
+    const paths = JSON.parse(result.stdout)
+    const structure = await Bun.file(paths.structure).json()
+    expect(structure.package.external_references).toEqual([])
+    expect(structure.modules[0].workflow_nodes[0].settings_main.FileName).toBe("data.lgd")
+    const report = await readFile(paths.report, "utf8")
+    expect(report).toContain("* Ссылки на внешние пакеты отсутствуют")
+    expect(report).not.toContain("Нет внешних зависимостей")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 20_000)
+
 test("repeating skeleton preserves the user's filled draft", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-docs-repeat-skeleton-"))
   try {
@@ -391,7 +407,7 @@ test("the DOCX writer runs under bundled Node without Bun or Python", async () =
   } finally { await zip.close() }
 }, 20_000)
 
-test("Markdown skeleton matches the saved Python report apart from its timestamp", async () => {
+test("Markdown skeleton matches the approved report template apart from its timestamp", async () => {
   const report = renderSkeleton(await extractPackage(join(fixtures, "demo.lgp")))
   const normalize = (text: string) => text.replace(/\(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\)/, "(timestamp)")
   expect(normalize(report)).toBe(normalize(await readFile(join(fixtures, "skeleton.md"), "utf8")))

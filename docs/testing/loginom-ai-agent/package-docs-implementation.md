@@ -1859,6 +1859,49 @@ Evidence `cli-live-help-setup-stdin-6c24f8de7/` и соответствующи�
 Его evidence сохранён отдельно, контейнер также удалён. Требования плана
 не пересматривались и setup gate всего этапа не отмечался выполненным.
 
+## Настоящий PDF с Help: механика подтверждена, содержание ещё не принято
+
+Установленный CLI C6, собственный Ubuntu22 container и профиль, основная
+модель `xiaomi-token-plan-sgp/mimo-v2.5-pro`, `default`: естественный запрос
+`docs-attached-pdf` с исходным вложением `Исходный сценарий.LGP` завершился
+за **85.878 s**, exit 0. Модель сама активировала `package-docs`, извлекла
+структуру, прочитала действительную Help и выпустила PDF через `emit`.
+Loginom web target намеренно недоступен (`127.0.0.1:9`); key-only Help готова.
+`strace -f -e trace=process` вокруг документирования зафиксировал **0 exec
+Chromium**. Вызовов Dock нет, SHA-256 исходного `.lgp` до/после совпадает.
+Вывод находится в session workspace, без `--auto` и override ресурсов.
+
+PDF — **45382 bytes**, 2 страницы A4, PDF 1.4. Текст извлечён системным
+Poppler; обе страницы отрендерены и просмотрены: кириллица читается, обрезки
+и наложений нет. Статистика соответствует fixture: 1 модуль, 6 узлов,
+2 подмодели, 1 программный, 1 ссылочный, 1 производный узел, глубина 3.
+Это доказательство механики и layout, **не PASS фактического содержания**.
+Модель написала «Пакет не имеет внешних зависимостей», хотя сама описала
+импорт `data.lgd`. В скелете была такая же ошибочная фраза: пустые
+`external_references` означают отсутствие внешних **пакетов**, а не файлов.
+Кроме того, текст содержит смешанное «пipelines» и описание общих возможностей
+Python/ссылки; качество narrative требует повторной проверки.
+
+Исправление выполнено отдельным TDD-циклом. Actual bundled Node CLI на
+`nested.lgp` сначала **RED**: `external_references: []`, `FileName: data.lgd`,
+старое общее отрицание зависимостей. Минимальное изменение скелета на
+«Ссылки на внешние пакеты отсутствуют» дало **GREEN**. SKILL.md отдельно
+разграничивает ссылки на пакеты и зависимости файлов/БД/сервисов/библиотек.
+В трёх skeleton golden изменена только эта строка; исходные Python PDF/DOCX
+и структуры оставлены для проверки паритета writer. Node pipeline теперь
+**42 PASS / 164 assertions**, bundled catalog **19 PASS / 119 assertions**,
+Host typecheck **PASS**. Новая immutable сборка и повторный live PDF ещё нужны;
+полный report gate не отмечен выполненным.
+
+Evidence: `cli-live-pdf-final-6c24f8de7/{evidence,report.txt,page-1.png,page-2.png}`
+в собственном acceptance root. Сохранены реальные tool events, setup outcome,
+process trace, результат и original hash. Ключ/профиль не экспортировались;
+temporary container удалён. Первые два adapter запуска сохранены отдельно:
+`--file` без разделителя `--` поглотил prompt; затем закрытый для UID 1200
+каталог driver не позволил начать запуск. Эти отказы произошли до модельного
+прогона и не считаются продуктовой регрессией. Изменены только собственные
+driver/permissions. План и рабочие деревья evals не менялись.
+
 ## Checkpoint
 
 - Product candidates: Desktop `8dc7bdccb`, CLI `6c24f8de7`; полные artifacts/manifest/archive сохранены, SHA различаются.
@@ -1866,7 +1909,7 @@ Evidence `cli-live-help-setup-stdin-6c24f8de7/` и соответствующи�
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node pipeline 41 PASS; оригинальные файлы/permission/cancellation проверены отдельно.
+- Docs Node pipeline 42 PASS; dependency wording RED→GREEN; catalog 19 PASS, Host typecheck PASS; нужен новый live PDF.
 - BrowserStatus/key-only Help: source; lazy CLI exit 2 подтверждён native, exit 1 source; first setup GUI/TTY открыт.
 - Scope/command/HTTP/Runner/revert: 168 PASS / 1 SKIP; offline skill regression 135 PASS / 1 SKIP; typecheck PASS.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
