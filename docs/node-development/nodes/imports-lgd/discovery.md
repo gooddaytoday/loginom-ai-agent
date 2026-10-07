@@ -201,3 +201,16 @@ text-import-parameters. Git object сверка подтвердила, что �
 Это известное ограничение общего validator, не PASS; исправление общего
 registry/runtime находится вне этапа 0. Проверка LGD fixtures/oracle отдельно
 проходит. Полная CLI/model приёмка и handler cold oracle остаются NOT_RUN.
+
+## Остановка финальной readiness-попытки
+
+После завершённого native исследования собран чистый delivery candidate
+`7044912a11f56973f404874da3081e8154fb17a9`. Новая отдельная CLI setup попытка
+вернула connection `state=ready`, затем `LOGINOM_HOST_CLEANUP_FAILED`, exit 1.
+CLI status после этого не запускался; повтор setup не выполнялся. Процессов
+с этой попыткой в cmdline/environment после foreground выхода не найдено,
+но завершение процесса не подтверждает logout или server-side cleanup.
+Этот отдельный CLI Host cleanup исход остаётся UNKNOWN и блокирует передачу
+на приёмку до квалификации. Предыдущий native package_closed/logged_out
+SUCCEEDED и native child exit=0 относятся к своей сессии и не подменяют
+результат новой попытки. Общий runtime/config не изменены; карточка Blocked.
