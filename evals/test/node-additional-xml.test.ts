@@ -17,3 +17,11 @@ test("multi-row-keys сохраняет оба ключа Region затем Mont
   const swapped=cross(["Region","Month"],"ctatSum"); swapped.nodes[0]!.columns[0]!.extension.Order="1"; swapped.nodes[0]!.columns[1]!.extension.Order="0"
   expect(check(swapped,"crosstable-multi-row-keys").length).toBeGreaterThan(0)
 })
+
+test("min/max XML допускает ровно две функции; sliding XML требует sliding режим",()=>{
+  expect(check(cross(["Region"],"ctatMin ctatMax"),"crosstable-min-max")).toEqual([])
+  for (const functions of ["ctatMin", "ctatMax", "ctatSum ctatMin ctatMax", "ctatAvg"])
+    expect(check(cross(["Region"],functions),"crosstable-min-max").length).toBeGreaterThan(0)
+  expect(check(cross(["Region"],"ctatSum",true),"crosstable-sliding-source-refresh")).toEqual([])
+  expect(check(cross(["Region"],"ctatSum"),"crosstable-sliding-source-refresh").length).toBeGreaterThan(0)
+})
