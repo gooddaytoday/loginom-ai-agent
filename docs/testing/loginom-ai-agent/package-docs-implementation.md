@@ -2735,6 +2735,33 @@ routing/report quality и парный evals gate остаются отдель�
 Требования замороженного плана не перерабатывались: отмечен только выполненный
 этап и его последний подтверждённый подпункт.
 
+## Docs narrative: null в hierarchy и порты подмодели
+
+Старый live report gate CLI520 остаётся **RED** по ручной фактографической
+проверке: утверждения о входе/выходе через несуществующие порты. SKILL.md и
+narrative-prompts.md у CLI520, CLI83 и текущего source совпадали побайтно
+(SHA `d6792bec…` и `416eb2bb…`); новая TUI правка не меняла эти инструкции.
+Known-good full report pin для этого кейса нет, first bad commit не установлен.
+
+Точечная правка existing skill/references по утверждённому этапу 6:
+null в hierarchy обозначает отсутствие соответствующего ребра на этом уровне,
+не внешний порт; внешние порты подмодели искать у её узла в родителе, внутренние
+links — в её собственном workflow. Изолированный узел не подтверждает поток.
+Добавлены конкретные корректные формулировки для пустых портов, неизвестной
+бизнес-задачи/настроек и отдельного описания каждого уровня подмодели.
+Контракты инструментов, extractor, шаблон, judge/harness и план не менялись.
+
+Host bundled integrity **9 PASS / 16 assertions**, Agent metadata/discovery/skill
+**21 PASS / 132 assertions**, diff check **PASS**;
+`docs-port-guidance-{integrity,discovery}.log`.
+Generic Codex `skill-creator/scripts/quick_validate.py` отказался на existing
+frontmatter `compatibility`: его allowed-fields список не содержит этого поля.
+Product Agent Skills metadata validator принимает поле и прошёл; корректное
+поле не удалялось ради несовместимого helper. Ни одна static проверка не
+доказывает правильность narrative. Нужны clean candidate и новые live reports
+с прежними model/variant/input, проверкой фактов и PDF layout. GREEN полного
+качества пока не заявляется; старые evidence сохранены.
+
 ## Checkpoint
 
 - Product candidates: Desktop `2aa3a3284`, CLI `83a2aff26`, clean source/artifacts/manifests; Desktop и TUI diagnostics 5/5 stable PASS; разные source pins.
@@ -2742,7 +2769,7 @@ routing/report quality и парный evals gate остаются отдель�
 - Этапы 0–3 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node pipeline 43 PASS; dependency wording и list numbers RED→GREEN; catalog 19 PASS, Host typecheck PASS; live report gate открыт.
+- Docs Node pipeline 43 PASS; port/null narrative clarification и catalog 21 PASS / integrity 9 PASS; прежний live report gate RED, новый candidate/live GREEN ещё нужен.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; lazy CLI exit 2 и 1 native PASS; весь этап 4 открыт.
 - Scope/command/HTTP/Runner/revert: 168 PASS / 1 SKIP; offline skill regression 135 PASS / 1 SKIP; typecheck PASS.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
