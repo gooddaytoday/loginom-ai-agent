@@ -151,21 +151,6 @@ export type TuiInput = {
   pluginHost: TuiPluginHost
 }
 
-function errorMessage(error: unknown) {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "data" in error &&
-    typeof error.data === "object" &&
-    error.data !== null &&
-    "message" in error.data &&
-    typeof error.data.message === "string"
-  ) {
-    return error.data.message
-  }
-  return error instanceof Error ? error.message : String(error)
-}
-
 function isVersionGreater(left: string, right: string) {
   const parse = (value: string) => {
     const [core, prerelease] = value.replace(/^v/, "").split("-", 2)
@@ -1021,19 +1006,6 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         message: "The current session was deleted",
       })
     }
-  })
-
-  event.on("session.error", (evt, { workspace }) => {
-    if (workspace !== project.workspace.current()) return
-    const error = evt.properties.error
-    if (error && typeof error === "object" && error.name === "MessageAbortedError") return
-    const message = errorMessage(error)
-
-    toast.show({
-      variant: "error",
-      message,
-      duration: 5000,
-    })
   })
 
   event.on("installation.update-available", async (evt) => {

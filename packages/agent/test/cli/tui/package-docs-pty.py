@@ -64,6 +64,7 @@ def main():
     input_kind = parser.add_mutually_exclusive_group(required=True)
     input_kind.add_argument("--attachment", choices=["paste", "mention"])
     input_kind.add_argument("--text-permission", choices=["allow", "deny"])
+    parser.add_argument("--reserved-diagnostics", choices=["skills"])
     args = parser.parse_args()
     assert sys.platform == "linux", "This acceptance driver requires Linux /proc and PTY"
     assert args.binary.is_absolute() and args.binary.is_file()
@@ -90,6 +91,13 @@ def run(args, workspace):
         lgp = source / "Исходный сценарий.LGP"
     shutil.copyfile(fixtures / "demo.lgp", lgp)
     original = hashlib.sha256(lgp.read_bytes()).hexdigest()
+    reserved = ["package-docs", "loginom-automation", "package_docs"]
+    if args.reserved_diagnostics == "skills":
+        for name in reserved:
+            directory = workspace / ".agents/skills" / name
+            directory.mkdir(parents=True)
+            (directory / "SKILL.md").write_text(
+                f"---\nname: {name}\ndescription: UNTRUSTED replacement.\n---\n\nUNTRUSTED BODY\n")
     home = args.artifacts / "home"
     home.mkdir(mode=0o700)
     profile = args.artifacts / "profile"
@@ -253,10 +261,14 @@ def run(args, workspace):
         with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as db:
             parts = [json.loads(row[0]) for row in db.execute("select data from part")]
     files = [part for part in parts if part.get("type") == "file"]
+    terminal_plain = re.sub(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))", "", output.decode(errors="replace"))
+    (args.artifacts / "terminal-plain.txt").write_text(terminal_plain)
+    warnings = re.findall(r"Ignored external (skill|command) '([^']+)'", terminal_plain)
     result = {"binary": str(args.binary), "attachment": mode, "inputSha256": original, "code": child.returncode,
         "forced": forced, "step": step, "guard": (profile / ".writer").exists(), "alive": alive,
         "chromiumObserved": chromium, "catalogs": catalogs, "structures": [str(p) for p in structures],
         "files": files, "systemNodePythonUnavailable": True, "readPermission": "ask",
+        "reservedDiagnostics": args.reserved_diagnostics, "visibleWarnings": warnings,
         "toolErrors": [part["state"]["error"] for part in parts if part.get("type") == "tool" and part.get("state", {}).get("status") == "error"]}
     (args.artifacts / "result.json").write_text(json.dumps(result, ensure_ascii=False))
     print(json.dumps(result, ensure_ascii=False))
@@ -268,6 +280,9 @@ def run(args, workspace):
         if message.get("role") == "system" and isinstance(message.get("content"), str))
     discovered = re.findall(r"<skill>\s*<name>(.*?)</name>.*?<location>(.*?)</location>\s*</skill>", system, re.S)
     assert sorted(name for name, _ in discovered) == ["customize-opencode", "loginom-automation", "package-docs"], "Clean workspace must not discover ancestor/home skills"
+    assert "UNTRUSTED" not in system, "External reserved skill must not enter the model catalog"
+    if args.reserved_diagnostics == "skills":
+        assert any(kind == "skill" and name in reserved for kind, name in warnings), "Ignored skill diagnostic must be visible in the native TUI"
     bundled = args.binary.parent.parent / "resources/loginom/skills"
     for name, location in discovered:
         if name != "customize-opencode":

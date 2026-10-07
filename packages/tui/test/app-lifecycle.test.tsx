@@ -167,6 +167,63 @@ test("startup warning from args is shown as a toast", async () => {
   }
 })
 
+test("global skill diagnostics are visible without a session", async () => {
+  const setup = await createTestRenderer({ width: 120, height: 35, useThread: false })
+  const core = await import("@opentui/core")
+  mock.module("@opentui/core", () => ({ ...core, createCliRenderer: async () => setup.renderer }))
+  const events = createEventSource()
+  const warning = {
+    directory,
+    payload: {
+      id: "evt_bootstrap_skill_warning",
+      type: "session.error" as const,
+      properties: {
+        error: {
+          name: "UnknownError" as const,
+          data: { message: "Ignored external skill 'package-docs': this name is reserved for a bundled Loginom skill." },
+        },
+      },
+    },
+  }
+  const calls = createFetch((url) => {
+    if (url.pathname === "/agent") events.emit(warning)
+    return undefined
+  })
+  let started!: () => void
+  const ready = new Promise<void>((resolve) => {
+    started = resolve
+  })
+
+  try {
+    const { run } = await import("../src/app")
+    const task = Effect.runPromise(
+      run({
+        url: "http://test",
+        directory,
+        config: createTuiResolvedConfig({ plugin_enabled: {} }),
+        fetch: calls.fetch,
+        events: events.source,
+        args: {},
+        pluginHost: {
+          async start() {
+            started()
+          },
+          async dispose() {},
+        },
+      }).pipe(Effect.provide(AppNodeBuilder.build(Global.node))),
+    )
+    await ready
+    await setup.renderOnce()
+    await setup.renderOnce()
+    expect(setup.captureCharFrame()).toContain("Ignored external skill 'package-docs'")
+    setup.renderer.destroy()
+    await task
+  } finally {
+    if (!setup.renderer.isDestroyed) setup.renderer.destroy()
+    mock.restore()
+  }
+})
+
 test("fatal startup errors set a nonzero exit after scoped cleanup", async () => {
   const setup = await createTestRenderer({ width: 80, height: 24, useThread: false })
   const core = await import("@opentui/core")

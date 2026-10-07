@@ -8,6 +8,7 @@ import { SDKProvider } from "../../../../src/context/sdk"
 import { SyncProvider, useSync } from "../../../../src/context/sync"
 import { PermissionProvider } from "../../../../src/context/permission"
 import { ExitProvider } from "../../../../src/context/exit"
+import { ToastProvider } from "../../../../src/ui/toast"
 import { createEventSource, createFetch, type FetchHandler, directory } from "../../../fixture/tui-sdk"
 import { TestTuiContexts } from "../../../fixture/tui-environment"
 export { createEventSource, createFetch, directory, eventSource, json, worktree } from "../../../fixture/tui-sdk"
@@ -52,9 +53,11 @@ export async function mount(override?: FetchHandler, state?: string) {
             <PermissionProvider>
               <ProjectProvider>
                 <ExitProvider exit={() => {}}>
-                  <SyncProvider>
-                    <Probe />
-                  </SyncProvider>
+                  <ToastProvider>
+                    <SyncProvider>
+                      <Probe />
+                    </SyncProvider>
+                  </ToastProvider>
                 </ExitProvider>
               </ProjectProvider>
             </PermissionProvider>

@@ -2639,6 +2639,40 @@ Native TUI diagnostics ещё не проверены, поэтому весь �
 Bookend file `desktop-2aa3a3284-damage-source-before.sha256`;
 сохранённые candidate checksums проверены после initial runs, без изменений.
 
+## Native TUI: предупреждение при загрузке каталога
+
+PTY driver получил opt-in `--reserved-diagnostics skills`: в собственном
+workspace он создаёт три внешних reserved skill, требует trusted bundled
+catalog, отсутствие UNTRUSTED в model context и хотя бы одно видимое
+предупреждение. Штатный TUI показывает одно текущее toast, поэтому одновременное
+отображение всех трёх не требуется. ANSI/raw output сохраняются отдельно.
+
+CLI `6cfda621f` **RED 3/3**: 10.295 / 9.633 / 10.068 s; CLI exit 0, extraction,
+оригинальное вложение и trusted catalog исправны, но warning отсутствует и в
+raw, и в plain terminal. Все input hashes до/после совпали, writer отсутствует,
+own live processes 0, Chromium не наблюдался, temporary roots удалены.
+Evidence `tui-reserved-warning-signal-6cfda621f/report.md`.
+
+Public `Tui.run`/renderer test сначала подтвердил, что после готовности App
+global `session.error` без session ID отображается. Затем тот же diagnostic
+передан из `/agent` fetch при первоначальной загрузке: **RED**, остальные
+lifecycle tests PASS. Причина: SyncProvider скрывает дочерний App до завершения
+блокирующей загрузки; handler внутри App ещё не существует, когда Agent/Skill
+публикуют предупреждения. Это обнаруженный пробел startup diagnostics; known
+good native pin для этой новой проверки нет, first bad commit не установлен.
+Предположение о необходимости RPC buffering не подтвердилось и не реализовано.
+
+Handler перенесён в уже работающий SyncProvider, workspace filter и игнорирование
+MessageAbortedError сохранены; используется существующий formatter/toast.
+Удалён ставший ненужным private formatter App. Новый public regression test
+**GREEN**. Первое полное выполнение выявило отсутствующий ToastProvider в
+общей sync test fixture; добавлен настоящий provider, без изменения assertions.
+Typecheck обнаружил недостающие event ID/explicit undefined в новой fixture,
+они исправлены. Повторный весь TUI: **198 PASS / 1 SKIP**, 8 прежних snapshots,
+477 assertions; `bun typecheck`, Python AST и `git diff --check` **PASS**.
+Логи `tui-bootstrap-diagnostic-{source,source-green,full,full-green,typecheck,typecheck-green}.log`.
+Native GREEN новой полной CLI-сборки ещё требуется; этап 3 остаётся открытым.
+
 ## Checkpoint
 
 - Product candidates: Desktop `2aa3a3284`, CLI `6cfda621f`, clean source/artifacts/manifests; Desktop reserved diagnostics и damaged-bundle rejection 5/5 stable PASS; разные source pins.
@@ -2657,7 +2691,7 @@ Bookend file `desktop-2aa3a3284-damage-source-before.sha256`;
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
-- CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cfd discovery/diagnostics 7 PASS, CLIa891 pipeline/permissions 5 PASS; clean HOME CLI938 PTY 4 PASS, read path GREEN; TUI suite 197 PASS / 1 SKIP; Desktop diagnostics 5/5 stable PASS.
+- CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cfd discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI warning CLI6cf RED 3/3, source GREEN / suite 198 PASS / 1 SKIP; Desktop diagnostics 5/5 stable PASS.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; static DEB/AppImage2aa PASS; GUI2aa 5 permissions и missing/modified/unlisted cases PASS; TUI typecheck PASS; report/corpus/evals и остальные Linux gates открыты.
 - Далее: native TUI reserved diagnostics, native lazy Help exit 1 и живые report/routing gates; требования плана повторно не перерабатывать.
