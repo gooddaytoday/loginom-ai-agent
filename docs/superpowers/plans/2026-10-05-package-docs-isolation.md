@@ -1102,7 +1102,7 @@ Core имеет разметку осей, но без CSV oracle. По доку
 - [x] Записать SHA сборки, версии инструментов, выполненные команды, результаты
   матрицы и ограничения. Source-only результат не помечать installed acceptance;
   Linux-проверку не переносить на Windows/macOS.
-- [ ] Обновить постоянные правила: `packages/product/AGENTS.md` — владелец
+- [x] Обновить постоянные правила: `packages/product/AGENTS.md` — владелец
   каталога/зарезервированных имён/integrity и правила «новый skill — новая папка»,
   ссылка из корневой карты; `agent/AGENTS.md` — профиль, admission и lazy run;
   `loginom-host/AGENTS.md` — knowledge, ready и scope;

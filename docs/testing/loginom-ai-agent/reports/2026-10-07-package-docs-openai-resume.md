@@ -3,7 +3,7 @@
 Статус: частичная приёмка; bc6 live-матрица завершена с native/infra отказами.
 Новый candidate669: Desktop/CLI installed Linux5/5 для каждого; PDF layout и
 Desktop native opening4/4 PASS. SUM bc6→cold6693/3 PASS. Полные живые
-corpus/TUI/upgrade/A-B и остальные cold gates остаются открытыми.
+corpus/TUI/lifecycle/independence/A-B и остальные cold gates остаются открытыми.
 Основная модель: `openai/gpt-6.1-sol`, variant `medium`.
 Source первоначальных clean candidates: `c50d220c186a1ef0332b15c4a3e9fb1bc7e42efc`.
 
@@ -500,3 +500,17 @@ refused/exit7, HTTP000 в обоих случаях. Глобальная сре
 модельные прогоны не начаты. Необязательный вызов private auth wrapper без
 аргументов отказал на validation acceptance runner; это не доказательство отказа
 OAuth. Полные corpus/TUI/upgrade/A-B и сценарные live gates остаются открытыми.
+
+
+## 2026-10-07 — проверка обновления установленного payload
+
+Ubuntu24 offline Desktop и CLI669 сохранили настройки, auth fixture, user skill
+и историю при замене payload. CLI продолжил прежний sessionID до/после
+обновления; второй writer получил PROFILE_BUSY/3. Desktop использовал обычный
+постоянный HOME/XDG и public backend/noReply. Оба результата PASS, exit0,
+containers removed, own processes0. Продукт и180s deadline не менялись:
+resume FAIL v2/v3 вызван открытым stdin внешнего execFile; точный RED3/3 и
+EOF GREEN3/3 плюс installed v4 сохранены рядом с исходными FAIL.
+[Полные команды, hashes и ограничения](2026-10-07-package-docs-upgrade.md).
+Это synthetic/noReply проверка сохранности, без внешних model/Help/Loginom calls;
+полную живую матрицу и browser independence она не закрывает.

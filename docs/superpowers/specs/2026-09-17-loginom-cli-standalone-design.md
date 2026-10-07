@@ -3280,3 +3280,24 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   Native/installed acceptance of this change remains open.
 - This supersedes the lazy exit-code item in the dated local-run progress above.
   [Current implementation evidence](../../testing/loginom-ai-agent/package-docs-implementation.md).
+
+### Package docs isolation: installed Linux candidate and profile update (2026-10-07)
+
+- Clean source `669822296615accbd6579c09244dacb24f77a056` produced complete
+  CLI TAR.GZ and Desktop DEB/AppImage, version0.1.17. Installed network-free
+  Ubuntu22/24/26 and Debian12/13 checks pass for both products (5/5 each),
+  including inventory, public launchers, root-owned4755 Chromium sandbox and
+  owned cleanup. These are isolated candidates, not the user's installation.
+- CLI update from `bc6e7e164` retained config/auth fixture/user skill/history
+  and resumed the saved Session in a new process before and after replacement.
+  Second writer refusal was PROFILE_BUSY/3 with the same owner nonce; no guard
+  remained after confirmed cleanup. The provider was synthetic; there were no
+  model/Help/Loginom calls. Desktop separately retained its persistent normal
+  HOME/XDG profile and public noReply history across dpkg payload replacement.
+- The first CLI acceptance resume timeout came from an unclosed execFile stdin
+  pipe. EOF framing was reproduced3/3 and corrected only in the private driver;
+  product code and180s budget were unchanged. Initial failures remain recorded.
+- Complete live skill-selection/TUI/lifecycle/independence and evals A/B gates
+  remain open. Linux evidence does not certify Windows/macOS or release.
+
+[Versioned update evidence](../../testing/loginom-ai-agent/reports/2026-10-07-package-docs-upgrade.md).

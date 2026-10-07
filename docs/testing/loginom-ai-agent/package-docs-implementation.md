@@ -4261,6 +4261,33 @@ refused/exit7, HTTP000 в обоих случаях. Глобальная сре
 аргументов отказал на validation acceptance runner; это не доказательство отказа
 OAuth. Полные corpus/TUI/upgrade/A-B и сценарные live gates остаются открытыми.
 
+## 2026-10-07 — сохранность профиля при замене установленного payload
+
+Offline Ubuntu24 Desktop и CLI669 прошли отдельное обновление с сохранением
+настроек, тестовой auth fixture, пользовательского skill и истории. CLI
+продолжил прежний sessionID новым процессом до/после замены; второй writer
+получил PROFILE_BUSY/3 без смены owner nonce. Desktop использовал обычный
+постоянный HOME/XDG, публичный backend/noReply и native store, а не onboarding
+test mode с in-memory DB. Новый ASAR/полные ресурсы подтверждены. Обе проверки
+завершились exit0, контейнеры удалены, собственных процессов нет.
+
+v1 CLI FAIL объяснён нормализацией config; v2/v3 cold-resume timeout — незакрытым
+stdin внешнего execFile. Минимальные RED3/3 и GREEN3/3 плюс cold source GET3/3
+зафиксированы; installed v4 прошёл после исправления только драйвера, deadline
+и продукт не менялись. Первоначальные FAIL сохранены. Desktop v1 mount FAIL125
+также сохранён; исправленный v2 PASS. Полный отчёт и hashes контроллеров:
+[обновление профилей](reports/2026-10-07-package-docs-upgrade.md).
+
+Постоянные инструкции Agent/Host/runtime/Desktop приведены к реализованным
+контрактам: установленный resource root, локальный verified каталог,
+activation на границе provider-turn, новый пользовательский запрос/default,
+Help без браузера. CLI design progress, runbook и Linux checkpoint дополнены
+только фактически проверенной приёмкой. Product AGENTS и корневая модульная
+ссылка уже соответствуют каталогу. Требования плана не менялись.
+
+Живой автовыбор, общая TUI/lifecycle/independence и A/B матрица остаются открыты.
+Synthetic provider/noReply не подменяют основную модель6.1-sol/medium.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
@@ -4282,4 +4309,4 @@ OAuth. Полные corpus/TUI/upgrade/A-B и сценарные live gates ос
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- RESUMED: bc6 saved docs/negative/default QA завершена; SUM bc6→cold6693/3 PASS, input unchanged/logout/processes0, collector EACCES/exit1 сохранён и evidence восстановлен без retry. Help TLS/direct недоступны; full corpus/TUI/upgrade/A-B открыты, evals ownership/stand — отдельные зависимости.
+- RESUMED: SUM bc6→cold6693/3 PASS; collector1 сохранён/recovered без retry. Offline Desktop+CLI upgrade669 PASS/settings/auth fixture/user skill/history/default, cold resume и busy3 PASS, containers/processes0; driver EOF RED3/3/GREEN3/3, исходные FAIL сохранены. Permanent rules/runbooks обновлены. Help недоступен; live corpus/TUI/lifecycle/independence/A-B и evals ownership/stand открыты.

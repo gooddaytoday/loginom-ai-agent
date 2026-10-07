@@ -14,11 +14,20 @@ Evince/Writer/gedit и awaited process cleanup подтверждены без �
 Host collector EACCES/exit1 сохранён; native receipts восстановлены без повторов.
 
 Это новый установленный локальный gate, не полный release/model PASS. Help
-TLS/direct недоступны; corpus/TUI/upgrade/A-B остаются открытыми. Общий стенд,
+TLS/direct недоступны; corpus/TUI/lifecycle/independence/A-B остаются открытыми. Общий стенд,
 человеческие launcher/profile не менялись; Windows/macOS не проверялись.
 Hashes/команды/evidence — в
 [отчёте](../testing/loginom-ai-agent/reports/2026-10-07-package-docs-openai-resume.md)
 и [checkpoint](../testing/loginom-ai-agent/package-docs-implementation.md#checkpoint).
+
+Отдельная Ubuntu24 offline замена payload Desktop/CLI669 сохранила настройки,
+auth fixture, user skill и историю. CLI продолжил прежнюю сессию до/после
+обновления и подтвердил PROFILE_BUSY/3 для второго writer. Desktop использовал
+обычный постоянный HOME/XDG, настоящий backend/noReply и native store.
+Обе проверки exit0, own containers removed/processes0; первоначальные отказы
+драйверов сохранены. Версия0.1.17 не менялась; живой provider и независимость
+параллельных browser sessions этим не проверены.
+[Отчёт обновления](../testing/loginom-ai-agent/reports/2026-10-07-package-docs-upgrade.md).
 
 ## 2026-10-07 — прежние смешанные кандидаты 3ece/bc6
 

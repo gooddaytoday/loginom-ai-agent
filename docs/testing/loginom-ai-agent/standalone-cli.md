@@ -21,6 +21,19 @@ scripted; реальный Xiaomi smoke Desktop проверен отдельн�
 
 ## Linux: текущая установка и исторические проверки
 
+**Изолированный кандидат package-docs, 2026-10-07:** чистый
+`669822296615accbd6579c09244dacb24f77a056`, версия `0.1.17`, полный CLI tar.gz
+SHA256 `79c287c4cc70f8c62fd33353f1cd0699b3d8d870f31234cb6cf05b74cc8fb4b0`.
+Public install/status/Chromium sandbox/uninstall и сохранение profile sentinel
+прошли на Ubuntu22/24/26, Debian12/13 без сети. Отдельное обновление со старого
+`bc6e7e164` сохранило config, auth fixture, user skill и историю; холодное
+продолжение того же sessionID до/после замены PASS. Второй writer получил exit3
+`PROFILE_BUSY` без смены owner nonce. Provider в этой проверке синтетический,
+Loginom/Help не вызывались. [Отчёт об обновлении](reports/2026-10-07-package-docs-upgrade.md).
+Установка пользователя не заменялась; оставшаяся live/TUI/lifecycle/A-B матрица
+отражена в [журнале](package-docs-implementation.md). Результаты отдельных
+кандидатов не распространяются на новую сборку автоматически.
+
 **Актуальная пользовательская установка Linux — 2026-09-18:** Desktop и CLI
 `0.1.4-local.20260918.697cc2e5a` собраны из чистого snapshot и установлены.
 Desktop GUI/ASAR/4365 runtime hashes и CLI help/version/status PASS.
