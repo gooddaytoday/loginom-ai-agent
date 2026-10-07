@@ -1,6 +1,6 @@
 # Кросс-таблица: code-only eval
 
-LAB-16 содержит ровно три кейса: `crosstable-fixed-sum`, `crosstable-sliding-average`, `crosstable-reconfigure`. Каждый получает только prompt и `data/sales.csv` и сам создаёт импорт. Oracle, SPEC и `reference.lgp` остаются у проверяющего. Task-контракт, parseEvents, generic summary и кодовый валидатор сохранены. После BLOCKED первой приёмки пользователь разрешил узкое исправление общего harness: очистку собственного CSV при отсутствии пакета. Текущий checkpoint — `docs/LAB-16-cleanup-checkpoint.md`; исходный `docs/LAB-16-checkpoint.md` сохраняет историю первой заморозки.
+LAB-16 содержит ровно три кейса: `crosstable-fixed-sum`, `crosstable-sliding-average`, `crosstable-reconfigure`. Каждый получает только prompt и `data/sales.csv` и сам создаёт импорт. Oracle, SPEC и `reference.lgp` остаются у проверяющего. Task-контракт, parseEvents и generic summary сохранены. После BLOCKED первой приёмки пользователь разрешил узкое исправление общего harness: очистку собственного CSV при отсутствии пакета. После review усилено доказательство создания и перенастройки узла. Текущий checkpoint — `docs/LAB-16-proof-checkpoint.md`; `docs/LAB-16-cleanup-checkpoint.md` и исходный `docs/LAB-16-checkpoint.md` сохраняют историю предыдущих заморозок.
 
 Из `evals/`, с назначенным приватным role env, выполнить:
 
