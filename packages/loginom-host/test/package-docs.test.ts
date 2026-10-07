@@ -366,6 +366,18 @@ test("multipage PDF retains every paragraph across page boundaries", async () =>
     .toBe(("Многостраничный отчёт" + paragraphs.join("")).replace(/\s+/g, ""))
 })
 
+test("PDF and DOCX keep ordered submodel numbers across blank lines and nested bullets", async () => {
+  const markdown = "# Подмодели\n\n1. Первая модель\n   * Вход первой модели\n\n2. Вторая модель\n   * Вход второй модели\n"
+  expect(pdfText(await renderReport(markdown, "pdf", fonts)).join(" ").replace(/\s+/g, " ")).toContain("2. Вторая модель")
+  const zip = new ZipReader(new Uint8ArrayReader(await renderReport(markdown, "docx")), { useWebWorkers: false })
+  try {
+    const entry = (await zip.getEntries()).find((entry) => entry.filename === "word/document.xml")!
+    const xml = await entry.getData!(new TextWriter())
+    expect(xml).toContain('<w:t xml:space="preserve">2. </w:t>')
+    expect(xml).toContain("Вторая модель")
+  } finally { await zip.close() }
+})
+
 test("DOCX writer preserves the baseline Word XML and package relationships", async () => {
   const bytes = await renderReport(await readFile(join(fixtures, "demo.report.md"), "utf8"), "docx")
   const zip = new ZipReader(new Uint8ArrayReader(bytes), { useWebWorkers: false })

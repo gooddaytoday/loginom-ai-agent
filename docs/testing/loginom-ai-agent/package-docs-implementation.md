@@ -1974,6 +1974,28 @@ Evidence `cli-live-tty-corrected-8791660db/`, исходный adapter отка�
 этап 4 (включая остальные lazy/cancellation/runtime проверки) ещё открыт.
 План не переписывался; это дополнительные доказательства выполнения.
 
+## Нумерация подмоделей в PDF/DOCX
+
+В actual отчёте `8791660db/attempt-1` исходный Markdown содержит пункты
+`1. Вложенная модель`, `2. Ещё глубже`, с вложенными bullets и пустой строкой
+между ними. PDF отображает оба как `1.`. Ошибка writer: пустая строка очищала
+счётчики упорядоченного списка. Тест через публичный `renderReport`, извлечение
+PDF text/Word XML сначала **RED**, затем **GREEN** после удаления этого сброса.
+Сброс при заголовке, цитате и обычном абзаце сохранён. Эталонные Python
+PDF/Word XML не менялись; проверка паритета также проходит.
+Полный Node pipeline **43 PASS / 167 assertions**, Host typecheck **PASS**,
+diff check **PASS**. Собранный ранее CLI `520d4f53b` этой правки не содержит;
+она должна войти в следующий полный candidate.
+
+Серия CLI `8791660db` завершилась **3/3** по механике: exit 0, PDF в session
+workspace, `.lgp` неизменен, 0 exec Chromium, контейнеры удалены;
+время **118.661 / 136.411 / 101.750 s**. Acceptance verifier отверг все три
+по Help B: ни одного успешного чтения документа обработчика. Первый также
+отрицает файловые зависимости, второй не упоминает известный `data.lgd`,
+третий проходит эти два узких фактографических условия. Это **0/3 принятого
+полного отчёта**, не успешная приёмка качества. Во время следующей серии
+условия и старые документы сохраняются неизменными.
+
 ## Checkpoint
 
 - Product candidates: Desktop `8dc7bdccb`, CLI `6c24f8de7`; полные artifacts/manifest/archive сохранены, SHA различаются.
@@ -1981,7 +2003,7 @@ Evidence `cli-live-tty-corrected-8791660db/`, исходный adapter отка�
 - Этапы 0 и 1 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node pipeline 42 PASS; dependency wording RED→GREEN; catalog 19 PASS, Host typecheck PASS; нужен новый live PDF.
+- Docs Node pipeline 43 PASS; dependency wording и list numbers RED→GREEN; catalog 19 PASS, Host typecheck PASS; live report gate открыт.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; lazy CLI exit 2 native, exit 1 source; этап 4 открыт.
 - Scope/command/HTTP/Runner/revert: 168 PASS / 1 SKIP; offline skill regression 135 PASS / 1 SKIP; typecheck PASS.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.

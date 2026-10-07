@@ -31,7 +31,7 @@ function parseBlocks(markdown: string) {
   const blocks: Block[] = []
   const counters = new Map<number, number>()
   for (const line of markdown.split(/\r?\n/)) {
-    if (!line.trim()) { counters.clear(); continue }
+    if (!line.trim()) continue
     const heading = /^(#{1,4})\s+(.*)$/.exec(line.trim())
     if (heading) {
       counters.clear()
