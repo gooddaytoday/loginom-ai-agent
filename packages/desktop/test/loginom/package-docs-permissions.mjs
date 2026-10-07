@@ -105,7 +105,7 @@ const provider = createServer(async (request, response) => {
 await new Promise((resolve) => provider.listen(0, "127.0.0.1", resolve))
 const results = []
 try {
-  for (const kind of ["text-deny", "attachment"]) {
+  for (const kind of ["text-deny", "text-allow", "attachment"]) {
     const output = join(evidence, kind)
     await mkdir(output, { mode: 0o700 })
     const root = await mkdtemp("/tmp/loginom-docs-gui-permissions-")
@@ -216,7 +216,7 @@ try {
           .waitFor({ timeout: 30000 })
       }
       await editor.fill(
-        kind === "text-deny"
+        kind.startsWith("text-")
           ? `Напиши документацию по локальному пакету ${source}.`
           : "Напиши документацию по приложенному пакету.",
       )
@@ -233,7 +233,7 @@ try {
         JSON.stringify({ url: submitted.url(), body: submitted.postDataJSON() }, null, 2),
       )
       const dock = page.locator('[data-component="dock-prompt"][data-kind="permission"]')
-      if (kind === "text-deny") {
+      if (kind.startsWith("text-")) {
         await dock.waitFor({ timeout: 60000 })
         const permissions = await call("/permission")
         assert.ok(
@@ -243,9 +243,28 @@ try {
         )
         await writeFile(join(output, "permissions.json"), JSON.stringify(permissions, null, 2))
         await page.screenshot({ path: join(output, "permission.png") })
-        await dock.getByRole("button", { name: /^(Deny|Запретить)$/ }).click()
+        await dock
+          .getByRole("button", {
+            name: kind === "text-deny" ? /^(Deny|Запретить)$/ : /^(Allow once|Разрешить один раз)$/,
+          })
+          .click()
+        if (kind === "text-allow") {
+          const deadline = Date.now() + 30000
+          while (true) {
+            const pending = (await call("/permission")).filter((permission) => permission.sessionID === session.id)
+            if (pending.some((permission) => permission.permission === "read")) {
+              await writeFile(join(output, "read-permissions.json"), JSON.stringify(pending, null, 2))
+              break
+            }
+            if (Date.now() > deadline) throw Error("READ_PERMISSION_NOT_REQUESTED")
+            await setTimeout(100)
+          }
+          await dock.getByText(/^(Чтение файла|Reading a file) \(/).waitFor({ timeout: 30000 })
+          await page.screenshot({ path: join(output, "read-permission.png") })
+          await dock.getByRole("button", { name: /^(Allow once|Разрешить один раз)$/ }).click()
+        }
       }
-      if (kind === "attachment")
+      if (kind !== "text-deny")
         await page.getByText("Проверка чтения завершена.", { exact: true }).waitFor({ timeout: 60000 })
       if (kind === "text-deny") {
         await dock.waitFor({ state: "hidden", timeout: 30000 })
@@ -276,11 +295,14 @@ try {
         assert.equal(originalFiles.length, 0)
         assert.ok(!(await readdir(workspace)).includes(".work"))
       }
+      if (kind === "text-allow") assert.equal(originalFiles.length, 0)
       if (kind === "attachment") {
         assert.equal(originalFiles.length, 1)
         assert.equal(originalFiles[0].mime, "application/x-loginom-package")
         assert.equal(originalFiles[0].url, pathToFileURL(source).href)
-        assert.equal((await call("/permission")).filter((permission) => permission.sessionID === session.id).length, 0)
+      }
+      assert.equal((await call("/permission")).filter((permission) => permission.sessionID === session.id).length, 0)
+      if (kind !== "text-deny") {
         const structure = JSON.parse(extracted.state.output).structure
         assert.ok(structure.startsWith(join(workspace, ".work/package-docs/")))
         assert.equal(JSON.parse(await readFile(structure, "utf8")).schema_version, "package_docs.structure.v1")

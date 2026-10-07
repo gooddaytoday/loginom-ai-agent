@@ -2167,8 +2167,14 @@ Node извлекает `package_docs.structure.v1` внутри session directo
 отсутствует; оба собственных временных roots удалены. Prettier/diff check **PASS**.
 Evidence: `desktop-aeef6c2c3-gui-permissions-canonical/`; предшествующая внешняя
 проверка `desktop-gui-package-docs-permissions-aeef6c2c3-v3/` также 2 PASS.
-Разрешение текстового пути, явные read/edit deny, TUI permission dialog и plan
-сохраняют отдельные незавершённые native критерии. Этап 2 пока не отмечается.
+Следующий отдельный цикл дополнил native тест `text-allow`: **3 PASS**
+на том же AppImageaeef. Два последовательных запроса действительно относятся
+к `external_directory` и `read`; в каждом GUI нажато «Разрешить один раз».
+После чтения pending permissions отсутствуют, структура находится внутри session
+directory, original file parts у текстового пути отсутствуют. Screenshot второго
+диалога просмотрен. Evidence: `desktop-aeef6c2c3-gui-text-allow/`.
+Явные read/edit deny, TUI permission dialog и plan сохраняют отдельные
+незавершённые native критерии. Этап 2 пока не отмечается.
 
 ## Checkpoint
 
