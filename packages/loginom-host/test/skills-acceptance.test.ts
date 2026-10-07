@@ -104,7 +104,11 @@ linuxTest.skipIf(!Bun.which("docker")).each([
 )
 
 linuxTest.each([
-  ["desktop", "docs-after-build", "SKILLS_ACCEPTANCE_MULTITURN_SCENARIO_ADAPTER_REQUIRED"],
+  ["desktop", "docs-after-build", "release-manifest.json"],
+  ["run", "docs-after-build", "cli-manifest.json"],
+  ["desktop", "scenario-then-docs", "release-manifest.json"],
+  ["run", "scenario-after-docs", "cli-manifest.json"],
+  ["run", "scenario-modify", "SKILLS_ACCEPTANCE_MULTITURN_SCENARIO_ADAPTER_REQUIRED"],
   ["desktop", "scenario-create", "release-manifest.json"],
   ["desktop", "docs-external-unicode-path", "release-manifest.json"],
   ["desktop", "docs-no-input,docs-no-input", "SKILLS_ACCEPTANCE_DUPLICATE_CASE"],

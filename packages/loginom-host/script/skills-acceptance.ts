@@ -76,8 +76,9 @@ if (new Set(ids).size !== ids.length) throw Error("SKILLS_ACCEPTANCE_DUPLICATE_C
 const cases = ids.map((id) => {
   const value = corpus.cases.find((item) => item.id === id)
   if (!value) throw Error("SKILLS_ACCEPTANCE_UNKNOWN_CASE")
-  const scenario = value.id === "scenario-create"
-  if ((!scenario && !["docs", "default"].includes(value.group)) || value.setup || value.followup)
+  const scenario = ["scenario-create", "scenario-then-docs", "scenario-after-docs"].includes(value.id)
+  const transition = ["docs-after-build", "scenario-then-docs", "scenario-after-docs"].includes(value.id)
+  if ((!scenario && !["docs", "default"].includes(value.group)) || (!transition && (value.setup || value.followup)))
     throw Error("SKILLS_ACCEPTANCE_MULTITURN_SCENARIO_ADAPTER_REQUIRED")
   if (
     ![
@@ -88,12 +89,14 @@ const cases = ids.map((id) => {
       "none",
       "server-reference-only",
       "external-text-path",
+      ...(transition ? ["created-lgp-attachment"] : []),
       ...(scenario ? ["csv-attachment"] : []),
     ].includes(value.input)
   )
     throw Error("SKILLS_ACCEPTANCE_PERMISSION_ADAPTER_REQUIRED")
   return value
 })
+const browserCases = cases.filter((value) => value.group === "scenario" || value.id === "docs-after-build")
 const resources = join(artifact, args.interface === "run" ? "resources/loginom" : "linux-unpacked/resources/loginom")
 const cliMetadata =
   args.interface === "run" ? await verifyCliManifest(artifact, { platform: "linux", arch: "x64" }) : undefined
@@ -145,7 +148,7 @@ const privateInput = await new Response(Bun.stdin.stream())
   .catch(() => {
     throw Error("SKILLS_ACCEPTANCE_PRIVATE_INPUT_INVALID")
   })
-if (cases.some((testcase) => testcase.group === "scenario")) {
+if (browserCases.length) {
   if (!privateInput.connection || !args["package-container"])
     throw Error("SKILLS_ACCEPTANCE_SCENARIO_CONNECTION_REQUIRED")
   const address = new URL(privateInput.connection.url)
@@ -215,7 +218,7 @@ await writeFile(
       image,
       packageContainer: args["package-container"],
       connection:
-        cases.some((testcase) => testcase.group === "scenario") && privateInput.connection
+        browserCases.length && privateInput.connection
           ? { url: privateInput.connection.url, username: privateInput.connection.username }
           : undefined,
       corpusSha256: sha(corpusBytes),
@@ -237,7 +240,8 @@ await writeFile(
 )
 const payload = {
   apiKey: privateInput.apiKey,
-  connection: cases.some((testcase) => testcase.group === "scenario") ? privateInput.connection : undefined,
+  connection: browserCases.length ? privateInput.connection : undefined,
+  packageContainer: args["package-container"],
   auth: privateInput.auth,
   artifact,
   resources,
@@ -264,7 +268,7 @@ if (args.interface === "desktop") {
   requireRedacted(out + err)
   await writeFile(join(output, "driver.log"), out + err)
   process.stdout.write(out)
-  for (const testcase of cases.filter((value) => value.group === "scenario")) {
+  for (const testcase of browserCases) {
     for (let attempt = 1; attempt <= repeat; attempt++) {
       const evidence = join(output, testcase.id, "attempt-" + attempt)
       const result = Bun.file(join(evidence, "result.json"))
@@ -332,7 +336,7 @@ if (args.interface === "run") {
       )
       const [code, out, err] = await Promise.all([
         child.exited,
-        new Response(child.stdout).text(),
+        readDriverOutput(child.stdout, testcase, attempt, container, runRoot),
         new Response(child.stderr).text(),
       ])
       try {
@@ -340,7 +344,8 @@ if (args.interface === "run") {
         await writeFile(join(runRoot, "driver.log"), out + err)
         await writeFile(join(runRoot, "exit.json"), JSON.stringify({ code }))
         await command(["docker", "cp", container + ":/home/tester/evidence", runRoot])
-        if (code === 0 && testcase.group === "scenario") {
+        if (out.includes('"event":"package-transfer-failed"')) throw Error("SKILLS_ACCEPTANCE_PACKAGE_TRANSFER_FAILED")
+        if (code === 0 && browserCases.includes(testcase)) {
           await verifySavedPackage(testcase, attempt, join(runRoot, "evidence"))
         }
       } finally {
@@ -379,12 +384,73 @@ async function command(argv: string[]) {
   return out
 }
 
+async function readDriverOutput(
+  stream: ReadableStream<Uint8Array>,
+  testcase: (typeof cases)[number],
+  attempt: number,
+  container: string,
+  runRoot: string,
+) {
+  const decoder = new TextDecoder()
+  let content = ""
+  let pending = ""
+  let transferred = false
+  const reader = stream.getReader()
+  while (true) {
+    const chunk = await reader.read()
+    if (chunk.done) break
+    const text = decoder.decode(chunk.value, { stream: true })
+    content += text
+    pending += text
+    while (pending.includes("\n")) {
+      const end = pending.indexOf("\n")
+      const line = pending.slice(0, end)
+      pending = pending.slice(end + 1)
+      requireRedacted(line)
+      if (!line.startsWith("{")) continue
+      const value = JSON.parse(line)
+      if (value.event !== "saved-package-input-required") continue
+      try {
+        const packagePath = `/${privateInput.connection!.username}/skills-acceptance-${sha(output).slice(0, 12)}-${testcase.id}-${attempt}.lgp`
+        if (
+          !["docs-after-build", "scenario-then-docs"].includes(testcase.id) ||
+          transferred ||
+          value.packagePath !== packagePath ||
+          value.attempt !== attempt
+        )
+          throw Error("SKILLS_ACCEPTANCE_PACKAGE_TRANSFER_INVALID")
+        transferred = true
+        const saved = join(runRoot, "created-package.lgp")
+        await command(["docker", "cp", args["package-container"] + ":/workdir/UserStorage" + packagePath, saved])
+        await command(["docker", "cp", saved, container + ":/home/tester/input/Исходный сценарий.LGP"])
+        await command([
+          "docker",
+          "exec",
+          "--user",
+          "root",
+          container,
+          "chown",
+          "1200:1200",
+          "/home/tester/input/Исходный сценарий.LGP",
+        ])
+      } catch {
+        // Keep draining until the driver exits; its bounded transfer wait retains failed evidence.
+        content += '\n{"event":"package-transfer-failed"}\n'
+      }
+    }
+  }
+  reader.releaseLock()
+  return content + decoder.decode()
+}
+
 async function verifySavedPackage(testcase: (typeof cases)[number], attempt: number, evidence: string) {
   const result = await Bun.file(join(evidence, "result.json")).json()
   const packagePath = `/${privateInput.connection!.username}/skills-acceptance-${sha(output).slice(0, 12)}-${testcase.id}-${attempt}.lgp`
   if (result.packagePath !== packagePath) throw Error("SKILLS_ACCEPTANCE_PACKAGE_IDENTITY_MISMATCH")
   const saved = join(evidence, "built.lgp")
   await command(["docker", "cp", args["package-container"] + ":/workdir/UserStorage" + packagePath, saved])
+  if (result.createdPackageSha256 && result.createdPackageSha256 !== (await fileHash(saved)))
+    throw Error("SKILLS_ACCEPTANCE_CREATED_PACKAGE_CHANGED")
   const { extractPackage } = await import("../src/package-docs/extract")
   const structure = await extractPackage(saved)
   await Bun.write(join(evidence, "built.structure.json"), JSON.stringify(structure, null, 2))

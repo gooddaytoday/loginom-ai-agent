@@ -1,10 +1,12 @@
 import assert from "node:assert/strict"
 import { createRequire } from "node:module"
 import { createHash } from "node:crypto"
+import { execFile } from "node:child_process"
 import { mkdir, mkdtemp, readFile, writeFile, readdir, cp, rm, chmod } from "node:fs/promises"
 import { join, basename, relative } from "node:path"
 import { pathToFileURL } from "node:url"
 import { setTimeout } from "node:timers/promises"
+import { promisify } from "node:util"
 import { observeProcesses } from "./processes.mjs"
 import { verifySalesScenario } from "./scenario.mjs"
 
@@ -25,7 +27,9 @@ const sha = (bytes) => createHash("sha256").update(bytes).digest("hex")
 const failures = []
 
 for (const testcase of input.cases) {
-  const scenario = testcase.id === "scenario-create"
+  const docsFirst = testcase.id === "scenario-after-docs"
+  const transition = ["docs-after-build", "scenario-then-docs"].includes(testcase.id) || docsFirst
+  const scenario = testcase.id === "scenario-create" || transition
   await mkdir(join(input.output, testcase.id), { mode: 0o700 })
   for (let attempt = 1; attempt <= input.repeat; attempt++) {
     const evidence = join(input.output, testcase.id, "attempt-" + attempt)
@@ -43,11 +47,9 @@ for (const testcase of input.cases) {
       csv = join(filesRoot, "sales.csv")
     if (scenario) await cp(input.fixtures.csv, csv)
     if (testcase.input === "workspace-path") await cp(input.fixtures.lgp, local)
-    if (["lgp-attachment", "lgp-and-png-attachments", "external-text-path"].includes(testcase.input))
+    if (docsFirst || ["lgp-attachment", "lgp-and-png-attachments", "external-text-path"].includes(testcase.input))
       await cp(input.fixtures.lgp, external)
     if (testcase.input === "lgp-and-png-attachments") await cp(input.fixtures.png, png)
-    const originalPath = scenario ? csv : testcase.input === "workspace-path" ? local : external
-    const originalSha = await readFile(originalPath).then(sha, () => undefined)
     const bindings = {
       local_lgp: local,
       unicode_lgp: external,
@@ -56,10 +58,11 @@ for (const testcase of input.cases) {
         ? `/${input.connection.username}/skills-acceptance-${sha(input.output).slice(0, 12)}-${testcase.id}-${attempt}.lgp`
         : "/user/package-docs-acceptance/" + basename(root) + "/missing.lgp",
     }
-    const prompt = testcase.prompt.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
-      assert.ok(bindings[key], "UNKNOWN_BINDING")
-      return bindings[key]
-    })
+    const bindPrompt = (text) =>
+      text.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+        assert.ok(bindings[key], "UNKNOWN_BINDING")
+        return bindings[key]
+      })
     const trace = join(evidence, "process.trace")
     const wrapper = join(root, "electron")
     const quote = (value) => "'" + value.replaceAll("'", "'\\''") + "'"
@@ -178,186 +181,236 @@ for (const testcase of input.cases) {
         await page.locator('[data-component="prompt-input"][contenteditable="true"]').waitFor({ timeout: 60000 })
         await save("permission-view.json", { route, sessionID })
       }
-      const files =
-        testcase.input === "lgp-attachment"
-          ? [external]
-          : testcase.input === "lgp-and-png-attachments"
-            ? [external, png]
-            : scenario
-              ? [csv]
-              : []
-      const csvUrl = scenario ? `data:text/plain;base64,${(await readFile(csv)).toString("base64")}` : undefined
-      const parts = [
-        { type: "text", text: prompt },
-        ...files.map((path) => ({
-          type: "file",
-          filename: path.endsWith(".csv") ? path : basename(path),
-          mime: path.endsWith(".png")
-            ? "image/png"
-            : path.endsWith(".csv")
-              ? "text/plain"
-              : "application/x-loginom-package",
-          // Native Desktop uploads preserve original bytes; file: denotes a path reference.
-          url: path.endsWith(".csv") ? csvUrl : pathToFileURL(path).href,
-        })),
-      ]
-      const timeoutMs = scenario ? 1200000 : 480000
-      const started = Date.now()
-      await save("submission.json", { sessionID, model: input.model, variant: input.variant, prompt, parts, started })
-      // Keep HTTP requests short and retain each projected snapshot while tools await permission.
-      await call(`/session/${sessionID}/prompt_async`, "POST", {
-        agent: "build",
-        model: { providerID, modelID },
-        ...(input.variant !== "default" ? { variant: input.variant } : {}),
-        parts,
-      })
-      let messages, answer, idleCompletedID
-      while (Date.now() - started < timeoutMs) {
-        const [current, status, pending] = await Promise.all([
-          call(`/session/${sessionID}/message`),
-          call("/session/status"),
-          call("/permission"),
-        ])
-        messages = current
-        await save("messages.json", messages)
-        await save("session-status.json", status[sessionID] ?? { type: "idle" })
-        for (const request of pending.filter((request) => request.sessionID === sessionID)) {
-          const approve =
-            testcase.input === "external-text-path" &&
-            request.metadata?.filepath === external &&
-            request.patterns.length === 1 &&
-            ((request.permission === "external_directory" && request.patterns[0] === join(filesRoot, "*")) ||
-              (request.permission === "read" && request.patterns[0] === relative(workspace, external)))
-          const decision = {
-            request,
-            reply: approve ? "once" : "reject",
-            via: approve ? "GUI" : "HTTP",
-            acknowledged: false,
+      const turns = docsFirst
+        ? [
+            { ...testcase.setup, expected: { profile: "package-docs", result: "pdf" }, scenario: false },
+            { ...testcase, scenario: true },
+          ]
+        : transition
+          ? [
+              {
+                ...(testcase.setup ?? testcase),
+                expected: { profile: "loginom-automation", result: "saved-executed-package" },
+                scenario: true,
+              },
+              { ...(testcase.setup ? testcase : testcase.followup), input: "lgp-attachment", scenario: false },
+            ]
+          : [{ ...testcase, scenario }]
+      let built
+      for (const [turnIndex, turn] of turns.entries()) {
+        const scenario = turn.scenario
+        const prompt = bindPrompt(turn.prompt)
+        const priorMessages = new Set((await call(`/session/${sessionID}/message`)).map((message) => message.info.id))
+        const priorFiles = new Set(await readdir(workspace))
+        const originalPath = scenario ? csv : turn.input === "workspace-path" ? local : external
+        const originalSha = await readFile(originalPath).then(sha, () => undefined)
+        const files =
+          turn.input === "lgp-attachment"
+            ? [external]
+            : turn.input === "lgp-and-png-attachments"
+              ? [external, png]
+              : scenario
+                ? [csv]
+                : []
+        const csvUrl = scenario ? `data:text/plain;base64,${(await readFile(csv)).toString("base64")}` : undefined
+        const parts = [
+          { type: "text", text: prompt },
+          ...files.map((path) => ({
+            type: "file",
+            filename: path.endsWith(".csv") ? path : basename(path),
+            mime: path.endsWith(".png")
+              ? "image/png"
+              : path.endsWith(".csv")
+                ? "text/plain"
+                : "application/x-loginom-package",
+            // Native Desktop uploads preserve original bytes; file: denotes a path reference.
+            url: path.endsWith(".csv") ? csvUrl : pathToFileURL(path).href,
+          })),
+        ]
+        const timeoutMs = scenario ? 1200000 : 480000
+        const started = Date.now()
+        await save("submission.json", { sessionID, model: input.model, variant: input.variant, prompt, parts, started })
+        // Keep HTTP requests short and retain each projected snapshot while tools await permission.
+        await call(`/session/${sessionID}/prompt_async`, "POST", {
+          agent: "build",
+          model: { providerID, modelID },
+          ...(input.variant !== "default" ? { variant: input.variant } : {}),
+          parts,
+        })
+        let messages, answer, idleCompletedID
+        while (Date.now() - started < timeoutMs) {
+          const [current, status, pending] = await Promise.all([
+            call(`/session/${sessionID}/message`),
+            call("/session/status"),
+            call("/permission"),
+          ])
+          messages = current
+          await save("messages.json", messages)
+          await save("session-status.json", status[sessionID] ?? { type: "idle" })
+          for (const request of pending.filter((request) => request.sessionID === sessionID)) {
+            const approve =
+              testcase.input === "external-text-path" &&
+              request.metadata?.filepath === external &&
+              request.patterns.length === 1 &&
+              ((request.permission === "external_directory" && request.patterns[0] === join(filesRoot, "*")) ||
+                (request.permission === "read" && request.patterns[0] === relative(workspace, external)))
+            const decision = {
+              request,
+              reply: approve ? "once" : "reject",
+              via: approve ? "GUI" : "HTTP",
+              acknowledged: false,
+            }
+            permissions.push(decision)
+            await save("permissions.json", permissions)
+            if (approve) {
+              const dock = page.locator('[data-component="dock-prompt"][data-kind="permission"]')
+              await dock.waitFor({ timeout: 30000 })
+              await page.screenshot({ path: join(evidence, `permission-${permissions.length}.png`) })
+              await dock.getByRole("button", { name: /^(Allow once|Разрешить один раз)$/ }).click()
+            } else await call(`/permission/${request.id}/reply`, "POST", { reply: "reject" })
+            decision.acknowledged = true
+            await save("permissions.json", permissions)
           }
-          permissions.push(decision)
-          await save("permissions.json", permissions)
-          if (approve) {
-            const dock = page.locator('[data-component="dock-prompt"][data-kind="permission"]')
-            await dock.waitFor({ timeout: 30000 })
-            await page.screenshot({ path: join(evidence, `permission-${permissions.length}.png`) })
-            await dock.getByRole("button", { name: /^(Allow once|Разрешить один раз)$/ }).click()
-          } else await call(`/permission/${request.id}/reply`, "POST", { reply: "reject" })
-          decision.acknowledged = true
-          await save("permissions.json", permissions)
+          const latest = messages.filter((message) => message.info.role === "assistant").at(-1)
+          const idleCompleted =
+            (!status[sessionID] || status[sessionID].type === "idle") &&
+            latest &&
+            !priorMessages.has(latest.info.id) &&
+            (latest.info.error || latest.info.time.completed) &&
+            !messages
+              .flatMap((message) => message.parts)
+              .some((part) => part.type === "tool" && ["pending", "running"].includes(part.state.status))
+          if (idleCompleted && idleCompletedID === latest.info.id) {
+            answer = latest
+            break
+          }
+          idleCompletedID = idleCompleted ? latest.info.id : undefined
+          await setTimeout(1000)
         }
-        const latest = messages.filter((message) => message.info.role === "assistant").at(-1)
-        const idleCompleted =
-          (!status[sessionID] || status[sessionID].type === "idle") &&
-          latest &&
-          (latest.info.error || latest.info.time.completed) &&
-          !messages
-            .flatMap((message) => message.parts)
-            .some((part) => part.type === "tool" && ["pending", "running"].includes(part.state.status))
-        if (idleCompleted && idleCompletedID === latest.info.id) {
-          answer = latest
-          break
+        assert.ok(answer, "MODEL_COMPLETION_TIMEOUT")
+        const tools = messages
+          .filter((message) => !priorMessages.has(message.info.id))
+          .flatMap((message) => message.parts)
+          .filter((part) => part.type === "tool")
+        const reports = (await readdir(workspace)).filter(
+          (file) => !priorFiles.has(file) && /lgp_report(?:-\d+)?\.(pdf|docx|md)$/.test(file),
+        )
+        const execs = (await readFile(trace, "utf8"))
+          .split("\n")
+          .filter(
+            (line) =>
+              Number(line.trim().split(/\s+/)[1]) * 1000 >= started &&
+              /execve\(/.test(line) &&
+              /chromium-\d+\/|chrome-linux64\/chrome/.test(line),
+          )
+        result = {
+          status: "MECHANICS_PASS_MANUAL_REVIEW_REQUIRED",
+          case: testcase.id,
+          attempt,
+          interface: "native AppImage backend HTTP",
+          model: input.model,
+          variant: input.variant,
+          headless: input.headless,
+          sessionID,
+          prompt,
+          wallMs: Date.now() - started,
+          timeoutMs,
+          ...(scenario || transition ? { packagePath: bindings.server_package } : {}),
+          ...(built ? { builtNodes: built.builtNodes, createdPackageSha256: originalSha } : {}),
+          modelError: answer.info.error,
+          tools: tools.map((part) => ({
+            id: part.id,
+            name: part.tool,
+            status: part.state.status,
+            input: part.state.input,
+            metadata: part.state.metadata,
+            error: part.state.error,
+          })),
+          text: answer.parts
+            .filter((part) => part.type === "text")
+            .map((part) => part.text)
+            .join("\n"),
+          reports,
+          browserExecs: execs,
+          permissions,
+          inputShaBefore: originalSha,
+          inputShaAfter: await readFile(originalPath).then(sha, () => undefined),
         }
-        idleCompletedID = idleCompleted ? latest.info.id : undefined
-        await setTimeout(1000)
-      }
-      assert.ok(answer, "MODEL_COMPLETION_TIMEOUT")
-      const tools = messages.flatMap((message) => message.parts).filter((part) => part.type === "tool")
-      const reports = (await readdir(workspace)).filter((file) => /lgp_report(?:-\d+)?\.(pdf|docx|md)$/.test(file))
-      const execs = (await readFile(trace, "utf8"))
-        .split("\n")
-        .filter(
-          (line) =>
-            Number(line.trim().split(/\s+/)[1]) * 1000 >= started &&
-            /execve\(/.test(line) &&
-            /chromium-\d+\/|chrome-linux64\/chrome/.test(line),
-        )
-      result = {
-        status: "MECHANICS_PASS_MANUAL_REVIEW_REQUIRED",
-        case: testcase.id,
-        attempt,
-        interface: "native AppImage backend HTTP",
-        model: input.model,
-        variant: input.variant,
-        headless: input.headless,
-        sessionID,
-        prompt,
-        wallMs: Date.now() - started,
-        timeoutMs,
-        ...(scenario ? { packagePath: bindings.server_package } : {}),
-        modelError: answer.info.error,
-        tools: tools.map((part) => ({
-          id: part.id,
-          name: part.tool,
-          status: part.state.status,
-          input: part.state.input,
-          metadata: part.state.metadata,
-          error: part.state.error,
-        })),
-        text: answer.parts
-          .filter((part) => part.type === "text")
-          .map((part) => part.text)
-          .join("\n"),
-        reports,
-        browserExecs: execs,
-        permissions,
-        inputShaBefore: originalSha,
-        inputShaAfter: await readFile(originalPath).then(sha, () => undefined),
-      }
-      await save("result.json", result)
-      assert.ok(!answer.info.error, "MODEL_ERROR")
-      assert.ok(scenario ? execs.length > 0 : execs.length === 0, "EXPECTED_BROWSER_EXEC_SCOPE")
-      if (scenario) {
-        const csvSha256 = sha(await readFile(input.fixtures.csv))
-        assert.equal(originalSha, csvSha256)
-        Object.assign(
-          result,
-          verifySalesScenario(tools, { skills: input.skills, csvSha256, packagePath: bindings.server_package }),
-        )
         await save("result.json", result)
+        assert.ok(!answer.info.error, "MODEL_ERROR")
+        assert.ok(scenario ? execs.length > 0 : execs.length === 0, "EXPECTED_BROWSER_EXEC_SCOPE")
+        if (scenario) {
+          const csvSha256 = sha(await readFile(input.fixtures.csv))
+          assert.equal(originalSha, csvSha256)
+          Object.assign(
+            result,
+            verifySalesScenario(tools, { skills: input.skills, csvSha256, packagePath: bindings.server_package }),
+          )
+          await save("result.json", result)
+        }
+        assert.ok(result.text.trim(), "NO_FINAL_ANSWER_AFTER_TERMINAL_TURN")
+        assert.equal(result.inputShaAfter, originalSha)
+        if (!scenario)
+          assert.ok(
+            !tools.some((part) => part.tool.startsWith("loginom_dock_") && part.tool !== "loginom_dock_diagnostics"),
+          )
+        if (turn.expected.profile === "package-docs")
+          assert.ok(
+            tools.some(
+              (part) =>
+                part.tool === "skill" &&
+                part.state.metadata?.activation?.profile === "package-docs" &&
+                part.state.metadata.activation.digest ===
+                  input.skills.find((skill) => skill.name === "package-docs").digest,
+            ),
+          )
+        if (turn.expected.profile === "default") assert.ok(!tools.some((part) => part.state.metadata?.activation))
+        const format = turn.input === "external-text-path" ? "pdf" : turn.expected.result
+        if (["pdf", "docx", "md"].includes(format)) {
+          if (testcase.input === "external-text-path") {
+            assert.ok(
+              permissions.some((row) => row.request.permission === "external_directory"),
+              "NO_EXTERNAL_PERMISSION",
+            )
+            assert.ok(
+              permissions.every((row) => row.reply === "once" && row.acknowledged),
+              "UNEXPECTED_EXTERNAL_PERMISSION",
+            )
+          } else assert.equal(permissions.length, 0, "UNEXPECTED_PERMISSION_FOR_ADMITTED_ATTACHMENT")
+          assert.equal(reports.length, 1)
+          assert.ok(reports[0].endsWith("." + format))
+          assert.ok(
+            tools.some(
+              (part) =>
+                part.tool === "package_docs_run" &&
+                part.state.input.operation === "emit" &&
+                part.state.status === "completed",
+            ),
+          )
+          assert.ok(tools.some((part) => part.tool === "loginom_read" && part.state.status === "completed"))
+        } else assert.equal(reports.length, 0)
+        if (testcase.id === "default-unconfigured-arithmetic") assert.equal(result.text.trim(), "102")
+        if (testcase.id === "default-translation") assert.match(result.text, /documentation.{0,12}ready/i)
+        if (transition) {
+          await mkdir(join(evidence, "turn-" + (turnIndex + 1)), { mode: 0o700 })
+          await save("turn-" + (turnIndex + 1) + "/result.json", result)
+          await save("turn-" + (turnIndex + 1) + "/messages.json", messages)
+          if (turnIndex === 0 && scenario) {
+            built = result
+            // The path is owned by this output/case/attempt, never supplied by the model.
+            await promisify(execFile)(
+              "docker",
+              ["cp", input.packageContainer + ":/workdir/UserStorage" + bindings.server_package, external],
+              { timeout: 30000 },
+            )
+            await save("created-package.json", {
+              packagePath: bindings.server_package,
+              sha256: sha(await readFile(external)),
+              sessionID,
+            })
+          }
+        }
       }
-      assert.ok(result.text.trim(), "NO_FINAL_ANSWER_AFTER_TERMINAL_TURN")
-      assert.equal(result.inputShaAfter, originalSha)
-      if (!scenario)
-        assert.ok(
-          !tools.some((part) => part.tool.startsWith("loginom_dock_") && part.tool !== "loginom_dock_diagnostics"),
-        )
-      if (testcase.expected.profile === "package-docs")
-        assert.ok(
-          tools.some(
-            (part) =>
-              part.tool === "skill" &&
-              part.state.metadata?.activation?.profile === "package-docs" &&
-              part.state.metadata.activation.digest ===
-                input.skills.find((skill) => skill.name === "package-docs").digest,
-          ),
-        )
-      if (testcase.expected.profile === "default") assert.ok(!tools.some((part) => part.state.metadata?.activation))
-      const format = testcase.input === "external-text-path" ? "pdf" : testcase.expected.result
-      if (["pdf", "docx", "md"].includes(format)) {
-        if (testcase.input === "external-text-path") {
-          assert.ok(
-            permissions.some((row) => row.request.permission === "external_directory"),
-            "NO_EXTERNAL_PERMISSION",
-          )
-          assert.ok(
-            permissions.every((row) => row.reply === "once" && row.acknowledged),
-            "UNEXPECTED_EXTERNAL_PERMISSION",
-          )
-        } else assert.equal(permissions.length, 0, "UNEXPECTED_PERMISSION_FOR_ADMITTED_ATTACHMENT")
-        assert.equal(reports.length, 1)
-        assert.ok(reports[0].endsWith("." + format))
-        assert.ok(
-          tools.some(
-            (part) =>
-              part.tool === "package_docs_run" &&
-              part.state.input.operation === "emit" &&
-              part.state.status === "completed",
-          ),
-        )
-        assert.ok(tools.some((part) => part.tool === "loginom_read" && part.state.status === "completed"))
-      } else assert.equal(reports.length, 0)
-      if (testcase.id === "default-unconfigured-arithmetic") assert.equal(result.text.trim(), "102")
-      if (testcase.id === "default-translation") assert.match(result.text, /documentation.{0,12}ready/i)
     } catch (error) {
       failures.push(testcase.id + ":" + attempt)
       if (result) {

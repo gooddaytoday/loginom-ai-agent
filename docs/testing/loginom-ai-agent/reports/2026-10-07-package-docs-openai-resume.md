@@ -222,3 +222,9 @@ Desktopbc6 построен, manifest/static DEB/AppImage PASS после уст
 Linux253: Desktop Ubuntu22/24/26, CLI Ubuntu24/26/Debian12 PASS, Ubuntu22 CLI
 исходный180s FAIL; остальные дистрибутивы ещё идут. Desktop/CLI docs-after-build
 проверяются отдельными адаптерами в собственной инфраструктуре.
+
+Desktop253 build → docs3/3 принят: один Session ID, физический пакет и его
+хэш/граф проверены; оба ответа и все6 PDF-страниц просмотрены. Docs-ход без
+нового Chromium/browser calls, remaining0. CLI переход ещё идёт. Source
+adapters трёх multi-turn случаев19 PASS/71, typecheck/Prettier PASS; живое
+прохождение остальных переходов и cold replay ещё не заявляется.

@@ -3950,6 +3950,29 @@ TDD multi-turn adapters начаты независимо от evals: первы
 только точный собственный пакет через parent/container bridge; live идёт.
 Переход и полный corpus gate ещё не приняты.
 
+
+## 2026-10-07 — Desktop build → docs3/3 и multi-turn adapters
+
+`desktop-openai-docs-after-build-2530143dd` завершён exit0,3/3 PASS после
+ручной проверки всех6 PDF-страниц и обоих полных ответов каждой попытки.
+Первый реальный ход строит импорт/SUM и сохраняет35/20, второй прикладывает
+именно этот физический пакет. Одинаковые Session ID, GUID/link и SHA копии
+подтверждены. Второй ход выбирает docs, читает настоящую Help, не вызывает
+browser tools и не запускает новый Chromium; общий cleanup remaining0.
+В отчётах явно отделены названия узлов от отсутствующих подробных параметров
+группировки и численных результатов. Cold reexecution не заявляется.
+
+В своих adapters добавлены Desktop/CLI `docs-after-build`, `scenario-then-docs`,
+`scenario-after-docs`. Каждый ход учитывает только новые messages/tools/reports;
+завершённый ответ прошлого хода не принимается за завершение нового.
+CLI использует настоящий `--session`; parent передаёт лишь точный собственный
+пакет в container, без Docker socket в модели, и ждёт завершения/сохраняет
+ошибку передачи. Переданная копия сверяется с физическим пакетом. Docs → build
+сохраняет первый документ. RED preflight каждого перехода сохранён отдельно;
+GREEN19 tests/71 assertions, Host typecheck/Prettier PASS. CLI build → docs
+ещё идёт; другие два перехода пока source-only. `scenario-modify` и
+`scenario-execute-save` остаются явно неподдержанными адаптером.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
@@ -3964,11 +3987,11 @@ TDD multi-turn adapters начаты независимо от evals: первы
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
 - Первый prepare: scope → runtime → original bytes admission → workspace call.
 - Новый runtime повторно получает байты; неудачный prepare не выдаёт Dock-каталог.
-- Полный Host238 PASS/7 SKIP; acceptance adapters15 PASS/55, OAuth/medium/local endpoint/CSV oracle и typecheck PASS; Agent history/tools/registry30 PASS.
+- Полный Host238 PASS/7 SKIP; acceptance adapters19 PASS/71, OAuth/medium/local endpoint/CSV oracle и typecheck PASS; Agent history/tools/registry30 PASS.
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- RESUMED: QA36:33 docs+3 CLI denials, один исходный layout FAIL; Desktop/CLI default30/30 PASS; CLI local scenario-create2/3 PASS+1 UI_EPOCH_CHANGED FAIL; Desktop scenario3/3 PASS, физические GUID/link сохранены, remaining0. Cold/compound/transitions/corpus20/TUI/Linux5/A-B открыты.
+- RESUMED: QA36:33 docs+3 CLI denials, один исходный layout FAIL; Desktop/CLI default30/30 PASS; CLI local scenario-create2/3 PASS+1 UI_EPOCH_CHANGED FAIL; Desktop scenario3/3 PASS, физические GUID/link сохранены, remaining0. Desktop build→docs3/3 с6 страницами QA PASS; CLI идёт. Cold/остальные compound/transitions/corpus20/TUI/Linux5/A-B открыты.
