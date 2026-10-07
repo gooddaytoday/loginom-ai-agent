@@ -3694,6 +3694,23 @@ Checkpoint — `package-docs-resource-pause-2026-10-07.md`. Пауза отно�
 OpenAI gpt-6.1-sol/medium, проверить стенд и новый immutable harness pin.
 План повторно не редактировался; незавершённые gate остаются открытыми.
 
+## Возобновление 2026-10-07 после освобождения стенда
+
+Владелец сообщил о завершении соседней приёмки и явно возобновил цель.
+Рабочая ветка `docs-no-browser` чистая на `dc38245b6`; Loginom
+`http://localhost/app/` доступен (HTTP 200). Тестовые server/client сохранены.
+Повторная доработка замороженного плана по corrections не выполняется.
+
+На сохранённых clean candidates `c50d220c1` начаты отдельные Desktop/CLI
+прогоны `docs-attached-pdf`, `docs-attached-word`, `docs-markdown` ×3.
+Модель `openai/gpt-6.1-sol`, variant `medium`, неизменный models snapshot
+`e47bd31afb882a62655a5783b4b37fb47bbd7652ab71b1ab0a85cfecfd33aacd`.
+Каталоги результатов: `desktop-openai-formats-c50d220c1-resume` и
+`cli-openai-formats-c50d220c1-resume` в собственном acceptance root.
+Механический успех требует отдельной проверки фактов и всех страниц.
+Актуальная ветка evals наблюдается read-only; её рабочие файлы не меняются.
+Свежий SHA и совместимость harness должны быть проверены до A/B.
+
 ## Checkpoint
 
 - Product candidates: Desktop/CLI `c50d220c1`, clean full builds/manifests/static/installed CLI seed PASS; Ubuntu22 installed PASS; прежние candidates сохранены.
@@ -3715,4 +3732,4 @@ OpenAI gpt-6.1-sol/medium, проверить стенд и новый immutable
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- PAUSED по просьбе владельца: собственные клиенты/контейнеры/debugger endpoints освобождены; server/client 7.4.2-test сохранены. После явного resume: c50d, OpenAI gpt-6.1-sol/medium, docs-markdown; natural quality×3/полный20/installed переходы/Linux5/A-B открыты; план заморожен.
+- RESUMED по явной просьбе владельца: c50d, OpenAI gpt-6.1-sol/medium, formats×3 Desktop/CLI запущены; natural quality/полный20/installed переходы/Linux5/A-B открыты; план заморожен.
