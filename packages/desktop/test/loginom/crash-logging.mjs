@@ -12,6 +12,7 @@ const profile = await mkdtemp(join(tmpdir(), "loginom-crash-logging-"))
 const launch = async (root, env = {}) => {
   await waitUntilDebuggerPortFree()
   return _electron.launch({
+    chromiumSandbox: true,
     executablePath:
       process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE ??
       resolve(

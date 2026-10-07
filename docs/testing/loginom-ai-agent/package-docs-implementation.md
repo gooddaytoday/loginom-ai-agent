@@ -2932,14 +2932,73 @@ audit не является самостоятельной переписью su
 Модельный ключ читался из существующего auth без изменения, затем сохранялся
 только в собственных временных private profiles; в git/conditions его нет.
 
+## Общий source pin 67c3898c3: CLI/Desktop и PDF gate
+
+Обе полные сборки сохранены на clean source
+`67c3898c3f6bc0d5e86f9a1e1bd0729fad6b0a2d`, Node 24.19.0,
+Bun 1.3.14, Chromium 1243, prod 0.1.17. CLI archive/roundtrip/source verifier
+прошли; tree `1eb50dc60719d3aa28a45c939d137bdedbdcf0263cf90c6fbd9741ed1416afd4`,
+archive `eb0b4a84317dd0af6ea3b2dbb90a4b9121e22c3a8173a08092edf863b61ce1bf`.
+Desktop включает соответствующий полный source archive и release manifest;
+DEB и AppImage static verifiers **PASS**, по **4654 resources**.
+
+| Desktop artifact | SHA-256 |
+| --- | --- |
+| AppImage | `cca65b1024f1d11ab622cf00b397b76b915d5784ed1c310b59cc697afa0c51e1` |
+| DEB | `54ea495bb9a0cf8252d96b06162cb0e40012f1517534dd9107a144d015dc2777` |
+| Source archive | `9c97c4c59bb1e6f39dce8f9dda56668244aec604d537f2b29a94d621e1c85ac0` |
+| Resource manifest | `c00c687be2490b263e77c5b8d5f4e439d77385e0edc71593b16b931ead1f4631` |
+
+CLI `docs-attached-pdf`, та же основная модель/variant/fixture/driver/image:
+**3/3 mechanics/Help B/layout PASS**, 178.786 / 254.772 / 162.103 s,
+input SHA не изменился, Chromium exec **0**. Просмотрены все шесть страниц
+PDF системным Poppler; все читаемы, без clipping/placeholder, нумерация 1/2
+сохранена. Narrow verifier прошёл три раза, **полные факты — 2/3 PASS**.
+Третий отчёт назвал `DerivedReference` «производным компонентом, созданным
+на базе другого узла» после чтения только generic `derived-component.md`.
+Настройки не содержат базовый узел; statistical derived/reference grouping
+не доказывает наследование. Этот live gate остаётся **FAIL**, результаты
+не заменяются повторным запуском и не объединяются с предыдущими source pins.
+
+Evidence: `candidate-67c3898c3-{cli,desktop}/`, build/verify logs,
+`cli-live-pdf-67c3898c3/attempt-*/{report-verification,manual-facts-verification}.json`,
+events/strace/workspace и page PNG. Все три собственных контейнера удалены.
+Требования основного плана не пересматриваются; дальнейшая правка guidance
+выполняет согласованный пункт этапа 6 о фактах и стабильности модели.
+
+## Native Desktop67: crash logging с sandbox
+
+После полной сборки выполнен обязательный `test/loginom/crash-logging.mjs`
+на неизменной AppImage67, UID 1001, Xvfb, pinned Node. Драйвер теперь явно
+задаёт `chromiumSandbox: true`, поскольку default Playwright Electron launch
+добавляет `--no-sandbox`, недопустимый по Linux runbook.
+
+На коротком `TMPDIR=/tmp` **6 PASS**: routing backend в server.log,
+main rejection/renderer exception/sidecar exit, initialization failure,
+unexpected exit/restart, native Crashpad dump/restart, clean quit/restart,
+rotation/retention budget 100 MB. Desktop `bun typecheck` **PASS**.
+Это проверка логирования и восстановления собственной тестовой программы,
+не живое построение Loginom и не полная Linux матрица.
+
+Первый запуск с TMPDIR внутри длинного acceptance path остановился на
+первом Electron launch с SIGILL; main.log содержал только `app starting`.
+Его log/minidump/profile сохранены в `desktop-67-crash-home/tmp/`.
+Повтор на коротком пути прошёл; точная причина первого native abort не
+установлена, длинные profile paths этим запуском не приняты. Условия первой
+попытки не выдаются за проверку продукта без ограничений.
+
+Evidence: `desktop-67-crash-logging{,-short-tmp}.log`,
+`desktop-crash-driver-typecheck.log`. Пользовательская установка, profiles,
+launcher, соседний worktree и основной план не изменены.
+
 ## Checkpoint
 
-- Product candidates: Desktop `2aa3a3284`, CLI `704d441d5`, clean source/artifacts/manifests; Desktop и TUI83 diagnostics 5/5 stable PASS; разные source pins.
+- Product candidates: Desktop/CLI `67c3898c3`, clean source/artifacts/manifests; static Desktop 4654 resources PASS; предыдущие candidates сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
 - Source attribution сохраняет 35 baseline mismatches; live gate ещё не принят.
-- Docs Node pipeline43/catalog21/integrity9 PASS; CLI704 PDF 3/3 mechanics, 2/3 facts; unknown-type guidance ждёт нового live gate. Обычные CLI corpus cases 2×3 PASS.
+- Docs Node pipeline43/catalog21/integrity9 PASS; CLI67 PDF 3/3 mechanics/layout, 2/3 facts FAIL; statistical type grouping требует guidance fix. Обычные CLI704 cases 2×3 PASS.
 - BrowserStatus/key-only Help: first setup GUI/TTY/stdin-json native PASS; CLIc721 startup/Help/cancel/lazy 8 PASS, source 12 PASS; Host35/runtime22 PASS; этап 4 закрыт.
 - Scope/history/prompt/revert/docs: 200 PASS / 2 V2 SKIP; Host scope11 PASS; пять implementation подпунктов этапа 5 отмечены; installed переходы ещё открыты.
 - Host scope проверяет pending/apply/живую работу и запрещает браузер для default/docs.
@@ -2952,5 +3011,5 @@ audit не является самостоятельной переписью su
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
-- Installed DEB85 smoke/metadata/ASAR PASS; static DEB/AppImage2aa PASS; GUI2aa 5 permissions и missing/modified/unlisted cases PASS; TUI typecheck PASS; report/corpus/evals и остальные Linux gates открыты.
-- Далее: clean candidate с unknown-type guidance, полный facts/routing gate и installed переходы; A/B ждёт согласованной harness задачи из handoff. Требования плана не перерабатывать.
+- Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
+- Далее: statistical grouping guidance RED→GREEN, полный facts/routing gate и installed переходы; A/B ждёт согласованной harness задачи из handoff. Требования плана не перерабатывать.
