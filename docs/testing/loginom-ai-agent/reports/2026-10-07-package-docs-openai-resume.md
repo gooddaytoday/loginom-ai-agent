@@ -514,3 +514,12 @@ EOF GREEN3/3 плюс installed v4 сохранены рядом с исходн
 [Полные команды, hashes и ограничения](2026-10-07-package-docs-upgrade.md).
 Это synthetic/noReply проверка сохранности, без внешних model/Help/Loginom calls;
 полную живую матрицу и browser independence она не закрывает.
+
+## 2026-10-07 — отдельная локальная приёмка669 без внешней модели
+
+Чистый установленный Desktop catalog/integrity PASS; installed CLI PTY6/6
+и QA всех четырёх PDF PASS, без браузера Loginom. Холодный новый запрос в
+прежней CLI сессии сбросил docs→default; старый grant сохранён без применения.
+Cleanup/public uninstall подтверждены. Это controlled provider/локальная
+механика, не продолжение живой матрицы6.1-sol/medium.
+[Hashes и команды](2026-10-07-package-docs-local-installed.md).

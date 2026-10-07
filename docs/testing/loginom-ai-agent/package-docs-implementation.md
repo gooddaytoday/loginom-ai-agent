@@ -4288,6 +4288,33 @@ Help без браузера. CLI design progress, runbook и Linux checkpoint �
 Живой автовыбор, общая TUI/lifecycle/independence и A/B матрица остаются открыты.
 Synthetic provider/noReply не подменяют основную модель6.1-sol/medium.
 
+## 2026-10-07 — clean discovery, native TUI и новый запрос после restart
+
+Новый Desktop669 установлен в собственном Ubuntu24/network=none, UID1200,
+пустой HOME/XDG/workspace, PATH=/nonexistent. Настоящий backend catalog
+подтвердил оба bundled skills, точные resource paths/digest64 и builtin skill;
+полная integrity прошла, app/container закрыты, remaining0.
+
+Installed CLI669 native PTY: paste/`@`, оба со slash, external-path allow/read
+и deny —6/6 PASS. Четыре полных PDF прочитаны/просмотрены целиком, demo facts
+и layout PASS. Исходный `.lgp` неизменен, forced=false/writer=false/Chromium0/
+remaining0; public install/uninstall в собственном HOME не меняли человеческую
+установку. Python — внешний test driver, продукт использовал bundled Node.
+
+Отдельный установленный CLI669 применил docs slash grant перед первой моделью
+и выполнил настоящий extract. Следующий обычный пользовательский запрос в
+новом процессе/прежнем sessionID получил default catalog. Старый grant сохранён,
+но не переиспользован; файл неизменен, writer отсутствует, cleanup подтверждён.
+Provider во всех этих проверках синтетический, внешних model/Help/Loginom calls0.
+[Полные hashes, команды и ограничения](reports/2026-10-07-package-docs-local-installed.md).
+
+Read-only evals остаётся на `cd592244485cb892a0c1f13fd7b60dcbbf7f32ca`;
+обязательная серверная skill revision и legacy parser ещё требуют отдельного
+назначенного владельца. Исходная калибровочная сессия завершена, её последний
+результат —323 tests/typecheck/XML guard, без нового live judge. Чужие worktree,
+harness и стенд не менялись. Help health2026-10-07T20:05Z: proxy TLS EOF/35,
+direct refused/7, HTTP000. Живые прогоны не начаты при известном отказе Help.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
@@ -4306,7 +4333,7 @@ Synthetic provider/noReply не подменяют основную модель
 - Lazy admission/full history: 128 PASS / 1 SKIP; actual prompt 11 PASS; Agent typecheck PASS.
 - Bundled activation: 109 PASS / 1 SKIP; pending-revert: 4 boundary tests и 87 PASS / 1 SKIP; typecheck PASS.
 - Slash source: 104 PASS / 1 SKIP; typecheck PASS; build/general остаются в исходной сессии.
-- CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
+- CLI `.lgp`: 94 PASS / 1 SKIP; TUI83 diagnostics/command/damage PASS, suite198 PASS/1 SKIP. Installed669 PTY6/6/PDF4 pages QA PASS, input unchanged/writer/Chromium/processes0; cold new-user resume resets docs→default, historical grant preserved, native PASS.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
-- Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- RESUMED: SUM bc6→cold6693/3 PASS; collector1 сохранён/recovered без retry. Offline Desktop+CLI upgrade669 PASS/settings/auth fixture/user skill/history/default, cold resume и busy3 PASS, containers/processes0; driver EOF RED3/3/GREEN3/3, исходные FAIL сохранены. Permanent rules/runbooks обновлены. Help недоступен; live corpus/TUI/lifecycle/independence/A-B и evals ownership/stand открыты.
+- Installed DEB85/GUI2aa permissions/damage PASS; Desktop67 crash logging6 PASS/typecheck. Desktop669 clean HOME/workspace/PATHnone catalog/digests/integrity PASS, container/processes0; installed clean-discovery и permanent-rules подпункты8 закрыты, full live/lifecycle/evals открыты.
+- RESUMED: SUM bc6→cold6693/3 PASS; collector1 сохранён/recovered без retry. Offline Desktop+CLI upgrade669 PASS/settings/auth fixture/user skill/history/default, cold resume и busy3 PASS, containers/processes0; driver EOF RED3/3/GREEN3/3, исходные FAIL сохранены. Permanent rules/runbooks обновлены. Own clients/containers0, исходный test stand running/always. Next: восстановить Help, назначить владельца harness compatibility, закрепить свежий SHA/чистый стенд; full live/lifecycle/independence/A-B открыты.

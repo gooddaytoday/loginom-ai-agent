@@ -420,3 +420,13 @@ managed/MCP 2 PASS. Изолированный текущий runtime на на�
 пакетов. DPR=1, viewport1920×966. Устаревший oracle потребовал временного удаления
 запрещённого `budgets`; автоматический resume в диагностической копии отключён.
 Подробности и хеши — в browser-scale отчёте. Официальные установщики не пересобраны.
+
+## 2026-10-07 — clean skills catalog и installed TUI669
+
+Installed Desktop669: empty HOME/workspace, PATHnone, backend catalog обоих
+verified skills/digest64 и полная integrity PASS. CLI669 native PTY6/6, четыре
+PDF целиком QA PASS, public install/uninstall, input unchanged, browser/writer/
+processes0. Отдельный CLI restart/new user сбросил docs→default и сохранил
+исторический grant без повторного применения. Synthetic provider, live Help/
+Loginom/model calls0; общие gates открыты.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-07-package-docs-local-installed.md).

@@ -609,3 +609,12 @@ Active-import driver также принимает SIGINT. Для этого с�
 
 Обязательная матрица и текущие исходные доказательства: [browser-scale](browser-scale.md).
 Исторические результаты этого runbook не подтверждают исправленный payload.
+
+## Package docs: установленный TUI и restart, 2026-10-07
+
+CLI669 прошёл native PTY paste/`@`/slash и external-path allow/read/deny —6/6.
+Четыре PDF полностью прочитаны и просмотрены, источник не менялся, браузер0,
+guard/processes0, public uninstall выполнен. Отдельный холодный новый запрос
+в прежнем sessionID сбросил docs-профиль в default, сохранив исторический grant.
+Provider синтетический; полная живая TUI/lifecycle матрица этим не закрывается.
+[Отчёт локальной приёмки](reports/2026-10-07-package-docs-local-installed.md).
