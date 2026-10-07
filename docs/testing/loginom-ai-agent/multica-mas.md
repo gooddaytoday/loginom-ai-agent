@@ -44,5 +44,6 @@ CLI model requests и девятая задача в native очереди. Не
 - GitHub resource ref обновлён на f9bf332cc; штатный чистый checkout LAB-27 и API readback PASS.
 - Bun1.3.14/build toolchain установлены; Node24.19.0 hash совпал с pin. HTTPS app.loginom.ai TLS EOF.
 - Владелец указал app.loginom.ai и предоставил сервисный ключ; административный доступ не подтверждён.
-- Установка, настоящий OAuth и 8 реальных CLI-прогонов NOT_RUN; node cards ещё не созданы.
-- Следующее: зависимости/сеть, Linux тесты/сборка, login, parallel qualification, свежие Backlog cards.
+- Старые LAB24/25 cancelled, wakeups нет; новые LAB29 LGD / LAB30 XLSX Backlog, 0 запусков.
+- Стенды/MCP и новые Loginom-аккаунты отложены владельцем; 8 реальных циклов/queue9 NOT_RUN.
+- Следующее: закончить Linux фиксы/сборку; после доступа — login, аккаунты и parallel qualification.

@@ -69,6 +69,28 @@ afterEach(async () => {
 })
 
 describe("shared OAuth store (real processes, fake provider only)", () => {
+  test("special auth and pending files fail promptly and release flock", async () => {
+    for (const name of ["auth.json", "refresh-pending.json"]) {
+      const dir = await directory()
+      const original = await fs.readFile(path.join(dir, "auth.json"))
+      const file = path.join(dir, name)
+      if (name === "auth.json") await fs.unlink(file)
+      expect(await Bun.spawn(["mkfifo", "-m", "600", file]).exited).toBe(0)
+      const proc = worker(name === "auth.json" ? "read" : "refresh", dir)
+      const outcome = await Promise.race([
+        result(proc),
+        Bun.sleep(2000).then(() => {
+          throw new Error("SPECIAL_FILE_READ_BLOCKED")
+        }),
+      ])
+      expect(outcome.code).toBe(1)
+      expect(outcome.error).toContain("SHARED_AUTH_READ_FAILED")
+      await fs.unlink(file)
+      if (name === "auth.json") await fs.writeFile(file, original, { mode: 0o600 })
+      expect((await SharedAuth.snapshot(dir, "openai")).auth).toEqual(oldAuth)
+    }
+  }, 10000)
+
   test("eight model calls overlap after one refresh", async () => {
     const dir = await directory()
     const started = signal()
