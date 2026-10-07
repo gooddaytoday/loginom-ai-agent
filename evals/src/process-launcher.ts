@@ -11,7 +11,7 @@ const admitted = JSON.parse(await readFile(path.join(directory, "command.json"),
 await rm(path.join(directory, "command.json"))
 let state = { nonce: admitted.nonce, pid: process.pid, ready: false, cli_pid: null as number | null,
   exit_code: null as number | null, error: null as string | null,
-  sandbox_started: false, sandbox_exit_code: null as number | null, sandbox_error: null as string | null }
+  sandbox_started: false, sandbox_pid: null as number | null, sandbox_exit_code: null as number | null, sandbox_error: null as string | null }
 let writing = Promise.resolve()
 const record = (update: Partial<typeof state>) => {
   state = { ...state, ...update }
@@ -47,7 +47,7 @@ if (admitted.sandbox) {
       try {
         const value = JSON.parse(line) as Record<string, unknown>
         if (Number.isSafeInteger(value["child-pid"]) && Number(value["child-pid"]) > 0)
-          void record({ sandbox_started: true })
+          void record({ sandbox_started: true, sandbox_pid: Number(value["child-pid"]) })
         else if (Number.isSafeInteger(value["exit-code"]) && state.sandbox_started)
           void record({ sandbox_exit_code: Number(value["exit-code"]) })
         else void record({ sandbox_error: "SANDBOX_STATUS_INVALID" })

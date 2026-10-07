@@ -184,6 +184,7 @@ export async function superviseProcess(input: {
   const cliExecutable = await realpath(Bun.which(input.cmd[0]!) ?? input.cmd[0]!)
   const cliInfo = await stat(cliExecutable)
   const wrapper = input.sandbox ? await stat(await realpath(input.sandbox[0]!)) : undefined
+  const isWrapper = (entry: ProcessIdentity) => Boolean(wrapper && entry.device === wrapper.dev && entry.inode === wrapper.ino)
   cleanup.selectedCli = { executable: cliExecutable, device: cliInfo.dev, inode: cliInfo.ino }
   if (input.signal?.aborted) return { stdout: "", stderr: "", exitCode: -1, timedOut: false, interrupted: true,
     startedAt, durationMs: 0, processCleanup: cleanup, sandboxError: null as string | null }
@@ -201,7 +202,7 @@ export async function superviseProcess(input: {
   const proc = spawn(process.execPath, [path.join(import.meta.dir, "process-launcher.ts"), capsule], { cwd: input.cwd, env: input.env,
     detached: true, stdio: [input.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"] })
   let cliExitCode: number | undefined, cliPid: number | undefined, reaperReady = false
-  let sandboxStarted = false, sandboxExitCode: number | null = null, sandboxError: string | null = null
+  let sandboxStarted = false, namespacePid: number | null = null, sandboxExitCode: number | null = null, sandboxError: string | null = null
   cleanup.launcher = { kind: "linux_subreaper", pid: proc.pid ?? -1, cli_pid: null, ready: false }
   let finish = () => {}
   const exited = new Promise<void>((resolve) => {
@@ -223,13 +224,14 @@ export async function superviseProcess(input: {
     if (!root || !observed || !sameIdentity(observed, root)) throw Error("Launcher receipt lacks verified live identity")
     const state = (() => {
       try { return JSON.parse(raw) as { nonce: string; pid: number; ready: boolean; cli_pid: number | null; exit_code: number | null; error: string | null;
-        sandbox_started: boolean; sandbox_exit_code: number | null; sandbox_error: string | null } }
+        sandbox_started: boolean; sandbox_pid: number | null; sandbox_exit_code: number | null; sandbox_error: string | null } }
       catch { throw Error("Launcher receipt invalid") }
     })()
     if (!state || typeof state.ready !== "boolean" ||
       state.cli_pid !== null && (!Number.isSafeInteger(state.cli_pid) || state.cli_pid <= 0) ||
       state.exit_code !== null && !Number.isSafeInteger(state.exit_code) ||
       state.error !== null && typeof state.error !== "string" || typeof state.sandbox_started !== "boolean" ||
+      state.sandbox_pid !== null && (!Number.isSafeInteger(state.sandbox_pid) || state.sandbox_pid <= 0) ||
       state.sandbox_exit_code !== null && !Number.isSafeInteger(state.sandbox_exit_code) ||
       state.sandbox_error !== null && typeof state.sandbox_error !== "string") throw Error("Launcher receipt invalid")
     if (state.nonce !== nonce || state.pid !== proc.pid) throw Error("Launcher receipt identity differs")
@@ -238,6 +240,7 @@ export async function superviseProcess(input: {
     cleanup.launcher!.ready = state.ready
     if (state.cli_pid !== null) { cliPid = state.cli_pid; if (!input.sandbox) cleanup.launcher!.cli_pid = state.cli_pid }
     sandboxStarted = state.sandbox_started
+    namespacePid = state.sandbox_pid
     sandboxExitCode = state.sandbox_exit_code
     sandboxError = state.sandbox_error
     if (state.error) cleanup.error ??= "Launcher admission failed"
@@ -303,15 +306,26 @@ export async function superviseProcess(input: {
     // Group/session numbers are evidence, never a second admission algorithm.
     for (let pass = 0; pass < live.length; pass++) {
       const added = live.filter((entry) => !existing.has(key(entry)) && !ledger.get(key(entry))?.origin &&
+        // bwrap publishes child-pid before setsid/mount/exec completes. Admit
+        // the namespace reaper only after --new-session has settled, and the
+        // CLI after exec, preserving immutable identities once admitted.
+        (!input.sandbox || !(isWrapper(entry) && (entry.pid === namespacePid
+          ? entry.group !== entry.pid || entry.session !== entry.pid
+          : live.some((parent) => parent.pid === entry.parent && isWrapper(parent)) &&
+            (namespacePid === null || cleanup.launcher!.cli_pid === null)))) &&
         live.some((parent) => parent.pid === entry.parent && ledger.get(key(parent))?.origin &&
           sameIdentity(parent, ledger.get(key(parent))!.process) && (parent.pid !== root?.pid || reaperReady)))
       if (!added.length) break
       added.forEach((entry) => {
         const parent = live.find((candidate) => candidate.pid === entry.parent && ledger.get(key(candidate))?.origin)!
         const via = input.sandbox
-          ? entry.device === cliInfo.dev && entry.inode === cliInfo.ino ? "cli" : "parent"
+          ? entry.parent === namespacePid && entry.device === cliInfo.dev && entry.inode === cliInfo.ino &&
+            (cleanup.launcher!.cli_pid === null || cleanup.launcher!.cli_pid === entry.pid) ? "cli"
+            : parent.pid === namespacePid || parent.pid === root?.pid && entry.pid !== cliPid ? "subreaper" : "parent"
           : entry.pid === cliPid && parent.pid === root?.pid ? "cli" : parent.pid === root?.pid ? "subreaper" : "parent"
         track(entry, via, parent)
+        if (input.sandbox && isWrapper(entry) && (entry.pid === cliPid || entry.pid === namespacePid))
+          ledger.get(key(entry))!.admission = "allowed"
         if (input.sandbox && via === "cli") cleanup.launcher!.cli_pid = entry.pid
         if (input.sandbox && entry.pid === cliPid && parent.pid === root?.pid &&
           (entry.device !== wrapper!.dev || entry.inode !== wrapper!.ino)) {
@@ -322,10 +336,21 @@ export async function superviseProcess(input: {
         }
       })
     }
-    const cli = live.find((entry) => entry.pid === cliPid && entry.parent === root?.pid && ledger.has(key(entry)))
+    const cli = live.find((entry) => (input.sandbox
+      ? entry.parent === namespacePid && entry.device === cliInfo.dev && entry.inode === cliInfo.ino &&
+        (cleanup.launcher!.cli_pid === null || cleanup.launcher!.cli_pid === entry.pid)
+      : entry.pid === cliPid && entry.parent === root?.pid) && ledger.has(key(entry)))
     if (cli && cli.device === cliInfo.dev && cli.inode === cliInfo.ino && ledger.get(key(cli))!.origin!.via !== "cli") {
+      if (input.sandbox) cleanup.launcher!.cli_pid = cli.pid
       ledger.get(key(cli))!.origin!.via = "cli"
       if (ledger.get(key(cli))!.admission === "pending") ledger.get(key(cli))!.admission = "allowed"
+    }
+    // The private receipt may arrive after the first ancestry observation.
+    // Only the two identified wrapper processes can leave pending this way.
+    if (input.sandbox) for (const entry of ledger.values()) {
+      if (entry.origin && entry.admission === "pending" && isWrapper(entry.process) &&
+        [cliPid, namespacePid].includes(entry.process.pid) && live.some((current) => sameIdentity(current, entry.process)))
+        entry.admission = "allowed"
     }
     if (profile && root && live.some((entry) => key(entry) === key(root))) {
       const writer = await writerIdentity(profile)
@@ -348,9 +373,9 @@ export async function superviseProcess(input: {
       }
       // An adopted process with a lost chain may be a browser helper outside the
       // bundle. Adoption cannot bypass executable admission, including its children.
-      const native = live.filter((entry) => entry.device === browser.device && entry.inode === browser.inode ||
+      const native = live.filter((entry) => !isWrapper(entry) && (entry.device === browser.device && entry.inode === browser.inode ||
         inside(entry.executable, browser.directory) || ledger.has(key(entry)) &&
-          (browserAncestor(ledger.get(key(entry))!, false) || cliPid !== undefined && entry.pid !== cliPid && ledger.get(key(entry))!.origin?.via === "subreaper"))
+          (browserAncestor(ledger.get(key(entry))!, false) || cliPid !== undefined && entry.pid !== cliPid && ledger.get(key(entry))!.origin?.via === "subreaper")))
       // Establish exact root bindings first. Helpers cannot supply a missing
       // root proof, even when the kernel has adopted them to our launcher.
       for (const current of native) {
@@ -444,7 +469,6 @@ export async function superviseProcess(input: {
       pollPending = false
     })
   }, 10)
-  const isWrapper = (entry: ProcessIdentity) => Boolean(wrapper && entry.device === wrapper.dev && entry.inode === wrapper.ino)
   const signalOwned = async (signal: NodeJS.Signals, wrappers = false) => {
     // A fresh full pass before each syscall checks membership as well as birth.
     // Newly admitted descendants are handled by the next shutdown pass.
