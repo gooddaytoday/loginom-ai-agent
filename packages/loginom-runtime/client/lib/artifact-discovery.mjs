@@ -105,7 +105,7 @@ export async function discoverArtifactAndDownload(page,task,ui,download,reveal) 
 export function makeArtifactDiscoveryDownloadCode(options,{download,reveal}) {
  if(!options?.artifact?.upload||!options.snapshot?.observation_root?.ref||options.snapshot.file_storage?.status!=='observed'
    ||options.snapshot.file_storage.directory!==options.artifact.upload.directory||!/^MF;TF(?:-\d+)?$/.test(options.snapshot.workflow_ref?.prefix)
-   ||!(/\.(csv|tsv)$/i.test(options.artifact.name)))throw Error('Discovery requires the exact observed authorized storage');
+   ||!(/\.(csv|tsv|txt)$/i.test(options.artifact.name)))throw Error('Discovery requires the exact observed authorized storage');
  return `async page=>(${discoverArtifactAndDownload.toString()})(page,${JSON.stringify(options)},${workspaceUiCapability.toString()},${download.toString()},${reveal.toString()})`;
 }
 

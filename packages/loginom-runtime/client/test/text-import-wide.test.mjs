@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {configureTextImportFields,importFieldRevealDelta} from '../lib/text-import-procedure.mjs';
+import {configureTextImportFields,importFieldRevealDelta,ImportColumnCountError,ImportColumnBindingError} from '../lib/text-import-procedure.mjs';
 import {textImportStepBudget} from '../lib/text-import-limits.mjs';
 
 function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=null,editorChange=null,fillChange=null}={}) {
@@ -151,4 +151,44 @@ for(const [name,fillChange] of Object.entries({
  const f=fixture(1,{editLabels:true,fillChange});
  await assert.rejects(configureTextImportFields(f.channel,f.parameters,f.owner));
  assert.equal(f.gestures,2,'only Next and editor open were applied');
+});
+
+
+for(const [observed,requested] of [[1,2],[9,2],[9,10]])test(`complete ${observed}-field schema refuses ${requested} settings before column edits`,async()=>{
+ const f=fixture(observed,{editLabels:true});
+ f.parameters.columns=Array.from({length:requested},(_,i)=>({...f.parameters.columns[0],name:'F'+i,label:'Changed'+i}));
+ await assert.rejects(configureTextImportFields(f.channel,f.parameters,f.owner),e=>{
+  assert.ok(e instanceof ImportColumnCountError);
+  assert.ok(e instanceof ImportColumnBindingError);
+  assert.equal(e.message,`Import definition count differs: requested ${requested}, observed ${observed}`);
+  return true;
+ });
+ assert.deepEqual(f.reads.filter(r=>r.condition.startsWith('complete import definition page')).map(r=>r.offset),observed>8?[0,8]:[0]);
+ assert.deepEqual(f.performed,[]);
+ assert.equal(f.gestures,1,'only source-to-format transition; no column edits');
+});
+
+for(const fault of ['incomplete','changing','foreign_owner','transport'])test(`${fault} page is not converted to a typed count refusal`,async()=>{
+ const f=fixture(9,{editLabels:true}),observe=f.channel.observe;
+ f.parameters.columns=f.parameters.columns.slice(0,2);
+ const transport=new Error('transport response lost');
+ f.channel.observe=async options=>{
+  if(!options.importColumnPage)return observe(options);
+  if(fault==='transport')throw transport;
+  const state=await observe(options);
+  if(fault==='incomplete')state.wizard.import_columns.page.returned--;
+  if(fault==='changing'&&options.importColumnPage.offset===8)state.wizard.import_columns.page.schema_id='changed';
+  if(fault==='foreign_owner'){
+   state.wizard.owner_context.node.tid='foreign';
+   assert.equal(options.ready(state),false);
+   throw new Error('Foreign owner is not ready');
+  }
+  return state;
+ };
+ await assert.rejects(configureTextImportFields(f.channel,f.parameters,f.owner),e=>{
+  assert.ok(!(e instanceof ImportColumnCountError));
+  if(fault==='transport')assert.equal(e,transport);
+  return true;
+ });
+ assert.deepEqual(f.performed,[]);assert.equal(f.gestures,1);
 });

@@ -272,7 +272,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         return [owner,owner+' input','[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
       })),
       '[data-tid$=";WizrdMCF;FilterDataWizard;FilterDataPanel"]','[data-tid*=";WizrdMCF;FilterDataWizard;FilterDataPanel;tbl;celleditor"]','[data-tid*=";WizrdMCF;CalcDataWizard;colExpressionName_"]','[data-tid*=";WizrdMCF;CalcDataWizard;colExpressionDisplayName_"]','[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"]','[data-tid$=";WizrdMCF;CalcDataWizard;btnCalcMode"]','[data-tid$=";WizrdMCF;CalcDataWizard;btnReplaceField"]','span.bg-TBGCalcMode-cmExpression,span.bg-TBGCalcMode-cmJavaScript',
-      ...['edtDelimiterChar','edtTextQualifier','edtValueNull','edtDecimalSeparator'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+';ValueControl"]';return [owner,owner+' input',owner+' textarea'];}),
+      ...['edtDelimiterChar','edtTextQualifier','edtValueNull','edtDecimalSeparator','edtDateFormat','edtDateSeparator'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+';ValueControl"]';return [owner,owner+' input',owner+' textarea'];}),
+      ...['edtMultipleDelimiters;ValueControl','edtMultipleDelimiters;ValueControl;InputEl','edtMultipleDelimiters;ValueControl;DisplayEl'].map(name=>'[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+'"]'),
       ...['edtConnection','edtFileName;ValueControl','edtCodePage;ValueControl','edtRowsToSkip;ValueControl'].flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;'+name+'"]';return [owner,owner+' input',owner+' textarea'];}),
       '[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFirstLineAsTitle;ValueControl"]',
@@ -1599,7 +1600,7 @@ function readRenderedInputMapping(observation) {
     }
     if(wizard.status==='observed' && wizard.stage==='text_import_format') {
       const base=wizard.root_tid+';ImportTextFileParamsWizard;';
-      const fields={delimiter:'edtDelimiterChar',text_qualifier:'edtTextQualifier',null_marker:'edtValueNull',decimal_separator:'edtDecimalSeparator'};
+      const fields={delimiter:'edtDelimiterChar',text_qualifier:'edtTextQualifier',null_marker:'edtValueNull',decimal_separator:'edtDecimalSeparator',date_format:'edtDateFormat',date_separator:'edtDateSeparator'};
       wizard.settings={status:'draft_ui_values',applied_verified:false,fields:Object.fromEntries(Object.entries(fields).map(([name,key])=>{
         const owners=(tids.get(base+key+';ValueControl')??[]).filter(item=>wizardForms[0].contains(item) && visible(item) && !sensitive(item));
         const inputs=owners.length===1?dom.filter(item=>{charge();return owners[0].contains(item) && item.matches('input:not([type="hidden"]),textarea') && visible(item) && !sensitive(item);}):[];
@@ -1613,6 +1614,13 @@ function readRenderedInputMapping(observation) {
         return [name,{status:'observed',value:value.slice(0,256),value_length_utf16:value.length,truncated:value.length>256,
           enabled:enabled(input),read_only:input.readOnly===true,source_tid:ownerTid,input_ref:refOf(input),owner_ref:refOf(owners[0]),value_kind:'displayed_input_text',native_max_length_utf16:nativeMax}];
       }))};
+      const multipleTid=base+'edtMultipleDelimiters;ValueControl';
+      const multipleOwners=(tids.get(multipleTid)??[]).filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e));
+      const multipleDisplays=(tids.get(multipleTid+';DisplayEl')??[]).filter(e=>multipleOwners.length===1&&multipleOwners[0].contains(e)&&visible(e)&&!sensitive(e));
+      wizard.settings.fields.multiple_delimiters=multipleOwners.length===1&&multipleDisplays.length===1&&multipleDisplays[0].matches('.x-form-checkbox')
+        ?{status:'observed',value:multipleOwners[0].classList.contains('x-form-cb-checked'),owner_ref:refOf(multipleOwners[0]),
+          display_ref:refOf(multipleDisplays[0]),root_ref:wizard.root_ref,enabled:enabled(multipleDisplays[0]),value_kind:'loginom_ext_checkbox'}
+        :{status:multipleOwners.length>1||multipleDisplays.length>1?'ambiguous':'unobserved'};
       // E2E sColumnDefsTuning: properties are rows; field identity is a column
       // index. These are rendered draft settings, never complete output schema.
       scanStage='import_definitions';

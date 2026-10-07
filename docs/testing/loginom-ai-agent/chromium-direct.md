@@ -34,6 +34,33 @@ Windows/macOS изменяют нативные настройки только 
 WinINET per-connection API / SystemConfiguration Dynamic Store. После теста
 восстанавливаются исходные значения с read-back. Пользовательская сессия не меняется.
 
+Перед Windows-проверкой CI отключает и останавливает задачи `\Mozilla\`, затем
+останавливает `firefox`, `default-browser-agent` и `pingsender` на одноразовом runner.
+Состояние задач и отсутствие процессов проверяются до изменения WinINET.
+Это изоляция окружения: продукт и строгая проверка отсутствия запросов к прокси
+не меняются. Список отключённых задач и остановленных процессов выводится в CI.
+Mozilla описывает фоновые задачи [обновления Firefox](https://firefox-source-docs.mozilla.org/toolkit/mozapps/update/docs/BackgroundUpdates.html)
+и [Default Browser Agent](https://firefox-source-docs.mozilla.org/toolkit/mozapps/defaultagent/default-browser-agent/index.html).
+
+Причина изменения: [Windows run 37465813876](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/37465813876)
+зафиксировал четыре CONNECT к `incoming.telemetry.mozilla.org:443` во время
+`manual, headed`. Лог не содержит идентификатора отправившего процесса, поэтому
+его принадлежность Mozilla остаётся гипотезой; повторная Windows-проверка должна
+подтвердить работоспособность изоляции. Домены Mozilla не исключаются из проверки.
+
+Разбор 2026-10-06: успешный [push 37465808013](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/37465808013)
+и неуспешный PR-прогон выше использовали один SHA `685ac7ad9` и образ Windows
+`20260927.320.1`; код проверки между ними не менялся. Задача Default Browser Agent
+запускается раз в 24 часа либо при пробуждении после пропущенного запуска
+([Mozilla](https://firefox-source-docs.mozilla.org/toolkit/mozapps/defaultagent/default-browser-agent/index.html)).
+Поэтому совпадение фонового запуска с окном активного WinINET proxy — вероятное
+объяснение непостоянного падения; старый лог не позволяет установить отправивший
+процесс или точное время запуска задачи. На SHA `911a39e` три отдельных Windows jobs
+дали 14/14 PASS без пропусков: [PR](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/37499617309/job/112392953184),
+[push](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/37499611949/job/112392931826)
+и [повтор Windows](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/37499611949/job/112398643870).
+Во всех трёх логах обнаружена и отключена задача `\Mozilla\Firefox Default Browser Agent`.
+
 Для обычной локальной проверки без изменения настроек ОС:
 
 ```sh

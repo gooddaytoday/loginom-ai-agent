@@ -43,10 +43,10 @@ function fixture(fault,initialDirectory='/') {
  const prefix='MF;TF-2',nav=prefix+';NavigationBar;NavigationPanel';
  const entry=(tid,kind)=>({tid,ref:'ui-'+tid,label:tid.split(';colName_')[1]??'',allowed_actions:['click','double_click'],...(kind?{storage_entry:{kind}}:{})});
  const state=()=>({observation_id:'obs',dom_epoch:{document:'doc',revision:1},active_tab_ref:'tab',workflow_ref:{prefix},file_storage:{status:'observed',directory},ui:{elements:[entry(nav),entry(prefix+';FileStorageForm;pnlFileStorage;tbl'),entry(prefix+';cnrNaviMode;b.s_Сервер>Файлы'),entry(prefix+';FileStorageForm;colName_'+(directory==='/'?'user':directory==='/user'?'dock-p3':'input.csv'),directory==='/user/dock-p3'?undefined:'folder')]}});
- const runtime={observe:async()=>({status:'SUCCEEDED',output:state()}),uiAct:async a=>{calls.push(a.verb);if(a.verb==='click'&&a.ref.endsWith(';cnrNaviMode;b.s_Сервер>Файлы'))directory='/';if(a.verb==='double_click')directory+='/'+a.ref.split('colName_')[1];directory=directory.replace('//','/');return {status:'SUCCEEDED',cleanup_complete:true}},
+ const runtime={preflightDeliveredArtifact:()=>{},observe:async()=>({status:'SUCCEEDED',output:state()}),uiAct:async a=>{calls.push(a.verb);if(a.verb==='click'&&a.ref.endsWith(';cnrNaviMode;b.s_Сервер>Файлы'))directory='/';if(a.verb==='double_click')directory+='/'+a.ref.split('colName_')[1];directory=directory.replace('//','/');return {status:'SUCCEEDED',cleanup_complete:true}},
   uploadDeliveredArtifact:async()=>{calls.push('upload');if(fault==='upload')throw Error('Lost browser response');return {status:'AMBIGUOUS',cleanup_complete:true,output:{upload_submitted:true}};},
   inspect:async()=>{calls.push('inspect');return {output:{state:verified?'resolved':'pending',cleanup_confirmed:true,outcome:{status:verified?'SUCCEEDED':'AMBIGUOUS',output:{upload_submitted:true,server_copy_verification:{bytes_verified:true,upload_completion_verified:true,destination:artifact.upload.destination,bytes:3,sha256:fault==='digest'?'b'.repeat(64):artifact.sha256,verification_id:'delivery:verify'}}}}};},
-  verifyDeliveredArtifact:async()=>{calls.push('verify');if(fault==='verify')throw Error('Lost download receipt');verified=true;return {status:'SUCCEEDED',cleanup_complete:true,output:{bytes_verified:true}};}};
+  verifyDeliveredArtifact:async({onDispatched}={})=>{onDispatched?.();calls.push('verify');if(fault==='verify')throw Error('Lost download receipt');verified=true;return {status:'SUCCEEDED',cleanup_complete:true,output:{bytes_verified:true}};}};
  const service=createArtifactDelivery({runtime,artifactStore:{getUploadGrant:(id,grant)=>{assert.equal(id,'artifact');assert.equal(grant,'grant');return artifact;}},admit:()=>{},record:async e=>{events.push(e);if(fault==='journal'&&e.phase==='artifact_delivery_completed')throw Error('Disk unavailable');return e;}});
  return {service,artifact,calls,events,runtime};
 }
@@ -224,7 +224,7 @@ test('delivery returns a terminal path conflict without byte verification or ano
 for(const stage of ['upload','verify'])test('delivery reconciles lost '+stage+' reply from the original receipt without repeating it',async()=>{
  const f=fixture(),originalInspect=f.runtime.inspect;
  if(stage==='upload')f.runtime.uploadDeliveredArtifact=async()=>{f.calls.push('upload');return {status:'AMBIGUOUS',cleanup_complete:false,error:{code:'BROWSER_CALL_UNCERTAIN'}};};
- else {const verify=f.runtime.verifyDeliveredArtifact;f.runtime.verifyDeliveredArtifact=async()=>{await verify();return {status:'FAILED',error:{code:'BROWSER_CALL_UNCERTAIN'}};};}
+ else {const verify=f.runtime.verifyDeliveredArtifact;f.runtime.verifyDeliveredArtifact=async options=>{await verify(options);return {status:'FAILED',error:{code:'BROWSER_CALL_UNCERTAIN'}};};}
  f.runtime.inspect=async options=>{assert.equal(options.operationId,'delivery:upload');const r=await originalInspect();r.output.operation_id='delivery:upload';r.output.outcome.operation_id='delivery:upload';r.output.outcome.cleanup_complete=true;return r;};
  const p=f.service.deliver(request),r=await p;assert.equal(r.outcome.status,'SUCCEEDED');
  assert.deepEqual(f.calls,['double_click','double_click','upload','inspect','verify','inspect']);
@@ -248,7 +248,7 @@ function resumeFixture(stage) {
   f.runtime.inspect=async()=>{if(first){first=false;return {output:{operation_id:'delivery:upload',cleanup_confirmed:false}};}return normal();};
  } else {
   const verify=f.runtime.verifyDeliveredArtifact;
-  f.runtime.verifyDeliveredArtifact=async()=>{await verify();throw Error('Verification return lost after commit');};
+  f.runtime.verifyDeliveredArtifact=async options=>{await verify(options);throw Error('Verification return lost after commit');};
  }
  return f;
 }
@@ -323,4 +323,29 @@ test('an inaccessible input folder reports an admitted artifact and never upload
  assert.equal(result.outcome.upload_submitted_or_unknown,false);
  assert.ok(!f.calls.includes('upload'));assert.ok(!f.calls.includes('verify'));
  assert.equal(await f.service.deliver(request),result);
+});
+
+test('unsupported verification route refuses before navigation or upload',async()=>{
+ const f=fixture();f.runtime.preflightDeliveredArtifact=()=>{throw Object.assign(Error('Unsupported verification route'),{code:'ARTIFACT_VERIFICATION_UNSUPPORTED'});};
+ const r=await f.service.deliver(request);
+ assert.equal(r.outcome.status,'NOT_APPLIED');assert.equal(r.error.code,'ARTIFACT_VERIFICATION_UNSUPPORTED');
+ assert.equal(r.outcome.cleanup_complete,true);assert.equal(r.outcome.inspection_required,false);
+ assert.deepEqual(f.calls,[]);assert.equal(f.service.unsettled,false);
+});
+
+test('local verification refusal resumes the original upload without another submission',async()=>{
+ const f=fixture(),verify=f.runtime.verifyDeliveredArtifact,inspect=f.runtime.inspect;let refused=false;
+ f.runtime.inspect=async()=>{const r=await inspect();r.output.operation_id='delivery:upload';r.output.outcome.operation_id='delivery:upload';r.output.outcome.cleanup_complete=true;return r;};
+ f.runtime.verifyDeliveredArtifact=async options=>{if(!refused){refused=true;throw Error('Local observation missing before dispatch');}return verify(options);};
+ const initial=await f.service.deliver(request);assert.equal(initial.outcome.status,'AMBIGUOUS');
+ assert.equal(initial.outcome.next_step.tool,'dock_artifact_delivery_resume');
+ const result=await f.service.resume({operation_id:'delivery',resume_id:'local-refusal',budget_ms:120000});
+ assert.equal(result.outcome.status,'SUCCEEDED',JSON.stringify(result));assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
+});
+
+test('resume never extends the original delivery deadline',async()=>{
+ const f=resumeFixture('upload');await f.service.deliver({...request,budget_ms:1000});
+ await new Promise(resolve=>setTimeout(resolve,1050));
+ assert.throws(()=>f.service.resume({operation_id:'delivery',resume_id:'expired',budget_ms:120000}),/deadline elapsed/);
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.ok(!f.calls.includes('verify'));
 });

@@ -22,6 +22,12 @@ Component ID: `component.imports.Text`, slug `text-import`. Runtime type и ре
 
 ### Объём назначения
 
+Дополнение LAB-15: владелец отдельно назначил матрицу одиночных табличных TXT
+из части этапа 1 и адресные import-format bindings для трёх полей; согласован
+выбор date_separator через существующий select_wizard_option. Остальные
+границы подплана сохраняются. Матрица и результаты — `acceptance/matrix/`
+и `discovery.md`; прежний accepted scope не означает её приёмку.
+
 Разрешено: собрать `acceptance/` из прежнего oracle; выполнить адресные тесты, CLI и независимую приёмку; при расхождении сверить мастер штатными средствами runtime; исправить дефекты в `text-import-*.mjs` и их тестах в принятом объёме; подготовить PR и доказательства.
 
 Не разрешено: merge и релиз; следующие этапы; изменение общей оболочки (`calculator-node.mjs`, `node-read-*`, `workspace-ui.mjs`, `node-procedure.mjs`, `collapse-native-*`) или `cold-check.mjs` без решения владельца; изменение конфигураций обвязки.

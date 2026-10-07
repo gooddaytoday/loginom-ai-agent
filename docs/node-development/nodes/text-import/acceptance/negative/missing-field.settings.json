@@ -1,0 +1,30 @@
+{
+  "source": {
+    "encoding": "65001",
+    "rows_to_skip": 0,
+    "first_line_as_title": true
+  },
+  "format": {
+    "delimiter": ",",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "text_qualifier": "\"",
+    "multiple_delimiters": false
+  },
+  "columns": [
+    {
+      "name": "Name",
+      "label": "Name",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "name": "OtherName",
+      "label": "OtherName",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    }
+  ]
+}

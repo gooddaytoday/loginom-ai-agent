@@ -319,6 +319,85 @@ describe("session.message-v2.toModelMessage", () => {
     ])
   })
 
+  test("describes inline CSV to the model without changing original non-UTF8 admission bytes", async () => {
+    for (const [filename, bytes] of [
+      ["cp1251.csv", Buffer.from([0x49, 0x64, 0x2c, 0xcf, 0xf0, 0xe8, 0xe2, 0xe5, 0xf2])],
+      ["utf16le.csv", Buffer.from([0xff, 0xfe, 0x49, 0, 0x64, 0, 0x2c, 0, 0x1f, 0x04])],
+      ["utf16be.CSV", Buffer.from([0xfe, 0xff, 0, 0x49, 0, 0x64, 0, 0x2c, 0x04, 0x1f])],
+    ] as const) {
+      const input: SessionV1.WithParts[] = [
+        {
+          info: userInfo("csv-user"),
+          parts: [
+            {
+              ...basePart("csv-user", "csv-part"),
+              type: "file",
+              mime: "text/csv",
+              filename,
+              url: `data:text/csv;base64,${bytes.toString("base64")}`,
+            },
+          ],
+        },
+      ]
+      const original = structuredClone(input)
+      const messages = await MessageV2.toModelMessages(input, model)
+      expect(messages).toStrictEqual([
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `[CSV attachment: ${JSON.stringify(filename)} (text/csv). Original bytes retained for attachment admission and verified delivery; file contents are not decoded here.]`,
+            },
+          ],
+        },
+      ])
+      expect(input).toStrictEqual(original)
+      const part = input[0].parts[0]
+      expect(part.type).toBe("file")
+      if (part.type !== "file") throw new Error("Original file part lost")
+      expect(Buffer.from(part.url.split(",")[1], "base64")).toEqual(bytes)
+    }
+  })
+
+  test("CSV model adaptation does not replace remote CSV or other file types", async () => {
+    const input: SessionV1.WithParts[] = [
+      {
+        info: userInfo("files"),
+        parts: [
+          {
+            ...basePart("files", "remote"),
+            type: "file",
+            mime: "text/csv",
+            filename: "remote.csv",
+            url: "https://example.com/remote.csv",
+          },
+          {
+            ...basePart("files", "pdf"),
+            type: "file",
+            mime: "application/pdf",
+            filename: "document.pdf",
+            url: "data:application/pdf;base64,JVBERg==",
+          },
+        ],
+      },
+    ]
+    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
+      {
+        role: "user",
+        content: [
+          { type: "file", mediaType: "text/csv", filename: "remote.csv", data: "https://example.com/remote.csv" },
+          {
+            type: "file",
+            mediaType: "application/pdf",
+            filename: "document.pdf",
+            data: "data:application/pdf;base64,JVBERg==",
+          },
+        ],
+      },
+    ])
+  })
+
   test("converts assistant tool completion into tool-call + tool-result messages with attachments", async () => {
     const userID = "m-user"
     const assistantID = "m-assistant"

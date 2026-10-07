@@ -9,6 +9,22 @@ const kinds = ['Неопределенное', 'Непрерывный', 'Дис
 function requireValue(condition, message) { if (!condition) throw new Error(message); }
 function one(values, message) { requireValue(values.length === 1, message); return values[0]; }
 
+// Editable combos can display labels longer than their native input limit.
+// Resolve a choice only in the current format field; never type that label.
+export function textImportFormatChoice(state, name, kind, label) {
+  const wizard=state.wizard,field=wizard?.settings?.fields?.[name];
+  requireValue(wizard?.status==='observed'&&wizard.stage==='text_import_format'
+    &&wizard.root_ref&&field?.status==='observed'&&!field.truncated
+    &&field.owner_ref&&field.input_ref,'Import format field ownership unavailable');
+  return one(state.ui.elements.filter(e=>{
+    const combo=e.wizard_combo,owner=combo?.field;
+    return owner&&combo.kind===kind&&(kind!=='option'||combo.label===label)
+      &&(owner.scope??'import_format')==='import_format'&&owner.name===name
+      &&owner.owner_ref===field.owner_ref&&owner.input_ref===field.input_ref
+      &&owner.root_ref===wizard.root_ref;
+  }),'Exact import format '+kind+' unavailable or ambiguous');
+}
+
 // Inline editors occupy the entire column, including a picker at its right edge.
 // A clickable sliver is sufficient for a cell gesture, but not for its editor.
 export function importFieldRevealDelta(target, scroller) {
@@ -48,9 +64,17 @@ function validateSettings(p,maxColumns) {
   requireValue(typeof p.source.encoding === 'string' && p.source.encoding.length > 0 && p.source.encoding.length <= 100, 'Encoding is required');
   requireValue(typeof p.source.first_line_as_title === 'boolean' && Number.isInteger(p.source.rows_to_skip)
     && p.source.rows_to_skip >= 0 && p.source.rows_to_skip <= 1000000, 'Invalid source row settings');
-  requireValue(p.format && Object.keys(p.format).sort().join(',') === 'decimal_separator,delimiter,null_marker,text_qualifier', 'Format parameters are incomplete');
-  for (const [name, value] of Object.entries(p.format)) requireValue(typeof value === 'string'
-    && value.length <= (name === 'null_marker' ? 256 : 1) && !/[\x00\r\n]/.test(value), 'Invalid format value: ' + name);
+  const formatKeys=['delimiter','decimal_separator','null_marker','text_qualifier'];
+  requireValue(p.format && formatKeys.every(k=>Object.hasOwn(p.format,k))
+    &&Object.keys(p.format).every(k=>[...formatKeys,'multiple_delimiters','date_format','date_separator'].includes(k)), 'Format parameters are incomplete');
+  for (const name of formatKeys) {
+    const value=p.format[name];
+    requireValue(typeof value === 'string' && value.length <= (name === 'null_marker' ? 256 : 1)
+      && !/[\x00\r\n]/.test(value), 'Invalid format value: ' + name);
+  }
+  if(Object.hasOwn(p.format,'multiple_delimiters'))requireValue(typeof p.format.multiple_delimiters==='boolean','Invalid multiple_delimiters');
+  if(Object.hasOwn(p.format,'date_format'))requireValue(['dd/mm/yyyy','mm/dd/yyyy','yyyy/mm/dd','dd/mm/yy','mm/dd/yy','yy/mm/dd'].includes(p.format.date_format),'Invalid date_format');
+  if(Object.hasOwn(p.format,'date_separator'))requireValue(['.','/','\\','-'].includes(p.format.date_separator),'Invalid date_separator');
   requireValue(p.format.delimiter.length === 1 && ['.', ','].includes(p.format.decimal_separator), 'Explicit delimiters are required');
   requireValue(Array.isArray(p.columns) && p.columns.length >= 1 && p.columns.length <= maxColumns,
     maxColumns===8?'The current reader supports 1–8 fully visible configured columns':'Delimited import supports 1–1000 explicitly configured columns');
@@ -71,6 +95,23 @@ function validateSettings(p,maxColumns) {
 export const validateTextImportRequest=p=>validateSettings(p,8);
 export const validateTextImportFieldsRequest=p=>{validateSettings(p,1000);resolveTextImportEncoding(p.source.encoding);};
 
+export class ImportInitialSettingsError extends Error {
+  constructor(reason) {
+    super('Existing import has no saved source. Supply complete settings.source including an explicit source_path matching the verified upload, complete settings.format and nonempty settings.columns; the upload reference does not supply settings. '+reason);
+    this.name='ImportInitialSettingsError';
+  }
+}
+
+export function validateInitialExistingImportSettings(parameters,verifiedSourcePath) {
+  try {
+    validateTextImportFieldsRequest(parameters);
+    requireValue(parameters.source.source_path===verifiedSourcePath,'Existing source does not match the verified upload');
+    requireValue(parameters.columns.some(c=>c.used),'Import output requires at least one used field');
+  } catch(error) {
+    throw new ImportInitialSettingsError(error.message);
+  }
+}
+
 export function validateTextImportPatch(p) {
   const object=value=>value && typeof value==='object' && !Array.isArray(value);
   requireValue(object(p) && Object.keys(p).every(k=>['source','format','columns'].includes(k)), 'Invalid import settings patch');
@@ -78,7 +119,7 @@ export function validateTextImportPatch(p) {
   const format={delimiter:';',decimal_separator:'.',null_marker:'?',text_qualifier:'"'};
   for(const [name,defaults] of Object.entries({source,format})) {
     if(!Object.hasOwn(p,name))continue;
-    requireValue(object(p[name]) && Object.keys(p[name]).every(k=>Object.hasOwn(defaults,k)), 'Unknown import patch '+name);
+    requireValue(object(p[name]) && Object.keys(p[name]).every(k=>Object.hasOwn(defaults,k)||name==='format'&&['multiple_delimiters','date_format','date_separator'].includes(k)), 'Unknown import patch '+name);
     Object.assign(defaults,p[name]);
   }
   requireValue(!Object.hasOwn(p,'columns') || Array.isArray(p.columns)&&p.columns.length<=1000,'Invalid column patch list');
@@ -148,6 +189,15 @@ export class ImportColumnBindingError extends Error {
     super('Requested source field is missing or ambiguous: '+JSON.stringify(key)
       +'; observed name/label: '+JSON.stringify((candidates.length?candidates:observed).slice(0,8).map(({name,label})=>({name,label}))));
     this.name='ImportColumnBindingError';
+  }
+}
+
+// Only a complete, owned native definition may produce this binding refusal.
+export class ImportColumnCountError extends ImportColumnBindingError {
+  constructor(requestedCount,observed) {
+    super(null,[],observed);
+    this.name='ImportColumnCountError';
+    this.message='Import definition count differs: requested '+requestedCount+', observed '+observed.length;
   }
 }
 
@@ -286,8 +336,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   // A discarded first configuration leaves a graph node with no source. There
   // is no retained schema to inspect until complete source settings are applied.
   if(patch&&sourceBaseline.fields.source_path.value==='') {
-    validateTextImportFieldsRequest(parameters);
-    requireValue(parameters.source.source_path===patch.verifiedSourcePath,'Existing source does not match the verified upload');
+    validateInitialExistingImportSettings(parameters,patch.verifiedSourcePath);
     return configureImport(channel,parameters,owner,true);
   }
   if(patch && parameters.source.source_path===undefined)requireValue(sourceBaseline.fields.source_path.value===patch.verifiedSourcePath,'Existing source does not match the verified upload');
@@ -345,25 +394,31 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   for (const [name, text] of Object.entries(parameters.format)) {
     let s = await read('text_import_format'); const f = field(s, name);
     if (f.value === text) continue;
+    if(name==='multiple_delimiters'){
+      await act(s,{verb:'set_checked',ref:f.display_ref,checked:text});
+      await read('text_import_format','multiple delimiters applied',state=>state.wizard.settings?.fields[name]?.value===text);
+      continue;
+    }
     // Native editable combo resolves typed NULL to the first case-insensitive
     // match (null) on blur. Select the exact observed built-in, never retype it.
-    if (name === 'null_marker' && ['null', 'NULL'].includes(text)) {
+    if (name === 'date_separator' || name === 'null_marker' && ['null', 'NULL'].includes(text)) {
+      const label=name==='date_separator'?{'.':'Точка (.)','/':'Слэш (/)','\\':'Обратный слэш (\\)','-':'Дефис (-)'}[text]:text;
       const rootRef = s.wizard.root_ref;
       const owns = e => e.wizard_combo?.field && (e.wizard_combo.field.scope ?? 'import_format') === 'import_format'
         && e.wizard_combo.field.name === name && e.wizard_combo.field.owner_ref === f.owner_ref
         && e.wizard_combo.field.root_ref === rootRef;
-      const picker = one(s.ui.elements.filter(e => owns(e) && e.wizard_combo.kind === 'picker'),
-        'Exact Null marker picker unavailable');
+      const picker = name==='date_separator'?textImportFormatChoice(s,name,'picker'):
+        one(s.ui.elements.filter(e=>owns(e)&&e.wizard_combo.kind==='picker'),'Exact Null marker picker unavailable');
       await act(s, {verb:'click', ref:picker.ref});
       s = await read('text_import_format', 'exact Null marker option visible', state =>
-        state.ui.elements.filter(e => owns(e) && e.wizard_combo.kind === 'option' && e.wizard_combo.label === text).length === 1);
-      const option = one(s.ui.elements.filter(e => owns(e) && e.wizard_combo.kind === 'option' && e.wizard_combo.label === text),
-        'Exact Null marker option unavailable');
+        state.ui.elements.filter(e => owns(e) && e.wizard_combo.kind === 'option' && e.wizard_combo.label === label).length === 1);
+      const option = name==='date_separator'?textImportFormatChoice(s,name,'option',label):
+        one(s.ui.elements.filter(e=>owns(e)&&e.wizard_combo.kind==='option'&&e.wizard_combo.label===label),'Exact Null marker option unavailable');
       await act(s, {verb:'select_wizard_option', ref:option.ref});
       const after = field(await read('text_import_format', 'exact Null marker applied', state =>
-        state.wizard.settings.fields[name]?.value === text), name);
-      requireValue(after.value === text && after.owner_ref === f.owner_ref && after.input_ref === f.input_ref,
-        'Null marker field or case changed after selection');
+        state.wizard.settings.fields[name]?.value === label), name);
+      requireValue(after.value === label && after.owner_ref === f.owner_ref && after.input_ref === f.input_ref,
+        'Import format field or exact label changed after selection');
     } else await act(s, { verb: 'set_wizard_field', ref: f.input_ref, text });
   }
   let parsedColumns;
@@ -392,8 +447,10 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
     parameters.columns=reconcileImportColumnPatch(columnBaseline.fields,parsedSchema.fields,parameters.columns,{schemaChangeRequested:
       Object.keys(parameters.source).length>0||Object.keys(parameters.format).length>0});
   } else if(fieldsOnly) {
-    const parsed=await readImportDefinitionPages(channel,{expectedCount:parameters.columns.length,
+    const parsed=await readImportDefinitionPages(channel,{
       ready:state=>same(identity(state.wizard?.owner_context),identity(currentOwner))});
+    if(parsed.total_columns!==parameters.columns.length)
+      throw new ImportColumnCountError(parameters.columns.length,parsed.fields);
     parsedColumns=parsed.fields;
     parameters.columns=bindImportSourceColumns(parameters.columns,parsed.fields);
   }

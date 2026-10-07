@@ -62,6 +62,32 @@ jobs:
           # Preserve the Chromium sandbox, as in the existing Linux release matrix.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
+      # WinINET is shared by every process on this disposable runner. Mozilla's
+      # scheduled agents can otherwise send telemetry to our proxy trap while
+      # Chromium is being checked; retain the strict zero-traffic assertion.
+      - name: Isolate Windows proxy acceptance from Mozilla background tasks
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $mozillaTasks = @(Get-ScheduledTask | Where-Object { $_.TaskPath -eq '\Mozilla\' })
+          foreach ($task in $mozillaTasks) {
+            Write-Host "Disabling background task: $($task.TaskPath)$($task.TaskName)"
+            $task | Disable-ScheduledTask | Out-Null
+            $task | Stop-ScheduledTask
+            if ((Get-ScheduledTask -TaskName $task.TaskName -TaskPath $task.TaskPath).State -ne 'Disabled') {
+              throw 'Mozilla background tasks must be disabled before proxy acceptance'
+            }
+          }
+          $mozillaProcesses = @(Get-Process -Name firefox, default-browser-agent, pingsender -ErrorAction SilentlyContinue)
+          foreach ($process in $mozillaProcesses) {
+            Write-Host "Stopping background process: $($process.ProcessName) PID=$($process.Id)"
+            $process | Stop-Process -Force -ErrorAction Stop
+          }
+          if (Get-Process -Name firefox, default-browser-agent, pingsender -ErrorAction SilentlyContinue) {
+            throw 'Mozilla background processes remain active before proxy acceptance'
+          }
+
       - name: Verify direct Chromium and browser downloads
         working-directory: packages/loginom-runtime/client
         env:
