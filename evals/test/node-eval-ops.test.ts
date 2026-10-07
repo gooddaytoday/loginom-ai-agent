@@ -121,6 +121,8 @@ test.skipIf(!dockerAvailable || browserBusy)("fixed unit commands produce proces
     const result = await runNodeUnitChecks(fixture.config, lease)
     expect(result.code).toBe(0)
     expect(result.evidence).toContain("stand.lease")
+    const completion = await Bun.file(result.evidence).json()
+    expect(completion.checks.map((check: { processes: { observation_mode: string } }) => check.processes.observation_mode)).toEqual(["unit_after_exit", "unit_after_exit"])
     await Bun.write(path.join(fixture.config.roles.ben.evalProfile, "loginom/connection/pending.json"), "{}")
     await expect(releaseNodeStand(fixture.config, lease, result.evidence)).rejects.toThrow("PROFILE_NOT_CLEAN")
     expect((await nodeStandStatus(fixture.config)).status).toBe("BUSY")

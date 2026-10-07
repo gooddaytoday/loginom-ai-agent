@@ -186,9 +186,9 @@ export async function runNodeUnitChecks(config: NodeOpsConfig, lease: NodeStandL
       const run = await superviseProcess({ cmd: [process.execPath, command], cwd: path.join(config.roles[lease.role].checkout, "evals"),
         env: Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined &&
           /^(PATH|HOME|LANG|LC_[A-Z_]+|TMPDIR|https?_proxy|all_proxy|no_proxy|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|NODE_USE_ENV_PROXY|EVAL_TEST_LOGINOM_IMAGE)$/.test(entry[0]))),
-        timeoutMs: 900_000, outDir })
+        timeoutMs: 900_000, outDir, observationMode: "unit_after_exit" })
       checks.push({ command: `bun ${command}`, exitCode: run.exitCode, processes: run.processCleanup })
-      await verifyProcesses(run.processCleanup, lease)
+      await verifyProcesses(run.processCleanup, lease, true)
     }
     const completion: NodeStandCompletion = { version: 1, owner: ownerOf(lease), acquiredAt: lease.acquiredAt, kind: "unit", checks }
     const evidence = path.join(unit, "completion.json")
@@ -376,7 +376,7 @@ async function verifyCompletion(config: NodeOpsConfig, lease: NodeStandLease, co
     if (lease.phase !== "unit" || !inside(evidence, directory(config)) || completion.checks.length !== 2 ||
       completion.checks.some((check, index) => check.command !== ["bun test", "bun typecheck"][index] || !Number.isInteger(check.exitCode)))
       throw new NodeOpsFailure("INVALID_UNIT_PROOF")
-    for (const check of completion.checks) await verifyProcesses(check.processes, lease)
+    for (const check of completion.checks) await verifyProcesses(check.processes, lease, true)
     return
   }
   if (completion.kind === "eval") {
@@ -411,8 +411,9 @@ async function verifyCompletion(config: NodeOpsConfig, lease: NodeStandLease, co
   }
 }
 
-async function verifyProcesses(processes: ProcessCleanup, lease: NodeStandLease) {
-  if (processes?.status !== "confirmed" || processes.error || processes.capture_complete !== true || !Array.isArray(processes.processes) ||
+async function verifyProcesses(processes: ProcessCleanup, lease: NodeStandLease, trustedUnit = false) {
+  if (processes?.observation_mode === "unit_after_exit" && !trustedUnit ||
+    processes?.status !== "confirmed" || processes.error || processes.capture_complete !== true || !Array.isArray(processes.processes) ||
     processes.unknownProcesses?.length || !processes.verification || processes.verification.length < 2 ||
     processes.verification.some(pass => pass.owned_remaining !== 0 || !Number.isFinite(Date.parse(pass.observed_at)) || Date.parse(pass.observed_at) < Date.parse(lease.acquiredAt)))
     throw new NodeOpsFailure("PROCESS_CLEANUP_UNKNOWN")

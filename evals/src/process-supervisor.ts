@@ -19,6 +19,7 @@ export type ProcessCleanup = {
   status: "confirmed" | "failed" | "not_run"; error: string | null
   processes: ProcessIdentity[]; unknownProcesses?: ProcessIdentity[]; runtimeDirectories: string[]; writer: WriterIdentity | null
   capture_complete: boolean
+  observation_mode?: "continuous" | "unit_after_exit"
   verification?: { observed_at: string; owned_remaining: number }[]
   origins?: { pid: number; starttime: string; via: ProcessOrigin["via"]; parent_pid: number | null; parent_starttime: string | null; observed_at: string }[]
   observations?: { count: number; max_duration_ms: number }
@@ -181,11 +182,19 @@ async function browserIdentity(cmd: string[], env: Record<string, string>) {
 export async function superviseProcess(input: {
   cmd: string[]; cwd: string; env: Record<string, string>; timeoutMs: number
   profileDir?: string; outDir?: string; stdin?: string; signal?: AbortSignal; sandbox?: string[]
+  observationMode?: "continuous" | "unit_after_exit"
 }) {
   if (process.platform !== "linux") throw Error("Process ownership supervision requires Linux /proc")
+  if (input.observationMode !== undefined && input.observationMode !== "continuous" && input.observationMode !== "unit_after_exit")
+    throw Error("Unknown process observation mode")
+  if (input.observationMode === "unit_after_exit" && (input.cmd.length !== 2 || input.cmd[0] !== process.execPath ||
+    !["test", "typecheck"].includes(input.cmd[1]!) || path.basename(input.cwd) !== "evals" ||
+    input.profileDir !== undefined || input.sandbox !== undefined || await realpath(input.cwd) !== input.cwd))
+    throw Error("Trusted unit observation requires Bun test/typecheck in evals without profile or sandbox")
   const startedAt = Date.now()
   const ledger = new Map<string, ProcessEntry>()
-  const cleanup: ProcessCleanup = { status: "not_run", error: null, processes: [], runtimeDirectories: [], writer: null, capture_complete: true }
+  const cleanup: ProcessCleanup = { status: "not_run", error: null, processes: [], runtimeDirectories: [], writer: null, capture_complete: true,
+    observation_mode: input.observationMode ?? "continuous" }
   const profile = input.profileDir ? await realpath(input.profileDir) : undefined
   const baseline = await snapshot()
   const existing = new Set(baseline.map(key))
@@ -450,11 +459,14 @@ export async function superviseProcess(input: {
     lastOwn = live.filter((entry) => ledger.get(key(entry))?.origin).map(identity)
     return lastOwn
   }
+  // Trusted fixtures intentionally make their own /proc unreadable. The private
+  // live subreaper receipt retains the boundary until strict shutdown scans.
+  let unitActive = input.observationMode === "unit_after_exit"
   const checkedScan = () => {
     let confirmed = false
     scanning = scanning.then(async () => {
       const started = Date.now()
-      try { await readReceipt(); await scan(); confirmed = true }
+      try { await readReceipt(); if (!unitActive) await scan(); confirmed = true }
       finally {
         cleanup.observations ??= { count: 0, max_duration_ms: 0 }
         cleanup.observations.count++
@@ -514,6 +526,7 @@ export async function superviseProcess(input: {
   input.signal?.addEventListener("abort", abort, { once: true })
   if (input.signal?.aborted) abort()
   await Promise.race([exited, budget])
+  unitActive = false
   clearTimeout(timer)
   input.signal?.removeEventListener("abort", abort)
   const deadline = Date.now() + 60_000
