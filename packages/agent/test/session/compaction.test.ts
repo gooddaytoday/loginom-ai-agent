@@ -904,6 +904,66 @@ describe("session.compaction.process", () => {
     }).pipe(withCompaction({ result: "compact" })),
   )
 
+  itCompaction.instance(
+    "truncates oversized conversation text before summarizing",
+    () => {
+      const stub = llm()
+      let captured = ""
+      stub.push(
+        reply("summary", (input) => {
+          captured = JSON.stringify(input.messages)
+        }),
+      )
+      return Effect.gen(function* () {
+        const test = yield* TestInstance
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+        const huge = (char: string, marker: string) => char.repeat(5_000) + marker
+        const msg = yield* createUserMessage(session.id, huge("A", "HIDDEN_USER"))
+        const assistant = yield* createAssistantMessage(session.id, msg.id, test.directory)
+        yield* ssn.updatePart({
+          id: PartID.ascending(),
+          messageID: assistant.id,
+          sessionID: session.id,
+          type: "text",
+          text: huge("B", "HIDDEN_ASSISTANT"),
+        })
+        yield* ssn.updatePart({
+          id: PartID.ascending(),
+          messageID: assistant.id,
+          sessionID: session.id,
+          type: "reasoning",
+          text: huge("C", "HIDDEN_REASONING"),
+          time: { start: Date.now() },
+        })
+
+        const msgs = yield* ssn.messages({ sessionID: session.id })
+        const result = yield* SessionCompaction.use.process({
+          parentID: msg.id,
+          messages: msgs,
+          sessionID: session.id,
+          auto: false,
+        })
+        const summary = (yield* ssn.messages({ sessionID: session.id })).find(
+          (item) => item.info.role === "assistant" && item.info.summary,
+        )
+
+        expect(result).toBe("continue")
+        expect(captured).toContain("[truncated]")
+        expect(captured).toContain("A".repeat(100))
+        expect(captured).toContain("B".repeat(100))
+        expect(captured).toContain("C".repeat(100))
+        expect(captured).not.toContain("HIDDEN_USER")
+        expect(captured).not.toContain("HIDDEN_ASSISTANT")
+        expect(captured).not.toContain("HIDDEN_REASONING")
+        expect(summary?.info.role).toBe("assistant")
+        if (summary?.info.role === "assistant") expect(summary.info.error).toBeUndefined()
+      }).pipe(withCompaction({ llm: stub.llmLayer }))
+    },
+    { git: true },
+    15_000,
+  )
+
   it.instance(
     "adds synthetic continue prompt when auto is enabled",
     Effect.gen(function* () {
