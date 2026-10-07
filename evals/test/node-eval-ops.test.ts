@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rename, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireNodeStand, assertNodeStandOwner, nodeStandStatus, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, runNodeEvalOps, runNodeUnitChecks, type NodeOpsConfig } from "../src/node-eval-ops"
+import { acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, runNodeEvalOps, runNodeUnitChecks, type NodeOpsConfig } from "../src/node-eval-ops"
 import { archiveProfileHistory } from "../src/profile"
 import { superviseProcess } from "../src/process-supervisor"
 
@@ -206,6 +206,20 @@ test("admitted lease refuses a changed configured target profile", async () => {
     await expect(assertNodeStandOwner(fixture.config, lease)).rejects.toThrow("LEASE_IDENTITY_CHANGED")
   } finally { await fixture.dispose() }
 })
+
+test("owned process capture directory exists before supervisor opens output files", async () => {
+  const fixture = await runtime()
+  try {
+    const lease = await acquireNodeStand(fixture.config, owner)
+    const outDir = await nodeProcessOutput(fixture.config, lease, "native-check")
+    const execution = await superviseProcess({ cmd: [process.execPath, "-e", "console.log('captured')"], cwd: fixture.config.roles.rich.workRoots[0]!,
+      env: { PATH: process.env.PATH ?? "" }, outDir, timeoutMs: 5_000 })
+    expect(execution.exitCode).toBe(0)
+    expect(execution.processCleanup.status).toBe("confirmed")
+    expect(await Bun.file(path.join(outDir, "events.jsonl")).text()).toContain("captured")
+    expect(await Bun.file(path.join(outDir, "process-cleanup.json")).exists()).toBe(true)
+  } finally { await fixture.dispose() }
+}, 10_000)
 
 test("stand acquired by a terminated CLI remains blocked for a new process", async () => {
   const fixture = await runtime()
