@@ -3711,6 +3711,23 @@ OpenAI gpt-6.1-sol/medium, проверить стенд и новый immutable
 Актуальная ветка evals наблюдается read-only; её рабочие файлы не меняются.
 Свежий SHA и совместимость harness должны быть проверены до A/B.
 
+## 2026-10-07 — разрешения CLI после локальной активации skill
+
+Actual CLI c50d RED: старый permission driver запросил `loginom_dock_prepare`
+в default-профиле и получил `CLI_ORACLE_TOOL_NOT_ADVERTISED`. Публичный
+missing-tool receipt подтверждает отсутствие prepare; приватный результат
+сохранён в `permission-c50d220c1/red.log` собственного acceptance root.
+Driver теперь сначала запрашивает `skill(loginom-automation)`, затем prepare;
+проверяет applied profile/digest и отдельно разрешения именно prepare, сохраняя
+все события skill. Finally ожидает завершение своего CLI до закрытия oracle.
+GREEN на том же clean бинарнике: exit1, `CLI_PERMISSION_REJECTED`, skill applied,
+prepare error, writer отсутствует; собственные процессы завершены. Evidence
+`/tmp/loginom-cli-permission-fxxHPm`, приватный `green.log`. Это scripted
+permission acceptance, не проверка выбора skill живой моделью.
+Oracle HTTP tests 3 PASS / 20 assertions; Host typecheck и diff check PASS.
+Продуктовый код и замороженный план не менялись. TUI allow/restart/once/always
+этим циклом пока не приняты.
+
 ## Checkpoint
 
 - Resume c50d/OpenAI6.1 medium: Desktop formats9/9 facts/layout PASS (MD source read), CLI PDF3/3 и Word1 PASS; Desktop routing11×3 и остальные CLI formats выполняются. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
