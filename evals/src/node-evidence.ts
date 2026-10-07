@@ -74,7 +74,7 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
           const parts=name.split("_"), key=name==="Region", fn=parts[1], label=fn==="min"?"Минимум":"Максимум"
           return ts.length===1 && !t.excluded && t.type===(key?"string":"real") && sourceMatches.length===1 && source.type===t.type &&
             (key ? source.name==="Region" && source.label==="Region" : source.label===`${parts[0]}${c!.options.separator}Amount${c!.options.separator}${label}` && new RegExp(`_Amount_${fn==="min"?"Min":"Max"}(?:_[1-9][0-9]*)?$`).test(source.name)) &&
-            column?.source===source.name && column.DataType===(key?"dtString":"dtFloat")
+            column && column.source===source.name && column.DataType===(key?"dtString":"dtFloat")
         }) && cross?.output_columns?.length===5
       if (!valid) failures.push("crosstable: complete owned native output mapping and XML sources required")
     }
