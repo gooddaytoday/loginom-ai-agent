@@ -41,7 +41,7 @@ async function run(root: string, code: string, extra: NodeJS.ProcessEnv = {}) {
 
 test("help and version never invoke backend or create profile/Desktop storage", async () => {
   const root = await temporary()
-  for (const argument of ["--help", "--version", "-h", "-v"]) {
+  for (const argument of ["--help", "--version", "-h", "-v", "--capabilities"]) {
     const result = await run(
       root,
       `import { standalone } from './src/cli/standalone.ts';
@@ -49,6 +49,10 @@ test("help and version never invoke backend or create profile/Desktop storage", 
     )
     expect(result.code).toBe(0)
     expect(result.out.length).toBeGreaterThan(0)
+    if (argument === "--capabilities")
+      expect(JSON.parse(result.out)).toEqual({
+        capabilities: [],
+      })
     expect(await fs.readdir(root)).toEqual([])
   }
 })
@@ -85,6 +89,23 @@ test("backend imports use isolated global paths and cannot inherit Desktop DB/co
   expect(value.auth).toBeUndefined()
   expect(await fs.readdir(root)).toEqual(["profile"])
   expect(await fs.readdir(path.join(root, "profile"))).not.toContain(".writer")
+})
+
+test("conflicting shared auth settings fail before acquiring a profile", async () => {
+  const root = await temporary()
+  const result = await run(
+    root,
+    `import { standalone } from './src/cli/standalone.ts';
+    await standalone(['models'], async () => { throw new Error('backend imported') });`,
+    {
+      LOGINOM_AI_AGENT_SHARED_AUTH_DIR: path.join(root, "shared"),
+      LOGINOM_AI_AGENT_AUTH_CONTENT: "must-not-be-read",
+    },
+  )
+  expect(result.code).not.toBe(0)
+  expect(result.error).toContain("SHARED_AUTH_CONTENT_CONFLICT")
+  expect(result.error).not.toContain("must-not-be-read")
+  expect(await fs.readdir(root)).toEqual([])
 })
 
 test("failed cleanup leaves the guard for offline recovery", async () => {

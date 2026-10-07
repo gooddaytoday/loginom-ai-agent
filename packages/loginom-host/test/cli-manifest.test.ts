@@ -29,6 +29,10 @@ test("CLI manifest verifies complete payload and rejects mutation, extras and es
     }
     await writeCliManifest(root, info)
     expect(await verifyCliManifest(root, { platform: "linux", arch: "x64", version: "test" })).toEqual(info)
+    const capable = { ...info, capabilities: ["shared-oauth-v1"] }
+    await writeCliManifest(root, capable)
+    expect(await verifyCliManifest(root, info)).toEqual(capable)
+    await writeCliManifest(root, info)
     if (process.platform !== "win32") {
       await symlink("loginom-ai-agent-cli", join(root, "bin/alias"))
       await writeCliManifest(root, info)
@@ -210,7 +214,9 @@ async function refreshWindowsResourceManifest(root: string, target = "win32-x64"
   const node = "bin/node.exe"
   const browser = "browsers/chromium-1243/chrome-win64/chrome.exe"
   const hash = async (path: string) =>
-    createHash("sha256").update(await readFile(join(root, "resources/loginom", path))).digest("hex")
+    createHash("sha256")
+      .update(await readFile(join(root, "resources/loginom", path)))
+      .digest("hex")
   const nodeSha256 = await hash(node)
   const browserSha256 = await hash(browser)
   await writeFile(
