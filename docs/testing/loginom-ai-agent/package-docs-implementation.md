@@ -3624,9 +3624,79 @@ immutable seed. Xiaomi результаты сохраняются отдель�
 модели не объединять в общий GREEN или A/B. Судья/harness соседней задачи
 этим решением не изменяются.
 
+## 2026-10-07 — clean c50d candidates, завершение проверок и освобождение ресурсов
+
+Существующий OpenAI OAuth работает в обоих интерфейсах: actual Desktop и
+installed CLI bd0d unconfigured arithmetic →102, exit0, Chromium0 и remaining0.
+Desktop projected user/assistant подтверждают gpt-6.1-sol/medium; CLI получает
+`--model openai/gpt-6.1-sol --variant medium`. Оба используют один архивированный
+catalog SHA e47bd31afb882a62655a5783b4b37fb47bbd7652ab71b1ab0a85cfecfd33aacd.
+SHA пользовательского auth.json после проверок не изменился.
+
+Новые Desktop/CLI built from clean source
+`c50d220c186a1ef0332b15c4a3e9fb1bc7e42efc`, версия0.1.17 prod.
+CLI full archive/roundtrip/source verifier PASS: archive
+`cef60cbddcb8ea2794fb43adaf66b212bc448c8256203c24cfd2ccfd1808d852`,
+source tree `5154b8ec34bfdc8c67e885f510ab6517c6a728dd0a1fcf3c646c19e70b698bbf`.
+Installed seed `sha256:70eb479b207cc911035a7ee74cc8226f5d4486f8209eff41f0ee5ef32e01fa55`
+PASS: manifest bytes совпадают, version0.1.17, sandbox root0:0:4755,
+исходный профиль отсутствует. Первая подготовка CLI не создала parent output
+и завершилась ENOENT до сборки; сохранена, v2 корректно создала свой каталог.
+Первый source verifier вызван с неверными flags до проверки; правильный
+публичный positional вызов завершился PASS. Это не product regression.
+Desktop full build/source archive/static DEB/AppImage PASS:
+DEB `111c141f3185a684fc25838fa9011a839d287e32199d1576112fdfb09a014a82`,
+AppImage `c6f5ef102f23f19bf18ab55ded3cba4ce4479228b619b8586ee7af12e5b14539`,
+resources `4c194ae16f8c001429aa7e64912c51eec61ed3418a853ffa1357b1b8aebcfd25`.
+
+CLI и Desktop formats preflight отказали до создания output/model/Loginom:
+в команде ошибочно указан несуществующий docs-attached-md. Правильный corpus
+ID — **docs-markdown**. Product guard сработал штатно. Retry не запускался
+после просьбы владельца освободить ресурсы. Новой natural quality×3 для
+c50d ещё нет. Новая narrative delivery проверена source TDD, не live отчётом.
+
+Ручная проверка старых сохранённых документов завершена: CLI Wordbd0d
+attempt1/2 facts/layout PASS, attempt3 прежний adapter FAIL до модели;
+Desktop external091-v2 mechanics3/3 и layout3/3 PASS, facts2/3 PASS,
+attempt2 FAIL. Просмотрены все страницы; сохранены отдельные manual-quality
+receipts, включая ошибку фактов. Import overview/database Help не считается
+доказательством точного ImportNative handler; соответствующее ограничение
+указано в receipts. Общий quality3/3 не объявлять успешным.
+
+По явной просьбе владельца новые live/repeats/retries не запускать до
+возобновления. Уже начатая own Ubuntu22 DEB matrix c50d завершилась штатно:
+**PASS, exit0**, installed non-root Desktop/Chromium sandbox/offline wizard.
+Остальные четыре Desktop distro и CLI Linux5 не запускались; общий gate открыт.
+Matrix работала с `--network none` и не подключалась к localhost Loginom.
+
+Освобождение подтверждено snapshot **OWN_RESOURCES_RELEASED**:
+`resource-release-after-20261007.json` в приватном acceptance каталоге.
+До очистки сопоставлены 453 evidence файла, 3347 PID/start и 828 собственных
+временных путей: живых клиентов Loginom/runtime/тестового Desktop нет.
+Matrix own container 2ef7050e8098 наблюдался отдельно; Electron PID743 внутри
+него слушал реальные случайные порты **35035 и 46243**, закрылся штатно,
+контейнер --rm удалён, его cgroup процессов больше не содержит.
+Исторический Node inspector **44471** также закрыт. После завершения нет
+живых процессов с inspect/remote-debugging flags; все три порта не принимают
+соединения, собственных acceptance-контейнеров нет. Оба read-only monitor
+завершились. Foreign/user процессы не останавливались; server и client
+7.4.2-test работают с прежним StartedAt, не перезапускались.
+43 своих архивных recovery каталога пусты, pending entries0. Пять архивных
+.writer маркеров старых failed tests сохранены как evidence; живого owner нет,
+они не удерживают стенд. Пользовательские профили/launcher/данные не менялись.
+Отдельный UI logout/закрытие пакета выполнять некому: активного собственного
+клиента нет. Серверный список сессий отдельно не перечислялся; чужие/shared
+сессии не менялись. Ограничение явно сохранено, logout не заявлен выполненным.
+
+Checkpoint — `package-docs-resource-pause-2026-10-07.md`. Пауза относится ко
+всей работе этой задачи по просьбе владельца; автоматического resume/retry нет.
+После явного возобновления использовать сохранённые c50d бинарники и
+OpenAI gpt-6.1-sol/medium, проверить стенд и новый immutable harness pin.
+План повторно не редактировался; незавершённые gate остаются открытыми.
+
 ## Checkpoint
 
-- Product candidates: Desktop/CLI `bd0d7abc2`, clean full builds/manifests/static/installed CLI seed PASS; предыдущие candidates сохранены.
+- Product candidates: Desktop/CLI `c50d220c1`, clean full builds/manifests/static/installed CLI seed PASS; Ubuntu22 installed PASS; прежние candidates сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.
 - Этапы 0–4 выполнены; требования плана заморожены, соседний evals worktree не изменялся.
 - Product skills/staging/loader/prepare локальны; Publisher отключён, серверная запись сохранена.
@@ -3645,4 +3715,4 @@ immutable seed. Xiaomi результаты сохраняются отдель�
 - CLI `.lgp`: 94 PASS / 1 SKIP; CLI6cf discovery 7 PASS, CLIa891 pipeline 5 PASS; CLI938 PTY 4 PASS; TUI CLI83 warning 5/5 stable GREEN, command/damage PASS, suite 198 PASS / 1 SKIP.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85 smoke/metadata/ASAR PASS; GUI2aa permissions/damage PASS; Desktop67 crash logging 6 PASS на short TMPDIR, typecheck PASS; corpus/evals/Linux gates открыты.
-- Далее: новый clean candidate с narrative в skeleton, OpenAI gpt-6.1-sol/medium по указанию владельца, natural quality×3/полный20/installed переходы/Linux5. Xiaomi quota429; DEB matrixbd0d exit143 без результата; A/B ждёт owner; план заморожен.
+- PAUSED по просьбе владельца: собственные клиенты/контейнеры/debugger endpoints освобождены; server/client 7.4.2-test сохранены. После явного resume: c50d, OpenAI gpt-6.1-sol/medium, docs-markdown; natural quality×3/полный20/installed переходы/Linux5/A-B открыты; план заморожен.
