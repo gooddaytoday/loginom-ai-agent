@@ -177,6 +177,40 @@ test("owned registration once refuses altered owner/acquiredAt/incident instead 
   }
 })
 
+test.skipIf(!dockerAvailable || browserBusy)("owned registration release admits only its exact lease-local attested settlement", async () => {
+  const f=await stand()
+  try {
+    const lease=await acquireNodeStand(f.config,owner),incident="LAB-31-product-namefix-v1-multi-facts-writer-owner-unavailable"
+    const attempted=await reserveNodeRecovery(f.config,lease,incident)
+    await reserveOwnedRegistrationContinuation(f.config,lease,new Bun.CryptoHasher("sha256").update(await Bun.file(attempted).text()).digest("hex"),"b".repeat(40),"followup")
+    const run=await superviseProcess({cmd:[process.execPath,"-e","await Bun.sleep(100)"],cwd:f.config.roles.rich.checkout,env:{PATH:process.env.PATH??""},timeoutMs:5000})
+    expect(run.processCleanup.status).toBe("confirmed")
+    const source=path.join(f.config.roles.rich.resultsRoot,"original/cleanup.json")
+    await Bun.write(source,"original fixture");await Bun.write(path.join(path.dirname(source),"result.json"),"original result fixture")
+    const hash=async(p:string)=>new Bun.CryptoHasher("sha256").update(await Bun.file(p).arrayBuffer()).digest("hex")
+    const base=path.join(f.config.runtimeRoot,"operations/stand.lease")
+    const evidence=path.join(base,"owned-registration-processes.json")
+    const proof={version:1,owner,acquiredAt:lease.acquiredAt,incident,profile:"eval",operation:"LAB-31-owned-registration-v1",
+      original:{path:source,sha256:await hash(source),resultSha256:await hash(path.join(path.dirname(source),"result.json"))},
+      processes:{...run.processCleanup,observation_mode:"writer_release_settlement"}}
+    await Bun.write(evidence,JSON.stringify(proof));await chmod(evidence,0o600)
+    const attestation={owner,acquiredAt:lease.acquiredAt,incident,profile:"eval",evidence,evidenceSha256:await hash(evidence),original:proof.original}
+    await Bun.write(path.join(base,"owned-registration-settlement-attestation.json"),JSON.stringify(attestation));await chmod(path.join(base,"owned-registration-settlement-attestation.json"),0o600)
+    const historyArchive=await archiveProfileHistory(f.config.roles.rich.evalProfile,"fixture")
+    const receipt=path.join(base,"owned-registration-settled.json")
+    await Bun.write(receipt,JSON.stringify({status:"SETTLED",owner,acquiredAt:lease.acquiredAt,profile:"eval",historyArchive,processEvidence:evidence}));await chmod(receipt,0o600)
+    const completion=path.join(base,"completion.json")
+    await Bun.write(completion,JSON.stringify({version:1,owner,acquiredAt:lease.acquiredAt,kind:"recovery",receipt,profile:"eval",historyArchive,processEvidence:evidence}));await chmod(completion,0o600)
+    // Altered or ordinary process proof cannot substitute for the continuation's attested proof.
+    await Bun.write(evidence,JSON.stringify({...proof,operation:undefined,processes:run.processCleanup}))
+    await expect(releaseNodeStand(f.config,lease,completion)).rejects.toThrow()
+    expect((await nodeStandStatus(f.config)).status).toBe("BUSY")
+    await Bun.write(evidence,JSON.stringify(proof));await chmod(evidence,0o600)
+    expect((await releaseNodeStand(f.config,lease,completion)).status).toBe("RELEASED")
+    expect((await nodeStandStatus(f.config)).status).toBe("FREE")
+  } finally {await f.dispose()}
+},30_000)
+
 test("recovery admits only the exact empty package lock bound by a settlement", () => {
   const lock = { name: ".fixture.lgp.lck", kind: "package_lock", package_path: "/user/fixture.lgp",
     sha256: new Bun.CryptoHasher("sha256").update("").digest("hex") }
