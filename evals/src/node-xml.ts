@@ -26,7 +26,28 @@ export function checkNodeXml(xml: PackageXml, id: string, required: Set<string>)
   const cross = crosses[0]
   if (required.has("crosstable")) {
     if (crosses.length !== 1) failures.push("crosstable: exactly one native CrossTable required")
-    if (cross) {
+    if (cross && contract.coverage) {
+      const types: Record<string, string> = { string: "dtString", real: "dtFloat", integer: "dtInteger" }
+      const functions: Record<string, string> = { sum: "ctatSum", count: "ctatCount", unique_count: "ctatUniqueCount", null_count: "ctatNullCount", max: "ctatMax" }
+      const expected = [
+        ...contract.keys.map((name, order) => ({ name, type: "string", role: "utActive", order, functions: [] as string[] })),
+        ...contract.dimensions.map((name, order) => ({ name, type: "string", role: "utGroup", order, functions: [] as string[] })),
+        ...contract.facts.map((fact, order) => ({ ...fact, role: "utValue", order })),
+      ]
+      if (cross.columns.length !== expected.length || expected.some(field => {
+        const columns = cross.columns.filter(c => c.Name === field.name), c = columns[0]
+        return columns.length !== 1 || !c || c.InputColumnInfoName !== field.name || c.DataType !== types[field.type] ||
+          c.DataKind !== (field.type === "string" ? "dkDiscrete" : "dkContinuous") || c.UsageType !== field.role ||
+          Number(c.extension.Order ?? 0) !== field.order ||
+          field.role === "utValue" && JSON.stringify((c.extension.AggregationTypes ?? "").split(/\s+/).filter(Boolean).sort()) !== JSON.stringify(field.functions.map(f => functions[f]).sort()) ||
+          c.extension.NullGroup === "true" || c.extension.OtherGroup === "true" || Number(c.extension.SlidingUniqueValuesMinCount ?? 0) !== 0
+      })) failures.push("crosstable: exact typed ordered coverage roles/functions required")
+      if ((cross.engine.SlidingUniqueValues === "true" ? "sliding" : "fixed") !== contract.mode)
+        failures.push("crosstable: category mode differs")
+      if (id !== "crosstable-local-variable-bindings" && cross.variables.length)
+        failures.push("crosstable: unexpected variable")
+    }
+    if (cross && !contract.coverage) {
       const mode = cross.engine.SlidingUniqueValues === "true" ? "sliding" : "fixed"
       if (mode !== contract.mode) failures.push("crosstable: category mode differs")
       const roles = cross.columns.map(c => `${c.Name}:${c.InputColumnInfoName}:${c.UsageType}:${numericType(c.DataType) ? "numeric" : c.DataType}`).sort()
