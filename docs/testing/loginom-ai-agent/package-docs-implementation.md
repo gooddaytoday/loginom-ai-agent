@@ -4461,14 +4461,14 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Output mapping ABC/cohort/low-liquidity: shared first geometry proof1/32 > tolerance1/64;12 modules identical; source2×3×20 PASS; native stability/unique cause UNKNOWN, immutable A/B unchanged.
 - cohort-spend-activity#1: no_artifact/294.054s, NODE_APPLY_STOPPED→OUTPUT_MAPPING_RECOVERY_UNVERIFIED; cleanup confirmed/native uncertainty сохранена; manual retry0.
 - V5 PID4050199: original errno/operation потеряны; native stable/flaky UNKNOWN; 3 offline runs×3 guard tests PASS не воспроизводят ошибку. Signal сохранён в formal-v5-process-identity-signal-20261008.
-- Старые own CLI091/239/253/5a9/bd0/c50 и upgrade CLI/Desktop669/bc6 сохранены проверенными архивами; baseline/current49 raw сохранены; свободно около7.2GiB.
+- Старые own CLI091/239/253/5a9/bd0/c50 и upgrade CLI/Desktop669/bc6 сохранены проверенными архивами; baseline/current49 raw сохранены; свободно около5.9GiB.
 - Неиспользуемый docs-build/node_modules удалён после process/FD guards; bytes не архивированы, locked reinstall/reverify записан в receipt; source49 clean.
 - Histories/diagnostics первых12 closed attempts сохранены с full roundtrip/restore receipts; summary первых9 diagnostics65cbbe16…; active profile/results/21 pins неизменны.
 - CLI modify3 FAIL; CLI docs-after-build3/3 accepted; Desktop warm3/cold1 PASS2 FAIL; offline bytes/pins3 prepared; formal guard6 PASS, controller wired и отказал на incomplete v5 до Docker/staging; native pending.
 - Lifecycle driver first skill fixed via real-process/HTTP RED→GREEN;4 focused PASS/typecheck PASS; native lifecycle/independence ещё нужны.
 - MiMo installed smoke UNKNOWN; отдельная native-payload диагностика подтвердила HTTP429/quota exhausted, writer absent/remaining0/no browser; новых MiMo calls нет, выбор второй модели запрошен.
 - Source binaries/resources/server skill907ff16b…/catalog17764f9a… сохранены; stage5–8/Linux lifecycle/second-model gates открыты;stage9 deferred.
-- Сейчас own formal refs0/writer absent/PID absent; прежний cleanup FAIL не подтверждён, attempt13/profile не очищать. Далее own harness TDD sanitized operation/errno context без ослабления identity; новый frozen pair после проверки.
+- Сейчас own formal refs0/writer/pending absent/recovery0; attempt13/profile сохранены. Own harness diagnostic TDD focused1/module19/typecheck PASS; full suite478 PASS/2 SKIP/3 FAIL (SIGINT2/writer1) исследуется, новый frozen/live pair запрещён до проверки.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 
