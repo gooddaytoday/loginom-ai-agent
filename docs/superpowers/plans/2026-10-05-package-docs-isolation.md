@@ -949,22 +949,26 @@ Core имеет разметку осей, но без CSV oracle. По доку
   калибровки. Если они меняют judge prompt/schema/код формирования, получить
   подтверждение калибровки этой версии до пары. Продуктовые TDD-циклы
   продолжаются независимо, соседний checkout и ветку не редактировать.
-  Закреплён `9d7b463c48e4bfb0d55e87fd108400617afa9da3` в собственном
-  чистом `skills-evals` worktree; зависимости установлены по frozen lockfile.
-  Judge prompt/schema/формирование и принятый corpus не изменены. Перед
-  фактической парой повторить сверку актуального evals SHA и хэшей условий;
-  закреплённое дерево не обновлять автоматически.
+  Текущая пара закреплена на `d1b364a9861d0c0a3acdd2394811e96bdbe51e04`
+  в собственном чистом `skills-evals-writer` worktree; frozen lockfile установлен.
+  Полный harness:481 PASS/2 SKIP/0 FAIL/2055 assertions; typecheck PASS.
+  Актуальный evals ref при фиксации:b31ebe7d0bf5cd2cb1116ccdb90df65cd8578c2c;
+  judge prompt/schema/код, задачи и corpus сверены без различий. Исторические
+  worktree/результаты сохранены. После writer-gap исправления обе стороны
+  smoke повторяются; общий manifest `ab-conditions-writer-20261008/common.json`,
+  SHA256 `abeeb0cfa4281e46a9359d692aaa2d93861918c7674b3764835e27c0e890a86e`.
+  Перед каждым запуском и compare повторить сверку; дерево не обновлять автоматически.
 - [ ] Проверить доступность Loginom/Dock/Help и судьи, общие лимиты и возможность
   одновременной работы со стендом. Собственные каталоги не гарантируют изоляцию
   серверных пакетов/учётной записи. При общем изменяемом состоянии или исчерпанных
   лимитах согласовать окно запуска, использовать отдельные пространства пакетов
   либо выполнять последовательно. Не обходить чужие блокировки и не завершать
   чужие процессы. Калибровка может быть закончена, а её инфраструктура ещё занята.
-- [ ] Повторно проверить сохранённый baseline из этапа 0 и candidate по manifest
+- [x] Повторно проверить сохранённый baseline из этапа 0 и candidate по manifest
   и checksum, без пересборки и подмены установленного launcher. Записать SHA
   исходников и бинарников, полный CLI manifest и resource/skill revisions каждой
   сборки; различия продукта — предмет сравнения, остальные условия общие.
-- [ ] Для обоих прогонов закрепить один harness SHA, lockfile/среду harness,
+- [x] Для обоих прогонов закрепить один harness SHA, lockfile/среду harness,
   один общий промпт судьи и код его формирования, модель/variant агента,
   модель/reasoning судьи, таймауты/пороги/repeat/параллелизм, версии Loginom,
   внешнего Dock/action catalog и один снимок задач. Сохранить хэши промпта,
@@ -1469,6 +1473,22 @@ EVAL_RESULTS_DIR="$skill_eval_root/compare" \
 bun run src/compare.ts "$skill_eval_base_run_id" "$skill_eval_candidate_run_id" \
   --margin 0.5 --confidence 0.95 --k 3
 ```
+
+Фактическая локальная приёмка использует закреплённые controller/reviewer v5
+из собственного каталога `package-docs-20261006/ab-local-stand-20261008`.
+Controller `skills-ab-run-v5.ts base smoke` и затем `candidate smoke` запускается
+из `skills-evals-writer/loginom-ai-agent/evals/`; после принятой полной smoke-пары
+те же команды с `formal` выполняют45+45 попыток. Абсолютные binary paths,
+раздельные profiles/results/workspaces, Node/judge/external/task/21 adapter pins
+и строгий reset только собственного стенда проверяются самим controller.
+Native profile создаётся до защищённого переноса provider auth; секреты не
+печатаются. Для каждого сохранённого артефакта reviewer v5 проверяет структуру/
+warm oracle, затем `skills-ab-cold-replay-installed-v5.py` — сохранённые байты/
+настоящий export/новую сессию/native close/logout/process cleanup. Неподтверждённый
+cleanup блокирует приёмку; failed receipts сохраняются. Один smoke не входит
+в90 попыток и не доказывает статистическую неухудшенность. Зафиксированная
+`comparison-policy.json`: margin0.5/confidence0.95/k3 и блокировка новых отказов
+кейса, который baseline строит стабильно3/3. Эти условия не меняются по результатам.
 
 В `artifacts/base` и `artifacts/candidate` хранить соответствующие manifests,
 checksums, ссылки на сохранённые полные CLI и результаты дополнительных

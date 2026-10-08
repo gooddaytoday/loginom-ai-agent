@@ -4451,8 +4451,8 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 - HEAD до checkpoint5d3be11f8; product baselinefc/candidate49b1584f2 неизменны; source changes только own harness/test infrastructure.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client/profiles и чужие процессы сохранены.
-- Frozen0876bb32f исторически476 PASS/2 SKIP/0 FAIL/typecheck PASS; новая own harness branch d1b364a98 clean, protected judge/tasks/near-miss unchanged.
-- Conditions e4a0daf2…/21 pins/wide viewport/fresh own server;15 task IDs выбраны заранее,90 formal attempts не начаты.
+- Новый frozen skills-evals-writer d1b364a98 clean; evalsrefb31ebe7d0 перечитан/protected diff0; исторический087 сохранён.
+- Conditions v5 abeeb0cf…/21 pins/wide viewport/fresh own server;15 tasks заранее/90 formal не начаты; baseline smoke session96764.
 - Common wide cold обеих сторон PASS/oracle0/byte-identical/native close/logout/remaining0; reader1920×1080, product viewport1280 неизменен.
 - Baseline v4 run170104 full smoke accepted:judge100/structure/warm oracle/cold/native cleanup confirmed.
 - Candidate v4 run171244 CLI0/judge100/warm oracle PASS, main1/cleanup FAIL Writer owner unavailable; cold не запускался, v4 pair не принят.
@@ -4463,7 +4463,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - CLI modify3 readonly/inactive-source FAIL; CLI docs-after-build3/3 accepted; Desktop docs-after-build warm3/cold1 PASS2 readonly FAIL.
 - Source binaries/resources/server skill907ff16b…/catalog17764f9a… сохранены; Desktop/CLI Linux gates и stage5–8 ещё открыты;stage9 deferred.
 - Шесть obsolete own CLI payloads roundtrip6850 entries each сохранены в архивах/receipts; raw удалены после проверки; свободно5,1GB.
-- Далее fresh immutable d1 harness SHA/conditions→обе smoke стороны→90 formal attempts; failed profiles/receipts preserve.
+- Далее обе v5 smoke стороны→structure/warm oracle/common cold→90 formal attempts; failed profiles/receipts preserve.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 

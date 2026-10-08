@@ -454,3 +454,18 @@ worktree и повтор обеих сторон по одному manifest; р�
 команды восстановления; helper сохранён рядом. Baselinefc/current49, upgrade
 artifacts, исторические результаты/профили и чужие файлы сохранены. Свободно
 около5,1GB; архивы и metadata остаются доступными для восстановления.
+
+## Новый frozen harness и общие условия v5
+
+Чистый managed worktree `skills-evals-writer` на полном SHA
+`d1b364a9861d0c0a3acdd2394811e96bdbe51e04`; frozen lockfile установлен.
+Перед фиксацией перечитан актуальный evals refb31ebe7d0…; protected diff0.
+658 tracked hashes,281 task files,5389 baseline/5651 candidate payload entries
+(байты и modes), судья/модели/21 адаптер повторно проверены.
+`frozen-harness-d1b364a98.json`, `ab-conditions-writer-20261008`: common SHA256
+`abeeb0cfa4281e46a9359d692aaa2d93861918c7674b3764835e27c0e890a86e`.
+Controller/reviewer/cold parent v5 импортируют только новый frozen comparator.
+Модели/судья/выбор15/90 attempts/рубрика/activation allowance/comparison policy
+не изменены; оба smoke повторяются serial, новые formal ещё не начаты.
+Текущий weekly usage44% consumed/ordinary usage allowed; чужих live jobs
+на собственном endpoint не обнаружено, исходные контейнеры не переключались.
