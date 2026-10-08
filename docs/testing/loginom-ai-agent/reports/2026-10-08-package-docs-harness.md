@@ -687,3 +687,26 @@ archive17224420 bytes; restore argv в sibling preservation receipt.
 Первые9:5 PASS,3 no_artifact,1 saved required-checklist FAIL;
 шесть saved artifacts прошли структуру/warm oracle, cold0/candidate0.
 Baseline45 продолжает работу; сравнение90 попыток ещё не выполнено.
+
+## Сохранение диагностики девяти закрытых попыток
+
+Только после result cleanup confirmed, process cleanup confirmed и отдельного
+diagnostics stage confirmed каталоги диагностики первых9 попыток сохранены
+в sibling `diagnostics.tar.gz` и `diagnostics.preservation.json`. Перед удалением
+распакованной копии проверены native `/proc` references/FD, SHA/bytes исходного
+manifest, полная распаковка и точное совпадение всех трёх entries, включая
+directory/file modes. Повторные guards подтвердили отсутствие изменений.
+
+Долговременная сводка:
+`ab-local-stand-20261008/closed-formal-diagnostics-first-nine.json`, SHA256
+`65cbbe164784ef014a9c8145cda3b1a06861b3222cac1e09bf4ae26054bc765b`.
+Все9 archive hashes перепроверены; исходные result/cleanup hashes совпали,
+common abeeb0cf… и21 execution pins неизменны. Result/events/judge/artifacts,
+management diagnostics и активный профиль остаются распакованными.
+Освобождено548549917 file bytes; на диске около7.2GiB свободного места.
+
+Для дальнейшего анализа execution journal сначала восстановить соответствующий
+diagnostics directory точным restore argv из receipt. Упоминания распакованной
+диагностики выше описывают состояние до этой операции. Байты сохранены в архиве;
+критерии/score/полнота A/B не менялись. Helper приватный, результат подтверждён
+реальным roundtrip, не fixture и не продуктовой live-проверкой.
