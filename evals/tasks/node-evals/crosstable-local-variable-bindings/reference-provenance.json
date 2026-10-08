@@ -1,0 +1,124 @@
+{
+  "builder_attempt": 4,
+  "builder_attempts_spent": 4,
+  "wrapper_attempt": 1,
+  "global_author_attempt": 4,
+  "session_id": "ses_ee4f8b40bffeDGNfAniYf7Fgy4",
+  "model": {
+    "providerID": "openai",
+    "modelID": "gpt-6.1-sol",
+    "variant": "xhigh"
+  },
+  "timeout_ms": 1800000,
+  "harness_checkpoint_sha": "54fc98aad56f1b794bcd7786c297306519fd45e2",
+  "cli_source_sha": "904f7f85bf5450cbbfd48360d7dd9c483401face",
+  "node_case_skill": {
+    "version": "1.0.4",
+    "source_sha": "2179e67d5cb5ffb4837ff13ce36a010b3a454709",
+    "archive_sha256": "2f56e91d985f3dd45bf0dff141955dbd9898c475066eb80a69ec77dd249387fb"
+  },
+  "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+  "action_manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+  "reference_sha256": "c7c19c2c3f2e5ed9b54908251a697a9aee8ac17738cf880c7eb7afb68f67ac5b",
+  "reference_code_check": {
+    "verdict": "PASS",
+    "errors": [],
+    "failures": []
+  },
+  "cleanup_status": "confirmed",
+  "cold_status": "PASS",
+  "cold_result_sha256": "a8ad1a5221898c761d62c4aa6fc60d6f340f1f2528495479301e31b3eab52851",
+  "cold_cleanup": "confirmed",
+  "cold_evidence": "cold/crosstable-local-variable-bindings/",
+  "source_attachment_sha256": "b22e16ccb91e82224bea12f90f7d9e7cf23f99aea69f1a0d7e0416bc62b8270b",
+  "reference_evidence": "reference/crosstable-local-variable-bindings/",
+  "observed_native_sha256": "8bd84baa00037fe03716e47071e8e27295e29549ed88e540b4bc8c0deb15ee5d",
+  "observed_native_provenance": [
+    {
+      "source": "loginom/runtime/generations/4/chats/94fbfba12d16f5ae831f9ebc6eb8a9ae7f8ceb60fe9961bc2b395445cc971fe4/attempts/8403bf21-a53c-4a69-b7ba-c71687301aa1/execution-events.jsonl",
+      "source_sha256": "bb2796982d73a1068ecd033f5429755fb0d23a8d53c702195206757fd7142e42",
+      "source_line": 628
+    }
+  ],
+  "intent": "LAB-31-f3-node-label-v1",
+  "operator_comment": "01a11af3-c2ec-7748-8edb-e5fa367c6efb",
+  "full_technical_hint": "Техническая подсказка по операторскому решению LAB-31-f3-node-label-v1 (комментарий 01a11af3-c2ec-7748-8edb-e5fa367c6efb). Исходное задание, CSV, ожидаемые значения и все критерии остаются прежними.\n\nЗадай создаваемой Кросс-таблице имя CrossTable_bindings. Имя должно быть ровно CrossTable_bindings, без точек с запятой. Не используй описание ролей полей в качестве имени узла. Это имя не меняет настройки, управляющий порт, локальные переменные, bindings, автоматические имена/метки выходных полей или вычисления.\n\nВ предыдущих трёх попытках configure/execute завершались успешно, но full native read останавливался с F3 is restricted to an observed graph table output. Оператор установил по настоящему trace: wizard.status=absent, выбран настоящий kind=port, Output_Data-0 того же узла, но имя узла содержало символы ';'. Наблюдённый tid MF;TF-1;Graph;cols:_Category;__rows:_Region;__cells:_Amount;Output_Data-0 не проходит неизменённую проверку одного сегмента [^;]+. Контрольный tid MF;TF-1;Graph;CrossTable_bindings;Output_Data-0 принят штатным validateUiAction; Input_Data-0, Output_Var-0 и kind=node по-прежнему отвергаются.\n\nВыполни исходное задание полностью: три собственные local variables и реальные bindings, полный свежий native read, CSV-экспорт и сохранённый XML. CLI, guard, sandbox и настройки доступа не изменяй; не читай CLI-профиль или внутренние файлы продукта. Если штатное чтение снова невозможно, сохрани настоящую причину и сообщи невозможность завершения, без обхода ограничений.\n",
+  "hint_sha256": "568d1340fd93366422067462c3ece09c73c1b1576e3d6c2689e76d528b05348c",
+  "prior_bindings_attempt_hashes": [
+    {
+      "global_author_attempt": 1,
+      "files": {
+        "builder-result.json": "9f72bafe7b9da984fd9c341cbb3468df8ef14144e99618d5f908fe7cf5b0cda2",
+        "config.json": "f29c1ad51a1ff46f19bebb16640dfcc58f5e724822f475747be520f33f7b6deb",
+        "crosstable-local-variable-bindings/1/actual-models.json": "8ebf548db26025ae68b95586c131aa088c84b43228bf8a137de6f8be2c82539c",
+        "crosstable-local-variable-bindings/1/cleanup.json": "c527e81073c06e27b0ea6566559c5a798df2cda739628405a2d6e78045011688",
+        "crosstable-local-variable-bindings/1/diagnostics/1-execution-events.jsonl": "5e89f5710d74adcdbadae57b0319365e9417203a713f1f9b804f687fcab224b6",
+        "crosstable-local-variable-bindings/1/diagnostics/manifest.json": "d6046aa00c19c50c2e8cca47306841c94034bedc3e714eea72b8f25cb57d43ed",
+        "crosstable-local-variable-bindings/1/events.jsonl": "9390dcb91f58810247582f7fda30a035a74374605d0f7f4c9c2cef38e5ff5670",
+        "crosstable-local-variable-bindings/1/management/1791451939314-17be00fb-d335-4ee4-835b-2283834c2dd7/cleanup.json": "5fd1121065532381df3abe86e35bcf670d481d1bfc4121b7f9bb0e1b092482a0",
+        "crosstable-local-variable-bindings/1/management/1791451939314-17be00fb-d335-4ee4-835b-2283834c2dd7/diagnostics/manifest.json": "a145c911c10be384af83b1f300f0e90d99532b472fb0b94f27cfbf71ab5510e6",
+        "crosstable-local-variable-bindings/1/native-crosstable.json": "e867ecf29de46178caaa6efa158d587130413665e587bdc44203bba6df7a1b77",
+        "crosstable-local-variable-bindings/1/process-cleanup.json": "6dcc5f88cd602f699b63ae37ce1b1ea4c669434a668b3c501afe6908a41ea09c",
+        "crosstable-local-variable-bindings/1/prompt.txt": "b2f747b4a2301aab084b27040eace9b35020aeb4379209be75011b090a13afb5",
+        "crosstable-local-variable-bindings/1/result.json": "55fe26b79b7893aa9bf8591509d9a457fc32054cc3154e391a9391b6f3f404a0",
+        "crosstable-local-variable-bindings/1/run.json": "e3ef37bfbfc5bd42d6b1cdcf4487f3a2936f806091362d10c6bb590699d8992b",
+        "crosstable-local-variable-bindings/1/stderr.txt": "025abd9e630ec9e8d80ba37dc64efdc6b9640bfa236d16d179d3fac0b57ac13e",
+        "crosstable-local-variable-bindings/1/storage-cleanup.json": "2c754b44589197a9a1302d927f279d0b3070c36d4a03495eb40cc49bf684b754",
+        "environment.json": "53ae8b64214c7ad8f8925c2701d6a3540d5c22da3b2dd355944b930fd7b82697",
+        "source-hashes.json": "28c9590fc7d314f113ba1a549b25c49bde887200de25ccf2ca5da77573d64399"
+      },
+      "manifest_sha256": "b885b6fd6d2250d5c24df61af0a1032d0d678c3b194cfaacf31be5b21d593629"
+    },
+    {
+      "global_author_attempt": 2,
+      "files": {
+        "builder-result.json": "34133ea6287140ee494570f731726836277fd35814abe1c172f9cf1a95bb70b8",
+        "config.json": "f29c1ad51a1ff46f19bebb16640dfcc58f5e724822f475747be520f33f7b6deb",
+        "crosstable-local-variable-bindings/2/actual-models.json": "42dc0d60cbbe26726f1e82719451941ff24a440eea0e26ea3df34811ea099349",
+        "crosstable-local-variable-bindings/2/cleanup.json": "942c4bfa958a874b5394146958fb0086980720249ae38ecbb7e7d598d6aa8138",
+        "crosstable-local-variable-bindings/2/diagnostics/1-execution-events.jsonl": "a705e8aca11447347b2afe71479c45f6fd6bdedfd135b357fd2130a6cfa9e71b",
+        "crosstable-local-variable-bindings/2/diagnostics/manifest.json": "549c40f335f9bb69e174da57dbded51f130aab55a59332b1c5813caab2d52a2a",
+        "crosstable-local-variable-bindings/2/events.jsonl": "f439af0a0ab7a382989bb4d9ae25b92c3d10c89368f3d853309f6a62bbedee05",
+        "crosstable-local-variable-bindings/2/management/1791452442101-3dba3853-5583-413d-a440-ee893b395e35/cleanup.json": "9b0eb1f9bdd9646883bc3355ce879cb2ed66ab21140ffba96546755b32a6b8a9",
+        "crosstable-local-variable-bindings/2/management/1791452442101-3dba3853-5583-413d-a440-ee893b395e35/diagnostics/manifest.json": "876fa56e76421eb19b8bd27ee2e4da682ac81e4682f421228b884a82c2308eb3",
+        "crosstable-local-variable-bindings/2/native-crosstable.json": "becc5d241cfd7424ea230df2a795cb58fb3591a19f2b18571bd514f680f9aaa8",
+        "crosstable-local-variable-bindings/2/process-cleanup.json": "7c01c76def39789ad0072e2d217074a471a931760db37875917ac974be6657e3",
+        "crosstable-local-variable-bindings/2/prompt.txt": "429827db36b493455cef002b98c62200da25fc445a5d829ae1846053e1194364",
+        "crosstable-local-variable-bindings/2/result.json": "803d8bf9b6ae25e1023f5bec8e506311507a2a59df6cbc577c3377b3fcb3afa9",
+        "crosstable-local-variable-bindings/2/run.json": "286706a59e0140c2110f82b0bbcd8630cd1752bdeddccdc5ec9c49f7ab4ff91d",
+        "crosstable-local-variable-bindings/2/stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "crosstable-local-variable-bindings/2/storage-cleanup.json": "4c90c4b6a6c4348c515a771c7f835bd979ff122ff9d4216861724ec19e904463",
+        "environment.json": "f7573b19c6c73ce9e792cbcc78f2cc867e42405ca0bdfad396d2d7a6164d1b83",
+        "source-hashes.json": "28c9590fc7d314f113ba1a549b25c49bde887200de25ccf2ca5da77573d64399"
+      },
+      "manifest_sha256": "9231b1621a81c7fbb7c4efde13335dc915852dcb517d7d05e555074fc096ab26"
+    },
+    {
+      "global_author_attempt": 3,
+      "files": {
+        "builder-result.json": "e07bf5dad8610e6e9ecfa2f19d1347c7e46b92b9ef26ffee981dd8c9fe65c60b",
+        "config.json": "f29c1ad51a1ff46f19bebb16640dfcc58f5e724822f475747be520f33f7b6deb",
+        "crosstable-local-variable-bindings/3/actual-models.json": "a77b258542771309e05fa6fe748ee3867acf0f06c4744f1bea2978d3a46861f6",
+        "crosstable-local-variable-bindings/3/cleanup.json": "0d72e824c8dfaa246c4fff29a0792ee00e0a35d2cf4284f02c6037409f97bc6e",
+        "crosstable-local-variable-bindings/3/diagnostics/1-execution-events.jsonl": "1d0cfa505b2ed843c6987f244d41c42b4ee9b8e23f7cc1dae9c13760cd8bf2c1",
+        "crosstable-local-variable-bindings/3/diagnostics/manifest.json": "a8ae1b255b02f30b3f391b33e8351d9511389d69ce4acbb3011bdaf48ea2f167",
+        "crosstable-local-variable-bindings/3/events.jsonl": "98951153865e613c448e3a9e203d9a9ab24aa1dbe6554b85d2453a40d15db5ab",
+        "crosstable-local-variable-bindings/3/management/1791452724818-f027d58d-a38c-470b-94bf-97d982305c03/cleanup.json": "9136664361177122d2f1a9ccc8106a276d268c8bd50b5e8a2584c0858309227e",
+        "crosstable-local-variable-bindings/3/management/1791452724818-f027d58d-a38c-470b-94bf-97d982305c03/diagnostics/manifest.json": "efcf454c8a6aed40b4ac52743c1fe5c7f0cfdaaa0c73af2d71518a1038846cad",
+        "crosstable-local-variable-bindings/3/native-crosstable.json": "85c294a6075c8ce703ac3caeba06a78ce955ffc755c498ff85bea508d39d4f87",
+        "crosstable-local-variable-bindings/3/process-cleanup.json": "8e384dfbf947cca83f7106c7a469077f93a6bb24e152116501ab10ac043e0cfa",
+        "crosstable-local-variable-bindings/3/prompt.txt": "e915283cab054b996a6caf8f45590c744d2ef40c832d3bdfb9223887e82f7995",
+        "crosstable-local-variable-bindings/3/result.json": "45634059dbc7044c97f9ef3b3f7adc4710f8b3d79592e61f38c9a2d8a6ba2081",
+        "crosstable-local-variable-bindings/3/run.json": "e049f95f7ca24e11dc1cc0c7fffd52ac97d1bfe13319ee71875aba7627f7abf0",
+        "crosstable-local-variable-bindings/3/stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "crosstable-local-variable-bindings/3/storage-cleanup.json": "cf0e3dc241ea424f45deb2d02af1109e8a08253b47d4205c9891f06399e050b8",
+        "environment.json": "f7573b19c6c73ce9e792cbcc78f2cc867e42405ca0bdfad396d2d7a6164d1b83",
+        "hint.txt": "b3e9d4c7026c9d1d256c2a5032b14c911a3e0d1b7d533264dc862c01cb2d049a",
+        "source-hashes.json": "28c9590fc7d314f113ba1a549b25c49bde887200de25ccf2ca5da77573d64399"
+      },
+      "manifest_sha256": "4a32429c81b6aff86581412edf91443a6323f7fc3067398f4651b18bddf0350d"
+    }
+  ],
+  "previous_evidence_archive_sha256": "831a9756063bc0c0b014814b34f1d655e9d83f88dfb45b7320aa228f509415fe",
+  "exception": "exactly one additional reference; global attempt 4, wrapper 1 in lab31-reference-namefix-v1; no budget reset"
+}
