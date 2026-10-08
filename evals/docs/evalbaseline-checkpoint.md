@@ -1,6 +1,6 @@
 # EvalBaseline — checkpoint 2026-10-08
 - Branch baseline-runtime; checkout /tmp/loginom-baseline-runtime; основной checkout сохранён.
-- Проверенный code SHA: aa33e613e; deployment source SHA — в supplement manifest/readback.
+- Проверенный code SHA: aa33e613e; deployment source SHA: bfb7c62e4266e76c995a43b6f909d8a6739ce062.
 - Корпус: 44 кейса, три круга, 132 отдельных измерения repeat=1.
 - Executor/journal/resume/check, config v1/v2, общий lease и baseline completion реализованы.
 - Отдельные regular/analytic/node, ошибки/расходы retries, compare, curated export.
@@ -13,7 +13,8 @@
 - Multica EvalBaseline 77032943-ad18-4ae9-a2c6-668769077c86: eval-tests, gpt-6.1-sol/xhigh, concurrency=1, вне squad.
 - Native MCP search PASS: actor, собственный checkout, automatic Git Peer; receipt source 44c7928bf.
 - Карточка LAB-32 [Baseline], baseline label; инструкции/три starters/API readback PASS.
-- Ограничение: Evaler по LAB-31 активен; общий config остаётся v1, supplement v2 только staged.
+- Ограничение: цепочка задач LAB-31 активна; общий config остаётся v1, supplement v2 только staged.
 - Остались activation всех исполнителей, server/native isolation checks и ровно два smoke; готовность неполная.
 - Живые smoke и полный baseline не запускались; unknown outcome автоматически не повторяется.
 - Следующий шаг: при FREE и пустой очереди выполнить activation/checks/smoke; evidence/readback — в LAB-32.
+- Evidence доставлен/скачан из LAB-32: bytes/SHA256/manifest/readback PASS; archive SHA f5279740982b97449a9828b5a0aa9ab96abef86e8f1826e67baa1eac4ef7edef.
