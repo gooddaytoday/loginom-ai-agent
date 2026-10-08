@@ -4447,9 +4447,9 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-09 — ACTIVE, frozen495 принят; baseline smoke v7 выполняется
+### 2026-10-09 — ACTIVE, smoke-пара v7 принята; formal baseline запущен
 
-- HEAD до checkpoint `e019407e3`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
+- HEAD до checkpoint `2ec0dcf4b`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client и чужие профили/процессы не изменялись.
 - Own mutable harness495463543 clean; новый detached skills-evals-release на полном SHA495463543901f1a69888b8d6375cd77996ef157b, frozen install/typecheck PASS.
 - Writer post-open real-IO RED→GREEN; release/persistent-empty/replacement guards×5 PASS; modules77 PASS/0 FAIL/241 assertions.
@@ -4458,11 +4458,11 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Exact own immutable dedupe:26568 old frozen source files,612 browser files,13285 new frozen source files; bytes/modes/pins и clean Git проверены до/после; чужие данные не очищались.
 - Dedupe receipts: frozen-worktree-dedupe-20261009, immutable-browser-dedupe-20261009, frozen-release-worktree-dedupe-20261009; около1.9GiB свободно. Frozen sources/resources не редактировать.
 - Conditions ab-conditions-release-20261009/common.json SHAa268a81e8b4ea163f50ac52ee99817559b3fab9a08ffc09652dc96c00fcd2ed4:658 harness/281 task/21 adapter pins/5389+5651 build inventory PASS.
-- На freeze свежий evals ref992fca12badf209169f13b569b9bd291e4d70e99; protected diff0. Перед приёмкой повторно читать ref и проверять pins.
-- Те же заранее закреплённые15 задач×3×2=90; primary openai/gpt-6.1-sol medium, judge gpt-6-astra high; submodel construction вне coverage.
-- Baseline smoke v7/session30063 выполняется в ab-smoke-v7-20261009/base, dispatch sales-by-category подтверждён; candidate/cold/formal v7 ещё не запускались.
-- Далее baseline terminal/review/own reset/installed cold → candidate warm/cold → paired acceptance → полный90/structure/cold/compare; старые smoke не подставлять.
-- V6 обе smoke PASS100/structure/warm/cold/bytes/close/logout/remaining0; formal2749 terminal1 до tasks:writer ENOENT/formal0; исторический native IO order UNKNOWN, FAIL сохранён.
+- На freeze evals ref992fca12badf209169f13b569b9bd291e4d70e99; после пары fresh b30dcbe5f/protected diff0, с freeze изменён только соседний docs-файл; frozen495/658files/21pins/оба full CLI повторно PASS.
+- Те же15 задач×3×2=90; primary openai/gpt-6.1-sol medium/judge gpt-6-astra high. Smoke metrics16/18 provider turns,17/20 tools,13/13 Loginom; activation delta1/skill1 PASS, прочий рост отдельно.
+- Baseline smoke v7/session30063 terminal0/run214239:score100/oracle/structure/installed cold21564 PASS; close/logout/remaining0/bytes unchanged; accepted receipt сохранён.
+- Candidate v7/session95877 terminal0/run215120:score100/oracle/structure/cold22429 PASS/cleanup confirmed; pair accepted receipt ab-smoke-v7-pair-accepted-20261009, fresh refb30dcbe5f/protected diff0.
+- Formal v7 baseline/session81639 запущен из frozen evals cwd, root ab-formal-v7-20261009/base; candidate formal не запускался. Далее45+45/structure/cold/compare; closed-only history/diagnostics adapters prepared, failed profile не очищать.
 - V5 formal1287 terminal1 на13/45:13-я analytic PASS100/process cleanup FAIL; historical PID4050199 errno/operation UNKNOWN; profile не очищен, candidate0/cold0.
 - CLI modify3 FAIL; CLI docs-after-build3 accepted; Desktop warm3/cold1 PASS2 FAIL; новый Desktop cold controller prepared/guard6 PASS, native запуск только после90 closed.
 - Linux installed CLI/Desktop49 по5 ОС PASS; TUI/native opening/headless docs и upgrade PASS; lifecycle/independence и remaining natural transitions открыты.

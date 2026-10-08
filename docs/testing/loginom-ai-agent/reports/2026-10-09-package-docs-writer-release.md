@@ -1,8 +1,10 @@
 # Release writer после открытия owner
 
-Локальная A/B smoke-пара v6 прошла, но формальный baseline остановился ещё
-в management preflight. Попыток задач и вызовов модели в formal0; приёмка
-по90 попыткам не завершена. Продуктовые binary/resources49b1584f2 не изменены.
+Новая локальная A/B smoke-пара v7 на frozen495 прошла судью, структуру,
+warm oracle и installed cold. Полный clean suite484 PASS/2 SKIP/0 FAIL,
+typecheck PASS; formal baseline v7 запущен. Приёмка90 ещё не завершена.
+Продуктовые binary/resources49b1584f2 не изменены. Прежний formal v6 отказал
+в management preflight до задач; его FAIL и evidence сохраняются отдельно.
 
 ## Принятая функциональная пара
 
@@ -90,9 +92,44 @@ Conditions ab-conditions-release-20261009/common.json SHA256
 658 harness files/281 task files/21 adapter pins,5389+5651 build files verified.
 Те же15 задач, модели/параметры/judge/viewport, оба сохранённых CLI.
 
-Baseline smoke v7 session30063 выполняется: sales-by-category dispatch подтверждён,
-root ab-smoke-v7-20261009/base. Candidate/cold/formal v7 ещё не запускались.
-Далее terminal baseline/review/cold, candidate warm/cold и лишь затем90 attempts.
+Baseline smoke v7/session30063 завершён exit0:run20261008-214239-495463543,
+score100/pass/oracle,304729ms, process/environment cleanup confirmed, все6 stages confirmed.
+Структура/warm oracle PASS; installed cold/session21564 exit0/PASS/oracle0,
+settingsReapplied=false/packageInputUnchanged/closeLogoutVerified/remaining0,
+containerRemoved/ownedStorageRemoved, modelJudgeHelpCalls0.
+Receipt ab-smoke-v7-base-accepted-20261009/review.json. Closed history4505entries,
+15563202archive bytes и diagnostics3entries/4006770archive bytes сохранены с
+full roundtrip/restore receipts; result/events/judge/artifacts остаются на месте.
+Candidate smoke v7/session95877 завершён exit0:run20261008-215120-495463543,
+score100/oracle/323206ms, process/environment cleanup confirmed и все6 stages confirmed.
+Структура/warm oracle PASS; installed cold/session22429 exit0/PASS/oracle0,
+package/input unchanged/settingsReapplied=false/close/logout/remaining0,
+own container/files removed/modelJudgeHelpCalls0. Candidate closed history1928entries/
+9151638archive bytes и diagnostics3entries/4008636archive bytes сохранены
+с full roundtrip/restore receipts. Candidate accepted receipt сохранён.
+
+Paired functional smoke принято: ab-smoke-v7-pair-accepted-20261009/review.json.
+Перед этим повторно проверены658 frozen files/21pins/5389+5651 CLI inventory
+bytes/modes/judge executables/external-after server skill/catalog/knowledge pins.
+Fresh evals refb30dcbe5f2768a740abab18d3fec436aada9ab2b; protected diff0;
+с freeze992fca изменён только соседний docs-файл, frozen495 не менялся.
+Первый read-only broad audit ошибочно сравнил все файлы независимого own harness
+с соседней веткой и отказал AssertionError до записи/мутаций/model calls.
+Корректная повторная проверка использует закреплённый набор protected paths;
+ошибка проверки отдельно описана в smoke-v7-metrics-fresh-ref.json.
+
+Метрики base/candidate:16/18 provider step-finish parts,17/20 unique tools,
+13/13 Loginom,0/1 skill(loginom-automation),tool errors0. До первого prepare
+1/2 provider turns:activation delta1/skill1 соответствует заранее заданному
+допуску. Два read идут в том же candidate turn, что prepare; общий рост на2
+хода включает отдельный todowrite после prepare и не подменяет activation delta.
+Receipt smoke-v7-activation-allowance-review.json. Smoke не доказывает
+статистическую неухудшенность и не входит в90 attempts.
+
+Formal baseline v7/session81639 запущен из frozen skills-evals-release/evals,
+root ab-formal-v7-20261009/base. Candidate formal ещё не запускался.
+После45+45 обязательны структура, cold каждого сохранённого пакета и compare.
+Closed-only preservation helpers v7 prepared; failed/active profile не очищать.
 Evidence private ab-local-stand-20261008; secrets/raw diagnostics в Git не внесены.
 
 Evidence TDD в writer-post-open-{red,green,guard,all-guards,repeat-1..5,typecheck,modules}.log.

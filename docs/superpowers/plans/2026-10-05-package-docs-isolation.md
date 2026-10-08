@@ -1045,7 +1045,14 @@ Core имеет разметку осей, но без CSV oracle. По доку
   `a268a81e8b4ea163f50ac52ee99817559b3fab9a08ffc09652dc96c00fcd2ed4`;
   inventories/658 harness/281 tasks/21 pins PASS, protected diff0 против
   fresh evalsref992fca12badf209169f13b569b9bd291e4d70e99 при freeze.
-  Baseline smoke v7 выполняется; candidate/cold/formal v7 ещё не запускались.
+  Baseline v7 run214239 завершён exit0/score100/oracle/structure/installed cold
+  PASS, close/logout/remaining0/bytes unchanged; baseline accepted receipt сохранён.
+  Candidate v7 run215120:score100/oracle/structure/installed cold PASS,
+  cleanup confirmed. Pair receipt `ab-smoke-v7-pair-accepted-20261009/review.json`;
+  frozen/21pins/оба full CLI/external after проверены повторно; fresh refb30dcbe5f,
+  protected diff0. Activation+1 provider-turn/skill1 PASS; total turns16/18
+  и tools17/20 измерены отдельно, Loginom13/13/errors0. Formal v7 baseline
+  запущен/session81639; candidate formal ещё не запускался.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой
   повторно проверить актуальный ref и условия. Старые v3–v6 не подставляются
   в новую пару. Подробнее: `reports/2026-10-09-package-docs-writer-release.md`.
@@ -1501,16 +1508,16 @@ bun run src/compare.ts "$skill_eval_base_run_id" "$skill_eval_candidate_run_id" 
   --margin 0.5 --confidence 0.95 --k 3
 ```
 
-Фактическая локальная приёмка использует закреплённые controller/reviewer v5
+Текущая локальная приёмка использует закреплённые controller/reviewer v7
 из собственного каталога `package-docs-20261006/ab-local-stand-20261008`.
-Controller `skills-ab-run-v5.ts base smoke` и затем `candidate smoke` запускается
-из `skills-evals-writer/loginom-ai-agent/evals/`; после принятой полной smoke-пары
+Controller `skills-ab-run-v7.ts base smoke` и затем `candidate smoke` запускается
+из frozen `skills-evals-release/loginom-ai-agent/evals/`; после принятой полной smoke-пары
 те же команды с `formal` выполняют45+45 попыток. Абсолютные binary paths,
 раздельные profiles/results/workspaces, Node/judge/external/task/21 adapter pins
 и строгий reset только собственного стенда проверяются самим controller.
 Native profile создаётся до защищённого переноса provider auth; секреты не
-печатаются. Для каждого сохранённого артефакта reviewer v5 проверяет структуру/
-warm oracle, затем `skills-ab-cold-replay-installed-v5.py` — сохранённые байты/
+печатаются. Для каждого сохранённого артефакта reviewer v7 проверяет структуру/
+warm oracle, затем `skills-ab-cold-replay-installed-v7.py` — сохранённые байты/
 настоящий export/новую сессию/native close/logout/process cleanup. Неподтверждённый
 cleanup блокирует приёмку; failed receipts сохраняются. Один smoke не входит
 в90 попыток и не доказывает статистическую неухудшенность. Зафиксированная
