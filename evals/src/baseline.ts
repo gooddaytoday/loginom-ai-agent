@@ -7,6 +7,7 @@ import { validateNodeRun } from "./node-evals"
 import { parseArgs } from "node:util"
 import type { NodeOpsConfig, NodeStandLease } from "./node-eval-ops"
 import { dockSkillRevision } from "./preflight"
+import { compareCsv, parseCsv } from "./oracle"
 
 export type BaselinePins = {
   mode: "live" | "fixture"; harnessSha: string; corpusSha: string; cliVersion: string; cliSource: string
@@ -17,7 +18,8 @@ export type BaselinePins = {
 export type BaselineCollection = "regular" | "analytic" | "node"
 type BaselineCase = { key: string; id: string; collection: BaselineCollection; directory: string; files: { path: string; sha256: string }[] }
 export type BaselineManifest = { version: 1; id: string; kind: "baseline" | "smoke"; createdAt: string; pins: BaselinePins
-  cases: BaselineCase[]; jobs: { key: string; caseKey: string; attempt: number }[] }
+  cases: BaselineCase[]; jobs: { key: string; caseKey: string; attempt: number }[]
+  smokeOracle?: { caseKey: string; inputSha256: string; expectedCsv: string } }
 type RecordedRun = { runDir: string; runId: string; files: { path: string; sha256: string }[]; measured: boolean; cleanup: boolean; verdict: "PASS" | "FAIL" | "ERROR" }
 type BaselineRow = { key: string; caseKey: string; attempt: number; collection: BaselineCollection; state: "pending" | "running" | "recorded"
   measured: boolean; cleanup: boolean; verdict: RecordedRun["verdict"] | null; runDir: string | null; result: AttemptResult | null }
@@ -65,6 +67,7 @@ export async function captureBaselinePins(config: NodeOpsConfig, env: Record<str
   const role = config.roles.evalbaseline
   if (config.version !== 2 || !role || env.EVAL_CLI_MODE !== "binary" || env.EVAL_CLI_BIN !== nodeRoleCli(config, "evalbaseline") ||
     env.EVAL_PROFILE_DIR !== role.evalProfile || env.EVAL_WORKSPACE_ROOT !== role.workRoots[0] || env.EVAL_ARTIFACT_SOURCE !== "docker" ||
+    env.CODEX_HOME !== path.join(path.dirname(role.evalProfile), "judge-home") ||
     env.LOGINOM_URL !== config.endpoint || env.LOGINOM_CONTAINER !== config.container.name || env.LOGINOM_STORAGE_DIR !== config.container.storageDir)
     throw new BaselineFailure("ISOLATION_CONFIG_CHANGED")
   await nodeStandStatus(config)
@@ -110,6 +113,7 @@ export async function prepareBaseline(directory: string, options: { checkout: st
   }
   const manifest: BaselineManifest = { version: 1, id: crypto.randomUUID(), kind: options.smoke ? "smoke" : "baseline",
     createdAt: new Date().toISOString(), pins: options.pins, cases,
+    ...(options.smoke ? { smokeOracle: await freezeSmokeOracle(options.checkout, cases) } : {}),
     jobs: (options.smoke ? [1] : [1, 2, 3]).flatMap(attempt => cases.map(item => ({ key: `${item.collection}-${item.id}-${attempt}`, caseKey: item.key, attempt }))) }
   await mkdir(directory, { mode: 0o700 }).catch(() => { throw new BaselineFailure("SERIES_EXISTS") })
   const raw = JSON.stringify(manifest, null, 2) + "\n"
@@ -191,11 +195,48 @@ export async function checkBaseline(directory: string) {
   const infrastructure = spent.filter(item => ["infra_error", "harness_error", "interrupted"].includes(item.result.status) || item.result.judge_status === "error")
     .map(item => ({ key: item.row.key, caseKey: item.row.caseKey, attempt: item.row.attempt,
       phase: item.result === item.row.result ? "final" : "infra-retry-initial", status: item.result.status, judge_status: item.result.judge_status }))
-  return { id: manifest.id, kind: manifest.kind, status: coverage.measured === coverage.expected && cleanup && journal.release ? "complete" : "incomplete",
-    manifest, coverage, cleanup, released: Boolean(journal.release), groups, spending, infrastructure,
+  const smokeVerification = manifest.kind === "smoke" ? await verifySmokeMeasurements(manifest, rows) : null
+  return { id: manifest.id, kind: manifest.kind, status: coverage.measured === coverage.expected && cleanup && journal.release && (smokeVerification?.verified ?? true) ? "complete" : "incomplete",
+    manifest, coverage, cleanup, released: Boolean(journal.release), groups, spending, infrastructure, smokeVerification,
     nodes: manifest.cases.filter(item => item.collection === "node").map(item => ({ id: item.id, expected: manifest.kind === "smoke" ? 1 : 3,
       passed: rows.filter(row => row.caseKey === item.key && row.verdict === "PASS").length,
       measured: rows.filter(row => row.caseKey === item.key && row.measured).length })), rows }
+}
+
+async function freezeSmokeOracle(checkout: string, cases: BaselineCase[]) {
+  if (JSON.stringify(cases.map(item => item.key)) !== JSON.stringify(["regular:calc-data-double", "node:crosstable-fixed-sum"])) throw new BaselineFailure("SMOKE_CORPUS_INCOMPLETE")
+  const source = await Bun.file(path.join(checkout, "evals", cases[0]!.directory, "data/amounts.csv")).text()
+  const parsed = parseCsv(source)
+  if ("error" in parsed || parsed.rows[0]?.join(",") !== "Amount" || parsed.rows.length < 2 ||
+    parsed.rows.slice(1).some(row => row.length !== 1 || !row[0]?.trim() || !Number.isFinite(Number(row[0])))) throw new BaselineFailure("SMOKE_ORACLE_INPUT_REFUSED")
+  return { caseKey: cases[0]!.key, inputSha256: baselineHash(source), expectedCsv: `Double\n${parsed.rows.slice(1).map(row => Number(row[0]) * 2).join("\n")}\n` }
+}
+
+async function verifySmokeMeasurements(manifest: BaselineManifest, rows: BaselineRow[]) {
+  const checks = await Promise.all(rows.map(async row => {
+    const out = row.runDir ? path.join(row.runDir, row.caseKey.split(":")[1]!, "1/artifact") : undefined
+    const artifact = Boolean(out && row.result?.package_path && await Bun.file(path.join(out, "package.lgp")).exists())
+    const oracle = row.collection === "regular" && artifact && manifest.smokeOracle ? await checkSmokeOracle(out!, manifest.smokeOracle.expectedCsv) :
+      { checked: false, passed: null, error: null }
+    const evaluator = row.collection === "regular" ? manifest.pins.mode === "live" && row.result?.judge_status === "scored" && row.result.judge_attempts > 0 :
+      Boolean(row.runDir && row.measured && await Bun.file(path.join(row.runDir, "code-verdict.json")).exists())
+    return { caseKey: row.caseKey, artifact, evaluator, oracle, qualityPass: row.collection === "node" ? row.verdict === "PASS" : row.result?.pass ?? null }
+  }))
+  return { verified: checks.length === 2 && checks.every(check => check.artifact && check.evaluator && (check.caseKey.startsWith("node:") || check.oracle.checked)), checks }
+}
+
+async function checkSmokeOracle(artifact: string, expected: string) {
+  const files = (await readdir(path.join(artifact, "results")).catch(() => [])).filter(name => name.endsWith(".result.csv"))
+  if (files.length !== 1) return { checked: false, passed: null, error: "SMOKE_RESULT_CSV_REQUIRED" }
+  const actual = await Bun.file(path.join(artifact, "results", files[0]!)).text()
+  const parsed = parseCsv(actual)
+  if ("error" in parsed) return { checked: true, passed: false, error: "SMOKE_RESULT_CSV_INVALID" }
+  const header = parsed.rows[0] ?? []
+  if (header.filter(column => column === "Double").length !== 1 || parsed.rows.slice(1).some(row => row.length !== header.length))
+    return { checked: true, passed: false, error: "SMOKE_DOUBLE_COLUMN_INVALID" }
+  // SPEC requires Double; optional retained Amount/other columns are not a new acceptance criterion.
+  const projected = ["Double", ...parsed.rows.slice(1).map(row => `"${row[header.indexOf("Double")]!.replaceAll('"', '""')}"`)].join("\n") + "\n"
+  return { checked: true, ...compareCsv(expected, projected, 0), resultSha256: baselineHash(actual) }
 }
 
 export async function sealBaselineRelease(directory: string, receipt: BaselineRelease) {
@@ -411,6 +452,7 @@ async function writeBaselineReport(directory: string, report: Awaited<ReturnType
     `# ${report.kind === "smoke" ? "Smoke" : "Baseline"} ${report.id}: ${report.status}`, "",
     `Ожидается ${report.coverage.expected}; сохранено ${report.coverage.recorded}; измерено ${report.coverage.measured}; не запущено ${report.coverage.pending}; неизвестный исход ${report.coverage.unknown}.`,
     `Очистка: ${report.cleanup ? "подтверждена" : "не подтверждена"}; стенд: ${report.released ? "освобождён" : "освобождение не подтверждено"}.`, "",
+    ...(report.smokeVerification ? [`Проверки smoke: ${JSON.stringify(report.smokeVerification)}.`, ""] : []),
     "Метрики судьи представлены отдельно для regular и analytic. Узловой code PASS не входит в общий score.", "",
     `Расход продукта с infra retry: ${JSON.stringify(report.spending)}. Токены судьи не предоставлены текущим harness.`, "",
     ...report.infrastructure.map(error => `${error.caseKey}#${error.attempt} (${error.phase}): ${error.status}; judge=${error.judge_status}.`), "",

@@ -50,7 +50,7 @@ export function compareCsv(expected: string, actual: string, tolerance = 0.01) {
   return { passed: true, error: null }
 }
 
-function parseCsv(source: string) {
+export function parseCsv(source: string) {
   const rows: string[][] = []
   const text = source.replace(/^\uFEFF/, "")
   const header = text.split(/\r?\n/, 1)[0]?.replace(/"(?:[^"]|"")*"/g, "") ?? ""

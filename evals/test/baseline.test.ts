@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { chmod, cp, lstat, mkdtemp, rm } from "node:fs/promises"
+import { chmod, lstat, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease, runBaseline, verifyBaselineInstallation, baselineHash, captureBaselinePins } from "../src/baseline"
@@ -70,6 +70,39 @@ test("prepare freezes a matching operational config before any live admission", 
     expect((await lstat(path.join(directory, "series/ops-config.json"))).mode & 0o077).toBe(0)
     await expect(prepareBaseline(path.join(directory, "wrong"), { checkout: repoRoot, pins: baselineFixturePins, config })).rejects.toThrow("CONFIG_PIN_CHANGED")
     expect(await Bun.file(path.join(directory, "wrong/manifest.json")).exists()).toBe(false)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("smoke computes an independent Double oracle while a missing node artifact keeps readiness incomplete", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-smoke-"))
+  try {
+    const series = path.join(directory, "series")
+    const manifest = await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins, smoke: true })
+    expect(manifest.smokeOracle?.expectedCsv).toBe("Double\n20\n40\n")
+    for (const job of manifest.jobs) {
+      const admitted = await beginBaselineMeasurement(series, job.key, { checkout: repoRoot, pins: baselineFixturePins })
+      const run = path.join(admitted.resultsDir, "fixture")
+      const regular = admitted.case.collection === "regular"
+      await Bun.write(path.join(run, "summary.json"), JSON.stringify({ run_id: job.key, config: { repeat: 1 }, task_ids: [admitted.case.id], storage_leftovers: [],
+        tasks: [{ id: admitted.case.id, attempts: [{ task_id: admitted.case.id, attempt: 1, status: regular ? "completed" : "no_artifact", judge_status: regular ? "scored" : "skipped",
+          judge_attempts: regular ? 1 : 0, package_path: regular ? "package.lgp" : null, pass: regular, score: regular ? 100 : null,
+          environment_cleanup: { status: "confirmed" }, tokens: { input: 0, output: 0, reasoning: 0 }, counters: { toolCalls: 0, toolErrors: 0, memoryToolCalls: 0 }, duration_ms: 1, cost: 0 }] }] }))
+      await Bun.write(path.join(run, admitted.case.id, "1/cleanup.json"), JSON.stringify({ result: { status: "confirmed" }, processes: { status: "confirmed" },
+        stages: ["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].map(stage => ({ stage, status: "confirmed" })) }))
+      if (regular) {
+        await Bun.write(path.join(run, admitted.case.id, "1/artifact/package.lgp"), await Bun.file(path.join(evalsRoot, "tasks/calc-data-double/reference.lgp")).bytes())
+        await Bun.write(path.join(run, admitted.case.id, "1/artifact/results/export.result.csv"), '\uFEFF"Amount";"Double"\r\n10;20\r\n20;40\r\n')
+      }
+      await recordBaselineMeasurement(series, job.key, run)
+    }
+    await sealBaselineRelease(series, { status: "RELEASED", evidenceSha256: "5".repeat(64) })
+    const report = await checkBaseline(series)
+    expect(report.coverage.measured).toBe(2)
+    expect(report.status).toBe("incomplete")
+    expect(report.smokeVerification).toMatchObject({ verified: false, checks: [
+      { caseKey: "regular:calc-data-double", artifact: true, oracle: { checked: true, passed: true } },
+      { caseKey: "node:crosstable-fixed-sum", artifact: false },
+    ] })
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
