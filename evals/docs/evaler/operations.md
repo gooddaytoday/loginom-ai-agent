@@ -92,7 +92,7 @@ Nested paths остаются в своих workRoots/resultsRoot, а historyArc
 Операторское исключение `LAB-31-writer-release-race-v1`: для единственного error `Writer owner unavailable` при штатном unlink(owner) → rmdir(.writer) разрешён отдельный немодельный сбор process settlement. Сам `writerIdentity` повторяет только ENOENT не более 100ms и возвращает null лишь после двух наблюдений исчезнувшего исходного каталога; устойчиво отсутствующий owner, доступы, symlinks и смена identity остаются ошибкой. Source cleanup/summary/code-verdict не изменяются.
 
 ```sh
-"$R/bin/with-env" "$R/runtime.env" "$R/bin/bun" script/node-eval-ops.ts settle-writer-release \
+"$R/bin/with-env" "$R/runtime.env" "$R/bin/bun" "$OPS" settle-writer-release \
   --config "$CFG" --lease "$LEASE" --incident '<original incident>' --profile eval \
   --followup-task '<actual new worker task>' --evidence '<immutable failed cleanup.json>' \
   --receipt "$WORK/writer-release-settlement.json"
@@ -105,7 +105,7 @@ Helper сверяет исходный admission/config/container/CLI/profile, e
 Закрытое исключение `LAB-31-owned-registration-v1-admission` (оператор `01a11b8e-be80-7481-8254-bc2bd014aac1`) продолжает ровно исходный ATTEMPTED incident. Исторический exception остаётся UNKNOWN: доказательство no-dispatch — фактический role profile/source, доминирующий open(wx), непрерывная исходная registration и отсутствие profile/history/storage mutations. Закреплённый admission SHA256 `c79db297982c257c41c5a60dff46fb7311a87c539f260b5106bba6c927f237e5` проверяется вместе с исходным clean admission/config/container/CLI и immutable owner/acquiredAt. Это не общий retry/resume API.
 
 ```sh
-"$R/bin/with-env" "$R/runtime.env" "$R/bin/with-env" "$R/roles/rich/eval.env" "$R/bin/bun" script/node-eval-ops.ts lab31-owned-registration \
+"$R/bin/with-env" "$R/runtime.env" "$R/bin/with-env" "$R/roles/rich/eval.env" "$R/bin/bun" "$OPS" lab31-owned-registration \
   --config "$OPS" --lease "$LEASE" --evidence "$ORIGINAL_RECOVERY" \
   --admission "$PRIVATE_ADMISSION_COPY" --followup-task "$FOLLOWUP_TASK"
 ```

@@ -71,3 +71,15 @@ fixture из `077d0b5b1` проверен отдельно на сервере. 
 ошибка сохранена в отдельном private log. Оцениваемая модель и судья не вызывались.
 Это подтверждение fixtures, а немодельная проверка установленного CLI и два живых
 smoke на настоящем стенде остаются этапами 5–6.
+
+## Финальные recovery границы
+
+На `86caa7cfa` проверено подтверждение очистки при остановившемся executor: полный
+UID/PID/starttime/nonce, сохранённый terminal run и валидный receipt обязательны;
+живой harness и неполная identity запрещают разрешение, guard сохраняется для native resume.
+На `3ce983703` writer settlements baseline разделены по immutable source receipt;
+Rich/Ben сохраняют прежний marker на lease. Native red воспроизвёл запрет второго
+исполнения; green дал два независимых receipt, отказ повторов и прежнюю защиту Rich.
+Полный локальный suite: 553 PASS, 9 clean-host SKIP, 0 FAIL; 562 теста, 2732 assertions,
+547,25 секунды. Typecheck PASS. Server helper/writer/registration: 51 PASS, 0 SKIP,
+0 FAIL; все девять clean-host fixtures пройдены. Оцениваемые модели не вызывались.

@@ -1,12 +1,12 @@
 # EvalBaseline — checkpoint 2026-10-08
 - Branch baseline-runtime; checkout /tmp/loginom-baseline-runtime; основной checkout сохранён.
-- Проверенный code SHA 114d10ffab0efe32dc3db28b25be7137a274cce3; LAB-31 принят на 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad.
+- Проверенный code SHA 3ce983703bbeca5d759f1cd7bfc8b9a8196c7f64; LAB-31 принят на 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad.
 - Корпус 48 кейсов/144 измерения; public prepare и полный fixture N×3 PASS.
 - Этапы 0, 3.0 и 3.1 выполнены; single-case smoke, budget=0 и устойчивый readiness ledger реализованы.
-- Этап 3.2: infrastructure/judge recovery, retries, abandon, reconcile, execution budget и cleanup resolutions реализованы.
+- Этап 3.2 выполнен: infrastructure/judge recovery, retries, abandon, reconcile, execution budget и cleanup resolutions проверены.
 - Private v2 config должен закрепить readinessIssue на UUID LAB-32 до freeze; полный start gated.
-- Полный локальный suite после cleanup resolutions: 549 PASS/7 clean-host SKIP/0 FAIL; 556 тестов/48 файлов/2714 assertions.
-- Targeted 90 PASS/4 SKIP; concurrent/orphan admission 4 PASS; server helper+writer/registration 50 PASS/0 SKIP; typecheck PASS.
+- Полный локальный suite: 553 PASS/9 clean-host SKIP/0 FAIL; 562 теста/48 файлов/2732 assertions/547,25 с.
+- Targeted 96 PASS/6 SKIP + terminal reconcile 1 PASS; server helper+writer/registration 51 PASS/0 SKIP; typecheck PASS.
 - Единичный fixture CLEANUP_UNKNOWN не воспроизведён в 6 повторах и полном suite; причина не установлена.
 - Исходные bytes/failed cleanup/retry ошибки/verdict сохраняются; отдельный cleanup proof открывает продолжение без повтора продукта.
 - Deployment остаётся bfb7c62e4266e76c995a43b6f909d8a6739ce062; active config v1.
@@ -14,7 +14,7 @@
 - Multica EvalBaseline: eval-tests, gpt-6.1-sol/xhigh, concurrency=1, вне squad; Native MCP actor/auto Peer ранее PASS.
 - LAB-32 01a11ae4-fa45-79ce-aec6-edd7170dafc7; первоначальные instructions/evidence readback PASS.
 - LAB-31 Ben ACCEPT/Evaler completed/in_review; исходный чат idle/его монитор PAUSED.
-- Стенд/очереди/пять профилей ранее чисты; повторить перед активацией. Все 8 clean-host fixtures выполнены без skip (077d0b5b1).
+- Все 4 исполнителя idle/очереди пусты; lease отсутствует. Все 9 clean-host fixtures пройдены; чистоту повторить при активации.
 - Живые smoke и полный baseline не запускались; UNKNOWN автоматически не повторяется.
 - Карточку полного baseline создать и реально запустить на этапе 7; native heartbeat основного чата на этапе 8.
-- Далее: writer settlements для разных executions и cleanup resolution при stale executor; проверки, freeze, затем этапы 4–10.
+- Далее: закрепить финальный supplement, атомарно включить v2 и readback всех ролей; затем этапы 5–10.

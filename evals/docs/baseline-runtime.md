@@ -46,8 +46,7 @@ Chrome sandbox должен быть root:root 4755; фактическая гр
 
 Полная baseline-серия с сохранённым, но неизмеренным исходом удерживает стенд и возвращает
 `AWAITING_RECOVERY`. Допуск следующего slot и штатная фиксация release запрещены, даже если
-очистка ошибочного запуска подтверждена. Ошибки и расходы сохраняются; этап 3.2 плана ещё
-требует завершения проверок crash/concurrency и проверки восстановленной очистки на выделенном сервере.
+очистка ошибочного запуска подтверждена. Ошибки и расходы сохраняются. Получены положительные fixture-проверки crash/concurrency и восстановленной очистки на выделенном сервере.
 Smoke сохраняет собственный release после подтверждённой очистки, включая infra error;
 ошибка оставляет его readiness незавершённым и не разрешает автоматический повтор.
 После записанного release допуск нового измерения отклоняется как `SERIES_RELEASED`.
@@ -107,8 +106,8 @@ Judge `resume` запускает отдельный supervised worker и шта
 с результатом, ошибкой и временем и `judge/verdict-N.json`, если ответ получен. Успешный retry
 не скрывает предыдущую ошибку; отчёт учитывает время всех сохранённых вызовов. В экспорт входят
 receipts, все полученные verdict и связь восстановления,
-а process proof остаётся закрытым. Оставшиеся проверки crash/concurrency и выделенного сервера
-должны завершиться до live.
+а process proof остаётся закрытым. Проверки crash/concurrency и выделенного сервера пройдены;
+живые проверки установленного CLI и обоих smoke остаются отдельными обязательными этапами.
 
 `resolve-cleanup --series DIR --evidence RECOVERY_COMPLETION_JSON` фиксирует восстановленную
 очистку конкретного product execution после штатного `node-eval-ops recover`. В live helper
@@ -117,8 +116,12 @@ receipts, все полученные verdict и связь восстановл
 Команда не запускает модель и сохраняет отдельный immutable private proof. Исходные summary,
 cleanup.json и `record.cleanup=false` остаются неизменными; отчёт сохраняет первоначальную
 ошибку с признаком `cleanup_resolved`. Подтверждение открывает следующий кейс или восстановление
-судьи на прежнем артефакте; отсутствующее измерение качества оно не создаёт. UNKNOWN и executor
-guard запрещают команду. Private proof не входит во вложения Multica.
+судьи на прежнем артефакте; отсутствующее измерение качества оно не создаёт. По умолчанию
+executor guard запрещает команду. После разбора `resolve-cleanup --recover-executor` проверяет
+полную UID/PID/starttime/nonce identity умершего executor, принимает только доказанный сохранённый
+terminal run и валидный recovery receipt. Живой harness, неполная identity, UNKNOWN и drift
+запрещают разрешение. Guard не удаляется: его штатно закрывает последующий native resume после
+проверки стенда и harness. Private proof не входит во вложения Multica.
 
 `resume --recover-executor` использует тот же reconcile в fixture и live: проверяет private
 receipt PID/starttime/uid дочернего harness, подтверждает его завершение и принимает ровно один
@@ -144,6 +147,10 @@ Abandon не снимает блокировки и не служит замен
 первой мутации. Rich/Ben сохраняют один recovery на lease. EvalBaseline освобождает стенд через
 baseline-completion всех executions; отдельный recovery-completion не разрешает release.
 Фиксированные unit проверки под phase=unit сохраняют штатный unit completion.
+Writer settlement EvalBaseline хранит отдельный attestation по хэшу неизменяемого исходного
+cleanup receipt; разные исполнения под одним lease допускаются отдельно, копия/переименование
+того же исходного receipt не сбрасывает marker. Сам аварийный бюджет по-прежнему привязан к
+исходному launcher PID/starttime/uid. Rich/Ben сохраняют один writer settlement на lease.
 
 ## Доставка
 
