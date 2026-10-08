@@ -277,7 +277,8 @@ receipts до удаления собственного контейнера, н
 798 assertions**, typecheck PASS. Проверка настоящим pinned Node24.19.0 и
 поставленным producer журнала подтвердила сохранение bytes и redaction.
 Evidence с manifest: `skills-journals-20261008`. Live-интеграция коллектора ещё
-не выполнена; старый internal step попытки2 не восстановлен. В третьем цикле
+принята для Desktop3; CLI wiring ещё не принято. Старый internal step попытки2
+не восстановлен. В третьем цикле
 исходный FAIL порядка `readdir` сохранён, assertion исправлен сортировкой.
 
 Все13 scripts существующего loginom-eval-case скопированы в собственный
@@ -327,6 +328,43 @@ warm + два cold выполнения **PASS**: исходные bytes вос�
 ещё не закрыты. A/B требует доступа к выделенному стенду и выбранных до
 первого live smoke12–15 задач; судья, структура и cold replay обязательны.
 Этап9/full35 отложены вне текущей цели; серверная публикация сохраняется.
+
+## Desktop49: три warm построения и readonly cold отказ
+
+`openai-49-desktop-scenario-create-journals-20261008`: **3/3 warm PASS** на
+OpenAI6.1-sol medium, original CSV через настоящий Desktop transport,
+bundled activation/admission/import/SUM/save. Physical `.lgp` содержит нужные
+GUID/связь; native result Alpha35/Beta20 совпал с финальным ответом. Input
+неизменён, локальный cleanup/remaining0; журналы664/654/761 events и их SHA
+сохранены. Это не analytic A/B и не принятая полная Desktop cold-проверка.
+
+Первый cold с проверенными Desktop49 resources остановился **до execution**:
+`COLD_PACKAGE_NOT_WRITABLE`. Исходный whole FAIL сохранён в
+`cold-49-desktop-scenario-create-20261008`; bytes package/input неизменны,
+container removed/remaining0. Cleanup ожидал writable-пакет и получил
+`BLOCKED / PACKAGE_IDENTITY_CHANGED`; close/logout этим не подтверждены.
+Warm driver выполнял `application.close`, без отдельного server close/logout.
+Кто удерживает writer lock, не установлено; неизвестный owner не завершался.
+В warm saved-state marker `read_only:true` означает чтение состояния,
+а helper одновременно требует native `ReadOnly=false`; marker нельзя
+трактовать как readonly-пакет. Диагностика и три offline guard PASS сохранены.
+
+TDD negative guard теперь подтверждает закрытие **только своей свежей
+readonly-копии** и logout, без discard, node execution и снятия writer lock.
+Reader сохраняет `prepared.json` и исходный FAIL/error; readonly не считается
+cold PASS. RED на прежнем cleanup, GREEN на новом live negative receipt;
+`cold-49-desktop-readonly-guard-20261008` сохраняет оба и manifest.
+Итоговый suite **93 PASS, 0 FAIL, 801 assertions**, typecheck PASS.
+Product/runtime не менялись. Writer owner и cold всех трёх Desktop пакетов
+остаются открытыми; остальные cold-попытки после отказа не запускались.
+
+Configured native CLI49 scope теперь **PASS**:
+`cli-49b1584f2-scope-restart-native-v3`. Реальный public setup в собственном
+профиле, synthetic provider/model calls0; Help и browser validation выполнялись,
+их число не измерялось. Same-task automation denial, restart/fork new-user
+default и новая явная automation-команда с verified grant/digest подтверждены.
+Input unchanged, own uninstall/root removed/remaining0. Исторические
+unconfigured v1/v2 FAIL сохранены, Desktop-переходы этим не заменяются.
 
 Сохранённые полные CLI повторно проверены без пересборки: baseline `fc3d97dbf`
 по собственному frozen verifier, candidate `49b1584f2` по новому verifier и

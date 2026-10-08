@@ -444,12 +444,12 @@ LivePDF×3 отдельно CLI/Desktop: факты/механика/вёрст�
 Single-turn49:84 completed(14×3 each), docs33+/21− QA/30 default core answers;
 3 optional Desktop URLs invalid-specific/recorded. Outer143 retained/cleanup0.
 OS-opening4/4/TUI6/6/4PDF QA и headless live docs49/PDF2pages QA PASS/cleanup0.
-Native CLI669→49/DEB upgrade PASS; old Docker2/3 и180s FAIL сохранены; scope partial.
+CLI669→49/DEB upgrade/configured scope v3 PASS; old Docker2/3/180s FAIL сохранены.
 Cold planner:TDD10/reference35 offline PASS; reader:TDD4/final88 PASS/783/typecheck;
 own XML reference warm+2 cold PASS/oracle/cleanup0, own9 files archived/removed.
 Harness clean9d7b463c4:460 PASS/2 SKIP/typecheck; отдельный frozen worktree.
 A/B12–15 заранее выбранных задач ×3×2 с judge/structure/cold replay ещё открыт;
-CLI49 scenario-create attempts1,3 warm+cold PASS2/2; attempt2 FAIL/internal step unknown.
-Journal collector:TDD4/92 PASS/798/typecheck/producer probe; live/SSH/подмодель pending.
+CLI49 attempts1,3 warm+cold PASS;2 FAIL. Desktop3 warm PASS; cold readonly FAIL/owner unknown.
+Journal live Desktop3 PASS; readonly cleanup TDD/93 PASS/801/typecheck; SSH/подмодель pending.
 Этап9/full35 отложены/server skill retained; исходные server/client не переключались.
 [Отчёт](../testing/loginom-ai-agent/reports/2026-10-08-package-docs-live.md).

@@ -86,6 +86,7 @@ try {
     }),
   )
   state.prepared = prepared
+  await writeFile(join(args.output, "prepared.json"), JSON.stringify(prepared, null, 2) + "\n")
   if (
     prepared.status !== "READY" ||
     prepared.package_ref.path !== saved.path ||
@@ -204,8 +205,14 @@ try {
     join(args.output, "readback.json"),
     JSON.stringify({ ...result, status: "VALUES_VERIFIED_PROCESS_CLEANUP_PENDING" }, null, 2) + "\n",
   )
+} catch (error) {
+  const message = String(error?.message ?? "COLD_READER_FAILED")
+  const safe = secrets.some((secret) => message.includes(secret)) ? "COLD_READER_FAILED" : message
+  await writeFile(join(args.output, "result.json"), JSON.stringify({ status: "FAIL", error: safe }, null, 2) + "\n")
+  throw Error(safe)
 } finally {
   if (!state.closed && state.prepared?.status === "READY" && state.prepared.package_ref?.path === saved.path) {
+    const readOnly = state.prepared.workflow_ref.navigation_path.some((item) => item.label.endsWith("(только чтение)"))
     await execute(
       makePackageCleanupCode({
         sessionId: session,
@@ -215,7 +222,8 @@ try {
         loginomUrl: config.loginom_url,
         loginomBuild: "7.4.2",
         tabTid: state.prepared.workflow_ref.tab_tid,
-        diagnosticDiscard: true,
+        diagnosticDiscard: !readOnly,
+        diagnosticReadOnly: readOnly,
       }),
     )
       .then((result) => writeFile(join(args.output, "cleanup.json"), JSON.stringify(result, null, 2) + "\n"))

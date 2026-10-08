@@ -4447,6 +4447,16 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
+### 2026-10-08 — Desktop warm и readonly cleanup
+
+- Desktop49 scenario-create3/3 warm PASS: admission/import/SUM35/20/save/physical graph/input unchanged/local remaining0; internal journals664/654/761events preserved.
+- Первый cold FAIL readonly до execution; source/input bytes unchanged, container removed. Warm server close/logout не подтверждены, writer owner неизвестен.
+- TDD negative cleanup: RED прежний readonly BLOCKED; GREEN закрывает только свою fresh readonly copy/logout, не discard/execution/writer lock. Whole cold FAIL сохраняется.
+- Suite93 PASS/0 FAIL/801/typecheck; evidence `cold-49-desktop-readonly-guard-20261008`. Product/runtime не изменялись.
+- Configured CLI49 scope v3 PASS: same-task deny, restart/fork default/new automation slash; synthetic provider, real validation, own uninstall/remaining0. v1/v2 FAIL сохранены.
+- CLI manifests baselinefc/candidate49 повторно PASS, hashes неизменны. A/B12–15×3×2/stand/подмодель и gates5–8 открыты; stage9/server removal вне цели.
+- Следующий шаг: установить readonly holder/status exact own Desktop package, обеспечить server teardown будущих adapters; затем оставшаяся Linux матрица, independent clients и A/B.
+
 ### 2026-10-08 — сохранение внутренних receipts
 
 - CLI/Desktop acceptance копируют только `execution-events.jsonl` собственного профиля до его удаления; bytes и SHA256 сохраняются, auth/browser-profile не копируются.
