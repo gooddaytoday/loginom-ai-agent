@@ -43,7 +43,11 @@ def inspect(package, unpacked):
                                   "engine": engine.attrib, "columns": columns, "output_columns": output_columns,
                                   "inputs": {p.get("Guid"): p.get("Name") for p in item.findall("./InputPorts/Item")},
                                   "outputs": {p.get("Guid"): p.get("Name") for p in item.findall("./OutputPorts/Item")},
-                                  "variables": [v.attrib for v in item.findall("./Component/InputSockets/Item[@Name='ControlVariables']/Socket/Variables/Elements/Item")]})
+                                  "control_ports": [p.attrib for p in item.findall("./ServiceInputPorts/Item[@Name='ControlVariables']")],
+                                  "control_sockets": [p.attrib for p in item.findall("./Component/InputSockets/Item[@Name='ControlVariables']")],
+                                  "property_bindings": [p.attrib for p in item.findall("./Component/PropBinder/PropertyBindSavers/Item")],
+                                  "variables": [{**v.attrib, "default_value": d.attrib if (d := v.find("./DefaultValue")) is not None else {}}
+                                                for v in item.findall("./Component/InputSockets/Item[@Name='ControlVariables']/Socket/Variables/Elements/Item")]})
                 for item in workflow.findall("./Links/Item"):
                     source, target = item.find("SourcePort"), item.find("TargetPort")
                     if source is None or target is None:

@@ -1,0 +1,195 @@
+{
+  "version": 1,
+  "observations": [
+    {
+      "operation_id": "cross-bindings-001",
+      "recorded_at": "2026-10-08T10:24:12.020Z",
+      "node_crosstable": {
+        "verified": true,
+        "inventory_complete": true,
+        "state_source": "cached_crosstable_source_store",
+        "input_fields": [
+          {
+            "record_id": "499",
+            "index": 0,
+            "label": "Region",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "disposition": 2,
+            "order": 0,
+            "functions": 0,
+            "available_functions": 1934,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          },
+          {
+            "record_id": "500",
+            "index": 1,
+            "label": "Category",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "disposition": 1,
+            "order": 0,
+            "functions": 0,
+            "available_functions": 1934,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          },
+          {
+            "record_id": "501",
+            "index": 2,
+            "label": "Amount",
+            "type": "real",
+            "data_kind": "Непрерывный",
+            "disposition": 3,
+            "order": 0,
+            "functions": 3,
+            "available_functions": 2047,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          }
+        ],
+        "service_fields": [
+          {
+            "record_id": "502",
+            "index": 3,
+            "label": "Количество",
+            "type": "integer",
+            "data_kind": "Дискретный",
+            "disposition": 0,
+            "order": 0,
+            "functions": 2,
+            "available_functions": 2,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0,
+            "count": true
+          }
+        ],
+        "selected_available": [],
+        "selected_used": [
+          "501"
+        ],
+        "options": {
+          "pedDisplayNameSeparator": {
+            "value": ".",
+            "variable": {
+              "name": "CaptionSeparator",
+              "id": 2,
+              "type": 5,
+              "value": ".",
+              "selected_proxy_equal": true
+            },
+            "switch_pressed": true,
+            "disabled": false
+          },
+          "pedSlidingUniqueValues": {
+            "value": true,
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": false
+          },
+          "pedSlidingUniqueValuesLimit": {
+            "value": 1,
+            "variable": {
+              "name": "GroupLimit",
+              "id": 0,
+              "type": 4,
+              "value": 1,
+              "selected_proxy_equal": true
+            },
+            "switch_pressed": true,
+            "disabled": false
+          },
+          "pedUniqueValueNames": {
+            "value": true,
+            "variable": {
+              "name": "CategoryNames",
+              "id": 1,
+              "type": 1,
+              "value": true,
+              "selected_proxy_equal": true
+            },
+            "switch_pressed": true,
+            "disabled": false
+          }
+        },
+        "dialogs": [],
+        "settings_applied": false,
+        "node_context": {
+          "verified": true,
+          "document_id": "bd3ea775-4762-4200-9eca-3858326dbefb",
+          "workflow_id": "bd3ea775-4762-4200-9eca-3858326dbefb-1",
+          "node_id": "43c6846e-3081-4be7-8bac-3092f35fbecb",
+          "surface": "wizard",
+          "tid": "MF;TF-1;WizrdMCF"
+        }
+      },
+      "source": "loginom/runtime/generations/4/chats/94fbfba12d16f5ae831f9ebc6eb8a9ae7f8ceb60fe9961bc2b395445cc971fe4/attempts/8403bf21-a53c-4a69-b7ba-c71687301aa1/execution-events.jsonl",
+      "source_sha256": "bb2796982d73a1068ecd033f5429755fb0d23a8d53c702195206757fd7142e42",
+      "source_line": 628
+    }
+  ],
+  "local_variable_observations": [
+    {
+      "operation_id": "cross-bindings-001",
+      "internal_operation_id": "cross-bindings-001:n37",
+      "action_key": "node.crosstable.local_variables.internal",
+      "output": {
+        "status": "SUCCEEDED",
+        "verified": true,
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "node_context": {
+          "verified": true,
+          "document_id": "bd3ea775-4762-4200-9eca-3858326dbefb",
+          "workflow_id": "bd3ea775-4762-4200-9eca-3858326dbefb-1",
+          "node_id": "43c6846e-3081-4be7-8bac-3092f35fbecb",
+          "surface": "graph",
+          "tid": "MF;TF-1;Graph;CrossTable_bindings",
+          "locked": false
+        },
+        "variables": [
+          {
+            "id": 0,
+            "name": "GroupLimit",
+            "label": "GroupLimit",
+            "type": 4,
+            "value": 1,
+            "is_null": false
+          },
+          {
+            "id": 1,
+            "name": "CategoryNames",
+            "label": "CategoryNames",
+            "type": 1,
+            "value": true,
+            "is_null": false
+          },
+          {
+            "id": 2,
+            "name": "CaptionSeparator",
+            "label": "CaptionSeparator",
+            "type": 5,
+            "value": ".",
+            "is_null": false
+          }
+        ],
+        "changed": [
+          "GroupLimit",
+          "CategoryNames",
+          "CaptionSeparator"
+        ],
+        "settings_changed": true,
+        "settings_applied": true,
+        "draft_discarded": false
+      },
+      "source": "loginom/runtime/generations/4/chats/94fbfba12d16f5ae831f9ebc6eb8a9ae7f8ceb60fe9961bc2b395445cc971fe4/attempts/8403bf21-a53c-4a69-b7ba-c71687301aa1/execution-events.jsonl",
+      "source_sha256": "bb2796982d73a1068ecd033f5429755fb0d23a8d53c702195206757fd7142e42",
+      "source_line": 472
+    }
+  ]
+}
