@@ -4423,6 +4423,27 @@ Native CLI669→49 и offline DEB upgrade49 PASS: settings/history/user skill
 Cold planner offline reference compatibility35/35 PASS, source d5fb8031356e,
 planner a93a9471d. Это не server restoration/execution или candidate cold gate.
 
+### 2026-10-08 — CSV cold adapter и scoped Linux49 контроли
+
+Новый независимый `cold-export.mjs` проверяет фактический destination через UI
+до выполнения, подтверждает execution owner и требует от parent SHA свежего
+CSV до logout. Он не поставляется продуктом и не является model tool.
+Собственный XML reference: warm+2 fresh cold PASS/oracle/bytes unchanged,
+settingsReapplied=false, cleanup/remaining0; свои9 файлов сняты с SHA и удалены.
+Начальный surrogate ошибочно изменил только XML при сохранённом BIN;
+его исходные FAIL и ошибочный destination явно записаны, чужой CSV не удалён.
+Теперь mismatch guard отклоняет этот пакет до execution. TDD4 guard cycles,
+final suite88 PASS/783/typecheck; sandbox async capture18FAIL сохранён и
+локализован независимой диагностикой без изменения expectations.
+[Отчёт](reports/2026-10-08-package-docs-cold-adapter.md).
+
+CLI49 scope: same-task automation denial, restart/fork new-user default PASS;
+configured automation не достигнут в unconfigured profile, whole FAIL сохранён.
+Естественный CLI49 scenario-create: попытки1/3 warm PASS, попытка2
+imports.text/configure/UI_EPOCH_CHANGED FAIL; конкретный internal step неизвестен.
+Cold этих пакетов ещё открыт, кейс/общая матрица не приняты.
+[Живой журнал](reports/2026-10-08-package-docs-live.md).
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
@@ -4444,4 +4465,4 @@ planner a93a9471d. Это не server restoration/execution или candidate col
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI83 diagnostics/command/damage PASS, suite198 PASS/1 SKIP. Installed669 PTY6/6/PDF4 pages QA PASS, input unchanged/writer/Chromium/processes0; cold new-user resume resets docs→default, historical grant preserved, native PASS.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85/GUI2aa permissions/damage PASS; Desktop67 crash logging6 PASS/typecheck. Desktop669 clean HOME/workspace/PATHnone catalog/digests/integrity PASS, container/processes0; installed clean-discovery и permanent-rules подпункты8 закрыты, full live/lifecycle/evals открыты.
-- RESUMED 2026-10-08: frozen9d harness460 PASS/2 SKIP/typecheck, source snapshot35/113 checked; Linux49 CLI/Desktop5/5 each PASS. Single-turn84 completed(14×3 each), docs33+/21− QA and30 default core answers;3 optional Desktop URLs invalid-specific/recorded. Original/resume outer143 retained, own cleanup0. AppImage49 OS-opening4/4 PASS/calls0; installed TUI6/6 and4PDF/4pages QA PASS/writer/Chromium/processes0/uninstalled. Native CLI669→49 and offline DEB upgrade PASS/settings/history/user skill/cleanup0; old CLI Docker cleanup flaky2/3 and180s timeout retained. Headless live docs49/PDF2pages QA PASS/input unchanged/Chromium0. Cold planner TDD10/suite84 PASS/767/typecheck/reference35 offline and structural35 offline PASS; no server restore/execution. Historical669 FAIL retained. SSH stand/submodel pending; original server/client untouched. A/B72–90 needs freeze12–15; stage9/full35 deferred/server skill retained. Next: installed control transitions/cold adapter, own scenario runs; gates5–8 open.
+- RESUMED 2026-10-08: frozen9d harness460 PASS/2 SKIP/typecheck, source snapshot35/113 checked; Linux49 CLI/Desktop5/5 each PASS. Single-turn84 completed(14×3 each), docs33+/21− QA and30 default core answers;3 optional Desktop URLs invalid-specific/recorded. Original/resume outer143 retained, own cleanup0. AppImage49 OS-opening4/4 PASS/calls0; installed TUI6/6 and4PDF/4pages QA PASS/writer/Chromium/processes0/uninstalled. Native CLI669→49 and offline DEB upgrade PASS/settings/history/user skill/cleanup0; old CLI Docker cleanup flaky2/3 and180s timeout retained. Headless live docs49/PDF2pages QA PASS/input unchanged/Chromium0. Cold planner TDD10/reference35/structural35 offline PASS; CSV reader TDD4/final88 PASS/783/typecheck and own XML reference warm+2 cold PASS/oracle/cleanup0. Wrong XML/BIN fixture FAIL preserved/foreign CSV not removed; controls9 owned files archived/removed. CLI49 scope partial; scenario-create2/3 warm PASS, attempt2 UI_EPOCH_CHANGED FAIL/internal step unknown. Candidate cold/matrix still open. Historical669 FAIL retained. SSH stand/submodel pending; original server/client not stopped/switched. A/B72–90 needs freeze12–15; stage9/full35 deferred/server skill retained. Next: installed control transitions/cold adapter, own scenario runs; gates5–8 open.

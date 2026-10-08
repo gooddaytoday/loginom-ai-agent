@@ -237,6 +237,31 @@ installed ASAR и resource manifest совпали с candidate. Обе фазы
 их FAIL сохранены. Обновление обоих продуктов проверено; одновременная
 независимость Desktop/CLI остаётся отдельным открытым подпунктом этапа8.
 
+## Переходы scope и новое построение CLI49
+
+Два synthetic scope-контроллера сохранены с исходным whole `FAIL`.
+Проверенные части: `package-docs` действительно выполняет extract;
+активация automation в той же задаче отклоняется `LOGINOM_SCOPE_DENIED` без grant.
+После restart/new-user и fork/new-user восстановлен `default`, исторический
+activation не становится правами нового запроса. Remaining processes0.
+Новый `run --command loginom-automation` остановлен до provider с
+`LOGINOM_CONFIG_REQUIRED` в намеренно ненастроенном профиле; configured
+automation этой проверкой не принято. Live model/Help/Loginom calls0.
+Scoped QA и безопасный signal с manifest: `live-followup-49-20261008`.
+
+Новый естественный `scenario-create` через CLI49/OpenAI6.1-sol medium:
+**2/3 warm PASS, кейс не принят**. В попытках1/3 исходный CSV admitted,
+импорт и связанная группировка SUM дали Alpha35/Beta20; пакет действительно
+сохранён, структура и хэши зафиксированы, cleanup/remaining0. Их независимое
+cold выполнение пока не выполнено. Попытка2 честно завершилась без готового
+пакета: `imports.text/configure`, `NODE_APPLY_STOPPED → UI_EPOCH_CHANGED`.
+Child exit0 не заменяет внешний FAIL. Причина совпадает с pre-gesture epoch
+проверкой, но внутренний step journal не сохранён: конкретный field/action
+и воспроизводимость не установлены. Исходный отказ сохранён; новые модельные
+повторы не запускались. Для следующей диагностики нужно сохранить внутренние
+receipts до удаления собственного контейнера, не ослабляя runtime guards.
+Эти три попытки не входят в84 принятых single-turn и не являются analytic A/B.
+
 ## Независимый structural verifier
 
 Все13 scripts существующего loginom-eval-case скопированы в собственный
@@ -270,6 +295,17 @@ analytic reference.lgp: **35/35 PASS**, сохранены точные GUID э�
 evidence `cold-reference-plan-20261008`. Bindings получены из доверенных
 эталонных XML, а не receipts испытуемой попытки. Эта проверка не восстанавливает
 серверные файлы, не исполняет сценарий и не принимает candidate cold replay.
+
+CSV reader теперь проверяет фактический destination через UI до исполнения,
+а parent получает свежий output до logout. На собственном XML-only reference
+warm + два cold выполнения **PASS**: исходные bytes восстановлены без применения
+настроек, свежесть/CSV oracle/cleanup/remaining0 подтверждены. Девять файлов
+только своих контролей сняты с SHA и удалены; контейнеров не осталось.
+Первый fixture с заменой только XML и прежним BIN подготовлен неверно и сохранил FAIL;
+исходный destination CSV обнаружен и не удалён, прежние bytes неизвестны.
+Новый negative guard отклоняет это расхождение до исполнения.
+Это приёмка адаптера, не candidate cold/A/B.
+[Подробности](2026-10-08-package-docs-cold-adapter.md).
 
 Полная матрица Desktop/CLI/TUI, жизненный цикл, independent clients и A/B
 ещё не закрыты. A/B требует доступа к выделенному стенду и выбранных до
