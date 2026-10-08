@@ -269,3 +269,15 @@ Snapshot `formal-v7-progress-10-20261009.json`:10 terminal,6 PASS/4 FAIL;
 всего7 сохранённых пакетов. Controller81639 live, candidate formal/compare
 не запускались. Частичный индекс первых9 остаётся историческим snapshot,
 перед cold составить полный индекс обеих законченных сторон.
+
+## Formal v7: одиннадцатая попытка
+
+Risky-approved-claims#1 completed/score100/pass=true/oracle=true,
+environment/process cleanup confirmed. Структура и warm oracle отдельно PASS,
+request/plan cold сохранены. History4532entries/16837528archive bytes и
+diagnostics3entries/5188681bytes сохранены с full roundtrip.
+Snapshot `formal-v7-progress-11-20261009.json`:11 terminal,7 PASS/4 FAIL,
+8 сохранённых пакетов. Baseline81639 live; candidate formal/cold/compare pending.
+52 прежних confirmed closed архива перенесены на отдельный own local disk
+с сохранением исходных путей через links и проверкой receipts/readback;
+это не изменение результата кейсов или условий A/B.
