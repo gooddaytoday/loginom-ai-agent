@@ -383,3 +383,13 @@ PASS, группа workspace/persistence/cleanup/bridge PASS без измене
 Старые3 wrapper FAIL сохраняются; сегодняшнее наблюдение не устанавливает
 их причину. Предлагаемое изменение test isolation не внесено, поскольку RED
 поведение сейчас не воспроизведено.
+
+Provider growth v3 теперь классифицирован по messageID step_finish и unique
+callID каждой provider turn, без чтения reasoning. Evidence
+`ab-smoke-v3-provider-cost-20261008/review.json` с events SHA обеих сторон.
+Baseline17 vs candidate20: +1 skill activation, +1 bundled workflow.md read,
++1 separate describe/deliver provider turns (baseline делает два tool calls
+одной пачкой, candidate раздельно). Raw skill event повторяет один callID/partID;
+это не повторная активация. Unique tool calls17 vs19, Loginom calls13/13.
+Допуск1activation turn+1skill call неизменен; два других хода измеряются
+отдельно. Причинный эффект skill на batching одним smoke не доказывается.
