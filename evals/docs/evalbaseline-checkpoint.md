@@ -1,17 +1,19 @@
 # EvalBaseline — checkpoint 2026-10-08
-- Branch baseline-runtime; checkout /tmp/loginom-baseline-runtime, основной checkout сохранён.
-- Проверенный code SHA: 9b76a3b3b; operational source SHA фиксируется manifest поставки.
+- Branch baseline-runtime; checkout /tmp/loginom-baseline-runtime; основной checkout сохранён.
+- Проверенный code SHA: aa33e613e; deployment source SHA — в supplement manifest/readback.
 - Корпус: 44 кейса, три круга, 132 отдельных измерения repeat=1.
-- Executor, atomic journal/resume/check, config v2, общий lease и baseline completion готовы.
-- Отдельные regular/analytic/node, ошибки и расходы retries, compare, curated export.
-- Полный bun test: 457 PASS, 2 server-only SKIP, 0 FAIL; дополнительные baseline: 9 PASS.
-- bun typecheck PASS; source-only проверки не заменяют live-приёмку.
+- Executor/journal/resume/check, config v1/v2, общий lease и baseline completion реализованы.
+- Отдельные regular/analytic/node, ошибки/расходы retries, compare, curated export.
+- Финальный bun test: 460 PASS, 2 server-only SKIP, 0 FAIL; 462 теста/37 файлов.
+- bun typecheck PASS; Docker admission fixtures также 5 повторов/10 PASS с подтверждённой очисткой.
 - CLI 0.1.17 / fc3d97dbf695c2ed8dba942feb6fe83591a33944 установлен отдельно.
-- Manifest SHA256 6928473abd91329c4cf557d405f23865eab885176cd6596459c524f5f43c3ff1, 5389 файлов.
-- AppArmor установлен/parser exit 0; chrome-sandbox root:root 4755.
-- Собственный Loginom setup ready; история настройки архивирована, профиль clean.
-- Multica EvalBaseline 77032943-ad18-4ae9-a2c6-668769077c86, gpt-6.1-sol/xhigh, concurrency=1.
-- Runtime eval-tests, вне squad; продуктовые smoke и полный baseline не запускались.
-- Ограничения: deploy/config switch, native MCP и isolated native check ещё предстоят.
-- Unknown outcome требует ручного разбора/recovery и автоматически не повторяется.
-- Следующий шаг: server checks и ровно два smoke, Multica readback и доставка evidence.
+- Полный manifest SHA256 6928473abd91329c4cf557d405f23865eab885176cd6596459c524f5f43c3ff1: 5389 файлов PASS.
+- AppArmor установлен/parser exit 0; chrome-sandbox root:root 4755; собственный профиль clean.
+- Setup ready; его история в закрытом архиве; прежний CLI Rich/Ben сохранён.
+- Multica EvalBaseline 77032943-ad18-4ae9-a2c6-668769077c86: eval-tests, gpt-6.1-sol/xhigh, concurrency=1, вне squad.
+- Native MCP search PASS: actor, собственный checkout, automatic Git Peer; receipt source 44c7928bf.
+- Карточка LAB-32 [Baseline], baseline label; инструкции/три starters/API readback PASS.
+- Ограничение: Evaler по LAB-31 активен; общий config остаётся v1, supplement v2 только staged.
+- Остались activation всех исполнителей, server/native isolation checks и ровно два smoke; готовность неполная.
+- Живые smoke и полный baseline не запускались; unknown outcome автоматически не повторяется.
+- Следующий шаг: при FREE и пустой очереди выполнить activation/checks/smoke; evidence/readback — в LAB-32.

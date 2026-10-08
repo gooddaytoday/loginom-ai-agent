@@ -1,10 +1,10 @@
 # Операторские команды Evaler, Rich и Ben
 
-Команды запускаются из `evals/` собственного checkout, содержащего принимаемый код. Установка и воспроизводимость runtime описаны в [runbook](../2026-10-07-eval-tests-runtime.md); эта инструкция не назначает новую модельную попытку. Несекретный конфигурационный файл установлен оператором: `/home/user/.local/share/loginom-evals-runtime/operations/node-eval-ops.json`.
+Команды запускаются из `evals/` собственного checkout, содержащего принимаемый код. Общий helper после активации v2 берётся из единой закреплённой поставки `R/support/baseline-v2/evals/script/node-eval-ops.ts`, а не из авторского checkout; сначала проверить её manifest. До переключения сохраняется установленная operator-инструкция v1. Установка и воспроизводимость runtime описаны в [runbook](../2026-10-07-eval-tests-runtime.md); эта инструкция не назначает новую модельную попытку. Несекретный конфигурационный файл установлен оператором: `/home/user/.local/share/loginom-evals-runtime/operations/node-eval-ops.json`.
 
 ## Shared stand lease
 
-Конфигурация v1 фиксирует runtimeRoot, endpoint, точные container name/ID/storageDir, cliBin и отдельные rich/ben checkout, referenceProfile, evalProfile, workRoots, resultsRoot. Optional offline задаёт только checkout/workRoots/resultsRoot Evaler для чтения доставленных evidence; CLI-профилей у него нет. Helper проверяет канонические непересекающиеся пути и фиксирует digest конфигурации в lease. Несуществующий path, symlink или профиль внутри checkout/CLI-installation не исправлять автоматическим fallback. Несогласованный container ID не заменять текущим самостоятельно.
+Конфигурация v1 фиксирует runtimeRoot, endpoint, точные container name/ID/storageDir, cliBin и отдельные rich/ben checkout, referenceProfile, evalProfile, workRoots, resultsRoot. v2 добавляет отдельную eval-only роль evalbaseline, её evalProfile и cliBin; прежний global CLI и optional role cliBin Rich/Ben сохраняются. Helper читает обе версии. Очистка и admission v2 проверяют все пять профилей и общее хранилище. Baseline completion проверяет regular/analytic/node отдельно от полноты серии; порядок приёмки узлов остаётся прежним. Optional offline задаёт только checkout/workRoots/resultsRoot Evaler для чтения доставленных evidence; CLI-профилей у него нет. Helper проверяет канонические непересекающиеся пути и фиксирует digest конфигурации в lease. Несуществующий path, symlink или профиль внутри checkout/CLI-installation не исправлять автоматическим fallback. Несогласованный container ID не заменять текущим самостоятельно.
 
 Созданные исполнителем private receipts/sidecars хранятся в **собственном настроенном workRoots/resultsRoot**, вне checkout и профиля, с правами 0600. Внутренние completion/admission/recovery proofs helper создаёт в закрытом `R/operations/stand.lease/`. Receipt содержит секретный lease token: он не прикладывается к карточке или evidence archive. В комментарий допустимы owner/phase/SHA/acquiredAt и безопасный статус; путь private receipt служит recovery locator, не доказательством передачи результатов.
 
@@ -13,6 +13,7 @@
 ```sh
 R=/home/user/.local/share/loginom-evals-runtime
 CFG="$R/operations/node-eval-ops.json"
+OPS="$R/support/baseline-v2/evals/script/node-eval-ops.ts"
 ROLE=rich
 ISSUE='<current issue UUID>'
 TASK='<current worker task UUID>'
@@ -22,17 +23,17 @@ LEASE="$WORK/stand-lease.json"
 cd "$R/checkouts/$ROLE/loginom-ai-agent/evals"
 
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/bun" \
-  script/node-eval-ops.ts status --config "$CFG"
+  "$OPS" status --config "$CFG"
 
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/bun" \
-  script/node-eval-ops.ts acquire --config "$CFG" \
+  "$OPS" acquire --config "$CFG" \
   --issue "$ISSUE" --task "$TASK" --role "$ROLE" --phase eval --sha "$SHA" --receipt "$LEASE"
 
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/with-env" "$R/roles/$ROLE/eval.env" "$R/bin/bun" \
-  script/node-eval-ops.ts preflight --config "$CFG" --lease "$LEASE"
+  "$OPS" preflight --config "$CFG" --lease "$LEASE"
 
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/bun" \
-  script/node-eval-ops.ts unit --config "$CFG" --lease "$LEASE"
+  "$OPS" unit --config "$CFG" --lease "$LEASE"
 ```
 
 `--phase eval` охватывает весь этап исполнителя: unit → reference → cold → live → cleanup. Owner.sha остаётся первоначальным SHA при приобретении lease. Rich может изменить/закоммитить checkout; финальный runSha/READY SHA фиксируется отдельно и не подменяет identity lease. Ben работает на неизменном frozen SHA. Unit выполняет supervised `bun test` и `bun typecheck` в фиксированном checkout/evals, возвращает private completion proof и использует очищенное окружение. Пропускаются только PATH/HOME/locale/TMPDIR, proxy/Node proxy и явный fixture `EVAL_TEST_LOGINOM_IMAGE`; role EVAL defaults, LOGINOM/auth/Codex keys не наследуются. Role eval.env для unit не загружается. Unit не запускается одновременно с браузером/CLI/live. Сначала закрыть author browser, затем fresh node runner.
@@ -51,7 +52,7 @@ cd "$R/checkouts/$ROLE/loginom-ai-agent/evals"
 
 ```sh
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/bun" \
-  script/node-eval-ops.ts release --config "$CFG" --lease "$LEASE" \
+  "$OPS" release --config "$CFG" --lease "$LEASE" \
   --run '<own fresh run directory>' --ids '<assigned IDs comma separated>' \
   --run-sha '<full clean frozen SHA used by run>'
 ```
@@ -81,7 +82,7 @@ Nested paths остаются в своих workRoots/resultsRoot, а historyArc
 
 ```sh
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/with-env" "$R/roles/$ROLE/eval.env" "$R/bin/bun" \
-  script/node-eval-ops.ts release --config "$CFG" --lease "$LEASE" --evidence "$WORK/completion.json"
+  "$OPS" release --config "$CFG" --lease "$LEASE" --evidence "$WORK/completion.json"
 ```
 
 Неуспешный release сохраняет lease. Crash, завершённая задача Multica или мёртвый PID не являются разрешением его удалить. Evaler получает BLOCKED со связью issue/task/lease owner/incident/evidence, а не ложный READY.
@@ -90,7 +91,7 @@ Nested paths остаются в своих workRoots/resultsRoot, а historyArc
 
 ```sh
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/with-env" "$R/roles/$ROLE/eval.env" "$R/bin/bun" \
-  script/node-eval-ops.ts recover --config "$CFG" --lease "$LEASE" \
+  "$OPS" recover --config "$CFG" --lease "$LEASE" \
   --incident '<stable issue/task/failed-stage incident ID>' --evidence "$WORK/recovery-evidence.json"
 ```
 
@@ -101,7 +102,7 @@ Nested paths остаются в своих workRoots/resultsRoot, а historyArc
 Evaler проверяет доставленный archive и manifest по bytes, exact SHA, список кейсов, cleanup и models. Затем использует существующий валидатор на полученных evidence — без новых sessions и без перезаписи исходных результатов:
 
 ```sh
-bun script/node-eval-ops.ts check-run --config "$CFG" \
+bun "$OPS" check-run --config "$CFG" \
   --run '<verified delivered run directory>' --ids '<assigned IDs comma separated>' \
   --tasks '<exact frozen checkout>/evals/tasks/node-evals'
 
@@ -143,3 +144,13 @@ Report имеет native comment ID, issue/task, phase rich|ben, actual full SHA
 Personal templates `evaler.md`, `rich.md`, `ben.md` публикуются как полные активные инструкции; `squad.md` — leader-only briefing. Вместе с контрактом/операторской инструкцией они входят в отдельный новый nonsecret immutable operational supplement с SHA256 manifest. Это заменяет старые route/status/runtime override правила, а не редактирует прежний archive. Дополнительные reference/eval env и auth Evaler не создаются.
 
 Перед переключением read-only проверить очередь/процессы/stand и отсутствие pending cleanup. Обновить настройки без запуска; readback whitelist model/thinking/concurrency/runtime/leader/members/instruction hash. Не печатать raw MCP env. До следующего user-prepared node pilot корректная формулировка — «настроено и проверено статически». LAB-16, аналитический baseline и model smoke автоматически не запускаются.
+
+## Активация baseline v2
+
+Переключение выполняет оператор только при FREE, отсутствии active/queued задач всех
+четырёх исполнителей, harness lease, pending recovery и остатков профилей/storage.
+Сначала подготовить immutable supplement и private backup v1; затем атомарно заменить
+config и явно переключить operator entrypoint в инструкциях Multica и runtime.md
+Rich, Ben, Evaler и EvalBaseline. API readback проверяет helper/source manifest и прежние
+model/runtime/concurrency/squad. Исходные checkout, корпус, продуктовые настройки
+и полный порядок приёмки Rich/Ben сохраняются. Подробности: ../baseline-runtime.md.
