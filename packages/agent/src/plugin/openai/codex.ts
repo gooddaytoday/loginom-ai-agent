@@ -6,6 +6,7 @@ import { standaloneCancellation } from "../../cli/standalone-cancellation"
 import os from "os"
 import { setTimeout as sleep } from "node:timers/promises"
 import { createServer } from "http"
+import { debuglog } from "node:util"
 import { OpenAIWebSocketPool } from "./ws-pool"
 import { OauthCallbackPage } from "@loginom-ai-agent/core/oauth/page"
 
@@ -16,6 +17,8 @@ const OAUTH_PORT = 1455
 const OAUTH_POLLING_SAFETY_MARGIN_MS = 3000
 const ALLOWED_MODELS = new Set(["gpt-5.5", "gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini"])
 const DISALLOWED_MODELS = new Set(["gpt-5.5-pro"])
+// Opt-in stage markers contain no credentials, request bodies, or response payloads.
+const diagnostic = debuglog("loginom-codex")
 
 interface PkceCodes {
   verifier: string
@@ -395,6 +398,7 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
               ].filter((value): value is AbortSignal => !!value),
             )
             signal.throwIfAborted()
+            diagnostic("auth.begin")
             const currentAuth = {
               ...(shared
                 ? await SharedAuth.refresh(
@@ -417,6 +421,7 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
                 : await getAuth()),
             }
             signal.throwIfAborted()
+            diagnostic("auth.ready")
             if (currentAuth.type !== "oauth")
               return websocketFetch ? websocketFetch(requestInput, init) : fetch(requestInput, init)
             const authWithAccount = currentAuth as typeof currentAuth & { accountId?: string }
@@ -488,8 +493,18 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
               headers,
               ...(shared && { signal }),
             }
-            if (websocketFetch && parsed.pathname.endsWith("/responses")) return websocketFetch(url, requestInit)
-            return fetch(url, OpenAIWebSocketPool.withoutInternalHeaders(requestInit))
+            if (websocketFetch && parsed.pathname.endsWith("/responses")) {
+              diagnostic("dispatch.websocket")
+              return websocketFetch(url, requestInit)
+            }
+            diagnostic(
+              "dispatch.http bodyBytes=%d",
+              typeof requestInit.body === "string" ? Buffer.byteLength(requestInit.body) : 0,
+            )
+            return fetch(url, OpenAIWebSocketPool.withoutInternalHeaders(requestInit)).then((response) => {
+              diagnostic("response.headers status=%d", response.status)
+              return response
+            })
           },
         }
       },

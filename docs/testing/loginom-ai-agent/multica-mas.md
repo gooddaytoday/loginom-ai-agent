@@ -63,10 +63,13 @@ firewall вместе. Проверка остановки VPN после это
 Перед правками сохранены закрытые backups в /root/mas-loginom-vpn-20261008 и
 /root/mas-multica-vpn-20261008. Конфиги/backup с секретами не публиковать.
 
-Защита повторной попытки ещё не квалифицирована: штатный flock отдельного аккаунта должен
+LAB44 подтвердил защиту повторной попытки: штатный flock отдельного аккаунта должен
 охватывать CLI/browser и cleanup; имя lock задаёт Loginom username, не task slot.
 Не удалять постоянный lock inode и не снимать неопределённый результат по возрасту.
-Проверить повтор/отмену с работающим дочерним процессом в реальной квалификации.
+В реальной проверке после SIGKILL supervisor работающие CLI/Host/browser удерживали
+унаследованный lock; повтор и cleanup были запрещены. После подтверждённого
+завершения процессов и точного server cleanup допускается новый профиль; старый
+writer остаётся AMBIGUOUS/retired и не удаляется.
 Закрытие браузера может оставить disconnected server session до истечения её
 срока жизни; это не доказательство logout. В [Диспетчере](https://help.loginom.ru/userguide/admin/dispatcher.html)
 команда «Закрыть» удаляет выбранную сессию. Сначала подтвердить её принадлежность
@@ -91,22 +94,30 @@ Ubuntu требует стандартную подготовку sandbox из .
 Linux CLI сохраняет XDG_CONFIG_HOME для системного proxy, но XDG_CACHE_HOME и
 XDG_RUNTIME_DIR принадлежат guarded profile. Это не меняет native Codex/Multica.
 
+Завершённую карточку повторно запускают штатным `multica issue rerun <UUID>`.
+Изменение статуса или того же исполнителя само по себе не запускает новую попытку.
+Зависший native run отменяют `multica issue cancel-task <taskUUID>` после проверки
+его собственных процессов и возможных эффектов; daemon целиком не перезапускают.
+
 ## Checkpoint — 08.10.2026
 
-- Client base loginom@f9bf332cc; PR40 draft, installed 3bcf645a7, 0.0.0-dev-202610081223.
-- Current archive SHA256 fbc00a5f436aae6a46c9b139e030101f1b97f87903b5552c4c56fbeadb0ea20c; clean source/manifest/roundtrip verified.
+- Client base loginom@f9bf332cc; PR40 draft, installed 66f0956bc, 0.0.0-dev-202610081319.
+- Current archive SHA256 b9eeaecd52e2b1094127d5430408fd466b2694a50db755b33190f7e3c04304b7; clean source/manifest/roundtrip verified.
 - Native mas daemon argv=8; три role runtime привязки/caps 1/8/8 и instructions API-readback PASS.
-- WatchDog исключён из сквада, агент/история сохранены; Eval не менялся.
-- GitHub resource f9bf332cc; штатный чистый checkout LAB27 PASS.
+- WatchDog membership removed/history preserved; Eval untouched; GitHub f9bf332cc / LAB27 checkout PASS.
 - Bun1.3.14, Node24.19.0, Chromium1243 hashes совпали с pins; Linux проверки exact bd4951803: 133 PASS, 0 FAIL/skip.
 - Localhost browser/installed CLI rejection sandbox+cleanup PASS; независимый source/runtime LAB28 PASS.
 - LAB24/25 cancelled, wakeups отсутствуют; LAB29 LGD / LAB30 XLSX Backlog, 0 запусков.
-- lgd-research/xlsx-research созданы от f9bf332cc; Stage0 criteria сохранены, старый PASS не перенесён.
 - Свежий отдельный ChatGPT login PASS; shared auth.json regular/nonlinked0600, dir0700, uncertainty отсутствует.
 - HTTPS app/MCP restored; authenticated MCP initialize/tools-list PASS, certificate verification enabled.
 - Generator LAB33: пары LAB29/30 ready; identity/nonadmin/sandbox/logout/server inventory/cleanup PASS; ранний AMBIGUOUS сохранён.
 - Direct HTTPS VPN exceptions app/MCP/Multica, DNS/routes/firewall/services/native CLI PASS; pinned IPv4 требуют обновления при смене DNS.
 - LAB34–41 — восемь model fixtures; LAB42 — queue9; LAB43: 16 identities ready/login/logout и Dispatcher zero PASS до fixtures; ранние AMBIGUOUS сохранены.
-- Первая подготовка LAB34–41 остановлена до модели: Loginom preflight/ошибки fixture supervisors; model calls=0, история сохранена.
 - Исправление password focus 3bcf645a7: readonly воспроизведён, явный focus дал live login/logout PASS; 5 tests и 32 pre-push typechecks PASS.
+- LAB44: installed setup/check и SIGKILL account/profile guard PASS; старые AMBIGUOUS/writer сохранены.
+- Round2: три полных модельных ответа из восьми; пересечение восьми streams FAILED, cleanup проходит независимую сверку.
+- Queue9: восемь Workers running, девятая Reviewer queued/null; стартовала после освобождения слота, независимая сверка продолжается.
+- Source 66f0956bc: explicit WEBSOCKETS=false теперь действует на dev; 39 tests/32 typechecks PASS, Linux build/installed candidate PASS; round3 FAILED по180sec без model replies; причины исследуются.
+- Round3: восемь simultaneous CLI/false flag/shared dir/inherited Loginom flocks PASS; реальные completed model streams отсутствуют.
+- Отдельные tiny API и source SDK probes completed за1.3/1.5sec; shared-plugin usage GET200/0.6sec; это не CLI acceptance.
 - Общая готовность восьми потоков не объявлена; node acceptance/merge/release NOT_RUN.
