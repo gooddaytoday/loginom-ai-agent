@@ -5,9 +5,16 @@
 WatchDog исключён из сквада; его агент и история сохранены. Сквад Eval не меняется.
 
 Runtime Codex (mas): 24aa980b-b8c3-43e2-b087-bad8f79c9517.
-По подтверждению владельца config max_concurrent_tasks=8 и daemon restart
---max-concurrent-tasks 8 выполнены. Служебный preflight LAB-27 подтвердил argv=8,
-Ubuntu26.04 x64/glibc2.43, Multica0.6.1, Codex0.160.1. Caps ролей 1/8/8 API-readback PASS.
+Текущий общий предел daemon — 12 задач: 08.10.2026 в 22:52 MSK штатные
+config set max_concurrent_tasks 12 и daemon restart --max-concurrent-tasks 12 выполнены.
+Обратное чтение config=12 и argv нового daemon=12 PASS; тот же runtime online.
+mas: 12 logical CPU, RAM30863MiB/available29569MiB, swap0, load0.07/0.02/0.00,
+391GiB свободно на диске (снимок без нагрузки перед изменением).
+Caps ролей 1/8/8 сохранены; инструкции трёх агентов обновлены partial PUT/readback,
+остальные настройки сохранены. Это ёмкость агентов, не отдельный лимит CLI.
+Прежние preflight LAB-27 и round4 выполнены при cap8; 12 одновременных задач
+и первые реальные обработки при новом cap — NOT_RUN. LGD/XLSX остаются Backlog.
+Ubuntu26.04 x64/glibc2.43, Multica0.6.1, Codex0.160.1.
 Общий daemon cap учитывает все роли; одна задача имеет максимум один внутренний
 модельный прогон одновременно. Дополнительных очередей/брокеров/semaphore нет.
 
@@ -127,13 +134,13 @@ LAB38 options cleanup независимо PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 
 LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_ABSENCE: native01a11c9f-2c17-750a-82a5-ee9997bc4917, private evidence-private/vpn-fixed-diagnostic-recovery.json. Независимый cleanup LAB40/LAB41: native01a11caf-dbd6-785c-94cd-4f674ea67ed6; ожидаемый private evidence-private/final-diagnostics-recovery.json. Cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_ABSENCE для обеих точных попыток; оригинальные guards/results сохранены до отдельного forward recovery. Все старые профили, результаты и записи попыток сохраняются.
 
-## Checkpoint — восемь потоков mas приняты, 08.10.2026
+## Checkpoint — daemon12, квалифицированы восемь CLI-потоков, 08.10.2026
 
 - PR40 draft → loginom; shared-oauth source basis f9bf332cc491baa784e6e04fdfda7c0f09151cb7. Merge/release NOT_RUN; проверенный artifact не получает PASS новых merge SHA.
 - Installed source597592f5d53f86beb69ffe318af2d4db52c5f416/version0.0.0-dev-202610081651, Linux x64/glibc; executable+manifest shared-oauth-v1;5678 file checksums PASS.
 - Archive SHA2561aa667f7d34bc066b7fb7e3c52f69f0b7db0f042351f9aedde6cf36afcf1dbaa; source/manifest/build/archive roundtrip PASS; replacement штатный, OAuth/profile history сохранены.
 - Exact597 на mas: Agent118/Host6/Product3/runtime5=132 tests PASS/0FAIL, Agent/Host/Product typechecks PASS (Bun1.3.14/Node24.19); docs-only pre-push32 PASS.
-- mas daemon cap8 включает все роли; Generator/Worker/Reviewer runtime24aa980b-b8c3-43e2-b087-bad8f79c9517/caps1/8/8; WatchDog excluded, Eval unchanged; API partial updates/readback PASS.
+- mas daemon cap12 подтверждён config/argv после штатного restart без активных задач; нагрузка12 NOT_RUN; Generator/Worker/Reviewer runtime24aa980b-b8c3-43e2-b087-bad8f79c9517/caps1/8/8; WatchDog excluded, Eval unchanged; API partial updates/readback PASS.
 - Round4 LAB34–41:8/8 full CLI exit0/positive usage, gpt-5.6-sol/low, one CLI model run each; eight distinct profiles/Loginom identities/package --dir outsideGit, one shared CLI OAuth directory.
 - Independent local step_start→step_finish overlap3464ms:1791484322488–1791484325952; native queue9 queued/null при running8 и starts при первом освобождении; timestamp precision limitations retained.
 - Reviewer01a11cce-729b-7735-9a1b-b848e2c9513f completed; private lab-44-b848e2c9513f/workdir/evidence-private/round4-independent-acceptance.json: PASS_WITH_EXPLICIT_OBSERVABILITY_LIMITS.
@@ -145,4 +152,4 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 - First supplied Trojan installed; parallel comparison first8/8 vs second1/8; VPN-down/physical publicIPv4+IPv6 blocked/recovery PASS. Old185 endpoint retained only for deliberate rollback; private config backups outside Git.
 - New LGD LAB29/XLSX LAB30 and lgd-research/xlsx-research fast-forward to current loginom0ca9e75bc7bb6897f46ac1ddc880b9758e993dc9; source change only attachments, Stage0 criteria preserved.
 - LGD/XLSX Backlog0, pairs ready via Generator, manual assignment only; no PR38/39 continuation, Stage0/full node acceptance NOT_RUN. Node profiles/accounts/branch/evidence independent.
-- Next: manually assign LGD/XLSX or other node cards. New shared-oauth build/merge requires new exact artifact qualification; merge/release remain owner commands.
+- Next: вручную назначить LGD/XLSX или другие узлы и наблюдать CPU/RAM/очередь/ошибки при cap12; испытание12 NOT_RUN. New shared-oauth build/merge requires new exact artifact qualification; merge/release remain owner commands.
