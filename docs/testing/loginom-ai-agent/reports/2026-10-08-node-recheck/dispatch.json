@@ -268,5 +268,13 @@
     },
     "account_qualification": "Generator reports both ready/identity/permissions/logout/process and calibrated server absence PASS",
     "model_node_acceptance": "NOT_RUN"
-  }
+  },
+  "observation_reports": [
+    {
+      "path": "catalogue-refresh.json",
+      "event": "stale bundled catalogue recovered via stock refresh; same-card native continuation",
+      "latest_card_snapshot_path": "catalogue-refresh.json#/current_snapshot",
+      "acceptance": "NOT_RUN"
+    }
+  ]
 }

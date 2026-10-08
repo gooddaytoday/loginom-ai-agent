@@ -23,23 +23,23 @@
 
 До использования Генератор проверяет установленный launcher, version/source/capability, manifest и файлы, актуальный daemon cap и ресурсы mas, затем создаёт собственную пару worker/reviewer штатным accounts-only provisioning. Пара проходит ready/identity/permissions/cleanup. Каждый исполнитель и ревьюер использует отдельные checkout, кандидат, пустой профиль CLI, каталог пакетов вне Git, Loginom account, Host/browser и evidence. Общий OAuth остаётся отдельным; старый пул не используется.
 
-Итог — самостоятельное создание, настройка, выполнение и сохранение сценария через Loginom CLI, независимый модельный прогон на том же clean published SHA и предусмотренный подпланом cold reopen. Модель получает только задание и входы; oracle/expected/история дефектов остаются вне её контекста. Требуются полная матрица, адресные регрессии, проверенные значения/типы/схема/граф, порядок там, где он обещан, подтверждения `package_closed=true`/`logged_out=true` и cleanup. Снимки ресурсов и provider errors сохраняются в приватных доказательствах; API queue не доказывает отсутствие дочерних процессов.
+Цель волны — улучшить надёжность самостоятельного построения реальных аналитических сценариев Loginom агентом. Итог — самостоятельное создание, настройка, выполнение и сохранение сценария через Loginom CLI, независимый модельный прогон на том же clean published SHA и предусмотренный подпланом cold reopen. Модель получает только задание и входы; oracle/expected/история дефектов остаются вне её контекста. Требуются полная матрица, адресные регрессии, проверенные значения/типы/схема/граф, порядок там, где он обещан, подтверждения `package_closed=true`/`logged_out=true` и cleanup. Снимки ресурсов и provider errors сохраняются в приватных доказательствах; API queue не доказывает отсутствие дочерних процессов.
 
 Адресный дефект исправляется в той же карточке, затем выполняется новая итоговая попытка с новым UUID/профилем. Прежние попытки и неизвестные эффекты сохраняются. Общий дефект, новые критерии, нехватка доступа или три последовательные попытки без прогресса — конкретный вопрос владельцу. Checkpoint каждой карточки — не более 20 строк; итоговый статус требует независимой приёмки.
 
-## Checkpoint запуска
+## Checkpoint наблюдения — 09.10.2026
 
-- SHA исходников восьми веток: `4e626d547258e9ae7c0b7937cd672781dde0667e`; remote refs опубликованы и проверяются перед dispatch.
-- LAB45–52 созданы и обратно прочитаны; все назначены существующему скваду, восемь узлов/один этап на карточку.
-- Инструкции Stage0/handoff уточнены без изменения критериев, runtime/caps/model/MCP сохранены; Eval unchanged.
-- LAB45: пара worker/reviewer готова с identity/permissions/logout/process/calibrated server absence; handoff comment `01a11d44-b8c9-76ea-b676-51d8c3686284`.
-- LAB45 Worker task `01a11d44-b8f8-7b36-a6b3-93fbb28a1cf2` running на mas в собственной native задаче после Генератора.
-- Живой preflight LAB45 PASS: installed source597/version0.0.0-dev-202610081651/shared-oauth-v1;5678/5678 hash/lstat/link/inventory; daemon argv/config12, caps1/8/8.
-- [Доказательства dispatch/preflight](reports/2026-10-08-node-recheck/dispatch.json): attachment скачан, SHA256ceebd7c7bc0edcebe6473bb1ccf1960308948729800296344ec9ecb6212e83d3; первый ошибочный stat-mode diagnostic сохранён.
-- mas live: CPU12, availableRAM28774MiB, load0.15/0.04/0.01, disk390.47GiB; это preflight без полной нагрузки.
-- Наблюдение в этом чате включено каждые5мин через штатный heartbeat Codex; Multica scheduler/очередь не меняются, уведомления только при существенном изменении.
-- Перепроверка узлов, итоговые модельные попытки и cold reopen этой волны — NOT_RUN.
-- LGD LAB29/XLSX LAB30 Backlog; PR40 draft/open; merge/release NOT_RUN.
-- Все восемь Generator dispatch приняты; LAB45 уже передана Worker, остальные обрабатываются Генератором по штатной очереди cap1.
-- Исправлена ошибочная запись ancestry0ca→4e: подтверждён merge-basef9; исходные ветки/SHA не менялись.
-- Следующий шаг: принять живой preflight и наблюдать передачу Генератор → Исполнитель → Ревьюер, ресурсы, provider errors и cleanup.
+- Исходный SHA восьми веток `4e626d547258e9ae7c0b7937cd672781dde0667e`, common basef9; current loginom0ca не включён.
+- LAB45: draft PR42 → shared-oauth, clean published `a00b0203026f7719f10403bfc4fa02810aa8502e`; изменён только calculator acceptance-комплект.
+- Первая попытка LAB45 остановлена до model run: старый snapshot не содержит назначенную модель; report/manifest скачаны и hashes согласованы.
+- История попытки98556be8/state-lock сохранена; новый Worker run01a11d55-25fc-7c39-a4b8-a13b0dfc870a возобновлён на том же опубликованном SHA.
+- Штатный refresh на mas показал назначенные model/variant после OAuth filtering; метаданные текущего каталога независимо прочитаны наблюдателем.
+- Центральный squad preflight уточнён/readback PASS: реальный fetch/cache/hash/mtime/stderr, а не только надпись refreshed/exit0; без замены модели/общего sourcefix.
+- LAB46 Generator completed; ready/accounts/cleanup/catalogue receipts скачаны, hash manifest совпал; Worker01a11d57-4c99-7a8d-9cb9-e2f2984ec683 running.
+- LAB47–52: временно отменённые до запуска ожидания сохранены; штатные Generator mentions восстановили очередь в тех же шести карточках.
+- [Доказательства текущего наблюдения](reports/2026-10-08-node-recheck/catalogue-refresh.json); отсутствие прежнего каталога не доказывает отказ провайдера.
+- Полная приёмка восьми узлов/независимый Reviewer/cold reopen NOT_RUN; каталог и helper tests не дают PASS.
+- Цель — самостоятельные реальные сценарии; oracle/expected/history defects вне контекста модели, после адресного исправления новая итоговая попытка.
+- mas receipt21:05:20UTC: CPU12, availableRAM29904904KiB, disk416052633600bytes, load0.004/0.094/0.163; own Generator processes/server/locks cleanup подтверждены receipt; нагрузка12 NOT_RUN.
+- LAB29/LAB30 Backlog; heartbeat ACTIVE; PR40/PR42 не сливались, выпуск NOT_RUN.
+- Следующий шаг: наблюдать Worker LAB45/46, подготовку LAB47–52, фактические model settings/provider ошибки и полную независимую приёмку на том же SHA.

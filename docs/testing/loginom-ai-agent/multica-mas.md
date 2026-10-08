@@ -156,22 +156,19 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 - LGD/XLSX Backlog0, pairs ready via Generator, manual assignment only; no PR38/39 continuation, Stage0/full node acceptance NOT_RUN. Node profiles/accounts/branch/evidence independent.
 - Next: вручную назначить LGD/XLSX или другие узлы и наблюдать CPU/RAM/очередь/ошибки при cap12; испытание12 NOT_RUN. New shared-oauth build/merge requires new exact artifact qualification; merge/release remain owner commands.
 
-## Checkpoint — восемь перепроверок реализованных узлов, 08.10.2026
+## Checkpoint — восемь перепроверок реализованных узлов, 09.10.2026
 
-- Владелец назначил восемь карточек; [границы и ветки](multica-node-recheck.md). Это Stage0 перепроверки принятых обработчиков, не discovery LGD/XLSX.
-- Исходный SHA восьми отдельных remote веток: `4e626d547258e9ae7c0b7937cd672781dde0667e`; общая база `f9bf332cc491baa784e6e04fdfda7c0f09151cb7`; current loginom0ca содержит два отдельных новых коммита, отсутствующих в4e.
-- LAB45 calculator, LAB46 field-parameters, LAB47 row-filter, LAB48 grouping, LAB49 sorting, LAB50 join, LAB51 union, LAB52 replacement.
-- PR узлов: draft → shared-oauth; PR40 draft → loginom остаётся открытым, merge/release NOT_RUN.
-- Текущие API readback: mas online, тот же runtime; Генератор/Исполнитель/Ревьюер caps1/8/8, активных старых задач этих ролей перед запуском нет.
-- Центральная настройка CLI в скваде сверена с назначением владельца; concrete model/variant не копируются в подпланы/регламенты/карточки, фактические значения — в evidence.
-- Уточнены Stage0 и последовательный native handoff в существующих инструкциях; partial PUT/readback PASS, native model/MCP/runtime/caps сохранены; Eval unchanged.
-- LAB45 Generator подтвердил exact4e/clean и готовность пары с identity/permissions/logout/process/calibrated server absence; handoff `01a11d44-b8c9-76ea-b676-51d8c3686284`.
-- LAB45 Worker task `01a11d44-b8f8-7b36-a6b3-93fbb28a1cf2` running на mas в отдельной native задаче.
-- Живой preflight LAB45 PASS: source597/version0.0.0-dev-202610081651/shared-oauth-v1,5678/5678 hash/lstat/link/inventory, daemon argv/config12, caps1/8/8; доступны28774MiB RAM/390.47GiB disk, load0.15.
-- Receipt LAB45 скачан/прочитан; [dispatch evidence](reports/2026-10-08-node-recheck/dispatch.json) закрепляет hash и центральные configured CLI settings отдельно от фактических прогонов.
-- Наблюдение в этом чате каждые5мин, только существенные уведомления; Multica scheduler/очередь не менялись.
-- Приёмка узлов, независимые модельные итоги и cold reopen этой волны NOT_RUN; нагрузка12 NOT_RUN.
-- LAB29/LAB30 Backlog, старые attempts/evidence/profiles сохраняются; чужие локальные reports не изменялись.
-- Все восемь Generator dispatch приняты на mas; LAB45 передана Worker, остальные идут по штатной очереди cap1; роли в карточке последовательны.
-- Исправлена ошибочная ancestry-запись в карточках; проверен merge-basef9, исходные remote ветки не менялись.
-- Следующий шаг: завершить preflight и наблюдать штатную очередь, передачу ролей, ресурсы, provider errors и cleanup.
+- Исходный SHA восьми веток `4e626d547258e9ae7c0b7937cd672781dde0667e`, common basef9; current loginom0ca не включён.
+- LAB45: draft PR42 → shared-oauth, clean published `a00b0203026f7719f10403bfc4fa02810aa8502e`; изменён только calculator acceptance-комплект.
+- Первая попытка LAB45 остановлена до model run: старый snapshot не содержит назначенную модель; report/manifest скачаны и hashes согласованы.
+- История попытки98556be8/state-lock сохранена; новый Worker run01a11d55-25fc-7c39-a4b8-a13b0dfc870a возобновлён на том же опубликованном SHA.
+- Штатный refresh на mas показал назначенные model/variant после OAuth filtering; метаданные текущего каталога независимо прочитаны наблюдателем.
+- Центральный squad preflight уточнён/readback PASS: реальный fetch/cache/hash/mtime/stderr, а не только надпись refreshed/exit0; без замены модели/общего sourcefix.
+- LAB46 Generator completed; ready/accounts/cleanup/catalogue receipts скачаны, hash manifest совпал; Worker01a11d57-4c99-7a8d-9cb9-e2f2984ec683 running.
+- LAB47–52: временно отменённые до запуска ожидания сохранены; штатные Generator mentions восстановили очередь в тех же шести карточках.
+- [Доказательства текущего наблюдения](reports/2026-10-08-node-recheck/catalogue-refresh.json); отсутствие прежнего каталога не доказывает отказ провайдера.
+- Полная приёмка восьми узлов/независимый Reviewer/cold reopen NOT_RUN; каталог и helper tests не дают PASS.
+- Цель — самостоятельные реальные сценарии; oracle/expected/history defects вне контекста модели, после адресного исправления новая итоговая попытка.
+- mas receipt21:05:20UTC: CPU12, availableRAM29904904KiB, disk416052633600bytes, load0.004/0.094/0.163; own Generator processes/server/locks cleanup подтверждены receipt; нагрузка12 NOT_RUN.
+- LAB29/LAB30 Backlog; heartbeat ACTIVE; PR40/PR42 не сливались, выпуск NOT_RUN.
+- Следующий шаг: наблюдать Worker LAB45/46, подготовку LAB47–52, фактические model settings/provider ошибки и полную независимую приёмку на том же SHA.

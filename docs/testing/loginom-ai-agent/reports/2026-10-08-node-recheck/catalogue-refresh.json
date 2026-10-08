@@ -1,0 +1,921 @@
+{
+  "observed_at": "2026-10-08T21:08:21.666841+00:00",
+  "purpose": "Улучшить самостоятельное надёжное создание, настройку, выполнение и сохранение реальных Loginom-сценариев агентом; helper tests не заменяют независимую модельную приёмку и cold reopen.",
+  "source_boundary": {
+    "baseline": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+    "common_base": "f9bf332cc491baa784e6e04fdfda7c0f09151cb7",
+    "excluded_loginom_head": "0ca9e75bc7bb6897f46ac1ddc880b9758e993dc9"
+  },
+  "lab45": {
+    "published_sha": "a00b0203026f7719f10403bfc4fa02810aa8502e",
+    "pr": "https://github.com/gooddaytoday/loginom-ai-agent/pull/42",
+    "pr_draft_open_verified": true,
+    "changed_scope": "Only calculator acceptance task/data/oracle/expected; no helper or runtime changes",
+    "previous_attempt": "98556be8-eed0-4b0d-8564-bc6fc46b6f9d",
+    "previous_model_invocations": 0,
+    "previous_result": "NOT_RUN_CATALOGUE_MODEL_ABSENT",
+    "report_attachment_id": "01a11d4c-2188-7d73-a891-638787fc920c",
+    "report_sha256": "a9843b58e64a65b007ede4affb7ad49b49d6bd31a9e139fe2973df2726e891f9",
+    "report_size_bytes": 2922,
+    "manifest_attachment_id": "01a11d4c-27b4-7cf5-99c7-7e10e11de6ee",
+    "manifest_sha256": "c144caa508e2e4949e1e195bd9ed7efe42cd7067c4f8e0fc0803a299f45589df",
+    "manifest_size_bytes": 1184409,
+    "manifest_source_commit_verified": "a00b0203026f7719f10403bfc4fa02810aa8502e",
+    "manifest_source_dirty": false,
+    "independent_attachment_consistency": "report manifest_sha256 matches downloaded manifest; 5678 files",
+    "cleanup_report_limit": "Reported own processes absent, writer guard released; state lock directory preserved, profile not reused. No Loginom login/package/model execution. Observer has not independently sampled mas PID table."
+  },
+  "catalogue_diagnosis": {
+    "cause": "standaloneModels forces DISABLE_MODELS_FETCH=1; unrefreshed isolated profile reads old bundled snapshot",
+    "source_paths": [
+      "packages/agent/src/cli/standalone-models.ts",
+      "packages/core/src/models-dev.ts",
+      "packages/agent/src/cli/cmd/models.ts"
+    ],
+    "stock_remedy": "models openai --refresh --verbose in own new profile; verify actual cache origin/mtime/hash/stderr and target metadata after OAuth filtering",
+    "local_readonly_fetch": {
+      "observed_at": "2026-10-08T21:01:54.609012+00:00",
+      "source": "https://models.opencode.ai/api.json",
+      "user_agent": "opencode/dev/0.0.0-dev-202610081651/cli",
+      "sha256": "928c759045bafa90ba05ab29c6db830810b21eed64b7ee25d34947e79188a5bc",
+      "bytes": 5367133,
+      "headers": {
+        "Date": "Thu, 08 Oct 2026 21:01:49 GMT",
+        "ETag": "\"928c759045bafa90ba05ab29c6db8308\"",
+        "Last-Modified": null
+      },
+      "target_present": true,
+      "luna_ids": [
+        "gpt-5.6-luna",
+        "gpt-6-luna"
+      ],
+      "target_metadata": {
+        "id": "gpt-6-luna",
+        "name": "GPT-6 Luna",
+        "description": "OpenAI's most efficient model for focused, high-volume tasks",
+        "family": "gpt-luna",
+        "attachment": true,
+        "reasoning": true,
+        "reasoning_options": [
+          {
+            "type": "effort",
+            "values": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ]
+          }
+        ],
+        "tool_call": true,
+        "structured_output": true,
+        "temperature": false,
+        "knowledge": "2026-05-18",
+        "release_date": "2026-09-22",
+        "last_updated": "2026-09-22",
+        "modalities": {
+          "input": [
+            "text",
+            "image",
+            "pdf"
+          ],
+          "output": [
+            "text"
+          ]
+        },
+        "open_weights": false,
+        "limit": {
+          "context": 1050000,
+          "input": 922000,
+          "output": 128000
+        },
+        "experimental": {
+          "modes": {
+            "fast": {
+              "cost": {
+                "input": 0.2,
+                "output": 1,
+                "cache_read": 0.02,
+                "cache_write": 0.25
+              },
+              "provider": {
+                "body": {
+                  "service_tier": "priority"
+                }
+              }
+            },
+            "pro": {
+              "provider": {
+                "body": {
+                  "reasoning": {
+                    "mode": "pro"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cost": {
+          "input": 0.1,
+          "output": 0.5,
+          "cache_read": 0.01,
+          "cache_write": 0.125,
+          "tiers": [
+            {
+              "input": 0.2,
+              "output": 0.75,
+              "cache_read": 0.02,
+              "cache_write": 0.25,
+              "tier": {
+                "type": "context",
+                "size": 272000
+              }
+            }
+          ],
+          "context_over_200k": {
+            "input": 0.2,
+            "output": 0.75,
+            "cache_read": 0.02,
+            "cache_write": 0.25
+          }
+        },
+        "canonical_model_id": "openai/gpt-6-luna"
+      }
+    },
+    "mas_live_messages": {
+      "task_id": "01a11d3a-79e8-7692-bf5a-619a7f194c64",
+      "seq": 204,
+      "cache_mtime_utc": "2026-10-08T21:00:47.194383+00:00",
+      "actual_model": "gpt-6-luna",
+      "api_id": "gpt-6-luna",
+      "variants": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "model_invocations": 0,
+      "receipt_hash_verification": "PASS; downloaded preflight/resources match receipt manifest; cache hash equals independent live source catalogue"
+    },
+    "no_substitution": true,
+    "source_contracts_or_global_launcher_changed": false,
+    "central_squad_preflight_updated_readback": true
+  },
+  "temporary_hold": {
+    "observed_at": "2026-10-08T20:58:39.767441+00:00",
+    "actions": [
+      {
+        "issue": "LAB-47",
+        "task_id": "01a11d3a-8606-7496-b636-6545844a9063",
+        "result": "cancelled"
+      },
+      {
+        "issue": "LAB-48",
+        "task_id": "01a11d3a-91ff-7403-891c-9f4e2724bc58",
+        "result": "cancelled"
+      },
+      {
+        "issue": "LAB-49",
+        "task_id": "01a11d3a-9db4-7946-a691-4acb08b7847e",
+        "result": "cancelled"
+      },
+      {
+        "issue": "LAB-50",
+        "task_id": "01a11d3a-a926-7cff-a9a3-d63d79f60769",
+        "result": "cancelled"
+      },
+      {
+        "issue": "LAB-51",
+        "task_id": "01a11d3a-b4e9-74a0-ba5c-1196ac112c0e",
+        "result": "cancelled"
+      },
+      {
+        "issue": "LAB-52",
+        "task_id": "01a11d3a-c0d0-75c8-b362-942aec7a3f52",
+        "result": "cancelled"
+      }
+    ]
+  },
+  "native_resume": {
+    "observed_at": "2026-10-08T21:07:31.638357+00:00",
+    "actions": [
+      {
+        "issue": "LAB-47",
+        "comment_id": "01a11d57-6bcc-70e1-9977-040f6e88a720",
+        "runs": [
+          {
+            "id": "01a11d57-6c11-7474-8c72-fac8fe178ede",
+            "status": "queued",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          },
+          {
+            "id": "01a11d3a-8606-7496-b636-6545844a9063",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ]
+      },
+      {
+        "issue": "LAB-48",
+        "comment_id": "01a11d57-7782-76e9-8ab9-e313db989016",
+        "runs": [
+          {
+            "id": "01a11d57-779a-7372-8db2-d811b8828a57",
+            "status": "queued",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          },
+          {
+            "id": "01a11d3a-91ff-7403-891c-9f4e2724bc58",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ]
+      },
+      {
+        "issue": "LAB-49",
+        "comment_id": "01a11d57-832a-7f05-825a-f4cfb012b680",
+        "runs": [
+          {
+            "id": "01a11d57-8335-74dd-937d-5bb4fa665edb",
+            "status": "queued",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          },
+          {
+            "id": "01a11d3a-9db4-7946-a691-4acb08b7847e",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ]
+      },
+      {
+        "issue": "LAB-50",
+        "comment_id": "01a11d57-9af0-7060-b6d8-c68b31b70708",
+        "runs": [
+          {
+            "id": "01a11d57-9b0c-7496-bea3-924243e1ad83",
+            "status": "queued",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          },
+          {
+            "id": "01a11d3a-a926-7cff-a9a3-d63d79f60769",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ]
+      },
+      {
+        "issue": "LAB-51",
+        "comment_id": "01a11d57-abb4-72f1-afe2-35f229245038",
+        "runs": [
+          {
+            "id": "01a11d57-abe7-7a0f-99dd-159c3659d4c8",
+            "status": "queued",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          },
+          {
+            "id": "01a11d3a-b4e9-74a0-ba5c-1196ac112c0e",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ]
+      },
+      {
+        "issue": "LAB-52",
+        "comment_id": "01a11d57-b7a0-73d2-ad81-5c3ea57b5e35",
+        "runs": [
+          {
+            "id": "01a11d57-b7ad-750b-956a-083a12f7277d",
+            "status": "queued",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          },
+          {
+            "id": "01a11d3a-c0d0-75c8-b362-942aec7a3f52",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ]
+      }
+    ]
+  },
+  "other_resume": {
+    "observed_at": "2026-10-08T21:04:44.297342+00:00",
+    "actions": [
+      {
+        "issue": "LAB-47",
+        "status": "todo",
+        "runs": [
+          {
+            "id": "01a11d3a-8606-7496-b636-6545844a9063",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ]
+      },
+      {
+        "issue": "LAB-48",
+        "status": "todo",
+        "runs": [
+          {
+            "id": "01a11d3a-91ff-7403-891c-9f4e2724bc58",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ]
+      },
+      {
+        "issue": "LAB-49",
+        "status": "todo",
+        "runs": [
+          {
+            "id": "01a11d3a-9db4-7946-a691-4acb08b7847e",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ]
+      },
+      {
+        "issue": "LAB-50",
+        "status": "todo",
+        "runs": [
+          {
+            "id": "01a11d3a-a926-7cff-a9a3-d63d79f60769",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ]
+      },
+      {
+        "issue": "LAB-51",
+        "status": "todo",
+        "runs": [
+          {
+            "id": "01a11d3a-b4e9-74a0-ba5c-1196ac112c0e",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ]
+      },
+      {
+        "issue": "LAB-52",
+        "status": "todo",
+        "runs": [
+          {
+            "id": "01a11d3a-c0d0-75c8-b362-942aec7a3f52",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ]
+      },
+      {
+        "issue": "LAB-45",
+        "comment_id": "01a11d55-25d3-7dab-a3a2-bc98d4613346"
+      },
+      {
+        "issue": "LAB-46",
+        "supplement_id": "8a98e38c-a452-406c-b5f5-211870d28d0f"
+      }
+    ]
+  },
+  "current_snapshot": {
+    "observed_at": "2026-10-08T21:07:32.393638+00:00",
+    "cards": [
+      {
+        "identifier": "LAB-45",
+        "id": "01a11d36-053e-78da-b06c-e313de5319e3",
+        "status": "in_progress",
+        "runs": [
+          {
+            "id": "01a11d55-25fc-7c39-a4b8-a13b0dfc870a",
+            "status": "running",
+            "agent_id": "c25d6205-7c17-4672-a177-7e8ee9af9358"
+          },
+          {
+            "id": "01a11d44-b8f8-7b36-a6b3-93fbb28a1cf2",
+            "status": "completed",
+            "agent_id": "c25d6205-7c17-4672-a177-7e8ee9af9358"
+          },
+          {
+            "id": "01a11d37-c86d-7241-8ad3-196348de401d",
+            "status": "completed",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ],
+        "attachments": [
+          {
+            "id": "01a11d3d-bf9b-7706-93dd-e4f33f7988d1",
+            "filename": "preflight.json",
+            "size_bytes": 3382
+          },
+          {
+            "id": "01a11d3d-c065-7e1a-b3d2-060136b1e059",
+            "filename": "preflight-integrity.json",
+            "size_bytes": 786
+          },
+          {
+            "id": "01a11d44-b64a-730a-8da3-33487e5b3425",
+            "filename": "accounts-ready-nonsecret.json",
+            "size_bytes": 4113
+          },
+          {
+            "id": "01a11d44-b718-76d4-9857-cd3efad97ce9",
+            "filename": "base-description-correction.json",
+            "size_bytes": 507
+          },
+          {
+            "id": "01a11d44-b7ec-7a4c-b8ff-bd295041a7f4",
+            "filename": "cleanup-resources.json",
+            "size_bytes": 1370
+          },
+          {
+            "id": "01a11d4c-2188-7d73-a891-638787fc920c",
+            "filename": "report.json",
+            "size_bytes": 2922
+          },
+          {
+            "id": "01a11d4c-2268-7e0c-9538-d24bd720b1d3",
+            "filename": "tests-summary.json",
+            "size_bytes": 690
+          },
+          {
+            "id": "01a11d4c-27b4-7cf5-99c7-7e10e11de6ee",
+            "filename": "cli-manifest.json",
+            "size_bytes": 1184409
+          }
+        ]
+      },
+      {
+        "identifier": "LAB-46",
+        "id": "01a11d36-10b0-702f-930d-e91315129205",
+        "status": "in_progress",
+        "runs": [
+          {
+            "id": "01a11d57-4c99-7a8d-9cb9-e2f2984ec683",
+            "status": "running",
+            "agent_id": "c25d6205-7c17-4672-a177-7e8ee9af9358"
+          },
+          {
+            "id": "01a11d3a-79e8-7692-bf5a-619a7f194c64",
+            "status": "completed",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ],
+        "attachments": [
+          {
+            "id": "01a11d57-4a09-7226-bcb7-59594da47f13",
+            "filename": "generator-preflight-ready.json",
+            "size_bytes": 7277
+          },
+          {
+            "id": "01a11d57-4ad3-7b24-acd2-5ccc1f588aa4",
+            "filename": "generator-resources-cleanup.json",
+            "size_bytes": 1109
+          },
+          {
+            "id": "01a11d57-4ba0-793b-af58-e6b0a791ab17",
+            "filename": "generator-receipts-manifest.json",
+            "size_bytes": 601
+          }
+        ]
+      },
+      {
+        "identifier": "LAB-47",
+        "id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+        "status": "todo",
+        "runs": [
+          {
+            "id": "01a11d57-6c11-7474-8c72-fac8fe178ede",
+            "status": "running",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          },
+          {
+            "id": "01a11d3a-8606-7496-b636-6545844a9063",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ],
+        "attachments": []
+      },
+      {
+        "identifier": "LAB-48",
+        "id": "01a11d36-2811-71ba-a493-0e397e3e60f2",
+        "status": "todo",
+        "runs": [
+          {
+            "id": "01a11d57-779a-7372-8db2-d811b8828a57",
+            "status": "queued",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          },
+          {
+            "id": "01a11d3a-91ff-7403-891c-9f4e2724bc58",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ],
+        "attachments": []
+      },
+      {
+        "identifier": "LAB-49",
+        "id": "01a11d36-33ae-732e-b618-5618ed5301cd",
+        "status": "todo",
+        "runs": [
+          {
+            "id": "01a11d57-8335-74dd-937d-5bb4fa665edb",
+            "status": "queued",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          },
+          {
+            "id": "01a11d3a-9db4-7946-a691-4acb08b7847e",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ],
+        "attachments": []
+      },
+      {
+        "identifier": "LAB-50",
+        "id": "01a11d36-3f2a-7df1-bd81-d5401bdcdd16",
+        "status": "todo",
+        "runs": [
+          {
+            "id": "01a11d57-9b0c-7496-bea3-924243e1ad83",
+            "status": "queued",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          },
+          {
+            "id": "01a11d3a-a926-7cff-a9a3-d63d79f60769",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ],
+        "attachments": []
+      },
+      {
+        "identifier": "LAB-51",
+        "id": "01a11d36-4ace-7dd4-a0d4-498195f7d2e9",
+        "status": "todo",
+        "runs": [
+          {
+            "id": "01a11d57-abe7-7a0f-99dd-159c3659d4c8",
+            "status": "queued",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          },
+          {
+            "id": "01a11d3a-b4e9-74a0-ba5c-1196ac112c0e",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ],
+        "attachments": []
+      },
+      {
+        "identifier": "LAB-52",
+        "id": "01a11d36-5670-7786-bfe1-e9a4a4462e6e",
+        "status": "todo",
+        "runs": [
+          {
+            "id": "01a11d57-b7ad-750b-956a-083a12f7277d",
+            "status": "queued",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          },
+          {
+            "id": "01a11d3a-c0d0-75c8-b362-942aec7a3f52",
+            "status": "cancelled",
+            "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a"
+          }
+        ],
+        "attachments": []
+      }
+    ]
+  },
+  "acceptance": {
+    "node_pass_count": 0,
+    "model_final": "NOT_RUN_OR_NOT_YET_OBSERVED",
+    "independent_reviewer": "NOT_RUN",
+    "cold_reopen": "NOT_RUN",
+    "load12": "NOT_RUN"
+  },
+  "heartbeat": "ACTIVE; common catalogue block resolved, same cards resume, no duplicate active tasks",
+  "lab46_verified_attachments": [
+    {
+      "attachment_id": "01a11d57-4a09-7226-bcb7-59594da47f13",
+      "sha256": "f7d326191a329c6c7dc00f529e3ed9fc559721d24b995491f25538fb480e66a2",
+      "bytes": 7277,
+      "receipt": {
+        "issue_id": "01a11d36-10b0-702f-930d-e91315129205",
+        "status": "GENERATOR_PREFLIGHT_READY",
+        "model_invocations": 0,
+        "assigned_branch": "recheck-fields",
+        "assigned_source_commit": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+        "installed_source_commit": "597592f5d53f86beb69ffe318af2d4db52c5f416",
+        "installed_version": "0.0.0-dev-202610081651",
+        "installed_manifest_file_checks": 5678,
+        "installed_file_mismatches": [],
+        "installed_capability": "shared-oauth-v1",
+        "installed_executable_sha256": "20305a8d848f785c2120d03c56e3fc77129d0156d7319a9f43beca3bc0b70d03",
+        "installed_to_assigned_diff": {
+          "docs_only": true,
+          "changed_document_count": 82,
+          "runtime_source_unchanged": true,
+          "assigned_candidate_built": false
+        },
+        "catalogue": {
+          "attempt_uuid": "95159097-956a-420f-8128-f38b813d1cc5",
+          "origin": "https://models.opencode.ai/api.json",
+          "fetch_confirmed": "new disk cache written within this foreground refresh interval; source uses filterStatusOk",
+          "cache_bytes": 5367133,
+          "cache_sha256": "928c759045bafa90ba05ab29c6db830810b21eed64b7ee25d34947e79188a5bc",
+          "cache_mtime_utc": "2026-10-08T21:00:47.194383+00:00",
+          "stdout_sha256": "4f9ac92ef895b45572c961ed78cb2716ed7ee34422cd6ec2f8bb1e77c97a1b14",
+          "stderr_sha256": "0eed60a01d6207874687b81565e2f44e2a1c58e0cfda2598e93f2edbdae23fc8",
+          "stderr": "\u001b[92m\u001b[1mModels cache refreshed\u001b[0m\n",
+          "exit_code": 0,
+          "elapsed_ms": 4834,
+          "models_url_override": null,
+          "models_path_override": null,
+          "raw_openai_model_count": 53,
+          "effective_openai_model_count": 23,
+          "observed_model": "openai/gpt-6-luna",
+          "observed_variant": "high",
+          "exact_raw_model_present": true,
+          "exact_effective_model_present": true,
+          "exact_effective_variant_present": true,
+          "effective_model_metadata": {
+            "id": "gpt-6-luna",
+            "providerID": "openai",
+            "name": "GPT-6 Luna",
+            "family": "gpt-luna",
+            "api": {
+              "id": "gpt-6-luna",
+              "url": "",
+              "npm": "@ai-sdk/openai"
+            },
+            "status": "active",
+            "headers": {},
+            "options": {},
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cache": {
+                "read": 0,
+                "write": 0
+              }
+            },
+            "limit": {
+              "context": 1050000,
+              "input": 922000,
+              "output": 128000
+            },
+            "capabilities": {
+              "temperature": false,
+              "reasoning": true,
+              "attachment": true,
+              "toolcall": true,
+              "input": {
+                "text": true,
+                "audio": false,
+                "image": true,
+                "video": false,
+                "pdf": true
+              },
+              "output": {
+                "text": true,
+                "audio": false,
+                "image": false,
+                "video": false,
+                "pdf": false
+              },
+              "interleaved": false
+            },
+            "release_date": "2026-09-22",
+            "variants": {
+              "none": {
+                "reasoningEffort": "none",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              },
+              "low": {
+                "reasoningEffort": "low",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              },
+              "medium": {
+                "reasoningEffort": "medium",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              },
+              "high": {
+                "reasoningEffort": "high",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              },
+              "xhigh": {
+                "reasoningEffort": "xhigh",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              },
+              "max": {
+                "reasoningEffort": "max",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              }
+            }
+          },
+          "oauth_filtering_evidence": {
+            "raw_target_cost_nonzero": true,
+            "effective_target_cost_zero": true,
+            "raw_gpt_4_1_present": true,
+            "effective_gpt_4_1_absent": true,
+            "shared_auth_read_path_confirmed_in_source": true,
+            "raw_catalog_presence_distinct_from_effective_metadata": true
+          },
+          "shared_oauth_metadata_unchanged": true,
+          "provider_model_invocation_performed": false,
+          "profile_writer_released": true
+        },
+        "accounts": {
+          "ready_both": true,
+          "same_stand": true,
+          "distinct_usernames": true,
+          "config_paths": [
+            "/home/user/.config/loginom-multica/cards/01a11d36-10b0-702f-930d-e91315129205/worker.json",
+            "/home/user/.config/loginom-multica/cards/01a11d36-10b0-702f-930d-e91315129205/reviewer.json"
+          ],
+          "permissions": [
+            {
+              "role": "worker",
+              "effective_policy": {
+                "chkDesigner": true,
+                "chkViewer": true,
+                "chkRunner": false,
+                "chkAdmin": false,
+                "chkAllowPublish": false,
+                "chkAllowPasswordSave": false,
+                "chkGlobalFileStorage": false,
+                "chkSchedulerFullAccess": false,
+                "chkMustChangePassword": false,
+                "chkBlocked": false
+              },
+              "logged_out": true,
+              "loginom_version": "7.4.2"
+            },
+            {
+              "role": "reviewer",
+              "effective_policy": {
+                "chkDesigner": true,
+                "chkViewer": true,
+                "chkRunner": false,
+                "chkAdmin": false,
+                "chkAllowPublish": false,
+                "chkAllowPasswordSave": false,
+                "chkGlobalFileStorage": false,
+                "chkSchedulerFullAccess": false,
+                "chkMustChangePassword": false,
+                "chkBlocked": false
+              },
+              "logged_out": true,
+              "loginom_version": "7.4.2"
+            }
+          ],
+          "calibrated_server_absence": true,
+          "server_observed_at": "2026-10-08T21:02:35.294Z",
+          "own_admin_logged_out": true,
+          "browser_closed": true,
+          "remaining_browser_processes": 0,
+          "permanent_locks": [
+            {
+              "role": "worker",
+              "nonblocking_available": true,
+              "inode_unchanged": true
+            },
+            {
+              "role": "reviewer",
+              "nonblocking_available": true,
+              "inode_unchanged": true
+            }
+          ]
+        },
+        "resources": {
+          "utc": "2026-10-08T21:05:20Z",
+          "logical_cpus": 12,
+          "loadavg": [
+            0.00390625,
+            0.09375,
+            0.16259765625
+          ],
+          "mem_available_kb": 29904904,
+          "disk_free_bytes": 416052633600,
+          "daemon_cap": 12,
+          "role_caps": [
+            1,
+            8,
+            8
+          ],
+          "active_task_count": 2,
+          "resource_wait_task_count": 0,
+          "native_task_id": "01a11d3a-79e8-7692-bf5a-619a7f194c64",
+          "own_run_processes_remaining": []
+        },
+        "history": "All local preflight failures and provisioning/qualification receipts retained; LAB-45 history untouched.",
+        "acceptance": "Node CLI, node regression matrix, independent model run and cold reopen NOT_RUN by Generator; owned stage-0 preparation only.",
+        "latest_squad_readback": {
+          "squad_id": "8ff41bd5-f794-4b5b-a063-026f3874628e",
+          "updated_at": "2026-10-09T00:03:07+03:00",
+          "actual_setting_still_matches": true,
+          "instructions_sha256": "0c7c8cf8d99da0f74991336d0d34f0ddcf2a13ab37fe4ef98c5d87d0ea9ca5d9"
+        }
+      }
+    },
+    {
+      "attachment_id": "01a11d57-4ad3-7b24-acd2-5ccc1f588aa4",
+      "sha256": "fd3e4e77fb8fa3f1f1f888460e7fdfd8f8b8ce7baee3ff210d74f8c5fe88fa6f",
+      "bytes": 1109,
+      "receipt": {
+        "issue_id": "01a11d36-10b0-702f-930d-e91315129205",
+        "model_invocations": 0,
+        "resources": {
+          "utc": "2026-10-08T21:05:20Z",
+          "logical_cpus": 12,
+          "loadavg": [
+            0.00390625,
+            0.09375,
+            0.16259765625
+          ],
+          "mem_available_kb": 29904904,
+          "disk_free_bytes": 416052633600,
+          "daemon_cap": 12,
+          "role_caps": [
+            1,
+            8,
+            8
+          ],
+          "active_task_count": 2,
+          "resource_wait_task_count": 0,
+          "native_task_id": "01a11d3a-79e8-7692-bf5a-619a7f194c64",
+          "own_run_processes_remaining": []
+        },
+        "cleanup": {
+          "exact_owned_process_absence": true,
+          "role_server_absence": true,
+          "server_observed_at": "2026-10-08T21:02:35.294Z",
+          "browser_closed": true,
+          "own_admin_logged_out": true,
+          "permanent_account_locks": [
+            {
+              "role": "worker",
+              "nonblocking_available": true,
+              "inode_unchanged": true
+            },
+            {
+              "role": "reviewer",
+              "nonblocking_available": true,
+              "inode_unchanged": true
+            }
+          ],
+          "profile_writer_released": true,
+          "shared_oauth_metadata_unchanged": true
+        }
+      }
+    },
+    {
+      "attachment_id": "01a11d57-4ba0-793b-af58-e6b0a791ab17",
+      "sha256": "d363f0180783254fa3c130b3531280b271a45a02f002dadf703affc57d7ce36f",
+      "bytes": 601,
+      "receipt": {
+        "issue_id": "01a11d36-10b0-702f-930d-e91315129205",
+        "created_utc": "2026-10-08T21:06:14Z",
+        "catalogue_sha256": "928c759045bafa90ba05ab29c6db830810b21eed64b7ee25d34947e79188a5bc",
+        "catalogue_bytes": 5367133,
+        "model_invocations": 0,
+        "files": [
+          {
+            "filename": "generator-preflight-ready.json",
+            "bytes": 7277,
+            "sha256": "f7d326191a329c6c7dc00f529e3ed9fc559721d24b995491f25538fb480e66a2"
+          },
+          {
+            "filename": "generator-resources-cleanup.json",
+            "bytes": 1109,
+            "sha256": "fd3e4e77fb8fa3f1f1f888460e7fdfd8f8b8ce7baee3ff210d74f8c5fe88fa6f"
+          }
+        ]
+      }
+    }
+  ],
+  "lab46_stage": "Generator completed; own ready/identity/permissions/process/server/lock cleanup receipts, Worker running01a11d57-4c99-7a8d-9cb9-e2f2984ec683"
+}
