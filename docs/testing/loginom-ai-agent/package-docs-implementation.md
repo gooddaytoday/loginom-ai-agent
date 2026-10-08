@@ -4452,9 +4452,9 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - HEAD до checkpoint5d3be11f8; product baselinefc/candidate49b1584f2 неизменны; source changes только own harness/test infrastructure.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client/profiles и чужие процессы сохранены.
 - Новый frozen skills-evals-writer d1b364a98 clean; evalsrefb31ebe7d0 перечитан/protected diff0; исторический087 сохранён.
-- Conditions v5 abeeb0cf…/21 pins/wide viewport/fresh own server;15 tasks заранее/90 formal не начаты; baseline первая preflight0 failure archived; own v4 residue preserved/marked cleanup PASS; fresh baseline preparation идёт.
+- Conditions v5 abeeb0cf…/21 pins/wide viewport/fresh own server;15 tasks заранее/90 formal не начаты; baseline preflight0 failure archived; own residue preserved/marked cleanup PASS; baseline v5 full smoke accepted, candidate v5 идёт.
 - Common wide cold обеих сторон PASS/oracle0/byte-identical/native close/logout/remaining0; reader1920×1080, product viewport1280 неизменен.
-- Baseline v4 run170104 full smoke accepted:judge100/structure/warm oracle/cold/native cleanup confirmed.
+- Baseline v5 run174713 full smoke accepted:judge100/structure/warm oracle/cold/native cleanup confirmed; historical v4 retained.
 - Candidate v4 run171244 CLI0/judge100/warm oracle PASS, main1/cleanup FAIL Writer owner unavailable; cold не запускался, v4 pair не принят.
 - Candidate management receipt capture complete/unknown0/remaining0×2; current profile waitProfileIdle PASS/.writer absent; historical FAIL retained.
 - Native writer unlink→rmdir/mkdir→publication gap reproduced RED→GREEN; bounded3 reads/20ms preserve empty/replacement/integrity refusals.

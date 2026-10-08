@@ -480,3 +480,15 @@ V5 первая baseline preparation: native profile подготовлен, н�
 проверен waitProfileIdle и полностью архивирован в `base-preflight-storage-failed`
 с записью model/judge/formal0. Однократная fresh preparation выполняется по
 тому же common manifest; guard не ослаблен, старый отказ сохранён.
+
+## Baseline v5: полный smoke принят
+
+Run `ab-smoke-v5-20261008/base/results/20261008-174713-d1b364a98`:
+CLI0/completed, judge100/100/warm oracle PASS,320.85s, cleanup confirmed.
+Независимая структура `ab-smoke-v5-base-review-20261008` PASS.
+Общий cold reader в `ab-smoke-v5-base-cold-20261008`: actual saved destination
+verified, fresh export/oracle0, input/package bytes unchanged, settings not
+reapplied, native close/logout/remaining0, container removed/exact staged cleanup.
+`ab-smoke-v5-base-accepted-20261008/review.json` перепроверяет658 frozen files
+и21 adapter pins, общий manifest abeeb0cf…; formalAttempts0.
+Candidate v5 запускается следующим по тем же условиям.
