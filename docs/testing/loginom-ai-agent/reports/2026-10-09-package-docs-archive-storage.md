@@ -58,3 +58,15 @@ targets600/parents700. Root free2011873280→2084851712bytes на момент b
 это наблюдение при продолжающейся записи live baseline, не оценка точного
 выигрыша от одного переноса. Current profile, failed-cleanup13 и frozen
 resources/harness/common не менялись.
+
+Четвёртый batch: `closed-archive-storage-20261009/batch-4` с отдельными
+plan/receipt/readback/tar-readback. Перенесены6 confirmed closed архивов
+risky-approved-claims/sales-by-category/slow-supplier-deliveries,
+64989278bytes. Matching result/cleanup и prior full roundtrip проверены;
+process/FD references отсутствуют, SHA/size/UID/GID/mode/xattrs совпадают
+после copy2/fsync/atomic links и readback6. Штатный tar через две исходные
+ссылки PASS:4620/3 entries, совпадает с исходным inventory. Preservation
+receipts не изменены. Итого58 архивов618653673bytes на отдельном локальном
+диске, targets600/parents700. Root free2005716992→2070642688bytes на момент
+batch. Активные профили, failed-cleanup13 v5, результаты, frozen builds,
+harness и условия A/B не перемещались и не изменялись.
