@@ -177,8 +177,16 @@ export async function checkBaseline(directory: string) {
     return [collection, { metrics: aggregate(attempts, false), tasks: manifest.cases.filter(item => item.collection === collection).map(item => ({
       id: item.id, metrics: aggregateTask(attempts.filter(attempt => attempt.task_id === item.id), false) })) }]
   }))
+  const spent = rows.flatMap(row => row.result ? (row.result.infra_retry ? [row.result.infra_retry.initial, row.result] : [row.result]).map(result => ({ row, result })) : [])
+  const spending = { duration_ms: spent.reduce((sum, item) => sum + item.result.duration_ms, 0),
+    cost: spent.reduce((sum, item) => sum + item.result.cost, 0),
+    tokens: { input: spent.reduce((sum, item) => sum + item.result.tokens.input, 0), output: spent.reduce((sum, item) => sum + item.result.tokens.output, 0),
+      reasoning: spent.reduce((sum, item) => sum + item.result.tokens.reasoning, 0) }, judge_tokens: null }
+  const infrastructure = spent.filter(item => ["infra_error", "harness_error", "interrupted"].includes(item.result.status) || item.result.judge_status === "error")
+    .map(item => ({ key: item.row.key, caseKey: item.row.caseKey, attempt: item.row.attempt,
+      phase: item.result === item.row.result ? "final" : "infra-retry-initial", status: item.result.status, judge_status: item.result.judge_status }))
   return { id: manifest.id, kind: manifest.kind, status: coverage.measured === coverage.expected && cleanup && journal.release ? "complete" : "incomplete",
-    manifest, coverage, cleanup, released: Boolean(journal.release), groups,
+    manifest, coverage, cleanup, released: Boolean(journal.release), groups, spending, infrastructure,
     nodes: manifest.cases.filter(item => item.collection === "node").map(item => ({ id: item.id, expected: manifest.kind === "smoke" ? 1 : 3,
       passed: rows.filter(row => row.caseKey === item.key && row.verdict === "PASS").length,
       measured: rows.filter(row => row.caseKey === item.key && row.measured).length })), rows }
@@ -217,6 +225,7 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
     if (command === "check") {
       const report = await checkBaseline(directory)
       const reportDir = await writeBaselineReport(directory, report)
+      if (values.compare) await writeBaselineComparison(reportDir, await checkBaseline(values.compare), report)
       return { code: 0, status: report.status, ...report.coverage, reportDir }
     }
     if (["start", "resume"].includes(command ?? "") && env.EVAL_BASELINE_FIXTURE === "1") {
@@ -396,6 +405,8 @@ async function writeBaselineReport(directory: string, report: Awaited<ReturnType
     `Ожидается ${report.coverage.expected}; сохранено ${report.coverage.recorded}; измерено ${report.coverage.measured}; не запущено ${report.coverage.pending}; неизвестный исход ${report.coverage.unknown}.`,
     `Очистка: ${report.cleanup ? "подтверждена" : "не подтверждена"}; стенд: ${report.released ? "освобождён" : "освобождение не подтверждено"}.`, "",
     "Метрики судьи представлены отдельно для regular и analytic. Узловой code PASS не входит в общий score.", "",
+    `Расход продукта с infra retry: ${JSON.stringify(report.spending)}. Токены судьи не предоставлены текущим harness.`, "",
+    ...report.infrastructure.map(error => `${error.caseKey}#${error.attempt} (${error.phase}): ${error.status}; judge=${error.judge_status}.`), "",
     ...Object.entries(report.groups).map(([collection, group]) => `${collection}: ${JSON.stringify(group.metrics)}`), "",
     ...report.nodes.map(node => `${node.id}: PASS ${node.passed}/${node.expected}; измерено ${node.measured}/${node.expected}.`), "",
     "| Кейс | Попытка | Состояние | Результат | Измерено | Судья | Время, мс |",
@@ -403,6 +414,44 @@ async function writeBaselineReport(directory: string, report: Awaited<ReturnType
     ...rows.map(row => `| ${row.caseKey} | ${row.attempt} | ${row.state} | ${row.verdict ?? "—"} (${row.status ?? "—"}) | ${row.measured} | ${row.judge_status ?? "—"} | ${row.duration_ms} |`), "",
   ].join("\n"), { flag: "wx", mode: 0o600 })
   return out
+}
+
+// Each original harness run evaluates one case. Preserve that evaluation lineage when
+// combining its logical attempts; a synthetic corpus-wide rubric would invalidate it.
+async function writeBaselineComparison(out: string, before: Awaited<ReturnType<typeof checkBaseline>>, after: Awaited<ReturnType<typeof checkBaseline>>) {
+  const { compare } = await import("./compare")
+  const environment = before.manifest.pins.isolationSha256 === after.manifest.pins.isolationSha256
+    ? "Пины изоляции совпадают." : "Пины изоляции различаются: контролируемое сравнение качества не подтверждено."
+  for (const collection of ["regular", "analytic"] as const) {
+    const keys = [...new Set([...before.manifest.cases, ...after.manifest.cases].filter(item => item.collection === collection).map(item => item.key))]
+    const sections: string[] = []
+    for (const key of keys) {
+      const a = await baselineCaseSummary(before, key)
+      const b = await baselineCaseSummary(after, key)
+      sections.push(a && b ? compare(a, b) : `${key}: нет сохранённых результатов в одной из серий; сравнение недоступно.`)
+    }
+    await writeFile(path.join(out, `compare-${collection}.md`), [`# ${collection}: ${before.id} → ${after.id}`, environment,
+      "Сравнения штатного harness представлены по кейсам; их повторения сохраняют исходные rubric/evaluation hashes.", ...sections].join("\n\n"), { flag: "wx", mode: 0o600 })
+  }
+  await writeFile(path.join(out, "compare-node.json"), JSON.stringify({ before: before.id, after: after.id, environment,
+    nodes: [...new Set([...before.nodes, ...after.nodes].map(node => node.id))].map(id => ({ id,
+      before: before.nodes.find(node => node.id === id) ?? null, after: after.nodes.find(node => node.id === id) ?? null })) }, null, 2), { flag: "wx", mode: 0o600 })
+}
+
+async function baselineCaseSummary(report: Awaited<ReturnType<typeof checkBaseline>>, key: string): Promise<RunSummary | undefined> {
+  const rows = report.rows.filter(row => row.caseKey === key && row.runDir)
+  if (!rows.length) return undefined
+  const summaries = await Promise.all(rows.map(async row => Bun.file(path.join(row.runDir!, "summary.json")).json() as Promise<RunSummary>))
+  const first = summaries[0]!
+  if (summaries.some(summary => summary.agent_inputs_hash !== first.agent_inputs_hash || summary.rubric_hash !== first.rubric_hash ||
+    JSON.stringify(summary.judge) !== JSON.stringify(first.judge))) throw new BaselineFailure("MEASUREMENT_LINEAGE_CHANGED")
+  const attempts = rows.map(row => ({ ...row.result!, attempt: row.attempt }))
+  const expected = report.manifest.kind === "smoke" ? 1 : 3
+  return { ...first, run_id: `${report.id}:${first.task_ids[0]}`, label: report.kind, started_at: summaries.map(run => run.started_at).sort()[0]!,
+    finished_at: summaries.map(run => run.finished_at).sort().at(-1)!, interrupted: summaries.some(run => run.interrupted),
+    stopped_reason: rows.length === expected ? summaries.find(run => run.stopped_reason)?.stopped_reason ?? null : "INCOMPLETE_BASELINE_CASE",
+    config: { ...first.config, repeat: expected }, metrics: aggregate(attempts, false),
+    tasks: [{ ...first.tasks[0]!, attempts, metrics: aggregateTask(attempts, false) }] }
 }
 
 async function inspectMeasurement(manifest: BaselineManifest, item: BaselineCase, checkout: string, runDir: string): Promise<RecordedRun> {

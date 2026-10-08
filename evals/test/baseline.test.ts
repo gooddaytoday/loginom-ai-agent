@@ -124,6 +124,10 @@ test("fixture executor resumes pending jobs through the real harness without rep
     expect(resumed).toMatchObject({ code: 0, recorded: 2 })
     expect(await Bun.file(path.join(first, "summary.json")).text()).toBe(before)
     expect((await checkBaseline(series)).rows.filter(row => row.runDir === first)).toHaveLength(1)
+    const comparison = await runBaseline(["check", "--series", series, "--compare", series], {})
+    expect(comparison).toMatchObject({ code: 0 })
+    expect(await Bun.file(path.join(String(comparison.reportDir), "compare-regular.md")).text()).toContain("calc-data-double")
+    expect(await Bun.file(path.join(first, "summary.json")).text()).toBe(before)
   } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
 }, 60_000)
 
@@ -149,5 +153,30 @@ test("a recorded product failure is retained while an unknown dispatch or pin dr
     await beginBaselineMeasurement(series, manifest.jobs[1]!.key, { checkout: repoRoot, pins: baselineFixturePins })
     expect((await checkBaseline(series)).coverage.unknown).toBe(1)
     await expect(beginBaselineMeasurement(series, manifest.jobs[1]!.key, { checkout: repoRoot, pins: baselineFixturePins })).rejects.toThrow("ALREADY_DISPATCHED")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("judge and infrastructure errors stay incomplete and their retry expenditure remains visible", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-errors-"))
+  try {
+    const series = path.join(directory, "series")
+    const manifest = await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins })
+    for (const [index, job] of manifest.jobs.slice(0, 2).entries()) {
+      const admitted = await beginBaselineMeasurement(series, job.key, { checkout: repoRoot, pins: baselineFixturePins })
+      const run = path.join(admitted.resultsDir, "fixture")
+      const initial = { task_id: admitted.case.id, attempt: 1, status: "infra_error", judge_status: "skipped", pass: null, score: null,
+        environment_cleanup: { status: "confirmed" }, tokens: { input: 2, output: 1, reasoning: 0 }, counters: { toolCalls: 0, toolErrors: 0, memoryToolCalls: 0 }, duration_ms: 10, cost: 0.01 }
+      await Bun.write(path.join(run, "summary.json"), JSON.stringify({ run_id: job.key, config: { repeat: 1 }, task_ids: [admitted.case.id], storage_leftovers: [],
+        tasks: [{ id: admitted.case.id, attempts: [{ ...initial, status: index ? "infra_error" : "completed", judge_status: index ? "skipped" : "error", infra_retry: { initial } }] }] }))
+      for (const out of ["1", "1/infra-error"]) await Bun.write(path.join(run, admitted.case.id, out, "cleanup.json"), JSON.stringify({ result: { status: "confirmed" }, processes: { status: "confirmed" },
+        stages: ["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].map(stage => ({ stage, status: "confirmed" })) }))
+      await recordBaselineMeasurement(series, job.key, run)
+      await expect(beginBaselineMeasurement(series, job.key, { checkout: repoRoot, pins: baselineFixturePins })).rejects.toThrow("ALREADY_DISPATCHED")
+    }
+    const report = await checkBaseline(series)
+    expect(report.coverage.measured).toBe(0)
+    expect(report.status).toBe("incomplete")
+    expect(report.spending).toMatchObject({ duration_ms: 40, cost: 0.04, tokens: { input: 8, output: 4, reasoning: 0 } })
+    expect(report.infrastructure).toHaveLength(4)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
