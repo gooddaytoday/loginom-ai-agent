@@ -3,7 +3,7 @@ import { main } from "./run"
 import { evalsRoot, loadConfig } from "./config"
 import { loadTasks } from "./task"
 import { validateNodeRun } from "./node-evals"
-import { nodeCaseIds } from "./node-cases"
+import { coverageCaseIds, nodeCaseIds } from "./node-cases"
 import { collectNodeNativeEvidence } from "./node-native"
 
 export async function runNodeEvals(argv: string[], env: Record<string, string | undefined>) {
@@ -24,7 +24,7 @@ async function executeNodeEvals(argv: string[], env: Record<string, string | und
   }
   const run = await main(args, env)
   const summary=await Bun.file(path.join(run.runDir,"summary.json")).json()
-  for(const task of summary.tasks) if(task.id==="crosstable-min-max") for(const attempt of task.attempts) {
+  for(const task of summary.tasks) if(task.id==="crosstable-min-max" || coverageCaseIds.includes(task.id)) for(const attempt of task.attempts) {
     if(attempt.status==="completed" && attempt.environment_cleanup?.status==="confirmed")
       await collectNodeNativeEvidence(path.join(run.runDir,task.id,String(attempt.attempt)),config.profileDir)
   }
