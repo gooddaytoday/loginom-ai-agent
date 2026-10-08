@@ -2,7 +2,7 @@
 - Branch baseline-runtime; checkout /tmp/loginom-baseline-runtime; основной checkout сохранён.
 - Code SHA 3ce983703bbeca5d759f1cd7bfc8b9a8196c7f64; frozen server/supplement SHA 53d03a35b0ee2901b40c1a1bbb0170804d59e865.
 - LAB-31 принят на 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad; корпус 48 кейсов/144 измерения.
-- Этапы 0, 3.0, 3.1, 3.2 и 4 выполнены; full start gated двумя отдельными smoke.
+- Этапы 0, 3.0, 3.1, 3.2, 4 и 5 выполнены; full start gated двумя отдельными smoke.
 - Infrastructure/judge recovery, retries, abandon, reconcile, execution budget и cleanup resolutions проверены.
 - Config v2 активна; readinessIssue LAB-32; отдельные профиль/CLI EvalBaseline, параметры Rich/Ben сохранены.
 - Supplement 733 файла; manifest SHA256 9f78455de8c03996e3dbfc12696b0fed5197597f664553cd2502b349ba5e0aae.
@@ -12,9 +12,9 @@
 - Original bytes/failed cleanup/retry/verdict immutable; отдельный cleanup proof разрешает безопасное продолжение.
 - CLI 0.1.17 / fc3d97dbf695c2ed8dba942feb6fe83591a33944; модель openai/gpt-6.1-sol/medium; judge gpt-6-astra/high.
 - Multica readback v2 четырёх ролей/трёх starters/squad PASS; runtime service active/running после переключения.
-- LAB-32 01a11ae4-fa45-79ce-aec6-edd7170dafc7; native gate run 01a11d44-5374-7e30-9ab4-ea3125364559: MCP actor PASS.
-- 2026-10-08 23:44 MSK: очереди пусты, stand FREE, 5 profiles clean, storage EMPTY, model calls 0.
-- Native prepare остановился до серии/lease; исправлен только Dock URL на существующий mcp.loginom.ai, health 200/pins PASS.
+- LAB-32 01a11ae4-fa45-79ce-aec6-edd7170dafc7; native run 01a11d4f-9de4-7da6-a096-1d403753da8c READY/release PASS; MCP actor PASS.
+- Technical manifest bed77af4-b5fe-4a53-b67b-014bc4f6bcc4; incomplete/0 measured; 2026-10-09 00:02 MSK release/FREE.
+- First prepare error сохранён; Dock URL исправлен до серий; независимый post-release check: 5 profiles clean/storage EMPTY/browser 0.
 - Живые smoke/полный baseline не запускались; UNKNOWN и smoke автоматически не повторяются.
 - Полную карточку создать и реально запустить на этапе 7; heartbeat основного чата 30 минут на этапе 8.
-- Далее: проверить native gate 5 в LAB-32; затем ровно два smoke и этапы 7–10; серверный pin не менять.
+- Далее: дождаться native evidence delivery/terminal run; выполнить calc smoke один раз, затем node smoke и этапы 7–10; pin не менять.

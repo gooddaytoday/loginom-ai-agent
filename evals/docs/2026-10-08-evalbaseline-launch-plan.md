@@ -129,7 +129,7 @@ Infrastructure и judge recovery реализованы отдельными app
 
 Проверено 2026-10-08 23:44 MSK: runtime возобновлён, очереди четырёх исполнителей пусты; `FREE`, пять профилей чисты, storage пуст. Развёрнутый immutable SHA `53d03a35b0ee2901b40c1a1bbb0170804d59e865`, manifest 733 файлов, SHA256 `9f78455de8c03996e3dbfc12696b0fed5197597f664553cd2502b349ba5e0aae`. Server proof: `R/evidence/baseline-v2-activation-resumed-53d03a35b.json`; Multica readback подтвердил инструкции всех четырёх ролей, три starters, неизменность настроек и squad. Дальнейшие операторские doc-коммиты не меняют этот серверный pin.
 
-## 5. Немодельная проверка установленного CLI внутри изоляции
+## 5. Немодельная проверка установленного CLI внутри изоляции — выполнено
 
 Новое задание LAB-32: `01a11d44-5374-7e30-9ab4-ea3125364559`, создано 2026-10-08 23:47 MSK. Readback подтвердил единственный dispatched run EvalBaseline; gate ещё не завершён. Ограничение задания — только немодельная проверка, без smoke и полного baseline.
 
@@ -156,8 +156,8 @@ run_ops() {
 ```
 
 - [x] Проверить собственную память настоящим MCP-вызовом, если её конфигурация или подключение изменились: actor scope, automatic Git Peer собственного checkout. При ошибке восстановить память до live-работы.
-- [ ] Создать отдельную техническую серию через `prepare`, не вызывать для неё `start` и не использовать её в будущем baseline.
-- [ ] Выполнить штатный admission/preflight/release:
+- [x] Создать отдельную техническую серию через `prepare`, не вызывать для неё `start` и не использовать её в будущем baseline.
+- [x] Выполнить штатный admission/preflight/release:
 
 ```sh
 run_baseline prepare --config "$CFG" --series "$TECH_PREFLIGHT_SERIES"
@@ -169,9 +169,11 @@ run_ops release --config "$CFG" --lease "$PRIVATE_WORK_DIR/preflight-lease.json"
   --baseline "$TECH_PREFLIGHT_SERIES" --run-sha "$FULL_SHA"
 ```
 
-- [ ] Подтвердить настоящий `loginom check` установленного CLI внутри bubblewrap: подключение/Loginom READY, Chromium/AppArmor, отсутствие доступа к корпусу/ответам/архивам, завершение всех процессов, закрытый архив истории, чистоту профилей/storage и реальный release receipt/FREE.
-- [ ] Сохранить техническую серию как **incomplete, 0 измерений**, а успешность native проверки и безопасное освобождение — отдельно. Это существующий допустимый completion-path; нулевую техническую серию не обозначать полным baseline.
+- [x] Подтвердить настоящий `loginom check` установленного CLI внутри bubblewrap: подключение/Loginom READY, Chromium/AppArmor, отсутствие доступа к корпусу/ответам/архивам, завершение всех процессов, закрытый архив истории, чистоту профилей/storage и реальный release receipt/FREE.
+- [x] Сохранить техническую серию как **incomplete, 0 измерений**, а успешность native проверки и безопасное освобождение — отдельно. Это существующий допустимый completion-path; нулевую техническую серию не обозначать полным baseline.
 - [x] Выполнить оставшиеся реальные server-only проверки lease/completion в отдельном назначенном немодельном окне; сохранить результат и подтверждённую очистку. Незавершённую проверку не заменять локальным PASS.
+
+Native gate завершён новым run `01a11d4f-9de4-7da6-a096-1d403753da8c`: technical manifest `bed77af4-b5fe-4a53-b67b-014bc4f6bcc4`, `R/roles/evalbaseline/results/native-gate5-01a11d4f-9de4-7da6-a096-1d403753da8c`, 48 cases/144 pending/0 measured, status incomplete. Actual admission READY, process cleanup confirmed, private history archive mode 0700. Штатный baseline-completion release RELEASED `2026-10-08T21:02:36.237Z` (00:02:36 MSK 2026-10-09), evidence SHA256 `c8707dbc8a4851d88de04c07ffb1ef2399a3fe49b179b39baeb306232ef966f3`. Основной чат независимо подтвердил FREE/5 profiles clean/storage EMPTY/harness leases 0/browsers 0. Изоляция: агент проверил 15 запрещённых путей, в том числе `/proc/1/root`; public evidence доставка завершается до следующего live задания.
 
 ## 6. Два отдельных smoke — ровно две продуктовые попытки
 
