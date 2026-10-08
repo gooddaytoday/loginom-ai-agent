@@ -4447,28 +4447,28 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-09 — ACTIVE, post-open writer TDD; formal v6 preflight FAIL
+### 2026-10-09 — ACTIVE, frozen495 принят; baseline smoke v7 выполняется
 
-- HEAD до checkpoint `1c572b29c`; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
-- Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client/profiles и чужие процессы сохранены.
-- Прежний frozen skills-evals-inspection b4661a7b6 сохранён; mutable495463543 clean/protected diff0 против evalsrefb31ebe7d0; новый frozen ещё не создан.
-- Clean b466 harness full481 PASS/2 SKIP/0 FAIL/2056 assertions/579.40s/typecheck PASS; sanitized inspection context real IO RED→GREEN, bounded guards preserved.
-- Conditions v6 c07c876e…/21 pins/658 harness/281 task files/5389+5651 build inventory PASS; прежние15 tasks/models/judge/viewport; formal90 planned.
-- Baseline v5 run174713 и candidate v5 run175606 full smoke accepted:judge100/structure/warm oracle/cold/native cleanup confirmed.
-- Pair evidence ab-smoke-v5-pair-accepted-20261008; functional control, formal0/statistical noninferiority not proven.
-- V5 metrics provider17/18 (dedup), unique tools17/19/Loginom13/13/errors0; skill+workflow read, allowance неизменен.
-- Baseline run180611/session1287 завершён exit1 на13/45: slow-supplier-deliveries#1 analytic PASS100, process cleanup FAIL; candidate0/cold0/compare pending. Первые12:8 PASS/4 measured FAIL;9 saved structure-warm PASS.
-- Output mapping ABC/cohort/low-liquidity: shared first geometry proof1/32 > tolerance1/64;12 modules identical; source2×3×20 PASS; native stability/unique cause UNKNOWN, immutable A/B unchanged.
-- cohort-spend-activity#1: no_artifact/294.054s, NODE_APPLY_STOPPED→OUTPUT_MAPPING_RECOVERY_UNVERIFIED; cleanup confirmed/native uncertainty сохранена; manual retry0.
-- V5 PID4050199: original errno/operation потеряны; native stable/flaky UNKNOWN; 3 offline runs×3 guard tests PASS не воспроизводят ошибку. Signal сохранён в formal-v5-process-identity-signal-20261008.
-- Старые own CLI091/239/253/5a9/bd0/c50 и upgrade CLI/Desktop669/bc6 сохранены проверенными архивами; baseline/current49 raw сохранены; свободно около1.8GiB;3 obsolete context duplicates905448921 bytes deduped, paths/bytes/modes retained.
-- Неиспользуемый docs-build/node_modules удалён после process/FD guards; bytes не архивированы, locked reinstall/reverify записан в receipt; source49 clean.
-- Histories/diagnostics первых12 closed attempts сохранены с full roundtrip/restore receipts; summary первых9 diagnostics65cbbe16…; active profile/results/21 pins неизменны.
-- CLI modify3 FAIL; CLI docs-after-build3/3 accepted; Desktop warm3/cold1 PASS2 FAIL; offline bytes/pins3 prepared; formal guard6 PASS, controller wired и отказал на incomplete v5 до Docker/staging; native pending.
-- Lifecycle driver first skill fixed via real-process/HTTP RED→GREEN;4 focused PASS/typecheck PASS; native lifecycle/independence ещё нужны.
-- MiMo installed smoke UNKNOWN; отдельная native-payload диагностика подтвердила HTTP429/quota exhausted, writer absent/remaining0/no browser; новых MiMo calls нет, выбор второй модели запрошен.
-- Source binaries/resources/server skill907ff16b…/catalog17764f9a… сохранены; stage5–8/Linux lifecycle/second-model gates открыты;stage9 deferred.
-- V6 обе smoke PASS100/structure/warm/cold/bytes/close/logout/remaining0; formal2749 terminal1 до tasks:writer ENOENT, current refs0/writer absent/recovery0. Post-open RED→GREEN/3guards×5 PASS/modules77 PASS/typecheck PASS; clean495 full suite80830 идёт с own TMPDIR в /dev/shm (disk641MiB); далее new frozen pair90 + gates. Старые FAIL сохранены.
+- HEAD до checkpoint `e019407e3`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
+- Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client и чужие профили/процессы не изменялись.
+- Own mutable harness495463543 clean; новый detached skills-evals-release на полном SHA495463543901f1a69888b8d6375cd77996ef157b, frozen install/typecheck PASS.
+- Writer post-open real-IO RED→GREEN; release/persistent-empty/replacement guards×5 PASS; modules77 PASS/0 FAIL/241 assertions.
+- Первый full495/session80830 terminal1:447 PASS/2 SKIP/37 FAIL/2 errors; cwd640MiB ниже1GiB.31 прямой space FAIL,6 downstream supported; весь evidence сохранён.
+- Fresh full495/session12760 terminal0:484 PASS/2 SKIP/0 FAIL/2063 assertions/576.34s; порог пространства сохранён, новый own executable TMPDIR в /dev/shm.
+- Exact own immutable dedupe:26568 old frozen source files,612 browser files,13285 new frozen source files; bytes/modes/pins и clean Git проверены до/после; чужие данные не очищались.
+- Dedupe receipts: frozen-worktree-dedupe-20261009, immutable-browser-dedupe-20261009, frozen-release-worktree-dedupe-20261009; около1.9GiB свободно. Frozen sources/resources не редактировать.
+- Conditions ab-conditions-release-20261009/common.json SHAa268a81e8b4ea163f50ac52ee99817559b3fab9a08ffc09652dc96c00fcd2ed4:658 harness/281 task/21 adapter pins/5389+5651 build inventory PASS.
+- На freeze свежий evals ref992fca12badf209169f13b569b9bd291e4d70e99; protected diff0. Перед приёмкой повторно читать ref и проверять pins.
+- Те же заранее закреплённые15 задач×3×2=90; primary openai/gpt-6.1-sol medium, judge gpt-6-astra high; submodel construction вне coverage.
+- Baseline smoke v7/session30063 выполняется в ab-smoke-v7-20261009/base, dispatch sales-by-category подтверждён; candidate/cold/formal v7 ещё не запускались.
+- Далее baseline terminal/review/own reset/installed cold → candidate warm/cold → paired acceptance → полный90/structure/cold/compare; старые smoke не подставлять.
+- V6 обе smoke PASS100/structure/warm/cold/bytes/close/logout/remaining0; formal2749 terminal1 до tasks:writer ENOENT/formal0; исторический native IO order UNKNOWN, FAIL сохранён.
+- V5 formal1287 terminal1 на13/45:13-я analytic PASS100/process cleanup FAIL; historical PID4050199 errno/operation UNKNOWN; profile не очищен, candidate0/cold0.
+- CLI modify3 FAIL; CLI docs-after-build3 accepted; Desktop warm3/cold1 PASS2 FAIL; новый Desktop cold controller prepared/guard6 PASS, native запуск только после90 closed.
+- Linux installed CLI/Desktop49 по5 ОС PASS; TUI/native opening/headless docs и upgrade PASS; lifecycle/independence и remaining natural transitions открыты.
+- MiMo429/quota exhausted; новых secondary-model calls нет, ответ о вторичной модели ещё ожидается.
+- Source/server skill907ff16b…/catalog17764f9a… сохранены; stage5–8 открыты,stage9/full35 deferred; серверный skill сохраняется.
+- Evidence и ограничения: reports/2026-10-09-package-docs-writer-release.md; работа продолжается без изменения чужого evals worktree.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 

@@ -1037,10 +1037,18 @@ Core имеет разметку осей, но без CSV oracle. По доку
   Formal v6 отказал в management preflight:ENOENT `.writer`, attempts0;
   результаты и отказ сохранены. В own mutable harness выполнен real-IO
   RED→GREEN для release после открытия owner:mutable `495463543`,
-  3 guards×5 PASS/modules77 PASS/typecheck PASS; полный suite ещё выполняется.
-  После принятия нового SHA
-  необходимы новые условия, обе smoke стороны и полный набор90.
-  Старые v3/v4/v5 не подставляются в новую пару.
+  3 guards×5 PASS/modules77 PASS/typecheck PASS; clean full495484 PASS/2 SKIP/0 FAIL.
+  Первый full495 отказал при cwd640MiB<1GiB и сохранён отдельно; порог не менялся.
+  Создан новый frozen skills-evals-release на полном SHA
+  `495463543901f1a69888b8d6375cd77996ef157b`, frozen typecheck PASS.
+  Conditions `ab-conditions-release-20261009/common.json` SHA256
+  `a268a81e8b4ea163f50ac52ee99817559b3fab9a08ffc09652dc96c00fcd2ed4`;
+  inventories/658 harness/281 tasks/21 pins PASS, protected diff0 против
+  fresh evalsref992fca12badf209169f13b569b9bd291e4d70e99 при freeze.
+  Baseline smoke v7 выполняется; candidate/cold/formal v7 ещё не запускались.
+  После обеих новых smoke сторон необходим полный набор90; перед приёмкой
+  повторно проверить актуальный ref и условия. Старые v3–v6 не подставляются
+  в новую пару. Подробнее: `reports/2026-10-09-package-docs-writer-release.md`.
 - [ ] Сначала прогнать небольшой представительный smoke (импорт, преобразование,
   соединение/агрегация, сохранение) из заранее выбранных задач,
   затем весь выбранный набор из 12–15 задач с тремя повторами для каждой сборки.

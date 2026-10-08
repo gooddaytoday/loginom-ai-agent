@@ -54,17 +54,48 @@ RED0 PASS/1 FAIL: тот же ENOENT/statx .writer; GREEN1 PASS.16MiB test owner
 guards PASS; typecheck PASS. Modules profile+process-supervisor session90146
 завершены exit0:77 PASS/0 FAIL/241 assertions/168.25s. Harness commit
 `495463543901f1a69888b8d6375cd77996ef157b` clean; protected diff0 против
-fresh evals refb31ebe7d0. Full suite session80830 выполняется на чистом commit;
-новая frozen-пара ещё не принята.
+fresh evals refb31ebe7d0 при исходной проверке.
 
-После source modules свободно641MiB. Для full suite создан новый собственный
-TMPDIR `/dev/shm/loginom-skills-evals-495463543-20261009`:mode700/UID1001,
-20GiB available, mount executable подтверждён запуском своего /usr/bin/true copy.
-Receipt `writer-post-open-full-tmpdir.json`; старые `/tmp` данные не очищались.
-Suite пишет только новые fixtures в выделенный root; этот тестовый environment
-зафиксирован отдельно и не меняет conditions живой пары или продуктовые сборки.
+## Полный suite и новая frozen-пара
 
-Evidence в `ab-local-stand-20261008/writer-post-open-{red,green,guard,all-guards,
-repeat-1..5,typecheck,modules}.log`. При смене harness SHA новая пара должна
-получить новый manifest и обе smoke стороны; v6 PASS не подставляется вместо неё.
-Этапы5–8 остаются открыты, stage9 отложен; выбор вторичной модели всё ещё ожидается.
+Первый full suite session80830 завершён exit1:447 PASS/2 SKIP/37 FAIL/2 errors.
+Хотя own TMPDIR в /dev/shm имел20GiB и executable probe PASS, preflight отдельно
+проверяет cwd harness:640MiB ниже неизменённого порога1GiB.31 отказ прямо связан
+с этим порогом; для6 downstream отказов связь поддерживается сигналом, но не
+доказана независимо. Log writer-post-open-full-495463543.log и collector
+full-cwd-space-signal-20261009 сохранены; ошибка подготовки запуска признана.
+
+Освобождены только точные дубликаты собственных immutable файлов через hardlink:
+26568 tracked файлов старых frozen worktrees,612 browser файлов в сохранённых
+baseline/candidate CLI/Desktop resources,13285 tracked файлов нового frozen.
+Сохранены пути/байты/права, проверены inventories/pins/clean Git до и после;
+setuid chrome-sandbox исключён. Receipts frozen-worktree-dedupe-20261009,
+immutable-browser-dedupe-20261009 и frozen-release-worktree-dedupe-20261009.
+Эти immutable источники и ресурсы нельзя редактировать на месте. Чужие /tmp,
+контейнеры, профили и исходные Loginom server/client не очищались.
+
+Новый full suite session12760 завершён exit0:484 PASS/2 SKIP/0 FAIL,
+2063 assertions/576.34s. Log writer-post-open-full-clean-495463543.log;
+own fresh TMPDIR /dev/shm/loginom-skills-evals-495463543-clean-20261009,
+receipt writer-post-open-full-clean-tmpdir.json; порог1GiB не изменён.
+Оба TMPDIR и исходный FAIL сохранены. Сейчас около1.9GiB свободно на cwd.
+
+Создан detached worktree skills-evals-release на
+495463543901f1a69888b8d6375cd77996ef157b, bun install --frozen-lockfile и
+frozen typecheck/session46440 exit0. Freeze прочитал свежий evals ref
+992fca12badf209169f13b569b9bd291e4d70e99; protected diff0. Более поздние docs-only
+изменения evals не подставляются в frozen; ref/pins повторно проверяются перед приёмкой.
+Conditions ab-conditions-release-20261009/common.json SHA256
+`a268a81e8b4ea163f50ac52ee99817559b3fab9a08ffc09652dc96c00fcd2ed4`:
+658 harness files/281 task files/21 adapter pins,5389+5651 build files verified.
+Те же15 задач, модели/параметры/judge/viewport, оба сохранённых CLI.
+
+Baseline smoke v7 session30063 выполняется: sales-by-category dispatch подтверждён,
+root ab-smoke-v7-20261009/base. Candidate/cold/formal v7 ещё не запускались.
+Далее terminal baseline/review/cold, candidate warm/cold и лишь затем90 attempts.
+Evidence private ab-local-stand-20261008; secrets/raw diagnostics в Git не внесены.
+
+Evidence TDD в writer-post-open-{red,green,guard,all-guards,repeat-1..5,typecheck,modules}.log.
+При смене harness SHA новая пара получает новый manifest и обе smoke стороны;
+v6 PASS не подставляется вместо неё. Этапы5–8 открыты,stage9 отложен;
+выбор вторичной модели всё ещё ожидается.
