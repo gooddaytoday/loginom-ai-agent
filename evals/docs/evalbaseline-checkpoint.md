@@ -1,4 +1,4 @@
-# EvalBaseline — checkpoint 2026-10-08
+# EvalBaseline — checkpoint 2026-10-09
 - Branch baseline-runtime; checkout /tmp/loginom-baseline-runtime; основной checkout сохранён.
 - Code SHA 3ce983703bbeca5d759f1cd7bfc8b9a8196c7f64; frozen server/supplement SHA 53d03a35b0ee2901b40c1a1bbb0170804d59e865.
 - LAB-31 принят на 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad; корпус 48 кейсов/144 измерения.
@@ -15,6 +15,6 @@
 - LAB-32 01a11ae4-fa45-79ce-aec6-edd7170dafc7; native run 01a11d4f-9de4-7da6-a096-1d403753da8c READY/release PASS; MCP actor PASS.
 - Technical manifest bed77af4-b5fe-4a53-b67b-014bc4f6bcc4; incomplete/0 measured; 2026-10-09 00:02 MSK release/FREE.
 - First prepare error сохранён; Dock URL исправлен до серий; независимый post-release check: 5 profiles clean/storage EMPTY/browser 0.
-- Calc smoke 889c9f8e-819a-431d-9ed1-2082e839ae00: ProviderModelNotFoundError, artifact отсутствует, tokens/tool calls 0; release/FREE.
-- Полную карточку создать и реально запустить на этапе 7; heartbeat основного чата 30 минут на этапе 8.
-- Readiness INCOMPLETE: oracle/judge/actual model proof отсутствуют; далее немодельно обновить собственный каталог, calc автоматически не повторять.
+- Calc smoke 889c9f8e-819a-431d-9ed1-2082e839ae00: ProviderModelNotFoundError, artifact отсутствует, tokens/tool calls 0; release/FREE; delivery 11 файлов PASS.
+- Каталог обновлён установленным CLI внутри bubblewrap: точные gpt-6.1-sol/medium зарегистрированы; model/judge calls=0, CLI pins unchanged, clean/FREE.
+- Readiness INCOMPLETE: ожидается ответ на запрос нового подготовительного цикла; calc не повторять, node/full не запускать. Затем полная карточка и heartbeat 30m по этапам 7–8.
