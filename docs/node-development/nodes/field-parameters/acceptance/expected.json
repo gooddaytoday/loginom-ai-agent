@@ -1,0 +1,77 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.reform_columns"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.reform_columns",
+      "output_node_label": "Очистка",
+      "columns": [
+        {
+          "name": "Timestamp",
+          "label": "Время",
+          "type": "datetime"
+        },
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "integer"
+        },
+        {
+          "name": "NetAmount",
+          "label": "Сумма",
+          "type": "real"
+        },
+        {
+          "name": "Enabled",
+          "label": "Значение",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        {
+          "Timestamp": "2024-02-29T23:59:58.000",
+          "Id": 1,
+          "NetAmount": 3.545,
+          "Enabled": true
+        },
+        {
+          "Timestamp": "2000-01-01T00:00:00.000",
+          "Id": 2,
+          "NetAmount": -42.2,
+          "Enabled": false
+        },
+        {
+          "Timestamp": null,
+          "Id": 3,
+          "NetAmount": null,
+          "Enabled": null
+        },
+        {
+          "Timestamp": null,
+          "Id": 4,
+          "NetAmount": null,
+          "Enabled": null
+        },
+        {
+          "Timestamp": null,
+          "Id": 5,
+          "NetAmount": null,
+          "Enabled": null
+        },
+        {
+          "Timestamp": "1899-12-30T00:00:00.000",
+          "Id": 6,
+          "NetAmount": 0.0,
+          "Enabled": false
+        }
+      ]
+    }
+  ]
+}
