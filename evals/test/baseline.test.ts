@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { chmod, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease, runBaseline } from "../src/baseline"
-import { repoRoot } from "../src/config"
+import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease, runBaseline, verifyBaselineInstallation, baselineHash } from "../src/baseline"
+import { repoRoot, evalsRoot } from "../src/config"
 
 import { baselineFixturePins } from "../fixtures/baseline"
 
@@ -21,6 +21,23 @@ test("prepare freezes all 44 cases as three complete rounds without executing a 
     await expect(prepareBaseline(path.join(directory, "series"), { checkout: repoRoot, pins: baselineFixturePins })).rejects.toThrow("SERIES_EXISTS")
     expect(await Bun.file(path.join(directory, "series/manifest.json")).text()).toBe(before)
   } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("installation verification refuses tampered payloads and extra files without executing CLI", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "baseline-install-"))
+  try {
+    const bin = path.join(root, "bin/loginom-ai-agent-cli")
+    await Bun.write(bin, "fixture binary never executed")
+    await chmod(bin, 0o755)
+    await Bun.write(path.join(root, "cli-manifest.json"), JSON.stringify({ format: "loginom-cli-artifact-v1", metadata: { version: "0.1.17", sourceCommit: baselineFixturePins.cliSource, sourceDirty: false },
+      files: [{ path: "bin/loginom-ai-agent-cli", sha256: baselineHash("fixture binary never executed"), mode: 0o755 }] }))
+    expect((await verifyBaselineInstallation(bin)).files).toBe(1)
+    await Bun.write(bin, "tampered")
+    await expect(verifyBaselineInstallation(bin)).rejects.toThrow("CLI_FILE_CHANGED")
+    await Bun.write(bin, "fixture binary never executed")
+    await Bun.write(path.join(root, "unexpected"), "extra")
+    await expect(verifyBaselineInstallation(bin)).rejects.toThrow("CLI_FILE_SET_CHANGED")
+  } finally { await rm(root, { recursive: true, force: true }) }
 })
 
 test("all 132 fixture measurements retain separate quality axes and become complete only after release", async () => {
@@ -68,6 +85,28 @@ test("check writes a separate report without models, admission or changes to sto
     expect((await runBaseline(["start", "--series", series], {})).code).toBe(2)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
+
+test("fixture executor resumes pending jobs through the real harness without repeating a saved attempt", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-executor-"))
+  const server = Bun.serve({ port: 0, fetch: () => Response.json({ status: "ok", result: { revision: "fixture" } }) })
+  try {
+    const series = path.join(directory, "series")
+    await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins })
+    const env = { PATH: Bun.env.PATH, EVAL_BASELINE_FIXTURE: "1", EVAL_CLI_MODE: "fake", EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_AGENT_VARIANT: "medium",
+      EVAL_PROFILE_DIR: path.join(directory, "profile"), EVAL_WORKSPACE_ROOT: path.join(directory, "work"), EVAL_ARTIFACT_SOURCE: `dir:${path.join(evalsRoot, "fixtures/storage")}`,
+      LOGINOM_URL: `http://127.0.0.1:${server.port}`, LOGINOM_DOCK_BASE_URL: `http://127.0.0.1:${server.port}`, LOGINOM_DOCK_API_KEY: "fixture",
+      EVAL_AGENT_PROVIDER_ID: "openai", EVAL_AGENT_PROVIDER_BASE_URL: "http://fixture", EVAL_AGENT_PROVIDER_API_KEY: "fixture", EVAL_AGENT_PROVIDER_MODEL_ID: "model",
+      EVAL_JUDGE_COMMAND: `${Bun.which("bun")} ${path.join(evalsRoot, "fixtures/fake-codex.ts")}`, JUDGE_MODEL: "gpt-6-astra", JUDGE_REASONING: "high" }
+    const started = await runBaseline(["start", "--series", series, "--limit", "1"], env)
+    expect(started).toMatchObject({ code: 0, recorded: 1, measured: 1 })
+    const first = (await checkBaseline(series)).rows[0]!.runDir!
+    const before = await Bun.file(path.join(first, "summary.json")).text()
+    const resumed = await runBaseline(["resume", "--series", series, "--limit", "1"], env)
+    expect(resumed).toMatchObject({ code: 0, recorded: 2 })
+    expect(await Bun.file(path.join(first, "summary.json")).text()).toBe(before)
+    expect((await checkBaseline(series)).rows.filter(row => row.runDir === first)).toHaveLength(1)
+  } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
+}, 60_000)
 
 test("a recorded product failure is retained while an unknown dispatch or pin drift blocks continuation", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-resume-"))

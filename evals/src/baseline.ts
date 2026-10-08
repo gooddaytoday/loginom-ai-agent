@@ -1,5 +1,5 @@
 import path from "node:path"
-import { lstat, mkdir, readdir, realpath, rename, rm, writeFile } from "node:fs/promises"
+import { lstat, mkdir, readdir, readlink, realpath, rename, rm, writeFile } from "node:fs/promises"
 import { loadTasks } from "./task"
 import { aggregate, aggregateTask, type AttemptResult, type RunSummary } from "./report"
 import { validateNodeRun } from "./node-evals"
@@ -23,6 +23,32 @@ type BaselineJournal = { version: 1; manifestSha256: string; checkout: string; r
 
 export class BaselineFailure extends Error {}
 export const baselineHash = (value: string | Uint8Array) => new Bun.CryptoHasher("sha256").update(value).digest("hex")
+
+export async function verifyBaselineInstallation(bin: string) {
+  const root = path.dirname(path.dirname(bin))
+  if (!path.isAbsolute(bin) || await realpath(bin) !== bin || await realpath(root) !== root) throw new BaselineFailure("CLI_PATH_REFUSED")
+  const raw = await Bun.file(path.join(root, "cli-manifest.json")).text()
+  const manifest = JSON.parse(raw) as { format: string; metadata: { version: string; sourceCommit: string; sourceDirty: boolean }
+    files: { path: string; sha256: string; mode: number; link?: string }[] }
+  if (manifest.format !== "loginom-cli-artifact-v1" || manifest.metadata?.version !== "0.1.17" || manifest.metadata.sourceDirty !== false ||
+    manifest.metadata.sourceCommit !== "fc3d97dbf695c2ed8dba942feb6fe83591a33944" || !manifest.files?.length ||
+    new Set(manifest.files.map(item => item.path)).size !== manifest.files.length) throw new BaselineFailure("CLI_MANIFEST_REFUSED")
+  for (const item of manifest.files) {
+    if (path.isAbsolute(item.path) || item.path.split(path.sep).some(part => ["..", ".", ""].includes(part)) ||
+      !/^[0-9a-f]{64}$/.test(item.sha256) || !Number.isInteger(item.mode)) throw new BaselineFailure("CLI_MANIFEST_REFUSED")
+    const file = path.join(root, item.path)
+    const info = await lstat(file)
+    const resolved = await realpath(file)
+    if (!resolved.startsWith(root + path.sep) || !info.isFile() && !info.isSymbolicLink() || (info.mode & 0o777) !== (item.mode & 0o777) ||
+      (info.isSymbolicLink() ? await readlink(file) : undefined) !== item.link || baselineHash(await Bun.file(file).bytes()) !== item.sha256)
+      throw new BaselineFailure("CLI_FILE_CHANGED")
+  }
+  const walk = async (directory: string): Promise<string[]> => (await Promise.all((await readdir(directory, { withFileTypes: true })).map(async item =>
+    item.isDirectory() ? walk(path.join(directory, item.name)) : [path.relative(root, path.join(directory, item.name))]))).flat()
+  if (JSON.stringify((await walk(root)).sort()) !== JSON.stringify([...manifest.files.map(item => item.path), "cli-manifest.json"].sort()))
+    throw new BaselineFailure("CLI_FILE_SET_CHANGED")
+  return { files: manifest.files.length, metadata: manifest.metadata, manifestSha256: baselineHash(raw), binarySha256: baselineHash(await Bun.file(bin).bytes()) }
+}
 
 export async function prepareBaseline(directory: string, options: { checkout: string; pins: BaselinePins; smoke?: boolean }) {
   validatePins(options.pins)
@@ -125,7 +151,7 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
   try {
     const command = argv[0]
     if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke --series DIR [--config PRIVATE --issue ID --task ID] [--compare SERIES]" }
-    const values = parseArgs({ args: argv.slice(1), strict: true, options: Object.fromEntries(["series", "config", "issue", "task", "compare"].map(name => [name, { type: "string" as const }])) }).values
+    const values = parseArgs({ args: argv.slice(1), strict: true, options: Object.fromEntries(["series", "config", "issue", "task", "compare", "limit"].map(name => [name, { type: "string" as const }])) }).values
     const directory = values.series
     if (!directory || !path.isAbsolute(directory)) throw new BaselineFailure("SERIES_PATH_REQUIRED")
     if (command === "check") {
@@ -133,9 +159,38 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
       const reportDir = await writeBaselineReport(directory, report)
       return { code: 0, status: report.status, ...report.coverage, reportDir }
     }
-    void env
+    if (["start", "resume"].includes(command ?? "") && env.EVAL_BASELINE_FIXTURE === "1") {
+      const { manifest, journal } = await readBaseline(directory)
+      if (manifest.pins.mode !== "fixture" || env.EVAL_CLI_MODE !== "fake" || !env.EVAL_ARTIFACT_SOURCE?.startsWith("dir:")) throw new BaselineFailure("FIXTURE_MODE_REQUIRED")
+      if (command === "start" && journal.jobs.some(job => job.state !== "pending")) throw new BaselineFailure("USE_RESUME")
+      const limit = Number(values.limit ?? manifest.jobs.length)
+      if (!Number.isSafeInteger(limit) || limit < 1) throw new BaselineFailure("INVALID_LIMIT")
+      for (const job of journal.jobs.filter(job => job.state === "pending").slice(0, limit)) {
+        await dispatchBaselineJob(directory, job.key, { checkout: journal.checkout, pins: manifest.pins }, env)
+      }
+      const report = await checkBaseline(directory)
+      return { code: 0, status: report.status, ...report.coverage, reportDir: await writeBaselineReport(directory, report) }
+    }
     throw new BaselineFailure("LIVE_CONFIGURATION_REQUIRED")
   } catch (error) { return { code: 2, status: "BLOCKED", reason: error instanceof BaselineFailure ? error.message : "BASELINE_OPERATION_FAILED" } }
+}
+
+async function dispatchBaselineJob(directory: string, key: string, current: { checkout: string; pins: BaselinePins }, env: Record<string, string | undefined>) {
+  const admitted = await beginBaselineMeasurement(directory, key, current)
+  const parent = path.dirname(admitted.resultsDir)
+  const script = admitted.case.collection === "node" ? "script/run-node-evals.ts" : "src/run.ts"
+  const argv = [process.execPath, path.join(current.checkout, "evals", script), "--tasks", path.join(current.checkout, "evals", path.dirname(admitted.case.directory)),
+    "--only", admitted.case.id, "--repeat", "1", "--timeout-ms", String(current.pins.timeoutMs), "--label", key]
+  const child = Bun.spawn(argv, { cwd: path.join(current.checkout, "evals"), env: { ...env, EVAL_RESULTS_DIR: admitted.resultsDir,
+    EVAL_HARNESS_LEASE_RECEIPT: path.join(parent, "harness-admission.json"), EVAL_REPEAT: "1",
+    EVAL_PASS_THRESHOLD: String(current.pins.threshold), EVAL_JUDGE_TIMEOUT_MS: String(current.pins.judgeTimeoutMs) },
+    stdout: Bun.file(path.join(parent, "harness.stdout")), stderr: Bun.file(path.join(parent, "harness.stderr")) })
+  await child.exited
+  const runs = (await readdir(admitted.resultsDir, { withFileTypes: true })).filter(item => item.isDirectory())
+  if (runs.length !== 1) throw new BaselineFailure("UNKNOWN_OUTCOME")
+  const record = await recordBaselineMeasurement(directory, key, path.join(admitted.resultsDir, runs[0]!.name))
+  if (!record.cleanup) throw new BaselineFailure("CLEANUP_UNKNOWN")
+  return record
 }
 
 async function writeBaselineReport(directory: string, report: Awaited<ReturnType<typeof checkBaseline>>) {
@@ -170,7 +225,7 @@ async function inspectMeasurement(manifest: BaselineManifest, item: BaselineCase
     .map(async out => Bun.file(path.join(out, "cleanup.json")).json()))
   const cleanup = summary.storage_leftovers?.length === 0 && result.environment_cleanup?.status === "confirmed" && cleanups.every(proof =>
     proof.result?.status === "confirmed" && proof.processes?.status === "confirmed" &&
-    ["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].every(stage => proof.stages?.some((item: { stage: string; status: string }) => item.stage === stage && item.status === "confirmed")))
+    ["processes", "diagnostics", "writer", "ready", "profile_history", ...(manifest.pins.mode === "live" ? ["storage"] : [])].every(stage => proof.stages?.some((item: { stage: string; status: string }) => item.stage === stage && item.status === "confirmed")))
   if (manifest.pins.mode === "live" && (summary.agent?.cli_version !== manifest.pins.cliVersion || summary.agent.source_commit !== manifest.pins.cliSource ||
     summary.agent.binary_sha256 !== manifest.pins.binarySha256 || summary.agent.model !== manifest.pins.model || summary.agent.variant !== manifest.pins.variant ||
     summary.harness?.dirty || !manifest.pins.harnessSha.startsWith(summary.harness?.git_sha ?? "UNKNOWN"))) throw new BaselineFailure("RUN_PINS_CHANGED")
