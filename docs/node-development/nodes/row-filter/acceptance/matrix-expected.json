@@ -1,0 +1,3494 @@
+{
+  "fixture_sha256": "7ac857baaecd48b1e03f2cff470140ae7526a3e289016a209c7d41a706a2e0bb",
+  "cases": [
+    {
+      "name": "Id_compare_0",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": "<",
+              "value": 6
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        5,
+        5
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        [
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Id_compare_1",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": "<=",
+              "value": 6
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        7,
+        3
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          6
+        ],
+        [
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Id_compare_2",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": ">",
+              "value": 6
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        3,
+        7
+      ],
+      "expected_ids": [
+        [
+          7,
+          8,
+          9
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "Id_compare_3",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": ">=",
+              "value": 6
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        5,
+        5
+      ],
+      "expected_ids": [
+        [
+          6,
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "Id_compare_4",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": "=",
+              "value": 6
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        2,
+        8
+      ],
+      "expected_ids": [
+        [
+          6,
+          6
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Id_compare_5",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": "<>",
+              "value": 6
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        8,
+        2
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          7,
+          8,
+          9
+        ],
+        [
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "Id_between",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": "between",
+              "lower": 2,
+              "upper": 7
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        7,
+        3
+      ],
+      "expected_ids": [
+        [
+          2,
+          3,
+          4,
+          5,
+          6,
+          6,
+          7
+        ],
+        [
+          1,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Id_not_between",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": "not_between",
+              "lower": 2,
+              "upper": 7
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        3,
+        7
+      ],
+      "expected_ids": [
+        [
+          1,
+          8,
+          9
+        ],
+        [
+          2,
+          3,
+          4,
+          5,
+          6,
+          6,
+          7
+        ]
+      ]
+    },
+    {
+      "name": "Id_in",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": "in",
+              "values": [
+                2,
+                6
+              ]
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        3,
+        7
+      ],
+      "expected_ids": [
+        [
+          2,
+          6,
+          6
+        ],
+        [
+          1,
+          3,
+          4,
+          5,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Id_not_in",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": "not_in",
+              "values": [
+                2,
+                6
+              ]
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        7,
+        3
+      ],
+      "expected_ids": [
+        [
+          1,
+          3,
+          4,
+          5,
+          7,
+          8,
+          9
+        ],
+        [
+          2,
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "Id_is_null",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": "is_null"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        0,
+        10
+      ],
+      "expected_ids": [
+        [],
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Id_not_null",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": "not_null"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        10,
+        0
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          6,
+          7,
+          8,
+          9
+        ],
+        []
+      ]
+    },
+    {
+      "name": "Amount_compare_0",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Amount"
+              },
+              "type": "real",
+              "operator": "<",
+              "value": 1.23456
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        3,
+        7
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          8
+        ],
+        [
+          3,
+          4,
+          5,
+          6,
+          6,
+          7,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Amount_compare_1",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Amount"
+              },
+              "type": "real",
+              "operator": "<=",
+              "value": 1.23456
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        4,
+        6
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          8
+        ],
+        [
+          4,
+          5,
+          6,
+          6,
+          7,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Amount_compare_2",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Amount"
+              },
+              "type": "real",
+              "operator": ">",
+              "value": 1.23456
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        5,
+        5
+      ],
+      "expected_ids": [
+        [
+          4,
+          6,
+          6,
+          7,
+          9
+        ],
+        [
+          1,
+          2,
+          3,
+          5,
+          8
+        ]
+      ]
+    },
+    {
+      "name": "Amount_compare_3",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Amount"
+              },
+              "type": "real",
+              "operator": ">=",
+              "value": 1.23456
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        6,
+        4
+      ],
+      "expected_ids": [
+        [
+          3,
+          4,
+          6,
+          6,
+          7,
+          9
+        ],
+        [
+          1,
+          2,
+          5,
+          8
+        ]
+      ]
+    },
+    {
+      "name": "Amount_compare_4",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Amount"
+              },
+              "type": "real",
+              "operator": "=",
+              "value": 1.23456
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        1,
+        9
+      ],
+      "expected_ids": [
+        [
+          3
+        ],
+        [
+          1,
+          2,
+          4,
+          5,
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Amount_compare_5",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Amount"
+              },
+              "type": "real",
+              "operator": "<>",
+              "value": 1.23456
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        8,
+        2
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          4,
+          6,
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          3,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "Amount_between",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Amount"
+              },
+              "type": "real",
+              "operator": "between",
+              "lower": -1e-05,
+              "upper": 8.76543
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        6,
+        4
+      ],
+      "expected_ids": [
+        [
+          2,
+          3,
+          4,
+          6,
+          6,
+          8
+        ],
+        [
+          1,
+          5,
+          7,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Amount_not_between",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Amount"
+              },
+              "type": "real",
+              "operator": "not_between",
+              "lower": -1e-05,
+              "upper": 8.76543
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        3,
+        7
+      ],
+      "expected_ids": [
+        [
+          1,
+          7,
+          9
+        ],
+        [
+          2,
+          3,
+          4,
+          5,
+          6,
+          6,
+          8
+        ]
+      ]
+    },
+    {
+      "name": "Amount_in",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Amount"
+              },
+              "type": "real",
+              "operator": "in",
+              "values": [
+                -2.34567,
+                8.76543
+              ]
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        3,
+        7
+      ],
+      "expected_ids": [
+        [
+          1,
+          6,
+          6
+        ],
+        [
+          2,
+          3,
+          4,
+          5,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Amount_not_in",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Amount"
+              },
+              "type": "real",
+              "operator": "not_in",
+              "values": [
+                -2.34567,
+                8.76543
+              ]
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        6,
+        4
+      ],
+      "expected_ids": [
+        [
+          2,
+          3,
+          4,
+          7,
+          8,
+          9
+        ],
+        [
+          1,
+          5,
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "Amount_is_null",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Amount"
+              },
+              "type": "real",
+              "operator": "is_null"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        1,
+        9
+      ],
+      "expected_ids": [
+        [
+          5
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Amount_not_null",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Amount"
+              },
+              "type": "real",
+              "operator": "not_null"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        9,
+        1
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          5
+        ]
+      ]
+    },
+    {
+      "name": "When_compare_0",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "When"
+              },
+              "type": "datetime",
+              "operator": "<",
+              "value": "2024-01-02T12:30:01"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        4,
+        6
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4
+        ],
+        [
+          5,
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "When_compare_1",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "When"
+              },
+              "type": "datetime",
+              "operator": "<=",
+              "value": "2024-01-02T12:30:01"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        6,
+        4
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          6
+        ],
+        [
+          5,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "When_compare_2",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "When"
+              },
+              "type": "datetime",
+              "operator": ">",
+              "value": "2024-01-02T12:30:01"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        3,
+        7
+      ],
+      "expected_ids": [
+        [
+          7,
+          8,
+          9
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "When_compare_3",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "When"
+              },
+              "type": "datetime",
+              "operator": ">=",
+              "value": "2024-01-02T12:30:01"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        5,
+        5
+      ],
+      "expected_ids": [
+        [
+          6,
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "When_compare_4",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "When"
+              },
+              "type": "datetime",
+              "operator": "=",
+              "value": "2024-01-02T12:30:01"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        2,
+        8
+      ],
+      "expected_ids": [
+        [
+          6,
+          6
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "When_compare_5",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "When"
+              },
+              "type": "datetime",
+              "operator": "<>",
+              "value": "2024-01-02T12:30:01"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        7,
+        3
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          9
+        ],
+        [
+          5,
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "When_between",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "When"
+              },
+              "type": "datetime",
+              "operator": "between",
+              "lower": "2024-01-01T00:00:02",
+              "upper": "2024-01-02T12:30:03"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        7,
+        3
+      ],
+      "expected_ids": [
+        [
+          2,
+          3,
+          4,
+          6,
+          6,
+          7,
+          8
+        ],
+        [
+          1,
+          5,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "When_not_between",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "When"
+              },
+              "type": "datetime",
+              "operator": "not_between",
+              "lower": "2024-01-01T00:00:02",
+              "upper": "2024-01-02T12:30:03"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        2,
+        8
+      ],
+      "expected_ids": [
+        [
+          1,
+          9
+        ],
+        [
+          2,
+          3,
+          4,
+          5,
+          6,
+          6,
+          7,
+          8
+        ]
+      ]
+    },
+    {
+      "name": "When_in",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "When"
+              },
+              "type": "datetime",
+              "operator": "in",
+              "values": [
+                "2024-01-01T00:00:02",
+                "2024-01-02T12:30:03"
+              ]
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        2,
+        8
+      ],
+      "expected_ids": [
+        [
+          2,
+          8
+        ],
+        [
+          1,
+          3,
+          4,
+          5,
+          6,
+          6,
+          7,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "When_not_in",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "When"
+              },
+              "type": "datetime",
+              "operator": "not_in",
+              "values": [
+                "2024-01-01T00:00:02",
+                "2024-01-02T12:30:03"
+              ]
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        7,
+        3
+      ],
+      "expected_ids": [
+        [
+          1,
+          3,
+          4,
+          6,
+          6,
+          7,
+          9
+        ],
+        [
+          2,
+          5,
+          8
+        ]
+      ]
+    },
+    {
+      "name": "When_is_null",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "When"
+              },
+              "type": "datetime",
+              "operator": "is_null"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        1,
+        9
+      ],
+      "expected_ids": [
+        [
+          5
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "When_not_null",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "When"
+              },
+              "type": "datetime",
+              "operator": "not_null"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        9,
+        1
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          5
+        ]
+      ]
+    },
+    {
+      "name": "Text_compare_0_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": true,
+              "operator": "<",
+              "value": "Beta"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        5,
+        5
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          4,
+          6,
+          6
+        ],
+        [
+          3,
+          5,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_compare_1_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": true,
+              "operator": "<=",
+              "value": "Beta"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        6,
+        4
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          6
+        ],
+        [
+          5,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_compare_2_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": true,
+              "operator": ">",
+              "value": "Beta"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        3,
+        7
+      ],
+      "expected_ids": [
+        [
+          7,
+          8,
+          9
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "Text_compare_3_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": true,
+              "operator": ">=",
+              "value": "Beta"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        4,
+        6
+      ],
+      "expected_ids": [
+        [
+          3,
+          7,
+          8,
+          9
+        ],
+        [
+          1,
+          2,
+          4,
+          5,
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "Text_compare_4_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": true,
+              "operator": "=",
+              "value": "Beta"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        1,
+        9
+      ],
+      "expected_ids": [
+        [
+          3
+        ],
+        [
+          1,
+          2,
+          4,
+          5,
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_compare_5_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": true,
+              "operator": "<>",
+              "value": "Beta"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        8,
+        2
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          4,
+          6,
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          3,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "Text_between_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": true,
+              "operator": "between",
+              "lower": "Alpha",
+              "upper": "preTail"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        4,
+        6
+      ],
+      "expected_ids": [
+        [
+          1,
+          3,
+          7,
+          9
+        ],
+        [
+          2,
+          4,
+          5,
+          6,
+          6,
+          8
+        ]
+      ]
+    },
+    {
+      "name": "Text_not_between_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": true,
+              "operator": "not_between",
+              "lower": "Alpha",
+              "upper": "preTail"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        5,
+        5
+      ],
+      "expected_ids": [
+        [
+          2,
+          4,
+          6,
+          6,
+          8
+        ],
+        [
+          1,
+          3,
+          5,
+          7,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_in_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": true,
+              "operator": "in",
+              "values": [
+                "Alpha",
+                "A,b"
+              ]
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        3,
+        7
+      ],
+      "expected_ids": [
+        [
+          1,
+          6,
+          6
+        ],
+        [
+          2,
+          3,
+          4,
+          5,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_not_in_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": true,
+              "operator": "not_in",
+              "values": [
+                "Alpha",
+                "A,b"
+              ]
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        6,
+        4
+      ],
+      "expected_ids": [
+        [
+          2,
+          3,
+          4,
+          7,
+          8,
+          9
+        ],
+        [
+          1,
+          5,
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "Text_compare_0_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": false,
+              "operator": "<",
+              "value": "Beta"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        5,
+        5
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          4,
+          6,
+          6
+        ],
+        [
+          3,
+          5,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_compare_1_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": false,
+              "operator": "<=",
+              "value": "Beta"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        6,
+        4
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          6
+        ],
+        [
+          5,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_compare_2_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": false,
+              "operator": ">",
+              "value": "Beta"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        3,
+        7
+      ],
+      "expected_ids": [
+        [
+          7,
+          8,
+          9
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "Text_compare_3_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": false,
+              "operator": ">=",
+              "value": "Beta"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        4,
+        6
+      ],
+      "expected_ids": [
+        [
+          3,
+          7,
+          8,
+          9
+        ],
+        [
+          1,
+          2,
+          4,
+          5,
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "Text_compare_4_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": false,
+              "operator": "=",
+              "value": "Beta"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        1,
+        9
+      ],
+      "expected_ids": [
+        [
+          3
+        ],
+        [
+          1,
+          2,
+          4,
+          5,
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_compare_5_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": false,
+              "operator": "<>",
+              "value": "Beta"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        8,
+        2
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          4,
+          6,
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          3,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "Text_between_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": false,
+              "operator": "between",
+              "lower": "Alpha",
+              "upper": "preTail"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        6,
+        4
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          7,
+          8,
+          9
+        ],
+        [
+          4,
+          5,
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "Text_not_between_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": false,
+              "operator": "not_between",
+              "lower": "Alpha",
+              "upper": "preTail"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        3,
+        7
+      ],
+      "expected_ids": [
+        [
+          4,
+          6,
+          6
+        ],
+        [
+          1,
+          2,
+          3,
+          5,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_in_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": false,
+              "operator": "in",
+              "values": [
+                "Alpha",
+                "A,b"
+              ]
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        4,
+        6
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          6,
+          6
+        ],
+        [
+          3,
+          4,
+          5,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_not_in_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "case_sensitive": false,
+              "operator": "not_in",
+              "values": [
+                "Alpha",
+                "A,b"
+              ]
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        5,
+        5
+      ],
+      "expected_ids": [
+        [
+          3,
+          4,
+          7,
+          8,
+          9
+        ],
+        [
+          1,
+          2,
+          5,
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "Text_is_null",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "is_null"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        1,
+        9
+      ],
+      "expected_ids": [
+        [
+          5
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_not_null",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "not_null"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        9,
+        1
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          5
+        ]
+      ]
+    },
+    {
+      "name": "row_number_compare_0",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "row_number"
+              },
+              "type": "integer",
+              "operator": "<",
+              "value": 6
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        5,
+        5
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        [
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "row_number_compare_1",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "row_number"
+              },
+              "type": "integer",
+              "operator": "<=",
+              "value": 6
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        6,
+        4
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        [
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "row_number_compare_2",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "row_number"
+              },
+              "type": "integer",
+              "operator": ">",
+              "value": 6
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        4,
+        6
+      ],
+      "expected_ids": [
+        [
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "row_number_compare_3",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "row_number"
+              },
+              "type": "integer",
+              "operator": ">=",
+              "value": 6
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        5,
+        5
+      ],
+      "expected_ids": [
+        [
+          6,
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "row_number_compare_4",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "row_number"
+              },
+              "type": "integer",
+              "operator": "=",
+              "value": 6
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        1,
+        9
+      ],
+      "expected_ids": [
+        [
+          6
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "row_number_compare_5",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "row_number"
+              },
+              "type": "integer",
+              "operator": "<>",
+              "value": 6
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        9,
+        1
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          6
+        ]
+      ]
+    },
+    {
+      "name": "row_number_between",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "row_number"
+              },
+              "type": "integer",
+              "operator": "between",
+              "lower": 2,
+              "upper": 7
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        6,
+        4
+      ],
+      "expected_ids": [
+        [
+          2,
+          3,
+          4,
+          5,
+          6,
+          6
+        ],
+        [
+          1,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "row_number_not_between",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "row_number"
+              },
+              "type": "integer",
+              "operator": "not_between",
+              "lower": 2,
+              "upper": 7
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        4,
+        6
+      ],
+      "expected_ids": [
+        [
+          1,
+          7,
+          8,
+          9
+        ],
+        [
+          2,
+          3,
+          4,
+          5,
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "row_number_in",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "row_number"
+              },
+              "type": "integer",
+              "operator": "in",
+              "values": [
+                2,
+                6
+              ]
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        2,
+        8
+      ],
+      "expected_ids": [
+        [
+          2,
+          6
+        ],
+        [
+          1,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "row_number_not_in",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "row_number"
+              },
+              "type": "integer",
+              "operator": "not_in",
+              "values": [
+                2,
+                6
+              ]
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        8,
+        2
+      ],
+      "expected_ids": [
+        [
+          1,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          2,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "row_number_is_null",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "row_number"
+              },
+              "type": "integer",
+              "operator": "is_null"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        0,
+        10
+      ],
+      "expected_ids": [
+        [],
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "row_number_not_null",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "row_number"
+              },
+              "type": "integer",
+              "operator": "not_null"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        10,
+        0
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          6,
+          7,
+          8,
+          9
+        ],
+        []
+      ]
+    },
+    {
+      "name": "Flag_is_true",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Flag"
+              },
+              "type": "boolean",
+              "operator": "is_true"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        5,
+        5
+      ],
+      "expected_ids": [
+        [
+          1,
+          3,
+          6,
+          6,
+          8
+        ],
+        [
+          2,
+          4,
+          5,
+          7,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Flag_is_false",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Flag"
+              },
+              "type": "boolean",
+              "operator": "is_false"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        4,
+        6
+      ],
+      "expected_ids": [
+        [
+          2,
+          4,
+          7,
+          9
+        ],
+        [
+          1,
+          3,
+          5,
+          6,
+          6,
+          8
+        ]
+      ]
+    },
+    {
+      "name": "Flag_is_null",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Flag"
+              },
+              "type": "boolean",
+              "operator": "is_null"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        1,
+        9
+      ],
+      "expected_ids": [
+        [
+          5
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Flag_not_null",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Flag"
+              },
+              "type": "boolean",
+              "operator": "not_null"
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        9,
+        1
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          5
+        ]
+      ]
+    },
+    {
+      "name": "Text_contains_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "contains",
+              "value": "a",
+              "case_sensitive": true
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        4,
+        6
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          7
+        ],
+        [
+          4,
+          5,
+          6,
+          6,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_contains_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "contains",
+              "value": "a",
+              "case_sensitive": false
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        7,
+        3
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          6,
+          6,
+          7,
+          8
+        ],
+        [
+          4,
+          5,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_not_contains_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "not_contains",
+              "value": "a",
+              "case_sensitive": true
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        5,
+        5
+      ],
+      "expected_ids": [
+        [
+          4,
+          6,
+          6,
+          8,
+          9
+        ],
+        [
+          1,
+          2,
+          3,
+          5,
+          7
+        ]
+      ]
+    },
+    {
+      "name": "Text_not_contains_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "not_contains",
+              "value": "a",
+              "case_sensitive": false
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        2,
+        8
+      ],
+      "expected_ids": [
+        [
+          4,
+          9
+        ],
+        [
+          1,
+          2,
+          3,
+          5,
+          6,
+          6,
+          7,
+          8
+        ]
+      ]
+    },
+    {
+      "name": "Text_starts_with_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "starts_with",
+              "value": "a",
+              "case_sensitive": true
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        1,
+        9
+      ],
+      "expected_ids": [
+        [
+          2
+        ],
+        [
+          1,
+          3,
+          4,
+          5,
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_starts_with_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "starts_with",
+              "value": "a",
+              "case_sensitive": false
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        4,
+        6
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          6,
+          6
+        ],
+        [
+          3,
+          4,
+          5,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_not_starts_with_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "not_starts_with",
+              "value": "a",
+              "case_sensitive": true
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        8,
+        2
+      ],
+      "expected_ids": [
+        [
+          1,
+          3,
+          4,
+          6,
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          2,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "Text_not_starts_with_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "not_starts_with",
+              "value": "a",
+              "case_sensitive": false
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        5,
+        5
+      ],
+      "expected_ids": [
+        [
+          3,
+          4,
+          7,
+          8,
+          9
+        ],
+        [
+          1,
+          2,
+          5,
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "Text_ends_with_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "ends_with",
+              "value": "Tail",
+              "case_sensitive": true
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        1,
+        9
+      ],
+      "expected_ids": [
+        [
+          7
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          6,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_ends_with_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "ends_with",
+              "value": "Tail",
+              "case_sensitive": false
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        2,
+        8
+      ],
+      "expected_ids": [
+        [
+          7,
+          8
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          6,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "Text_not_ends_with_case",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "not_ends_with",
+              "value": "Tail",
+              "case_sensitive": true
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        8,
+        2
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          6,
+          8,
+          9
+        ],
+        [
+          5,
+          7
+        ]
+      ]
+    },
+    {
+      "name": "Text_not_ends_with_nocase",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "not_ends_with",
+              "value": "Tail",
+              "case_sensitive": false
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        7,
+        3
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          6,
+          6,
+          9
+        ],
+        [
+          5,
+          7,
+          8
+        ]
+      ]
+    },
+    {
+      "name": "precedence_or_then_and",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": "=",
+              "value": 9
+            }
+          ],
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": ">=",
+              "value": 6
+            },
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": "<=",
+              "value": 7
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        4,
+        6
+      ],
+      "expected_ids": [
+        [
+          6,
+          6,
+          7,
+          9
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          8
+        ]
+      ]
+    },
+    {
+      "name": "all_records",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": ">=",
+              "value": 1
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        10,
+        0
+      ],
+      "expected_ids": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          6,
+          7,
+          8,
+          9
+        ],
+        []
+      ]
+    },
+    {
+      "name": "no_records",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Id"
+              },
+              "type": "integer",
+              "operator": "<",
+              "value": 0
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        0,
+        10
+      ],
+      "expected_ids": [
+        [],
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    },
+    {
+      "name": "empty_string",
+      "parameters": {
+        "groups": [
+          [
+            {
+              "field": {
+                "kind": "input_field",
+                "name": "Text"
+              },
+              "type": "string",
+              "operator": "=",
+              "value": "",
+              "case_sensitive": true
+            }
+          ]
+        ]
+      },
+      "expected_counts": [
+        1,
+        9
+      ],
+      "expected_ids": [
+        [
+          4
+        ],
+        [
+          1,
+          2,
+          3,
+          5,
+          6,
+          6,
+          7,
+          8,
+          9
+        ]
+      ]
+    }
+  ]
+}

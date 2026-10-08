@@ -1,0 +1,272 @@
+{
+  "package_path": "packages/LAB47-row-filter.lgp",
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Данные"
+    },
+    {
+      "type": "transform.filter_data",
+      "label": "Отбор"
+    }
+  ],
+  "output_node_type": "transform.filter_data",
+  "columns": [
+    {
+      "name": "Id",
+      "label": "Id",
+      "type": "integer"
+    },
+    {
+      "name": "Amount",
+      "label": "Amount",
+      "type": "real"
+    },
+    {
+      "name": "Flag",
+      "label": "Flag",
+      "type": "boolean"
+    },
+    {
+      "name": "When",
+      "label": "When",
+      "type": "datetime"
+    },
+    {
+      "name": "Text",
+      "label": "Text",
+      "type": "string"
+    }
+  ],
+  "rows": [
+    {
+      "Id": 3,
+      "Amount": 1.23456,
+      "Flag": true,
+      "When": "2024-01-01T00:00:03.000",
+      "Text": "Beta"
+    },
+    {
+      "Id": 6,
+      "Amount": 8.76543,
+      "Flag": true,
+      "When": "2024-01-02T12:30:01.000",
+      "Text": "A,b"
+    },
+    {
+      "Id": 6,
+      "Amount": 8.76543,
+      "Flag": true,
+      "When": "2024-01-02T12:30:01.000",
+      "Text": "A,b"
+    },
+    {
+      "Id": 7,
+      "Amount": 10.00001,
+      "Flag": false,
+      "When": "2024-01-02T12:30:02.000",
+      "Text": "preTail"
+    },
+    {
+      "Id": 8,
+      "Amount": -1e-05,
+      "Flag": true,
+      "When": "2024-01-02T12:30:03.000",
+      "Text": "preTAIL"
+    }
+  ],
+  "final_groups": [
+    [
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "Amount"
+        },
+        "type": "real",
+        "operator": ">=",
+        "value": 1.23456
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "When"
+        },
+        "type": "datetime",
+        "operator": "<=",
+        "value": "2024-01-02T12:30:01"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "Flag"
+        },
+        "type": "boolean",
+        "operator": "is_true"
+      }
+    ],
+    [
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "Text"
+        },
+        "type": "string",
+        "operator": "contains",
+        "value": "Tail",
+        "case_sensitive": false
+      }
+    ]
+  ],
+  "full_ports": [
+    [
+      {
+        "Id": 3,
+        "Amount": 1.23456,
+        "Flag": true,
+        "When": "2024-01-01T00:00:03.000",
+        "Text": "Beta"
+      },
+      {
+        "Id": 6,
+        "Amount": 8.76543,
+        "Flag": true,
+        "When": "2024-01-02T12:30:01.000",
+        "Text": "A,b"
+      },
+      {
+        "Id": 6,
+        "Amount": 8.76543,
+        "Flag": true,
+        "When": "2024-01-02T12:30:01.000",
+        "Text": "A,b"
+      },
+      {
+        "Id": 7,
+        "Amount": 10.00001,
+        "Flag": false,
+        "When": "2024-01-02T12:30:02.000",
+        "Text": "preTail"
+      },
+      {
+        "Id": 8,
+        "Amount": -1e-05,
+        "Flag": true,
+        "When": "2024-01-02T12:30:03.000",
+        "Text": "preTAIL"
+      }
+    ],
+    [
+      {
+        "Id": 1,
+        "Amount": -2.34567,
+        "Flag": true,
+        "When": "2024-01-01T00:00:01.000",
+        "Text": "Alpha"
+      },
+      {
+        "Id": 2,
+        "Amount": 0.0,
+        "Flag": false,
+        "When": "2024-01-01T00:00:02.000",
+        "Text": "alpha"
+      },
+      {
+        "Id": 4,
+        "Amount": 1.23457,
+        "Flag": false,
+        "When": "2024-01-01T00:00:04.000",
+        "Text": ""
+      },
+      {
+        "Id": 5,
+        "Amount": null,
+        "Flag": null,
+        "When": null,
+        "Text": null
+      },
+      {
+        "Id": 9,
+        "Amount": 100.12345,
+        "Flag": false,
+        "When": "2024-01-02T12:30:04.000",
+        "Text": "end"
+      }
+    ]
+  ],
+  "initial_ports": [
+    [
+      {
+        "Id": 1,
+        "Amount": -2.34567,
+        "Flag": true,
+        "When": "2024-01-01T00:00:01.000",
+        "Text": "Alpha"
+      },
+      {
+        "Id": 2,
+        "Amount": 0.0,
+        "Flag": false,
+        "When": "2024-01-01T00:00:02.000",
+        "Text": "alpha"
+      },
+      {
+        "Id": 3,
+        "Amount": 1.23456,
+        "Flag": true,
+        "When": "2024-01-01T00:00:03.000",
+        "Text": "Beta"
+      },
+      {
+        "Id": 6,
+        "Amount": 8.76543,
+        "Flag": true,
+        "When": "2024-01-02T12:30:01.000",
+        "Text": "A,b"
+      },
+      {
+        "Id": 6,
+        "Amount": 8.76543,
+        "Flag": true,
+        "When": "2024-01-02T12:30:01.000",
+        "Text": "A,b"
+      },
+      {
+        "Id": 7,
+        "Amount": 10.00001,
+        "Flag": false,
+        "When": "2024-01-02T12:30:02.000",
+        "Text": "preTail"
+      },
+      {
+        "Id": 8,
+        "Amount": -1e-05,
+        "Flag": true,
+        "When": "2024-01-02T12:30:03.000",
+        "Text": "preTAIL"
+      },
+      {
+        "Id": 9,
+        "Amount": 100.12345,
+        "Flag": false,
+        "When": "2024-01-02T12:30:04.000",
+        "Text": "end"
+      }
+    ],
+    [
+      {
+        "Id": 4,
+        "Amount": 1.23457,
+        "Flag": false,
+        "When": "2024-01-01T00:00:04.000",
+        "Text": ""
+      },
+      {
+        "Id": 5,
+        "Amount": null,
+        "Flag": null,
+        "When": null,
+        "Text": null
+      }
+    ]
+  ]
+}

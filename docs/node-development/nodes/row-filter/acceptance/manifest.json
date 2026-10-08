@@ -1,0 +1,100 @@
+{
+  "format": "row-filter-fixtures-v1",
+  "sources": {
+    "golden.csv": "packages/loginom-runtime/tools/loginom-acceptance/fixtures/row-filter/golden.csv",
+    "row_filter_oracle.py": "packages/loginom-runtime/tools/loginom-acceptance/row_filter_oracle.py",
+    "row_filter_matrix.py": "packages/loginom-runtime/tools/loginom-acceptance/row_filter_matrix.py"
+  },
+  "fixtures": [
+    {
+      "path": "data/and-or.csv",
+      "bytes": 66,
+      "sha256": "284befe17608702cbc1055aa66df335a7454fee70bc7517a36f47a9773238366",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "text_qualifier": "\"",
+      "null_marker": "NULL",
+      "header": [
+        "RowID",
+        "Age",
+        "Income"
+      ],
+      "data_rows": 6,
+      "types": [
+        "integer",
+        "integer",
+        "integer"
+      ],
+      "order": "source file order"
+    },
+    {
+      "path": "data/empty.csv",
+      "bytes": 25,
+      "sha256": "9169cabf02314b487c7879475fbd2caa6c770f5b3f720a5a8a74c614811ca2e0",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "text_qualifier": "\"",
+      "null_marker": "NULL",
+      "header": [
+        "Id",
+        "Amount",
+        "Flag",
+        "When",
+        "Text"
+      ],
+      "data_rows": 0,
+      "types": [
+        "integer",
+        "real",
+        "boolean",
+        "datetime",
+        "string"
+      ],
+      "order": "source file order"
+    },
+    {
+      "path": "data/golden.csv",
+      "bytes": 413,
+      "sha256": "7ac857baaecd48b1e03f2cff470140ae7526a3e289016a209c7d41a706a2e0bb",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "text_qualifier": "\"",
+      "null_marker": "NULL",
+      "header": [
+        "Id",
+        "Amount",
+        "Flag",
+        "When",
+        "Text"
+      ],
+      "data_rows": 10,
+      "types": [
+        "integer",
+        "real",
+        "boolean",
+        "datetime",
+        "string"
+      ],
+      "order": "source file order"
+    },
+    {
+      "path": "data/strings.csv",
+      "bytes": 47,
+      "sha256": "4cad2b885a35fea393a16bfbf34d93cc5702a09247ed8cadf0287a4d7491ee2f",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "text_qualifier": "\"",
+      "null_marker": "NULL",
+      "header": [
+        "RowID",
+        "Text"
+      ],
+      "data_rows": 6,
+      "types": [
+        "integer",
+        "string"
+      ],
+      "order": "source file order"
+    }
+  ]
+}
