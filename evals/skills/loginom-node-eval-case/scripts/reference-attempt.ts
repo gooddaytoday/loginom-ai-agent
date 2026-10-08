@@ -51,23 +51,27 @@ async function main() {
     cleanupDir: path.join(runDir, "preparation"),
     cleanupSecrets: [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""] }
   await assertProfileClean(config.profileDir)
-  const settingsFile = path.join(config.profileDir, "config/loginom-ai-agent.json")
-  // The product loads JSONC after JSON; do not silently leave an overriding policy active.
-  if (await Bun.file(path.join(config.profileDir, "config/loginom-ai-agent.jsonc")).exists())
-    throw Error("reference profile requires canonical loginom-ai-agent.json; JSONC overlay is unsupported")
-  const settings = await Bun.file(settingsFile).exists() ? await Bun.file(settingsFile).json() : {}
-  const inherited = Object.entries(typeof settings.permission === "string" ? { "*": settings.permission } : settings.permission ?? {})
   const denied = ["loginom_remember", "loginom_write", "loginom_edit", "loginom_add_resource", "loginom_forget"]
-  settings.permission = {
-    ...Object.fromEntries(inherited.filter(([key]) => !key.startsWith("loginom_"))),
-    "loginom_*": "allow",
-    ...Object.fromEntries(inherited.filter(([key]) => key.startsWith("loginom_") && key !== "loginom_*" && !denied.includes(key))),
-    ...Object.fromEntries(denied.map(key => [key, "deny"])),
+  const settingsFiles = (await Promise.all(["config.json", "loginom-ai-agent.json", "loginom-ai-agent.jsonc"].map(async name => {
+    const file = path.join(config.profileDir, "config", name)
+    return await Bun.file(file).exists() ? file : undefined
+  }))).filter((file): file is string => file !== undefined)
+  // Normalize each loaded file: an earlier JSON policy must not override later JSONC denials by key order.
+  for (const settingsFile of settingsFiles.length ? settingsFiles : [path.join(config.profileDir, "config/loginom-ai-agent.json")]) {
+    const settings = (await Bun.file(settingsFile).exists() ? Bun.JSONC.parse(await Bun.file(settingsFile).text()) : {}) as
+      { permission?: string | Record<string, unknown>; provider?: Record<string, unknown> } & Record<string, unknown>
+    const inherited = Object.entries(typeof settings.permission === "string" ? { "*": settings.permission } : settings.permission ?? {})
+    settings.permission = {
+      ...Object.fromEntries(inherited.filter(([key]) => !key.startsWith("loginom_"))),
+      "loginom_*": "allow",
+      ...Object.fromEntries(inherited.filter(([key]) => key.startsWith("loginom_") && key !== "loginom_*" && !denied.includes(key))),
+      ...Object.fromEntries(denied.map(key => [key, "deny"])),
+    }
+    if (config.agent.provider) settings.provider = { ...settings.provider, ...agentConfigJson(config).provider }
+    await mkdir(path.dirname(settingsFile), { recursive: true, mode: 0o700 })
+    if (await Bun.file(settingsFile).exists()) await chmod(settingsFile, 0o600)
+    await writeFile(settingsFile, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 })
   }
-  if (config.agent.provider) settings.provider = { ...settings.provider, ...agentConfigJson(config).provider }
-  await mkdir(path.dirname(settingsFile), { recursive: true, mode: 0o700 })
-  if (await Bun.file(settingsFile).exists()) await chmod(settingsFile, 0o600)
-  await writeFile(settingsFile, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 })
   await assertAuth(config, command)
   const source = parseArtifactSource(config.artifactSource, config.loginom)
   const environment = await preflight(config, source)
