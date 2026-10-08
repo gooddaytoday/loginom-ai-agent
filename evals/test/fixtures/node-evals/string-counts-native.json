@@ -1,0 +1,229 @@
+{
+  "version": 1,
+  "observations": [
+    {
+      "operation_id": "cross-sales-null-01",
+      "recorded_at": "2026-10-08T09:12:19.189Z",
+      "node_crosstable": {
+        "verified": true,
+        "inventory_complete": true,
+        "state_source": "cached_crosstable_source_store",
+        "input_fields": [
+          {
+            "record_id": "433",
+            "index": 0,
+            "label": "Region",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "disposition": 2,
+            "order": 0,
+            "functions": 0,
+            "available_functions": 1934,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          },
+          {
+            "record_id": "434",
+            "index": 1,
+            "label": "Category",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "disposition": 1,
+            "order": 0,
+            "functions": 0,
+            "available_functions": 1934,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          },
+          {
+            "record_id": "435",
+            "index": 2,
+            "label": "Text",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "disposition": 3,
+            "order": 0,
+            "functions": 386,
+            "available_functions": 1934,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          }
+        ],
+        "service_fields": [
+          {
+            "record_id": "436",
+            "index": 3,
+            "label": "Количество",
+            "type": "integer",
+            "data_kind": "Дискретный",
+            "disposition": 0,
+            "order": 0,
+            "functions": 2,
+            "available_functions": 2,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0,
+            "count": true
+          }
+        ],
+        "selected_available": [],
+        "selected_used": [
+          "435"
+        ],
+        "options": {
+          "pedDisplayNameSeparator": {
+            "value": "|",
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": false
+          },
+          "pedSlidingUniqueValues": {
+            "value": false,
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": false
+          },
+          "pedSlidingUniqueValuesLimit": {
+            "value": 0,
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": true
+          },
+          "pedUniqueValueNames": {
+            "value": true,
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": false
+          }
+        },
+        "dialogs": [],
+        "settings_applied": false,
+        "node_context": {
+          "verified": true,
+          "document_id": "50768899-f22d-4a7d-9b5b-16f50692c896",
+          "workflow_id": "50768899-f22d-4a7d-9b5b-16f50692c896-1",
+          "node_id": "49199513-a0a7-47ed-9fc5-2f7f58167be0",
+          "surface": "wizard",
+          "tid": "MF;TF-1;WizrdMCF"
+        }
+      },
+      "source": "loginom/runtime/generations/4/chats/2ed150924e93431dfb32646e4e96e708474000898c2817f76b2ea7061e77d084/attempts/207501c1-1059-465d-a447-fcf27168aeb3/execution-events.jsonl",
+      "source_sha256": "5c10f444acf6fbec53d1949fe4789398a37cb486337768f5a988d53771f5727f",
+      "source_line": 524
+    },
+    {
+      "operation_id": "cross-sales-names-02",
+      "recorded_at": "2026-10-08T09:12:58.416Z",
+      "node_crosstable": {
+        "verified": true,
+        "inventory_complete": true,
+        "state_source": "cached_crosstable_source_store",
+        "input_fields": [
+          {
+            "record_id": "494",
+            "index": 0,
+            "label": "Region",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "disposition": 2,
+            "order": 0,
+            "functions": 0,
+            "available_functions": 1934,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          },
+          {
+            "record_id": "495",
+            "index": 1,
+            "label": "Category",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "disposition": 1,
+            "order": 0,
+            "functions": 0,
+            "available_functions": 1934,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          },
+          {
+            "record_id": "496",
+            "index": 2,
+            "label": "Text",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "disposition": 3,
+            "order": 0,
+            "functions": 386,
+            "available_functions": 1934,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          }
+        ],
+        "service_fields": [
+          {
+            "record_id": "497",
+            "index": 3,
+            "label": "Количество",
+            "type": "integer",
+            "data_kind": "Дискретный",
+            "disposition": 0,
+            "order": 0,
+            "functions": 2,
+            "available_functions": 2,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0,
+            "count": true
+          }
+        ],
+        "selected_available": [],
+        "selected_used": [],
+        "options": {
+          "pedDisplayNameSeparator": {
+            "value": "|",
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": false
+          },
+          "pedSlidingUniqueValues": {
+            "value": false,
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": false
+          },
+          "pedSlidingUniqueValuesLimit": {
+            "value": 0,
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": true
+          },
+          "pedUniqueValueNames": {
+            "value": true,
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": false
+          }
+        },
+        "dialogs": [],
+        "settings_applied": false,
+        "node_context": {
+          "verified": true,
+          "document_id": "50768899-f22d-4a7d-9b5b-16f50692c896",
+          "workflow_id": "50768899-f22d-4a7d-9b5b-16f50692c896-1",
+          "node_id": "49199513-a0a7-47ed-9fc5-2f7f58167be0",
+          "surface": "wizard",
+          "tid": "MF;TF-1;WizrdMCF"
+        }
+      },
+      "source": "loginom/runtime/generations/4/chats/2ed150924e93431dfb32646e4e96e708474000898c2817f76b2ea7061e77d084/attempts/207501c1-1059-465d-a447-fcf27168aeb3/execution-events.jsonl",
+      "source_sha256": "5c10f444acf6fbec53d1949fe4789398a37cb486337768f5a988d53771f5727f",
+      "source_line": 704
+    }
+  ]
+}
