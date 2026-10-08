@@ -1031,8 +1031,15 @@ Core имеет разметку осей, но без CSV oracle. По доку
   свежего evals refb31ebe7d0. Common `ab-conditions-inspection-20261008/common.json`
   SHA256 `c07c876e618383b6428beb24f16819aba80c5c68f92d4c22a2f0dfb7564c4dd0`.
   Те же baseline/candidate inventories и281 task files проверены. Baseline smoke
-  v6 run204506:judge100/structure/warm oracle/cold/native cleanup PASS,
-  package/input bytes unchanged; candidate smoke запущен, formal0.
+  v6 baseline run204506 и candidate run205411:
+  judge100/structure/warm oracle/cold/native cleanup PASS,
+  package/input bytes unchanged; `ab-smoke-v6-pair-accepted-20261008/review.json`.
+  Formal v6 отказал в management preflight:ENOENT `.writer`, attempts0;
+  результаты и отказ сохранены. В own mutable harness выполнен real-IO
+  RED→GREEN для release после открытия owner:mutable `495463543`,
+  3 guards×5 PASS/modules77 PASS/typecheck PASS; полный suite ещё выполняется.
+  После принятия нового SHA
+  необходимы новые условия, обе smoke стороны и полный набор90.
   Старые v3/v4/v5 не подставляются в новую пару.
 - [ ] Сначала прогнать небольшой представительный smoke (импорт, преобразование,
   соединение/агрегация, сохранение) из заранее выбранных задач,

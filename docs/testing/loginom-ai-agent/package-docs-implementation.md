@@ -4447,11 +4447,11 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-08 — ACTIVE, v6 candidate smoke; historical formal v5 cleanup FAIL
+### 2026-10-09 — ACTIVE, post-open writer TDD; formal v6 preflight FAIL
 
-- HEAD до checkpoint `05e0aec19`; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
+- HEAD до checkpoint `1c572b29c`; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client/profiles и чужие процессы сохранены.
-- Новый frozen skills-evals-inspection b4661a7b6 clean/typecheck PASS; fresh evalsrefb31ebe7d0/protected diff0; d1/087 сохранены.
+- Прежний frozen skills-evals-inspection b4661a7b6 сохранён; mutable495463543 clean/protected diff0 против evalsrefb31ebe7d0; новый frozen ещё не создан.
 - Clean b466 harness full481 PASS/2 SKIP/0 FAIL/2056 assertions/579.40s/typecheck PASS; sanitized inspection context real IO RED→GREEN, bounded guards preserved.
 - Conditions v6 c07c876e…/21 pins/658 harness/281 task files/5389+5651 build inventory PASS; прежние15 tasks/models/judge/viewport; formal90 planned.
 - Baseline v5 run174713 и candidate v5 run175606 full smoke accepted:judge100/structure/warm oracle/cold/native cleanup confirmed.
@@ -4468,7 +4468,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Lifecycle driver first skill fixed via real-process/HTTP RED→GREEN;4 focused PASS/typecheck PASS; native lifecycle/independence ещё нужны.
 - MiMo installed smoke UNKNOWN; отдельная native-payload диагностика подтвердила HTTP429/quota exhausted, writer absent/remaining0/no browser; новых MiMo calls нет, выбор второй модели запрошен.
 - Source binaries/resources/server skill907ff16b…/catalog17764f9a… сохранены; stage5–8/Linux lifecycle/second-model gates открыты;stage9 deferred.
-- V6 baseline run204506 exit0/judge100/structure/warm oracle/cold PASS, bytes unchanged/close/logout/remaining0/container removed; history4506 entries archived with full roundtrip. Candidate smoke session92839 жив; formal0; далее candidate cold, formal90 + остальные gates. Старый attempt13/profile/snapshots и cleanup FAIL сохранены.
+- V6 обе smoke PASS100/structure/warm/cold/bytes/close/logout/remaining0; formal2749 terminal1 до tasks:writer ENOENT, current refs0/writer absent/recovery0. Post-open RED→GREEN/3guards×5 PASS/modules77 PASS/typecheck PASS; clean495 full suite80830 идёт с own TMPDIR в /dev/shm (disk641MiB); далее new frozen pair90 + gates. Старые FAIL сохранены.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 
