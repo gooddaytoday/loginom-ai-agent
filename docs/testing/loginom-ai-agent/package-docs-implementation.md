@@ -4447,16 +4447,20 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-08 — Desktop scenario-create warm и cold
+### 2026-10-08 — PAUSED по запросу пользователя
 
-- Desktop49 scenario-create3/3 warm PASS: admission/import/SUM35/20/save/physical graph/input unchanged/local remaining0; internal journals664/654/761events preserved.
-- Первый cold FAIL readonly до execution; source/input bytes unchanged, container removed. Warm server close/logout не подтверждены, writer owner неизвестен.
-- TDD negative cleanup: RED прежний readonly BLOCKED; GREEN закрывает только свою fresh readonly copy/logout, не discard/execution/writer lock. Whole cold FAIL сохраняется.
-- Suite93 PASS/0 FAIL/801/typecheck; evidence `cold-49-desktop-readonly-guard-20261008`. Product/runtime не изменялись.
-- Desktop49 saved packages independent cold3/3 PASS: exact35/20, settingsReapplied=false, source/input SHA unchanged, native close/logout/remaining0/container removed. Manifest `0714c4ad548e264e6c91f90ef72259efa7b7d1e25ad3ffd33f2327b32787f851`.
-- Configured CLI49 scope v3 PASS: same-task deny, restart/fork default/new automation slash; synthetic provider, real validation, own uninstall/remaining0. v1/v2 FAIL сохранены.
-- CLI manifests baselinefc/candidate49 повторно PASS, hashes неизменны. A/B12–15×3×2/stand/подмодель и gates5–8 открыты; stage9/server removal вне цели.
-- Own cloned cold session observed package1 writable, no execution/owner release; own view close/logout/remaining0. Original holder/cause неизвестны, original FAIL сохранён. Следующий шаг: оставшиеся scenario/multiturn, Linux oracle/independent clients и A/B.
+- Product candidate SHA `49b1584f23b4aa47e18b26119389d6f45623fc94`; до checkpoint HEAD `49b36242d`. Product/runtime в этой подзадаче не изменялись.
+- Desktop scenario-create warm3/3 + independent cold3/3 PASS: exact35/20, source/input SHA unchanged, settingsReapplied=false; cold native close/logout/remaining0/container removed.
+- Cold manifest `0714c4ad548e264e6c91f90ef72259efa7b7d1e25ad3ffd33f2327b32787f851`; первоначальные readonly FAIL сохранены. Writer owner/cause и warm server logout неизвестны.
+- TDD readonly cleanup suite93 PASS/0 FAIL/801/typecheck; только own fresh readonly view закрывается без discard/execution/снятия writer lock.
+- Configured CLI49 scope v3 PASS; baselinefc/candidate49 full manifests повторно PASS, hashes unchanged; исторические FAIL сохранены.
+- CLI docs-after-build: начатые попытки1/2 штатно exit0, docs browserExecs0/Dock calls0, каждый ход remaining0/internal journals preserved. Попытка3 не запускалась.
+- Контроллер остановлен SIGTERM только после exit0 всей PID namespace контейнера2; outer143 — пользовательская пауза. Own container removed/processes0; исходные server/client running.
+- `openai-49-cli-docs-after-build-journals-20261008/pause-review.json`, manifest `5b4cd2c237732c48b2f160e14d96c76fbf3a91bafb8a60cd01d2c910228c26cf`; recovered attempt2 bytes сохранены отдельно.
+- CLI серия не принята: нужны третий повтор, PDF facts/layout QA и cold этих пакетов. Warm server close/logout отдельно не подтверждены.
+- SIGSTOP контроллера отклонён auto-review и не применялся; разрешённая остановка после полного выхода клиента выполнена.
+- Этапы5–8 открыты; A/B12–15×3×2 (72–90), stand/подмодель pending. Этап9/full35 отложены, server skill retained. Новые live/повторы не запускаются.
+- После явного возобновления: восстановить эту незавершённую CLI серию без перезаписи попыток1/2; продолжить scenario/multiturn, Linux oracle/independence и A/B.
 
 ### 2026-10-08 — сохранение внутренних receipts
 
