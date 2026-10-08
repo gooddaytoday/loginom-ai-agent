@@ -653,3 +653,23 @@ manual retry0; исходные result/events/artifacts/диагностика �
 Итого первые7:4 PASS,2 no_artifact и1 saved required-checklist FAIL;
 пять сохранённых пакетов прошли независимую структуру/warm oracle, cold0.
 Серия продолжает работу, полный baseline45/candidate45/compare ещё открыты.
+
+## Formal baseline: восьмая попытка без артефакта
+
+`low-liquidity-companies#1`: CLI0/no_artifact/score0/379.158s,
+harness cleanup confirmed/no cleanup_error. Импорт200 компаний и фильтр35
+подтверждены, но сортировка `sort-liquidity-1` остановилась в `output_mapping`
+с `NODE_APPLY_STOPPED`: complete output definition page at0.
+Native `effect_possible=true`, `cleanup_complete=false`; сортировка не
+подтверждена, пакет и CSV не сохранены. Agent final честно сообщает отказ.
+Workspace observation отдельно отклонён из-за page budget; resume/cancel/
+recover/status не разрешили исходную неопределённость. Все семь tool errors
+и исходные hashes сохранены в
+`ab-formal-v5-base-low-liquidity-failure-20261008/review.json`.
+
+Это измеренный отказ baseline; не infrastructure exclusion и не доказанная
+регрессия candidate. Рубрика/выбор задач неизменны, manual retry0.
+Закрытая история сохранена с guards/full roundtrip4487 entries,
+archive15708806 bytes/restore receipt. Исходные результаты и диагностика
+сохранены. Из первых8:4 PASS,3 no_artifact,1 saved required-checklist FAIL;
+пять saved artifacts прошли структуру/warm oracle, cold0/candidate0.
