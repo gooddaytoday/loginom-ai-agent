@@ -1,0 +1,7 @@
+{
+  "id": "crosstable-string-counts-null",
+  "input": "Region,Category,Text\nN,A,x\nN,A,x\nN,A,?\nN,B,y\nS,A,?\nS,B,z\nS,B,w\n",
+  "oracle": "Region,A_count,A_unique,A_null,B_count,B_unique,B_null\nN,3,1,1,1,1,0\nS,1,0,1,2,2,0\n",
+  "result_basename": "eval-reference-crosstable-string-counts-null-1-crosstable-string-counts-null-1.result.csv",
+  "source": "actual builder protocol; outputs checked against pre-builder independent oracle"
+}
