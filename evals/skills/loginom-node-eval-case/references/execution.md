@@ -20,6 +20,34 @@ results вне agent workspace и profile. Не использовать про�
 немодельный допуск. Сам helper использует профильный harness lease; он не заменяет
 блокировку общего endpoint. Локально подтвердить эксклюзивное окно выделенного стенда.
 
+## Существующий reference.env runtime
+
+В установленном node runtime reference.env использует прежние имена MODEL,
+VARIANT, CLI, PROFILE, WORK_ROOT, ATTEMPT_TIMEOUT_S и LOGINOM_STORAGE. Это данные
+окружения, не зависимость от старого skill. Не передавать такой файл helper без
+перевода: product eval.env выбирает другую модель и другой профиль.
+
+Запустить команду внутри текущих `with-env runtime.env` и `with-env reference.env`;
+назначение также задаёт SKILL_ROOT, DRAFT и REFERENCE_RESULTS (собственный отдельный
+каталог results этой работы). В этой загруженной shell-среде:
+
+```sh
+export EVAL_CLI_MODE=binary
+export EVAL_CLI_BIN="$CLI"
+export EVAL_AGENT_MODEL="$MODEL"
+export EVAL_AGENT_VARIANT="$VARIANT"
+export EVAL_PROFILE_DIR="$PROFILE"
+export EVAL_WORKSPACE_ROOT="$WORK_ROOT/agent-work"
+export EVAL_RESULTS_DIR="$REFERENCE_RESULTS"
+export EVAL_TASK_TIMEOUT_MS="$((ATTEMPT_TIMEOUT_S * 1000))"
+export LOGINOM_STORAGE_DIR="$LOGINOM_STORAGE"
+bun "$SKILL_ROOT/scripts/reference-attempt.ts" "$DRAFT" 1
+```
+
+Для прямого EVAL_* окружения этот перевод не нужен. При отсутствующих значениях
+сначала установить параметры из назначения; не подставлять модель/product профиль
+или timeout другого эксперимента. Новый workspace — сосед черновиков, а не их родитель.
+
 ## Одна авторская попытка
 
 Из evals/ назначенного checkout, после допуска:
