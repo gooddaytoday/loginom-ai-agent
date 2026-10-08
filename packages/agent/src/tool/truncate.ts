@@ -7,7 +7,7 @@ import { FSUtil } from "@loginom-ai-agent/core/fs-util"
 import { evaluate } from "@/permission/evaluate"
 import { Config } from "@/config/config"
 import { ToolID } from "./schema"
-import { TRUNCATION_DIR } from "./truncation-dir"
+import { TRUNCATION_DIR, TRUNCATION_LOCK } from "./truncation-dir"
 
 const RETENTION = Duration.days(7)
 
@@ -58,10 +58,14 @@ const layer = Layer.effect(
       )
       for (const entry of entries) {
         const file = path.join(TRUNCATION_DIR, entry)
-        const info = yield* fs.stat(file).pipe(Effect.catch(() => Effect.succeed(undefined)))
-        const mtime = info && Option.getOrUndefined(info.mtime)
-        if (!mtime || mtime.getTime() >= cutoff) continue
-        yield* fs.remove(file).pipe(Effect.catch(() => Effect.void))
+        yield* TRUNCATION_LOCK.withPermit(
+          Effect.gen(function* () {
+            const info = yield* fs.stat(file).pipe(Effect.catch(() => Effect.succeed(undefined)))
+            const mtime = info && Option.getOrUndefined(info.mtime)
+            if (!mtime || mtime.getTime() >= cutoff) return
+            yield* fs.remove(file).pipe(Effect.catch(() => Effect.void))
+          }),
+        )
       }
     })
 

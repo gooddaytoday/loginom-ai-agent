@@ -1,4 +1,4 @@
-import { attachmentPreview } from "@/util/attachment-preview"
+import { attachmentContext, attachmentPreview } from "@/util/attachment-preview"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
@@ -55,8 +55,8 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { Database } from "@loginom-ai-agent/core/database/database"
 import { ModelV2 } from "@loginom-ai-agent/core/model"
 import { ProviderV2 } from "@loginom-ai-agent/core/provider"
-import { eq } from "drizzle-orm"
-import { SessionTable } from "@loginom-ai-agent/core/session/sql"
+import { and, eq, sql } from "drizzle-orm"
+import { MessageTable, PartTable, SessionTable } from "@loginom-ai-agent/core/session/sql"
 import { SessionReminders } from "./reminders"
 import { SessionTools } from "./tools"
 import { LLMEvent } from "@loginom-ai-agent/llm"
@@ -803,7 +803,9 @@ const layer = Layer.effect(
                     sessionID: input.sessionID,
                     type: "text",
                     synthetic: true,
-                    text: attachmentPreview(decodeDataUrl(part.url)),
+                    text: yield* attachmentContext(decodeDataUrl(part.url)).pipe(
+                      Effect.provideService(FSUtil.Service, fsys),
+                    ),
                   },
                   { ...part, messageID: info.id, sessionID: input.sessionID },
                 ]
@@ -1100,6 +1102,29 @@ const layer = Layer.effect(
 
     const runLoop: (sessionID: SessionID) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID) {
+        // Compacted messages still own the canonical data URLs used by saved snapshot links.
+        const attachments = yield* db
+          .select({ url: sql<string>`json_extract(${PartTable.data}, '$.url')` })
+          .from(MessageTable)
+          .innerJoin(PartTable, eq(PartTable.message_id, MessageTable.id))
+          .where(
+            and(
+              eq(MessageTable.session_id, sessionID),
+              sql`json_extract(${MessageTable.data}, '$.role') = 'user'`,
+              sql`json_extract(${PartTable.data}, '$.type') = 'file'`,
+              sql`json_extract(${PartTable.data}, '$.mime') = 'text/plain'`,
+            ),
+          )
+          .all()
+          .pipe(Effect.orDie)
+        yield* Effect.forEach(
+          new Set(
+            attachments.map((part) => part.url).filter((url) => URL.canParse(url) && new URL(url).protocol === "data:"),
+          ),
+          (url) => attachmentContext(decodeDataUrl(url)),
+          { discard: true },
+        ).pipe(Effect.provideService(FSUtil.Service, fsys))
+
         const loginomStatus: { failure?: string } = {}
         const loginom = yield* Effect.acquireRelease(
           Effect.promise(() =>

@@ -55,15 +55,23 @@ const serialize = (message: SessionV1.WithParts) => {
   if (message.info.role === "user") {
     const text = truncate(
       message.parts
-        .filter((part): part is SessionV1.TextPart => part.type === "text" && !part.ignored)
+        .filter((part): part is SessionV1.TextPart => part.type === "text" && !part.ignored && !part.synthetic)
         .map((part) => part.text)
         .filter(Boolean)
         .join("\n"),
     )
+    // CLI previews precede the directive. Give each preview its own budget so
+    // user instructions and full-snapshot references cannot displace each other.
+    const context = message.parts
+      .filter((part): part is SessionV1.TextPart => part.type === "text" && !part.ignored && !!part.synthetic)
+      .map((part) => truncate(part.text))
+      .filter(Boolean)
     const files = message.parts.flatMap((part) =>
       part.type === "file" ? [`[Attached ${part.mime}: ${part.filename ?? "file"}]`] : [],
     )
-    return [...(text ? [`[User]: ${text}`] : []), ...files].join("\n")
+    return [...(text ? [`[User]: ${text}`] : []), ...context.map((text) => `[User context]: ${text}`), ...files].join(
+      "\n",
+    )
   }
   return message.parts
     .flatMap((part) => {

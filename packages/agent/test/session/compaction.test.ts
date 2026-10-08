@@ -964,6 +964,75 @@ describe("session.compaction.process", () => {
     15_000,
   )
 
+  itCompaction.instance(
+    "preserves user directives after oversized synthetic attachment context",
+    () => {
+      const stub = llm()
+      let captured = ""
+      stub.push(
+        reply("summary", (input) => {
+          captured = JSON.stringify(input.messages)
+        }),
+      )
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+        const msg = yield* ssn.updateMessage({
+          id: MessageID.ascending(),
+          role: "user",
+          sessionID: session.id,
+          agent: "build",
+          model: ref,
+          time: { created: Date.now() },
+        })
+        yield* Effect.forEach(
+          [
+            {
+              type: "text" as const,
+              synthetic: true,
+              text: "Full snapshot: /snapshot/rows.csv\n" + "rows\n".repeat(1_000) + "HIDDEN_ATTACHMENT_TAIL",
+            },
+            {
+              type: "text" as const,
+              synthetic: true,
+              text: "Full snapshot: /snapshot/columns.csv\n" + "columns\n".repeat(1_000) + "HIDDEN_SECOND_PREVIEW",
+            },
+            { type: "text" as const, ignored: true, text: "IGNORED_INSTRUCTION" },
+            { type: "text" as const, text: "Save new-output.lgp; preserve existing.lgp" },
+            { type: "text" as const, text: "Keep all original rows." },
+            { type: "file" as const, mime: "text/plain", filename: "rows.csv", url: "data:text/plain;base64,cm93cw==" },
+          ],
+          (part) =>
+            ssn.updatePart({
+              ...part,
+              id: PartID.ascending(),
+              messageID: msg.id,
+              sessionID: session.id,
+            }),
+        )
+        const result = yield* SessionCompaction.use.process({
+          parentID: msg.id,
+          messages: yield* ssn.messages({ sessionID: session.id }),
+          sessionID: session.id,
+          auto: false,
+        })
+
+        expect(result).toBe("continue")
+        expect(captured).toContain("Save new-output.lgp; preserve existing.lgp")
+        expect(captured).toContain("Keep all original rows.")
+        expect(captured).toContain("Full snapshot: /snapshot/rows.csv")
+        expect(captured).toContain("Full snapshot: /snapshot/columns.csv")
+        expect(captured).toContain("[Attached text/plain: rows.csv]")
+        expect(captured).toContain("[truncated]")
+        expect(captured).not.toContain("HIDDEN_ATTACHMENT_TAIL")
+        expect(captured).not.toContain("HIDDEN_SECOND_PREVIEW")
+        expect(captured).not.toContain("IGNORED_INSTRUCTION")
+      }).pipe(withCompaction({ llm: stub.llmLayer }))
+    },
+    { git: true },
+    15_000,
+  )
+
   it.instance(
     "adds synthetic continue prompt when auto is enabled",
     Effect.gen(function* () {
