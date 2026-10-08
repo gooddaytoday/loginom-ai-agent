@@ -1,7 +1,7 @@
 # EvalBaseline — checkpoint 2026-10-08
 - Branch baseline-runtime; checkout /tmp/loginom-baseline-runtime; основной checkout сохранён.
 - Проверенный code SHA: aa33e613e; deployment source SHA: bfb7c62e4266e76c995a43b6f909d8a6739ce062.
-- Корпус: 44 кейса, три круга, 132 отдельных измерения repeat=1.
+- Исходный корпус: 44 кейса/132 измерения; принятые кейсы LAB-31 включить до нового freeze.
 - Executor/journal/resume/check, config v1/v2, общий lease и baseline completion реализованы.
 - Отдельные regular/analytic/node, ошибки/расходы retries, compare, curated export.
 - Финальный bun test: 460 PASS, 2 server-only SKIP, 0 FAIL; 462 теста/37 файлов.
@@ -13,8 +13,8 @@
 - Multica EvalBaseline 77032943-ad18-4ae9-a2c6-668769077c86: eval-tests, gpt-6.1-sol/xhigh, concurrency=1, вне squad.
 - Native MCP search PASS: actor, собственный checkout, automatic Git Peer; receipt source 44c7928bf.
 - Карточка LAB-32 [Baseline], baseline label; инструкции/три starters/API readback PASS.
-- Ограничение: цепочка задач LAB-31 активна; общий config остаётся v1, supplement v2 только staged.
-- Остались activation всех исполнителей, server/native isolation checks и ровно два smoke; готовность неполная.
+- Контроль 2026-10-08 18:24 MSK: LAB-31 in_progress; Ben run 01a11c05-d01e-7afb-9687-f3bb98a282c4 running.
+- Lease принадлежит этому Ben run; приёмка SHA 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad; config v1.
 - Живые smoke и полный baseline не запускались; unknown outcome автоматически не повторяется.
-- Следующий шаг: при FREE и пустой очереди выполнить activation/checks/smoke; evidence/readback — в LAB-32.
+- Следующий шаг: дождаться LAB-31/FREE, выполнить этап 3 launch-plan (single smoke, missing-only recovery), затем этапы 4–10.
 - Evidence доставлен/скачан из LAB-32: bytes/SHA256/manifest/readback PASS; archive SHA f5279740982b97449a9828b5a0aa9ab96abef86e8f1826e67baa1eac4ef7edef.
