@@ -66,6 +66,33 @@ export async function planColdReplay(input: {
   }
 }
 
+// Harness archives saved package bytes separately from its original task inputs.
+// Recover only the native host admission filename; never rewrite node settings.
+export async function planEvalColdReplay(input: Omit<Parameters<typeof planColdReplay>[0], "inputs"> & {
+  inputs: { path: string; sha256: string }[]
+}) {
+  if (!isAbsolute(input.package) || input.inputs.some((file) => !isAbsolute(file.path)))
+    throw Error("COLD_SOURCE_PATH_INVALID")
+  await Promise.all(input.inputs.map(async (file) => {
+    if (createHash("sha256").update(await Bun.file(file.path).bytes()).digest("hex") !== file.sha256)
+      throw Error("COLD_INPUT_INTEGRITY_INVALID")
+  }))
+  const structure = await extractPackage(input.package)
+  const paths = [...new Set(structure.modules.flatMap(allNodes)
+    .filter((node) => node.engine_type === "TBGImportTextFile")
+    .map((node) => node.settings_main.FileName))]
+  const inputs = paths.map((serverPath) => {
+    const matches = input.inputs.filter((file) => {
+      const suffix = "-" + basename(file.path)
+      if (typeof serverPath !== "string" || !serverPath.endsWith(suffix)) return false
+      return new RegExp(`^/${input.username}/[a-f0-9]{64}-[0-9]+$`).test(serverPath.slice(0, -suffix.length))
+    })
+    if (matches.length !== 1) throw Error("COLD_INPUT_BINDING_INVALID")
+    return { ...matches[0]!, serverPath: serverPath! }
+  })
+  return planColdReplay({ ...input, inputs })
+}
+
 function allNodes(
   workflow: Pick<PackageStructure["modules"][number], "workflow_nodes" | "submodels">,
 ): PackageStructure["modules"][number]["workflow_nodes"] {
