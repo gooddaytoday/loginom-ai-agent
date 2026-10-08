@@ -59,6 +59,8 @@ export async function captureBaselinePins(config: NodeOpsConfig, env: Record<str
     throw new BaselineFailure("MODEL_PIN_CHANGED")
   if (env.JUDGE_MODEL !== "gpt-6-astra" || env.JUDGE_REASONING !== "high" || Number(env.EVAL_PASS_THRESHOLD ?? "70") !== 70 ||
     Number(env.EVAL_JUDGE_TIMEOUT_MS ?? "300000") !== 300_000) throw new BaselineFailure("JUDGE_PIN_CHANGED")
+  if (env.EVAL_JUDGE_COMMAND && env.EVAL_JUDGE_COMMAND !== "codex" && env.EVAL_JUDGE_COMMAND !== Bun.which("codex"))
+    throw new BaselineFailure("JUDGE_OVERRIDE_REFUSED")
   const { nodeRoleCli, nodeStandStatus } = await import("./node-eval-ops")
   const role = config.roles.evalbaseline
   if (config.version !== 2 || !role || env.EVAL_CLI_MODE !== "binary" || env.EVAL_CLI_BIN !== nodeRoleCli(config, "evalbaseline") ||

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { chmod, lstat, mkdtemp, rm } from "node:fs/promises"
+import { chmod, cp, lstat, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease, runBaseline, verifyBaselineInstallation, baselineHash, captureBaselinePins } from "../src/baseline"
@@ -53,6 +53,7 @@ test("live preparation rejects drift from the agreed product and judge settings 
     cliBin: "/fixture/old/bin/cli", roles: { rich: role, ben: role, evalbaseline: { ...role, referenceProfile: undefined, cliBin: "/fixture/new/bin/cli" } } }
   await expect(captureBaselinePins(config, { EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_AGENT_VARIANT: "high" })).rejects.toThrow("MODEL_PIN_CHANGED")
   await expect(captureBaselinePins(config, { EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_AGENT_VARIANT: "medium", JUDGE_MODEL: "gpt-6-astra", JUDGE_REASONING: "medium" })).rejects.toThrow("JUDGE_PIN_CHANGED")
+  await expect(captureBaselinePins(config, { EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_AGENT_VARIANT: "medium", JUDGE_MODEL: "gpt-6-astra", JUDGE_REASONING: "high", EVAL_JUDGE_COMMAND: "fake-codex" })).rejects.toThrow("JUDGE_OVERRIDE_REFUSED")
 })
 
 test("live entry refuses a test-only attempt limit instead of quietly starting a partial baseline", async () => {
