@@ -253,5 +253,20 @@
   },
   "eval_changed": false,
   "merge": "NOT_RUN",
-  "release": "NOT_RUN"
+  "release": "NOT_RUN",
+  "first_handoff_observed_at": "2026-10-08T20:47:50.526809+00:00",
+  "first_handoff": {
+    "issue": "LAB-45",
+    "comment_id": "01a11d44-b8c9-76ea-b676-51d8c3686284",
+    "worker_task": {
+      "id": "01a11d44-b8f8-7b36-a6b3-93fbb28a1cf2",
+      "agent_id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+      "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+      "status": "running",
+      "started_at": "2026-10-08T23:46:46+03:00",
+      "work_dir": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-45-93fbb28a1cf2/workdir"
+    },
+    "account_qualification": "Generator reports both ready/identity/permissions/logout/process and calibrated server absence PASS",
+    "model_node_acceptance": "NOT_RUN"
+  }
 }

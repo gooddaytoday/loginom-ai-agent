@@ -165,12 +165,13 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 - Текущие API readback: mas online, тот же runtime; Генератор/Исполнитель/Ревьюер caps1/8/8, активных старых задач этих ролей перед запуском нет.
 - Центральная настройка CLI в скваде сверена с назначением владельца; concrete model/variant не копируются в подпланы/регламенты/карточки, фактические значения — в evidence.
 - Уточнены Stage0 и последовательный native handoff в существующих инструкциях; partial PUT/readback PASS, native model/MCP/runtime/caps сохранены; Eval unchanged.
-- LAB45 Generator task `01a11d37-c86d-7241-8ad3-196348de401d` running на mas, собственный checkout подтвердил exact4e626d и чистые исходники.
+- LAB45 Generator подтвердил exact4e/clean и готовность пары с identity/permissions/logout/process/calibrated server absence; handoff `01a11d44-b8c9-76ea-b676-51d8c3686284`.
+- LAB45 Worker task `01a11d44-b8f8-7b36-a6b3-93fbb28a1cf2` running на mas в отдельной native задаче.
 - Живой preflight LAB45 PASS: source597/version0.0.0-dev-202610081651/shared-oauth-v1,5678/5678 hash/lstat/link/inventory, daemon argv/config12, caps1/8/8; доступны28774MiB RAM/390.47GiB disk, load0.15.
 - Receipt LAB45 скачан/прочитан; [dispatch evidence](reports/2026-10-08-node-recheck/dispatch.json) закрепляет hash и центральные configured CLI settings отдельно от фактических прогонов.
 - Наблюдение в этом чате каждые5мин, только существенные уведомления; Multica scheduler/очередь не менялись.
 - Приёмка узлов, независимые модельные итоги и cold reopen этой волны NOT_RUN; нагрузка12 NOT_RUN.
 - LAB29/LAB30 Backlog, старые attempts/evidence/profiles сохраняются; чужие локальные reports не изменялись.
-- Все восемь Generator dispatch приняты на mas: LAB45 running, LAB46–52 queued; роли в каждой карточке передаются последовательно.
+- Все восемь Generator dispatch приняты на mas; LAB45 передана Worker, остальные идут по штатной очереди cap1; роли в карточке последовательны.
 - Исправлена ошибочная ancestry-запись в карточках; проверен merge-basef9, исходные remote ветки не менялись.
 - Следующий шаг: завершить preflight и наблюдать штатную очередь, передачу ролей, ресурсы, provider errors и cleanup.

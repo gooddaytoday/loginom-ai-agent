@@ -32,13 +32,14 @@
 - SHA исходников восьми веток: `4e626d547258e9ae7c0b7937cd672781dde0667e`; remote refs опубликованы и проверяются перед dispatch.
 - LAB45–52 созданы и обратно прочитаны; все назначены существующему скваду, восемь узлов/один этап на карточку.
 - Инструкции Stage0/handoff уточнены без изменения критериев, runtime/caps/model/MCP сохранены; Eval unchanged.
-- LAB45 Generator task `01a11d37-c86d-7241-8ad3-196348de401d` запущен на mas в собственном native checkout.
+- LAB45: пара worker/reviewer готова с identity/permissions/logout/process/calibrated server absence; handoff comment `01a11d44-b8c9-76ea-b676-51d8c3686284`.
+- LAB45 Worker task `01a11d44-b8f8-7b36-a6b3-93fbb28a1cf2` running на mas в собственной native задаче после Генератора.
 - Живой preflight LAB45 PASS: installed source597/version0.0.0-dev-202610081651/shared-oauth-v1;5678/5678 hash/lstat/link/inventory; daemon argv/config12, caps1/8/8.
 - [Доказательства dispatch/preflight](reports/2026-10-08-node-recheck/dispatch.json): attachment скачан, SHA256ceebd7c7bc0edcebe6473bb1ccf1960308948729800296344ec9ecb6212e83d3; первый ошибочный stat-mode diagnostic сохранён.
 - mas live: CPU12, availableRAM28774MiB, load0.15/0.04/0.01, disk390.47GiB; это preflight без полной нагрузки.
 - Наблюдение в этом чате включено каждые5мин через штатный heartbeat Codex; Multica scheduler/очередь не меняются, уведомления только при существенном изменении.
 - Перепроверка узлов, итоговые модельные попытки и cold reopen этой волны — NOT_RUN.
 - LGD LAB29/XLSX LAB30 Backlog; PR40 draft/open; merge/release NOT_RUN.
-- Все восемь dispatch приняты: LAB45 Generator running, LAB46–52 queued при cap1; исполнители начинают после готовности своей пары.
+- Все восемь Generator dispatch приняты; LAB45 уже передана Worker, остальные обрабатываются Генератором по штатной очереди cap1.
 - Исправлена ошибочная запись ancestry0ca→4e: подтверждён merge-basef9; исходные ветки/SHA не менялись.
 - Следующий шаг: принять живой preflight и наблюдать передачу Генератор → Исполнитель → Ревьюер, ресурсы, provider errors и cleanup.
