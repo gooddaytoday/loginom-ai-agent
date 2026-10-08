@@ -258,3 +258,14 @@ step_start messageID. Это частичный baseline snapshot без candida
 не paired verdict и не доказательство activation delta/noninferiority.
 Общий manifest/порог/допуск не изменены. Индекс составлен локально без
 model/Help/Loginom/judge вызовов; live controller81639 подтверждён.
+
+## Formal v7: десятая попытка
+
+Nps-segments-by-tier#1 completed/score100/pass=true/oracle=true,
+environment/process cleanup confirmed. Структура и warm oracle отдельно PASS,
+cold request/plan сохранены; cold pending. History4606entries/17148561archive
+bytes и diagnostics3entries/5290695bytes сохранены с full roundtrip.
+Snapshot `formal-v7-progress-10-20261009.json`:10 terminal,6 PASS/4 FAIL;
+всего7 сохранённых пакетов. Controller81639 live, candidate formal/compare
+не запускались. Частичный индекс первых9 остаётся историческим snapshot,
+перед cold составить полный индекс обеих законченных сторон.
