@@ -738,3 +738,9 @@ Exact restore argv — в sibling receipts; исходные result/events/judge
 не менялись. Первые11:7 PASS,3 no_artifact,1 saved required-checklist FAIL;
 восемь saved artifacts прошли структуру/warm oracle, cold0/candidate0.
 Контроллер baseline45 остаётся живым; полный A/B90/compare не завершён.
+
+Read-only [разбор output mapping](2026-10-08-package-docs-output-mapping.md)
+подтвердил общий first failed geometry proof в ABC/cohort/low-liquidity;
+выбранные12 frozen modules baseline/candidate byte-identical. Два source/VM
+набора ×3 дали каждый20 PASS/0 FAIL, source unchanged. Единственная первопричина
+и native stable/flaky неизвестны; score/рубрика/допуск/viewport не менялись.

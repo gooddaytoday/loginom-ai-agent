@@ -4449,7 +4449,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ### 2026-10-08 — ACTIVE, парный smoke v5 PASS; formal A/B выполняется
 
-- HEAD до checkpoint `0b5071831`; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
+- HEAD до checkpoint `32896ba2f`; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client/profiles и чужие процессы сохранены.
 - Frozen skills-evals-writer d1b364a98 clean; evalsrefb31ebe7d0 перечитан перед formal/protected diff0; исторический087 сохранён.
 - Harness full481 PASS/2 SKIP/0 FAIL/2055 assertions/585.37s/typecheck PASS; writer gap real IO RED→GREEN, bounded guards preserved.
@@ -4458,7 +4458,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Pair evidence ab-smoke-v5-pair-accepted-20261008; functional control, formal0/statistical noninferiority not proven.
 - V5 metrics provider17/18 (dedup), unique tools17/19/Loginom13/13/errors0; skill+workflow read, allowance неизменен.
 - Baseline formal run180611/session1287 жив; первые11:7 PASS,3 no_artifact,1 saved required-checklist FAIL; все8 saved structure-warm PASS; cold0/candidate0/compare pending.
-- abc-pareto-groups#1: no_artifact/score0/624.161s, NODE_APPLY_STOPPED/output_mapping; harness cleanup confirmed, native uncertainty сохранена; manual retry0.
+- Output mapping ABC/cohort/low-liquidity: shared first geometry proof1/32 > tolerance1/64;12 modules identical; source2×3×20 PASS; native stability/unique cause UNKNOWN, immutable A/B unchanged.
 - cohort-spend-activity#1: no_artifact/294.054s, NODE_APPLY_STOPPED→OUTPUT_MAPPING_RECOVERY_UNVERIFIED; cleanup confirmed/native uncertainty сохранена; manual retry0.
 - V4 candidate historical cleanup FAIL Writer owner unavailable retained; v5 первая preflight0 refusal archived, own residue preserved/marked cleanup PASS.
 - Старые own CLI091/239/253/5a9/bd0/c50 и upgrade CLI/Desktop669/bc6 сохранены проверенными архивами; baseline/current49 raw сохранены; свободно около7.2GiB.
