@@ -1,0 +1,7 @@
+{
+  "id": "crosstable-local-variable-bindings",
+  "input": "Region,Category,Amount\nN,A,10\nN,A,5\nN,B,7\nS,A,3\nS,B,2\n",
+  "oracle": "Region,A_Amount_Sum,A_Amount_Count\nN,15,2\nS,3,1\n",
+  "result_basename": "eval-reference-crosstable-local-variable-bindings-1-crosstable-local-variable-bindings-1.result.csv",
+  "source": "actual builder protocol; outputs checked against pre-builder independent oracle"
+}
