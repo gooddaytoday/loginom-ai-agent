@@ -1,20 +1,20 @@
 # EvalBaseline — checkpoint 2026-10-08
 - Branch baseline-runtime; checkout /tmp/loginom-baseline-runtime; основной checkout сохранён.
-- LAB-31 включён merge commit cf9b4cce0; принятый source 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad.
-- Корпус 48 кейсов/144 измерения; prepare и полный fixture N×3 PASS.
-- Single-case smoke c9aeaa1d7; infra retry budget 0 для smoke / 1 default — 054a53b27.
-- Readiness ledger реализован, пока без коммита; 4 focused проверки PASS, typecheck PASS.
-- Новый private v2 config должен фиксировать readinessIssue на UUID LAB-32 до freeze.
-- Полный bun test сейчас выполняется; исходный targeted resume дал один CLEANUP_UNKNOWN.
-- Шесть последующих воспроизведений resume PASS; причина единичного отказа не установлена.
-- При новом отказе тест сохраняет закрытый fixture; guards и assertions не ослаблены.
-- Предыдущий retry/compatibility suite: 65 PASS, 4 clean-host SKIP, 0 FAIL; typecheck PASS.
-- Семь clean-host fixtures обязательно выполнить на сервере без skip до smoke.
+- Проверенный code SHA 3d3cf1f94df026252105da0535550b25fc0930c1; LAB-31 принят на 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad.
+- Корпус 48 кейсов/144 измерения; public prepare и полный fixture N×3 PASS.
+- Этапы 0, 3.0 и 3.1 выполнены; single-case smoke, budget=0 и устойчивый readiness ledger реализованы.
+- Smoke admission переживает crash/новый каталог; concurrent запросы не создают второй допуск.
+- Private v2 config должен закрепить readinessIssue на UUID LAB-32 до freeze; полный start gated.
+- Полный bun test: 519 PASS, 7 clean-host SKIP, 0 FAIL; 526 тестов/47 файлов/2508 assertions, 526,39 с.
+- bun typecheck PASS; семь clean-host fixtures выполнить на сервере без skip до smoke.
+- Единичный fixture CLEANUP_UNKNOWN не воспроизведён в 6 повторах и полном suite; причина не установлена.
+- При следующем отказе закрытый fixture сохраняется для диагностики; guards/assertions сохранены.
 - Deployment остаётся bfb7c62e4266e76c995a43b6f909d8a6739ce062; active config v1.
 - CLI 0.1.17 / fc3d97dbf695c2ed8dba942feb6fe83591a33944; manifest 5389 файлов, AppArmor/setup ранее PASS.
-- Multica EvalBaseline: eval-tests, gpt-6.1-sol/xhigh, concurrency=1, вне squad; Native MCP actor/auto Peer PASS.
+- Multica EvalBaseline: eval-tests, gpt-6.1-sol/xhigh, concurrency=1, вне squad; Native MCP actor/auto Peer ранее PASS.
 - LAB-32 01a11ae4-fa45-79ce-aec6-edd7170dafc7; первоначальные instructions/evidence readback PASS.
-- LAB-31 Ben ACCEPT/Evaler completed/in_review; исходный чат idle/монитор PAUSED.
+- LAB-31 Ben ACCEPT/Evaler completed/in_review; исходный чат idle/его монитор PAUSED.
 - Стенд/очереди/пять профилей чисты при последней проверке; повторить перед активацией.
-- Живые smoke и полный baseline не запускались; unknown outcome автоматически не повторяется.
-- Следующий шаг: завершить проверки/коммит этапа 3.1, затем 3.2 append-only recovery и этапы 4–10; goal активен.
+- Живые smoke и полный baseline не запускались; UNKNOWN автоматически не повторяется.
+- Карточку полного baseline создать и реально запустить на этапе 7; native heartbeat основного чата на этапе 8.
+- Следующий шаг: этап 3.2 append-only recovery через TDD, затем этапы 4–10; goal остаётся активным.
