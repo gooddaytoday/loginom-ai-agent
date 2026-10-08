@@ -1,12 +1,12 @@
 # EvalBaseline — checkpoint 2026-10-08
 - Branch baseline-runtime; checkout /tmp/loginom-baseline-runtime; основной checkout сохранён.
-- Проверенный code SHA 3d3cf1f94df026252105da0535550b25fc0930c1; LAB-31 принят на 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad.
+- Проверенный code SHA 2d28d67da803b6374e561bd80d7ce4410a1a5802; LAB-31 принят на 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad.
 - Корпус 48 кейсов/144 измерения; public prepare и полный fixture N×3 PASS.
 - Этапы 0, 3.0 и 3.1 выполнены; single-case smoke, budget=0 и устойчивый readiness ledger реализованы.
-- Smoke admission переживает crash/новый каталог; concurrent запросы не создают второй допуск.
+- Этап 3.2 начат: неизмеренный исход запрещает следующий slot/release (AWAITING_RECOVERY); released admission запрещён.
 - Private v2 config должен закрепить readinessIssue на UUID LAB-32 до freeze; полный start gated.
-- Полный bun test: 519 PASS, 7 clean-host SKIP, 0 FAIL; 526 тестов/47 файлов/2508 assertions, 526,39 с.
-- bun typecheck PASS; семь clean-host fixtures выполнить на сервере без skip до smoke.
+- Последний полный suite на 3d3cf1f94: 519 PASS, 7 clean-host SKIP, 0 FAIL; 526 тестов/47 файлов/2508 assertions.
+- После guards: baseline.test.ts 19 PASS/0 FAIL, 126 assertions; typecheck PASS; полный suite повторить по завершении 3.2.
 - Единичный fixture CLEANUP_UNKNOWN не воспроизведён в 6 повторах и полном suite; причина не установлена.
 - При следующем отказе закрытый fixture сохраняется для диагностики; guards/assertions сохранены.
 - Deployment остаётся bfb7c62e4266e76c995a43b6f909d8a6739ce062; active config v1.
@@ -14,7 +14,7 @@
 - Multica EvalBaseline: eval-tests, gpt-6.1-sol/xhigh, concurrency=1, вне squad; Native MCP actor/auto Peer ранее PASS.
 - LAB-32 01a11ae4-fa45-79ce-aec6-edd7170dafc7; первоначальные instructions/evidence readback PASS.
 - LAB-31 Ben ACCEPT/Evaler completed/in_review; исходный чат idle/его монитор PAUSED.
-- Стенд/очереди/пять профилей чисты при последней проверке; повторить перед активацией.
+- Стенд/очереди/пять профилей ранее чисты; повторить перед активацией, семь clean-host fixtures выполнить без skip до smoke.
 - Живые smoke и полный baseline не запускались; UNKNOWN автоматически не повторяется.
 - Карточку полного baseline создать и реально запустить на этапе 7; native heartbeat основного чата на этапе 8.
 - Следующий шаг: этап 3.2 append-only recovery через TDD, затем этапы 4–10; goal остаётся активным.
