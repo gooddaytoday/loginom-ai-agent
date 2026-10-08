@@ -620,3 +620,13 @@ result/events/cleanup: `ab-formal-v5-base-cohort-failure-20261008/review.json`.
 4562 entries, archive14665634 bytes, restore argv в sibling preservation receipt.
 Диагностика и исходные результаты оставлены распакованными.
 Серия продолжается:3 PASS и2 no_artifact из первых5, cold0/candidate0.
+
+## Formal baseline: шестая попытка PASS
+
+`customer-activity-segments#1`: CLI0/completed/judge100/oracle PASS/429.681s,
+cleanup confirmed/no cleanup_error. Независимая структура0/warm oracle PASS
+в `ab-formal-v5-base-reviews-20261008-customer-activity-segments-1`.
+Cold ещё не выполнен. Закрытая история сохранена с guards/full roundtrip:
+4607 entries, archive17265821 bytes, restore argv в preservation receipt.
+Все6 исходных result/events/диагностика сохранены; серия остаётся живой,
+4 PASS и2 no_artifact из первых6 не подменяют45/90 или compare.
