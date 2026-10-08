@@ -26,7 +26,7 @@ type RecordedRun = { runDir: string; runId: string; files: { path: string; sha25
 type BaselineRow = { key: string; caseKey: string; attempt: number; collection: BaselineCollection; state: "pending" | "running" | "recorded"
   measured: boolean; cleanup: boolean; verdict: RecordedRun["verdict"] | null; runDir: string | null; result: AttemptResult | null }
 type BaselineExecution = { key: string; caseKey: string; attempt: number; kind: "product" | "judge"; record: RecordedRun; result: AttemptResult }
-type BaselineRelease = { status: "RELEASED"; evidenceSha256: string; receiptPath?: string; receiptSha256?: string }
+type BaselineRelease = { status: "RELEASED"; evidenceSha256: string; receiptPath?: string; receiptSha256?: string; abandoned?: { reason: string; at: string } }
 type RecoveryEvidence = { version: 1; baselineId: string; jobKey: string; executionId: string; executionFilesSha256: string
   kind: "infrastructure" | "judge"; cause: string; fix: { id: string; files: { path: string; sha256: string }[] }
   validation: { path: string; sha256: string }; taskId: string; runId: string }
@@ -313,7 +313,8 @@ export async function checkBaseline(directory: string) {
       executionId: item.execution.record.runId, phase: `judge-attempt-${item.call.attempt}`, status: item.execution.result.status,
       judge_status: "error" as const, error: item.call.error, evidence: item.file }))]
   const smokeVerification = manifest.kind === "smoke" ? await verifySmokeMeasurements(manifest, rows) : null
-  return { id: manifest.id, kind: manifest.kind, status: coverage.measured === coverage.expected && cleanup && journal.release && (smokeVerification?.verified ?? true) ? "complete" : "incomplete",
+  return { id: manifest.id, kind: manifest.kind, status: journal.release?.abandoned ? "abandoned" : coverage.measured === coverage.expected && cleanup && journal.release && (smokeVerification?.verified ?? true) ? "complete" : "incomplete",
+    abandoned: journal.release?.abandoned ?? null,
     manifest, coverage, cleanup, released: Boolean(journal.release), groups, spending, infrastructure, smokeVerification, recoveries, executions,
     nodes: manifest.cases.filter(item => item.collection === "node").map(item => ({ id: item.id, expected: manifest.kind === "smoke" ? 1 : 3,
       passed: rows.filter(row => row.caseKey === item.key && row.verdict === "PASS").length,
@@ -364,7 +365,10 @@ async function checkSmokeOracle(artifact: string, expected: string) {
 
 export async function sealBaselineRelease(directory: string, receipt: BaselineRelease) {
   return mutateBaseline(directory, async (manifest, journal) => {
-    if (manifest.kind === "baseline" && journal.jobs.some(job => job.record && !effectiveMeasurement(job)?.measured)) throw new BaselineFailure("AWAITING_RECOVERY")
+    if (journal.release) throw new BaselineFailure("SERIES_RELEASED")
+    if (receipt.abandoned && (!receipt.abandoned.reason.trim() || receipt.abandoned.reason.length > 1000 || !Number.isFinite(Date.parse(receipt.abandoned.at))))
+      throw new BaselineFailure("ABANDON_REASON_REQUIRED")
+    if (!receipt.abandoned && manifest.kind === "baseline" && journal.jobs.some(job => job.record && !effectiveMeasurement(job)?.measured)) throw new BaselineFailure("AWAITING_RECOVERY")
     if (receipt.status !== "RELEASED" || !/^[0-9a-f]{64}$/.test(receipt.evidenceSha256) ||
       journal.jobs.some(job => job.state === "running" || job.record && !job.record.cleanup || job.recoveries?.some(recovery => recovery.state === "running" || recovery.record && !recovery.record.cleanup)))
       throw new BaselineFailure("RELEASE_UNCONFIRMED")
@@ -390,12 +394,27 @@ export async function sealBaselineRelease(directory: string, receipt: BaselineRe
 export async function runBaseline(argv: string[], env: Record<string, string | undefined> = process.env): Promise<Record<string, unknown> & { code: number }> {
   try {
     const command = argv[0]
-    if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke|recover-measurement --series DIR [smoke: --case calc-data-double|crosstable-fixed-sum] [recover-measurement: --job KEY --kind infrastructure|judge --evidence PRIVATE_JSON] [--config PRIVATE --issue ID --task ID] [check: --compare SERIES --export] [resume: --recover-executor after inspection]" }
-    const values = parseArgs({ args: argv.slice(1), strict: true, options: { series: { type: "string" }, case: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, job: { type: "string" }, kind: { type: "string" }, evidence: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" } } }).values
+    if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke|recover-measurement|abandon --series DIR [smoke: --case calc-data-double|crosstable-fixed-sum] [recover-measurement: --job KEY --kind infrastructure|judge --evidence PRIVATE_JSON] [abandon: --reason REASON --evidence RELEASE_JSON] [--config PRIVATE --issue ID --task ID] [check: --compare SERIES --export] [resume: --recover-executor after inspection]" }
+    const values = parseArgs({ args: argv.slice(1), strict: true, options: { series: { type: "string" }, case: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, job: { type: "string" }, kind: { type: "string" }, reason: { type: "string" }, evidence: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" } } }).values
     const directory = values.series
     if (!directory || !path.isAbsolute(directory)) throw new BaselineFailure("SERIES_PATH_REQUIRED")
     if (command === "smoke") smokeCaseKey(values.case)
     if (command !== "smoke" && values.case !== undefined) throw new BaselineFailure("CASE_ONLY_FOR_SMOKE")
+    if (command === "abandon") {
+      if (!values.reason?.trim() || values.reason.length > 1000) throw new BaselineFailure("ABANDON_REASON_REQUIRED")
+      if (!values.evidence) throw new BaselineFailure("RELEASE_UNCONFIRMED")
+      const { manifest } = await readBaseline(directory)
+      if (manifest.pins.mode === "fixture" && (env.EVAL_BASELINE_FIXTURE !== "1" || env.EVAL_CLI_MODE !== "fake" || !env.EVAL_ARTIFACT_SOURCE?.startsWith("dir:")))
+        throw new BaselineFailure("FIXTURE_MODE_REQUIRED")
+      if (await lstat(path.join(directory, "executor.lock")).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error }))
+        throw new BaselineFailure("EXECUTOR_REQUIRES_INSPECTION")
+      const report = await checkBaseline(directory)
+      if (!report.cleanup || report.coverage.unknown) throw new BaselineFailure("CLEANUP_UNKNOWN")
+      const proof = await readPrivateBaselineJson(values.evidence) as BaselineRelease
+      await sealBaselineRelease(directory, { status: proof.status, evidenceSha256: proof.evidenceSha256,
+        ...(manifest.pins.mode === "live" ? { receiptPath: values.evidence } : {}), abandoned: { reason: values.reason.trim(), at: new Date().toISOString() } })
+      return { code: 0, ...await writeCheckResult(directory) }
+    }
     if (command === "recover-measurement") {
       if (!values.job || !["infrastructure", "judge"].includes(values.kind ?? "") || !values.evidence) throw new BaselineFailure("RECOVERY_ARGUMENTS_REQUIRED")
       const { manifest, journal } = await readBaseline(directory)
@@ -418,6 +437,7 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
     if (["start", "resume"].includes(command ?? "") && env.EVAL_BASELINE_FIXTURE === "1") {
       const { manifest, journal } = await readBaseline(directory)
       if (manifest.pins.mode !== "fixture" || env.EVAL_CLI_MODE !== "fake" || !env.EVAL_ARTIFACT_SOURCE?.startsWith("dir:")) throw new BaselineFailure("FIXTURE_MODE_REQUIRED")
+      if (journal.release) throw new BaselineFailure("SERIES_RELEASED")
       if (command === "start" && journal.jobs.some(job => job.state !== "pending")) throw new BaselineFailure("USE_RESUME")
       const limit = Number(values.limit ?? manifest.jobs.length)
       if (!Number.isSafeInteger(limit) || limit < 1) throw new BaselineFailure("INVALID_LIMIT")

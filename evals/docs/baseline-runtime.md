@@ -1,6 +1,6 @@
 # Runtime baseline
 
-Executor: `src/baseline.ts`, вход `script/run-baseline.ts`, команды prepare/start/resume/check/smoke/recover-measurement.
+Executor: `src/baseline.ts`, вход `script/run-baseline.ts`, команды prepare/start/resume/check/smoke/recover-measurement/abandon.
 Live `--limit` запрещён, fixture допускает fake/dir и тестовый limit. Smoke требует
 `--case calc-data-double|crosstable-fixed-sum` и создаёт отдельную серию с одним заданием
 attempt=1; повтор создания существующей серии запрещён. Отсутствие артефакта оставляет
@@ -109,6 +109,14 @@ Judge `resume` запускает отдельный supervised worker и шта
 receipts, все полученные verdict и связь восстановления,
 а process proof остаётся закрытым. Crash/reconcile, terminal abandon и аварийный бюджет ещё
 не завершены; это не готовность к live.
+
+Терминальное прекращение: после подтверждения всех процессов/архивов/очистки оператор выполняет
+штатный helper release с completion kind=baseline, затем `abandon --series DIR --reason REASON
+--evidence /absolute/operations/completed/ARCHIVE/release.json`. CLI проверяет настоящий release
+receipt, owner/пины/хэш, исходные evidence и отсутствие executor guard/UNKNOWN/failed cleanup.
+В journal записываются причина и время; итог `abandoned` сохраняет пропуски и никогда не означает
+полный baseline. Серия закрыта для новых admissions; новая серия автоматически не создаётся.
+Abandon не снимает блокировки и не служит заменой безопасной очистке.
 
 ## Доставка
 

@@ -210,6 +210,40 @@ test("a measured product with failed cleanup cannot admit the next case", async 
   } finally { await rm(fixture.directory, { recursive: true, force: true }) }
 })
 
+test("explicit abandonment retains missing quality and permanently closes a safely released series", async () => {
+  const fixture = await recoveryFixture()
+  try {
+    const before = await Bun.file(path.join(fixture.run, "summary.json")).text()
+    const receipt = path.join(fixture.directory, "release.json")
+    await Bun.write(receipt, JSON.stringify({ status: "RELEASED", evidenceSha256: "a".repeat(64) }))
+    await chmod(receipt, 0o600)
+    const argv = ["abandon", "--series", fixture.series, "--evidence", receipt]
+    expect(await runBaseline(argv, fixture.env)).toMatchObject({ code: 2, reason: "ABANDON_REASON_REQUIRED" })
+    expect(await runBaseline([...argv, "--reason", "confirmed external outage; terminate this series"], fixture.env))
+      .toMatchObject({ code: 0, status: "abandoned", measured: 0, pending: 143 })
+    expect(await checkBaseline(fixture.series)).toMatchObject({ status: "abandoned", released: true, cleanup: true })
+    expect(await Bun.file(path.join(fixture.run, "summary.json")).text()).toBe(before)
+    expect(await runBaseline(fixture.argv, fixture.env)).toMatchObject({ code: 2, reason: "SERIES_RELEASED" })
+    expect(await runBaseline(["resume", "--series", fixture.series, "--limit", "1"], fixture.env)).toMatchObject({ code: 2, reason: "SERIES_RELEASED" })
+  } finally { await rm(fixture.directory, { recursive: true, force: true }) }
+})
+
+test.each(["cleanup", "executor", "unknown"])("abandonment refuses an unresolved %s and retains the journal", async condition => {
+  const fixture = await recoveryFixture(condition === "cleanup" ? { environment_cleanup: { status: "failed" } } :
+    condition === "unknown" ? { status: "completed", judge_status: "scored", pass: true, score: 100 } : {})
+  try {
+    if (condition === "executor") await mkdir(path.join(fixture.series, "executor.lock"), { mode: 0o700 })
+    if (condition === "unknown") await beginBaselineMeasurement(fixture.series, fixture.manifest.jobs[1]!.key, { checkout: repoRoot, pins: baselineFixturePins })
+    const before = await Bun.file(path.join(fixture.series, "journal.json")).text()
+    const receipt = path.join(fixture.directory, "release.json")
+    await Bun.write(receipt, JSON.stringify({ status: "RELEASED", evidenceSha256: "a".repeat(64) }))
+    await chmod(receipt, 0o600)
+    expect(await runBaseline(["abandon", "--series", fixture.series, "--evidence", receipt, "--reason", "terminate incomplete series"], fixture.env))
+      .toMatchObject({ code: 2, reason: condition === "executor" ? "EXECUTOR_REQUIRES_INSPECTION" : "CLEANUP_UNKNOWN" })
+    expect(await Bun.file(path.join(fixture.series, "journal.json")).text()).toBe(before)
+  } finally { await rm(fixture.directory, { recursive: true, force: true }) }
+})
+
 test("judge recovery scores the original artifact once without product execution or rewriting its evidence", async () => {
   const fixture = await recoveryFixture({ status: "completed", judge_status: "error", package_path: "/user/fixture.lgp" }, "judge")
   try {
