@@ -51,6 +51,8 @@ const text = truncate(
 
 **Files:** packages/agent/src/util/attachment-preview.ts, packages/agent/src/session/prompt.ts,
 packages/agent/test/util/attachment-preview.test.ts, packages/agent/test/session/prompt.test.ts.
+Совместная очистка: packages/agent/src/tool/truncation-dir.ts, packages/agent/src/tool/truncate.ts,
+packages/agent/test/tool/truncation.test.ts.
 **Consumes:** FSUtil.Service, TRUNCATION_DIR, decodeDataUrl, существующий attachmentPreview.
 **Produces:** Effect helper для materialization bounded attachment context; стабильный путь cache.
 
@@ -82,8 +84,8 @@ expect(stored.parts.find((part) => part.type === "file")?.url).toBe(data)
 - [x] `bun test test/session/compaction.test.ts test/session/prompt.test.ts test/session/message-v2.test.ts test/util/attachment-preview.test.ts test/tool/read.test.ts test/tool/truncation.test.ts test/session/loginom-truncation.test.ts --timeout 30000 --only-failures`.
 - [x] `bun typecheck`; `git diff --check`.
 - [x] Независимый read-only review; исправить только подтверждённые дефекты.
-- [ ] Записать checkpoint <=20 строк: база/SHA, выполненное, результаты, ограничения, следующий шаг.
-- [ ] Сохранить законченные изменения локальным conventional commit, без push/merge/release.
+- [x] Записать checkpoint <=20 строк: база/SHA, выполненное, результаты, ограничения, следующий шаг.
+- [x] Сохранить законченные изменения локальным conventional commit, без push/merge/release.
 
 ## Результат проверки
 
@@ -95,3 +97,5 @@ expect(stored.parts.find((part) => part.type === "file")?.url).toBe(data)
 - Atomic same-content case проверяет 8 параллельных читателей полного 4 MiB snapshot;
   воспроизведение конкурентной гонки прежнего atomic publish не утверждается.
 - Installed Desktop/Loginom acceptance не выполнялась.
+- Локальный fix commit: `6a2720b9a9b369f507ca45f7c343cd507a982b35`.
+- Checkpoint: [context-attachments-checkpoint.md](../../testing/loginom-ai-agent/context-attachments-checkpoint.md).
