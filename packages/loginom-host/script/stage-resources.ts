@@ -7,6 +7,7 @@ import { nativeResourceCandidates } from "./native-resource-candidates"
 import { buildPhase } from "./build-phase"
 import { buildKeychain } from "./build-keychain"
 import { buildPackageDocs } from "./build-package-docs"
+import { buildSyntheticData } from "./build-synthetic-data"
 import { collectBuildNotices } from "./collect-build-notices"
 import release from "../../product/loginom-release.json"
 import catalogs from "../../product/loginom-catalogs.json"
@@ -59,13 +60,14 @@ export async function stageResources(input: {
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const source = resolve(import.meta.dir, "../../loginom-runtime")
   const docsSource = resolve(import.meta.dir, "../src/package-docs")
+  const syntheticSource = resolve(import.meta.dir, "../src/synthetic-data")
   const destination = resolve(input.destination)
   const node = input.node
   const browsers = input.browsers
   const staging = destination + ".staging"
   for (const paths of [
-    [destination, staging, source, node, browsers, productSkillsDirectory, docsSource],
-    await Promise.all([destination, staging, source, node, browsers, productSkillsDirectory, docsSource].map(canonicalBuildPath)),
+    [destination, staging, source, node, browsers, productSkillsDirectory, docsSource, syntheticSource],
+    await Promise.all([destination, staging, source, node, browsers, productSkillsDirectory, docsSource, syntheticSource].map(canonicalBuildPath)),
   ]) {
     if (
       paths
@@ -163,6 +165,9 @@ export async function stageResources(input: {
   const docs = await buildPhase(`${input.flavor}-package-docs`, () =>
     buildPackageDocs(join(staging, "skills/package-docs/scripts")))
   await collectBuildNotices(join(staging, "licenses/package-docs"), [{ root: docs.root, metafile: docs.metafile }])
+  const synthetic = await buildPhase(`${input.flavor}-synthetic-data`, () =>
+    buildSyntheticData(join(staging, "skills/synthetic-data/scripts")))
+  await collectBuildNotices(join(staging, "licenses/synthetic-data"), [{ root: synthetic.root, metafile: synthetic.metafile }])
   await cp(join(productSkillsDirectory, "package-docs/assets/fonts/OFL.txt"), join(staging, "licenses/Golos-OFL.txt"))
   await cp(resolve(source, "../../LICENSE"), join(staging, "licenses/OpenCode-MIT.txt"))
   await cp(
@@ -179,6 +184,7 @@ export async function stageResources(input: {
   Node.js license and bundled dependency notices are in licenses/Node.txt.
   Package documentation uses Golos Text under the SIL Open Font License (licenses/Golos-OFL.txt).
   Its emitted npm dependency notices are in licenses/package-docs/.
+  Synthetic datasets use the same bundled Node; their emitted npm dependency notices are in licenses/synthetic-data/.
   Playwright, MCP and their dependency license files are included alongside their package sources in runtime/client/node_modules/.
   ${input.flavor === "desktop" ? "Electron notices are included at the application root by electron-builder; the managed Chromium also exposes chrome://credits/." : "The bundled Chromium exposes its notices at chrome://credits/. Linux CLI archives also export them under licenses/chromium/ at the archive root. Browser-side license files remain under browsers/. Electron is not included."}
   The active Dock JavaScript sources are included in runtime/.

@@ -227,6 +227,7 @@ for (const profile of ["default", "package-docs", "loginom-automation"] as const
       expect(!!tools.loginom_dock_prepare).toBe(profile === "loginom-automation")
       expect(!!tools.loginom_browser_click).toBe(profile === "loginom-automation")
       expect(!!tools.package_docs_run).toBe(profile === "package-docs")
+      expect(!!tools.synthetic_data_run).toBe(profile !== "package-docs")
       expect(!!tools.task).toBe(profile === "default")
       expect(!!tools.bash).toBe(profile !== "package-docs")
       history.length = 0

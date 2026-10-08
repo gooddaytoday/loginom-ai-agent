@@ -46,6 +46,19 @@ beforeAll(async () => {
   expect(await builder.exited).toBe(0)
   expect(await stderr).toBe("")
   expect(JSON.parse(await stdout).script).toBe(join(resources, "skills/package-docs/scripts/package-docs.mjs"))
+  const synthetic = Bun.spawn(
+    [
+      process.execPath,
+      join(import.meta.dir, "../../../loginom-host/script/build-synthetic-data.ts"),
+      join(resources, "skills/synthetic-data/scripts"),
+    ],
+    { stdout: "pipe", stderr: "pipe" },
+  )
+  const syntheticStdout = new Response(synthetic.stdout).text(),
+    syntheticStderr = new Response(synthetic.stderr).text()
+  expect(await synthetic.exited).toBe(0)
+  expect(await syntheticStderr).toBe("")
+  expect(JSON.parse(await syntheticStdout).script).toBe(join(resources, "skills/synthetic-data/scripts/synthetic-data.mjs"))
   await Bun.write(
     join(resources, "resource-manifest.json"),
     JSON.stringify({ protocol: 1, node: "bin/node", files: await resourceInventory(resources) }),

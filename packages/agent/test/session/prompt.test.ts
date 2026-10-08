@@ -1077,6 +1077,19 @@ const stageBundledResources = Effect.gen(function* () {
   expect(yield* Effect.promise(() => builder.exited)).toBe(0)
   expect(yield* Effect.promise(() => stderr)).toBe("")
   yield* Effect.promise(() => stdout)
+  const synthetic = Bun.spawn(
+    [
+      process.execPath,
+      path.join(import.meta.dir, "../../../loginom-host/script/build-synthetic-data.ts"),
+      path.join(bundledResources, "skills/synthetic-data/scripts"),
+    ],
+    { stdout: "pipe", stderr: "pipe" },
+  )
+  const syntheticStdout = new Response(synthetic.stdout).text(),
+    syntheticStderr = new Response(synthetic.stderr).text()
+  expect(yield* Effect.promise(() => synthetic.exited)).toBe(0)
+  expect(yield* Effect.promise(() => syntheticStderr)).toBe("")
+  yield* Effect.promise(() => syntheticStdout)
   yield* Effect.promise(async () =>
     Bun.write(
       path.join(bundledResources, "resource-manifest.json"),

@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test"
-import { cp, mkdtemp, readFile, readdir, rm, symlink } from "node:fs/promises"
+import { cp, mkdtemp, readFile, readdir, realpath, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect, Layer } from "effect"
@@ -50,6 +50,17 @@ test("shipped skill metadata conforms to the Agent Skills specification", async 
   }
 })
 
+test("synthetic data declares its generated Node executor and keeps dataset generation inside the tool", async () => {
+  const skill = await ConfigMarkdown.parse(join(productSkillsDirectory, "synthetic-data/SKILL.md"))
+  expect(skill.data.metadata?.["loginom-generated"]).toBe("scripts/synthetic-data.mjs")
+  expect(skill.content).toContain("synthetic_data_run")
+  for (const reference of ["references/spec.md", "references/defects.md", "references/formats.md", "references/presets.md", "references/existing-scenario.md"]) {
+    expect(skill.content).toContain(reference)
+  }
+  expect(skill.content).not.toMatch(/python3|scripts\/\S+\.py/)
+  expect(skill.content.split("\n").length).toBeLessThan(500)
+})
+
 test("package documentation declares its generated Node executor and describes the restricted product workflow", async () => {
   const skill = await ConfigMarkdown.parse(join(productSkillsDirectory, "package-docs/SKILL.md"))
   expect(skill.data.metadata?.["loginom-generated"]).toBe("scripts/package-docs.mjs")
@@ -62,7 +73,7 @@ test("package documentation declares its generated Node executor and describes t
   expect((await readdir(join(productSkillsDirectory, "package-docs"), { recursive: true })).filter((file) => file.endsWith(".py"))).toEqual([])
 })
 
-const resources = await mkdtemp(join(tmpdir(), "loginom-bundled-skills-"))
+const resources = await realpath(await mkdtemp(join(tmpdir(), "loginom-bundled-skills-")))
 const content = await readFile(join(productSkillsDirectory, "package-docs/SKILL.md"), "utf8")
 await cp(productSkillsDirectory, join(resources, "skills"), { recursive: true })
 const builder = Bun.spawn(
@@ -78,6 +89,19 @@ const stdout = new Response(builder.stdout).text(),
 expect(await builder.exited).toBe(0)
 expect(await stderr).toBe("")
 expect(JSON.parse(await stdout).script).toBe(join(resources, "skills/package-docs/scripts/package-docs.mjs"))
+const syntheticBuilder = Bun.spawn(
+  [
+    process.execPath,
+    join(import.meta.dir, "../../../loginom-host/script/build-synthetic-data.ts"),
+    join(resources, "skills/synthetic-data/scripts"),
+  ],
+  { stdout: "pipe", stderr: "pipe" },
+)
+const syntheticStdout = new Response(syntheticBuilder.stdout).text(),
+  syntheticStderr = new Response(syntheticBuilder.stderr).text()
+expect(await syntheticBuilder.exited).toBe(0)
+expect(await syntheticStderr).toBe("")
+expect(JSON.parse(await syntheticStdout).script).toBe(join(resources, "skills/synthetic-data/scripts/synthetic-data.mjs"))
 await Bun.write(
   join(resources, "resource-manifest.json"),
   JSON.stringify({
@@ -305,7 +329,7 @@ it.live("the same skill realpath is discovered only once through two configured 
       )
       const skills = yield* Skill.Service
       expect((yield* skills.all()).filter((skill) => skill.name === "sample")).toHaveLength(1)
-      expect(yield* skills.dirs()).toHaveLength(3)
+      expect(yield* skills.dirs()).toHaveLength(reservedSkillNames.length + 1)
       expect((yield* skills.require("sample")).location).toBe(join(source, "sample/SKILL.md"))
     }),
   ),
@@ -323,7 +347,7 @@ it.live("an ordinary project skill retains its source provenance", () =>
   ),
 )
 
-for (const name of ["package-docs", "loginom-automation", "package_docs"]) {
+for (const name of [...reservedSkillNames, "package_docs"]) {
   it.live(`a configured command cannot claim the reserved name ${name}`, () =>
     provideTmpdirInstance((directory) =>
       Effect.gen(function* () {

@@ -1,0 +1,17 @@
+# Дефекты
+
+Каждый элемент `defects` указывает `table`, `kind` и `rate` от 0 до 1. Доля применяется независимо к строкам, поэтому фактическое число близко к `rate`, но не обязано совпасть с округлением. Все срабатывания пишутся в `defects.csv`: файл, таблица, номер строки внутри файла, колонка, вид, исходное значение, новое значение. `manifest.json` хранит `defect_count` и хеши файлов данных.
+
+| kind | Что делает | Поля |
+| --- | --- | --- |
+| `missing` | Пропуск | `column`, `as`: `null`, `empty` или `sentinel`, `sentinel`, `mechanism`: `mcar`, `depends`, `block`. Для `depends` нужен `when`: `{ "column", "equals" }` или `{ "column", "above" }`. Для `block` — `length` |
+| `outlier` | Выброс числа или выражения | `method`: `multiplier`, `zscore`, `iqr`; `factor`; `direction`: `high`, `low`, `both`; `force`: `negative` или `zero` |
+| `noise` | Шум | `noise`: `gaussian` (`sd`), `typo`, `case`, `spaces`, `date_format`, `decimal`, `synonym`. Для `synonym` — объект `synonyms` со списками замен |
+| `duplicate` | Лишние строки | `mode`: `exact` или `fuzzy`. Колонка не нужна |
+| `text_in_number` | Текст в числе | `token`, по умолчанию `н/д` |
+| `out_of_range` | Число за пределами `min`/`max` | `direction` |
+| `orphan` | Значение ссылки, которого нет в родителе | `column` типа `ref` или `lookup` |
+| `inconsistent` | Итог выражения не сходится | `factor`, по умолчанию 3 |
+| `broken_row` | Лишнее или пропущенное поле | Только `csv`, `tsv`, `txt` |
+
+Сентинел по умолчанию: `-999` для числа, `1900-01-01` для даты, `N/A` для текста. `null` и пустая строка в CSV выглядят одинаково пустым полем; в JSON это `null` и `""`.
