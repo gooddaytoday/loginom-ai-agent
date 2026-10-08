@@ -520,3 +520,47 @@ Formal baseline run `20261008-180611-d1b364a98`: первая задача
 cleanup confirmed. Reviewer v5 сохранил независимую структуру/warm oracle PASS
 в `ab-formal-v5-base-reviews-20261008-ab-revenue-per-converter-1`; cold ещё
 не выполнен. Серия продолжается, первая успешная попытка не подменяет45/90.
+
+## Formal baseline: первые три результата
+
+`articles-by-author#1`: CLI0/completed/judge100/warm oracle PASS/519.277s,
+harness cleanup confirmed. Независимая проверка структуры и результатов PASS:
+`ab-formal-v5-base-reviews-20261008-articles-by-author-1`; cold ещё не выполнен.
+
+`abc-pareto-groups#1`: CLI0, но `no_artifact`, score0, 624.161s.
+`loginom_dock_node_wait` остановился с `NODE_APPLY_STOPPED` в `output_mapping`:
+ожидание addressed output definition page завершилось timeout. Последующие
+resume/cancel/recover/status не разрешили исходную неопределённость
+(`effect_possible=true`, native `cleanup_complete=false`). Пакет и CSV не
+сохранены; агент сообщил о незавершённой работе. Harness подтвердил cleanup
+процессов без `cleanup_error`; это не доказательство завершения операции узла.
+Исходные result/events/cleanup hashes и пять ошибок сохранены в
+`ab-formal-v5-base-abc-failure-20261008/review.json`.
+
+Это измеренный отказ baseline, не исключённая инфраструктурная попытка.
+Выбор15 задач, рубрика и pins не менялись; manual retry не запускался.
+Серия продолжается. Регрессия candidate этим результатом не доказана.
+
+## Сохранение старых upgrade-артефактов и место для серии
+
+Удалены только собственные распакованные CLI/Desktop669822296 и bc6e7e164
+после сохранения и roundtrip проверки полных архивов. CLI: по6849 entries,
+включая файлы, каталоги, режимы и symlinks; Desktop: по4764 файла/symlink,
+все байты, хэши и режимы проверены, в том числе sandbox4755. Режимы каталогов
+Desktop отдельно не сверялись. DEB/AppImage, manifests, source archives,
+старые upgrade-результаты, profiles и inputs сохранены. Перед повторным
+upgrade старые raw paths необходимо восстановить по receipts.
+
+Сводка `ab-local-stand-20261008/upgrade-artifacts-preservation-summary.json`,
+SHA256 `639a7131f6451c78a21690a4522b1496e1d824c6669442940f8bb328b3f7be50`,
+содержит повторно проверенные archive hashes, receipt hashes и restore argv.
+Baselinefc и текущие CLI/Desktop49 raw не удалялись.
+
+Также удалён только неиспользуемый ignored `node_modules` собственного
+`docs-build` worktree после проверки clean source49, отсутствия tracked files
+и любых process/FD references. Байты зависимостей не архивированы:
+`docs-build-dependencies-reconstruction.json` закрепляет lockfile SHA и
+`bun install --frozen-lockfile`; перед новой сборкой нужна повторная проверка.
+Исходники, полный baseline, продуктовые сборки и shared caches сохранены.
+После операций наблюдалось около7GB свободного места; это не оценка объёма
+освобождения. Активные результаты и profiles не очищались.
