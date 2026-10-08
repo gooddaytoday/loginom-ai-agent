@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rename, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, runNodeEvalOps, runNodeUnitChecks, type NodeOpsConfig } from "../src/node-eval-ops"
+import { acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, runNodeEvalOps, runNodeUnitChecks, nodeRoleCli, type NodeOpsConfig } from "../src/node-eval-ops"
 import { archiveProfileHistory } from "../src/profile"
 import { superviseProcess } from "../src/process-supervisor"
 
@@ -12,13 +12,34 @@ async function runtime() {
     evalProfile: path.join(root, "roles", name, "eval"), workRoots: [path.join(root, "roles", name, "work")], resultsRoot: path.join(root, "roles", name, "results") })
   const config: NodeOpsConfig = { version: 1, runtimeRoot: root, endpoint: "http://localhost/app/", container: { name: "test", id: "b".repeat(64), storageDir: "/workdir/UserStorage/user" },
     cliBin: path.join(root, "cli", "bin", "loginom-ai-agent-cli"), roles: { rich: role("rich"), ben: role("ben") } }
-  for (const item of Object.values(config.roles)) for (const directory of [item.checkout, item.referenceProfile, item.evalProfile, ...item.workRoots, item.resultsRoot])
+  for (const item of Object.values(config.roles)) for (const directory of [item.checkout, item.referenceProfile, item.evalProfile, ...item.workRoots, item.resultsRoot].filter((value): value is string => value !== undefined))
     await mkdir(directory, { recursive: true, mode: 0o700 })
   await Bun.write(config.cliBin, "installed")
   return { config, dispose: () => rm(root, { recursive: true, force: true }) }
 }
 
 const owner = { issue: "LAB-16", task: "task-one", role: "rich" as const, phase: "eval" as const, sha: "a".repeat(40) }
+
+test("v2 eval-only baseline role shares the stand while preserving independent worker CLI pins", async () => {
+  const fixture = await runtime()
+  try {
+    const root = fixture.config.runtimeRoot
+    const baseline = { checkout: path.join(root, "checkouts/baseline"), evalProfile: path.join(root, "roles/baseline/eval"),
+      workRoots: [path.join(root, "roles/baseline/work")], resultsRoot: path.join(root, "roles/baseline/results"),
+      cliBin: path.join(root, "cli-baseline/bin/loginom-ai-agent-cli") }
+    for (const directory of [baseline.checkout, baseline.evalProfile, ...baseline.workRoots, baseline.resultsRoot]) await mkdir(directory, { recursive: true, mode: 0o700 })
+    await Bun.write(baseline.cliBin, "new installation")
+    const config: NodeOpsConfig = { ...fixture.config, version: 2, roles: { ...fixture.config.roles, evalbaseline: baseline } }
+    expect(nodeRoleCli(config, "rich")).toBe(fixture.config.cliBin)
+    expect(nodeRoleCli(config, "evalbaseline")).toBe(baseline.cliBin)
+    const lease = await acquireNodeStand(config, { ...owner, role: "evalbaseline" })
+    await expect(acquireNodeStand(config, owner)).rejects.toThrow("BUSY")
+    await expect(acquireNodeStand(config, { ...owner, role: "ben" })).rejects.toThrow("BUSY")
+    await expect(assertNodeStandOwner(config, { ...lease, role: "rich" })).rejects.toThrow("LEASE_OWNER_CHANGED")
+    await expect(preflightNodeStand(config, lease, {})).rejects.toThrow()
+    expect((await nodeStandStatus(config)).status).toBe("BUSY")
+  } finally { await fixture.dispose() }
+})
 const image = process.env.EVAL_TEST_LOGINOM_IMAGE ?? "sha256:5e3c79877de937aae168ecdcaf70c837bbbcf04e8f4262c2a976ac283ea394c2"
 const dockerAvailable = Boolean(Bun.which("docker")) && (await Bun.$`docker image inspect ${image}`.quiet().nothrow()).exitCode === 0
 const browserBusy = (await Bun.$`ps -u ${process.getuid?.() ?? ""} -o comm=`.quiet().nothrow()).text().split("\n").some(name => /^(chrome|chromium)([-\s]|$)/.test(name.trim()))
