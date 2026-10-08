@@ -1,14 +1,14 @@
 # EvalBaseline — checkpoint 2026-10-08
 - Branch baseline-runtime; checkout /tmp/loginom-baseline-runtime; основной checkout сохранён.
-- Проверенный code SHA f3ecf7ea3fdb7f2156b2c4b2c642b25eae7f998f; LAB-31 принят на 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad.
+- Проверенный code SHA be0933a99a5bbdb0702647bc219967b5dc377a15; LAB-31 принят на 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad.
 - Корпус 48 кейсов/144 измерения; public prepare и полный fixture N×3 PASS.
 - Этапы 0, 3.0 и 3.1 выполнены; single-case smoke, budget=0 и устойчивый readiness ledger реализованы.
 - Этап 3.2: infrastructure admission/resume сохраняет исходный record, добирает один slot и учитывает все executions/расходы.
 - Private v2 config должен закрепить readinessIssue на UUID LAB-32 до freeze; полный start gated.
 - Последний полный suite на 3d3cf1f94: 519 PASS, 7 clean-host SKIP, 0 FAIL; 526 тестов/47 файлов/2508 assertions.
-- Targeted: 54 PASS, 4 clean-host SKIP, 0 FAIL; 58 тестов/3 файла/269 assertions; typecheck PASS; полный suite после 3.2.
+- Targeted: 55 PASS, 4 clean-host SKIP, 0 FAIL; 59 тестов/3 файла/286 assertions; typecheck PASS; полный suite после 3.2.
 - Единичный fixture CLEANUP_UNKNOWN не воспроизведён в 6 повторах и полном suite; причина не установлена.
-- Immutable recovery evidence/исходные bytes/экспорт обоих runs проверены; measured failure и failed cleanup не дают нового dispatch.
+- Judge-only recovery: прежний артефакт, исходные bytes неизменны, оба verdict в export; score=0 окончателен; расход продукта один раз.
 - Deployment остаётся bfb7c62e4266e76c995a43b6f909d8a6739ce062; active config v1.
 - CLI 0.1.17 / fc3d97dbf695c2ed8dba942feb6fe83591a33944; manifest 5389 файлов, AppArmor/setup ранее PASS.
 - Multica EvalBaseline: eval-tests, gpt-6.1-sol/xhigh, concurrency=1, вне squad; Native MCP actor/auto Peer ранее PASS.
@@ -17,4 +17,4 @@
 - Стенд/очереди/пять профилей ранее чисты; повторить перед активацией, семь clean-host fixtures выполнить без skip до smoke.
 - Живые smoke и полный baseline не запускались; UNKNOWN автоматически не повторяется.
 - Карточку полного baseline создать и реально запустить на этапе 7; native heartbeat основного чата на этапе 8.
-- Далее: judge-only recovery (сейчас JUDGE_RECOVERY_NOT_READY), crash/UNKNOWN, terminal abandon, per-execution recovery budget; затем 4–10.
+- Далее: сохранение judge retries, crash/UNKNOWN, terminal abandon, per-execution recovery budget; затем 4–10.
