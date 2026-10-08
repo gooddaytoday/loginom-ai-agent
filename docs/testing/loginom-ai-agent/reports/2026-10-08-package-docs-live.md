@@ -126,10 +126,35 @@ prod/beta/dev: профилей нет. Первая probe-команда оши
 base image и завершилась до проверки; её log сохранён. Те же критерии
 проверены поставляемым Node, продукт и образ после сборки не изменены.
 
-На новом candidate запущен `docs-attached-pdf` ×3 отдельно через CLI и Desktop,
-OpenAI6.1-sol/medium с прежним models snapshot. Эти продуктовые прогоны ещё
-выполняются и не являются analytic A/B. Их итоговая механика, факты, вёрстка
-и cleanup требуют отдельной проверки после завершения.
+На новом candidate `docs-attached-pdf` **3/3 PASS отдельно в CLI и Desktop**,
+OpenAI6.1-sol/medium с прежним models snapshot. Прочитаны полные тексты и
+просмотрены все17 страниц: CLI2/3/3, Desktop3/3/3. Правильные факты/статистика,
+все уровни вложенности, неизвестные настройки без выдуманного поведения,
+явная data.lgd-зависимость; placeholders и ложного объявления выполнения нет.
+Механика, факты и layout PASS6/6. Реальный Help read и backend-applied
+package-docs подтверждены в каждой попытке; digest CLI2b393882…,
+Desktop87a707b7… фиксируются отдельно по verified trees этих артефактов.
+Input SHA до/после совпадает6/6, browser execs0, remaining processes[],
+CLI containers removed3/3, Desktop roots/temporary removed3/3.
+`manual-quality.json`, изображения/текст и отдельный `manual-summary.json`
+сохранены в `openai-49-{cli,desktop}-docs-pdf-20261008`.
+
+Продолжается оставшаяся docs/default matrix:13 случаев ×3 отдельно через
+CLI/Desktop, новые каталоги `openai-49-{cli,desktop}-routing-20261008`.
+Эти продуктовые прогоны не являются analytic A/B. Общий этап6 ещё открыт.
+
+## Независимый structural verifier
+
+Все13 scripts существующего loginom-eval-case скопированы в собственный
+`analytic-structural-verifier-20261008/scripts` с SHA256 manifest. Отдельный
+`offline-verifier.env` направляет CSV-компаратор в frozen9d7 harness и явно
+содержит нерабочие offline-only параметры подключения; глобальные настройки
+и чужие файлы не менялись. Оффлайн-аудит всех35 сохранённых reference.lgp:
+**35/35 PASS** по acceptance.json (типы, связи/пути, входные файлы, запрещённые
+литералы) и oracle.csv self-comparison. Это проверка verifier/эталонов,
+а не построение продукта, проверка всех параметров или cold replay.
+Отчёты каждого кейса и `reference-self-check.json` сохранены.
+Живые72–90 попыток выбранного набора и повторное выполнение ещё требуются.
 
 Полная матрица Desktop/CLI/TUI, жизненный цикл, independent clients и A/B
 ещё не закрыты. A/B требует доступа к выделенному стенду и выбранных до
