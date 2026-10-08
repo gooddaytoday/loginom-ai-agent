@@ -711,7 +711,7 @@
     "sha256": "7242dca9becfc3d7a7d111e4a0271e51caf845ad295b8dfdbbcce4ac0736ed73",
     "bytes": 3148
   },
-  "next_step": "Same LAB47 finite own reconnect reconciliation and private profile-A exception diagnosis; no new CreateSession/root login/cards/schedules, no shared source/contracts mutation. Common fixes need owner approval. Node acceptance remains held.",
+  "next_step": "One instrumented finite diagnostic in same LAB47, max2 root browser profiles; preserve original attempts, record exact own key/phase early; reconcile3114/3113; prove2 only if prerequisites pass; stock3m queue retained; no model/build/handoff/source/common-contract changes.",
   "verified_fresh_diagnostic_attachments": [
     {
       "id": "01a11d95-301f-714a-b520-d68c5f95d975",
@@ -1030,8 +1030,155 @@
     "comment_id": "01a11db2-d352-7d04-8a50-d6ce0174ad24",
     "purpose": "owner continuation: finite own reconnect reconciliation and private diagnostic error cause; no CreateSession/new cards/schedules/model",
     "id": "01a11db2-d363-7e10-9799-63f77d5b05c2",
-    "status": "running",
+    "status": "completed",
     "started_at": "2026-10-09T01:47:02+03:00",
-    "created_at": "2026-10-09T01:47:01+03:00"
+    "created_at": "2026-10-09T01:47:01+03:00",
+    "completed_at": "2026-10-09T01:55:03+03:00"
+  },
+  "finite_causal_diagnostic": {
+    "attachments": [
+      {
+        "id": "01a11db9-f669-7cca-b362-e3b051259693",
+        "name": "generator-profile-a-causal-receipt.json",
+        "bytes": 5376,
+        "sha256": "628d51e72c52bdf50bba9c73e434fb18d8a08b84fdfea3c47240b62173a6a549"
+      },
+      {
+        "id": "01a11db9-f737-7ea8-9e74-92b3c86e64d0",
+        "name": "generator-profile-a-own-cleanup.json",
+        "bytes": 3540,
+        "sha256": "a9294cdea64e76dec96166f21d43b50e343562c7506d793ce56e0ddfbf72df70"
+      },
+      {
+        "id": "01a11db9-f804-7496-bcd0-71789d830651",
+        "name": "generator-profile-a-resources.json",
+        "bytes": 1343,
+        "sha256": "06bb90d5831fbf14e2a56fc4b0f1e8ffa7553b8b71c1a6a895bf00535fbfaba3"
+      },
+      {
+        "id": "01a11db9-f8cc-7972-add3-3fafbc28cea3",
+        "name": "generator-profile-a-manifest.json",
+        "bytes": 711,
+        "sha256": "e9a566ea2c80c66ed2879f78a5765822618af03e366859ea4e8f20a78d81c9c0"
+      }
+    ],
+    "manifest_artifacts_bytes_sha256_verified": true,
+    "profile_A_error": {
+      "original_started_at": "2026-10-08T22:39:08.788Z",
+      "own_key_saved_at": "2026-10-08T22:39:12.423982+00:00",
+      "original_finished_at": "2026-10-08T22:39:13.049Z",
+      "original_private_receipt_sha256": "29403f2fa2d0e08f5be66d8b41670b97bde4f1a144efc45dcdcecc5b50f9c287",
+      "original_stderr_bytes": 0,
+      "DOM_trace_stack": "NOT_CAPTURED",
+      "bounded_phase": "after own GUID/key saved; during Dispatcher navigation or initial refresh/read/validation, before first successful snapshot; exact subphase UNKNOWN",
+      "underlying_exception_cause": "UNKNOWN; cannot reconstruct lost message/stack from preserved data",
+      "hypotheses_promoted_to_source_defect": false,
+      "confirmed_private_helper_defects": [
+        "primary catch discards non-uppercase message and every stack; wrapped page.evaluate Error becomes generic Error",
+        "session/logout/browser receipt registered only after first successful Dispatcher read; pre-read failures leave no session receipt"
+      ],
+      "offline_verification": {
+        "checks": {
+          "legacy_wrapped_error_loses_message": "CONFIRMED",
+          "new_phase_message_stack": "PASS",
+          "public_message_redaction": "PASS",
+          "pre_numeric_session_cleanup_receipt": "PASS",
+          "DOM_private": "PASS",
+          "private_modes": "PASS",
+          "cleanup_survives_logging_and_logout_failure": "PASS"
+        },
+        "network_calls": 0,
+        "CreateSession_calls": 0,
+        "ConnectToSession_calls": 0,
+        "root_logins": 0,
+        "browsers_launched": 0,
+        "synthetic_test_only": true
+      }
+    },
+    "private_helper_improvement": {
+      "original_helper_sha256": "a769ae480a6aba2665413ae6feab9ce951d1572de693d7577903ca287c145f01",
+      "archive_original_sha256": "a769ae480a6aba2665413ae6feab9ce951d1572de693d7577903ca287c145f01",
+      "instrumented_helper_sha256": "c0597b9aa40c4c39d0c10efef0c4af15629346c014cfabdb15500d5b1685d952",
+      "recorder_module_sha256": "28a51b495b1f300f9ed51f852c6659e75a9eba48cde8c725b66db84a69036abc",
+      "scope": "only private diagnostic copy; original/provisioner/shared source unchanged",
+      "network_account_workflow_execution": "NOT_RUN",
+      "changes": [
+        "durable phase before browser/login/key/navigation/refresh/evaluate/validation/logout/close",
+        "raw name/message/stack/cause saved private0600",
+        "public error code allowlist handles Playwright Error prefix",
+        "DOM saved private on failure; capture failure cannot prevent finally cleanup",
+        "session/logout/browser receipt registered before Dispatcher capture",
+        "original exception and cleanup exceptions kept separately; numeric SessionID remains NOT_CAPTURED until proved"
+      ]
+    },
+    "root3114_recovery_access": {
+      "Guid_only_capture": true,
+      "original_audit_helper_does_not_read_ReconnectKey": true,
+      "saved_exact_own_ReconnectKey_with_provenance": "NOT_FOUND",
+      "profile_A_key_is_different_identity": true,
+      "current_ConnectToSession_attempts": 0,
+      "blocker": "missing saved exact root3114 ReconnectKey; no authorized currently connected root context for refreshed numeric3114/mstSelf positive control or independent exact3113 readback"
+    },
+    "finite_own_session_termination": {
+      "standard_UI_path": "Application.LogOut -> DoDisconnect -> ServerConnection.Dispose -> CustomServerContainer.Finalize -> DeductorServer.Disconnect",
+      "UI_logout_is_dispatcher_CloseSession": false,
+      "mstSelf_not_closable_in_standard_UI": true,
+      "unconditional_final_server_disappearance_after_Disconnect": "NOT_PROVED",
+      "CloseSession_mstSelf_bypass": "NOT_ATTEMPTED",
+      "root3114_last_independent_absence": "PENDING",
+      "technical_admin3113_current_independent_numeric_readback": "NOT_RUN",
+      "technical_admin3113_CloseSession": "NOT_ATTEMPTED; fresh readback prerequisite unavailable",
+      "negative_probe_as_full_cleanup_PASS": "NOT_CLAIMED"
+    },
+    "root_marker_preserved_byte_for_byte": true,
+    "shared_source_provisioner_rights_model_criteria_changes": 0
+  },
+  "queue_cadence_owner_steering": {
+    "source_review_commit": "2ea01ae4ef55de4310b99af192d2dbd367832883",
+    "owner_ssh_access": "password SSH verified; no key/auth changes; supplied secrets not retained",
+    "daemon_id": "01a116e7-cc72-796d-8f8a-e4e8c9f33d9e",
+    "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+    "profile": "",
+    "before_pid": 164056,
+    "temporary_5s_pid": 212247,
+    "restored_3m_pid": 212379,
+    "restored_argv": [
+      "/usr/local/bin/multica",
+      "daemon",
+      "start",
+      "--foreground",
+      "--ws-claim-poll-interval",
+      "3m0s",
+      "--max-concurrent-tasks",
+      "12"
+    ],
+    "protected_config_unchanged": true,
+    "both_restarts_at_active_running_resource_wait_zero": true,
+    "both_restarts_terminal_reports_zero": true,
+    "active_tasks_interrupted": 0,
+    "new_dispatcher_queue_scheduler_created": false,
+    "owner_direction": "Stock3m cadence is acceptable for node work; restored instead of continuing queue tuning",
+    "runtime_live_readback": "PASS",
+    "executable_current_sha256": "20305a8d848f785c2120d03c56e3fc77129d0156d7319a9f43beca3bc0b70d03",
+    "cli_manifest_current_sha256": "1d518db83c2e3ae625fc93b707edaaeb837a6f2cfcc99a1ed0824093f9b70768",
+    "raw_secret_logs_saved": false,
+    "private_audit_dir": "/home/user/.local/state/loginom-recheck/ws-claim-10ab22971920"
+  },
+  "instrumented_shared_admin_continuation": {
+    "observed_at": "2026-10-08T23:07:04.790253+00:00",
+    "issue_id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+    "comment_id": "01a11dc5-2f98-7b2f-8d6c-91c9c6cce834",
+    "purpose": "one instrumented bounded shared-admin reconciliation/two-profile check after private helper correction; owner continues; no source/model/schedules",
+    "id": "01a11dc5-2fb1-77c2-b8c9-8670cbe1923e",
+    "status": "running",
+    "started_at": "2026-10-09T02:07:05+03:00",
+    "created_at": "2026-10-09T02:07:04+03:00"
+  },
+  "documentation_review": {
+    "status": "PASS",
+    "reviewer": "independent local read-only reviewer",
+    "scope": "two20-line checkpoints and structured evidence consistency/secret exclusion",
+    "live_api_ssh_node_acceptance": "NOT_RUN",
+    "source_prechange_sha": "02da9bf2e10c295f50f9224e2e801d793ba096e4"
   }
 }

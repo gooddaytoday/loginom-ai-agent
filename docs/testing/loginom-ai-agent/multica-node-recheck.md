@@ -31,22 +31,23 @@
 
 ## Checkpoint наблюдения — новая параллельная волна, 09.10.2026
 
-- Документация до продолжения4003b43d; baseline4e626d547, common basef9bf332c; loginom0ca не включён; remote SHA сверены.
+- Документация до продолжения02da9bf2; baseline4e626d547/basef9bf332c; loginom0ca не включён; remote SHA сверены.
 - Node SHA: LAB45 a00b0203/PR42, LAB46 41e0b170/PR43, LAB47 c92a3bfd; LAB48–52 4e626d547; назначения сохранены.
-- Caps8/8/8/runtime readback; daemon12;8 Generator tasks batch21:46:24UTC,8 simultaneous running NOT_CONFIRMED.
-- Partial distinct-agent claim/WS3min — source explanation, installed Multica0.6.1/source2ea; server exact SHA NOT_OBSERVED.
+- Caps8/8/8, daemon12;8 running одновременно NOT_CONFIRMED; stock3m claim cadence оставлена по команде владельца.
+- Owner SSH verified; временные5s отменены; два stock restart в idle/terminal_reports0, interruption0; тот же daemon/runtime/profile.
+- daemon PID212379/argv3m0s+12/readback PASS; installed Multica0.6.1/source2ea; server exact SHA NOT_OBSERVED.
 - Native capacity classified model_not_found_or_unavailable, auto retry не назначен; stock rerun сохранён, модели не менялись.
-- Protocol run01a11d9a-b146 completed;5 attachments downloaded,4 manifest artifacts bytes/SHA256 PASS; это не приёмка.
-- root3114 GUID↔numericID через unique mstSelf подтверждён в loaded-store9/9; cross-profile validation NOT_RUN.
-- Settings DisableUserMultiSession=false/AdminMultiSessionRestriction=0; SessionKeepAlive1800000ms; UI logout=disconnect.
-- root3112 отсутствует при own3114 positive control; root3114/admin3113 server cleanup PENDING; marker/history сохранены.
-- Profile A failed до Dispatcher: helper сохранил только Error; numericID неизвестен, profile B NEVER_OPENED.
-- Own saved-key probe:0 CreateSession/0 login, rcrNotFound; independent positive/negative calibration NOT_RUN.
-- Exact own PID/startticks absence и свободные account locks/inodes подтверждены; API completed не означает server absence.
-- mas01:42MSK: CPU1%,RAM available30144180KiB,disk409929609216B,load0.029/0.043/0.016; queue1 running/resource_wait0.
-- Installed CLI source597592f, executable/manifest hash PASS; CLI/model/build execution0;2 admin records/6 planned retained.
-- Все8 приёмок удержаны; новая finite diagnostic task LAB47 01a11db2-d363-7e10-9799-63f77d5b05c2 running; новых root login не разрешено.
-- Scheduled observer ранееPAUSED; текущий TOML не найден, matching monitor отсутствует; create/resume не выполнялись.
-- [SHA/tasks/hashes/ограничения](reports/2026-10-08-node-recheck/parallel8-restart.json); source/критерии не менялись; PR40 draft, merge/release NOT_RUN.
-- Приёмка8 NOT_CONFIRMED, нагрузка12 NOT_RUN; LAB29/30 Backlog, Eval unchanged; central CLI selection readback PASS.
-- Следующий шаг: finite reconnect cleanup и phase/cause profile A по private evidence; общие fixes согласовать отдельно.
+- Protocol:5 attachments/4 manifest artifacts hash PASS; finite diagnostic:4 attachments/3 artifacts hash PASS; не node acceptance.
+- root3114 GUID↔numericID через mstSelf confirmed в loaded-store9/9; cross-profile validation NOT_RUN.
+- Settings multi-session разрешают входы; SessionKeepAlive1800000ms; UI logout=disconnect, mstSelf нельзя закрыть штатной UI строкой.
+- root3112 отсутствие калибровано; root3114/admin3113 текущий server cleanup PENDING; marker/history сохранены.
+- Original A exception не восстановить: message/stack/DOM потеряны; private copy recorder исправлен/offline PASS, network NOT_RUN.
+- Exact root3114 reconnect key NOT_FOUND; ключ failed A другой; reuse/подмена не выполнялись; негативный probe не полный cleanup PASS.
+- Exact own PID/startticks/fd absence подтверждены; permanent lock inodes сохранены; foreign sessions unchanged.
+- mas02:03MSK load0/0/0,MemAvailable30267192KiB,disk409886097408B,queue0; fresh attempt ресурсы снимает отдельно.
+- Installed CLI launcher+manifest current SHA256 match; source597 evidence retained; CLI/model/build0; новые admin не создаются.
+- Один новый instrumented run LAB47 01a11dc5-2fb1-77c2-b8c9-8670cbe1923e running, max2 root profiles/new UUID; first reconciliation, затем2-profile proof.
+- Остальные приёмки удержаны; scheduled observer не возобновлён/не создан; source/контракты/критерии не менялись.
+- [SHA/tasks/hashes/ограничения](reports/2026-10-08-node-recheck/parallel8-restart.json); PR40 draft; docs hook typechecks PASS из cache для02da9bf2.
+- Приёмка8 NOT_CONFIRMED/load12 NOT_RUN; LAB29/30 Backlog, Eval unchanged; merge/release NOT_RUN.
+- Следующий шаг: получить finite calibrated reconciliation/2-profile result и exact cleanup; общий fix согласовывать отдельно.
