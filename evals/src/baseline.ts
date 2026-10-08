@@ -1,6 +1,8 @@
 import path from "node:path"
-import { lstat, mkdir, readdir, rename, writeFile } from "node:fs/promises"
+import { lstat, mkdir, readdir, realpath, rename, rm, writeFile } from "node:fs/promises"
 import { loadTasks } from "./task"
+import { aggregate, aggregateTask, type AttemptResult, type RunSummary } from "./report"
+import { validateNodeRun } from "./node-evals"
 
 export type BaselinePins = {
   mode: "live" | "fixture"; harnessSha: string; corpusSha: string; cliVersion: string; cliSource: string
@@ -12,7 +14,11 @@ export type BaselineCollection = "regular" | "analytic" | "node"
 type BaselineCase = { key: string; id: string; collection: BaselineCollection; directory: string; files: { path: string; sha256: string }[] }
 export type BaselineManifest = { version: 1; id: string; kind: "baseline" | "smoke"; createdAt: string; pins: BaselinePins
   cases: BaselineCase[]; jobs: { key: string; caseKey: string; attempt: number }[] }
-type BaselineJournal = { version: 1; manifestSha256: string; jobs: { key: string; state: "pending" | "running" | "recorded"; runDir?: string }[] }
+type RecordedRun = { runDir: string; runId: string; files: { path: string; sha256: string }[]; measured: boolean; cleanup: boolean; verdict: "PASS" | "FAIL" | "ERROR" }
+type BaselineRow = { key: string; caseKey: string; attempt: number; collection: BaselineCollection; state: "pending" | "running" | "recorded"
+  measured: boolean; cleanup: boolean; verdict: RecordedRun["verdict"] | null; runDir: string | null; result: AttemptResult | null }
+type BaselineJournal = { version: 1; manifestSha256: string; checkout: string; release?: { status: "RELEASED"; evidenceSha256: string }
+  jobs: { key: string; state: "pending" | "running" | "recorded"; dispatchedAt?: string; record?: RecordedRun }[] }
 
 export class BaselineFailure extends Error {}
 export const baselineHash = (value: string | Uint8Array) => new Bun.CryptoHasher("sha256").update(value).digest("hex")
@@ -34,9 +40,121 @@ export async function prepareBaseline(directory: string, options: { checkout: st
   await mkdir(directory, { mode: 0o700 }).catch(() => { throw new BaselineFailure("SERIES_EXISTS") })
   const raw = JSON.stringify(manifest, null, 2) + "\n"
   await writeFile(path.join(directory, "manifest.json"), raw, { flag: "wx", mode: 0o600 })
-  const journal: BaselineJournal = { version: 1, manifestSha256: baselineHash(raw), jobs: manifest.jobs.map(job => ({ key: job.key, state: "pending" })) }
+  const journal: BaselineJournal = { version: 1, manifestSha256: baselineHash(raw), checkout: options.checkout,
+    jobs: manifest.jobs.map(job => ({ key: job.key, state: "pending" })) }
   await atomicJournal(directory, journal)
   return manifest
+}
+
+/** Durable admission precedes dispatch. A running row is never interpreted as permission to retry. */
+export async function beginBaselineMeasurement(directory: string, key: string, current: { checkout: string; pins: BaselinePins }) {
+  return mutateBaseline(directory, async (manifest, journal) => {
+    if (JSON.stringify(manifest.pins) !== JSON.stringify(current.pins) || journal.checkout !== current.checkout) throw new BaselineFailure("PINS_CHANGED")
+    for (const item of manifest.cases) if (JSON.stringify(await snapshotDirectory(path.join(current.checkout, "evals", item.directory))) !== JSON.stringify(item.files))
+      throw new BaselineFailure("CORPUS_CHANGED")
+    const job = journal.jobs.find(item => item.key === key)
+    if (!job) throw new BaselineFailure("UNKNOWN_JOB")
+    if (job.state !== "pending") throw new BaselineFailure("ALREADY_DISPATCHED")
+    if (journal.jobs.some(item => item.state === "running")) throw new BaselineFailure("UNKNOWN_OUTCOME")
+    if (journal.jobs.find(item => item.state === "pending") !== job) throw new BaselineFailure("ROUND_ORDER_CHANGED")
+    const resultsDir = path.join(directory, "measurements", key, "runs")
+    await mkdir(resultsDir, { recursive: true, mode: 0o700 })
+    job.state = "running"
+    job.dispatchedAt = new Date().toISOString()
+    await atomicJournal(directory, journal)
+    return { resultsDir, job: manifest.jobs.find(item => item.key === key)!, case: manifest.cases.find(item => item.key === manifest.jobs.find(job => job.key === key)!.caseKey)! }
+  })
+}
+
+/** Record raw evidence, including product FAIL. No original result or judge verdict is rewritten. */
+export async function recordBaselineMeasurement(directory: string, key: string, runDir: string) {
+  return mutateBaseline(directory, async (manifest, journal) => {
+    const job = journal.jobs.find(item => item.key === key)
+    if (!job || job.state !== "running") throw new BaselineFailure("NOT_DISPATCHED")
+    const root = path.join(directory, "measurements", key, "runs")
+    if (await realpath(runDir) !== runDir || !runDir.startsWith(root + path.sep)) throw new BaselineFailure("RUN_PATH_REFUSED")
+    const item = manifest.cases.find(item => item.key === manifest.jobs.find(job => job.key === key)!.caseKey)!
+    const record = await inspectMeasurement(manifest, item, journal.checkout, runDir)
+    job.record = record
+    job.state = "recorded"
+    await atomicJournal(directory, journal)
+    return record
+  })
+}
+
+export async function checkBaseline(directory: string) {
+  const { manifest, journal } = await readBaseline(directory)
+  const rows: BaselineRow[] = []
+  for (const expected of manifest.jobs) {
+    const job = journal.jobs.find(item => item.key === expected.key)!
+    const item = manifest.cases.find(item => item.key === expected.caseKey)!
+    if (!job.record) { rows.push({ ...expected, collection: item.collection, state: job.state, measured: false, cleanup: false, verdict: null, runDir: null, result: null }); continue }
+    if (JSON.stringify(await snapshotDirectory(job.record.runDir)) !== JSON.stringify(job.record.files)) throw new BaselineFailure("EVIDENCE_CHANGED")
+    const summary = await Bun.file(path.join(job.record.runDir, "summary.json")).json() as RunSummary
+    rows.push({ ...expected, collection: item.collection, state: job.state, measured: job.record.measured, cleanup: job.record.cleanup,
+      verdict: job.record.verdict, runDir: job.record.runDir, result: summary.tasks[0]!.attempts[0]! })
+  }
+  const coverage = { expected: manifest.jobs.length, recorded: rows.filter(row => row.state === "recorded").length,
+    measured: rows.filter(row => row.measured).length, pending: rows.filter(row => row.state === "pending").length,
+    unknown: rows.filter(row => row.state === "running").length }
+  const cleanup = coverage.unknown === 0 && rows.filter(row => row.state === "recorded").every(row => row.cleanup)
+  const groups = Object.fromEntries((["regular", "analytic"] as const).map(collection => {
+    const attempts = rows.filter(row => row.collection === collection).flatMap(row => row.result ? [{ ...row.result, attempt: row.attempt }] : [])
+    return [collection, { metrics: aggregate(attempts, false), tasks: manifest.cases.filter(item => item.collection === collection).map(item => ({
+      id: item.id, metrics: aggregateTask(attempts.filter(attempt => attempt.task_id === item.id), false) })) }]
+  }))
+  return { id: manifest.id, kind: manifest.kind, status: coverage.measured === coverage.expected && cleanup && journal.release ? "complete" : "incomplete",
+    manifest, coverage, cleanup, released: Boolean(journal.release), groups,
+    nodes: manifest.cases.filter(item => item.collection === "node").map(item => ({ id: item.id, expected: manifest.kind === "smoke" ? 1 : 3,
+      passed: rows.filter(row => row.caseKey === item.key && row.verdict === "PASS").length,
+      measured: rows.filter(row => row.caseKey === item.key && row.measured).length })), rows }
+}
+
+async function inspectMeasurement(manifest: BaselineManifest, item: BaselineCase, checkout: string, runDir: string): Promise<RecordedRun> {
+  const summary = await Bun.file(path.join(runDir, "summary.json")).json() as RunSummary
+  if (summary.config?.repeat !== 1 || JSON.stringify(summary.task_ids) !== JSON.stringify([item.id]) || summary.tasks?.length !== 1 ||
+    summary.tasks[0]?.id !== item.id || summary.tasks[0].attempts.length !== 1 || summary.tasks[0].attempts[0]?.attempt !== 1)
+    throw new BaselineFailure("INVALID_MEASUREMENT")
+  const result = summary.tasks[0].attempts[0]
+  const cleanups = await Promise.all([path.join(runDir, item.id, "1"), ...(result.infra_retry ? [path.join(runDir, item.id, "1", "infra-retry-initial")] : [])]
+    .map(async out => Bun.file(path.join(out, "cleanup.json")).json()))
+  const cleanup = summary.storage_leftovers?.length === 0 && result.environment_cleanup?.status === "confirmed" && cleanups.every(proof =>
+    proof.result?.status === "confirmed" && proof.processes?.status === "confirmed" &&
+    ["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].every(stage => proof.stages?.some((item: { stage: string; status: string }) => item.stage === stage && item.status === "confirmed")))
+  if (manifest.pins.mode === "live" && (summary.agent?.cli_version !== manifest.pins.cliVersion || summary.agent.source_commit !== manifest.pins.cliSource ||
+    summary.agent.binary_sha256 !== manifest.pins.binarySha256 || summary.agent.model !== manifest.pins.model || summary.agent.variant !== manifest.pins.variant ||
+    summary.harness?.dirty || !manifest.pins.harnessSha.startsWith(summary.harness?.git_sha ?? "UNKNOWN"))) throw new BaselineFailure("RUN_PINS_CHANGED")
+  const product = ["completed", "failed", "timeout", "no_artifact"].includes(result.status)
+  if (item.collection === "node") {
+    const verdict = await validateNodeRun(runDir, [item.id], path.join(checkout, "evals", path.dirname(item.directory)))
+    return { runDir, runId: summary.run_id, files: await snapshotDirectory(runDir), measured: product && verdict.code !== 2,
+      cleanup, verdict: verdict.code === 2 ? "ERROR" : verdict.code === 1 ? "FAIL" : "PASS" }
+  }
+  const evaluated = ["scored", "no_artifact"].includes(result.judge_status) && typeof result.pass === "boolean"
+  if (manifest.pins.mode === "live" && (summary.judge?.model !== manifest.pins.judgeModel || summary.judge.reasoning !== manifest.pins.judgeReasoning ||
+    summary.judge.prompt_sha256 !== manifest.pins.promptSha256 || summary.judge.schema_sha256 !== manifest.pins.schemaSha256)) throw new BaselineFailure("JUDGE_PINS_CHANGED")
+  return { runDir, runId: summary.run_id, files: await snapshotDirectory(runDir), measured: product && evaluated, cleanup,
+    verdict: !product || !evaluated ? "ERROR" : result.pass ? "PASS" : "FAIL" }
+}
+
+async function readBaseline(directory: string) {
+  const raw = await Bun.file(path.join(directory, "manifest.json")).text()
+  const manifest = JSON.parse(raw) as BaselineManifest
+  const journal = await Bun.file(path.join(directory, "journal.json")).json() as BaselineJournal
+  if (manifest.version !== 1 || journal.version !== 1 || journal.manifestSha256 !== baselineHash(raw) ||
+    JSON.stringify(journal.jobs.map(job => job.key)) !== JSON.stringify(manifest.jobs.map(job => job.key))) throw new BaselineFailure("MANIFEST_CHANGED")
+  return { manifest, journal }
+}
+
+async function mutateBaseline<T>(directory: string, operation: (manifest: BaselineManifest, journal: BaselineJournal) => Promise<T>) {
+  const guard = path.join(directory, "journal.lock")
+  await mkdir(guard, { mode: 0o700 }).catch(() => { throw new BaselineFailure("JOURNAL_BUSY_REQUIRES_INSPECTION") })
+  const info = await lstat(guard)
+  try { const { manifest, journal } = await readBaseline(directory); return await operation(manifest, journal) }
+  finally {
+    const current = await lstat(guard)
+    if (current.dev === info.dev && current.ino === info.ino && !current.isSymbolicLink()) await rm(guard, { recursive: true })
+  }
 }
 
 async function atomicJournal(directory: string, journal: BaselineJournal) {
