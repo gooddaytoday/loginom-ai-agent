@@ -469,3 +469,14 @@ Controller/reviewer/cold parent v5 импортируют только новы�
 не изменены; оба smoke повторяются serial, новые formal ещё не начаты.
 Текущий weekly usage44% consumed/ordinary usage allowed; чужих live jobs
 на собственном endpoint не обнаружено, исходные контейнеры не переключались.
+
+V5 первая baseline preparation: native profile подготовлен, но full preflight
+отказал до agent/judge из-за остатков v4 candidate. Собственные CSV и
+`.eval-20261008-171244-0876bb32f-sales-by-category-1.lgp.lck` сохранены вместе
+с хэшами в `ab-v4-owned-storage-recovery-20261008`; CSV совпал с закреплённым
+входом задачи. После свежего own-server reset штатный frozen
+`cleanupIsolatedStorage` подтвердил marker/ID/roots/no bind mounts и пустоту
+выделенного storage; original server/client не затронуты. Own baseline profile
+проверен waitProfileIdle и полностью архивирован в `base-preflight-storage-failed`
+с записью model/judge/formal0. Однократная fresh preparation выполняется по
+тому же common manifest; guard не ослаблен, старый отказ сохранён.
