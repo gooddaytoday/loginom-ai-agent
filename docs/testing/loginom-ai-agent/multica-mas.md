@@ -115,7 +115,7 @@ Native cancellation остановила supervisor последней CLI-по�
 
 На mas выбран первый Trojan. Сохранён private backup `/root/mas-vpn-trojan-20261008`; Xray config проверен, direct exceptions/Multica daemon/Loginom/OAuth не изменены. Первый application control не прошёл и автоматически вернул старый конфиг; причина этого control отказа UNKNOWN. Следующая отдельная application attempt с ограниченным ожиданием proxy listener прошла две проверки egress; установлен Trojan, TLS certificate verification включена. Non-model compiled plugin usage GET с существующей shared авторизацией: HTTP200, elapsed2753ms; OAuth payload не сохранялся.
 
-Проверка выключения обеих служб Xray/sing-box: public IPv4 с фиксированным DNS и proxy blocked, physical publicIPv4/IPv6 blocked, после восстановления служб egress151.244.228.56 PASS. `trojan-fail-closed.json` содержит metadata. Старый endpoint185.21.15.251 остаётся разрешённым для rollback до завершения CLI проверки; удалять его согласованно из DNS/route исключений и firewall после успешного переключения. Не переиспользовать retired CLI profile.
+Проверка выключения обеих служб Xray/sing-box: public IPv4 с фиксированным DNS и proxy blocked, physical publicIPv4/IPv6 blocked, после восстановления служб egress151.244.228.56 PASS. `trojan-fail-closed.json` содержит metadata. Старый endpoint185.21.15.251 оставлен как узкое исключение для deliberate rollback проверенной dev-конфигурации. При отказе от rollback удалять его согласованно из DNS/route исключений и firewall с новой проверкой восстановления. Не переиспользовать retired CLI profile.
 
 LAB38 options cleanup независимо PASS_PROCESS_AND_CALIBRATED_SERVER_ABSENCE, task01a11c86-eae9-7846-94f3-ebcc92bd79fe завершён,0 новых моделей; evidence-private/options-diagnostic-recovery.json. Guard/history сохраняются. Подготовлена отдельная LAB39 fresh CLI попытка на candidate597 с прежними параметрами и DISABLE_PROJECT_CONFIG=true; изменён сетевой путь. Native task01a11c9a-76fc-746c-90ed-a84a2a7bfa2d завершён: attemptc03ae120-dd65-421f-9469-1faa3874ea6a, full CLI exit0/HTTP200/usage10540, elapsed15329ms. Headers пришли за2153ms после dispatch58092bytes. Отдельный calibrated cleanup LAB44 task01a11c9f-2c17-750a-82a5-ee9997bc4917 завершён PASS. Обычная repoConfig проверена отдельной LAB40 task01a11ca0-dcc1-77df-8f11-1ba27364eacf (project-disable=false); результат приведён ниже. Готовность восьми реальных модельных потоков не объявлена.
 
@@ -127,23 +127,22 @@ LAB38 options cleanup независимо PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 
 LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_ABSENCE: native01a11c9f-2c17-750a-82a5-ee9997bc4917, private evidence-private/vpn-fixed-diagnostic-recovery.json. Независимый cleanup LAB40/LAB41: native01a11caf-dbd6-785c-94cd-4f674ea67ed6; ожидаемый private evidence-private/final-diagnostics-recovery.json. Cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_ABSENCE для обеих точных попыток; оригинальные guards/results сохранены до отдельного forward recovery. Все старые профили, результаты и записи попыток сохраняются.
 
-## Checkpoint — диагностика сети и CLI, 08.10.2026
+## Checkpoint — восемь потоков mas приняты, 08.10.2026
 
-- Worktree `/Users/kartamyshev/.codex/worktrees/shared-oauth/loginom-ai-agent`, shared-oauth; база loginom f9bf332cc491baa784e6e04fdfda7c0f09151cb7; PR40 OPEN draft → loginom; merge/release NOT_RUN.
-- Source597592f5d53f86beb69ffe318af2d4db52c5f416: safe diagnostics; Codex46/Agent typecheck/32 pre-push PASS. Не переносить PASS между SHA.
-- Installed597592f5d53f86beb69ffe318af2d4db52c5f416/version0.0.0-dev-202610081651; archive1aa667f7d34bc066b7fb7e3c52f69f0b7db0f042351f9aedde6cf36afcf1dbaa; все5678 файлов checksum PASS.
-- Candidate source/manifest/roundtrip PASS; replacement штатным uninstall/install после остановки задач, OAuth сохранён; operator dependency paths обновлены на installed payload.
-- mas cap8/roles1/8/8; WatchDog excluded/Eval preserved; native Codex отдельно. LGD LAB29/XLSX LAB30 Backlog0; Stage0 NOT_RUN.
-- Round3:8 overlapping CLI,0/8 replies за180sec. Queue9/account guards/calibrated cleanup проверены отдельно; full8 NOT_READY.
-- Старые active архивируются только по exact independent receipt/hash/inode/current process absence; profiles/writers/results immutable. API empty stream не доказывает model0.
-- LAB38 interrupted attempt13caa9f3-f044-4491-9eeb-435de78a7420 model1/AMBIGUOUS сохранена; own children stopped; independent cleanup01a11c86-eae9-7846-94f3-ebcc92bd79fe PASS.
-- Old VPN:129/146 sockets data unACK/retransmit; MTU1200 не помог. Controlled Chrome10/12timeouts vsFirefox12/12success, including simultaneousAB; точное место потери не установлено.
-- Trojan comparison: первый kartamyshev8/8success, второй obh1 1/8success/7timeouts. Temporary proxies/159route/firewall removed; secrets private.
-- Первый Trojan установлен после backup/validation/2egress checks. Initial control failed/rolled back UNKNOWN; daemon/CLI/OAuth/Loginom не изменены.
-- Shared provider nonmodel usage HTTP200/2753ms; VPN-down + physical publicIPv4/IPv6 blocked; recoveryegress151.244.228.56 PASS. Old185 endpoint reserved rollback до квалификации.
-- LAB39 candidate597 fullCLI HTTP200/exit0/usage10540/15329ms; project-disable=true. Independent cleanup01a11c9f-2c17-750a-82a5-ee9997bc4917 PASS.
-- LAB40 normal repoConfig: attemptbf2c3306-3015-4445-b774-346d50a1afef, exit1/BadRequest до auth/dispatch; disabled GitHub tools import отсутствующего plugin подтверждён немодельно.
-- LAB41 own package --dir outsideGit/project-disable=false: attemptc3bab5ff-e7fa-4354-8a99-cf722976a275, HTTP200/exit0/usage10355/17122ms; source clean.
-- CLI package workspace и profile отдельные для каждого запуска; native Codex Git checkout отдельный; shared directory только OAuth. Реестр инструментов не изменён.
-- LAB40/LAB41 independent cleanup native01a11caf-dbd6-785c-94cd-4f674ea67ed6 completed PASS; evidence-private/final-diagnostics-recovery.json. Восемь worker active архивированы по exact proof/current checks в round4/control/worker-forward-recovery.json.
-- Round4 восемь native задач запущены, модели ждут test-only start после ready8; queue9 task01a11cc4-4f59-7b8c-8ec1-a465227a2536 queued/start null при running8. Инструкции API readback/other settings PASS. Далее ready8→model gate→independent review; full8 NOT_READY.
+- PR40 draft → loginom; shared-oauth source basis f9bf332cc491baa784e6e04fdfda7c0f09151cb7. Merge/release NOT_RUN; проверенный artifact не получает PASS новых merge SHA.
+- Installed source597592f5d53f86beb69ffe318af2d4db52c5f416/version0.0.0-dev-202610081651, Linux x64/glibc; executable+manifest shared-oauth-v1;5678 file checksums PASS.
+- Archive SHA2561aa667f7d34bc066b7fb7e3c52f69f0b7db0f042351f9aedde6cf36afcf1dbaa; source/manifest/build/archive roundtrip PASS; replacement штатный, OAuth/profile history сохранены.
+- Exact597 на mas: Agent118/Host6/Product3/runtime5=132 tests PASS/0FAIL, Agent/Host/Product typechecks PASS (Bun1.3.14/Node24.19); docs-only pre-push32 PASS.
+- mas daemon cap8 включает все роли; Generator/Worker/Reviewer runtime24aa980b-b8c3-43e2-b087-bad8f79c9517/caps1/8/8; WatchDog excluded, Eval unchanged; API partial updates/readback PASS.
+- Round4 LAB34–41:8/8 full CLI exit0/positive usage, gpt-5.6-sol/low, one CLI model run each; eight distinct profiles/Loginom identities/package --dir outsideGit, one shared CLI OAuth directory.
+- Independent local step_start→step_finish overlap3464ms:1791484322488–1791484325952; native queue9 queued/null при running8 и starts при первом освобождении; timestamp precision limitations retained.
+- Reviewer01a11cce-729b-7735-9a1b-b848e2c9513f completed; private lab-44-b848e2c9513f/workdir/evidence-private/round4-independent-acceptance.json: PASS_WITH_EXPLICIT_OBSERVABILITY_LIMITS.
+- Independent calibrated cleanup8/8 PASS:49 target session records→0, positive own admin control, own processes/browser/admin logout complete; permanent account inode/nonblocking release checks PASS.
+- Three partial LAB40 close effects remain AMBIGUOUS in immutable history; current absence independently proven. Remote provider internal concurrency/retries and direct historical child FD readback NOT_OBSERVED; source/retained receipts support inheritance.
+- Owner accepted installed597 for eight local concurrent checks; private 20261008-round4/control/owner-acceptance.json pins receipt hash/source/limits. LAB34–42/LAB44 Done; no model reruns.
+- Auth directory0700/files0600/regular file/no uncertainty PASS, no OAuth content copied/read by reviewer; native Codex auth separate. Common quota/revocation/uncertain-refresh remain shared failure boundaries.
+- CLI uses fresh profile+package --dir outsideGit with ordinary projectConfig; native Codex owns Git checkout. Disabled GitHub tool import defect remains unfixed; diagnostics saved separately.
+- First supplied Trojan installed; parallel comparison first8/8 vs second1/8; VPN-down/physical publicIPv4+IPv6 blocked/recovery PASS. Old185 endpoint retained only for deliberate rollback; private config backups outside Git.
+- New LGD LAB29/XLSX LAB30 and lgd-research/xlsx-research fast-forward to current loginom0ca9e75bc7bb6897f46ac1ddc880b9758e993dc9; source change only attachments, Stage0 criteria preserved.
+- LGD/XLSX Backlog0, pairs ready via Generator, manual assignment only; no PR38/39 continuation, Stage0/full node acceptance NOT_RUN. Node profiles/accounts/branch/evidence independent.
+- Next: manually assign LGD/XLSX or other node cards. New shared-oauth build/merge requires new exact artifact qualification; merge/release remain owner commands.
