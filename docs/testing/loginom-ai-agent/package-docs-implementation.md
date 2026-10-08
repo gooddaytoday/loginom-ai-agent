@@ -4447,9 +4447,9 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-08 — ACTIVE, wide cold пара PASS; новый парный smoke
+### 2026-10-08 — ACTIVE, baseline v4 smoke принят; candidate выполняется
 
-- HEAD до checkpoint5f775f3bc; product baselinefc/candidate49b1584f2 неизменны; новые изменения только evidence/docs.
+- HEAD до checkpointfb8247fc8; product baselinefc/candidate49b1584f2 неизменны; новые изменения только evidence/docs.
 - Все запуски локально;10.200.13.152 исключён. Исходные Loginom server/client/profiles и чужие процессы сохранены.
 - Frozen harness0876bb32f clean/658 hashes:476 PASS/2 SKIP/0 FAIL/typecheck PASS; protected judge/tasks/near-miss unchanged.
 - Full binary preflight обоих CLI PASS; новые common conditions e4a0daf2…/21 pins/wide viewport/fresh server before each side;15 tasks/90 formal attempts не запущены.
@@ -4462,7 +4462,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - CLI modify3 FAIL readonly/inactive-source; owner неизвестен, новая product regression не доказана. CLI docs-after-build3/3 принят.
 - Desktop docs-after-build warm/docs3/3; cold1 PASS/2 readonly FAIL. Эти gate остаются открыты.
 - Own obsolete unpacked trees archived/full roundtrip PASS, backups/DEB/AppImage retained; свободно4.5GB/guard1GB.
-- V4 first prep PID identity FAIL/model0 archived; waitProfileIdle PASS/fresh own profile, baseline reached model dispatch. Этапы5–8 открыты; далее v4 обеих сторон→90 attempts.
+- Baseline v4 run170104 принят judge100/structure/warm oracle/cold/native close/logout/remaining0; candidate v4 запущен следом, formal90 не начат.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 

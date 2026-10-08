@@ -393,3 +393,17 @@ Baseline17 vs candidate20: +1 skill activation, +1 bundled workflow.md read,
 это не повторная активация. Unique tool calls17 vs19, Loginom calls13/13.
 Допуск1activation turn+1skill call неизменен; два других хода измеряются
 отдельно. Причинный эффект skill на batching одним smoke не доказывается.
+
+## Baseline v4: smoke принят полностью
+
+Run `ab-smoke-v4-20261008/base/results/20261008-170104-0876bb32f`:
+CLI completed/exit0, judge100/100, oracle PASS, cleanup confirmed.
+`ab-smoke-v4-base-review-20261008`: независимая структура0/warm oracle PASS.
+`ab-smoke-v4-base-cold-20261008`: общий reader1920×1080/fresh own server,
+native destination verified/реальный export/oracle0/byte-identical input и
+package/settingsReapplied=false/native close/logout/remaining0/container removed/
+exact owned staged cleanup. Все21 adapter pins повторно проверены.
+Итог `ab-smoke-v4-base-accepted-20261008/review.json`:
+SMOKE_JUDGE_STRUCTURE_WARM_ORACLE_COLD_PASS, countsTowardFormal90=false,
+common SHA e4a0daf2… и хэши исходных receipts сохранены.
+Candidate v4 запущен следующим, сериализация соблюдена; formal90 не начат.
