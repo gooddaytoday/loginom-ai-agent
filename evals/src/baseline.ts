@@ -406,13 +406,22 @@ export async function sealBaselineRelease(directory: string, receipt: BaselineRe
   })
 }
 
-async function resolveBaselineCleanup(directory: string, evidence: string, env: Record<string, string | undefined>) {
+async function resolveBaselineCleanup(directory: string, evidence: string, env: Record<string, string | undefined>, recoverExecutor: boolean) {
+  const executor = await inspectCleanupExecutor(directory, recoverExecutor)
+  if (recoverExecutor) await reconcileRunningBaseline(directory)
   return mutateBaseline(directory, async (manifest, journal) => {
     if (journal.release) throw new BaselineFailure("SERIES_RELEASED")
-    if (await lstat(path.join(directory, "executor.lock")).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error }))
-      throw new BaselineFailure("EXECUTOR_REQUIRES_INSPECTION")
+    if (JSON.stringify(await inspectCleanupExecutor(directory, recoverExecutor)) !== JSON.stringify(executor)) throw new BaselineFailure("EXECUTOR_OWNER_CHANGED")
     const report = await checkBaseline(directory)
     if (report.coverage.unknown) throw new BaselineFailure("UNKNOWN_OUTCOME")
+    for (const execution of report.executions) {
+      const file = path.join(path.dirname(path.dirname(execution.record.runDir)), "harness-process.json")
+      if (!await Bun.file(file).exists()) continue
+      const child = await readPrivateBaselineJson(file) as { pid: number; starttime: string; uid: number }
+      if (!child || !Number.isSafeInteger(child.pid) || child.pid < 1 || !/^[0-9]+$/.test(child.starttime) || child.uid !== process.getuid?.())
+        throw new BaselineFailure("UNKNOWN_OUTCOME_REQUIRES_RECOVERY")
+      if (await processBirthPresent(child)) throw new BaselineFailure("HARNESS_STILL_RUNNING")
+    }
     const input = await readPrivateBaselineBytes(evidence)
     const id = baselineHash(input)
     const previous = journal.cleanupResolutions?.find(resolution => resolution.id === id)
@@ -433,6 +442,7 @@ async function resolveBaselineCleanup(directory: string, evidence: string, env: 
     const source = report.executions.find(execution => execution.kind === "product" && execution.record.runDir === proof.runDir)
     assertCleanupResolution(proof, manifest, source?.record)
     if (!source || source.record.cleanup || journal.cleanupResolutions?.some(resolution => resolution.runDir === proof.runDir)) throw new BaselineFailure("CLEANUP_ALREADY_CONFIRMED")
+    if (JSON.stringify(await inspectCleanupExecutor(directory, recoverExecutor)) !== JSON.stringify(executor)) throw new BaselineFailure("EXECUTOR_OWNER_CHANGED")
     const root = path.join(directory, "cleanup-resolutions")
     await mkdir(root, { recursive: true, mode: 0o700 })
     const evidencePath = path.join(root, `${id}.json`)
@@ -442,6 +452,20 @@ async function resolveBaselineCleanup(directory: string, evidence: string, env: 
     await atomicJournal(directory, journal)
     return { code: 0, status: "CLEANUP_RESOLVED", resolutionId: id }
   })
+}
+
+async function inspectCleanupExecutor(directory: string, recoverExecutor: boolean) {
+  const guard = path.join(directory, "executor.lock")
+  const info = await lstat(guard).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error })
+  if (!info) return null
+  if (!recoverExecutor || !info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || info.mode & 0o077)
+    throw new BaselineFailure("EXECUTOR_REQUIRES_INSPECTION")
+  const raw = await readPrivateBaselineBytes(path.join(guard, "owner.json")).catch(() => { throw new BaselineFailure("EXECUTOR_REQUIRES_INSPECTION") })
+  const owner = JSON.parse(new TextDecoder().decode(raw)) as { pid: number; starttime: string; uid: number; nonce: string }
+  if (!Number.isSafeInteger(owner.pid) || owner.pid < 1 || !/^[0-9]+$/.test(owner.starttime) || owner.uid !== process.getuid?.() ||
+    !/^[0-9a-f-]{36}$/.test(owner.nonce) || await processBirthPresent(owner)) throw new BaselineFailure("EXECUTOR_REQUIRES_INSPECTION")
+  // Keep the guard. Native resume retires it only after the restored stand and harness checks.
+  return { device: info.dev, inode: info.ino, sha256: baselineHash(raw) }
 }
 
 function assertCleanupResolution(proof: CleanupResolutionProof, manifest: BaselineManifest, record: RecordedRun | undefined) {
@@ -468,7 +492,7 @@ async function readCleanupResolution(manifest: BaselineManifest, record: Recorde
 export async function runBaseline(argv: string[], env: Record<string, string | undefined> = process.env): Promise<Record<string, unknown> & { code: number }> {
   try {
     const command = argv[0]
-    if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke|recover-measurement|resolve-cleanup|abandon --series DIR [smoke: --case calc-data-double|crosstable-fixed-sum] [recover-measurement: --job KEY --kind infrastructure|judge --evidence PRIVATE_JSON] [resolve-cleanup: --evidence RECOVERY_COMPLETION_JSON] [abandon: --reason REASON --evidence RELEASE_JSON] [--config PRIVATE --issue ID --task ID] [check: --compare SERIES --export] [resume: --recover-executor after inspection]" }
+    if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke|recover-measurement|resolve-cleanup|abandon --series DIR [smoke: --case calc-data-double|crosstable-fixed-sum] [recover-measurement: --job KEY --kind infrastructure|judge --evidence PRIVATE_JSON] [resolve-cleanup: --evidence RECOVERY_COMPLETION_JSON] [abandon: --reason REASON --evidence RELEASE_JSON] [--config PRIVATE --issue ID --task ID] [check: --compare SERIES --export] [resume/resolve-cleanup: --recover-executor after inspection]" }
     const values = parseArgs({ args: argv.slice(1), strict: true, options: { series: { type: "string" }, case: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, job: { type: "string" }, kind: { type: "string" }, reason: { type: "string" }, evidence: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" } } }).values
     const directory = values.series
     if (!directory || !path.isAbsolute(directory)) throw new BaselineFailure("SERIES_PATH_REQUIRED")
@@ -476,7 +500,7 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
     if (command !== "smoke" && values.case !== undefined) throw new BaselineFailure("CASE_ONLY_FOR_SMOKE")
     if (command === "resolve-cleanup") {
       if (!values.evidence) throw new BaselineFailure("CLEANUP_RESOLUTION_REQUIRED")
-      return await resolveBaselineCleanup(directory, values.evidence, env)
+      return await resolveBaselineCleanup(directory, values.evidence, env, values["recover-executor"] === true)
     }
     if (command === "abandon") {
       if (!values.reason?.trim() || values.reason.length > 1000) throw new BaselineFailure("ABANDON_REASON_REQUIRED")

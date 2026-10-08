@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises"
+import { chmod, cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { baselineHash, beginBaselineMeasurement, checkBaseline, prepareBaseline, recordBaselineMeasurement, runBaseline } from "../src/baseline"
@@ -377,6 +377,99 @@ test("cleanup resolution permits judge recovery from the original artifact witho
     expect(report.spending.cost).toBe(0.01)
   } finally { await rm(fixture.directory, { recursive: true, force: true }) }
 }, 60_000)
+
+test("cleanup resolution after executor death requires explicit inspection and preserves its guard for resume", async () => {
+  const fixture = await recoveryFixture({ status: "no_artifact", judge_status: "no_artifact", pass: false, score: 0,
+    environment_cleanup: { status: "failed", error: "fixture cleanup failed" } })
+  const child = Bun.spawn([process.execPath, "-e", "await Bun.sleep(10000)"], { stdout: "ignore", stderr: "ignore" })
+  try {
+    const raw = await Bun.file(`/proc/${child.pid}/stat`).text()
+    const guard = path.join(fixture.series, "executor.lock")
+    await mkdir(guard, { mode: 0o700 })
+    const owner = JSON.stringify({ pid: child.pid, starttime: raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19], uid: process.getuid?.(), nonce: crypto.randomUUID() })
+    await Bun.write(path.join(guard, "owner.json"), owner); await chmod(path.join(guard, "owner.json"), 0o600)
+    const cleanup = await cleanupFixture(fixture)
+    const argv = [...cleanup.argv, "--recover-executor"]
+    expect(await runBaseline(argv, fixture.env)).toMatchObject({ code: 2, reason: "EXECUTOR_REQUIRES_INSPECTION" })
+    child.kill("SIGTERM"); await child.exited
+    expect(await runBaseline(cleanup.argv, fixture.env)).toMatchObject({ code: 2, reason: "EXECUTOR_REQUIRES_INSPECTION" })
+    await Bun.write(cleanup.evidence, JSON.stringify({ ...cleanup.proof, pinsSha256: "0".repeat(64) }))
+    expect(await runBaseline(argv, fixture.env)).toMatchObject({ code: 2, reason: "CLEANUP_RESOLUTION_INVALID" })
+    await Bun.write(cleanup.evidence, JSON.stringify(cleanup.proof))
+    expect(await runBaseline(argv, fixture.env)).toMatchObject({ code: 0, status: "CLEANUP_RESOLVED" })
+    expect(await Bun.file(path.join(guard, "owner.json")).text()).toBe(owner)
+    expect((await checkBaseline(fixture.series)).cleanup).toBe(true)
+    expect((await checkBaseline(fixture.series)).executions[0]!.record.cleanup).toBe(false)
+  } finally {
+    if (child.exitCode === null) { child.kill("SIGTERM"); await child.exited }
+    await rm(fixture.directory, { recursive: true, force: true })
+  }
+})
+
+test("cleanup resolution reconciles a saved terminal run after executor death without dispatching a product", async () => {
+  const fixture = await recoveryFixture({ status: "no_artifact", judge_status: "no_artifact", pass: false, score: 0,
+    environment_cleanup: { status: "failed", error: "fixture cleanup failed" } })
+  const child = Bun.spawn([process.execPath, "-e", "await Bun.sleep(10000)"], { stdout: "ignore", stderr: "ignore" })
+  try {
+    const series = path.join(fixture.directory, "crashed-series")
+    const manifest = await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins })
+    const admitted = await beginBaselineMeasurement(series, manifest.jobs[0]!.key, { checkout: repoRoot, pins: baselineFixturePins })
+    const run = path.join(admitted.resultsDir, "original-error")
+    await cp(fixture.run, run, { recursive: true })
+    const raw = await Bun.file(`/proc/${child.pid}/stat`).text()
+    const identity = { pid: child.pid, starttime: raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19], uid: process.getuid?.() }
+    const receipt = path.join(path.dirname(admitted.resultsDir), "harness-process.json")
+    await Bun.write(receipt, JSON.stringify(identity)); await chmod(receipt, 0o600)
+    await mkdir(path.join(series, "executor.lock"), { mode: 0o700 })
+    await Bun.write(path.join(series, "executor.lock/owner.json"), JSON.stringify({ ...identity, nonce: crypto.randomUUID() })); await chmod(path.join(series, "executor.lock/owner.json"), 0o600)
+    child.kill("SIGTERM"); await child.exited
+    const cleanup = await cleanupFixture(fixture)
+    await Bun.write(cleanup.evidence, JSON.stringify({ ...cleanup.proof, baselineId: manifest.id, runDir: run }))
+    const before = await Bun.file(path.join(run, "summary.json")).text()
+    expect((await checkBaseline(series)).coverage.unknown).toBe(1)
+    expect(await runBaseline(["resolve-cleanup", "--series", series, "--evidence", cleanup.evidence, "--recover-executor"], fixture.env))
+      .toMatchObject({ code: 0, status: "CLEANUP_RESOLVED" })
+    expect((await checkBaseline(series)).coverage).toMatchObject({ recorded: 1, measured: 1, pending: 143, unknown: 0 })
+    expect((await checkBaseline(series)).cleanup).toBe(true)
+    expect(await Bun.file(path.join(run, "summary.json")).text()).toBe(before)
+    expect(await Bun.file(path.join(series, "executor.lock/owner.json")).exists()).toBe(true)
+  } finally {
+    if (child.exitCode === null) { child.kill("SIGTERM"); await child.exited }
+    await rm(fixture.directory, { recursive: true, force: true })
+  }
+})
+
+test("a live saved harness blocks cleanup resolution even after a terminal summary was recorded", async () => {
+  const fixture = await recoveryFixture({ environment_cleanup: { status: "failed" } })
+  const child = Bun.spawn([process.execPath, "-e", "await Bun.sleep(10000)"], { stdout: "ignore", stderr: "ignore" })
+  try {
+    const raw = await Bun.file(`/proc/${child.pid}/stat`).text()
+    const receipt = path.join(fixture.series, "measurements", fixture.job.key, "harness-process.json")
+    await Bun.write(receipt, JSON.stringify({ pid: child.pid, starttime: raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19], uid: process.getuid?.() })); await chmod(receipt, 0o600)
+    const cleanup = await cleanupFixture(fixture)
+    const before = await Bun.file(path.join(fixture.series, "journal.json")).text()
+    expect(await runBaseline(cleanup.argv, fixture.env)).toMatchObject({ code: 2, reason: "HARNESS_STILL_RUNNING" })
+    expect(await Bun.file(path.join(fixture.series, "journal.json")).text()).toBe(before)
+    child.kill("SIGTERM"); await child.exited
+    expect(await runBaseline(cleanup.argv, fixture.env)).toMatchObject({ code: 0, status: "CLEANUP_RESOLVED" })
+  } finally {
+    if (child.exitCode === null) { child.kill("SIGTERM"); await child.exited }
+    await rm(fixture.directory, { recursive: true, force: true })
+  }
+})
+
+test("a missing PID without a complete executor identity cannot authorize cleanup resolution", async () => {
+  const fixture = await recoveryFixture({ environment_cleanup: { status: "failed" } })
+  try {
+    const cleanup = await cleanupFixture(fixture)
+    await mkdir(path.join(fixture.series, "executor.lock"), { mode: 0o700 })
+    await Bun.write(path.join(fixture.series, "executor.lock/owner.json"), JSON.stringify({ pid: 99999999 }))
+    await chmod(path.join(fixture.series, "executor.lock/owner.json"), 0o600)
+    const before = await Bun.file(path.join(fixture.series, "journal.json")).text()
+    expect(await runBaseline([...cleanup.argv, "--recover-executor"], fixture.env)).toMatchObject({ code: 2, reason: "EXECUTOR_REQUIRES_INSPECTION" })
+    expect(await Bun.file(path.join(fixture.series, "journal.json")).text()).toBe(before)
+  } finally { await rm(fixture.directory, { recursive: true, force: true }) }
+})
 
 test("cleanup resolution rejects drift and model calls and retains an immutable verification receipt", async () => {
   const fixture = await recoveryFixture({ environment_cleanup: { status: "failed" } })
