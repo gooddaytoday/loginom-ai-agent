@@ -15,6 +15,8 @@ type ProcessEntry = {
   binding?: { runtimeDirectory: string; observed_at: string }; helper?: boolean; foreign?: boolean
 }
 export type WriterIdentity = { device: number; inode: number; owner: string }
+export type RegistrationIdentity = { device: number; inode: number; uid: number; mode: number; bytes: string; mtimeNs: string; ctimeNs: string }
+export type OwnedRegistration = { profile: string; acquiredAt: string; original: ProcessCleanup; marker: RegistrationIdentity }
 export type ProcessCleanup = {
   status: "confirmed" | "failed" | "not_run"; error: string | null
   processes: ProcessIdentity[]; unknownProcesses?: ProcessIdentity[]; runtimeDirectories: string[]; writer: WriterIdentity | null
@@ -156,6 +158,45 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
 async function snapshot(owners: ProcessIdentity[] = []) {
   return (await Promise.all((await readdir("/proc")).filter((name) => /^\d+$/.test(name))
     .map((pid) => processView(Number(pid), false, owners)))).filter((entry) => entry !== undefined)
+}
+
+/** Inspect only the canonical, private sibling registration; never follow aliases. */
+export async function registrationIdentity(profile: string): Promise<RegistrationIdentity> {
+  for (const directory of [profile, path.dirname(profile)]) {
+    const info = await lstat(directory)
+    if (await realpath(directory) !== directory || !info.isDirectory() || info.isSymbolicLink() ||
+      info.uid !== process.getuid?.() || (info.mode & 0o077)) throw Error("Registration profile ownership differs")
+  }
+  const marker = `${profile}.process-group`
+  const before = await lstat(marker, { bigint: true })
+  const handle = await open(marker, constants.O_RDONLY | constants.O_NOFOLLOW)
+  try {
+    const opened = await handle.stat({ bigint: true })
+    const bytes = await handle.readFile("utf8")
+    const after = await lstat(marker, { bigint: true })
+    for (const info of [before, opened, after]) {
+      if (!info.isFile() || info.isSymbolicLink() || info.uid !== BigInt(process.getuid!()) || (info.mode & 0o777n) !== 0o600n ||
+        ["dev", "ino", "uid", "mode", "size", "mtimeNs", "ctimeNs"].some(k => info[k as keyof typeof info] !== before[k as keyof typeof before]))
+        throw Error("Registration identity differs")
+    }
+    return { device: Number(before.dev), inode: Number(before.ino), uid: Number(before.uid), mode: Number(before.mode),
+      bytes, mtimeNs: String(before.mtimeNs), ctimeNs: String(before.ctimeNs) }
+  } finally { await handle.close() }
+}
+
+/** Fresh complete ancestry/absence checks, followed by the last exact file check before unlink. */
+export async function verifyOwnedRegistration(profile: string, saved: OwnedRegistration) {
+  if (saved.profile !== profile || !saved.original.launcher || !saved.original.processes.some(p =>
+    p.pid === saved.original.launcher!.pid && /^\d+$/.test(p.starttime)) ||
+    saved.marker.bytes !== String(saved.original.launcher.pid)) throw Error("Registration owner unknown")
+  const same = async () => {
+    if (JSON.stringify(await registrationIdentity(profile)) !== JSON.stringify(saved.marker)) throw Error("Registration identity differs")
+  }
+  await same()
+  const processes = await observeWriterReleaseSettlement(profile, saved.original, saved.acquiredAt)
+  if (await writerIdentity(profile)) throw Error("Registration writer changed")
+  await same()
+  return processes
 }
 
 /** No signals or CLI execution. A new proof of absence for the sole writer-release error. */

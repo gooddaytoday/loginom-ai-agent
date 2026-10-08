@@ -101,6 +101,16 @@ Helper сверяет исходный admission/config/container/CLI/profile, e
 
 При таком attested settlement адресный storage ledger может включать `kind=package_lock`, `package_path` из неизменного исходного result, имя строго `.<original-package>.lgp.lck` и SHA256 пустого файла. Общий safeName не изменяется; другие dot-prefixed файлы и чужой lock запрещены. CSV по-прежнему требует собственный доказанный ledger/hash. `PROCESS_SETTLED` не освобождает lease и не меняет ERROR: далее выполнить единственный назначенный recovery штатным helper. После SETTLED и чистых profiles/storage допустим назначенный supervised unit, последовательно с CLI/UI; release использует настоящий recovery completion. Новой модельной попытки этот путь не разрешает.
 
+Закрытое исключение `LAB-31-owned-registration-v1-admission` (оператор `01a11b8e-be80-7481-8254-bc2bd014aac1`) продолжает ровно исходный ATTEMPTED incident. Исторический exception остаётся UNKNOWN: доказательство no-dispatch — фактический role profile/source, доминирующий open(wx), непрерывная исходная registration и отсутствие profile/history/storage mutations. Закреплённый admission SHA256 `c79db297982c257c41c5a60dff46fb7311a87c539f260b5106bba6c927f237e5` проверяется вместе с исходным clean admission/config/container/CLI и immutable owner/acquiredAt. Это не общий retry/resume API.
+
+```sh
+"$R/bin/with-env" "$R/runtime.env" "$R/bin/with-env" "$R/roles/rich/eval.env" "$R/bin/bun" script/node-eval-ops.ts lab31-owned-registration \
+  --config "$OPS" --lease "$LEASE" --evidence "$ORIGINAL_RECOVERY" \
+  --admission "$PRIVATE_ADMISSION_COPY" --followup-task "$FOLLOWUP_TASK"
+```
+
+До адресной мутации выполняются свежий полный ancestry/absence settlement и сверка canonical profile/parent, private regular registration, uid/mode/device/inode/bytes/mtime/ctime, PID с исходным launcher и birth identity. Непосредственно перед unlink эти проверки повторяются; live/reused PID, unknown cleanup, symlink или замена файла запрещают удаление. Обычный отсутствующий writer registration не удаляет. Private `owned-registration-once.json` записывается wx/0600 со статусом CONSUMED_BEFORE_MUTATION, исходным ATTEMPTED hash и новым clean SHA до unlink; ошибка/crash не восстанавливают once. Исходный ATTEMPTED receipt и ERROR остаются неизменными. Штатная общая немодельная recovery-цепочка пишет отдельный `owned-registration-settled.json` и настоящий completion, который принимает стандартный release после проверки once/source hashes. После SETTLED — один supervised unit/typecheck под удержанным lease, затем release. Второго continuation и новых model/product запусков нет.
+
 ```sh
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/with-env" "$R/roles/$ROLE/eval.env" "$R/bin/bun" \
   script/node-eval-ops.ts recover --config "$CFG" --lease "$LEASE" \
