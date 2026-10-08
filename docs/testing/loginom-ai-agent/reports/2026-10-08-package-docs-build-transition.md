@@ -76,3 +76,27 @@ Docker и стенд не затрагивались. Прежние cold1 PASS/
 Запуск разрешён только после завершения formal controller с подтверждённым
 cleanup, на fresh own isolated server, с повторной проверкой guards/pins.
 Дальнейший staging/reader adapter ещё требуется; подготовка не закрывает gate.
+
+### Source/file guard перед будущим Desktop cold controller
+
+Приватный `ab-local-stand-20261008/skills-desktop-cold-guard.py` проверяет обе
+formal completion receipts, собственный runDir каждой стороны,15 уникальных
+задач ×3, точные task/attempt identities и подтверждённый result/process cleanup.
+Проверка освобождения ресурсов не требует analytic PASS: закрытый no_artifact
+остаётся отказом в A/B и не мешает дальнейшей независимой приёмке.
+
+Через TDD выполнены пять последовательных RED→GREEN циклов: незавершённая
+серия; неподтверждённый cleanup; candidate, заимствующий baseline runDir;
+подменённая attempt identity; сокращённый task set, скрывающий failed cleanup.
+Positive fixture подтверждает допуск полностью закрытых analytic failures.
+Финальный `test-desktop-cold-guard.py`:6 PASS/0 FAIL, реальные временные файлы,
+без mocks и внешних вызовов. Это исходная fixture-проверка, не native cold.
+
+Текущая реальная formal-серия отклонена `FORMAL_NOT_COMPLETED` до ресурсных
+операций; `desktop-cold-guard-current-formal-refusal-v2.json` SHA256
+`e684eedac0d4bf2ee50a441dd33e89bd35f22d26d9eda245be3a946aaa4448d6`.
+Guard SHA256 `a161573fc957c66ee5cf71c9b0a741f7280979417eaa9401dd067b38c1c206bd`,
+test SHA256 `76ea430c5b15291d82d2d900892e1fc9fa6b2912330db8cd83cccddc1caa3bac`.
+Все RED/GREEN logs сохранены; common/21 pins перепроверены и неизменны.
+Guard пока не подключён к staging/reader controller: его реализация и native
+проверка ещё нужны. Desktop cold1 PASS/2 readonly FAIL и открытый gate сохраняются.
