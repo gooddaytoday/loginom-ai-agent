@@ -1,20 +1,20 @@
 # EvalBaseline — checkpoint 2026-10-08
 - Branch baseline-runtime; checkout /tmp/loginom-baseline-runtime; основной checkout сохранён.
-- Проверенный code SHA: aa33e613e; deployment source SHA: bfb7c62e4266e76c995a43b6f909d8a6739ce062.
-- Исходный корпус: 44 кейса/132 измерения; принятые кейсы LAB-31 включить до нового freeze.
+- Включён принятый LAB-31 source 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad; интеграционный commit см. git HEAD.
+- Корпус: 48 кейсов/144 измерения; public prepare и полный fixture N×3 PASS.
 - Executor/journal/resume/check, config v1/v2, общий lease и baseline completion реализованы.
-- Отдельные regular/analytic/node, ошибки/расходы retries, compare, curated export.
-- Финальный bun test: 460 PASS, 2 server-only SKIP, 0 FAIL; 462 теста/37 файлов.
-- bun typecheck PASS; Docker admission fixtures также 5 повторов/10 PASS с подтверждённой очисткой.
+- Этап 3.0 выполнен; single-case smoke и append-only recovery ещё требуют реализации.
+- Targeted suite: 78 PASS, 7 clean-host SKIP, 0 FAIL; 85 тестов/13 файлов; bun typecheck PASS.
+- Предыдущий полный suite aa33e613e: 460 PASS, 2 server-only SKIP, 0 FAIL; новый полный suite впереди.
+- Семь clean-host fixtures обязательно выполнить на сервере без skip до smoke; guard чужих процессов сохранён.
+- Deployment остаётся bfb7c62e4266e76c995a43b6f909d8a6739ce062; active config v1.
 - CLI 0.1.17 / fc3d97dbf695c2ed8dba942feb6fe83591a33944 установлен отдельно.
-- Полный manifest SHA256 6928473abd91329c4cf557d405f23865eab885176cd6596459c524f5f43c3ff1: 5389 файлов PASS.
-- AppArmor установлен/parser exit 0; chrome-sandbox root:root 4755; собственный профиль clean.
-- Setup ready; его история в закрытом архиве; прежний CLI Rich/Ben сохранён.
+- Manifest 5389 файлов PASS; SHA256 6928473abd91329c4cf557d405f23865eab885176cd6596459c524f5f43c3ff1.
+- AppArmor/parser PASS; chrome-sandbox root:root 4755; setup READY; история в закрытом архиве.
 - Multica EvalBaseline 77032943-ad18-4ae9-a2c6-668769077c86: eval-tests, gpt-6.1-sol/xhigh, concurrency=1, вне squad.
 - Native MCP search PASS: actor, собственный checkout, automatic Git Peer; receipt source 44c7928bf.
-- Карточка LAB-32 [Baseline], baseline label; инструкции/три starters/API readback PASS.
-- LAB-31 принят на SHA 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad; Ben ACCEPT, Evaler completed/in_review; продукт 2 PASS/2 FAIL.
-- Условие ожидания выполнено: исходный чат idle, его монитор PAUSED; очереди пусты, пять профилей clean, lease/storage/processes clear.
+- LAB-32 [Baseline], baseline label; инструкции/starters/API readback и первоначальная доставка evidence PASS.
+- LAB-31 Ben ACCEPT/Evaler completed/in_review; продукт 2 PASS/2 FAIL; исходный чат idle/монитор PAUSED.
+- Стенд/очереди/пять профилей чисты при последней проверке; повторить перед активацией.
 - Живые smoke и полный baseline не запускались; unknown outcome автоматически не повторяется.
-- Следующий шаг: включить принятый корпус LAB-31; выполнить этап 3 launch-plan через TDD, затем этапы 4–10. Active config пока v1.
-- Evidence доставлен/скачан из LAB-32: bytes/SHA256/manifest/readback PASS; archive SHA f5279740982b97449a9828b5a0aa9ab96abef86e8f1826e67baa1eac4ef7edef.
+- Следующий шаг: этап 3.1 через TDD, затем 3.2 и этапы 4–10 launch-plan; goal остаётся активным.

@@ -8,13 +8,25 @@ import { repoRoot, evalsRoot } from "../src/config"
 
 import { baselineFixturePins } from "../fixtures/baseline"
 
-test("prepare freezes all 44 cases as three complete rounds without executing a model", async () => {
+test("prepared baseline includes the four accepted LAB-31 cases in each of three rounds", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-lab31-"))
+  try {
+    const manifest = await prepareBaseline(path.join(directory, "series"), { checkout: repoRoot, pins: baselineFixturePins })
+    expect(manifest.cases).toHaveLength(48)
+    expect(manifest.jobs).toHaveLength(144)
+    for (const id of ["crosstable-column-cartesian", "crosstable-local-variable-bindings", "crosstable-multi-facts", "crosstable-string-counts-null"]) {
+      expect(manifest.jobs.filter(job => job.caseKey === `node:${id}`).map(job => job.attempt)).toEqual([1, 2, 3])
+    }
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("prepare freezes all 48 cases as three complete rounds without executing a model", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-"))
   try {
     const manifest = await prepareBaseline(path.join(directory, "series"), { checkout: repoRoot, pins: baselineFixturePins })
-    expect(manifest.cases).toHaveLength(44)
-    expect(manifest.jobs).toHaveLength(132)
-    expect(new Set(manifest.jobs.map(job => job.key)).size).toBe(132)
+    expect(manifest.cases).toHaveLength(48)
+    expect(manifest.jobs).toHaveLength(144)
+    expect(new Set(manifest.jobs.map(job => job.key)).size).toBe(144)
     for (const attempt of [1, 2, 3]) {
       expect(manifest.jobs.filter(job => job.attempt === attempt).map(job => job.caseKey)).toEqual(manifest.cases.map(item => item.key))
     }
@@ -106,7 +118,7 @@ test("smoke computes an independent Double oracle while a missing node artifact 
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
-test("all 132 fixture measurements retain separate quality axes and become complete only after release", async () => {
+test("all 144 fixture measurements retain separate quality axes and become complete only after release", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-full-"))
   try {
     const series = path.join(directory, "series")
@@ -123,12 +135,12 @@ test("all 132 fixture measurements retain separate quality axes and become compl
       await recordBaselineMeasurement(series, job.key, run)
     }
     const before = await checkBaseline(series)
-    expect(before.coverage).toEqual({ expected: 132, recorded: 132, measured: 132, pending: 0, unknown: 0 })
+    expect(before.coverage).toEqual({ expected: 144, recorded: 144, measured: 144, pending: 0, unknown: 0 })
     expect(before.status).toBe("incomplete")
     await sealBaselineRelease(series, { status: "RELEASED", evidenceSha256: "5".repeat(64) })
     const after = await checkBaseline(series)
     expect(after.status).toBe("complete")
-    expect(after.nodes).toHaveLength(6)
+    expect(after.nodes).toHaveLength(10)
     expect(after.nodes.every(item => item.measured === 3 && item.passed === 0)).toBe(true)
     expect(after.groups.regular?.metrics.total).toBe(9)
     expect(after.groups.analytic?.metrics.total).toBe(105)
@@ -146,9 +158,9 @@ test("check writes a separate report without models, admission or changes to sto
     await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins })
     const before = await Bun.file(path.join(series, "journal.json")).text()
     const result = await runBaseline(["check", "--series", series], {})
-    expect(result).toMatchObject({ code: 0, status: "incomplete", expected: 132, measured: 0 })
+    expect(result).toMatchObject({ code: 0, status: "incomplete", expected: 144, measured: 0 })
     expect(typeof result.reportDir).toBe("string")
-    expect(await Bun.file(path.join(String(result.reportDir), "report.md")).text()).toContain("132")
+    expect(await Bun.file(path.join(String(result.reportDir), "report.md")).text()).toContain("144")
     expect(await Bun.file(path.join(series, "journal.json")).text()).toBe(before)
     expect((await runBaseline(["start", "--series", series], {})).code).toBe(2)
     await Bun.write(path.join(series, "stand-handle.json"), JSON.stringify({ token: "secret-token" }))

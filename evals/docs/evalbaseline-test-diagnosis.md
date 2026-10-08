@@ -15,3 +15,24 @@ Fixtures изолированы network none, без host mounts/портов; L
 для первого теста и 1,96–2,11 секунды для второго. Каждый повтор подтвердил очистку.
 Команда из evals/: `bun test test/isolated-storage.test.ts -t 'checkIsolatedLoginom:'`.
 `bun typecheck` после изменения PASS. Итог полного suite фиксируется в checkpoint.
+
+## Writer settlement после включения LAB-31
+
+Классификация: отсутствующая предпосылка интеграционных тестов, не флаки и не
+регрессия защиты. В `d6e0d0720` добавлена проверка отсутствия всех native-процессов
+текущего UID перед settlement; `24472a1d7` использует её для owned registration.
+Три теста воспроизвели `Writer-release processes busy or foreign` в 4/4 запусках:
+на локальном хосте в обоих снимках присутствовал сторонний Chrome.
+
+Положительные settlement/registration и проверка последующих writer/runtime
+ограничений требуют чистый stand UID. Для этих трёх тестов добавлен явный
+`skipIf(nativeBusy)`, как в существующих server-only node-eval-ops fixtures.
+Assertions и production guard сохранены; отрицательные проверки чужих native
+процессов продолжают исполняться. Чужие процессы не завершаются.
+Команда воспроизведения из evals/: `bun test test/writer-settlement.test.ts test/owned-registration.test.ts`.
+Локальный skip не подтверждает положительные ветки: все семь clean-host fixtures
+обязательно выполнить на сервере без skip на этапе 5, до smoke.
+
+После правки targeted suite: 78 PASS, 7 clean-host SKIP, 0 FAIL; 85 тестов в
+13 файлах, 535 assertions. `bun typecheck` PASS. Полный suite после следующих
+изменений этапа 3 остаётся обязательным; положительные clean-host ветки пока не проверены.
