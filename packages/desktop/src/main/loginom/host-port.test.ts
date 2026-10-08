@@ -25,13 +25,18 @@ test.each(["call", "tools", "admit", "interrupt"])(
     await writeFile(
       join(resources, "runtime/src/managed-entry.mjs"),
       `
-      let pending, entered;
+      let pending, entered, armed = false;
       const reply = (id, result) => process.send({id,result});
+      const tools = {prepared:true,tools:[{name:'dock_node_wait',inputSchema:{type:'object'}}]};
       process.on('message', m => {
         if (m.operation === 'start') return reply(m.id, m.input.validation
           ? {protocol:1,generation:m.input.generation,checked:true}
           : {protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true});
         if (m.operation === 'close') return process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+        if (m.operation === 'arm') { armed = true; return reply(m.id, true); }
+        if (m.operation === 'call' && m.input.name === 'dock_prepare')
+          return reply(m.id, {result:{content:[]},recoveryPending:false,activeWork:false});
+        if (m.operation === 'list' && !armed) return reply(m.id, tools);
         if (m.operation === 'entered') {
           if (pending) return reply(m.id, true);
           entered = m.id; return;
@@ -39,7 +44,7 @@ test.each(["call", "tools", "admit", "interrupt"])(
         if (m.operation === 'finish') {
           if (pending) reply(pending.id, pending.operation === 'call'
             ? {result:{content:[]},recoveryPending:false}
-            : pending.operation === 'list' ? {tools:[]} : true);
+            : pending.operation === 'list' ? tools : pending.operation === 'admit' ? [] : true);
           pending = undefined; return reply(m.id, true);
         }
         pending = m;
@@ -85,10 +90,16 @@ test.each(["call", "tools", "admit", "interrupt"])(
     const runtime = await service.runtime(1, createHash("sha256").update("chat").digest("hex"))
     try {
       expect(await client.request("acquire", { run: "first", session: "chat" })).toEqual({ generation: 1 })
+      await client.request("scope", {
+        run: "first", mode: "bind", scope: { taskMessageID: "msg_original", profile: "loginom-automation" },
+      })
+      await client.request("call", { run: "first", name: "dock_prepare", userMessage: "msg_original", args: {} })
+      await client.request("tools", { run: "first" })
+      await runtime.request("arm")
       const call = client.request(method, {
         run: "first",
-        name: "tool",
-        userMessage: "original-user",
+        name: "dock_node_wait",
+        userMessage: "msg_original",
         args: {},
         files: [],
       })

@@ -23,7 +23,16 @@ credentials, Loginom, браузер и модель при этом не зап
 Штатный CI исключает `src/main/draft-store.test.ts` и использует pinned Node.
 Отдельный повтор host-port с Node24.19 показал устаревшую fixture: call/admit
 отклонены текущим skill scope, tools не входит в managed runtime и зависает.
-Этот отдельный gate ещё открыт; общий Desktop suite PASS не заявляется.
+Fixture приведена к действующему публичному IPC-контракту: bind automation scope,
+prepare и получение advertised tools происходят до проверяемой задержки.
+Scope и generation guards не обходятся. Возврат каталога tools исправлен
+в fixture; проверяемая поздняя операция по-прежнему не может пересечь поколения.
+Узкий host-port набор: 4 PASS в трёх последовательных повторах.
+Штатный CI-набор с Node24.19.0: 159 PASS / 5 SKIP / 0 FAIL / 864 assertions.
+Команда из `packages/desktop`:
+`LOGINOM_AI_AGENT_TEST_NODE=<owned Node24.19.0>/bin/node bun test --path-ignore-patterns=src/main/draft-store.test.ts`.
+Desktop `bun typecheck` после исправления fixture: PASS.
+Это исправление тестовой инфраструктуры; продуктовые сборки49 не изменились.
 
 Evidence находится в приватном каталоге `package-docs-20261006/ab-local-stand-20261008`
 и `/tmp/skills-runtime-acceptance-budgets-signal`. Native live oracle после
