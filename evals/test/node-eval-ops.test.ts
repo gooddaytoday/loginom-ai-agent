@@ -3,7 +3,7 @@ import { chmod, copyFile, cp, mkdir, mkdtemp, rename, rm, stat, symlink } from "
 import os from "node:os"
 import path from "node:path"
 import { acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, ownedRecoveryEntry, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, reserveOwnedRegistrationContinuation, runNodeEvalOps, runNodeUnitChecks, settleNodeWriterRelease, nodeRoleCli, verifyBaselineStand, verifyBaselineCleanupRecovery, type NodeOpsConfig } from "../src/node-eval-ops"
-import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement } from "../src/baseline"
+import { baselineHash, prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement } from "../src/baseline"
 import { repoRoot } from "../src/config"
 import { baselineFixturePins } from "../fixtures/baseline"
 import { archiveProfileHistory } from "../src/profile"
@@ -455,6 +455,66 @@ test("baseline recovery reserves once per immutable execution while renamed inci
     expect((await nodeStandStatus(config)).status).toBe("BUSY")
   } finally { await fixture.dispose() }
 })
+
+test.skipIf(!dockerAvailable || browserBusy)("baseline cleanup verification binds its execution and checks actual archives, profiles and isolated storage", async () => {
+  const fixture = await stand()
+  try {
+    const baseline = { checkout: path.join(fixture.config.runtimeRoot, "checkouts/baseline"),
+      evalProfile: path.join(fixture.config.runtimeRoot, "roles/baseline/eval"), cliBin: fixture.config.cliBin,
+      workRoots: [path.join(fixture.config.runtimeRoot, "roles/baseline/work")], resultsRoot: path.join(fixture.config.runtimeRoot, "roles/baseline/results") }
+    for (const directory of [baseline.checkout, baseline.evalProfile, ...baseline.workRoots, baseline.resultsRoot]) await mkdir(directory, { recursive: true, mode: 0o700 })
+    await cp(path.join(repoRoot, "evals/tasks"), path.join(baseline.checkout, "evals/tasks"), { recursive: true })
+    const config: NodeOpsConfig = { ...fixture.config, version: 2, roles: { ...fixture.config.roles, evalbaseline: baseline } }
+    const lease = await acquireNodeStand(config, { ...owner, role: "evalbaseline" })
+    const admittedOwner = { ...owner, role: "evalbaseline" }
+    const leaseDir = path.join(config.runtimeRoot, "operations/stand.lease")
+    await Bun.write(path.join(leaseDir, "admission.json"), JSON.stringify({ owner: admittedOwner, acquiredAt: lease.acquiredAt,
+      containerId: lease.containerId, configSha256: lease.configSha256,
+      profiles: [...Object.values(fixture.config.roles).flatMap(role => [role.referenceProfile, role.evalProfile]), baseline.evalProfile] }))
+    await chmod(path.join(leaseDir, "admission.json"), 0o600)
+    const pins = { ...baselineFixturePins, containerId: lease.containerId, endpoint: lease.endpoint }
+    const series = path.join(baseline.resultsRoot, "series")
+    const manifest = await prepareBaseline(series, { checkout: baseline.checkout, pins })
+    const job = manifest.jobs[0]!
+    const admitted = await beginBaselineMeasurement(series, job.key, { checkout: baseline.checkout, pins })
+    const run = path.join(admitted.resultsDir, "original-cleanup-error")
+    const started = new Date().toISOString()
+    const supervised = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(50)"], cwd: baseline.checkout,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000 })
+    await Bun.write(path.join(baseline.evalProfile, "data/fixture.txt"), "private history")
+    const historyArchive = await archiveProfileHistory(baseline.evalProfile, "fixture")
+    const cleanupPath = `${admitted.case.id}/1/cleanup.json`
+    await Bun.write(path.join(run, cleanupPath), JSON.stringify({ result: { status: "failed", error: "fixture storage check interrupted" }, processes: supervised.processCleanup,
+      stages: ["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].map(stage => ({ stage,
+        status: stage === "storage" ? "failed" : "confirmed", ...(stage === "profile_history" ? { path: historyArchive } : {}) })) }))
+    await Bun.write(path.join(run, "summary.json"), JSON.stringify({ run_id: "original-cleanup-error", started_at: started,
+      harness: { git_sha: lease.sha.slice(0, 9), dirty: false }, config: { repeat: 1 }, task_ids: [admitted.case.id], storage_leftovers: [],
+      tasks: [{ id: admitted.case.id, attempts: [{ task_id: admitted.case.id, attempt: 1, status: "no_artifact", judge_status: "no_artifact", pass: false, score: 0,
+        environment_cleanup: { status: "failed" }, tokens: { input: 0, output: 0, reasoning: 0 },
+        counters: { toolCalls: 0, toolErrors: 0, memoryToolCalls: 0 }, duration_ms: 50, cost: 0 }] }] }))
+    const recorded = await recordBaselineMeasurement(series, job.key, run)
+    expect(recorded.cleanup).toBe(false)
+    const execution = { seriesDir: series, runDir: run, cleanupPath }
+    const receipt = await reserveNodeRecovery(config, lease, "fixture-cleanup", execution)
+    const processEvidence = path.join(run, cleanupPath)
+    // Historical SETTLED fixture; process identities, archive, profile and Docker checks are real.
+    await Bun.write(receipt, JSON.stringify({ status: "SETTLED", owner: admittedOwner, acquiredAt: lease.acquiredAt, profile: "eval", historyArchive, processEvidence, execution }))
+    await chmod(receipt, 0o600)
+    const completion = path.join(leaseDir, "fixture-cleanup-completion.json")
+    const evidence = { version: 1, owner: admittedOwner, acquiredAt: lease.acquiredAt, kind: "recovery", receipt, profile: "eval", historyArchive, processEvidence, execution }
+    await Bun.write(completion, JSON.stringify(evidence)); await chmod(completion, 0o600)
+    const before = await Bun.file(processEvidence).text()
+    expect(await verifyBaselineCleanupRecovery(config, lease, series, completion)).toMatchObject({ execution,
+      executionFilesSha256: baselineHash(JSON.stringify(recorded.files)), historyArchive, processes: { status: "confirmed" } })
+    const pending = path.join(config.roles.ben.evalProfile, "loginom/connection/pending.json")
+    await Bun.write(pending, "{}")
+    await expect(verifyBaselineCleanupRecovery(config, lease, series, completion)).rejects.toThrow("PROFILE_NOT_CLEAN")
+    await rm(pending)
+    await expect(verifyBaselineCleanupRecovery(config, { ...lease, task: "foreign" }, series, completion)).rejects.toThrow("LEASE_OWNER_CHANGED")
+    expect(await Bun.file(processEvidence).text()).toBe(before)
+    expect((await nodeStandStatus(config)).status).toBe("BUSY")
+  } finally { await fixture.dispose() }
+}, 30_000)
 
 test("runtime roots refuse result/profile overlaps before acquisition", async () => {
   const fixture = await runtime()

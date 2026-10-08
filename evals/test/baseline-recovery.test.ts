@@ -87,7 +87,11 @@ test("resume fills the missing slot once, preserves its original error and then 
       LOGINOM_URL: `http://127.0.0.1:${server.port}`, LOGINOM_DOCK_BASE_URL: `http://127.0.0.1:${server.port}`,
       EVAL_AGENT_PROVIDER_ID: "openai", EVAL_AGENT_PROVIDER_BASE_URL: "http://fixture", EVAL_AGENT_PROVIDER_API_KEY: "fixture", EVAL_AGENT_PROVIDER_MODEL_ID: "model",
       EVAL_JUDGE_COMMAND: `${Bun.which("bun")} ${path.join(evalsRoot, "fixtures/fake-codex.ts")}`, JUDGE_MODEL: "gpt-6-astra", JUDGE_REASONING: "high" }
-    expect(await runBaseline(["resume", "--series", fixture.series, "--limit", "1"], env)).toMatchObject({ code: 0, recorded: 1, measured: 1, pending: 143 })
+    const concurrent = await Promise.all([runBaseline(["resume", "--series", fixture.series, "--limit", "1"], env),
+      runBaseline(["resume", "--series", fixture.series, "--limit", "1"], env)])
+    expect(concurrent.filter(result => result.code === 0)).toHaveLength(1)
+    expect(concurrent.find(result => result.code === 0)).toMatchObject({ recorded: 1, measured: 1, pending: 143 })
+    expect(concurrent.find(result => result.code !== 0)?.status).toBe("BLOCKED")
     const recovered = await checkBaseline(fixture.series)
     expect(recovered.executions).toHaveLength(2)
     expect(recovered.recoveries[0]?.state).toBe("recorded")
@@ -260,6 +264,26 @@ test("concurrent identical recovery requests create only one admission", async (
     expect(requests.find(result => result.code !== 0)).toMatchObject({ reason: "JOURNAL_BUSY_REQUIRES_INSPECTION" })
     expect((await checkBaseline(fixture.series)).recoveries).toHaveLength(1)
     expect(await runBaseline(fixture.argv, fixture.env)).toMatchObject(requests.find(result => result.code === 0)!)
+  } finally { await rm(fixture.directory, { recursive: true, force: true }) }
+})
+
+test.each(["reserved", "fix-copied", "admission-written"])("orphan %s recovery admission blocks another dispatch and preserves the terminal source", async phase => {
+  const fixture = await recoveryFixture()
+  try {
+    const journal = await Bun.file(path.join(fixture.series, "journal.json")).text()
+    const source = await Bun.file(path.join(fixture.run, "summary.json")).text()
+    const directory = path.join(fixture.series, "measurements", fixture.job.key, "recoveries", baselineHash(JSON.stringify(fixture.proof)))
+    await mkdir(directory, { recursive: true, mode: 0o700 })
+    if (phase !== "reserved") { await Bun.write(path.join(directory, "proof-0.data"), "interrupted private copy"); await chmod(path.join(directory, "proof-0.data"), 0o400) }
+    if (phase === "admission-written") { await Bun.write(path.join(directory, "admission.json"), JSON.stringify(fixture.proof)); await chmod(path.join(directory, "admission.json"), 0o400) }
+    expect(await runBaseline(fixture.argv, fixture.env)).toMatchObject({ code: 2, reason: "RECOVERY_ADMISSION_UNKNOWN" })
+    expect(await runBaseline(["resume", "--series", fixture.series, "--limit", "1"], fixture.env)).toMatchObject({ code: 2, reason: "AWAITING_RECOVERY" })
+    const report = await checkBaseline(fixture.series)
+    expect(report.recoveries).toHaveLength(0)
+    expect(report.executions).toHaveLength(1)
+    expect(report.coverage).toMatchObject({ measured: 0, pending: 143 })
+    expect(await Bun.file(path.join(fixture.series, "journal.json")).text()).toBe(journal)
+    expect(await Bun.file(path.join(fixture.run, "summary.json")).text()).toBe(source)
   } finally { await rm(fixture.directory, { recursive: true, force: true }) }
 })
 
