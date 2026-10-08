@@ -21,6 +21,29 @@ scripted; реальный Xiaomi smoke Desktop проверен отдельн�
 
 ## Linux: текущая установка и исторические проверки
 
+**Актуальный изолированный кандидат package-docs, 2026-10-08:** чистый
+`49b1584f23b4aa47e18b26119389d6f45623fc94`,0.1.17, полный CLI TAR.GZ SHA256
+`3de2ad8eabb0625dee91076ea02e12c2b09a71f82abdc140adbd80824a661f4f`, manifest
+`13896844e3ec3c3620d3c082aea2d426c3c64ac0ca10fb86da8bf931c06024f7`.
+Установленные Ubuntu22/24/26, Debian12/13 —5/5 PASS без сети/non-root,
+root:root4755 sandbox, public install/status/uninstall и сохранение профиля.
+Native upgrade669→49: настройки/auth fixture/user skill/history/Session
+preserved, PROFILE_BUSY/3 без смены owner, собственные процессы завершены.
+Synthetic provider и model/Help/Loginom0 в update; прежние Docker FAIL сохранены.
+Native TUI attachment/permission/command smoke6/6 PASS, все4 PDF-страницы
+просмотрены; это synthetic transport проверка, не full live TUI gate.
+
+Live `openai/gpt-6.1-sol/medium`: локальная PDF-документация3/3 прошла факты,
+вёрстку, реальную Help и browser0; CLI docs-after-build3/3 прошёл independent
+cold. Парный A/B functional smoke с сохранённым baselinefc прошёл полностью
+на frozen harnessd1b364a98; formal baseline45/candidate45 и compare ещё не
+завершены. Прочие natural transitions, lifecycle/owner-loss, независимость
+Desktop/CLI и second-model gate остаются открытыми. Установка пользователя и
+исходный Loginom server/client не изменяются. Детали и конкретные ограничения:
+[отчёт live/installed](reports/2026-10-08-package-docs-live.md),
+[отчёт A/B](reports/2026-10-08-package-docs-harness.md),
+[активный checkpoint](package-docs-implementation.md#checkpoint).
+
 **Изолированный кандидат package-docs, 2026-10-07:** чистый
 `669822296615accbd6579c09244dacb24f77a056`, версия `0.1.17`, полный CLI tar.gz
 SHA256 `79c287c4cc70f8c62fd33353f1cd0699b3d8d870f31234cb6cf05b74cc8fb4b0`.

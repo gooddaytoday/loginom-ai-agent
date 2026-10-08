@@ -1,5 +1,40 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-08 — package-docs: кандидат49 и текущая граница приёмки
+
+Чистый source `49b1584f23b4aa47e18b26119389d6f45623fc94`, версия0.1.17:
+полный CLI TAR.GZ и Desktop DEB/AppImage проверены по manifests. Установленная
+матрица Ubuntu22/24/26, Debian12/13 — **5/5 PASS для каждого продукта**,
+non-root/network:none, root:root4755 Chromium sandbox. Все10 собственных
+контейнеров удалены; пользовательские launcher/profile не заменялись.
+
+CLI native upgrade669→49 сохранил настройки, auth fixture, user skill и
+историю, продолжение Session до/после замены PASS, второй writer —
+PROFILE_BUSY/3 без смены owner. Desktop DEB upgrade сохранил обычный
+постоянный HOME/XDG и public history; ASAR/resources совпали с candidate.
+Это synthetic/offline проверки обновления; исходные неудачные попытки
+сохранены. Установленный TUI attachment/permission/command smoke6/6 прошёл
+с просмотром всех4 PDF-страниц и cleanup; provider был синтетическим.
+
+Основная live-модель закреплена `openai/gpt-6.1-sol/medium`. Естественный
+`docs-attached-pdf` прошёл3/3 отдельно в Desktop и CLI, факты/все17 PDF-страниц
+проверены, source `.lgp` неизменён/browser execs0. CLI docs-after-build3/3
+имеет independent cold PASS; Desktop тот же переход warm3/3, cold1 PASS2
+readonly FAIL и пока не принят полностью. Остальные transitions/lifecycle/
+одновременная независимость продуктов и вторичная модель остаются открытыми.
+
+Парный A/B functional smoke baselinefc/candidate49 на frozen harnessd1b364a98
+прошёл judge100/structure/warm oracle/cold/native cleanup для обеих сторон.
+Серия15 задач×3×2=90 выполняется; compare и cold всех formal артефактов ещё
+не приняты. Все запуски локально на собственном выделенном стенде; исходные
+Loginom server/client не переключались. Stage9/server skill removal отложен
+вне текущей цели; серверная публикация сохраняется. Эти данные не означают
+завершение release, Windows/macOS или всей Linux live-матрицы.
+
+Полные hashes/receipts/ограничения: [отчёт кандидата и live-проверок](../testing/loginom-ai-agent/reports/2026-10-08-package-docs-live.md),
+[приёмка harness](../testing/loginom-ai-agent/reports/2026-10-08-package-docs-harness.md),
+[активный checkpoint](../testing/loginom-ai-agent/package-docs-implementation.md#checkpoint).
+
 ## 2026-10-07 — package-docs: новый единый кандидат669
 
 Desktop DEB/AppImage и полный CLI0.1.17 из чистого

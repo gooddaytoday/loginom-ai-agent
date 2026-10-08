@@ -3301,3 +3301,25 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   remain open. Linux evidence does not certify Windows/macOS or release.
 
 [Versioned update evidence](../../testing/loginom-ai-agent/reports/2026-10-07-package-docs-upgrade.md).
+
+
+### Package docs isolation: candidate49 and ongoing live acceptance (2026-10-08)
+
+- Clean source `49b1584f23b4aa47e18b26119389d6f45623fc94`, version0.1.17,
+  delivered full CLI TAR.GZ and Desktop DEB/AppImage. Installed offline
+  Ubuntu22/24/26 and Debian12/13 pass5/5 for each product; owned containers
+  removed, actual manifests and root-owned4755 sandbox verified.
+- Native CLI update669→49 retained config/auth fixture/user skill/history and
+  resumed the saved Session; PROFILE_BUSY/3 preserved the owner nonce. The
+  synthetic update does not prove live provider/browser lifecycle. Desktop
+  public persistent profile/history update separately passed; Docker/controller
+  preparation failures remain recorded. The user installation was not changed.
+- Main model is OpenAI gpt-6.1-sol/medium. Both A/B functional smoke sides passed
+  judge100/structure/warm oracle/independent cold/native cleanup on frozen
+  harnessd1b364a98. Formal15×3×2 attempts, compare, remaining transitions,
+  lifecycle/independence and second-model gates remain open. Stage9/server
+  publication removal is deferred outside the current goal.
+
+[Current Linux evidence](../../testing/loginom-ai-agent/reports/2026-10-08-package-docs-live.md),
+[A/B evidence](../../testing/loginom-ai-agent/reports/2026-10-08-package-docs-harness.md),
+[active checkpoint](../../testing/loginom-ai-agent/package-docs-implementation.md#checkpoint).
