@@ -46,3 +46,15 @@ SHA256/размер/права/UID/GID/xattrs до и после копиров�
 число записей совпадает с исходным inventory. Root free1950679040→2088456192bytes
 на момент batch. Итого46 архивов490686762bytes; все targets600, parents700.
 Текущие profiles, failed-cleanup попытка13 v5 и A/B conditions не изменялись.
+
+Третий batch: `closed-archive-storage-20261009/batch-3` с отдельными
+plan/receipt/readback/tar-readback. Перенесены6 новых confirmed closed архивов
+low-liquidity/monthly-demand/NPS,62977633bytes. Matching result/cleanup,
+process/FD absence, original inode, SHA256/size/UID/GID/mode/xattrs проверены;
+copy2/fsync/atomic links и readback6 PASS. Штатное tar-чтение двух исходных
+alias PASS, число записей совпадает с исходным inventory. Исходные preservation
+receipts неизменны. Итого52 архива553664395bytes вне root disk;
+targets600/parents700. Root free2011873280→2084851712bytes на момент batch;
+это наблюдение при продолжающейся записи live baseline, не оценка точного
+выигрыша от одного переноса. Current profile, failed-cleanup13 и frozen
+resources/harness/common не менялись.
