@@ -19,11 +19,12 @@ export type ProcessCleanup = {
   status: "confirmed" | "failed" | "not_run"; error: string | null
   processes: ProcessIdentity[]; unknownProcesses?: ProcessIdentity[]; runtimeDirectories: string[]; writer: WriterIdentity | null
   capture_complete: boolean
-  observation_mode?: "continuous" | "unit_after_exit"
+  observation_mode?: "continuous" | "unit_after_exit" | "writer_release_settlement"
   verification?: { observed_at: string; owned_remaining: number }[]
   origins?: { pid: number; starttime: string; via: ProcessOrigin["via"]; parent_pid: number | null; parent_starttime: string | null; observed_at: string }[]
   observations?: { count: number; max_duration_ms: number }
   polling?: { interval_ms: number; observed_at: string }[]
+  settlement?: { started_at: string; source_processes: number; passes: { observed_at: string; inspected: number; owned_remaining: number; native_remaining: number }[] }
   admissions?: { pid: number; starttime: string; status: ProcessEntry["admission"] }[]
   selectedCli?: { executable: string; device: number; inode: number }
   launcher?: { kind: "linux_subreaper"; pid: number; cli_pid: number | null; ready: boolean }
@@ -44,19 +45,61 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
   })
   if (!info) return null
   if (!info.isDirectory() || info.isSymbolicLink()) throw Error("Writer is not a private directory")
-  const file = await open(path.join(directory, "owner"), constants.O_RDONLY | constants.O_NOFOLLOW)
-    .catch(() => { throw Error("Writer owner unavailable") })
+  const ownerPath = path.join(directory, "owner")
+  const ownerBefore = await lstat(ownerPath).catch(async (error: NodeJS.ErrnoException) => {
+    if (error.code !== "ENOENT") throw Error("Writer owner unavailable")
+    await observeWriterRelease(directory, info)
+    return undefined
+  })
+  if (!ownerBefore) return null
+  if (!ownerBefore.isFile() || ownerBefore.isSymbolicLink()) throw Error("Writer owner is not a private file")
+  const file = await open(ownerPath, constants.O_RDONLY | constants.O_NOFOLLOW)
+    .catch(async (error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw Error("Writer owner unavailable")
+      await observeWriterRelease(directory, info)
+      return undefined
+    })
+  if (!file) return null
   try {
     const ownerInfo = await file.stat()
-    if (!ownerInfo.isFile()) throw Error("Writer owner is not a private file")
+    if (!ownerInfo.isFile() || ownerInfo.dev !== ownerBefore.dev || ownerInfo.ino !== ownerBefore.ino)
+      throw Error("Writer owner identity changed during read")
     const owner = await file.readFile("utf8")
-    const current = await lstat(directory)
-    const currentOwner = await lstat(path.join(directory, "owner"))
+    const observed = await Promise.all([lstat(directory), lstat(ownerPath)]).catch(async (error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error
+      await observeWriterRelease(directory, info)
+      return undefined
+    })
+    if (!observed) return null
+    const [current, currentOwner] = observed
     if (current.dev !== info.dev || current.ino !== info.ino || current.isSymbolicLink() ||
       currentOwner.dev !== ownerInfo.dev || currentOwner.ino !== ownerInfo.ino || currentOwner.isSymbolicLink())
       throw Error("Writer owner identity changed during read")
     return { device: info.dev, inode: info.ino, owner }
   } finally { await file.close() }
+}
+
+/** CLI release unlinks owner before rmdir. Only that bounded ENOENT window is retried. */
+async function observeWriterRelease(directory: string, expected: Awaited<ReturnType<typeof lstat>>) {
+  let absent = 0
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const current = await lstat(directory).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined
+      throw error
+    })
+    if (current) {
+      absent = 0
+      if (!current.isDirectory() || current.isSymbolicLink() || current.dev !== expected.dev || current.ino !== expected.ino)
+        throw Error("Writer directory identity changed during release")
+      const owner = await lstat(path.join(directory, "owner")).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return undefined
+        throw error
+      })
+      if (owner) throw Error("Writer owner identity changed during release")
+    } else if (++absent === 2) return
+    if (attempt < 5) await Bun.sleep(20)
+  }
+  throw Error("Writer owner unavailable")
 }
 
 async function processView(pid: number, required = true, owners: ProcessIdentity[] = [], retries = 2): Promise<ProcessView | undefined> {
@@ -115,6 +158,71 @@ async function snapshot(owners: ProcessIdentity[] = []) {
     .map((pid) => processView(Number(pid), false, owners)))).filter((entry) => entry !== undefined)
 }
 
+/** No signals or CLI execution. A new proof of absence for the sole writer-release error. */
+export async function observeWriterReleaseSettlement(profile: string, original: ProcessCleanup, acquiredAt: string): Promise<ProcessCleanup> {
+  if (original?.status !== "failed" || original.error !== "Writer owner unavailable" || original.capture_complete !== true ||
+    original.observation_mode !== "continuous" || !Array.isArray(original.unknownProcesses) || original.unknownProcesses.length ||
+    !original.writer || !original.writer.owner || !Number.isSafeInteger(original.writer.device) || !Number.isSafeInteger(original.writer.inode) ||
+    !original.launcher?.ready || !original.selectedCli || !original.processes?.length || !original.runtimeDirectories?.length ||
+    !original.verification || original.verification.length < 2 || original.verification.some(pass => pass.owned_remaining !== 0 ||
+      !Number.isFinite(Date.parse(pass.observed_at)) || Date.parse(pass.observed_at) < Date.parse(acquiredAt)))
+    throw Error("Writer-release source proof ineligible")
+  const ids = new Set(original.processes.map(key))
+  if (ids.size !== original.processes.length || original.processes.some(identity =>
+    identity.uid !== process.getuid?.() || !Number.isSafeInteger(identity.pid) || identity.pid <= 0 ||
+    !/^\d+$/.test(identity.starttime) || !Number.isSafeInteger(identity.group) || identity.group <= 0 ||
+    !Number.isSafeInteger(identity.session) || identity.session <= 0 || !Number.isSafeInteger(identity.device) || identity.device <= 0 ||
+    !Number.isSafeInteger(identity.inode) || identity.inode <= 0 || !path.isAbsolute(identity.executable) ||
+    original.admissions?.filter(entry => entry.pid === identity.pid && entry.starttime === identity.starttime && entry.status === "allowed").length !== 1 ||
+    original.origins?.filter(entry => entry.pid === identity.pid && entry.starttime === identity.starttime &&
+      ["launcher", "cli", "parent", "subreaper"].includes(entry.via) && Number.isFinite(Date.parse(entry.observed_at)) && Date.parse(entry.observed_at) >= Date.parse(acquiredAt) &&
+      (entry.via === "launcher" ? entry.pid === original.launcher?.pid && entry.parent_pid === null && entry.parent_starttime === null :
+        ids.has(`${entry.parent_pid}:${entry.parent_starttime}`))).length !== 1))
+    throw Error("Writer-release ancestry unconfirmed")
+  const cli = original.processes.find(identity => identity.pid === original.launcher?.cli_pid)
+  if (original.origins?.length !== original.processes.length || original.admissions?.length !== original.processes.length ||
+    !cli || cli.executable !== original.selectedCli.executable || cli.device !== original.selectedCli.device || cli.inode !== original.selectedCli.inode ||
+    original.origins.find(entry => entry.pid === cli.pid)?.via !== "cli") throw Error("Writer-release ancestry unconfirmed")
+  for (const identity of original.processes) {
+    const visited = new Set<string>()
+    let current: string | undefined = key(identity)
+    while (current) {
+      if (visited.has(current)) throw Error("Writer-release ancestry unconfirmed")
+      visited.add(current)
+      const entry = original.origins!.find(entry => `${entry.pid}:${entry.starttime}` === current)
+      if (!entry) throw Error("Writer-release ancestry unconfirmed")
+      current = entry.via === "launcher" ? undefined : `${entry.parent_pid}:${entry.parent_starttime}`
+    }
+  }
+  const canonical = await realpath(profile)
+  if (canonical !== profile || original.runtimeDirectories.some(directory => !inside(directory, profile) || directory === profile))
+    throw Error("Writer-release profile ownership differs")
+  const started_at = new Date().toISOString()
+  const passes: NonNullable<ProcessCleanup["settlement"]>["passes"] = []
+  for (let pass = 0; pass < 2; pass++) {
+    const current = await snapshot(original.processes)
+    const owned = current.filter(process => ids.has(key(process)) || original.processes.some(saved => saved.pid === process.pid || saved.group === process.group) ||
+      inside(process.cwd, profile) || process.args.some(arg => arg === profile || arg.startsWith(profile + path.sep)))
+    const native = current.filter(process => /^(?:loginom-ai-|chrome|chromium)/.test(process.name) ||
+      process.args.some(arg => /(?:node-host\.mjs|standalone\.ts|loginom-ai-agent-cli)$/.test(arg)) ||
+      /^(?:chrome|chromium)(?:[-_]|$)/.test(path.basename(process.executable)))
+    if (owned.length || native.length) throw Error("Writer-release processes busy or foreign")
+    if (await writerIdentity(profile)) throw Error("Writer-release writer identity differs")
+    const directories = await runtimeDirectories(profile, true)
+    if (JSON.stringify([...directories].sort()) !== JSON.stringify([...original.runtimeDirectories].sort()) ||
+      (await Promise.all(directories.map(directory => realpath(directory)))).some((actual, index) => actual !== directories[index]))
+      throw Error("Writer-release runtime directories differ")
+    passes.push({ observed_at: new Date().toISOString(), inspected: current.length, owned_remaining: owned.length, native_remaining: native.length })
+    if (!pass) await Bun.sleep(100)
+  }
+  return { status: "confirmed", error: null, processes: original.processes, unknownProcesses: [],
+    runtimeDirectories: original.runtimeDirectories, writer: original.writer, capture_complete: true,
+    observation_mode: "writer_release_settlement", selectedCli: original.selectedCli, launcher: original.launcher,
+    origins: original.origins, admissions: original.admissions, browserBindings: original.browserBindings,
+    verification: passes.map(pass => ({ observed_at: pass.observed_at, owned_remaining: pass.owned_remaining })),
+    settlement: { started_at, source_processes: original.processes.length, passes } }
+}
+
 function identity(view: ProcessIdentity): ProcessIdentity {
   return { pid: view.pid, starttime: view.starttime, uid: view.uid, parent: view.parent,
     group: view.group, session: view.session, executable: view.executable, device: view.device, inode: view.inode }
@@ -136,12 +244,13 @@ export async function signalProcess(saved: ProcessIdentity, signal: NodeJS.Signa
   try { process.kill(current.pid, signal); return true } catch (error) { if (!gone(error)) throw error; return false }
 }
 
-async function runtimeDirectories(profile: string): Promise<string[]> {
+async function runtimeDirectories(profile: string, strict = false): Promise<string[]> {
   const walk = async (directory: string): Promise<string[]> => {
     const entries = await readdir(directory, { withFileTypes: true }).catch((error) => {
       if (gone(error)) return []
       throw error
     })
+    if (strict && entries.some(entry => entry.isSymbolicLink())) throw Error("Writer-release runtime directories differ")
     return (await Promise.all(entries.filter((entry) => entry.isDirectory() && !entry.isSymbolicLink()).map(async (entry) => {
       const file = path.join(directory, entry.name)
       if (path.basename(directory) === "attempts") return [file]
