@@ -10,7 +10,7 @@ config set max_concurrent_tasks 12 и daemon restart --max-concurrent-tasks 12 �
 Обратное чтение config=12 и argv нового daemon=12 PASS; тот же runtime online.
 mas: 12 logical CPU, RAM30863MiB/available29569MiB, swap0, load0.07/0.02/0.00,
 391GiB свободно на диске (снимок без нагрузки перед изменением).
-Caps ролей 1/8/8 сохранены; инструкции трёх агентов обновлены partial PUT/readback,
+09.10 по команде владельца caps ролей стали 8/8/8; partial PUT/readback подтвердил:
 остальные настройки сохранены. Это ёмкость агентов, не отдельный лимит CLI.
 Прежние preflight LAB-27 и round4 выполнены при cap8; 12 одновременных задач
 и первые реальные обработки при новом cap — NOT_RUN. LGD/XLSX остаются Backlog.
@@ -25,8 +25,8 @@ user@10.200.13.132; реквизиты доступа не включать в �
 не переносятся и не возобновляются. Новые ветки lgd-research/xlsx-research и
 карточки imports-lgd/imports-excel начинаются Stage0 и остаются Backlog.
 
-Каждая карточка фиксирует slug, stage, исходный SHA, ветку/PR target, критерии и
-разрешённые изменения. Читать docs/node-development/RUNBOOK.md и подплан узла.
+Короткая карточка фиксирует slug, stage, исходный SHA и ветку/PR target.
+Критерии и разрешённые изменения читаются в RUNBOOK и подплане узла.
 Для каждой карточки новая пара Loginom worker/reviewer, отдельные browser/CLI
 profiles и доказательства. До первой команды CLI новый профиль пуст: private logs размещаются рядом,
 после инициализации допустимы внутри него. Иначе CLI отказывает PROFILE_FORMAT_INVALID.
@@ -35,8 +35,15 @@ profiles и доказательства. До первой команды CLI �
 Технические проблемы исправлять; вопрос владельцу — изменение критериев,
 общего контракта, нехватка доступа или 3 последовательные попытки без прогресса.
 Передача роли требует clean SHA, evidence и cleanup; история попыток immutable.
-Stage0 принимается как исследование; model/full handler acceptance остаются NOT_RUN.
+Stage0 нового узла — исследование; Stage0 реализованного узла — перепроверка
+заданного реализованного объёма, включая модельную и независимую полную приёмку.
 Merge/release — отдельная команда владельца.
+
+Восемь Генераторов готовят карточки независимо, без общего readiness barrier.
+Для новой волны каждый создаёт отдельного технического admin карточки; общий
+root admin используется только для короткого bootstrap под постоянным account
+flock до подтверждённого logout/cleanup. Далее собственный card operator;
+worker/reviewer остаются без Admin. Данные operator закрыты и не передаются модели.
 
 Новые Loginom worker/reviewer создаёт Генератор Тасок существующим инструментом:
 `python3 ~/.local/share/loginom-multica-accounts/scripts/provision-accounts.py --issue <UUID карточки> --stage stage0`.
@@ -156,19 +163,20 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 - LGD/XLSX Backlog0, pairs ready via Generator, manual assignment only; no PR38/39 continuation, Stage0/full node acceptance NOT_RUN. Node profiles/accounts/branch/evidence independent.
 - Next: вручную назначить LGD/XLSX или другие узлы и наблюдать CPU/RAM/очередь/ошибки при cap12; испытание12 NOT_RUN. New shared-oauth build/merge requires new exact artifact qualification; merge/release remain owner commands.
 
-## Checkpoint — восемь перепроверок реализованных узлов, 09.10.2026
+## Checkpoint — новая параллельная волна восьми узлов, 09.10.2026
 
-- Исходный SHA восьми веток `4e626d547258e9ae7c0b7937cd672781dde0667e`, common basef9; current loginom0ca не включён.
-- LAB45: draft PR42 → shared-oauth, clean published `a00b0203026f7719f10403bfc4fa02810aa8502e`; изменён только calculator acceptance-комплект.
-- Первая попытка LAB45 остановлена до model run: старый snapshot не содержит назначенную модель; report/manifest скачаны и hashes согласованы.
-- История попытки98556be8/state-lock сохранена; новый Worker run01a11d55-25fc-7c39-a4b8-a13b0dfc870a возобновлён на том же опубликованном SHA.
-- Штатный refresh на mas показал назначенные model/variant после OAuth filtering; метаданные текущего каталога независимо прочитаны наблюдателем.
-- Центральный squad preflight уточнён/readback PASS: реальный fetch/cache/hash/mtime/stderr, а не только надпись refreshed/exit0; без замены модели/общего sourcefix.
-- LAB46 Generator completed; ready/accounts/cleanup/catalogue receipts скачаны, hash manifest совпал; Worker01a11d57-4c99-7a8d-9cb9-e2f2984ec683 running.
-- LAB47–52: временно отменённые до запуска ожидания сохранены; штатные Generator mentions восстановили очередь в тех же шести карточках.
-- [Доказательства текущего наблюдения](reports/2026-10-08-node-recheck/catalogue-refresh.json); отсутствие прежнего каталога не доказывает отказ провайдера.
-- Полная приёмка восьми узлов/независимый Reviewer/cold reopen NOT_RUN; каталог и helper tests не дают PASS.
-- Цель — самостоятельные реальные сценарии; oracle/expected/history defects вне контекста модели, после адресного исправления новая итоговая попытка.
-- mas receipt21:05:20UTC: CPU12, availableRAM29904904KiB, disk416052633600bytes, load0.004/0.094/0.163; own Generator processes/server/locks cleanup подтверждены receipt; нагрузка12 NOT_RUN.
-- LAB29/LAB30 Backlog; heartbeat ACTIVE; PR40/PR42 не сливались, выпуск NOT_RUN.
-- Следующий шаг: наблюдать Worker LAB45/46, подготовку LAB47–52, фактические model settings/provider ошибки и полную независимую приёмку на том же SHA.
+- Документация до перезапуска8b1f39c9; baseline4e626d547, common basef9bf332c; loginom0ca не включён.
+- Назначения: LAB45 a00b0203/PR42, LAB46 41e0b170/PR43, LAB47 c92a3bfd; LAB48–52 4e626d547; ветки не сбрасывались.
+- Старые четыре stop receipts независимо скачаны/hash PASS; текущий cleanup не переписывает прежние AMBIGUOUS.
+- LAB45 sales-calc-021 и LAB46 cleanup-transform-002 остаются AMBIGUOUS/effect_possible; полного результата приёмки нет.
+- Caps8/8/8 и daemon12/readback сохранены; восемь fresh Generator tasks назначены параллельным batch21:46:24UTC.
+- Все восемь стартовали постепенно; одновременное8 running NOT_CONFIRMED. Poll30s/WS3min, free resources; distinct-agent claim — source explanation.
+- LAB47 native failure model_not_found_or_unavailable не получила auto retry; выбран штатный rerun той же карточки, модель не заменена.
+- Шесть карточек blocked root bootstrap marker LAB47; её own SessionID3109 logout сообщён, независимое server absence пока ожидается.
+- LAB46 Admin-menu раскрыто; её собственный admin выполняет только read-only Dispatcher аудит root3109, чужие сеансы не закрывает.
+- LAB46/47 сообщили создание own admin; остальных6 только planned. Эффективные права/изоляция/полный cleanup ещё не квалифицированы.
+- LAB47 LoadPublishedFileNames/различия Designer-Viewer диагностируются; common source defect/причинное исправление не установлены.
+- По новой команде владельца handoff/model/build удержаны; существующий heartbeat PAUSED/readback, scheduled задачи не создаются.
+- [SHA, dispatch/run UUID, hashes и диагностика](reports/2026-10-08-node-recheck/parallel8-restart.json); краткие карточки ссылаются на подпланы/сквад.
+- Полная независимая приёмка8 NOT_CONFIRMED; нагрузка12 NOT_RUN; LAB29/30 Backlog, Eval unchanged, merge/release NOT_RUN.
+- Следующий шаг: завершить own cleanup/квалификацию admin и разбор очереди/retry; не возобновлять приёмку до завершения диагностики.

@@ -1,0 +1,714 @@
+{
+  "format": "loginom-multica-parallel8-restart-v1",
+  "prepared_at": "2026-10-08T21:55:08.740490+00:00",
+  "documentation_prechange_sha": "8b1f39c9c272f88a3f6dca6234dcb07cba0a7d86",
+  "authorization": "Owner requested cap8 and fresh concurrent wave on same eight cards, offered eight admin accounts if necessary; shared root-admin calibration conflict observed",
+  "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+  "squad_id": "8ff41bd5-f794-4b5b-a063-026f3874628e",
+  "daemon_cap": 12,
+  "role_configuration": {
+    "observed_at": "2026-10-08T21:27:57.819273+00:00",
+    "changes": [
+      {
+        "id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+        "name": "Генератор Тасок",
+        "before_cap": 1,
+        "after_cap": 8,
+        "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "protected_settings_sha256": "b361b7a0e88cfc2a0358b0428d54654bc908363478b04440cb8c2199b7a9eb2a",
+        "readback": "PASS"
+      },
+      {
+        "id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+        "name": "Тест-Манки #1",
+        "before_cap": 8,
+        "after_cap": 8,
+        "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "protected_settings_sha256": "b361b7a0e88cfc2a0358b0428d54654bc908363478b04440cb8c2199b7a9eb2a",
+        "readback": "PASS"
+      },
+      {
+        "id": "027d102c-5d25-402c-a8fb-58a3e810013c",
+        "name": "Ловец Галюцинаций",
+        "before_cap": 8,
+        "after_cap": 8,
+        "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+        "protected_settings_sha256": "b361b7a0e88cfc2a0358b0428d54654bc908363478b04440cb8c2199b7a9eb2a",
+        "readback": "PASS"
+      },
+      {
+        "id": "8ff41bd5-f794-4b5b-a063-026f3874628e",
+        "type": "squad",
+        "readback": "PASS",
+        "central_cli_settings_unchanged": true
+      }
+    ]
+  },
+  "admin_configuration": {
+    "observed_at": "2026-10-08T21:38:44.970385+00:00",
+    "authorization": "Owner offered eight admin identities if necessary; shared admin calibration conflict observed",
+    "changes": [
+      {
+        "type": "squad",
+        "id": "8ff41bd5-f794-4b5b-a063-026f3874628e",
+        "instructions_sha256": "9087f8800d35abe7f7cf5e7f40251dc6e8be776d8063fec6b4dd23159cad4fa9",
+        "readback": "PASS"
+      },
+      {
+        "type": "agent",
+        "id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+        "instructions_sha256": "f6145734f26e195a4239bccd12bab0e21e1822c4e6e97f6e27be0af335b1d621",
+        "readback": "PASS"
+      },
+      {
+        "type": "agent",
+        "id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+        "instructions_sha256": "ee182290a66074c5d5807bf617f91fb7524d620787403af3ad0ffb633572fb56",
+        "readback": "PASS"
+      },
+      {
+        "type": "agent",
+        "id": "027d102c-5d25-402c-a8fb-58a3e810013c",
+        "instructions_sha256": "03b728b936ae9107fe32c9fd60094033ac7dd87140460fe40760ae095550d6ca",
+        "readback": "PASS"
+      }
+    ],
+    "admin_scope": "Per-card operational identities only; worker/reviewer remain nonadmin; no OAuth/native authorization pool"
+  },
+  "central_cli_selection": {
+    "model": "openai/gpt-6-luna",
+    "variant": "high",
+    "readback": "PASS",
+    "substitution": false,
+    "native_codex_model_changed": false
+  },
+  "source_baseline": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+  "common_base": "f9bf332cc491baa784e6e04fdfda7c0f09151cb7",
+  "excluded_loginom_head": "0ca9e75bc7bb6897f46ac1ddc880b9758e993dc9",
+  "cards": [
+    {
+      "id": "01a11d36-053e-78da-b06c-e313de5319e3",
+      "identifier": "LAB-45",
+      "slug": "calculator",
+      "branch": "recheck-calculator",
+      "round_start_sha": "a00b0203026f7719f10403bfc4fa02810aa8502e",
+      "previous_description_sha256": "6a39f283df8efb770a48cbc1fb8105b2cf6cf4a5d1c876478665ef399f6f8c05",
+      "readback": "PASS"
+    },
+    {
+      "id": "01a11d36-10b0-702f-930d-e91315129205",
+      "identifier": "LAB-46",
+      "slug": "field-parameters",
+      "branch": "recheck-fields",
+      "round_start_sha": "41e0b170a4528537bb9a5137756878f2ca950c92",
+      "previous_description_sha256": "03d0a9462f69630654d4bd2f2e9e69bda027446b1144d90783fc021a20714f42",
+      "readback": "PASS"
+    },
+    {
+      "id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+      "identifier": "LAB-47",
+      "slug": "row-filter",
+      "branch": "recheck-filter",
+      "round_start_sha": "c92a3bfd1005ab4ff181c7a15626aa39f9394a49",
+      "previous_description_sha256": "348a6ff4f0393cc67e743e15ad46ba9e336e459c3472a76b08a199bb0d56f2cb",
+      "readback": "PASS"
+    },
+    {
+      "id": "01a11d36-2811-71ba-a493-0e397e3e60f2",
+      "identifier": "LAB-48",
+      "slug": "grouping",
+      "branch": "recheck-grouping",
+      "round_start_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+      "previous_description_sha256": "259ca1eb0613b6fa99363a19096e2b41ca6fd808802ab9024977672b2b6bde76",
+      "readback": "PASS"
+    },
+    {
+      "id": "01a11d36-33ae-732e-b618-5618ed5301cd",
+      "identifier": "LAB-49",
+      "slug": "sorting",
+      "branch": "recheck-sorting",
+      "round_start_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+      "previous_description_sha256": "528d517167aa629754716234f0ee957706fe09d4571997881bd159620e127448",
+      "readback": "PASS"
+    },
+    {
+      "id": "01a11d36-3f2a-7df1-bd81-d5401bdcdd16",
+      "identifier": "LAB-50",
+      "slug": "join",
+      "branch": "recheck-join",
+      "round_start_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+      "previous_description_sha256": "48e54a4230bec33b8bb7db41d5960f902c0bace25f4f35478b76e608b6485082",
+      "readback": "PASS"
+    },
+    {
+      "id": "01a11d36-4ace-7dd4-a0d4-498195f7d2e9",
+      "identifier": "LAB-51",
+      "slug": "union",
+      "branch": "recheck-union",
+      "round_start_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+      "previous_description_sha256": "09fae56a803eca3d63f896cab9c901d96920da24c8bc7ed29c85268cdeccd836",
+      "readback": "PASS"
+    },
+    {
+      "id": "01a11d36-5670-7786-bfe1-e9a4a4462e6e",
+      "identifier": "LAB-52",
+      "slug": "replacement",
+      "branch": "recheck-replacement",
+      "round_start_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+      "previous_description_sha256": "4d940ac8e285a78ba811a1b1c276678ac43a52fe52ee20dcb158e666736ee533",
+      "readback": "PASS"
+    }
+  ],
+  "launch": {
+    "batch_id": "ab99d22a-0f02-4166-98e4-b1b98103d163",
+    "prepared_at": "2026-10-08T21:46:14.271798+00:00",
+    "comments": [
+      {
+        "identifier": "LAB-45",
+        "started_at": "2026-10-08T21:46:24.888747+00:00",
+        "completed_at": "2026-10-08T21:46:26.140794+00:00",
+        "comment_id": "01a11d7b-5a22-7e0e-b46c-11a755de2bd6"
+      },
+      {
+        "identifier": "LAB-46",
+        "started_at": "2026-10-08T21:46:24.888907+00:00",
+        "completed_at": "2026-10-08T21:46:25.977970+00:00",
+        "comment_id": "01a11d7b-59dd-7ae2-9b1f-274e15aad10f"
+      },
+      {
+        "identifier": "LAB-47",
+        "started_at": "2026-10-08T21:46:24.889185+00:00",
+        "completed_at": "2026-10-08T21:46:26.007302+00:00",
+        "comment_id": "01a11d7b-59e2-78af-9b32-8f77d94e94f9"
+      },
+      {
+        "identifier": "LAB-48",
+        "started_at": "2026-10-08T21:46:24.889535+00:00",
+        "completed_at": "2026-10-08T21:46:26.144280+00:00",
+        "comment_id": "01a11d7b-5a60-7e41-bf3d-3c63e0ea7eae"
+      },
+      {
+        "identifier": "LAB-49",
+        "started_at": "2026-10-08T21:46:24.889720+00:00",
+        "completed_at": "2026-10-08T21:46:26.146809+00:00",
+        "comment_id": "01a11d7b-5a76-716d-a377-4ae672f694c6"
+      },
+      {
+        "identifier": "LAB-50",
+        "started_at": "2026-10-08T21:46:24.890059+00:00",
+        "completed_at": "2026-10-08T21:46:26.013786+00:00",
+        "comment_id": "01a11d7b-59ea-7760-9b70-0047448b3de8"
+      },
+      {
+        "identifier": "LAB-51",
+        "started_at": "2026-10-08T21:46:24.890275+00:00",
+        "completed_at": "2026-10-08T21:46:26.132827+00:00",
+        "comment_id": "01a11d7b-5a15-7937-91a0-1331bc2dd0e5"
+      },
+      {
+        "identifier": "LAB-52",
+        "started_at": "2026-10-08T21:46:24.890469+00:00",
+        "completed_at": "2026-10-08T21:46:26.137819+00:00",
+        "comment_id": "01a11d7b-5a1a-760f-9275-ecb87c47987d"
+      }
+    ]
+  },
+  "observations": [
+    {
+      "observed_at": "2026-10-08T21:48:35.990180+00:00",
+      "cards": [
+        {
+          "identifier": "LAB-45",
+          "id": "01a11d36-053e-78da-b06c-e313de5319e3",
+          "active_runs": [
+            {
+              "id": "01a11d7b-5a71-7dcc-ba9a-702ad8178ccd",
+              "issue_id": "01a11d36-053e-78da-b06c-e313de5319e3",
+              "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+              "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+              "status": "queued",
+              "created_at": "2026-10-09T00:46:25+03:00",
+              "started_at": null
+            }
+          ]
+        },
+        {
+          "identifier": "LAB-46",
+          "id": "01a11d36-10b0-702f-930d-e91315129205",
+          "active_runs": [
+            {
+              "id": "01a11d7b-59f6-7a64-b8d1-d63716e40a13",
+              "issue_id": "01a11d36-10b0-702f-930d-e91315129205",
+              "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+              "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+              "status": "running",
+              "created_at": "2026-10-09T00:46:25+03:00",
+              "started_at": "2026-10-09T00:46:26+03:00"
+            }
+          ]
+        },
+        {
+          "identifier": "LAB-47",
+          "id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+          "active_runs": [
+            {
+              "id": "01a11d7b-5a08-7654-b307-4703a0f5872d",
+              "issue_id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+              "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+              "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+              "status": "running",
+              "created_at": "2026-10-09T00:46:25+03:00",
+              "started_at": "2026-10-09T00:46:26+03:00"
+            }
+          ]
+        },
+        {
+          "identifier": "LAB-48",
+          "id": "01a11d36-2811-71ba-a493-0e397e3e60f2",
+          "active_runs": [
+            {
+              "id": "01a11d7b-5a8b-7290-bcf3-16004ddb3f77",
+              "issue_id": "01a11d36-2811-71ba-a493-0e397e3e60f2",
+              "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+              "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+              "status": "queued",
+              "created_at": "2026-10-09T00:46:25+03:00",
+              "started_at": null
+            }
+          ]
+        },
+        {
+          "identifier": "LAB-49",
+          "id": "01a11d36-33ae-732e-b618-5618ed5301cd",
+          "active_runs": [
+            {
+              "id": "01a11d7b-5a93-7643-98e1-bc1458117036",
+              "issue_id": "01a11d36-33ae-732e-b618-5618ed5301cd",
+              "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+              "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+              "status": "queued",
+              "created_at": "2026-10-09T00:46:25+03:00",
+              "started_at": null
+            }
+          ]
+        },
+        {
+          "identifier": "LAB-50",
+          "id": "01a11d36-3f2a-7df1-bd81-d5401bdcdd16",
+          "active_runs": [
+            {
+              "id": "01a11d7b-5a0d-7299-be4d-ad08346bae36",
+              "issue_id": "01a11d36-3f2a-7df1-bd81-d5401bdcdd16",
+              "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+              "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+              "status": "queued",
+              "created_at": "2026-10-09T00:46:25+03:00",
+              "started_at": null
+            }
+          ]
+        },
+        {
+          "identifier": "LAB-51",
+          "id": "01a11d36-4ace-7dd4-a0d4-498195f7d2e9",
+          "active_runs": [
+            {
+              "id": "01a11d7b-5a43-78f5-a45b-ccb6efc3e307",
+              "issue_id": "01a11d36-4ace-7dd4-a0d4-498195f7d2e9",
+              "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+              "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+              "status": "queued",
+              "created_at": "2026-10-09T00:46:25+03:00",
+              "started_at": null
+            }
+          ]
+        },
+        {
+          "identifier": "LAB-52",
+          "id": "01a11d36-5670-7786-bfe1-e9a4a4462e6e",
+          "active_runs": [
+            {
+              "id": "01a11d7b-5a66-7607-9072-d7f65a8edb27",
+              "issue_id": "01a11d36-5670-7786-bfe1-e9a4a4462e6e",
+              "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+              "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+              "status": "queued",
+              "created_at": "2026-10-09T00:46:25+03:00",
+              "started_at": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observed_at": "2026-10-08T21:57:02.173779+00:00",
+      "runs": [
+        {
+          "id": "01a11d7b-5a93-7643-98e1-bc1458117036",
+          "issue_id": "01a11d36-33ae-732e-b618-5618ed5301cd",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "running",
+          "created_at": "2026-10-09T00:46:25+03:00",
+          "started_at": "2026-10-09T00:56:03+03:00"
+        },
+        {
+          "id": "01a11d7b-5a8b-7290-bcf3-16004ddb3f77",
+          "issue_id": "01a11d36-2811-71ba-a493-0e397e3e60f2",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "running",
+          "created_at": "2026-10-09T00:46:25+03:00",
+          "started_at": "2026-10-09T00:55:57+03:00"
+        },
+        {
+          "id": "01a11d7b-5a71-7dcc-ba9a-702ad8178ccd",
+          "issue_id": "01a11d36-053e-78da-b06c-e313de5319e3",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "running",
+          "created_at": "2026-10-09T00:46:25+03:00",
+          "started_at": "2026-10-09T00:55:57+03:00"
+        },
+        {
+          "id": "01a11d7b-5a66-7607-9072-d7f65a8edb27",
+          "issue_id": "01a11d36-5670-7786-bfe1-e9a4a4462e6e",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "running",
+          "created_at": "2026-10-09T00:46:25+03:00",
+          "started_at": "2026-10-09T00:54:14+03:00"
+        },
+        {
+          "id": "01a11d7b-59f6-7a64-b8d1-d63716e40a13",
+          "issue_id": "01a11d36-10b0-702f-930d-e91315129205",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "running",
+          "created_at": "2026-10-09T00:46:25+03:00",
+          "started_at": "2026-10-09T00:46:26+03:00"
+        }
+      ]
+    },
+    {
+      "observed_at": "2026-10-08T22:00:47.880285+00:00",
+      "runs": [
+        {
+          "id": "01a11d86-5bff-7aae-a0e9-e70fc489444d",
+          "issue_id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "running",
+          "created_at": "2026-10-09T00:58:27+03:00",
+          "started_at": "2026-10-09T00:58:27+03:00",
+          "completed_at": null,
+          "error": null
+        },
+        {
+          "id": "01a11d7b-5a93-7643-98e1-bc1458117036",
+          "issue_id": "01a11d36-33ae-732e-b618-5618ed5301cd",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "running",
+          "created_at": "2026-10-09T00:46:25+03:00",
+          "started_at": "2026-10-09T00:56:03+03:00",
+          "completed_at": null,
+          "error": null
+        },
+        {
+          "id": "01a11d7b-5a8b-7290-bcf3-16004ddb3f77",
+          "issue_id": "01a11d36-2811-71ba-a493-0e397e3e60f2",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "running",
+          "created_at": "2026-10-09T00:46:25+03:00",
+          "started_at": "2026-10-09T00:55:57+03:00",
+          "completed_at": null,
+          "error": null
+        },
+        {
+          "id": "01a11d7b-5a71-7dcc-ba9a-702ad8178ccd",
+          "issue_id": "01a11d36-053e-78da-b06c-e313de5319e3",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "running",
+          "created_at": "2026-10-09T00:46:25+03:00",
+          "started_at": "2026-10-09T00:55:57+03:00",
+          "completed_at": null,
+          "error": null
+        },
+        {
+          "id": "01a11d7b-5a66-7607-9072-d7f65a8edb27",
+          "issue_id": "01a11d36-5670-7786-bfe1-e9a4a4462e6e",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "running",
+          "created_at": "2026-10-09T00:46:25+03:00",
+          "started_at": "2026-10-09T00:54:14+03:00",
+          "completed_at": null,
+          "error": null
+        },
+        {
+          "id": "01a11d7b-5a43-78f5-a45b-ccb6efc3e307",
+          "issue_id": "01a11d36-4ace-7dd4-a0d4-498195f7d2e9",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "completed",
+          "created_at": "2026-10-09T00:46:25+03:00",
+          "started_at": "2026-10-09T00:51:37+03:00",
+          "completed_at": "2026-10-09T00:56:29+03:00",
+          "error": null
+        },
+        {
+          "id": "01a11d7b-5a0d-7299-be4d-ad08346bae36",
+          "issue_id": "01a11d36-3f2a-7df1-bd81-d5401bdcdd16",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "completed",
+          "created_at": "2026-10-09T00:46:25+03:00",
+          "started_at": "2026-10-09T00:49:04+03:00",
+          "completed_at": "2026-10-09T00:56:02+03:00",
+          "error": null
+        },
+        {
+          "id": "01a11d7b-5a08-7654-b307-4703a0f5872d",
+          "issue_id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "failed",
+          "created_at": "2026-10-09T00:46:25+03:00",
+          "started_at": "2026-10-09T00:46:26+03:00",
+          "completed_at": "2026-10-09T00:55:56+03:00",
+          "error": "Selected model is at capacity. Please try a different model."
+        },
+        {
+          "id": "01a11d7b-59f6-7a64-b8d1-d63716e40a13",
+          "issue_id": "01a11d36-10b0-702f-930d-e91315129205",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "running",
+          "created_at": "2026-10-09T00:46:25+03:00",
+          "started_at": "2026-10-09T00:46:26+03:00",
+          "completed_at": null,
+          "error": null
+        }
+      ]
+    }
+  ],
+  "verified_old_stop_attachments": [
+    {
+      "id": "01a11d6b-abfd-7186-a730-02758f47d25d",
+      "sha256": "e64f72434030045c456439aace6aad9935f4bce0a4bf6c88cffb9212868586fa",
+      "bytes": 13635
+    },
+    {
+      "id": "01a11d6c-66a7-7dc1-b0f2-8d50f178231d",
+      "sha256": "62c4345c64d8b4c241a98f8988a7e0e1d08ad2ca3a7120944474da972deba0a9",
+      "bytes": 16886
+    },
+    {
+      "id": "01a11d6c-6793-74a5-abdf-f16f673b131e",
+      "sha256": "90bde820fffa2ed7045c6285835fb91ccd381ee4753399936f86e05a25e4cbde",
+      "bytes": 5062
+    },
+    {
+      "id": "01a11d6c-e616-7c60-82f8-22636af2b02f",
+      "sha256": "09581366e2c31caedf2a72e61ac16f13554d785730718688c4edb4619afffdab",
+      "bytes": 29187
+    },
+    {
+      "id": "01a11d6c-e6e9-7db5-96dc-0f3f9c8d9911",
+      "sha256": "f51e0b94a54a08672b99aa609897e674963ecc81de9757e90a2201d155aae5c2",
+      "bytes": 4393
+    },
+    {
+      "id": "01a11d70-f046-7a80-accf-4b3e3df28d28",
+      "sha256": "278a58bd91a0d9b3ff6c7d0fc74d5cfc271cce3a93c08c40fe19fd5fe2e902c5",
+      "bytes": 52385
+    },
+    {
+      "id": "01a11d70-f117-7110-86fe-058435ed4d2a",
+      "sha256": "e687f1dd123810acc87584a7cf6bc15e761b0476dd69320371be775123ec7fb9",
+      "bytes": 145
+    }
+  ],
+  "old_attempts": {
+    "LAB-45": {
+      "uuid": "57854c38-db97-405d-9e46-c227615c3059",
+      "actual_model": "openai/gpt-6-luna",
+      "actual_variant": "high",
+      "operation": "sales-calc-021",
+      "state": "AMBIGUOUS",
+      "effect_possible": true,
+      "final_execution_save_cold_reviewer": "NOT_RUN"
+    },
+    "LAB-46": {
+      "uuid": "862058a8-281e-45a8-9edb-42079a02107d",
+      "actual_model": "openai/gpt-6-luna",
+      "actual_variant": "high",
+      "operation": "cleanup-transform-002",
+      "state": "AMBIGUOUS",
+      "effect_possible": true,
+      "final_execution_save_cold_reviewer": "NOT_RUN"
+    },
+    "LAB-47": {
+      "model_runs": 0,
+      "full_acceptance": "NOT_RUN"
+    },
+    "LAB-48": {
+      "pair_ready_historical": true,
+      "prior_admin_positive_calibration_failure": "retained",
+      "model_runs": 0
+    }
+  },
+  "stop_interpretation": "Verified exact current process/server/lock absence supports fresh reuse only; historical unknown effects and incomplete PID attribution remain immutable; no old acceptance PASS",
+  "admin_accounts_created": "LAB46/LAB47 reported creation; remaining6 planned; full current identity/rights/cleanup qualification not confirmed",
+  "queue_limitation": "Batch submitted together; observed scheduler starts staggered. Accessible Multica source claims at most one task per distinct agent per batch and WS safety poll upper bound 3min; deployed source identity/log causal confirmation pending. No runtime resource_wait observed.",
+  "node_acceptance": "NOT_CONFIRMED",
+  "load12": "NOT_RUN",
+  "protected": {
+    "LAB29": "backlog",
+    "LAB30": "backlog",
+    "Eval": "unchanged",
+    "merge_release": "NOT_RUN"
+  },
+  "installed_multica": {
+    "version": "0.6.1",
+    "source": "2ea01ae4e",
+    "observed_by_task": "01a11d7b-59f6-7a64-b8d1-d63716e40a13",
+    "actual_daemon_config_argv_cap": 12,
+    "actual_poll_interval": "30s",
+    "actual_ws_claim_poll_interval": "3m",
+    "resource_wait_task_count": 0,
+    "status": "native task text; public hash-verified receipt pending"
+  },
+  "native_provider_failure": {
+    "card": "LAB-47",
+    "task_id": "01a11d7b-5a08-7654-b307-4703a0f5872d",
+    "error": "Selected model is at capacity. Please try a different model.",
+    "scope": "native Codex Generator; internal Loginom model runs remain0",
+    "new_rerun_task_id": "01a11d86-5bff-7aae-a0e9-e70fc489444d",
+    "same_runtime_agent_model": true,
+    "purpose": "own LAB47 exact PID/server root bootstrap reconciliation before readiness"
+  },
+  "root_bootstrap_blocker": {
+    "owner_card": "LAB-47",
+    "owner_failed_task": "01a11d7b-5a08-7654-b307-4703a0f5872d",
+    "phase": "bootstrap_cleanup_requires_reconciliation",
+    "active_marker_sha256": "3164f4aa4d53b80ce1916c68426cffd9c6dcc261e524facca97ab987f2710608",
+    "permanent_lock_inode": 2396017,
+    "blocked_cards": [
+      "LAB-45",
+      "LAB-48",
+      "LAB-49",
+      "LAB-50",
+      "LAB-51",
+      "LAB-52"
+    ],
+    "receipt_status": "card comments; public attachments to verify",
+    "dependent_login_prohibited_until_exact_cleanup": true,
+    "owner_rerun": "01a11d86-5bff-7aae-a0e9-e70fc489444d"
+  },
+  "resource_observation": {
+    "utc": "2026-10-08T21:50:57Z",
+    "source_task": "01a11d7b-59f6-7a64-b8d1-d63716e40a13",
+    "source_message_seq": 50,
+    "daemon_pid": 164056,
+    "daemon_argv_cap": 12,
+    "generator_api_cap": 8,
+    "running": 3,
+    "resource_wait": 0,
+    "cpu_logical": 12,
+    "memory_available_kib": 29959924,
+    "disk_free_bytes": 411153309696,
+    "loadavg": [
+      0.17578125,
+      0.0947265625,
+      0.267578125
+    ],
+    "independent_attachment_hash_status": "pending"
+  },
+  "heartbeat": {
+    "id": "automation",
+    "status": "PAUSED",
+    "updated_existing_monitor": true,
+    "quiet_unchanged": true,
+    "owner_request": "No scheduled tasks; debug first"
+  },
+  "debug_hold_configuration": {
+    "at": "2026-10-08T22:10:15.176342+00:00",
+    "changes": [
+      {
+        "kind": "squads",
+        "id": "8ff41bd5-f794-4b5b-a063-026f3874628e",
+        "before_sha256": "9087f8800d35abe7f7cf5e7f40251dc6e8be776d8063fec6b4dd23159cad4fa9",
+        "after_sha256": "9c4a9455038c7d20b2497637aa014a12054492a8d0198fcf6e7dce26e3256a62",
+        "readback": "PASS",
+        "cap": null,
+        "native_model": null
+      },
+      {
+        "kind": "agents",
+        "id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+        "before_sha256": "f6145734f26e195a4239bccd12bab0e21e1822c4e6e97f6e27be0af335b1d621",
+        "after_sha256": "05a38beba5dfe8307dd369d738688ac26494c4e462f48c3ecb6d93401a5cc5b5",
+        "readback": "PASS",
+        "cap": 8,
+        "native_model": "gpt-6.1-sol"
+      },
+      {
+        "kind": "agents",
+        "id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+        "before_sha256": "ee182290a66074c5d5807bf617f91fb7524d620787403af3ad0ffb633572fb56",
+        "after_sha256": "1f304fb61fafcdc39c13d91c6a64caf33ad7a37de373ee06e4098ab7f692bdfc",
+        "readback": "PASS",
+        "cap": 8,
+        "native_model": "gpt-6.1-sol"
+      },
+      {
+        "kind": "agents",
+        "id": "027d102c-5d25-402c-a8fb-58a3e810013c",
+        "before_sha256": "03b728b936ae9107fe32c9fd60094033ac7dd87140460fe40760ae095550d6ca",
+        "after_sha256": "4260faae734aa9dc3f281e3c1fb5219146692a59bbee52ead752d95367924e2d",
+        "readback": "PASS",
+        "cap": 8,
+        "native_model": "gpt-6.1-sol"
+      }
+    ]
+  },
+  "diagnosis": {
+    "queue": {
+      "observed": "Eight comments submitted together; issued starts staggered, free daemon capacity; observed12 cap and8 role cap, resource_wait0",
+      "source": "Multica2ea01ae4e server/internal/service/task.go:4067 distinct-agent claim per batch; server/internal/daemon/daemon.go:5516 sleeps after partially filled batch",
+      "live_server_version": "v0.6.1",
+      "server_exact_sha": "NOT_OBSERVED",
+      "source_to_observation": "consistent, server exact source identity not independently verified",
+      "all_eight_running_overlap": "NOT_CONFIRMED"
+    },
+    "native_retry": {
+      "error": "Selected model is at capacity. Please try a different model.",
+      "observed_failure_reason": "agent_error.model_not_found_or_unavailable",
+      "attempt": 1,
+      "max_attempts": 2,
+      "automatic_retry": "none observed; category absent from source retryableReasons allowlist",
+      "source_classifier": "server/pkg/taskfailure/classify.go:252 matches selected model broadly",
+      "source_policy": "server/internal/service/task.go:5241 allowlist; :5431 MaybeRetryFailedTask excludes category",
+      "native_model_observed": "gpt-6.1-sol",
+      "internal_loginom_model_selection_unchanged": true,
+      "manual_stock_rerun": "01a11d86-5bff-7aae-a0e9-e70fc489444d",
+      "no_common_fix_applied": true
+    },
+    "admin_navigation": {
+      "LAB46": "Admin section collapsed; expanding revealed Users/Dispatcher; full qualification still pending",
+      "LAB47": "Own admin LoadPublishedFileNames exception observed; comparison reports Admin=true for root and own; Designer/Viewer differ; causality not established",
+      "root_last_session": "3109 logged_out per owner task, independent readback pending; own technical admin LAB46 assigned read-only verification, no root login or foreign close",
+      "old_own_admin_session": "3106 exact closure/refresh absence reported by owner task; receipt hash verification pending",
+      "source_or_permissions_fix": "not yet established"
+    }
+  },
+  "verified_fresh_blocker_attachment": {
+    "id": "01a11d84-12a2-78ec-8d34-dc17bf16bfbb",
+    "sha256": "7242dca9becfc3d7a7d111e4a0271e51caf845ad295b8dfdbbcce4ac0736ed73",
+    "bytes": 3148
+  },
+  "next_step": "Complete own root/admin cleanup diagnostics and independent readback. Do not schedule, create cards or launch Worker acceptance until debug is resolved under current owner instruction."
+}
