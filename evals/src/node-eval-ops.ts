@@ -681,6 +681,10 @@ export async function verifyBaselineStand(config: NodeOpsConfig, lease: NodeStan
     const summary = await Bun.file(path.join(runDir, "summary.json")).json() as RunSummary
     if (!Number.isFinite(Date.parse(summary.started_at)) || Date.parse(summary.started_at) < Date.parse(lease.acquiredAt) ||
       summary.harness?.dirty || !lease.sha.startsWith(summary.harness?.git_sha ?? "UNKNOWN")) throw new NodeOpsFailure("STALE_EVAL_PROOF")
+    if (execution.kind === "judge") {
+      await verifyProcesses(await Bun.file(path.join(runDir, "judge-process-cleanup.json")).json(), lease)
+      continue
+    }
     for (const task of summary.tasks) for (const attempt of task.attempts) {
       const out = path.join(runDir, task.id, String(attempt.attempt))
       for (const directory of [out, ...(attempt.infra_retry ? [path.join(out, "infra-error")] : [])]) {

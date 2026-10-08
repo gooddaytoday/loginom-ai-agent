@@ -8,6 +8,7 @@ import { parseArgs } from "node:util"
 import type { NodeOpsConfig, NodeStandLease } from "./node-eval-ops"
 import { dockSkillRevision } from "./preflight"
 import { compareCsv, parseCsv } from "./oracle"
+import type { AgentRun } from "./cli"
 
 export type BaselinePins = {
   mode: "live" | "fixture"; harnessSha: string; corpusSha: string; cliVersion: string; cliSource: string
@@ -21,7 +22,7 @@ export type BaselineManifest = { version: 1; id: string; kind: "baseline" | "smo
   infraRetries: 0 | 1
   cases: BaselineCase[]; jobs: { key: string; caseKey: string; attempt: number }[]
   smokeOracle?: { caseKey: string; inputSha256: string; expectedCsv: string } }
-type RecordedRun = { runDir: string; runId: string; files: { path: string; sha256: string }[]; measured: boolean; cleanup: boolean; verdict: "PASS" | "FAIL" | "ERROR" }
+type RecordedRun = { runDir: string; runId: string; files: { path: string; sha256: string }[]; measured: boolean; cleanup: boolean; verdict: "PASS" | "FAIL" | "ERROR"; judgeDurationMs?: number }
 type BaselineRow = { key: string; caseKey: string; attempt: number; collection: BaselineCollection; state: "pending" | "running" | "recorded"
   measured: boolean; cleanup: boolean; verdict: RecordedRun["verdict"] | null; runDir: string | null; result: AttemptResult | null }
 type BaselineExecution = { key: string; caseKey: string; attempt: number; kind: "product" | "judge"; record: RecordedRun; result: AttemptResult }
@@ -30,7 +31,7 @@ type RecoveryEvidence = { version: 1; baselineId: string; jobKey: string; execut
   kind: "infrastructure" | "judge"; cause: string; fix: { id: string; files: { path: string; sha256: string }[] }
   validation: { path: string; sha256: string }; taskId: string; runId: string }
 type BaselineRecovery = { id: string; kind: RecoveryEvidence["kind"]; state: "admitted" | "running" | "recorded"
-  sourceExecutionId: string; evidencePath: string; evidenceSha256: string; evidenceFiles: { path: string; sha256: string }[]
+  sourceExecutionId: string; sourceRunDir: string; evidencePath: string; evidenceSha256: string; evidenceFiles: { path: string; sha256: string }[]
   cause: string; taskId: string; runId: string; record?: RecordedRun }
 type BaselineJournal = { version: 1; manifestSha256: string; checkout: string; release?: BaselineRelease
   jobs: { key: string; state: "pending" | "running" | "recorded"; dispatchedAt?: string; record?: RecordedRun; recoveries?: BaselineRecovery[] }[] }
@@ -243,7 +244,8 @@ export async function recordBaselineMeasurement(directory: string, key: string, 
     const root = recovery ? path.join(path.dirname(recovery.evidencePath), "runs") : path.join(directory, "measurements", key, "runs")
     if (await realpath(runDir) !== runDir || !runDir.startsWith(root + path.sep)) throw new BaselineFailure("RUN_PATH_REFUSED")
     const item = manifest.cases.find(item => item.key === manifest.jobs.find(job => job.key === key)!.caseKey)!
-    const record = await inspectMeasurement(manifest, item, journal.checkout, runDir)
+    const inspected = await inspectMeasurement(manifest, item, journal.checkout, runDir)
+    const record = recovery?.kind === "judge" ? await inspectJudgeRecovery(job, recovery, runDir, inspected, item.id) : inspected
     if (recovery) { recovery.record = record; recovery.state = "recorded" }
     if (!recovery) { job.record = record; job.state = "recorded" }
     await atomicJournal(directory, journal)
@@ -293,8 +295,10 @@ export async function checkBaseline(directory: string) {
   const spending = { duration_ms: spent.reduce((sum, item) => sum + item.result.duration_ms, 0),
     cost: spent.reduce((sum, item) => sum + item.result.cost, 0),
     tokens: { input: spent.reduce((sum, item) => sum + item.result.tokens.input, 0), output: spent.reduce((sum, item) => sum + item.result.tokens.output, 0),
-      reasoning: spent.reduce((sum, item) => sum + item.result.tokens.reasoning, 0) }, judge_tokens: null }
-  const infrastructure = spent.filter(item => ["infra_error", "harness_error", "interrupted"].includes(item.result.status) || item.result.judge_status === "error")
+      reasoning: spent.reduce((sum, item) => sum + item.result.tokens.reasoning, 0) }, judge_tokens: null,
+    judge_duration_ms: executions.filter(execution => execution.kind === "judge").reduce((sum, execution) => sum + (execution.record.judgeDurationMs ?? 0), 0) }
+  const infrastructure = [...spent, ...executions.filter(execution => execution.kind === "judge").map(execution => ({ execution, result: execution.result }))]
+    .filter(item => ["infra_error", "harness_error", "interrupted"].includes(item.result.status) || item.result.judge_status === "error")
     .map(item => ({ key: item.execution.key, caseKey: item.execution.caseKey, attempt: item.execution.attempt, executionId: item.execution.record.runId,
       phase: item.result === item.execution.result ? "final" : "infra-retry-initial", status: item.result.status, judge_status: item.result.judge_status }))
   const smokeVerification = manifest.kind === "smoke" ? await verifySmokeMeasurements(manifest, rows) : null
@@ -641,7 +645,7 @@ async function admitBaselineRecovery(directory: string, key: string, kind: strin
     })() : null
     const evidencePath = path.join(recoveryDir, "admission.json")
     await writeBaselineProof(evidencePath, JSON.stringify({ proof, validation, live }))
-    const recovery: BaselineRecovery = { id, kind: proof.kind, state: "admitted", sourceExecutionId: record.runId, evidencePath,
+    const recovery: BaselineRecovery = { id, kind: proof.kind, state: "admitted", sourceExecutionId: record.runId, sourceRunDir: record.runDir, evidencePath,
       evidenceSha256: baselineHash(await Bun.file(evidencePath).bytes()), evidenceFiles, cause: proof.cause, taskId: proof.taskId, runId: proof.runId }
     job.recoveries = [...job.recoveries ?? [], recovery]
     await atomicJournal(directory, journal)
@@ -661,6 +665,90 @@ function effectiveMeasurement(job: BaselineJournal["jobs"][number]) {
   return records.find(record => record.measured) ?? records.at(-1)
 }
 
+/** Runs only inside the reserved, supervised judge worker; never calls the product. */
+export async function judgeBaselineRecovery(directory: string, key: string, id: string, env: Record<string, string | undefined> = process.env) {
+  const { manifest, journal } = await readBaseline(directory)
+  const job = journal.jobs.find(job => job.key === key)
+  const recovery = job?.recoveries?.find(recovery => recovery.id === id)
+  const source = [job?.record, ...(job?.recoveries ?? []).map(recovery => recovery.record)].find(record => record?.runDir === recovery?.sourceRunDir && record?.runId === recovery?.sourceExecutionId)
+  if (journal.release || !job || !recovery || recovery.kind !== "judge" || recovery.state !== "running" || !source || source.measured ||
+    journal.jobs.find(job => !effectiveMeasurement(job)?.measured) !== job) throw new BaselineFailure("RECOVERY_SLOT_INELIGIBLE")
+  if (JSON.stringify(await snapshotDirectory(source.runDir)) !== JSON.stringify(source.files)) throw new BaselineFailure("EVIDENCE_CHANGED")
+  const expected = manifest.jobs.find(job => job.key === key)!
+  const item = manifest.cases.find(item => item.key === expected.caseKey)!
+  if (item.collection === "node" || JSON.stringify(await snapshotDirectory(path.join(journal.checkout, "evals", item.directory))) !== JSON.stringify(item.files))
+    throw new BaselineFailure("CORPUS_CHANGED")
+  if (manifest.pins.mode === "live") {
+    const config = await readPrivateBaselineJson(path.join(directory, "ops-config.json")) as NodeOpsConfig
+    if (JSON.stringify(await captureBaselinePins(config, env)) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
+  }
+  if (manifest.pins.mode === "fixture" && (env.EVAL_BASELINE_FIXTURE !== "1" || env.EVAL_CLI_MODE !== "fake" ||
+    !env.EVAL_JUDGE_COMMAND?.split(" ").includes(path.join(journal.checkout, "evals/fixtures/fake-codex.ts")))) throw new BaselineFailure("FIXTURE_JUDGE_REQUIRED")
+  const parent = path.dirname(recovery.evidencePath)
+  await writeFile(path.join(parent, "harness-process.json"), JSON.stringify({ pid: process.pid, starttime: await processStarttime(process.pid), uid: process.getuid?.() }), { flag: "wx", mode: 0o600 })
+  const previous = await Bun.file(path.join(source.runDir, "summary.json")).json() as RunSummary
+  const result = previous.tasks[0]!.attempts[0]!
+  if (!source.cleanup || !["completed", "failed", "timeout"].includes(result.status) || result.judge_status !== "error" || !result.package_path)
+    throw new BaselineFailure("RECOVERY_SLOT_INELIGIBLE")
+  const { loadConfig } = await import("./config")
+  const config = loadConfig(["--judge-only", source.runId], env)
+  const { judgeInfo, judgeTask, judgedFields } = await import("./judge")
+  const judge = await judgeInfo(config)
+  if (judge.model !== manifest.pins.judgeModel || judge.reasoning !== manifest.pins.judgeReasoning || manifest.pins.mode === "live" &&
+    (judge.prompt_sha256 !== manifest.pins.promptSha256 || judge.schema_sha256 !== manifest.pins.schemaSha256)) throw new BaselineFailure("JUDGE_PINS_CHANGED")
+  const task = (await loadTasks(path.join(journal.checkout, "evals", path.dirname(item.directory)), [item.id]))[0]!
+  const runDir = path.join(parent, "runs", `judge-${id}`)
+  await mkdir(runDir, { mode: 0o700 })
+  const out = path.join(runDir, item.id, "1")
+  const original = path.join(source.runDir, item.id, "1")
+  for (const relative of ["artifact", "run.json", "prompt.txt", "cleanup.json", ...(result.infra_retry ? ["infra-error/cleanup.json"] : [])]) {
+    await mkdir(path.dirname(path.join(out, relative)), { recursive: true, mode: 0o700 })
+    await cp(path.join(original, relative), path.join(out, relative), { recursive: true, force: false, errorOnExist: true })
+  }
+  if (await Bun.file(path.join(source.runDir, "config.json")).exists()) await cp(path.join(source.runDir, "config.json"), path.join(runDir, "config.json"), { errorOnExist: true })
+  const started = Date.now()
+  const controller = new AbortController()
+  const stop = () => controller.abort()
+  process.on("SIGINT", stop)
+  process.on("SIGTERM", stop)
+  const judged = await (async () => {
+    try { return await judgeTask({ task, run: await Bun.file(path.join(out, "run.json")).json() as AgentRun,
+      artifactDir: path.join(out, "artifact"), prompt: await Bun.file(path.join(out, "prompt.txt")).text(), outDir: path.join(out, "judge"),
+      judge: { command: config.judge.command, model: manifest.pins.judgeModel, reasoning: manifest.pins.judgeReasoning,
+        timeoutMs: manifest.pins.judgeTimeoutMs, passThreshold: manifest.pins.threshold }, signal: controller.signal }) }
+    catch { return { ok: false as const, error: "JUDGE_OPERATION_FAILED", attempts: 0 as const } }
+    finally { process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop) }
+  })()
+  const { evaluationContractHash } = await import("./evaluation")
+  const { rubricHash } = await import("./task")
+  const rubric = await rubricHash([task])
+  if (manifest.pins.mode === "live" && previous.rubric_hash !== rubric) throw new BaselineFailure("MEASUREMENT_LINEAGE_CHANGED")
+  const updated: AttemptResult = { ...result, ...judgedFields(judged), evaluation_contract_hash: evaluationContractHash({ rubric_hash: rubric, judge, pass_threshold: manifest.pins.threshold }) }
+  await writeFile(path.join(out, "result.json"), JSON.stringify(updated), { flag: "wx", mode: 0o600 })
+  await writeFile(path.join(runDir, "judge-recovery.json"), JSON.stringify({ version: 1, sourceRunId: source.runId, sourceFilesSha256: baselineHash(JSON.stringify(source.files)),
+    artifactSha256: baselineHash(await Bun.file(path.join(out, "artifact/package.lgp")).bytes()), durationMs: Date.now() - started }), { flag: "wx", mode: 0o600 })
+  await writeFile(path.join(runDir, "summary.json"), JSON.stringify({ ...previous, run_id: `judge-${id}`, started_at: new Date(started).toISOString(), finished_at: new Date().toISOString(),
+    interrupted: controller.signal.aborted, stopped_reason: controller.signal.aborted ? "JUDGE_RECOVERY_INTERRUPTED" : null, judge, rubric_hash: rubric,
+    metrics: aggregate([updated], false), tasks: [{ ...previous.tasks[0]!, attempts: [updated], metrics: aggregateTask([updated], false) }] }), { flag: "wx", mode: 0o600 })
+  return { code: 0, status: judged.ok ? "SCORED" : "JUDGE_ERROR" }
+}
+
+async function inspectJudgeRecovery(job: BaselineJournal["jobs"][number], recovery: BaselineRecovery, runDir: string, record: RecordedRun, taskId: string) {
+  const source = [job.record, ...(job.recoveries ?? []).map(recovery => recovery.record)].find(record => record?.runDir === recovery.sourceRunDir && record?.runId === recovery.sourceExecutionId)
+  const metadata = await Bun.file(path.join(runDir, "judge-recovery.json")).json() as { version: number; sourceRunId: string; sourceFilesSha256: string; artifactSha256: string; durationMs: number }
+  if (!source || metadata.version !== 1 || metadata.sourceRunId !== source.runId || metadata.sourceFilesSha256 !== baselineHash(JSON.stringify(source.files)) ||
+    !Number.isFinite(metadata.durationMs) || metadata.durationMs < 0 || metadata.artifactSha256 !== baselineHash(await Bun.file(path.join(source.runDir, taskId, "1/artifact/package.lgp")).bytes()) ||
+    metadata.artifactSha256 !== baselineHash(await Bun.file(path.join(runDir, taskId, "1/artifact/package.lgp")).bytes())) throw new BaselineFailure("JUDGE_ARTIFACT_CHANGED")
+  const previous = (await Bun.file(path.join(source.runDir, "summary.json")).json() as RunSummary).tasks[0]!.attempts[0]!
+  const current = (await Bun.file(path.join(runDir, "summary.json")).json() as RunSummary).tasks[0]!.attempts[0]!
+  const product = (result: AttemptResult) => JSON.stringify([result.status, result.duration_ms, result.cost, result.tokens, result.package_path, result.infra_retry])
+  if (product(previous) !== product(current)) throw new BaselineFailure("JUDGE_PRODUCT_CHANGED")
+  const processes = await Bun.file(path.join(runDir, "judge-process-cleanup.json")).json()
+  const cleanup = record.cleanup && source.cleanup && processes.status === "confirmed" && !processes.error && processes.capture_complete === true &&
+    !processes.unknownProcesses?.length && processes.verification?.length >= 2 && processes.verification.every((pass: { owned_remaining: number }) => pass.owned_remaining === 0)
+  return { ...record, cleanup, judgeDurationMs: metadata.durationMs }
+}
+
 async function beginBaselineRecovery(directory: string, key: string, id: string, current: { checkout: string; pins: BaselinePins }) {
   return mutateBaseline(directory, async (manifest, journal) => {
     if (journal.release) throw new BaselineFailure("SERIES_RELEASED")
@@ -673,13 +761,12 @@ async function beginBaselineRecovery(directory: string, key: string, id: string,
       journal.jobs.find(job => !effectiveMeasurement(job)?.measured) !== job) throw new BaselineFailure("RECOVERY_SLOT_INELIGIBLE")
     const report = await checkBaseline(directory)
     if (report.coverage.unknown || !report.cleanup) throw new BaselineFailure("CLEANUP_UNKNOWN")
-    if (recovery.kind === "judge") throw new BaselineFailure("JUDGE_RECOVERY_NOT_READY")
     const resultsDir = path.join(path.dirname(recovery.evidencePath), "runs")
     await mkdir(resultsDir, { mode: 0o700 })
     recovery.state = "running"
     await atomicJournal(directory, journal)
     const expected = manifest.jobs.find(job => job.key === key)!
-    return { resultsDir, job: expected, case: manifest.cases.find(item => item.key === expected.caseKey)! }
+    return { resultsDir, job: expected, case: manifest.cases.find(item => item.key === expected.caseKey)!, kind: recovery.kind }
   })
 }
 
@@ -687,6 +774,29 @@ async function dispatchBaselineJob(directory: string, key: string, current: { ch
   const { manifest } = await readBaseline(directory)
   const admitted = recoveryId ? await beginBaselineRecovery(directory, key, recoveryId, current) : await beginBaselineMeasurement(directory, key, current)
   const parent = path.dirname(admitted.resultsDir)
+  if ("kind" in admitted && admitted.kind === "judge") {
+    const { superviseProcess } = await import("./process-supervisor")
+    await mkdir(path.join(parent, "judge-processes"), { mode: 0o700 })
+    const controller = new AbortController()
+    const stop = () => controller.abort()
+    process.on("SIGINT", stop)
+    process.on("SIGTERM", stop)
+    const supervised = await (async () => {
+      try { return await superviseProcess({ cmd: [process.execPath, path.join(current.checkout, "evals/script/judge-baseline-recovery.ts"), directory, key, recoveryId!],
+        cwd: path.join(current.checkout, "evals"), env: Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined)),
+        outDir: path.join(parent, "judge-processes"), timeoutMs: current.pins.judgeTimeoutMs * 2 + 60_000, signal: controller.signal }) }
+      finally { process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop) }
+    })()
+    const runs = (await readdir(admitted.resultsDir, { withFileTypes: true })).filter(item => item.isDirectory())
+    if (runs.length !== 1 || !await Bun.file(path.join(admitted.resultsDir, runs[0]!.name, "summary.json")).exists())
+      throw new BaselineFailure("UNKNOWN_OUTCOME_REQUIRES_RECOVERY")
+    const runDir = path.join(admitted.resultsDir, runs[0]!.name)
+    await writeBaselineProof(path.join(runDir, "judge-process-cleanup.json"), JSON.stringify(supervised.processCleanup))
+    const record = await recordBaselineMeasurement(directory, key, runDir, recoveryId)
+    if (!record.cleanup) throw new BaselineFailure("CLEANUP_UNKNOWN")
+    if (supervised.interrupted) throw new BaselineFailure("SERIES_STOPPED_WITH_RETAINED_STAND")
+    return record
+  }
   const script = admitted.case.collection === "node" ? "script/run-node-evals.ts" : "src/run.ts"
   const argv = [process.execPath, path.join(current.checkout, "evals", script), "--tasks", path.join(current.checkout, "evals", path.dirname(admitted.case.directory)),
     "--only", admitted.case.id, "--repeat", "1", "--infra-retries", String(manifest.infraRetries), "--timeout-ms", String(current.pins.timeoutMs), "--label", key]
@@ -788,8 +898,8 @@ async function exportBaselineReport(directory: string, reportDir: string, report
   for (const execution of report.executions) {
     const recovery = report.recoveries.find(recovery => recovery.record?.runDir === execution.record.runDir)
     for (const item of execution.record.files) {
-      if (!/^(summary\.json|config\.json|report\.md|code-verdict\.json|code-report\.md)$/.test(item.path) &&
-        !/^[^/]+\/1\/(?:infra-error\/)?(?:verdict(?:\.prev)?\.json|oracle\.json|artifact\/package\.lgp|artifact\/results\/[^/]+\.csv)$/.test(item.path)) continue
+      if (!/^(summary\.json|config\.json|report\.md|code-verdict\.json|code-report\.md|judge-recovery\.json)$/.test(item.path) &&
+        !/^[^/]+\/1\/(?:infra-error\/)?(?:judge\/verdict\.json|verdict(?:\.prev)?\.json|oracle\.json|artifact\/package\.lgp|artifact\/results\/[^/]+\.csv)$/.test(item.path)) continue
       selected.push({ source: path.join(execution.record.runDir, item.path), target: `measurements/${execution.key}${recovery ? `/recoveries/${recovery.id}` : ""}/${item.path}` })
     }
   }

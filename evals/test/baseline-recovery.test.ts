@@ -6,7 +6,7 @@ import { baselineHash, beginBaselineMeasurement, checkBaseline, prepareBaseline,
 import { baselineFixturePins } from "../fixtures/baseline"
 import { evalsRoot, repoRoot } from "../src/config"
 
-async function recoveryFixture(outcome: Record<string, unknown> = {}) {
+async function recoveryFixture(outcome: Record<string, unknown> = {}, kind: "infrastructure" | "judge" = "infrastructure") {
   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-recovery-"))
   const series = path.join(directory, "series")
   const manifest = await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins })
@@ -18,6 +18,15 @@ async function recoveryFixture(outcome: Record<string, unknown> = {}) {
       environment_cleanup: { status: "confirmed" }, tokens: { input: 2, output: 1, reasoning: 0 }, counters: { toolCalls: 0, toolErrors: 0, memoryToolCalls: 0 }, duration_ms: 10, cost: 0.01, ...outcome }] }] }))
   await Bun.write(path.join(run, admitted.case.id, "1/cleanup.json"), JSON.stringify({ result: { status: "confirmed" }, processes: { status: "confirmed" },
     stages: ["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].map(stage => ({ stage, status: "confirmed" })) }))
+  if (kind === "judge") {
+    const out = path.join(run, admitted.case.id, "1")
+    await mkdir(path.join(out, "artifact/unpacked"), { recursive: true, mode: 0o700 })
+    await Bun.write(path.join(out, "artifact/package.lgp"), await Bun.file(path.join(evalsRoot, "tasks/calc-data-double/reference.lgp")).bytes())
+    await Bun.$`unzip -q ${path.join(out, "artifact/package.lgp")} -d ${path.join(out, "artifact/unpacked")}`.quiet()
+    await Bun.write(path.join(out, "run.json"), JSON.stringify({ finalText: "Fixture Double artifact", tools: [], nodeReceipts: [], nodeReceiptsDropped: 0 }))
+    await Bun.write(path.join(out, "prompt.txt"), "Compute Double = Amount * 2.")
+    await Bun.write(path.join(out, "judge/verdict.json"), "initial judge unavailable")
+  }
   const record = await recordBaselineMeasurement(series, job.key, run)
   const fixed = path.join(directory, "fixed.json")
   await Bun.write(fixed, JSON.stringify({ fixtureEndpointRestored: true }))
@@ -30,12 +39,12 @@ async function recoveryFixture(outcome: Record<string, unknown> = {}) {
   await chmod(validation, 0o600)
   const evidence = path.join(directory, "recovery.json")
   const proof = { version: 1, baselineId: manifest.id, jobKey: job.key, executionId: record.runId,
-    executionFilesSha256: baselineHash(JSON.stringify(record.files)), kind: "infrastructure", cause: "fixture endpoint unavailable", fix,
+    executionFilesSha256: baselineHash(JSON.stringify(record.files)), kind, cause: "fixture endpoint unavailable", fix,
     validation: { path: validation, sha256: baselineHash(await Bun.file(validation).bytes()) }, taskId: "fixture-task", runId: "fixture-run" }
   await Bun.write(evidence, JSON.stringify(proof))
   await chmod(evidence, 0o600)
   const env = { EVAL_BASELINE_FIXTURE: "1", EVAL_CLI_MODE: "fake", EVAL_ARTIFACT_SOURCE: "dir:/fixture" }
-  const argv = ["recover-measurement", "--series", series, "--job", job.key, "--kind", "infrastructure", "--evidence", evidence]
+  const argv = ["recover-measurement", "--series", series, "--job", job.key, "--kind", kind, "--evidence", evidence]
   return { directory, series, manifest, job, run, evidence, proof, env, argv }
 }
 
@@ -180,3 +189,41 @@ test("a measured product with failed cleanup cannot admit the next case", async 
     expect((await checkBaseline(fixture.series)).coverage).toMatchObject({ recorded: 1, measured: 1, pending: 143, unknown: 0 })
   } finally { await rm(fixture.directory, { recursive: true, force: true }) }
 })
+
+test("judge recovery scores the original artifact once without product execution or rewriting its evidence", async () => {
+  const fixture = await recoveryFixture({ status: "completed", judge_status: "error", package_path: "/user/fixture.lgp" }, "judge")
+  try {
+    const out = path.join(fixture.run, "calc-data-double/1")
+    const before = await Bun.file(path.join(fixture.run, "summary.json")).text()
+    const artifactHash = baselineHash(await Bun.file(path.join(out, "artifact/package.lgp")).bytes())
+    const failures = path.join(fixture.directory, "judge-failures.json")
+    const task = await Bun.file(path.join(evalsRoot, "tasks/calc-data-double/task.json")).json()
+    await Bun.write(failures, JSON.stringify({ "1": task.checklist.map((item: { id: string }) => item.id) }))
+    const productCalls = path.join(fixture.directory, "unexpected-product.json")
+    const env = { ...fixture.env, PATH: Bun.env.PATH, EVAL_FAKE_ARGS_FILE: productCalls,
+      EVAL_JUDGE_COMMAND: `${Bun.which("bun")} ${path.join(evalsRoot, "fixtures/fake-codex.ts")} --failed-by-case ${failures}`,
+      JUDGE_MODEL: "gpt-6-astra", JUDGE_REASONING: "high" }
+    expect(await runBaseline(fixture.argv, fixture.env)).toMatchObject({ code: 0, status: "RECOVERY_ADMITTED" })
+    expect(await runBaseline(["resume", "--series", fixture.series, "--limit", "1"], env)).toMatchObject({ code: 0, recorded: 1, measured: 1, pending: 143 })
+    const report = await checkBaseline(fixture.series)
+    expect(report.executions.map(execution => execution.kind)).toEqual(["product", "judge"])
+    expect(report.rows[0]!.result).toMatchObject({ status: "completed", judge_status: "scored", score: 0, pass: false })
+    expect(report.cleanup).toBe(true)
+    expect(report.spending).toMatchObject({ cost: 0.01, tokens: { input: 2, output: 1 }, judge_tokens: null })
+    expect(report.spending.judge_duration_ms).toBeGreaterThan(0)
+    expect(report.infrastructure).toHaveLength(1)
+    expect(await Bun.file(productCalls).exists()).toBe(false)
+    expect(await Bun.file(path.join(fixture.run, "summary.json")).text()).toBe(before)
+    expect(await Bun.file(path.join(out, "judge/verdict.json")).text()).toBe("initial judge unavailable")
+    expect(baselineHash(await Bun.file(path.join(report.rows[0]!.runDir!, "calc-data-double/1/artifact/package.lgp")).bytes())).toBe(artifactHash)
+    const changed = { ...fixture.proof, fix: { ...fixture.proof.fix, id: "seek-better-score" } }
+    await Bun.write(fixture.evidence, JSON.stringify(changed))
+    expect(await runBaseline(fixture.argv, fixture.env)).toMatchObject({ code: 2, reason: "RECOVERY_SLOT_INELIGIBLE" })
+    expect((await checkBaseline(fixture.series)).executions).toHaveLength(2)
+    const exported = await runBaseline(["check", "--series", fixture.series, "--export"], {})
+    expect(exported).toMatchObject({ code: 0 })
+    const manifest = JSON.parse((await Bun.$`tar -xOf ${String(exported.archive)} delivery-manifest.json`.quiet()).text()) as { files: { path: string }[] }
+    expect(manifest.files.filter(file => file.path.endsWith("/judge/verdict.json"))).toHaveLength(2)
+    expect(manifest.files.some(file => file.path.includes("judge-process-cleanup") || file.path.endsWith("admission.json") || file.path.endsWith(".data"))).toBe(false)
+  } finally { await rm(fixture.directory, { recursive: true, force: true }) }
+}, 60_000)
