@@ -13,7 +13,7 @@ import { observeWriterReleaseSettlement, registrationIdentity, verifyOwnedRegist
 import { validateNodeRun } from "./node-evals"
 import type { RunSummary } from "./report"
 import { archiveDiagnostics } from "./diagnostics"
-import { checkBaseline } from "./baseline"
+import { baselineHash, checkBaseline } from "./baseline"
 
 type OfflinePaths = { checkout: string; workRoots: string[]; resultsRoot: string }
 type RolePaths = OfflinePaths & { referenceProfile: string; evalProfile: string; cliBin?: string }
@@ -642,7 +642,9 @@ async function verifyCompletion(config: NodeOpsConfig, lease: NodeStandLease, co
     const cleanup = await Bun.file(completion.processEvidence).json()
     if (continued && (cleanup.operation !== "LAB-31-owned-registration-v1" || cleanup.processes?.observation_mode !== "writer_release_settlement"))
       throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
-    await verifyWriterReleaseSettlement(config, lease, cleanup, completion.processEvidence)
+    const original = await verifyWriterReleaseSettlement(config, lease, cleanup, completion.processEvidence)
+    if (lease.role === "evalbaseline" && (!completion.execution || path.join(completion.execution.runDir, completion.execution.cleanupPath) !== (original ?? completion.processEvidence)))
+      throw new NodeOpsFailure("BASELINE_EXECUTION_UNKNOWN")
     await verifyProcesses(cleanup.processes ?? cleanup, lease)
     await verifyHistoryArchive(nodeProfile(config, lease.role, completion.profile), completion.historyArchive)
     return
@@ -714,6 +716,12 @@ export async function verifyBaselineStand(config: NodeOpsConfig, lease: NodeStan
   if (git.sha !== lease.sha || git.dirty || report.manifest.pins.harnessSha !== git.sha) throw new NodeOpsFailure("STALE_EVAL_PROOF")
   for (const execution of report.executions) {
     const runDir = execution.record.runDir
+    const resolution = report.cleanupResolutions.find(resolution => resolution.runDir === runDir)
+    const repaired = resolution ? await readPrivateJson(resolution.evidencePath) as { live?: { owner: NodeStandOwner; acquiredAt: string; configSha256: string;
+      execution: BaselineCleanupExecution; processes: ProcessCleanup; historyArchive: string } } : undefined
+    if (resolution && (!repaired?.live || !ownerMatches(repaired.live.owner, lease) || repaired.live.acquiredAt !== lease.acquiredAt ||
+      repaired.live.configSha256 !== lease.configSha256 || repaired.live.execution.seriesDir !== seriesDir || repaired.live.execution.runDir !== runDir))
+      throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
     await evidencePath(config, lease, runDir)
     const summary = await Bun.file(path.join(runDir, "summary.json")).json() as RunSummary
     if (!Number.isFinite(Date.parse(summary.started_at)) || Date.parse(summary.started_at) < Date.parse(lease.acquiredAt) ||
@@ -725,6 +733,11 @@ export async function verifyBaselineStand(config: NodeOpsConfig, lease: NodeStan
     for (const task of summary.tasks) for (const attempt of task.attempts) {
       const out = path.join(runDir, task.id, String(attempt.attempt))
       for (const directory of [out, ...(attempt.infra_retry ? [path.join(out, "infra-error")] : [])]) {
+        if (repaired?.live && path.join(runDir, repaired.live.execution.cleanupPath) === path.join(directory, "cleanup.json")) {
+          await verifyProcesses(repaired.live.processes, lease)
+          await verifyHistoryArchive(nodeRole(config, lease.role).evalProfile, repaired.live.historyArchive)
+          continue
+        }
         const cleanup = await Bun.file(path.join(directory, "cleanup.json")).json()
         await verifyProcesses(cleanup.processes, lease)
         await verifyHistoryArchive(nodeRole(config, lease.role).evalProfile,
@@ -738,6 +751,34 @@ export async function verifyBaselineStand(config: NodeOpsConfig, lease: NodeStan
   await assertBrowsersClosed()
   if ((await assertIsolatedStorageEmpty(source(config))).containerId !== lease.containerId) throw new NodeOpsFailure("CONTAINER_CHANGED")
   return { status: "SAFE", measured: report.coverage.measured, expected: report.coverage.expected }
+}
+
+export async function verifyBaselineCleanupRecovery(config: NodeOpsConfig, lease: NodeStandLease, seriesDir: string, evidence: string) {
+  return exclusive(config, lease, async () => {
+    if (lease.role !== "evalbaseline") throw new NodeOpsFailure("BASELINE_ROLE_REQUIRED")
+    await assertOriginalAdmission(config, lease)
+    const completion = await readCompletion(config, lease, evidence)
+    if (completion.kind !== "recovery" || completion.profile !== "eval" || !completion.execution || completion.execution.seriesDir !== seriesDir)
+      throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
+    await verifyCompletion(config, lease, completion, evidence)
+    const report = await checkBaseline(seriesDir)
+    const recorded = report.executions.find(execution => execution.kind === "product" && execution.record.runDir === completion.execution!.runDir)
+    if (!recorded) throw new NodeOpsFailure("BASELINE_EXECUTION_UNKNOWN")
+    for (const file of recorded.record.files.filter(file => /^[^/]+\/1\/(?:infra-error\/)?cleanup\.json$/.test(file.path))) {
+      if (file.path === completion.execution.cleanupPath) continue
+      const cleanup = await Bun.file(path.join(recorded.record.runDir, file.path)).json()
+      await verifyProcesses(cleanup.processes, lease)
+      await verifyHistoryArchive(nodeRole(config, lease.role).evalProfile, cleanup.stages.find((stage: { stage: string }) => stage.stage === "profile_history")?.path)
+      if (cleanup.result?.status !== "confirmed" || !["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].every(stage =>
+        cleanup.stages.some((item: { stage: string; status: string }) => item.stage === stage && item.status === "confirmed"))) throw new NodeOpsFailure("BASELINE_CLEANUP_UNKNOWN")
+    }
+    await assertAllProfilesClean(config, nodeRole(config, lease.role).evalProfile)
+    await assertBrowsersClosed()
+    if ((await assertIsolatedStorageEmpty(source(config))).containerId !== lease.containerId) throw new NodeOpsFailure("CONTAINER_CHANGED")
+    const proof = await Bun.file(completion.processEvidence).json()
+    return { owner: ownerOf(lease), acquiredAt: lease.acquiredAt, configSha256: lease.configSha256, execution: completion.execution,
+      executionFilesSha256: baselineHash(JSON.stringify(recorded.record.files)), historyArchive: completion.historyArchive, processes: (proof.processes ?? proof) as ProcessCleanup }
+  })
 }
 
 async function verifyProcesses(processes: ProcessCleanup, lease: NodeStandLease, trustedUnit = false) {

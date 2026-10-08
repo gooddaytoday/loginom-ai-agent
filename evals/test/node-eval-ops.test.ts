@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, copyFile, cp, mkdir, mkdtemp, rename, rm, stat, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, ownedRecoveryEntry, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, reserveOwnedRegistrationContinuation, runNodeEvalOps, runNodeUnitChecks, settleNodeWriterRelease, nodeRoleCli, verifyBaselineStand, type NodeOpsConfig } from "../src/node-eval-ops"
+import { acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, ownedRecoveryEntry, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, reserveOwnedRegistrationContinuation, runNodeEvalOps, runNodeUnitChecks, settleNodeWriterRelease, nodeRoleCli, verifyBaselineStand, verifyBaselineCleanupRecovery, type NodeOpsConfig } from "../src/node-eval-ops"
 import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement } from "../src/baseline"
 import { repoRoot } from "../src/config"
 import { baselineFixturePins } from "../fixtures/baseline"
@@ -39,6 +39,8 @@ test("v2 eval-only baseline role shares the stand while preserving independent w
     await expect(acquireNodeStand(config, owner)).rejects.toThrow("BUSY")
     await expect(acquireNodeStand(config, { ...owner, role: "ben" })).rejects.toThrow("BUSY")
     await expect(assertNodeStandOwner(config, { ...lease, role: "rich" })).rejects.toThrow("LEASE_OWNER_CHANGED")
+    await expect(verifyBaselineCleanupRecovery(config, lease, path.join(baseline.resultsRoot, "series"), path.join(baseline.workRoots[0]!, "receipt.json")))
+      .rejects.toThrow("ADMISSION_PROOF_REQUIRED")
     await expect(preflightNodeStand(config, lease, {})).rejects.toThrow()
     expect((await nodeStandStatus(config)).status).toBe("BUSY")
   } finally { await fixture.dispose() }

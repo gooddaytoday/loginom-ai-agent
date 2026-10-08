@@ -5,7 +5,8 @@ import { loadTasks } from "./task"
 import { aggregate, aggregateTask, type AttemptResult, type RunSummary } from "./report"
 import { validateNodeRun } from "./node-evals"
 import { parseArgs } from "node:util"
-import type { NodeOpsConfig, NodeStandLease } from "./node-eval-ops"
+import type { BaselineCleanupExecution, NodeOpsConfig, NodeStandLease, NodeStandOwner } from "./node-eval-ops"
+import type { ProcessCleanup } from "./process-supervisor"
 import { dockSkillRevision } from "./preflight"
 import { compareCsv, parseCsv } from "./oracle"
 import type { AgentRun } from "./cli"
@@ -33,7 +34,11 @@ type RecoveryEvidence = { version: 1; baselineId: string; jobKey: string; execut
 type BaselineRecovery = { id: string; kind: RecoveryEvidence["kind"]; state: "admitted" | "running" | "recorded"
   sourceExecutionId: string; sourceRunDir: string; evidencePath: string; evidenceSha256: string; evidenceFiles: { path: string; sha256: string }[]
   cause: string; taskId: string; runId: string; record?: RecordedRun }
-type BaselineJournal = { version: 1; manifestSha256: string; checkout: string; release?: BaselineRelease
+type CleanupResolutionProof = { version: 1; mode: BaselinePins["mode"]; baselineId: string; runDir: string; executionFilesSha256: string; pinsSha256: string;
+  status: "CONFIRMED"; modelCalls: 0; live?: { owner: NodeStandOwner; acquiredAt: string; configSha256: string; execution: BaselineCleanupExecution;
+    historyArchive: string; processes: ProcessCleanup } }
+type CleanupResolution = { id: string; runDir: string; evidencePath: string; evidenceSha256: string }
+type BaselineJournal = { version: 1; manifestSha256: string; checkout: string; release?: BaselineRelease; cleanupResolutions?: CleanupResolution[]
   jobs: { key: string; state: "pending" | "running" | "recorded"; dispatchedAt?: string; record?: RecordedRun; recoveries?: BaselineRecovery[] }[] }
 type SmokeAdmission = { version: 1; issue: string; task: string; caseKey: string; seriesDir: string; baselineId: string; manifestSha256: string }
 
@@ -149,7 +154,7 @@ export async function beginBaselineMeasurement(directory: string, key: string, c
     if (!job) throw new BaselineFailure("UNKNOWN_JOB")
     if (job.state !== "pending") throw new BaselineFailure("ALREADY_DISPATCHED")
     if (journal.jobs.some(item => item.state === "running" || item.recoveries?.some(recovery => recovery.state === "running"))) throw new BaselineFailure("UNKNOWN_OUTCOME")
-    if (journal.jobs.some(item => item.record && !item.record.cleanup || item.recoveries?.some(recovery => recovery.record && !recovery.record.cleanup)))
+    if (!(await checkBaseline(directory)).cleanup)
       throw new BaselineFailure("CLEANUP_UNKNOWN")
     if (manifest.kind === "baseline" && journal.jobs.some(item => item.record && !effectiveMeasurement(item)?.measured)) throw new BaselineFailure("AWAITING_RECOVERY")
     if (journal.jobs.find(item => item.state === "pending") !== job) throw new BaselineFailure("ROUND_ORDER_CHANGED")
@@ -245,7 +250,7 @@ export async function recordBaselineMeasurement(directory: string, key: string, 
     if (await realpath(runDir) !== runDir || !runDir.startsWith(root + path.sep)) throw new BaselineFailure("RUN_PATH_REFUSED")
     const item = manifest.cases.find(item => item.key === manifest.jobs.find(job => job.key === key)!.caseKey)!
     const inspected = await inspectMeasurement(manifest, item, journal.checkout, runDir)
-    const record = recovery?.kind === "judge" ? await inspectJudgeRecovery(job, recovery, runDir, inspected, item.id) : inspected
+    const record = recovery?.kind === "judge" ? await inspectJudgeRecovery(manifest, journal, job, recovery, runDir, inspected, item.id) : inspected
     if (recovery) { recovery.record = record; recovery.state = "recorded" }
     if (!recovery) { job.record = record; job.state = "recorded" }
     await atomicJournal(directory, journal)
@@ -262,6 +267,13 @@ export async function checkBaseline(directory: string) {
   }
   const rows: BaselineRow[] = []
   const executions: BaselineExecution[] = []
+  const cleanupResolutions = journal.cleanupResolutions ?? []
+  const resolved = new Set<string>()
+  for (const resolution of cleanupResolutions) {
+    const record = journal.jobs.flatMap(job => [job.record, ...(job.recoveries ?? []).map(recovery => recovery.record)]).find(record => record?.runDir === resolution.runDir)
+    await readCleanupResolution(manifest, record, resolution)
+    resolved.add(resolution.runDir)
+  }
   const recoveries = journal.jobs.flatMap(job => (job.recoveries ?? []).map(recovery => ({ ...recovery, key: job.key })))
   for (const recovery of recoveries) for (const file of [{ path: recovery.evidencePath, sha256: recovery.evidenceSha256 }, ...recovery.evidenceFiles])
     if (baselineHash(await readPrivateBaselineBytes(file.path)) !== file.sha256) throw new BaselineFailure("RECOVERY_EVIDENCE_CHANGED")
@@ -278,7 +290,7 @@ export async function checkBaseline(directory: string) {
     }
     const record = effectiveMeasurement(job)
     if (!record) { rows.push({ ...expected, collection: item.collection, state, measured: false, cleanup: false, verdict: null, runDir: null, result: null }); continue }
-    rows.push({ ...expected, collection: item.collection, state, measured: record.measured, cleanup: records.every(execution => execution.record.cleanup),
+    rows.push({ ...expected, collection: item.collection, state, measured: record.measured, cleanup: records.every(execution => execution.record.cleanup || resolved.has(execution.record.runDir)),
       verdict: record.verdict, runDir: record.runDir, result: executions.find(execution => execution.record === record)!.result })
   }
   const coverage = { expected: manifest.jobs.length, recorded: rows.filter(row => row.state === "recorded").length,
@@ -311,11 +323,14 @@ export async function checkBaseline(directory: string) {
       phase: item.result === item.execution.result ? "final" : "infra-retry-initial", status: item.result.status, judge_status: item.result.judge_status })),
     ...judgeCalls.filter(item => !item.call.ok).map(item => ({ key: item.execution.key, caseKey: item.execution.caseKey, attempt: item.execution.attempt,
       executionId: item.execution.record.runId, phase: `judge-attempt-${item.call.attempt}`, status: item.execution.result.status,
-      judge_status: "error" as const, error: item.call.error, evidence: item.file }))]
+      judge_status: "error" as const, error: item.call.error, evidence: item.file })),
+    ...executions.filter(execution => !execution.record.cleanup).map(execution => ({ key: execution.key, caseKey: execution.caseKey, attempt: execution.attempt,
+      executionId: execution.record.runId, phase: "cleanup-original", status: execution.result.status, judge_status: execution.result.judge_status,
+      error: execution.result.cleanup_error ?? execution.result.environment_cleanup?.error ?? "CLEANUP_UNCONFIRMED", cleanup_resolved: resolved.has(execution.record.runDir) }))]
   const smokeVerification = manifest.kind === "smoke" ? await verifySmokeMeasurements(manifest, rows) : null
   return { id: manifest.id, kind: manifest.kind, status: journal.release?.abandoned ? "abandoned" : coverage.measured === coverage.expected && cleanup && journal.release && (smokeVerification?.verified ?? true) ? "complete" : "incomplete",
     abandoned: journal.release?.abandoned ?? null,
-    manifest, coverage, cleanup, released: Boolean(journal.release), groups, spending, infrastructure, smokeVerification, recoveries, executions,
+    manifest, coverage, cleanup, released: Boolean(journal.release), groups, spending, infrastructure, smokeVerification, recoveries, executions, cleanupResolutions,
     nodes: manifest.cases.filter(item => item.collection === "node").map(item => ({ id: item.id, expected: manifest.kind === "smoke" ? 1 : 3,
       passed: rows.filter(row => row.caseKey === item.key && row.verdict === "PASS").length,
       measured: rows.filter(row => row.caseKey === item.key && row.measured).length })), rows }
@@ -370,7 +385,7 @@ export async function sealBaselineRelease(directory: string, receipt: BaselineRe
       throw new BaselineFailure("ABANDON_REASON_REQUIRED")
     if (!receipt.abandoned && manifest.kind === "baseline" && journal.jobs.some(job => job.record && !effectiveMeasurement(job)?.measured)) throw new BaselineFailure("AWAITING_RECOVERY")
     if (receipt.status !== "RELEASED" || !/^[0-9a-f]{64}$/.test(receipt.evidenceSha256) ||
-      journal.jobs.some(job => job.state === "running" || job.record && !job.record.cleanup || job.recoveries?.some(recovery => recovery.state === "running" || recovery.record && !recovery.record.cleanup)))
+      !(await checkBaseline(directory)).cleanup)
       throw new BaselineFailure("RELEASE_UNCONFIRMED")
     if (manifest.pins.mode === "live") {
       const lease = await readPrivateBaselineJson(path.join(directory, "stand-handle.json")) as NodeStandLease
@@ -391,15 +406,78 @@ export async function sealBaselineRelease(directory: string, receipt: BaselineRe
   })
 }
 
+async function resolveBaselineCleanup(directory: string, evidence: string, env: Record<string, string | undefined>) {
+  return mutateBaseline(directory, async (manifest, journal) => {
+    if (journal.release) throw new BaselineFailure("SERIES_RELEASED")
+    if (await lstat(path.join(directory, "executor.lock")).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error }))
+      throw new BaselineFailure("EXECUTOR_REQUIRES_INSPECTION")
+    const report = await checkBaseline(directory)
+    if (report.coverage.unknown) throw new BaselineFailure("UNKNOWN_OUTCOME")
+    const input = await readPrivateBaselineBytes(evidence)
+    const id = baselineHash(input)
+    const previous = journal.cleanupResolutions?.find(resolution => resolution.id === id)
+    if (previous) return { code: 0, status: "CLEANUP_RESOLVED", resolutionId: id }
+    const proof = await (async () => {
+      if (manifest.pins.mode === "fixture") {
+        if (env.EVAL_BASELINE_FIXTURE !== "1" || env.EVAL_CLI_MODE !== "fake" || !env.EVAL_ARTIFACT_SOURCE?.startsWith("dir:")) throw new BaselineFailure("FIXTURE_MODE_REQUIRED")
+        return JSON.parse(new TextDecoder().decode(input)) as CleanupResolutionProof
+      }
+      const config = await readPrivateBaselineJson(path.join(directory, "ops-config.json")) as NodeOpsConfig
+      if (JSON.stringify(await captureBaselinePins(config, env)) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
+      const { verifyBaselineCleanupRecovery, NodeOpsFailure } = await import("./node-eval-ops")
+      const live = await verifyBaselineCleanupRecovery(config, await readPrivateBaselineJson(path.join(directory, "stand-handle.json")) as NodeStandLease, directory, evidence)
+        .catch(error => { throw error instanceof NodeOpsFailure ? new BaselineFailure(error.reason) : error })
+      return { version: 1 as const, mode: "live" as const, baselineId: manifest.id, runDir: live.execution.runDir,
+        executionFilesSha256: live.executionFilesSha256, pinsSha256: baselineHash(JSON.stringify(manifest.pins)), status: "CONFIRMED" as const, modelCalls: 0 as const, live }
+    })()
+    const source = report.executions.find(execution => execution.kind === "product" && execution.record.runDir === proof.runDir)
+    assertCleanupResolution(proof, manifest, source?.record)
+    if (!source || source.record.cleanup || journal.cleanupResolutions?.some(resolution => resolution.runDir === proof.runDir)) throw new BaselineFailure("CLEANUP_ALREADY_CONFIRMED")
+    const root = path.join(directory, "cleanup-resolutions")
+    await mkdir(root, { recursive: true, mode: 0o700 })
+    const evidencePath = path.join(root, `${id}.json`)
+    const raw = JSON.stringify(proof)
+    await writeBaselineProof(evidencePath, raw)
+    journal.cleanupResolutions = [...(journal.cleanupResolutions ?? []), { id, runDir: proof.runDir, evidencePath, evidenceSha256: baselineHash(raw) }]
+    await atomicJournal(directory, journal)
+    return { code: 0, status: "CLEANUP_RESOLVED", resolutionId: id }
+  })
+}
+
+function assertCleanupResolution(proof: CleanupResolutionProof, manifest: BaselineManifest, record: RecordedRun | undefined) {
+  if (!proof || !record || proof.version !== 1 || proof.mode !== manifest.pins.mode || proof.baselineId !== manifest.id || proof.runDir !== record.runDir ||
+    proof.status !== "CONFIRMED" || proof.modelCalls !== 0 || proof.executionFilesSha256 !== baselineHash(JSON.stringify(record.files)) ||
+    proof.pinsSha256 !== baselineHash(JSON.stringify(manifest.pins))) throw new BaselineFailure("CLEANUP_RESOLUTION_INVALID")
+  if (manifest.pins.mode === "fixture") return
+  const live = proof.live
+  if (!live || live.owner.role !== "evalbaseline" || live.owner.sha !== manifest.pins.harnessSha || live.configSha256 !== manifest.pins.opsConfigSha256 ||
+    live.execution.runDir !== record.runDir || !Number.isFinite(Date.parse(live.acquiredAt)) || live.processes.status !== "confirmed" || live.processes.error ||
+    !live.processes.capture_complete || live.processes.unknownProcesses?.length || !live.processes.verification || live.processes.verification.length < 2 ||
+    live.processes.verification.some(pass => pass.owned_remaining !== 0)) throw new BaselineFailure("CLEANUP_RESOLUTION_INVALID")
+}
+
+async function readCleanupResolution(manifest: BaselineManifest, record: RecordedRun | undefined, resolution: CleanupResolution) {
+  const raw = await readPrivateBaselineBytes(resolution.evidencePath)
+  if (baselineHash(raw) !== resolution.evidenceSha256) throw new BaselineFailure("CLEANUP_RESOLUTION_CHANGED")
+  const proof = JSON.parse(new TextDecoder().decode(raw)) as CleanupResolutionProof
+  assertCleanupResolution(proof, manifest, record)
+  if (proof.runDir !== resolution.runDir) throw new BaselineFailure("CLEANUP_RESOLUTION_INVALID")
+  return proof
+}
+
 export async function runBaseline(argv: string[], env: Record<string, string | undefined> = process.env): Promise<Record<string, unknown> & { code: number }> {
   try {
     const command = argv[0]
-    if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke|recover-measurement|abandon --series DIR [smoke: --case calc-data-double|crosstable-fixed-sum] [recover-measurement: --job KEY --kind infrastructure|judge --evidence PRIVATE_JSON] [abandon: --reason REASON --evidence RELEASE_JSON] [--config PRIVATE --issue ID --task ID] [check: --compare SERIES --export] [resume: --recover-executor after inspection]" }
+    if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke|recover-measurement|resolve-cleanup|abandon --series DIR [smoke: --case calc-data-double|crosstable-fixed-sum] [recover-measurement: --job KEY --kind infrastructure|judge --evidence PRIVATE_JSON] [resolve-cleanup: --evidence RECOVERY_COMPLETION_JSON] [abandon: --reason REASON --evidence RELEASE_JSON] [--config PRIVATE --issue ID --task ID] [check: --compare SERIES --export] [resume: --recover-executor after inspection]" }
     const values = parseArgs({ args: argv.slice(1), strict: true, options: { series: { type: "string" }, case: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, job: { type: "string" }, kind: { type: "string" }, reason: { type: "string" }, evidence: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" } } }).values
     const directory = values.series
     if (!directory || !path.isAbsolute(directory)) throw new BaselineFailure("SERIES_PATH_REQUIRED")
     if (command === "smoke") smokeCaseKey(values.case)
     if (command !== "smoke" && values.case !== undefined) throw new BaselineFailure("CASE_ONLY_FOR_SMOKE")
+    if (command === "resolve-cleanup") {
+      if (!values.evidence) throw new BaselineFailure("CLEANUP_RESOLUTION_REQUIRED")
+      return await resolveBaselineCleanup(directory, values.evidence, env)
+    }
     if (command === "abandon") {
       if (!values.reason?.trim() || values.reason.length > 1000) throw new BaselineFailure("ABANDON_REASON_REQUIRED")
       if (!values.evidence) throw new BaselineFailure("RELEASE_UNCONFIRMED")
@@ -584,7 +662,10 @@ async function settleBaselineHarness(config: NodeOpsConfig, lease: NodeStandLeas
   if (!last) throw new BaselineFailure("HARNESS_ADMISSION_MISSING")
   const result = await Bun.file(path.join(last.record.runDir, "summary.json")).json() as RunSummary
   const cleanup = await Bun.file(path.join(last.record.runDir, result.tasks[0]!.id, "1/cleanup.json")).json()
-  await retireRecordedHarnessLease(profile, path.join(path.dirname(path.dirname(last.record.runDir)), "harness-admission.json"), cleanup.processes)
+  const resolution = report.cleanupResolutions.find(resolution => resolution.runDir === last.record.runDir)
+  const proof = resolution ? await readCleanupResolution(report.manifest, last.record, resolution) : undefined
+  await retireRecordedHarnessLease(profile, path.join(path.dirname(path.dirname(last.record.runDir)), "harness-admission.json"),
+    proof?.live?.execution.cleanupPath === `${result.tasks[0]!.id}/1/cleanup.json` ? proof.live.processes : cleanup.processes)
 }
 
 async function readPrivateBaselineJson(file: string) {
@@ -724,7 +805,9 @@ export async function judgeBaselineRecovery(directory: string, key: string, id: 
   await writeFile(path.join(parent, "harness-process.json"), JSON.stringify({ pid: process.pid, starttime: await processStarttime(process.pid), uid: process.getuid?.() }), { flag: "wx", mode: 0o600 })
   const previous = await Bun.file(path.join(source.runDir, "summary.json")).json() as RunSummary
   const result = previous.tasks[0]!.attempts[0]!
-  if (!source.cleanup || !["completed", "failed", "timeout"].includes(result.status) || result.judge_status !== "error" || !result.package_path)
+  const resolution = journal.cleanupResolutions?.find(resolution => resolution.runDir === source.runDir)
+  const cleaned = source.cleanup || Boolean(resolution && await readCleanupResolution(manifest, source, resolution))
+  if (!cleaned || !["completed", "failed", "timeout"].includes(result.status) || result.judge_status !== "error" || !result.package_path)
     throw new BaselineFailure("RECOVERY_SLOT_INELIGIBLE")
   const { loadConfig } = await import("./config")
   const config = loadConfig(["--judge-only", source.runId], env)
@@ -769,7 +852,7 @@ export async function judgeBaselineRecovery(directory: string, key: string, id: 
   return { code: 0, status: judged.ok ? "SCORED" : "JUDGE_ERROR" }
 }
 
-async function inspectJudgeRecovery(job: BaselineJournal["jobs"][number], recovery: BaselineRecovery, runDir: string, record: RecordedRun, taskId: string) {
+async function inspectJudgeRecovery(manifest: BaselineManifest, journal: BaselineJournal, job: BaselineJournal["jobs"][number], recovery: BaselineRecovery, runDir: string, record: RecordedRun, taskId: string) {
   const source = [job.record, ...(job.recoveries ?? []).map(recovery => recovery.record)].find(record => record?.runDir === recovery.sourceRunDir && record?.runId === recovery.sourceExecutionId)
   const metadata = await Bun.file(path.join(runDir, "judge-recovery.json")).json() as { version: number; sourceRunId: string; sourceFilesSha256: string; artifactSha256: string; durationMs: number }
   if (!source || metadata.version !== 1 || metadata.sourceRunId !== source.runId || metadata.sourceFilesSha256 !== baselineHash(JSON.stringify(source.files)) ||
@@ -780,7 +863,9 @@ async function inspectJudgeRecovery(job: BaselineJournal["jobs"][number], recove
   const product = (result: AttemptResult) => JSON.stringify([result.status, result.duration_ms, result.cost, result.tokens, result.package_path, result.infra_retry])
   if (product(previous) !== product(current)) throw new BaselineFailure("JUDGE_PRODUCT_CHANGED")
   const processes = await Bun.file(path.join(runDir, "judge-process-cleanup.json")).json()
-  const cleanup = record.cleanup && source.cleanup && processes.status === "confirmed" && !processes.error && processes.capture_complete === true &&
+  const resolution = journal.cleanupResolutions?.find(resolution => resolution.runDir === source.runDir)
+  const cleaned = source.cleanup || Boolean(resolution && await readCleanupResolution(manifest, source, resolution))
+  const cleanup = cleaned && processes.status === "confirmed" && !processes.error && processes.capture_complete === true &&
     !processes.unknownProcesses?.length && processes.verification?.length >= 2 && processes.verification.every((pass: { owned_remaining: number }) => pass.owned_remaining === 0)
   return { ...record, cleanup, judgeDurationMs: metadata.durationMs }
 }

@@ -48,6 +48,16 @@ async function recoveryFixture(outcome: Record<string, unknown> = {}, kind: "inf
   return { directory, series, manifest, job, run, evidence, proof, env, argv }
 }
 
+async function cleanupFixture(fixture: Awaited<ReturnType<typeof recoveryFixture>>) {
+  const record = (await checkBaseline(fixture.series)).executions[0]!.record
+  const proof = { version: 1, mode: "fixture", baselineId: fixture.manifest.id, runDir: fixture.run,
+    executionFilesSha256: baselineHash(JSON.stringify(record.files)), pinsSha256: baselineHash(JSON.stringify(fixture.manifest.pins)), status: "CONFIRMED", modelCalls: 0 }
+  const evidence = path.join(fixture.directory, "cleanup-resolved.json")
+  await Bun.write(evidence, JSON.stringify(proof))
+  await chmod(evidence, 0o600)
+  return { proof, evidence, argv: ["resolve-cleanup", "--series", fixture.series, "--evidence", evidence] }
+}
+
 test("recovery admission is atomic, idempotent and retains the original terminal error", async () => {
   const fixture = await recoveryFixture()
   try {
@@ -303,6 +313,65 @@ test("a measured product with failed cleanup cannot admit the next case", async 
       .rejects.toThrow("CLEANUP_UNKNOWN")
     expect(await Bun.file(path.join(fixture.series, "journal.json")).text()).toBe(before)
     expect((await checkBaseline(fixture.series)).coverage).toMatchObject({ recorded: 1, measured: 1, pending: 143, unknown: 0 })
+  } finally { await rm(fixture.directory, { recursive: true, force: true }) }
+})
+
+test("verified cleanup resolution preserves the failed receipt and admits the next case without a product retry", async () => {
+  const fixture = await recoveryFixture({ status: "no_artifact", judge_status: "no_artifact", pass: false, score: 0,
+    environment_cleanup: { status: "failed", error: "fixture cleanup failed" } })
+  try {
+    const before = await Bun.file(path.join(fixture.run, "summary.json")).text()
+    const cleanup = await cleanupFixture(fixture)
+    const resolved = await runBaseline(cleanup.argv, fixture.env)
+    expect(resolved).toMatchObject({ code: 0, status: "CLEANUP_RESOLVED" })
+    expect(await runBaseline(cleanup.argv, fixture.env)).toMatchObject(resolved)
+    const checked = await checkBaseline(fixture.series)
+    expect(checked.cleanup).toBe(true)
+    expect(checked.executions[0]!.record.cleanup).toBe(false)
+    expect(checked.rows[0]).toMatchObject({ measured: true, cleanup: true, verdict: "FAIL" })
+    expect(checked.infrastructure).toContainEqual(expect.objectContaining({ phase: "cleanup-original", cleanup_resolved: true }))
+    expect(await Bun.file(path.join(fixture.run, "summary.json")).text()).toBe(before)
+    expect(await beginBaselineMeasurement(fixture.series, fixture.manifest.jobs[1]!.key, { checkout: repoRoot, pins: baselineFixturePins }))
+      .toMatchObject({ job: fixture.manifest.jobs[1] })
+  } finally { await rm(fixture.directory, { recursive: true, force: true }) }
+})
+
+test("cleanup resolution permits judge recovery from the original artifact without rewriting failed cleanup", async () => {
+  const fixture = await recoveryFixture({ status: "completed", judge_status: "error", package_path: "/user/fixture.lgp",
+    environment_cleanup: { status: "failed", error: "fixture cleanup failed" } }, "judge")
+  try {
+    const cleanup = await cleanupFixture(fixture)
+    expect(await runBaseline(cleanup.argv, fixture.env)).toMatchObject({ code: 0 })
+    expect(await runBaseline(fixture.argv, fixture.env)).toMatchObject({ code: 0 })
+    expect(await runBaseline(["resume", "--series", fixture.series, "--limit", "1"], { ...fixture.env, PATH: Bun.env.PATH,
+      EVAL_JUDGE_COMMAND: `${Bun.which("bun")} ${path.join(evalsRoot, "fixtures/fake-codex.ts")}`, JUDGE_MODEL: "gpt-6-astra", JUDGE_REASONING: "high" }))
+      .toMatchObject({ code: 0, measured: 1, pending: 143 })
+    const report = await checkBaseline(fixture.series)
+    expect(report.cleanup).toBe(true)
+    expect(report.executions[0]!.record.cleanup).toBe(false)
+    expect(report.executions).toHaveLength(2)
+    expect(report.spending.cost).toBe(0.01)
+  } finally { await rm(fixture.directory, { recursive: true, force: true }) }
+}, 60_000)
+
+test("cleanup resolution rejects drift and model calls and retains an immutable verification receipt", async () => {
+  const fixture = await recoveryFixture({ environment_cleanup: { status: "failed" } })
+  try {
+    const cleanup = await cleanupFixture(fixture)
+    const before = await Bun.file(path.join(fixture.series, "journal.json")).text()
+    for (const proof of [{ ...cleanup.proof, pinsSha256: "0".repeat(64) }, { ...cleanup.proof, modelCalls: 1 }, { ...cleanup.proof, mode: "live" }]) {
+      await Bun.write(cleanup.evidence, JSON.stringify(proof))
+      expect(await runBaseline(cleanup.argv, fixture.env)).toMatchObject({ code: 2, reason: "CLEANUP_RESOLUTION_INVALID" })
+      expect(await Bun.file(path.join(fixture.series, "journal.json")).text()).toBe(before)
+    }
+    await Bun.write(cleanup.evidence, JSON.stringify(cleanup.proof))
+    expect(await runBaseline(cleanup.argv, fixture.env)).toMatchObject({ code: 0 })
+    const saved = (await checkBaseline(fixture.series)).cleanupResolutions[0]!
+    await Bun.write(cleanup.evidence, "working receipt changed")
+    expect((await checkBaseline(fixture.series)).cleanup).toBe(true)
+    await chmod(saved.evidencePath, 0o600)
+    await Bun.write(saved.evidencePath, "closed receipt changed")
+    await expect(checkBaseline(fixture.series)).rejects.toThrow("CLEANUP_RESOLUTION_CHANGED")
   } finally { await rm(fixture.directory, { recursive: true, force: true }) }
 })
 
