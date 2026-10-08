@@ -104,17 +104,22 @@ test("node skill: all loaded JSON and JSONC settings preserve the assigned sandb
     await Bun.write(file, JSON.stringify({ permission: { loginom_remember: "allow", "loginom_*": "allow" }, instructions: ["keep JSON"] }))
     await Bun.write(path.join(f.env.EVAL_PROFILE_DIR, "config/config.json"), JSON.stringify({ permission: { loginom_write: "allow", "loginom_*": "deny" } }))
     await Bun.write(path.join(f.env.EVAL_PROFILE_DIR, "config/loginom-ai-agent.jsonc"),
-      '{ // prepared profile\n "permission": {"loginom_remember": "allow", "loginom_*": "allow",}, "instructions": ["keep JSONC"],}')
+      '{ // prepared profile\n "permission": {"loginom_remember": "allow", "loginom_*": "allow", "loginom_re*": "allow",}, "instructions": ["keep JSONC"],}')
     const run = await execute(f.draft, f.env)
     expect(run.code).toBe(0)
+    const loaded = []
     for (const name of ["config.json", "loginom-ai-agent.json", "loginom-ai-agent.jsonc"]) {
       const settings = await readSandboxSettings(f.root, f.env.EVAL_PROFILE_DIR, name)
+      loaded.push(settings.permission)
       expect(settings.permission.loginom_remember).toBe("deny")
       expect(settings.permission.loginom_write).toBe("deny")
       expect(settings.provider.fake.options.baseURL).toBe(f.env.EVAL_AGENT_PROVIDER_BASE_URL)
       expect(Object.keys(settings.permission).indexOf("loginom_*")).toBeLessThan(Object.keys(settings.permission).indexOf("loginom_remember"))
       if (name !== "config.json") expect(settings.instructions).toEqual([name.endsWith("jsonc") ? "keep JSONC" : "keep JSON"])
     }
+    // For these flat string rules the product merge preserves earlier key positions.
+    const effective = Object.keys(Object.assign({}, ...loaded))
+    expect(effective.indexOf("loginom_re*")).toBeLessThan(effective.indexOf("loginom_remember"))
   } finally { await f.close() }
 }, 30000)
 
