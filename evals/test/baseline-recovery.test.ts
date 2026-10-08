@@ -168,3 +168,15 @@ test("admitted recovery retains immutable copies of repair and validation eviden
     await expect(checkBaseline(fixture.series)).rejects.toThrow("RECOVERY_EVIDENCE_CHANGED")
   } finally { await rm(fixture.directory, { recursive: true, force: true }) }
 })
+
+test("a measured product with failed cleanup cannot admit the next case", async () => {
+  const fixture = await recoveryFixture({ status: "no_artifact", judge_status: "no_artifact", pass: false, score: 0,
+    environment_cleanup: { status: "failed", error: "fixture cleanup unknown" } })
+  try {
+    const before = await Bun.file(path.join(fixture.series, "journal.json")).text()
+    await expect(beginBaselineMeasurement(fixture.series, fixture.manifest.jobs[1]!.key, { checkout: repoRoot, pins: baselineFixturePins }))
+      .rejects.toThrow("CLEANUP_UNKNOWN")
+    expect(await Bun.file(path.join(fixture.series, "journal.json")).text()).toBe(before)
+    expect((await checkBaseline(fixture.series)).coverage).toMatchObject({ recorded: 1, measured: 1, pending: 143, unknown: 0 })
+  } finally { await rm(fixture.directory, { recursive: true, force: true }) }
+})

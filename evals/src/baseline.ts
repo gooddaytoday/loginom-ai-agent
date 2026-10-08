@@ -148,6 +148,8 @@ export async function beginBaselineMeasurement(directory: string, key: string, c
     if (!job) throw new BaselineFailure("UNKNOWN_JOB")
     if (job.state !== "pending") throw new BaselineFailure("ALREADY_DISPATCHED")
     if (journal.jobs.some(item => item.state === "running" || item.recoveries?.some(recovery => recovery.state === "running"))) throw new BaselineFailure("UNKNOWN_OUTCOME")
+    if (journal.jobs.some(item => item.record && !item.record.cleanup || item.recoveries?.some(recovery => recovery.record && !recovery.record.cleanup)))
+      throw new BaselineFailure("CLEANUP_UNKNOWN")
     if (manifest.kind === "baseline" && journal.jobs.some(item => item.record && !effectiveMeasurement(item)?.measured)) throw new BaselineFailure("AWAITING_RECOVERY")
     if (journal.jobs.find(item => item.state === "pending") !== job) throw new BaselineFailure("ROUND_ORDER_CHANGED")
     if (manifest.kind === "smoke" && manifest.pins.mode === "live") {

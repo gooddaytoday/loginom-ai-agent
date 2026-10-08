@@ -89,6 +89,7 @@ status=PASS, exitCode=0, modelCalls=0 и команду немодельной �
 native Loginom check под теми же пинами. Его новый admission не заменяет первоначальный.
 Исходные receipts копируются и fsync сохраняются закрыто и неизменяемо до записи journal.
 Нет admission при executor guard (включая неполный), живом child, UNKNOWN или failed cleanup.
+Подтверждённое измерение с failed cleanup также запрещает допуск следующего кейса.
 Повтор того же evidence возвращает существующий admission; новая reservation по тому же
 исправлению не разрешена. Неполная запись admission не разрешает новый продуктовый вызов.
 
