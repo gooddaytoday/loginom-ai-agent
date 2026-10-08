@@ -569,8 +569,12 @@ async function verifyCompletion(config: NodeOpsConfig, lease: NodeStandLease, co
     const receipt = await readPrivateJson(completion.receipt) as { status?: string; owner?: NodeStandOwner; acquiredAt?: string; profile?: string; historyArchive?: string; processEvidence?: string }
     if (receipt.status !== "SETTLED" || !ownerMatches(receipt.owner, lease) || receipt.acquiredAt !== lease.acquiredAt || receipt.profile !== completion.profile ||
       receipt.historyArchive !== completion.historyArchive || receipt.processEvidence !== completion.processEvidence) throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
-    await evidencePath(config, lease, completion.processEvidence)
+    if (continued && completion.processEvidence !== path.join(directory(config), "owned-registration-processes.json"))
+      throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
+    await evidencePath(config, lease, completion.processEvidence, continued)
     const cleanup = await Bun.file(completion.processEvidence).json()
+    if (continued && (cleanup.operation !== "LAB-31-owned-registration-v1" || cleanup.processes?.observation_mode !== "writer_release_settlement"))
+      throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
     await verifyWriterReleaseSettlement(config, lease, cleanup, completion.processEvidence)
     await verifyProcesses(cleanup.processes ?? cleanup, lease)
     await verifyHistoryArchive(completion.profile === "reference" ? config.roles[lease.role].referenceProfile : config.roles[lease.role].evalProfile, completion.historyArchive)
