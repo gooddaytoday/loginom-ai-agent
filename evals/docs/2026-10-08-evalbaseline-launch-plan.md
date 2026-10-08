@@ -10,6 +10,11 @@
 
 **Spec:** согласованный пользователем план «Подготовка EvalBaseline к полным прогонам»; [runtime](baseline-runtime.md), [инструкция агента](evalbaseline.md), [checkpoint](evalbaseline-checkpoint.md), [операторские команды](evaler/operations.md), [контракт изоляции](2026-10-07-analytic-evals-isolation-plan.md).
 
+## 0. Дождаться завершения LAB-31 и свободного стенда — выполнено
+
+- [x] LAB-31 принят на `958b7aaac2bdea0c21f6a8e8dfd51cc090564dad`: Ben ACCEPT, Evaler подтвердил evidence и перевёл карточку в `in_review`; оба run завершены. Исходный чат завершил финальный readback, его мониторинг `lab-31-eval` подтверждён как PAUSED.
+- [x] Проверены пустые очереди Rich, Ben, Evaler и EvalBaseline; общего lease нет, пять профилей прошли `assertProfileClean`, harness leases отсутствуют. Продуктовых процессов нет, Loginom storage пуст. Проверка 2026-10-08 19:05–19:13 MSK; перед активацией повторить.
+
 ## 1. Решения и границы
 
 - Это план следующих работ. Сохранение этого файла само по себе не запускает карточки, smoke, baseline или мониторинг.
@@ -53,6 +58,10 @@
 ## 3. Подготовить недостающие возможности harness до живых запусков
 
 **Файлы:** изменить `evals/src/baseline.ts`, `evals/script/run-baseline.ts`, `evals/src/node-eval-ops.ts`, `evals/src/config.ts`, `evals/src/run.ts`, `evals/src/node-runner.ts`, `evals/script/run-node-evals.ts`, `evals/test/baseline.test.ts`, `evals/test/node-eval-ops.test.ts`, `evals/test/config.test.ts`, `evals/test/infra-retry.test.ts`, `evals/test/node-evals.test.ts`, `evals/docs/baseline-runtime.md`, `evals/docs/evalbaseline.md`. Если восстановление оценки требует отдельной границы, добавить `evals/src/baseline-recovery.ts` и `evals/test/baseline-recovery.test.ts`; повторно использовать существующего судью, не копировать его prompt/schema.
+
+### 3.0. Включить принятый корпус LAB-31
+
+- [ ] Включить принятые четыре кейса и связанные проверки harness из `958b7aaac2bdea0c21f6a8e8dfd51cc090564dad`, сохранив собственную реализацию baseline и совместимость Rich/Ben. Проверить через публичный `prepareBaseline`, что новый корпус содержит 48 кейсов и 144 задания в трёх кругах; обновить ожидания fixture-тестов.
 
 ### 3.1. Один кейс на отдельный smoke
 
