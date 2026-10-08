@@ -1,5 +1,5 @@
 import path from "node:path"
-import { mkdir } from "node:fs/promises"
+import { chmod, mkdir, writeFile } from "node:fs/promises"
 import type { Task } from "../../../src/task"
 
 async function main() {
@@ -50,8 +50,23 @@ async function main() {
   const command = { ...agentCommand(config, { ...process.env, AGENT_REPO: undefined }),
     cleanupDir: path.join(runDir, "preparation"),
     cleanupSecrets: [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""] }
-  command.env.LOGINOM_AI_AGENT_PERMISSION = '{"loginom_*":"allow","loginom_remember":"deny","loginom_write":"deny","loginom_edit":"deny","loginom_add_resource":"deny","loginom_forget":"deny"}'
   await assertProfileClean(config.profileDir)
+  const settingsFile = path.join(config.profileDir, "config/loginom-ai-agent.json")
+  // The product loads JSONC after JSON; do not silently leave an overriding policy active.
+  if (await Bun.file(path.join(config.profileDir, "config/loginom-ai-agent.jsonc")).exists())
+    throw Error("reference profile requires canonical loginom-ai-agent.json; JSONC overlay is unsupported")
+  const settings = await Bun.file(settingsFile).exists() ? await Bun.file(settingsFile).json() : {}
+  const inherited = Object.entries(typeof settings.permission === "string" ? { "*": settings.permission } : settings.permission ?? {})
+  const denied = ["loginom_remember", "loginom_write", "loginom_edit", "loginom_add_resource", "loginom_forget"]
+  settings.permission = {
+    ...Object.fromEntries(inherited.filter(([key]) => !key.startsWith("loginom_"))),
+    "loginom_*": "allow",
+    ...Object.fromEntries(inherited.filter(([key]) => key.startsWith("loginom_") && key !== "loginom_*" && !denied.includes(key))),
+    ...Object.fromEntries(denied.map(key => [key, "deny"])),
+  }
+  await mkdir(path.dirname(settingsFile), { recursive: true, mode: 0o700 })
+  if (await Bun.file(settingsFile).exists()) await chmod(settingsFile, 0o600)
+  await writeFile(settingsFile, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 })
   await assertAuth(config, command)
   const source = parseArtifactSource(config.artifactSource, config.loginom)
   const environment = await preflight(config, source)
