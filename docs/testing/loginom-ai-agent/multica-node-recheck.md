@@ -31,19 +31,22 @@
 
 ## Checkpoint наблюдения — новая параллельная волна, 09.10.2026
 
-- Документация e8b2f852; baseline4e626d547, common basef9bf332c; loginom0ca не включён.
-- Node SHA: LAB45 a00b0203/PR42, LAB46 41e0b170/PR43, LAB47 c92a3bfd; LAB48–52 4e626d547; ветки сохранены.
-- Caps8/8/8 и daemon12/readback;8 fresh Generator tasks назначены одним batch21:46:24UTC и стартовали постепенно.
-- Одновременные8 running NOT_CONFIRMED; poll30s/WS3min/free resources, distinct-agent claim — source explanation.
-- Native LAB47 capacity error classified model_not_found_or_unavailable; auto retry не назначен, stock rerun выполнен без смены модели.
-- LAB46/47 завершили diagnostics;11 attachments скачаны, bytes/SHA256 сверены с manifests PASS; это не приёмка узлов.
-- Exact own PID absence подтверждён; root3112 UI logout reported, independent server absence pending; own admin logout LAB47 AMBIGUOUS/числовой ID неизвестен.
-- Root3109 absence прочитана при последующем3112; прошлые неопределённые эффекты не переписаны; root marker сохранён.
-- У root/own Admin=true; own Designer/Viewer=true vs root false; LoadPublishedFileNames/Dispatcher timeout cause NOT_ESTABLISHED.
-- Необходимость8 admin не доказана:2 созданные записи и6 planned configs сохранены; новые admin не создаются.
-- Общий admin многосеансовость не запрещена; read-only protocol run LAB47 01a11d9a-b146-72b9-9a35-69ae94442ccd, без новых карточек/расписаний.
-- Browser logout=disconnect; GUID браузера и числовой Dispatcher ID различны, надёжная связь исследуется до нового login.
-- Handoff/model/build удержаны по команде владельца; существующий heartbeat PAUSED/readback; source/критерии не менялись.
-- [SHA, task UUID, проверенные hashes и диагностика](reports/2026-10-08-node-recheck/parallel8-restart.json); PR40 draft; Core/Agent/Host pre-push typechecks PASS дляe8b2f852.
-- Приёмка8 NOT_CONFIRMED, нагрузка12 NOT_RUN; LAB29/30 Backlog, Eval unchanged, merge/release NOT_RUN.
-- Следующий шаг: завершить GUID↔ID/logout диагностику общего admin; общие contract/source fixes только после согласования владельца.
+- Документация до продолжения4003b43d; baseline4e626d547, common basef9bf332c; loginom0ca не включён; remote SHA сверены.
+- Node SHA: LAB45 a00b0203/PR42, LAB46 41e0b170/PR43, LAB47 c92a3bfd; LAB48–52 4e626d547; назначения сохранены.
+- Caps8/8/8/runtime readback; daemon12;8 Generator tasks batch21:46:24UTC,8 simultaneous running NOT_CONFIRMED.
+- Partial distinct-agent claim/WS3min — source explanation, installed Multica0.6.1/source2ea; server exact SHA NOT_OBSERVED.
+- Native capacity classified model_not_found_or_unavailable, auto retry не назначен; stock rerun сохранён, модели не менялись.
+- Protocol run01a11d9a-b146 completed;5 attachments downloaded,4 manifest artifacts bytes/SHA256 PASS; это не приёмка.
+- root3114 GUID↔numericID через unique mstSelf подтверждён в loaded-store9/9; cross-profile validation NOT_RUN.
+- Settings DisableUserMultiSession=false/AdminMultiSessionRestriction=0; SessionKeepAlive1800000ms; UI logout=disconnect.
+- root3112 отсутствует при own3114 positive control; root3114/admin3113 server cleanup PENDING; marker/history сохранены.
+- Profile A failed до Dispatcher: helper сохранил только Error; numericID неизвестен, profile B NEVER_OPENED.
+- Own saved-key probe:0 CreateSession/0 login, rcrNotFound; independent positive/negative calibration NOT_RUN.
+- Exact own PID/startticks absence и свободные account locks/inodes подтверждены; API completed не означает server absence.
+- mas01:42MSK: CPU1%,RAM available30144180KiB,disk409929609216B,load0.029/0.043/0.016; queue1 running/resource_wait0.
+- Installed CLI source597592f, executable/manifest hash PASS; CLI/model/build execution0;2 admin records/6 planned retained.
+- Все8 приёмок удержаны; новая finite diagnostic task LAB47 01a11db2-d363-7e10-9799-63f77d5b05c2 running; новых root login не разрешено.
+- Scheduled observer ранееPAUSED; текущий TOML не найден, matching monitor отсутствует; create/resume не выполнялись.
+- [SHA/tasks/hashes/ограничения](reports/2026-10-08-node-recheck/parallel8-restart.json); source/критерии не менялись; PR40 draft, merge/release NOT_RUN.
+- Приёмка8 NOT_CONFIRMED, нагрузка12 NOT_RUN; LAB29/30 Backlog, Eval unchanged; central CLI selection readback PASS.
+- Следующий шаг: finite reconnect cleanup и phase/cause profile A по private evidence; общие fixes согласовать отдельно.
