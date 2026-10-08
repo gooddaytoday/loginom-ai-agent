@@ -58,6 +58,33 @@ report SHA256 `6f64c0dce5884430140cb07265ea1cfed4345f5787e0dec1b15605affba00811`
 В исходном collector report main-host snapshot ограничен первыми четырьмя runs;
 полные шесть подтверждены основной сессией отдельно, исходный report не переписан.
 
+Чистый suite session99064 завершён exit0:481 PASS/2 SKIP/0 FAIL/2056 assertions,
+579.40s. Его три ранее упавших теста прошли, но причина прежнего отказа остаётся
+UNKNOWN; прежний log478/2/3 сохранён. Frozen worktree
+`/home/kiselev/.codex/worktrees/skills-evals-inspection/loginom-ai-agent`
+создан на b466; frozen typecheck PASS, git status clean, protected diff0 против
+свежепрочитанного `evals` b31ebe7d0bf5cd2cb1116ccdb90df65cd8578c2c.
+
+`ab-conditions-inspection-20261008/common.json` SHA256
+`c07c876e618383b6428beb24f16819aba80c5c68f92d4c22a2f0dfb7564c4dd0`:
+658 tracked harness files,281 task files,21 adapters; оба полных build inventories
+5389/5651 и исходные15 задач повторно проверены. Модели и судья прежние.
+Новая пара v6 не смешивается с неполной v5. Baseline smoke v6 выполняется,
+session14241; formal attempts0. Native structure/cold и candidate ещё не приняты.
+
+После exact current closure и сохранения storage bytes свой сервер перезапущен;
+штатный `cleanupIsolatedStorage` b466 очистил только его фиксированные roots.
+В прежнем snapshot был нулевой `.lck`, который исчез до byte-check; этот первый
+check FAIL сохранён по описанию, после него server reset уже был выполнен.
+Свежий snapshot и повторная current closure проверены отдельно перед очисткой.
+Исходные server/client и старый formal cleanup FAIL не изменялись.
+
+Диск перед smoke: меньше1GiB. Три точных duplicate obsolete CLI build contexts
+объединены hard links с сохранёнными originals после SHA/UID/mode/inode checks;
+после операции paths/bytes/modes подтверждены. Receipt `build-context-dedupe-20261008`,
+905448921 bytes потенциально освобождены, свободно около1.8GiB. Baseline/current
+candidate payloads, старые builds и результаты сохранены; `/tmp` не очищался.
+
 Evidence: `formal-v5-process-identity-signal-20261008/diagnostic-context-{red,green,
 module,typecheck,suite}.log` в приватном acceptance-каталоге. Текущая read-only
 проверка: own refs0, writer absent, pending absent, recovery files0; старый FAIL

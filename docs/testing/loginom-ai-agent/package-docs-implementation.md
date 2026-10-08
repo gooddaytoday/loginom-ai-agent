@@ -4447,13 +4447,13 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-08 — ACTIVE, formal v5 остановлен: process cleanup FAIL
+### 2026-10-08 — ACTIVE, v6 baseline smoke; historical formal v5 cleanup FAIL
 
-- HEAD до checkpoint `d51a19880`; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
+- HEAD до checkpoint `b27cd4385`; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client/profiles и чужие процессы сохранены.
-- Frozen skills-evals-writer d1b364a98 clean; evalsrefb31ebe7d0 перечитан перед formal/protected diff0; исторический087 сохранён.
+- Новый frozen skills-evals-inspection b4661a7b6 clean/typecheck PASS; fresh evalsrefb31ebe7d0/protected diff0; d1/087 сохранены.
 - Harness full481 PASS/2 SKIP/0 FAIL/2055 assertions/585.37s/typecheck PASS; writer gap real IO RED→GREEN, bounded guards preserved.
-- Conditions v5 abeeb0cf…/21 pins/wide1920 viewport/fresh own server;15 tasks выбраны до первого smoke; formal90 planned.
+- Conditions v6 c07c876e…/21 pins/658 harness/281 task files/5389+5651 build inventory PASS; прежние15 tasks/models/judge/viewport; formal90 planned.
 - Baseline v5 run174713 и candidate v5 run175606 full smoke accepted:judge100/structure/warm oracle/cold/native cleanup confirmed.
 - Pair evidence ab-smoke-v5-pair-accepted-20261008; functional control, formal0/statistical noninferiority not proven.
 - V5 metrics provider17/18 (dedup), unique tools17/19/Loginom13/13/errors0; skill+workflow read, allowance неизменен.
@@ -4461,14 +4461,14 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Output mapping ABC/cohort/low-liquidity: shared first geometry proof1/32 > tolerance1/64;12 modules identical; source2×3×20 PASS; native stability/unique cause UNKNOWN, immutable A/B unchanged.
 - cohort-spend-activity#1: no_artifact/294.054s, NODE_APPLY_STOPPED→OUTPUT_MAPPING_RECOVERY_UNVERIFIED; cleanup confirmed/native uncertainty сохранена; manual retry0.
 - V5 PID4050199: original errno/operation потеряны; native stable/flaky UNKNOWN; 3 offline runs×3 guard tests PASS не воспроизводят ошибку. Signal сохранён в formal-v5-process-identity-signal-20261008.
-- Старые own CLI091/239/253/5a9/bd0/c50 и upgrade CLI/Desktop669/bc6 сохранены проверенными архивами; baseline/current49 raw сохранены; свободно около5.9GiB.
+- Старые own CLI091/239/253/5a9/bd0/c50 и upgrade CLI/Desktop669/bc6 сохранены проверенными архивами; baseline/current49 raw сохранены; свободно около1.8GiB;3 obsolete context duplicates905448921 bytes deduped, paths/bytes/modes retained.
 - Неиспользуемый docs-build/node_modules удалён после process/FD guards; bytes не архивированы, locked reinstall/reverify записан в receipt; source49 clean.
 - Histories/diagnostics первых12 closed attempts сохранены с full roundtrip/restore receipts; summary первых9 diagnostics65cbbe16…; active profile/results/21 pins неизменны.
 - CLI modify3 FAIL; CLI docs-after-build3/3 accepted; Desktop warm3/cold1 PASS2 FAIL; offline bytes/pins3 prepared; formal guard6 PASS, controller wired и отказал на incomplete v5 до Docker/staging; native pending.
 - Lifecycle driver first skill fixed via real-process/HTTP RED→GREEN;4 focused PASS/typecheck PASS; native lifecycle/independence ещё нужны.
 - MiMo installed smoke UNKNOWN; отдельная native-payload диагностика подтвердила HTTP429/quota exhausted, writer absent/remaining0/no browser; новых MiMo calls нет, выбор второй модели запрошен.
 - Source binaries/resources/server skill907ff16b…/catalog17764f9a… сохранены; stage5–8/Linux lifecycle/second-model gates открыты;stage9 deferred.
-- Own formal refs0/writer/pending absent/recovery0; attempt13/profile/storage snapshot сохранены. Own harness b466 TDD1/module19/typecheck PASS; full478/2skip/3FAIL retained; narrow SIGINT main6×2 PASS, adjacent collector6×2 PASS; clean full session99064 идёт, frozen/live pending.
+- Own formal refs0/writer/pending absent/recovery0; attempt13/profile/storage snapshots retained; own storage cleared after byte proof. Clean b466 full481/2skip/0FAIL/2056/typecheck PASS; baseline smoke v6 session14241 жив, candidate/cold/formal0; далее парный smoke, formal90 + остальные gates.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 

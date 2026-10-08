@@ -1023,8 +1023,15 @@ Core имеет разметку осей, но без CSV oracle. По доку
   результаты отдельно; после повторной фиксации условий выполнить новую пару
   теми же сохранёнными CLI, а не только повторить одну сторону.
   V5 обе smoke стороны:judge100/structure/warm oracle/common cold/native cleanup
-  PASS; `ab-smoke-v5-pair-accepted-20261008/review.json`. Формальная серия
-  запущена, но90 попыток/compare ещё не завершены; старые v3/v4 не подставляются.
+  PASS; `ab-smoke-v5-pair-accepted-20261008/review.json`. Формальная baseline v5
+  остановлена на13/45 с process cleanup FAIL; candidate не запускался,
+  90 попыток/compare не завершены. Эти результаты сохраняются отдельно.
+  Для новой пары v6 frozen harness `b4661a7b68fbad21726bd4d922a8c659165f8b11`:
+  clean suite481 PASS/2 SKIP/0 FAIL/typecheck PASS, protected diff0 против
+  свежего evals refb31ebe7d0. Common `ab-conditions-inspection-20261008/common.json`
+  SHA256 `c07c876e618383b6428beb24f16819aba80c5c68f92d4c22a2f0dfb7564c4dd0`.
+  Те же baseline/candidate inventories и281 task files проверены; baseline smoke
+  v6 выполняется. Старые v3/v4/v5 не подставляются в новую пару.
 - [ ] Сначала прогнать небольшой представительный smoke (импорт, преобразование,
   соединение/агрегация, сохранение) из заранее выбранных задач,
   затем весь выбранный набор из 12–15 задач с тремя повторами для каждой сборки.
