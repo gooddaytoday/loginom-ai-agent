@@ -140,8 +140,12 @@ Apache проксирует через alias собственного private br
 Own harness0876bb32f требует явный same-origin proxy, отклоняет auto/direct,
 внешний host и redirect до agent dispatch. TDD RED→GREEN, real HTTP tests:
 18 PASS / 0 FAIL / 36 assertions, typecheck PASS. Два промежуточных отказа
-были штатным запретом при свободном месте <1GB; порог сохранён. Полный suite
-нового SHA ещё выполняется; живое A/B сравнение не запускалось.
+были штатным запретом при свободном месте <1GB; порог сохранён. Полный suite нового SHA: **476 PASS / 2 SKIP / 0 FAIL / 2042 assertions**
+(478 tests, 36 files, 613.38s), `bun typecheck` PASS. Отдельный чистый
+worktree пары закреплён на **0876bb32fa4c876e6446662cfa4380ed6edbb68e**.
+Manifest содержит 658 tracked evals files; protected judge/near-miss/tasks
+сверены с актуальным evals ref b31ebe7d0 и не изменены. Живое A/B
+сравнение пока не запускалось; окончательные условия ещё нужно закрепить.
 
 `ab-local-cold-parent-control-v3-20261008`: **PASS**, exit0/oracle0,
 сохранённый синтетический reference восстановлен из точных archived bytes.
@@ -158,7 +162,10 @@ Initial resource-verification EACCES и следующий ошибочный п
 Controllers, фактический socket и новые configuration hashes сохранены в
 `ab-local-stand-20261008/stand-provenance-v2.json`.
 Candidate49 explicit-proxy `loginom check`: exit0, LOGINOM_CONNECTION_VALID,
-Help ready, browser verified. Проверка baseline выполняется отдельно.
+Help ready, browser verified. Baselinefc explicit-proxy native check также
+exit0, LOGINOM_CONNECTION_VALID; в его старой схеме нет полей Help/browser,
+поэтому их наличие для baseline не заявляется. Квитанции обеих проверок
+сохранены отдельно; ни одна не является model/judge A/B попыткой.
 
 Для места старый собственный `candidate-091103ef9-desktop/linux-unpacked`
 переведён в `linux-unpacked-preserved.tar.gz`, все4764 entries проверены
@@ -167,3 +174,8 @@ Help ready, browser verified. Проверка baseline выполняется �
 не сохранила group permissions; исходник оставлен до повторной успешной
 проверки с `--same-permissions`. DEB/AppImage091, baselinefc и candidate49,
 профили, результаты и чужие файлы не изменены.
+
+Старый собственный candidate-2396e78f2 Desktop unpacked tree также сохранён
+в archive: 4764 entries, 399683018 bytes, полный roundtrip SHA/modes/symlinks
+PASS; исходный unpacked удалён только после этой проверки. Сборки для
+baseline/candidate пары и старые DEB/AppImage сохранены.

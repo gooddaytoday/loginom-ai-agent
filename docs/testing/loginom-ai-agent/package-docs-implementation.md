@@ -4447,20 +4447,20 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-08 — ACTIVE, explicit local proxy
+### 2026-10-08 — ACTIVE, локальный harness закреплён
 
-- HEAD до checkpoint397c18c29, artifact SHA49b1584f2 неизменен; Linux Desktop/CLI прежние accepted gates сохранены.
-- Все запуски локально, 10.200.13.152 исключён; исходные Loginom server/client и пользовательские profiles не изменены.
-- Own local stand loginom-skills-ab-20261008: auto ошибочно шёл на общий8080; прежние native receipts historical, не isolation PASS.
-- Own client теперь explicit wsproxy true/host null/path app/ws; actual socket32768/app/ws verified, own server typed Python Disabled + native empty user credentials.
-- Full harness81619d80b470 PASS/2 SKIP/0 FAIL/typecheck PASS; own pair frozen816. Новый guard0876bb32f preflight18 PASS/typecheck, full suite идёт; после PASS обновить frozen pair.
-- Full cold parent control v3 PASS/oracle0/actual export destination/unchanged bytes/settingsReapplied=false/native close/logout/remaining0/container removed/owned files removed; не product A/B proof.
-- Candidate49 explicit-proxy native check PASS; baseline check идёт. A/B agent/judge calls0, 15 task IDs frozen,90 planned attempts.
-- CLI docs-after-build3/3 mechanics/graph/PDF6pages QA/cold PASS; Desktop3/3 warm/docs/PDF QA, cold1 PASS/2 readonly FAIL; exact own readonly close/logout verified, unknown locks retained.
-- CLI scenario-modify3 live started, output openai-49-cli-scenario-modify-v2-20261008; первичный неверный payload path отказал до модели и сохранён.
-- Старый own091 unpacked tree losslessly archived/roundtrip4764 entries; baselinefc/current49/DEB/AppImage unchanged; freed space, minimum1GB guard retained.
-- Product и judge/near-miss/tasks не менялись; подробности reports/2026-10-08-package-docs-harness.md и build-transition.md.
-- Этапы5–8 открыты; stage9/full35 отложены/server skill retained. Далее frozen final harness/pins/smoke+A/B, оставшиеся product transitions/lifecycle.
+- HEAD до checkpoint2b1463808; product artifact SHA49b1584f2 не изменился.
+- Все запуски локально; 10.200.13.152 исключён. Исходные Loginom server/client, профили и чужие процессы сохранены.
+- Own AB stand: explicit same-origin wsproxy, actual socket32768/app/ws verified; typed Python Disabled и native empty user credentials.
+- Harness0876bb32f:476 PASS/2 SKIP/0 FAIL/2042 assertions и typecheck PASS; отдельный чистый pair worktree закреплён на том же SHA,658 files manifest.
+- Protected judge/near-miss/tasks unchanged vs fresh evals b31ebe7d0; live A/B model/judge calls0.15 IDs frozen;90 formal attempts ещё не запускались.
+- Baselinefc/candidate49 explicit-proxy native checks exit0/LOGINOM_CONNECTION_VALID; Help/browser ready fields подтверждены только для candidate schema.
+- Full cold parent control v3 PASS/oracle0/unchanged bytes/settingsReapplied=false/native close/logout/remaining0/container removed; не product A/B proof.
+- CLI docs-after-build3/3 mechanics/graph/PDF6pages QA/cold PASS; Desktop warm/docs3/3/PDF QA, cold1 PASS/2 readonly FAIL; unknown locks не трогаем.
+- CLI scenario-modify3 завершены code1/SCENARIO_CALCULATOR_NOT_VERIFIED; результаты сохранены, не accepted; readonly diagnosis идёт по archived evidence и offline tests.
+- Старые own091/239 unpacked losslessly archived:4764 entries каждый/roundtrip PASS; own253 архивируется. Baselinefc/current49/DEB/AppImage/profiles/results сохранены,1GB guard неизменен.
+- Продукт не менялся; отчёты harness.md/build-transition.md; этапы5–8 открыты,stage9/full35 отложены,server skill retained.
+- Далее: закончить readonly diagnosis, безопасно освободить место, закрепить final conditions; затем preflight/smoke/A/B и оставшиеся transitions/lifecycle.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 
