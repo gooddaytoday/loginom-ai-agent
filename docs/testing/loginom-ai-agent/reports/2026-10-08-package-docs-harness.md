@@ -564,3 +564,30 @@ Baselinefc и текущие CLI/Desktop49 raw не удалялись.
 Исходники, полный baseline, продуктовые сборки и shared caches сохранены.
 После операций наблюдалось около7GB свободного места; это не оценка объёма
 освобождения. Активные результаты и profiles не очищались.
+
+### Закрытые formal histories первых трёх попыток
+
+Для продолжения полной90 серии с ограниченным диском только закрытые
+`profile.history` первых трёх попыток baseline переведены в tar.gz.
+Сначала проверены `result.environment_cleanup=confirmed`, process cleanup и
+точный `profile_history` path из cleanup receipt, затем отсутствие process/env/
+cmdline/FD references к этому пути. После создания каждый архив полностью
+распакован в приватный `/dev/shm` и сверен с оригиналом: точный набор записей,
+байты/хэши, режимы всех файлов и каталогов, symlink texts и режим корня.
+Оригинал повторно сверен перед удалением; активный профиль не затрагивался.
+
+| Попытка | Проверенные entries | Архив, bytes |
+| --- | ---: | ---: |
+| ab-revenue-per-converter#1 | 4604 | 17070095 |
+| abc-pareto-groups#1 | 4620 | 20077582 |
+| articles-by-author#1 | 4600 | 15890227 |
+
+Сводка `ab-local-stand-20261008/closed-formal-history-first-three.json`, SHA256
+`6e987ab867df2efe47d7d3042f177aa71d8c7448afb686ecd4a261079f8ff1ed`,
+закрепляет archive/receipt/result/cleanup hashes и точные restore argv.
+Исторические cleanup paths теперь восстанавливаются по receipts перед чтением.
+Result/events/artifacts/диагностика и score не менялись, включая исходный отказ
+ABC. Common abeeb0cf… и все21 execution pins повторно проверены и неизменны.
+Операция хранения не входит в агентский execution adapter и не меняет условия
+A/B. Архивирующий helper приватный; его доказательство — фактический полный
+roundtrip, а не fixture. Свободное место после проверки: около7.14GiB.
