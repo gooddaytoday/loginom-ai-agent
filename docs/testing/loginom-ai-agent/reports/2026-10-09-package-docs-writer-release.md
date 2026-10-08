@@ -178,3 +178,10 @@ campaign history4610/16662169,diag3/4689053.
 только после их confirmed closure и проверки receipts, как в storage report.
 Новые продуктовые/профильные/инструментальные ограничения не сняты;
 все90/paired compare/installed transitions/lifecycle и secondary smoke открыты.
+
+Customer-activity-segments#1 также completed/score100/pass/oracle,
+environment/process cleanup confirmed; structure/warm oracle PASS.
+Итого6 terminal результатов:4 PASS/2 FAIL; next observed first-last-touch#1.
+Live handle81639 подтверждён; snapshots formal-v7-progress-{3,5}-20261009.json
+содержат фактическое число результатов на момент записи (в последнем6),
+не количество, подразумеваемое именем файла. Candidate/cold/compare не запускались.
