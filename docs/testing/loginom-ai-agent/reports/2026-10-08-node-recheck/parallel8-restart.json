@@ -698,9 +698,9 @@
       "no_common_fix_applied": true
     },
     "admin_navigation": {
-      "LAB46": "Admin section collapsed; expanding revealed Users/Dispatcher; full qualification still pending",
-      "LAB47": "Own admin LoadPublishedFileNames exception observed; comparison reports Admin=true for root and own; Designer/Viewer differ; causality not established",
-      "root_last_session": "3109 logged_out per owner task, independent readback pending; own technical admin LAB46 assigned read-only verification, no root login or foreign close",
+      "LAB46": "Admin/Designer/Viewer=true and expanded menu observed; Dispatcher helper timeout after3 attempts without calibrated snapshot; no causal permissions defect established",
+      "LAB47": "Admin=true own/root; own Designer/Viewer=true vs root false; LoadPublishedFileNames observed, causal difference not tested; last own admin logout AMBIGUOUS, numeric SessionID not captured; current exact PID absence verified from downloaded receipt",
+      "root_last_session": "3112 replaces earlier3109 as latest pending root; UI logout reported, independent server absence pending. 3109 absence observed during3112 root comparison. Prior unknown effects retained.",
       "old_own_admin_session": "3106 exact closure/refresh absence reported by owner task; receipt hash verification pending",
       "source_or_permissions_fix": "not yet established"
     }
@@ -710,5 +710,126 @@
     "sha256": "7242dca9becfc3d7a7d111e4a0271e51caf845ad295b8dfdbbcce4ac0736ed73",
     "bytes": 3148
   },
-  "next_step": "Complete own root/admin cleanup diagnostics and independent readback. Do not schedule, create cards or launch Worker acceptance until debug is resolved under current owner instruction."
+  "next_step": "Read-only shared-admin audit under existing account lock; determine own RPC ManagedSessionInfo numeric ID, verify root ownership/cleanup. New admin creation and acceptance held; scheduled observerPAUSED; no source/contracts changed.",
+  "verified_fresh_diagnostic_attachments": [
+    {
+      "id": "01a11d95-301f-714a-b520-d68c5f95d975",
+      "filename": "generator-admin-bootstrap-receipt.json",
+      "bytes": 1465,
+      "sha256": "7dc2c835bb04e3ca325384f236fd74e8a77f2b913b26fae5e43e67d79e620c96"
+    },
+    {
+      "id": "01a11d95-30e7-796d-acb9-13e51864f24f",
+      "filename": "generator-admin-rights-diagnostic.json",
+      "bytes": 2089,
+      "sha256": "46c93622ebafd378ba208dfdb0453976b6ab2f4a3c5048c804c252c17ac09688"
+    },
+    {
+      "id": "01a11d95-3267-78cf-9145-1bec6ad28763",
+      "filename": "generator-exact-pid-cleanup.json",
+      "bytes": 14208,
+      "sha256": "e8153dc85fcb18b9e63fa84366265d9f3401bf8b0c8216f174814d7b4b590078"
+    },
+    {
+      "id": "01a11d95-3353-7404-b6a0-df23cdcc0f29",
+      "filename": "generator-diagnostic-resources.json",
+      "bytes": 1307,
+      "sha256": "40fe6c659bd956faa0c3f8787bf9842f7fad5771e4f4a201ab2369d0b24b620c"
+    },
+    {
+      "id": "01a11d95-3432-70d8-ae82-6c70325fc23c",
+      "filename": "generator-diagnostic-cpu-snapshot.json",
+      "bytes": 475,
+      "sha256": "d1a065c5fd190cc74ee278da1b334d872d5492f537ea03ca592289d37539529b"
+    },
+    {
+      "id": "01a11d95-34fa-7780-93e9-9d9ba9ca429e",
+      "filename": "generator-diagnostic-checkpoint.json",
+      "bytes": 3092,
+      "sha256": "a9860bff9097b94d6deb2997fa6d402ce998191cd0490acfa1fbc250300b2c79"
+    },
+    {
+      "id": "01a11d95-35bc-7d38-9f85-242cf685077d",
+      "filename": "generator-diagnostic-manifest-v2.json",
+      "bytes": 1280,
+      "sha256": "26d08bba5feddb30d02775409cee5e26a70b406b9194018eec6111e3c084d361"
+    },
+    {
+      "id": "01a11d97-4731-75fe-b586-98cdaa5694b3",
+      "filename": "generator-diagnostic-stop.json",
+      "bytes": 8236,
+      "sha256": "63e5a27ef1fca7033fc5a06afae22e4ca9a04a987cc01d8a6efc7bf4fa1cf1fe"
+    },
+    {
+      "id": "01a11d97-47f3-7aa8-baa3-ef2f825f5e8f",
+      "filename": "generator-resource-queue.json",
+      "bytes": 4922,
+      "sha256": "d7ee0bd9deb554fe0c29b9623ea8eccb9cf2cc55efddd5c9e0cde377f6f1790a"
+    },
+    {
+      "id": "01a11d97-48b1-75e0-b172-64dd21a0be43",
+      "filename": "generator-catalogue-refresh.json",
+      "bytes": 2621,
+      "sha256": "2799f2c9da8739b5909c91fad4377b54474d97e9c8a3654ac8c7180124731e77"
+    },
+    {
+      "id": "01a11d97-4977-7a9b-8834-9dcc86021b15",
+      "filename": "generator-diagnostic-manifest.json",
+      "bytes": 858,
+      "sha256": "d730a3189de5bf544c769bb00fbe88172cc8cd38b798b067032116d4995045f7"
+    }
+  ],
+  "fresh_diagnostic_manifest_checks": "Downloaded bytes and SHA256 match both LAB46/LAB47 manifests; LAB47 manifest26d08bba matches published comment",
+  "shared_admin_diagnostic": {
+    "prepared_at": "2026-10-08T22:20:39.889167+00:00",
+    "issue_id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+    "comment_id": "01a11d9a-b119-7559-b606-2f771ab09041",
+    "purpose": "shared-admin protocol read-only reconnaissance; no scheduled job/new card/acceptance",
+    "task_id": "01a11d9a-b146-72b9-9a35-69ae94442ccd",
+    "task_status": "running",
+    "observed_at": "2026-10-08T22:21:18.083288+00:00"
+  },
+  "shared_admin_clarification": {
+    "at": "2026-10-08T22:22:12.975967+00:00",
+    "changes": [
+      {
+        "kind": "squads",
+        "id": "8ff41bd5-f794-4b5b-a063-026f3874628e",
+        "instructions_sha256": "9ea8f31975f67a6ecc7235727663068a2c433b0be758c336862c76883a442ee4",
+        "readback": "PASS",
+        "protected_settings_preserved": true
+      },
+      {
+        "kind": "agents",
+        "id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+        "instructions_sha256": "29e3dae963531bfc49b8f7fbdcefde7987aab1c6d1c4cd445427c931b49baf2e",
+        "readback": "PASS",
+        "protected_settings_preserved": true
+      },
+      {
+        "kind": "agents",
+        "id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+        "instructions_sha256": "cc54297a20797e0c582cfb1b180f187fda6e8306d648407ef86ba8ec478e4e62",
+        "readback": "PASS",
+        "protected_settings_preserved": true
+      },
+      {
+        "kind": "agents",
+        "id": "027d102c-5d25-402c-a8fb-58a3e810013c",
+        "instructions_sha256": "426142520f7e3918025ac560f735347dae077f779641292b419372b2d3f88122",
+        "readback": "PASS",
+        "protected_settings_preserved": true
+      }
+    ]
+  },
+  "new_admin_creation": "HELD until necessity/shared admin protocol is tested;2 existing created records retained,6 planned configs retained",
+  "observed_protocol_issue": {
+    "source": "native same-card read-only reconnaissance",
+    "browser_logout": "disconnect; UI login form is not server session absence",
+    "identifier_difference": "browser RPC session GUID versus Dispatcher numeric session ID; stable binding not yet proven",
+    "public_reference": "https://help.loginom.ru/userguide/admin/dispatcher.html",
+    "reference_scope": "unique IDs and close/refresh; disconnected sessions persist for configured lifetime; does not alone qualify parallel admin on this stand",
+    "read_only_status": "running; no new logins recorded at latest text observation22:24Z",
+    "new_source_changes": "NONE"
+  }
 }

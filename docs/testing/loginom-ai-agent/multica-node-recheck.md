@@ -23,7 +23,7 @@
 
 В действующих инструкциях сквада устранено смешение исследовательского Stage0 нового узла и перепроверки Stage0 реализованного узла. Partial PUT и обратное чтение подтвердили сохранность runtime/caps/native model/MCP. Конкретные настройки внутреннего CLI остаются только в центральных инструкциях сквада; фактические значения фиксируются в доказательствах каждой попытки. Ревьюер читает центральную настройку самостоятельно и проверяет настройки принятой попытки. Недоступность целевой модели не разрешает замену.
 
-До использования Генератор проверяет установленный launcher, version/source/capability, manifest и файлы, актуальный daemon cap и ресурсы mas, затем создаёт отдельного технического admin своей карточки и подготавливает собственную пару worker/reviewer штатным accounts-only provisioning. Общий исходный admin используется только для короткого bootstrap под существующим постоянным account flock с точным logout/cleanup; основная подготовка идёт через собственный admin. Worker/reviewer остаются без Admin. Закрытый `cards/<UUID>/operator.json` не содержит OAuth/native Codex tokens; секреты не публикуются. Пара проходит ready/identity/permissions/cleanup. Каждый исполнитель и ревьюер использует отдельные checkout, кандидат, пустой профиль CLI, каталог пакетов вне Git, Loginom account, Host/browser и evidence. Общий OAuth остаётся отдельным; старый пул не используется.
+До использования Генератор проверяет установленный launcher, version/source/capability, manifest и файлы, актуальный daemon cap и ресурсы mas, затем подготавливает собственную пару worker/reviewer штатным accounts-only provisioning. Отдельные admin первоначально назначены, но необходимость не доказана: новые записи удержаны до диагностики нескольких сеансов общего admin. Текущее удержание описано в checkpoint. Общий исходный admin используется для короткого bootstrap под существующим постоянным account flock с точным logout/cleanup; основная подготовка идёт через собственный admin. Worker/reviewer остаются без Admin. Закрытый `cards/<UUID>/operator.json` не содержит OAuth/native Codex tokens; секреты не публикуются. Пара проходит ready/identity/permissions/cleanup. Каждый исполнитель и ревьюер использует отдельные checkout, кандидат, пустой профиль CLI, каталог пакетов вне Git, Loginom account, Host/browser и evidence. Общий OAuth остаётся отдельным; старый пул не используется.
 
 Цель волны — улучшить надёжность самостоятельного построения реальных аналитических сценариев Loginom агентом. Итог — самостоятельное создание, настройка, выполнение и сохранение сценария через Loginom CLI, независимый модельный прогон на том же clean published SHA и предусмотренный подпланом cold reopen. Модель получает только задание и входы; oracle/expected/история дефектов остаются вне её контекста. Требуются полная матрица, адресные регрессии, проверенные значения/типы/схема/граф, порядок там, где он обещан, подтверждения `package_closed=true`/`logged_out=true` и cleanup. Снимки ресурсов и provider errors сохраняются в приватных доказательствах; API queue не доказывает отсутствие дочерних процессов.
 
@@ -31,18 +31,19 @@
 
 ## Checkpoint наблюдения — новая параллельная волна, 09.10.2026
 
-- Документация до перезапуска8b1f39c9; baseline4e626d547, common basef9bf332c; loginom0ca не включён.
-- Назначения: LAB45 a00b0203/PR42, LAB46 41e0b170/PR43, LAB47 c92a3bfd; LAB48–52 4e626d547; ветки не сбрасывались.
-- Старые четыре stop receipts независимо скачаны/hash PASS; текущий cleanup не переписывает прежние AMBIGUOUS.
-- LAB45 sales-calc-021 и LAB46 cleanup-transform-002 остаются AMBIGUOUS/effect_possible; полного результата приёмки нет.
-- Caps8/8/8 и daemon12/readback сохранены; восемь fresh Generator tasks назначены параллельным batch21:46:24UTC.
-- Все восемь стартовали постепенно; одновременное8 running NOT_CONFIRMED. Poll30s/WS3min, free resources; distinct-agent claim — source explanation.
-- LAB47 native failure model_not_found_or_unavailable не получила auto retry; выбран штатный rerun той же карточки, модель не заменена.
-- Шесть карточек blocked root bootstrap marker LAB47; её own SessionID3109 logout сообщён, независимое server absence пока ожидается.
-- LAB46 Admin-menu раскрыто; её собственный admin выполняет только read-only Dispatcher аудит root3109, чужие сеансы не закрывает.
-- LAB46/47 сообщили создание own admin; остальных6 только planned. Эффективные права/изоляция/полный cleanup ещё не квалифицированы.
-- LAB47 LoadPublishedFileNames/различия Designer-Viewer диагностируются; common source defect/причинное исправление не установлены.
-- По новой команде владельца handoff/model/build удержаны; существующий heartbeat PAUSED/readback, scheduled задачи не создаются.
-- [SHA, dispatch/run UUID, hashes и диагностика](reports/2026-10-08-node-recheck/parallel8-restart.json); краткие карточки ссылаются на подпланы/сквад.
-- Полная независимая приёмка8 NOT_CONFIRMED; нагрузка12 NOT_RUN; LAB29/30 Backlog, Eval unchanged, merge/release NOT_RUN.
-- Следующий шаг: завершить own cleanup/квалификацию admin и разбор очереди/retry; не возобновлять приёмку до завершения диагностики.
+- Документация e8b2f852; baseline4e626d547, common basef9bf332c; loginom0ca не включён.
+- Node SHA: LAB45 a00b0203/PR42, LAB46 41e0b170/PR43, LAB47 c92a3bfd; LAB48–52 4e626d547; ветки сохранены.
+- Caps8/8/8 и daemon12/readback;8 fresh Generator tasks назначены одним batch21:46:24UTC и стартовали постепенно.
+- Одновременные8 running NOT_CONFIRMED; poll30s/WS3min/free resources, distinct-agent claim — source explanation.
+- Native LAB47 capacity error classified model_not_found_or_unavailable; auto retry не назначен, stock rerun выполнен без смены модели.
+- LAB46/47 завершили diagnostics;11 attachments скачаны, bytes/SHA256 сверены с manifests PASS; это не приёмка узлов.
+- Exact own PID absence подтверждён; root3112 UI logout reported, independent server absence pending; own admin logout LAB47 AMBIGUOUS/числовой ID неизвестен.
+- Root3109 absence прочитана при последующем3112; прошлые неопределённые эффекты не переписаны; root marker сохранён.
+- У root/own Admin=true; own Designer/Viewer=true vs root false; LoadPublishedFileNames/Dispatcher timeout cause NOT_ESTABLISHED.
+- Необходимость8 admin не доказана:2 созданные записи и6 planned configs сохранены; новые admin не создаются.
+- Общий admin многосеансовость не запрещена; read-only protocol run LAB47 01a11d9a-b146-72b9-9a35-69ae94442ccd, без новых карточек/расписаний.
+- Browser logout=disconnect; GUID браузера и числовой Dispatcher ID различны, надёжная связь исследуется до нового login.
+- Handoff/model/build удержаны по команде владельца; существующий heartbeat PAUSED/readback; source/критерии не менялись.
+- [SHA, task UUID, проверенные hashes и диагностика](reports/2026-10-08-node-recheck/parallel8-restart.json); PR40 draft; Core/Agent/Host pre-push typechecks PASS дляe8b2f852.
+- Приёмка8 NOT_CONFIRMED, нагрузка12 NOT_RUN; LAB29/30 Backlog, Eval unchanged, merge/release NOT_RUN.
+- Следующий шаг: завершить GUID↔ID/logout диагностику общего admin; общие contract/source fixes только после согласования владельца.
