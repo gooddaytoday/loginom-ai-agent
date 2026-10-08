@@ -34,7 +34,7 @@ Component ID: `component.imports.Warehouse`, slug `imports-warehouse`. Runtime t
 | Исходный SHA | вершина ветки задания; Генератор фиксирует его в карточке |
 | Runtime type и режим | `imports.warehouse` / `process` — предложение до конца этапа 0 |
 | Стенд и аккаунты | из конфигов ролей; пара worker/reviewer от Генератора, один стенд |
-| Модель приёмки | `openai/gpt-6-luna`, вариант `high`; итог исполнителя и независимая проверка ревьюера; предел модельного прогона 7200 с |
+| Настройки CLI-приёмки | из действующих инструкций сквада Multica; предел модельного прогона 7200 с |
 | Внешняя среда | готовый Deductor Warehouse на Firebird с Product(Group) и Sales, DW-драйвер сервера Loginom, read-only роль и независимый SQL/DW-клиент; этап 2 — отдельные MS SQL/Oracle профили с версиями и драйверами |
 
 ### Стоп-условия

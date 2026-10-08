@@ -52,7 +52,7 @@ Component ID: `component.transform.CrossTable`, slug `transform-crosstable`. Run
 |---|---|
 | Стенд | `http://logi-test-plan.bg.local/app/?testable=true` из конфигов ролей |
 | Аккаунты | пара worker/reviewer от Генератора, один стенд |
-| Модель приёмки | `openai/gpt-6-luna`, вариант `high`; итог исполнителя и независимая проверка ревьюера; предел модельного прогона 7200 с |
+| Настройки CLI-приёмки | из действующих инструкций сквада Multica; предел модельного прогона 7200 с |
 | Пределы | CLI 7200 с; cold-check 1800 с |
 | Обвязка | база `0b57a092fead4befc903068c5e8417f20b8e5359` с локальным патчем; SHA256 патча `658a4c3780d3669819ab79cdf1cf81ab0ad8989a13412951e7bbab7af2098e7b`, `accept.py` `e72114232afee4ca0953d54bc04d3fa76c33507b5f6640b539fd813e282962bc`, bundle `cd58d65847f19cefa4b9a4b681a91a87a9213d78aec73d97fdc82ce4b25dcb05` |
 | Внешняя среда | не нужна |

@@ -34,7 +34,7 @@ Component ID: `component.imports.Kafka`, slug `imports-kafka`. Runtime type и �
 | Исходный SHA | вершина ветки задания; Генератор фиксирует его в карточке |
 | Runtime type и режим | `imports.kafka` / `consume` — предложение до конца этапа 0 |
 | Стенд и аккаунты | из конфигов ролей; пара worker/reviewer от Генератора, один стенд |
-| Модель приёмки | `openai/gpt-6-luna`, вариант `high`; итог исполнителя и независимая проверка ревьюера; предел модельного прогона 7200 с |
+| Настройки CLI-приёмки | из действующих инструкций сквада Multica; предел модельного прогона 7200 с |
 | Внешняя среда | Loginom Enterprise/Cloud с Kafka; broker с выделенным topic (две партиции), отдельной consumer group для роли/попытки, ACL; producer, эталонный consumer и admin-клиент offsets; этап 2 — отдельные SASL/SSL профили |
 
 ### Стоп-условия
