@@ -241,3 +241,20 @@ History4527entries/16176904archive bytes и diagnostics3entries/4597165bytes
 Current binary/resources, harness и условия пары не менялись; candidate formal,
 formal cold и compare остаются открытыми. Подготовка независимых native adapters
 описана в [отчёте контрактов](2026-10-08-runtime-acceptance-contract.md).
+
+## Индекс cold replay и частичные метрики
+
+`ab-local-stand-20261008/formal-v7-closed-metrics-and-cold-index-9-20261009.json`
+связывает первые9 terminal result/run/events с SHA и все6 сохранённых пакетов
+с их review/request/plan. Включён first-last-touch#1 с harness FAIL;
+правильные CSV/структура не разрешают пропустить его cold replay.
+Все6 structure/warm PASS, все cold ещё pending. Для first-last-touch записан
+фактический нестандартный путь review, без предположения об общем layout.
+
+Метрики первых9:209 уникальных step_finish parts,208 уникальных tool calls,
+skill calls0 у legacy baseline. Finish parts дедуплицированы по part id,
+tools — по callID; turns до первого prepare посчитаны по упорядоченным
+step_start messageID. Это частичный baseline snapshot без candidate,
+не paired verdict и не доказательство activation delta/noninferiority.
+Общий manifest/порог/допуск не изменены. Индекс составлен локально без
+model/Help/Loginom/judge вызовов; live controller81639 подтверждён.
