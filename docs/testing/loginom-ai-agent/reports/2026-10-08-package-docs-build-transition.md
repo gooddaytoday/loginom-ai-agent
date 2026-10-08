@@ -2,7 +2,7 @@
 
 CLI: три логических повтора прошли mechanics, проверку графа, PDF facts/layout
 и independent cold replay. Desktop: три повтора mechanics/graph/PDF QA прошли;
-независимый cold replay ещё выполняется. Это отдельный переход, не закрытие
+cold replay: один PASS, два readonly FAIL; переход Desktop3/3 не принят. Это отдельный переход, не закрытие
 всей scenario/multiturn матрицы, этапов5–8 или A/B.
 
 Испытуемый product SHA `49b1584f23b4aa47e18b26119389d6f45623fc94`,

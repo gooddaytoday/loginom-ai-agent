@@ -340,3 +340,30 @@ Candidate raw skill records2 имеют один callID и partID: это пов
 к bundled references/workflow.md. Provider step_finish20 distinct IDs против17
 у baseline; причина оставшегося роста provider turns не выводится из одного
 только числа tool records. Допуск на activation не расширяется постфактум.
+
+## Общий wide cold proof и новая фиксация перед парным smoke
+
+`ab-smoke-base-cold-wide-20261008` PASS после такого же reset собственного
+стенда, как candidate wide. Обе стороны: actual destination verified до
+execution, fresh CSV/oracle0, bytes unchanged/settingsReapplied=false,
+native close/logout/remaining0, container removed, exact staged cleanup.
+Pair evidence `ab-smoke-wide-replay-pair-20261008/review.json` подтверждает
+общий cold reader; не входит в90 и не подменяет новую live-пару.
+
+Новые conditions `ab-conditions-wide-20261008/common.json`, SHA256
+`e4a0daf2bfb3d70e02fd0c61121655dd257e7d734e45b012a940c07c5771e5ea`:
+21 adapter/verifier/source pins, cold viewport1920×1080, fresh own server
+перед каждой warm стороной и каждым cold replay. Остальные модели, параметры,
+15 selected task IDs/281 files,658 harness hashes, judge/external pins,
+allowance1activation turn+1skill call и бинарники не изменены. Fresh evals ref
+b31ebe7d0… совпадает; judge ordinary usage allowed, общий window43% consumed.
+Первоначальный conditions0e5ee67e… сохранён; старый smoke не подставляется
+вместо v4 после изменения общих условий.
+
+Controller `skills-ab-run-v4.ts` и reviewer v4 закреплены в manifest.
+Before dispatch: frozen harness clean/hash, source/judge/binaries/adapters,
+fresh external snapshot и isolated own reset guards. Separate results/profile/
+workspace/artifacts каждого side; binary mode/absolute CLI bin; original
+launcher/profiles/.env не изменяются. Baseline v4 smoke запущен первым.
+После обоих v4 smoke нужны judge/structure/warm oracle и common cold replay;
+только затем formal45+45. Судья и структура/cold каждого saved artifact обязательны.

@@ -4447,22 +4447,22 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-08 — ACTIVE, wide cold reader проверяется на обеих сборках
+### 2026-10-08 — ACTIVE, wide cold пара PASS; новый парный smoke
 
-- HEAD до checkpoint ae6050cfa; product baselinefc/candidate49b1584f2 неизменны; новые изменения только evidence/docs.
+- HEAD до checkpoint5f775f3bc; product baselinefc/candidate49b1584f2 неизменны; новые изменения только evidence/docs.
 - Все запуски локально;10.200.13.152 исключён. Исходные Loginom server/client/profiles и чужие процессы сохранены.
 - Frozen harness0876bb32f clean/658 hashes:476 PASS/2 SKIP/0 FAIL/typecheck PASS; protected judge/tasks/near-miss unchanged.
-- Full binary preflight обоих CLI PASS; общие conditions0e5ee67e… проверены перед smoke,15 tasks/90 formal attempts ещё не запущены.
+- Full binary preflight обоих CLI PASS; новые common conditions e4a0daf2…/21 pins/wide viewport/fresh server before each side;15 tasks/90 formal attempts не запущены.
 - Server skill907ff16b…/catalog17764f9a…/Help pins verified; bundled loginom-automation activation candidate подтверждена.
 - Наш eval cold binding adapter TDD/6tests; Host297 PASS/7 SKIP/0 FAIL/typecheck PASS. Saved settings/bytes не переписываются.
 - Baseline smoke sales-by-category CLI/judge100/structure/warm oracle/cold PASS; native close/logout/remaining0/owned staged cleanup confirmed.
 - Candidate smoke CLI/judge100/structure/warm oracle PASS; cold FAIL WIZARD_OPEN_NOT_CONFIRMED, wizard GUID verified/owner breadcrumb unobserved.
 - Native diagnosis: Settings breadcrumb display:none на1280px. Common cold reader1920×1080; candidate wide cold PASS/oracle0/unchanged bytes/native close/logout/remaining0.
-- Own AB server fresh before each wide cold; exact staged cleanup hashed/archived. Baseline wide cold выполняется; originals untouched.
+- Wide cold обеих сторон PASS/oracle0/unchanged bytes/native close/logout/remaining0/exact staged cleanup; originals untouched.
 - CLI modify3 FAIL readonly/inactive-source; owner неизвестен, новая product regression не доказана. CLI docs-after-build3/3 принят.
 - Desktop docs-after-build warm/docs3/3; cold1 PASS/2 readonly FAIL. Эти gate остаются открыты.
 - Own obsolete unpacked trees archived/full roundtrip PASS, backups/DEB/AppImage retained; свободно4.5GB/guard1GB.
-- Этапы5–8 открыты; stage9/full35 deferred. Далее baseline wide cold→новый manifest условий/парный smoke→90 formal attempts.
+- Baseline v4 smoke запущен отдельно; old v3 preserved. Этапы5–8 открыты/stage9 deferred; далее v4 обеих сторон judge/structure/cold→90 formal attempts.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 
