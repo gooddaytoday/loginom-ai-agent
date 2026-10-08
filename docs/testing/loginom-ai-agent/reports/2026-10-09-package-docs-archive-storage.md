@@ -37,3 +37,12 @@ v5 failed cleanup попытки13 в этом списке нет; их ста�
 closed archives с теми же проверками в этот task-owned каталог. Ссылки нельзя
 переиспользовать как mutable profile или installed payload. При восстановлении
 читать существующие restore argv или сначала вернуть regular archive по receipt.
+
+Второй batch: `closed-archive-storage-20261009/batch-2/{plan,receipt,readback}.json`.
+После full roundtrip перенесены ещё12 архивов formal v7 закрытых попыток,
+143641070bytes. Matching result/cleanup, отсутствие process/FD references,
+SHA256/размер/права/UID/GID/xattrs до и после копирования и readback12 PASS.
+Дополнительный `tar-readback.json`: две исходные ссылки читаются штатным tar,
+число записей совпадает с исходным inventory. Root free1950679040→2088456192bytes
+на момент batch. Итого46 архивов490686762bytes; все targets600, parents700.
+Текущие profiles, failed-cleanup попытка13 v5 и A/B conditions не изменялись.

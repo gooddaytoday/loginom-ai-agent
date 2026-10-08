@@ -4449,20 +4449,20 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ### 2026-10-09 — ACTIVE, smoke-пара v7 принята; formal baseline запущен
 
-- HEAD до checkpoint `dfc9deed9`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
+- HEAD до checkpoint `b2de7c258`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client и чужие профили/процессы не изменялись.
 - Own mutable harness495463543 clean; новый detached skills-evals-release на полном SHA495463543901f1a69888b8d6375cd77996ef157b, frozen install/typecheck PASS.
 - Writer post-open real-IO RED→GREEN; release/persistent-empty/replacement guards×5 PASS; modules77 PASS/0 FAIL/241 assertions.
 - Первый full495/session80830 terminal1:447 PASS/2 SKIP/37 FAIL/2 errors; cwd640MiB ниже1GiB.31 прямой space FAIL,6 downstream supported; весь evidence сохранён.
 - Fresh full495/session12760 terminal0:484 PASS/2 SKIP/0 FAIL/2063 assertions/576.34s; порог пространства сохранён, новый own executable TMPDIR в /dev/shm.
 - Exact own immutable dedupe:26568 old frozen source files,612 browser files,13285 new frozen source files; bytes/modes/pins и clean Git проверены до/после; чужие данные не очищались.
-- Dedupe receipts3 сохранены;34 confirmed closed archives347045692bytes перенесены на own ext4 storage, старые archive paths→links/цели600/каталоги700/readback34+native tar3 PASS; около2GiB free. Frozen sources/resources не редактировать.
+- Dedupe receipts3 сохранены;46 confirmed closed archives490686762bytes перенесены двумя batch на own ext4 storage, archive paths→links/цели600/каталоги700/readback34+12/native tar3+2 PASS; около2GiB free. Frozen sources/resources не редактировать.
 - Conditions ab-conditions-release-20261009/common.json SHAa268a81e8b4ea163f50ac52ee99817559b3fab9a08ffc09652dc96c00fcd2ed4:658 harness/281 task/21 adapter pins/5389+5651 build inventory PASS.
 - На freeze evals ref992fca12badf209169f13b569b9bd291e4d70e99; после пары fresh b30dcbe5f/protected diff0, с freeze изменён только соседний docs-файл; frozen495/658files/21pins/оба full CLI повторно PASS.
 - Те же15 задач×3×2=90; primary openai/gpt-6.1-sol medium/judge gpt-6-astra high. Smoke metrics16/18 provider turns,17/20 tools,13/13 Loginom; activation delta1/skill1 PASS, прочий рост отдельно.
 - Baseline smoke v7/session30063 terminal0/run214239:score100/oracle/structure/installed cold21564 PASS; close/logout/remaining0/bytes unchanged; accepted receipt сохранён.
 - Candidate v7/session95877 terminal0/run215120:score100/oracle/structure/cold22429 PASS/cleanup confirmed; pair accepted receipt ab-smoke-v7-pair-accepted-20261009, fresh refb30dcbe5f/protected diff0.
-- Formal v7 baseline81639 live/run220203:6 closed,4 PASS100/oracle/structure-warm (ab-revenue/articles/campaign/customer-activity),ABC no_artifact/cohort failed permission; env/process cleanup confirmed6. ABC/cohort output_mapping AMBIGUOUS/effect possible/recovery unverified; native cause UNKNOWN. Candidate/cold/compare pending; failed cleanup profile не очищать.
+- Formal v7 baseline81639 live/run220203:7 closed,4 PASS/3 FAIL; first-last-touch score89/oracle+structure-warm PASS, judge отказал отсутствие правила исключения None. Env/process cleanup confirmed7; ABC/cohort semantic recovery unverified/native cause UNKNOWN. Snapshot progress-7 сохранён; candidate/cold/compare pending, retries0, failed cleanup profile не очищать.
 - V5 formal1287 terminal1 на13/45:13-я analytic PASS100/process cleanup FAIL; historical PID4050199 errno/operation UNKNOWN; profile не очищен, candidate0/cold0.
 - CLI modify3 FAIL: offline21 file occurrence hashes PASS, saved readonly3/3/UNKNOWN_PREPARED_WORKFLOW3/3/active-source refusal2/3; native writer owner/cause UNKNOWN. Docs-after-build CLI3 accepted/Desktop warm3+cold1 PASS2 FAIL; new Desktop cold guard6 PASS/native только после90 closed.
 - Linux installed CLI/Desktop49 по5 ОС PASS; TUI/native opening/headless docs и upgrade PASS; lifecycle/independence и remaining natural transitions открыты.

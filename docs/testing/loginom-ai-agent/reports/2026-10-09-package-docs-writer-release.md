@@ -185,3 +185,27 @@ environment/process cleanup confirmed; structure/warm oracle PASS.
 Live handle81639 подтверждён; snapshots formal-v7-progress-{3,5}-20261009.json
 содержат фактическое число результатов на момент записи (в последнем6),
 не количество, подразумеваемое именем файла. Candidate/cold/compare не запускались.
+
+## Formal v7: седьмая попытка
+
+First-last-touch#1 completed/score89/pass=false/oracle=true; environment и
+process cleanup confirmed. Структура и warm oracle отдельно PASS,
+review `ab-formal-v7-20261009/base/first-last-touch-1-review/review.json`.
+Судья отклонил пункт `two-aggregates`: в сохранённом сценарии нет правила
+исключения канала `None`. Остальные семь пунктов приняты. Правильный CSV
+не отменяет этот FAIL; судья и рубрика не изменялись, повтор не запускался.
+Cold ещё не выполнен. Первое обращение к reviewer завершилось ENOENT при
+создании output под отсутствующим parent; исправлен только путь output,
+повторена локальная проверка артефакта без model/Loginom/judge calls.
+
+Closed history4636entries/17169232archive bytes и diagnostics3entries/5237257bytes
+сохранены с полным extraction roundtrip. Вторым batch перенесены12 новых
+confirmed closed архивов143641070bytes на собственный локальный диск:
+copy/hash/metadata/readback12 PASS, штатное tar-чтение через2 исходных alias
+PASS. Preservation receipts и результат FAIL сохранены без правки.
+Итого46 архивов490686762bytes вне root disk; текущий profile не переносился.
+
+Snapshot `ab-local-stand-20261008/formal-v7-progress-7-20261009.json` закрепляет
+7 terminal результатов:4 PASS/3 FAIL, все7 environment/process cleanup
+confirmed. Это не подтверждает semantic recovery неуспешных ABC/cohort.
+Baseline81639 остаётся live; candidate formal, formal cold и compare не начаты.
