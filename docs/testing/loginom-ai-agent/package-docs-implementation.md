@@ -4449,7 +4449,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ### 2026-10-08 — ACTIVE, formal v5 остановлен: process cleanup FAIL
 
-- HEAD до checkpoint `55a99f673`; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
+- HEAD до checkpoint `d51a19880`; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client/profiles и чужие процессы сохранены.
 - Frozen skills-evals-writer d1b364a98 clean; evalsrefb31ebe7d0 перечитан перед formal/protected diff0; исторический087 сохранён.
 - Harness full481 PASS/2 SKIP/0 FAIL/2055 assertions/585.37s/typecheck PASS; writer gap real IO RED→GREEN, bounded guards preserved.
@@ -4468,7 +4468,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Lifecycle driver first skill fixed via real-process/HTTP RED→GREEN;4 focused PASS/typecheck PASS; native lifecycle/independence ещё нужны.
 - MiMo installed smoke UNKNOWN; отдельная native-payload диагностика подтвердила HTTP429/quota exhausted, writer absent/remaining0/no browser; новых MiMo calls нет, выбор второй модели запрошен.
 - Source binaries/resources/server skill907ff16b…/catalog17764f9a… сохранены; stage5–8/Linux lifecycle/second-model gates открыты;stage9 deferred.
-- Сейчас own formal refs0/writer/pending absent/recovery0; attempt13/profile сохранены. Own harness diagnostic TDD focused1/module19/typecheck PASS; full suite478 PASS/2 SKIP/3 FAIL (SIGINT2/writer1) исследуется, новый frozen/live pair запрещён до проверки.
+- Own formal refs0/writer/pending absent/recovery0; attempt13/profile/storage snapshot сохранены. Own harness b466 TDD1/module19/typecheck PASS; full478/2skip/3FAIL retained; narrow SIGINT main6×2 PASS, adjacent collector6×2 PASS; clean full session99064 идёт, frozen/live pending.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 

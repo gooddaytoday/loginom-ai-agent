@@ -35,6 +35,29 @@ attempt3/relevant=true, `2026-10-08T20:13:59.634Z`. Это отказ чтени
 Первый запуск модуля19/19 PASS против полного suite FAIL требует проверки
 влияния соседних fixtures; утверждать regression/flaky до этой проверки нельзя.
 
+Основная сессия выполнила шесть последовательных узких SIGINT runs:3 mutable и
+3 frozen d1b364a98, каждый2 PASS/0 FAIL/13 assertions/exit0. Проверены все шесть
+logs/metadata в `infra-sigint-main-host-signal-20261008`; эти два исходных отказа
+отдельно не воспроизвелись. Коллектор получил для соседней writer/helper пары
+3+3 runs exit0 в своей среде. Его HTTP/SIGINT runs отказали раньше тестируемого
+поведения на listen/EADDRINUSE; они отделены от результатов основной сессии.
+Full-suite order/environment impact и владельцы problematic PIDs остаются UNKNOWN.
+Ничьи assertions, ownership checks или retries ради PASS не ослаблялись.
+
+Диагностическая подзадача закреплена own harness SHA
+`b4661a7b68fbad21726bd4d922a8c659165f8b11`. Полный
+suite остаётся исторически FAILED; source frozen для новой live-пары пока не
+создан. Следующий допуск требует чистого полного прогона и одинаковых условий
+baseline/candidate. Новых live/model/judge запусков в этой подзадаче не было.
+
+После окончания всех узких repeats запущен один чистый полный suite на b466;
+exec session99064, log `diagnostic-context-clean-suite-b4661a7b6.log`.
+Результат пока ожидается, PASS ему не присвоен. Все37 файлов collector signal
+скопированы с exact bytes verification в `infra-sigint-collector-signal-20261008`;
+report SHA256 `6f64c0dce5884430140cb07265ea1cfed4345f5787e0dec1b15605affba00811`.
+В исходном collector report main-host snapshot ограничен первыми четырьмя runs;
+полные шесть подтверждены основной сессией отдельно, исходный report не переписан.
+
 Evidence: `formal-v5-process-identity-signal-20261008/diagnostic-context-{red,green,
 module,typecheck,suite}.log` в приватном acceptance-каталоге. Текущая read-only
 проверка: own refs0, writer absent, pending absent, recovery files0; старый FAIL
