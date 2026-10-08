@@ -2,7 +2,8 @@ import { expect, test } from "bun:test"
 import { chmod, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease, runBaseline, verifyBaselineInstallation, baselineHash } from "../src/baseline"
+import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease, runBaseline, verifyBaselineInstallation, baselineHash, captureBaselinePins } from "../src/baseline"
+import type { NodeOpsConfig } from "../src/node-eval-ops"
 import { repoRoot, evalsRoot } from "../src/config"
 
 import { baselineFixturePins } from "../fixtures/baseline"
@@ -38,6 +39,14 @@ test("installation verification refuses tampered payloads and extra files withou
     await Bun.write(path.join(root, "unexpected"), "extra")
     await expect(verifyBaselineInstallation(bin)).rejects.toThrow("CLI_FILE_SET_CHANGED")
   } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("live preparation rejects drift from the agreed product and judge settings before connecting", async () => {
+  const role = { checkout: "/fixture/checkout", referenceProfile: "/fixture/reference", evalProfile: "/fixture/eval", workRoots: ["/fixture/work"], resultsRoot: "/fixture/results" }
+  const config: NodeOpsConfig = { version: 2, runtimeRoot: "/fixture", endpoint: "http://localhost/app/", container: { name: "fixture", id: "b".repeat(64), storageDir: "/workdir/UserStorage/user" },
+    cliBin: "/fixture/old/bin/cli", roles: { rich: role, ben: role, evalbaseline: { ...role, referenceProfile: undefined, cliBin: "/fixture/new/bin/cli" } } }
+  await expect(captureBaselinePins(config, { EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_AGENT_VARIANT: "high" })).rejects.toThrow("MODEL_PIN_CHANGED")
+  await expect(captureBaselinePins(config, { EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_AGENT_VARIANT: "medium", JUDGE_MODEL: "gpt-6-astra", JUDGE_REASONING: "medium" })).rejects.toThrow("JUDGE_PIN_CHANGED")
 })
 
 test("all 132 fixture measurements retain separate quality axes and become complete only after release", async () => {

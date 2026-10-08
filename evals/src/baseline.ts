@@ -4,6 +4,8 @@ import { loadTasks } from "./task"
 import { aggregate, aggregateTask, type AttemptResult, type RunSummary } from "./report"
 import { validateNodeRun } from "./node-evals"
 import { parseArgs } from "node:util"
+import type { NodeOpsConfig, NodeStandLease } from "./node-eval-ops"
+import { dockSkillRevision } from "./preflight"
 
 export type BaselinePins = {
   mode: "live" | "fixture"; harnessSha: string; corpusSha: string; cliVersion: string; cliSource: string
@@ -48,6 +50,45 @@ export async function verifyBaselineInstallation(bin: string) {
   if (JSON.stringify((await walk(root)).sort()) !== JSON.stringify([...manifest.files.map(item => item.path), "cli-manifest.json"].sort()))
     throw new BaselineFailure("CLI_FILE_SET_CHANGED")
   return { files: manifest.files.length, metadata: manifest.metadata, manifestSha256: baselineHash(raw), binarySha256: baselineHash(await Bun.file(bin).bytes()) }
+}
+
+export async function captureBaselinePins(config: NodeOpsConfig, env: Record<string, string | undefined>): Promise<BaselinePins> {
+  if (env.EVAL_AGENT_MODEL !== "openai/gpt-6.1-sol" || env.EVAL_AGENT_VARIANT !== "medium" || env.EVAL_AGENT_PROVIDER_ID)
+    throw new BaselineFailure("MODEL_PIN_CHANGED")
+  if (env.JUDGE_MODEL !== "gpt-6-astra" || env.JUDGE_REASONING !== "high" || Number(env.EVAL_PASS_THRESHOLD ?? "70") !== 70 ||
+    Number(env.EVAL_JUDGE_TIMEOUT_MS ?? "300000") !== 300_000) throw new BaselineFailure("JUDGE_PIN_CHANGED")
+  const { nodeRoleCli, nodeStandStatus } = await import("./node-eval-ops")
+  const role = config.roles.evalbaseline
+  if (config.version !== 2 || !role || env.EVAL_CLI_MODE !== "binary" || env.EVAL_CLI_BIN !== nodeRoleCli(config, "evalbaseline") ||
+    env.EVAL_PROFILE_DIR !== role.evalProfile || env.EVAL_WORKSPACE_ROOT !== role.workRoots[0] || env.EVAL_ARTIFACT_SOURCE !== "docker" ||
+    env.LOGINOM_URL !== config.endpoint || env.LOGINOM_CONTAINER !== config.container.name || env.LOGINOM_STORAGE_DIR !== config.container.storageDir)
+    throw new BaselineFailure("ISOLATION_CONFIG_CHANGED")
+  await nodeStandStatus(config)
+  const installed = await verifyBaselineInstallation(role.cliBin)
+  const sha = (await Bun.$`git -C ${role.checkout} rev-parse HEAD`.quiet()).text().trim()
+  if (!/^[0-9a-f]{40}$/.test(sha) || (await Bun.$`git -C ${role.checkout} status --porcelain`.quiet()).text().trim()) throw new BaselineFailure("HARNESS_DIRTY_OR_UNKNOWN")
+  const inspected = (await Bun.$`docker inspect ${config.container.name}`.quiet()).json() as {
+    Id: string; Image: string; State: { Running: boolean }; Mounts: unknown[]; HostConfig: { RestartPolicy: unknown }; NetworkSettings: { Networks: unknown }
+  }[]
+  const container = inspected[0]
+  if (!container || container.Id !== config.container.id || !container.State.Running || container.Mounts.length) throw new BaselineFailure("CONTAINER_CHANGED")
+  const marker = (await Bun.$`docker exec ${config.container.id} cat /workdir/.loginom-evals-isolated.json`.quiet()).text()
+  const components = (await Bun.$`docker exec ${config.container.id} cat /workdir/Components.cfg`.quiet()).text()
+  const bwrap = await realpath(path.join(config.runtimeRoot, "bin/bwrap"))
+  const isolation = { endpoint: config.endpoint, container: { id: container.Id, image: container.Image, mounts: container.Mounts,
+    restart: container.HostConfig.RestartPolicy, network: container.NetworkSettings.Networks }, marker, components,
+    sandbox: baselineHash(await Bun.file(path.join(role.checkout, "evals/src/sandbox.ts")).bytes()),
+    bwrap: baselineHash(await Bun.file(bwrap).bytes()),
+    apparmor: await Promise.all(["loginom-evals-bwrap", "loginom-evals-chromium", "loginom-evalbaseline-chromium"].map(async name => baselineHash(await Bun.file(`/etc/apparmor.d/${name}`).bytes()))),
+    connection: Object.fromEntries(["LOGINOM_USERNAME", "LOGINOM_PASSWORD", "LOGINOM_DOCK_API_KEY", "LOGINOM_DOCK_BASE_URL", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"].map(key => [key, env[key] ?? ""])) }
+  const revision = await dockSkillRevision({ apiKey: env.LOGINOM_DOCK_API_KEY ?? "", baseUrl: env.LOGINOM_DOCK_BASE_URL ?? "https://loginom.duckdns.org" })
+  return { mode: "live", harnessSha: sha, corpusSha: sha, cliVersion: installed.metadata.version, cliSource: installed.metadata.sourceCommit,
+    cliManifestSha256: installed.manifestSha256, binarySha256: installed.binarySha256, model: "openai/gpt-6.1-sol", variant: "medium",
+    judgeModel: "gpt-6-astra", judgeReasoning: "high", threshold: 70, timeoutMs: 1_800_000, judgeTimeoutMs: 300_000,
+    promptSha256: baselineHash(await Bun.file(path.join(role.checkout, "evals/src/judge-prompt.md")).bytes()),
+    schemaSha256: baselineHash(await Bun.file(path.join(role.checkout, "evals/src/verdict.schema.json")).bytes()),
+    opsConfigSha256: baselineHash(JSON.stringify(config)), isolationSha256: baselineHash(JSON.stringify(isolation)),
+    endpoint: config.endpoint, containerId: config.container.id, imageDigest: container.Image, dockRevision: revision }
 }
 
 export async function prepareBaseline(directory: string, options: { checkout: string; pins: BaselinePins; smoke?: boolean }) {
