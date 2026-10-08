@@ -59,6 +59,19 @@ test("live entry refuses a test-only attempt limit instead of quietly starting a
   expect(await runBaseline(["start", "--series", "/fixture/series", "--limit", "1"], {})).toMatchObject({ code: 2, reason: "LIVE_LIMIT_REFUSED" })
 })
 
+test("prepare freezes a matching operational config before any live admission", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-config-"))
+  try {
+    const config = { version: 2 } as NodeOpsConfig
+    const pins = { ...baselineFixturePins, opsConfigSha256: baselineHash(JSON.stringify(config)) }
+    await prepareBaseline(path.join(directory, "series"), { checkout: repoRoot, pins, config })
+    expect(await Bun.file(path.join(directory, "series/ops-config.json")).json()).toEqual(config)
+    expect((await lstat(path.join(directory, "series/ops-config.json"))).mode & 0o077).toBe(0)
+    await expect(prepareBaseline(path.join(directory, "wrong"), { checkout: repoRoot, pins: baselineFixturePins, config })).rejects.toThrow("CONFIG_PIN_CHANGED")
+    expect(await Bun.file(path.join(directory, "wrong/manifest.json")).exists()).toBe(false)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test("all 132 fixture measurements retain separate quality axes and become complete only after release", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-full-"))
   try {

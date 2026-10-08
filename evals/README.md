@@ -1,5 +1,7 @@
 # Eval harness Loginom AI Agent
 
+Полные серии по три попытки, отдельный EvalBaseline runtime и продолжение: [baseline runtime](docs/baseline-runtime.md), [инструкция агента](docs/evalbaseline.md).
+
 Собирает сопоставимые результаты построения сценариев Loginom: прогоняет задачи через standalone CLI, забирает `.lgp`, сверяет экспорт с oracle и оценивает граф судьёй `codex exec`. `compare` вычисляет отдельные вердикты «хуже / лучше / неразличимо» по completion, oracle и структуре, с отдельным признаком «не хуже», надёжностью pass^1/pass^k и наблюдаемым правилом 3/3 → 0/3. Дизайн: `docs/superpowers/specs/2026-09-18-evals-design.md`.
 
 ## Предпосылки

@@ -94,16 +94,19 @@ export async function runNodeEvalOps(argv: string[], env: Record<string, string 
 export const nodeOpsHelp = `Usage: bun script/node-eval-ops.ts <command> --config <private-runtime.json> [options]
 Commands:
   status                         Inspect shared lease; FREE=0, BUSY=2; no token.
-  acquire --issue ID --task ID --role rich|ben --phase unit|reference|cold|eval|recovery --sha FULL --receipt FILE
+  acquire --issue ID --task ID --role rich|ben|evalbaseline --phase unit|reference|cold|eval|recovery --sha FULL --receipt FILE
   preflight --lease FILE          No model execution; clean profiles + existing live preflight.
   unit --lease FILE               Supervised bun test then bun typecheck, no arbitrary command.
   release --lease FILE --evidence FILE
   release --lease FILE --run DIR --ids a,b --run-sha FULL
+  release --lease FILE --baseline DIR --run-sha FULL
   recover --lease FILE --incident ID --evidence FILE
   check-run --run DIR --ids a,b [--tasks DIR]  Offline; never writes summary or verdict.
 Lease handles must stay private (0600); no TTL, waiting, PID stealing, or external retry.
 Runtime config v1 contains runtimeRoot, endpoint, container {name,id,storageDir}, cliBin,
 roles {rich,ben}, each {checkout,referenceProfile,evalProfile,workRoots,resultsRoot}.
+v2 adds eval-only evalbaseline {checkout,evalProfile,workRoots,resultsRoot,cliBin};
+worker roles may pin cliBin independently. Reference/cold are forbidden for evalbaseline.
 Optional offline {checkout,workRoots,resultsRoot} gives Evaler read-only evidence paths.
 One operator recovery is reserved per immutable lease; incident renaming cannot reset it.
 Successful release archives the private lease and proofs under operations/completed.

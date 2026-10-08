@@ -81,6 +81,7 @@ export async function captureBaselinePins(config: NodeOpsConfig, env: Record<str
     restart: container.HostConfig.RestartPolicy, network: container.NetworkSettings.Networks }, marker, components,
     sandbox: baselineHash(await Bun.file(path.join(role.checkout, "evals/src/sandbox.ts")).bytes()),
     bwrap: baselineHash(await Bun.file(bwrap).bytes()),
+    bwrapBinary: baselineHash(await Bun.file("/usr/local/libexec/loginom-evals/bwrap").bytes()),
     apparmor: await Promise.all(["loginom-evals-bwrap", "loginom-evals-chromium", "loginom-evalbaseline-chromium"].map(async name => baselineHash(await Bun.file(`/etc/apparmor.d/${name}`).bytes()))),
     connection: Object.fromEntries(["LOGINOM_USERNAME", "LOGINOM_PASSWORD", "LOGINOM_DOCK_API_KEY", "LOGINOM_DOCK_BASE_URL", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"].map(key => [key, env[key] ?? ""])) }
   const revision = await dockSkillRevision({ apiKey: env.LOGINOM_DOCK_API_KEY ?? "", baseUrl: env.LOGINOM_DOCK_BASE_URL ?? "https://loginom.duckdns.org" })
@@ -93,8 +94,9 @@ export async function captureBaselinePins(config: NodeOpsConfig, env: Record<str
     endpoint: config.endpoint, containerId: config.container.id, imageDigest: container.Image, dockRevision: revision }
 }
 
-export async function prepareBaseline(directory: string, options: { checkout: string; pins: BaselinePins; smoke?: boolean }) {
+export async function prepareBaseline(directory: string, options: { checkout: string; pins: BaselinePins; smoke?: boolean; config?: NodeOpsConfig }) {
   validatePins(options.pins)
+  if (options.config && baselineHash(JSON.stringify(options.config)) !== options.pins.opsConfigSha256) throw new BaselineFailure("CONFIG_PIN_CHANGED")
   const collections = [["regular", "tasks"], ["analytic", "tasks/analytic"], ["node", "tasks/node-evals"]] as const
   const cases: BaselineCase[] = []
   for (const [collection, relative] of collections) {
@@ -113,6 +115,7 @@ export async function prepareBaseline(directory: string, options: { checkout: st
   const journal: BaselineJournal = { version: 1, manifestSha256: baselineHash(raw), checkout: options.checkout,
     jobs: manifest.jobs.map(job => ({ key: job.key, state: "pending" })) }
   await atomicJournal(directory, journal)
+  if (options.config) await writeFile(path.join(directory, "ops-config.json"), JSON.stringify(options.config), { flag: "wx", mode: 0o600 })
   return manifest
 }
 
@@ -219,7 +222,7 @@ export async function sealBaselineRelease(directory: string, receipt: BaselineRe
 export async function runBaseline(argv: string[], env: Record<string, string | undefined> = process.env): Promise<Record<string, unknown> & { code: number }> {
   try {
     const command = argv[0]
-    if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke --series DIR [--config PRIVATE --issue ID --task ID] [--compare SERIES]" }
+    if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke --series DIR [--config PRIVATE --issue ID --task ID] [check: --compare SERIES --export] [resume: --recover-executor after inspection]" }
     const values = parseArgs({ args: argv.slice(1), strict: true, options: { series: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" } } }).values
     const directory = values.series
     if (!directory || !path.isAbsolute(directory)) throw new BaselineFailure("SERIES_PATH_REQUIRED")
@@ -251,7 +254,7 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
       throw new BaselineFailure("SERIES_PATH_REFUSED")
     const pins = await captureBaselinePins(config, env)
     if (command === "prepare" || command === "smoke") {
-      const manifest = await prepareBaseline(directory, { checkout: role.checkout, pins, smoke: command === "smoke" })
+      const manifest = await prepareBaseline(directory, { checkout: role.checkout, pins, smoke: command === "smoke", config })
       if (command === "prepare") return { code: 0, status: "PREPARED", id: manifest.id, expected: manifest.jobs.length, cases: manifest.cases.length }
     }
     return await executeLiveBaseline(directory, config, env, pins, { issue: typeof values.issue === "string" ? values.issue : undefined,
@@ -306,11 +309,11 @@ async function executeLiveBaseline(directory: string, config: NodeOpsConfig, env
       const summary = await Bun.file(path.join(record.runDir, "summary.json")).json() as RunSummary
       if (summary.interrupted || summary.stopped_reason) throw new BaselineFailure("SERIES_STOPPED_WITH_RETAINED_STAND")
     }
-    const completion = path.join(directory, "stand-completion.json")
+    const completion = path.join(directory, `stand-completion-${crypto.randomUUID()}.json`)
     await writeFile(completion, JSON.stringify({ version: 1, owner: { issue: lease.issue, task: lease.task, role: lease.role, phase: lease.phase, sha: lease.sha },
       acquiredAt: lease.acquiredAt, kind: "baseline", seriesDir: directory, runSha: pins.harnessSha }), { flag: "wx", mode: 0o600 })
     const configFile = path.join(directory, "ops-config.json")
-    await writeFile(configFile, JSON.stringify(config), { flag: "wx", mode: 0o600 })
+    if (baselineHash(JSON.stringify(await readPrivateBaselineJson(configFile))) !== pins.opsConfigSha256) throw new BaselineFailure("CONFIG_PIN_CHANGED")
     const released = await runNodeEvalOps(["release", "--config", configFile, "--lease", handle, "--evidence", completion], env)
     if (released.code !== 0 || typeof released.archive !== "string" || typeof released.evidenceSha256 !== "string") throw new BaselineFailure("STAND_RELEASE_BLOCKED")
     await sealBaselineRelease(directory, { status: "RELEASED", evidenceSha256: released.evidenceSha256, receiptPath: path.join(released.archive, "release.json") })

@@ -1,0 +1,17 @@
+# EvalBaseline — checkpoint 2026-10-08
+- Branch baseline-runtime; checkout /tmp/loginom-baseline-runtime, основной checkout сохранён.
+- Проверенный code SHA: 9b76a3b3b; operational source SHA фиксируется manifest поставки.
+- Корпус: 44 кейса, три круга, 132 отдельных измерения repeat=1.
+- Executor, atomic journal/resume/check, config v2, общий lease и baseline completion готовы.
+- Отдельные regular/analytic/node, ошибки и расходы retries, compare, curated export.
+- Полный bun test: 457 PASS, 2 server-only SKIP, 0 FAIL; дополнительные baseline: 9 PASS.
+- bun typecheck PASS; source-only проверки не заменяют live-приёмку.
+- CLI 0.1.17 / fc3d97dbf695c2ed8dba942feb6fe83591a33944 установлен отдельно.
+- Manifest SHA256 6928473abd91329c4cf557d405f23865eab885176cd6596459c524f5f43c3ff1, 5389 файлов.
+- AppArmor установлен/parser exit 0; chrome-sandbox root:root 4755.
+- Собственный Loginom setup ready; история настройки архивирована, профиль clean.
+- Multica EvalBaseline 77032943-ad18-4ae9-a2c6-668769077c86, gpt-6.1-sol/xhigh, concurrency=1.
+- Runtime eval-tests, вне squad; продуктовые smoke и полный baseline не запускались.
+- Ограничения: deploy/config switch, native MCP и isolated native check ещё предстоят.
+- Unknown outcome требует ручного разбора/recovery и автоматически не повторяется.
+- Следующий шаг: server checks и ровно два smoke, Multica readback и доставка evidence.
