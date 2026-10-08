@@ -497,13 +497,32 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
               diagnostic("dispatch.websocket")
               return websocketFetch(url, requestInit)
             }
-            if (process.env.NODE_DEBUG?.toLowerCase().split(/[,\s]+/).includes("loginom-codex")) {
+            if (
+              process.env.NODE_DEBUG?.toLowerCase()
+                .split(/[,\s]+/)
+                .includes("loginom-codex")
+            ) {
               const { Option, Schema } = await import("effect")
               const body =
                 typeof requestInit.body === "string"
                   ? Option.getOrUndefined(Schema.decodeUnknownOption(Schema.UnknownFromJsonString)(requestInit.body))
                   : undefined
               const value = body && typeof body === "object" ? body : undefined
+              const reasoning =
+                value && "reasoning" in value && value.reasoning && typeof value.reasoning === "object"
+                  ? value.reasoning
+                  : undefined
+              const effort = reasoning && "effort" in reasoning ? reasoning.effort : undefined
+              diagnostic(
+                "request.options gpt56Model=%s stream=%s store=%s reasoning=%s contentLength=%s",
+                !!value && "model" in value && value.model === "gpt-5.6-sol",
+                !!value && "stream" in value && value.stream === true,
+                !!value && "store" in value && value.store === true,
+                typeof effort === "string" && ["none", "minimal", "low", "medium", "high", "xhigh"].includes(effort)
+                  ? effort
+                  : "other",
+                headers.has("content-length"),
+              )
               diagnostic(
                 "request.shape codexTarget=%s post=%s inputCount=%d toolCount=%d instructionsBytes=%d",
                 url.origin === "https://chatgpt.com" && url.pathname === "/backend-api/codex/responses",
