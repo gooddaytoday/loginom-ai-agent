@@ -3,6 +3,7 @@ import path from "node:path"
 import os from "node:os"
 import { mkdtemp, rm } from "node:fs/promises"
 import { validateNodeAttempt } from "../src/node-evals"
+import { readNodeEvents } from "../src/node-events"
 
 test("string counts: actual native reference and required input/mask/mapping negatives", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "node-string-counts-"))
@@ -34,6 +35,20 @@ test("string counts: actual native reference and required input/mask/mapping neg
     await Bun.write(path.join(root, "data/sales.csv"), source.replace("N,A,?", "N,A,x"))
     expect((await validateNodeAttempt(root, root)).failures.join(" ")).toContain("input")
     await Bun.write(path.join(root, "data/sales.csv"), source)
+    const mutations = [
+      (calls: ReturnType<typeof readNodeEvents>["calls"]) => { calls.filter(c => c.output.configuration?.readback?.kind === "crosstable").forEach(c => { const m = c.output.configuration.readback.output_mapping; if (m) [m.target_fields[2].source, m.target_fields[3].source] = [m.target_fields[3].source, m.target_fields[2].source] }) },
+      (calls: ReturnType<typeof readNodeEvents>["calls"]) => { calls.filter(c => c.output.configuration?.readback?.kind === "text_import").forEach(c => { c.output.configuration.readback.format.null_marker = "" }) },
+      (calls: ReturnType<typeof readNodeEvents>["calls"]) => { calls.filter(c => c.input.target?.type === "imports.text").forEach(c => { c.input.parameters.settings.format.null_marker = "" }) },
+      (calls: ReturnType<typeof readNodeEvents>["calls"]) => { calls.filter(c => c.tool.endsWith("artifact_deliver")).forEach(c => { c.output.output.sha256 = "0".repeat(64) }) },
+      (calls: ReturnType<typeof readNodeEvents>["calls"]) => { calls.filter(c => c.output.configuration?.readback?.kind === "crosstable").forEach(c => { c.output.output.ports[0].exact_table.rows[1][2].value = "1"; c.output.output.ports[0].exact_table.rows[1][2].native.bytes_le = "0100000000000000" }) },
+      (calls: ReturnType<typeof readNodeEvents>["calls"]) => { calls.filter(c => c.input.action_key === "package.save_checkpoint").forEach(c => { c.output.output.save_completed = false }) },
+    ]
+    for (const mutate of mutations) {
+      const events = readNodeEvents(protocol.map((e: unknown) => JSON.stringify(e)).join("\n")); mutate(events.calls)
+      await Bun.write(path.join(root, "events.jsonl"), events.calls.map(c => JSON.stringify({ type: "tool_use", part: { id: String(c.index), tool: c.tool, state: { status: "completed", input: c.input, output: JSON.stringify(c.output), time: { start: c.start, end: c.end } } } })).join("\n"))
+      expect((await validateNodeAttempt(root, root)).failures.length).toBeGreaterThan(0)
+    }
+    await reset()
     await rm(path.join(root, "native-crosstable.json"))
     expect((await validateNodeAttempt(root, root)).failures.join(" ")).toContain("native")
   } finally { await rm(root, { recursive: true, force: true }) }
