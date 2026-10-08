@@ -177,6 +177,43 @@ outer container exit0 и очистка подтверждены. Сохране
 `manual-quality.json` и отдельные manual positive/negative summaries;
 их PASS относится к проверенным случаям, а не всей прерванной матрице.
 
+Недостающие single-turn слоты теперь выполнены отдельно, на том же clean49,
+models snapshot и corpus SHA. Aggregate `routing-49-single-turn-summary-20261008`
+содержит **84 завершённые попытки:14 случаев ×3 каждого интерфейса**.
+В него входят33 положительных отчёта,21 отрицательный docs-случай и30 default
+ответов. Automation/docs не активируются для справочного вопроса, арифметики
+или перевода; reports/Chromium0, арифметика102, перевод корректен. Ошибочные
+дополнительные URL в трёх Desktop-ответах перенаправляются в общий `/userguide/`,
+а не на конкретный обработчик; это отдельное зафиксированное ограничение,
+не утверждение безупречности ссылок. Содержательные ответы на исходный вопрос
+сопоставлены с реальной Help. Неполный исходный Desktop node-purpose3 сохранён.
+
+Возобновлённый Desktop defaults контроллер также вернул outer143, но все12
+result/processes/cleanup и свой summary failures[] уже записаны; root и
+temporary удалены12/12, remaining[]. Его верхний exit не переписан на0.
+Остальные resume контроллеры exit0. Новый контрольный native AppImage49
+действительно открыл по кнопкам два PDF, один Word и один Markdown: **4/4 PASS**,
+в своих системных просмотрщиках. Это повторное отображение сохранённых
+сообщений только собственной сессии, live model/Help/Loginom calls0;
+remaining processes/viewers[]. Evidence `native-document-link-49b1584f2`.
+
+Установленный CLI49 native TUI: **6/6 PASS** — paste/@, обе формы с
+`/package-docs`, external-path allow/deny. Synthetic provider, без реального
+Help/Loginom/модели. Четыре полных PDF имеют по одной странице; все просмотрены,
+факты demo fixture и layout PASS4/4. Вход неизменён, system Node/Python недоступны
+для продукта, `.writer` снят, browser/processes0; собственная установка удалена.
+Evidence `tui-49b1584f2-installed`. Файловый подпункт этапа6 отмечен выполненным;
+общая20-case матрица, сценарные переходы и этапы5–8 остаются открытыми.
+
+Offline CLI upgrade49 остановился до обновления: старый bc6 status вернул
+unconfigured JSON и `LOGINOM_HOST_CLEANUP_FAILED`, remaining[], контейнер
+удалён. Тот же old-status ранее прошёл в669 upgradev4; причина исследуется,
+новый payload ещё не выполнялся, regression49 не заявляется. Desktop upgrade
+первые два запуска остановились до приложения из-за ошибок нового контроллера:
+старое имя manifest и несовпавшее имя staged driver. Оба FAIL сохранены;
+v3 проверяет реальные пути и выполняет исходные byte-integrity assertions.
+Проверка обновления пока не принята.
+
 ## Независимый structural verifier
 
 Все13 scripts существующего loginom-eval-case скопированы в собственный
