@@ -98,6 +98,13 @@ receipt, финальный ответ и процессные наблюден�
 `package-proof.json` остаются в evidence. Холодное повторное выполнение
 отмечается отдельно как непроверенное; ответ модели также требует review.
 
+Перед удалением собственного профиля оба адаптера копируют только внутренние
+`execution-events.jsonl` в `internal-journals/`, с исходными относительными
+путями, размером и SHA256 в `internal-journals.json`. Это сохраняет внутренний
+step receipt при отказе, не меняя runtime и recovery. Auth и browser-profile
+не копируются; symlink профиля/журнала и известный raw secret дают отказ.
+Пустой список журналов допустим для кейса, не создающего browser runtime.
+
 Добавлены переходы `docs-after-build`, `scenario-then-docs`, `scenario-after-docs`.
 Каждый ход получает отдельные receipts/messages, сохраняет тот же Session ID
 и учитывает только новые tool calls и документы. Build → docs прикладывает
