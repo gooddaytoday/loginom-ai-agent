@@ -60,3 +60,30 @@ TDD RED: фактический request driver отклонён публичны
 Private evidence: `ab-local-stand-20261008/owner-driver-compact-{red,green,regression,final,typecheck,typecheck-final}-20261009.log`.
 Все21 закреплённых A/B adapter pins повторно PASS; испытуемые сборки и frozen
 harness не менялись. Native SIGINT/owner-loss/cleanup остаются непроверенными.
+
+## 2026-10-09: новая задача в resume oracle
+
+`script/resume-oracle.ts` начинает новый пользовательский ход, поэтому старый
+automation grant не применяется автоматически. Добавлена обычная активация
+`skill(loginom-automation)` перед prepare в каждом resumed ходе. Проверка свежей
+истории теперь требует три completed tool parts: skill, prepare и observe;
+все прежние проверки Session ID, нового user message и package identity сохранены.
+
+TDD запускает настоящий controller, PTY и отдельный CLI fixture через HTTP
+oracle provider. CLI fixture рекламирует только skill до активации и возвращает
+prepared=false после prepare; браузер и Loginom не запускаются. RED receipt:
+requested=loginom_dock_prepare, advertised=[skill]. GREEN: первые два вызова
+skill/loginom_dock_prepare, канонический аргумент loginom-automation.
+Этот отрицательный fixture не доказывает успешный live resume или cleanup
+Chromium; оконный guard не отключён, полный resume остаётся native gate.
+
+Первый диагностический RED был закрыт ошибкой оконного cleanup, а тест читал
+неверное имя refusal receipt. Исправлен путь на фактический `missing-tool.json`;
+повторное временное удаление только строки активации воспроизвело точный RED,
+после восстановления получен GREEN. Все промежуточные логи сохранены.
+
+Из `packages/loginom-host`: `bun test test/resume-oracle.test.ts test/cli-owner-crash.test.ts test/cli-owner-crash-contract.test.mjs test/oracle-provider.test.ts`:
+6 PASS/0 FAIL/33 assertions; `bun typecheck`: PASS.
+Private evidence: `ab-local-stand-20261008/resume-driver-activation-*-20261009.log`.
+Продукт, frozen harness и21 A/B adapter pins не менялись; natural/live resume,
+TUI exit и Desktop/CLI independence не помечены выполненными.
