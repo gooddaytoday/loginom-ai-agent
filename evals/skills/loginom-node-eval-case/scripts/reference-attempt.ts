@@ -1,5 +1,5 @@
 import path from "node:path"
-import { mkdir, readdir } from "node:fs/promises"
+import { mkdir } from "node:fs/promises"
 import type { Task } from "../../../src/task"
 
 async function main() {
@@ -38,7 +38,8 @@ async function main() {
   await mkdir(config.resultsDir, { recursive: true, mode: 0o700 })
   const runDir = path.join(config.resultsDir, runId)
   await mkdir(runDir, { mode: 0o700 }) // Never overwrite or silently retry an author attempt.
-  const sources = ["task.json", ...task.inputs, ...(await readdir(dir)).filter(file => /oracle.*\.(csv|py|json)$/.test(file))]
+  const sources = [...new Set([...task.inputs, ...await Array.fromAsync(
+    new Bun.Glob("**/*").scan({ cwd: dir, onlyFiles: true, dot: true, followSymlinks: false }))])]
   const hashes = Object.fromEntries(await Promise.all(sources.map(async file => [file,
     new Bun.CryptoHasher("sha256").update(await Bun.file(path.join(dir, file)).bytes()).digest("hex")])))
   await Bun.write(path.join(runDir, "source-hashes.json"), JSON.stringify(hashes, null, 2) + "\n")
