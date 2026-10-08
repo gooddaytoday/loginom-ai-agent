@@ -155,3 +155,22 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 - New LGD LAB29/XLSX LAB30 and lgd-research/xlsx-research fast-forward to current loginom0ca9e75bc7bb6897f46ac1ddc880b9758e993dc9; source change only attachments, Stage0 criteria preserved.
 - LGD/XLSX Backlog0, pairs ready via Generator, manual assignment only; no PR38/39 continuation, Stage0/full node acceptance NOT_RUN. Node profiles/accounts/branch/evidence independent.
 - Next: вручную назначить LGD/XLSX или другие узлы и наблюдать CPU/RAM/очередь/ошибки при cap12; испытание12 NOT_RUN. New shared-oauth build/merge requires new exact artifact qualification; merge/release remain owner commands.
+
+## Checkpoint — восемь перепроверок реализованных узлов, 08.10.2026
+
+- Владелец назначил восемь карточек; [границы и ветки](multica-node-recheck.md). Это Stage0 перепроверки принятых обработчиков, не discovery LGD/XLSX.
+- Исходный SHA восьми отдельных remote веток: `4e626d547258e9ae7c0b7937cd672781dde0667e`; общая база `f9bf332cc491baa784e6e04fdfda7c0f09151cb7`; current loginom0ca содержит два отдельных новых коммита, отсутствующих в4e.
+- LAB45 calculator, LAB46 field-parameters, LAB47 row-filter, LAB48 grouping, LAB49 sorting, LAB50 join, LAB51 union, LAB52 replacement.
+- PR узлов: draft → shared-oauth; PR40 draft → loginom остаётся открытым, merge/release NOT_RUN.
+- Текущие API readback: mas online, тот же runtime; Генератор/Исполнитель/Ревьюер caps1/8/8, активных старых задач этих ролей перед запуском нет.
+- Центральная настройка CLI в скваде сверена с назначением владельца; concrete model/variant не копируются в подпланы/регламенты/карточки, фактические значения — в evidence.
+- Уточнены Stage0 и последовательный native handoff в существующих инструкциях; partial PUT/readback PASS, native model/MCP/runtime/caps сохранены; Eval unchanged.
+- LAB45 Generator task `01a11d37-c86d-7241-8ad3-196348de401d` running на mas, собственный checkout подтвердил exact4e626d и чистые исходники.
+- Живой preflight LAB45 PASS: source597/version0.0.0-dev-202610081651/shared-oauth-v1,5678/5678 hash/lstat/link/inventory, daemon argv/config12, caps1/8/8; доступны28774MiB RAM/390.47GiB disk, load0.15.
+- Receipt LAB45 скачан/прочитан; [dispatch evidence](reports/2026-10-08-node-recheck/dispatch.json) закрепляет hash и центральные configured CLI settings отдельно от фактических прогонов.
+- Наблюдение в этом чате каждые5мин, только существенные уведомления; Multica scheduler/очередь не менялись.
+- Приёмка узлов, независимые модельные итоги и cold reopen этой волны NOT_RUN; нагрузка12 NOT_RUN.
+- LAB29/LAB30 Backlog, старые attempts/evidence/profiles сохраняются; чужие локальные reports не изменялись.
+- Все восемь Generator dispatch приняты на mas: LAB45 running, LAB46–52 queued; роли в каждой карточке передаются последовательно.
+- Исправлена ошибочная ancestry-запись в карточках; проверен merge-basef9, исходные remote ветки не менялись.
+- Следующий шаг: завершить preflight и наблюдать штатную очередь, передачу ролей, ресурсы, provider errors и cleanup.
