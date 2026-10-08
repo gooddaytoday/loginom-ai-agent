@@ -43,7 +43,6 @@ const policy = {
   mappings: [],
   finish: "execute",
   read: { ports: [0], sample_rows: 10, require_exact_numbers: true, coverage: "sample" },
-  budgets: { configure_ms: 120000, execute_ms: 60000, total_ms: 180000 },
 }
 // The user-v1 profile publishes no UI gesture tool, so the package is closed by the
 // runtime's own shutdown cleanup. Only the direct runtime transport can request it.
@@ -197,7 +196,7 @@ async function applyNode(child: Child, request: Record<string, unknown> & { oper
     // The settled dock_node_wait result is already the required inspection.
     // During an unresolved mutation the dynamic tool gate advertises resume,
     // while an additional status call is intentionally unavailable.
-    body = await call(child, "dock_node_resume", request)
+    body = await call(child, "dock_node_resume", { operation_id: request.operation_id })
   }
   throw Error(`NODE_FAILED_${request.operation_id}`)
 }
