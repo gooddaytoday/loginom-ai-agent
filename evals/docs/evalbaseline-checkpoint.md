@@ -1,14 +1,14 @@
 # EvalBaseline — checkpoint 2026-10-08
 - Branch baseline-runtime; checkout /tmp/loginom-baseline-runtime; основной checkout сохранён.
-- Проверенный code SHA 58e49fa98aa1f87a4b2a4cd7333f5070dc427fae; LAB-31 принят на 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad.
+- Проверенный code SHA 114d10ffab0efe32dc3db28b25be7137a274cce3; LAB-31 принят на 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad.
 - Корпус 48 кейсов/144 измерения; public prepare и полный fixture N×3 PASS.
 - Этапы 0, 3.0 и 3.1 выполнены; single-case smoke, budget=0 и устойчивый readiness ledger реализованы.
-- Этап 3.2: infrastructure/judge recovery, retries, abandon, reconcile и бюджет аварийной очистки по исходному execution реализованы.
+- Этап 3.2: infrastructure/judge recovery, retries, abandon, reconcile, execution budget и cleanup resolutions реализованы.
 - Private v2 config должен закрепить readinessIssue на UUID LAB-32 до freeze; полный start gated.
 - Последний полный suite на 3d3cf1f94: 519 PASS, 7 clean-host SKIP, 0 FAIL; 526 тестов/47 файлов/2508 assertions.
-- Helper targeted: 24 PASS/4 clean-host SKIP/0 FAIL; repeated recovery failure fixture PASS (077df6ffc); typecheck PASS.
+- Baseline/recovery/helper/judge targeted: 90 PASS/4 clean-host SKIP/0 FAIL/436 assertions; typecheck PASS; новый полный suite выполняется.
 - Единичный fixture CLEANUP_UNKNOWN не воспроизведён в 6 повторах и полном suite; причина не установлена.
-- Исходные bytes/retry ошибки/verdict сохраняются; score=0 окончателен; UNKNOWN и живой child не разрешают новый запуск.
+- Исходные bytes/failed cleanup/retry ошибки/verdict сохраняются; отдельный cleanup proof открывает продолжение без повтора продукта.
 - Deployment остаётся bfb7c62e4266e76c995a43b6f909d8a6739ce062; active config v1.
 - CLI 0.1.17 / fc3d97dbf695c2ed8dba942feb6fe83591a33944; manifest 5389 файлов, AppArmor/setup ранее PASS.
 - Multica EvalBaseline: eval-tests, gpt-6.1-sol/xhigh, concurrency=1, вне squad; Native MCP actor/auto Peer ранее PASS.
@@ -17,4 +17,4 @@
 - Стенд/очереди/пять профилей ранее чисты; повторить перед активацией, семь clean-host fixtures выполнить без skip до smoke.
 - Живые smoke и полный baseline не запускались; UNKNOWN автоматически не повторяется.
 - Карточку полного baseline создать и реально запустить на этапе 7; native heartbeat основного чата на этапе 8.
-- Далее: cleanup resolutions без изменения исходных receipts, оставшиеся crash/concurrency проверки; полный suite, затем 4–10.
+- Далее: результат полного suite, оставшиеся crash/concurrency и native cleanup проверки; затем активация и этапы 4–10.

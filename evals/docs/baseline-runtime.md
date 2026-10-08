@@ -1,6 +1,6 @@
 # Runtime baseline
 
-Executor: `src/baseline.ts`, вход `script/run-baseline.ts`, команды prepare/start/resume/check/smoke/recover-measurement/abandon.
+Executor: `src/baseline.ts`, вход `script/run-baseline.ts`, команды prepare/start/resume/check/smoke/recover-measurement/resolve-cleanup/abandon.
 Live `--limit` запрещён, fixture допускает fake/dir и тестовый limit. Smoke требует
 `--case calc-data-double|crosstable-fixed-sum` и создаёт отдельную серию с одним заданием
 attempt=1; повтор создания существующей серии запрещён. Отсутствие артефакта оставляет
@@ -47,7 +47,7 @@ Chrome sandbox должен быть root:root 4755; фактическая гр
 Полная baseline-серия с сохранённым, но неизмеренным исходом удерживает стенд и возвращает
 `AWAITING_RECOVERY`. Допуск следующего slot и штатная фиксация release запрещены, даже если
 очистка ошибочного запуска подтверждена. Ошибки и расходы сохраняются; этап 3.2 плана ещё
-требует завершения проверок crash/reconcile и подтверждений восстановленной очистки.
+требует завершения проверок crash/concurrency и проверки восстановленной очистки на выделенном сервере.
 Smoke сохраняет собственный release после подтверждённой очистки, включая infra error;
 ошибка оставляет его readiness незавершённым и не разрешает автоматический повтор.
 После записанного release допуск нового измерения отклоняется как `SERIES_RELEASED`.
@@ -71,8 +71,8 @@ UNKNOWN_OUTCOME_REQUIRES_RECOVERY и сохраняет серию для опе
 evidence и точным storage ledger; затем проверяет SETTLED и исходные файлы. Потерянное
 измерение не превращается в измеренный PASS/FAIL. Подтверждённая аварийная очистка сама по
 себе не закрывает пропущенное измерение и не разрешает штатный release полной baseline-серии.
-Терминальное прекращение такой серии с отдельной причиной и проверкой очистки ещё требуется
-реализовать в этапе 3.2; оно не будет означать полный baseline.
+Терминальное прекращение такой серии выполняется командой `abandon` с отдельной причиной
+и доказательством штатного release; оно не означает полный baseline.
 `resume --recover-executor` требует предварительного разбора: исходная identity/inode/stand
 owner совпадают, PID+starttime отсутствует, сохранённые измерения/cleanup/профиль проверены;
 guard архивируется. Stale journal.lock, запуск без terminal summary и неподтверждённая очистка
@@ -107,8 +107,18 @@ Judge `resume` запускает отдельный supervised worker и шта
 с результатом, ошибкой и временем и `judge/verdict-N.json`, если ответ получен. Успешный retry
 не скрывает предыдущую ошибку; отчёт учитывает время всех сохранённых вызовов. В экспорт входят
 receipts, все полученные verdict и связь восстановления,
-а process proof остаётся закрытым. Проверки всех границ crash/reconcile и cleanup resolutions ещё
-не завершены; это не готовность к live.
+а process proof остаётся закрытым. Оставшиеся проверки crash/concurrency и выделенного сервера
+должны завершиться до live.
+
+`resolve-cleanup --series DIR --evidence RECOVERY_COMPLETION_JSON` фиксирует восстановленную
+очистку конкретного product execution после штатного `node-eval-ops recover`. В live helper
+проверяет исходный admission, владельца lease, execution/budget, SETTLED receipt, завершение
+процессов, закрытый архив истории, остальные cleanup receipts, все профили и пустое хранилище.
+Команда не запускает модель и сохраняет отдельный immutable private proof. Исходные summary,
+cleanup.json и `record.cleanup=false` остаются неизменными; отчёт сохраняет первоначальную
+ошибку с признаком `cleanup_resolved`. Подтверждение открывает следующий кейс или восстановление
+судьи на прежнем артефакте; отсутствующее измерение качества оно не создаёт. UNKNOWN и executor
+guard запрещают команду. Private proof не входит во вложения Multica.
 
 `resume --recover-executor` использует тот же reconcile в fixture и live: проверяет private
 receipt PID/starttime/uid дочернего harness, подтверждает его завершение и принимает ровно один
