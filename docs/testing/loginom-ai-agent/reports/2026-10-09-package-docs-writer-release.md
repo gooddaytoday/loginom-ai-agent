@@ -281,3 +281,13 @@ Snapshot `formal-v7-progress-11-20261009.json`:11 terminal,7 PASS/4 FAIL,
 52 прежних confirmed closed архива перенесены на отдельный own local disk
 с сохранением исходных путей через links и проверкой receipts/readback;
 это не изменение результата кейсов или условий A/B.
+
+## Formal v7: двенадцатая попытка
+
+Sales-by-category#1 completed/score100/pass=true/oracle=true,
+environment/process cleanup confirmed. Структура/warm oracle отдельно PASS;
+cold request/plan сохранены. History4505entries/14880901archive bytes и
+diagnostics3entries/3331513bytes сохранены с full roundtrip.
+Snapshot `formal-v7-progress-12-20261009.json`:12 terminal,8 PASS/4 FAIL,
+9 сохранённых пакетов. Controller81639 live; все formal cold, candidate formal
+и compare остаются pending. Ручные повторы не запускались.
