@@ -291,3 +291,15 @@ diagnostics3entries/3331513bytes сохранены с full roundtrip.
 Snapshot `formal-v7-progress-12-20261009.json`:12 terminal,8 PASS/4 FAIL,
 9 сохранённых пакетов. Controller81639 live; все formal cold, candidate formal
 и compare остаются pending. Ручные повторы не запускались.
+
+## Formal v7: тринадцатая попытка
+
+Slow-supplier-deliveries#1 completed/score100/pass=true/oracle=true,
+447324ms. Все шесть стадий cleanup confirmed, обе проверки процессов
+показали owned_remaining=0; cleanup_error отсутствует. Исторический V5 FAIL
+очистки на этой задаче сохранён: текущий успех не устанавливает его причину.
+Структура/warm oracle отдельно PASS; cold request/plan сохранены, cold pending.
+History4620entries/18324214archive bytes и diagnostics3entries/6426441bytes
+сохранены с full roundtrip. Snapshot `formal-v7-progress-13-20261009.json`:
+13 terminal,9 PASS/4 FAIL,10 сохранённых пакетов. Common SHA повторно проверен.
+Controller81639 live; candidate formal/cold/compare pending, ручных retries0.
