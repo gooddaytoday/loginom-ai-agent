@@ -140,9 +140,42 @@ CLI containers removed3/3, Desktop roots/temporary removed3/3.
 `manual-quality.json`, изображения/текст и отдельный `manual-summary.json`
 сохранены в `openai-49-{cli,desktop}-docs-pdf-20261008`.
 
-Продолжается оставшаяся docs/default matrix:13 случаев ×3 отдельно через
-CLI/Desktop, новые каталоги `openai-49-{cli,desktop}-routing-20261008`.
+Оставшаяся docs/default matrix:13 случаев ×3 отдельно через CLI/Desktop,
+каталоги `openai-49-{cli,desktop}-routing-20261008`. Оба верхних контроллера
+завершились с exit143 до конца набора; общего `summary.json` нет.
+Сохранены35/39 результатов CLI и26/39 Desktop. CLI arithmetic/attempt2
+штатно завершился внутри контейнера с exit0 и ответом102; evidence восстановлен
+из уже остановленного контейнера, remaining[], контейнер удалён. Новых
+обращений к модели при восстановлении не было. Недостающие4 CLI и13 Desktop
+слотов не считаются успешными. В Desktop node-purpose/attempt3 trace содержит
+Electron SIGILL и последующий AppImage SIGPIPE; источник SIGTERM двух верхних
+контроллеров не установлен, OOM CLI не зафиксирован. Проверка382 PID/TID
+оборванного Desktop не обнаружила живых совпадающих идентичностей.
+После свежей повторной проверки identity=0 сохранена безопасная диагностика
+в `routing-controller-interruption-20261008`, удалены только два собственных
+временных root. Фактический CDP42649 не слушает; Node inspector порт не был
+сохранён, собственных процессов не осталось. Receipt явно не утверждает
+штатное завершение оборванного Desktop. Исходные Loginom server/client не менялись.
 Эти продуктовые прогоны не являются analytic A/B. Общий этап6 ещё открыт.
+
+Отдельный ручной review принял **27 положительных документов**: PDF15,
+Word6 и Markdown6. Просмотрены все30 страниц PDF и12 страниц Word,
+прочитаны полные тексты. Во всех отчётах правильные данные nested fixture,
+data.lgd-зависимость и неизвестные настройки; нет placeholders, выдуманного
+выполнения, обрезки, наложения или отдельного заголовка. Word отрендерен
+bundled LibreOffice в собственном offline Ubuntu24-контейнере; native
+OS-opening этих новых документов ещё не проверено. Каждая попытка содержит
+реальный успешный `loginom_read` Help и backend-applied package-docs,
+неизменный input SHA, browser execs[] и remaining processes[]. Desktop
+external-path3/3 содержит реальные запросы/одобрения permission и корректные PDF.
+
+Также приняты **21 отрицательный docs-случай**: missing/no-input/current-server
+×3 каждого интерфейса и CLI external-path×3. Они запрашивают локальный файл
+или явно отказывают с подсказкой `--file`, не ищут пакет в браузере и не
+создают отчёт. Inner CLI exit1 при missing/external — ожидаемый отказ,
+outer container exit0 и очистка подтверждены. Сохранены per-attempt
+`manual-quality.json` и отдельные manual positive/negative summaries;
+их PASS относится к проверенным случаям, а не всей прерванной матрице.
 
 ## Независимый structural verifier
 
@@ -169,6 +202,14 @@ planner/acceptance/docs: **84 PASS, 0 FAIL, 767 assertions**, typecheck PASS.
 18 отказов конфигурации; исходный log сохранён, повтор с закреплённым
 Node24.19.0 прошёл. Восстановление серверных файлов и повторное выполнение
 этим планировщиком ещё не реализованы: он не закрывает cold replay gate.
+
+Дополнительно проверена offline-совместимость planner со всеми35 accepted
+analytic reference.lgp: **35/35 PASS**, сохранены точные GUID экспорта,
+исходные bindings и хэши файлов. Источник — закреплённый agent-validation
+`d5fb8031356ecf17a08c73f5d15a0b2df52af8b6`, planner `a93a9471d`;
+evidence `cold-reference-plan-20261008`. Bindings получены из доверенных
+эталонных XML, а не receipts испытуемой попытки. Эта проверка не восстанавливает
+серверные файлы, не исполняет сценарий и не принимает candidate cold replay.
 
 Полная матрица Desktop/CLI/TUI, жизненный цикл, independent clients и A/B
 ещё не закрыты. A/B требует доступа к выделенному стенду и выбранных до

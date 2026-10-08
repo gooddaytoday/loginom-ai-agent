@@ -442,8 +442,11 @@ DOCX XML/MD проверены, `.lgp` неизменён, модель/Loginom 
 Desktop Ubuntu22/24/26+Debian12/13 5/5 PASS, containers removed.
 LivePDF×3 отдельно CLI/Desktop: факты/механика/вёрстка6/6 PASS, все17 страниц
 просмотрены; input unchanged, Chromium0/cleanup0. Исходный669 FAIL сохранён.
-Остальные13 docs/default×3 каждого интерфейса выполняются. Cold planner:
-TDD10, suite84 PASS/767/typecheck; восстановление/исполнение ещё не проверены.
+Routing49:27 documents/42 pages и21 negative docs QA PASS; native opening открыт.
+Controllers exit143:CLI35/39 (один recovered result, model calls0), Desktop26/39;
+недостающие4/13 не приняты, причина общего обрыва не установлена.
+Cold planner:TDD10, suite84 PASS/767/typecheck, reference35 offline PASS;
+восстановление/исполнение ещё не проверены.
 Harness clean9d7b463c4:460 PASS/2 SKIP/typecheck; отдельный frozen worktree.
 A/B12–15 заранее выбранных задач ×3×2 с judge/structure/cold replay ещё открыт;
 SSH stand/покрытие подмодели требуют уточнения. Этап9/full35 отложены,

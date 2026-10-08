@@ -4393,8 +4393,23 @@ log сохранён. Это планирование, без восстанов
 Новый Desktop49 завершил Ubuntu22/24/26 и Debian12/13:5/5 PASS, offline,
 non-root, все контейнеры удалены. CLI49 уже5/5 PASS. LivePDF×3 отдельно
 Desktop/CLI:6/6 facts/mechanics/layout PASS, все17 страниц просмотрены,
-input unchanged/Help reads/Chromium0/cleanup0. Остальные13 docs/default×3
-в каждом интерфейсе продолжаются; результаты669 остаются историческими.
+input unchanged/Help reads/Chromium0/cleanup0. Результаты669 остаются историческими.
+
+### 2026-10-08 — routing49: QA и прерванные контроллеры
+
+Ручной review27 документов PASS: PDF15/30 страниц, Word6/12 страниц,
+Markdown6 полных текстов. Bundled LibreOffice использован для Word; новое
+native OS-opening не проверено. Отрицательные docs21 PASS, включая CLI
+external-path отказ с подсказкой `--file`. Во всех48 случаях verified activation,
+input unchanged, Chromium0/remaining0; Desktop external разрешения реальны.
+Оба контроллера exit143:35/39 CLI сохранены после восстановления уже
+завершённого arithmetic2 без нового model call,26/39 Desktop сохранены.
+Desktop node-purpose3 SIGILL/SIGPIPE прерван; причина верхнего SIGTERM
+не установлена,382 наблюдаемых PID/TID не остались живы. Общих summaries нет,
+недостающие4 CLI/13 Desktop не приняты. Подробности и QA receipts — в live report.
+
+Cold planner offline reference compatibility35/35 PASS, source d5fb8031356e,
+planner a93a9471d. Это не server restoration/execution или candidate cold gate.
 
 ## Checkpoint
 
@@ -4417,4 +4432,4 @@ input unchanged/Help reads/Chromium0/cleanup0. Остальные13 docs/default
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI83 diagnostics/command/damage PASS, suite198 PASS/1 SKIP. Installed669 PTY6/6/PDF4 pages QA PASS, input unchanged/writer/Chromium/processes0; cold new-user resume resets docs→default, historical grant preserved, native PASS.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85/GUI2aa permissions/damage PASS; Desktop67 crash logging6 PASS/typecheck. Desktop669 clean HOME/workspace/PATHnone catalog/digests/integrity PASS, container/processes0; installed clean-discovery и permanent-rules подпункты8 закрыты, full live/lifecycle/evals открыты.
-- RESUMED 2026-10-08: harness frozen9d460 PASS/2 SKIP/typecheck, source snapshot35/113 checked; CLI/Desktop49 Linux5/5 each PASS, livePDF3/3 each facts/mechanics/layout PASS, all17 pages viewed, input unchanged/Help/Chromium0/cleanup0. Historical669 layout FAIL preserved. Cold planner TDD10, suite84 PASS/767/typecheck; no server restore/execution yet. Remaining13 docs/default×3 each ongoing; structural verifier35 offline PASS (limited, no execution). SSH stand/submodel coverage pending; original server/client untouched. A/B72–90 needs freeze12–15; stage9/full35 deferred/server skill retained. Next: finish live QA, native opening and cold adapter; gates5–8 open.
+- RESUMED 2026-10-08: frozen9d harness460 PASS/2 SKIP/typecheck, source snapshot35/113 checked; Linux49 CLI/Desktop5/5 each PASS. PDF attached6/6/all17 pages QA PASS; routing27 documents/42 pages and21 negative docs QA PASS. Controllers exit143, CLI35/39 (one collection recovery/no model call)/Desktop26/39 saved; missing4/13 not accepted. Cold planner TDD10/suite84 PASS/767/typecheck and reference35 offline PASS; structural verifier35 offline PASS, no server restore/execution. Historical669 FAIL retained. SSH stand/submodel pending; original server/client untouched. A/B72–90 needs freeze12–15; stage9/full35 deferred/server skill retained. Next: cleanup interruption, remaining routing, native opening/cold adapter; gates5–8 open.
