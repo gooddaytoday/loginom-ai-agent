@@ -4447,23 +4447,23 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-08 — ACTIVE, writer race исправлен; полный harness suite PASS
+### 2026-10-08 — ACTIVE, парный smoke v5 PASS; formal A/B выполняется
 
-- HEAD до checkpoint5d3be11f8; product baselinefc/candidate49b1584f2 неизменны; source changes только own harness/test infrastructure.
+- HEAD до checkpoint e730d3ac0; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client/profiles и чужие процессы сохранены.
-- Новый frozen skills-evals-writer d1b364a98 clean; evalsrefb31ebe7d0 перечитан/protected diff0; исторический087 сохранён.
-- Conditions v5 abeeb0cf…/21 pins/wide viewport/fresh own server;15 tasks заранее/90 formal не начаты; baseline preflight0 failure archived; own residue preserved/marked cleanup PASS; baseline v5 full smoke accepted, candidate v5 идёт.
-- Common wide cold обеих сторон PASS/oracle0/byte-identical/native close/logout/remaining0; reader1920×1080, product viewport1280 неизменен.
-- Baseline v5 run174713 full smoke accepted:judge100/structure/warm oracle/cold/native cleanup confirmed; historical v4 retained.
-- Candidate v4 run171244 CLI0/judge100/warm oracle PASS, main1/cleanup FAIL Writer owner unavailable; cold не запускался, v4 pair не принят.
-- Candidate management receipt capture complete/unknown0/remaining0×2; current profile waitProfileIdle PASS/.writer absent; historical FAIL retained.
-- Native writer unlink→rmdir/mkdir→publication gap reproduced RED→GREEN; bounded3 reads/20ms preserve empty/replacement/integrity refusals.
-- New harness focused74 PASS/typecheck PASS; full suite481 PASS/2 SKIP/0 FAIL/2055 assertions/585.37s; новых live jobs нет.
-- Candidate date=dtString vs baseline dtDateTime/SPEC outside frozen prompt/checklist recorded; score/rubric не менялись.
+- Frozen skills-evals-writer d1b364a98 clean; evalsrefb31ebe7d0 перечитан перед formal/protected diff0; исторический087 сохранён.
+- Harness full481 PASS/2 SKIP/0 FAIL/2055 assertions/585.37s/typecheck PASS; writer gap real IO RED→GREEN, bounded guards preserved.
+- Conditions v5 abeeb0cf…/21 pins/wide1920 viewport/fresh own server;15 tasks выбраны до первого smoke; formal90 planned.
+- Baseline v5 run174713 и candidate v5 run175606 full smoke accepted:judge100/structure/warm oracle/cold/native cleanup confirmed.
+- Pair evidence ab-smoke-v5-pair-accepted-20261008; functional control, formal0/statistical noninferiority not proven.
+- V5 metrics provider17/18 (dedup), unique tools17/19/Loginom13/13/errors0; skill+workflow read, allowance неизменен.
+- Baseline formal45 запущен controller v5/log formal-v5-base.log; candidate45 после завершения; structure/cold всех saved artifacts/compare pending.
+- V4 candidate historical cleanup FAIL Writer owner unavailable retained; v5 первая preflight0 refusal archived, own residue preserved/marked cleanup PASS.
+- Шесть obsolete own CLI payloads roundtrip6850 entries each сохранены в архивах/receipts; raw удалены после проверки; свободно около4,6GB.
 - CLI modify3 readonly/inactive-source FAIL; CLI docs-after-build3/3 accepted; Desktop docs-after-build warm3/cold1 PASS2 readonly FAIL.
-- Source binaries/resources/server skill907ff16b…/catalog17764f9a… сохранены; Desktop/CLI Linux gates и stage5–8 ещё открыты;stage9 deferred.
-- Шесть obsolete own CLI payloads roundtrip6850 entries each сохранены в архивах/receipts; raw удалены после проверки; свободно5,1GB.
-- Далее обе v5 smoke стороны→structure/warm oracle/common cold→90 formal attempts; failed profiles/receipts preserve.
+- Desktop existing saved docs-after-build packages/inputs preserved; cold3 на fresh own stand ещё нужен; originals не изменять.
+- Source binaries/resources/server skill907ff16b…/catalog17764f9a… сохранены; stage5–8/Linux lifecycle/second-model gates открыты;stage9 deferred.
+- Далее завершить formal baseline/candidate90, independent structure/cold каждого saved artifact/compare; затем остальные Desktop/CLI/TUI gates.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 

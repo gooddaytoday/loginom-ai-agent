@@ -492,3 +492,25 @@ reapplied, native close/logout/remaining0, container removed/exact staged cleanu
 `ab-smoke-v5-base-accepted-20261008/review.json` перепроверяет658 frozen files
 и21 adapter pins, общий manifest abeeb0cf…; formalAttempts0.
 Candidate v5 запускается следующим по тем же условиям.
+
+## Candidate v5 и парный функциональный smoke: PASS
+
+Run `ab-smoke-v5-20261008/candidate/results/20261008-175606-d1b364a98`:
+CLI0/completed, judge100/warm oracle PASS/323.88s, cleanup confirmed.
+Независимая структура `ab-smoke-v5-candidate-review-20261008` PASS.
+`ab-smoke-v5-candidate-cold-20261008`: общий reader/fresh own server,
+actual destination verified/export/oracle0/bytes unchanged/settings not reapplied,
+native close/logout/remaining0/container removed/exact staged cleanup PASS.
+Historical v4 Writer owner unavailable сохраняется; в новом smoke он не повторился.
+
+`ab-smoke-v5-pair-accepted-20261008/review.json` подтверждает обе полные smoke
+стороны по одному common abeeb0cf… и658/21 pins. Actual evalsrefb31ebe7d0…
+повторно перечитан перед formal. Это функциональный smoke одной задачи,
+formalAttempts0/statisticalNoninferiorityProven=false; не подмена90 попыток.
+`ab-smoke-v5-metrics-20261008/review.json`: baseline17/candidate18 provider
+turns (dedup verified), unique tools17/19, Loginom13/13, errors0/0, skill0/1.
+Дополнительный read workflow учитывается отдельно; allowance/рубрика неизменны.
+
+Формальная baseline серия45 попыток запущена через controller v5; candidate45
+идёт после штатного завершения baseline на тех же pins. Judge/structure/cold
+каждого сохранённого артефакта и compare остаются открытыми.
