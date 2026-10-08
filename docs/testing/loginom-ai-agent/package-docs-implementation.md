@@ -4449,7 +4449,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ### 2026-10-08 — ACTIVE, парный smoke v5 PASS; formal A/B выполняется
 
-- HEAD до checkpoint `12d0b93ab`; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
+- HEAD до checkpoint `bb8430cd1`; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client/profiles и чужие процессы сохранены.
 - Frozen skills-evals-writer d1b364a98 clean; evalsrefb31ebe7d0 перечитан перед formal/protected diff0; исторический087 сохранён.
 - Harness full481 PASS/2 SKIP/0 FAIL/2055 assertions/585.37s/typecheck PASS; writer gap real IO RED→GREEN, bounded guards preserved.
@@ -4457,13 +4457,13 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Baseline v5 run174713 и candidate v5 run175606 full smoke accepted:judge100/structure/warm oracle/cold/native cleanup confirmed.
 - Pair evidence ab-smoke-v5-pair-accepted-20261008; functional control, formal0/statistical noninferiority not proven.
 - V5 metrics provider17/18 (dedup), unique tools17/19/Loginom13/13/errors0; skill+workflow read, allowance неизменен.
-- Baseline formal run180611/session1287 жив; первые9:5 PASS,3 no_artifact,1 saved required-checklist FAIL; все6 saved structure-warm PASS; cold0/candidate0/compare pending.
+- Baseline formal run180611/session1287 жив; первые10:6 PASS,3 no_artifact,1 saved required-checklist FAIL; все7 saved structure-warm PASS; cold0/candidate0/compare pending.
 - abc-pareto-groups#1: no_artifact/score0/624.161s, NODE_APPLY_STOPPED/output_mapping; harness cleanup confirmed, native uncertainty сохранена; manual retry0.
 - cohort-spend-activity#1: no_artifact/294.054s, NODE_APPLY_STOPPED→OUTPUT_MAPPING_RECOVERY_UNVERIFIED; cleanup confirmed/native uncertainty сохранена; manual retry0.
 - V4 candidate historical cleanup FAIL Writer owner unavailable retained; v5 первая preflight0 refusal archived, own residue preserved/marked cleanup PASS.
 - Старые own CLI091/239/253/5a9/bd0/c50 и upgrade CLI/Desktop669/bc6 сохранены проверенными архивами; baseline/current49 raw сохранены; свободно около7.2GiB.
 - Неиспользуемый docs-build/node_modules удалён после process/FD guards; bytes не архивированы, locked reinstall/reverify записан в receipt; source49 clean.
-- Closed formal histories первых9 попыток сохранены с full roundtrip4604/4620/4600/4610/4562/4607/4636/4487/4606 entries; diagnostics9 archived/full roundtrip/65cbbe16…; active profile/results/21 pins неизменны; history/diagnostics restore по receipts.
+- Histories/diagnostics первых10 closed attempts сохранены с full roundtrip/restore receipts; summary первых9 diagnostics65cbbe16…; active profile/results/21 pins неизменны.
 - CLI modify3 readonly/inactive-source FAIL; CLI docs-after-build3/3 accepted; Desktop docs-after-build warm3/cold1 PASS2 readonly FAIL; offline exact bytes/pins3 prepared af98153c…/live pending.
 - Lifecycle driver first skill fixed via real-process/HTTP RED→GREEN;4 focused PASS/typecheck PASS; native lifecycle/independence ещё нужны.
 - MiMo installed smoke UNKNOWN; отдельная native-payload диагностика подтвердила HTTP429/quota exhausted, writer absent/remaining0/no browser; новых MiMo calls нет, выбор второй модели запрошен.

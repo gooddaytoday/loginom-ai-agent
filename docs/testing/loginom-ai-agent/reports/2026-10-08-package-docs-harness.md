@@ -710,3 +710,18 @@ diagnostics directory точным restore argv из receipt. Упоминани
 диагностики выше описывают состояние до этой операции. Байты сохранены в архиве;
 критерии/score/полнота A/B не менялись. Helper приватный, результат подтверждён
 реальным roundtrip, не fixture и не продуктовой live-проверкой.
+
+## Formal baseline: десятая попытка PASS
+
+`nps-segments-by-tier#1`: CLI0/completed/judge100/scored/oracle PASS/419.038s,
+harness pass=true, cleanup confirmed/no cleanup_error. Reviewer v5 подтвердил
+структуру0/warm oracle PASS в
+`ab-formal-v5-base-reviews-20261008-nps-segments-by-tier-1`; cold ещё не выполнен.
+Закрытая история сохранена с guards/full roundtrip4606 entries,
+archive17151120 bytes. Диагностика также сохранена с guards/full roundtrip3
+entries, archive5291834 bytes. Exact restore argv — в sibling receipts;
+result/events/judge/artifacts не изменялись.
+
+Первые10:6 PASS,3 no_artifact,1 saved required-checklist FAIL;
+семь saved artifacts прошли структуру/warm oracle, cold0/candidate0.
+Baseline45 продолжает работу, полный A/B90/compare не завершён.
