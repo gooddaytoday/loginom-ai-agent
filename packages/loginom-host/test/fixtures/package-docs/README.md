@@ -33,3 +33,10 @@ decode page text through ToUnicode and compare runs, not compressed PDF bytes.
 2530143dd live run (2026-10-07). Its final statistics item was orphaned on page 3.
 The regression reads actual PDF pages and requires the short statistics list to
 stay with its heading. This is a pagination fixture, not a new Python oracle.
+
+`heading-chain-pagination.report.md` retains the synthetic nested-package
+narrative from CLI669 `docs-attached-pdf`, attempt 3 (2026-10-08,
+OpenAI gpt-6.1-sol/medium). The module heading was orphaned on page 1 while
+its description heading and first paragraph started on page 2. The regression
+requires consecutive headings to stay with the first content line; this is
+reviewed pagination evidence, not a new extraction or Python oracle.

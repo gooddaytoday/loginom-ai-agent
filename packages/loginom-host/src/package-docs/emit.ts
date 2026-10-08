@@ -135,7 +135,8 @@ function layoutPdf(blocks: Block[], regular: ReportFont, bold: ReportFont) {
     const marker = block.marker ? block.marker + " " : ""
     const markerWidth = [...marker].reduce((sum, char) => sum + regular.width(char, style.size), 0)
     const wrapped = wrapText(chars, 595.28 - 112 - style.indent - markerWidth, style.size, regular, bold)
-    return { block, style, marker, markerWidth, wrapped }
+    const title = block.kind.startsWith("h") || block.kind === "p" && block.runs.every((run) => run.bold)
+    return { block, style, marker, markerWidth, wrapped, title }
   })
   for (const [index, row] of measured.entries()) {
     // Keep a heading and its list together when the complete group fits one page.
@@ -145,11 +146,13 @@ function layoutPdf(blocks: Block[], regular: ReportFont, bold: ReportFont) {
         sum + item.style.before + Math.max(1, item.wrapped.length) * item.style.size * 1.35 + item.style.after, 0)
       if (height <= 841.89 - 112 && y - height < 56) newPage()
     }
-    const next = measured[index + 1]
-    // A standalone bold label is also a section title in model-written reports.
-    if (next && (row.block.kind.startsWith("h") || row.block.kind === "p" && row.block.runs.every((run) => run.bold))) {
-      const height = row.style.before + Math.max(1, row.wrapped.length) * row.style.size * 1.35 + row.style.after
-        + next.style.before + next.style.size * 1.35
+    // Keep consecutive headings/bold labels with the first content line.
+    if (row.title && measured[index + 1]) {
+      const end = measured.findIndex((item, offset) => offset > index && !item.title)
+      const content = measured[end]
+      const height = measured.slice(index, end < 0 ? undefined : end).reduce((sum, item) =>
+        sum + item.style.before + Math.max(1, item.wrapped.length) * item.style.size * 1.35 + item.style.after, 0)
+        + (content ? content.style.before + content.style.size * 1.35 : 0)
       if (height <= 841.89 - 112 && y - height < 56) newPage()
     }
     const style = row.style

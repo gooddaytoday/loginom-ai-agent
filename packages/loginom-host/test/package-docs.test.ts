@@ -56,6 +56,15 @@ test("PDF keeps a bold section label with the first line of its paragraph", asyn
   expect(section).toContain("Узел «Источник» настроен")
 })
 
+test("PDF keeps consecutive headings with the first line of their section", async () => {
+  const pages = pdfPages(await renderReport(await readFile(join(fixtures, "heading-chain-pagination.report.md"), "utf8"), "pdf", fonts))
+    .map((page) => page.join(""))
+  const section = pages.find((page) => page.includes("Описание модуля"))
+  expect(section).toBeDefined()
+  expect(section).toContain("Модуль 1. «Демо»")
+  expect(section).toContain("Модуль «Демо» включает связанную пару")
+})
+
 test.each(["#", "##", "###", "####", "**"])("PDF keeps %s section titles with short and oversized paragraphs across page boundaries", async (marker) => {
   const title = marker === "**" ? "**Раздел проверки**" : `${marker} Раздел проверки`
   for (const repeats of [1, 400]) {
