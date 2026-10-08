@@ -12,9 +12,9 @@
 - Original bytes/failed cleanup/retry/verdict immutable; отдельный cleanup proof разрешает безопасное продолжение.
 - CLI 0.1.17 / fc3d97dbf695c2ed8dba942feb6fe83591a33944; модель openai/gpt-6.1-sol/medium; judge gpt-6-astra/high.
 - Multica readback v2 четырёх ролей/трёх starters/squad PASS; runtime service active/running после переключения.
-- LAB-32 01a11ae4-fa45-79ce-aec6-edd7170dafc7; прежний native MCP actor/auto Peer PASS, новое задание ещё требуется.
+- LAB-32 01a11ae4-fa45-79ce-aec6-edd7170dafc7; native gate 5 run 01a11d44-5374-7e30-9ab4-ea3125364559 допущен отдельно.
 - 2026-10-08 23:44 MSK: очереди пусты, stand FREE, 5 profiles clean, storage EMPTY, model calls 0.
 - Proof R/evidence/baseline-v2-activation-resumed-53d03a35b.json; private backups сохранены.
 - Живые smoke/полный baseline не запускались; UNKNOWN и smoke автоматически не повторяются.
 - Полную карточку создать и реально запустить на этапе 7; heartbeat основного чата 30 минут на этапе 8.
-- Далее: отдельное реальное задание LAB-32 на native gate 5; затем ровно два smoke и этапы 7–10; серверный pin не менять.
+- Далее: проверить native gate 5 в LAB-32; затем ровно два smoke и этапы 7–10; серверный pin не менять.
