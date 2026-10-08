@@ -744,3 +744,15 @@ Read-only [разбор output mapping](2026-10-08-package-docs-output-mapping.m
 выбранные12 frozen modules baseline/candidate byte-identical. Два source/VM
 набора ×3 дали каждый20 PASS/0 FAIL, source unchanged. Единственная первопричина
 и native stable/flaky неизвестны; score/рубрика/допуск/viewport не менялись.
+
+## Formal baseline: двенадцатая попытка PASS
+
+`sales-by-category#1`: CLI0/completed/judge100/oracle PASS/336.409s,
+harness pass=true, cleanup confirmed. Reviewer v5 подтвердил структуру0/warm
+oracle PASS в `ab-formal-v5-base-reviews-20261008-sales-by-category-1`.
+Закрытая история: guards/full roundtrip4507 entries, archive15573824 bytes.
+Диагностика: guards/full roundtrip3 entries, archive4008473 bytes.
+Restore argv — в sibling receipts; source result/events/judge/artifacts сохранены.
+Первые12:8 PASS,3 no_artifact,1 saved required-checklist FAIL;
+девять saved artifacts прошли структуру/warm oracle, cold0/candidate0.
+Baseline45 продолжается; полный A/B90/compare ещё открыты.
