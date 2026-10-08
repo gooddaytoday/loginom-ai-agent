@@ -166,23 +166,23 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 
 ## Checkpoint — новая параллельная волна восьми узлов, 09.10.2026
 
-- Документация до продолжения02da9bf2; baseline4e626d547/basef9bf332c; loginom0ca не включён; remote SHA сверены.
+- Документация до продолженияf0569f424; baseline4e626d547/basef9bf332c; loginom0ca не включён; remote SHA сверены.
 - Node SHA: LAB45 a00b0203/PR42, LAB46 41e0b170/PR43, LAB47 c92a3bfd; LAB48–52 4e626d547; назначения сохранены.
-- Caps8/8/8, daemon12;8 running одновременно NOT_CONFIRMED; stock3m claim cadence оставлена по команде владельца.
-- Owner SSH verified; временные5s отменены; два stock restart в idle/terminal_reports0, interruption0; тот же daemon/runtime/profile.
+- Caps8/8/8, daemon12;8 running одновременно NOT_CONFIRMED; штатный3m claim cadence оставлен по команде владельца.
+- Owner SSH verified; временные5s отменены; два stock restart idle/terminal_reports0, interruption0; тот же daemon/runtime/profile.
 - daemon PID212379/argv3m0s+12/readback PASS; installed Multica0.6.1/source2ea; server exact SHA NOT_OBSERVED.
 - Native capacity classified model_not_found_or_unavailable, auto retry не назначен; stock rerun сохранён, модели не менялись.
-- Protocol:5 attachments/4 manifest artifacts hash PASS; finite diagnostic:4 attachments/3 artifacts hash PASS; не node acceptance.
-- root3114 GUID↔numericID через mstSelf confirmed в loaded-store9/9; cross-profile validation NOT_RUN.
-- Settings multi-session разрешают входы; SessionKeepAlive1800000ms; UI logout=disconnect, mstSelf нельзя закрыть штатной UI строкой.
-- root3112 отсутствие калибровано; root3114/admin3113 текущий server cleanup PENDING; marker/history сохранены.
-- Original A exception не восстановить: message/stack/DOM потеряны; private copy recorder исправлен/offline PASS, network NOT_RUN.
-- Exact root3114 reconnect key NOT_FOUND; ключ failed A другой; reuse/подмена не выполнялись; негативный probe не полный cleanup PASS.
-- Exact own PID/startticks/fd absence подтверждены; permanent lock inodes сохранены; foreign sessions unchanged.
-- mas02:03MSK load0/0/0,MemAvailable30267192KiB,disk409886097408B,queue0; fresh attempt ресурсы снимает отдельно.
-- Installed CLI launcher+manifest current SHA256 match; source597 evidence retained; CLI/model/build0; новые admin не создаются.
-- Один новый instrumented run LAB47 01a11dc5-2fb1-77c2-b8c9-8670cbe1923e running, max2 root profiles/new UUID; first reconciliation, затем2-profile proof.
-- Остальные приёмки удержаны; scheduled observer не возобновлён/не создан; source/контракты/критерии не менялись.
-- [SHA/tasks/hashes/ограничения](reports/2026-10-08-node-recheck/parallel8-restart.json); PR40 draft; docs hook typechecks PASS из cache для02da9bf2.
-- Приёмка8 NOT_CONFIRMED/load12 NOT_RUN; LAB29/30 Backlog, Eval unchanged; merge/release NOT_RUN.
-- Следующий шаг: получить finite calibrated reconciliation/2-profile result и exact cleanup; общий fix согласовывать отдельно.
+- Старые manifests/receipts сохранены; новый shared2:4 attachments/3 artifacts bytes/hash PASS; это только admin diagnostic.
+- Private exact MF;MapTreeForm selector runtime PASS; два отдельных root profiles A3117/B3118 connected одновременно PASS.
+- Caller-specific views9/9: mstSelf/client меняются местами, разные GUID/key/ID; worker/reviewer независимость не проверялась.
+- Старые3114/3113 absence в complete8/8 store с own A3117 positive PASS; старые IDs не закрывались/не изменялись.
+- Settings multi-session разрешают входы; keepalive30min; UI logout=disconnect; mstSelf штатной UI строкой не закрывается.
+- B clean socket close сделал stock Reconnect терминальным; его return1 НЕ recorded RPC1841 negative; общий дефект не установлен.
+- A3117 UI logout ack/actual key1 некалиброван; B3118 logout AMBIGUOUS/server cleanup PENDING; marker/history сохранены.
+- Exact own PID/startticks/FD absence PASS; permanent lock inodes сохранены; foreign sessions unchanged.
+- mas02:30MSK CPU1.333%,load0.108/0.098/0.040,MemAvailable30141876KiB,disk409814499328B,queue1/0wait.
+- Installed CLI source597/version/checksums сверены; CLI/model/build0; новых admin аккаунтов не создавали.
+- Новый key-only LAB47 task01a11ddf-9f91-75c7-89a2-a218d127c31f running; fresh transport/exact B key; без CreateSession/нового входа.
+- Остальные приёмки удержаны; scheduled observer не возобновлён/не создан; source/контракты/критерии unchanged.
+- [SHA/tasks/hashes/ограничения](reports/2026-10-08-node-recheck/parallel8-restart.json);8 acceptance NOT_CONFIRMED/load12 NOT_RUN; PR40 draft/no merge/release.
+- Следующий шаг: finite B key reconciliation и exact cleanup; затем продолжить8 узлов; общий fix согласовывать отдельно.

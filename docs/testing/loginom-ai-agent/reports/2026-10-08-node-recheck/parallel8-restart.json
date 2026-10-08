@@ -711,7 +711,7 @@
     "sha256": "7242dca9becfc3d7a7d111e4a0271e51caf845ad295b8dfdbbcce4ac0736ed73",
     "bytes": 3148
   },
-  "next_step": "One instrumented finite diagnostic in same LAB47, max2 root browser profiles; preserve original attempts, record exact own key/phase early; reconcile3114/3113; prove2 only if prerequisites pass; stock3m queue retained; no model/build/handoff/source/common-contract changes.",
+  "next_step": "Same LAB47 new finite attempt after addressable private selector fix, max2rootprofiles/new UUID/profiles; independent server cleanup and2-profile proof required; stock3m kept, node/model/build/handoff held, no new schedule/source/contracts.",
   "verified_fresh_diagnostic_attachments": [
     {
       "id": "01a11d95-301f-714a-b520-d68c5f95d975",
@@ -1170,9 +1170,10 @@
     "comment_id": "01a11dc5-2f98-7b2f-8d6c-91c9c6cce834",
     "purpose": "one instrumented bounded shared-admin reconciliation/two-profile check after private helper correction; owner continues; no source/model/schedules",
     "id": "01a11dc5-2fb1-77c2-b8c9-8670cbe1923e",
-    "status": "running",
+    "status": "completed",
     "started_at": "2026-10-09T02:07:05+03:00",
-    "created_at": "2026-10-09T02:07:04+03:00"
+    "created_at": "2026-10-09T02:07:04+03:00",
+    "completed_at": "2026-10-09T02:18:23+03:00"
   },
   "documentation_review": {
     "status": "PASS",
@@ -1180,5 +1181,341 @@
     "scope": "two20-line checkpoints and structured evidence consistency/secret exclusion",
     "live_api_ssh_node_acceptance": "NOT_RUN",
     "source_prechange_sha": "02da9bf2e10c295f50f9224e2e801d793ba096e4"
+  },
+  "instrumented_selector_failure": {
+    "attachments": [
+      {
+        "id": "01a11dcf-545e-7d14-82a6-64f9a2b2aba9",
+        "name": "generator-finite-causal-receipt.json",
+        "bytes": 4776,
+        "sha256": "0df6ad21f1f8ce09a9c9abf2b878947b9ef0b4e0c3452087b311ea020d7818bd"
+      },
+      {
+        "id": "01a11dcf-5528-7cba-b3bd-32ce03784da5",
+        "name": "generator-finite-cleanup.json",
+        "bytes": 5032,
+        "sha256": "09780298abcd91ce2e68b8b24af1398eb3055d0ea8b3830fcede6b80ced94be0"
+      },
+      {
+        "id": "01a11dcf-55f3-70ba-9a07-6bcf0ee3e92b",
+        "name": "generator-finite-resources.json",
+        "bytes": 2306,
+        "sha256": "145f3555d069f8f7aad96848aac6787b545774f06d8d8b6e520b6d6b5e764ae8"
+      },
+      {
+        "id": "01a11dcf-56c3-74b3-b162-d60862a78757",
+        "name": "generator-finite-manifest.json",
+        "bytes": 747,
+        "sha256": "2e31ede987a9736cc2b59929b40999f3abdccd34853834859be2963404e4bcea"
+      }
+    ],
+    "three_artifacts_bytes_hash_manifest_verified": true,
+    "attempt_uuid": "40fc244c-aaa3-4c7d-91dd-48d70ed4dfb3",
+    "new_causal_failure": {
+      "phase": "A.Dispatcher.navigation",
+      "exception": "Playwright strict mode violation",
+      "cause": "global suffix navigation selector resolved two visible Admin folders, from embedded AdminStartForm and primary MainForm navigation; locator.waitFor rejected before Dispatcher opened",
+      "runtime_matching_data_tids": [
+        "MF;TF;AdminStartForm;MapTreeForm;colNavigation_Сервер>Администрирование;TreeText",
+        "MF;MapTreeForm;colNavigation_Сервер>Администрирование;TreeText"
+      ],
+      "own_private_exception_sha256": "c729090dc79d3e4e776b2f20dec9e95a854a515d54babc09f260416ed074af8d",
+      "own_private_DOM_sha256": "90ad38f0357aaba50636b77a9edbb8c681ccf320ccc6f5cc74e47947f1db682a",
+      "raw_message_stack_DOM": "kept private; no raw logs attached",
+      "general_Loginom_source_or_permission_defect": "NOT_ESTABLISHED"
+    },
+    "private_selector_candidate": {
+      "selector": "exact [data-tid=\"MF;MapTreeForm;colNavigation_Сервер>Администрирование;TreeText\"] and same exact main-tree Dispatcher path",
+      "offline_saved_DOM_unique_match_count": 1,
+      "offline_saved_DOM_check": "PASS",
+      "syntax": "PASS",
+      "live_Loginom_candidate_test": "NOT_RUN; single authorized reproduction used",
+      "executed_original_helper_sha256": "cd5749d9cb4cd4ce15a8a716af8ee5e4d2d4fe7f7556a091de5ffacdc2b4db5b",
+      "candidate_sha256": "31c45e23afac945a62165570c46213859a985c3b7bd4527abe3807827d211fe9",
+      "first_nth_record_order_fallback": false
+    },
+    "one_new_attempt": {
+      "root_login_attempts": 1,
+      "profile_B": "NOT_STARTED; early A failure",
+      "old_A_cause_rewritten": false,
+      "early_own_key_capture": {
+        "guid_sha256": "6f1886a58b0467dd44ec0b841baca4de669da934330b254fe74f9a36687b84c4",
+        "reconnect_key_sha256": "d3c77290f59dceb12102d2e851d80db2620dc3c440febee3f2318d328ed6f6c9",
+        "private_file_sha256": "35d5dae3f4570f12f5f4cf179e2e4aff3f8ff783add6448b06f635a3b5d8a101",
+        "transport_url_sha256": "05472e86491f2ad67128eab9a865f7349a345f7b019c21c5a32a1382428bab7d",
+        "reconnect_key_bytes": 32,
+        "fsync_and_readback_before_dispatcher": true,
+        "file_mode": "0600",
+        "directory_mode": "0700"
+      },
+      "numeric_session_id": "NOT_CAPTURED",
+      "UI_logout_ack": true,
+      "connection_disposed": true,
+      "browser_process_cleanup_before_key_probe": "PASS",
+      "last_exact_key_probe": {
+        "reply": 1,
+        "enum": "rcrNotFound",
+        "CreateSession_calls": 0,
+        "root_logins": 0,
+        "source_key_file_sha256": "35d5dae3f4570f12f5f4cf179e2e4aff3f8ff783add6448b06f635a3b5d8a101",
+        "known_GUID_sha_matches": true,
+        "independent_positive_calibration": "NOT_RUN"
+      },
+      "retention_wait": "NOT_RUN; initial exact-key reply1, B calibration and old-effects reconciliation not reached"
+    },
+    "exact_old_effects_source_review": {
+      "historical_root_selection": "find role root_admin -> exact session_id3114",
+      "historical_technical_selection": "find role own_technical_admin -> exact session_id3113",
+      "root_previous_CreateTime": "2026-10-08T22:29:12.578Z",
+      "technical_previous_CreateTime": "2026-10-08T22:10:36.361Z",
+      "root_previous_mstSelf_and_GUID_proof_required": true,
+      "unique_own_card_config_hash_verified_before_login": true,
+      "current_CreateTime_pending_disconnect_packages_confirmation_refresh_required_before_any_close": true,
+      "position_or_username_only_ownership": false,
+      "current_owned_old_ID_readback": "NOT_RUN; navigation failed",
+      "old_IDs_closed": [],
+      "mstSelf_bypass": false
+    },
+    "historical_cause_rewritten": false,
+    "server_cleanup": "NOT_PROVED; marker retained",
+    "shared_source_provisioner_model_rights_contract_changes": 0
+  },
+  "selector_fixed_live_continuation": {
+    "observed_at": "2026-10-08T23:20:57.345806+00:00",
+    "issue_id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+    "comment_id": "01a11dd1-e3ce-70e2-85a7-72415f793418",
+    "purpose": "new finite runtime attempt after exact main navigation selector fix; preserved attempts; no source/criteria/model changes",
+    "id": "01a11dd1-e3e1-761d-9dd6-643954ce5564",
+    "status": "completed",
+    "started_at": "2026-10-09T02:20:58+03:00",
+    "created_at": "2026-10-09T02:20:57+03:00",
+    "completed_at": "2026-10-09T02:32:00+03:00"
+  },
+  "shared_admin_two_profile_live": {
+    "attachments": [
+      {
+        "id": "01a11ddb-a826-7bc5-a8eb-4ce42f3183a4",
+        "name": "generator-selector-finite-receipt.json",
+        "bytes": 8684,
+        "sha256": "5a92a810e7ab49f4f84146e909ec50d36353813eb40de3ba744bbbaa1946ea19"
+      },
+      {
+        "id": "01a11ddb-a8fb-73ba-83f8-3ea1c48301ff",
+        "name": "generator-selector-finite-cleanup.json",
+        "bytes": 6391,
+        "sha256": "f91a918a962d6a64778dd18ad94c75e4fa28b288888def4544132f94fa6c63af"
+      },
+      {
+        "id": "01a11ddb-a9c3-79b0-95e1-110f4825d996",
+        "name": "generator-selector-finite-resources.json",
+        "bytes": 2511,
+        "sha256": "bfa8296d8108204e231444dacc04d16d5ec86a8857ed768e144e1dce11106b97"
+      },
+      {
+        "id": "01a11ddb-aa90-7044-b80e-0a31f972e423",
+        "name": "generator-selector-finite-manifest.json",
+        "bytes": 767,
+        "sha256": "586afe404d3fd69caac418f01b1901ab011363e2e4ecc96d583aac21f907046f"
+      }
+    ],
+    "three_artifacts_bytes_hash_manifest_verified": true,
+    "attempt_uuid": "eec16bec-7155-493b-a40b-f36c6b90f765",
+    "two_profile_connected_proof": {
+      "status": "PASS",
+      "independent_profiles": true,
+      "distinct_guids_and_reconnect_keys": true,
+      "distinct_numeric_ids": [
+        3117,
+        3118
+      ],
+      "cross_view_self_client_swap": true,
+      "connected_both": true
+    },
+    "caller_specific_complete_views": [
+      {
+        "at": "2026-10-08T23:26:35.743Z",
+        "managed_count": 9,
+        "store_count": 9,
+        "loaded": true,
+        "connection_connected": true,
+        "rows": [
+          {
+            "role": "root_admin",
+            "sessions": [
+              {
+                "session_id": 3117,
+                "created_at": "2026-10-08T23:26:29.506Z",
+                "session_type": 1,
+                "pending_disconnect": false,
+                "role_value": 1,
+                "package_count": 0
+              },
+              {
+                "session_id": 3118,
+                "created_at": "2026-10-08T23:26:34.191Z",
+                "session_type": 0,
+                "pending_disconnect": false,
+                "role_value": 1,
+                "package_count": 0
+              }
+            ]
+          },
+          {
+            "role": "own_technical_admin",
+            "sessions": []
+          }
+        ],
+        "unique_connected_mstSelf_positive_control": 3117,
+        "same_remote_guid_sha256": "b958be60e0ca5e57d1b51671e49852c3e5cafbb74ebe0271e7d64a738c4ed182",
+        "name": "simultaneous-A",
+        "observer": "A"
+      },
+      {
+        "at": "2026-10-08T23:26:35.802Z",
+        "managed_count": 9,
+        "store_count": 9,
+        "loaded": true,
+        "connection_connected": true,
+        "rows": [
+          {
+            "role": "root_admin",
+            "sessions": [
+              {
+                "session_id": 3117,
+                "created_at": "2026-10-08T23:26:29.506Z",
+                "session_type": 0,
+                "pending_disconnect": false,
+                "role_value": 1,
+                "package_count": 0
+              },
+              {
+                "session_id": 3118,
+                "created_at": "2026-10-08T23:26:34.191Z",
+                "session_type": 1,
+                "pending_disconnect": false,
+                "role_value": 1,
+                "package_count": 0
+              }
+            ]
+          },
+          {
+            "role": "own_technical_admin",
+            "sessions": []
+          }
+        ],
+        "unique_connected_mstSelf_positive_control": 3118,
+        "same_remote_guid_sha256": "b85c14b244c45e19a831bfbc27c67f5f90d47fdb71749780966cc88a2d7220ba",
+        "name": "simultaneous-B",
+        "observer": "B"
+      }
+    ],
+    "old_effect_reconciliation": {
+      "exact_root3114_previous_mstSelf_GUID_CreateTime_proof_checked": true,
+      "exact_technical3113_unique_card_config_previous_proof_checked": true,
+      "fresh_complete_store": 8,
+      "own_positive_control": 3117,
+      "root3114_technical3113_absent": true,
+      "old_ids_closed": [],
+      "old_known_root_IDs_3087_3103_3109_3112_absent": true,
+      "mstSelf_bypass": false,
+      "current_calibrated_server_readback_at": "2026-10-08T23:26:31.202Z"
+    },
+    "new_failure": {
+      "phase": "B.stock-reconnect.own-exact-key-positive",
+      "code": "B_POSITIVE_KEY_CALIBRATION_REQUIRED",
+      "private_exception_sha256": "72dc1b86f3deb5824d0299f710aa1bc17be1c7155a67efad3f0c09c7e5409c62",
+      "private_DOM_B_sha256": "33b1e0b9bdd793ca473cc4d7a851b628eed92c317916b84ff05799d57eedb15b",
+      "stock_ServerConnection_Reconnect_result": 1,
+      "actual_ConnectToSession_reply": "NOT_CAPTURED; must not equate stock Reconnect return1 with exact-key server negative",
+      "causal_source_chain": [
+        "Own helper called underlying WebSocket.close() instead of creating a separate fresh reconnect transport.",
+        "SocketClose passes e.wasClean to DoReadError; the clean-close message is present in saved DOM B.",
+        "Clean DoReadError calls CancelResponseAwaiters, which sets FDisconnected=true and FFinished=true.",
+        "WebSocketMessageTransport.Reconnect returns false when FFinished is true.",
+        "Stock container Reconnect returns rcrNotFound immediately on false ReconnectSocket, before ReconnectServer/ConnectToSession.",
+        "Therefore stock Reconnect result1 is not evidence of an exact-key server negative reply."
+      ],
+      "source_and_DOM_assessment": "Concrete private helper protocol mismatch with stock clean-close terminal path; no common Loginom source/access defect established.",
+      "runtime_subphase_limit": "ReconnectSocket false/ConnectToSession call count were not instrumented inside stock Reconnect; the causal subphase follows source and DOM, not a recorded RPC1841 reply. Do not label stock result1 as ConnectToSession rcrNotFound.",
+      "private_analysis_sha256": "8830b194bda436f4cbbbf47d0bc8782df30a4d682b31c906bdfa5be71ce30f8d",
+      "served_primary_source_hashes": {
+        "bg_js_rpc.js": "afeb91811a02da1f7841fb8c03e3003686c98a051f09186af082a3c44a12b4cc",
+        "bg_app_Client.js": "197b1efbee4aa846bdb91a15cc25b025181c35166da2f2c1408c071480873ee1",
+        "bg_js_bg.server.rpc.js": "e80d141da198b7800c3d212a534eb70bf0853a8dd0dd6381793291532f16ace3",
+        "bg_app_MainForm.js": "d0b2324d7162816d675e52adc5a5674b46b635d516157ced799ea33690a3c42e"
+      },
+      "common_Loginom_source_permissions_defect": "NOT_ESTABLISHED"
+    },
+    "B_positive_calibration": "NOT_OBTAINED; no repeat of unknown transport effect",
+    "B_negative_calibration": "NOT_RUN; no independent close/absence",
+    "last_A_exact_key_probe": {
+      "reply": 1,
+      "CreateSession_calls": 0,
+      "new_logins": 0,
+      "own_guid_sha256": "b958be60e0ca5e57d1b51671e49852c3e5cafbb74ebe0271e7d64a738c4ed182",
+      "own_key_file_sha256": "958a9c1366753748a1167afed0c424de2501a985cd1714d6c0dc28b3a0a8eafb",
+      "positive_calibration": false
+    },
+    "marker_retained": true,
+    "exact_own_PID_startticks_and_inherited_FD_absence": "PASS",
+    "B3118_server_cleanup": "AMBIGUOUS; no calibrated absence",
+    "A3117_server_cleanup": "UI logout ack plus uncalibrated actual key negative; not full absence PASS",
+    "resource_snapshot": {
+      "observed_at": "2026-10-08T23:30:00.398592+00:00",
+      "after_cleanup": {
+        "cpu_count": 12,
+        "sample_ms": 250,
+        "cpu_busy_percent": 1.333,
+        "load": [
+          0.1083984375,
+          0.09765625,
+          0.03955078125
+        ],
+        "memory": {
+          "MemTotal": "31604384 kB",
+          "MemAvailable": "30141876 kB",
+          "SwapTotal": "8388604 kB",
+          "SwapFree": "8385832 kB"
+        },
+        "disk_free_bytes": 409814499328
+      },
+      "native_queue": {
+        "daemon_id": "01a116e7-cc72-796d-8f8a-e4e8c9f33d9e",
+        "pid": 212379,
+        "profile": "",
+        "running_task_count": 1,
+        "resource_wait_task_count": 0,
+        "active_task_count": 1,
+        "status": "running"
+      },
+      "CLI_identity_readonly": {
+        "metadata_sourceCommit": "597592f5d53f86beb69ffe318af2d4db52c5f416",
+        "metadata_version": "0.0.0-dev-202610081651",
+        "launcher_is_symlink": true,
+        "executable_sha256": "20305a8d848f785c2120d03c56e3fc77129d0156d7319a9f43beca3bc0b70d03",
+        "manifest_sha256": "1d518db83c2e3ae625fc93b707edaaeb837a6f2cfcc99a1ed0824093f9b70768"
+      },
+      "CLI_model_build_runs": 0
+    },
+    "node_acceptance": "NOT_RUN; two-profile diagnostic only; not eight profiles or node PASS",
+    "source_contract_criteria_accounts_changes": 0,
+    "independent_artifact_review": {
+      "scope": "public receipt/cleanup/resources and 3 artifact bytes/hash; no live API/SSH/node acceptance",
+      "two_concurrent_root_profiles": "CONFIRMED; loaded9/9 views59ms apart, caller mstSelf/client swap",
+      "old3114_3113_absence": "CONFIRMED; complete8/8 store own3117 positive; deletion cause not established",
+      "stock_B_Reconnect_1_is_actual_RPC_negative": false,
+      "A3117_B3118_cleanup": "NOT_PROVED",
+      "reviewer": "independent read-only local reviewer"
+    }
+  },
+  "B3118_key_only_continuation": {
+    "issue_id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+    "comment_id": "01a11ddf-9f7a-7b7d-937e-ad4ee4772cca",
+    "task_id": "01a11ddf-9f91-75c7-89a2-a218d127c31f",
+    "status": "running",
+    "created_at": "2026-10-09T02:35:57+03:00",
+    "started_at": "2026-10-09T02:35:58+03:00",
+    "scope": "one own captured B3118 key on separate fresh transport; actual method1841, not stock wrapper; bind same GUID/current key if available; no CreateSession/new login/schedule/model; source and early receipts private",
+    "unknown_effects": "old attempts and uncalibrated A3117 remain immutable; marker retained until exact calibrated cleanup"
   }
 }
