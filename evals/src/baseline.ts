@@ -43,7 +43,7 @@ export async function verifyBaselineInstallation(bin: string) {
     const file = path.join(root, item.path)
     const info = await lstat(file)
     const resolved = await realpath(file)
-    if (!resolved.startsWith(root + path.sep) || !info.isFile() && !info.isSymbolicLink() || (info.mode & 0o777) !== (item.mode & 0o777) ||
+    if (!resolved.startsWith(root + path.sep) || !info.isFile() && !info.isSymbolicLink() || (info.mode & 0o7777) !== (item.mode & 0o7777) ||
       (info.isSymbolicLink() ? await readlink(file) : undefined) !== item.link || baselineHash(await Bun.file(file).bytes()) !== item.sha256)
       throw new BaselineFailure("CLI_FILE_CHANGED")
   }

@@ -33,6 +33,12 @@ test("installation verification refuses tampered payloads and extra files withou
     await Bun.write(path.join(root, "cli-manifest.json"), JSON.stringify({ format: "loginom-cli-artifact-v1", metadata: { version: "0.1.17", sourceCommit: baselineFixturePins.cliSource, sourceDirty: false },
       files: [{ path: "bin/loginom-ai-agent-cli", sha256: baselineHash("fixture binary never executed"), mode: 0o755 }] }))
     expect((await verifyBaselineInstallation(bin)).files).toBe(1)
+    const manifest = await Bun.file(path.join(root, "cli-manifest.json")).json()
+    manifest.files[0].mode = 0o4755
+    await Bun.write(path.join(root, "cli-manifest.json"), JSON.stringify(manifest))
+    await expect(verifyBaselineInstallation(bin)).rejects.toThrow("CLI_FILE_CHANGED")
+    manifest.files[0].mode = 0o755
+    await Bun.write(path.join(root, "cli-manifest.json"), JSON.stringify(manifest))
     await Bun.write(bin, "tampered")
     await expect(verifyBaselineInstallation(bin)).rejects.toThrow("CLI_FILE_CHANGED")
     await Bun.write(bin, "fixture binary never executed")
