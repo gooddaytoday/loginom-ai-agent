@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, rename, rm, symlink } from "node:fs/promises"
+import { chmod, copyFile, mkdir, mkdtemp, rename, rm, stat, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, runNodeEvalOps, runNodeUnitChecks, type NodeOpsConfig } from "../src/node-eval-ops"
+import { acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, ownedRecoveryEntry, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, runNodeEvalOps, runNodeUnitChecks, settleNodeWriterRelease, type NodeOpsConfig } from "../src/node-eval-ops"
 import { archiveProfileHistory } from "../src/profile"
 import { superviseProcess } from "../src/process-supervisor"
 
@@ -109,6 +109,76 @@ test("recovery cannot claim a profile without successful clean admission and sam
     expect(await Bun.file(writer).text()).toBe("unexplained")
     expect((await nodeStandStatus(fixture.config)).status).toBe("BUSY")
   } finally { await fixture.dispose() }
+})
+
+test("writer-release settlement requires the original clean admission before observing or writing proof", async () => {
+  const fixture = await runtime()
+  try {
+    const lease = await acquireNodeStand(fixture.config, owner)
+    const cfg = path.join(fixture.config.roles.rich.workRoots[0]!, "config.json")
+    const receipt = path.join(fixture.config.roles.rich.workRoots[0]!, "lease.json")
+    const output = path.join(fixture.config.roles.rich.workRoots[0]!, "settlement.json")
+    await Bun.write(cfg, JSON.stringify(fixture.config)); await chmod(cfg, 0o600)
+    await Bun.write(receipt, JSON.stringify(lease)); await chmod(receipt, 0o600)
+    const result = await runNodeEvalOps(["settle-writer-release", "--config", cfg, "--lease", receipt,
+      "--incident", "writer-release-incident", "--evidence", path.join(fixture.config.roles.rich.resultsRoot, "original.json"),
+      "--receipt", output, "--profile", "eval", "--followup-task", "followup-task"])
+    expect(result.reason).toBe("ADMISSION_PROOF_REQUIRED")
+    expect(await Bun.file(output).exists()).toBe(false)
+  } finally { await fixture.dispose() }
+})
+
+test("recovery admits only the exact empty package lock bound by a settlement", () => {
+  const lock = { name: ".fixture.lgp.lck", kind: "package_lock", package_path: "/user/fixture.lgp",
+    sha256: new Bun.CryptoHasher("sha256").update("").digest("hex") }
+  expect(ownedRecoveryEntry(lock, "/user/fixture.lgp")).toBe(true)
+  expect(ownedRecoveryEntry(lock)).toBe(false)
+  for (const changed of [{ name: ".foreign.lgp.lck" }, { kind: "ordinary" }, { package_path: "/user/foreign.lgp" },
+    { sha256: "a".repeat(64) }, { name: "../.fixture.lgp.lck" }, { name: "/.fixture.lgp.lck" }])
+    expect(ownedRecoveryEntry({ ...lock, ...changed }, "/user/fixture.lgp")).toBe(false)
+  expect(ownedRecoveryEntry(lock, "/foreign/fixture.lgp")).toBe(false)
+  expect(ownedRecoveryEntry({ name: "owned.csv" })).toBe(true)
+})
+
+test.skipIf(!dockerAvailable || browserBusy)("writer-release settlement binds immutable source/admission and refuses altered proof before recovery reservation", async () => {
+  const f = await stand()
+  try {
+    await copyFile(process.execPath, f.config.cliBin); await chmod(f.config.cliBin, 0o755)
+    const lease = await acquireNodeStand(f.config, owner)
+    const admission = path.join(f.config.runtimeRoot, "operations/stand.lease/admission.json")
+    await Bun.write(admission, JSON.stringify({ owner, acquiredAt: lease.acquiredAt, containerId: lease.containerId,
+      configSha256: lease.configSha256, profiles: Object.values(f.config.roles).flatMap(role => [role.referenceProfile, role.evalProfile]) }))
+    await chmod(admission, 0o600)
+    const profile = f.config.roles.rich.evalProfile
+    const directory = path.join(profile, "loginom/runtime/generations/1/chats/fixture/attempts/one")
+    await mkdir(directory, { recursive: true })
+    await Bun.write(path.join(profile, ".writer/owner"), "original-owner")
+    const writer = await stat(path.join(profile, ".writer"))
+    const run = await superviseProcess({ cmd: [f.config.cliBin, "-e", "await Bun.sleep(100);process.exit(0)"],
+      cwd: f.config.roles.rich.checkout, env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000 })
+    expect(run.processCleanup.status).toBe("confirmed")
+    // Historical-error fixture; the process identities and filesystem identity are genuine observations.
+    const processes = { ...run.processCleanup, status: "failed", error: "Writer owner unavailable", runtimeDirectories: [directory],
+      writer: { device: writer.dev, inode: writer.ino, owner: "original-owner" } }
+    await rm(path.join(profile, ".writer"), { recursive: true })
+    const source = path.join(f.config.roles.rich.resultsRoot, "attempt/cleanup.json")
+    await Bun.write(source, JSON.stringify({ processes, result: { status: "failed", error: processes.error } }))
+    await Bun.write(path.join(path.dirname(source), "result.json"), JSON.stringify({ status: "completed", session_id: "fixture-session",
+      package_path: "/user/fixture.lgp", environment_cleanup: { status: "failed", error: processes.error } }))
+    const before = await Bun.file(source).text()
+    const proof = path.join(f.config.roles.rich.workRoots[0]!, "settlement.json")
+    const result = await settleNodeWriterRelease(f.config, lease, "writer-incident", "eval", "followup", source, proof)
+    expect(result.status).toBe("PROCESS_SETTLED")
+    expect(await Bun.file(source).text()).toBe(before)
+    expect((await Bun.file(proof).json()).processes.observation_mode).toBe("writer_release_settlement")
+    await expect(settleNodeWriterRelease(f.config, lease, "renamed-incident", "eval", "followup", source, proof+".second")).rejects.toThrow("SETTLEMENT_ALREADY_RECORDED")
+    const recovery = path.join(f.config.roles.rich.workRoots[0]!, "recovery.json")
+    await Bun.write(recovery, JSON.stringify({ version: 1, owner, acquiredAt: lease.acquiredAt, profile: "eval", processEvidence: proof }))
+    await Bun.write(proof, (await Bun.file(proof).text()) + " ")
+    await expect(recoverNodeStand(f.config, lease, "writer-incident", recovery, {})).rejects.toThrow("SETTLEMENT_PROOF_UNKNOWN")
+    expect(await Bun.file(path.join(f.config.runtimeRoot, "operations/recovery-incidents")).exists()).toBe(false)
+    expect((await nodeStandStatus(f.config)).status).toBe("BUSY")
+  } finally { await f.dispose() }
 })
 
 test.skipIf(!dockerAvailable || browserBusy)("fixed unit commands produce process proof and release only after actual profile and storage checks", async () => {

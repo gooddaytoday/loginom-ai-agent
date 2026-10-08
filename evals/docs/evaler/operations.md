@@ -88,6 +88,19 @@ Nested paths остаются в своих workRoots/resultsRoot, а historyArc
 
 По отдельному поручению Evaler **тот же worker owner** может выполнить один немодельный recovery на устойчивый incident ID. Input sidecar `NodeStandRecovery` содержит version=1, исходные owner/acquiredAt, profile=`reference|eval`, настоящий processEvidence и optional storageLedger собственных файлов. Evidence должно доказывать принадлежность процессов/profile/writer/files именно этому lease и успешный чистый допуск до исходной работы. Бюджет привязан к исходному immutable lease: резервируется до recovery; crash/ошибка, новое имя incident или новый follow-up task не дают второй попытки. Новый follow-up Multica task того же агента записывается отдельно в report; original owner.task внутри lease остаётся прежним. Нельзя сменить identity lease, украсть его, очистить чужой профиль или бесконтрольно повторить CLI/model run.
 
+Операторское исключение `LAB-31-writer-release-race-v1`: для единственного error `Writer owner unavailable` при штатном unlink(owner) → rmdir(.writer) разрешён отдельный немодельный сбор process settlement. Сам `writerIdentity` повторяет только ENOENT не более 100ms и возвращает null лишь после двух наблюдений исчезнувшего исходного каталога; устойчиво отсутствующий owner, доступы, symlinks и смена identity остаются ошибкой. Source cleanup/summary/code-verdict не изменяются.
+
+```sh
+"$R/bin/with-env" "$R/runtime.env" "$R/bin/bun" script/node-eval-ops.ts settle-writer-release \
+  --config "$CFG" --lease "$LEASE" --incident '<original incident>' --profile eval \
+  --followup-task '<actual new worker task>' --evidence '<immutable failed cleanup.json>' \
+  --receipt "$WORK/writer-release-settlement.json"
+```
+
+Helper сверяет исходный admission/config/container/CLI/profile, eligible continuous capture, сохранённые ancestry/admissions/writer/runtime directories и нулевые старые проходы. Затем получает два свежих полных процесса/profile/runtime прохода без сигналов, CLI или модели; занятые/неизвестные native процессы и недоступные релевантные identities запрещают proof. Новый `writer_release_settlement` proof связывается SHA256 с исходными cleanup/result и записывается отдельно; закрытая attestation внутри исходного lease запрещает подмену и повторный settlement. Recovery/release принимают его лишь при совпадении attestation/source bytes. `verifyProcesses` сохраняет прежние требования confirmed/capture/verification/absence.
+
+При таком attested settlement адресный storage ledger может включать `kind=package_lock`, `package_path` из неизменного исходного result, имя строго `.<original-package>.lgp.lck` и SHA256 пустого файла. Общий safeName не изменяется; другие dot-prefixed файлы и чужой lock запрещены. CSV по-прежнему требует собственный доказанный ledger/hash. `PROCESS_SETTLED` не освобождает lease и не меняет ERROR: далее выполнить единственный назначенный recovery штатным helper. После SETTLED и чистых profiles/storage допустим назначенный supervised unit, последовательно с CLI/UI; release использует настоящий recovery completion. Новой модельной попытки этот путь не разрешает.
+
 ```sh
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/with-env" "$R/roles/$ROLE/eval.env" "$R/bin/bun" \
   script/node-eval-ops.ts recover --config "$CFG" --lease "$LEASE" \
