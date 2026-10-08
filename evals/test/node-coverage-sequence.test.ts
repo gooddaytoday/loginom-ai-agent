@@ -51,6 +51,8 @@ for (const c of cases) test(`${c.id}: full native typed/null table and configura
     (e: NodeEvents) => { e.calls.filter(x => x.output.configuration?.readback?.kind === "crosstable").forEach(x => { x.output.output.ports[0].exact_table.rows.pop() }) },
     (e: NodeEvents) => { e.calls.filter(x => x.output.configuration?.readback?.kind === "crosstable").forEach(x => { x.output.output.ports[0].category_fields[0].fact = "other" }) },
     (e: NodeEvents) => { e.calls.filter(x => x.output.configuration?.readback?.kind === "crosstable").forEach(x => { x.output.output.ports[0].schema[1].type = "string" }) },
+    (e: NodeEvents) => { e.calls.filter(x => x.output.configuration?.readback?.kind === "crosstable").forEach(x => { x.output.output.ports[0].exact_table.rows[0][1].type = "string" }) },
+    (e: NodeEvents) => { e.calls.filter(x => x.output.configuration?.readback?.kind === "crosstable").forEach(x => { x.output.output.ports[0].exact_table.rows[0][1].native.tag = 8 }) },
     (e: NodeEvents) => { e.calls.filter(x => x.input.target?.type === "transform.cross_table").forEach(x => { x.input.target.kind = "existing" }) },
     (e: NodeEvents) => { e.calls.find(x => x.input.target?.kind === "new" && x.input.target?.type === "transform.cross_table")!.input.parameters = {} },
   ]

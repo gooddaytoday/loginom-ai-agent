@@ -41,12 +41,15 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
               ["document_id", "workflow_id", "node_id"].every(k => input.target.ref?.[k] === r.node[k])))
       })
       const rb = imported?.receipt.output.configuration?.readback
+      const port = imported?.receipt.output.output?.ports?.find((p: Record<string, any>) => p.port === 0)
       if (imports.length !== 1 || !delivery || !imported || !after(imported.request, delivery) ||
         imp?.engine.CodePage !== "65001" || imp?.engine.DelimiterChar !== "," || JSON.stringify(columns) !== JSON.stringify(expectedColumns) ||
         contract.coverage && (imp?.columns.some(c => c.DataKind !== (assignedFields.find(f => f.name === c.Name)?.type === "string" ? "dkDiscrete" : "dkContinuous")) ||
           rb?.columns?.length !== assignedFields.length || !assignedFields.every((f, i) => rb.columns[i].name === f.name && rb.columns[i].type === f.type && rb.columns[i].used === true &&
             rb.columns[i].data_kind === (f.type === "string" ? "Дискретный" : "Непрерывный")) ||
-          id === "crosstable-string-counts-null" && ((imp?.engine.ValueNull ?? "?") !== "?" || rb?.format?.null_marker !== "?" || imported?.request.input.parameters?.settings?.format?.null_marker !== "?")) ||
+          id === "crosstable-string-counts-null" && ((imp?.engine.ValueNull ?? "?") !== "?" || rb?.format?.null_marker !== "?" || imported?.request.input.parameters?.settings?.format?.null_marker !== "?" ||
+            port?.fresh !== true || port.row_count !== 7 || port.sample_complete !== true || port.sample?.length !== 7 ||
+            ![2, 4].every(row => port.sample[row]?.[2]?.type === "string" && port.sample[row][2].is_null === true && port.sample[row][2].value === null && port.sample[row][2].precision === "exact_null"))) ||
         contract.native && !contract.coverage && (imp?.columns.some(c => c.DataType !== (c.Name === "Amount" ? "dtFloat" : "dtString") || c.DataKind !== (c.Name === "Amount" ? "dkContinuous" : "dkDiscrete")) ||
           rb?.columns?.length !== nativeColumns.length || !nativeColumns.every((name, i) => rb.columns[i].name === name && rb.columns[i].type === (name === "Amount" ? "real" : "string") &&
             rb.columns[i].used === true && rb.columns[i].data_kind === (name === "Amount" ? "Непрерывный" : "Дискретный"))))
