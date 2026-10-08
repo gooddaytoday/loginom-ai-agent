@@ -516,7 +516,7 @@ turns (dedup verified), unique tools17/19, Loginom13/13, errors0/0, skill0/1.
 каждого сохранённого артефакта и compare остаются открытыми.
 
 Formal baseline run `20261008-180611-d1b364a98`: первая задача
-`ab-revenue-per-converter#1` CLI0/completed/judge100/oracle PASS/397.84s,
+`ab-revenue-per-converter#1` CLI0/completed/judge100/oracle PASS/397.837s,
 cleanup confirmed. Reviewer v5 сохранил независимую структуру/warm oracle PASS
 в `ab-formal-v5-base-reviews-20261008-ab-revenue-per-converter-1`; cold ещё
 не выполнен. Серия продолжается, первая успешная попытка не подменяет45/90.
