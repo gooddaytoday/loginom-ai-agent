@@ -34,6 +34,14 @@ manifest до профиля, включая providers login; development bundle
 shared directory. Вход/выход и обслуживание проводить после остановки всех
 внутренних прогонов, без пересылки токенов в чат или Git.
 
+На mas свежий вход 08.10 завершён в onboarding-20261008-direct; auth.json
+сохранён в постоянном общем каталоге (0700/0600, regular/nonlinked), marker
+неопределённого refresh отсутствует. Для внешнего provider используется штатный
+HTTP CONNECT proxy 127.0.0.1:2080, HTTPS-сертификаты проверяются. NO_PROXY содержит
+localhost,127.0.0.1,::1,app.loginom.ai,mcp.loginom.ai,mas.kartamyshev.dev; последние
+три адреса имеют прямые правила VPN, описанные в [mas runbook](multica-mas.md).
+Loginom-аккаунт и CLI profile по-прежнему выбираются отдельно для каждой карточки.
+
 ## Refresh и отмена
 
 OS flock охватывает чтение, повторную проверку срока и refresh. Ожидание
@@ -67,20 +75,24 @@ Lock освобождается до модельного запроса, поэ
 Внутренние metadata не входят в публичную OAuth-схему/HttpApi. Диагностика
 не публикует auth payload, HTTP OAuth body или заголовки Authorization.
 
-## Проверка и текущий checkpoint — 07.10.2026
+## Проверка и текущий checkpoint — 08.10.2026
 
 - База shared-oauth: loginom@f9bf332cc491baa784e6e04fdfda7c0f09151cb7; PR40 в loginom, draft.
-- Проверенный и установленный source SHA: bd4951803532db3f51c1b5a66a864038d88865c3, clean.
-- Linux x64/glibc, Bun1.3.14; версия 0.0.0-dev-202610071848, executable/manifest shared-oauth-v1.
-- Archive SHA256: 61fe7a03766ca8aa406e66ca11aaf0b6ca3330a7ce9c96ee783649b5282932d2; roundtrip PASS.
+- Текущий установленный source SHA: 3bcf645a7363b41aed709b985a63758431abeee6, clean.
+- Linux x64/glibc, Bun1.3.14; версия 0.0.0-dev-202610081223, executable/manifest shared-oauth-v1.
+- Current archive SHA256: fbc00a5f436aae6a46c9b139e030101f1b97f87903b5552c4c56fbeadb0ea20c; roundtrip PASS.
 - На mas exact bd4951803: Agent124 + Host6/Product3 = 133 PASS, 0 FAIL/skip; typechecks PASS.
 - Fake provider: 8 concurrent requests/1 refresh, real 60/30 sec, SIGKILL/uncertainty,
   exact transaction, generic-set bypass, identity/generation, cancellation, FIFO/lock release PASS.
 - Manifest guards: 4 negative fixtures PASS на ba919629f; current strict installed integrity PASS.
 - Browser localhost/installed CLI rejection: sandbox=true, alive=[], rejection guard=false; cleanup PASS.
 - Независимый source/runtime LAB28 PASS: legacy dconf исправлен; 17 адресных tests/installed checks PASS.
-- Ожидавший ChatGPT login отменён перед пересборкой; auth.json не создан, свежий вход NOT_RUN.
-- Стенды/MCP, Loginom-аккаунты и 8 реальных циклов/queue9 отложены владельцем: NOT_RUN.
+- Свежий отдельный ChatGPT login 08.10 PASS; auth.json regular/nonlinked0600, directory0700, uncertainty отсутствует; native Codex auth отдельно.
+- HTTPS app/MCP restored; authenticated MCP initialize/tools-list с mas PASS. Generator LAB33: четыре identities LAB29/30 ready, nonadmin/login/logout/server inventory/sandbox/cleanup PASS.
+- Восемь fixture cards LAB34–41 и queue9 LAB42 созданы; Generator LAB43: 16 отдельных identities ready/login/logout и Dispatcher zero PASS до запусков. Model выбран до первой попытки по installed catalog: openai/gpt-5.6-sol, variant low.
+- Первая подготовка LAB34–41 остановлена до модели: Loginom preflight/ошибки fixture supervisors; model calls=0, история сохранена.
+- Исправление password focus 3bcf645a7: readonly воспроизведён, явный focus дал live login/logout PASS; 5 tests и 32 pre-push typechecks PASS.
+- 8 реальных циклов/queue9 и защита повторного использования Loginom-аккаунта NOT_RUN.
 - LGD/XLSX Stage0 и полная приёмка NOT_RUN; merge/release не выполнены.
 
 Общая сессия сохраняет общую квоту, отзыв и неопределённый refresh как общие
