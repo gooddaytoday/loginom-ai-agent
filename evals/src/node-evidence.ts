@@ -4,6 +4,7 @@ import { readdir } from "node:fs/promises"
 import { after, checkNodeSequence, operationReceipts, readNodeEvents, successful } from "./node-events"
 import { checkNodeXml, numericType, type PackageXml } from "./node-xml"
 import { coverageOutputFields, nodeCase } from "./node-cases"
+import { crossTableBindings } from "./node-bindings"
 
 const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex")
 const scalarTypesForOutput = (type: string) => ({ string: "dtString", real: "dtFloat", integer: "dtInteger" })[type as "string" | "real" | "integer"]
@@ -65,7 +66,8 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
       const final = sequence.final, c = final?.config
       const sameOwner = (a: Record<string, any> | undefined, b: Record<string, any> | undefined) => !!a && !!b && ["document_id", "workflow_id", "node_id"].every(k => typeof a[k] === "string" && a[k] === b[k])
       const file = Bun.file(path.join(attemptDir, "native-crosstable.json"))
-      const observations = (await file.exists() ? await file.json() : {}).observations ?? []
+      const native = await file.exists() ? await file.json() : {}
+      const observations = native.observations ?? []
       const observation = observations.findLast((o: Record<string, any>) => o.operation_id === final?.application.request.input.operation_id && sameOwner(o.node_crosstable?.node_context, c?.node))
       const frame = observation?.node_crosstable
       const expected = [
@@ -81,6 +83,29 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
           v.include_null === false && v.include_other === false && v.min_values === 0).length === 1) ||
         frame.service_fields?.some((f: Record<string, any>) => f.disposition > 0))
         failures.push("crosstable: complete owned observed native roles and masks required")
+      if (id === "crosstable-local-variable-bindings") {
+        const local = native.local_variable_observations?.findLast((o: Record<string, any>) =>
+          o.operation_id === final?.application.request.input.operation_id && sameOwner(o.output?.node_context, c?.node))
+        const variables = local?.output?.variables
+        const request = final?.application.request.input.parameters
+        const schema = final?.receipt.output.output?.ports?.[0]?.schema
+        const labels: Record<string, string> = { Region: "Region", A_Amount_Sum: "A.Amount.Сумма", A_Amount_Count: "A.Amount.Количество" }
+        if (!local || local.action_key !== "node.crosstable.local_variables.internal" || local.output?.verified !== true ||
+          local.output?.cleanup_complete !== true || local.output?.node_context?.verified !== true ||
+          !/^[a-f0-9]{64}$/.test(local.source_sha256 ?? "") || !Number.isInteger(local.source_line) || local.source_line < 0 || typeof local.source !== "string" ||
+          variables?.length !== 3 || new Set(variables?.map((v: Record<string, any>) => v.id)).size !== 3 ||
+          request?.local_variables?.length !== 3 || Object.keys(request?.bindings ?? {}).sort().join(",") !== "limit,separator,unique_names" ||
+          c?.output_mapping !== undefined || schema?.length !== 3 || !schema.every((s: Record<string, any>) => labels[s.name] === s.label) ||
+          !crossTableBindings.every(field => {
+            const matches = variables?.filter((v: Record<string, any>) => v.name === field.name), v = matches?.[0]
+            const rb = c?.options?.variable_bindings?.[field.key], option = frame?.options?.[field.native], proxy = option?.variable
+            return matches?.length === 1 && Number.isInteger(v?.id) && v.id >= 0 && v.type === field.nativeType && v.value === field.value && v.is_null === false &&
+              request.local_variables.filter((x: Record<string, any>) => x.name === field.name && x.type === field.type && x.value === field.value).length === 1 &&
+              request.bindings[field.key]?.variable === field.name &&
+              [rb, proxy].every(b => b?.name === field.name && b.id === v.id && b.type === v.type && b.value === v.value && b.selected_proxy_equal === true) &&
+              option?.switch_pressed === true && option.disabled === false && option.value === field.value
+          })) failures.push("crosstable: actual owned local variable IDs and selected bindings with automatic native names/labels required")
+      }
       if (id !== "crosstable-local-variable-bindings") {
         const fields = [{ name: "Region", categories: [] as string[], fact: "", fn: "", type: "string" }, ...coverageOutputFields(id)]
         const mapping = c?.output_mapping, sources = mapping?.source_fields, targets = mapping?.target_fields
