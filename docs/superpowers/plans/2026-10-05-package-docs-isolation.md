@@ -949,7 +949,7 @@ Core имеет разметку осей, но без CSV oracle. По доку
   калибровки. Если они меняют judge prompt/schema/код формирования, получить
   подтверждение калибровки этой версии до пары. Продуктовые TDD-циклы
   продолжаются независимо, соседний checkout и ветку не редактировать.
-  Текущая пара закреплена на `d1b364a9861d0c0a3acdd2394811e96bdbe51e04`
+  Историческая пара v5 была закреплена на `d1b364a9861d0c0a3acdd2394811e96bdbe51e04`
   в собственном чистом `skills-evals-writer` worktree; frozen lockfile установлен.
   Полный harness:481 PASS/2 SKIP/0 FAIL/2055 assertions; typecheck PASS.
   Актуальный evals ref при фиксации:b31ebe7d0bf5cd2cb1116ccdb90df65cd8578c2c;

@@ -229,3 +229,15 @@ History4487entries/15698877archive bytes и diagnostics3entries/4065431bytes
 сохранены с full roundtrip. Cold без package не заявлен, ручных повторов0.
 Snapshot `formal-v7-progress-8-20261009.json`:8 terminal,4 PASS/4 FAIL.
 Baseline81639 подтверждён live; candidate formal и compare пока не запускались.
+
+## Formal v7: девятая попытка
+
+Monthly-demand#1 completed/score100/pass=true/oracle=true,
+environment/process cleanup confirmed. Структура и warm oracle отдельно PASS;
+request/plan для cold сохранены в artifact-review. Cold ещё не выполнен.
+History4527entries/16176904archive bytes и diagnostics3entries/4597165bytes
+сохранены с full extraction roundtrip. Snapshot `formal-v7-progress-9-20261009.json`:
+9 terminal результатов,5 PASS/4 FAIL; baseline81639 остаётся live.
+Current binary/resources, harness и условия пары не менялись; candidate formal,
+formal cold и compare остаются открытыми. Подготовка независимых native adapters
+описана в [отчёте контрактов](2026-10-08-runtime-acceptance-contract.md).
