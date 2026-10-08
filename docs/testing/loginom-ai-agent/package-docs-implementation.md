@@ -4447,22 +4447,22 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-08 — ACTIVE, baseline v4 smoke принят; candidate выполняется
+### 2026-10-08 — ACTIVE, writer race исправлен; полный harness suite выполняется
 
-- HEAD до checkpointfb8247fc8; product baselinefc/candidate49b1584f2 неизменны; новые изменения только evidence/docs.
-- Все запуски локально;10.200.13.152 исключён. Исходные Loginom server/client/profiles и чужие процессы сохранены.
-- Frozen harness0876bb32f clean/658 hashes:476 PASS/2 SKIP/0 FAIL/typecheck PASS; protected judge/tasks/near-miss unchanged.
-- Full binary preflight обоих CLI PASS; новые common conditions e4a0daf2…/21 pins/wide viewport/fresh server before each side;15 tasks/90 formal attempts не запущены.
-- Server skill907ff16b…/catalog17764f9a…/Help pins verified; bundled loginom-automation activation candidate подтверждена.
-- Наш eval cold binding adapter TDD/6tests; Host297 PASS/7 SKIP/0 FAIL/typecheck PASS. Saved settings/bytes не переписываются.
-- Baseline smoke sales-by-category CLI/judge100/structure/warm oracle/cold PASS; native close/logout/remaining0/owned staged cleanup confirmed.
-- Candidate smoke CLI/judge100/structure/warm oracle PASS; cold FAIL WIZARD_OPEN_NOT_CONFIRMED, wizard GUID verified/owner breadcrumb unobserved.
-- Native diagnosis: Settings breadcrumb display:none на1280px. Common cold reader1920×1080; candidate wide cold PASS/oracle0/unchanged bytes/native close/logout/remaining0.
-- Wide cold обеих сторон PASS/oracle0/unchanged bytes/native close/logout/remaining0/exact staged cleanup; originals untouched.
-- CLI modify3 FAIL readonly/inactive-source; owner неизвестен, новая product regression не доказана. CLI docs-after-build3/3 принят.
-- Desktop docs-after-build warm/docs3/3; cold1 PASS/2 readonly FAIL. Эти gate остаются открыты.
-- Own obsolete unpacked trees archived/full roundtrip PASS, backups/DEB/AppImage retained; свободно4.5GB/guard1GB.
-- Baseline v4 run170104 принят judge100/structure/warm oracle/cold/native close/logout/remaining0; candidate v4 запущен следом, formal90 не начат.
+- HEAD до checkpoint0b5bda85e; product baselinefc/candidate49b1584f2 неизменны; source changes только own harness/test infrastructure.
+- Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client/profiles и чужие процессы сохранены.
+- Frozen0876bb32f исторически476 PASS/2 SKIP/0 FAIL/typecheck PASS; новая own harness branch d1b364a98 clean, protected judge/tasks/near-miss unchanged.
+- Conditions e4a0daf2…/21 pins/wide viewport/fresh own server;15 task IDs выбраны заранее,90 formal attempts не начаты.
+- Common wide cold обеих сторон PASS/oracle0/byte-identical/native close/logout/remaining0; reader1920×1080, product viewport1280 неизменен.
+- Baseline v4 run170104 full smoke accepted:judge100/structure/warm oracle/cold/native cleanup confirmed.
+- Candidate v4 run171244 CLI0/judge100/warm oracle PASS, main1/cleanup FAIL Writer owner unavailable; cold не запускался, v4 pair не принят.
+- Candidate management receipt capture complete/unknown0/remaining0×2; current profile waitProfileIdle PASS/.writer absent; historical FAIL retained.
+- Native writer unlink→rmdir/mkdir→publication gap reproduced RED→GREEN; bounded3 reads/20ms preserve empty/replacement/integrity refusals.
+- New harness focused74 PASS/0 FAIL/typecheck PASS; full suite session38460/log harness-writer-gap-full-suite.log running; новых live jobs нет.
+- Candidate date=dtString vs baseline dtDateTime/SPEC outside frozen prompt/checklist recorded; score/rubric не менялись.
+- CLI modify3 readonly/inactive-source FAIL; CLI docs-after-build3/3 accepted; Desktop docs-after-build warm3/cold1 PASS2 readonly FAIL.
+- Source binaries/resources/server skill907ff16b…/catalog17764f9a… сохранены; Desktop/CLI Linux gates и stage5–8 ещё открыты;stage9 deferred.
+- Далее full harness result→fresh immutable harness SHA/conditions→обе smoke стороны→90 formal attempts; failed profiles/receipts preserve.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 

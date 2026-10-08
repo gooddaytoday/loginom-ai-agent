@@ -407,3 +407,40 @@ exact owned staged cleanup. Все21 adapter pins повторно провер�
 SMOKE_JUDGE_STRUCTURE_WARM_ORACLE_COLD_PASS, countsTowardFormal90=false,
 common SHA e4a0daf2… и хэши исходных receipts сохранены.
 Candidate v4 запущен следующим, сериализация соблюдена; formal90 не начат.
+
+## Candidate v4: качество100, smoke не принят из-за writer cleanup
+
+Run `ab-smoke-v4-20261008/candidate/results/20261008-171244-0876bb32f`:
+CLI completed/exit0, judge100/100, warm oracle PASS. Итог main exit1:
+Management cleanup failed: Writer owner unavailable. Native agent process,
+diagnostics и writer stages подтверждены, но последующий management command
+оставил исторический cleanup failed. Его receipt: capture_complete=true,
+unknownProcesses=[], две проверки owned_remaining0, writer ранее захвачен.
+Текущий profile строго проверен waitProfileIdle10s: idle, .writer отсутствует.
+Это не превращает прошлый cleanup в confirmed. Candidate cold не запускался,
+пара v4 не принята; formal90 не начат.
+
+Судья также отметил date=dtString в candidate вместо dtDateTime из SPEC.md.
+Локальное XML сравнение подтверждает baseline dtDateTime/candidate dtString.
+Date не используется в расчётах, prompt/checklist не требуют этот тип;
+зафиксированный verdict100 не переписывается и рубрика не дополняется после
+прогона. Различие сохраняется в отчёте, а не скрывается за oracle PASS.
+
+Причина writer refusal воспроизведена на реальном файловом IO: native CLI
+release выполняет unlink(owner)→rmdir(.writer), acquisition mkdir→writeFile.
+Supervisor мог прочитать промежуточное состояние. Исправление только в own
+harness worktree, commit `d1b364a98`: максимум три чтения с20ms между ними;
+постоянно пустой guard, подмена inode/owner, symlink/недоступность всё ещё FAIL.
+Гейты происхождения процессов, complete capture и две final проверки сохранены.
+Product artifacts и protected judge/near-miss/task files не изменены.
+
+TDD/public real-filesystem removal: RED→GREEN. Negative persistent-empty и
+replacement, positive publication и full native-cycle fixture проверены.
+Native-cycle integration со старым кодом тоже прошла, поскольку sampling мог
+пропустить короткий gap: тот запуск не выдаётся за deterministic RED.
+Focused profile+supervisor **74 PASS/0 FAIL/233 assertions**,167.39s;
+реальный process control подтверждает writer receipt/unknown0/remaining0×2.
+Typecheck PASS. Full suite запущен на чистом d1b364a98:
+`harness-writer-gap-full-suite.log`; до результата новый frozen SHA/live-пара
+не назначаются. После PASS нужен новый immutable pair worktree и повтор обеих
+сторон по одному manifest; результаты087/v4 сохраняются отдельно.
