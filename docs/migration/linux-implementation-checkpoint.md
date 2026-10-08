@@ -430,3 +430,19 @@ processes0. Отдельный CLI restart/new user сбросил docs→defaul
 исторический grant без повторного применения. Synthetic provider, live Help/
 Loginom/model calls0; общие gates открыты.
 [Отчёт](../testing/loginom-ai-agent/reports/2026-10-07-package-docs-local-installed.md).
+
+## Package docs — checkpoint 2026-10-08
+
+Source49b1584f2: TDD heading-chain fix, docs57 PASS/678 и typecheck PASS.
+CLI/DEB/AppImage0.1.17 manifest/static PASS, без публикации.
+Установленный CLI Ubuntu22/24/26+Debian12/13 5/5 PASS, containers removed.
+Exact669 failing Markdown → установленный49 PDF3 страницы visual QA PASS;
+DOCX XML/MD проверены, `.lgp` неизменён, модель/Loginom calls0.
+Новый seed5651 hash/mode, UID1200, sandbox4755 и canonical empty profile PASS.
+Desktop offline пока Ubuntu22 PASS; остальная matrix и livePDF×3 обеих
+интерфейсов продукта выполняются. Исходный669 layout FAIL сохранён.
+Harness clean9d7b463c4:460 PASS/2 SKIP/typecheck; отдельный frozen worktree.
+A/B12–15 заранее выбранных задач ×3×2 с judge/structure/cold replay ещё открыт;
+SSH stand/покрытие подмодели требуют уточнения. Этап9/full35 отложены,
+серверный skill сохраняется, исходные local server/client не переключались.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-08-package-docs-live.md).

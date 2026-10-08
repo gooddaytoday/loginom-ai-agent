@@ -87,6 +87,50 @@ Renderer теперь резервирует цепочку заголовков
 исходное имя, проверки секций сохранены. Это source QA, не новая installed
 или live приёмка; следующая сборка и её обязательные проверки ещё требуются.
 
+## Новый установленный candidate 49b1584f2
+
+Исправление зафиксировано в `49b1584f23b4aa47e18b26119389d6f45623fc94`.
+CLI, DEB и AppImage собраны из собственного чистого build worktree; manifest,
+ресурсы и оба Desktop-артефакта проверены. Версия0.1.17, Bun1.3.14,
+Node24.19.0, Chromium1243; публикации не было.
+
+| Артефакт | SHA256 |
+| --- | --- |
+| CLI tar.gz | `3de2ad8eabb0625dee91076ea02e12c2b09a71f82abdc140adbd80824a661f4f` |
+| CLI manifest | `13896844e3ec3c3620d3c082aea2d426c3c64ac0ca10fb86da8bf931c06024f7` |
+| Desktop DEB | `799d9008ac2754901bffe68fc019e6bb6ea460729cbb6c6f88ae1ea5a7d83d19` |
+| Desktop AppImage | `758f08f3fb223d5554455a52d5a82aa72bf65220dd65c36ed2f3035a84780191` |
+| Desktop manifest | `b8463a3a8e2f390fd54ad573f1cc05c17d0673efb2f7c203cd3bdee9f8f040b5` |
+
+Новый установленный CLI: Ubuntu22/24/26 и Debian12/13 **5/5 PASS**, non-root,
+network:none, sandbox root:root4755, сохранение профиля и uninstall проверены;
+все пять контейнеров удалены. Desktop offline matrix ещё выполняется;
+пока подтверждён только Ubuntu22 PASS. Результаты669 не подставляются за49.
+
+Отдельный установленный CLI через public install обработал тот же точный
+Markdown третьей неудачной попытки669. PDF имеет три страницы; все просмотрены,
+заголовок модуля, описание и первая строка вместе на странице2, обрезки и
+наложения нет. PDF SHA256
+`ccd3cc1a94b0c35146097399294fdd4d3be2ba626329d2cc44d68f7f28c9595d`.
+Также emit создал DOCX/MD; XML DOCX и Markdown проверены на обязательные
+разделы и отсутствие placeholders. Визуальная проверка относится к PDF.
+Исходный `.lgp` неизменён; вызовов модели/Loginom0, контейнер удалён.
+Evidence: `cli-49b1584f2-installed-pdf/result.json` и `manual-quality/`
+в собственном acceptance-каталоге.
+
+Создан установленный seed
+`sha256:69458bc04bae35f3313959cb30dee3eec93f449600566e49b77fab515e178e1e`.
+Полная проверка5651 hash/mode, manifest bytes, UID1200, root:root4755 PASS.
+Дополнительно проверены реальные канонические HOME/.config/com.loginom.aiagent
+prod/beta/dev: профилей нет. Первая probe-команда ошибочно ожидала Python в
+base image и завершилась до проверки; её log сохранён. Те же критерии
+проверены поставляемым Node, продукт и образ после сборки не изменены.
+
+На новом candidate запущен `docs-attached-pdf` ×3 отдельно через CLI и Desktop,
+OpenAI6.1-sol/medium с прежним models snapshot. Эти продуктовые прогоны ещё
+выполняются и не являются analytic A/B. Их итоговая механика, факты, вёрстка
+и cleanup требуют отдельной проверки после завершения.
+
 Полная матрица Desktop/CLI/TUI, жизненный цикл, independent clients и A/B
 ещё не закрыты. A/B требует доступа к выделенному стенду и выбранных до
 первого live smoke12–15 задач; судья, структура и cold replay обязательны.
