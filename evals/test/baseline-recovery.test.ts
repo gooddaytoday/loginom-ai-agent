@@ -118,6 +118,42 @@ test("a successful judge retry retains its first failure in the report and deliv
   } finally { await rm(fixture.directory, { recursive: true, force: true }) }
 }, 60_000)
 
+test("a repeated recovery error requires a new verified repair and retains every failed execution", async () => {
+  const fixture = await recoveryFixture({ status: "completed", judge_status: "error", package_path: "/user/fixture.lgp" }, "judge")
+  try {
+    const env = { ...fixture.env, PATH: Bun.env.PATH,
+      EVAL_JUDGE_COMMAND: `env FAKE_CODEX_EXIT=1 ${Bun.which("bun")} ${path.join(evalsRoot, "fixtures/fake-codex.ts")}`,
+      JUDGE_MODEL: "gpt-6-astra", JUDGE_REASONING: "high" }
+    expect(await runBaseline(fixture.argv, fixture.env)).toMatchObject({ code: 0 })
+    expect(await runBaseline(["resume", "--series", fixture.series, "--limit", "1"], env)).toMatchObject({ code: 2, reason: "AWAITING_RECOVERY" })
+    const failed = await checkBaseline(fixture.series)
+    const current = failed.executions.at(-1)!.record
+    expect(failed.coverage).toMatchObject({ measured: 0, recorded: 1, pending: 143 })
+    expect(failed.executions).toHaveLength(2)
+    const fix = { ...fixture.proof.fix, id: "renamed-repair" }
+    const validation = await Bun.file(fixture.proof.validation.path).json()
+    const writeProof = async () => {
+      await Bun.write(fixture.proof.validation.path, JSON.stringify({ ...validation, executionId: current.runId, fixSha256: baselineHash(JSON.stringify(fix)) }))
+      await Bun.write(fixture.evidence, JSON.stringify({ ...fixture.proof, executionId: current.runId, executionFilesSha256: baselineHash(JSON.stringify(current.files)), fix,
+        validation: { path: fixture.proof.validation.path, sha256: baselineHash(await Bun.file(fixture.proof.validation.path).bytes()) } }))
+    }
+    await writeProof()
+    expect(await runBaseline(fixture.argv, fixture.env)).toMatchObject({ code: 2, reason: "RECOVERY_FIX_ALREADY_USED" })
+    expect((await checkBaseline(fixture.series)).recoveries).toHaveLength(1)
+    await Bun.write(fix.files[0]!.path, JSON.stringify({ judgeEndpointRestored: true }))
+    fix.files[0]!.sha256 = baselineHash(await Bun.file(fix.files[0]!.path).bytes())
+    await writeProof()
+    expect(await runBaseline(fixture.argv, fixture.env)).toMatchObject({ code: 0 })
+    expect(await runBaseline(["resume", "--series", fixture.series, "--limit", "1"], { ...env,
+      EVAL_JUDGE_COMMAND: `${Bun.which("bun")} ${path.join(evalsRoot, "fixtures/fake-codex.ts")}` })).toMatchObject({ code: 0, measured: 1, pending: 143 })
+    const report = await checkBaseline(fixture.series)
+    expect(report.recoveries).toHaveLength(2)
+    expect(report.executions.map(execution => execution.kind)).toEqual(["product", "judge", "judge"])
+    expect(report.infrastructure).toHaveLength(4)
+    expect(report.spending).toMatchObject({ cost: 0.01, tokens: { input: 2, output: 1 } })
+  } finally { await rm(fixture.directory, { recursive: true, force: true }) }
+}, 60_000)
+
 test("crashed recovery reconciles its saved terminal run and refuses to repeat a live child", async () => {
   const fixture = await recoveryFixture()
   const server = Bun.serve({ port: 0, fetch: () => Response.json({ status: "ok", result: { revision: "fixture" } }) })
