@@ -121,7 +121,7 @@ function tableCsv(output: ObjectValue, execution: string, node: ObjectValue, id:
     for (const cell of row) {
       if (contract.coverage && cell?.is_null === true) {
         if (id !== "crosstable-column-cartesian" || !["A_shop", "B_web"].includes(names[cells.length]) || cell.value !== null ||
-          cell.precision !== "exact_native" || cell.native?.tag !== 1 || cell.native.encoding !== "null") return null
+          cell.type !== port.schema[cells.length].type || cell.precision !== "exact_native" || cell.native?.tag !== 1 || cell.native.encoding !== "null") return null
         cells.push(""); continue
       }
       if (!cell || cell.is_null !== false || !["string", "number"].includes(typeof cell.value)) return null
@@ -129,6 +129,7 @@ function tableCsv(output: ObjectValue, execution: string, node: ObjectValue, id:
         const proof = cell.native
         if (cell.precision !== "exact_native" || !proof) return null
         const expectedType = contract.coverage ? port.schema[cells.length].type : contract.keys.includes(names[cells.length]) ? "string" : "real"
+        if (contract.coverage && (cell.type !== expectedType || proof.tag !== ({ string: 8, integer: 20, real: 5 } as Record<string, number>)[expectedType])) return null
         if (proof.encoding !== (expectedType === "string" ? "utf8" : expectedType === "integer" ? "signed-int64-le" : "ieee754-binary64-le")) return null
         if (proof.encoding === "utf8") {
           if (typeof proof.utf8_hex !== "string" || !/^(?:[\da-f]{2})*$/i.test(proof.utf8_hex) || Buffer.from(proof.utf8_hex, "hex").toString("utf8") !== cell.value) return null
