@@ -1,5 +1,6 @@
 import path from "node:path"
-import { lstat, mkdir, readdir, readlink, realpath, rename, rm, writeFile } from "node:fs/promises"
+import { lstat, mkdir, open, readdir, readFile, readlink, realpath, rename, rm, writeFile } from "node:fs/promises"
+import { constants } from "node:fs"
 import { loadTasks } from "./task"
 import { aggregate, aggregateTask, type AttemptResult, type RunSummary } from "./report"
 import { validateNodeRun } from "./node-evals"
@@ -20,7 +21,8 @@ export type BaselineManifest = { version: 1; id: string; kind: "baseline" | "smo
 type RecordedRun = { runDir: string; runId: string; files: { path: string; sha256: string }[]; measured: boolean; cleanup: boolean; verdict: "PASS" | "FAIL" | "ERROR" }
 type BaselineRow = { key: string; caseKey: string; attempt: number; collection: BaselineCollection; state: "pending" | "running" | "recorded"
   measured: boolean; cleanup: boolean; verdict: RecordedRun["verdict"] | null; runDir: string | null; result: AttemptResult | null }
-type BaselineJournal = { version: 1; manifestSha256: string; checkout: string; release?: { status: "RELEASED"; evidenceSha256: string }
+type BaselineRelease = { status: "RELEASED"; evidenceSha256: string; receiptPath?: string; receiptSha256?: string }
+type BaselineJournal = { version: 1; manifestSha256: string; checkout: string; release?: BaselineRelease
   jobs: { key: string; state: "pending" | "running" | "recorded"; dispatchedAt?: string; record?: RecordedRun }[] }
 
 export class BaselineFailure extends Error {}
@@ -152,6 +154,10 @@ export async function recordBaselineMeasurement(directory: string, key: string, 
 
 export async function checkBaseline(directory: string) {
   const { manifest, journal } = await readBaseline(directory)
+  if (journal.release && manifest.pins.mode === "live") {
+    if (!journal.release.receiptPath || baselineHash(await Bun.file(journal.release.receiptPath).bytes()) !== journal.release.receiptSha256)
+      throw new BaselineFailure("RELEASE_EVIDENCE_CHANGED")
+  }
   const rows: BaselineRow[] = []
   for (const expected of manifest.jobs) {
     const job = journal.jobs.find(item => item.key === expected.key)!
@@ -178,11 +184,24 @@ export async function checkBaseline(directory: string) {
       measured: rows.filter(row => row.caseKey === item.key && row.measured).length })), rows }
 }
 
-export async function sealBaselineRelease(directory: string, receipt: { status: "RELEASED"; evidenceSha256: string }) {
+export async function sealBaselineRelease(directory: string, receipt: BaselineRelease) {
   return mutateBaseline(directory, async (manifest, journal) => {
-    // Live release is admitted only by the executor after the common helper's verified receipt.
-    if (manifest.pins.mode !== "fixture" || receipt.status !== "RELEASED" || !/^[0-9a-f]{64}$/.test(receipt.evidenceSha256) ||
+    if (receipt.status !== "RELEASED" || !/^[0-9a-f]{64}$/.test(receipt.evidenceSha256) ||
       journal.jobs.some(job => job.state === "running" || job.record && !job.record.cleanup)) throw new BaselineFailure("RELEASE_UNCONFIRMED")
+    if (manifest.pins.mode === "live") {
+      const lease = await readPrivateBaselineJson(path.join(directory, "stand-handle.json")) as NodeStandLease
+      const config = await readPrivateBaselineJson(path.join(directory, "ops-config.json")) as NodeOpsConfig
+      if (!receipt.receiptPath || await realpath(receipt.receiptPath) !== receipt.receiptPath || !receipt.receiptPath.includes("/operations/completed/"))
+        throw new BaselineFailure("RELEASE_UNCONFIRMED")
+      if (baselineHash(JSON.stringify(config)) !== manifest.pins.opsConfigSha256 ||
+        !receipt.receiptPath.startsWith(path.join(config.runtimeRoot, "operations/completed") + path.sep)) throw new BaselineFailure("RELEASE_UNCONFIRMED")
+      const raw = await Bun.file(receipt.receiptPath!).bytes()
+      const proof = JSON.parse(new TextDecoder().decode(raw)) as { status: string; acquiredAt: string; evidenceSha256: string; owner: NodeStandLease; archive: string; containerId: string }
+      if (proof.status !== "RELEASED" || proof.acquiredAt !== lease.acquiredAt || proof.owner.role !== "evalbaseline" || proof.owner.task !== lease.task ||
+        proof.owner.issue !== lease.issue || proof.owner.sha !== manifest.pins.harnessSha || proof.containerId !== manifest.pins.containerId ||
+        proof.evidenceSha256 !== receipt.evidenceSha256 || receipt.receiptPath !== path.join(proof.archive, "release.json")) throw new BaselineFailure("RELEASE_UNCONFIRMED")
+      receipt.receiptSha256 = baselineHash(raw)
+    }
     journal.release = receipt
     await atomicJournal(directory, journal)
   })
@@ -192,7 +211,7 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
   try {
     const command = argv[0]
     if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke --series DIR [--config PRIVATE --issue ID --task ID] [--compare SERIES]" }
-    const values = parseArgs({ args: argv.slice(1), strict: true, options: Object.fromEntries(["series", "config", "issue", "task", "compare", "limit"].map(name => [name, { type: "string" as const }])) }).values
+    const values = parseArgs({ args: argv.slice(1), strict: true, options: { series: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, "recover-executor": { type: "boolean" } } }).values
     const directory = values.series
     if (!directory || !path.isAbsolute(directory)) throw new BaselineFailure("SERIES_PATH_REQUIRED")
     if (command === "check") {
@@ -212,9 +231,134 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
       const report = await checkBaseline(directory)
       return { code: 0, status: report.status, ...report.coverage, reportDir: await writeBaselineReport(directory, report) }
     }
-    throw new BaselineFailure("LIVE_CONFIGURATION_REQUIRED")
+    if (values.limit !== undefined) throw new BaselineFailure("LIVE_LIMIT_REFUSED")
+    if (!["prepare", "start", "resume", "smoke"].includes(command ?? "")) throw new BaselineFailure("UNKNOWN_COMMAND")
+    if (typeof values.config !== "string") throw new BaselineFailure("LIVE_CONFIGURATION_REQUIRED")
+    const config = await readPrivateBaselineJson(values.config) as NodeOpsConfig
+    const role = config.roles.evalbaseline
+    if (!role || !directory.startsWith(role.resultsRoot + path.sep) || await realpath(path.dirname(directory)) !== path.dirname(directory))
+      throw new BaselineFailure("SERIES_PATH_REFUSED")
+    const pins = await captureBaselinePins(config, env)
+    if (command === "prepare" || command === "smoke") {
+      const manifest = await prepareBaseline(directory, { checkout: role.checkout, pins, smoke: command === "smoke" })
+      if (command === "prepare") return { code: 0, status: "PREPARED", id: manifest.id, expected: manifest.jobs.length, cases: manifest.cases.length }
+    }
+    return await executeLiveBaseline(directory, config, env, pins, { issue: typeof values.issue === "string" ? values.issue : undefined,
+      task: typeof values.task === "string" ? values.task : undefined, resume: command === "resume", recoverExecutor: values["recover-executor"] === true })
   } catch (error) { return { code: 2, status: "BLOCKED", reason: error instanceof BaselineFailure ? error.message : "BASELINE_OPERATION_FAILED" } }
 }
+
+async function executeLiveBaseline(directory: string, config: NodeOpsConfig, env: Record<string, string | undefined>, pins: BaselinePins,
+  options: { issue?: string; task?: string; resume: boolean; recoverExecutor: boolean }) {
+  const { acquireNodeStand, assertNodeStandOwner, preflightNodeStand, verifyBaselineStand, runNodeEvalOps } = await import("./node-eval-ops")
+  const { manifest, journal } = await readBaseline(directory)
+  if (JSON.stringify(pins) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
+  if (!options.resume && journal.jobs.some(job => job.state !== "pending")) throw new BaselineFailure("USE_RESUME")
+  if (journal.release) return { code: 0, ...await writeCheckResult(directory) }
+  const handle = path.join(directory, "stand-handle.json")
+  const lease = await (async () => {
+    if (await Bun.file(handle).exists()) {
+      const saved = await readPrivateBaselineJson(handle) as NodeStandLease
+      await assertNodeStandOwner(config, saved)
+      return saved
+    }
+    if (journal.jobs.some(job => job.state !== "pending")) throw new BaselineFailure("STAND_ADMISSION_MISSING")
+    if (!options.issue || !options.task) throw new BaselineFailure("CARD_AND_TASK_REQUIRED")
+    const acquired = await acquireNodeStand(config, { issue: options.issue, task: options.task, role: "evalbaseline", phase: "eval", sha: pins.harnessSha })
+    await writeFile(handle, JSON.stringify(acquired), { flag: "wx", mode: 0o600 })
+    return acquired
+  })()
+  const guard = path.join(directory, "executor.lock")
+  if (await lstat(guard).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error })) {
+    const saved = await readPrivateBaselineJson(path.join(guard, "owner.json")) as { pid: number; starttime: string }
+    const before = await lstat(guard)
+    if (!options.resume || !options.recoverExecutor || await processBirthPresent(saved)) throw new BaselineFailure("EXECUTOR_REQUIRES_INSPECTION")
+    await reconcileRunningBaseline(directory)
+    await verifyBaselineStand(config, lease, directory)
+    await settleBaselineHarness(config, lease, directory)
+    if ((await lstat(guard)).ino !== before.ino || (await readPrivateBaselineJson(path.join(guard, "owner.json")) as { starttime: string }).starttime !== saved.starttime)
+      throw new BaselineFailure("EXECUTOR_OWNER_CHANGED")
+    await rename(guard, path.join(directory, `executor-recovered-${crypto.randomUUID()}`))
+  }
+  await mkdir(guard, { mode: 0o700 }).catch(() => { throw new BaselineFailure("EXECUTOR_BUSY") })
+  const guarded = await lstat(guard)
+  await writeFile(path.join(guard, "owner.json"), JSON.stringify({ pid: process.pid, starttime: await processStarttime(process.pid), uid: process.getuid?.(), nonce: crypto.randomUUID() }), { flag: "wx", mode: 0o600 })
+  try {
+    if (options.resume) { await reconcileRunningBaseline(directory); await verifyBaselineStand(config, lease, directory); await settleBaselineHarness(config, lease, directory) }
+    await preflightNodeStand(config, lease, env)
+    for (const job of (await readBaseline(directory)).journal.jobs.filter(job => job.state === "pending")) {
+      await assertNodeStandOwner(config, lease)
+      const current = await captureBaselinePins(config, env)
+      const record = await dispatchBaselineJob(directory, job.key, { checkout: journal.checkout, pins: current }, env)
+      await verifyBaselineStand(config, lease, directory)
+      await settleBaselineHarness(config, lease, directory)
+      const summary = await Bun.file(path.join(record.runDir, "summary.json")).json() as RunSummary
+      if (summary.interrupted || summary.stopped_reason) throw new BaselineFailure("SERIES_STOPPED_WITH_RETAINED_STAND")
+    }
+    const completion = path.join(directory, "stand-completion.json")
+    await writeFile(completion, JSON.stringify({ version: 1, owner: { issue: lease.issue, task: lease.task, role: lease.role, phase: lease.phase, sha: lease.sha },
+      acquiredAt: lease.acquiredAt, kind: "baseline", seriesDir: directory, runSha: pins.harnessSha }), { flag: "wx", mode: 0o600 })
+    const configFile = path.join(directory, "ops-config.json")
+    await writeFile(configFile, JSON.stringify(config), { flag: "wx", mode: 0o600 })
+    const released = await runNodeEvalOps(["release", "--config", configFile, "--lease", handle, "--evidence", completion], env)
+    if (released.code !== 0 || typeof released.archive !== "string" || typeof released.evidenceSha256 !== "string") throw new BaselineFailure("STAND_RELEASE_BLOCKED")
+    await sealBaselineRelease(directory, { status: "RELEASED", evidenceSha256: released.evidenceSha256, receiptPath: path.join(released.archive, "release.json") })
+    return { code: 0, ...await writeCheckResult(directory) }
+  } finally {
+    const current = await lstat(guard)
+    if (current.dev === guarded.dev && current.ino === guarded.ino && !current.isSymbolicLink()) await rm(guard, { recursive: true })
+  }
+}
+
+async function writeCheckResult(directory: string) {
+  const report = await checkBaseline(directory)
+  return { status: report.status, id: report.id, ...report.coverage, reportDir: await writeBaselineReport(directory, report) }
+}
+
+async function reconcileRunningBaseline(directory: string) {
+  const { journal } = await readBaseline(directory)
+  for (const job of journal.jobs.filter(job => job.state === "running")) {
+    const parent = path.join(directory, "measurements", job.key)
+    const child = await readPrivateBaselineJson(path.join(parent, "harness-process.json")) as { pid: number; starttime: string }
+    if (await processBirthPresent(child)) throw new BaselineFailure("HARNESS_STILL_RUNNING")
+    const runs = (await readdir(path.join(parent, "runs"), { withFileTypes: true })).filter(item => item.isDirectory())
+    if (runs.length !== 1 || !await Bun.file(path.join(parent, "runs", runs[0]!.name, "summary.json")).exists()) throw new BaselineFailure("UNKNOWN_OUTCOME_REQUIRES_RECOVERY")
+    await recordBaselineMeasurement(directory, job.key, path.join(parent, "runs", runs[0]!.name))
+  }
+}
+
+async function settleBaselineHarness(config: NodeOpsConfig, lease: NodeStandLease, directory: string) {
+  const profile = config.roles.evalbaseline!.evalProfile
+  if (!await lstat(`${profile}.harness-lease`).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error })) return
+  const { verifyBaselineStand } = await import("./node-eval-ops")
+  await verifyBaselineStand(config, lease, directory)
+  const { retireRecordedHarnessLease } = await import("./lease")
+  const report = await checkBaseline(directory)
+  const last = report.rows.filter(row => row.runDir).at(-1)
+  if (!last?.runDir) throw new BaselineFailure("HARNESS_ADMISSION_MISSING")
+  const result = await Bun.file(path.join(last.runDir, "summary.json")).json() as RunSummary
+  const cleanup = await Bun.file(path.join(last.runDir, result.tasks[0]!.id, "1/cleanup.json")).json()
+  await retireRecordedHarnessLease(profile, path.join(directory, "measurements", last.key, "harness-admission.json"), cleanup.processes)
+}
+
+async function readPrivateBaselineJson(file: string) {
+  const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW)
+  try {
+    const info = await handle.stat()
+    if (!info.isFile() || info.uid !== process.getuid?.() || info.mode & 0o077) throw new BaselineFailure("PRIVATE_FILE_REQUIRED")
+    return JSON.parse(await handle.readFile("utf8")) as unknown
+  } finally { await handle.close() }
+}
+
+async function processStarttime(pid: number) {
+  const raw = await readFile(`/proc/${pid}/stat`, "utf8")
+  return raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19]!
+}
+
+async function processBirthPresent(owner: { pid: number; starttime: string }) {
+  return await processStarttime(owner.pid).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error }) === owner.starttime
+}
+
 
 async function dispatchBaselineJob(directory: string, key: string, current: { checkout: string; pins: BaselinePins }, env: Record<string, string | undefined>) {
   const admitted = await beginBaselineMeasurement(directory, key, current)
@@ -226,7 +370,12 @@ async function dispatchBaselineJob(directory: string, key: string, current: { ch
     EVAL_HARNESS_LEASE_RECEIPT: path.join(parent, "harness-admission.json"), EVAL_REPEAT: "1",
     EVAL_PASS_THRESHOLD: String(current.pins.threshold), EVAL_JUDGE_TIMEOUT_MS: String(current.pins.judgeTimeoutMs) },
     stdout: Bun.file(path.join(parent, "harness.stdout")), stderr: Bun.file(path.join(parent, "harness.stderr")) })
-  await child.exited
+  await writeFile(path.join(parent, "harness-process.json"), JSON.stringify({ pid: child.pid, starttime: await processStarttime(child.pid), uid: process.getuid?.() }), { flag: "wx", mode: 0o600 })
+  const stop = () => child.kill("SIGINT")
+  process.on("SIGINT", stop)
+  process.on("SIGTERM", stop)
+  try { await child.exited }
+  finally { process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop) }
   const runs = (await readdir(admitted.resultsDir, { withFileTypes: true })).filter(item => item.isDirectory())
   if (runs.length !== 1) throw new BaselineFailure("UNKNOWN_OUTCOME")
   const record = await recordBaselineMeasurement(directory, key, path.join(admitted.resultsDir, runs[0]!.name))
@@ -259,17 +408,19 @@ async function writeBaselineReport(directory: string, report: Awaited<ReturnType
 async function inspectMeasurement(manifest: BaselineManifest, item: BaselineCase, checkout: string, runDir: string): Promise<RecordedRun> {
   const summary = await Bun.file(path.join(runDir, "summary.json")).json() as RunSummary
   if (summary.config?.repeat !== 1 || JSON.stringify(summary.task_ids) !== JSON.stringify([item.id]) || summary.tasks?.length !== 1 ||
-    summary.tasks[0]?.id !== item.id || summary.tasks[0].attempts.length !== 1 || summary.tasks[0].attempts[0]?.attempt !== 1)
+    summary.tasks[0]?.id !== item.id || summary.tasks[0].attempts.length !== 1 || summary.tasks[0].attempts[0]?.attempt !== 1 || summary.tasks[0].attempts[0].task_id !== item.id)
     throw new BaselineFailure("INVALID_MEASUREMENT")
   const result = summary.tasks[0].attempts[0]
   const cleanups = await Promise.all([path.join(runDir, item.id, "1"), ...(result.infra_retry ? [path.join(runDir, item.id, "1", "infra-error")] : [])]
     .map(async out => Bun.file(path.join(out, "cleanup.json")).json()))
-  const cleanup = summary.storage_leftovers?.length === 0 && result.environment_cleanup?.status === "confirmed" && cleanups.every(proof =>
-    proof.result?.status === "confirmed" && proof.processes?.status === "confirmed" &&
+  const cleanup = summary.storage_leftovers?.length === 0 && !result.cleanup_error && result.environment_cleanup?.status === "confirmed" && cleanups.every(proof =>
+    proof.result?.status === "confirmed" && !proof.result?.error && proof.processes?.status === "confirmed" &&
     ["processes", "diagnostics", "writer", "ready", "profile_history", ...(manifest.pins.mode === "live" ? ["storage"] : [])].every(stage => proof.stages?.some((item: { stage: string; status: string }) => item.stage === stage && item.status === "confirmed")))
   if (manifest.pins.mode === "live" && (summary.agent?.cli_version !== manifest.pins.cliVersion || summary.agent.source_commit !== manifest.pins.cliSource ||
     summary.agent.binary_sha256 !== manifest.pins.binarySha256 || summary.agent.model !== manifest.pins.model || summary.agent.variant !== manifest.pins.variant ||
-    summary.harness?.dirty || !manifest.pins.harnessSha.startsWith(summary.harness?.git_sha ?? "UNKNOWN"))) throw new BaselineFailure("RUN_PINS_CHANGED")
+    summary.harness?.dirty || !manifest.pins.harnessSha.startsWith(summary.harness?.git_sha ?? "UNKNOWN") || summary.agent.source_dirty !== false ||
+    summary.config.timeout_ms !== manifest.pins.timeoutMs || summary.config.judge_timeout_ms !== manifest.pins.judgeTimeoutMs || summary.config.pass_threshold !== manifest.pins.threshold ||
+    summary.loginom?.image_digest !== manifest.pins.imageDigest || summary.dock?.skill_revision !== manifest.pins.dockRevision)) throw new BaselineFailure("RUN_PINS_CHANGED")
   const product = ["completed", "failed", "timeout", "no_artifact"].includes(result.status)
   if (item.collection === "node") {
     const verdict = await validateNodeRun(runDir, [item.id], path.join(checkout, "evals", path.dirname(item.directory)))
@@ -305,8 +456,12 @@ async function mutateBaseline<T>(directory: string, operation: (manifest: Baseli
 
 async function atomicJournal(directory: string, journal: BaselineJournal) {
   const temp = path.join(directory, `journal-${crypto.randomUUID()}.tmp`)
-  await writeFile(temp, JSON.stringify(journal, null, 2) + "\n", { flag: "wx", mode: 0o600 })
+  const file = await open(temp, "wx", 0o600)
+  try { await file.writeFile(JSON.stringify(journal, null, 2) + "\n"); await file.sync() }
+  finally { await file.close() }
   await rename(temp, path.join(directory, "journal.json"))
+  const parent = await open(directory, constants.O_RDONLY | constants.O_DIRECTORY)
+  try { await parent.sync() } finally { await parent.close() }
 }
 
 async function snapshotDirectory(directory: string, relative = ""): Promise<{ path: string; sha256: string }[]> {

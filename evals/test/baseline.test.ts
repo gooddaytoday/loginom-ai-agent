@@ -49,6 +49,10 @@ test("live preparation rejects drift from the agreed product and judge settings 
   await expect(captureBaselinePins(config, { EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_AGENT_VARIANT: "medium", JUDGE_MODEL: "gpt-6-astra", JUDGE_REASONING: "medium" })).rejects.toThrow("JUDGE_PIN_CHANGED")
 })
 
+test("live entry refuses a test-only attempt limit instead of quietly starting a partial baseline", async () => {
+  expect(await runBaseline(["start", "--series", "/fixture/series", "--limit", "1"], {})).toMatchObject({ code: 2, reason: "LIVE_LIMIT_REFUSED" })
+})
+
 test("all 132 fixture measurements retain separate quality axes and become complete only after release", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-full-"))
   try {

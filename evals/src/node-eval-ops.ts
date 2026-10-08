@@ -250,11 +250,13 @@ export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStand
     const receipt = JSON.parse(check.stdout.trim().split("\n").at(-1) ?? "null") as { ok?: boolean; code?: string } | null
     if (check.exitCode !== 0 || check.sandboxError || check.timedOut || check.interrupted || receipt?.ok !== true || receipt.code !== "LOGINOM_CONNECTION_VALID")
       throw new NodeOpsFailure("NATIVE_LOGINOM_CHECK_FAILED")
-    await archiveProfileHistory(current.profileDir, `node-ops-admission-${lease.task}`)
+    const historyArchive = await archiveProfileHistory(current.profileDir, `node-ops-admission-${lease.task}`)
     await rm(workdir, { recursive: true })
     await assertAllProfilesClean(config)
     await assertBrowsersClosed()
     if ((await assertIsolatedStorageEmpty(source(config))).containerId !== lease.containerId) throw new NodeOpsFailure("CONTAINER_CHANGED")
+    await writeFile(path.join(directory(config), "admission-complete.json"), JSON.stringify({ owner: ownerOf(lease), acquiredAt: lease.acquiredAt,
+      configSha256: lease.configSha256, status: "READY", processEvidence: path.join(checkDir, "process-cleanup.json"), historyArchive }), { mode: 0o600 })
     return { status: "READY", sha: git.sha, dirty: git.dirty, containerId: storage.containerId,
       cliSourceSha: environment.agent?.sourceCommit ?? null, model: current.agent.model, variant: current.agent.variant }
   })
@@ -436,6 +438,13 @@ export async function verifyBaselineStand(config: NodeOpsConfig, lease: NodeStan
   await evidencePath(config, lease, seriesDir)
   const report = await checkBaseline(seriesDir)
   if (report.coverage.unknown || !report.cleanup) throw new NodeOpsFailure("BASELINE_CLEANUP_UNKNOWN")
+  const admission = await readPrivateJson(path.join(directory(config), "admission-complete.json")).catch(() => undefined) as
+    { owner?: NodeStandOwner; acquiredAt?: string; configSha256?: string; status?: string; processEvidence?: string; historyArchive?: string } | undefined
+  if (!admission || !ownerMatches(admission.owner, lease) || admission.acquiredAt !== lease.acquiredAt || admission.configSha256 !== lease.configSha256 ||
+    admission.status !== "READY" || !admission.processEvidence || !admission.historyArchive) throw new NodeOpsFailure("ADMISSION_PROOF_REQUIRED")
+  await evidencePath(config, lease, admission.processEvidence, true)
+  await verifyProcesses(await Bun.file(admission.processEvidence).json(), lease)
+  await verifyHistoryArchive(nodeRole(config, lease.role).evalProfile, admission.historyArchive)
   const git = await checkoutIdentity(nodeRole(config, lease.role).checkout)
   if (git.sha !== lease.sha || git.dirty || report.manifest.pins.harnessSha !== git.sha) throw new NodeOpsFailure("STALE_EVAL_PROOF")
   for (const row of report.rows) {
@@ -456,7 +465,7 @@ export async function verifyBaselineStand(config: NodeOpsConfig, lease: NodeStan
       }
     }
   }
-  await assertAllProfilesClean(config)
+  await assertAllProfilesClean(config, nodeRole(config, lease.role).evalProfile)
   await assertBrowsersClosed()
   if ((await assertIsolatedStorageEmpty(source(config))).containerId !== lease.containerId) throw new NodeOpsFailure("CONTAINER_CHANGED")
   return { status: "SAFE", measured: report.coverage.measured, expected: report.coverage.expected }
