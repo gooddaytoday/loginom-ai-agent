@@ -1,20 +1,20 @@
 # loginom-node-eval-case — checkpoint 2026-10-08
 
-- Версия skill: 1.0.1; ветка: `node-eval-skill`; source SHA: `a9121493747e562207ef2b6daed73fd353cd9cab`.
+- Версия skill: 1.0.4; ветка: `node-skill-fixes`; source SHA: `2179e67d5cb5ffb4837ff13ce36a010b3a454709`.
 - Совместимость imports/checker проверена на обоих remote checkout `701bb7e202708f46cd8f5f028c42008fd0f3f9a9`.
-- Bundle SHA256: `ae063af24dee7e2885cc3cab5562f7bdb856fefea0172bd5c557e4dfc738e5b8`; manifest: 13/13 файлов.
-- Remote: `/home/user/.local/share/loginom-evals-runtime/support/node-eval-skill-v1.0.1/`; архив рядом `.tar.gz`, read-only.
+- Bundle SHA256: `2f56e91d985f3dd45bf0dff141955dbd9898c475066eb80a69ec77dd249387fb`; manifest: 13/13 файлов.
+- Remote: `/home/user/.local/share/loginom-evals-runtime/support/node-eval-skill-v1.0.4/`; архив рядом `.tar.gz`, read-only.
 - Local: `~/.agents/skills/loginom-node-eval-case` → текущий `evals/skills/loginom-node-eval-case`; symlink/read-back проверены.
-- Rich instructions SHA256: `5cf9d1f315205b265f62bde664932a7da4ac8ac0390acf71bb66ca1e31e23548`; API readback совпал.
-- Ben instructions SHA256: `b20acfb68b0be254905ccd7d5fe6dbe094394f9aadedc71614ed2b39ab68b2d3`; API readback совпал.
+- Rich instructions SHA256: `55f476791e47478cbdb84c77bf86e2f65c824e5727717636b704282f459b1588`; API readback совпал.
+- Ben instructions SHA256: `673f84fa8a300dec71c37e0b5350eb204cc26f7ad90de573fd057c612426289b`; API readback совпал.
 - Evaler/squad и прочие worker settings сохранены; active/queued tasks отсутствовали; карточки не запускались.
-- Role env overlay немодельно подтвердил reference profiles, `gpt-6.1-sol/xhigh`, explicit assignment timeout 1800000 ms.
-- Структура skill, ссылки и отсутствие executable зависимости от старого пакета проверены; `quick_validate`/typecheck PASS.
-- Узкие tests: 7 PASS, 0 FAIL, 34 assertions — шесть helper tests и существующий native collector; typecheck PASS.
-- LAB-16: реальные cold CSV fixed-sum/sliding-average/reconfigure прошли новый static checker.
-- LAB-26: три archived code verdict PASS; три реальные cold CSV прошли checker; без native/read proof — FAIL.
-- Независимый offline forward-test создал расчёт до чтения harness; найденный пропуск произвольных expected CSV в хэшах исправлен.
-- Remote imports и 8 static graph/CSV smoke PASS; remote live-цикл нового skill ещё не проверен.
-- Локальный live-пилот BLOCKED: isolated container stopped; оба старых reference profile не проходят assertProfileClean (история).
-- Полная suite была остановлена из-за пересечения с соседним live; её итог не заявляется. Старые reports/кейсы сохранены.
+- Memory denials и заданный provider применяются в собственном profile mount; OAuth/Loginom setup не меняются.
+- JSON/JSONC поддержаны Bun.JSONC; одинаковый порядок итоговых permissions не допускает перекрытия поздним wildcard.
+- Настройки/провайдеры сохраняются; конфигурационные файлы получают 0600; секреты не записываются в builder/config report.
+- Узкие tests: 10 PASS, 0 FAIL, 79 assertions; реальные bwrap profile probes; typecheck/quick_validate PASS.
+- Runtime docs имеют 0 битых относительных ссылок; 5 внешних целей явно читаются в AGENT_REPO, проверены на обоих checkout.
+- Remote imports и 8 static graph/CSV smoke PASS; stand FREE, 4 profile guards без остатков, storage пустой.
+- Предыдущие immutable версии сохранены; 1.0.2 не подключалась (JSONC gate); актуальное подключение — 1.0.4.
+- Исторические LAB-16/LAB-26 не перезапускались. Локальный пилот/новый remote live-цикл этой правкой не проводились.
+- Полная suite не повторялась; прежний локальный пилот BLOCKED из-за stopped isolated stand/истории reference profiles.
 - Следующий шаг: подготовить собственный clean profile и эксклюзивное окно isolated stand, затем согласованный пилот sliding-source-refresh.
