@@ -129,7 +129,15 @@ Receipt smoke-v7-activation-allowance-review.json. Smoke не доказывае
 Formal baseline v7/session81639 запущен из frozen skills-evals-release/evals,
 root ab-formal-v7-20261009/base. Candidate formal ещё не запускался.
 После45+45 обязательны структура, cold каждого сохранённого пакета и compare.
-Closed-only preservation helpers v7 prepared; failed/active profile не очищать.
+Первый formal result:ab-revenue-per-converter#1 completed/PASS/score100/oracle,
+386113ms, environment/process cleanup confirmed. Структура/warm oracle отдельно
+PASS; cold ещё не выполнен. Closed history4604entries/17062750archive bytes,
+diagnostics3entries/5122138archive bytes full roundtrip сохранены. Следующая
+abc-pareto-groups#1 выполняется; baseline45/candidate45/compare ещё не завершены.
+Closed-only preservation helpers v7 используются; failed/active profile не очищать.
+34 closed archive перенесены с readback на own локальный ext4-диск; прежние
+пути сохранены как links, original preservation receipts unchanged.
+См. [хранение архивов](2026-10-09-package-docs-archive-storage.md).
 Evidence private ab-local-stand-20261008; secrets/raw diagnostics в Git не внесены.
 
 Evidence TDD в writer-post-open-{red,green,guard,all-guards,repeat-1..5,typecheck,modules}.log.
