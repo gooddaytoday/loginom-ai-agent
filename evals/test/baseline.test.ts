@@ -102,6 +102,17 @@ test("check writes a separate report without models, admission or changes to sto
     expect(await Bun.file(path.join(String(result.reportDir), "report.md")).text()).toContain("132")
     expect(await Bun.file(path.join(series, "journal.json")).text()).toBe(before)
     expect((await runBaseline(["start", "--series", series], {})).code).toBe(2)
+    await Bun.write(path.join(series, "stand-handle.json"), JSON.stringify({ token: "secret-token" }))
+    await Bun.write(path.join(series, "private-history/agent.db"), "secret-history")
+    const exported = await runBaseline(["check", "--series", series, "--export"], {})
+    expect(exported).toMatchObject({ code: 0 })
+    expect(typeof exported.archive).toBe("string")
+    const inspected = await Bun.$`python3 ${path.join(evalsRoot, "script/baseline-archive.py")} verify ${String(exported.archive)} ${String(exported.archiveSha256)}`.quiet()
+    const names = JSON.parse(inspected.text()).files as string[]
+    expect(names).toContain("manifest.json")
+    expect(names).not.toContain("stand-handle.json")
+    expect(names.some(name => name.endsWith(".db"))).toBe(false)
+    expect(await Bun.file(path.join(series, "journal.json")).text()).toBe(before)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 

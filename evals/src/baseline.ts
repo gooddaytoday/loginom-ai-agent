@@ -1,5 +1,5 @@
 import path from "node:path"
-import { lstat, mkdir, open, readdir, readFile, readlink, realpath, rename, rm, writeFile } from "node:fs/promises"
+import { chmod, cp, lstat, mkdir, open, readdir, readFile, readlink, realpath, rename, rm, writeFile } from "node:fs/promises"
 import { constants } from "node:fs"
 import { loadTasks } from "./task"
 import { aggregate, aggregateTask, type AttemptResult, type RunSummary } from "./report"
@@ -219,14 +219,15 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
   try {
     const command = argv[0]
     if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke --series DIR [--config PRIVATE --issue ID --task ID] [--compare SERIES]" }
-    const values = parseArgs({ args: argv.slice(1), strict: true, options: { series: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, "recover-executor": { type: "boolean" } } }).values
+    const values = parseArgs({ args: argv.slice(1), strict: true, options: { series: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" } } }).values
     const directory = values.series
     if (!directory || !path.isAbsolute(directory)) throw new BaselineFailure("SERIES_PATH_REQUIRED")
     if (command === "check") {
       const report = await checkBaseline(directory)
       const reportDir = await writeBaselineReport(directory, report)
       if (values.compare) await writeBaselineComparison(reportDir, await checkBaseline(values.compare), report)
-      return { code: 0, status: report.status, ...report.coverage, reportDir }
+      return { code: 0, status: report.status, ...report.coverage, reportDir,
+        ...(values.export ? await exportBaselineReport(directory, reportDir, report, env) : {}) }
     }
     if (["start", "resume"].includes(command ?? "") && env.EVAL_BASELINE_FIXTURE === "1") {
       const { manifest, journal } = await readBaseline(directory)
@@ -452,6 +453,47 @@ async function baselineCaseSummary(report: Awaited<ReturnType<typeof checkBaseli
     stopped_reason: rows.length === expected ? summaries.find(run => run.stopped_reason)?.stopped_reason ?? null : "INCOMPLETE_BASELINE_CASE",
     config: { ...first.config, repeat: expected }, metrics: aggregate(attempts, false),
     tasks: [{ ...first.tasks[0]!, attempts, metrics: aggregateTask(attempts, false) }] }
+}
+
+async function exportBaselineReport(directory: string, reportDir: string, report: Awaited<ReturnType<typeof checkBaseline>>, env: Record<string, string | undefined>) {
+  const out = path.join(directory, "exports", crypto.randomUUID())
+  const payload = path.join(out, "payload")
+  await mkdir(payload, { recursive: true, mode: 0o700 })
+  const secrets = [env.LOGINOM_PASSWORD, env.LOGINOM_DOCK_API_KEY, env.EVAL_AGENT_PROVIDER_API_KEY].filter((value): value is string => Boolean(value && value.length > 3))
+  if (report.manifest.pins.mode === "live") {
+    const config = await readPrivateBaselineJson(path.join(directory, "ops-config.json")) as NodeOpsConfig
+    const auth = await readPrivateBaselineJson(path.join(config.roles.evalbaseline!.evalProfile, "data/auth.json")) as { openai?: { access?: string; refresh?: string } }
+    secrets.push(...[auth.openai?.access, auth.openai?.refresh].filter((value): value is string => Boolean(value)))
+  }
+  const selected: { source: string; target: string }[] = [
+    { source: path.join(directory, "manifest.json"), target: "manifest.json" },
+    ...(await readdir(reportDir)).filter(name => ["baseline.json", "report.md", "compare-regular.md", "compare-analytic.md", "compare-node.json"].includes(name))
+      .map(name => ({ source: path.join(reportDir, name), target: name })),
+  ]
+  for (const row of report.rows.filter(row => row.runDir)) {
+    for (const item of await snapshotDirectory(row.runDir!)) {
+      if (!/^(summary\.json|config\.json|report\.md|code-verdict\.json|code-report\.md)$/.test(item.path) &&
+        !/^[^/]+\/1\/(?:infra-error\/)?(?:verdict(?:\.prev)?\.json|oracle\.json|artifact\/package\.lgp|artifact\/results\/[^/]+\.csv)$/.test(item.path)) continue
+      selected.push({ source: path.join(row.runDir!, item.path), target: `measurements/${row.key}/${item.path}` })
+    }
+  }
+  for (const item of selected) {
+    const bytes = await Bun.file(item.source).bytes()
+    const text = item.source.endsWith(".lgp") ? (await Bun.$`unzip -p ${item.source}`.quiet()).text() : new TextDecoder().decode(bytes)
+    if (secrets.some(secret => text.includes(secret))) throw new BaselineFailure("EXPORT_SECRET_DETECTED")
+    await mkdir(path.dirname(path.join(payload, item.target)), { recursive: true, mode: 0o700 })
+    await cp(item.source, path.join(payload, item.target), { errorOnExist: true, force: false })
+    await chmod(path.join(payload, item.target), 0o444)
+  }
+  const files = await snapshotDirectory(payload)
+  await writeFile(path.join(payload, "delivery-manifest.json"), JSON.stringify({ version: 1, baselineId: report.id, files }, null, 2), { flag: "wx", mode: 0o444 })
+  const archive = path.join(out, "baseline-evidence.tar.gz")
+  const script = path.join(import.meta.dir, "../script/baseline-archive.py")
+  await Bun.$`python3 ${script} create ${payload} ${archive}`.quiet()
+  const archiveSha256 = baselineHash(await Bun.file(archive).bytes())
+  await Bun.$`python3 ${script} verify ${archive} ${archiveSha256}`.quiet()
+  await chmod(archive, 0o444)
+  return { archive, archiveSha256, deliveryManifestSha256: baselineHash(await Bun.file(path.join(payload, "delivery-manifest.json")).bytes()) }
 }
 
 async function inspectMeasurement(manifest: BaselineManifest, item: BaselineCase, checkout: string, runDir: string): Promise<RecordedRun> {
