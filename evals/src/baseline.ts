@@ -110,6 +110,16 @@ export async function checkBaseline(directory: string) {
       measured: rows.filter(row => row.caseKey === item.key && row.measured).length })), rows }
 }
 
+export async function sealBaselineRelease(directory: string, receipt: { status: "RELEASED"; evidenceSha256: string }) {
+  return mutateBaseline(directory, async (manifest, journal) => {
+    // Live release is admitted only by the executor after the common helper's verified receipt.
+    if (manifest.pins.mode !== "fixture" || receipt.status !== "RELEASED" || !/^[0-9a-f]{64}$/.test(receipt.evidenceSha256) ||
+      journal.jobs.some(job => job.state === "running" || job.record && !job.record.cleanup)) throw new BaselineFailure("RELEASE_UNCONFIRMED")
+    journal.release = receipt
+    await atomicJournal(directory, journal)
+  })
+}
+
 async function inspectMeasurement(manifest: BaselineManifest, item: BaselineCase, checkout: string, runDir: string): Promise<RecordedRun> {
   const summary = await Bun.file(path.join(runDir, "summary.json")).json() as RunSummary
   if (summary.config?.repeat !== 1 || JSON.stringify(summary.task_ids) !== JSON.stringify([item.id]) || summary.tasks?.length !== 1 ||

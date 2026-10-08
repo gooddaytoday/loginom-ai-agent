@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline } from "../src/baseline"
+import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease } from "../src/baseline"
 import { repoRoot } from "../src/config"
 
 const pins = { mode: "fixture" as const, harnessSha: "a".repeat(40), corpusSha: "b".repeat(40), cliVersion: "0.1.17",
@@ -27,6 +27,37 @@ test("prepare freezes all 44 cases as three complete rounds without executing a 
     expect(await Bun.file(path.join(directory, "series/manifest.json")).text()).toBe(before)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
+
+test("all 132 fixture measurements retain separate quality axes and become complete only after release", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-full-"))
+  try {
+    const series = path.join(directory, "series")
+    const manifest = await prepareBaseline(series, { checkout: repoRoot, pins })
+    for (const job of manifest.jobs) {
+      const dispatched = await beginBaselineMeasurement(series, job.key, { checkout: repoRoot, pins })
+      const run = path.join(dispatched.resultsDir, "fixture")
+      const id = dispatched.case.id
+      await Bun.write(path.join(run, "summary.json"), JSON.stringify({ run_id: job.key, config: { repeat: 1 }, task_ids: [id], storage_leftovers: [],
+        tasks: [{ id, attempts: [{ task_id: id, attempt: 1, status: "failed", judge_status: "no_artifact", pass: false, score: 0,
+          environment_cleanup: { status: "confirmed" }, tokens: { input: 4, output: 2, reasoning: 0 }, counters: { toolCalls: 0, toolErrors: 0, memoryToolCalls: 0 }, duration_ms: 1, cost: 0 }] }] }))
+      await Bun.write(path.join(run, id, "1/cleanup.json"), JSON.stringify({ result: { status: "confirmed" }, processes: { status: "confirmed" },
+        stages: ["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].map(stage => ({ stage, status: "confirmed" })) }))
+      await recordBaselineMeasurement(series, job.key, run)
+    }
+    const before = await checkBaseline(series)
+    expect(before.coverage).toEqual({ expected: 132, recorded: 132, measured: 132, pending: 0, unknown: 0 })
+    expect(before.status).toBe("incomplete")
+    await sealBaselineRelease(series, { status: "RELEASED", evidenceSha256: "5".repeat(64) })
+    const after = await checkBaseline(series)
+    expect(after.status).toBe("complete")
+    expect(after.nodes).toHaveLength(6)
+    expect(after.nodes.every(item => item.measured === 3 && item.passed === 0)).toBe(true)
+    expect(after.groups.regular?.metrics.total).toBe(9)
+    expect(after.groups.analytic?.metrics.total).toBe(105)
+    await Bun.write(path.join(after.rows[0]!.runDir!, "summary.json"), "{}")
+    await expect(checkBaseline(series)).rejects.toThrow("EVIDENCE_CHANGED")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 30_000)
 
 test("a recorded product failure is retained while an unknown dispatch or pin drift blocks continuation", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-resume-"))
