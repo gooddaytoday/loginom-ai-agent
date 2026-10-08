@@ -4449,7 +4449,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ### 2026-10-09 — ACTIVE, smoke-пара v7 принята; formal baseline запущен
 
-- HEAD до checkpoint `4e0d7c3a9`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
+- HEAD до checkpoint `6027b3915`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client и чужие профили/процессы не изменялись.
 - Own mutable harness495463543 clean; новый detached skills-evals-release на полном SHA495463543901f1a69888b8d6375cd77996ef157b, frozen install/typecheck PASS.
 - Writer post-open real-IO RED→GREEN; release/persistent-empty/replacement guards×5 PASS; modules77 PASS/0 FAIL/241 assertions.
@@ -4462,7 +4462,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Те же15 задач×3×2=90; primary openai/gpt-6.1-sol medium/judge gpt-6-astra high. Smoke metrics16/18 provider turns,17/20 tools,13/13 Loginom; activation delta1/skill1 PASS, прочий рост отдельно.
 - Baseline smoke v7/session30063 terminal0/run214239:score100/oracle/structure/installed cold21564 PASS; close/logout/remaining0/bytes unchanged; accepted receipt сохранён.
 - Candidate v7/session95877 terminal0/run215120:score100/oracle/structure/cold22429 PASS/cleanup confirmed; pair accepted receipt ab-smoke-v7-pair-accepted-20261009, fresh refb30dcbe5f/protected diff0.
-- Formal v7 baseline81639 live/run220203:первые15 разных задач attempt1 closed,9 PASS/6 FAIL; trial no_artifact/target AMBIGUOUS/NODE_WORKER_REJECTED. Начат ab-revenue-per-converter#2. Env/process cleanup confirmed15; semantic recovery отказов/native cause UNKNOWN. Snapshot progress-15/roundtrip archives и partial cold index сохранены; baseline ещё30/candidate45/cold/compare pending,retries0.
+- Formal v7 baseline81639 live/run220203:первые15 разных задач attempt1 closed,9 PASS/6 FAIL; trial no_artifact/target AMBIGUOUS/NODE_WORKER_REJECTED. Начат ab-revenue-per-converter#2. Env/process cleanup confirmed15; semantic recovery отказов/native cause UNKNOWN. Snapshot progress-15/roundtrip archives и first-repeat cold index15/10packages SHA/structure/warm PASS сохранены; baseline ещё30/candidate45/cold/compare pending,retries0.
 - V5 formal1287 terminal1 на13/45:13-я analytic PASS100/process cleanup FAIL; historical PID4050199 errno/operation UNKNOWN; profile не очищен, candidate0/cold0.
 - CLI modify3 FAIL:21 file occurrence hashes PASS, readonly3/3/UNKNOWN_PREPARED_WORKFLOW3/3/active-source refusal2/3; candidate49 bridge/managed-entry exact source hashes PASS, explicit package/logout cleanup test-only; native writer owner/cause UNKNOWN. Docs-after-build CLI3 accepted/Desktop cold1 PASS2 FAIL; new cold native только после90 closed.
 - Linux installed CLI/Desktop49 по5 ОС PASS; TUI/native opening/headless docs и upgrade PASS; lifecycle/independence и remaining natural transitions открыты.

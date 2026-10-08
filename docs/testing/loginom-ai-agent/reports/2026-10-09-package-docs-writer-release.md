@@ -341,3 +341,13 @@ History4177entries/10357584archive bytes и diagnostics3entries/22340bytes
 неизменён. Controller81639 live, начат ab-revenue-per-converter#2.
 Это первый повтор baseline, не полная сторона45 и не A/B verdict.
 Остальные повторы, candidate45, formal cold и compare pending; manual retries0.
+
+Индекс первого повтора `formal-v7-first-repeat-cold-index-15-20261009.json`
+проверяет matching result/cleanup SHA всех15 и SHA десяти локальных сохранённых
+пакетов, review/request/plan. Структура и warm oracle10/10 PASS, cold pending;
+first-last-touch#1 включён с неизменённым judge FAIL. Серверный package_path
+и локальный artifact/package.lgp записаны отдельно. Первоначальная сборка
+индекса ошибочно проверяла серверный путь как локальный файл и остановилась
+на assertion до записи; это исправлено без native/model вызовов и ослабления
+SHA/structure/oracle проверок. Перед formal cold нужен полный индекс обеих
+завершённых сторон; этот снимок охватывает только первый повтор baseline.
