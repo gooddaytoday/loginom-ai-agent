@@ -1,8 +1,10 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { cp, mkdtemp, rm } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
+import { spawn } from "node:child_process"
 import { evalsRoot, repoRoot } from "../src/config"
+import { sandboxCommand } from "../src/sandbox"
 
 const builder = path.join(evalsRoot, "skills/loginom-node-eval-case/scripts/reference-attempt.ts")
 
@@ -31,6 +33,48 @@ async function execute(draft: string, env: Record<string, string | undefined>, a
   const [code, stdout, stderr] = await Promise.all([run.exited, new Response(run.stdout).text(), new Response(run.stderr).text()])
   return { code, stdout, stderr }
 }
+
+async function readSandboxSettings(root: string, profile: string) {
+  const installation = path.join(root, "installation")
+  const workspace = path.join(root, "probe-workspace")
+  await mkdir(path.join(installation, "bin"), { recursive: true })
+  await mkdir(workspace)
+  await cp("/usr/bin/python3", path.join(installation, "bin/cli"), { dereference: true })
+  await Bun.write(path.join(installation, "cli-manifest.json"), "{}")
+  const boundary = await sandboxCommand({
+    cmd: [path.join(installation, "bin/cli"), "-c",
+      "import os,pathlib; print((pathlib.Path(os.environ['LOGINOM_AI_AGENT_CLI_PROFILE'])/'config/loginom-ai-agent.json').read_text())"],
+    profileDir: profile, workdir: workspace, env: { LOGINOM_AI_AGENT_CLI_PROFILE: profile },
+  })
+  const run = spawn(boundary.cmd[0]!, boundary.cmd.slice(1), {
+    cwd: boundary.cwd, env: boundary.env, stdio: ["ignore", "pipe", "pipe", "ignore"],
+  })
+  const [output, error, code] = await Promise.all([Array.fromAsync(run.stdout!), Array.fromAsync(run.stderr!),
+    new Promise<number | null>(resolve => run.once("close", resolve))])
+  expect(Buffer.concat(error).toString()).toBe("")
+  expect(code).toBe(0)
+  return JSON.parse(Buffer.concat(output).toString())
+}
+
+test("node skill: memory write denials reach the sandbox through the prepared profile", async () => {
+  const f = await fixture("group-sum-qty")
+  try {
+    await mkdir(path.join(f.env.EVAL_PROFILE_DIR, "config"), { recursive: true })
+    await Bun.write(path.join(f.env.EVAL_PROFILE_DIR, "config/loginom-ai-agent.json"), JSON.stringify({
+      permission: { loginom_remember: "allow", "loginom_*": "allow", loginom_dock_action_run: "deny", read: "allow" }, instructions: ["retain this setting"],
+    }))
+    expect((await execute(f.draft, f.env)).code).toBe(0)
+    const settings = await readSandboxSettings(f.root, f.env.EVAL_PROFILE_DIR)
+    expect(settings.instructions).toEqual(["retain this setting"])
+    expect(settings.permission["loginom_*"]).toBe("allow")
+    expect(settings.permission.loginom_dock_action_run).toBe("deny")
+    expect(settings.permission.read).toBe("allow")
+    for (const tool of ["loginom_remember", "loginom_write", "loginom_edit", "loginom_add_resource", "loginom_forget"])
+      expect(settings.permission[tool]).toBe("deny")
+    // Permission rules use their last match; a general allow must precede the exact denials.
+    expect(Object.keys(settings.permission).indexOf("loginom_*")).toBeLessThan(Object.keys(settings.permission).indexOf("loginom_remember"))
+  } finally { await f.close() }
+}, 30000)
 
 test("node skill: draft without reference runs one fake attempt and archives cleanup", async () => {
   const f = await fixture("group-sum-qty")
