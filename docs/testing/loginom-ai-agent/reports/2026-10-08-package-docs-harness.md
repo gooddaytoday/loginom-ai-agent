@@ -725,3 +725,16 @@ result/events/judge/artifacts не изменялись.
 Первые10:6 PASS,3 no_artifact,1 saved required-checklist FAIL;
 семь saved artifacts прошли структуру/warm oracle, cold0/candidate0.
 Baseline45 продолжает работу, полный A/B90/compare не завершён.
+
+## Formal baseline: одиннадцатая попытка PASS
+
+`risky-approved-claims#1`: CLI0/completed/judge100/oracle PASS/435.310s,
+harness pass=true, cleanup confirmed/no cleanup_error. Reviewer v5:
+структура0/warm oracle PASS в
+`ab-formal-v5-base-reviews-20261008-risky-approved-claims-1`; cold ещё не выполнен.
+Закрытая история: guards/full roundtrip4532 entries, archive16840646 bytes.
+Диагностика: guards/full roundtrip3 entries, archive5196789 bytes.
+Exact restore argv — в sibling receipts; исходные result/events/judge/artifacts
+не менялись. Первые11:7 PASS,3 no_artifact,1 saved required-checklist FAIL;
+восемь saved artifacts прошли структуру/warm oracle, cold0/candidate0.
+Контроллер baseline45 остаётся живым; полный A/B90/compare не завершён.
