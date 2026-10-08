@@ -4462,7 +4462,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - CLI modify3 FAIL readonly/inactive-source; owner неизвестен, новая product regression не доказана. CLI docs-after-build3/3 принят.
 - Desktop docs-after-build warm/docs3/3; cold1 PASS/2 readonly FAIL. Эти gate остаются открыты.
 - Own obsolete unpacked trees archived/full roundtrip PASS, backups/DEB/AppImage retained; свободно4.5GB/guard1GB.
-- Baseline v4 smoke запущен отдельно; old v3 preserved. Этапы5–8 открыты/stage9 deferred; далее v4 обеих сторон judge/structure/cold→90 formal attempts.
+- V4 first prep PID identity FAIL/model0 archived; waitProfileIdle PASS/fresh own profile, baseline reached model dispatch. Этапы5–8 открыты; далее v4 обеих сторон→90 attempts.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 

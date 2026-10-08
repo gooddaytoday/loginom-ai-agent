@@ -367,3 +367,19 @@ workspace/artifacts каждого side; binary mode/absolute CLI bin; original
 launcher/profiles/.env не изменяются. Baseline v4 smoke запущен первым.
 После обоих v4 smoke нужны judge/structure/warm oracle и common cold replay;
 только затем formal45+45. Судья и структура/cold каждого saved artifact обязательны.
+
+Первая v4 baseline preparation остановилась до model dispatch: supervisor
+Cannot inspect process identity PID3659485 во время ensureProfile. PID затем
+исчез; историческая cleanup uncertainty не объявляется confirmed. Строгий
+публичный waitProfileIdle10s подтвердил свободный own profile; весь каталог
+архивирован в `ab-smoke-v4-20261008/base-preparation-failed` с receipt original
+path/archive path/log SHA/modelCalls0/formalAttempts0. Файлы не очищались и
+история не переиспользована. На новом профиле по тем же pins однократная fresh
+preparation прошла; baseline v4 реально достиг smoke-dispatch. Все причины
+proc identity refusal остаются неизвестны; это не product build verdict.
+
+Свежий offline wrapper check pinned Node24: package-cleanup-bridge standalone
+PASS, группа workspace/persistence/cleanup/bridge PASS без изменения source.
+Старые3 wrapper FAIL сохраняются; сегодняшнее наблюдение не устанавливает
+их причину. Предлагаемое изменение test isolation не внесено, поскольку RED
+поведение сейчас не воспроизведено.
