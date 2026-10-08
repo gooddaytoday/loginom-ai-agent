@@ -81,6 +81,9 @@ try {
   })
   state.context = opened.context
   const page = opened.context.pages()[0]
+  // Saved eval filenames can hide the Settings breadcrumb at 1280px. Both
+  // builds use this same acceptance viewport; native ownership guards stay on.
+  await page.setViewportSize({ width: 1920, height: 1080 })
   state.execute = (code) => new Function("page", `return (${code})(page)`)(page)
   const prepared = await state.execute(makeWorkspacePrepareCode({
     loginomUrl: page.url(),

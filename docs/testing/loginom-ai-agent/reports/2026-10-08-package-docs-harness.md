@@ -265,3 +265,78 @@ attempts/model/judge calls0. Controllerv3 использует существу�
 до auth/cache и отдельный `ab-smoke-v3-20261008`; базовый smoke только после
 этой подготовки считается фактическим запуском. Ни один из preparations не
 входит в90 formal attempts. Финальный результат v3 фиксируется отдельно.
+
+## Первый локальный парный smoke: warm успешен, candidate cold не принят
+
+Общие условия0e5ee67e…/harness0876bb32f проверены перед каждой стороной.
+Оба запуска `sales-by-category` выполнены в отдельных profiles/results/workspace,
+agent `openai/gpt-6.1-sol medium`, judge `gpt-6-astra high`. Это отдельный smoke;
+формальная матрица15×3×2=90 попыток ещё не началась.
+
+Baseline: `ab-smoke-v3-20261008/base/results/20261008-162053-0876bb32f`.
+CLI exit0/completed, judge100/100, независимые структура и warm CSV oracle PASS.
+Cold `ab-smoke-base-cold-20261008` PASS: сохранённые package/input bytes
+неизменны, реальный native export destination проверен до выполнения,
+settingsReapplied=false, oracle PASS, native close/logout, remaining0,
+container removed и удалены только точные собственные staged files.
+Итог `ab-smoke-base-accepted-20261008/review.json` принят как smoke.
+
+Candidate: `ab-smoke-v3-20261008/candidate/results/20261008-163112-0876bb32f`.
+CLI exit0/completed, judge100/100, независимые структура и warm CSV oracle PASS.
+Естественная активация bundled `loginom-automation` подтверждена.
+Tool calls19 против17 у baseline, Loginom calls13/13, tool errors0/0;
+provider step_finish20 против17. Сам activation call не объясняет автоматически
+весь рост provider turns; дополнительные ходы требуют отдельной классификации.
+
+Cold `ab-smoke-candidate-cold-20261008` FAIL: WIZARD_OPEN_NOT_CONFIRMED после
+одного begin_wizard. Prepared native GUID independently verified на graph и
+wizard; мастер observed/text_export_params, owner_context unobserved.
+Отказ относится к подтверждению открытия мастера, readonly guard пройден.
+Export execution/oracle не выполнялись; настройки не применялись.
+Native close/logout BLOCKED/NATIVE_CLOSE_UNCONFIRMED, remaining0,
+container removed. Ноль процессов не заменяет native cleanup.
+Свои staged package/input сохранены и после отказа повторно SHA-verified.
+Причина расхождения breadcrumb observation ещё не установлена; blind retry
+и основная матрица запрещены до разбора и безопасного cleanup.
+Первый recovery helper не запустился до браузера из-за доступа к private
+bind mount; ошибка и контейнерная очистка сохранены. Recovery v2 использовал собственную копию профиля внутри disposable container,
+не меняя исходник. Exact package opened readonly, native own-view close/logout
+SUCCEEDED/remaining0/container removed. Это не доказательство освобождения
+прежнего writer. После guard отсутствия других own AB клиентов перезапущен
+только own server027ec…; staged package/input SHA и explicit proxy unchanged.
+Исходные server/client не трогались. Restart относится к диагностике; для
+сопоставимого cold proof обе стороны должны пройти одинаковую процедуру.
+
+## Cold reader: длинный breadcrumb, TDD/native RED→GREEN
+
+При повторном native диагностическом чтении candidate точно воспроизведён
+отказ: `ab-smoke-candidate-breadcrumb-diagnosis-20261008`. На1280×800
+breadcrumb узла visible, а точный дочерний `…>Настройка` display:none/width0;
+prepared GUID wizard verified. Это объясняет owner_context unobserved.
+Мастер не исполнялся, settings не применялись. Native cleanup снова BLOCKED;
+собственный сервер перезапущен после отсутствия клиентов, только точные
+SHA-verified staged files архивированы/удалены. Исходные контейнеры сохранены.
+
+Минимальное исправление только test infrastructure: после loginBrowser общий
+cold-export reader устанавливает1920×1080 до preparation. Product/browser
+launch policy1280×800 неизменна, оба сохранённых бинарника неизменны.
+GUID, workflow chain, real saved XML/BIN destination, oracle, native close/logout
+и process guards сохранены. Не заменяем отсутствующего владельца догадкой.
+
+Native RED: прежний reader WIZARD_OPEN_NOT_CONFIRMED на том же сохранённом
+candidate package. GREEN: `ab-smoke-candidate-cold-wide-v2-20261008` PASS,
+реальное выполнение/свежий CSV/oracle0, destination verified, settingsReapplied
+false, package/input byte-identical, native close/logout/remaining0,
+container removed, exact owned staged files removed. Первый wide helper
+остановился до браузера, пока reset не завершился; preflight FAIL сохранён.
+Обе стороны обязаны пройти один wide reader и одинаковый fresh-server policy;
+первый baseline1280 cold не подставляется вместо такой пары.
+
+Offline cold export/binding guards20 PASS/0 FAIL, Host typecheck PASS.
+Полный Host suite297 PASS/7 SKIP/0 FAIL/typecheck PASS; baseline wide cold выполняется отдельно.
+
+Candidate raw skill records2 имеют один callID и partID: это повторная запись
+того же вызова, а не два разных activation calls. Дополнительный read относится
+к bundled references/workflow.md. Provider step_finish20 distinct IDs против17
+у baseline; причина оставшегося роста provider turns не выводится из одного
+только числа tool records. Допуск на activation не расширяется постфактум.
