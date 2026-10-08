@@ -4449,7 +4449,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ### 2026-10-08 — ACTIVE, парный smoke v5 PASS; formal A/B выполняется
 
-- HEAD до checkpoint169cfd392; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
+- HEAD до checkpoint5fd51fed5; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client/profiles и чужие процессы сохранены.
 - Frozen skills-evals-writer d1b364a98 clean; evalsrefb31ebe7d0 перечитан перед formal/protected diff0; исторический087 сохранён.
 - Harness full481 PASS/2 SKIP/0 FAIL/2055 assertions/585.37s/typecheck PASS; writer gap real IO RED→GREEN, bounded guards preserved.
@@ -4466,7 +4466,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Closed formal histories первых6 попыток сохранены с full roundtrip4604/4620/4600/4610/4562/4607 entries; active profile/results/21 execution pins неизменны; raw history restore по receipts.
 - CLI modify3 readonly/inactive-source FAIL; CLI docs-after-build3/3 accepted; Desktop docs-after-build warm3/cold1 PASS2 readonly FAIL.
 - Lifecycle driver first skill fixed via real-process/HTTP RED→GREEN;4 focused PASS/typecheck PASS; native lifecycle/independence ещё нужны.
-- MiMo-v2.5/default installed49 CLI arithmetic smoke FAIL: exit1/88.319s/empty stdout+stderr/browser0/remaining0; причина неизвестна, signal review без live retries.
+- MiMo installed smoke UNKNOWN; отдельная native-payload диагностика подтвердила HTTP429/quota exhausted, writer absent/remaining0/no browser; новых MiMo calls нет, выбор второй модели запрошен.
 - Source binaries/resources/server skill907ff16b…/catalog17764f9a… сохранены; stage5–8/Linux lifecycle/second-model gates открыты;stage9 deferred.
 - Далее завершить formal baseline/candidate90, independent structure/cold каждого saved artifact/compare; затем остальные Desktop/CLI/TUI gates.
 

@@ -503,3 +503,36 @@ secret scan до точного cleanup. Не копировать auth/cookies/
 не делать Loginom setup/check/automation, не заменять этим запуском старый FAIL.
 Изменять продуктовый JSON error handling до установления provider причины
 не требуется; существующие frozen A/B binaries/conditions сохраняются.
+
+### Отдельная диагностика подтвердила HTTP429 у MiMo
+
+`model2-49-native-diagnostic-v2-20261008`: текущий проверенный CLI payload49
+запущен на этой системе с новым private unconfigured profile/workspace.
+Это диагностический native payload запуск, не installed smoke и не замена
+старому FAIL. Исходный auth/profile не изменялся; Loginom setup/check и
+браузерный runtime не запускались, judge calls0. Stdout/stderr направлены
+прямо в mode600 files, ERROR backend log сохранён с проверкой секретов.
+
+CLI exit1/signalnull/78.248s. `backend.log` содержит `AI_APICallError: quota
+exhausted`; durable assistant error в собственном DB: `APIError`, statusCode429,
+message `quota exhausted`, isRetryabletrue. Это актуальное подтверждение
+недоступности второй модели, а не вывод по прежнему отказу. Встроенные SDK/session
+попытки видны в логе; ручных retries0, дополнительных вызовов MiMo после
+диагноза не запускать. Original installed smoke остаётся UNKNOWN по причине.
+
+Receipts: `receipt.json`, `provider-error-review.json`, `cleanup-review.json`.
+Backend SHA256 `bf80b43b862b635c469ccfc3933dbe7ba14e333419af6904a099ad23f3e8a192`;
+writer absent, exact profile process references0, browser runtime отсутствует.
+При проверке процессов исключена сама audit chain; её строка команды с
+literal profile path не считается клиентом. Profile/log data сохраняются
+приватно, auth/cookies/DB/сырые логи в git не включаются.
+
+Первая preparation этого helper остановилась до auth/CLI/model на неверном
+типе ArrayBuffer в checksum; исходный helper/пустой output/preparation receipt
+сохранены отдельно. Исправлена только приватная checksum операция, не продукт.
+V2 использовал новый output; не перезаписывал исходный smoke или preparation.
+
+Пользователю задан выбор второй модели: `openai/gpt-6-sol medium` (есть в
+закреплённом catalog) либо ожидание MiMo. Основная `openai/gpt-6.1-sol medium`
+и A/B conditions неизменны; до ответа смену второй OpenAI модели не выполнять.
+Этап6/второй smoke остаётся открытым, A/B продолжает работу независимо.
