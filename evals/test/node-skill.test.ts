@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, rm, stat } from "node:fs/promises"
 import { spawn } from "node:child_process"
 import { evalsRoot, repoRoot } from "../src/config"
 import { sandboxCommand } from "../src/sandbox"
@@ -90,11 +90,28 @@ test("node skill: assigned provider overrides stale profile settings inside the 
     expect(settings.provider.fake.options.apiKey).toBe(f.env.EVAL_AGENT_PROVIDER_API_KEY)
     expect(settings.provider.fake.models[f.env.EVAL_AGENT_PROVIDER_MODEL_ID].id).toBe(f.env.EVAL_AGENT_PROVIDER_MODEL_ID)
     expect(settings.provider.retained.name).toBe("retained")
+    expect((await stat(path.join(f.env.EVAL_PROFILE_DIR, "config/loginom-ai-agent.json"))).mode & 0o777).toBe(0o600)
     expect(run.stdout).not.toContain(f.env.EVAL_AGENT_PROVIDER_API_KEY)
     const report = JSON.parse(run.stdout)
     expect(await Bun.file(path.join(report.run_dir, "config.json")).text()).not.toContain(f.env.EVAL_AGENT_PROVIDER_API_KEY)
   } finally { await f.close() }
 }, 30000)
+
+test("node skill: overriding JSONC refuses dispatch without changing prepared settings", async () => {
+  const f = await fixture("group-sum-qty")
+  try {
+    await mkdir(path.join(f.env.EVAL_PROFILE_DIR, "config"), { recursive: true })
+    const file = path.join(f.env.EVAL_PROFILE_DIR, "config/loginom-ai-agent.json")
+    const saved = JSON.stringify({ permission: { loginom_remember: "allow" } })
+    await Bun.write(file, saved)
+    await Bun.write(path.join(f.env.EVAL_PROFILE_DIR, "config/loginom-ai-agent.jsonc"), "{}")
+    const run = await execute(f.draft, f.env)
+    expect(run.code).toBe(2)
+    expect(run.stderr).toContain("JSONC overlay is unsupported")
+    expect(await Bun.file(file).text()).toBe(saved)
+    expect(await Bun.file(path.join(f.root, "results/reference-group-sum-qty-1/group-sum-qty/1/events.jsonl")).exists()).toBe(false)
+  } finally { await f.close() }
+})
 
 test("node skill: draft without reference runs one fake attempt and archives cleanup", async () => {
   const f = await fixture("group-sum-qty")
