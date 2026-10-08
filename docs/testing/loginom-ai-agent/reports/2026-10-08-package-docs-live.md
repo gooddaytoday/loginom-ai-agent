@@ -478,3 +478,28 @@ failure/log paths read-only, без live retries. Полный private profile/l
 не сохранён адаптером; следующая диагностика должна удержать его до чтения.
 Второй модельный smoke и этап6 остаются открытыми; исторические успешные
 прогоны других source SHA не заменяют приёмку49.
+
+### Read-only разбор второго модельного отказа
+
+Сборщик сигнала завершил анализ без новых внешних вызовов или правок продукта:
+`model2-49-readonly-signal-20261008/report.md`, сопроводительные source/evidence
+hashes и offline probes. Единственный native smoke сохраняет классификацию
+UNKNOWN: причина и стабильность не установлены, provider429 не подтверждён.
+
+Из immutable source49 извлечены настоящие `RunCommand.loop/finish`:
+на synthetic `session.error` JSON-ветка3/3 возвращает exit1 без JSON/UI emission.
+Это воспроизводимая возможность потери диагностики, не доказательство данного
+native отказа и не интеграционная приёмка CLI. Отдельный местный child sentinel
+терял stdout/stderr даже после close; ptrace контроль в его среде запрещён.
+Эти условия другой exec-среды не переносятся на сохранённый Docker smoke.
+
+Первичный `SessionProcessor.halt` пишет ERROR в private
+`profile/data/log/loginom-ai-agent.log` и сохраняет assistant error в DB.
+Адаптер exported только evidence/workspace/execution journals; контейнер
+удалён, первичный backend log не восстановить. Следующий диагностический
+model-only запуск должен использовать новый unconfigured profile/output,
+прямые mode600 stdout/stderr files, ERROR logger и экспорт backend log с
+secret scan до точного cleanup. Не копировать auth/cookies/полный профиль,
+не делать Loginom setup/check/automation, не заменять этим запуском старый FAIL.
+Изменять продуктовый JSON error handling до установления provider причины
+не требуется; существующие frozen A/B binaries/conditions сохраняются.
