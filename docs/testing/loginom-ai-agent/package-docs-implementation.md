@@ -4449,7 +4449,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ### 2026-10-09 — ACTIVE, smoke-пара v7 принята; formal baseline запущен
 
-- HEAD до checkpoint `2ec0dcf4b`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
+- HEAD до checkpoint `3e181a61d`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client и чужие профили/процессы не изменялись.
 - Own mutable harness495463543 clean; новый detached skills-evals-release на полном SHA495463543901f1a69888b8d6375cd77996ef157b, frozen install/typecheck PASS.
 - Writer post-open real-IO RED→GREEN; release/persistent-empty/replacement guards×5 PASS; modules77 PASS/0 FAIL/241 assertions.
@@ -4464,7 +4464,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Candidate v7/session95877 terminal0/run215120:score100/oracle/structure/cold22429 PASS/cleanup confirmed; pair accepted receipt ab-smoke-v7-pair-accepted-20261009, fresh refb30dcbe5f/protected diff0.
 - Formal v7 baseline/session81639 запущен из frozen evals cwd, root ab-formal-v7-20261009/base; candidate formal не запускался. Далее45+45/structure/cold/compare; closed-only history/diagnostics adapters prepared, failed profile не очищать.
 - V5 formal1287 terminal1 на13/45:13-я analytic PASS100/process cleanup FAIL; historical PID4050199 errno/operation UNKNOWN; profile не очищен, candidate0/cold0.
-- CLI modify3 FAIL; CLI docs-after-build3 accepted; Desktop warm3/cold1 PASS2 FAIL; новый Desktop cold controller prepared/guard6 PASS, native запуск только после90 closed.
+- CLI modify3 FAIL: offline21 file occurrence hashes PASS, saved readonly3/3/UNKNOWN_PREPARED_WORKFLOW3/3/active-source refusal2/3; native writer owner/cause UNKNOWN. Docs-after-build CLI3 accepted/Desktop warm3+cold1 PASS2 FAIL; new Desktop cold guard6 PASS/native только после90 closed.
 - Linux installed CLI/Desktop49 по5 ОС PASS; TUI/native opening/headless docs и upgrade PASS; lifecycle/independence и remaining natural transitions открыты.
 - MiMo429/quota exhausted; новых secondary-model calls нет, ответ о вторичной модели ещё ожидается.
 - Source/server skill907ff16b…/catalog17764f9a… сохранены; stage5–8 открыты,stage9/full35 deferred; серверный skill сохраняется.
