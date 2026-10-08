@@ -1,0 +1,48 @@
+{
+  "builder_attempt": 1,
+  "builder_attempts_spent": 1,
+  "wrapper_attempt": 1,
+  "global_author_attempt": 1,
+  "session_id": "ses_ee53079deffeTzETpBlLXVs2Wm",
+  "model": {
+    "providerID": "openai",
+    "modelID": "gpt-6.1-sol",
+    "variant": "xhigh"
+  },
+  "timeout_ms": 1800000,
+  "harness_checkpoint_sha": "54fc98aad56f1b794bcd7786c297306519fd45e2",
+  "cli_source_sha": "904f7f85bf5450cbbfd48360d7dd9c483401face",
+  "node_case_skill": {
+    "version": "1.0.4",
+    "source_sha": "2179e67d5cb5ffb4837ff13ce36a010b3a454709",
+    "archive_sha256": "2f56e91d985f3dd45bf0dff141955dbd9898c475066eb80a69ec77dd249387fb"
+  },
+  "skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+  "action_manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+  "reference_sha256": "ea1337ace66b3b752db4d88784e5b3ea2c68c32fbe17737efea266de54f8b4a4",
+  "reference_code_check": {
+    "verdict": "PASS",
+    "errors": [],
+    "failures": []
+  },
+  "cleanup_status": "confirmed",
+  "cold_status": "PASS",
+  "cold_result_sha256": "4f31533889cdeeec878ce00242e1ad70ed8b0257f3ba8599205f40e8152181c7",
+  "cold_cleanup": "confirmed",
+  "cold_evidence": "cold/crosstable-column-cartesian/",
+  "source_attachment_sha256": "b22e16ccb91e82224bea12f90f7d9e7cf23f99aea69f1a0d7e0416bc62b8270b",
+  "reference_evidence": "reference/crosstable-column-cartesian/",
+  "observed_native_sha256": "afe740672145c66b173aaf076d70c4646acdf7b119458714b6d7278edef4d949",
+  "observed_native_provenance": [
+    {
+      "source": "loginom/runtime/generations/4/chats/d444e97ca049dcbfa331f6fd76a90f35507f09e9b412fe0b4a3a8f4c3c71d068/attempts/faf37ddd-e4ce-4e69-a10b-e3031f62b7fe/execution-events.jsonl",
+      "source_sha256": "d5c8627a5a665e309476d37d99f5c91af4e03636f9b02e57e957057dac8038ce",
+      "source_line": 660
+    },
+    {
+      "source": "loginom/runtime/generations/4/chats/d444e97ca049dcbfa331f6fd76a90f35507f09e9b412fe0b4a3a8f4c3c71d068/attempts/faf37ddd-e4ce-4e69-a10b-e3031f62b7fe/execution-events.jsonl",
+      "source_sha256": "d5c8627a5a665e309476d37d99f5c91af4e03636f9b02e57e957057dac8038ce",
+      "source_line": 840
+    }
+  ]
+}
