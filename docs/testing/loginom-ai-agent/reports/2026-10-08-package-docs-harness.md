@@ -673,3 +673,17 @@ recover/status не разрешили исходную неопределённ
 archive15708806 bytes/restore receipt. Исходные результаты и диагностика
 сохранены. Из первых8:4 PASS,3 no_artifact,1 saved required-checklist FAIL;
 пять saved artifacts прошли структуру/warm oracle, cold0/candidate0.
+
+## Formal baseline: девятая попытка PASS
+
+`monthly-demand#1`: CLI0/completed/judge100/oracle PASS/413.137s,
+harness pass=true, cleanup confirmed/no cleanup_error. Reviewer v5 подтвердил
+структуру0/warm oracle PASS в
+`ab-formal-v5-base-reviews-20261008-monthly-demand-1`. Cold ещё не выполнен.
+Закрытая история сохранена с guards/full roundtrip4606 entries,
+archive17224420 bytes; restore argv в sibling preservation receipt.
+Исходные result/events/артефакты/диагностика сохранены без изменения.
+
+Первые9:5 PASS,3 no_artifact,1 saved required-checklist FAIL;
+шесть saved artifacts прошли структуру/warm oracle, cold0/candidate0.
+Baseline45 продолжает работу; сравнение90 попыток ещё не выполнено.

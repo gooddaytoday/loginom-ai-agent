@@ -59,3 +59,20 @@ own readonly view close/logout и remaining0 подтверждены; container
 Неизвестные writer locks не снимаются; case3/3 не принят.
 Product code не менялся; все первоначальные отказы сохраняются.
 Исходные Loginom server/client не останавливались и не переключались.
+## Offline подготовка Desktop cold на собственном локальном стенде
+
+Сохранён набор `desktop-docs-cold-local-prepared-20261008` в долговременном
+acceptance-каталоге. Manifest SHA256
+`af98153cbe379acd51577088c42178612e9675a47ffc1288fb6558661bc2922d`.
+Для трёх исходных `docs-after-build` пакетов Desktop49 проверены SHA256 пакета
+и CSV по warm proof и историческим before-копиям; сохранены точные server paths,
+три разных GUID grouping, label и ожидаемые Alpha35/Beta20. XML не изменялся.
+Закреплены hashes `cold.mjs`, `processes.mjs`, resource manifest и исходных
+proof/result. Повторное чтение всех plans/copies/pins подтвердило совпадение;
+полный inventory ресурсов в этой подготовке повторно не проверялся.
+
+Статус `OFFLINE_BYTES_PINS_PASS_LIVE_REQUIRED`: браузер/модель/судья0,
+Docker и стенд не затрагивались. Прежние cold1 PASS/2 readonly FAIL сохранены.
+Запуск разрешён только после завершения formal controller с подтверждённым
+cleanup, на fresh own isolated server, с повторной проверкой guards/pins.
+Дальнейший staging/reader adapter ещё требуется; подготовка не закрывает gate.
