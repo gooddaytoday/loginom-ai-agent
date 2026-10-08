@@ -13,8 +13,8 @@
 - Multica EvalBaseline 77032943-ad18-4ae9-a2c6-668769077c86: eval-tests, gpt-6.1-sol/xhigh, concurrency=1, вне squad.
 - Native MCP search PASS: actor, собственный checkout, automatic Git Peer; receipt source 44c7928bf.
 - Карточка LAB-32 [Baseline], baseline label; инструкции/три starters/API readback PASS.
-- Контроль 2026-10-08 18:24 MSK: LAB-31 in_progress; Ben run 01a11c05-d01e-7afb-9687-f3bb98a282c4 running.
-- Lease принадлежит этому Ben run; приёмка SHA 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad; config v1.
+- Ben завершён/ACCEPT на SHA 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad; продукт 2 PASS/2 FAIL, cold 4 PASS.
+- Контроль 2026-10-08 18:55 MSK: lease FREE, config v1; Evaler 01a11c34-883d-7cb1-be8c-e5b0bd241e39 running; LAB-31 in_progress.
 - Живые smoke и полный baseline не запускались; unknown outcome автоматически не повторяется.
 - Следующий шаг: дождаться LAB-31/FREE, выполнить этап 3 launch-plan (single smoke, missing-only recovery), затем этапы 4–10.
 - Evidence доставлен/скачан из LAB-32: bytes/SHA256/manifest/readback PASS; archive SHA f5279740982b97449a9828b5a0aa9ab96abef86e8f1826e67baa1eac4ef7edef.
