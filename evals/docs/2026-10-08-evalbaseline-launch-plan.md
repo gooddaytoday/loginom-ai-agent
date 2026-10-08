@@ -37,7 +37,7 @@
 |---|---|
 | Основной чат-контроллер | `01a11a65-5025-7050-8d46-cee03e4023f3` |
 | Локальный checkout | `/tmp/loginom-baseline-runtime` |
-| Последний проверенный код / развёрнутый срез | `114d10ffab0efe32dc3db28b25be7137a274cce3` / `bfb7c62e4266e76c995a43b6f909d8a6739ce062` |
+| Последний проверенный код / развёрнутый срез | `3ce983703bbeca5d759f1cd7bfc8b9a8196c7f64` / `53d03a35b0ee2901b40c1a1bbb0170804d59e865` |
 | Проверки recovery и native helper | `077d0b5b109b182787d3964e46412e0e899fcc63` |
 | Сервер / runtime root | `user@10.200.13.152`; `/home/user/.local/share/loginom-evals-runtime` (`R` ниже) |
 | Собственный checkout | `R/checkouts/evalbaseline/loginom-ai-agent` |
@@ -53,7 +53,7 @@
 
 Основной чат отвечает за изменения harness, активацию общей среды, мониторинг и устранение блокеров. EvalBaseline отвечает за исполнение серии, сохранение доказательств и отчёт; он не исправляет продукт или критерии оценки. Rich, Ben и Evaler сохраняют свои роли и порядок приёмки.
 
-Уже проверено: полный CLI manifest — 5389 файлов, AppArmor/sandbox, setup READY, чистота собственного профиля, настоящий MCP search с actor scope и автоматическим Git Peer, Multica readback и доставка evidence. Последний полный локальный suite: 549 PASS, 7 clean-host SKIP, 0 FAIL; typecheck PASS. На выделенном сервере helper и writer/registration fixtures: 50 PASS, 0 SKIP, 0 FAIL, включая дополнительную native cleanup проверку. Это исходные свидетельства, а не замена проверки изменившегося состояния перед исполнением.
+Уже проверено: полный CLI manifest — 5389 файлов, AppArmor/sandbox, setup READY, чистота собственного профиля, настоящий MCP search с actor scope и автоматическим Git Peer, Multica readback и доставка evidence. Последний полный локальный suite: 553 PASS, 9 clean-host SKIP, 0 FAIL; typecheck PASS. На выделенном сервере helper и writer/registration fixtures: 51 PASS, 0 SKIP, 0 FAIL, включая дополнительную native cleanup проверку. Это исходные свидетельства, а не замена проверки изменившегося состояния перед исполнением.
 
 ## 3. Подготовить недостающие возможности harness до живых запусков
 
@@ -115,17 +115,19 @@ Infrastructure и judge recovery реализованы отдельными app
 - [x] Потребление всех дополнительных executions отражено; regular/analytic и node metrics не объединены в общий score; экспорт исключает secrets/leases/БД.
 - [x] После cleanup-resolution изменений: targeted 90 PASS/4 SKIP; `bun test` — 549 PASS/7 SKIP/0 FAIL, 556 тестов/48 файлов/2714 assertions/559,88 с; `bun typecheck` PASS. Дополнительный native cleanup test и прежние clean-host fixtures проверены на серверном срезе `077d0b5b1`: helper 29 PASS, writer/registration 21 PASS, без skips. Первый writer запуск сохранил ошибку отсутствующего Node; изолированный fixture Node с проверенным SHA устранил предпосылку, повтор PASS. При следующих изменениях кода повторить необходимые проверки.
 
-## 4. Активировать v2 для всех исполнителей
+## 4. Активировать v2 для всех исполнителей — выполнено
 
 **Результат:** единые config/helper/instructions действительно включены, а не только подготовлены рядом с активной v1.
 
-- [ ] Заново прочитать очередь и статусы **всех** исполнителей runtime, lease, процессы, recovery и профили. Дождаться завершения цепочки LAB-31; не отменять чужие задачи и не перехватывать lease.
-- [ ] Подготовить финальный чистый SHA с доработками этапа 3 и принятым корпусом. Установить immutable supplement с полным файловым manifest, проверить его SHA и хэши. Сохранить предыдущую версию и private backup config/instructions.
-- [ ] При пустой очереди и отсутствии активных задач временно исключить новый dispatch на время переключения штатным механизмом runtime; повторно проверить очередь перед заменой. Не использовать текущий BUSY как разрешение остановить работника.
-- [ ] Подтвердить FREE, отсутствие harness leases/pending cleanup, чистоту всех пяти профилей, отсутствие браузеров/отладчиков и остатков общего Loginom storage.
-- [ ] Атомарно заменить active config на v2. Переключить инструкции Multica и server `runtime.md` Rich, Ben, Evaler и EvalBaseline на один manifest/helper. Не оставлять часть исполнителей на относительном старом `script/node-eval-ops.ts` из checkout.
-- [ ] Readback: прежние runtime/model/thinking/concurrency/squad/роль и продуктовые настройки Rich/Ben сохранены; EvalBaseline имеет отдельные eval-profile и CLI 0.1.17; Evaler остаётся без продуктового профиля. У всех совпадает operational supplement.
-- [ ] Возобновить dispatch после успешного readback. До реального использования v2 при ошибке переключения восстановить сохранённую конфигурацию; после приобретения v2 lease сначала выполнить предусмотренное восстановление и cleanup.
+- [x] Заново прочитать очередь и статусы **всех** исполнителей runtime, lease, процессы, recovery и профили. Дождаться завершения цепочки LAB-31; не отменять чужие задачи и не перехватывать lease.
+- [x] Подготовить финальный чистый SHA с доработками этапа 3 и принятым корпусом. Установить immutable supplement с полным файловым manifest, проверить его SHA и хэши. Сохранить предыдущую версию и private backup config/instructions.
+- [x] При пустой очереди и отсутствии активных задач временно исключить новый dispatch на время переключения штатным механизмом runtime; повторно проверить очередь перед заменой. Не использовать текущий BUSY как разрешение остановить работника.
+- [x] Подтвердить FREE, отсутствие harness leases/pending cleanup, чистоту всех пяти профилей, отсутствие браузеров/отладчиков и остатков общего Loginom storage.
+- [x] Атомарно заменить active config на v2. Переключить инструкции Multica и server `runtime.md` Rich, Ben, Evaler и EvalBaseline на один manifest/helper. Не оставлять часть исполнителей на относительном старом `script/node-eval-ops.ts` из checkout.
+- [x] Readback: прежние runtime/model/thinking/concurrency/squad/роль и продуктовые настройки Rich/Ben сохранены; EvalBaseline имеет отдельные eval-profile и CLI 0.1.17; Evaler остаётся без продуктового профиля. У всех совпадает operational supplement.
+- [x] Возобновить dispatch после успешного readback. До реального использования v2 при ошибке переключения восстановить сохранённую конфигурацию; после приобретения v2 lease сначала выполнить предусмотренное восстановление и cleanup.
+
+Проверено 2026-10-08 23:44 MSK: runtime возобновлён, очереди четырёх исполнителей пусты; `FREE`, пять профилей чисты, storage пуст. Развёрнутый immutable SHA `53d03a35b0ee2901b40c1a1bbb0170804d59e865`, manifest 733 файлов, SHA256 `9f78455de8c03996e3dbfc12696b0fed5197597f664553cd2502b349ba5e0aae`. Server proof: `R/evidence/baseline-v2-activation-resumed-53d03a35b.json`; Multica readback подтвердил инструкции всех четырёх ролей, три starters, неизменность настроек и squad. Дальнейшие операторские doc-коммиты не меняют этот серверный pin.
 
 ## 5. Немодельная проверка установленного CLI внутри изоляции
 
