@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, copyFile, mkdir, mkdtemp, rename, rm, stat, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, ownedRecoveryEntry, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, runNodeEvalOps, runNodeUnitChecks, settleNodeWriterRelease, type NodeOpsConfig } from "../src/node-eval-ops"
+import { acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, ownedRecoveryEntry, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, reserveOwnedRegistrationContinuation, runNodeEvalOps, runNodeUnitChecks, settleNodeWriterRelease, type NodeOpsConfig } from "../src/node-eval-ops"
 import { archiveProfileHistory } from "../src/profile"
 import { superviseProcess } from "../src/process-supervisor"
 
@@ -128,6 +128,55 @@ test("writer-release settlement requires the original clean admission before obs
   } finally { await fixture.dispose() }
 })
 
+test("LAB-31 owned-registration continuation requires original admission before any mutation", async () => {
+  const f=await runtime()
+  try {
+    const lease=await acquireNodeStand(f.config,owner)
+    const cfg=path.join(f.config.roles.rich.workRoots[0]!,"config.json"),handle=path.join(f.config.roles.rich.workRoots[0]!,"lease.json")
+    await Bun.write(cfg,JSON.stringify(f.config));await chmod(cfg,0o600)
+    await Bun.write(handle,JSON.stringify(lease));await chmod(handle,0o600)
+    const result=await runNodeEvalOps(["lab31-owned-registration","--config",cfg,"--lease",handle,
+      "--evidence",path.join(f.config.roles.rich.workRoots[0]!,"recovery.json"),"--admission",path.join(f.config.roles.rich.workRoots[0]!,"admission.json"),"--followup-task","followup"])
+    expect(result.reason).toBe("ADMISSION_PROOF_REQUIRED")
+    expect(await Bun.file(path.join(f.config.runtimeRoot,"operations/stand.lease/owned-registration-once.json")).exists()).toBe(false)
+  } finally {await f.dispose()}
+})
+
+test("owned registration once receipt is durable, hash-bound and cannot reset an ATTEMPTED reservation", async () => {
+  const f=await runtime()
+  try {
+    const lease=await acquireNodeStand(f.config,owner)
+    const incident="LAB-31-product-namefix-v1-multi-facts-writer-owner-unavailable"
+    const attempted=await reserveNodeRecovery(f.config,lease,incident),bytes=await Bun.file(attempted).text()
+    const hash=new Bun.CryptoHasher("sha256").update(bytes).digest("hex")
+    await expect(reserveOwnedRegistrationContinuation(f.config,lease,"0".repeat(64),"b".repeat(40),"followup")).rejects.toThrow("CONTINUATION_RESERVATION_UNKNOWN")
+    const once=await reserveOwnedRegistrationContinuation(f.config,lease,hash,"b".repeat(40),"followup")
+    const receipt=await Bun.file(once).json()
+    expect(receipt.status).toBe("CONSUMED_BEFORE_MUTATION");expect(receipt.originalSha256).toBe(hash)
+    expect(receipt.newSha).toBe("b".repeat(40));expect((await stat(once)).mode & 0o077).toBe(0)
+    await expect(reserveOwnedRegistrationContinuation(f.config,lease,hash,"c".repeat(40),"renamed-followup")).rejects.toThrow("CONTINUATION_ALREADY_ATTEMPTED")
+    await expect(reserveNodeRecovery(f.config,lease,incident)).rejects.toThrow("RECOVERY_ALREADY_ATTEMPTED")
+    expect(await Bun.file(attempted).text()).toBe(bytes)
+    expect((await nodeStandStatus(f.config)).status).toBe("BUSY")
+  } finally {await f.dispose()}
+})
+
+test("owned registration once refuses altered owner/acquiredAt/incident instead of granting mutation", async () => {
+  for(const change of ["owner","acquiredAt","incident"]) {
+    const f=await runtime()
+    try {
+      const lease=await acquireNodeStand(f.config,owner)
+      const attempted=await reserveNodeRecovery(f.config,lease,"LAB-31-product-namefix-v1-multi-facts-writer-owner-unavailable")
+      const value=await Bun.file(attempted).json()
+      if(change==="owner")value.owner.task="foreign";else value[change]="foreign"
+      await Bun.write(attempted,JSON.stringify(value))
+      const hash=new Bun.CryptoHasher("sha256").update(await Bun.file(attempted).text()).digest("hex")
+      await expect(reserveOwnedRegistrationContinuation(f.config,lease,hash,"b".repeat(40),"followup")).rejects.toThrow("CONTINUATION_RESERVATION_UNKNOWN")
+      expect(await Bun.file(path.join(f.config.runtimeRoot,"operations/stand.lease/owned-registration-once.json")).exists()).toBe(false)
+    } finally {await f.dispose()}
+  }
+})
+
 test("recovery admits only the exact empty package lock bound by a settlement", () => {
   const lock = { name: ".fixture.lgp.lck", kind: "package_lock", package_path: "/user/fixture.lgp",
     sha256: new Bun.CryptoHasher("sha256").update("").digest("hex") }
@@ -179,7 +228,7 @@ test.skipIf(!dockerAvailable || browserBusy)("writer-release settlement binds im
     expect(await Bun.file(path.join(f.config.runtimeRoot, "operations/recovery-incidents")).exists()).toBe(false)
     expect((await nodeStandStatus(f.config)).status).toBe("BUSY")
   } finally { await f.dispose() }
-})
+}, 30_000)
 
 test.skipIf(!dockerAvailable || browserBusy)("fixed unit commands produce process proof and release only after actual profile and storage checks", async () => {
   const fixture = await stand()
