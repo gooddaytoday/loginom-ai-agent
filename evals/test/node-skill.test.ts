@@ -34,16 +34,15 @@ async function execute(draft: string, env: Record<string, string | undefined>, a
   return { code, stdout, stderr }
 }
 
-async function readSandboxSettings(root: string, profile: string) {
-  const installation = path.join(root, "installation")
-  const workspace = path.join(root, "probe-workspace")
+async function readSandboxSettings(root: string, profile: string, file = "loginom-ai-agent.json") {
+  const installation = await mkdtemp(path.join(root, "probe-installation-"))
+  const workspace = await mkdtemp(path.join(root, "probe-workspace-"))
   await mkdir(path.join(installation, "bin"), { recursive: true })
-  await mkdir(workspace)
   await cp("/usr/bin/python3", path.join(installation, "bin/cli"), { dereference: true })
   await Bun.write(path.join(installation, "cli-manifest.json"), "{}")
   const boundary = await sandboxCommand({
     cmd: [path.join(installation, "bin/cli"), "-c",
-      "import os,pathlib; print((pathlib.Path(os.environ['LOGINOM_AI_AGENT_CLI_PROFILE'])/'config/loginom-ai-agent.json').read_text())"],
+      "import os,pathlib,sys; print((pathlib.Path(os.environ['LOGINOM_AI_AGENT_CLI_PROFILE'])/'config'/sys.argv[1]).read_text())", file],
     profileDir: profile, workdir: workspace, env: { LOGINOM_AI_AGENT_CLI_PROFILE: profile },
   })
   const run = spawn(boundary.cmd[0]!, boundary.cmd.slice(1), {
@@ -97,21 +96,27 @@ test("node skill: assigned provider overrides stale profile settings inside the 
   } finally { await f.close() }
 }, 30000)
 
-test("node skill: overriding JSONC refuses dispatch without changing prepared settings", async () => {
+test("node skill: all loaded JSON and JSONC settings preserve the assigned sandbox policy", async () => {
   const f = await fixture("group-sum-qty")
   try {
     await mkdir(path.join(f.env.EVAL_PROFILE_DIR, "config"), { recursive: true })
     const file = path.join(f.env.EVAL_PROFILE_DIR, "config/loginom-ai-agent.json")
-    const saved = JSON.stringify({ permission: { loginom_remember: "allow" } })
-    await Bun.write(file, saved)
-    await Bun.write(path.join(f.env.EVAL_PROFILE_DIR, "config/loginom-ai-agent.jsonc"), "{}")
+    await Bun.write(file, JSON.stringify({ permission: { loginom_remember: "allow", "loginom_*": "allow" }, instructions: ["keep JSON"] }))
+    await Bun.write(path.join(f.env.EVAL_PROFILE_DIR, "config/config.json"), JSON.stringify({ permission: { loginom_write: "allow", "loginom_*": "deny" } }))
+    await Bun.write(path.join(f.env.EVAL_PROFILE_DIR, "config/loginom-ai-agent.jsonc"),
+      '{ // prepared profile\n "permission": {"loginom_remember": "allow", "loginom_*": "allow",}, "instructions": ["keep JSONC"],}')
     const run = await execute(f.draft, f.env)
-    expect(run.code).toBe(2)
-    expect(run.stderr).toContain("JSONC overlay is unsupported")
-    expect(await Bun.file(file).text()).toBe(saved)
-    expect(await Bun.file(path.join(f.root, "results/reference-group-sum-qty-1/group-sum-qty/1/events.jsonl")).exists()).toBe(false)
+    expect(run.code).toBe(0)
+    for (const name of ["config.json", "loginom-ai-agent.json", "loginom-ai-agent.jsonc"]) {
+      const settings = await readSandboxSettings(f.root, f.env.EVAL_PROFILE_DIR, name)
+      expect(settings.permission.loginom_remember).toBe("deny")
+      expect(settings.permission.loginom_write).toBe("deny")
+      expect(settings.provider.fake.options.baseURL).toBe(f.env.EVAL_AGENT_PROVIDER_BASE_URL)
+      expect(Object.keys(settings.permission).indexOf("loginom_*")).toBeLessThan(Object.keys(settings.permission).indexOf("loginom_remember"))
+      if (name !== "config.json") expect(settings.instructions).toEqual([name.endsWith("jsonc") ? "keep JSONC" : "keep JSON"])
+    }
   } finally { await f.close() }
-})
+}, 30000)
 
 test("node skill: draft without reference runs one fake attempt and archives cleanup", async () => {
   const f = await fixture("group-sum-qty")
