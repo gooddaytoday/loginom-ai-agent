@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url"
 import { setTimeout } from "node:timers/promises"
 import { promisify } from "node:util"
 import { observeProcesses } from "./processes.mjs"
+import { collectExecutionJournals } from "./journals.mjs"
 import { verifySalesScenario } from "./scenario.mjs"
 import { verifyImportBuild, verifyCalculatorModification, verifyImportExecution } from "./scenario-import.mjs"
 import { acceptanceTurns } from "./turns.mjs"
@@ -434,6 +435,7 @@ for (const testcase of input.cases) {
       if (application) await application.close()
       const processes = await observer.close()
       await save("processes.json", processes)
+      await collectExecutionJournals(profile, evidence, secrets)
       assert.equal(processes.remaining.length, 0, "OWNED_PROCESS_SURVIVED")
       assert.ok(!processes.processes.some((row) => row.command.split(" ").includes("--no-sandbox")))
       await rm(root, { recursive: true, force: true })

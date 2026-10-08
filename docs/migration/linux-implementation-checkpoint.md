@@ -433,8 +433,7 @@ Loginom/model calls0; общие gates открыты.
 
 ## Package docs — checkpoint 2026-10-08
 
-Source49b1584f2: TDD heading-chain fix, docs57 PASS/678 и typecheck PASS.
-CLI/DEB/AppImage0.1.17 manifest/static PASS, без публикации.
+Source49b1584f2:TDD/docs57 PASS/678/typecheck; CLI/DEB/AppImage0.1.17 manifest PASS.
 Установленный CLI Ubuntu22/24/26+Debian12/13 5/5 PASS, containers removed.
 Exact669 failing Markdown → установленный49 PDF3 страницы visual QA PASS;
 DOCX XML/MD проверены, `.lgp` неизменён, модель/Loginom calls0.
@@ -450,6 +449,7 @@ Cold planner:TDD10/reference35 offline PASS; reader:TDD4/final88 PASS/783/typech
 own XML reference warm+2 cold PASS/oracle/cleanup0, own9 files archived/removed.
 Harness clean9d7b463c4:460 PASS/2 SKIP/typecheck; отдельный frozen worktree.
 A/B12–15 заранее выбранных задач ×3×2 с judge/structure/cold replay ещё открыт;
-CLI49 scenario-create1/3 warm+cold PASS2/2, attempt2 FAIL; SSH stand/подмодель pending.
+CLI49 scenario-create attempts1,3 warm+cold PASS2/2; attempt2 FAIL/internal step unknown.
+Journal collector:TDD4/92 PASS/798/typecheck/producer probe; live/SSH/подмодель pending.
 Этап9/full35 отложены/server skill retained; исходные server/client не переключались.
 [Отчёт](../testing/loginom-ai-agent/reports/2026-10-08-package-docs-live.md).

@@ -4447,6 +4447,14 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
+### 2026-10-08 — сохранение внутренних receipts
+
+- CLI/Desktop acceptance копируют только `execution-events.jsonl` собственного профиля до его удаления; bytes и SHA256 сохраняются, auth/browser-profile не копируются.
+- TDD4 RED→GREEN: сохранение receipts, отказ raw known secret, journal symlink и profile symlink; incidental `readdir` order FAIL сохранён и исправлен в assertion.
+- Общий suite92 PASS/0 FAIL/798 assertions; typecheck PASS. Real pinned Node/installed journal producer probe PASS, model/Help/Loginom calls0.
+- Evidence `skills-journals-20261008` с manifest; runtime и recovery не изменялись. Live wiring не принято, конкретный internal step старого scenario-create2 неизвестен.
+- Следующий шаг: оставшиеся installed переходы и scenario/multiturn с новым сбором receipts. Gates5–8 открыты; A/B12–15×3×2 и stage9 вне цели сохранены.
+
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
 - Clean candidate669: Desktop DEB/AppImage + CLI full tar/manifest/static PASS; installed Ubuntu22/24/26, Debian12/13 Desktop5/5+CLI5/5 PASS, containers removed. Исторические253 archive180s FAIL сохранены.
 - Полный чистый baseline `fc3d97dbf`: CLI, resources, manifest и детерминированные проверки сохранены.

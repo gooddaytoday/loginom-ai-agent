@@ -268,6 +268,18 @@ receipts до удаления собственного контейнера, н
 
 ## Независимый structural verifier
 
+Для следующей диагностики добавлен сбор `execution-events.jsonl` из собственного
+профиля в адаптеры CLI и Desktop, до удаления профиля и проверки результатов.
+Сохраняются исходные bytes, внутренний operation ID и SHA256; auth/browser-profile
+не копируются, ссылки на профиль/журнал и известные неотредактированные секреты
+отклоняются. Runtime, recovery и границы повторного выполнения не изменены.
+Четыре последовательных TDD-цикла сохранены; общий suite **92 PASS, 0 FAIL,
+798 assertions**, typecheck PASS. Проверка настоящим pinned Node24.19.0 и
+поставленным producer журнала подтвердила сохранение bytes и redaction.
+Evidence с manifest: `skills-journals-20261008`. Live-интеграция коллектора ещё
+не выполнена; старый internal step попытки2 не восстановлен. В третьем цикле
+исходный FAIL порядка `readdir` сохранён, assertion исправлен сортировкой.
+
 Все13 scripts существующего loginom-eval-case скопированы в собственный
 `analytic-structural-verifier-20261008/scripts` с SHA256 manifest. Отдельный
 `offline-verifier.env` направляет CSV-компаратор в frozen9d7 harness и явно

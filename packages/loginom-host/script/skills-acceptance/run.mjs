@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile, appendFile, cp, readdir } from "node:fs/pro
 import { join } from "node:path"
 import { scheduler } from "node:timers/promises"
 import { observeProcesses } from "./processes.mjs"
+import { collectExecutionJournals } from "./journals.mjs"
 import { verifySalesScenario } from "./scenario.mjs"
 import { verifyImportBuild, verifyCalculatorModification, verifyImportExecution } from "./scenario-import.mjs"
 import { acceptanceTurns } from "./turns.mjs"
@@ -183,6 +184,7 @@ for (const [turnIndex, turn] of turns.entries()) {
   await writes
   const processEvidence = await observer.close()
   await writeFile(join(evidence, "processes.json"), JSON.stringify(processEvidence, null, 2))
+  await collectExecutionJournals(profile, evidence, secrets)
   const raw = Buffer.concat(events).toString()
   assert.ok(!secrets.some((secret) => raw.includes(secret)))
   const parsed = raw.trim().split("\n").filter(Boolean).map(JSON.parse)
