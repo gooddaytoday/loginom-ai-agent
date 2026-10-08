@@ -16,5 +16,5 @@
 - Technical manifest bed77af4-b5fe-4a53-b67b-014bc4f6bcc4; incomplete/0 measured; 2026-10-09 00:02 MSK release/FREE.
 - First prepare error сохранён; Dock URL исправлен до серий; независимый post-release check: 5 profiles clean/storage EMPTY/browser 0.
 - Calc smoke 889c9f8e-819a-431d-9ed1-2082e839ae00: ProviderModelNotFoundError, artifact отсутствует, tokens/tool calls 0; release/FREE; delivery 11 файлов PASS.
-- Каталог обновлён установленным CLI внутри bubblewrap: точные gpt-6.1-sol/medium зарегистрированы; model/judge calls=0, CLI pins unchanged, clean/FREE.
+- Каталог CLI/bubblewrap: точные gpt-6.1-sol/medium зарегистрированы, model/judge calls=0, pins unchanged/clean/FREE; attachment 01a11d73-d5ba-70d4-9cb5-deeb96cc85a3 verified.
 - Readiness INCOMPLETE: ожидается ответ на запрос нового подготовительного цикла; calc не повторять, node/full не запускать. Затем полная карточка и heartbeat 30m по этапам 7–8.
