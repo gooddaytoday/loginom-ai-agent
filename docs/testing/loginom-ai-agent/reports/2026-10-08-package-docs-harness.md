@@ -756,3 +756,29 @@ Restore argv — в sibling receipts; source result/events/judge/artifacts со�
 Первые12:8 PASS,3 no_artifact,1 saved required-checklist FAIL;
 девять saved artifacts прошли структуру/warm oracle, cold0/candidate0.
 Baseline45 продолжается; полный A/B90/compare ещё открыты.
+
+## Formal v5: остановка на тринадцатой попытке
+
+После предыдущего checkpoint controller завершился exit1. В `base/completion.json`
+сохранён run `20261008-180611-d1b364a98`: выполнено13/45, candidate не запускался.
+`slow-supplier-deliveries#1`: CLI0/completed/judge100/oracle PASS/465.478s,
+исходный analytic pass=true сохранён. Однако environment/process cleanup FAILED:
+`Cannot inspect process identity PID 4050199`. Приёмка и полное A/B не завершены.
+Отказ произошёл до diagnostics/writer/recovery/history/storage stages; stages[].
+Attempt13 и активный профиль не архивировались и не очищались.
+
+Read-only signal сохранён в `formal-v5-process-identity-signal-20261008`;
+report SHA256 `81f5fae3c715862b4cc83adc4f9baa309ad39a3bc44a362bd2e8e0834eebe83c`.
+Первоначальные errno, операция чтения и время ошибки потеряны generic catch.
+PID отсутствует в captured identities; его владельца установить нельзя.
+4902 scans/31 captured processes и два final owned_remaining0 не отменяют
+sticky error. Три source guard runs дали каждый3 PASS/0 FAIL; native stable/flaky
+остаётся UNKNOWN, исходная ошибка ими не воспроизведена.
+
+Текущая read-only проверка `formal-v5-terminal-current-processes.json`:
+PID отсутствует, own formal refs0, writer absent. Это текущее состояние, а не
+доказательство исторического cleanup. Новые live/reset/candidate не запускались.
+Следующий шаг — TDD диагностического контекста в собственном mutable harness;
+ownership/identity guards и исходные результаты сохраняются. При смене harness
+потребуется новый frozen SHA и одинаковые условия обеих сборок; неполная серия
+v5 остаётся исторической и не дополняется выборочными ручными retries.

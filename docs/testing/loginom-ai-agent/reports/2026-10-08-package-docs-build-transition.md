@@ -98,5 +98,17 @@ Positive fixture подтверждает допуск полностью зак
 Guard SHA256 `a161573fc957c66ee5cf71c9b0a741f7280979417eaa9401dd067b38c1c206bd`,
 test SHA256 `76ea430c5b15291d82d2d900892e1fc9fa6b2912330db8cd83cccddc1caa3bac`.
 Все RED/GREEN logs сохранены; common/21 pins перепроверены и неизменны.
-Guard пока не подключён к staging/reader controller: его реализация и native
-проверка ещё нужны. Desktop cold1 PASS/2 readonly FAIL и открытый gate сохраняются.
+Guard подключён к приватному `skills-desktop-docs-cold-local.py`: перед staging,
+Docker и reset проверяются полный formal cleanup, отсутствие native owners и
+writer. Formal root и common file передаются явно; условия обеих сторон должны
+ссылаться на SHA этого common. Существующие server destinations запрещены,
+восстанавливаются точные сохранённые package/CSV bytes без переписывания XML.
+Последующий native reader ещё не выполнялся и этим не считается проверенным.
+
+Текущий v2 entrypoint получил реальные formal v5 paths и завершился exit1 на
+отсутствующем `sales-by-category/2/result.json` до любых ресурсных операций;
+это отказ неполной серии, не новый `FORMAL_NOT_COMPLETED` receipt. Log:
+`desktop-cold-controller-v2-current-formal-refusal.log`; source SHA256
+`0e9bdf253eb7f411a4492a3435453c01bbd22881c66888f933eeb03ad5f4f363`.
+Ранее сохранённые v1 source/log/receipt не заменены. Guard suite повторно6 PASS.
+Desktop cold1 PASS/2 readonly FAIL и открытый native gate сохраняются.

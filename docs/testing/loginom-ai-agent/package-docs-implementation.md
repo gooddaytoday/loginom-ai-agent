@@ -4447,9 +4447,9 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-08 — ACTIVE, парный smoke v5 PASS; formal A/B выполняется
+### 2026-10-08 — ACTIVE, formal v5 остановлен: process cleanup FAIL
 
-- HEAD до checkpoint `213364e3e`; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
+- HEAD до checkpoint `55a99f673`; product baselinefc/candidate49b1584f2 неизменны; изменения только own harness/test infra/docs.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client/profiles и чужие процессы сохранены.
 - Frozen skills-evals-writer d1b364a98 clean; evalsrefb31ebe7d0 перечитан перед formal/protected diff0; исторический087 сохранён.
 - Harness full481 PASS/2 SKIP/0 FAIL/2055 assertions/585.37s/typecheck PASS; writer gap real IO RED→GREEN, bounded guards preserved.
@@ -4457,18 +4457,18 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Baseline v5 run174713 и candidate v5 run175606 full smoke accepted:judge100/structure/warm oracle/cold/native cleanup confirmed.
 - Pair evidence ab-smoke-v5-pair-accepted-20261008; functional control, formal0/statistical noninferiority not proven.
 - V5 metrics provider17/18 (dedup), unique tools17/19/Loginom13/13/errors0; skill+workflow read, allowance неизменен.
-- Baseline formal run180611/session1287 жив; первые12:8 PASS,3 no_artifact,1 saved required-checklist FAIL; все9 saved structure-warm PASS; cold0/candidate0/compare pending.
+- Baseline run180611/session1287 завершён exit1 на13/45: slow-supplier-deliveries#1 analytic PASS100, process cleanup FAIL; candidate0/cold0/compare pending. Первые12:8 PASS/4 measured FAIL;9 saved structure-warm PASS.
 - Output mapping ABC/cohort/low-liquidity: shared first geometry proof1/32 > tolerance1/64;12 modules identical; source2×3×20 PASS; native stability/unique cause UNKNOWN, immutable A/B unchanged.
 - cohort-spend-activity#1: no_artifact/294.054s, NODE_APPLY_STOPPED→OUTPUT_MAPPING_RECOVERY_UNVERIFIED; cleanup confirmed/native uncertainty сохранена; manual retry0.
-- V4 candidate historical cleanup FAIL Writer owner unavailable retained; v5 первая preflight0 refusal archived, own residue preserved/marked cleanup PASS.
+- V5 PID4050199: original errno/operation потеряны; native stable/flaky UNKNOWN; 3 offline runs×3 guard tests PASS не воспроизводят ошибку. Signal сохранён в formal-v5-process-identity-signal-20261008.
 - Старые own CLI091/239/253/5a9/bd0/c50 и upgrade CLI/Desktop669/bc6 сохранены проверенными архивами; baseline/current49 raw сохранены; свободно около7.2GiB.
 - Неиспользуемый docs-build/node_modules удалён после process/FD guards; bytes не архивированы, locked reinstall/reverify записан в receipt; source49 clean.
 - Histories/diagnostics первых12 closed attempts сохранены с full roundtrip/restore receipts; summary первых9 diagnostics65cbbe16…; active profile/results/21 pins неизменны.
-- CLI modify3 readonly/inactive-source FAIL; CLI docs-after-build3/3 accepted; Desktop docs-after-build warm3/cold1 PASS2 readonly FAIL; offline exact bytes/pins3 prepared; new formal guard TDD6 PASS/e684eeda…; controller wiring/live pending.
+- CLI modify3 FAIL; CLI docs-after-build3/3 accepted; Desktop warm3/cold1 PASS2 FAIL; offline bytes/pins3 prepared; formal guard6 PASS, controller wired и отказал на incomplete v5 до Docker/staging; native pending.
 - Lifecycle driver first skill fixed via real-process/HTTP RED→GREEN;4 focused PASS/typecheck PASS; native lifecycle/independence ещё нужны.
 - MiMo installed smoke UNKNOWN; отдельная native-payload диагностика подтвердила HTTP429/quota exhausted, writer absent/remaining0/no browser; новых MiMo calls нет, выбор второй модели запрошен.
 - Source binaries/resources/server skill907ff16b…/catalog17764f9a… сохранены; stage5–8/Linux lifecycle/second-model gates открыты;stage9 deferred.
-- Далее завершить formal baseline/candidate90, independent structure/cold каждого saved artifact/compare; затем остальные Desktop/CLI/TUI gates.
+- Сейчас own formal refs0/writer absent/PID absent; прежний cleanup FAIL не подтверждён, attempt13/profile не очищать. Далее own harness TDD sanitized operation/errno context без ослабления identity; новый frozen pair после проверки.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 
