@@ -4377,6 +4377,25 @@ gates. [Факты, вёрстка и TDD](reports/2026-10-08-package-docs-live.
 нет явного требования подмодели, фактические reference не содержат такого узла;
 уточнение отдельного контроля запрошено. Ожидание не останавливает product QA.
 
+
+### 2026-10-08 — cold replay planner и Linux49
+
+Новый тестовый `skills-acceptance/cold-plan.ts` использует реальный extractor:
+проверяет сохранённые bytes/hash и серверные bindings, принадлежность
+пакета попытке, точный CSV-export GUID первого модуля и выходной путь.
+Десять последовательных RED→GREEN циклов; fixtures — read-only копии
+синтетического sales-by-category из закреплённого agent-validation SHA.
+Общий planner/acceptance/docs suite84 PASS/767, typecheck PASS с pinned Node.
+Первый общий запуск без обязательной Node-переменной дал18 config failures;
+log сохранён. Это планирование, без восстановления файлов или исполнения:
+общий cold replay gate остаётся открытым; harness/judge не изменены.
+
+Новый Desktop49 завершил Ubuntu22/24/26 и Debian12/13:5/5 PASS, offline,
+non-root, все контейнеры удалены. CLI49 уже5/5 PASS. LivePDF×3 отдельно
+Desktop/CLI:6/6 facts/mechanics/layout PASS, все17 страниц просмотрены,
+input unchanged/Help reads/Chromium0/cleanup0. Остальные13 docs/default×3
+в каждом интерфейсе продолжаются; результаты669 остаются историческими.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
@@ -4398,4 +4417,4 @@ gates. [Факты, вёрстка и TDD](reports/2026-10-08-package-docs-live.
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI83 diagnostics/command/damage PASS, suite198 PASS/1 SKIP. Installed669 PTY6/6/PDF4 pages QA PASS, input unchanged/writer/Chromium/processes0; cold new-user resume resets docs→default, historical grant preserved, native PASS.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85/GUI2aa permissions/damage PASS; Desktop67 crash logging6 PASS/typecheck. Desktop669 clean HOME/workspace/PATHnone catalog/digests/integrity PASS, container/processes0; installed clean-discovery и permanent-rules подпункты8 закрыты, full live/lifecycle/evals открыты.
-- RESUMED 2026-10-08: harness clean9d7b463c4/frozen skills-evals,460 PASS/2 SKIP/typecheck/corpus35/113;643 protected unchanged/latest b31 node-only checked. CLI669 seed5651 PASS; PDF3 mechanics/facts/Help PASS, layout2/3 FAIL, all8 pages/cleanup0; no new live669. Heading RED→source57 PASS/678/typecheck/Node/PDF3 pages QA PASS; sandbox child EOF3/3 diagnosed, native full PASS. Clean49b1584f2 CLI/DEB/AppImage/static PASS; installed CLI Linux5/5 and exact failing Markdown PDF3 pages visual QA PASS, DOCX XML/MD checked, input unchanged/calls0/containers removed. Seed69458bc0…5651/hash/mode/real canonical profile absent PASS; first Python probe FAIL retained/Node PASS. Desktop matrix Ubuntu22/24/26 PASS, remaining ongoing; new49 CLI/Desktop livePDF3/3 each mechanics/facts/layout PASS, all17 pages viewed, inputs/Help/Chromium0/cleanup0 confirmed. Remaining docs/default13×3 each ongoing; pinned structural scripts/reference35 offline PASS (no execution/parameter proof); harness final9d frozen checkbox closed. SSH stand/подмодель coverage pending; original server/client untouched. A/B72–90 needs freeze12–15; stage9/full35 deferred/server skill retained. Next: finish new installed/live QA and selection/stand; full gates open.
+- RESUMED 2026-10-08: harness frozen9d460 PASS/2 SKIP/typecheck, source snapshot35/113 checked; CLI/Desktop49 Linux5/5 each PASS, livePDF3/3 each facts/mechanics/layout PASS, all17 pages viewed, input unchanged/Help/Chromium0/cleanup0. Historical669 layout FAIL preserved. Cold planner TDD10, suite84 PASS/767/typecheck; no server restore/execution yet. Remaining13 docs/default×3 each ongoing; structural verifier35 offline PASS (limited, no execution). SSH stand/submodel coverage pending; original server/client untouched. A/B72–90 needs freeze12–15; stage9/full35 deferred/server skill retained. Next: finish live QA, native opening and cold adapter; gates5–8 open.

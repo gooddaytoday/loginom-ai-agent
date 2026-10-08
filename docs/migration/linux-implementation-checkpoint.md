@@ -439,8 +439,11 @@ CLI/DEB/AppImage0.1.17 manifest/static PASS, без публикации.
 Exact669 failing Markdown → установленный49 PDF3 страницы visual QA PASS;
 DOCX XML/MD проверены, `.lgp` неизменён, модель/Loginom calls0.
 Новый seed5651 hash/mode, UID1200, sandbox4755 и canonical empty profile PASS.
-Desktop offline пока Ubuntu22 PASS; остальная matrix и livePDF×3 обеих
-интерфейсов продукта выполняются. Исходный669 layout FAIL сохранён.
+Desktop Ubuntu22/24/26+Debian12/13 5/5 PASS, containers removed.
+LivePDF×3 отдельно CLI/Desktop: факты/механика/вёрстка6/6 PASS, все17 страниц
+просмотрены; input unchanged, Chromium0/cleanup0. Исходный669 FAIL сохранён.
+Остальные13 docs/default×3 каждого интерфейса выполняются. Cold planner:
+TDD10, suite84 PASS/767/typecheck; восстановление/исполнение ещё не проверены.
 Harness clean9d7b463c4:460 PASS/2 SKIP/typecheck; отдельный frozen worktree.
 A/B12–15 заранее выбранных задач ×3×2 с judge/structure/cold replay ещё открыт;
 SSH stand/покрытие подмодели требуют уточнения. Этап9/full35 отложены,
