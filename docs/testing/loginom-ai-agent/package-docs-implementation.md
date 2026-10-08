@@ -4447,9 +4447,9 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-08 — ACTIVE, writer race исправлен; полный harness suite выполняется
+### 2026-10-08 — ACTIVE, writer race исправлен; полный harness suite PASS
 
-- HEAD до checkpoint0b5bda85e; product baselinefc/candidate49b1584f2 неизменны; source changes только own harness/test infrastructure.
+- HEAD до checkpoint5d3be11f8; product baselinefc/candidate49b1584f2 неизменны; source changes только own harness/test infrastructure.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client/profiles и чужие процессы сохранены.
 - Frozen0876bb32f исторически476 PASS/2 SKIP/0 FAIL/typecheck PASS; новая own harness branch d1b364a98 clean, protected judge/tasks/near-miss unchanged.
 - Conditions e4a0daf2…/21 pins/wide viewport/fresh own server;15 task IDs выбраны заранее,90 formal attempts не начаты.
@@ -4458,11 +4458,12 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Candidate v4 run171244 CLI0/judge100/warm oracle PASS, main1/cleanup FAIL Writer owner unavailable; cold не запускался, v4 pair не принят.
 - Candidate management receipt capture complete/unknown0/remaining0×2; current profile waitProfileIdle PASS/.writer absent; historical FAIL retained.
 - Native writer unlink→rmdir/mkdir→publication gap reproduced RED→GREEN; bounded3 reads/20ms preserve empty/replacement/integrity refusals.
-- New harness focused74 PASS/0 FAIL/typecheck PASS; full suite session38460/log harness-writer-gap-full-suite.log running; новых live jobs нет.
+- New harness focused74 PASS/typecheck PASS; full suite481 PASS/2 SKIP/0 FAIL/2055 assertions/585.37s; новых live jobs нет.
 - Candidate date=dtString vs baseline dtDateTime/SPEC outside frozen prompt/checklist recorded; score/rubric не менялись.
 - CLI modify3 readonly/inactive-source FAIL; CLI docs-after-build3/3 accepted; Desktop docs-after-build warm3/cold1 PASS2 readonly FAIL.
 - Source binaries/resources/server skill907ff16b…/catalog17764f9a… сохранены; Desktop/CLI Linux gates и stage5–8 ещё открыты;stage9 deferred.
-- Далее full harness result→fresh immutable harness SHA/conditions→обе smoke стороны→90 formal attempts; failed profiles/receipts preserve.
+- Шесть obsolete own CLI payloads roundtrip6850 entries each сохранены в архивах/receipts; raw удалены после проверки; свободно5,1GB.
+- Далее fresh immutable d1 harness SHA/conditions→обе smoke стороны→90 formal attempts; failed profiles/receipts preserve.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 

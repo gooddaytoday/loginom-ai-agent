@@ -440,7 +440,17 @@ Native-cycle integration со старым кодом тоже прошла, п�
 пропустить короткий gap: тот запуск не выдаётся за deterministic RED.
 Focused profile+supervisor **74 PASS/0 FAIL/233 assertions**,167.39s;
 реальный process control подтверждает writer receipt/unknown0/remaining0×2.
-Typecheck PASS. Full suite запущен на чистом d1b364a98:
-`harness-writer-gap-full-suite.log`; до результата новый frozen SHA/live-пара
-не назначаются. После PASS нужен новый immutable pair worktree и повтор обеих
-сторон по одному manifest; результаты087/v4 сохраняются отдельно.
+Typecheck PASS. Full suite на чистом d1b364a98 завершился: **481 PASS,
+2 SKIP, 0 FAIL, 2055 assertions**, 483 tests/36 files/585.37s. Лог
+`harness-writer-gap-full-suite.log`. Следующий шаг — новый immutable pair
+worktree и повтор обеих сторон по одному manifest; результаты087/v4 сохраняются
+отдельно. Полный PASS не подменяет live-приёмку исправленного harness.
+
+Шесть собственных устаревших CLI payloads091/239-v2/253/5a9/bd0/c50 сохранены
+в полных исходных архивах: каждый распакован в отдельный own tmp и проверен
+по6850 entries (байты/SHA, размеры, modes, symlinks/directories). Только после
+успешной сверки и отсутствия процессов с этими payload удалены их raw-каталоги.
+`obsolete-cli-preservation-summary.json` закрепляет receipts/archive hashes и
+команды восстановления; helper сохранён рядом. Baselinefc/current49, upgrade
+artifacts, исторические результаты/профили и чужие файлы сохранены. Свободно
+около5,1GB; архивы и metadata остаются доступными для восстановления.
