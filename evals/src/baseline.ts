@@ -3,6 +3,7 @@ import { lstat, mkdir, readdir, realpath, rename, rm, writeFile } from "node:fs/
 import { loadTasks } from "./task"
 import { aggregate, aggregateTask, type AttemptResult, type RunSummary } from "./report"
 import { validateNodeRun } from "./node-evals"
+import { parseArgs } from "node:util"
 
 export type BaselinePins = {
   mode: "live" | "fixture"; harnessSha: string; corpusSha: string; cliVersion: string; cliSource: string
@@ -118,6 +119,45 @@ export async function sealBaselineRelease(directory: string, receipt: { status: 
     journal.release = receipt
     await atomicJournal(directory, journal)
   })
+}
+
+export async function runBaseline(argv: string[], env: Record<string, string | undefined> = process.env): Promise<Record<string, unknown> & { code: number }> {
+  try {
+    const command = argv[0]
+    if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke --series DIR [--config PRIVATE --issue ID --task ID] [--compare SERIES]" }
+    const values = parseArgs({ args: argv.slice(1), strict: true, options: Object.fromEntries(["series", "config", "issue", "task", "compare"].map(name => [name, { type: "string" as const }])) }).values
+    const directory = values.series
+    if (!directory || !path.isAbsolute(directory)) throw new BaselineFailure("SERIES_PATH_REQUIRED")
+    if (command === "check") {
+      const report = await checkBaseline(directory)
+      const reportDir = await writeBaselineReport(directory, report)
+      return { code: 0, status: report.status, ...report.coverage, reportDir }
+    }
+    void env
+    throw new BaselineFailure("LIVE_CONFIGURATION_REQUIRED")
+  } catch (error) { return { code: 2, status: "BLOCKED", reason: error instanceof BaselineFailure ? error.message : "BASELINE_OPERATION_FAILED" } }
+}
+
+async function writeBaselineReport(directory: string, report: Awaited<ReturnType<typeof checkBaseline>>) {
+  const out = path.join(directory, "reports", crypto.randomUUID())
+  await mkdir(out, { recursive: true, mode: 0o700 })
+  const rows = report.rows.map(row => ({ key: row.key, caseKey: row.caseKey, attempt: row.attempt, state: row.state, measured: row.measured,
+    cleanup: row.cleanup, verdict: row.verdict, runDir: row.runDir, status: row.result?.status ?? null,
+    judge_status: row.result?.judge_status ?? null, score: row.result?.score ?? null, pass: row.result?.pass ?? null,
+    duration_ms: row.result?.duration_ms ?? 0, tokens: row.result?.tokens ?? null, cost: row.result?.cost ?? 0 }))
+  await writeFile(path.join(out, "baseline.json"), JSON.stringify({ ...report, rows }, null, 2) + "\n", { flag: "wx", mode: 0o600 })
+  await writeFile(path.join(out, "report.md"), [
+    `# ${report.kind === "smoke" ? "Smoke" : "Baseline"} ${report.id}: ${report.status}`, "",
+    `Ожидается ${report.coverage.expected}; сохранено ${report.coverage.recorded}; измерено ${report.coverage.measured}; не запущено ${report.coverage.pending}; неизвестный исход ${report.coverage.unknown}.`,
+    `Очистка: ${report.cleanup ? "подтверждена" : "не подтверждена"}; стенд: ${report.released ? "освобождён" : "освобождение не подтверждено"}.`, "",
+    "Метрики судьи представлены отдельно для regular и analytic. Узловой code PASS не входит в общий score.", "",
+    ...Object.entries(report.groups).map(([collection, group]) => `${collection}: ${JSON.stringify(group.metrics)}`), "",
+    ...report.nodes.map(node => `${node.id}: PASS ${node.passed}/${node.expected}; измерено ${node.measured}/${node.expected}.`), "",
+    "| Кейс | Попытка | Состояние | Результат | Измерено | Судья | Время, мс |",
+    "|---|---:|---|---|---|---|---:|",
+    ...rows.map(row => `| ${row.caseKey} | ${row.attempt} | ${row.state} | ${row.verdict ?? "—"} (${row.status ?? "—"}) | ${row.measured} | ${row.judge_status ?? "—"} | ${row.duration_ms} |`), "",
+  ].join("\n"), { flag: "wx", mode: 0o600 })
+  return out
 }
 
 async function inspectMeasurement(manifest: BaselineManifest, item: BaselineCase, checkout: string, runDir: string): Promise<RecordedRun> {

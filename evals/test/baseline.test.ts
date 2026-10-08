@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease } from "../src/baseline"
+import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease, runBaseline } from "../src/baseline"
 import { repoRoot } from "../src/config"
 
 import { baselineFixturePins } from "../fixtures/baseline"
@@ -53,6 +53,21 @@ test("all 132 fixture measurements retain separate quality axes and become compl
     await expect(checkBaseline(series)).rejects.toThrow("EVIDENCE_CHANGED")
   } finally { await rm(directory, { recursive: true, force: true }) }
 }, 30_000)
+
+test("check writes a separate report without models, admission or changes to stored evidence", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-check-"))
+  try {
+    const series = path.join(directory, "series")
+    await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins })
+    const before = await Bun.file(path.join(series, "journal.json")).text()
+    const result = await runBaseline(["check", "--series", series], {})
+    expect(result).toMatchObject({ code: 0, status: "incomplete", expected: 132, measured: 0 })
+    expect(typeof result.reportDir).toBe("string")
+    expect(await Bun.file(path.join(String(result.reportDir), "report.md")).text()).toContain("132")
+    expect(await Bun.file(path.join(series, "journal.json")).text()).toBe(before)
+    expect((await runBaseline(["start", "--series", series], {})).code).toBe(2)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
 
 test("a recorded product failure is retained while an unknown dispatch or pin drift blocks continuation", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-resume-"))
