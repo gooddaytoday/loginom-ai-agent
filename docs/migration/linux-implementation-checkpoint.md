@@ -444,8 +444,8 @@ LivePDF×3 отдельно CLI/Desktop: факты/механика/вёрст�
 просмотрены; input unchanged, Chromium0/cleanup0. Исходный669 FAIL сохранён.
 Single-turn49:84 completed(14×3 each), docs33+/21− QA/30 default core answers;
 3 optional Desktop URLs invalid-specific/recorded. Outer143 retained/cleanup0.
-Native opening4/4 PASS; TUI6/6+4PDF/4pages QA PASS/uninstalled/calls0/processes0.
-Upgrade ещё не принят: CLI old bc6 cleanup FAIL; Desktop controller fixes/v3.
+OS-opening4/4/TUI6/6/4PDF QA и headless live docs49/PDF2pages QA PASS/cleanup0.
+Native CLI669→49/DEB upgrade PASS; old CLI Docker flaky2/3 и180s FAIL сохранены.
 Cold planner:TDD10, suite84 PASS/767/typecheck, reference35 offline PASS;
 восстановление/исполнение ещё не проверены.
 Harness clean9d7b463c4:460 PASS/2 SKIP/typecheck; отдельный frozen worktree.

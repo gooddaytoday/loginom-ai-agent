@@ -205,14 +205,37 @@ Help/Loginom/модели. Четыре полных PDF имеют по одн�
 Evidence `tui-49b1584f2-installed`. Файловый подпункт этапа6 отмечен выполненным;
 общая20-case матрица, сценарные переходы и этапы5–8 остаются открытыми.
 
-Offline CLI upgrade49 остановился до обновления: старый bc6 status вернул
-unconfigured JSON и `LOGINOM_HOST_CLEANUP_FAILED`, remaining[], контейнер
-удалён. Тот же old-status ранее прошёл в669 upgradev4; причина исследуется,
-новый payload ещё не выполнялся, regression49 не заявляется. Desktop upgrade
-первые два запуска остановились до приложения из-за ошибок нового контроллера:
-старое имя manifest и несовпавшее имя staged driver. Оба FAIL сохранены;
-v3 проверяет реальные пути и выполняет исходные byte-integrity assertions.
-Проверка обновления пока не принята.
+Дополнительный установленный CLI49 `--headless` docs-контроль **PASS** на
+OpenAI6.1-sol/medium с тем же models snapshot. Прочитан полный текст и
+просмотрены обе страницы PDF: факты nested fixture и layout корректны,
+input неизменён, реальный Help read и applied docs подтверждены,
+Chromium/remaining0, контейнер удалён. Evidence
+`openai-49-cli-docs-headless-20261008`; контроль режима записан отдельно от84
+обычных routing-попыток и не является analytic A/B.
+
+CLI upgrade49 в Docker дважды остановился до обновления: old bc6 status
+вернул unconfigured JSON и `LOGINOM_HOST_CLEANUP_FAILED`, old669 status
+получил прежний180s timeout без stdout/stderr. Новый payload в этих попытках
+не выполнялся. Signal collector получил FAIL/FAIL/PASS в трёх свежих
+old-bc6 профилях: отказ cleanup нестабилен, конкретная причина не установлена.
+Все исходные FAIL сохранены, собственные контейнеры удалены, remaining0.
+Диагностика с manifest: `upgrade49-signal-20261008`.
+
+Отдельный native Linux CLI upgrade669→49 **PASS** с теми же assertions и
+deadline: штатные uninstall/install, сохранение настроек, auth fixture,
+пользовательского skill и истории, продолжение той же сессии. `PROFILE_BUSY`
+exit3 не изменил owner; новый installed manifest clean49, default не получил
+grant. Own launcher/HOME/profile удалены, processesRemaining[]. Synthetic
+provider, live model/Help/Loginom calls0. Evidence
+`cli-49b1584f2-upgrade-native-from669`; Docker FAIL этим PASS не переписаны.
+
+Desktop DEB upgrade49 **PASS** в offline non-root окружении: реальные dpkg,
+публичная история до/после, настройки/auth fixture/user skill сохранены,
+installed ASAR и resource manifest совпали с candidate. Обе фазы remaining0,
+контейнер удалён, live calls0. Evidence `desktop-49b1584f2-upgrade-v3`.
+Первые два запуска остановились до приложения из-за ошибок controller paths;
+их FAIL сохранены. Обновление обоих продуктов проверено; одновременная
+независимость Desktop/CLI остаётся отдельным открытым подпунктом этапа8.
 
 ## Независимый structural verifier
 

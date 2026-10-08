@@ -4416,8 +4416,9 @@ Single-turn49 aggregate теперь84 завершённых попытки:14�
 Native AppImage49 OS-opening2PDF+Word+MD4/4 PASS, calls0/remaining0.
 Installed TUI49 six mechanics PASS,4PDF/all4 pages facts/layout PASS,
 input unchanged/writer/Chromium/processes0, own install removed.
-CLI upgrade49 пока FAIL на old bc6 status cleanup, новый payload не запускался;
-Desktop upgrade первые два FAIL — ошибки controller paths, v3 идёт отдельно.
+Native CLI669→49 и offline DEB upgrade49 PASS: settings/history/user skill
+сохранены, cleanup0. Docker old bc6 cleanup flaky2/3 и old669180s timeout
+сохранены отдельно. Headless docs49/PDF2 страницы QA PASS/input unchanged/Chromium0.
 
 Cold planner offline reference compatibility35/35 PASS, source d5fb8031356e,
 planner a93a9471d. Это не server restoration/execution или candidate cold gate.
@@ -4443,4 +4444,4 @@ planner a93a9471d. Это не server restoration/execution или candidate col
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI83 diagnostics/command/damage PASS, suite198 PASS/1 SKIP. Installed669 PTY6/6/PDF4 pages QA PASS, input unchanged/writer/Chromium/processes0; cold new-user resume resets docs→default, historical grant preserved, native PASS.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85/GUI2aa permissions/damage PASS; Desktop67 crash logging6 PASS/typecheck. Desktop669 clean HOME/workspace/PATHnone catalog/digests/integrity PASS, container/processes0; installed clean-discovery и permanent-rules подпункты8 закрыты, full live/lifecycle/evals открыты.
-- RESUMED 2026-10-08: frozen9d harness460 PASS/2 SKIP/typecheck, source snapshot35/113 checked; Linux49 CLI/Desktop5/5 each PASS. Single-turn84 completed(14×3 each), docs33+/21− QA and30 default core answers;3 optional Desktop URLs invalid-specific/recorded. Original/resume outer143 retained, own cleanup0. AppImage49 OS-opening4/4 PASS/calls0; installed TUI6/6 and4PDF/4pages QA PASS/writer/Chromium/processes0/uninstalled. CLI upgrade stopped on old bc6 cleanup before new payload; Desktop controller fixes/v3 not yet accepted. Cold planner TDD10/suite84 PASS/767/typecheck/reference35 offline and structural35 offline PASS; no server restore/execution. Historical669 FAIL retained. SSH stand/submodel pending; original server/client untouched. A/B72–90 needs freeze12–15; stage9/full35 deferred/server skill retained. Next: upgrade signal, headless/control transitions/cold adapter; gates5–8 open.
+- RESUMED 2026-10-08: frozen9d harness460 PASS/2 SKIP/typecheck, source snapshot35/113 checked; Linux49 CLI/Desktop5/5 each PASS. Single-turn84 completed(14×3 each), docs33+/21− QA and30 default core answers;3 optional Desktop URLs invalid-specific/recorded. Original/resume outer143 retained, own cleanup0. AppImage49 OS-opening4/4 PASS/calls0; installed TUI6/6 and4PDF/4pages QA PASS/writer/Chromium/processes0/uninstalled. Native CLI669→49 and offline DEB upgrade PASS/settings/history/user skill/cleanup0; old CLI Docker cleanup flaky2/3 and180s timeout retained. Headless live docs49/PDF2pages QA PASS/input unchanged/Chromium0. Cold planner TDD10/suite84 PASS/767/typecheck/reference35 offline and structural35 offline PASS; no server restore/execution. Historical669 FAIL retained. SSH stand/submodel pending; original server/client untouched. A/B72–90 needs freeze12–15; stage9/full35 deferred/server skill retained. Next: installed control transitions/cold adapter, own scenario runs; gates5–8 open.
