@@ -293,7 +293,7 @@ export async function checkBaseline(directory: string) {
   const spent = executions.filter(execution => execution.kind === "product").flatMap(execution =>
     (execution.result.infra_retry ? [execution.result.infra_retry.initial, execution.result] : [execution.result]).map(result => ({ execution, result })))
   const judgeCalls: { execution: BaselineExecution; file: string; call: { attempt: number; ok: boolean; error: string | null; duration_ms: number } }[] = []
-  for (const execution of executions) for (const file of execution.record.files.filter(file => /\/judge\/attempt-[12]\.json$/.test(file.path))) {
+  for (const execution of executions) for (const file of execution.record.files.filter(file => /^[^/]+\/1\/(?:infra-error\/)?judge\/attempt-[12]\.json$/.test(file.path))) {
     const call = await Bun.file(path.join(execution.record.runDir, file.path)).json() as { attempt: number; ok: boolean; error: string | null; duration_ms: number }
     if (![1, 2].includes(call.attempt) || typeof call.ok !== "boolean" || !Number.isFinite(call.duration_ms) || call.duration_ms < 0 ||
       !call.ok && typeof call.error !== "string") throw new BaselineFailure("JUDGE_ATTEMPT_INVALID")
@@ -441,6 +441,7 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
       if (command === "start" && journal.jobs.some(job => job.state !== "pending")) throw new BaselineFailure("USE_RESUME")
       const limit = Number(values.limit ?? manifest.jobs.length)
       if (!Number.isSafeInteger(limit) || limit < 1) throw new BaselineFailure("INVALID_LIMIT")
+      if (command === "resume" && values["recover-executor"]) await reconcileRunningBaseline(directory)
       for (const unused of Array.from({ length: Math.min(limit, manifest.jobs.length) })) {
         const job = (await readBaseline(directory)).journal.jobs.find(job => job.state === "pending" || manifest.kind === "baseline" && !effectiveMeasurement(job)?.measured)
         if (!job) break
@@ -560,7 +561,11 @@ async function reconcileRunningBaseline(directory: string) {
     ...(job.recoveries ?? []).filter(recovery => recovery.state === "running").map(recovery => ({ job, recovery }))])
   for (const { job, recovery } of running) {
     const parent = recovery ? path.dirname(recovery.evidencePath) : path.join(directory, "measurements", job.key)
-    const child = await readPrivateBaselineJson(path.join(parent, "harness-process.json")) as { pid: number; starttime: string }
+    const child = await readPrivateBaselineJson(path.join(parent, "harness-process.json")).catch(() => {
+      throw new BaselineFailure("UNKNOWN_OUTCOME_REQUIRES_RECOVERY")
+    }) as { pid: number; starttime: string; uid: number }
+    if (!child || !Number.isSafeInteger(child.pid) || child.pid < 1 || !/^[0-9]+$/.test(child.starttime) || child.uid !== process.getuid?.())
+      throw new BaselineFailure("UNKNOWN_OUTCOME_REQUIRES_RECOVERY")
     if (await processBirthPresent(child)) throw new BaselineFailure("HARNESS_STILL_RUNNING")
     const runs = (await readdir(path.join(parent, "runs"), { withFileTypes: true })).filter(item => item.isDirectory())
     if (runs.length !== 1 || !await Bun.file(path.join(parent, "runs", runs[0]!.name, "summary.json")).exists()) throw new BaselineFailure("UNKNOWN_OUTCOME_REQUIRES_RECOVERY")

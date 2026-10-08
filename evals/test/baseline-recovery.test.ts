@@ -118,6 +118,66 @@ test("a successful judge retry retains its first failure in the report and deliv
   } finally { await rm(fixture.directory, { recursive: true, force: true }) }
 }, 60_000)
 
+test("crashed recovery reconciles its saved terminal run and refuses to repeat a live child", async () => {
+  const fixture = await recoveryFixture()
+  const server = Bun.serve({ port: 0, fetch: () => Response.json({ status: "ok", result: { revision: "fixture" } }) })
+  const processes: { executor?: ReturnType<typeof Bun.spawn>; child?: { pid: number; starttime: string } } = {}
+  const env = { ...fixture.env, PATH: Bun.env.PATH, EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_AGENT_VARIANT: "medium",
+    EVAL_PROFILE_DIR: path.join(fixture.directory, "profile"), EVAL_WORKSPACE_ROOT: path.join(fixture.directory, "work"), EVAL_FAKE_SLEEP_MS: "1000",
+    EVAL_ARTIFACT_SOURCE: `dir:${path.join(evalsRoot, "fixtures/storage")}`, LOGINOM_DOCK_API_KEY: "fixture",
+    LOGINOM_URL: `http://127.0.0.1:${server.port}`, LOGINOM_DOCK_BASE_URL: `http://127.0.0.1:${server.port}`,
+    EVAL_AGENT_PROVIDER_ID: "openai", EVAL_AGENT_PROVIDER_BASE_URL: "http://fixture", EVAL_AGENT_PROVIDER_API_KEY: "fixture", EVAL_AGENT_PROVIDER_MODEL_ID: "model",
+    EVAL_JUDGE_COMMAND: `${Bun.which("bun")} ${path.join(evalsRoot, "fixtures/fake-codex.ts")}`, JUDGE_MODEL: "gpt-6-astra", JUDGE_REASONING: "high" }
+  try {
+    const admitted = await runBaseline(fixture.argv, fixture.env)
+    expect(admitted).toMatchObject({ code: 0 })
+    const parent = path.join(fixture.series, "measurements", fixture.job.key, "recoveries", String(admitted.recoveryId))
+    const executor = Bun.spawn([process.execPath, path.join(evalsRoot, "script/run-baseline.ts"), "resume", "--series", fixture.series, "--limit", "1"],
+      { cwd: evalsRoot, env, stdout: "ignore", stderr: "ignore" })
+    processes.executor = executor
+    for (let i = 0; i < 100 && !await Bun.file(path.join(parent, "harness-process.json")).exists(); i++) await Bun.sleep(50)
+    expect(await Bun.file(path.join(parent, "harness-process.json")).exists()).toBe(true)
+    processes.child = await Bun.file(path.join(parent, "harness-process.json")).json()
+    executor.kill("SIGKILL")
+    await executor.exited
+    expect(await runBaseline(["resume", "--series", fixture.series, "--recover-executor", "--limit", "1"], env))
+      .toMatchObject({ code: 2, reason: "HARNESS_STILL_RUNNING" })
+    const child = await Bun.file(path.join(parent, "harness-process.json")).json() as { pid: number }
+    for (let i = 0; i < 400 && await Bun.file(`/proc/${child.pid}/stat`).exists(); i++) await Bun.sleep(50)
+    expect(await Bun.file(`/proc/${child.pid}/stat`).exists()).toBe(false)
+    expect(await runBaseline(["resume", "--series", fixture.series, "--limit", "1"], env)).toMatchObject({ code: 2, reason: "UNKNOWN_OUTCOME" })
+    expect(await runBaseline(["resume", "--series", fixture.series, "--recover-executor", "--limit", "1"], env))
+      .toMatchObject({ code: 0, recorded: 2, measured: 2, pending: 142 })
+    const report = await checkBaseline(fixture.series)
+    expect(report.recoveries).toHaveLength(1)
+    expect(report.executions).toHaveLength(3)
+    expect(report.recoveries[0]!.state).toBe("recorded")
+  } finally {
+    if (processes.executor && processes.executor.exitCode === null) { processes.executor.kill("SIGKILL"); await processes.executor.exited }
+    const child = processes.child
+    if (child && await Bun.file(`/proc/${child.pid}/stat`).exists()) {
+      const stat = await Bun.file(`/proc/${child.pid}/stat`).text()
+      if (stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19] === child.starttime) process.kill(child.pid, "SIGINT")
+      for (let i = 0; i < 400 && await Bun.file(`/proc/${child.pid}/stat`).exists(); i++) await Bun.sleep(50)
+      expect(await Bun.file(`/proc/${child.pid}/stat`).exists()).toBe(false)
+    }
+    server.stop(true)
+    await rm(fixture.directory, { recursive: true, force: true })
+  }
+}, 60_000)
+
+test("reconcile cannot resolve a dispatched job without its child identity receipt", async () => {
+  const fixture = await recoveryFixture({ status: "completed", judge_status: "scored", pass: true, score: 100 })
+  try {
+    await beginBaselineMeasurement(fixture.series, fixture.manifest.jobs[1]!.key, { checkout: repoRoot, pins: baselineFixturePins })
+    const before = await Bun.file(path.join(fixture.series, "journal.json")).text()
+    expect(await runBaseline(["resume", "--series", fixture.series, "--recover-executor", "--limit", "1"], fixture.env))
+      .toMatchObject({ code: 2, reason: "UNKNOWN_OUTCOME_REQUIRES_RECOVERY" })
+    expect(await Bun.file(path.join(fixture.series, "journal.json")).text()).toBe(before)
+    expect((await checkBaseline(fixture.series)).coverage).toMatchObject({ recorded: 1, measured: 1, unknown: 1 })
+  } finally { await rm(fixture.directory, { recursive: true, force: true }) }
+})
+
 test("an incomplete executor guard blocks recovery even without a PID receipt", async () => {
   const fixture = await recoveryFixture()
   try {
