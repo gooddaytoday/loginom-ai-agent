@@ -21,15 +21,16 @@ type BaselinePaths = OfflinePaths & { referenceProfile?: never; evalProfile: str
 export type NodeOpsConfig = { version: 1 | 2; runtimeRoot: string; endpoint: string; container: { name: string; id: string; storageDir: string }; cliBin: string; roles: { rich: RolePaths; ben: RolePaths; evalbaseline?: BaselinePaths }; offline?: OfflinePaths }
 export type NodeStandOwner = { issue: string; task: string; role: "rich" | "ben" | "evalbaseline"; phase: "unit" | "reference" | "cold" | "eval" | "recovery"; sha: string }
 export type NodeStandLease = NodeStandOwner & { version: 1; token: string; device: number; inode: number; endpoint: string; containerId: string; acquiredAt: string; configSha256: string }
+export type BaselineCleanupExecution = { seriesDir: string; runDir: string; cleanupPath: string }
 export type NodeStandCompletion = { version: 1; owner: NodeStandOwner; acquiredAt: string } & (
   { kind: "unit"; checks: { command: string; exitCode: number; processes: ProcessCleanup }[] } |
   { kind: "eval"; runDir: string; runSha: string; caseIds: string[] } |
   { kind: "baseline"; seriesDir: string; runSha: string } |
-  { kind: "recovery"; receipt: string; profile: "reference" | "eval"; historyArchive: string; processEvidence: string } |
+  { kind: "recovery"; receipt: string; profile: "reference" | "eval"; historyArchive: string; processEvidence: string; execution?: BaselineCleanupExecution } |
   { kind: "cold"; browserCloseEvidence: string; storageLedger: string } |
   { kind: "reference"; processEvidence: string; historyArchive: string; storageLedger: string; browserCloseEvidence?: string }
 )
-export type NodeStandRecovery = { version: 1; owner: NodeStandOwner; acquiredAt: string; profile: "reference" | "eval"; processEvidence: string; storageLedger?: string }
+export type NodeStandRecovery = { version: 1; owner: NodeStandOwner; acquiredAt: string; profile: "reference" | "eval"; processEvidence: string; storageLedger?: string; execution?: BaselineCleanupExecution }
 type WriterReleaseSettlement = { version: 1; owner: NodeStandOwner; acquiredAt: string; incident: string; profile: "reference" | "eval";
   followupTask: string; original: { path: string; sha256: string; resultSha256: string }; processes: ProcessCleanup; operation?: "LAB-31-owned-registration-v1" }
 const registrationIncident = "LAB-31-product-namefix-v1-multi-facts-writer-owner-unavailable"
@@ -70,6 +71,8 @@ export async function assertNodeStandOwner(config: NodeOpsConfig, expected: Node
 export async function releaseNodeStand(config: NodeOpsConfig, lease: NodeStandLease, evidence: string) {
   return exclusive(config, lease, async () => {
     const completion = await readCompletion(config, lease, evidence)
+    if (lease.role === "evalbaseline" && completion.kind !== "baseline" && !(lease.phase === "unit" && completion.kind === "unit"))
+      throw new NodeOpsFailure("BASELINE_COMPLETION_REQUIRED")
     await verifyCompletion(config, lease, completion, evidence)
     await assertAllProfilesClean(config)
     await assertBrowsersClosed()
@@ -359,6 +362,8 @@ export async function recoverNodeStand(config: NodeOpsConfig, lease: NodeStandLe
     const proof = await Bun.file(recovery.processEvidence).json()
     const processes = (proof.processes ?? proof) as ProcessCleanup
     const settledOriginal = await verifyWriterReleaseSettlement(config, lease, proof, recovery.processEvidence, incident)
+    if (lease.role === "evalbaseline" && (!recovery.execution || path.join(recovery.execution.runDir, recovery.execution.cleanupPath) !== (settledOriginal ?? recovery.processEvidence)))
+      throw new NodeOpsFailure("BASELINE_EXECUTION_UNKNOWN")
     await verifyProcesses(processes, lease)
     const profile = nodeProfile(config, lease.role, recovery.profile)
     if (processes.runtimeDirectories.some(root => !inside(root, profile))) throw new NodeOpsFailure("RECOVERY_OWNER_UNKNOWN")
@@ -369,7 +374,7 @@ export async function recoverNodeStand(config: NodeOpsConfig, lease: NodeStandLe
     await assertBrowsersClosed()
     const storage = await checkIsolatedStorage(source(config))
     if (storage.containerId !== lease.containerId) throw new NodeOpsFailure("CONTAINER_CHANGED")
-    const receipt = await reserveNodeRecovery(config, lease, incident)
+    const receipt = await reserveNodeRecovery(config, lease, incident, recovery.execution)
     // No killing, resetting, or broad deletion: these functions inspect the saved writer and exact profile.
     await releaseStaleWriter(profile, processes.writer)
     return completeNodeRecovery(config, lease, incident, recovery, receipt, settledOriginal, env)
@@ -391,9 +396,9 @@ async function completeNodeRecovery(config: NodeOpsConfig, lease: NodeStandLease
     await assertAllProfilesClean(config)
     await assertNodeStandOwner(config, lease)
     await writeFile(receipt, JSON.stringify({ owner: ownerOf(lease), acquiredAt: lease.acquiredAt, incident, status: "SETTLED", at: new Date().toISOString(), historyArchive,
-      profile: recovery.profile, processEvidence: recovery.processEvidence }), { mode: 0o600 })
+      profile: recovery.profile, processEvidence: recovery.processEvidence, ...(recovery.execution ? { execution: recovery.execution } : {}) }), { mode: 0o600 })
     const completion: NodeStandCompletion = { version: 1, owner: ownerOf(lease), acquiredAt: lease.acquiredAt, kind: "recovery", receipt,
-      profile: recovery.profile, historyArchive, processEvidence: recovery.processEvidence }
+      profile: recovery.profile, historyArchive, processEvidence: recovery.processEvidence, ...(recovery.execution ? { execution: recovery.execution } : {}) }
     const completionFile = path.join(directory(config), `recovery-completion-${crypto.randomUUID()}.json`)
     await writeFile(completionFile, JSON.stringify(completion), { flag: "wx", mode: 0o600 })
     return { status: "SETTLED", incident, historyArchive, evidence: completionFile, leaseRetained: true }
@@ -508,16 +513,47 @@ export async function continueLab31OwnedRegistration(config: NodeOpsConfig, leas
 }
 
 /** Reserve before the first mutation. Renaming an incident cannot reset a lease's operator budget. */
-export async function reserveNodeRecovery(config: NodeOpsConfig, lease: NodeStandLease, incident: string) {
+export async function reserveNodeRecovery(config: NodeOpsConfig, lease: NodeStandLease, incident: string, execution?: BaselineCleanupExecution) {
   await assertNodeStandOwner(config, lease)
   if (!safeName(incident)) throw new NodeOpsFailure("INVALID_INCIDENT")
   const incidents = path.join(config.runtimeRoot, "operations", "recovery-incidents")
   await mkdir(incidents, { recursive: true, mode: 0o700 })
-  const key = new Bun.CryptoHasher("sha256").update(`${lease.token}:${lease.issue}:${lease.task}:${lease.acquiredAt}`).digest("hex")
+  const key = await nodeRecoveryKey(config, lease, execution)
   const receipt = path.join(incidents, `${key}.json`)
-  await writeFile(receipt, JSON.stringify({ owner: ownerOf(lease), acquiredAt: lease.acquiredAt, incident, status: "ATTEMPTED", at: new Date().toISOString() }),
-    { flag: "wx", mode: 0o600 }).catch(() => { throw new NodeOpsFailure("RECOVERY_ALREADY_ATTEMPTED") })
+  const reservation = await open(receipt, "wx", 0o600).catch(() => { throw new NodeOpsFailure("RECOVERY_ALREADY_ATTEMPTED") })
+  try {
+    await reservation.writeFile(JSON.stringify({ owner: ownerOf(lease), acquiredAt: lease.acquiredAt, incident, status: "ATTEMPTED", at: new Date().toISOString(),
+      ...(execution ? { execution } : {}) }))
+    await reservation.sync()
+  } finally { await reservation.close() }
+  const parent = await open(incidents, constants.O_RDONLY | constants.O_DIRECTORY)
+  try { await parent.sync() } finally { await parent.close() }
   return receipt
+}
+
+async function nodeRecoveryKey(config: NodeOpsConfig, lease: NodeStandLease, execution?: BaselineCleanupExecution) {
+  const owner = `${lease.token}:${lease.issue}:${lease.task}:${lease.acquiredAt}`
+  if (lease.role !== "evalbaseline") return new Bun.CryptoHasher("sha256").update(owner).digest("hex")
+  if (!execution) throw new NodeOpsFailure("BASELINE_EXECUTION_REQUIRED")
+  await evidencePath(config, lease, execution.seriesDir)
+  await evidencePath(config, lease, execution.runDir)
+  const report = await checkBaseline(execution.seriesDir)
+  const recorded = report.executions.find(item => item.kind === "product" && item.record.runDir === execution.runDir)
+  if (report.released || report.coverage.unknown || report.manifest.pins.harnessSha !== lease.sha || report.manifest.pins.containerId !== lease.containerId ||
+    report.manifest.pins.endpoint !== lease.endpoint || !recorded || ![`${recorded.result.task_id}/1/cleanup.json`, `${recorded.result.task_id}/1/infra-error/cleanup.json`].includes(execution.cleanupPath) ||
+    !recorded.record.files.some(file => file.path === execution.cleanupPath)) throw new NodeOpsFailure("BASELINE_EXECUTION_UNKNOWN")
+  const summary = await Bun.file(path.join(execution.runDir, "summary.json")).json() as RunSummary
+  if (!Number.isFinite(Date.parse(summary.started_at)) || Date.parse(summary.started_at) < Date.parse(lease.acquiredAt) ||
+    summary.harness?.dirty || typeof summary.harness?.git_sha !== "string" || !/^[0-9a-f]{7,40}$/.test(summary.harness.git_sha) ||
+    !lease.sha.startsWith(summary.harness.git_sha)) throw new NodeOpsFailure("BASELINE_EXECUTION_UNKNOWN")
+  const cleanup = await Bun.file(path.join(execution.runDir, execution.cleanupPath)).json() as { processes: ProcessCleanup }
+  const origins = cleanup.processes?.origins?.filter(origin => origin.via === "launcher") ?? []
+  const root = cleanup.processes?.processes?.find(process => process.pid === origins[0]?.pid && process.starttime === origins[0]?.starttime)
+  if (!root || origins.length !== 1 || !Number.isSafeInteger(root.pid) || root.pid < 1 || !/^[0-9]+$/.test(root.starttime) || root.uid !== process.getuid?.() ||
+    !Number.isFinite(Date.parse(origins[0]!.observed_at)) || Date.parse(origins[0]!.observed_at) < Date.parse(lease.acquiredAt) ||
+    !cleanup.processes.capture_complete || cleanup.processes.unknownProcesses?.length) throw new NodeOpsFailure("BASELINE_EXECUTION_UNKNOWN")
+  // Root birth identity survives renamed incidents, receipts and copied run directories.
+  return new Bun.CryptoHasher("sha256").update(`${owner}:${root.uid}:${root.pid}:${root.starttime}`).digest("hex")
 }
 
 async function cleanupOwnedLedger(config: NodeOpsConfig, lease: NodeStandLease, file: string, incident: string, settledOriginal?: string) {
@@ -585,7 +621,7 @@ async function verifyCompletion(config: NodeOpsConfig, lease: NodeStandLease, co
     return
   }
   if (completion.kind === "recovery") {
-    const key = new Bun.CryptoHasher("sha256").update(`${lease.token}:${lease.issue}:${lease.task}:${lease.acquiredAt}`).digest("hex")
+    const key = await nodeRecoveryKey(config, lease, completion.execution)
     const continued = completion.receipt === path.join(directory(config), "owned-registration-settled.json")
     if (!inside(evidence, directory(config)) || !continued && completion.receipt !== path.join(config.runtimeRoot, "operations", "recovery-incidents", `${key}.json`))
       throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
@@ -596,9 +632,10 @@ async function verifyCompletion(config: NodeOpsConfig, lease: NodeStandLease, co
         once.status !== "CONSUMED_BEFORE_MUTATION" || once.originalReceipt !== recoveryReceiptPath(config, lease) ||
         await digest(once.originalReceipt) !== once.originalSha256) throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
     }
-    const receipt = await readPrivateJson(completion.receipt) as { status?: string; owner?: NodeStandOwner; acquiredAt?: string; profile?: string; historyArchive?: string; processEvidence?: string }
+    const receipt = await readPrivateJson(completion.receipt) as { status?: string; owner?: NodeStandOwner; acquiredAt?: string; profile?: string; historyArchive?: string; processEvidence?: string; execution?: BaselineCleanupExecution }
     if (receipt.status !== "SETTLED" || !ownerMatches(receipt.owner, lease) || receipt.acquiredAt !== lease.acquiredAt || receipt.profile !== completion.profile ||
-      receipt.historyArchive !== completion.historyArchive || receipt.processEvidence !== completion.processEvidence) throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
+      receipt.historyArchive !== completion.historyArchive || receipt.processEvidence !== completion.processEvidence ||
+      JSON.stringify(receipt.execution) !== JSON.stringify(completion.execution)) throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
     if (continued && completion.processEvidence !== path.join(directory(config), "owned-registration-processes.json"))
       throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
     await evidencePath(config, lease, completion.processEvidence, continued)

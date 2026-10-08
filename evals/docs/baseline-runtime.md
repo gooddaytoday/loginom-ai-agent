@@ -47,7 +47,7 @@ Chrome sandbox должен быть root:root 4755; фактическая гр
 Полная baseline-серия с сохранённым, но неизмеренным исходом удерживает стенд и возвращает
 `AWAITING_RECOVERY`. Допуск следующего slot и штатная фиксация release запрещены, даже если
 очистка ошибочного запуска подтверждена. Ошибки и расходы сохраняются; этап 3.2 плана ещё
-требует завершения проверок crash/reconcile и аварийного бюджета.
+требует завершения проверок crash/reconcile и подтверждений восстановленной очистки.
 Smoke сохраняет собственный release после подтверждённой очистки, включая infra error;
 ошибка оставляет его readiness незавершённым и не разрешает автоматический повтор.
 После записанного release допуск нового измерения отклоняется как `SERIES_RELEASED`.
@@ -107,7 +107,7 @@ Judge `resume` запускает отдельный supervised worker и шта
 с результатом, ошибкой и временем и `judge/verdict-N.json`, если ответ получен. Успешный retry
 не скрывает предыдущую ошибку; отчёт учитывает время всех сохранённых вызовов. В экспорт входят
 receipts, все полученные verdict и связь восстановления,
-а process proof остаётся закрытым. Проверки всех границ crash/reconcile и аварийный бюджет ещё
+а process proof остаётся закрытым. Проверки всех границ crash/reconcile и cleanup resolutions ещё
 не завершены; это не готовность к live.
 
 `resume --recover-executor` использует тот же reconcile в fixture и live: проверяет private
@@ -123,6 +123,17 @@ receipt, owner/пины/хэш, исходные evidence и отсутстви�
 В journal записываются причина и время; итог `abandoned` сохраняет пропуски и никогда не означает
 полный baseline. Серия закрыта для новых admissions; новая серия автоматически не создаётся.
 Abandon не снимает блокировки и не служит заменой безопасной очистке.
+
+Для EvalBaseline `node-eval-ops recover` требует `execution: {seriesDir, runDir, cleanupPath}`
+в private recovery evidence. Источник — неизменяемый product run journal этой серии; cleanupPath
+указывает на его `CASE/1/cleanup.json` либо `CASE/1/infra-error/cleanup.json`. Helper связывает
+положительное process evidence с этим источником напрямую либо через проверенный settlement.
+Бюджет определяется исходным launcher PID/starttime/uid, owner lease и подтверждёнными хэшами,
+а не именем incident/receipt. Разные исполнения имеют разные reservations; повтор и частично
+записанная reservation расходуют бюджет навсегда. O_EXCL и fsync файла/каталога выполняются до
+первой мутации. Rich/Ben сохраняют один recovery на lease. EvalBaseline освобождает стенд через
+baseline-completion всех executions; отдельный recovery-completion не разрешает release.
+Фиксированные unit проверки под phase=unit сохраняют штатный unit completion.
 
 ## Доставка
 

@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test"
-import { chmod, copyFile, mkdir, mkdtemp, rename, rm, stat, symlink } from "node:fs/promises"
+import { chmod, copyFile, cp, mkdir, mkdtemp, rename, rm, stat, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, ownedRecoveryEntry, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, reserveOwnedRegistrationContinuation, runNodeEvalOps, runNodeUnitChecks, settleNodeWriterRelease, nodeRoleCli, verifyBaselineStand, type NodeOpsConfig } from "../src/node-eval-ops"
-import { prepareBaseline, beginBaselineMeasurement } from "../src/baseline"
+import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement } from "../src/baseline"
 import { repoRoot } from "../src/config"
 import { baselineFixturePins } from "../fixtures/baseline"
 import { archiveProfileHistory } from "../src/profile"
@@ -396,6 +396,61 @@ test("one durable operator recovery budget survives renamed incident and task co
     await expect(reserveNodeRecovery(fixture.config, lease, "renamed-incident")).rejects.toThrow("RECOVERY_ALREADY_ATTEMPTED")
     await expect(reserveNodeRecovery(fixture.config, { ...lease, task: "new-task" }, "renamed-again")).rejects.toThrow("LEASE_OWNER_CHANGED")
     expect((await nodeStandStatus(fixture.config)).status).toBe("BUSY")
+  } finally { await fixture.dispose() }
+})
+
+test("baseline recovery reserves once per immutable execution while renamed incidents retain the spent budget", async () => {
+  const fixture = await runtime()
+  try {
+    const baseline = { checkout: path.join(fixture.config.runtimeRoot, "checkouts/baseline"),
+      evalProfile: path.join(fixture.config.runtimeRoot, "roles/baseline/eval"), cliBin: fixture.config.cliBin,
+      workRoots: [path.join(fixture.config.runtimeRoot, "roles/baseline/work")], resultsRoot: path.join(fixture.config.runtimeRoot, "roles/baseline/results") }
+    for (const directory of [baseline.checkout, baseline.evalProfile, ...baseline.workRoots, baseline.resultsRoot]) await mkdir(directory, { recursive: true, mode: 0o700 })
+    await cp(path.join(repoRoot, "evals/tasks"), path.join(baseline.checkout, "evals/tasks"), { recursive: true })
+    const config: NodeOpsConfig = { ...fixture.config, version: 2, roles: { ...fixture.config.roles, evalbaseline: baseline } }
+    const lease = await acquireNodeStand(config, { ...owner, role: "evalbaseline" })
+    const pins = { ...baselineFixturePins, containerId: lease.containerId, endpoint: lease.endpoint }
+    const series = path.join(baseline.resultsRoot, "series")
+    const manifest = await prepareBaseline(series, { checkout: baseline.checkout, pins })
+    const executions = []
+    for (const job of manifest.jobs.slice(0, 2)) {
+      const admitted = await beginBaselineMeasurement(series, job.key, { checkout: baseline.checkout, pins })
+      const run = path.join(admitted.resultsDir, job.key)
+      const output = path.join(run, admitted.case.id, "1")
+      await mkdir(output, { recursive: true, mode: 0o700 })
+      const started = new Date().toISOString()
+      const supervised = await superviseProcess({ cmd: [process.execPath, "-e", "process.stdout.write('fixture'); await Bun.sleep(50)"],
+        cwd: baseline.checkout, env: { PATH: process.env.PATH ?? "" }, outDir: output, timeoutMs: 5000 })
+      await Bun.write(path.join(output, "cleanup.json"), JSON.stringify({ result: { status: "confirmed" }, processes: supervised.processCleanup,
+        stages: ["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].map(stage => ({ stage, status: "confirmed" })) }))
+      await Bun.write(path.join(run, "summary.json"), JSON.stringify({ run_id: job.key, started_at: started, harness: { git_sha: lease.sha.slice(0, 9), dirty: false },
+        config: { repeat: 1 }, task_ids: [admitted.case.id], storage_leftovers: [], tasks: [{ id: admitted.case.id, attempts: [{ task_id: admitted.case.id,
+          attempt: 1, status: "no_artifact", judge_status: "no_artifact", pass: false, score: 0, environment_cleanup: { status: "confirmed" },
+          tokens: { input: 0, output: 0, reasoning: 0 }, counters: { toolCalls: 0, toolErrors: 0, memoryToolCalls: 0 }, duration_ms: 50, cost: 0 }] }] }))
+      await recordBaselineMeasurement(series, job.key, run)
+      executions.push({ seriesDir: series, runDir: run, cleanupPath: `${admitted.case.id}/1/cleanup.json` })
+    }
+    const reservations = await Promise.allSettled([reserveNodeRecovery(config, lease, "first-incident", executions[0]),
+      reserveNodeRecovery(config, lease, "concurrent-incident", executions[0])])
+    expect(reservations.filter(result => result.status === "fulfilled")).toHaveLength(1)
+    const admitted = reservations.find(result => result.status === "fulfilled")!
+    if (admitted.status !== "fulfilled") throw Error("Reservation missing")
+    const first = admitted.value
+    await expect(reserveNodeRecovery(config, lease, "renamed-incident", executions[0])).rejects.toThrow("RECOVERY_ALREADY_ATTEMPTED")
+    const second = await reserveNodeRecovery(config, lease, "second-incident", executions[1])
+    expect(second).not.toBe(first)
+    expect(await Bun.file(first).json()).toMatchObject({ status: "ATTEMPTED", execution: executions[0] })
+    await Bun.write(first, "")
+    await expect(reserveNodeRecovery(config, lease, "partial-reservation", executions[0])).rejects.toThrow("RECOVERY_ALREADY_ATTEMPTED")
+    await expect(reserveNodeRecovery(config, lease, "wrong-cleanup", { ...executions[1]!, cleanupPath: "summary.json" })).rejects.toThrow("BASELINE_EXECUTION_UNKNOWN")
+    await expect(reserveNodeRecovery(config, lease, "missing-execution")).rejects.toThrow("BASELINE_EXECUTION_REQUIRED")
+    const completion = path.join(baseline.workRoots[0]!, "recovery-completion.json")
+    await Bun.write(completion, JSON.stringify({ version: 1, owner: { ...owner, role: "evalbaseline" }, acquiredAt: lease.acquiredAt, kind: "recovery",
+      receipt: second, profile: "eval", historyArchive: `${baseline.evalProfile}.history/fixture`, processEvidence: path.join(executions[1]!.runDir, executions[1]!.cleanupPath),
+      execution: executions[1] }))
+    await chmod(completion, 0o600)
+    await expect(releaseNodeStand(config, lease, completion)).rejects.toThrow("BASELINE_COMPLETION_REQUIRED")
+    expect((await nodeStandStatus(config)).status).toBe("BUSY")
   } finally { await fixture.dispose() }
 })
 
