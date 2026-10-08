@@ -24,7 +24,7 @@ Evaler имеет собственные checkout и `R/roles/evaler/work`, shel
 
 Карточка остаётся назначенной squad; смена assignee может отменить задачи. Evaler не создаёт карточки, дочерние карточки приёмки, autopilot или расписания и не выбирает следующий узел. Полномочие менять status есть только у лидера на карточке, фактически назначенной этому squad. При упоминании на чужой карточке Evaler читает контекст и сообщает ограничение без смены assignee/status.
 
-В первом поручении фиксируются принятый узел/подплан, case IDs, возможности настройки/перенастройки, входы, кодовые обязательные проверки, base SHA, установленный CLI SHA/version, endpoint/container ID, runtime, модели и timeout. Без этих условий модельные действия не начинаются. Новые узлы требуют реализации поддерживающего валидатора и негативных тестов: текущий runner ограничен тремя CrossTable IDs, а неизвестный required ID должен давать ERROR.
+В первом поручении фиксируются принятый узел/подплан, case IDs, возможности настройки/перенастройки, входы, кодовые обязательные проверки, base SHA, установленный CLI SHA/version, endpoint/container ID, runtime, модели и timeout. Без этих условий модельные действия не начинаются. Новые узлы требуют реализации поддерживающего валидатора и негативных тестов: список поддержанных case IDs определяется `evals/src/node-cases.ts` назначенного checkout, а неизвестный required ID должен давать ERROR.
 
 Текущее состояние хранится в metadata `evaler.state` этой же карточки; проверенная comment/task history подтверждает его. Пишет его только Evaler. Использовать короткий блок `EVALER_STATE` вместе с каждым существенным решением:
 
@@ -107,7 +107,7 @@ CrossTable негативные проверки включают неверны
 
 ## Внедрение и проверка
 
-Готовые личные инструкции — [Evaler](evaler/evaler.md), [Rich](evaler/rich.md), [Ben](evaler/ben.md); [squad instructions](evaler/squad.md) получает только лидер. Эти материалы заменяют оперативные правила прежнего Rich-leader/manual handoff, прежние Rich↔Ben mentions, управление статусами Rich и старые runtime paths; historical attachments и результаты сохраняются неизменными. Исходные node acceptance и полезные scripts skill остаются обязательными, а старые аналитические calibration/manual-start пункты к node workflow не применяются.
+Готовые личные инструкции — [Evaler](evaler/evaler.md), [Rich](evaler/rich.md), [Ben](evaler/ben.md); [squad instructions](evaler/squad.md) получает только лидер. Эти материалы заменяют оперативные правила прежнего Rich-leader/manual handoff, прежние Rich↔Ben mentions, управление статусами Rich и старые runtime paths; historical attachments и результаты сохраняются неизменными. Методика узлового кейса — самостоятельный `loginom-node-eval-case` (runtime `R/support/node-eval-skill-v1/loginom-node-eval-case/SKILL.md`, исходник `evals/skills/loginom-node-eval-case/SKILL.md`). Исходные node acceptance сохраняются; роль, lease/recovery и handoff определяются этим контрактом. Старый аналитический skill не требуется для node workflow.
 
 До изменения проверить отсутствие active/queued работ на runtime и pending stand cleanup. Изменить существующие агенты/squad без запуска карточек. Readback должен подтвердить ровно 3 members, Evaler leader, runtime/model/xhigh/concurrency и совпадение актуальных инструкций; приватные MCP env не печатать. Operational supplement публикуется как новый immutable архив с manifest, а не перепаковка прежнего support/evidence. LAB-16 остаётся исторической карточкой без перезапуска.
 

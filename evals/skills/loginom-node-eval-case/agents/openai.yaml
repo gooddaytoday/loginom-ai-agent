@@ -1,0 +1,4 @@
+interface:
+  display_name: "Loginom: eval узла"
+  short_description: "Независимые эталоны и проверки отдельного узла Loginom"
+  default_prompt: "Используй $loginom-node-eval-case для подготовки или проверки небольшого eval конкретного узла Loginom."
