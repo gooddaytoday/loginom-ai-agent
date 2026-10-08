@@ -253,7 +253,11 @@ Scoped QA и безопасный signal с manifest: `live-followup-49-20261008
 **2/3 warm PASS, кейс не принят**. В попытках1/3 исходный CSV admitted,
 импорт и связанная группировка SUM дали Alpha35/Beta20; пакет действительно
 сохранён, структура и хэши зафиксированы, cleanup/remaining0. Их независимое
-cold выполнение пока не выполнено. Попытка2 честно завершилась без готового
+cold выполнение дополнительно **2/2 PASS**: новый runtime/session, исходные
+package/input bytes неизменны, Alpha35/Beta20 проверены по native exact values,
+settingsReapplied=false, logout/cleanup/remaining0, контейнеры удалены.
+Evidence `cold-49-cli-scenario-create-20261008` содержит manifest и контроллер.
+Полный3-repeat кейс этим не закрыт. Попытка2 честно завершилась без готового
 пакета: `imports.text/configure`, `NODE_APPLY_STOPPED → UI_EPOCH_CHANGED`.
 Child exit0 не заменяет внешний FAIL. Причина совпадает с pre-gesture epoch
 проверкой, но внутренний step journal не сохранён: конкретный field/action
