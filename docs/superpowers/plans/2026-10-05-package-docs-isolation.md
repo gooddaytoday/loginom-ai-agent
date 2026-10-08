@@ -1030,8 +1030,10 @@ Core имеет разметку осей, но без CSV oracle. По доку
   clean suite481 PASS/2 SKIP/0 FAIL/typecheck PASS, protected diff0 против
   свежего evals refb31ebe7d0. Common `ab-conditions-inspection-20261008/common.json`
   SHA256 `c07c876e618383b6428beb24f16819aba80c5c68f92d4c22a2f0dfb7564c4dd0`.
-  Те же baseline/candidate inventories и281 task files проверены; baseline smoke
-  v6 выполняется. Старые v3/v4/v5 не подставляются в новую пару.
+  Те же baseline/candidate inventories и281 task files проверены. Baseline smoke
+  v6 run204506:judge100/structure/warm oracle/cold/native cleanup PASS,
+  package/input bytes unchanged; candidate smoke запущен, formal0.
+  Старые v3/v4/v5 не подставляются в новую пару.
 - [ ] Сначала прогнать небольшой представительный smoke (импорт, преобразование,
   соединение/агрегация, сохранение) из заранее выбранных задач,
   затем весь выбранный набор из 12–15 задач с тремя повторами для каждой сборки.

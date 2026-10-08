@@ -96,3 +96,16 @@ frozen SHA, одинаковых условий обеих сборок и пр�
 `bf28cd68954ad64343581b70febb415b40fe9d5281be8dd56912e671691dd3a2`.
 Он не восстанавливался и не использовался для удаления исходных файлов;
 это сохранение bytes, а не подтверждение cleanup или полного roundtrip.
+
+Baseline v6 session14241 завершён exit0: run20261008-204506-b4661a7b6,
+sales-by-category#1 completed/317s/judge100/pass=true/environment cleanup confirmed.
+Отдельные structure/warm oracle PASS; installed cold session19486 exit0/PASS:
+сохранённые package/input bytes unchanged, settingsReapplied=false, CSV oracle PASS,
+package closed/logout/remaining0, own container removed и созданные этим reader
+storage files удалены после проверки bytes. Model/judge/Help calls в cold0.
+Evidence: `ab-smoke-v6-20261008/base/{artifact-review,cold}`.
+
+Закрытая baseline history4506 entries сохранена в tar.gz15020315 bytes с полным
+roundtrip inventory/modes/bytes и проверкой отсутствия process/open references;
+restore command в preservation receipt. Raw result/events/judge/artifact сохранены.
+Candidate smoke v6 запущен session92839, результат ожидается; formal0.
