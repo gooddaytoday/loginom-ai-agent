@@ -6,6 +6,19 @@ export const nodeCaseIds = [
 
 export const coverageCaseIds = nodeCaseIds.slice(6) as readonly string[]
 
+export function coverageOutputFields(id: string) {
+  if (!coverageCaseIds.includes(id)) throw Error(`unsupported coverage case: ${id}`)
+  if (id === "crosstable-column-cartesian") return ["A", "B"].flatMap(category => ["web", "shop"].map(channel => ({
+    name: `${category}_${channel}`, categories: [category, channel], fact: "Amount", fn: "sum", type: "real",
+  })))
+  const facts = nodeCase(id).facts
+  return (id === "crosstable-local-variable-bindings" ? ["A"] : ["A", "B"]).flatMap(category => facts.flatMap(f => f.functions.map(fn => ({
+    name: id === "crosstable-string-counts-null" ? `${category}_${fn === "unique_count" ? "unique" : fn === "null_count" ? "null" : "count"}`
+      : id === "crosstable-multi-facts" ? `${category}_${f.name.toLowerCase()}_${fn}` : `${category}_Amount_${fn === "sum" ? "Sum" : "Count"}`,
+    categories: [category], fact: f.name, fn, type: ["count", "unique_count", "null_count"].includes(fn) ? "integer" : fn === "sum" ? "real" : f.type,
+  }))))
+}
+
 export function nodeCase(id: string) {
   if (!(nodeCaseIds as readonly string[]).includes(id)) throw Error(`unsupported node case: ${id}`)
   const coverage = coverageCaseIds.includes(id)
