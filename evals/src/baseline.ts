@@ -148,6 +148,7 @@ export async function recordBaselineMeasurement(directory: string, key: string, 
     job.record = record
     job.state = "recorded"
     await atomicJournal(directory, journal)
+    for (const file of record.files) await chmod(path.join(runDir, file.path), 0o444)
     return record
   })
 }

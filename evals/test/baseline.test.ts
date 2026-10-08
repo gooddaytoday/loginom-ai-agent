@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdtemp, rm } from "node:fs/promises"
+import { chmod, lstat, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease, runBaseline, verifyBaselineInstallation, baselineHash, captureBaselinePins } from "../src/baseline"
@@ -85,6 +85,8 @@ test("all 132 fixture measurements retain separate quality axes and become compl
     expect(after.nodes.every(item => item.measured === 3 && item.passed === 0)).toBe(true)
     expect(after.groups.regular?.metrics.total).toBe(9)
     expect(after.groups.analytic?.metrics.total).toBe(105)
+    expect((await lstat(path.join(after.rows[0]!.runDir!, "summary.json"))).mode & 0o222).toBe(0)
+    await chmod(path.join(after.rows[0]!.runDir!, "summary.json"), 0o600)
     await Bun.write(path.join(after.rows[0]!.runDir!, "summary.json"), "{}")
     await expect(checkBaseline(series)).rejects.toThrow("EVIDENCE_CHANGED")
   } finally { await rm(directory, { recursive: true, force: true }) }
