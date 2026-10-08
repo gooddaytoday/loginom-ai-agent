@@ -144,3 +144,37 @@ Evidence TDD в writer-post-open-{red,green,guard,all-guards,repeat-1..5,typeche
 При смене harness SHA новая пара получает новый manifest и обе smoke стороны;
 v6 PASS не подставляется вместо неё. Этапы5–8 открыты,stage9 отложен;
 выбор вторичной модели всё ещё ожидается.
+
+## Formal v7: первые5 terminal results
+
+Baseline session81639 продолжает run20261008-220203-495463543.
+Ab-revenue-per-converter#1,articles-by-author#1,campaign-roi-by-channel#1:
+completed/score100/pass/oracle, все environment/process cleanup confirmed,
+структура и warm oracle отдельно PASS. Cold ещё не выполнен.
+
+ABC#1:no_artifact/score0/oracle false/judge_status=no_artifact,841512ms,
+package отсутствует. Cohort#1:failed/exit1/failure_kind=permission,
+303494ms/timed_out=false/score0/oracle false/no artifact.
+У обоих node_wait:output_mapping/AMBIGUOUS/NODE_APPLY_STOPPED,
+затем OUTPUT_MAPPING_RECOVERY_UNVERIFIED у wait/cancel;
+effect_possible=true/cleanup_complete=false. Recover вернул unstructured error.
+У cohort дополнительно read error и CLI_PERMISSION_REJECTED events.
+Эти факты не доказывают исходную причину или native stable/flaky.
+Они не помечены infra,infra_retry отсутствует, manual retries0.
+
+Environment/process cleanup обоих confirmed; это не подтверждение
+семантического восстановления output_mapping. Raw result/events/cleanup
+сохранены, observations с SHA:
+formal-v7-abc-attempt1-observations-20261009/review.json,
+formal-v7-cohort-attempt1-observations-20261009/review.json.
+Cold для отсутствующего package не заявлен, judge_status=no_artifact сохраняется.
+
+Closed histories/diagnostics первых5 с confirmed environment/process cleanup
+сохранены full roundtrip, включая pending/error journals, без переписывания FAIL.
+ABC history4616entries/25253226archive bytes,diag3/13250774bytes;
+articles history4600/15885766,diag3/4024752;
+campaign history4610/16662169,diag3/4689053.
+Архивы новых случаев пока на root disk; переносить на выделенный own storage
+только после их confirmed closure и проверки receipts, как в storage report.
+Новые продуктовые/профильные/инструментальные ограничения не сняты;
+все90/paired compare/installed transitions/lifecycle и secondary smoke открыты.
