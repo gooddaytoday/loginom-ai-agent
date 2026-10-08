@@ -76,6 +76,26 @@ test("node skill: memory write denials reach the sandbox through the prepared pr
   } finally { await f.close() }
 }, 30000)
 
+test("node skill: assigned provider overrides stale profile settings inside the sandbox", async () => {
+  const f = await fixture("group-sum-qty")
+  try {
+    await mkdir(path.join(f.env.EVAL_PROFILE_DIR, "config"), { recursive: true })
+    await Bun.write(path.join(f.env.EVAL_PROFILE_DIR, "config/loginom-ai-agent.json"), JSON.stringify({
+      provider: { fake: { options: { baseURL: "http://stale", apiKey: "stale-key" } }, retained: { name: "retained" } },
+    }))
+    const run = await execute(f.draft, f.env)
+    expect(run.code).toBe(0)
+    const settings = await readSandboxSettings(f.root, f.env.EVAL_PROFILE_DIR)
+    expect(settings.provider.fake.options.baseURL).toBe(f.env.EVAL_AGENT_PROVIDER_BASE_URL)
+    expect(settings.provider.fake.options.apiKey).toBe(f.env.EVAL_AGENT_PROVIDER_API_KEY)
+    expect(settings.provider.fake.models[f.env.EVAL_AGENT_PROVIDER_MODEL_ID].id).toBe(f.env.EVAL_AGENT_PROVIDER_MODEL_ID)
+    expect(settings.provider.retained.name).toBe("retained")
+    expect(run.stdout).not.toContain(f.env.EVAL_AGENT_PROVIDER_API_KEY)
+    const report = JSON.parse(run.stdout)
+    expect(await Bun.file(path.join(report.run_dir, "config.json")).text()).not.toContain(f.env.EVAL_AGENT_PROVIDER_API_KEY)
+  } finally { await f.close() }
+}, 30000)
+
 test("node skill: draft without reference runs one fake attempt and archives cleanup", async () => {
   const f = await fixture("group-sum-qty")
   try {

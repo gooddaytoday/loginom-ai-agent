@@ -16,7 +16,7 @@ async function main() {
   const { parseArtifactSource } = await import(path.join(repo, "evals/src/artifact.ts")) as typeof import("../../../src/artifact")
   const { preflight } = await import(path.join(repo, "evals/src/preflight.ts")) as typeof import("../../../src/preflight")
   const { acquireHarnessLease } = await import(path.join(repo, "evals/src/lease.ts")) as typeof import("../../../src/lease")
-  const { assertAuth, assertProfileClean } = await import(path.join(repo, "evals/src/profile.ts")) as typeof import("../../../src/profile")
+  const { assertAuth, assertProfileClean, agentConfigJson } = await import(path.join(repo, "evals/src/profile.ts")) as typeof import("../../../src/profile")
   const dir = path.resolve(draft)
   const raw = await Bun.file(path.join(dir, "task.json")).json()
   if (!/^[a-z0-9][a-z0-9-]*$/.test(raw.id) || raw.id !== path.basename(dir) || typeof raw.prompt !== "string" || !raw.prompt.trim())
@@ -64,6 +64,7 @@ async function main() {
     ...Object.fromEntries(inherited.filter(([key]) => key.startsWith("loginom_") && key !== "loginom_*" && !denied.includes(key))),
     ...Object.fromEntries(denied.map(key => [key, "deny"])),
   }
+  if (config.agent.provider) settings.provider = { ...settings.provider, ...agentConfigJson(config).provider }
   await mkdir(path.dirname(settingsFile), { recursive: true, mode: 0o700 })
   if (await Bun.file(settingsFile).exists()) await chmod(settingsFile, 0o600)
   await writeFile(settingsFile, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 })
