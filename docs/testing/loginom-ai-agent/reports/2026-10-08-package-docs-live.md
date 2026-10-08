@@ -327,3 +327,14 @@ warm + два cold выполнения **PASS**: исходные bytes вос�
 ещё не закрыты. A/B требует доступа к выделенному стенду и выбранных до
 первого live smoke12–15 задач; судья, структура и cold replay обязательны.
 Этап9/full35 отложены вне текущей цели; серверная публикация сохраняется.
+
+Сохранённые полные CLI повторно проверены без пересборки: baseline `fc3d97dbf`
+по собственному frozen verifier, candidate `49b1584f2` по новому verifier и
+Product skills integrity — **оба PASS**. Manifest baseline
+`6928473abd91329c4cf557d405f23865eab885176cd6596459c524f5f43c3ff1`,
+candidate `13896844e3ec3c3620d3c082aea2d426c3c64ac0ca10fb86da8bf931c06024f7`.
+Полные inventories/resources/source/binary/archive hashes сохранены в
+`pair-manifest-recheck-20261008` с контроллером и checksum manifest.
+Исходные baseline manifest/archive совпали с закреплёнными SHA этапа0;
+оба `sourceDirty=false`. Это static gate, без model/Help/Loginom вызовов,
+не принятая A/B пара; перед живой приёмкой условия повторно сверяются.
