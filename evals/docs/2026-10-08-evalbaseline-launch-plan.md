@@ -179,6 +179,8 @@ Native gate завершён новым run `01a11d4f-9de4-7da6-a096-1d403753da8
 
 Отдельное calc-поручение допущено после native release/delivery: run `01a11d59-d21d-76de-8cc8-b875a6cd46e0`, trigger comment `01a11d59-d210-7b04-940d-0e13aa826a9a`. Планируемый каталог `R/roles/evalbaseline/results/smoke-calc-data-double-20261009`; только `calc-data-double`, один продуктовый запуск, without infra retry. Остальные исполнители проверены idle/без pending задач. Node smoke и полная карточка пока не допущены.
 
+Calc outcome: manifest `889c9f8e-819a-431d-9ed1-2082e839ae00`, logical job `regular-calc-data-double-1`, source run `20261008-211338-53d03a35b`. Единственный CLI запуск завершился за 10088 мс: raw status `failed`, failure_kind `provider`, error `ProviderModelNotFoundError`, session ID пуст, tokens/tool calls 0, artifact отсутствует, oracle/judge не вызваны. Исходный record `measured=true/verdict=FAIL` сохранён без изменений; readiness gate **INCOMPLETE**, фактическая model/medium не доказана. Cleanup confirmed, общий release RELEASED/FREE. Причина: embedded snapshot CLI fc3d97db не содержит `openai/gpt-6.1-sol`, собственный cache/models.json отсутствует. Текущий публичный каталог models.opencode.ai и models.dev содержит точный model ID с medium (оба HTTP 200, одинаковый SHA256 `88cdf1604e85999e2bfea9538248e44a6c5fefff7e6218e36e97ac2f82d6e048`); далее — немодельное восстановление собственного каталога. Автоматический повтор calc запрещён; node пока не допущен, чтобы не расходовать его единственную попытку на ту же ошибку.
+
 Команды с `--case` ниже — **интерфейс, который должен быть реализован и проверен в 3.1**, а не возможность исходного среза.
 
 ```sh
@@ -192,7 +194,7 @@ run_baseline smoke --config "$CFG" --series "$SMOKE_NODE_SERIES" \
 - [ ] Подтвердить его архивы/модель/процессы/очистку и release; только после безопасного освобождения допустить `crosstable-fixed-sum` отдельной серией.
 - [ ] Для `crosstable-fixed-sum` проверить артефакт и штатный node validator, его code-verdict, архивы, процессы, очистку и собственный release.
 - [ ] Для обоих подтвердить фактическую модель продукта и `medium` по закрытой истории; не ограничиваться env/config. В публичный evidence включать только несекретное заключение, не БД.
-- [ ] Если артефакта нет, gate остаётся незавершённым. Диагностика допустима, автоматический продуктовый повтор smoke запрещён, даже после исправления причины и при новом каталоге/UUID. Добор этапа 3.2 относится к полной baseline-серии, не снимает это ограничение smoke.
+- [x] Если артефакта нет, gate остаётся незавершённым. Диагностика допустима, автоматический продуктовый повтор smoke запрещён, даже после исправления причины и при новом каталоге/UUID. Добор этапа 3.2 относится к полной baseline-серии, не снимает это ограничение smoke.
 - [ ] Quality FAIL при имеющихся артефакте, выполненных oracle/judge/validator и подтверждённой очистке показать честно; не пытаться получить PASS повторением. Gate интеграции и качество продукта — отдельные поля отчёта.
 - [ ] Проверить evidence обоих smoke, загрузить в LAB-32, скачать, проверить bytes/SHA256/manifest и readback. Зафиксировать готовность либо точный незавершённый gate.
 

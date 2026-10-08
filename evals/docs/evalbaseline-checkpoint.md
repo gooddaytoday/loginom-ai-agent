@@ -15,6 +15,6 @@
 - LAB-32 01a11ae4-fa45-79ce-aec6-edd7170dafc7; native run 01a11d4f-9de4-7da6-a096-1d403753da8c READY/release PASS; MCP actor PASS.
 - Technical manifest bed77af4-b5fe-4a53-b67b-014bc4f6bcc4; incomplete/0 measured; 2026-10-09 00:02 MSK release/FREE.
 - First prepare error сохранён; Dock URL исправлен до серий; независимый post-release check: 5 profiles clean/storage EMPTY/browser 0.
-- Calc smoke допущен отдельным run 01a11d59-d21d-76de-8cc8-b875a6cd46e0; node/full пока не допущены; без повторов.
+- Calc smoke 889c9f8e-819a-431d-9ed1-2082e839ae00: ProviderModelNotFoundError, artifact отсутствует, tokens/tool calls 0; release/FREE.
 - Полную карточку создать и реально запустить на этапе 7; heartbeat основного чата 30 минут на этапе 8.
-- Native attachment 01a11d56-86ad-76c8-a8c8-87a5b2850865: download/SHA256/11-file manifest PASS; далее calc result, node smoke, 7–10.
+- Readiness INCOMPLETE: oracle/judge/actual model proof отсутствуют; далее немодельно обновить собственный каталог, calc автоматически не повторять.
