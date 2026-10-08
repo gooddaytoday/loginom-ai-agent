@@ -430,3 +430,25 @@ final cleanup receipt лежит рядом с суффиксом `.pause-cleanu
 живого дочернего клиента; он не выполнялся. Проверка идентичности пути
 отменила отправку SIGINT, клиент успел закончить самостоятельно. Разрешённая
 остановка контроллера после полного выхода клиента выполнена без SIGSTOP.
+
+## Подготовка новой lifecycle-приёмки: порядок активации driver
+
+`script/cli-owner-crash.ts` начинал с Dock prepare без обычной активации skill;
+новый профиль не рекламирует этот инструмент. Добавлен ровно один вызов
+`skill(loginom-automation)` перед prepare, как в прочих acceptance adapters.
+Продуктовые binaries/resources и текущие A/B conditions не менялись.
+
+TDD тест запускает фактический controller и отдельный CLI process fixture через
+настоящий HTTP scripted provider. До активации fixture рекламирует только skill,
+после неё — prepare; отрицательный prepared=false завершает проверку до любого
+browser/signal target. Старый код: RED CLI_ORACLE_TOOL_NOT_ADVERTISED; новый:
+GREEN с каноническим именем skill и ожидаемым CRASH_PREPARE_FAILED. Oracle
+provider+driver regression4 PASS/0 FAIL/25 assertions, Host typecheck PASS.
+Первый ошибочный запуск из root остановлен guard do-not-run-tests-from-root;
+он не является RED, правильные RED/GREEN выполнены из packages/loginom-host.
+Логи owner-driver-activation-* сохранены в собственном acceptance-каталоге.
+
+Это Linux source/control проверка, не native SIGINT/owner-loss/Chromium cleanup
+приёмка. Полный lifecycle и Desktop/CLI independence остаются открытыми;
+Linux не подтверждает Windows/macOS. Canonical Linux checkpoint, CLI runbook
+и CLI design progress обновлены по фактическим49 installed/update receipts.

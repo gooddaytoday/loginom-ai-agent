@@ -514,3 +514,9 @@ turns (dedup verified), unique tools17/19, Loginom13/13, errors0/0, skill0/1.
 Формальная baseline серия45 попыток запущена через controller v5; candidate45
 идёт после штатного завершения baseline на тех же pins. Judge/structure/cold
 каждого сохранённого артефакта и compare остаются открытыми.
+
+Formal baseline run `20261008-180611-d1b364a98`: первая задача
+`ab-revenue-per-converter#1` CLI0/completed/judge100/oracle PASS/397.84s,
+cleanup confirmed. Reviewer v5 сохранил независимую структуру/warm oracle PASS
+в `ab-formal-v5-base-reviews-20261008-ab-revenue-per-converter-1`; cold ещё
+не выполнен. Серия продолжается, первая успешная попытка не подменяет45/90.

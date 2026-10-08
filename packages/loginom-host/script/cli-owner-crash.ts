@@ -106,6 +106,7 @@ const timer = setTimeout(() => {
   child.kill("SIGINT")
 }, 120000)
 try {
+  await provider.request("call", { name: "skill", arguments: { name: "loginom-automation" } })
   const response = (await provider.request("call", {
     name: "dock_prepare",
     arguments: {
