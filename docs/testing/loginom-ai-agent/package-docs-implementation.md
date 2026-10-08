@@ -4447,6 +4447,21 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
+### 2026-10-08 — ACTIVE, explicit local proxy
+
+- HEAD до checkpoint397c18c29, artifact SHA49b1584f2 неизменен; Linux Desktop/CLI прежние accepted gates сохранены.
+- Все запуски локально, 10.200.13.152 исключён; исходные Loginom server/client и пользовательские profiles не изменены.
+- Own local stand loginom-skills-ab-20261008: auto ошибочно шёл на общий8080; прежние native receipts historical, не isolation PASS.
+- Own client теперь explicit wsproxy true/host null/path app/ws; actual socket32768/app/ws verified, own server typed Python Disabled + native empty user credentials.
+- Full harness81619d80b470 PASS/2 SKIP/0 FAIL/typecheck PASS; own pair frozen816. Новый guard0876bb32f preflight18 PASS/typecheck, full suite идёт; после PASS обновить frozen pair.
+- Full cold parent control v3 PASS/oracle0/actual export destination/unchanged bytes/settingsReapplied=false/native close/logout/remaining0/container removed/owned files removed; не product A/B proof.
+- Candidate49 explicit-proxy native check PASS; baseline check идёт. A/B agent/judge calls0, 15 task IDs frozen,90 planned attempts.
+- CLI docs-after-build3/3 mechanics/graph/PDF6pages QA/cold PASS; Desktop3/3 warm/docs/PDF QA, cold1 PASS/2 readonly FAIL; exact own readonly close/logout verified, unknown locks retained.
+- CLI scenario-modify3 live started, output openai-49-cli-scenario-modify-v2-20261008; первичный неверный payload path отказал до модели и сохранён.
+- Старый own091 unpacked tree losslessly archived/roundtrip4764 entries; baselinefc/current49/DEB/AppImage unchanged; freed space, minimum1GB guard retained.
+- Product и judge/near-miss/tasks не менялись; подробности reports/2026-10-08-package-docs-harness.md и build-transition.md.
+- Этапы5–8 открыты; stage9/full35 отложены/server skill retained. Далее frozen final harness/pins/smoke+A/B, оставшиеся product transitions/lifecycle.
+
 ### 2026-10-08 — ACTIVE, локальные запуски
 
 - HEAD до checkpoint `018c6f983`; product artifact SHA49b1584f2 не изменился.

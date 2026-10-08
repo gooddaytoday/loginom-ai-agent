@@ -51,5 +51,11 @@ layout PASS. Полный аудит всех настроек этой пров
 Evidence QA: `desktop-docs-after-build-qa-20261008`; сохранены render receipts,
 review и manifest. Internal journals собраны в конце попыток; попарная
 байтовая неизменность warm/docs, проверенная для CLI, для Desktop не заявляется.
-Independent cold3/3 — следующий обязательный gate; product code не менялся.
+Independent cold: попытка1 PASS (Alpha35/Beta20, settingsReapplied=false,
+bytes unchanged, close/logout/remaining0/container removed). Попытки2/3
+отклонены COLD_PACKAGE_NOT_WRITABLE, source/input SHA не изменились,
+own readonly view close/logout и remaining0 подтверждены; containers removed.
+Для попытки2 отдельное native observation подтвердило ReadOnly=true.
+Неизвестные writer locks не снимаются; case3/3 не принят.
+Product code не менялся; все первоначальные отказы сохраняются.
 Исходные Loginom server/client не останавливались и не переключались.

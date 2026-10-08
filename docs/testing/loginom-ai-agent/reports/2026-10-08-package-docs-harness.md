@@ -114,3 +114,56 @@ cold replay. По уточнению пользователя от 2026-10-08 а
 Обязательные product/Linux/live gates этапов 0–8 остаются открыты в плане.
 Полный прогон 35 задач и этап 9 отложены по решению пользователя и не входят
 в условия закрытия текущей цели. Серверный skill сохраняется.
+
+## Локальный стенд: исправление маршрута и полный cold control
+
+Первоначальный native connection PASS не доказывал изоляцию: Studio с
+`wsproxy: auto` подключалась к общему `ws://127.0.0.1:8080/ws/`, хотя HTTP
+origin был собственным портом32768. Отказ открытия контрольного пакета
+`PACKAGE_OPEN_REJECTED` и фактический socket URL выявили ошибку настройки.
+Прежние квитанции сохранены как historical; они не принимаются за A/B.
+
+В собственном client установлен явный `wsproxy=true`, `host=null`,
+`path=app/ws/`; фактический сокет теперь `ws://127.0.0.1:32768/app/ws/`,
+Apache проксирует через alias собственного private bridge. Настройка сверена
+с [официальной конфигурацией Studio](https://help.loginom.ru/adminguide/studio/config.html).
+В собственном server восстановлен typed Python settings с Disabled=true и
+нативное представление пустого пароля только тестовой учётной записи user.
+Изначальные library/configuration/login отказы сохранены. Исходные server/client
+и их настройки не изменялись. Свой стенд перезапускался только при setup,
+до первого model/judge прогона; earlier own dirty reference view не получила
+подтверждённый native close и не записана как успешная очистка.
+
+Полный fixed-SHA harness81619d80b: **470 PASS / 2 SKIP / 0 FAIL / 2034 assertions**,
+`bun typecheck` PASS. Для будущей пары отдельный worktree временно обновлён
+до этого SHA. Затем найденный direct fallback потребовал дополнительного guard.
+Own harness0876bb32f требует явный same-origin proxy, отклоняет auto/direct,
+внешний host и redirect до agent dispatch. TDD RED→GREEN, real HTTP tests:
+18 PASS / 0 FAIL / 36 assertions, typecheck PASS. Два промежуточных отказа
+были штатным запретом при свободном месте <1GB; порог сохранён. Полный suite
+нового SHA ещё выполняется; живое A/B сравнение не запускалось.
+
+`ab-local-cold-parent-control-v3-20261008`: **PASS**, exit0/oracle0,
+сохранённый синтетический reference восстановлен из точных archived bytes.
+Native export destination проверен до execution, fresh CSV собран до logout,
+source/input byte-identical, settingsReapplied=false, native close/logout,
+remaining0, own container removed. Только проверенные по SHA собственные
+staged package/input/output удалены. Это проверка full parent adapter на
+контрольном reference, не cold proof пакетов ещё не выполненной A/B пары.
+Для обеих сторон закрепляется один installed cold reader49 и один controller;
+пакеты baseline/candidate и их исходные настройки не переписываются.
+
+Initial resource-verification EACCES и следующий ошибочный прямой маршрут
+сохранены в control/v2; новая попытка использует установленный verified seed.
+Controllers, фактический socket и новые configuration hashes сохранены в
+`ab-local-stand-20261008/stand-provenance-v2.json`.
+Candidate49 explicit-proxy `loginom check`: exit0, LOGINOM_CONNECTION_VALID,
+Help ready, browser verified. Проверка baseline выполняется отдельно.
+
+Для места старый собственный `candidate-091103ef9-desktop/linux-unpacked`
+переведён в `linux-unpacked-preserved.tar.gz`, все4764 entries проверены
+полным roundtrip по bytes/SHA/modes/symlinks. Restore command и hashes в
+`linux-unpacked-preservation.json`. Первоначальная проверка default tar
+не сохранила group permissions; исходник оставлен до повторной успешной
+проверки с `--same-permissions`. DEB/AppImage091, baselinefc и candidate49,
+профили, результаты и чужие файлы не изменены.
