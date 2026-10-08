@@ -303,3 +303,21 @@ History4620entries/18324214archive bytes и diagnostics3entries/6426441bytes
 сохранены с full roundtrip. Snapshot `formal-v7-progress-13-20261009.json`:
 13 terminal,9 PASS/4 FAIL,10 сохранённых пакетов. Common SHA повторно проверен.
 Controller81639 live; candidate formal/cold/compare pending, ручных retries0.
+
+## Formal v7: четырнадцатая попытка
+
+Support-by-priority#1 no_artifact/FAIL0/oracle=false/judge=no_artifact,
+298261ms. Все шесть стадий environment cleanup и process cleanup confirmed,
+две проверки owned_remaining=0; cleanup_error отсутствует.
+21 уникальный tool call,4 terminal tool errors: node_wait в output_mapping
+AMBIGUOUS/NODE_APPLY_STOPPED, затем wait/cancel с
+OUTPUT_MAPPING_RECOVERY_UNVERIFIED; effect_possible=true/cleanup_complete=false.
+Operation_recover вернул неструктурированную ошибку. Семантическое восстановление
+не подтверждено; точная native причина и stable/flaky UNKNOWN. Process cleanup
+не считается доказательством успешного восстановления операции.
+Private `formal-v7-support-attempt1-observations-20261009/review.json` содержит
+хэши исходных файлов и наблюдения без новых model/judge/Loginom вызовов.
+History4563entries/15325983archive bytes и diagnostics3entries/3498982bytes
+сохранены с full roundtrip. Snapshot progress-14:14 terminal,9 PASS/5 FAIL,
+10 сохранённых пакетов; common SHA проверен, controller81639 live.
+Candidate formal/cold/compare pending; выборочных повторов и правок harness нет.
