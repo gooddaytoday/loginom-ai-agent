@@ -98,7 +98,7 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
             const label = f.name === "Region" ? "Region" : [...f.categories, ...(detailed ? [f.fact, labels[f.fn]] : [])].join(c!.options.separator)
             const technical = f.name === "Region" ? /^Region$/ : detailed ? new RegExp(`_(?:${f.fact})_${suffixes[f.fn]}(?:_[1-9][0-9]*)?$`) : /^[A-Za-z_][A-Za-z0-9_]*$/
             return ts.length === 1 && t.excluded === false && t.type === f.type && source?.length === 1 && s.type === f.type && s.label === label && technical.test(s.name) &&
-              column?.source === s.name && column.DataType === scalarTypesForOutput(f.type)
+              column !== undefined && column.source === s.name && column.DataType === scalarTypesForOutput(f.type)
           })
         if (!valid) failures.push("crosstable: complete owned category/fact/function/type native mapping and persisted sources required")
       }
