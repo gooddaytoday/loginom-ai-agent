@@ -497,6 +497,24 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
               diagnostic("dispatch.websocket")
               return websocketFetch(url, requestInit)
             }
+            if (process.env.NODE_DEBUG?.toLowerCase().split(/[,\s]+/).includes("loginom-codex")) {
+              const { Option, Schema } = await import("effect")
+              const body =
+                typeof requestInit.body === "string"
+                  ? Option.getOrUndefined(Schema.decodeUnknownOption(Schema.UnknownFromJsonString)(requestInit.body))
+                  : undefined
+              const value = body && typeof body === "object" ? body : undefined
+              diagnostic(
+                "request.shape codexTarget=%s post=%s inputCount=%d toolCount=%d instructionsBytes=%d",
+                url.origin === "https://chatgpt.com" && url.pathname === "/backend-api/codex/responses",
+                requestInit.method === "POST",
+                value && "input" in value && Array.isArray(value.input) ? value.input.length : 0,
+                value && "tools" in value && Array.isArray(value.tools) ? value.tools.length : 0,
+                value && "instructions" in value && typeof value.instructions === "string"
+                  ? Buffer.byteLength(value.instructions)
+                  : 0,
+              )
+            }
             diagnostic(
               "dispatch.http bodyBytes=%d",
               typeof requestInit.body === "string" ? Buffer.byteLength(requestInit.body) : 0,
