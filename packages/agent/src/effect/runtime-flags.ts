@@ -52,7 +52,10 @@ export class Service extends ConfigService.Service<Service>()("@loginom-ai-agent
   outputTokenMax: positiveInteger("LOGINOM_AI_AGENT_EXPERIMENTAL_OUTPUT_TOKEN_MAX"),
   bashDefaultTimeoutMs: positiveInteger("LOGINOM_AI_AGENT_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS"),
   experimentalNativeLlm: bool("LOGINOM_AI_AGENT_EXPERIMENTAL_NATIVE_LLM"),
-  experimentalWebSockets: bool("LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS"),
+  experimentalWebSockets: Config.boolean("LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
   client: Config.string("LOGINOM_AI_AGENT_CLIENT").pipe(Config.withDefault("cli")),
 }) {}
 
