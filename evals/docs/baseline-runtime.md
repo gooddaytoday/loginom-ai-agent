@@ -1,7 +1,8 @@
 # Runtime baseline
 
 Executor: `src/baseline.ts`, вход `script/run-baseline.ts`, команды prepare/start/resume/check/smoke.
-Live `--limit` запрещён, fixture допускает fake/dir и тестовый limit. Smoke имеет два задания
+Live `--limit` запрещён, fixture допускает fake/dir и тестовый limit. Smoke требует
+`--case calc-data-double|crosstable-fixed-sum` и создаёт отдельную серию с одним заданием
 attempt=1; повтор создания существующей серии запрещён. Отсутствие артефакта оставляет
 соответствующую проверку внедрения незавершённой, без автоматического повтора.
 У calc-data-double в исходном корпусе нет oracle.csv: smoke замораживает независимый oracle

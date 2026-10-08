@@ -99,21 +99,24 @@ export async function captureBaselinePins(config: NodeOpsConfig, env: Record<str
     endpoint: config.endpoint, containerId: config.container.id, imageDigest: container.Image, dockRevision: revision }
 }
 
-export async function prepareBaseline(directory: string, options: { checkout: string; pins: BaselinePins; smoke?: boolean; config?: NodeOpsConfig }) {
+export async function prepareBaseline(directory: string, options: { checkout: string; pins: BaselinePins; smoke?: boolean; smokeCase?: string; config?: NodeOpsConfig }) {
   validatePins(options.pins)
+  const selected = options.smoke ? smokeCaseKey(options.smokeCase) : undefined
+  if (!options.smoke && options.smokeCase !== undefined) throw new BaselineFailure("CASE_ONLY_FOR_SMOKE")
   if (options.config && baselineHash(JSON.stringify(options.config)) !== options.pins.opsConfigSha256) throw new BaselineFailure("CONFIG_PIN_CHANGED")
   const collections = [["regular", "tasks"], ["analytic", "tasks/analytic"], ["node", "tasks/node-evals"]] as const
   const cases: BaselineCase[] = []
   for (const [collection, relative] of collections) {
     for (const task of await loadTasks(path.join(options.checkout, "evals", relative))) {
-      if (options.smoke && !["regular:calc-data-double", "node:crosstable-fixed-sum"].includes(`${collection}:${task.id}`)) continue
+      if (selected && selected !== `${collection}:${task.id}`) continue
       cases.push({ key: `${collection}:${task.id}`, id: task.id, collection, directory: `${relative}/${task.id}`,
         files: await snapshotDirectory(task.dir) })
     }
   }
+  if (selected && cases.length !== 1) throw new BaselineFailure("SMOKE_CORPUS_INCOMPLETE")
   const manifest: BaselineManifest = { version: 1, id: crypto.randomUUID(), kind: options.smoke ? "smoke" : "baseline",
     createdAt: new Date().toISOString(), pins: options.pins, cases,
-    ...(options.smoke ? { smokeOracle: await freezeSmokeOracle(options.checkout, cases) } : {}),
+    ...(selected === "regular:calc-data-double" ? { smokeOracle: await freezeSmokeOracle(options.checkout, cases[0]!) } : {}),
     jobs: (options.smoke ? [1] : [1, 2, 3]).flatMap(attempt => cases.map(item => ({ key: `${item.collection}-${item.id}-${attempt}`, caseKey: item.key, attempt }))) }
   await mkdir(directory, { mode: 0o700 }).catch(() => { throw new BaselineFailure("SERIES_EXISTS") })
   const raw = JSON.stringify(manifest, null, 2) + "\n"
@@ -203,13 +206,19 @@ export async function checkBaseline(directory: string) {
       measured: rows.filter(row => row.caseKey === item.key && row.measured).length })), rows }
 }
 
-async function freezeSmokeOracle(checkout: string, cases: BaselineCase[]) {
-  if (JSON.stringify(cases.map(item => item.key)) !== JSON.stringify(["regular:calc-data-double", "node:crosstable-fixed-sum"])) throw new BaselineFailure("SMOKE_CORPUS_INCOMPLETE")
-  const source = await Bun.file(path.join(checkout, "evals", cases[0]!.directory, "data/amounts.csv")).text()
+function smokeCaseKey(id: string | undefined) {
+  if (id === undefined) throw new BaselineFailure("SMOKE_CASE_REQUIRED")
+  if (id === "calc-data-double") return "regular:calc-data-double"
+  if (id === "crosstable-fixed-sum") return "node:crosstable-fixed-sum"
+  throw new BaselineFailure("SMOKE_CASE_REFUSED")
+}
+
+async function freezeSmokeOracle(checkout: string, item: BaselineCase) {
+  const source = await Bun.file(path.join(checkout, "evals", item.directory, "data/amounts.csv")).text()
   const parsed = parseCsv(source)
   if ("error" in parsed || parsed.rows[0]?.join(",") !== "Amount" || parsed.rows.length < 2 ||
     parsed.rows.slice(1).some(row => row.length !== 1 || !row[0]?.trim() || !Number.isFinite(Number(row[0])))) throw new BaselineFailure("SMOKE_ORACLE_INPUT_REFUSED")
-  return { caseKey: cases[0]!.key, inputSha256: baselineHash(source), expectedCsv: `Double\n${parsed.rows.slice(1).map(row => Number(row[0]) * 2).join("\n")}\n` }
+  return { caseKey: item.key, inputSha256: baselineHash(source), expectedCsv: `Double\n${parsed.rows.slice(1).map(row => Number(row[0]) * 2).join("\n")}\n` }
 }
 
 async function verifySmokeMeasurements(manifest: BaselineManifest, rows: BaselineRow[]) {
@@ -222,7 +231,7 @@ async function verifySmokeMeasurements(manifest: BaselineManifest, rows: Baselin
       Boolean(row.runDir && row.measured && await Bun.file(path.join(row.runDir, "code-verdict.json")).exists())
     return { caseKey: row.caseKey, artifact, evaluator, oracle, qualityPass: row.collection === "node" ? row.verdict === "PASS" : row.result?.pass ?? null }
   }))
-  return { verified: checks.length === 2 && checks.every(check => check.artifact && check.evaluator && (check.caseKey.startsWith("node:") || check.oracle.checked)), checks }
+  return { verified: checks.length === 1 && checks.every(check => check.artifact && check.evaluator && (check.caseKey.startsWith("node:") || check.oracle.checked)), checks }
 }
 
 async function checkSmokeOracle(artifact: string, expected: string) {
@@ -265,10 +274,12 @@ export async function sealBaselineRelease(directory: string, receipt: BaselineRe
 export async function runBaseline(argv: string[], env: Record<string, string | undefined> = process.env): Promise<Record<string, unknown> & { code: number }> {
   try {
     const command = argv[0]
-    if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke --series DIR [--config PRIVATE --issue ID --task ID] [check: --compare SERIES --export] [resume: --recover-executor after inspection]" }
-    const values = parseArgs({ args: argv.slice(1), strict: true, options: { series: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" } } }).values
+    if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke --series DIR [smoke: --case calc-data-double|crosstable-fixed-sum] [--config PRIVATE --issue ID --task ID] [check: --compare SERIES --export] [resume: --recover-executor after inspection]" }
+    const values = parseArgs({ args: argv.slice(1), strict: true, options: { series: { type: "string" }, case: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" } } }).values
     const directory = values.series
     if (!directory || !path.isAbsolute(directory)) throw new BaselineFailure("SERIES_PATH_REQUIRED")
+    if (command === "smoke") smokeCaseKey(values.case)
+    if (command !== "smoke" && values.case !== undefined) throw new BaselineFailure("CASE_ONLY_FOR_SMOKE")
     if (command === "check") {
       const report = await checkBaseline(directory)
       const reportDir = await writeBaselineReport(directory, report)
@@ -297,7 +308,7 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
       throw new BaselineFailure("SERIES_PATH_REFUSED")
     const pins = await captureBaselinePins(config, env)
     if (command === "prepare" || command === "smoke") {
-      const manifest = await prepareBaseline(directory, { checkout: role.checkout, pins, smoke: command === "smoke", config })
+      const manifest = await prepareBaseline(directory, { checkout: role.checkout, pins, smoke: command === "smoke", smokeCase: values.case, config })
       if (command === "prepare") return { code: 0, status: "PREPARED", id: manifest.id, expected: manifest.jobs.length, cases: manifest.cases.length }
     }
     return await executeLiveBaseline(directory, config, env, pins, { issue: typeof values.issue === "string" ? values.issue : undefined,

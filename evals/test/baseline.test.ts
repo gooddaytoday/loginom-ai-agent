@@ -36,6 +36,26 @@ test("prepare freezes all 48 cases as three complete rounds without executing a 
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+test("a selected smoke prepares exactly one case and one logical attempt", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-single-smoke-"))
+  try {
+    const manifest = await prepareBaseline(path.join(directory, "series"), {
+      checkout: repoRoot, pins: baselineFixturePins, smoke: true, smokeCase: "calc-data-double",
+    })
+    expect(manifest.cases.map(item => item.key)).toEqual(["regular:calc-data-double"])
+    expect(manifest.jobs).toEqual([{ key: "regular-calc-data-double-1", caseKey: "regular:calc-data-double", attempt: 1 }])
+    expect(manifest.smokeOracle?.expectedCsv).toBe("Double\n20\n40\n")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("smoke rejects a missing or foreign case before live configuration or dispatch", async () => {
+  for (const [selector, reason] of [[[], "SMOKE_CASE_REQUIRED"], [["--case", "group-sum-qty"], "SMOKE_CASE_REFUSED"]] as const) {
+    expect(await runBaseline(["smoke", "--series", "/fixture/not-created", ...selector], {})).toMatchObject({ code: 2, reason })
+  }
+  expect(await runBaseline(["prepare", "--series", "/fixture/not-created", "--case", "calc-data-double"], {}))
+    .toMatchObject({ code: 2, reason: "CASE_ONLY_FOR_SMOKE" })
+})
+
 test("installation verification refuses tampered payloads and extra files without executing CLI", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "baseline-install-"))
   try {
@@ -85,16 +105,18 @@ test("prepare freezes a matching operational config before any live admission", 
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
-test("smoke computes an independent Double oracle while a missing node artifact keeps readiness incomplete", async () => {
+test("separate smoke series check only their own artifact and independent oracle", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-smoke-"))
   try {
-    const series = path.join(directory, "series")
-    const manifest = await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins, smoke: true })
-    expect(manifest.smokeOracle?.expectedCsv).toBe("Double\n20\n40\n")
-    for (const job of manifest.jobs) {
+    for (const smokeCase of ["calc-data-double", "crosstable-fixed-sum"]) {
+      const series = path.join(directory, smokeCase)
+      const manifest = await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins, smoke: true, smokeCase })
+      const regular = smokeCase === "calc-data-double"
+      expect(manifest.jobs).toHaveLength(1)
+      expect(manifest.smokeOracle?.expectedCsv).toBe(regular ? "Double\n20\n40\n" : undefined)
+      const job = manifest.jobs[0]!
       const admitted = await beginBaselineMeasurement(series, job.key, { checkout: repoRoot, pins: baselineFixturePins })
       const run = path.join(admitted.resultsDir, "fixture")
-      const regular = admitted.case.collection === "regular"
       await Bun.write(path.join(run, "summary.json"), JSON.stringify({ run_id: job.key, config: { repeat: 1 }, task_ids: [admitted.case.id], storage_leftovers: [],
         tasks: [{ id: admitted.case.id, attempts: [{ task_id: admitted.case.id, attempt: 1, status: regular ? "completed" : "no_artifact", judge_status: regular ? "scored" : "skipped",
           judge_attempts: regular ? 1 : 0, package_path: regular ? "package.lgp" : null, pass: regular, score: regular ? 100 : null,
@@ -106,15 +128,14 @@ test("smoke computes an independent Double oracle while a missing node artifact 
         await Bun.write(path.join(run, admitted.case.id, "1/artifact/results/export.result.csv"), '\uFEFF"Amount";"Double"\r\n10;20\r\n20;40\r\n')
       }
       await recordBaselineMeasurement(series, job.key, run)
+      await sealBaselineRelease(series, { status: "RELEASED", evidenceSha256: "5".repeat(64) })
+      const report = await checkBaseline(series)
+      expect(report.coverage.measured).toBe(1)
+      expect(report.status).toBe("incomplete")
+      expect(report.smokeVerification).toMatchObject({ verified: false, checks: [regular
+        ? { caseKey: "regular:calc-data-double", artifact: true, oracle: { checked: true, passed: true } }
+        : { caseKey: "node:crosstable-fixed-sum", artifact: false }] })
     }
-    await sealBaselineRelease(series, { status: "RELEASED", evidenceSha256: "5".repeat(64) })
-    const report = await checkBaseline(series)
-    expect(report.coverage.measured).toBe(2)
-    expect(report.status).toBe("incomplete")
-    expect(report.smokeVerification).toMatchObject({ verified: false, checks: [
-      { caseKey: "regular:calc-data-double", artifact: true, oracle: { checked: true, passed: true } },
-      { caseKey: "node:crosstable-fixed-sum", artifact: false },
-    ] })
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
@@ -207,7 +228,7 @@ test("a recorded product failure is retained while an unknown dispatch or pin dr
   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-resume-"))
   try {
     const series = path.join(directory, "series")
-    const manifest = await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins, smoke: true })
+    const manifest = await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins })
     const first = manifest.jobs[0]!
     const dispatched = await beginBaselineMeasurement(series, first.key, { checkout: repoRoot, pins: baselineFixturePins })
     const run = path.join(dispatched.resultsDir, "fixture")
@@ -219,7 +240,7 @@ test("a recorded product failure is retained while an unknown dispatch or pin dr
     await recordBaselineMeasurement(series, first.key, run)
     await expect(beginBaselineMeasurement(series, first.key, { checkout: repoRoot, pins: baselineFixturePins })).rejects.toThrow("ALREADY_DISPATCHED")
     const report = await checkBaseline(series)
-    expect(report.coverage).toMatchObject({ expected: 2, recorded: 1, measured: 1, pending: 1, unknown: 0 })
+    expect(report.coverage).toMatchObject({ expected: 144, recorded: 1, measured: 1, pending: 143, unknown: 0 })
     expect(report.status).toBe("incomplete")
     await expect(beginBaselineMeasurement(series, manifest.jobs[1]!.key, { checkout: repoRoot, pins: { ...baselineFixturePins, dockRevision: "changed" } })).rejects.toThrow("PINS_CHANGED")
     await beginBaselineMeasurement(series, manifest.jobs[1]!.key, { checkout: repoRoot, pins: baselineFixturePins })

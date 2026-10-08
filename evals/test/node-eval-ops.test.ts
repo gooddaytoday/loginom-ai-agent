@@ -485,7 +485,7 @@ test("an unknown baseline dispatch retains the common stand even when no product
     const config: NodeOpsConfig = { ...fixture.config, version: 2, roles: { ...fixture.config.roles, evalbaseline: baseline } }
     const lease = await acquireNodeStand(config, { ...owner, role: "evalbaseline" })
     const series = path.join(baseline.resultsRoot, "unknown")
-    const manifest = await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins, smoke: true })
+    const manifest = await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins, smoke: true, smokeCase: "calc-data-double" })
     await beginBaselineMeasurement(series, manifest.jobs[0]!.key, { checkout: repoRoot, pins: baselineFixturePins })
     await expect(verifyBaselineStand(config, lease, series)).rejects.toThrow("BASELINE_CLEANUP_UNKNOWN")
     expect((await nodeStandStatus(config)).status).toBe("BUSY")
