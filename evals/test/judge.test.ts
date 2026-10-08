@@ -303,6 +303,8 @@ test("judgeTask: первый отказ, второй успех → ok, attemp
     ).toMatchObject({ ok: true, score: 100, attempts: 2 })
     expect(await Bun.file(path.join(parent, "judge-events-1.jsonl")).exists()).toBe(true)
     expect(await Bun.file(path.join(parent, "judge-events-2.jsonl")).exists()).toBe(true)
+    expect(await Bun.file(path.join(outDir, "attempt-1.json")).json()).toMatchObject({ attempt: 1, exit_code: 1, ok: false, error: "судья завершился кодом 1" })
+    expect(await Bun.file(path.join(outDir, "attempt-2.json")).json()).toMatchObject({ attempt: 2, exit_code: 0, ok: true, error: null })
   } finally {
     await rm(parent, { recursive: true, force: true })
   }
@@ -313,6 +315,23 @@ test("scoreVerdict: провал результата не снижает стр
   expect(scoreVerdict(rubric, verdict({ a: true, b: true, c: false }), 70)).toMatchObject({
     ok: true, score: 50, pass: false, structural_score: 100,
   })
+})
+
+test("judgeTask retains both invalid responses and errors after exhausting its retries", async () => {
+  const parent = await mkdtemp(path.join(os.tmpdir(), "evals-invalid-judge-"))
+  const outDir = path.join(parent, "judge")
+  try {
+    const [task] = await loadTasks(path.join(evalsRoot, "tasks"), ["group-sum-qty"])
+    const artifact = await fixtureArtifact()
+    expect(await judgeTask({ task: task!, artifactDir: path.dirname(artifact.unpackedDir), prompt: "p", outDir,
+      judge: settings({ FAKE_CODEX_VERDICT: "invalid" }) })).toMatchObject({ ok: false, attempts: 2 })
+    for (const attempt of [1, 2]) {
+      const bytes = await Bun.file(path.join(outDir, `verdict-${attempt}.json`)).text()
+      expect(bytes).toBe("{not json")
+      expect(await Bun.file(path.join(outDir, `attempt-${attempt}.json`)).json()).toMatchObject({ attempt, exit_code: 0,
+        ok: false, error: "verdict.json не соответствует схеме", verdict_sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex") })
+    }
+  } finally { await rm(parent, { recursive: true, force: true }) }
 })
 
 test("judgedFields: переносит отдельный structural_score, ошибка не равна нулю", async () => {

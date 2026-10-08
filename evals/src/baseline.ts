@@ -292,15 +292,26 @@ export async function checkBaseline(directory: string) {
   }))
   const spent = executions.filter(execution => execution.kind === "product").flatMap(execution =>
     (execution.result.infra_retry ? [execution.result.infra_retry.initial, execution.result] : [execution.result]).map(result => ({ execution, result })))
+  const judgeCalls: { execution: BaselineExecution; file: string; call: { attempt: number; ok: boolean; error: string | null; duration_ms: number } }[] = []
+  for (const execution of executions) for (const file of execution.record.files.filter(file => /\/judge\/attempt-[12]\.json$/.test(file.path))) {
+    const call = await Bun.file(path.join(execution.record.runDir, file.path)).json() as { attempt: number; ok: boolean; error: string | null; duration_ms: number }
+    if (![1, 2].includes(call.attempt) || typeof call.ok !== "boolean" || !Number.isFinite(call.duration_ms) || call.duration_ms < 0 ||
+      !call.ok && typeof call.error !== "string") throw new BaselineFailure("JUDGE_ATTEMPT_INVALID")
+    judgeCalls.push({ execution, file: file.path, call })
+  }
   const spending = { duration_ms: spent.reduce((sum, item) => sum + item.result.duration_ms, 0),
     cost: spent.reduce((sum, item) => sum + item.result.cost, 0),
     tokens: { input: spent.reduce((sum, item) => sum + item.result.tokens.input, 0), output: spent.reduce((sum, item) => sum + item.result.tokens.output, 0),
       reasoning: spent.reduce((sum, item) => sum + item.result.tokens.reasoning, 0) }, judge_tokens: null,
-    judge_duration_ms: executions.filter(execution => execution.kind === "judge").reduce((sum, execution) => sum + (execution.record.judgeDurationMs ?? 0), 0) }
-  const infrastructure = [...spent, ...executions.filter(execution => execution.kind === "judge").map(execution => ({ execution, result: execution.result }))]
+    judge_duration_ms: judgeCalls.reduce((sum, item) => sum + item.call.duration_ms, 0) + executions.filter(execution => execution.kind === "judge" &&
+      !judgeCalls.some(item => item.execution === execution)).reduce((sum, execution) => sum + (execution.record.judgeDurationMs ?? 0), 0) }
+  const infrastructure = [...[...spent, ...executions.filter(execution => execution.kind === "judge").map(execution => ({ execution, result: execution.result }))]
     .filter(item => ["infra_error", "harness_error", "interrupted"].includes(item.result.status) || item.result.judge_status === "error")
     .map(item => ({ key: item.execution.key, caseKey: item.execution.caseKey, attempt: item.execution.attempt, executionId: item.execution.record.runId,
-      phase: item.result === item.execution.result ? "final" : "infra-retry-initial", status: item.result.status, judge_status: item.result.judge_status }))
+      phase: item.result === item.execution.result ? "final" : "infra-retry-initial", status: item.result.status, judge_status: item.result.judge_status })),
+    ...judgeCalls.filter(item => !item.call.ok).map(item => ({ key: item.execution.key, caseKey: item.execution.caseKey, attempt: item.execution.attempt,
+      executionId: item.execution.record.runId, phase: `judge-attempt-${item.call.attempt}`, status: item.execution.result.status,
+      judge_status: "error" as const, error: item.call.error, evidence: item.file }))]
   const smokeVerification = manifest.kind === "smoke" ? await verifySmokeMeasurements(manifest, rows) : null
   return { id: manifest.id, kind: manifest.kind, status: coverage.measured === coverage.expected && cleanup && journal.release && (smokeVerification?.verified ?? true) ? "complete" : "incomplete",
     manifest, coverage, cleanup, released: Boolean(journal.release), groups, spending, infrastructure, smokeVerification, recoveries, executions,
@@ -899,7 +910,7 @@ async function exportBaselineReport(directory: string, reportDir: string, report
     const recovery = report.recoveries.find(recovery => recovery.record?.runDir === execution.record.runDir)
     for (const item of execution.record.files) {
       if (!/^(summary\.json|config\.json|report\.md|code-verdict\.json|code-report\.md|judge-recovery\.json)$/.test(item.path) &&
-        !/^[^/]+\/1\/(?:infra-error\/)?(?:judge\/verdict\.json|verdict(?:\.prev)?\.json|oracle\.json|artifact\/package\.lgp|artifact\/results\/[^/]+\.csv)$/.test(item.path)) continue
+        !/^[^/]+\/1\/(?:infra-error\/)?(?:judge\/(?:verdict(?:-[12])?|attempt-[12])\.json|verdict(?:\.prev)?\.json|oracle\.json|artifact\/package\.lgp|artifact\/results\/[^/]+\.csv)$/.test(item.path)) continue
       selected.push({ source: path.join(execution.record.runDir, item.path), target: `measurements/${execution.key}${recovery ? `/recoveries/${recovery.id}` : ""}/${item.path}` })
     }
   }

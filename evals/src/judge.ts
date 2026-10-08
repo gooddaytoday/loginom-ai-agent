@@ -218,6 +218,7 @@ async function invoke(
 ) {
   const verdictPath = path.join(input.outDir, "verdict.json")
   await rm(verdictPath, { force: true })
+  const started = Date.now()
   const proc = Bun.spawn(
     judgeCommand({ command: input.judge.command, dir: input.outDir, model: input.judge.model, reasoning: input.judge.reasoning }),
     {
@@ -242,12 +243,21 @@ async function invoke(
   const exitCode = await proc.exited
   clearTimeout(timer)
   input.signal?.removeEventListener("abort", onAbort)
-  if (exitCode !== 0) return { ok: false as const, error: `судья завершился кодом ${exitCode}` }
-  const file = Bun.file(verdictPath)
-  if (!(await file.exists())) return { ok: false as const, error: "verdict.json не создан" }
-  const verdict = parseVerdict(await file.text())
-  if (!verdict) return { ok: false as const, error: "verdict.json не соответствует схеме" }
-  const scored = scoreVerdict(checklist, verdict, input.judge.passThreshold)
-  if (!scored.ok) return { ok: false as const, error: scored.error }
-  return { ...scored, verdict }
+  const result = await (async () => {
+    if (exitCode !== 0) return { ok: false as const, error: `судья завершился кодом ${exitCode}` }
+    const file = Bun.file(verdictPath)
+    if (!(await file.exists())) return { ok: false as const, error: "verdict.json не создан" }
+    const verdict = parseVerdict(await file.text())
+    if (!verdict) return { ok: false as const, error: "verdict.json не соответствует схеме" }
+    const scored = scoreVerdict(checklist, verdict, input.judge.passThreshold)
+    if (!scored.ok) return { ok: false as const, error: scored.error }
+    return { ...scored, verdict }
+  })()
+  const bytes = await Bun.file(verdictPath).exists() ? await Bun.file(verdictPath).bytes() : null
+  // A later retry removes verdict.json; retain the failed response and its cause first.
+  if (bytes) await Bun.write(path.join(input.outDir, `verdict-${attempt}.json`), bytes)
+  await Bun.write(path.join(input.outDir, `attempt-${attempt}.json`), JSON.stringify({ attempt, exit_code: exitCode,
+    ok: result.ok, error: "error" in result ? result.error : null, duration_ms: Date.now() - started,
+    verdict_sha256: bytes ? new Bun.CryptoHasher("sha256").update(bytes).digest("hex") : null }))
+  return result
 }

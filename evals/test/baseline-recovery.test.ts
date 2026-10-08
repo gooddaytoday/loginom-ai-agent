@@ -98,6 +98,26 @@ test("resume fills the missing slot once, preserves its original error and then 
   } finally { server.stop(true); await rm(fixture.directory, { recursive: true, force: true }) }
 }, 60_000)
 
+test("a successful judge retry retains its first failure in the report and delivery", async () => {
+  const fixture = await recoveryFixture({ status: "completed", judge_status: "error", package_path: "/user/fixture.lgp" }, "judge")
+  try {
+    const marker = path.join(fixture.directory, "first-judge-failed")
+    const env = { ...fixture.env, PATH: Bun.env.PATH,
+      EVAL_JUDGE_COMMAND: `env FAKE_CODEX_FLAKY_MARKER=${marker} ${Bun.which("bun")} ${path.join(evalsRoot, "fixtures/fake-codex.ts")}`,
+      JUDGE_MODEL: "gpt-6-astra", JUDGE_REASONING: "high" }
+    expect(await runBaseline(fixture.argv, fixture.env)).toMatchObject({ code: 0 })
+    expect(await runBaseline(["resume", "--series", fixture.series, "--limit", "1"], env)).toMatchObject({ code: 0, measured: 1 })
+    const report = await checkBaseline(fixture.series)
+    expect(report.rows[0]!.result).toMatchObject({ judge_status: "scored", judge_attempts: 2 })
+    expect(report.infrastructure).toHaveLength(2)
+    expect(report.infrastructure).toContainEqual(expect.objectContaining({ phase: "judge-attempt-1", judge_status: "error", error: "судья завершился кодом 1" }))
+    const exported = await runBaseline(["check", "--series", fixture.series, "--export"], {})
+    expect(exported).toMatchObject({ code: 0 })
+    const manifest = JSON.parse((await Bun.$`tar -xOf ${String(exported.archive)} delivery-manifest.json`.quiet()).text()) as { files: { path: string }[] }
+    expect(manifest.files.filter(file => /\/judge\/attempt-[12]\.json$/.test(file.path))).toHaveLength(2)
+  } finally { await rm(fixture.directory, { recursive: true, force: true }) }
+}, 60_000)
+
 test("an incomplete executor guard blocks recovery even without a PID receipt", async () => {
   const fixture = await recoveryFixture()
   try {
