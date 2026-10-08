@@ -34,7 +34,7 @@ Component ID: `component.exports.Kafka`, slug `exports-kafka`. Runtime type и �
 | Исходный SHA | вершина ветки задания; Генератор фиксирует его в карточке |
 | Runtime type и режим | `exports.kafka` / `publish` — предложение до конца этапа 0 |
 | Стенд и аккаунты | из конфигов ролей; пара worker/reviewer от Генератора, один стенд |
-| Модель приёмки | из конфигурации обвязки; предел модельного прогона 7200 с |
+| Модель приёмки | `openai/gpt-6-luna`, вариант `high`; итог исполнителя и независимая проверка ревьюера; предел модельного прогона 7200 с |
 | Внешняя среда | Loginom Enterprise/Cloud с Kafka; изолированный broker, выделенный topic/ACL и отдельный consumer; этап 2 — PLAINTEXT, SASL_Plaintext, SSL, SASL_SSL и SASL PLAIN/SCRAM-SHA-256/SCRAM-SHA-512 по отдельным профилям |
 
 ### Стоп-условия

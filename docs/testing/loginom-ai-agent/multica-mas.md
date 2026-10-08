@@ -136,6 +136,8 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 
 ## Checkpoint — daemon12, квалифицированы восемь CLI-потоков, 08.10.2026
 
+- Новая приёмка узлов: итог Worker и независимый модельный прогон Reviewer — openai/gpt-6-luna/high; промежуточные модели любые. Хелперы/инструкции исправляются по ошибкам, контракты/критерии согласуются; Stage0 неизменен. Доступность и реальный прогон Luna/high NOT_RUN.
+
 - PR40 draft → loginom; shared-oauth source basis f9bf332cc491baa784e6e04fdfda7c0f09151cb7. Merge/release NOT_RUN; проверенный artifact не получает PASS новых merge SHA.
 - Installed source597592f5d53f86beb69ffe318af2d4db52c5f416/version0.0.0-dev-202610081651, Linux x64/glibc; executable+manifest shared-oauth-v1;5678 file checksums PASS.
 - Archive SHA2561aa667f7d34bc066b7fb7e3c52f69f0b7db0f042351f9aedde6cf36afcf1dbaa; source/manifest/build/archive roundtrip PASS; replacement штатный, OAuth/profile history сохранены.
