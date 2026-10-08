@@ -4447,20 +4447,21 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-08 — ACTIVE, локальный harness закреплён
+### 2026-10-08 — ACTIVE, условия локальной пары сохранены
 
-- HEAD до checkpoint2b1463808; product artifact SHA49b1584f2 не изменился.
-- Все запуски локально; 10.200.13.152 исключён. Исходные Loginom server/client, профили и чужие процессы сохранены.
-- Own AB stand: explicit same-origin wsproxy, actual socket32768/app/ws verified; typed Python Disabled и native empty user credentials.
-- Harness0876bb32f:476 PASS/2 SKIP/0 FAIL/2042 assertions и typecheck PASS; отдельный чистый pair worktree закреплён на том же SHA,658 files manifest.
-- Protected judge/near-miss/tasks unchanged vs fresh evals b31ebe7d0; live A/B model/judge calls0.15 IDs frozen;90 formal attempts ещё не запускались.
-- Baselinefc/candidate49 explicit-proxy native checks exit0/LOGINOM_CONNECTION_VALID; Help/browser ready fields подтверждены только для candidate schema.
-- Full cold parent control v3 PASS/oracle0/unchanged bytes/settingsReapplied=false/native close/logout/remaining0/container removed; не product A/B proof.
-- CLI docs-after-build3/3 mechanics/graph/PDF6pages QA/cold PASS; Desktop warm/docs3/3/PDF QA, cold1 PASS/2 readonly FAIL; unknown locks не трогаем.
-- CLI scenario-modify3 завершены code1/SCENARIO_CALCULATOR_NOT_VERIFIED; результаты сохранены, не accepted; readonly diagnosis идёт по archived evidence и offline tests.
-- Старые own091/239 unpacked losslessly archived:4764 entries каждый/roundtrip PASS; own253 архивируется. Baselinefc/current49/DEB/AppImage/profiles/results сохранены,1GB guard неизменен.
-- Продукт не менялся; отчёты harness.md/build-transition.md; этапы5–8 открыты,stage9/full35 отложены,server skill retained.
-- Далее: закончить readonly diagnosis, безопасно освободить место, закрепить final conditions; затем preflight/smoke/A/B и оставшиеся transitions/lifecycle.
+- HEAD до checkpoint1d8dbd387; product artifacts baselinefc/candidate49b1584f2 неизменны; изменения только own test infrastructure/docs.
+- Все запуски локально;10.200.13.152 исключён. Исходные Loginom server/client/profiles и чужие процессы сохранены.
+- Frozen pair harness0876bb32f clean/658 hashes:476 PASS/2 SKIP/0 FAIL/typecheck PASS; protected judge/tasks/near-miss unchanged vs evals b31ebe7d0.
+- Полный binary preflight обоих CLI PASS без моделей; candidate native Help/browser verified, baseline connection valid schema без этих полей.
+- Common conditions0e5ee67e… до первого smoke:281 source files,15 IDs/90 attempts,1activation turn+1skill call allowance,models/judge/catalog/pins/timeouts/serial; guard drift.
+- Server skill snapshot907ff16b… verified; оба resource manifests pin same action catalog17764f9a…; current.json отсутствует и не используется; server skill сохраняется.
+- Новый eval cold binding adapter TDD/6tests; Host full297 PASS/7 SKIP/0 FAIL/typecheck PASS. Saved package/settings не переписываются,оба binaries прежние.
+- Own full cold parent control v3 PASS/native close/logout/unchanged bytes/oracle0; реальные A/B saved artifacts ещё не replayed.
+- CLI modify3 FAIL:readonly public/journal3/3,calculator inactive-source2/3,remaining0; native owner неизвестен,новая product regression не доказана; safe signal archived.
+- CLI docs-after-build3/3 QA/cold PASS; Desktop warm/docs3/3, cold1 PASS/2 readonly FAIL; эти gate остаются открыты.
+- Own obsolete091/239/253/3ec/5a9/bd0/c50 unpacked archived/4764entries each/roundtrip PASS,all backups/DEB/AppImage retained;free4.5GB/1GB guard preserved.
+- Smoke preparations v1/v2 FAIL до модели сохранены;v3 uses native ensureProfile first,baseline representative smoke запущен отдельно;90 formal attempts не начаты.
+- Этапы5–8 открыты;stage9/full35 deferred. Далее сохранить smoke/judge/structure/cold proof,сверить conditions→candidate smoke→полная пара;remaining transitions/lifecycle отдельно.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 

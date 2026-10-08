@@ -179,3 +179,89 @@ exit0, LOGINOM_CONNECTION_VALID; в его старой схеме нет пол
 в archive: 4764 entries, 399683018 bytes, полный roundtrip SHA/modes/symlinks
 PASS; исходный unpacked удалён только после этой проверки. Сборки для
 baseline/candidate пары и старые DEB/AppImage сохранены.
+
+## Полный preflight и условия до первого A/B smoke
+
+Обе binary сборки прошли **полный preflight** frozen harness0876bb32f:
+изолированный server marker/ID/storage/Python/network, отсутствие debugger,
+bubblewrap, Studio HTTP200 и explicit proxy, Docker/Dock health, agent identity,
+Codex version и свободное место. Model/judge calls0. Evidence:
+`ab-full-preflight-20261008/{base,candidate}/receipt.json`.
+Это не readiness/model smoke: native check receipts приведены отдельно выше.
+
+`ab-conditions-verified-20261008/common.json`: SHA256
+`0e5ee67e67e38299736fa3857e327b7dc5237239fee3f0e7b2e12c7c94402df4`.
+Подтверждены все658 harness files,281 snapshot files,5389 baseline и5651
+candidate CLI manifest entries, включая symlink modes через lstat. Первая
+проверка ошибочно сравнивала mode symlink target через stat; FAIL сохранён,
+пакеты не изменялись. Common pins включают модели/variant, судью/high,
+prompt/schema/code/executable dependencies, task timeouts, threshold70,
+repeat3/serial,15 IDs/90 attempts, near-miss hashes, stand provenance,
+external catalog/server skill и model cache. Seed не настраивается.
+Допуск на активацию: один дополнительный provider-turn и один skill-вызов на
+задачу; остальной рост вызовов измеряется отдельно и не ослабляет качество.
+Перед каждой стороной и smoke требуется повторная проверка неизменности.
+Если candidate меняется, нужна новая фиксация условий и полная новая пара.
+
+`ab-external-snapshot-pinned-20261008`: Skills API manifest и все его files
+сохранены с validation/revision/SHA; server revision
+`907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148`.
+Action catalog обеих сборок совпадает: `2026.09.14-rc6-linux-candidate`,
+manifest17764f9a…, все4 remote files проверены. Production current.json на
+сервере отсутствует; первоначальный запрос FAIL сохранён. Обе сборки реально
+используют exact candidate pin из resource-manifest, а не production current.
+Help catalog hash также сохранён. Model/browser calls0, сервер не изменён.
+
+Упакованы own obsolete091/239/253/3ec/5a9/bd0/c50 Desktop trees: по4764 entries
+каждый, полный byte/mode/symlink roundtrip. Все архивы, DEB/AppImage и manifest
+восстановления сохранены; baseline/current49 и результаты не изменены.
+Свободное место после сохранения —4.5GB; прежний guard1GB сохранён.
+
+## CLI build→modify: подтверждённый отказ, причина lock открыта
+
+`openai-49-cli-scenario-modify-v2-20261008`: все3 controller attempts exit1,
+SCENARIO_CALCULATOR_NOT_VERIFIED; каждый из6 CLI ходов exit0/process remaining0.
+Warm import/save подтверждён, turn2 public prepare и journal во всех3 выдают
+readonly package. Attempts1/3 calculator NOT_APPLIED, effect_possiblefalse,
+cleanup_completetrue из-за неактивного source output; attempt2 calculator не
+вызывал. Эти отказы не принимаются за успешное изменение сценария.
+
+Readonly owner/причина неизвестны. Ordinary runtime close и ноль local процессов
+не подтверждают native close/logout. Exact shutdown bodies и основные ownership
+modules fc→49 совпадают; новая регрессия продукта не доказана. CLI отдельный
+run на каждый ход проверяет cold continuation; Desktop общий backend — warm.
+Старые runtime refs закономерно отвергаются, активный source после reopen нужно
+подтверждать заново. Private acceptance-only native cleanup не включается
+глобально в продукт без отдельного решения о владении.
+
+Evidence `cli-workspace-close-signal-20261008`: saved public/journal extraction,
+source/history hashes, offline70 guards+7 inner bridge tests PASS ×3.
+Исходный bridge wrapper FAIL ×3 (nested child stdout пуст); этот FAIL сохранён
+и не объявляется green вследствие прямого запуска inner fixture. Без blind
+retries, неизвестные блокировки/чужие процессы не трогались.
+
+## Наш адаптер привязки eval→cold replay
+
+Commit1d8dbd387 добавляет только test infrastructure `planEvalColdReplay`.
+Из XML сохранённого пакета он берёт точные import filenames native admission,
+сопоставляет их с единственным original task basename и проверяет SHA всех
+snapshot attachments, включая неиспользованные. Затем общий planColdReplay
+проверяет package bytes, account/export ownership и saved GUID. Узлы/настройки
+не переписываются; этот код не включается в оцениваемые сохранённые бинарники.
+
+TDD: missing export RED→positive GREEN; unused changed attachment RED→GREEN.
+Шесть новых проверок: exact binding/unchanged package, unused changed bytes,
+ambiguous basenames, foreign export identity, changed package и relative source.
+Полный Host suite с pinned Node24.19: **297 PASS / 7 SKIP / 0 FAIL / 1924 assertions**,
+304 tests/43 files,83.54s; typecheck PASS. Изначальные ошибочные commands из
+неверного cwd и без обязательного TEST_NODE сохранены отдельно; они не служат
+RED поведений и не считаются регрессиями продукта. Общие adapters и checksums
+записаны в `ab-conditions-verified-20261008/adapters.json`.
+
+Первые preparations smoke остановились до агента: контроллер сначала не
+создал parent output, затем preseed auth/cache нарушил native profile format,
+затем direct management потребовал существующий profile root. Все сохранены,
+attempts/model/judge calls0. Controllerv3 использует существующий ensureProfile
+до auth/cache и отдельный `ab-smoke-v3-20261008`; базовый smoke только после
+этой подготовки считается фактическим запуском. Ни один из preparations не
+входит в90 formal attempts. Финальный результат v3 фиксируется отдельно.
