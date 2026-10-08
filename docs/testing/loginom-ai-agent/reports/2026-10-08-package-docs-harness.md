@@ -603,3 +603,20 @@ Cold не выполнен. Закрытая история сохранена �
 receipt argv; исходные result/events/артефакты и диагностика сохранены.
 Серия жива:3 успешные и1 no_artifact из первых4 завершённых попыток;
 это не полный baseline45, не candidate и не статистический verdict.
+
+## Formal baseline: пятая попытка без артефакта
+
+`cohort-spend-activity#1`: CLI0/no_artifact/score0/294.054s,
+harness cleanup confirmed/no cleanup_error. После импорта и группировки
+калькулятор остановился в `output_mapping`: `NODE_APPLY_STOPPED`, затем
+`OUTPUT_MAPPING_RECOVERY_UNVERIFIED` (original output Done reference unavailable).
+Native `effect_possible=true`, `cleanup_complete=false`; recover этой же
+операции вернул `REQUEST_REJECTED`. Пакет и CSV не сохранены, финальный ответ
+честно сообщает незавершённость. Четыре tool errors и hashes исходных
+result/events/cleanup: `ab-formal-v5-base-cohort-failure-20261008/review.json`.
+Это измеренный исходный отказ; задачи/рубрика не менялись, manual retry0.
+
+Закрытая история этой попытки сохранена с теми же guards/full roundtrip:
+4562 entries, archive14665634 bytes, restore argv в sibling preservation receipt.
+Диагностика и исходные результаты оставлены распакованными.
+Серия продолжается:3 PASS и2 no_artifact из первых5, cold0/candidate0.

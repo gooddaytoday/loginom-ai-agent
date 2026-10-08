@@ -452,3 +452,29 @@ provider+driver regression4 PASS/0 FAIL/25 assertions, Host typecheck PASS.
 приёмка. Полный lifecycle и Desktop/CLI independence остаются открытыми;
 Linux не подтверждает Windows/macOS. Canonical Linux checkpoint, CLI runbook
 и CLI design progress обновлены по фактическим49 installed/update receipts.
+
+## Текущая49: второй модельный smoke не принят
+
+Независимый smoke installed CLI49 на `xiaomi-token-plan-sgp/mimo-v2.5`,
+variant `default`, один `default-unconfigured-arithmetic`:
+«Сколько будет 17 × 6? Дай только результат.» Инициализация настоящего CLI
+вернула `unconfigured`; ключ второй модели передан только stdin в собственный
+профиль, исходный auth/profile сохранён. Использованы текущий установленный
+seed69458bc… и тот же models snapshot, версия продукта49 подтверждена manifest.
+Loginom endpoint и судья не использовались; основная A/B пара не менялась.
+
+FAIL: CLI exit1/signalnull/interruptedfalse/88.319s, text/tools/reports пусты,
+stdout/stderr evidence files не созданы. Chromium exec0, observed processes3,
+remaining0; контейнер штатно удалён. `CLI_EXIT_CONTRACT` — последующее
+падение механики проверки, не первичная причина. Writer release отдельно не
+зафиксирован; удаление контейнера не подменяет эту проверку.
+
+Evidence: `model2-49-cli-arithmetic-20261008`, независимый summary с хэшами
+`model2-49-cli-arithmetic-review-20261008/review.json`.
+Причина и стабильность неизвестны: один текущий отказ не доказывает flaky
+или стабильную регрессию. Прежний Xiaomi HTTP429 этому запуску не приписывается
+без фактического provider error. Сборщик сигнала изучает saved evidence и CLI
+failure/log paths read-only, без live retries. Полный private profile/log data
+не сохранён адаптером; следующая диагностика должна удержать его до чтения.
+Второй модельный smoke и этап6 остаются открытыми; исторические успешные
+прогоны других source SHA не заменяют приёмку49.
