@@ -39,7 +39,11 @@ checkout: `evals/docs/evaler-orchestration.md`, `evals/docs/evaler/operations.md
 
 Публиковать новую versioned immutable копию skill и применимых role docs в runtime
 support с внутренним SHA256 manifest и внешним хэшем архива. Исторические bundles
-не перепаковывать. Rich/Ben получают короткую явную ссылку на SKILL.md, а все остальные
+не перепаковывать. Ссылки на документы вне supplement явно направлять в
+`$AGENT_REPO/<repo-relative-path>` собственного checkout; проверять наличие целей
+на обоих checkout и все оставшиеся относительные ссылки готового пакета. Такие
+преобразования runtime-копий документов включать в manifest и provenance поставки.
+Rich/Ben получают короткую явную ссылку на SKILL.md, а все остальные
 инструкции/настройки сохраняются. Перед обновлением подтвердить отсутствие active/
 queued работ и pending stand cleanup; затем readback обоих агентов.
 Evaler, squad, модели и маршрутизация при этой установке не меняются.
