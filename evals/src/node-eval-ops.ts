@@ -233,8 +233,13 @@ export async function nodeProcessOutput(config: NodeOpsConfig, lease: NodeStandL
   return outDir
 }
 
-export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStandLease, env: Record<string, string | undefined> = process.env) {
+export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStandLease, env: Record<string, string | undefined> = process.env, evidenceDir?: string) {
   return exclusive(config, lease, async () => {
+    const admissionRoot = evidenceDir ?? directory(config)
+    if (evidenceDir) {
+      if (!evidenceDir.startsWith(directory(config) + path.sep) || path.dirname(evidenceDir) !== directory(config)) throw new NodeOpsFailure("EVIDENCE_PATH_REFUSED")
+      await mkdir(evidenceDir, { mode: 0o700 })
+    }
     await assertAllProfilesClean(config)
     await assertBrowsersClosed()
     const git = await checkoutIdentity(nodeRole(config, lease.role).checkout)
@@ -248,7 +253,7 @@ export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStand
     await assertAuth(current, command)
     const admission = { owner: ownerOf(lease), acquiredAt: lease.acquiredAt, containerId: storage.containerId, configSha256: configDigest(config),
       profiles: Object.values(config.roles).flatMap(roleProfiles), checkedAt: new Date().toISOString() }
-    await writeFile(path.join(directory(config), "admission.json"), JSON.stringify(admission), { mode: 0o600 })
+    await writeFile(path.join(admissionRoot, "admission.json"), JSON.stringify(admission), { mode: 0o600 })
     const view = parseView((await management(command, ["loginom", "status", "--format", "json"])).stdout)
     if (view?.state !== "ready" || view.recoveries?.length) throw new NodeOpsFailure("PROFILE_NOT_READY")
     // Validate Loginom credentials, websocket and licence with the installed product's real browser.
@@ -269,10 +274,11 @@ export async function preflightNodeStand(config: NodeOpsConfig, lease: NodeStand
     await assertAllProfilesClean(config)
     await assertBrowsersClosed()
     if ((await assertIsolatedStorageEmpty(source(config))).containerId !== lease.containerId) throw new NodeOpsFailure("CONTAINER_CHANGED")
-    await writeFile(path.join(directory(config), "admission-complete.json"), JSON.stringify({ owner: ownerOf(lease), acquiredAt: lease.acquiredAt,
+    await writeFile(path.join(admissionRoot, "admission-complete.json"), JSON.stringify({ owner: ownerOf(lease), acquiredAt: lease.acquiredAt,
       configSha256: lease.configSha256, status: "READY", processEvidence: path.join(checkDir, "process-cleanup.json"), historyArchive }), { mode: 0o600 })
     return { status: "READY", sha: git.sha, dirty: git.dirty, containerId: storage.containerId,
-      cliSourceSha: environment.agent?.sourceCommit ?? null, model: current.agent.model, variant: current.agent.variant }
+      cliSourceSha: environment.agent?.sourceCommit ?? null, model: current.agent.model, variant: current.agent.variant,
+      admission: path.join(admissionRoot, "admission-complete.json"), processEvidence: path.join(checkDir, "process-cleanup.json"), historyArchive }
   })
 }
 
@@ -657,16 +663,26 @@ export async function verifyBaselineStand(config: NodeOpsConfig, lease: NodeStan
   await evidencePath(config, lease, admission.processEvidence, true)
   await verifyProcesses(await Bun.file(admission.processEvidence).json(), lease)
   await verifyHistoryArchive(nodeRole(config, lease.role).evalProfile, admission.historyArchive)
+  for (const recovery of report.recoveries) {
+    const saved = await readPrivateJson(recovery.evidencePath) as { live?: { status: string; admissionProof: {
+      owner: NodeStandOwner; acquiredAt: string; configSha256: string; status: string; historyArchive: string }; processProof: ProcessCleanup; historyArchive: string } }
+    const proof = saved.live
+    if (!proof || proof.status !== "READY" || proof.admissionProof?.status !== "READY" || !ownerMatches(proof.admissionProof.owner, lease) ||
+      proof.admissionProof.acquiredAt !== lease.acquiredAt || proof.admissionProof.configSha256 !== lease.configSha256 ||
+      proof.historyArchive !== proof.admissionProof.historyArchive) throw new NodeOpsFailure("RECOVERY_VALIDATION_REQUIRED")
+    await verifyProcesses(proof.processProof, lease)
+    await verifyHistoryArchive(nodeRole(config, lease.role).evalProfile, proof.historyArchive)
+  }
   const git = await checkoutIdentity(nodeRole(config, lease.role).checkout)
   if (git.sha !== lease.sha || git.dirty || report.manifest.pins.harnessSha !== git.sha) throw new NodeOpsFailure("STALE_EVAL_PROOF")
-  for (const row of report.rows) {
-    if (!row.runDir) continue
-    await evidencePath(config, lease, row.runDir)
-    const summary = await Bun.file(path.join(row.runDir, "summary.json")).json() as RunSummary
+  for (const execution of report.executions) {
+    const runDir = execution.record.runDir
+    await evidencePath(config, lease, runDir)
+    const summary = await Bun.file(path.join(runDir, "summary.json")).json() as RunSummary
     if (!Number.isFinite(Date.parse(summary.started_at)) || Date.parse(summary.started_at) < Date.parse(lease.acquiredAt) ||
       summary.harness?.dirty || !lease.sha.startsWith(summary.harness?.git_sha ?? "UNKNOWN")) throw new NodeOpsFailure("STALE_EVAL_PROOF")
     for (const task of summary.tasks) for (const attempt of task.attempts) {
-      const out = path.join(row.runDir, task.id, String(attempt.attempt))
+      const out = path.join(runDir, task.id, String(attempt.attempt))
       for (const directory of [out, ...(attempt.infra_retry ? [path.join(out, "infra-error")] : [])]) {
         const cleanup = await Bun.file(path.join(directory, "cleanup.json")).json()
         await verifyProcesses(cleanup.processes, lease)

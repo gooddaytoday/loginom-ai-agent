@@ -131,6 +131,20 @@ test("admission refuses pending state in another role's profile without executin
   } finally { await fixture.dispose() }
 })
 
+test("a repair preflight cannot overwrite the original admission or write outside its lease", async () => {
+  const fixture = await runtime()
+  try {
+    const lease = await acquireNodeStand(fixture.config, owner)
+    const original = path.join(fixture.config.runtimeRoot, "operations/stand.lease/admission-complete.json")
+    await Bun.write(original, "preserved original admission")
+    for (const directory of [path.dirname(original), fixture.config.roles.rich.workRoots[0]!, path.join(path.dirname(original), "nested/repair")]) {
+      await expect(preflightNodeStand(fixture.config, lease, {}, directory)).rejects.toThrow("EVIDENCE_PATH_REFUSED")
+    }
+    expect(await Bun.file(original).text()).toBe("preserved original admission")
+    expect((await nodeStandStatus(fixture.config)).status).toBe("BUSY")
+  } finally { await fixture.dispose() }
+})
+
 test("admission refuses another profile's harness lease even after its recorded PID disappears", async () => {
   const fixture = await runtime()
   try {

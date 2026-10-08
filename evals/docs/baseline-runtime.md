@@ -1,6 +1,6 @@
 # Runtime baseline
 
-Executor: `src/baseline.ts`, вход `script/run-baseline.ts`, команды prepare/start/resume/check/smoke.
+Executor: `src/baseline.ts`, вход `script/run-baseline.ts`, команды prepare/start/resume/check/smoke/recover-measurement.
 Live `--limit` запрещён, fixture допускает fake/dir и тестовый limit. Smoke требует
 `--case calc-data-double|crosstable-fixed-sum` и создаёт отдельную серию с одним заданием
 attempt=1; повтор создания существующей серии запрещён. Отсутствие артефакта оставляет
@@ -47,7 +47,7 @@ Chrome sandbox должен быть root:root 4755; фактическая гр
 Полная baseline-серия с сохранённым, но неизмеренным исходом удерживает стенд и возвращает
 `AWAITING_RECOVERY`. Допуск следующего slot и штатная фиксация release запрещены, даже если
 очистка ошибочного запуска подтверждена. Ошибки и расходы сохраняются; этап 3.2 плана ещё
-требует append-only добора и отдельного терминального пути прекращения неполной серии.
+требует отдельной оценки после judge error и терминального пути прекращения неполной серии.
 Smoke сохраняет собственный release после подтверждённой очистки, включая infra error;
 ошибка оставляет его readiness незавершённым и не разрешает автоматический повтор.
 После записанного release допуск нового измерения отклоняется как `SERIES_RELEASED`.
@@ -78,6 +78,26 @@ owner совпадают, PID+starttime отсутствует, сохранён
 guard архивируется. Stale journal.lock, запуск без terminal summary и неподтверждённая очистка
 автоматически не восстанавливаются. Нужен разбор atomic journal/temp и реальной evidence.
 Ручное дописывание качества или внешнее повторение продукта ради PASS запрещены.
+
+`recover-measurement --series DIR --job KEY --kind infrastructure|judge --evidence PRIVATE_JSON`
+добавляет атомарный admission только для первого пропущенного slot. Evidence version=1
+содержит baselineId/jobKey/executionId/executionFilesSha256, kind/cause, fix {id,files},
+validation {path,sha256}, taskId/runId. Файлы fix и validation — абсолютные, private, с SHA256.
+Validation version=1 связывает baselineId/jobKey/executionId, pinsSha256 и fixSha256; требует
+status=PASS, exitCode=0, modelCalls=0 и команду немодельной проверки. В live helper дополнительно
+проверяет процессы/все прежние executions/архивы/профили/storage и выполняет фиксированный
+native Loginom check под теми же пинами. Его новый admission не заменяет первоначальный.
+Исходные receipts копируются и fsync сохраняются закрыто и неизменяемо до записи journal.
+Нет admission при executor guard (включая неполный), живом child, UNKNOWN или failed cleanup.
+Повтор того же evidence возвращает существующий admission; новая reservation по тому же
+исправлению не разрешена. Неполная запись admission не разрешает новый продуктовый вызов.
+
+Infrastructure `resume` выполняет admission однажды в новом `recoveries/ID/runs/RUN`, сохраняя
+исходный `recorded` job. Первый валидный результат становится результатом логической попытки,
+включая FAIL/timeout/no_artifact; следующие jobs выполняются после него. Все product executions
+и встроенные retries учитываются в расходе и проверке очистки. Экспорт содержит исходный run
+и дополнительные run в разных путях; private recovery evidence исключён. Judge dispatch пока
+заблокирован `JUDGE_RECOVERY_NOT_READY`; это незавершённая часть этапа 3.2, не готовность к live.
 
 ## Доставка
 

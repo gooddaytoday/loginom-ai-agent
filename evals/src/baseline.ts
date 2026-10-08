@@ -24,9 +24,16 @@ export type BaselineManifest = { version: 1; id: string; kind: "baseline" | "smo
 type RecordedRun = { runDir: string; runId: string; files: { path: string; sha256: string }[]; measured: boolean; cleanup: boolean; verdict: "PASS" | "FAIL" | "ERROR" }
 type BaselineRow = { key: string; caseKey: string; attempt: number; collection: BaselineCollection; state: "pending" | "running" | "recorded"
   measured: boolean; cleanup: boolean; verdict: RecordedRun["verdict"] | null; runDir: string | null; result: AttemptResult | null }
+type BaselineExecution = { key: string; caseKey: string; attempt: number; kind: "product" | "judge"; record: RecordedRun; result: AttemptResult }
 type BaselineRelease = { status: "RELEASED"; evidenceSha256: string; receiptPath?: string; receiptSha256?: string }
+type RecoveryEvidence = { version: 1; baselineId: string; jobKey: string; executionId: string; executionFilesSha256: string
+  kind: "infrastructure" | "judge"; cause: string; fix: { id: string; files: { path: string; sha256: string }[] }
+  validation: { path: string; sha256: string }; taskId: string; runId: string }
+type BaselineRecovery = { id: string; kind: RecoveryEvidence["kind"]; state: "admitted" | "running" | "recorded"
+  sourceExecutionId: string; evidencePath: string; evidenceSha256: string; evidenceFiles: { path: string; sha256: string }[]
+  cause: string; taskId: string; runId: string; record?: RecordedRun }
 type BaselineJournal = { version: 1; manifestSha256: string; checkout: string; release?: BaselineRelease
-  jobs: { key: string; state: "pending" | "running" | "recorded"; dispatchedAt?: string; record?: RecordedRun }[] }
+  jobs: { key: string; state: "pending" | "running" | "recorded"; dispatchedAt?: string; record?: RecordedRun; recoveries?: BaselineRecovery[] }[] }
 type SmokeAdmission = { version: 1; issue: string; task: string; caseKey: string; seriesDir: string; baselineId: string; manifestSha256: string }
 
 export class BaselineFailure extends Error {}
@@ -140,8 +147,8 @@ export async function beginBaselineMeasurement(directory: string, key: string, c
     const job = journal.jobs.find(item => item.key === key)
     if (!job) throw new BaselineFailure("UNKNOWN_JOB")
     if (job.state !== "pending") throw new BaselineFailure("ALREADY_DISPATCHED")
-    if (journal.jobs.some(item => item.state === "running")) throw new BaselineFailure("UNKNOWN_OUTCOME")
-    if (manifest.kind === "baseline" && journal.jobs.some(item => item.record && !item.record.measured)) throw new BaselineFailure("AWAITING_RECOVERY")
+    if (journal.jobs.some(item => item.state === "running" || item.recoveries?.some(recovery => recovery.state === "running"))) throw new BaselineFailure("UNKNOWN_OUTCOME")
+    if (manifest.kind === "baseline" && journal.jobs.some(item => item.record && !effectiveMeasurement(item)?.measured)) throw new BaselineFailure("AWAITING_RECOVERY")
     if (journal.jobs.find(item => item.state === "pending") !== job) throw new BaselineFailure("ROUND_ORDER_CHANGED")
     if (manifest.kind === "smoke" && manifest.pins.mode === "live") {
       await admitBaselineSmoke(directory, await readPrivateBaselineJson(path.join(directory, "ops-config.json")) as NodeOpsConfig,
@@ -226,16 +233,17 @@ async function readinessRoot(config: NodeOpsConfig, create: boolean) {
 }
 
 /** Record raw evidence, including product FAIL. No original result or judge verdict is rewritten. */
-export async function recordBaselineMeasurement(directory: string, key: string, runDir: string) {
+export async function recordBaselineMeasurement(directory: string, key: string, runDir: string, recoveryId?: string) {
   return mutateBaseline(directory, async (manifest, journal) => {
     const job = journal.jobs.find(item => item.key === key)
-    if (!job || job.state !== "running") throw new BaselineFailure("NOT_DISPATCHED")
-    const root = path.join(directory, "measurements", key, "runs")
+    const recovery = recoveryId ? job?.recoveries?.find(recovery => recovery.id === recoveryId) : undefined
+    if (!job || (recoveryId ? recovery?.state !== "running" : job.state !== "running")) throw new BaselineFailure("NOT_DISPATCHED")
+    const root = recovery ? path.join(path.dirname(recovery.evidencePath), "runs") : path.join(directory, "measurements", key, "runs")
     if (await realpath(runDir) !== runDir || !runDir.startsWith(root + path.sep)) throw new BaselineFailure("RUN_PATH_REFUSED")
     const item = manifest.cases.find(item => item.key === manifest.jobs.find(job => job.key === key)!.caseKey)!
     const record = await inspectMeasurement(manifest, item, journal.checkout, runDir)
-    job.record = record
-    job.state = "recorded"
+    if (recovery) { recovery.record = record; recovery.state = "recorded" }
+    if (!recovery) { job.record = record; job.state = "recorded" }
     await atomicJournal(directory, journal)
     for (const file of record.files) await chmod(path.join(runDir, file.path), 0o444)
     return record
@@ -249,14 +257,25 @@ export async function checkBaseline(directory: string) {
       throw new BaselineFailure("RELEASE_EVIDENCE_CHANGED")
   }
   const rows: BaselineRow[] = []
+  const executions: BaselineExecution[] = []
+  const recoveries = journal.jobs.flatMap(job => (job.recoveries ?? []).map(recovery => ({ ...recovery, key: job.key })))
+  for (const recovery of recoveries) for (const file of [{ path: recovery.evidencePath, sha256: recovery.evidenceSha256 }, ...recovery.evidenceFiles])
+    if (baselineHash(await readPrivateBaselineBytes(file.path)) !== file.sha256) throw new BaselineFailure("RECOVERY_EVIDENCE_CHANGED")
   for (const expected of manifest.jobs) {
     const job = journal.jobs.find(item => item.key === expected.key)!
     const item = manifest.cases.find(item => item.key === expected.caseKey)!
-    if (!job.record) { rows.push({ ...expected, collection: item.collection, state: job.state, measured: false, cleanup: false, verdict: null, runDir: null, result: null }); continue }
-    if (JSON.stringify(await snapshotDirectory(job.record.runDir)) !== JSON.stringify(job.record.files)) throw new BaselineFailure("EVIDENCE_CHANGED")
-    const summary = await Bun.file(path.join(job.record.runDir, "summary.json")).json() as RunSummary
-    rows.push({ ...expected, collection: item.collection, state: job.state, measured: job.record.measured, cleanup: job.record.cleanup,
-      verdict: job.record.verdict, runDir: job.record.runDir, result: summary.tasks[0]!.attempts[0]! })
+    const state = job.recoveries?.some(recovery => recovery.state === "running") ? "running" : job.state
+    const records = [...(job.record ? [{ kind: "product" as const, record: job.record }] : []),
+      ...(job.recoveries ?? []).flatMap(recovery => recovery.record ? [{ kind: recovery.kind === "judge" ? "judge" as const : "product" as const, record: recovery.record }] : [])]
+    for (const execution of records) {
+      if (JSON.stringify(await snapshotDirectory(execution.record.runDir)) !== JSON.stringify(execution.record.files)) throw new BaselineFailure("EVIDENCE_CHANGED")
+      const summary = await Bun.file(path.join(execution.record.runDir, "summary.json")).json() as RunSummary
+      executions.push({ ...expected, ...execution, result: summary.tasks[0]!.attempts[0]! })
+    }
+    const record = effectiveMeasurement(job)
+    if (!record) { rows.push({ ...expected, collection: item.collection, state, measured: false, cleanup: false, verdict: null, runDir: null, result: null }); continue }
+    rows.push({ ...expected, collection: item.collection, state, measured: record.measured, cleanup: records.every(execution => execution.record.cleanup),
+      verdict: record.verdict, runDir: record.runDir, result: executions.find(execution => execution.record === record)!.result })
   }
   const coverage = { expected: manifest.jobs.length, recorded: rows.filter(row => row.state === "recorded").length,
     measured: rows.filter(row => row.measured).length, pending: rows.filter(row => row.state === "pending").length,
@@ -267,17 +286,18 @@ export async function checkBaseline(directory: string) {
     return [collection, { metrics: aggregate(attempts, false), tasks: manifest.cases.filter(item => item.collection === collection).map(item => ({
       id: item.id, metrics: aggregateTask(attempts.filter(attempt => attempt.task_id === item.id), false) })) }]
   }))
-  const spent = rows.flatMap(row => row.result ? (row.result.infra_retry ? [row.result.infra_retry.initial, row.result] : [row.result]).map(result => ({ row, result })) : [])
+  const spent = executions.filter(execution => execution.kind === "product").flatMap(execution =>
+    (execution.result.infra_retry ? [execution.result.infra_retry.initial, execution.result] : [execution.result]).map(result => ({ execution, result })))
   const spending = { duration_ms: spent.reduce((sum, item) => sum + item.result.duration_ms, 0),
     cost: spent.reduce((sum, item) => sum + item.result.cost, 0),
     tokens: { input: spent.reduce((sum, item) => sum + item.result.tokens.input, 0), output: spent.reduce((sum, item) => sum + item.result.tokens.output, 0),
       reasoning: spent.reduce((sum, item) => sum + item.result.tokens.reasoning, 0) }, judge_tokens: null }
   const infrastructure = spent.filter(item => ["infra_error", "harness_error", "interrupted"].includes(item.result.status) || item.result.judge_status === "error")
-    .map(item => ({ key: item.row.key, caseKey: item.row.caseKey, attempt: item.row.attempt,
-      phase: item.result === item.row.result ? "final" : "infra-retry-initial", status: item.result.status, judge_status: item.result.judge_status }))
+    .map(item => ({ key: item.execution.key, caseKey: item.execution.caseKey, attempt: item.execution.attempt, executionId: item.execution.record.runId,
+      phase: item.result === item.execution.result ? "final" : "infra-retry-initial", status: item.result.status, judge_status: item.result.judge_status }))
   const smokeVerification = manifest.kind === "smoke" ? await verifySmokeMeasurements(manifest, rows) : null
   return { id: manifest.id, kind: manifest.kind, status: coverage.measured === coverage.expected && cleanup && journal.release && (smokeVerification?.verified ?? true) ? "complete" : "incomplete",
-    manifest, coverage, cleanup, released: Boolean(journal.release), groups, spending, infrastructure, smokeVerification,
+    manifest, coverage, cleanup, released: Boolean(journal.release), groups, spending, infrastructure, smokeVerification, recoveries, executions,
     nodes: manifest.cases.filter(item => item.collection === "node").map(item => ({ id: item.id, expected: manifest.kind === "smoke" ? 1 : 3,
       passed: rows.filter(row => row.caseKey === item.key && row.verdict === "PASS").length,
       measured: rows.filter(row => row.caseKey === item.key && row.measured).length })), rows }
@@ -327,9 +347,10 @@ async function checkSmokeOracle(artifact: string, expected: string) {
 
 export async function sealBaselineRelease(directory: string, receipt: BaselineRelease) {
   return mutateBaseline(directory, async (manifest, journal) => {
-    if (manifest.kind === "baseline" && journal.jobs.some(job => job.record && !job.record.measured)) throw new BaselineFailure("AWAITING_RECOVERY")
+    if (manifest.kind === "baseline" && journal.jobs.some(job => job.record && !effectiveMeasurement(job)?.measured)) throw new BaselineFailure("AWAITING_RECOVERY")
     if (receipt.status !== "RELEASED" || !/^[0-9a-f]{64}$/.test(receipt.evidenceSha256) ||
-      journal.jobs.some(job => job.state === "running" || job.record && !job.record.cleanup)) throw new BaselineFailure("RELEASE_UNCONFIRMED")
+      journal.jobs.some(job => job.state === "running" || job.record && !job.record.cleanup || job.recoveries?.some(recovery => recovery.state === "running" || recovery.record && !recovery.record.cleanup)))
+      throw new BaselineFailure("RELEASE_UNCONFIRMED")
     if (manifest.pins.mode === "live") {
       const lease = await readPrivateBaselineJson(path.join(directory, "stand-handle.json")) as NodeStandLease
       const config = await readPrivateBaselineJson(path.join(directory, "ops-config.json")) as NodeOpsConfig
@@ -352,12 +373,24 @@ export async function sealBaselineRelease(directory: string, receipt: BaselineRe
 export async function runBaseline(argv: string[], env: Record<string, string | undefined> = process.env): Promise<Record<string, unknown> & { code: number }> {
   try {
     const command = argv[0]
-    if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke --series DIR [smoke: --case calc-data-double|crosstable-fixed-sum] [--config PRIVATE --issue ID --task ID] [check: --compare SERIES --export] [resume: --recover-executor after inspection]" }
-    const values = parseArgs({ args: argv.slice(1), strict: true, options: { series: { type: "string" }, case: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" } } }).values
+    if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke|recover-measurement --series DIR [smoke: --case calc-data-double|crosstable-fixed-sum] [recover-measurement: --job KEY --kind infrastructure|judge --evidence PRIVATE_JSON] [--config PRIVATE --issue ID --task ID] [check: --compare SERIES --export] [resume: --recover-executor after inspection]" }
+    const values = parseArgs({ args: argv.slice(1), strict: true, options: { series: { type: "string" }, case: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, job: { type: "string" }, kind: { type: "string" }, evidence: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" } } }).values
     const directory = values.series
     if (!directory || !path.isAbsolute(directory)) throw new BaselineFailure("SERIES_PATH_REQUIRED")
     if (command === "smoke") smokeCaseKey(values.case)
     if (command !== "smoke" && values.case !== undefined) throw new BaselineFailure("CASE_ONLY_FOR_SMOKE")
+    if (command === "recover-measurement") {
+      if (!values.job || !["infrastructure", "judge"].includes(values.kind ?? "") || !values.evidence) throw new BaselineFailure("RECOVERY_ARGUMENTS_REQUIRED")
+      const { manifest, journal } = await readBaseline(directory)
+      if (manifest.pins.mode === "fixture") {
+        if (env.EVAL_BASELINE_FIXTURE !== "1" || env.EVAL_CLI_MODE !== "fake" || !env.EVAL_ARTIFACT_SOURCE?.startsWith("dir:")) throw new BaselineFailure("FIXTURE_MODE_REQUIRED")
+        return await admitBaselineRecovery(directory, values.job, values.kind!, values.evidence, { checkout: journal.checkout, pins: manifest.pins }, env)
+      }
+      if (!values.config) throw new BaselineFailure("LIVE_CONFIGURATION_REQUIRED")
+      const config = await readPrivateBaselineJson(values.config) as NodeOpsConfig
+      return await admitBaselineRecovery(directory, values.job, values.kind!, values.evidence,
+        { checkout: config.roles.evalbaseline!.checkout, pins: await captureBaselinePins(config, env) }, env)
+    }
     if (command === "check") {
       const report = await checkBaseline(directory)
       const reportDir = await writeBaselineReport(directory, report)
@@ -371,8 +404,13 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
       if (command === "start" && journal.jobs.some(job => job.state !== "pending")) throw new BaselineFailure("USE_RESUME")
       const limit = Number(values.limit ?? manifest.jobs.length)
       if (!Number.isSafeInteger(limit) || limit < 1) throw new BaselineFailure("INVALID_LIMIT")
-      for (const job of journal.jobs.filter(job => job.state === "pending").slice(0, limit)) {
-        await dispatchBaselineJob(directory, job.key, { checkout: journal.checkout, pins: manifest.pins }, env)
+      for (const unused of Array.from({ length: Math.min(limit, manifest.jobs.length) })) {
+        const job = (await readBaseline(directory)).journal.jobs.find(job => job.state === "pending" || manifest.kind === "baseline" && !effectiveMeasurement(job)?.measured)
+        if (!job) break
+        const recovery = job.recoveries?.find(recovery => recovery.state === "admitted")
+        if (job.state !== "pending" && !recovery) throw new BaselineFailure(job.state === "running" || job.recoveries?.some(recovery => recovery.state === "running") ? "UNKNOWN_OUTCOME" : "AWAITING_RECOVERY")
+        const record = await dispatchBaselineJob(directory, job.key, { checkout: journal.checkout, pins: manifest.pins }, env, recovery?.id)
+        if (manifest.kind === "baseline" && !record.measured) throw new BaselineFailure("AWAITING_RECOVERY")
       }
       const report = await checkBaseline(directory)
       return { code: 0, status: report.status, ...report.coverage, reportDir: await writeBaselineReport(directory, report) }
@@ -441,15 +479,20 @@ async function executeLiveBaseline(directory: string, config: NodeOpsConfig, env
   await writeFile(path.join(guard, "owner.json"), JSON.stringify({ pid: process.pid, starttime: await processStarttime(process.pid), uid: process.getuid?.(), nonce: crypto.randomUUID() }), { flag: "wx", mode: 0o600 })
   try {
     if (options.resume) { await reconcileRunningBaseline(directory); await verifyBaselineStand(config, lease, directory); await settleBaselineHarness(config, lease, directory) }
-    await preflightNodeStand(config, lease, env)
-    for (const job of (await readBaseline(directory)).journal.jobs.filter(job => job.state === "pending")) {
+    if (!await Bun.file(path.join(config.runtimeRoot, "operations/stand.lease/admission-complete.json")).exists()) await preflightNodeStand(config, lease, env)
+    while (true) {
+      const job = (await readBaseline(directory)).journal.jobs.find(job => job.state === "pending" || manifest.kind === "baseline" && !effectiveMeasurement(job)?.measured)
+      if (!job) break
+      const recovery = job.recoveries?.find(recovery => recovery.state === "admitted")
+      if (job.state !== "pending" && !recovery) throw new BaselineFailure(job.state === "running" || job.recoveries?.some(recovery => recovery.state === "running") ? "UNKNOWN_OUTCOME" : "AWAITING_RECOVERY")
       await assertNodeStandOwner(config, lease)
       const current = await captureBaselinePins(config, env)
-      const record = await dispatchBaselineJob(directory, job.key, { checkout: journal.checkout, pins: current }, env)
+      const record = await dispatchBaselineJob(directory, job.key, { checkout: journal.checkout, pins: current }, env, recovery?.id)
       await verifyBaselineStand(config, lease, directory)
       await settleBaselineHarness(config, lease, directory)
       const summary = await Bun.file(path.join(record.runDir, "summary.json")).json() as RunSummary
       if (summary.interrupted || summary.stopped_reason) throw new BaselineFailure("SERIES_STOPPED_WITH_RETAINED_STAND")
+      if (manifest.kind === "baseline" && !record.measured) throw new BaselineFailure("AWAITING_RECOVERY")
     }
     if ((await checkBaseline(directory)).rows.some(row => manifest.kind === "baseline" && row.state === "recorded" && !row.measured))
       throw new BaselineFailure("AWAITING_RECOVERY")
@@ -475,13 +518,16 @@ async function writeCheckResult(directory: string) {
 
 async function reconcileRunningBaseline(directory: string) {
   const { journal } = await readBaseline(directory)
-  for (const job of journal.jobs.filter(job => job.state === "running")) {
-    const parent = path.join(directory, "measurements", job.key)
+  const running = journal.jobs.flatMap(job => [
+    ...(job.state === "running" ? [{ job, recovery: undefined }] : []),
+    ...(job.recoveries ?? []).filter(recovery => recovery.state === "running").map(recovery => ({ job, recovery }))])
+  for (const { job, recovery } of running) {
+    const parent = recovery ? path.dirname(recovery.evidencePath) : path.join(directory, "measurements", job.key)
     const child = await readPrivateBaselineJson(path.join(parent, "harness-process.json")) as { pid: number; starttime: string }
     if (await processBirthPresent(child)) throw new BaselineFailure("HARNESS_STILL_RUNNING")
     const runs = (await readdir(path.join(parent, "runs"), { withFileTypes: true })).filter(item => item.isDirectory())
     if (runs.length !== 1 || !await Bun.file(path.join(parent, "runs", runs[0]!.name, "summary.json")).exists()) throw new BaselineFailure("UNKNOWN_OUTCOME_REQUIRES_RECOVERY")
-    await recordBaselineMeasurement(directory, job.key, path.join(parent, "runs", runs[0]!.name))
+    await recordBaselineMeasurement(directory, job.key, path.join(parent, "runs", runs[0]!.name), recovery?.id)
   }
 }
 
@@ -492,19 +538,23 @@ async function settleBaselineHarness(config: NodeOpsConfig, lease: NodeStandLeas
   await verifyBaselineStand(config, lease, directory)
   const { retireRecordedHarnessLease } = await import("./lease")
   const report = await checkBaseline(directory)
-  const last = report.rows.filter(row => row.runDir).at(-1)
-  if (!last?.runDir) throw new BaselineFailure("HARNESS_ADMISSION_MISSING")
-  const result = await Bun.file(path.join(last.runDir, "summary.json")).json() as RunSummary
-  const cleanup = await Bun.file(path.join(last.runDir, result.tasks[0]!.id, "1/cleanup.json")).json()
-  await retireRecordedHarnessLease(profile, path.join(directory, "measurements", last.key, "harness-admission.json"), cleanup.processes)
+  const last = report.executions.filter(execution => execution.kind === "product").at(-1)
+  if (!last) throw new BaselineFailure("HARNESS_ADMISSION_MISSING")
+  const result = await Bun.file(path.join(last.record.runDir, "summary.json")).json() as RunSummary
+  const cleanup = await Bun.file(path.join(last.record.runDir, result.tasks[0]!.id, "1/cleanup.json")).json()
+  await retireRecordedHarnessLease(profile, path.join(path.dirname(path.dirname(last.record.runDir)), "harness-admission.json"), cleanup.processes)
 }
 
 async function readPrivateBaselineJson(file: string) {
+  return JSON.parse(new TextDecoder().decode(await readPrivateBaselineBytes(file))) as unknown
+}
+
+async function readPrivateBaselineBytes(file: string) {
   const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW)
   try {
     const info = await handle.stat()
     if (!info.isFile() || info.uid !== process.getuid?.() || info.mode & 0o077) throw new BaselineFailure("PRIVATE_FILE_REQUIRED")
-    return JSON.parse(await handle.readFile("utf8")) as unknown
+    return await handle.readFile()
   } finally { await handle.close() }
 }
 
@@ -517,10 +567,123 @@ async function processBirthPresent(owner: { pid: number; starttime: string }) {
   return await processStarttime(owner.pid).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error }) === owner.starttime
 }
 
+async function admitBaselineRecovery(directory: string, key: string, kind: string, evidence: string,
+  current: { checkout: string; pins: BaselinePins }, env: Record<string, string | undefined>) {
+  return mutateBaseline(directory, async (manifest, journal) => {
+    if (journal.release) throw new BaselineFailure("SERIES_RELEASED")
+    if (manifest.kind !== "baseline") throw new BaselineFailure("SMOKE_RECOVERY_REFUSED")
+    if (JSON.stringify(manifest.pins) !== JSON.stringify(current.pins) || journal.checkout !== current.checkout) throw new BaselineFailure("PINS_CHANGED")
+    if (!path.isAbsolute(evidence) || await realpath(evidence) !== evidence) throw new BaselineFailure("RECOVERY_PROOF_REQUIRED")
+    const proof = await readPrivateBaselineJson(evidence) as RecoveryEvidence
+    const raw = JSON.stringify(proof)
+    const id = baselineHash(raw)
+    const job = journal.jobs.find(job => job.key === key)
+    const previous = job?.recoveries?.find(recovery => recovery.id === id)
+    if (previous) return { code: 0, status: "RECOVERY_ADMITTED", recoveryId: previous.id, state: previous.state }
+    if (await lstat(path.join(directory, "executor.lock")).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error }))
+      throw new BaselineFailure("EXECUTOR_REQUIRES_INSPECTION")
+    if (journal.jobs.some(job => job.state === "running" || job.recoveries?.some(recovery => recovery.state === "running"))) throw new BaselineFailure("UNKNOWN_OUTCOME")
+    if (!job?.record || effectiveMeasurement(job)?.measured || journal.jobs.find(job => !effectiveMeasurement(job)?.measured) !== job || job.recoveries?.some(recovery => recovery.state !== "recorded"))
+      throw new BaselineFailure("RECOVERY_SLOT_INELIGIBLE")
+    const report = await checkBaseline(directory)
+    if (!report.cleanup) throw new BaselineFailure("CLEANUP_UNKNOWN")
+    const record = job.recoveries?.at(-1)?.record ?? job.record
+    const result = (await Bun.file(path.join(record.runDir, "summary.json")).json() as RunSummary).tasks[0]!.attempts[0]!
+    const item = manifest.cases.find(item => item.key === manifest.jobs.find(job => job.key === key)!.caseKey)!
+    if (record.measured || kind === "infrastructure" && !["infra_error", "harness_error"].includes(result.status) ||
+      kind === "judge" && (item.collection === "node" || !["completed", "failed", "timeout"].includes(result.status) || result.judge_status !== "error" ||
+        !result.package_path || !await Bun.file(path.join(record.runDir, item.id, "1/artifact/package.lgp")).exists())) throw new BaselineFailure("RECOVERY_SLOT_INELIGIBLE")
+    if (proof.version !== 1 || proof.baselineId !== manifest.id || proof.jobKey !== key || proof.kind !== kind || proof.executionId !== record.runId ||
+      proof.executionFilesSha256 !== baselineHash(JSON.stringify(record.files)) || typeof proof.cause !== "string" || !proof.cause.trim() ||
+      !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(proof.taskId) || !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(proof.runId) ||
+      !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(proof.fix?.id ?? "") || !proof.fix.files?.length || !proof.validation)
+      throw new BaselineFailure("RECOVERY_PROOF_REQUIRED")
+    for (const file of [...proof.fix.files, proof.validation]) {
+      if (!path.isAbsolute(file.path) || await realpath(file.path) !== file.path || !/^[0-9a-f]{64}$/.test(file.sha256)) throw new BaselineFailure("RECOVERY_PROOF_REQUIRED")
+      if (baselineHash(await readPrivateBaselineBytes(file.path)) !== file.sha256) throw new BaselineFailure("RECOVERY_PROOF_CHANGED")
+    }
+    const validation = await readPrivateBaselineJson(proof.validation.path) as { version: number; baselineId: string; jobKey: string; executionId: string;
+      pinsSha256: string; fixSha256: string; status: string; modelCalls: number; exitCode: number; command: string }
+    if (validation.version !== 1 || validation.baselineId !== manifest.id || validation.jobKey !== key || validation.executionId !== record.runId ||
+      validation.pinsSha256 !== baselineHash(JSON.stringify(manifest.pins)) || validation.fixSha256 !== baselineHash(JSON.stringify(proof.fix)) ||
+      validation.status !== "PASS" || validation.modelCalls !== 0 || validation.exitCode !== 0 || !validation.command)
+      throw new BaselineFailure("RECOVERY_VALIDATION_REQUIRED")
+    for (const previous of job.recoveries ?? []) {
+      const saved = await Bun.file(previous.evidencePath).json() as { proof: RecoveryEvidence }
+      if (saved.proof.fix.id === proof.fix.id || JSON.stringify(saved.proof.fix.files.map(file => file.sha256).sort()) === JSON.stringify(proof.fix.files.map(file => file.sha256).sort()))
+        throw new BaselineFailure("RECOVERY_FIX_ALREADY_USED")
+    }
+    const childFile = path.join(path.dirname(path.dirname(record.runDir)), "harness-process.json")
+    if (await Bun.file(childFile).exists() && await processBirthPresent(await readPrivateBaselineJson(childFile) as { pid: number; starttime: string }))
+      throw new BaselineFailure("HARNESS_STILL_RUNNING")
+    const root = path.join(directory, "measurements", key, "recoveries")
+    await mkdir(root, { recursive: true, mode: 0o700 })
+    const recoveryDir = path.join(root, id)
+    await mkdir(recoveryDir, { mode: 0o700 }).catch(() => { throw new BaselineFailure("RECOVERY_ADMISSION_UNKNOWN") })
+    const evidenceFiles: BaselineRecovery["evidenceFiles"] = []
+    for (const [index, file] of [...proof.fix.files, proof.validation].entries()) {
+      const bytes = await readPrivateBaselineBytes(file.path)
+      if (baselineHash(bytes) !== file.sha256) throw new BaselineFailure("RECOVERY_PROOF_CHANGED")
+      const target = path.join(recoveryDir, `proof-${index}.data`)
+      await writeBaselineProof(target, bytes)
+      evidenceFiles.push({ path: target, sha256: file.sha256 })
+    }
+    const live = manifest.pins.mode === "live" ? await (async () => {
+      const config = await readPrivateBaselineJson(path.join(directory, "ops-config.json")) as NodeOpsConfig
+      const lease = await readPrivateBaselineJson(path.join(directory, "stand-handle.json")) as NodeStandLease
+      const { verifyBaselineStand, preflightNodeStand } = await import("./node-eval-ops")
+      await verifyBaselineStand(config, lease, directory)
+      const receipt = await preflightNodeStand(config, lease, env, path.join(config.runtimeRoot, "operations/stand.lease", `baseline-recovery-${id}`))
+      if (JSON.stringify(await captureBaselinePins(config, env)) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
+      return { ...receipt, admissionProof: await readPrivateBaselineJson(receipt.admission), processProof: await readPrivateBaselineJson(receipt.processEvidence) }
+    })() : null
+    const evidencePath = path.join(recoveryDir, "admission.json")
+    await writeBaselineProof(evidencePath, JSON.stringify({ proof, validation, live }))
+    const recovery: BaselineRecovery = { id, kind: proof.kind, state: "admitted", sourceExecutionId: record.runId, evidencePath,
+      evidenceSha256: baselineHash(await Bun.file(evidencePath).bytes()), evidenceFiles, cause: proof.cause, taskId: proof.taskId, runId: proof.runId }
+    job.recoveries = [...job.recoveries ?? [], recovery]
+    await atomicJournal(directory, journal)
+    return { code: 0, status: "RECOVERY_ADMITTED", recoveryId: id, state: recovery.state }
+  })
+}
 
-async function dispatchBaselineJob(directory: string, key: string, current: { checkout: string; pins: BaselinePins }, env: Record<string, string | undefined>) {
+async function writeBaselineProof(file: string, raw: string | Uint8Array) {
+  const handle = await open(file, "wx", 0o400)
+  try { await handle.writeFile(raw); await handle.sync() } finally { await handle.close() }
+  const parent = await open(path.dirname(file), constants.O_RDONLY | constants.O_DIRECTORY)
+  try { await parent.sync() } finally { await parent.close() }
+}
+
+function effectiveMeasurement(job: BaselineJournal["jobs"][number]) {
+  const records = [job.record, ...(job.recoveries ?? []).map(recovery => recovery.record)].filter((record): record is RecordedRun => Boolean(record))
+  return records.find(record => record.measured) ?? records.at(-1)
+}
+
+async function beginBaselineRecovery(directory: string, key: string, id: string, current: { checkout: string; pins: BaselinePins }) {
+  return mutateBaseline(directory, async (manifest, journal) => {
+    if (journal.release) throw new BaselineFailure("SERIES_RELEASED")
+    if (JSON.stringify(current.pins) !== JSON.stringify(manifest.pins) || current.checkout !== journal.checkout) throw new BaselineFailure("PINS_CHANGED")
+    for (const item of manifest.cases) if (JSON.stringify(await snapshotDirectory(path.join(current.checkout, "evals", item.directory))) !== JSON.stringify(item.files))
+      throw new BaselineFailure("CORPUS_CHANGED")
+    const job = journal.jobs.find(job => job.key === key)
+    const recovery = job?.recoveries?.find(recovery => recovery.id === id)
+    if (!job || !recovery || recovery.state !== "admitted" || effectiveMeasurement(job)?.measured ||
+      journal.jobs.find(job => !effectiveMeasurement(job)?.measured) !== job) throw new BaselineFailure("RECOVERY_SLOT_INELIGIBLE")
+    const report = await checkBaseline(directory)
+    if (report.coverage.unknown || !report.cleanup) throw new BaselineFailure("CLEANUP_UNKNOWN")
+    if (recovery.kind === "judge") throw new BaselineFailure("JUDGE_RECOVERY_NOT_READY")
+    const resultsDir = path.join(path.dirname(recovery.evidencePath), "runs")
+    await mkdir(resultsDir, { mode: 0o700 })
+    recovery.state = "running"
+    await atomicJournal(directory, journal)
+    const expected = manifest.jobs.find(job => job.key === key)!
+    return { resultsDir, job: expected, case: manifest.cases.find(item => item.key === expected.caseKey)! }
+  })
+}
+
+async function dispatchBaselineJob(directory: string, key: string, current: { checkout: string; pins: BaselinePins }, env: Record<string, string | undefined>, recoveryId?: string) {
   const { manifest } = await readBaseline(directory)
-  const admitted = await beginBaselineMeasurement(directory, key, current)
+  const admitted = recoveryId ? await beginBaselineRecovery(directory, key, recoveryId, current) : await beginBaselineMeasurement(directory, key, current)
   const parent = path.dirname(admitted.resultsDir)
   const script = admitted.case.collection === "node" ? "script/run-node-evals.ts" : "src/run.ts"
   const argv = [process.execPath, path.join(current.checkout, "evals", script), "--tasks", path.join(current.checkout, "evals", path.dirname(admitted.case.directory)),
@@ -537,7 +700,7 @@ async function dispatchBaselineJob(directory: string, key: string, current: { ch
   finally { process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop) }
   const runs = (await readdir(admitted.resultsDir, { withFileTypes: true })).filter(item => item.isDirectory())
   if (runs.length !== 1) throw new BaselineFailure("UNKNOWN_OUTCOME")
-  const record = await recordBaselineMeasurement(directory, key, path.join(admitted.resultsDir, runs[0]!.name))
+  const record = await recordBaselineMeasurement(directory, key, path.join(admitted.resultsDir, runs[0]!.name), recoveryId)
   if (!record.cleanup) throw new BaselineFailure("CLEANUP_UNKNOWN")
   return record
 }
@@ -620,11 +783,12 @@ async function exportBaselineReport(directory: string, reportDir: string, report
     ...(await readdir(reportDir)).filter(name => ["baseline.json", "report.md", "compare-regular.md", "compare-analytic.md", "compare-node.json"].includes(name))
       .map(name => ({ source: path.join(reportDir, name), target: name })),
   ]
-  for (const row of report.rows.filter(row => row.runDir)) {
-    for (const item of await snapshotDirectory(row.runDir!)) {
+  for (const execution of report.executions) {
+    const recovery = report.recoveries.find(recovery => recovery.record?.runDir === execution.record.runDir)
+    for (const item of execution.record.files) {
       if (!/^(summary\.json|config\.json|report\.md|code-verdict\.json|code-report\.md)$/.test(item.path) &&
         !/^[^/]+\/1\/(?:infra-error\/)?(?:verdict(?:\.prev)?\.json|oracle\.json|artifact\/package\.lgp|artifact\/results\/[^/]+\.csv)$/.test(item.path)) continue
-      selected.push({ source: path.join(row.runDir!, item.path), target: `measurements/${row.key}/${item.path}` })
+      selected.push({ source: path.join(execution.record.runDir, item.path), target: `measurements/${execution.key}${recovery ? `/recoveries/${recovery.id}` : ""}/${item.path}` })
     }
   }
   for (const item of selected) {
