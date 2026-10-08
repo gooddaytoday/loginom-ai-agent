@@ -133,6 +133,7 @@ export async function prepareBaseline(directory: string, options: { checkout: st
 /** Durable admission precedes dispatch. A running row is never interpreted as permission to retry. */
 export async function beginBaselineMeasurement(directory: string, key: string, current: { checkout: string; pins: BaselinePins }) {
   return mutateBaseline(directory, async (manifest, journal) => {
+    if (journal.release) throw new BaselineFailure("SERIES_RELEASED")
     if (JSON.stringify(manifest.pins) !== JSON.stringify(current.pins) || journal.checkout !== current.checkout) throw new BaselineFailure("PINS_CHANGED")
     for (const item of manifest.cases) if (JSON.stringify(await snapshotDirectory(path.join(current.checkout, "evals", item.directory))) !== JSON.stringify(item.files))
       throw new BaselineFailure("CORPUS_CHANGED")
@@ -140,6 +141,7 @@ export async function beginBaselineMeasurement(directory: string, key: string, c
     if (!job) throw new BaselineFailure("UNKNOWN_JOB")
     if (job.state !== "pending") throw new BaselineFailure("ALREADY_DISPATCHED")
     if (journal.jobs.some(item => item.state === "running")) throw new BaselineFailure("UNKNOWN_OUTCOME")
+    if (manifest.kind === "baseline" && journal.jobs.some(item => item.record && !item.record.measured)) throw new BaselineFailure("AWAITING_RECOVERY")
     if (journal.jobs.find(item => item.state === "pending") !== job) throw new BaselineFailure("ROUND_ORDER_CHANGED")
     if (manifest.kind === "smoke" && manifest.pins.mode === "live") {
       await admitBaselineSmoke(directory, await readPrivateBaselineJson(path.join(directory, "ops-config.json")) as NodeOpsConfig,
@@ -325,6 +327,7 @@ async function checkSmokeOracle(artifact: string, expected: string) {
 
 export async function sealBaselineRelease(directory: string, receipt: BaselineRelease) {
   return mutateBaseline(directory, async (manifest, journal) => {
+    if (manifest.kind === "baseline" && journal.jobs.some(job => job.record && !job.record.measured)) throw new BaselineFailure("AWAITING_RECOVERY")
     if (receipt.status !== "RELEASED" || !/^[0-9a-f]{64}$/.test(receipt.evidenceSha256) ||
       journal.jobs.some(job => job.state === "running" || job.record && !job.record.cleanup)) throw new BaselineFailure("RELEASE_UNCONFIRMED")
     if (manifest.pins.mode === "live") {
@@ -388,7 +391,10 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
     }
     return await executeLiveBaseline(directory, config, env, pins, { issue: typeof values.issue === "string" ? values.issue : undefined,
       task: typeof values.task === "string" ? values.task : undefined, resume: command === "resume", recoverExecutor: values["recover-executor"] === true })
-  } catch (error) { return { code: 2, status: "BLOCKED", reason: error instanceof BaselineFailure ? error.message : "BASELINE_OPERATION_FAILED" } }
+  } catch (error) {
+    const reason = error instanceof BaselineFailure ? error.message : "BASELINE_OPERATION_FAILED"
+    return { code: 2, status: reason === "AWAITING_RECOVERY" ? "AWAITING_RECOVERY" : "BLOCKED", reason }
+  }
 }
 
 async function executeLiveBaseline(directory: string, config: NodeOpsConfig, env: Record<string, string | undefined>, pins: BaselinePins,
@@ -445,6 +451,8 @@ async function executeLiveBaseline(directory: string, config: NodeOpsConfig, env
       const summary = await Bun.file(path.join(record.runDir, "summary.json")).json() as RunSummary
       if (summary.interrupted || summary.stopped_reason) throw new BaselineFailure("SERIES_STOPPED_WITH_RETAINED_STAND")
     }
+    if ((await checkBaseline(directory)).rows.some(row => manifest.kind === "baseline" && row.state === "recorded" && !row.measured))
+      throw new BaselineFailure("AWAITING_RECOVERY")
     const completion = path.join(directory, `stand-completion-${crypto.randomUUID()}.json`)
     await writeFile(completion, JSON.stringify({ version: 1, owner: { issue: lease.issue, task: lease.task, role: lease.role, phase: lease.phase, sha: lease.sha },
       acquiredAt: lease.acquiredAt, kind: "baseline", seriesDir: directory, runSha: pins.harnessSha }), { flag: "wx", mode: 0o600 })

@@ -285,6 +285,9 @@ test("all 144 fixture measurements retain separate quality axes and become compl
     await sealBaselineRelease(series, { status: "RELEASED", evidenceSha256: "5".repeat(64) })
     const after = await checkBaseline(series)
     expect(after.status).toBe("complete")
+    const releasedJournal = await Bun.file(path.join(series, "journal.json")).text()
+    await expect(beginBaselineMeasurement(series, manifest.jobs[0]!.key, { checkout: repoRoot, pins: baselineFixturePins })).rejects.toThrow("SERIES_RELEASED")
+    expect(await Bun.file(path.join(series, "journal.json")).text()).toBe(releasedJournal)
     expect(after.nodes).toHaveLength(10)
     expect(after.nodes.every(item => item.measured === 3 && item.passed === 0)).toBe(true)
     expect(after.groups.regular?.metrics.total).toBe(9)
@@ -380,12 +383,13 @@ test("a recorded product failure is retained while an unknown dispatch or pin dr
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
-test("judge and infrastructure errors stay incomplete and their retry expenditure remains visible", async () => {
+test("judge and infrastructure errors retain retry expenditure and stop admission of the next slot", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-errors-"))
   try {
-    const series = path.join(directory, "series")
-    const manifest = await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins })
-    for (const [index, job] of manifest.jobs.slice(0, 2).entries()) {
+    for (const [index, kind] of ["judge", "infrastructure"].entries()) {
+      const series = path.join(directory, kind)
+      const manifest = await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins })
+      const job = manifest.jobs[0]!
       const admitted = await beginBaselineMeasurement(series, job.key, { checkout: repoRoot, pins: baselineFixturePins })
       const run = path.join(admitted.resultsDir, "fixture")
       const initial = { task_id: admitted.case.id, attempt: 1, status: "infra_error", judge_status: "skipped", pass: null, score: null,
@@ -396,11 +400,19 @@ test("judge and infrastructure errors stay incomplete and their retry expenditur
         stages: ["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].map(stage => ({ stage, status: "confirmed" })) }))
       await recordBaselineMeasurement(series, job.key, run)
       await expect(beginBaselineMeasurement(series, job.key, { checkout: repoRoot, pins: baselineFixturePins })).rejects.toThrow("ALREADY_DISPATCHED")
+      const before = await Bun.file(path.join(series, "journal.json")).text()
+      await expect(beginBaselineMeasurement(series, manifest.jobs[1]!.key, { checkout: repoRoot, pins: baselineFixturePins })).rejects.toThrow("AWAITING_RECOVERY")
+      expect(await Bun.file(path.join(series, "journal.json")).text()).toBe(before)
+      const report = await checkBaseline(series)
+      expect(report.coverage).toMatchObject({ measured: 0, recorded: 1, pending: 143, unknown: 0 })
+      expect(report.status).toBe("incomplete")
+      expect(report.released).toBe(false)
+      expect(report.spending).toMatchObject({ duration_ms: 20, cost: 0.02, tokens: { input: 4, output: 2, reasoning: 0 } })
+      expect(report.infrastructure).toHaveLength(2)
+      await expect(sealBaselineRelease(series, { status: "RELEASED", evidenceSha256: "5".repeat(64) })).rejects.toThrow("AWAITING_RECOVERY")
+      expect(await runBaseline(["resume", "--series", series], { EVAL_BASELINE_FIXTURE: "1", EVAL_CLI_MODE: "fake", EVAL_ARTIFACT_SOURCE: "dir:/fixture" }))
+        .toMatchObject({ code: 2, status: "AWAITING_RECOVERY", reason: "AWAITING_RECOVERY" })
+      expect(await Bun.file(path.join(series, "journal.json")).text()).toBe(before)
     }
-    const report = await checkBaseline(series)
-    expect(report.coverage.measured).toBe(0)
-    expect(report.status).toBe("incomplete")
-    expect(report.spending).toMatchObject({ duration_ms: 40, cost: 0.04, tokens: { input: 8, output: 4, reasoning: 0 } })
-    expect(report.infrastructure).toHaveLength(4)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
