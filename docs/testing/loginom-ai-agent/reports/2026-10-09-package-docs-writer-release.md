@@ -209,3 +209,23 @@ Snapshot `ab-local-stand-20261008/formal-v7-progress-7-20261009.json` закре
 7 terminal результатов:4 PASS/3 FAIL, все7 environment/process cleanup
 confirmed. Это не подтверждает semantic recovery неуспешных ABC/cohort.
 Baseline81639 остаётся live; candidate formal, formal cold и compare не начаты.
+
+## Formal v7: восьмая попытка
+
+Low-liquidity-companies#1:no_artifact/score0/pass=false/oracle=false,
+judge_status=no_artifact, infra_retry отсутствует. Environment/process cleanup
+confirmed, все шесть cleanup stages confirmed. В23 уникальных tool calls
+семь terminal errors: первый filter request отклонён как Unsupported node label
+без possible effect; далее sort output_mapping AMBIGUOUS/NODE_APPLY_STOPPED,
+effect_possible=true/cleanup_complete=false. Wait/cancel сохраняют
+неопределённость; resume требует исходный checkpoint без unresolved phase.
+Recover/inspect не подтверждают разрешение pending outcome. Точная native
+причина и stable/flaky UNKNOWN; предположение о прежнем geometry отказе
+не выдаётся за доказательство текущего случая.
+
+Raw result/events/cleanup сохранены; отдельный readonly observations receipt
+`formal-v7-low-liquidity-attempt1-observations-20261009/review.json` содержит SHA.
+History4487entries/15698877archive bytes и diagnostics3entries/4065431bytes
+сохранены с full roundtrip. Cold без package не заявлен, ручных повторов0.
+Snapshot `formal-v7-progress-8-20261009.json`:8 terminal,4 PASS/4 FAIL.
+Baseline81639 подтверждён live; candidate formal и compare пока не запускались.
