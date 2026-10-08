@@ -276,7 +276,7 @@ receipts до удаления собственного контейнера, н
 Четыре последовательных TDD-цикла сохранены; общий suite **92 PASS, 0 FAIL,
 798 assertions**, typecheck PASS. Проверка настоящим pinned Node24.19.0 и
 поставленным producer журнала подтвердила сохранение bytes и redaction.
-Evidence с manifest: `skills-journals-20261008`. Live-интеграция коллектора ещё
+Evidence с manifest: `skills-journals-20261008`. Live-интеграция коллектора
 принята для Desktop3; CLI wiring ещё не принято. Старый internal step попытки2
 не восстановлен. В третьем цикле
 исходный FAIL порядка `readdir` сохранён, assertion исправлен сортировкой.
@@ -355,8 +355,8 @@ Reader сохраняет `prepared.json` и исходный FAIL/error; readon
 cold PASS. RED на прежнем cleanup, GREEN на новом live negative receipt;
 `cold-49-desktop-readonly-guard-20261008` сохраняет оба и manifest.
 Итоговый suite **93 PASS, 0 FAIL, 801 assertions**, typecheck PASS.
-Product/runtime не менялись. Writer owner и cold всех трёх Desktop пакетов
-остаются открытыми; остальные cold-попытки после отказа не запускались.
+Product/runtime не менялись. Исходный writer owner не установлен;
+первоначальный readonly FAIL остаётся сохранённым отдельно.
 
 Configured native CLI49 scope теперь **PASS**:
 `cli-49b1584f2-scope-restart-native-v3`. Реальный public setup в собственном
@@ -376,3 +376,29 @@ candidate `13896844e3ec3c3620d3c082aea2d426c3c64ac0ca10fb86da8bf931c06024f7`.
 Исходные baseline manifest/archive совпали с закреплёнными SHA этапа0;
 оба `sourceDirty=false`. Это static gate, без model/Help/Loginom вызовов,
 не принятая A/B пара; перед живой приёмкой условия повторно сверяются.
+
+## Desktop49: независимое cold-выполнение трёх пакетов
+
+После readonly отказа собственный сохранённый cold browser-profile был
+скопирован в новый приватный каталог для чтения состояния ровно нашего
+пакета №1. В `desktop49-own-cold-session-lock-observe-v2-20261008` native
+`ReadOnly=false`; никаких узлов не выполняли. Собственный view закрыт,
+logout/remaining0 подтверждены. Причина снятия прежней блокировки и owner
+не установлены; чужие сессии, настройки сервера и lock-файлы не менялись.
+Первый диагностический контроллер с неверным Node path сохранён как FAIL
+до запуска браузера; корректный использовал Node из Desktop49 resources.
+
+`cold-49-desktop-scenario-create-v2-20261008`: **3/3 независимых cold PASS**,
+каждый в свежей browser/session с проверенными Desktop49 resources и
+установленным seed image. Фактический native execution completed/owner_verified;
+выход ровно Alpha=35/Beta=20, `settingsReapplied=false`. SHA256 package и
+исходного CSV совпали до/после. В каждом прогоне native close/logout SUCCEEDED,
+remaining0 и container removed; model/judge/Help calls0. Контроллер, receipts
+и review сохранены, 4901 файл; manifest
+`0714c4ad548e264e6c91f90ef72259efa7b7d1e25ad3ffd33f2327b32787f851`.
+
+Вместе с тремя warm-построениями это закрывает отдельный Desktop
+`scenario-create` gate сборки `49b1584f23b4aa47e18b26119389d6f45623fc94`.
+Это не приёмка остальных пяти сценарных/многоходовых кейсов, CLI case,
+lifecycle/independence или аналитической A/B пары. Все первоначальные readonly
+и диагностические FAIL сохранены; warm server close/logout этим не доказаны.
