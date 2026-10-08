@@ -322,6 +322,53 @@ test.skipIf(!dockerAvailable || browserBusy)("writer-release settlement binds im
   } finally { await f.dispose() }
 }, 30_000)
 
+test.skipIf(!dockerAvailable || browserBusy)("baseline writer settlements preserve separate executions without resetting the same source", async () => {
+  const f = await stand()
+  try {
+    const baseline = { checkout: path.join(f.config.runtimeRoot, "checkouts/baseline"), evalProfile: path.join(f.config.runtimeRoot, "roles/baseline/eval"),
+      workRoots: [path.join(f.config.runtimeRoot, "roles/baseline/work")], resultsRoot: path.join(f.config.runtimeRoot, "roles/baseline/results"), cliBin: f.config.cliBin }
+    for (const directory of [baseline.checkout, baseline.evalProfile, ...baseline.workRoots, baseline.resultsRoot]) await mkdir(directory, { recursive: true, mode: 0o700 })
+    await copyFile(process.execPath, f.config.cliBin); await chmod(f.config.cliBin, 0o755)
+    const config: NodeOpsConfig = { ...f.config, version: 2, roles: { ...f.config.roles, evalbaseline: baseline } }
+    const identity = { ...owner, role: "evalbaseline" as const }
+    const lease = await acquireNodeStand(config, identity)
+    const admission = path.join(config.runtimeRoot, "operations/stand.lease/admission.json")
+    await Bun.write(admission, JSON.stringify({ owner: identity, acquiredAt: lease.acquiredAt, containerId: lease.containerId,
+      configSha256: lease.configSha256, profiles: [...Object.values(f.config.roles).flatMap(role => [role.referenceProfile, role.evalProfile]), baseline.evalProfile] }))
+    await chmod(admission, 0o600)
+    const directory = path.join(baseline.evalProfile, "loginom/runtime/generations/1/chats/fixture/attempts/one")
+    await mkdir(directory, { recursive: true })
+    const originals: { source: string; proof: string; bytes: string }[] = []
+    for (const index of [1, 2]) {
+      await Bun.write(path.join(baseline.evalProfile, ".writer/owner"), `fixture-owner-${index}`)
+      const writer = await stat(path.join(baseline.evalProfile, ".writer"))
+      const run = await superviseProcess({ cmd: [config.cliBin, "-e", "await Bun.sleep(100)"], cwd: baseline.checkout,
+        env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000 })
+      const processes = { ...run.processCleanup, status: "failed", error: "Writer owner unavailable", runtimeDirectories: [directory],
+        writer: { device: writer.dev, inode: writer.ino, owner: `fixture-owner-${index}` } }
+      await rm(path.join(baseline.evalProfile, ".writer"), { recursive: true })
+      const source = path.join(baseline.resultsRoot, `attempt-${index}/cleanup.json`)
+      await Bun.write(source, JSON.stringify({ processes, result: { status: "failed", error: processes.error } }))
+      await Bun.write(path.join(path.dirname(source), "result.json"), JSON.stringify({ status: "completed", session_id: `fixture-${index}`,
+        package_path: `/user/fixture-${index}.lgp`, environment_cleanup: { status: "failed", error: processes.error } }))
+      const proof = path.join(baseline.workRoots[0]!, `settlement-${index}.json`)
+      const bytes = await Bun.file(source).text()
+      expect(await settleNodeWriterRelease(config, lease, `incident-${index}`, "eval", "followup", source, proof)).toMatchObject({ status: "PROCESS_SETTLED" })
+      originals.push({ source, proof, bytes })
+      const recovery = path.join(baseline.workRoots[0]!, `recovery-${index}.json`)
+      await Bun.write(recovery, JSON.stringify({ version: 1, owner: identity, acquiredAt: lease.acquiredAt, profile: "eval", processEvidence: proof }))
+      // A valid settlement reaches the next admission gate; it cannot authorize a cleanup without its baseline execution.
+      await expect(recoverNodeStand(config, lease, `incident-${index}`, recovery, {})).rejects.toThrow("BASELINE_EXECUTION_UNKNOWN")
+    }
+    for (const original of originals) {
+      expect(await Bun.file(original.source).text()).toBe(original.bytes)
+      await expect(settleNodeWriterRelease(config, lease, "renamed-incident", "eval", "followup", original.source, original.proof + ".again"))
+        .rejects.toThrow("SETTLEMENT_ALREADY_RECORDED")
+    }
+    expect((await nodeStandStatus(config)).status).toBe("BUSY")
+  } finally { await f.dispose() }
+}, 30_000)
+
 test.skipIf(!dockerAvailable || browserBusy)("fixed unit commands produce process proof and release only after actual profile and storage checks", async () => {
   const fixture = await stand()
   try {

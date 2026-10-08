@@ -301,8 +301,9 @@ export async function settleNodeWriterRelease(config: NodeOpsConfig, lease: Node
     await evidencePath(config, lease, original)
     if (!path.isAbsolute(receipt) || !nodeRole(config, lease.role).workRoots.some(root => inside(receipt, root)) ||
       await realpath(path.dirname(receipt)) !== path.dirname(receipt)) throw new NodeOpsFailure("RECEIPT_PATH_REFUSED")
-    if (await Bun.file(path.join(directory(config), "writer-release-settlement.json")).exists()) throw new NodeOpsFailure("SETTLEMENT_ALREADY_RECORDED")
     const bytes = await readFile(original)
+    const marker = writerSettlementMarker(config, lease, baselineHash(bytes))
+    if (await Bun.file(marker).exists()) throw new NodeOpsFailure("SETTLEMENT_ALREADY_RECORDED")
     const proof = JSON.parse(bytes.toString()) as { processes: ProcessCleanup; result?: { status: string; error: string } }
     if (proof.result?.status !== "failed" || proof.result.error !== "Writer owner unavailable") throw new NodeOpsFailure("SETTLEMENT_SOURCE_INELIGIBLE")
     const cli = await stat(nodeRoleCli(config, lease.role))
@@ -326,18 +327,24 @@ export async function settleNodeWriterRelease(config: NodeOpsConfig, lease: Node
       processes: await observeWriterReleaseSettlement(profile, proof.processes, lease.acquiredAt) }
     if (await digest(original) !== settlement.original.sha256) throw new NodeOpsFailure("SETTLEMENT_SOURCE_CHANGED")
     await writeFile(receipt, JSON.stringify(settlement, null, 2), { flag: "wx", mode: 0o600 })
-    await writeFile(path.join(directory(config), "writer-release-settlement.json"), JSON.stringify({ version: 1,
+    await writeFile(marker, JSON.stringify({ version: 1,
       owner: ownerOf(lease), acquiredAt: lease.acquiredAt, incident, profile: profileName, evidence: receipt,
       evidenceSha256: await digest(receipt), original: settlement.original }), { flag: "wx", mode: 0o600 })
     return { status: "PROCESS_SETTLED", incident, evidence: receipt, originalSha256: settlement.original.sha256, leaseRetained: true }
   })
 }
 
+function writerSettlementMarker(config: NodeOpsConfig, lease: NodeStandLease, sourceSha: string) {
+  if (!/^[0-9a-f]{64}$/.test(sourceSha)) throw new NodeOpsFailure("SETTLEMENT_PROOF_UNKNOWN")
+  // Baseline keeps one lease across different executions; copies of the same source share a marker.
+  return path.join(directory(config), lease.role === "evalbaseline" ? `writer-release-settlement-${sourceSha}.json` : "writer-release-settlement.json")
+}
+
 async function verifyWriterReleaseSettlement(config: NodeOpsConfig, lease: NodeStandLease, proof: WriterReleaseSettlement,
   evidence: string, incident?: string) {
   if (proof.processes.observation_mode !== "writer_release_settlement") return undefined
-  const recorded = await readPrivateJson(path.join(directory(config), proof.operation === "LAB-31-owned-registration-v1" ?
-    "owned-registration-settlement-attestation.json" : "writer-release-settlement.json"))
+  const recorded = await readPrivateJson(proof.operation === "LAB-31-owned-registration-v1" ?
+    path.join(directory(config), "owned-registration-settlement-attestation.json") : writerSettlementMarker(config, lease, proof.original?.sha256))
     .catch(() => { throw new NodeOpsFailure("SETTLEMENT_PROOF_UNKNOWN") }) as
     { owner: NodeStandOwner; acquiredAt: string; incident: string; profile: string; evidence: string; evidenceSha256: string; original: WriterReleaseSettlement["original"] }
   if (proof.version !== 1 || !ownerMatches(proof.owner, lease) || proof.acquiredAt !== lease.acquiredAt ||
