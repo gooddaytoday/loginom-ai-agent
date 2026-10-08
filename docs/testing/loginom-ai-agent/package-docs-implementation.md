@@ -9,7 +9,10 @@
 
 Это направление владеет skills, Desktop, CLI, runtime и своими тестовыми
 адаптерами. Соседняя сессия `01a10fce-57bf-7093-bd1d-f2bae8c99772` владеет
-harness, near-miss корпусом, общим промптом судьи и их документацией.
+near-miss корпусом, общим промптом судьи и документацией калибровки.
+2026-10-08 пользователь отдельно поручил основной сессии совместимость
+harness с product skills в собственном worktree `skills-harness`; границы
+задачи и исходный SHA записаны в `package-docs-evals-handoff.md`.
 Её worktree `calibration-near-miss`, ветка, незавершённые изменения, `.env`,
 профили, результаты, launcher и блокировки не изменяются.
 
@@ -4315,6 +4318,65 @@ Read-only evals остаётся на `cd592244485cb892a0c1f13fd7b60dcbbf7f32ca`
 harness и стенд не менялись. Help health2026-10-07T20:05Z: proxy TLS EOF/35,
 direct refused/7, HTTP000. Живые прогоны не начаты при известном отказе Help.
 
+## Harness compatibility — 2026-10-08
+
+По прямому назначению пользователя основная сессия реализовала отдельную
+совместимость в own `skills-harness` от свежего evals `db8c1b93e`.
+Clean code `9d7b463c48e4bfb0d55e87fd108400617afa9da3`: 460 PASS/2 SKIP,
+2017 assertions, typecheck PASS. Для будущей пары создан отдельный frozen
+`skills-evals` на том же полном SHA. Проверены 658 файлов manifest,
+643 исходных защищённых файла неизменны; judge/near-miss/tasks/изоляция
+сохранены. Полный corpus guard frozen worktree: 35 tasks/113 mutations PASS.
+
+Preflight не требует Skills API, но сохраняет health и остальные guards.
+Фактические applied automation grant/source/revision и разные причины
+отсутствия пакета сохраняются в результатах, включая initial infra retry.
+Lazy infra ограничен prepare connection allowlist и независимым HTTP
+5xx/transport evidence; dry-run не делает probes, один retry сохранён.
+Первый mutable-source test run несопоставим; последующий frozen run обнаружил
+реальную dry-run регрессию, RED3/3 → guard → GREEN/полный suite. Все логи
+и отказы сохранены. [Подробная приёмка](reports/2026-10-08-package-docs-harness.md).
+
+Сверка после разработки: `evals` продвинулся до `b31ebe7d0bf5cd2cb1116ccdb90df65cd8578c2c`.
+Его девять изменений относятся к node-eval skill/test/docs; `evals/src`,
+analytic-задачи, corpus, judge и lockfile совпадают с базой разработанного
+harness. Эти коммиты не подменяют закреплённый SHA пары автоматически.
+Принятый источник agent-validation `d5fb8031356ecf17a08c73f5d15a0b2df52af8b6`
+извлечён через git archive в собственный каталог: все 280 файлов 35 задач
+совпадают с frozen harness; отдельно отличается README, это отражено в manifest.
+
+CLI669 установлен в own offline image
+`sha256:2a24f8bc26b75945f7f87fd9baa1772a2539bf15a4081c0d8ea588128d6fdf46`:
+5651 files/hash/mode, manifest bytes, version0.1.17, UID1200 и sandbox
+root:root4755 PASS, profile отсутствует. Исходные controller/probe failures
+сохранены; неверный путь sandbox и следование symlink в probe исправлены
+без изменения payload/installer. Первый live docs-PDF запуск был отклонён
+automatic approval review: ошибочно предполагался чувствительный входной PDF.
+Все пять XML отслеживаемого synthetic nested.lgp просмотрены, вход не содержит
+пользовательских данных/секретов; PDF — результат. Повторная оценка разрешила
+тот же согласованный запуск. Live CLI669 PDF ×3 на6.1-sol/medium завершён:
+mechanics/facts3/3 PASS, layout2/3 PASS; все8 страниц просмотрены. Attempt3
+оставил заголовок модуля на странице1, описание началось на странице2 — FAIL
+сохранён, не принят по качеству. Input unchanged/Chromium0/remaining0/container0.
+Authenticated Help ready/find/read3/3 при web login failed; независимость Help
+от Loginom подтверждена этими конкретными CLI-кейсами. Новые live669 остановлены;
+heading-chain regression fixture/test и минимальная source-правка завершены
+через TDD: refined RED на прежнем renderer → GREEN, весь docs57 PASS/678,
+typecheck PASS, Node24.19/PATHnone emit и визуальная source QA3 pages PASS.
+Первый source full внутри exec sandbox:17 исходных Node child EOF и одна
+неоднозначная regression selector ошибка. Collector3/3 воспроизвёл EOF на
+Node sentinel без продукта; require_escalated sentinel/builder PASS, исходники
+не менялись. Полный suite57 PASS выполнен вне sandbox, ограничения pipes
+не скрыты правкой tests. Нужен новый чистый candidate и повторные installed/live
+gates. [Факты, вёрстка и TDD](reports/2026-10-08-package-docs-live.md).
+
+Актуальные границы пользователя: обязательны этапы0–8; A/B 12–15 заранее
+выбранных задач ×3 ×2, судья/структура/cold replay, 72–90 попыток. Полный35
+и этап9 отложены вне текущей цели; серверный skill сохраняется. Нет SSH-доступа
+к выделенному stand; исходные local server/client не переключались. В35 задачах
+нет явного требования подмодели, фактические reference не содержат такого узла;
+уточнение отдельного контроля запрошено. Ожидание не останавливает product QA.
+
 ## Checkpoint
 
 - Clean 2530143dd/OpenAI6.1 medium: negative missing/no-input/server ×3 Desktop/CLI 18/18 mechanics/semantics PASS, Chromium0/reports0/remaining0; c50d formats и routing относятся только к прежней сборке. Отчёт `reports/2026-10-07-package-docs-openai-resume.md`.
@@ -4336,4 +4398,4 @@ direct refused/7, HTTP000. Живые прогоны не начаты при и
 - CLI `.lgp`: 94 PASS / 1 SKIP; TUI83 diagnostics/command/damage PASS, suite198 PASS/1 SKIP. Installed669 PTY6/6/PDF4 pages QA PASS, input unchanged/writer/Chromium/processes0; cold new-user resume resets docs→default, historical grant preserved, native PASS.
 - CLI installer C8 RED 3/3: chown сбрасывал setuid; fix/Host 226 PASS / 6 SKIP; C6 native installer/status/browser/uninstall PASS.
 - Installed DEB85/GUI2aa permissions/damage PASS; Desktop67 crash logging6 PASS/typecheck. Desktop669 clean HOME/workspace/PATHnone catalog/digests/integrity PASS, container/processes0; installed clean-discovery и permanent-rules подпункты8 закрыты, full live/lifecycle/evals открыты.
-- RESUMED: SUM bc6→cold6693/3 PASS; collector1 сохранён/recovered без retry. Offline Desktop+CLI upgrade669 PASS/settings/auth fixture/user skill/history/default, cold resume и busy3 PASS, containers/processes0; driver EOF RED3/3/GREEN3/3, исходные FAIL сохранены. Permanent rules/runbooks обновлены. Own clients/containers0, исходный test stand running/always. Next: восстановить Help, назначить владельца harness compatibility, закрепить свежий SHA/чистый стенд; full live/lifecycle/independence/A-B открыты.
+- RESUMED 2026-10-08: harness clean9d7b463c4/frozen skills-evals,460 PASS/2 SKIP/typecheck/corpus35/113;643 protected unchanged/latest b31 node-only checked. CLI669 seed5651 PASS; PDF3 mechanics/facts/Help PASS, layout2/3 FAIL, all8 pages/cleanup0; no new live669. Heading RED→source57 PASS/678/typecheck/Node/PDF3 pages QA PASS; sandbox child EOF3/3 diagnosed, native full PASS. Need new candidate/build/gates. SSH stand/подмодель coverage pending; original server/client untouched. A/B72–90 needs freeze12–15; stage9/full35 deferred/server skill retained. Next: commit/build/QA and selection/stand; full gates open.
