@@ -630,3 +630,26 @@ Cold ещё не выполнен. Закрытая история сохран�
 4607 entries, archive17265821 bytes, restore argv в preservation receipt.
 Все6 исходных result/events/диагностика сохранены; серия остаётся живой,
 4 PASS и2 no_artifact из первых6 не подменяют45/90 или compare.
+
+## Formal baseline: седьмая попытка — обязательный checklist FAIL
+
+`first-last-touch#1`: CLI0/completed/497.947s, judge89/scored, oracle PASS,
+но **harness pass=false**. Обязательный `two-aggregates` не пройден:
+по обеим атрибуциям суммы/числа посчитаны, но в графе нет правила исключения
+канала `None`. Отсутствие такого канала в текущем CSV не доказывает настройку
+правила. Judge evidence привязан к actual saved XML и links; required=true
+подтверждён закреплённым task.json. Порог70 не отменяет mandatory checklist.
+
+Cleanup confirmed/no cleanup_error. Reviewer v5 подтвердил структуру0 и
+warm oracle PASS в `ab-formal-v5-base-reviews-20261008-first-last-touch-1`;
+его receipt сохраняет harnessPass=false. Отдельный отказ с hashes/criteria:
+`ab-formal-v5-base-first-last-critical-failure-20261008/review.json`.
+Saved artifact остаётся обязательным для cold replay, который ещё не выполнен;
+oracle/структура и наличие пакета не подменяют полный analytic PASS.
+
+Закрытая история сохранена с guards/full roundtrip4636 entries,
+archive17171265 bytes/restore receipt. Рубрика/набор задач не менялись,
+manual retry0; исходные result/events/artifacts/диагностика сохранены.
+Итого первые7:4 PASS,2 no_artifact и1 saved required-checklist FAIL;
+пять сохранённых пакетов прошли независимую структуру/warm oracle, cold0.
+Серия продолжает работу, полный baseline45/candidate45/compare ещё открыты.
