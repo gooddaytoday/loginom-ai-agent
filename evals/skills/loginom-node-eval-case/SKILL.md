@@ -6,7 +6,7 @@ description: >-
   и evidence. Использовать для узлового eval, reference.lgp или task.json в node-evals;
   работает локально и в роли автора/независимого приёмщика Multica.
 metadata:
-  version: 1.0.3
+  version: 1.0.4
 ---
 
 # Eval отдельного узла Loginom
