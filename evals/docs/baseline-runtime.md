@@ -5,6 +5,9 @@ Live `--limit` запрещён, fixture допускает fake/dir и тест
 `--case calc-data-double|crosstable-fixed-sum` и создаёт отдельную серию с одним заданием
 attempt=1; повтор создания существующей серии запрещён. Отсутствие артефакта оставляет
 соответствующую проверку внедрения незавершённой, без автоматического повтора.
+Общий harness принимает `--infra-retries 0|1`, по умолчанию 1. Smoke замораживает
+budget=0 в manifest и передаёт его обычному и узловому runner; полный baseline — 1.
+Run config сохраняет бюджет; перед записью измерения его сверяют с manifest.
 У calc-data-double в исходном корпусе нет oracle.csv: smoke замораживает независимый oracle
 Double = Amount × 2 из исходного CSV, затем сверяет колонку Double штатным CSV parser/compare.
 Дополнительные колонки допускаются по исходному SPEC. Case, prompt, судья и raw summary

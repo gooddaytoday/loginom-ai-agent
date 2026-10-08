@@ -47,6 +47,15 @@ test("loadConfig: --repeat перекрывает EVAL_REPEAT, нечисло о
   expect(() => loadConfig(["--repeat", "x"], full)).toThrow("--repeat")
 })
 
+test("loadConfig: infra retry budget defaults to one and only accepts zero or one", () => {
+  expect(loadConfig(["--infra-retries", "0"], full).infraRetries).toBe(0)
+  expect(loadConfig([], full).infraRetries).toBe(1)
+  expect(loadConfig(["--infra-retries", "1"], full).infraRetries).toBe(1)
+  for (const budget of ["2", "-1", "x", "", "0.5"]) {
+    expect(() => loadConfig(["--infra-retries", budget], full)).toThrow("--infra-retries")
+  }
+})
+
 test("loadConfig: binary без EVAL_CLI_BIN отклоняется", () => {
   expect(() => loadConfig([], { ...full, EVAL_CLI_MODE: "binary" })).toThrow("EVAL_CLI_BIN")
 })

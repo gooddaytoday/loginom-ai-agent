@@ -18,6 +18,7 @@ export type BaselinePins = {
 export type BaselineCollection = "regular" | "analytic" | "node"
 type BaselineCase = { key: string; id: string; collection: BaselineCollection; directory: string; files: { path: string; sha256: string }[] }
 export type BaselineManifest = { version: 1; id: string; kind: "baseline" | "smoke"; createdAt: string; pins: BaselinePins
+  infraRetries: 0 | 1
   cases: BaselineCase[]; jobs: { key: string; caseKey: string; attempt: number }[]
   smokeOracle?: { caseKey: string; inputSha256: string; expectedCsv: string } }
 type RecordedRun = { runDir: string; runId: string; files: { path: string; sha256: string }[]; measured: boolean; cleanup: boolean; verdict: "PASS" | "FAIL" | "ERROR" }
@@ -115,7 +116,7 @@ export async function prepareBaseline(directory: string, options: { checkout: st
   }
   if (selected && cases.length !== 1) throw new BaselineFailure("SMOKE_CORPUS_INCOMPLETE")
   const manifest: BaselineManifest = { version: 1, id: crypto.randomUUID(), kind: options.smoke ? "smoke" : "baseline",
-    createdAt: new Date().toISOString(), pins: options.pins, cases,
+    createdAt: new Date().toISOString(), pins: options.pins, cases, infraRetries: options.smoke ? 0 : 1,
     ...(selected === "regular:calc-data-double" ? { smokeOracle: await freezeSmokeOracle(options.checkout, cases[0]!) } : {}),
     jobs: (options.smoke ? [1] : [1, 2, 3]).flatMap(attempt => cases.map(item => ({ key: `${item.collection}-${item.id}-${attempt}`, caseKey: item.key, attempt }))) }
   await mkdir(directory, { mode: 0o700 }).catch(() => { throw new BaselineFailure("SERIES_EXISTS") })
@@ -429,11 +430,12 @@ async function processBirthPresent(owner: { pid: number; starttime: string }) {
 
 
 async function dispatchBaselineJob(directory: string, key: string, current: { checkout: string; pins: BaselinePins }, env: Record<string, string | undefined>) {
+  const { manifest } = await readBaseline(directory)
   const admitted = await beginBaselineMeasurement(directory, key, current)
   const parent = path.dirname(admitted.resultsDir)
   const script = admitted.case.collection === "node" ? "script/run-node-evals.ts" : "src/run.ts"
   const argv = [process.execPath, path.join(current.checkout, "evals", script), "--tasks", path.join(current.checkout, "evals", path.dirname(admitted.case.directory)),
-    "--only", admitted.case.id, "--repeat", "1", "--timeout-ms", String(current.pins.timeoutMs), "--label", key]
+    "--only", admitted.case.id, "--repeat", "1", "--infra-retries", String(manifest.infraRetries), "--timeout-ms", String(current.pins.timeoutMs), "--label", key]
   const child = Bun.spawn(argv, { cwd: path.join(current.checkout, "evals"), env: { ...env, EVAL_RESULTS_DIR: admitted.resultsDir,
     EVAL_HARNESS_LEASE_RECEIPT: path.join(parent, "harness-admission.json"), EVAL_REPEAT: "1",
     EVAL_PASS_THRESHOLD: String(current.pins.threshold), EVAL_JUDGE_TIMEOUT_MS: String(current.pins.judgeTimeoutMs) },
@@ -561,6 +563,8 @@ async function inspectMeasurement(manifest: BaselineManifest, item: BaselineCase
     summary.tasks[0]?.id !== item.id || summary.tasks[0].attempts.length !== 1 || summary.tasks[0].attempts[0]?.attempt !== 1 || summary.tasks[0].attempts[0].task_id !== item.id)
     throw new BaselineFailure("INVALID_MEASUREMENT")
   const result = summary.tasks[0].attempts[0]
+  if ((summary.config.infra_retries ?? 1) !== manifest.infraRetries || manifest.infraRetries === 0 && result.infra_retry)
+    throw new BaselineFailure("RETRY_BUDGET_CHANGED")
   const cleanups = await Promise.all([path.join(runDir, item.id, "1"), ...(result.infra_retry ? [path.join(runDir, item.id, "1", "infra-error")] : [])]
     .map(async out => Bun.file(path.join(out, "cleanup.json")).json()))
   const cleanup = summary.storage_leftovers?.length === 0 && !result.cleanup_error && result.environment_cleanup?.status === "confirmed" && cleanups.every(proof =>
@@ -569,7 +573,7 @@ async function inspectMeasurement(manifest: BaselineManifest, item: BaselineCase
   if (manifest.pins.mode === "live" && (summary.agent?.cli_version !== manifest.pins.cliVersion || summary.agent.source_commit !== manifest.pins.cliSource ||
     summary.agent.binary_sha256 !== manifest.pins.binarySha256 || summary.agent.model !== manifest.pins.model || summary.agent.variant !== manifest.pins.variant ||
     summary.harness?.dirty || !manifest.pins.harnessSha.startsWith(summary.harness?.git_sha ?? "UNKNOWN") || summary.agent.source_dirty !== false ||
-    summary.config.timeout_ms !== manifest.pins.timeoutMs || summary.config.judge_timeout_ms !== manifest.pins.judgeTimeoutMs || summary.config.pass_threshold !== manifest.pins.threshold ||
+    summary.config.timeout_ms !== manifest.pins.timeoutMs || summary.config.infra_retries !== manifest.infraRetries || summary.config.judge_timeout_ms !== manifest.pins.judgeTimeoutMs || summary.config.pass_threshold !== manifest.pins.threshold ||
     summary.loginom?.image_digest !== manifest.pins.imageDigest || summary.dock?.skill_revision !== manifest.pins.dockRevision)) throw new BaselineFailure("RUN_PINS_CHANGED")
   const product = ["completed", "failed", "timeout", "no_artifact"].includes(result.status)
   if (item.collection === "node") {
@@ -588,7 +592,7 @@ async function readBaseline(directory: string) {
   const raw = await Bun.file(path.join(directory, "manifest.json")).text()
   const manifest = JSON.parse(raw) as BaselineManifest
   const journal = await Bun.file(path.join(directory, "journal.json")).json() as BaselineJournal
-  if (manifest.version !== 1 || journal.version !== 1 || journal.manifestSha256 !== baselineHash(raw) ||
+  if (manifest.version !== 1 || manifest.infraRetries !== (manifest.kind === "smoke" ? 0 : 1) || journal.version !== 1 || journal.manifestSha256 !== baselineHash(raw) ||
     JSON.stringify(journal.jobs.map(job => job.key)) !== JSON.stringify(manifest.jobs.map(job => job.key))) throw new BaselineFailure("MANIFEST_CHANGED")
   return { manifest, journal }
 }

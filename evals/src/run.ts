@@ -69,7 +69,7 @@ async function executeRun(config: EvalConfig) {
     for (const task of tasks) {
       if (controller.signal.aborted || state.stopped) break outer
       const history: { initial?: AttemptResult } = {}
-      for (const retry of [0, 1]) {
+      for (const retry of [0, 1].slice(0, config.infraRetries + 1)) {
         if (controller.signal.aborted || state.stopped) break outer
         const { result, stop } = await runAttempt({
           config,
@@ -111,7 +111,7 @@ async function executeRun(config: EvalConfig) {
           break outer
         }
         if (result.status === "interrupted") break outer
-        if (result.status !== "infra_error" || retry === 1 || controller.signal.aborted) break
+        if (result.status !== "infra_error" || retry === config.infraRetries || controller.signal.aborted) break
         const out = path.join(runDir, task.id, String(attempt))
         await archiveInfraAttempt(out).catch(async (error: unknown) => {
           state.stopped = describe(error)
@@ -161,6 +161,7 @@ async function executeRun(config: EvalConfig) {
     task_ids: tasks.map((task) => task.id),
     config: {
       repeat: config.repeat,
+      infra_retries: config.infraRetries,
       tasks_dir: config.tasksDir,
       task_timeout_ms: Object.fromEntries(tasks.map((task) => [task.id, taskTimeoutMs(config, task)])),
       timeout_ms: config.timeoutMs ?? config.taskTimeoutMs,

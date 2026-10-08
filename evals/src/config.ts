@@ -38,6 +38,8 @@ export function loadConfig(argv: string[], env: Env = process.env) {
     return parsed
   }
   const providerId = env.EVAL_AGENT_PROVIDER_ID
+  if (values["infra-retries"] !== undefined && !["0", "1"].includes(values["infra-retries"]))
+    throw new EvalFailure("--infra-retries: ожидается 0|1", 2)
   return {
     dryRun,
     calibrate,
@@ -50,6 +52,7 @@ export function loadConfig(argv: string[], env: Env = process.env) {
     tasksDirExplicit: values.tasks !== undefined,
     label: values.label ?? null,
     repeat: positive("--repeat", values.repeat ?? env.EVAL_REPEAT, 1),
+    infraRetries: values["infra-retries"] === "0" ? 0 : 1,
     timeoutMs: values["timeout-ms"] === undefined ? undefined : positive("--timeout-ms", values["timeout-ms"], 0),
     skipJudge: !needsJudge,
     keepStorage: values["keep-storage"],
@@ -113,6 +116,7 @@ function parseEvalArgs(argv: string[]) {
         tasks: { type: "string" },
         label: { type: "string" },
         repeat: { type: "string" },
+        "infra-retries": { type: "string" },
         "timeout-ms": { type: "string" },
         "skip-judge": { type: "boolean", default: false },
         "keep-storage": { type: "boolean", default: false },

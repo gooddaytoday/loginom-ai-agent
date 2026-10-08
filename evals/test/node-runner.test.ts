@@ -38,3 +38,28 @@ test("runner отклоняет режимы с судьёй и сохранен
   }
   expect(await runNodeEvals(["--unknown-flag"], {})).toMatchObject({ code: 2, runDir: null })
 })
+
+test("node runner preserves one infrastructure retry by default and keeps repeat at one", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-runner-infra-"))
+  const server = Bun.serve({ port: 0, fetch: () => Response.json({ status: "ok", result: { revision: "fixture" } }) })
+  try {
+    const tasks = path.join(directory, "tasks")
+    const taskDir = path.join(tasks, "crosstable-fixed-sum")
+    await cp(path.join(evalsRoot, "tasks/node-evals/crosstable-fixed-sum"), taskDir, { recursive: true })
+    const task = await Bun.file(path.join(taskDir, "task.json")).json()
+    await Bun.write(path.join(taskDir, "data/fake-infra-retry.json"), "{}")
+    await Bun.write(path.join(taskDir, "task.json"), JSON.stringify({ ...task, inputs: [...task.inputs, "data/fake-infra-retry.json"] }))
+    const result = await runNodeEvals(["--tasks", tasks, "--repeat", "3"], {
+      EVAL_CLI_MODE: "fake", EVAL_AGENT_MODEL: "fake/model", EVAL_PROFILE_DIR: path.join(directory, "profile"),
+      EVAL_RESULTS_DIR: path.join(directory, "results"), EVAL_WORKSPACE_ROOT: path.join(directory, "workspace"),
+      EVAL_ARTIFACT_SOURCE: `dir:${path.join(evalsRoot, "fixtures/storage")}`, LOGINOM_DOCK_API_KEY: "fixture",
+      LOGINOM_URL: `http://127.0.0.1:${server.port}`, LOGINOM_DOCK_BASE_URL: `http://127.0.0.1:${server.port}`,
+      EVAL_AGENT_PROVIDER_ID: "fake", EVAL_AGENT_PROVIDER_BASE_URL: "http://fixture", EVAL_AGENT_PROVIDER_API_KEY: "fixture", EVAL_AGENT_PROVIDER_MODEL_ID: "model",
+    })
+    const summary = await Bun.file(path.join(result.runDir!, "summary.json")).json()
+    expect(summary.config).toMatchObject({ repeat: 1, infra_retries: 1 })
+    expect(summary.tasks[0].attempts).toHaveLength(1)
+    expect(summary.tasks[0].attempts[0].infra_retry.initial.status).toBe("infra_error")
+    expect(await Bun.file(path.join(directory, "workspace", summary.run_id, "crosstable-fixed-sum", "1/fake-launches.json")).json()).toBe(2)
+  } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
+}, 60_000)

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { chmod, lstat, mkdtemp, rm } from "node:fs/promises"
+import { chmod, cp, lstat, mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease, runBaseline, verifyBaselineInstallation, baselineHash, captureBaselinePins } from "../src/baseline"
@@ -55,6 +55,39 @@ test("smoke rejects a missing or foreign case before live configuration or dispa
   expect(await runBaseline(["prepare", "--series", "/fixture/not-created", "--case", "calc-data-double"], {}))
     .toMatchObject({ code: 2, reason: "CASE_ONLY_FOR_SMOKE" })
 })
+
+test("smoke dispatches a startup error only once through both standard and node harness", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-smoke-dispatch-"))
+  const server = Bun.serve({ port: 0, fetch: () => Response.json({ status: "ok", result: { revision: "fixture" } }) })
+  try {
+    const checkout = path.join(directory, "checkout")
+    await mkdir(path.join(checkout, "evals"), { recursive: true })
+    await cp(path.join(evalsRoot, "tasks"), path.join(checkout, "evals/tasks"), { recursive: true })
+    for (const part of ["src", "script"]) await symlink(path.join(evalsRoot, part), path.join(checkout, "evals", part))
+    for (const smokeCase of ["calc-data-double", "crosstable-fixed-sum"]) {
+      const caseDir = path.join(checkout, "evals/tasks", ...(smokeCase === "calc-data-double" ? [] : ["node-evals"]), smokeCase)
+      const task = await Bun.file(path.join(caseDir, "task.json")).json()
+      await Bun.write(path.join(caseDir, "data/fake-infra-retry.json"), "{}")
+      await Bun.write(path.join(caseDir, "task.json"), JSON.stringify({ ...task, inputs: [...task.inputs, "data/fake-infra-retry.json"] }))
+      const series = path.join(directory, smokeCase)
+      const manifest = await prepareBaseline(series, { checkout, pins: baselineFixturePins, smoke: true, smokeCase })
+      const env = { PATH: Bun.env.PATH, EVAL_BASELINE_FIXTURE: "1", EVAL_CLI_MODE: "fake", EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_AGENT_VARIANT: "medium",
+        EVAL_PROFILE_DIR: path.join(directory, smokeCase + "-profile"), EVAL_WORKSPACE_ROOT: path.join(directory, "work"),
+        EVAL_ARTIFACT_SOURCE: `dir:${path.join(evalsRoot, "fixtures/storage")}`, LOGINOM_DOCK_API_KEY: "fixture",
+        LOGINOM_URL: `http://127.0.0.1:${server.port}`, LOGINOM_DOCK_BASE_URL: `http://127.0.0.1:${server.port}`,
+        EVAL_AGENT_PROVIDER_ID: "openai", EVAL_AGENT_PROVIDER_BASE_URL: "http://fixture", EVAL_AGENT_PROVIDER_API_KEY: "fixture", EVAL_AGENT_PROVIDER_MODEL_ID: "model",
+        EVAL_JUDGE_COMMAND: `${Bun.which("bun")} ${path.join(evalsRoot, "fixtures/fake-codex.ts")}`, JUDGE_MODEL: "gpt-6-astra", JUDGE_REASONING: "high" }
+      expect(await runBaseline(["start", "--series", series], env)).toMatchObject({ code: 0, recorded: 1, measured: 0 })
+      const report = await checkBaseline(series)
+      const summary = await Bun.file(path.join(report.rows[0]!.runDir!, "summary.json")).json()
+      expect(manifest.infraRetries).toBe(0)
+      expect(summary.config.infra_retries).toBe(0)
+      expect(summary.tasks[0].attempts[0]).toMatchObject({ status: "infra_error" })
+      expect(summary.tasks[0].attempts[0].infra_retry).toBeUndefined()
+      expect(await Bun.file(path.join(directory, "work", summary.run_id, smokeCase, "1/fake-launches.json")).json()).toBe(1)
+    }
+  } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
+}, 60_000)
 
 test("installation verification refuses tampered payloads and extra files without executing CLI", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "baseline-install-"))
@@ -117,7 +150,7 @@ test("separate smoke series check only their own artifact and independent oracle
       const job = manifest.jobs[0]!
       const admitted = await beginBaselineMeasurement(series, job.key, { checkout: repoRoot, pins: baselineFixturePins })
       const run = path.join(admitted.resultsDir, "fixture")
-      await Bun.write(path.join(run, "summary.json"), JSON.stringify({ run_id: job.key, config: { repeat: 1 }, task_ids: [admitted.case.id], storage_leftovers: [],
+      await Bun.write(path.join(run, "summary.json"), JSON.stringify({ run_id: job.key, config: { repeat: 1, infra_retries: 0 }, task_ids: [admitted.case.id], storage_leftovers: [],
         tasks: [{ id: admitted.case.id, attempts: [{ task_id: admitted.case.id, attempt: 1, status: regular ? "completed" : "no_artifact", judge_status: regular ? "scored" : "skipped",
           judge_attempts: regular ? 1 : 0, package_path: regular ? "package.lgp" : null, pass: regular, score: regular ? 100 : null,
           environment_cleanup: { status: "confirmed" }, tokens: { input: 0, output: 0, reasoning: 0 }, counters: { toolCalls: 0, toolErrors: 0, memoryToolCalls: 0 }, duration_ms: 1, cost: 0 }] }] }))
