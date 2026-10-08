@@ -4447,6 +4447,20 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
+### 2026-10-08 — ACTIVE, локальные запуски
+
+- HEAD до checkpoint `018c6f983`; product artifact SHA49b1584f2 не изменился.
+- По указанию пользователя все запуски на текущей системе; 10.200.13.152 исключён.
+- Own A/B server/client/network loginom-skills-ab-20261008 running, исходные server/client сохранены; no bind mounts, isolated marker/native check PASS.
+- Baselinefc native ready PASS; candidate49 native Help/browser receipt PASS без подмены starting; model/judge calls0.
+- 15 задач выбраны и hashes281 files проверены до smoke; итоговая пара90 attempts; построение подмоделей вне coverage, docs существующих подмоделей обязательны.
+- Own harness81619d80b: readiness profile51 PASS/typecheck PASS; полный suite идёт на чистом SHA. Pair worktree пока9d, live A/B не начат.
+- Desktop CI159 PASS/5 SKIP/0 FAIL/typecheck PASS; host-port fixture исправлена через актуальный scope, runtime compact adapter исправлен, guards сохранены.
+- CLI docs-after-build3/3 mechanics/graph/PDF6pages QA/cold35/20 PASS; initial cold3 readonly FAIL сохранён, после native writable observation fresh cold PASS; writer owner/cause неизвестны.
+- Desktop docs-after-build3/3 mechanics/graph/PDF6pages QA PASS; cold ещё выполняется. Warm server logout отдельно не подтверждён.
+- Evidence/manifest и ограничения: reports/2026-10-08-package-docs-build-transition.md и reports/2026-10-08-package-docs-harness.md.
+- Этапы5–8 открыты, stage9/full35 отложены/server skill retained; далее Desktop cold, оставшиеся transitions/lifecycle и frozen-harness A/B.
+
 ### 2026-10-08 — PAUSED по запросу пользователя
 
 - Product candidate SHA `49b1584f23b4aa47e18b26119389d6f45623fc94`; до checkpoint HEAD `49b36242d`. Product/runtime в этой подзадаче не изменялись.

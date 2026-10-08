@@ -84,16 +84,32 @@ dry-run тестами и outage/healthy controls: 5 PASS, 32 assertions. Пос
 Затем CLI669 PDF ×3 подтвердил key-only Help ready и реальные find/read без
 Chromium при недоступном web login; документный gate ещё не принят из-за
 [layout FAIL](2026-10-08-package-docs-live.md).
-SSH к выделенному `user@10.200.13.152` отклоняет имеющиеся способы
-входа. Уточнение доступа запрошено; исходные локальные Loginom server/client
-не переключались. Ожидание не останавливает независимую приёмку продукта.
+По указанию пользователя от 2026-10-08 занятый `10.200.13.152` исключён:
+все запуски выполняются на текущей системе. Созданы собственные
+`loginom-skills-ab-{server,client}-20261008` и network `loginom-skills-ab-20261008`.
+Исходные server/client не переключались. На собственной сети Studio использует
+обязательный alias; у сервера нет mounts, storage пуст, Python Disabled=true.
+`checkIsolatedLoginom` PASS, Studio HTTP200; native CLI49 `loginom check`:
+exit0, Help ready, browser verified. Это не полный A/B preflight или live пара.
 
-До первого A/B live smoke необходимо закрепить **12–15 задач** по prompt,
-checklist и acceptance, таблицу покрытия и checksum списка. Финальная пара:
+В отдельном harness принят `c9f3b12b2`: TDD конфигурации собственной network и
+реальная Docker-проверка alias; все прежние изоляционные guards сохранены.
+Полный suite на чистом SHA: 462 PASS, 2 SKIP, 0 FAIL, 2023 assertions;
+`bun typecheck` PASS. Судья/near-miss/tasks не менялись.
+Выявлен следующий открытый adapter gate: отдельный native `loginom status`
+возвращает `starting` нового backend; межпроцессное ожидание `ready` требует
+совместимой проверки фактической квитанции `loginom check`, без подмены state.
+
+До первого A/B live smoke закреплены **15 задач** по prompt,
+checklist и acceptance, таблица покрытия и checksum списка. Evidence:
+`package-docs-20261006/ab-selected-15-20261008`; SHA256 списка
+`c526d8301b2ae0dfba35cf203e64e74bc5fb966ed69ac2c3d668bdcfa52108c5`.
+281 файл исходного snapshot проверен. Финальная пара:
 **72–90 попыток**, одна модель агента `openai/gpt-6.1-sol/medium`, неизменные
 harness/судья/данные/параметры; каждому сохранённому пакету нужны структура и
-cold replay. В исходных 35 задачах пока не найдено явное требование подмодели:
-это ограничение покрытия нельзя скрывать названием задачи.
+cold replay. По уточнению пользователя от 2026-10-08 агент пока не умеет
+строить подмодели, поэтому этот путь вне текущего A/B coverage gate.
+Проверка документации существующих подмоделей остаётся обязательной.
 
 Обязательные product/Linux/live gates этапов 0–8 остаются открыты в плане.
 Полный прогон 35 задач и этап 9 отложены по решению пользователя и не входят
