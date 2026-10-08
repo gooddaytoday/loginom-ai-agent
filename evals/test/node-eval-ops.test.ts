@@ -99,6 +99,16 @@ test("admission refuses pending state in another role's profile without executin
   } finally { await fixture.dispose() }
 })
 
+test("admission refuses another profile's harness lease even after its recorded PID disappears", async () => {
+  const fixture = await runtime()
+  try {
+    const lease = await acquireNodeStand(fixture.config, owner)
+    await Bun.write(path.join(`${fixture.config.roles.ben.evalProfile}.harness-lease`, "owner.json"), JSON.stringify({ pid: 99999999 }))
+    await expect(preflightNodeStand(fixture.config, lease, {})).rejects.toThrow("HARNESS_PROFILE_BUSY")
+    expect((await nodeStandStatus(fixture.config)).status).toBe("BUSY")
+  } finally { await fixture.dispose() }
+})
+
 test("recovery cannot claim a profile without successful clean admission and same-lease evidence", async () => {
   const fixture = await runtime()
   try {

@@ -665,9 +665,14 @@ async function evidencePath(config: NodeOpsConfig, lease: NodeStandLease, file: 
   return file
 }
 
-async function assertAllProfilesClean(config: NodeOpsConfig) {
-  for (const role of Object.values(config.roles)) for (const profile of [role.referenceProfile, role.evalProfile])
+async function assertAllProfilesClean(config: NodeOpsConfig, ownedHarnessProfile?: string) {
+  for (const role of Object.values(config.roles)) for (const profile of [role.referenceProfile, role.evalProfile]) {
+    if (profile !== ownedHarnessProfile && await lstat(`${profile}.harness-lease`).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined
+      throw error
+    })) throw new NodeOpsFailure("HARNESS_PROFILE_BUSY")
     await assertProfileClean(profile).catch(() => { throw new NodeOpsFailure("PROFILE_NOT_CLEAN") })
+  }
 }
 
 async function assertBrowsersClosed() {
