@@ -27,6 +27,7 @@ type BaselineRow = { key: string; caseKey: string; attempt: number; collection: 
 type BaselineRelease = { status: "RELEASED"; evidenceSha256: string; receiptPath?: string; receiptSha256?: string }
 type BaselineJournal = { version: 1; manifestSha256: string; checkout: string; release?: BaselineRelease
   jobs: { key: string; state: "pending" | "running" | "recorded"; dispatchedAt?: string; record?: RecordedRun }[] }
+type SmokeAdmission = { version: 1; issue: string; task: string; caseKey: string; seriesDir: string; baselineId: string; manifestSha256: string }
 
 export class BaselineFailure extends Error {}
 export const baselineHash = (value: string | Uint8Array) => new Bun.CryptoHasher("sha256").update(value).digest("hex")
@@ -140,6 +141,10 @@ export async function beginBaselineMeasurement(directory: string, key: string, c
     if (job.state !== "pending") throw new BaselineFailure("ALREADY_DISPATCHED")
     if (journal.jobs.some(item => item.state === "running")) throw new BaselineFailure("UNKNOWN_OUTCOME")
     if (journal.jobs.find(item => item.state === "pending") !== job) throw new BaselineFailure("ROUND_ORDER_CHANGED")
+    if (manifest.kind === "smoke" && manifest.pins.mode === "live") {
+      await admitBaselineSmoke(directory, await readPrivateBaselineJson(path.join(directory, "ops-config.json")) as NodeOpsConfig,
+        await readPrivateBaselineJson(path.join(directory, "stand-handle.json")) as NodeStandLease)
+    }
     const resultsDir = path.join(directory, "measurements", key, "runs")
     await mkdir(resultsDir, { recursive: true, mode: 0o700 })
     job.state = "running"
@@ -147,6 +152,75 @@ export async function beginBaselineMeasurement(directory: string, key: string, c
     await atomicJournal(directory, journal)
     return { resultsDir, job: manifest.jobs.find(item => item.key === key)!, case: manifest.cases.find(item => item.key === manifest.jobs.find(job => job.key === key)!.caseKey)! }
   })
+}
+
+/** An immutable per-case admission survives a crash and replacement series directories. */
+export async function admitBaselineSmoke(directory: string, config: NodeOpsConfig, owner: { issue: string; task: string }) {
+  const { manifest, journal } = await readBaseline(directory)
+  const role = config.roles.evalbaseline
+  if (manifest.kind !== "smoke" || manifest.cases.length !== 1 || manifest.jobs.length !== 1 || manifest.jobs[0]!.attempt !== 1 ||
+    !role || journal.checkout !== role.checkout || !directory.startsWith(role.resultsRoot + path.sep) || await realpath(directory) !== directory ||
+    baselineHash(JSON.stringify(config)) !== manifest.pins.opsConfigSha256 || owner.issue !== role.readinessIssue ||
+    typeof owner.task !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(owner.task)) throw new BaselineFailure("SMOKE_ADMISSION_REFUSED")
+  const item = manifest.cases[0]!
+  if (smokeCaseKey(item.id) !== item.key) throw new BaselineFailure("SMOKE_CASE_REFUSED")
+  const root = await readinessRoot(config, true)
+  const file = path.join(root!, item.id + ".json")
+  const admission: SmokeAdmission = { version: 1, issue: owner.issue, task: owner.task, caseKey: item.key, seriesDir: directory,
+    baselineId: manifest.id, manifestSha256: journal.manifestSha256 }
+  const handle = await open(file, "wx", 0o400).catch((error: NodeJS.ErrnoException) => { if (error.code === "EEXIST") return undefined; throw error })
+  if (!handle) {
+    if (JSON.stringify(await readPrivateBaselineJson(file)) !== JSON.stringify(admission)) throw new BaselineFailure("SMOKE_ALREADY_ADMITTED")
+    return admission
+  }
+  try { await handle.writeFile(JSON.stringify(admission)); await handle.sync() }
+  finally { await handle.close() }
+  const parent = await open(root!, constants.O_RDONLY | constants.O_DIRECTORY)
+  try { await parent.sync() } finally { await parent.close() }
+  return admission
+}
+
+/** Readiness comes from both immutable smoke reports and their distinct verified releases. */
+export async function checkBaselineReadiness(config: NodeOpsConfig, pins?: BaselinePins) {
+  const root = await readinessRoot(config, false)
+  const checks: { caseKey: string; admitted: boolean; complete: boolean; baselineId?: string; pins?: BaselinePins; release?: BaselineRelease }[] = []
+  for (const id of ["calc-data-double", "crosstable-fixed-sum"]) {
+    const caseKey = smokeCaseKey(id)
+    const file = root ? path.join(root, id + ".json") : undefined
+    if (!file || !await lstat(file).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error })) {
+      checks.push({ caseKey, admitted: false, complete: false }); continue
+    }
+    const saved = await readPrivateBaselineJson(file) as SmokeAdmission
+    const { manifest, journal } = await readBaseline(saved.seriesDir)
+    if (saved.version !== 1 || saved.issue !== config.roles.evalbaseline!.readinessIssue || saved.caseKey !== caseKey ||
+      saved.baselineId !== manifest.id || saved.manifestSha256 !== journal.manifestSha256 || manifest.kind !== "smoke" || manifest.cases.length !== 1 ||
+      manifest.cases[0]!.key !== caseKey || !saved.seriesDir.startsWith(config.roles.evalbaseline!.resultsRoot + path.sep) ||
+      baselineHash(JSON.stringify(config)) !== manifest.pins.opsConfigSha256) throw new BaselineFailure("READINESS_EVIDENCE_CHANGED")
+    if (pins && JSON.stringify(pins) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("READINESS_PINS_CHANGED")
+    const report = await checkBaseline(saved.seriesDir)
+    checks.push({ caseKey, admitted: true, complete: report.status === "complete" && manifest.pins.mode === "live",
+      baselineId: manifest.id, pins: manifest.pins, release: journal.release })
+  }
+  const admitted = checks.filter(check => check.admitted)
+  if (admitted.length === 2 && (admitted[0]!.baselineId === admitted[1]!.baselineId ||
+    JSON.stringify(admitted[0]!.pins) !== JSON.stringify(admitted[1]!.pins) ||
+    admitted[0]!.release?.receiptPath && admitted[0]!.release?.receiptPath === admitted[1]!.release?.receiptPath))
+    throw new BaselineFailure("READINESS_EVIDENCE_CHANGED")
+  return { issue: config.roles.evalbaseline!.readinessIssue, expected: 2, admitted: admitted.length,
+    complete: checks.filter(check => check.complete).length, ready: checks.every(check => check.complete), checks }
+}
+
+async function readinessRoot(config: NodeOpsConfig, create: boolean) {
+  const issue = config.roles.evalbaseline?.readinessIssue
+  if (config.version !== 2 || !issue || !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(issue) || !path.isAbsolute(config.runtimeRoot))
+    throw new BaselineFailure("READINESS_CONFIGURATION_REQUIRED")
+  const root = path.join(config.runtimeRoot, "operations/baseline-readiness", issue)
+  if (create) await mkdir(root, { recursive: true, mode: 0o700 })
+  const info = await lstat(root).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error })
+  if (!info) return undefined
+  if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || info.mode & 0o077 || await realpath(root) !== root)
+    throw new BaselineFailure("READINESS_PATH_REFUSED")
+  return root
 }
 
 /** Record raw evidence, including product FAIL. No original result or judge verdict is rewritten. */
@@ -324,6 +398,13 @@ async function executeLiveBaseline(directory: string, config: NodeOpsConfig, env
   if (JSON.stringify(pins) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
   if (!options.resume && journal.jobs.some(job => job.state !== "pending")) throw new BaselineFailure("USE_RESUME")
   if (journal.release) return { code: 0, ...await writeCheckResult(directory) }
+  const readiness = await checkBaselineReadiness(config, pins)
+  if (manifest.kind === "baseline" && !readiness.ready) throw new BaselineFailure("BASELINE_READINESS_INCOMPLETE")
+  if (manifest.kind === "smoke") {
+    const previous = readiness.checks.find(check => check.caseKey === manifest.cases[0]!.key)
+    if (previous?.admitted && previous.baselineId !== manifest.id) throw new BaselineFailure("SMOKE_ALREADY_ADMITTED")
+    if (!options.resume && options.issue !== config.roles.evalbaseline!.readinessIssue) throw new BaselineFailure("SMOKE_ADMISSION_REFUSED")
+  }
   const handle = path.join(directory, "stand-handle.json")
   const lease = await (async () => {
     if (await Bun.file(handle).exists()) {

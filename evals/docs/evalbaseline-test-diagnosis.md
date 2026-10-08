@@ -36,3 +36,19 @@ Assertions и production guard сохранены; отрицательные п
 После правки targeted suite: 78 PASS, 7 clean-host SKIP, 0 FAIL; 85 тестов в
 13 файлах, 535 assertions. `bun typecheck` PASS. Полный suite после следующих
 изменений этапа 3 остаётся обязательным; положительные clean-host ветки пока не проверены.
+
+## Единичный CLEANUP_UNKNOWN в fixture resume
+
+Targeted запуск baseline/node-eval-ops после readiness ledger дал 40 PASS, 4 SKIP,
+1 отказ `fixture executor resumes pending jobs...`: resume вернул CLEANUP_UNKNOWN.
+Три отдельных повтора и три воспроизведения через public prepare/start/resume/check
+прошли; все шесть cleanup имели confirmed, capture_complete=true, unknown=0,
+owned_remaining=[0,0] и подтверждённые обязательные stages. Причина исходного
+отказа не установлена: старый finally удалил fixture вместе с доказательствами.
+CLEANUP_UNKNOWN не доказывает конкретную ошибку supervisor или чужой Chrome.
+
+Тест теперь сохраняет приватный fixture при отказе; успешный удаляет как прежде.
+Это диагностическое изменение, не утверждение об устранении неизвестной причины.
+Assertions и guards сохранены. Финальный полный suite на текущей реализации:
+519 PASS, 7 clean-host SKIP, 0 FAIL; 526 тестов/47 файлов, 2508 assertions,
+526,39 секунды. `bun typecheck` PASS. Live проверки ещё не выполнены.

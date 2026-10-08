@@ -2,8 +2,8 @@ import { expect, test } from "bun:test"
 import { chmod, cp, lstat, mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease, runBaseline, verifyBaselineInstallation, baselineHash, captureBaselinePins } from "../src/baseline"
-import type { NodeOpsConfig } from "../src/node-eval-ops"
+import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease, runBaseline, verifyBaselineInstallation, baselineHash, captureBaselinePins, admitBaselineSmoke, checkBaselineReadiness } from "../src/baseline"
+import { acquireNodeStand, type NodeOpsConfig } from "../src/node-eval-ops"
 import { repoRoot, evalsRoot } from "../src/config"
 
 import { baselineFixturePins } from "../fixtures/baseline"
@@ -54,6 +54,97 @@ test("smoke rejects a missing or foreign case before live configuration or dispa
   }
   expect(await runBaseline(["prepare", "--series", "/fixture/not-created", "--case", "calc-data-double"], {}))
     .toMatchObject({ code: 2, reason: "CASE_ONLY_FOR_SMOKE" })
+})
+
+async function readinessFixture() {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-readiness-"))
+  const results = path.join(directory, "results")
+  await mkdir(results)
+  const checkout = path.join(directory, "checkouts/evalbaseline")
+  await cp(path.join(evalsRoot, "tasks"), path.join(checkout, "evals/tasks"), { recursive: true })
+  const role = { checkout, evalProfile: path.join(directory, "roles/evalbaseline/profile"), workRoots: [path.join(directory, "roles/evalbaseline/work")], resultsRoot: results,
+    cliBin: path.join(directory, "cli-baseline/bin/cli"), readinessIssue: "LAB-32" }
+  const worker = (name: string) => ({ checkout: path.join(directory, "checkouts", name), referenceProfile: path.join(directory, "roles", name, "reference"),
+    evalProfile: path.join(directory, "roles", name, "eval"), workRoots: [path.join(directory, "roles", name, "work")], resultsRoot: path.join(directory, "roles", name, "results") })
+  const config: NodeOpsConfig = { version: 2, runtimeRoot: directory, endpoint: "http://fixture", container: { name: "fixture", id: "b".repeat(64), storageDir: "/workdir/UserStorage/user" },
+    cliBin: path.join(directory, "cli-old/bin/cli"), roles: { rich: worker("rich"), ben: worker("ben"), evalbaseline: role } }
+  for (const item of Object.values(config.roles)) for (const root of [item.checkout, item.evalProfile, item.referenceProfile, ...item.workRoots, item.resultsRoot])
+    if (root) await mkdir(root, { recursive: true, mode: 0o700 })
+  await Bun.write(config.cliBin, "fixture CLI never executed")
+  await Bun.write(role.cliBin, "fixture CLI never executed")
+  const pins = { ...baselineFixturePins, opsConfigSha256: baselineHash(JSON.stringify(config)) }
+  return { directory, checkout, config, pins, async prepare(name: string, smokeCase = "calc-data-double") {
+    const series = path.join(results, name)
+    await prepareBaseline(series, { checkout, pins, config, smoke: true, smokeCase })
+    return series
+  }, close: () => rm(directory, { recursive: true, force: true }) }
+}
+
+test("readiness admits each smoke case once and a new series cannot bypass the durable limit", async () => {
+  const fixture = await readinessFixture()
+  try {
+    const original = await fixture.prepare("calc-one")
+    const duplicate = await fixture.prepare("calc-two")
+    const admitted = await admitBaselineSmoke(original, fixture.config, { issue: "LAB-32", task: "smoke-one" })
+    expect(await admitBaselineSmoke(original, fixture.config, { issue: "LAB-32", task: "smoke-one" })).toEqual(admitted)
+    await beginBaselineMeasurement(original, "regular-calc-data-double-1", { checkout: fixture.checkout, pins: fixture.pins })
+    await expect(admitBaselineSmoke(duplicate, fixture.config, { issue: "LAB-32", task: "smoke-two" })).rejects.toThrow("SMOKE_ALREADY_ADMITTED")
+    await expect(beginBaselineMeasurement(original, "regular-calc-data-double-1", { checkout: fixture.checkout, pins: fixture.pins })).rejects.toThrow("ALREADY_DISPATCHED")
+    await admitBaselineSmoke(await fixture.prepare("node-one", "crosstable-fixed-sum"), fixture.config, { issue: "LAB-32", task: "smoke-three" })
+    expect(await checkBaselineReadiness(fixture.config)).toMatchObject({ expected: 2, admitted: 2, complete: 0, ready: false })
+    expect(await checkBaseline(original)).toMatchObject({ coverage: { unknown: 1 }, released: false })
+  } finally { await fixture.close() }
+})
+
+test("concurrent smoke admissions cannot reserve two series for the same case", async () => {
+  const fixture = await readinessFixture()
+  try {
+    const one = await fixture.prepare("one")
+    const two = await fixture.prepare("two")
+    const admissions = await Promise.allSettled([one, two].map((series, index) =>
+      admitBaselineSmoke(series, fixture.config, { issue: "LAB-32", task: `smoke-${index}` })))
+    expect(admissions.filter(admission => admission.status === "fulfilled")).toHaveLength(1)
+    expect(admissions.filter(admission => admission.status === "rejected")).toHaveLength(1)
+    expect(await checkBaselineReadiness(fixture.config)).toMatchObject({ admitted: 1, complete: 0, ready: false })
+  } finally { await fixture.close() }
+})
+
+test("readiness refuses the wrong card, changed pins and altered admission evidence", async () => {
+  const fixture = await readinessFixture()
+  try {
+    const series = await fixture.prepare("one")
+    await expect(admitBaselineSmoke(series, fixture.config, { issue: "LAB-other", task: "smoke" })).rejects.toThrow("SMOKE_ADMISSION_REFUSED")
+    expect(await checkBaselineReadiness(fixture.config)).toMatchObject({ admitted: 0, ready: false })
+    await admitBaselineSmoke(series, fixture.config, { issue: "LAB-32", task: "smoke" })
+    await expect(checkBaselineReadiness(fixture.config, { ...fixture.pins, dockRevision: "changed" })).rejects.toThrow("READINESS_PINS_CHANGED")
+    const receipt = path.join(fixture.directory, "operations/baseline-readiness/LAB-32/calc-data-double.json")
+    const saved = await Bun.file(receipt).json()
+    await chmod(receipt, 0o600)
+    await Bun.write(receipt, JSON.stringify({ ...saved, manifestSha256: "0".repeat(64) }))
+    await expect(checkBaselineReadiness(fixture.config)).rejects.toThrow("READINESS_EVIDENCE_CHANGED")
+  } finally { await fixture.close() }
+})
+
+test("live smoke admission is wired before dispatch and preserves the duplicate series as pending", async () => {
+  const fixture = await readinessFixture()
+  try {
+    const pins = { ...fixture.pins, mode: "live" as const }
+    const role = fixture.config.roles.evalbaseline!
+    const series = path.join(role.resultsRoot, "live-one")
+    const duplicate = path.join(role.resultsRoot, "live-two")
+    for (const target of [series, duplicate]) {
+      await prepareBaseline(target, { checkout: fixture.checkout, pins, config: fixture.config, smoke: true, smokeCase: "calc-data-double" })
+    }
+    const lease = await acquireNodeStand(fixture.config, { issue: "LAB-32", task: "smoke-task", role: "evalbaseline", phase: "eval", sha: pins.harnessSha })
+    for (const target of [series, duplicate]) {
+      await Bun.write(path.join(target, "stand-handle.json"), JSON.stringify(lease))
+      await chmod(path.join(target, "stand-handle.json"), 0o600)
+    }
+    await beginBaselineMeasurement(series, "regular-calc-data-double-1", { checkout: fixture.checkout, pins })
+    await expect(beginBaselineMeasurement(duplicate, "regular-calc-data-double-1", { checkout: fixture.checkout, pins })).rejects.toThrow("SMOKE_ALREADY_ADMITTED")
+    expect((await checkBaselineReadiness(fixture.config)).admitted).toBe(1)
+    expect((await checkBaseline(duplicate)).coverage).toMatchObject({ pending: 1, unknown: 0 })
+  } finally { await fixture.close() }
 })
 
 test("smoke dispatches a startup error only once through both standard and node harness", async () => {
@@ -234,6 +325,7 @@ test("check writes a separate report without models, admission or changes to sto
 test("fixture executor resumes pending jobs through the real harness without repeating a saved attempt", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-executor-"))
   const server = Bun.serve({ port: 0, fetch: () => Response.json({ status: "ok", result: { revision: "fixture" } }) })
+  const verification = { passed: false }
   try {
     const series = path.join(directory, "series")
     await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins })
@@ -254,7 +346,13 @@ test("fixture executor resumes pending jobs through the real harness without rep
     expect(comparison).toMatchObject({ code: 0 })
     expect(await Bun.file(path.join(String(comparison.reportDir), "compare-regular.md")).text()).toContain("calc-data-double")
     expect(await Bun.file(path.join(first, "summary.json")).text()).toBe(before)
-  } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
+    verification.passed = true
+  } finally {
+    server.stop(true)
+    if (verification.passed) await rm(directory, { recursive: true, force: true })
+    // Preserve the actual cleanup proof if a guard fails; absence cannot diagnose it.
+    if (!verification.passed) console.error(`Failed resume fixture retained privately: ${directory}`)
+  }
 }, 60_000)
 
 test("a recorded product failure is retained while an unknown dispatch or pin drift blocks continuation", async () => {

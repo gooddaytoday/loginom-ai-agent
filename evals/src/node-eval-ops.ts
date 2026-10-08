@@ -17,7 +17,7 @@ import { checkBaseline } from "./baseline"
 
 type OfflinePaths = { checkout: string; workRoots: string[]; resultsRoot: string }
 type RolePaths = OfflinePaths & { referenceProfile: string; evalProfile: string; cliBin?: string }
-type BaselinePaths = OfflinePaths & { referenceProfile?: never; evalProfile: string; cliBin: string }
+type BaselinePaths = OfflinePaths & { referenceProfile?: never; evalProfile: string; cliBin: string; readinessIssue?: string }
 export type NodeOpsConfig = { version: 1 | 2; runtimeRoot: string; endpoint: string; container: { name: string; id: string; storageDir: string }; cliBin: string; roles: { rich: RolePaths; ben: RolePaths; evalbaseline?: BaselinePaths }; offline?: OfflinePaths }
 export type NodeStandOwner = { issue: string; task: string; role: "rich" | "ben" | "evalbaseline"; phase: "unit" | "reference" | "cold" | "eval" | "recovery"; sha: string }
 export type NodeStandLease = NodeStandOwner & { version: 1; token: string; device: number; inode: number; endpoint: string; containerId: string; acquiredAt: string; configSha256: string }
@@ -112,6 +112,7 @@ Lease handles must stay private (0600); no TTL, waiting, PID stealing, or extern
 Runtime config v1 contains runtimeRoot, endpoint, container {name,id,storageDir}, cliBin,
 roles {rich,ben}, each {checkout,referenceProfile,evalProfile,workRoots,resultsRoot}.
 v2 adds eval-only evalbaseline {checkout,evalProfile,workRoots,resultsRoot,cliBin};
+readinessIssue in this role pins the preparation card for durable smoke admission.
 worker roles may pin cliBin independently. Reference/cold are forbidden for evalbaseline.
 Optional offline {checkout,workRoots,resultsRoot} gives Evaler read-only evidence paths.
 One operator recovery is reserved per immutable lease; incident renaming cannot reset it.

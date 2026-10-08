@@ -14,6 +14,15 @@ Double = Amount × 2 из исходного CSV, затем сверяет ко
 не изменяются; результат дополнительной проверки сохраняется в производном smoke report.
 Проверенность интеграции и quality PASS показаны отдельно: product FAIL не скрывается.
 
+Private v2 config фиксирует `roles.evalbaseline.readinessIssue` на UUID карточки LAB-32.
+Перед первым dispatch live smoke создаёт неизменяемый admission в
+`R/operations/baseline-readiness/ISSUE/CASE.json`. Он привязан к карточке, task, серии
+и manifest hash; один кейс получает один admission. Новая серия/каталог и concurrent
+запрос не сбрасывают лимит. Неполная запись или UNKNOWN требуют разбора, без нового dispatch.
+`checkBaselineReadiness(config)` читает обе сохранённые серии: готовность требует
+live mode, artifact/evaluator/oracle, подтверждённую очистку и два разных release receipt.
+Fixture mode не подтверждает live готовность. Полный start до этого gate заблокирован.
+
 ## Общая поставка
 
 Для всех исполнителей helper поставляется как `R/support/baseline-v2/evals/` с полным source
