@@ -13,6 +13,7 @@ import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
 import { validateNodeRun } from "./node-evals"
 import type { RunSummary } from "./report"
 import { archiveDiagnostics } from "./diagnostics"
+import { checkBaseline } from "./baseline"
 
 type OfflinePaths = { checkout: string; workRoots: string[]; resultsRoot: string }
 type RolePaths = OfflinePaths & { referenceProfile: string; evalProfile: string; cliBin?: string }
@@ -23,6 +24,7 @@ export type NodeStandLease = NodeStandOwner & { version: 1; token: string; devic
 export type NodeStandCompletion = { version: 1; owner: NodeStandOwner; acquiredAt: string } & (
   { kind: "unit"; checks: { command: string; exitCode: number; processes: ProcessCleanup }[] } |
   { kind: "eval"; runDir: string; runSha: string; caseIds: string[] } |
+  { kind: "baseline"; seriesDir: string; runSha: string } |
   { kind: "recovery"; receipt: string; profile: "reference" | "eval"; historyArchive: string; processEvidence: string } |
   { kind: "cold"; browserCloseEvidence: string; storageLedger: string } |
   { kind: "reference"; processEvidence: string; historyArchive: string; storageLedger: string; browserCloseEvidence?: string }
@@ -112,7 +114,7 @@ async function executeOps(argv: string[], env: Record<string, string | undefined
   const command = argv[0]
   if (!["status", "acquire", "preflight", "unit", "release", "recover", "check-run"].includes(command ?? "")) throw new NodeOpsFailure("UNKNOWN_COMMAND")
   const values = parseArgs({ args: argv.slice(1), strict: true, options: Object.fromEntries(
-    ["config", "lease", "issue", "task", "role", "phase", "sha", "receipt", "evidence", "incident", "run", "ids", "tasks", "run-sha"].map(name => [name, { type: "string" as const }])) }).values
+    ["config", "lease", "issue", "task", "role", "phase", "sha", "receipt", "evidence", "incident", "run", "baseline", "ids", "tasks", "run-sha"].map(name => [name, { type: "string" as const }])) }).values
   const required = (name: string) => {
     const value = values[name]
     if (typeof value !== "string" || !value) throw new NodeOpsFailure("MISSING_ARGUMENT")
@@ -154,8 +156,17 @@ async function executeOps(argv: string[], env: Record<string, string | undefined
   if (command === "preflight") return { code: 0, ...await preflightNodeStand(config, lease, env) }
   if (command === "unit") return runNodeUnitChecks(config, lease)
   if (command === "recover") return { code: 0, ...await recoverNodeStand(config, lease, required("incident"), required("evidence"), env) }
-  const evidence = typeof values.run === "string" ? await writeEvalCompletion(config, lease, values.run, required("ids").split(","), required("run-sha")) : required("evidence")
+  const evidence = typeof values.baseline === "string" ? await writeBaselineCompletion(config, lease, values.baseline, required("run-sha")) :
+    typeof values.run === "string" ? await writeEvalCompletion(config, lease, values.run, required("ids").split(","), required("run-sha")) : required("evidence")
   return { code: 0, ...await releaseNodeStand(config, lease, evidence) }
+}
+
+async function writeBaselineCompletion(config: NodeOpsConfig, lease: NodeStandLease, seriesDir: string, runSha: string) {
+  await evidencePath(config, lease, seriesDir)
+  const evidence = path.join(directory(config), `baseline-completion-${crypto.randomUUID()}.json`)
+  const completion: NodeStandCompletion = { version: 1, owner: ownerOf(lease), acquiredAt: lease.acquiredAt, kind: "baseline", seriesDir, runSha }
+  await writeFile(evidence, JSON.stringify(completion), { flag: "wx", mode: 0o600 })
+  return evidence
 }
 
 async function writeEvalCompletion(config: NodeOpsConfig, lease: NodeStandLease, runDir: string, caseIds: string[], runSha: string) {
@@ -354,13 +365,18 @@ async function exclusive<T>(config: NodeOpsConfig, lease: NodeStandLease, operat
 async function readCompletion(config: NodeOpsConfig, lease: NodeStandLease, evidence: string) {
   await evidencePath(config, lease, evidence, true)
   const completion = await Bun.file(evidence).json() as NodeStandCompletion
-  if (completion.version !== 1 || !["unit", "eval", "cold", "reference", "recovery"].includes(completion.kind) ||
+  if (completion.version !== 1 || !["unit", "eval", "baseline", "cold", "reference", "recovery"].includes(completion.kind) ||
     completion.acquiredAt !== lease.acquiredAt || !ownerMatches(completion.owner, lease))
     throw new NodeOpsFailure("INVALID_COMPLETION")
   return completion
 }
 
 async function verifyCompletion(config: NodeOpsConfig, lease: NodeStandLease, completion: NodeStandCompletion, evidence: string) {
+  if (completion.kind === "baseline") {
+    if (completion.runSha !== lease.sha) throw new NodeOpsFailure("STALE_EVAL_PROOF")
+    await verifyBaselineStand(config, lease, completion.seriesDir)
+    return
+  }
   if (completion.kind === "recovery") {
     const key = new Bun.CryptoHasher("sha256").update(`${lease.token}:${lease.issue}:${lease.task}:${lease.acquiredAt}`).digest("hex")
     if (!inside(evidence, directory(config)) || completion.receipt !== path.join(config.runtimeRoot, "operations", "recovery-incidents", `${key}.json`))
@@ -411,6 +427,39 @@ async function verifyCompletion(config: NodeOpsConfig, lease: NodeStandLease, co
     await verifyHistoryArchive(nodeProfile(config, lease.role, "reference"), completion.historyArchive)
     if (completion.browserCloseEvidence) await verifyBrowserClose(config, lease, completion.browserCloseEvidence)
   }
+}
+
+/** Safety is independent of quality coverage: even an incomplete series may have fully verified cleanup. */
+export async function verifyBaselineStand(config: NodeOpsConfig, lease: NodeStandLease, seriesDir: string) {
+  if (lease.role !== "evalbaseline") throw new NodeOpsFailure("BASELINE_ROLE_REQUIRED")
+  await assertNodeStandOwner(config, lease)
+  await evidencePath(config, lease, seriesDir)
+  const report = await checkBaseline(seriesDir)
+  if (report.coverage.unknown || !report.cleanup) throw new NodeOpsFailure("BASELINE_CLEANUP_UNKNOWN")
+  const git = await checkoutIdentity(nodeRole(config, lease.role).checkout)
+  if (git.sha !== lease.sha || git.dirty || report.manifest.pins.harnessSha !== git.sha) throw new NodeOpsFailure("STALE_EVAL_PROOF")
+  for (const row of report.rows) {
+    if (!row.runDir) continue
+    await evidencePath(config, lease, row.runDir)
+    const summary = await Bun.file(path.join(row.runDir, "summary.json")).json() as RunSummary
+    if (!Number.isFinite(Date.parse(summary.started_at)) || Date.parse(summary.started_at) < Date.parse(lease.acquiredAt) ||
+      summary.harness?.dirty || !lease.sha.startsWith(summary.harness?.git_sha ?? "UNKNOWN")) throw new NodeOpsFailure("STALE_EVAL_PROOF")
+    for (const task of summary.tasks) for (const attempt of task.attempts) {
+      const out = path.join(row.runDir, task.id, String(attempt.attempt))
+      for (const directory of [out, ...(attempt.infra_retry ? [path.join(out, "infra-error")] : [])]) {
+        const cleanup = await Bun.file(path.join(directory, "cleanup.json")).json()
+        await verifyProcesses(cleanup.processes, lease)
+        await verifyHistoryArchive(nodeRole(config, lease.role).evalProfile,
+          cleanup.stages.find((stage: { stage: string }) => stage.stage === "profile_history")?.path)
+        if (cleanup.result?.status !== "confirmed" || !["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].every(stage =>
+          cleanup.stages.some((item: { stage: string; status: string }) => item.stage === stage && item.status === "confirmed"))) throw new NodeOpsFailure("BASELINE_CLEANUP_UNKNOWN")
+      }
+    }
+  }
+  await assertAllProfilesClean(config)
+  await assertBrowsersClosed()
+  if ((await assertIsolatedStorageEmpty(source(config))).containerId !== lease.containerId) throw new NodeOpsFailure("CONTAINER_CHANGED")
+  return { status: "SAFE", measured: report.coverage.measured, expected: report.coverage.expected }
 }
 
 async function verifyProcesses(processes: ProcessCleanup, lease: NodeStandLease, trustedUnit = false) {

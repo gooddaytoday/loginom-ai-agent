@@ -126,7 +126,7 @@ async function inspectMeasurement(manifest: BaselineManifest, item: BaselineCase
     summary.tasks[0]?.id !== item.id || summary.tasks[0].attempts.length !== 1 || summary.tasks[0].attempts[0]?.attempt !== 1)
     throw new BaselineFailure("INVALID_MEASUREMENT")
   const result = summary.tasks[0].attempts[0]
-  const cleanups = await Promise.all([path.join(runDir, item.id, "1"), ...(result.infra_retry ? [path.join(runDir, item.id, "1", "infra-retry-initial")] : [])]
+  const cleanups = await Promise.all([path.join(runDir, item.id, "1"), ...(result.infra_retry ? [path.join(runDir, item.id, "1", "infra-error")] : [])]
     .map(async out => Bun.file(path.join(out, "cleanup.json")).json()))
   const cleanup = summary.storage_leftovers?.length === 0 && result.environment_cleanup?.status === "confirmed" && cleanups.every(proof =>
     proof.result?.status === "confirmed" && proof.processes?.status === "confirmed" &&

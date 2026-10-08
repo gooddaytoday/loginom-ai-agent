@@ -2,7 +2,10 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, rename, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, runNodeEvalOps, runNodeUnitChecks, nodeRoleCli, type NodeOpsConfig } from "../src/node-eval-ops"
+import { acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, runNodeEvalOps, runNodeUnitChecks, nodeRoleCli, verifyBaselineStand, type NodeOpsConfig } from "../src/node-eval-ops"
+import { prepareBaseline, beginBaselineMeasurement } from "../src/baseline"
+import { repoRoot } from "../src/config"
+import { baselineFixturePins } from "../fixtures/baseline"
 import { archiveProfileHistory } from "../src/profile"
 import { superviseProcess } from "../src/process-supervisor"
 
@@ -107,6 +110,14 @@ test("completion without valid proof cannot release an owned stand", async () =>
     await Bun.write(file, JSON.stringify({ status: "confirmed", cleanup: true }))
     await expect(releaseNodeStand(fixture.config, lease, file)).rejects.toThrow("INVALID_COMPLETION")
     expect((await nodeStandStatus(fixture.config)).status).toBe("BUSY")
+  } finally { await fixture.dispose() }
+})
+
+test("worker completion cannot impersonate baseline completion", async () => {
+  const fixture = await runtime()
+  try {
+    const lease = await acquireNodeStand(fixture.config, owner)
+    await expect(verifyBaselineStand(fixture.config, lease, fixture.config.roles.rich.resultsRoot)).rejects.toThrow("BASELINE_ROLE_REQUIRED")
   } finally { await fixture.dispose() }
 })
 
@@ -298,3 +309,22 @@ test.skipIf(!dockerAvailable || browserBusy)("real harness summary format releas
     await assertNodeStandOwner(fixture.config, next)
   } finally { await fixture.dispose() }
 }, 30_000)
+
+test("an unknown baseline dispatch retains the common stand even when no product PID exists", async () => {
+  const fixture = await runtime()
+  try {
+    const root = fixture.config.runtimeRoot
+    const baseline = { checkout: path.join(root, "checkouts/baseline"), evalProfile: path.join(root, "roles/baseline/eval"),
+      workRoots: [path.join(root, "roles/baseline/work")], resultsRoot: path.join(root, "roles/baseline/results"),
+      cliBin: path.join(root, "cli-baseline/bin/loginom-ai-agent-cli") }
+    for (const directory of [baseline.checkout, baseline.evalProfile, ...baseline.workRoots, baseline.resultsRoot]) await mkdir(directory, { recursive: true, mode: 0o700 })
+    await Bun.write(baseline.cliBin, "new installation")
+    const config: NodeOpsConfig = { ...fixture.config, version: 2, roles: { ...fixture.config.roles, evalbaseline: baseline } }
+    const lease = await acquireNodeStand(config, { ...owner, role: "evalbaseline" })
+    const series = path.join(baseline.resultsRoot, "unknown")
+    const manifest = await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins, smoke: true })
+    await beginBaselineMeasurement(series, manifest.jobs[0]!.key, { checkout: repoRoot, pins: baselineFixturePins })
+    await expect(verifyBaselineStand(config, lease, series)).rejects.toThrow("BASELINE_CLEANUP_UNKNOWN")
+    expect((await nodeStandStatus(config)).status).toBe("BUSY")
+  } finally { await fixture.dispose() }
+})
