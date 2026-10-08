@@ -5,8 +5,8 @@
 - Этапы 0, 3.0 и 3.1 выполнены; single-case smoke, budget=0 и устойчивый readiness ledger реализованы.
 - Этап 3.2: infrastructure/judge recovery, retries, abandon, reconcile, execution budget и cleanup resolutions реализованы.
 - Private v2 config должен закрепить readinessIssue на UUID LAB-32 до freeze; полный start gated.
-- Последний полный suite на 3d3cf1f94: 519 PASS, 7 clean-host SKIP, 0 FAIL; 526 тестов/47 файлов/2508 assertions.
-- Baseline/recovery/helper/judge targeted: 90 PASS/4 clean-host SKIP/0 FAIL/436 assertions; typecheck PASS; новый полный suite выполняется.
+- Полный локальный suite после cleanup resolutions: 549 PASS/7 clean-host SKIP/0 FAIL; 556 тестов/48 файлов/2714 assertions.
+- Targeted 90 PASS/4 SKIP; concurrent/orphan admission 4 PASS; server helper+writer/registration 50 PASS/0 SKIP; typecheck PASS.
 - Единичный fixture CLEANUP_UNKNOWN не воспроизведён в 6 повторах и полном suite; причина не установлена.
 - Исходные bytes/failed cleanup/retry ошибки/verdict сохраняются; отдельный cleanup proof открывает продолжение без повтора продукта.
 - Deployment остаётся bfb7c62e4266e76c995a43b6f909d8a6739ce062; active config v1.
@@ -14,7 +14,7 @@
 - Multica EvalBaseline: eval-tests, gpt-6.1-sol/xhigh, concurrency=1, вне squad; Native MCP actor/auto Peer ранее PASS.
 - LAB-32 01a11ae4-fa45-79ce-aec6-edd7170dafc7; первоначальные instructions/evidence readback PASS.
 - LAB-31 Ben ACCEPT/Evaler completed/in_review; исходный чат idle/его монитор PAUSED.
-- Стенд/очереди/пять профилей ранее чисты; повторить перед активацией, семь clean-host fixtures выполнить без skip до smoke.
+- Стенд/очереди/пять профилей ранее чисты; повторить перед активацией. Все 8 clean-host fixtures выполнены без skip (077d0b5b1).
 - Живые smoke и полный baseline не запускались; UNKNOWN автоматически не повторяется.
 - Карточку полного baseline создать и реально запустить на этапе 7; native heartbeat основного чата на этапе 8.
-- Далее: результат полного suite, оставшиеся crash/concurrency и native cleanup проверки; затем активация и этапы 4–10.
+- Далее: writer settlements для разных executions и cleanup resolution при stale executor; проверки, freeze, затем этапы 4–10.

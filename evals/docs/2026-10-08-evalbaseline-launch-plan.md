@@ -37,8 +37,8 @@
 |---|---|
 | Основной чат-контроллер | `01a11a65-5025-7050-8d46-cee03e4023f3` |
 | Локальный checkout | `/tmp/loginom-baseline-runtime` |
-| Последний проверенный код / развёрнутый срез | `aa33e613e` / `bfb7c62e4266e76c995a43b6f909d8a6739ce062` |
-| Локальный checkpoint после доставки | `ccb85009035fd95db7382af7ef17a22e1d239ac7` |
+| Последний проверенный код / развёрнутый срез | `114d10ffab0efe32dc3db28b25be7137a274cce3` / `bfb7c62e4266e76c995a43b6f909d8a6739ce062` |
+| Проверки recovery и native helper | `077d0b5b109b182787d3964e46412e0e899fcc63` |
 | Сервер / runtime root | `user@10.200.13.152`; `/home/user/.local/share/loginom-evals-runtime` (`R` ниже) |
 | Собственный checkout | `R/checkouts/evalbaseline/loginom-ai-agent` |
 | Собственная среда | `R/roles/evalbaseline/{eval.env,eval-profile,agent-work,work,results,judge-home}` |
@@ -53,7 +53,7 @@
 
 Основной чат отвечает за изменения harness, активацию общей среды, мониторинг и устранение блокеров. EvalBaseline отвечает за исполнение серии, сохранение доказательств и отчёт; он не исправляет продукт или критерии оценки. Rich, Ben и Evaler сохраняют свои роли и порядок приёмки.
 
-Уже проверено: полный CLI manifest — 5389 файлов, AppArmor/sandbox, setup READY, чистота собственного профиля, настоящий MCP search с actor scope и автоматическим Git Peer, Multica readback и доставка evidence. Последний полный suite: 460 PASS, 2 server-only SKIP, 0 FAIL; typecheck PASS. Это исходные свидетельства, а не замена проверки изменившегося состояния перед исполнением.
+Уже проверено: полный CLI manifest — 5389 файлов, AppArmor/sandbox, setup READY, чистота собственного профиля, настоящий MCP search с actor scope и автоматическим Git Peer, Multica readback и доставка evidence. Последний полный локальный suite: 549 PASS, 7 clean-host SKIP, 0 FAIL; typecheck PASS. На выделенном сервере helper и writer/registration fixtures: 50 PASS, 0 SKIP, 0 FAIL, включая дополнительную native cleanup проверку. Это исходные свидетельства, а не замена проверки изменившегося состояния перед исполнением.
 
 ## 3. Подготовить недостающие возможности harness до живых запусков
 
@@ -97,6 +97,7 @@ Infrastructure и judge recovery реализованы отдельными app
 **Бюджет аварийной очистки:** обычный добор после штатной подтверждённой очистки не вызывает `node-eval-ops recover`. Для EvalBaseline действует одна атомарная reservation на конкретный доказанный execution/cleanup incident, включая неуспешную reservation. Новое имя incident при том же execution не сбрасывает бюджет; повтор одной аварии не разрешается. Rich/Ben сохраняют прежнее правило одного recovery на lease. Когда очистку доказать не удалось, сохраняется BLOCKED; новый execution и force-release запрещены.
 
 - [x] Через TDD добавить отдельный аварийный бюджет EvalBaseline: immutable run и cleanup связываются с исходным launcher PID/starttime/uid; O_EXCL/fsync до мутации; разные исполнения допускаются отдельно. Конкурентные/переименованные/частично записанные reservations не сбрасывают бюджет, произвольный cleanup отклоняется; Rich/Ben unchanged. Release отдельным recovery-completion для baseline запрещён. Helper targeted: 24 PASS, 4 clean-host SKIP, 0 FAIL; typecheck PASS.
+- [ ] Завершить границы восстановленной очистки: отдельные writer-settlement receipts для разных baseline executions под одним lease, сохранив прежнее правило Rich/Ben; доказанное cleanup resolution после смерти executor должно позволять штатный reconcile без удаления guard по отсутствующему PID. Проверить оба сценария до freeze.
 
 **Обязательные тесты:**
 
@@ -107,11 +108,12 @@ Infrastructure и judge recovery реализованы отдельными app
 - [x] Повторная ошибка после recovery сохраняет очередной failed execution и удерживает пропуск; переименование прежнего fix с теми же bytes отклоняется. Новое подтверждённое исправление допускает один добор; обе ошибки/retries и расходы сохранены, продукт при judge recovery не повторяется. Public fixture PASS, typecheck PASS.
 - [x] Product PASS/FAIL/timeout/no_artifact не допускают нового продуктового исполнения; валидная низкая оценка не допускает rejudge.
 - [ ] Два одинаковых тика/одновременные recovery-запросы не создают два admission или два dispatch; crash в каждом промежутке сохраняет однозначный результат либо UNKNOWN.
+- [x] Public concurrent resume создаёт один дополнительный execution. Прерванная запись reservation, private fix copy или admission без journal запрещает повторный dispatch и сохраняет исходные bytes. Targeted 4 PASS; все эти проверки вошли в полный suite.
 - [x] Принудительно завершённый fixture executor: живой child запрещает reconcile; после его завершения принимается сохранённый run без повторения; соседний pending job выполняется один раз. Dispatch без child receipt остаётся UNKNOWN. Targeted recovery: 20 PASS, 0 FAIL; typecheck PASS.
 - [ ] Изменённые пины, неизвестный исход, живой child и неподтверждённая очистка блокируют recovery.
 - [ ] Lease удерживается при пропуске; completion проверяет очистку первоначального и дополнительных executions. Чужой release и обход recovery budget отклоняются.
 - [ ] Потребление всех дополнительных executions отражено; regular/analytic и node metrics не объединены в общий score; экспорт исключает secrets/leases/БД.
-- [ ] После изменений выполнить из `evals/` targeted tests, затем `bun test` и `bun typecheck`; разобрать server-only skips на выделенной среде до smoke.
+- [x] После cleanup-resolution изменений: targeted 90 PASS/4 SKIP; `bun test` — 549 PASS/7 SKIP/0 FAIL, 556 тестов/48 файлов/2714 assertions/559,88 с; `bun typecheck` PASS. Дополнительный native cleanup test и прежние clean-host fixtures проверены на серверном срезе `077d0b5b1`: helper 29 PASS, writer/registration 21 PASS, без skips. Первый writer запуск сохранил ошибку отсутствующего Node; изолированный fixture Node с проверенным SHA устранил предпосылку, повтор PASS. При следующих изменениях кода повторить необходимые проверки.
 
 ## 4. Активировать v2 для всех исполнителей
 

@@ -52,3 +52,22 @@ CLEANUP_UNKNOWN не доказывает конкретную ошибку supe
 Assertions и guards сохранены. Финальный полный suite на текущей реализации:
 519 PASS, 7 clean-host SKIP, 0 FAIL; 526 тестов/47 файлов, 2508 assertions,
 526,39 секунды. `bun typecheck` PASS. Live проверки ещё не выполнены.
+
+## Проверки после cleanup resolutions
+
+Полный локальный suite после реализации `114d10ffa`: 549 PASS, 7 clean-host SKIP,
+0 FAIL; 556 тестов/48 файлов/2714 assertions, 559,88 секунды. Concurrent resume
+и три orphan admission состояния вошли в этот suite; дополнительный native cleanup
+fixture из `077d0b5b1` проверен отдельно на сервере. `bun typecheck` PASS.
+
+Серверный срез `077d0b5b1` распакован в отдельном закрытом fixture-каталоге, без
+переключения active config или operational supplement. `node-eval-ops.test.ts`:
+29 PASS, 0 SKIP, 0 FAIL; процессы, архивы, профили и отдельные network-none Docker
+контейнеры проверены фактически. Writer/registration: первый запуск 20 PASS/1 FAIL
+из-за `Bun.which("node") === null`; это установленная недостающая предпосылка.
+Проверенный bundled Node v24.19.0 помещён только в fixture-bin, SHA256
+`bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12`.
+Повтор: 21 PASS, 0 SKIP, 0 FAIL. Все восемь clean-host fixtures прошли; первоначальная
+ошибка сохранена в отдельном private log. Оцениваемая модель и судья не вызывались.
+Это подтверждение fixtures, а немодельная проверка установленного CLI и два живых
+smoke на настоящем стенде остаются этапами 5–6.
