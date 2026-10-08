@@ -25,11 +25,14 @@ results вне agent workspace и profile. Не использовать про�
 В установленном node runtime reference.env использует прежние имена MODEL,
 VARIANT, CLI, PROFILE, WORK_ROOT, ATTEMPT_TIMEOUT_S и LOGINOM_STORAGE. Это данные
 окружения, не зависимость от старого skill. Не передавать такой файл helper без
-перевода: product eval.env выбирает другую модель и другой профиль.
+перевода. eval.env даёт параметры подключения, но его product модель/профиль
+обязательно переопределяются reference overlay до dispatch.
 
-Запустить команду внутри текущих `with-env runtime.env` и `with-env reference.env`;
-назначение также задаёт SKILL_ROOT, DRAFT и REFERENCE_RESULTS (собственный отдельный
-каталог results этой работы). В этой загруженной shell-среде:
+Загрузить окружение в порядке `with-env runtime.env` → `with-env roles/<role>/eval.env`
+(подключение к Loginom/Dock) → `with-env roles/<role>/reference.env` → shell overlay;
+назначение также задаёт SKILL_ROOT, DRAFT, REFERENCE_TIMEOUT_MS и REFERENCE_RESULTS
+(собственный отдельный каталог results этой работы). Старый ATTEMPT_TIMEOUT_S
+может расходиться с текущим поручением; timeout брать явно из назначения. В этой загруженной shell-среде:
 
 ```sh
 export EVAL_CLI_MODE=binary
@@ -39,7 +42,7 @@ export EVAL_AGENT_VARIANT="$VARIANT"
 export EVAL_PROFILE_DIR="$PROFILE"
 export EVAL_WORKSPACE_ROOT="$WORK_ROOT/agent-work"
 export EVAL_RESULTS_DIR="$REFERENCE_RESULTS"
-export EVAL_TASK_TIMEOUT_MS="$((ATTEMPT_TIMEOUT_S * 1000))"
+export EVAL_TASK_TIMEOUT_MS="${REFERENCE_TIMEOUT_MS:?timeout from assignment required}"
 export LOGINOM_STORAGE_DIR="$LOGINOM_STORAGE"
 bun "$SKILL_ROOT/scripts/reference-attempt.ts" "$DRAFT" 1
 ```
