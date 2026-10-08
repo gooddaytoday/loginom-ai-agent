@@ -591,3 +591,15 @@ ABC. Common abeeb0cf… и все21 execution pins повторно провер
 Операция хранения не входит в агентский execution adapter и не меняет условия
 A/B. Архивирующий helper приватный; его доказательство — фактический полный
 roundtrip, а не fixture. Свободное место после проверки: около7.14GiB.
+
+## Formal baseline: четвёртая попытка PASS
+
+`campaign-roi-by-channel#1`: CLI0/completed/judge100/oracle PASS/404.383s,
+cleanup confirmed/no cleanup_error. Reviewer v5: структура0/warm oracle PASS
+в `ab-formal-v5-base-reviews-20261008-campaign-roi-by-channel-1`.
+Cold не выполнен. Закрытая история сохранена тем же helper после всех guards:
+4610 entries/full roundtrip, archive16643448 bytes; receipt рядом с архивом в
+`ab-formal-v5-20261008/base/profile.history`. История восстанавливается по
+receipt argv; исходные result/events/артефакты и диагностика сохранены.
+Серия жива:3 успешные и1 no_artifact из первых4 завершённых попыток;
+это не полный baseline45, не candidate и не статистический verdict.
