@@ -37,3 +37,26 @@ Desktop `bun typecheck` после исправления fixture: PASS.
 Evidence находится в приватном каталоге `package-docs-20261006/ab-local-stand-20261008`
 и `/tmp/skills-runtime-acceptance-budgets-signal`. Native live oracle после
 исправления не выполнен; успешная проверка schemas его не заменяет.
+
+## 2026-10-09: compact request в owner-loss driver
+
+Тот же устаревший аргумент найден в `script/cli-owner-crash.ts` до его native
+запуска. Контракт `c643db476` намеренно удаляет `budgets` из публичной compact
+schema и добавляет их при host expansion. Удалена одна строка driver;
+signal targets, проверка active operation/recovery, deadlines и cleanup assertions
+сохранены. Это исправление тестового адаптера, не изменение продукта.
+
+TDD RED: фактический request driver отклонён публичным validator с
+`unknown field budgets`. GREEN: compact schema, import parameter schema и
+полный host-expanded request принимаются. Тест вычисляет существующий request
+в VM без запуска live entrypoint; отдельной копии request в тесте нет.
+Он написан на JavaScript, как проверяемые runtime contracts. Первый TypeScript
+вариант дал TS7016 на их отсутствующих declarations; после переноса теста в
+`.test.mjs` Host typecheck PASS без изменения tsconfig или добавления `any`.
+
+Команда из `packages/loginom-host`:
+`bun test test/cli-owner-crash-contract.test.mjs test/cli-owner-crash.test.ts test/oracle-provider.test.ts`:
+5 PASS/0 FAIL/28 assertions; `bun typecheck`: PASS.
+Private evidence: `ab-local-stand-20261008/owner-driver-compact-{red,green,regression,final,typecheck,typecheck-final}-20261009.log`.
+Все21 закреплённых A/B adapter pins повторно PASS; испытуемые сборки и frozen
+harness не менялись. Native SIGINT/owner-loss/cleanup остаются непроверенными.
