@@ -668,6 +668,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | low-liquidity-companies | 1 | FAIL0/no_artifact | Нет / не выполнялись | 23 / 23 / 21 | 4487 / 15707741 | 3 / 4075869 |
 | monthly-demand | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4604 / 16230213 | 3 / 4358291 |
 | nps-segments-by-tier | 1 | PASS100 | Есть / PASS | 23 / 22 / 18 | 4605 / 16613250 | 3 / 4745354 |
+| risky-approved-claims | 1 | PASS100 | Есть / PASS | 20 / 21 / 17 | 4531 / 16301844 | 3 / 4666374 |
 
 Последний private snapshot `formal-v9-progress-9-20261009.json` SHA256
 `bd3dfd6fadbe73a2f9bff01ee31681692d1fb6da52d92f348a5351bfaba04702`:
@@ -792,3 +793,20 @@ metrics10 SHA256
 жив с совпадающими UID/exe/inode, common020c08059… неизменен.
 Итого closed10/45:7 PASS100/3 no_artifact FAIL0; risky-approved-claims#1
 выполняется. Candidate formal/cold/compare не начаты, полный90 не принят.
+
+Одиннадцатый closed formal v9 `risky-approved-claims#1` PASS100:
+structure/warm oracle PASS, cleanup6 stages/processes confirmed,
+error null/remaining0×2. History4531/16301844bytes и diagnostics3/4666374bytes
+сохранены с full roundtrip. Trace/result counters match:20 finishes/21 tools/
+17 Loginom/skill0/prepare1/error1. Ошибка node_apply REQUEST_REJECTED/NOT_APPLIED
+(Unsupported node label, effectPossible=false/cleanupComplete=true) сохранена;
+ручного перезапуска нет. Cold formal пакета pending.
+
+Private progress11 SHA256
+`e5e85ebe774444ffd35653ab8afd9c6e89c26ab57b21eeaf4484aa4a64949769`,
+metrics11 SHA256
+`7b2ffa3dfe112a9786188c6167ba0f536ce252e1b18bbd138ed852994bda7cb8`.
+Все11 closed results/cleanup/process-cleanup и архивы, предыдущие10 traces
+повторно проверены по SHA; common020c08059… и PID676156/UID/birth/exe/inode
+неизменны. Closed11/45:8 PASS100/3 no_artifact FAIL0, sales-by-category#1
+running. Candidate/cold/compare не начаты; полный90 не принят.
