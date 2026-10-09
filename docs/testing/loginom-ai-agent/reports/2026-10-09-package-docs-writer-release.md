@@ -679,6 +679,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | nps-segments-by-tier | 1 | PASS100 | Есть / PASS | 23 / 22 / 18 | 4605 / 16613250 | 3 / 4745354 |
 | nps-segments-by-tier | 2 | FAIL0/no_artifact | Нет / не выполнялись | 25 / 24 / 22 | 4573 / 15360166 | 3 / 3529110 |
 | risky-approved-claims | 1 | PASS100 | Есть / PASS | 20 / 21 / 17 | 4531 / 16301844 | 3 / 4666374 |
+| risky-approved-claims | 2 | PASS100 | Есть / PASS | 21 / 21 / 17 | 4531 / 16273731 | 3 / 4637187 |
 | sales-by-category | 1 | PASS100 | Есть / PASS | 16 / 17 / 13 | 4507 / 15561728 | 3 / 4000100 |
 | slow-supplier-deliveries | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4618 / 17032000 | 3 / 5128503 |
 | support-by-priority | 1 | PASS100 | Есть / PASS | 24 / 23 / 19 | 4622 / 17776466 | 3 / 5863398 |
@@ -1147,4 +1148,22 @@ metrics25 SHA256
 проверены; reviews18/first-repeat cold index15/partial closed24 cold index/
 batch8 receipt/readback SHA совпали. Common020c08059… и controller identity
 совпали. Closed25/45:18 PASS100/7 no_artifact FAIL0, risky#2 running;
+candidate/cold/compare0/retries0. Полный90 не принят.
+
+Двадцать шестой closed formal v9 `risky-approved-claims#2` PASS100:
+structure/warm oracle PASS; cleanup6 stages/processes confirmed,
+error null/remaining0×2. History4531/16273731bytes и diagnostics3/4637187bytes
+full roundtrip. Trace/result counters match:21 finishes/21 tools/17 Loginom/
+skill0/prepare1/errors1. Единственный node_apply error: unsupported node label,
+NOT_APPLIED/REQUEST_REJECTED/effectPossible=false/cleanupComplete=true.
+Исходная попытка затем завершилась PASS100; ручного model retry не было.
+
+Private progress26 SHA256
+`274d0b7c6e21ad22dd018ef27183bc7f8862bd3d9a5414eb53bd00cc2c79d8cf`,
+metrics26 SHA256
+`a0f0d16644d55dd26e280a5e34df655e6627a1a20e631343c1c942da0cb62651`.
+Все26 results/cleanup/process-cleanup/архивы и предыдущие25 trace SHA
+проверены; reviews19/first-repeat cold index15/partial closed24 cold index/
+batch8 receipt/readback SHA совпали. Common020c08059… и controller identity
+совпали. Closed26/45:19 PASS100/7 no_artifact FAIL0, sales#2 running;
 candidate/cold/compare0/retries0. Полный90 не принят.
