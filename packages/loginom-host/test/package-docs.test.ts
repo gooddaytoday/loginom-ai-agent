@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "bun:test"
 import { Uint8ArrayReader, TextWriter, ZipReader } from "@zip.js/zip.js"
 import { createHash } from "node:crypto"
-import { cp, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, readFile, realpath, readdir, rm, symlink, writeFile } from "node:fs/promises"
 import { inflateSync } from "node:zlib"
 import { tmpdir } from "node:os"
 import { pathToFileURL } from "node:url"
@@ -13,7 +13,7 @@ import { pdfPages, pdfText } from "./package-docs-pdf"
 
 const fixtures = join(import.meta.dir, "fixtures/package-docs")
 const fonts = new URL("../../product/skills/package-docs/assets/fonts/", import.meta.url)
-const bundle = await mkdtemp(join(tmpdir(), "loginom-docs-node-"))
+const bundle = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-node-")))
 const output = join(bundle, "scripts")
 
 beforeAll(async () => {
@@ -81,7 +81,7 @@ test.each(["#", "##", "###", "####", "**"])("PDF keeps %s section titles with sh
 test("the product builder emits a standalone Node script and its actual license dependency graph", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
-  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-builder-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-builder-")))
   try {
     const builder = Bun.spawn([process.execPath, join(import.meta.dir, "../script/build-package-docs.ts"), join(directory, "scripts")],
       { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" })
@@ -103,7 +103,7 @@ test("the product builder emits a standalone Node script and its actual license 
 test.skipIf(process.platform === "win32")("Node CLI runs through a symlink without executing when imported", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
-  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-symlink-entry-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-symlink-entry-")))
   try {
     const entry = join(directory, "package-docs.mjs")
     await symlink(join(output, "package-docs.mjs"), entry)
@@ -123,7 +123,7 @@ test.skipIf(process.platform === "win32")("Node CLI runs through a symlink witho
 test("Node CLI extracts an unchanged package into a session-owned work directory", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
-  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-session-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-session-")))
   try {
     const lgp = join(fixtures, "demo.lgp")
     const before = createHash("sha256").update(await readFile(lgp)).digest("hex")
@@ -140,7 +140,7 @@ test("Node CLI extracts an unchanged package into a session-owned work directory
 }, 20_000)
 
 test("Node CLI creates a Markdown skeleton in the same session work directory", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-skeleton-session-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-skeleton-session-")))
   try {
     const result = await docsCommand(["skeleton", "--lgp", join(fixtures, "demo.lgp"), "--directory", directory], directory)
     expect(result.code).toBe(0)
@@ -162,7 +162,7 @@ async function docsCommand(args: string[], directory: string) {
 }
 
 test("a package using a local input file reports only the absence of external package references", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-file-dependency-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-file-dependency-")))
   try {
     const result = await docsCommand(["skeleton", "--lgp", join(fixtures, "nested.lgp"), "--directory", directory], directory)
     expect(result.code).toBe(0)
@@ -178,7 +178,7 @@ test("a package using a local input file reports only the absence of external pa
 }, 20_000)
 
 test("repeating skeleton preserves the user's filled draft", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-repeat-skeleton-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-repeat-skeleton-")))
   try {
     const args = ["skeleton", "--lgp", join(fixtures, "demo.lgp"), "--directory", directory]
     const first = await docsCommand(args, directory)
@@ -192,7 +192,7 @@ test("repeating skeleton preserves the user's filled draft", async () => {
 }, 20_000)
 
 test("Node CLI emits default PDF into the session directory from its filled draft", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-emit-session-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-emit-session-")))
   try {
     const options = ["--lgp", join(fixtures, "demo.lgp"), "--directory", directory]
     const skeleton = await docsCommand(["skeleton", ...options], directory)
@@ -208,7 +208,7 @@ test("Node CLI emits default PDF into the session directory from its filled draf
 }, 20_000)
 
 test("emit rejects a draft missing mandatory sections without publishing a report", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-incomplete-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-incomplete-")))
   try {
     const options = ["--lgp", join(fixtures, "demo.lgp"), "--directory", directory]
     const skeleton = await docsCommand(["skeleton", ...options], directory)
@@ -223,7 +223,7 @@ test("emit rejects a draft missing mandatory sections without publishing a repor
 }, 20_000)
 
 test("emit preserves existing reports and chooses the next free collision suffix", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-collision-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-collision-")))
   try {
     const options = ["--lgp", join(fixtures, "demo.lgp"), "--directory", directory]
     const skeleton = await docsCommand(["skeleton", ...options], directory)
@@ -244,7 +244,7 @@ test("emit preserves existing reports and chooses the next free collision suffix
 }, 20_000)
 
 test("CLI handles spaces and quoted Cyrillic paths, all formats and format aliases", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom docs formats "))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom docs formats ")))
   try {
     const lgp = join(directory, "Пакет & 'данные'.lgp")
     await cp(join(fixtures, "demo.lgp"), lgp)
@@ -275,8 +275,8 @@ test("CLI handles spaces and quoted Cyrillic paths, all formats and format alias
 }, 20_000)
 
 test("a workspace symlink cannot redirect generated files outside the session", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-linked-work-"))
-  const external = await mkdtemp(join(tmpdir(), "loginom-docs-external-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-linked-work-")))
+  const external = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-external-")))
   try {
     await writeFile(join(external, "keep"), "original")
     await symlink(external, join(directory, ".work"))
@@ -290,7 +290,7 @@ test("a workspace symlink cannot redirect generated files outside the session", 
 }, 20_000)
 
 test("CLI placeholder failure leaves no final report or publication temporary file", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-placeholders-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-placeholders-")))
   try {
     const options = ["--lgp", join(fixtures, "demo.lgp"), "--directory", directory]
     expect((await docsCommand(["skeleton", ...options], directory)).code).toBe(0)
@@ -302,8 +302,33 @@ test("CLI placeholder failure leaves no final report or publication temporary fi
   } finally { await rm(directory, { recursive: true, force: true }) }
 }, 20_000)
 
+test.skipIf(process.platform === "win32")("backend-selected output accepts an alias of the owned session directory", async () => {
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
+  const root = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-output-alias-")))
+  try {
+    const directory = join(root, "session")
+    const alias = join(root, "alias")
+    await mkdir(directory)
+    await symlink(directory, alias, "dir")
+    const run = (operation: string, args: string[] = []) => Bun.spawn([
+      node, join(output, "package-docs.mjs"), operation, "--lgp", join(fixtures, "demo.lgp"), "--directory", alias, ...args,
+    ], { stdout: "pipe", stderr: "pipe" })
+    const skeleton = run("skeleton")
+    const [code, stdout, stderr] = await Promise.all([skeleton.exited, new Response(skeleton.stdout).text(), new Response(skeleton.stderr).text()])
+    expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+    const report = JSON.parse(stdout).report
+    await writeFile(report, (await readFile(report, "utf8")).replace(/PLACEHOLDER_[A-Z_0-9]+/g, "Описание сценария."))
+    const child = run("emit", ["--format", "md", "--output", join(alias, "demo.lgp_report.md")])
+    const [emitCode, emitOut, emitError] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect({ code: emitCode, stderr: emitError }).toEqual({ code: 0, stderr: "" })
+    expect(await readFile(JSON.parse(emitOut).output, "utf8")).toContain("Описание сценария.")
+    expect(await readFile(join(directory, "demo.lgp_report.md"), "utf8")).toContain("Описание сценария.")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("backend-selected output is exclusive and never silently moves after a collision", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-fixed-output-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-fixed-output-")))
   try {
     const options = ["--lgp", join(fixtures, "demo.lgp"), "--directory", directory]
     const skeleton = await docsCommand(["skeleton", ...options], directory)
@@ -326,8 +351,8 @@ test("backend-selected output is exclusive and never silently moves after a coll
 }, 20_000)
 
 test("backend-selected output cannot escape the session or target an unrelated file", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-output-boundary-"))
-  const outside = await mkdtemp(join(tmpdir(), "loginom-docs-output-outside-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-output-boundary-")))
+  const outside = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-output-outside-")))
   try {
     const options = ["--lgp", join(fixtures, "demo.lgp"), "--directory", directory]
     const skeleton = await docsCommand(["skeleton", ...options], directory)
@@ -370,7 +395,7 @@ test("a missing report font gives a specific error instead of a finished report"
 })
 
 test("a truncated TTF metrics table gives a specific invalid-font error", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-bad-font-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-docs-bad-font-")))
   try {
     await cp(fonts, directory, { recursive: true })
     const path = join(directory, "GolosText-Regular.ttf")

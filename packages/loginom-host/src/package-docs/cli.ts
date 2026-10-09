@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto"
 import { constants } from "node:fs"
 import { link, lstat, mkdir, open, realpath, rename, unlink, writeFile } from "node:fs/promises"
-import { basename, extname, isAbsolute, join, relative } from "node:path"
+import { basename, dirname, extname, isAbsolute, join, relative } from "node:path"
 import { pathToFileURL } from "node:url"
 import { extractPackage } from "./extract"
 import { renderSkeleton } from "./skeleton"
@@ -44,6 +44,9 @@ export async function runPackageDocs(input: { operation: "extract" | "skeleton" 
   const payload = await renderReport(markdown, format)
   let output = input.output ?? join(directory, `${stem}.lgp_report.${format}`)
   if (input.output) {
+    const parent = isAbsolute(input.output) ? await realpath(dirname(input.output)).catch(() => undefined) : undefined
+    if (parent !== directory) throw Error("PACKAGE_DOCS_OUTPUT_ESCAPE")
+    output = join(directory, basename(input.output))
     const name = relative(directory, output), prefix = stem + ".lgp_report", suffix = "." + format
     const number = name.slice(prefix.length, -suffix.length)
     if (!isAbsolute(output) || !name.startsWith(prefix) || !name.endsWith(suffix) ||

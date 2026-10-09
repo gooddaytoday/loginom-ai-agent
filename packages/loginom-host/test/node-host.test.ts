@@ -152,6 +152,7 @@ test.each(["ready", "close"])(
       `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser forbidden');`,
     )
     await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
+    await mkdir(root, { recursive: true, mode: 0o700 })
     if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
     const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
     await store.stage({
