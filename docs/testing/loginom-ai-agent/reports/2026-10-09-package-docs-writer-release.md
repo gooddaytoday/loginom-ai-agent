@@ -1309,3 +1309,17 @@ Progress34 SHA `f0c93ebc3c6df3d62075d7076e559ae459361266c4f081579e48ad1ef915a83a
 metrics34 SHA `6ae258133e796d0124c172295b04f5cbea2a18117c75673876d710d15fa63893`.
 Common020c08059…/controller identity совпали. Closed34/45:25 PASS100/9 FAIL0,
 cohort#3 running; candidate/cold/compare0/retries0, полный90 не принят.
+
+Read-only наблюдение текущего `cohort-spend-activity#3` до terminal:
+в собственном execution journal на06:36:15Z записан `recovery_unverified`,
+`AMBIGUOUS/output_mapping/effect_possible=true/cleanup_complete=false`,
+`OUTPUT_MAPPING_RECOVERY_UNVERIFIED: Original output Done reference unavailable`.
+Позднейшая запись `verification_delivered` на06:36:22Z сама по себе
+не подтверждает recovery. На момент чтения result.json отсутствовал,
+controller UID/birth/executable/inode совпали; journal размер/mtime
+не изменились во время чтения. Сохранены SHA четырёх последних записей
+и ограниченный набор полей, без выполнения новых native/model/judge calls.
+Private receipt `formal-v9-cohort-attempt3-readonly-live-20261009.json`,
+SHA `2ea8c4b2319993fbc40d9afd7ba5cb8936f04d067084059b600669bca96ac797`,
+mode600/read-back PASS. Итог попытки и native cause ещё UNKNOWN;
+счётчики closed34/PASS25/FAIL9 не меняются, ручных повторов0.

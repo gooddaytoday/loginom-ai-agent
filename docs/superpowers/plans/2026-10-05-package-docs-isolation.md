@@ -1055,7 +1055,10 @@ Core имеет разметку осей, но без CSV oracle. По доку
   SHA8eecd96824… сохранён; two-repeat cold index30 SHA942b6964c6… проверяет21
   request/package/input/oracle SHA; cold ещё не выполнен. По первым двум повторам:
   9 задач PASS/PASS,3 FAIL/FAIL,3 mixed. Ab-revenue/ABC/articles/campaign baseline judge/structure/warm3/3
-  PASS, formal cold12 pending. Cohort#3 выполняется; candidate formal,
+  PASS, formal cold12 pending. Cohort#3 выполняется; read-only journal
+  отмечает recovery_unverified/AMBIGUOUS/output_mapping/cleanup=false,
+  receipt SHA2ea8c4b231… сохранён. Это не terminal result и не причина сбоя.
+  Candidate formal,
   formal cold и compare не начаты. Ручных повторов0; первый повтор не заменяет
   baseline45/candidate45, cold каждого сохранённого пакета и итоговый compare.
 
