@@ -669,6 +669,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | articles-by-author | 3 | PASS100 | Есть / PASS | 21 / 21 / 17 | 4600 / 15910992 | 3 / 4040201 |
 | campaign-roi-by-channel | 1 | PASS100 | Есть / PASS | 19 / 19 / 15 | 4610 / 16655815 | 3 / 4687353 |
 | campaign-roi-by-channel | 2 | PASS100 | Есть / PASS | 17 / 16 / 16 | 4612 / 17586705 | 3 / 5620442 |
+| campaign-roi-by-channel | 3 | PASS100 | Есть / PASS | 20 / 20 / 16 | 4610 / 16681226 | 3 / 4709869 |
 | cohort-spend-activity | 1 | FAIL0/no_artifact | Нет / не выполнялись | 22 / 21 / 18 | 4563 / 15206251 | 3 / 3337376 |
 | cohort-spend-activity | 2 | FAIL0 | Нет / не выполнялось | 21 / 21 / 19 | 4564 / 15352878 | 3 / 3489173 |
 | customer-activity-segments | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4608 / 17448322 | 3 / 5497845 |
@@ -1295,3 +1296,16 @@ Progress33 SHA `b85efd19a4db5ef4b22c8ea688cad15cfeb2bdc4e1c2cf6e814fba2efe0a800f
 metrics33 SHA `fd8831f8ff53cdec2c876f8ec83470923784f3571beb5529445c3af61203d5a8`.
 Common020c08059…/controller identity совпали. Closed33/45:24 PASS100/9 FAIL0,
 campaign#3 running; candidate/cold/compare0/retries0, полный90 не принят.
+
+Тридцать четвёртый closed formal v9 `campaign-roi-by-channel#3` PASS100:
+structure/warm oracle PASS, cleanup6 stages/processes confirmed/error null/
+remaining0×2; history/diagnostics full roundtrip (объёмы в таблице).
+Trace/result counters match:20 finishes/20 tools/16 Loginom/skill0/prepare1/errors0.
+У ab-revenue/ABC/articles/campaign проверены judge100/structure/warm3/3 PASS;
+formal cold этих12 пакетов pending, candidate/NI не доказаны.
+Все34 results/cleanup/process-cleanup/архивы, предыдущие33 trace SHA и
+reviews25/cold indexes15+24+30/batch8+9 receipts повторно проверены.
+Progress34 SHA `f0c93ebc3c6df3d62075d7076e559ae459361266c4f081579e48ad1ef915a83a`;
+metrics34 SHA `6ae258133e796d0124c172295b04f5cbea2a18117c75673876d710d15fa63893`.
+Common020c08059…/controller identity совпали. Closed34/45:25 PASS100/9 FAIL0,
+cohort#3 running; candidate/cold/compare0/retries0, полный90 не принят.
