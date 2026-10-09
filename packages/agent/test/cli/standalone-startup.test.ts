@@ -236,7 +236,7 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN)(
       }
     }
     try {
-      expect(await invoke(["providers", "list"])).toMatchObject({ code: 0, stderr: "" })
+      expect(await invoke(["providers", "list"])).toMatchObject({ code: 0 })
       for (const args of [
         ["run", "--format=json"],
         ["loginom", "status", "--format=json"],

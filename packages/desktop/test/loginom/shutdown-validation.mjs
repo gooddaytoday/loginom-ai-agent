@@ -124,7 +124,7 @@ for (const phase of ["navigation", "login-form"]) {
     const before = await processes()
     // The private artifact path also identifies owned crash handlers that may
     // already have been reparented outside the Electron descendant tree.
-    for (const entry of before) if (entry.args.includes(dirname(executable))) owned.add(entry.pid)
+    for (const entry of before) if (entry.args.startsWith(dirname(executable) + "/")) owned.add(entry.pid)
     for (let changed = true; changed; ) {
       changed = false
       for (const entry of before)
