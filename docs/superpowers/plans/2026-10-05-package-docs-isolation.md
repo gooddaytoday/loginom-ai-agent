@@ -1041,19 +1041,19 @@ Core имеет разметку осей, но без CSV oracle. По доку
   Дополнительная активация candidate:1 provider-turn/1 skill-вызов;
   прочий рост tools/Loginom измерен отдельно и не разрешает новые отказы.
   Formal baseline session60189/run20261009-021118-d08be6baf продолжается:
-  closed27/45:20 PASS100/7 no_artifact FAIL0. Первый повтор15 завершён:
-  12 PASS100/3 FAIL (cohort/first-last/low-liquidity). Второй повтор:8 PASS100/4 FAIL0; у созданных пакетов
+  closed28/45:21 PASS100/7 no_artifact FAIL0. Первый повтор15 завершён:
+  12 PASS100/3 FAIL (cohort/first-last/low-liquidity). Второй повтор:9 PASS100/4 FAIL0; у созданных пакетов
   structure/warm oracle PASS; третий повтор остаётся обязательным.
   Cohort#2, first-last#2, low-liquidity#2, NPS#2 no_artifact FAIL0:
   readiness/recovery не подтверждены.
-  Всем27 подтверждены6 cleanup stages,
+  Всем28 подтверждены6 cleanup stages,
   process cleanup/error null/remaining0×2, history/diagnostics full roundtrip;
   semantic recovery этим не доказывается, native root causes UNKNOWN.
-  Для20 пакетов structure/warm oracle PASS. Progress27 SHA317723f5dd…,
-  metrics27 SHAf7fceb513d…, первый cold index15 SHA25f7fe5287… подтверждает
+  Для21 пакета structure/warm oracle PASS. Progress28 SHA5ab97a0490…,
+  metrics28 SHA24d5c023b7…, первый cold index15 SHA25f7fe5287… подтверждает
   request/package/input SHA для12 пакетов первого повтора. Partial closed24 cold index
   SHA8eecd96824… проверяет18 request/package/input/oracle SHA; cold ещё не выполнен.
-  Slow-supplier#2 выполняется; candidate formal,
+  Support#2 выполняется; candidate formal,
   formal cold и compare не начаты. Ручных повторов0; первый повтор не заменяет
   baseline45/candidate45, cold каждого сохранённого пакета и итоговый compare.
 

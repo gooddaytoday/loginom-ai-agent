@@ -683,6 +683,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | sales-by-category | 1 | PASS100 | Есть / PASS | 16 / 17 / 13 | 4507 / 15561728 | 3 / 4000100 |
 | sales-by-category | 2 | PASS100 | Есть / PASS | 17 / 17 / 13 | 4507 / 15570944 | 3 / 4007473 |
 | slow-supplier-deliveries | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4618 / 17032000 | 3 / 5128503 |
+| slow-supplier-deliveries | 2 | PASS100 | Есть / PASS | 23 / 23 / 19 | 4618 / 17032433 | 3 / 5127753 |
 | support-by-priority | 1 | PASS100 | Есть / PASS | 24 / 23 / 19 | 4622 / 17776466 | 3 / 5863398 |
 | trial-dosage-outcomes | 1 | PASS100 | Есть / PASS | 20 / 21 / 17 | 4606 / 16932603 | 3 / 5046893 |
 
@@ -1180,3 +1181,17 @@ Progress27 SHA `317723f5dd28728405d95fdd0dfe3702c1d65d0943f759ac2e256381341bfdfa
 metrics27 SHA `f7fceb513de557b0a091923abb9a3a93788ae0cfca5b46170ef43d87c0332e70`.
 Common020c08059…/controller identity совпали. Closed27/45:20 PASS100/7 FAIL0,
 slow-supplier#2 running; candidate/cold/compare0/retries0, полный90 не принят.
+
+Двадцать восьмой closed formal v9 `slow-supplier-deliveries#2` PASS100:
+structure/warm oracle PASS, cleanup6 stages/processes confirmed/error null/
+remaining0×2; history/diagnostics full roundtrip (объёмы в таблице).
+Trace/result counters match:23 finishes/23 tools/19 Loginom/skill0/prepare1/
+errors1. Единственный node_apply error: unsupported node label,
+NOT_APPLIED/REQUEST_REJECTED/effectPossible=false/cleanupComplete=true;
+исходная попытка затем завершилась PASS100 без ручного model retry.
+Все28 results/cleanup/process-cleanup/архивы, предыдущие27 trace SHA и
+reviews21/cold indexes15+24/batch8 receipts повторно проверены.
+Progress28 SHA `5ab97a0490aef8b3362e78df36ac61b51a7e56a9d56b833a814c74359f63e213`;
+metrics28 SHA `24d5c023b7848070ae56736578e59f9dd22162c3eb9e6bdf6d99e689317ec297`.
+Common020c08059…/controller identity совпали. Closed28/45:21 PASS100/7 FAIL0,
+support#2 running; candidate/cold/compare0/retries0, полный90 не принят.
