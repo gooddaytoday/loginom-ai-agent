@@ -37,13 +37,16 @@ async function loadTask(dir: string) {
     throw new EvalFailure(`${id}: task.json не является корректным JSON-объектом`, 2)
   const raw = parsed as Raw
   if (raw.id !== id) throw new EvalFailure(`${id}: поле id ("${String(raw.id)}") должно совпадать с именем каталога`, 2)
+  if (raw.output_mode !== undefined && raw.output_mode !== "diagnostic")
+    throw new EvalFailure(`${id}: output_mode должен быть diagnostic или отсутствовать`, 2)
   const task = {
     id,
     dir,
     title: text(raw, "title", id),
     prompt: text(raw, "prompt", id),
     inputs: strings(raw, "inputs", id),
-    reference: text(raw, "reference", id),
+    reference: raw.output_mode === "diagnostic" ? "" : text(raw, "reference", id),
+    ...(raw.output_mode === "diagnostic" ? { outputMode: "diagnostic" as const } : {}),
     spec: text(raw, "spec", id),
     checklist: checklist(raw, id),
     expectedOutput: text(raw, "expected_output", id),
@@ -51,7 +54,7 @@ async function loadTask(dir: string) {
     oracle: await Bun.file(path.join(dir, "oracle.csv")).exists() ? "oracle.csv" : undefined,
     oracleTolerance: oracleTolerance(raw, id),
   }
-  for (const rel of [task.reference, task.spec, ...task.inputs]) {
+  for (const rel of [task.reference, task.spec, ...task.inputs].filter(Boolean)) {
     if (!(await Bun.file(path.join(dir, rel)).exists())) throw new EvalFailure(`${id}: файл "${rel}" не найден`, 2)
   }
   return task
@@ -129,8 +132,11 @@ export const agentPromptTail =
   "Если задача требует выгрузку в файл, назови его `{result_name}`. " +
   "Уточняющих вопросов не задавай — принимай разумные решения самостоятельно и доведи задачу до конца."
 
-export function buildAgentPrompt(prompt: string, packagePath: string, resultName: string) {
-  return `${prompt}\n\n${agentPromptTail.replace("{package_path}", () => packagePath).replace("{result_name}", () => resultName)}`
+export const diagnosticPromptTail = "Выполни заданный диагностический протокол и сообщи наблюдаемый исход. " +
+  "Ожидаемый отказ не требует успешного пакета или выгрузки. Уточняющих вопросов не задавай."
+
+export function buildAgentPrompt(prompt: string, packagePath: string, resultName: string, outputMode?: "diagnostic") {
+  return `${prompt.replaceAll("{{PACKAGE_PATH}}", () => packagePath)}\n\n${outputMode === "diagnostic" ? diagnosticPromptTail : agentPromptTail.replace("{package_path}", () => packagePath).replace("{result_name}", () => resultName)}`
 }
 
 export function taskTimeoutMs(config: Pick<EvalConfig, "timeoutMs" | "taskTimeoutMs">, task: Task) {
@@ -142,6 +148,7 @@ export async function agentInputsHash(tasks: Task[], tail = agentPromptTail) {
   hashPart(hasher, "prompt_tail", tail)
   for (const task of tasks) {
     hasher.update(`${task.id}\n`)
+    if (task.outputMode) hashPart(hasher, "diagnostic_prompt_tail", diagnosticPromptTail)
     hashPart(hasher, "prompt", task.prompt)
     for (const rel of [...task.inputs].sort()) hashPart(hasher, `input:${rel}`, await Bun.file(path.join(task.dir, rel)).bytes())
   }
@@ -155,7 +162,8 @@ export async function rubricHash(tasks: Task[]) {
     hashPart(hasher, "checklist", JSON.stringify(task.checklist))
     hashPart(hasher, "expected_output", task.expectedOutput)
     hashPart(hasher, "spec", await Bun.file(path.join(task.dir, task.spec)).bytes())
-    hashPart(hasher, "reference", await Bun.file(path.join(task.dir, task.reference)).bytes())
+    if (task.outputMode) hashPart(hasher, "output_mode", task.outputMode)
+    if (task.reference) hashPart(hasher, "reference", await Bun.file(path.join(task.dir, task.reference)).bytes())
     if (task.oracle) {
       hashPart(hasher, "oracle", await Bun.file(path.join(task.dir, task.oracle)).bytes())
       hashPart(hasher, "oracle_tolerance", String(task.oracleTolerance))
