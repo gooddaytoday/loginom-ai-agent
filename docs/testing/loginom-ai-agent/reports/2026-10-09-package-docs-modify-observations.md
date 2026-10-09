@@ -151,3 +151,39 @@ receipt42a0688cfb…; первая проверка отказала из-за s
 
 Новых model/judge calls0. Installed CLI/Desktop нового snapshot ещё не собраны;
 Task3/native writable reopen и полная матрица pending. V9 hang этим не исправлен.
+
+## Новый полный CLI969: native normal close и writable reopen PASS
+
+Clean source `9695e61e358ac5e6043c08eb56d183faa03d7a28`; полный payload
+`candidate-9695e61e3-cli-v3/payload`, CLI TAR.GZ/roundtrip/manifest PASS.
+Archive SHA822ba2c58dd5ba09bbaa33369400e248f81e710368c4842e6fb093d2bec02acb;
+CLI manifest SHA3d1c461c6760bf768deee50ebf2c9edb0d5faca9f114a5aca80bf428fe4b598d.
+Binary SHA остаётся cc2b2c3bf284a51a20a3f8fd945d32b222c7668c19d3ff6fefa690d1dd7ea1ed:
+изменения находятся в поставленном runtime JS; полный payload отличается.
+Bridge SHA816687983721b9e014e53b1ecd066a264478313151c5e97ce1b3f921539343f5;
+cleanup helper SHAbb8183e7e52af8a71c53e439c58b18ddcaacdbd7d468ae48ec1301f694945a1e.
+
+Через настоящий standalone CLI/artifact tool path синтетический provider
+создал own пустой draft и сохранил `/user/skills-shutdown-9695-20261009.lgp`.
+Штатное завершение CLI без acceptanceCleanupPackage: native receipt
+SUCCEEDED/package_closed=true/logged_out=true/discard=false, saved_package_cleanup
+в execution journal, exit0/guarded=false/remaining0. Не UI/серверный reset.
+Новый независимый браузер из тех же поставленных ресурсов открыл exact path:
+ReadOnly=false/count1/account=user, затем diagnostic exact-own close/logout
+SUCCEEDED/discard=false/remaining0. Второе закрытие — diagnostic control;
+первое закрытие является штатным product path.
+
+Private `native-normal-shutdown-9695-20261009`, readback20 public files SHA
+`47e2eb53166e1511d294722fee4a53bb6aaaf858be4746a96f146b9e8440e05c`;
+auth/profile исключены. Own/original container IDs/StartedAt/no own mounts и
+новый target absent проверены до запуска. Model/judge calls0. Этот контроль
+проверяет native полный artifact, не естественный выбор модели и не установку
+launcher. Новая offline installed Linux matrix и Desktop build ещё выполняются.
+
+Первый build отказал до compile: отсутствовал effect в own docs-build.
+Frozen-lockfile install восстановил4668 dependencies/7.59s, Git clean.
+Второй build отказал при resource staging: старый browser input5a99 отсутствовал.
+Третья попытка использует read-only pinned browser input из сохранённого49;
+vendor hashes/source unchanged/CLI archive verification PASS. Все FAIL logs
+сохранены; предыдущие baseline/candidate49 payloads не редактировались.
+Task3 overall, реальные modify/transitions и новая полная A/B90 остаются открыты.

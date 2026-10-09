@@ -89,7 +89,7 @@ test('missing prepared tab refuses before native package close', async () => {
 
 - [ ] Собрать полный CLI/Desktop в новые own каталоги по штатным builders;
   manifests/source SHA/resources фиксируют фактический новый snapshot.
-- [ ] Повторить normal CLI shutdown observation без acceptance-only параметра;
+- [x] Повторить normal CLI shutdown observation без acceptance-only параметра;
   новый клиент должен открыть exact saved package writable без server reset.
   Native close/logout и process remaining0 требуют отдельных receipts.
 - [ ] Полные scenario-modify/create/transitions/cleanup/owner-loss/resume и
