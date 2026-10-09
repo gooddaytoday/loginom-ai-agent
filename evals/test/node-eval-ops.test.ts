@@ -23,6 +23,33 @@ async function runtime() {
 
 const owner = { issue: "LAB-16", task: "task-one", role: "rich" as const, phase: "eval" as const, sha: "a".repeat(40) }
 
+test("v3 EvalRunner owns the shared stand without impersonating EvalBaseline", async () => {
+  const fixture = await runtime()
+  try {
+    const root = fixture.config.runtimeRoot
+    const role = (name: string) => ({ checkout: path.join(root, "checkouts", name), evalProfile: path.join(root, "roles", name, "eval"),
+      workRoots: [path.join(root, "roles", name, "work")], resultsRoot: path.join(root, "roles", name, "results"),
+      cliBin: path.join(root, `cli-${name}/bin/loginom-ai-agent-cli`) })
+    const config: NodeOpsConfig = { ...fixture.config, version: 3, roles: { ...fixture.config.roles,
+      evalbaseline: role("evalbaseline"), evalrunner: role("evalrunner") } }
+    for (const item of [config.roles.evalbaseline!, config.roles.evalrunner!]) {
+      for (const directory of [item.checkout, item.evalProfile, ...item.workRoots, item.resultsRoot]) await mkdir(directory, { recursive: true, mode: 0o700 })
+      await Bun.write(item.cliBin, "fixture installed CLI")
+    }
+    const lease = await acquireNodeStand(config, { ...owner, role: "evalrunner" })
+    expect(nodeRoleCli(config, "evalrunner")).toBe(config.roles.evalrunner!.cliBin)
+    for (const role of ["rich", "ben", "evalbaseline"] as const) await expect(acquireNodeStand(config, { ...owner, role })).rejects.toThrow("BUSY")
+    await expect(assertNodeStandOwner(config, { ...lease, role: "evalbaseline" })).rejects.toThrow("LEASE_OWNER_CHANGED")
+    await expect(acquireNodeStand(config, { ...owner, role: "evalrunner", phase: "reference" })).rejects.toThrow("INVALID_OWNER")
+    const completion = path.join(config.roles.evalrunner!.workRoots[0]!, "completion.json")
+    await Bun.write(completion, JSON.stringify({ version: 1, owner: { ...owner, role: "evalrunner" }, acquiredAt: lease.acquiredAt,
+      kind: "eval", runDir: config.roles.evalrunner!.resultsRoot, runSha: owner.sha, caseIds: ["case"] }))
+    await chmod(completion, 0o600)
+    await expect(releaseNodeStand(config, lease, completion)).rejects.toThrow("BASELINE_COMPLETION_REQUIRED")
+    expect((await nodeStandStatus(config)).status).toBe("BUSY")
+  } finally { await fixture.dispose() }
+})
+
 test("v2 eval-only baseline role shares the stand while preserving independent worker CLI pins", async () => {
   const fixture = await runtime()
   try {

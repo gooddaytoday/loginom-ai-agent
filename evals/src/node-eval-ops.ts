@@ -18,8 +18,8 @@ import { baselineHash, checkBaseline } from "./baseline"
 type OfflinePaths = { checkout: string; workRoots: string[]; resultsRoot: string }
 type RolePaths = OfflinePaths & { referenceProfile: string; evalProfile: string; cliBin?: string }
 type BaselinePaths = OfflinePaths & { referenceProfile?: never; evalProfile: string; cliBin: string; readinessIssue?: string }
-export type NodeOpsConfig = { version: 1 | 2; runtimeRoot: string; endpoint: string; container: { name: string; id: string; storageDir: string }; cliBin: string; roles: { rich: RolePaths; ben: RolePaths; evalbaseline?: BaselinePaths }; offline?: OfflinePaths }
-export type NodeStandOwner = { issue: string; task: string; role: "rich" | "ben" | "evalbaseline"; phase: "unit" | "reference" | "cold" | "eval" | "recovery"; sha: string }
+export type NodeOpsConfig = { version: 1 | 2 | 3; runtimeRoot: string; endpoint: string; container: { name: string; id: string; storageDir: string }; cliBin: string; roles: { rich: RolePaths; ben: RolePaths; evalbaseline?: BaselinePaths; evalrunner?: BaselinePaths }; offline?: OfflinePaths }
+export type NodeStandOwner = { issue: string; task: string; role: "rich" | "ben" | "evalbaseline" | "evalrunner"; phase: "unit" | "reference" | "cold" | "eval" | "recovery"; sha: string }
 export type NodeStandLease = NodeStandOwner & { version: 1; token: string; device: number; inode: number; endpoint: string; containerId: string; acquiredAt: string; configSha256: string }
 export type BaselineCleanupExecution = { seriesDir: string; runDir: string; cleanupPath: string }
 export type NodeStandCompletion = { version: 1; owner: NodeStandOwner; acquiredAt: string } & (
@@ -71,7 +71,7 @@ export async function assertNodeStandOwner(config: NodeOpsConfig, expected: Node
 export async function releaseNodeStand(config: NodeOpsConfig, lease: NodeStandLease, evidence: string) {
   return exclusive(config, lease, async () => {
     const completion = await readCompletion(config, lease, evidence)
-    if (lease.role === "evalbaseline" && completion.kind !== "baseline" && !(lease.phase === "unit" && completion.kind === "unit"))
+    if (evalOnlyRole(lease.role) && completion.kind !== "baseline" && !(lease.phase === "unit" && completion.kind === "unit"))
       throw new NodeOpsFailure("BASELINE_COMPLETION_REQUIRED")
     await verifyCompletion(config, lease, completion, evidence)
     await assertAllProfilesClean(config)
@@ -101,7 +101,7 @@ export async function runNodeEvalOps(argv: string[], env: Record<string, string 
 export const nodeOpsHelp = `Usage: bun script/node-eval-ops.ts <command> --config <private-runtime.json> [options]
 Commands:
   status                         Inspect shared lease; FREE=0, BUSY=2; no token.
-  acquire --issue ID --task ID --role rich|ben|evalbaseline --phase unit|reference|cold|eval|recovery --sha FULL --receipt FILE
+  acquire --issue ID --task ID --role rich|ben|evalbaseline|evalrunner --phase unit|reference|cold|eval|recovery --sha FULL --receipt FILE
   preflight --lease FILE          No model execution; clean profiles + existing live preflight.
   unit --lease FILE               Supervised bun test then bun typecheck, no arbitrary command.
   release --lease FILE --evidence FILE
@@ -116,7 +116,8 @@ Runtime config v1 contains runtimeRoot, endpoint, container {name,id,storageDir}
 roles {rich,ben}, each {checkout,referenceProfile,evalProfile,workRoots,resultsRoot}.
 v2 adds eval-only evalbaseline {checkout,evalProfile,workRoots,resultsRoot,cliBin};
 readinessIssue in this role pins the preparation card for durable smoke admission.
-worker roles may pin cliBin independently. Reference/cold are forbidden for evalbaseline.
+v3 adds independent eval-only evalrunner paths and CLI; both eval roles share the same stand.
+worker roles may pin cliBin independently. Reference/cold are forbidden for both eval roles.
 Optional offline {checkout,workRoots,resultsRoot} gives Evaler read-only evidence paths.
 One operator recovery is reserved per immutable lease; incident renaming cannot reset it.
 Successful release archives the private lease and proofs under operations/completed.
@@ -337,7 +338,7 @@ export async function settleNodeWriterRelease(config: NodeOpsConfig, lease: Node
 function writerSettlementMarker(config: NodeOpsConfig, lease: NodeStandLease, sourceSha: string) {
   if (!/^[0-9a-f]{64}$/.test(sourceSha)) throw new NodeOpsFailure("SETTLEMENT_PROOF_UNKNOWN")
   // Baseline keeps one lease across different executions; copies of the same source share a marker.
-  return path.join(directory(config), lease.role === "evalbaseline" ? `writer-release-settlement-${sourceSha}.json` : "writer-release-settlement.json")
+  return path.join(directory(config), evalOnlyRole(lease.role) ? `writer-release-settlement-${sourceSha}.json` : "writer-release-settlement.json")
 }
 
 async function verifyWriterReleaseSettlement(config: NodeOpsConfig, lease: NodeStandLease, proof: WriterReleaseSettlement,
@@ -369,7 +370,7 @@ export async function recoverNodeStand(config: NodeOpsConfig, lease: NodeStandLe
     const proof = await Bun.file(recovery.processEvidence).json()
     const processes = (proof.processes ?? proof) as ProcessCleanup
     const settledOriginal = await verifyWriterReleaseSettlement(config, lease, proof, recovery.processEvidence, incident)
-    if (lease.role === "evalbaseline" && (!recovery.execution || path.join(recovery.execution.runDir, recovery.execution.cleanupPath) !== (settledOriginal ?? recovery.processEvidence)))
+    if (evalOnlyRole(lease.role) && (!recovery.execution || path.join(recovery.execution.runDir, recovery.execution.cleanupPath) !== (settledOriginal ?? recovery.processEvidence)))
       throw new NodeOpsFailure("BASELINE_EXECUTION_UNKNOWN")
     await verifyProcesses(processes, lease)
     const profile = nodeProfile(config, lease.role, recovery.profile)
@@ -540,7 +541,7 @@ export async function reserveNodeRecovery(config: NodeOpsConfig, lease: NodeStan
 
 async function nodeRecoveryKey(config: NodeOpsConfig, lease: NodeStandLease, execution?: BaselineCleanupExecution) {
   const owner = `${lease.token}:${lease.issue}:${lease.task}:${lease.acquiredAt}`
-  if (lease.role !== "evalbaseline") return new Bun.CryptoHasher("sha256").update(owner).digest("hex")
+  if (!evalOnlyRole(lease.role)) return new Bun.CryptoHasher("sha256").update(owner).digest("hex")
   if (!execution) throw new NodeOpsFailure("BASELINE_EXECUTION_REQUIRED")
   await evidencePath(config, lease, execution.seriesDir)
   await evidencePath(config, lease, execution.runDir)
@@ -650,7 +651,7 @@ async function verifyCompletion(config: NodeOpsConfig, lease: NodeStandLease, co
     if (continued && (cleanup.operation !== "LAB-31-owned-registration-v1" || cleanup.processes?.observation_mode !== "writer_release_settlement"))
       throw new NodeOpsFailure("RECOVERY_PROOF_UNKNOWN")
     const original = await verifyWriterReleaseSettlement(config, lease, cleanup, completion.processEvidence)
-    if (lease.role === "evalbaseline" && (!completion.execution || path.join(completion.execution.runDir, completion.execution.cleanupPath) !== (original ?? completion.processEvidence)))
+    if (evalOnlyRole(lease.role) && (!completion.execution || path.join(completion.execution.runDir, completion.execution.cleanupPath) !== (original ?? completion.processEvidence)))
       throw new NodeOpsFailure("BASELINE_EXECUTION_UNKNOWN")
     await verifyProcesses(cleanup.processes ?? cleanup, lease)
     await verifyHistoryArchive(nodeProfile(config, lease.role, completion.profile), completion.historyArchive)
@@ -697,7 +698,7 @@ async function verifyCompletion(config: NodeOpsConfig, lease: NodeStandLease, co
 
 /** Safety is independent of quality coverage: even an incomplete series may have fully verified cleanup. */
 export async function verifyBaselineStand(config: NodeOpsConfig, lease: NodeStandLease, seriesDir: string) {
-  if (lease.role !== "evalbaseline") throw new NodeOpsFailure("BASELINE_ROLE_REQUIRED")
+  if (!evalOnlyRole(lease.role)) throw new NodeOpsFailure("BASELINE_ROLE_REQUIRED")
   await assertNodeStandOwner(config, lease)
   await evidencePath(config, lease, seriesDir)
   const report = await checkBaseline(seriesDir)
@@ -762,7 +763,7 @@ export async function verifyBaselineStand(config: NodeOpsConfig, lease: NodeStan
 
 export async function verifyBaselineCleanupRecovery(config: NodeOpsConfig, lease: NodeStandLease, seriesDir: string, evidence: string) {
   return exclusive(config, lease, async () => {
-    if (lease.role !== "evalbaseline") throw new NodeOpsFailure("BASELINE_ROLE_REQUIRED")
+    if (!evalOnlyRole(lease.role)) throw new NodeOpsFailure("BASELINE_ROLE_REQUIRED")
     await assertOriginalAdmission(config, lease)
     const completion = await readCompletion(config, lease, evidence)
     if (completion.kind !== "recovery" || completion.profile !== "eval" || !completion.execution || completion.execution.seriesDir !== seriesDir)
@@ -907,14 +908,15 @@ async function readLease(config: NodeOpsConfig) {
 
 function validateOwner(owner: NodeStandOwner) {
   if (![owner.issue, owner.task].every(id => typeof id === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(id)) ||
-    !["rich", "ben", "evalbaseline"].includes(owner.role) || owner.role === "evalbaseline" && ["reference", "cold"].includes(owner.phase) || !["unit", "reference", "cold", "eval", "recovery"].includes(owner.phase) || !/^[0-9a-f]{40}$/.test(owner.sha))
+    !["rich", "ben", "evalbaseline", "evalrunner"].includes(owner.role) || evalOnlyRole(owner.role) && ["reference", "cold"].includes(owner.phase) || !["unit", "reference", "cold", "eval", "recovery"].includes(owner.phase) || !/^[0-9a-f]{40}$/.test(owner.sha))
     throw new NodeOpsFailure("INVALID_OWNER")
 }
 
 async function validateConfig(config: NodeOpsConfig) {
-  if (![1, 2].includes(config.version) || !path.isAbsolute(config.runtimeRoot) || !/^[0-9a-f]{64}$/.test(config.container.id) ||
+  if (![1, 2, 3].includes(config.version) || !path.isAbsolute(config.runtimeRoot) || !/^[0-9a-f]{64}$/.test(config.container.id) ||
     !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(config.container.name) || !/^\/workdir\/UserStorage\/[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(config.container.storageDir) ||
-    Object.keys(config.roles).sort().join(",") !== (config.version === 1 ? "ben,rich" : "ben,evalbaseline,rich") || config.version === 2 && !config.roles.evalbaseline?.cliBin || Object.values(config.roles).some(role => !Array.isArray(role.workRoots) || !role.workRoots.length))
+    Object.keys(config.roles).sort().join(",") !== (config.version === 1 ? "ben,rich" : config.version === 2 ? "ben,evalbaseline,rich" : "ben,evalbaseline,evalrunner,rich") ||
+    config.version >= 2 && !config.roles.evalbaseline?.cliBin || config.version === 3 && !config.roles.evalrunner?.cliBin || Object.values(config.roles).some(role => !Array.isArray(role.workRoots) || !role.workRoots.length))
     throw new NodeOpsFailure("INVALID_CONFIG")
   const endpoint = new URL(config.endpoint)
   if (!["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.search || endpoint.hash)
@@ -940,9 +942,11 @@ async function validateConfig(config: NodeOpsConfig) {
     index !== otherIndex && (inside(root, other) || inside(other, root))))) throw new NodeOpsFailure("INVALID_CONFIG_PATH")
 }
 
+export const evalOnlyRole = (role: NodeStandOwner["role"]) => role === "evalbaseline" || role === "evalrunner"
+
 function nodeRole(config: NodeOpsConfig, role: NodeStandOwner["role"]) {
   const paths = config.roles[role]
-  if (!paths || role === "evalbaseline" && config.version !== 2) throw new NodeOpsFailure("ROLE_NOT_CONFIGURED")
+  if (!paths || role === "evalbaseline" && config.version < 2 || role === "evalrunner" && config.version !== 3) throw new NodeOpsFailure("ROLE_NOT_CONFIGURED")
   return paths
 }
 
