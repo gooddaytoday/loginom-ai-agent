@@ -4463,10 +4463,10 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Историческая v9:34closed/25PASS/9FAIL,cohort#3 INCOMPLETE; hang cause UNKNOWN, raw recovery evidence сохранён, в новую приёмку не засчитывается.
 - S1–S6 PASS на реальной основной модели: CLI/default/Help/no-file, native Desktop PDF2pages и CLI DOCX2pages; факты/все страницы/вход unchanged/browser0/remaining0 проверены. Произвольное имя DOCX не поддерживается и не критерий S5.
 - ABC pre-model refusals2 с model attempts0 сохранены; S4 ports closed/helper1440162/1440164 absent, прежняя failed cleanup не переписана. Revision4 только новый admission3 path, все live checks строго serial.
-- Остальные fixed8 ведёт serial controller/session89353: articles/campaign/customer/monthly/ab-revenue/risky/slow PASS100/CLI0/structure/warm/cleanup,closed9/8PASS/1FAIL,cold3/3 PASS; текущая последняя trial-dosage-outcomes; fresh profile/results per task, никаких live параллельно. Следующий шаг: итог10, S7/S8/native lifecycle.
+- Десятка10/10 terminal/cleanup:9 full PASS/1 full FAIL (ABC CLI1), все10 judge100/structure/warm CSV PASS; cold3/3 PASS. Controller89353 terminal0; final read-back SHA04ec49980a…, этап7 выполнен. Новых CLI eval tasks нет.
 - Source scope/attachments final9695:11 PASS/0 FAIL/40 assertions/2.35s, receipt5cd6a622ef…, модель/судья/Browser0; повтор из-за недостаточного source binding старого лога. Shutdown24 evidence files SHA повторно verified; runtime JS/no public TypeScript change.
 - Generator reuse: полные package-docs ресурсы+Node9/9 SHA равны source49/final9695; installed PDF/DOCX/MD и PDF3pages QA/Word XML receipts проверены; current Word all-pages S5. Receipt SHA92a2308eb9…, полной повторной матрицы нет.
-- Private helpers подготовлены, НЕ запущены: skills-short-desktop-observer-20261009.py (S7 actual inspector/CDP), routing S7/S8 payload с exact own packageContainer, skills-short-modify-cancel-20261009.ts (после S8 PASS; small calculator + обычный SIGINT активного provider-turn, не node stop/recovery matrix). Syntax checks PASS; pending-lifecycle-adapters.json содержит hashes.
+- S7 native Desktop запущен отдельно/session47678 под observer actual inspector/CDP, routing payload содержит exact own packageContainer. S8 и installed modify/cancel ещё НЕ запущены; small calculator + SIGINT active provider-turn (не node stop/recovery matrix) только после S8 PASS. Helper hashes/syntax проверены. Следующий шаг: S7/S8/native lifecycle/итоговая очистка.
 
 ### 2026-10-09 — ACTIVE, v9 terminal143; closed34/45, PASS25/FAIL9; cohort#3 INCOMPLETE
 

@@ -106,48 +106,58 @@ Private `short-acceptance-9695e61e3-20261009/reused-generator-evidence.json`, SH
 `92a2308eb93556e01434ea263cc23246352a1a931ccb9ca80f32ae289f3078dd`.
 Полная повторная матрица форматов/моделей не выполняется.
 
-## Открытые проверки
+## CLI-десятка и cold replay — PASS
 
-Текущая десятка: sales-by-category **PASS100**, judge scored/structure0/warm
-CSV oracle PASS/environment cleanup confirmed, process terminal0. Cold этого
-пакета **PASS**: независимый native reader из той же installed9695 сборки,
-исходные package/input bytes неизменны, без перенастройки и server reset,
-свежий CSV oracle PASS/close/logout/remaining0;18 public files read-back
-`f0ab94e3ce474ca1d844e947396fb80fd77c3f8d808108a97ef83994fac1ba21`.
-Унаследованные cold-reader49/image поля common — историческая справка,
-фактический current-host replay использует полный final candidate9695, как
-записано в его result/read-back. Новая серия не является сравнением двух reader.
-ABC завершена второй: штатный judge PASS100/checklist, structure0/warm oracle
-PASS и cold PASS без перенастройки/bytes unchanged/remaining0. Cold read-back
-18 файлов `108163136fbdfcbf713594758c8f8875aaea45e0d8b4c1a2fd3cbec122540c94`.
-CLI при этом exit1/failed/tool/CLI_TOOL_FAILED: первый вызов skill был aborted.
-Harness `pass:true` оценивает артефакт, но полный исход консервативно **FAIL**;
-его не засчитываем в минимум8 CLI PASS. Ручного модельного повтора нет.
-Articles-by-author **PASS100**: CLI exit0, judge scored/checklist, structure0,
-warm CSV oracle PASS, process terminal и6 cleanup stages confirmed. Итого
-закрыты9/10:8 полных PASS,1 полный FAIL; cold3/3 PASS. Campaign ROI
-также PASS100/CLI0/structure0/warm oracle/cleanup confirmed. Его independent
-cold PASS/bytes unchanged/native close/logout/remaining0, read-back18files
-`fa9649c4a74465347debd369da6e8ede7e0ba55163757b7ae9c4f47bc08310b0`.
-Customer-activity-segments также **PASS100/CLI0/structure/warm/cleanup**.
-Monthly-demand **PASS100/CLI0/structure/warm/cleanup**.
-Ab-revenue-per-converter **PASS100/CLI0/structure/warm/cleanup**.
-Risky-approved-claims **PASS100/CLI0/structure/warm/cleanup**. Первоначальное
-имя узла с `>` отклонено с `NOT_APPLIED/effect_possible:false`; исправленный
-запрос выполнен в пределах той же попытки, без ручного перезапуска.
-Slow-supplier-deliveries **PASS100/CLI0/structure/warm/cleanup**.
-Выполняется последняя фиксированная trial-dosage-outcomes; минимальный порог8
-достигнут, итог десятки требует её terminal/cleanup. Progress4 receipt SHA256
-`b8959507b3e5d9f1c8f35a9f862adba00179df6e41b3ad4da7841aeebd2eaca0`. Оставшиеся задачи ведёт отдельный serial controller: каждый процесс по одному,
-между ними terminal/cleanup/structure/oracle gates, для campaign обязательный
-cold. Подготовки ABC сохранены
-как pre-model admission refusals с нулём модельных попыток: внешний debugger
-собственного S4 Desktop и последующая необъяснённая helper PID при параллельном
-S5 setup. S4 debugger ports37937/36905 закрыты; helper PID1440162/1440164
-теперь отсутствуют, но прежняя cleanup receipt остаётся failed. Точная
-принадлежность helper не доказана. Новая dispatch revision4 меняет только
-каталог ABC на admission3 и фиксирует последовательность всех live-проверок;
-common, продукт, harness, модели, судья и задачи неизменны.
+**10/10 terminal,9 полных PASS,1 полный FAIL; cold3/3 PASS.** Каждый task
+получил единственную модельную попытку в отдельном последовательном процессе.
+Все10 имеют judge scored100/checklist, structure PASS, warm CSV oracle PASS
+и подтверждённые environment/process cleanup; ручных модельных повторов0.
+
+| Задача | Полный исход | CLI exit | Судья | Структура/CSV | Cold |
+| --- | --- | --- | --- | --- | --- |
+| sales-by-category | PASS | 0 | 100 | PASS/PASS | PASS |
+| abc-pareto-groups | FAIL | 1 | 100 | PASS/PASS | PASS |
+| articles-by-author | PASS | 0 | 100 | PASS/PASS | Не выбран |
+| campaign-roi-by-channel | PASS | 0 | 100 | PASS/PASS | PASS |
+| customer-activity-segments | PASS | 0 | 100 | PASS/PASS | Не выбран |
+| monthly-demand | PASS | 0 | 100 | PASS/PASS | Не выбран |
+| ab-revenue-per-converter | PASS | 0 | 100 | PASS/PASS | Не выбран |
+| risky-approved-claims | PASS | 0 | 100 | PASS/PASS | Не выбран |
+| slow-supplier-deliveries | PASS | 0 | 100 | PASS/PASS | Не выбран |
+| trial-dosage-outcomes | PASS | 0 | 100 | PASS/PASS | Не выбран |
+
+ABC: первый skill call aborted, CLI exit1/failed/tool/CLI_TOOL_FAILED.
+Harness `pass:true` оценивает артефакт; полный исход консервативно FAIL,
+в минимум8 CLI PASS он не входит. Risky: имя узла с `>` отклонено как
+NOT_APPLIED/effect_possible:false; модель исправила запрос в той же попытке.
+Порог выполнен без замены задач и ручных повторов.
+
+Final read-back: private `short-acceptance-9695e61e3-20261009/formal-final.json`,
+SHA256 `04ec49980af5d6158f6123549b213f79de770087b635d32d3cca1a550b7ff14a`.
+Он связывает все10 gates/results/artifacts и3 cold receipts. Прежний sales gate
+не переписан: final receipt добавляет фактический exit0 из result и независимый
+cold PASS вместо старых отсутствующих полей. Окончание serial controller0
+подтверждено; после десятки новые CLI eval tasks не запускались.
+
+Cold: независимый native reader использует полный installed9695 candidate,
+сохранённые package/input bytes неизменны, настройки не применяются заново,
+server reset отсутствует. Свежий CSV oracle PASS, close/logout/remaining0.
+Каждый read-back содержит18 public files:
+
+- sales SHA256 `f0ab94e3ce474ca1d844e947396fb80fd77c3f8d808108a97ef83994fac1ba21`;
+- ABC SHA256 `108163136fbdfcbf713594758c8f8875aaea45e0d8b4c1a2fd3cbec122540c94`;
+- campaign SHA256 `fa9649c4a74465347debd369da6e8ede7e0ba55163757b7ae9c4f47bc08310b0`.
+
+Унаследованные cold-reader49/image поля common — историческая справка;
+фактический source9695 записан в current result/read-back. Diagnostic discard
+native test reader не выдаётся за обычное поведение продукта: штатный shutdown
+проверяется отдельно. Первичные0-attempt admission refusals сохранены:
+ошибочные ранние own configs, собственный S4 debugger и последующий helper PID
+при параллельном S5 setup. Теперь все live checks строго serial. S4 ports
+37937/36905 закрыты, helper PID1440162/1440164 отсутствуют; прежняя failed cleanup
+receipt не переписана, точная принадлежность helper не доказана.
+
+## Выбор skill и документы — S1–S6 PASS, S7/S8 открыты
 
 S1 installed CLI и S2 native Desktop: **PASS** с реальной gpt-6.1-sol medium,
 ответ102, tool calls0/Loginom browser execs0/runtime journals0,remaining0.
@@ -175,7 +185,7 @@ Host-render ABI failure и первая ошибка cwd сохранены, о�
 S6 **PASS**: запрос локального `.lgp`, готового отчёта нет, только activation
 package-docs; browser/upload/journals0,remaining0/writer absent. Read-back
 `e4eb8d888b36967ae8cdf90aed6d2c55a55e270720c2226f184e6766f7474d61`.
-Итог десятки, всех cold3 и S1–S8 ещё не принят. Нужны S7/S8,
+Десятка и cold3 приняты. Для итоговой цели ещё нужны S7/S8,
 небольшое изменение/execute/save после writable reopen установленного CLI,
 одна штатная отмена с процессным наблюдением и итоговая очистка.
 Предыдущий scripted normal shutdown/writable reopen нового CLI прошёл;

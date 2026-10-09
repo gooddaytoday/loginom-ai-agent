@@ -12,9 +12,10 @@ root:root4755 совпали. Desktop AppImage доставлен; native S2/S4 
 
 По решению пользователя текущая цель:10 fixed CLI задач×1,≥8 PASS с судьёй/
 структурой/CSV, cold3, S1–S8 и минимальный installed lifecycle. A/B90, полная
-TUI/recovery матрица, вторая модель и stage9 отложены. Sales PASS100 и cold PASS,
-S1–S6 PASS; ABC artifact/cold PASS, CLI exit1/полный FAIL сохранён,
-остальные8 выполняются последовательно. Итоги всей приёмки ещё не приняты. Предыдущая v9 остаётся INCOMPLETE, не доказательство
+TUI/recovery матрица, вторая модель и stage9 отложены. Десятка завершена:
+9 full PASS/1 full FAIL (ABC CLI exit1), все10 judge100/structure/CSV/cleanup;
+cold3/3 PASS. S1–S6 PASS, S7/S8 и installed lifecycle ещё открыты.
+Итоги всей приёмки ещё не приняты. Предыдущая v9 остаётся INCOMPLETE, не доказательство
 неухудшения. Полные hashes и текущая граница:
 [сокращённая приёмка](../testing/loginom-ai-agent/reports/2026-10-09-package-docs-short-acceptance.md).
 
