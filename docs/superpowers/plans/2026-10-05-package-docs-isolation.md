@@ -1023,7 +1023,7 @@ Core имеет разметку осей, но без CSV oracle. По доку
   результаты отдельно; после повторной фиксации условий выполнить новую пару
   теми же сохранёнными CLI, а не только повторить одну сторону.
 
-  **Текущая серия v9, checkpoint 15 (2026-10-09):** frozen harness
+  **Текущая серия v9, checkpoint 16 (2026-10-09):** frozen harness
   `d08be6baf8f5aea53f83c228cd0984c9d2bf0494`, source-only полный suite
   486 PASS/2 SKIP/0 FAIL, install/typecheck PASS. Общие условия:
   `ab-conditions-storage-clean-20261009/common.json`, SHA256
@@ -1041,13 +1041,15 @@ Core имеет разметку осей, но без CSV oracle. По доку
   Дополнительная активация candidate:1 provider-turn/1 skill-вызов;
   прочий рост tools/Loginom измерен отдельно и не разрешает новые отказы.
   Formal baseline session60189/run20261009-021118-d08be6baf продолжается:
-  первый повтор15 завершён,12 PASS100/3 no_artifact FAIL0
-  (cohort/first-last/low-liquidity). Всем15 подтверждены6 cleanup stages,
+  closed16/45:13 PASS100/3 no_artifact FAIL0. Первый повтор15 завершён:
+  12 PASS100/3 FAIL (cohort/first-last/low-liquidity). Ab-revenue#2 PASS100,
+  structure/warm oracle PASS; третий повтор остаётся обязательным.
+  Всем16 подтверждены6 cleanup stages,
   process cleanup/error null/remaining0×2, history/diagnostics full roundtrip;
   semantic recovery этим не доказывается, native root causes UNKNOWN.
-  Для12 пакетов structure/warm oracle PASS. Progress15 SHA346ceeefe6…,
-  metrics15 SHAcf14c23a5b…, первый cold index15 SHA25f7fe5287… подтверждает
-  request/package/input SHA. Второй повтор выполняется, candidate formal,
+  Для13 пакетов structure/warm oracle PASS. Progress16 SHA90fc921d65…,
+  metrics16 SHAf86fdb89b9…, первый cold index15 SHA25f7fe5287… подтверждает
+  request/package/input SHA для12 пакетов первого повтора. ABC#2 выполняется; candidate formal,
   formal cold и compare не начаты. Ручных повторов0; первый повтор не заменяет
   baseline45/candidate45, cold каждого сохранённого пакета и итоговый compare.
 

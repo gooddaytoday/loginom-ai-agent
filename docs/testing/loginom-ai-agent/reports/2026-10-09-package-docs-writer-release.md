@@ -659,6 +659,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | Задача | Повтор | Итог | Пакет / structure+warm | Provider finishes / tools / Loginom | History entries / gzip bytes | Diagnostics entries / gzip bytes |
 | --- | --- | --- | --- | --- | --- | --- |
 | ab-revenue-per-converter | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4604 / 17048407 | 3 / 5110421 |
+| ab-revenue-per-converter | 2 | PASS100 | Есть / PASS | 20 / 20 / 16 | 4604 / 17083652 | 3 / 5138263 |
 | abc-pareto-groups | 1 | PASS100 | Есть / PASS | 36 / 35 / 31 | 4640 / 21348941 | 3 / 9371065 |
 | articles-by-author | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4600 / 15892038 | 3 / 4038019 |
 | campaign-roi-by-channel | 1 | PASS100 | Есть / PASS | 19 / 19 / 15 | 4610 / 16655815 | 3 / 4687353 |
@@ -894,3 +895,22 @@ cold нужен полный индекс двух сторон по90 исхо�
 Baseline closed15/45/candidate0/cold0/compare0/manual retries0. Первый повтор
 не доказывает stable baseline3/3 или statistical non-inferiority; полный90
 остаётся открытым.
+
+Шестнадцатый closed formal v9 `ab-revenue-per-converter#2` PASS100:
+structure/warm oracle PASS, cleanup6 stages/processes confirmed,
+error null/remaining0×2. History4604/17083652bytes и diagnostics3/5138263bytes
+full roundtrip. Trace/result counters match:20 finishes/20 tools/16 Loginom/
+skill0/prepare1/errors0. Два успешных повтора не заменяют stable baseline3/3.
+
+Private progress16 SHA256
+`90fc921d655a04bf85a2d8359debef8e66752495dc03ddd211a8173c12a8f2ef`,
+metrics16 SHA256
+`f86fdb89b9efce86fd6e0931cafcb261a6453a66fcf4cfd6a1413af75008b7a6`.
+Все16 closed results/cleanup/process-cleanup и архивы, предыдущие15 traces
+и cold index15 повторно проверены по SHA; common020c08059… и
+PID676156/UID/birth/exe/inode неизменны. Closed16/45:13 PASS100/3 no_artifact
+FAIL0, ABC#2 running; candidate/cold/compare0/retries0. Полный90 не принят.
+
+В плане накопленная хронология сведена к текущему статусу и ссылкам на этот
+отчёт/checkpoint; все97 checklist lines и критерии сохранены без изменений.
+Подробные outcomes и historical failures остаются в отчётах и private evidence.
