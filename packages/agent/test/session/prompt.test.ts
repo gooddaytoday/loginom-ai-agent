@@ -1018,6 +1018,51 @@ with zipfile.ZipFile(p, "w") as zf:
   60_000,
 )
 
+it.instance("loginom_help loads through the agent", () =>
+  Effect.gen(function* () {
+    const { dir, llm } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const source = fileURLToPath(new URL("../../../desktop/resources/skills/loginom_help", import.meta.url))
+    const skillDir = path.join(dir, ".loginom-ai-agent", "skills", "loginom_help")
+    yield* Effect.promise(() => cp(source, skillDir, { recursive: true }))
+
+    const session = yield* sessions.create({
+      title: "Loginom help",
+      permission: [{ permission: "*", pattern: "*", action: "allow" }],
+    })
+    yield* prompt.prompt({
+      sessionID: session.id,
+      agent: "build",
+      noReply: true,
+      parts: [{ type: "text", text: "Как в калькуляторе подсчитать количество строк в таблице?" }],
+    })
+    yield* llm.tool("skill", { name: "loginom_help" })
+    yield* llm.text("уточню по справке")
+
+    const result = yield* prompt.loop({ sessionID: session.id })
+    expect(result.info.role).toBe("assistant")
+    const request = JSON.stringify(yield* llm.inputs)
+    expect(request).toContain("<name>loginom_help</name>")
+
+    const msgs = yield* MessageV2.filterCompactedEffect(session.id)
+    const tools = msgs.flatMap((msg) => msg.parts).filter((part): part is SessionV1.ToolPart => part.type === "tool")
+    const loaded = tools.find((part) => part.tool === "skill")
+    expect(loaded?.state.status).toBe("completed")
+    if (loaded?.state.status === "completed") {
+      expect(loaded.state.output).toContain('<skill_content name="loginom_help">')
+      expect(loaded.state.output).toContain(`Base directory for this skill: ${skillDir}`)
+      expect(loaded.state.output).toContain("viking://resources/loginom-dock/sources/loginom-help")
+      expect(loaded.state.output).toContain("loginom_find")
+      expect(loaded.state.output).toContain("loginom_read")
+      expect(loaded.state.output).toContain("help.loginom.ru/userguide")
+      expect(loaded.state.output).toContain("уточняющий вопрос")
+      expect(loaded.state.output).toContain("loginom_dock_*")
+    }
+  }),
+  60_000,
+)
+
 it.instance("loop continues when finish is stop but assistant has tool parts", () =>
   Effect.gen(function* () {
     const { llm } = yield* useServerConfig(providerCfg)
