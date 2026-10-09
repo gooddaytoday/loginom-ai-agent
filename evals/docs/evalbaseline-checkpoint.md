@@ -1,10 +1,10 @@
 # EvalBaseline — checkpoint 2026-10-09
-- Branch baseline-runtime; checkout /tmp/loginom-baseline-runtime; основной checkout сохранён.
+- Branch baseline-runtime; checkout /home/kiselev/.codex/worktrees/baseline-runtime/loginom-ai-agent восстановлен из сохранённых коммитов; основной checkout сохранён.
 - Code SHA 3ce983703bbeca5d759f1cd7bfc8b9a8196c7f64; frozen server/supplement SHA 53d03a35b0ee2901b40c1a1bbb0170804d59e865.
 - LAB-31 принят на 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad; корпус 48 кейсов/144 измерения.
 - Этапы 0, 3.0, 3.1, 3.2, 4 и 5 выполнены; full start gated двумя отдельными smoke.
 - Infrastructure/judge recovery, retries, abandon, reconcile, execution budget и cleanup resolutions проверены.
-- Config v2 активна; readinessIssue LAB-32; отдельные профиль/CLI EvalBaseline, параметры Rich/Ben сохранены.
+- Config v2 активна; readinessIssue LAB-54 01a11f72-c385-7d3e-bfd7-6911b3a7bdf2; профиль/CLI EvalBaseline и параметры Rich/Ben сохранены.
 - Supplement 733 файла; manifest SHA256 9f78455de8c03996e3dbfc12696b0fed5197597f664553cd2502b349ba5e0aae.
 - Локально: 553 PASS/9 clean-host SKIP/0 FAIL, 562 теста/48 файлов; bun typecheck PASS.
 - Server helper+writer/registration: 51 PASS/0 SKIP; все 9 clean-host fixtures пройдены.
@@ -17,4 +17,4 @@
 - First prepare error сохранён; Dock URL исправлен до серий; независимый post-release check: 5 profiles clean/storage EMPTY/browser 0.
 - Calc smoke 889c9f8e-819a-431d-9ed1-2082e839ae00: ProviderModelNotFoundError, artifact отсутствует, tokens/tool calls 0; release/FREE; delivery 11 файлов PASS.
 - Каталог CLI/bubblewrap: точные gpt-6.1-sol/medium зарегистрированы, model/judge calls=0, pins unchanged/clean/FREE; attachment 01a11d73-d5ba-70d4-9cb5-deeb96cc85a3 verified.
-- Readiness INCOMPLETE: ожидается ответ на запрос нового подготовительного цикла; calc не повторять, node/full не запускать. Затем полная карточка и heartbeat 30m по этапам 7–8.
+- Новый цикл явно разрешён пользователем; LAB-54 создана, config изменена только по readinessIssue при FREE/clean/paused dispatch, runtime active; далее отдельные calc/node и full+heartbeat по этапам 7–8.
