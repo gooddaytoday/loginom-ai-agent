@@ -206,13 +206,15 @@ run_baseline smoke --config "$CFG" --series "$SMOKE_NODE_SERIES" \
   --case crosstable-fixed-sum --issue "$CARD_UUID" --task "$MULTICA_RUN_UUID"
 ```
 
-- [ ] Сначала допустить и завершить `calc-data-double`: пакет `.lgp`, результат CSV, независимый Double = Amount × 2 oracle и **настоящий** judge `gpt-6-astra/high`. Не изменять исходный кейс, где отдельного oracle.csv нет.
-- [ ] Подтвердить его архивы/модель/процессы/очистку и release; только после безопасного освобождения допустить `crosstable-fixed-sum` отдельной серией.
+- [x] Сначала допустить и завершить `calc-data-double`: пакет `.lgp`, результат CSV, независимый Double = Amount × 2 oracle и **настоящий** judge `gpt-6-astra/high`. Не изменять исходный кейс, где отдельного oracle.csv нет.
+- [x] Подтвердить его архивы/модель/процессы/очистку и release; только после безопасного освобождения допустить `crosstable-fixed-sum` отдельной серией.
 - [ ] Для `crosstable-fixed-sum` проверить артефакт и штатный node validator, его code-verdict, архивы, процессы, очистку и собственный release.
 - [ ] Для обоих подтвердить фактическую модель продукта и `medium` по закрытой истории; не ограничиваться env/config. В публичный evidence включать только несекретное заключение, не БД.
 - [x] Если артефакта нет, gate остаётся незавершённым. Диагностика допустима, автоматический продуктовый повтор smoke запрещён, даже после исправления причины и при новом каталоге/UUID. Добор этапа 3.2 относится к полной baseline-серии, не снимает это ограничение smoke.
 - [ ] Quality FAIL при имеющихся артефакте, выполненных oracle/judge/validator и подтверждённой очистке показать честно; не пытаться получить PASS повторением. Gate интеграции и качество продукта — отдельные поля отчёта.
 - [ ] Проверить evidence обоих smoke нового разрешённого цикла, загрузить в LAB-54 с сохранением ссылок на LAB-32, скачать, проверить bytes/SHA256/manifest и readback. Зафиксировать готовность либо точный незавершённый gate.
+
+**Calc нового цикла завершён и независимо проверен:** manifest `2f8b3b19-dfd3-45c4-819a-315a7beae02d`, source run `20261009-070420-53d03a35b`, одна попытка/infraRetries=0, duration 503769 мс. Product completed/PASS, package/CSV есть, Double 20/40 и независимый oracle PASS; настоящий judge `gpt-6-astra/high`, 1 вызов, 100/100, прежние prompt/schema. Штатный `checkBaseline` основного чата подтвердил complete/cleanup/released и smoke verification. По private copy закрытой истории независимо проверены все 10 assistant messages: `openai/gpt-6.1-sol/medium`, без ошибок; история mode 0700, исходные DB/WAL/SHM bytes неизменны. Управляющий run завершён, LAB-54 `in_review`; readiness 1/2. Attachment `01a11f86-b4a8-74cd-99cf-903649731eaf`, архив 24085 bytes, SHA256 `62df969cba807e8d59d7762daa2ea0659b3f947ed0a17e3565d4cd27ce639bd3`: основной чат скачал его и подтвердил серверные bytes, все 15 членов manifest и отсутствие известных secrets/lease/DB. Node пока ожидает отдельного допуска.
 
 ## 7. Обязательно создать карточку полного baseline и запустить её в работу
 
