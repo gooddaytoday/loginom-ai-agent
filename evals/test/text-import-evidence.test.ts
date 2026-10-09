@@ -184,3 +184,46 @@ test("damaged Unicode may be diagnosed after a full read without inventing a nat
     expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("diagnosed")
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
+
+test("CSV to TSV refresh requires two deliveries and fresh full reads on the same node", async () => {
+  const f = await positiveFixture("csv-to-tsv-source-refresh")
+  try {
+    const spec = await Bun.file(path.join(f.task, "SPEC.json")).json()
+    const changed = spec.inputs[1], destination = "/eval/changed.tsv"
+    const first = JSON.parse(JSON.stringify(f.apply))
+    first.input.operation_id = "stage1"; first.output.operation_id = "stage1"
+    first.output.execution.execution_id = "first"; first.output.output.execution_id = "first"; first.output.output.ports[0].execution_id = "first"
+    const firstConfig = JSON.parse(JSON.stringify(f.events[1])), firstCheckpoint = { operation_id: "stage1", phase: "node_checkpoint", result: first.output }
+    firstConfig.operation_id = "stage1"
+    f.events[0]!.operation_id = "stage1"
+    const prepare = JSON.parse(JSON.stringify(f.calls[0]))
+    prepare.output.input_artifacts.push({ artifact_id: "changed", name: "changed.tsv", bytes: changed.bytes, sha256: changed.sha256,
+      upload: { grant_id: "grant2", destination } })
+    f.calls[0] = prepare
+    const delivery = { tool: "loginom_dock_artifact_deliver", input: { artifact_id: "changed", upload_grant_id: "grant2" },
+      output: { status: "SUCCEEDED", cleanup_complete: true, output: { artifact_id: "changed", bytes: changed.bytes, sha256: changed.sha256,
+        destination, upload_operation_id: "upload2", upload_completion_verified: true, cleanup_complete: true } } }
+    f.calls.splice(2, 0, first, JSON.parse(JSON.stringify(delivery)))
+    Object.assign(f.apply.input.target, { kind: "existing", ref: f.output.node })
+    Object.assign(f.apply.input.parameters.source, { artifact_id: "changed", upload_operation_id: "upload2" })
+    f.apply.input.parameters.settings.source.source_path = destination
+    f.apply.input.parameters.settings.format.delimiter = "\t"
+    const expected = await Bun.file(path.join(f.task, "expected/stage-2.json")).json()
+    f.port.row_count = expected.row_count; f.port.sample_rows = expected.row_count
+    f.port.sample = expected.rows.map((row: { type: string; value: string | null }[]) => row.map(cell => ({ ...cell, is_null: cell.value === null,
+      ...(cell.type === "real" && cell.value !== null ? { decimal: cell.value } : {}) })))
+    const finalConfig = JSON.parse(JSON.stringify(f.events[1])), finalCheckpoint = f.events[2]!
+    finalConfig.receipt.value.source.fields.source_path.value = destination
+    finalConfig.receipt.value.format.fields.delimiter.value = "\t"
+    f.events.splice(1, 2, firstConfig, JSON.parse(JSON.stringify(firstCheckpoint)), finalConfig, finalCheckpoint)
+    await f.write()
+    const patch = Bun.spawn(["python3", "-c", `import pathlib,sys,zipfile
+p=pathlib.Path(sys.argv[1]);xml=p/'unpacked/Unit_1/Unit.xml';data=xml.read_bytes().replace(b'/eval/base.csv',b'/eval/changed.tsv');xml.write_bytes(data)
+with zipfile.ZipFile(p/'package.lgp','w') as z:z.writestr('Unit_1/Unit.xml',data)`, path.join(f.attempt, "artifact")])
+    expect(await patch.exited).toBe(0)
+    expect(await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).toEqual({ errors: [], failures: [] })
+    f.output.execution.execution_id = "first"; f.output.output.execution_id = "first"; f.port.execution_id = "first"
+    await f.write()
+    expect((await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).failures.join(" ")).toContain("fresh")
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
