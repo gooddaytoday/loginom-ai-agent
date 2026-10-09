@@ -165,7 +165,7 @@ FD проверено. Удалены только `/tmp/loginom-skills-analytic
 исторические условия/common paths не переписаны. Текущие Desktop temp roots
 и старые recovery материалы не затронуты.
 
-## Выбор skill и документы — S1–S6 PASS, S7/S8 открыты
+## Выбор skill и документы — S1–S7 PASS, S8 открыт
 
 S1 installed CLI и S2 native Desktop: **PASS** с реальной gpt-6.1-sol medium,
 ответ102, tool calls0/Loginom browser execs0/runtime journals0,remaining0.
@@ -193,7 +193,20 @@ Host-render ABI failure и первая ошибка cwd сохранены, о�
 S6 **PASS**: запрос локального `.lgp`, готового отчёта нет, только activation
 package-docs; browser/upload/journals0,remaining0/writer absent. Read-back
 `e4eb8d888b36967ae8cdf90aed6d2c55a55e270720c2226f184e6766f7474d61`.
-Десятка и cold3 приняты. Для итоговой цели ещё нужны S7/S8,
+S7 **PASS**: native Desktop в одном чате импортировал CSV, выполнил группировку
+с точными Alpha35/Beta20, сохранил пакет и попросил локальный `.lgp`. После
+второго user turn приложен этот saved package, SHA
+`6493affb4853eefdaaa137547d0e730c1bb5b6674268a35ee6a1e6ff70d6f5c5`.
+Получен настоящий PDF2pages; обе страницы просмотрены,1module/2nodes/depth1,
+import→grouping/файловая зависимость верны; неизвестные поля/функции группировки
+не выдуманы. Local input unchanged; docs browser execs/automation/upload0.
+Normal native close/logout SUCCEEDED/packages_after0/discard:false.
+Фактические Node inspector43417 и Electron CDP33677 наблюдались принадлежащими
+этому экземпляру и перестали слушать; own remaining0, сигналов observer нет.
+Receipt27 files SHA256
+`23c08095b18b7d6f503db0d4179972131844249c98acc322dd4fc8321b2cb3f1`.
+
+Десятка и cold3 приняты. Для итоговой цели ещё нужен S8,
 небольшое изменение/execute/save после writable reopen установленного CLI,
 одна штатная отмена с процессным наблюдением и итоговая очистка.
 Предыдущий scripted normal shutdown/writable reopen нового CLI прошёл;
