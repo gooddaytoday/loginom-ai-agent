@@ -4454,14 +4454,16 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Runtime shutdown TDD и full upstream2564 PASS/10 SKIP/0 FAIL; TypeScript/public IPC не изменены, runtime typecheck script отсутствует.
 - CLI scripted normal close→fresh writable reopen без server reset PASS/native close/logout/remaining0; small modify/execute/save ещё открыт.
 - Уже начатые offline матрицы завершены:CLI5/5,Desktop5/5,network:none; own containers10 удалены; read-back47files SHA dc84c279e6….
-- CLI установлен штатно в private HOME вне checkout,5651 inventory entries/root:root4755/unconfigured PASS; Desktop AppImage доставлен, native проверки pending.
+- CLI установлен штатно в private HOME вне checkout,5651 inventory entries/root:root4755/unconfigured PASS; Desktop AppImage доставлен, native запуск S2/S4 PASS.
 - Frozen harnessd08 clean/658 pins; свежий evals ref7318ec61fef3, protected judge/calibration/tasks unchanged. Принятый judge contract сохранён.
 - Fixed10/cold3 сохранены до первого live; v2 common SHA67c0f30005…, dispatch1ee3b44718… (первичный pre-model отказ0 попыток сохранён; own configs исправлены/native check PASS). Каждая задача — отдельный процесс, следующая только после terminal+cleanup gate.
 - Модель openai/gpt-6.1-sol medium,judge gpt-6-astra high,threshold70/checklist; effective task timeout1800000ms сохранён.
 - Новый own stand127.0.0.1:32769/server8ef472ee…/network loginom-skills-short-20261009; admission PASS. Старый v9 и original server/client не изменены.
 - Sales single-task PASS100/judge/structure/CSV/cleanup confirmed; независимый installed9695 cold PASS/bytes unchanged/no reset/remaining0. ABC запущена второй. Ручных модельных повторов0.
 - Историческая v9:34closed/25PASS/9FAIL,cohort#3 INCOMPLETE; hang cause UNKNOWN, raw recovery evidence сохранён, в новую приёмку не засчитывается.
-- S1 CLI/S2 Desktop/S3 Help PASS на реальной основной модели, browser/runtime journals0/remaining0; S4 native Desktop docs запущен. Следующий шаг: ABC terminal/review/cold, остальные fixed tasks/S4–S8/native lifecycle.
+- S1–S6 PASS на реальной основной модели: CLI/default/Help/no-file, native Desktop PDF2pages и CLI DOCX2pages; факты/все страницы/вход unchanged/browser0/remaining0 проверены. Произвольное имя DOCX не поддерживается и не критерий S5.
+- ABC pre-model refusals2 с model attempts0 сохранены; S4 ports closed/helper1440162/1440164 absent, прежняя failed cleanup не переписана. Revision4 только новый admission3 path, все live checks строго serial.
+- Следующий шаг: ABC terminal/review/cold, остальные fixed tasks, S7/S8/native lifecycle.
 
 ### 2026-10-09 — ACTIVE, v9 terminal143; closed34/45, PASS25/FAIL9; cohort#3 INCOMPLETE
 

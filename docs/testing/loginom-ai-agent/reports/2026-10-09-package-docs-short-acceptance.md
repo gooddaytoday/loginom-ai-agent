@@ -33,7 +33,7 @@ chrome-sandbox root:root4755. Пользовательский launcher не з�
 Первоначальный диагностический checker ошибочно использовал `stat` для symlink;
 после перехода к `lstat`, как в штатном manifest verifier, проверка прошла
 без изменения установленного payload. Desktop AppImage доставлен в отдельный
-каталог; native проверки этой установки ещё открыты. Выпуск не опубликован.
+каталог; native запуск этой установки подтверждён S2/S4. Выпуск не опубликован.
 
 ## Условия новой десятки
 
@@ -54,6 +54,8 @@ ABC и campaign ROI. Исходный task snapshot/рубрики/oracle сох
 
 Основная модель `openai/gpt-6.1-sol medium`, судья `gpt-6-astra high`, threshold70
 и обязательный checklist; исходные effective timeout1800000ms сохранены.
+Все live-проверки сериализованы, включая routing, connection setup и cold reader:
+параллельный запуск даже собственного клиента мешает общим процессным guards.
 Каждый task запускается отдельным процессом `--only ID --repeat 1`, со своими
 results/profile/workspace/artifacts. Следующий admission требует terminal
 result и подтверждённый cleanup предыдущего. Ручных повторов нет.
@@ -88,7 +90,14 @@ CSV oracle PASS/environment cleanup confirmed, process terminal0. Cold этог�
 Унаследованные cold-reader49/image поля common — историческая справка,
 фактический current-host replay использует полный final candidate9695, как
 записано в его result/read-back. Новая серия не является сравнением двух reader.
-ABC запущена второй; остальные8 ещё не запущены.
+ABC запущена второй; остальные8 ещё не запущены. Две её подготовки сохранены
+как pre-model admission refusals с нулём модельных попыток: внешний debugger
+собственного S4 Desktop и последующая необъяснённая helper PID при параллельном
+S5 setup. S4 debugger ports37937/36905 закрыты; helper PID1440162/1440164
+теперь отсутствуют, но прежняя cleanup receipt остаётся failed. Точная
+принадлежность helper не доказана. Новая dispatch revision4 меняет только
+каталог ABC на admission3 и фиксирует последовательность всех live-проверок;
+common, продукт, harness, модели, судья и задачи неизменны.
 
 S1 installed CLI и S2 native Desktop: **PASS** с реальной gpt-6.1-sol medium,
 ответ102, tool calls0/Loginom browser execs0/runtime journals0,remaining0.
@@ -99,8 +108,24 @@ S3 **PASS**: Help loginom_find completed и содержательный отв�
 Loginom endpoint127.0.0.1:9 недоступен, skill activation/browser execs/runtime
 journals0,remaining0; read-back
 `10ce2e105f4928291a51f024076482405376c15bf2102d9513b1e4d07df005fa`.
-S4 Desktop nested `.lgp`+PNG запущен, результат ещё открыт. Итог десятки,
-всех cold3 и S1–S8 ещё не принят. Нужны оставшиеся docs/Desktop переходы,
+S4 **PASS**: native Desktop создал настоящий PDF2 страницы по nested `.lgp`
+и PNG с пробелами/кириллицей в пути, в каталоге сессии. Все страницы просмотрены:
+1 модуль/6 узлов/2 подмодели/depth3 и связи отражены верно, неизвестные
+бизнес-цель/формулы/код указаны явно. Вход unchanged, browser/upload/journals0,
+remaining0, фактические inspector/CDP ports закрыты. Read-back
+`49aa0ace2989d5efc98eaa0f7b0f6e577b2d3692fa9a138e83938200574429f6`.
+S5 **PASS**: installed CLI `--file`/`--dir` создал явный DOCX, он открыт
+в bundled LibreOffice в собственном network:none Ubuntu26-контейнере; обе
+страницы просмотрены, факты/вход/изоляция/remaining0/writer absent подтверждены.
+Host-render ABI failure и первая ошибка cwd сохранены, оба контейнера удалены.
+Дополнительное точное имя `lgp_report.docx`, добавленное адаптером сверх
+обязательного S5, генератор не поддерживает; модель сообщила фактическое имя.
+Произвольное имя файла не считается проверенным. Read-back
+`e58da94ce34d8f0e7e5a205619e926eef083ec47e5a826eb9aa1ce97d96dfe55`.
+S6 **PASS**: запрос локального `.lgp`, готового отчёта нет, только activation
+package-docs; browser/upload/journals0,remaining0/writer absent. Read-back
+`e4eb8d888b36967ae8cdf90aed6d2c55a55e270720c2226f184e6766f7474d61`.
+Итог десятки, всех cold3 и S1–S8 ещё не принят. Нужны S7/S8,
 небольшое изменение/execute/save после writable reopen установленного CLI,
 одна штатная отмена с процессным наблюдением и итоговая очистка.
 Предыдущий scripted normal shutdown/writable reopen нового CLI прошёл;
