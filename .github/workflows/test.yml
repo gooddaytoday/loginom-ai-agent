@@ -102,6 +102,9 @@ jobs:
           foreach ($process in $mozillaProcesses) {
             Write-Host "Stopping background process: $($process.ProcessName) PID=$($process.Id)"
             $process | Stop-Process -Force -ErrorAction Stop
+            if (-not $process.WaitForExit(10000)) {
+              throw "Mozilla background process did not exit: PID=$($process.Id)"
+            }
           }
           if (Get-Process -Name firefox, default-browser-agent, pingsender -ErrorAction SilentlyContinue) {
             throw 'Mozilla background processes remain active before proxy acceptance'
