@@ -648,3 +648,28 @@ Private `ab-local-stand-20261008/formal-v9-progress-2-20261009.json` SHA256
 и совпал. `articles-by-author#1` running; closed2/45/PASS2/FAIL0,
 candidate formal/cold/compare0/manual retries0. Полный90 ещё не принят;
 исторический ABC FAIL v7 не удалён и не объявлен доказанной flaky ошибкой.
+
+## Formal v9: сохранённые результаты текущей серии
+
+Baseline run `20261009-021118-d08be6baf`, session60189. Во всех строках
+structure/warm oracle PASS, все6 cleanup stages confirmed, process cleanup
+confirmed/error null/remaining0×2 и full inventory/restore roundtrip архивов.
+Cold formal ещё не выполнялся; candidate formal и compare не начаты.
+
+| Задача | Повтор | Judge | History entries / gzip bytes | Diagnostics entries / gzip bytes |
+| --- | --- | --- | --- | --- |
+| ab-revenue-per-converter | 1 | PASS100 | 4604 / 17048407 | 3 / 5110421 |
+| abc-pareto-groups | 1 | PASS100 | 4640 / 21348941 | 3 / 9371065 |
+| articles-by-author | 1 | PASS100 | 4600 / 15892038 | 3 / 4038019 |
+
+Последний private snapshot `formal-v9-progress-3-20261009.json` SHA256
+`e0fd71b357af1a35239d0229ff93e78dfe4507b60b56692c846657bdf0c369e2`:
+три result/cleanup/process-cleanup/review/preservation receipts и archive SHA
+повторно проверены. Controller идентичность живого PID676156 совпала;
+campaign-roi-by-channel#1 running. Closed3/45/PASS3/FAIL0/manual retries0,
+common020c08059… неизменен. Новый private `formal-v9-observe.py` read-only,
+SHA256 `eb9111bcc5191527eafcc49b5af07633709a3cc63276bb60f7a40b5c696a6e9a`,
+проверен на живом процессе; не входит в исполняемый harness/21 adapters.
+Наблюдался промежуточный result PASS100 с environment cleanup not_run;
+архивирование начато только после отдельной подтверждённой полной cleanup.
+Его метка RESULT не является terminal cleanup доказательством.
