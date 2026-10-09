@@ -199,6 +199,8 @@ artifacts; its scope excludes observer3119/server/node acceptance. The retained
 cleanup supplies11 available exact records, deduplicated against the observer
 collectors. previousObservedOwnTreeCount15 and uncaptured-old-tree TRUE remain
 unknown historical limits, never invented PID trees/ticks or a transferred PASS.
+The old root cleanup's2174-byte marker SHAce1b94… and the current4533-byte
+checkpoint SHA0b61b8… are different retained stages, not interchangeable proof.
 All originals are included in the NEW held-flock FD/hash checks. The secret GUID
 is hashed as its actual UTF8 string and compared privately with captured hash;
 no normalization or opaque ID substitution. This never establishes executed

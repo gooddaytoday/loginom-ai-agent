@@ -4,12 +4,13 @@ import {readFileSync,mkdtempSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir,tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
 import {Diagnostics} from '../scripts/account-ui.mjs';
 import {loginOwnPage,readOwnClient} from '../scripts/account-session-ui.mjs';
 import {inspectOrCreateAdmin,cardAdminPolicy} from '../scripts/admin-bootstrap-ui.mjs';
 import {accountPolicy} from '../scripts/account-lifecycle.mjs';
 import {verifyObserver47Absence,observer47} from '../scripts/card-observer-readback.mjs';
-import {verifyBootstrapLogouts} from '../scripts/admin-bindings.mjs';
+import {verifyBootstrapLogouts,requireExactProcessAbsence} from '../scripts/admin-bindings.mjs';
 const dependency=JSON.parse(readFileSync(join(homedir(),'.config/loginom-multica/operator.json')));
 const {chromium}=await import(dependency.playwright_module),root=mkdtempSync(join(tmpdir(),'lab53-admin-offline-'));
 const html=readFileSync(new URL('../fixtures/navigation.html',import.meta.url),'utf8')+readFileSync(new URL('../fixtures/accounts.html',import.meta.url),'utf8');
@@ -38,6 +39,16 @@ async function ui(initialRecord){
 const target={loginom:{url:'about:blank',username:'card-admin',password:'SYNTHETIC'}};
 const intent={full_name:'owned-card-admin',action:'probe-existing',history:{state:'EXISTING_VERIFIED',prior_attempts:[]}};
 test('Worker/Reviewer minimal policy retains chkAdmin false',()=>{assert.equal(accountPolicy.chkAdmin,false);assert.equal(cardAdminPolicy.chkAdmin,true);});
+test('both new readbacks reject numeric/bool ticks before comparison and reject the exact live string tuple',()=>{
+  const ticks=readFileSync('/proc/self/stat','utf8').split(')').at(-1).trim().split(/\s+/)[19];
+  for(const value of [Number(ticks),true,false])assert.throws(()=>requireExactProcessAbsence([{pid:process.pid,start_ticks:value}]),/PROVENANCE_UNKNOWN/);
+  for(const pid of [0,-1,true,false])assert.throws(()=>requireExactProcessAbsence([{pid,start_ticks:ticks}]),/PROVENANCE_UNKNOWN/);
+  assert.throws(()=>requireExactProcessAbsence([{pid:process.pid,start_ticks:ticks}]),/OWN_PROCESS_PRESENT/);
+  for(const filename of ['bootstrap-readback.mjs','migration-readback.mjs'])assert.match(readFileSync(new URL('../scripts/'+filename,import.meta.url),'utf8'),/requireExactProcessAbsence\(cleanup.processes\)/);
+  const child=spawnSync(process.execPath,['--input-type=module','-e',"import {readFileSync} from 'node:fs';const ticks=readFileSync('/proc/self/stat','utf8').split(')').at(-1).trim().split(/\\s+/)[19];console.log(JSON.stringify({pid:process.pid,start_ticks:ticks}));"],{encoding:'utf8'});
+  assert.equal(child.status,0);const record=JSON.parse(child.stdout);assert.equal(typeof record.start_ticks,'string');
+  requireExactProcessAbsence([record]);processes.push(record);
+});
 test('existing positively owned Admin is read/cancel only, never repaired',async()=>{
   const x=await ui({username:'card-admin',marker:intent.full_name,policy:cardAdminPolicy});
   try{assert.equal((await inspectOrCreateAdmin(x.page,target,intent,x.diagnostics,x.recheck)).chkAdmin,true);

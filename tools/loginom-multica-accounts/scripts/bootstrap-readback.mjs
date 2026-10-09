@@ -3,7 +3,7 @@ import {createHash,randomBytes} from 'node:crypto';
 import {privatePath,savePrivateArtifact,verifyParentEnvelope} from './parent-readback.mjs';
 import {verifyFinalReadback} from './account-lifecycle.mjs';
 import {requireSameObserver} from './account-identity.mjs';
-import {bootstrapBindings,verifyBootstrapLogouts,equal} from './admin-bindings.mjs';
+import {bootstrapBindings,verifyBootstrapLogouts,equal,requireExactProcessAbsence} from './admin-bindings.mjs';
 const hash=x=>createHash('sha256').update(x).digest('hex');
 export function bootstrapReadback(action,inputFile) {
   privatePath(inputFile);const input=JSON.parse(readFileSync(inputFile)),operation=input.operation;
@@ -16,12 +16,7 @@ export function bootstrapReadback(action,inputFile) {
     ||cleanup.process_cleanup!=='PASS'||cleanup.failure!==null||cleanup.returncode!==0
     ||cleanup.issue_id!==operation.issue_id||cleanup.operation_id!==operation.operation_id||cleanup.source_sha!==operation.source.sha
     ||!cleanup.processes?.length)throw Error('BOOTSTRAP_CLEANUP_UNKNOWN');
-  for(const old of cleanup.processes){
-    if(!Number.isSafeInteger(old.pid)||!/^\d+$/.test(old.start_ticks))throw Error('BOOTSTRAP_CLEANUP_UNKNOWN');
-    try{const fields=readFileSync(`/proc/${old.pid}/stat`,'utf8').split(')').at(-1).trim().split(/\s+/);
-      if(fields[19]===old.start_ticks&&!['Z','X'].includes(fields[0]))throw Error('BOOTSTRAP_OWN_PROCESS_PRESENT');}
-    catch(error){if(error.code!=='ENOENT')throw error;}
-  }
+  requireExactProcessAbsence(cleanup.processes);
   for(const receipt of receipts)requireSameObserver(operation.expected_observer,receipt.observer,operation.stand);
   if(action==='request')savePrivateArtifact(input.directory,'parent-request.json',{
     schema:'lab53-parent-readback-request-v1',purpose:'bounded-card-admin-bootstrap',phase:'post-cleanup',

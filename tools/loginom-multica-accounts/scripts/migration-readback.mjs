@@ -3,7 +3,7 @@ import {randomBytes} from 'node:crypto';
 import {privatePath,savePrivateArtifact,verifyParentEnvelope,configBindings} from './parent-readback.mjs';
 import {verifyCalibratedInventory,verifyFinalReadback} from './account-lifecycle.mjs';
 import {requireSameObserver} from './account-identity.mjs';
-import {hash,equal,boundFile,verifyBootstrapLogouts} from './admin-bindings.mjs';
+import {hash,equal,boundFile,verifyBootstrapLogouts,requireExactProcessAbsence} from './admin-bindings.mjs';
 
 export function checkBootstrapReceipt(receiptFile,target,source,issue) {
   privatePath(receiptFile);const receipt=JSON.parse(readFileSync(receiptFile));
@@ -45,12 +45,7 @@ export function checkBootstrapReceipt(receiptFile,target,source,issue) {
   if(cleanup.issue_id!==issue||cleanup.operation_id!==receipt.operation_id||cleanup.source_sha!==source.sha
     ||cleanup.process_cleanup!=='PASS'||cleanup.failure!==null||cleanup.returncode!==0||!cleanup.processes?.length)
     throw Error('MIGRATION_BOOTSTRAP_BYTES_CHANGED');
-  for(const record of cleanup.processes){
-    if(!Number.isSafeInteger(record.pid)||!/^\d+$/.test(record.start_ticks))throw Error('MIGRATION_BOOTSTRAP_BYTES_CHANGED');
-    try{const fields=readFileSync(`/proc/${record.pid}/stat`,'utf8').split(')').at(-1).trim().split(/\s+/);
-      if(fields[19]===record.start_ticks&&!['Z','X'].includes(fields[0]))throw Error('MIGRATION_BOOTSTRAP_PROCESS_PRESENT');}
-    catch(error){if(error.code!=='ENOENT')throw error;}
-  }
+  requireExactProcessAbsence(cleanup.processes);
   // The old bootstrap result is provenance for this exact operator, not the
   // current pair-absence proof or permission to reuse a global-bound ready flag.
   return receipt;

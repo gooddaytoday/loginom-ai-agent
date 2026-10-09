@@ -4,6 +4,18 @@ import {privatePath} from './parent-readback.mjs';
 
 export const hash = value => createHash('sha256').update(value).digest('hex');
 export const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+export function requireExactProcessAbsence(records) {
+  if(!Array.isArray(records)||!records.length)throw Error('ADMIN_PROCESS_PROVENANCE_UNKNOWN');
+  for(const record of records){
+    // Preserve producer string ticks exactly. RegExp would otherwise coerce
+    // numeric/bool input, while /proc returns a string and equality misses it.
+    if(!Number.isSafeInteger(record.pid)||record.pid<=0||typeof record.start_ticks!=='string'
+      ||!/^\d+$/.test(record.start_ticks))throw Error('ADMIN_PROCESS_PROVENANCE_UNKNOWN');
+    try{const fields=readFileSync(`/proc/${record.pid}/stat`,'utf8').split(')').at(-1).trim().split(/\s+/);
+      if(fields[19]===record.start_ticks&&!['Z','X'].includes(fields[0]))throw Error('ADMIN_OWN_PROCESS_PRESENT');}
+    catch(error){if(error.code!=='ENOENT')throw error;}
+  }
+}
 export function boundFile(path) {
   const info = privatePath(path);
   return {path, device: info.dev, inode: info.ino, sha256: hash(readFileSync(path))};
