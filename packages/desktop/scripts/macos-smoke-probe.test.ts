@@ -2,7 +2,41 @@ import { expect, test } from "bun:test"
 import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { spawnSync } from "node:child_process"
 import { runProbe } from "./macos-smoke-probe.mjs"
+
+test.skipIf(process.platform === "win32")(
+  "probe cleanup ignores an invalid launch-result PID",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "loginom-probe-identity-"))
+    const node = process.env.LOGINOM_AI_AGENT_TEST_NODE ?? Bun.which("node")
+    if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
+    const companion = Bun.spawn([node, "-e", "process.stdout.write('ready'); setInterval(() => {}, 1000)"], {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "ignore",
+    })
+    try {
+      const reader = companion.stdout.getReader()
+      expect(new TextDecoder().decode((await reader.read()).value)).toBe("ready")
+      reader.releaseLock()
+      expect(
+        runProbe(
+          node,
+          "console.log('probe complete')",
+          { env: {}, cwd: root, timeout: 1000 },
+          (executable, args, options) => ({ ...spawnSync(executable, args, options), pid: -companion.pid }),
+        ),
+      ).toBe("probe complete")
+      expect(() => process.kill(companion.pid, 0)).not.toThrow()
+    } finally {
+      companion.kill()
+      await companion.exited
+      await rm(root, { recursive: true, force: true })
+    }
+  },
+  10_000,
+)
 
 for (const blocked of [false, true]) {
   test.skipIf(process.platform === "win32")(
