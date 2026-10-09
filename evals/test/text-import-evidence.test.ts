@@ -291,9 +291,14 @@ test("cold verdict requires original downloaded bytes, fresh complete values and
       { ref: { ...f.output.node, document_id: "cold-doc", workflow_id: "cold-flow" }, type: "imports.text", inputs: [], outputs: [0] }], links: [] }))
     await Bun.write(path.join(cold, "result.json"), JSON.stringify(report))
     expect(await validateTextImportCold(f.task, f.attempt, cold)).toEqual({ errors: [], failures: [] })
+    await expect(finalizeTextImportCase(f.task, f.attempt, path.join(f.root, "missing-cold"))).rejects.toThrow("cold")
+    const finalized = await finalizeTextImportCase(f.task, f.attempt, path.join(f.root, "final"), cold)
+    expect(await Bun.file(path.join(finalized, "reference.lgp")).bytes()).toEqual(await Bun.file(path.join(f.attempt, "artifact/package.lgp")).bytes())
     report.port.sample[2][1].value = ""
     await Bun.write(path.join(cold, "result.json"), JSON.stringify(report))
     expect((await validateTextImportCold(f.task, f.attempt, cold)).failures).not.toHaveLength(0)
+    await expect(finalizeTextImportCase(f.task, f.attempt, path.join(f.root, "bad-cold"), cold)).rejects.toThrow("cold")
+    expect(await Bun.file(path.join(f.root, "bad-cold", path.basename(f.task), "reference.lgp")).exists()).toBe(false)
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
 
