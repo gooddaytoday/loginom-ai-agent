@@ -5144,3 +5144,63 @@ test('fractional Reform rows retain complete definitions and native record bindi
   for(const field of s.wizard.reform_columns.fields)assert.ok(s.ui.elements.find(e=>e.ref===field.name_ref)?.allowed_actions.includes('double_click'));
  }
 });
+
+
+test('F3 accepts a table output owned by the complete observed semicolon node label',()=>{
+ for(const label of ['CrossTable','cols:_Category;__rows:_Region;__cells:_Amount','a;b;c;Output_Data-0']) {
+  const tid='MF;TF-1;Graph;'+label+';Output_Data-0';
+  const snapshot={wizard:{status:'absent'},nodes:[{node_ref:{node_label:label,workflow_ref:{prefix:'MF;TF-1'}},bounding_box:{x:100,y:100,width:50,height:50},ports:[{tid,ui_ref:'ui-output'}]}],
+   ui:{elements:[{ref:'ui-output',tid,kind:'port',allowed_actions:['press']}]}};
+  assert.doesNotThrow(()=>validateUiAction({verb:'press',ref:'ui-output',key:'F3'},snapshot));
+ }
+});
+
+
+test('F3 rejects foreign non-table child link ambiguous and wizard references',()=>{
+ const action={verb:'press',ref:'ui-output',key:'F3'},label='a;b;c',tid='MF;TF-1;Graph;'+label+';Output_Data-0';
+ const base={wizard:{status:'absent'},nodes:[{node_ref:{node_label:label,workflow_ref:{prefix:'MF;TF-1'}},bounding_box:{x:100,y:100,width:50,height:50},ports:[{tid,ui_ref:'ui-output'}]}],
+  ui:{elements:[{ref:'ui-output',tid,kind:'port',allowed_actions:['press']}]}};
+ for(const fault of ['foreign_node','foreign_workflow','input','variable','child','link','duplicate_ref','duplicate_owner','duplicate_port','missing_port','missing_action','wizard','missing_ref']) {
+  const s=clone(base),e=s.ui.elements[0];
+  if(fault==='foreign_node')s.nodes[0].node_ref.node_label='other';
+  if(fault==='foreign_workflow')s.nodes[0].node_ref.workflow_ref.prefix='MF;TF-2';
+  if(['input','variable','child','link'].includes(fault)) {
+   e.tid=fault==='input'?tid.replace('Output_Data','Input_Data'):fault==='variable'?tid.replace('Output_Data','Output_Variable'):fault==='child'?tid+';Label':tid+'|other|Input_Data-0';
+   s.nodes[0].ports[0].tid=e.tid;
+  }
+  if(fault==='duplicate_ref')s.ui.elements.push(clone(e));
+  if(fault==='duplicate_owner')s.nodes.push(clone(s.nodes[0]));
+  if(fault==='duplicate_port')s.nodes[0].ports.push(clone(s.nodes[0].ports[0]));
+  if(fault==='missing_port')s.nodes[0].ports=[];
+  if(fault==='missing_action')e.allowed_actions=[];
+  if(fault==='wizard')s.wizard.status='observed';
+  if(fault==='missing_ref')e.ref='ui-other';
+  assert.throws(()=>validateUiAction(action,s),undefined,fault);
+ }
+});
+
+
+test('F3 automatic output action keeps DOM freshness before dispatch',async()=>{
+ for(const stale of [false,true]) {
+  const page=new Page(),label='cols:_Category;__rows:_Region;__cells:_Amount',base='MF;TF-1;Graph;'+label;
+  page.add('g',base,'',{x:100,y:120,width:180,height:80});
+  page.add('text',base+';Label;Label',label,{x:110,y:120,width:150,height:20});
+  const port=page.add('g',base+';Output_Data-0','',{x:260,y:165,width:10,height:10});
+  const s=await page.observe(),e=s.ui.elements.find(e=>e.tid===port.attrs['data-tid']);
+  assert.ok(e,JSON.stringify(s.ui));validateUiAction({verb:'press',ref:e.ref,key:'F3'},s);
+  if(stale)page.mutationObserver.pending.push({type:'attributes',attributeName:'class',target:port});
+  const r=await page.act({verb:'press',ref:e.ref,key:'F3'},s);
+  assert.equal(r.status,stale?'NOT_APPLIED':'SUCCEEDED',JSON.stringify(r.error));
+  assert.equal(page.events.filter(e=>e==='F3').length,stale?0:1);
+ }
+});
+
+
+test('F3 refuses an output when the observed node body is ambiguous',async()=>{
+ const page=new Page(),base='MF;TF-1;Graph;a;b';
+ for(const x of [100,200])page.add('g',base,'',{x,y:120,width:80,height:60});
+ page.add('text',base+';Label;Label','a;b',{x:100,y:120,width:60,height:20});
+ const port=page.add('g',base+';Output_Data-0','',{x:275,y:165,width:10,height:10});
+ const s=await page.observe(),e=s.ui.elements.find(e=>e.tid===port.attrs['data-tid']);
+ assert.ok(e);assert.throws(()=>validateUiAction({verb:'press',ref:e.ref,key:'F3'},s));
+});

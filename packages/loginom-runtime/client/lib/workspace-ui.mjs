@@ -41,7 +41,18 @@ export function validateUiAction(action, snapshot) {
     for (const ref of refs) {
       const elements = snapshot.ui.elements.filter(element => element.ref === ref);
       if (elements.length !== 1 || !elements[0].allowed_actions?.includes(action.verb)) throw new Error('UI reference is absent, ambiguous, or does not support this action');
-      if(action.verb==='press'&&action.key==='F3'&&(snapshot.wizard?.status!=='absent'||elements[0].kind!=='port'||!/^MF;TF(?:-\d+)?;Graph;[^;]+;Output_Data-\d+$/.test(elements[0].tid??'')))throw Error('F3 is restricted to an observed graph table output');
+      if(action.verb==='press'&&action.key==='F3') {
+        // Automatic node names contain native delimiters. Resolve the full
+        // observed graph key, then admit only its exact terminal table port.
+        const owners=(snapshot.nodes??[]).filter(node=>{
+          const prefix=node.node_ref?.workflow_ref?.prefix,label=node.node_ref?.node_label;
+          if(!node.bounding_box || !/^MF;TF(?:-\d+)?$/.test(prefix??'') || typeof label!=='string' || !label)return false;
+          const base=prefix+';Graph;'+label+';';
+          return elements[0].tid?.startsWith(base) && /^Output_Data-\d+$/.test(elements[0].tid.slice(base.length))
+            && node.ports?.filter(port=>port.tid===elements[0].tid && port.ui_ref===ref).length===1;
+        });
+        if(snapshot.wizard?.status!=='absent'||elements[0].kind!=='port'||owners.length!==1)throw Error('F3 is restricted to an observed graph table output');
+      }
       if(action.verb==='set_wizard_field' && action.text.length>elements[0].wizard_field.max_length_utf16)throw new Error('Wizard text exceeds the observed native input limit; select an observed option instead of typing its label');
       if (action.verb==='set_checked' && elements[0].check_state?.kind==='radio' && !action.checked) throw new Error('Select the desired radio option; a radio cannot be independently unchecked');
     }
