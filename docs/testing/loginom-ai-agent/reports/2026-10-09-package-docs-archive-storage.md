@@ -99,3 +99,20 @@ readback SHA256 `2998a9e685fe8a0cb66bdd1ab1985b7f9defc702c30a24dbde909386e64b250
 Итого76 архивов798614529bytes вне root, targets600/parents700; root free
 1827414016bytes после batch при продолжающемся formal запуске. Активный
 abc#1, failed/incomplete profiles, frozen CLI/harness и условия не изменены.
+
+Седьмой batch: `closed-archive-storage-20261009/batch-7` с отдельными
+plan/receipt/readback/tar-readback. Перенесены10 confirmed closed архивов
+formal v9 abc/articles/campaign/cohort/customer#1,113483025bytes. Cohort
+остаётся semantic FAIL; процессная cleanup confirmed не означает recovery PASS.
+Prior full roundtrip, все6 cleanup stages/remaining0×2, hashes result/cleanup/
+process-cleanup/preservation, архивов, UID/GID/mode/xattrs/inode и отсутствие
+доступных process/FD references проверены до/после copy2/fsync/atomic links.
+Недоступные `/proc` наблюдения учтены в receipt, чужие процессы не изменялись.
+
+Readback10 PASS, штатный tar через исходные ссылки PASS:4640/3 entries,
+совпадают с preservation inventory. Receipt SHA256
+`226c9a4efa7e9f1f4b12d4917dc192d1cbd415cb825863b159c917fbe5b62ac1`;
+readback SHA256 `3db8a22a65572e8496273846e835b52edc536626d3a1cf0a0da8471fc4b7cc4a`.
+Actual own storage inventory86 archives912097554bytes/targets600 PASS;
+parents700. Root free1882009600bytes после batch при live записи. Active
+first-last#1, failed-cleanup/incomplete profiles и frozen условия не перемещались.
