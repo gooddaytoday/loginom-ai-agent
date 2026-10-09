@@ -57,7 +57,7 @@
     "scripts/retired-worker-readback.mjs": "6ecced409c9e6c90a5a96704f919b8fce76e14a9bd3c4b4fd7a39c3a1acf3165",
     "scripts/vendor-provenance.mjs": "7111f61f2f720f7634b473528ab31d5446e1b0d710efd37ba96c35cbef3d5f00",
     "tests/account-ui.test.mjs": "3b7a48516ff0ca7bb8d7c4b69ad0295a10b8c70fd9be0356f4c686f53b86bc9e",
-    "tests/admin-bootstrap.test.mjs": "68ad5e11621ed48ad23dcd76a7c55c07556292b902678f2c42ac912ab334f45a",
+    "tests/admin-bootstrap.test.mjs": "ca73075a237d40cd7c9a2f9aea17009e818b2df7e93bed32df96a4774eff0c28",
     "tests/admin-harness.mjs": "7640a0735cf3c3a09c8d847e4ac84bfcd4db2e01cea26914276f90c67fcb0177",
     "tests/card-census-fixture.py": "7e27af0ff7a70476c660a39d47300191db4123021aaa81bf22405511910c635c",
     "tests/fd-census-fixture.py": "8b5ff846f0c3669afbebbe037f9e1d73e7dfcbae71d4c9216ed489f42bc21768",

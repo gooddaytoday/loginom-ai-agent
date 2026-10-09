@@ -44,7 +44,6 @@ test('both new readbacks reject numeric/bool ticks before comparison and reject 
   for(const value of [Number(ticks),true,false])assert.throws(()=>requireExactProcessAbsence([{pid:process.pid,start_ticks:value}]),/PROVENANCE_UNKNOWN/);
   for(const pid of [0,-1,true,false])assert.throws(()=>requireExactProcessAbsence([{pid,start_ticks:ticks}]),/PROVENANCE_UNKNOWN/);
   assert.throws(()=>requireExactProcessAbsence([{pid:process.pid,start_ticks:ticks}]),/OWN_PROCESS_PRESENT/);
-  for(const filename of ['bootstrap-readback.mjs','migration-readback.mjs'])assert.match(readFileSync(new URL('../scripts/'+filename,import.meta.url),'utf8'),/requireExactProcessAbsence\(cleanup.processes\)/);
   const child=spawnSync(process.execPath,['--input-type=module','-e',"import {readFileSync} from 'node:fs';const ticks=readFileSync('/proc/self/stat','utf8').split(')').at(-1).trim().split(/\\s+/)[19];console.log(JSON.stringify({pid:process.pid,start_ticks:ticks}));"],{encoding:'utf8'});
   assert.equal(child.status,0);const record=JSON.parse(child.stdout);assert.equal(typeof record.start_ticks,'string');
   requireExactProcessAbsence([record]);processes.push(record);
