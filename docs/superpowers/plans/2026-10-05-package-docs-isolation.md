@@ -1067,7 +1067,10 @@ Core имеет разметку осей, но без CSV oracle. По доку
   Новый frozen d08 на own storage создан/install/typecheck PASS/clean. V8 отказал
   в storage preflight до0 задач: один наш cohort CSV сохранён и exact-SHA удалён,
   raw profiles сохранены. V9 conditions storage-clean/SHA020c08059… закрепляют
-  те же658/281/21 pins и оба CLI; baseline smoke79154 запущен, candidate ещё нет.
+  те же658/281/21 pins и оба CLI. Baseline smoke79154 terminal0/score100,
+  structure/warm/cold24704 PASS, close/logout/remaining0/bytes unchanged;
+  baseline accepted receipt сохранён. Candidate smoke80478 запущен на тех же
+  условиях; обе стороны/полный90/compare пока не приняты.
   Частичный v7 не подставлять
   как полный baseline и не повторять выборочно только неуспешные попытки.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой

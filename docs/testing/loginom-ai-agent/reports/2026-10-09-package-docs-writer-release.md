@@ -562,3 +562,24 @@ SHA256 `020c08059d809d417e03b977911407c570a51b8861cc3eeb21786c4fce1b162a`.
 запущен из frozen evals, run20261009-014845-d08be6baf, phase running подтверждена;
 terminal результата ещё нет. Candidate smoke, formal90 и compare ещё не начаты.
 Все запуски локальные; никаких действий на10.200.13.152.
+
+
+## Baseline smoke v9 принят
+
+Session79154 terminal0/run20261009-014845-d08be6baf: completed/score100/pass,
+oracle true, environment cleanup confirmed; все6 stages и process cleanup
+confirmed/error null/remaining0 в обеих проверках. Структура по независимому
+verifier и warm oracle PASS. Cold session24704 terminal0/PASS: новый native
+server, сохранённые package/input bytes, settingsReapplied false, свежий CSV
+собран до logout, oracle PASS, package close/logout/remaining0 подтверждены;
+только byte-verified owned storage files удалены, own cold container удалён.
+
+Closed history4506 entries/15452718bytes и diagnostics3/3882841bytes сохранены
+с полным inventory/restore roundtrip, mode600; активные профили не архивировались.
+Frozen658 files/21 adapters и fresh evals b30/protected diff0 повторно PASS.
+Receipt `ab-smoke-v9-base-accepted-20261009/review.json`
+SHA256 `c019ba636696ef9535cfc3b504ce753fc1b129d687052184c27abbb506bac646`.
+Метрики уникальных step-finish parts18/tool call IDs17/Loginom13/skills0/errors0;
+turns through prepare1. Это smoke, не доказательство statistical non-inferiority.
+Candidate smoke session80478 запущен на том же common020c08059…;
+formal90 и compare ещё не начаты.
