@@ -4447,11 +4447,11 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-09 — ACTIVE, formal v7 прерван; диагностика до следующей пары
+### 2026-10-09 — ACTIVE, v7 неполный; harness с phase evidence проверен
 
-- HEAD до checkpoint `4402803a7`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
+- HEAD до checkpoint `581a1a346`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client и чужие профили/процессы не изменялись.
-- Own mutable harness495463543 clean; новый detached skills-evals-release на полном SHA495463543901f1a69888b8d6375cd77996ef157b, frozen install/typecheck PASS.
+- Own mutable harness `d08be6baf8f5aea53f83c228cd0984c9d2bf0494` clean: промежуточный process-progress.jsonl через TDD; modules29 PASS/typecheck PASS/full486 PASS/2 SKIP/0 FAIL/2080 assertions/581.74s, terminal0/process cleanup confirmed. Frozen495 остаётся прежним и не редактировался; новый freeze и обе smoke стороны ещё не выполнены.
 - Writer post-open real-IO RED→GREEN; release/persistent-empty/replacement guards×5 PASS; modules77 PASS/0 FAIL/241 assertions.
 - Первый full495/session80830 terminal1:447 PASS/2 SKIP/37 FAIL/2 errors; cwd640MiB ниже1GiB.31 прямой space FAIL,6 downstream supported; весь evidence сохранён.
 - Fresh full495/session12760 terminal0:484 PASS/2 SKIP/0 FAIL/2063 assertions/576.34s; порог пространства сохранён, новый own executable TMPDIR в /dev/shm.
@@ -4467,7 +4467,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - CLI modify3 FAIL:21 file occurrence hashes PASS, readonly3/3/UNKNOWN_PREPARED_WORKFLOW3/3/active-source refusal2/3; candidate49 bridge/managed-entry exact source hashes PASS, explicit package/logout cleanup test-only; native writer owner/cause UNKNOWN. Docs-after-build CLI3 accepted/Desktop cold1 PASS2 FAIL; new cold native только после90 closed.
 - Linux installed CLI/Desktop49 по5 ОС PASS; TUI/native opening/headless docs и upgrade PASS; lifecycle/independence и remaining natural transitions открыты.
 - MiMo429/quota exhausted; новых secondary-model calls нет, ответ о вторичной модели ещё ожидается.
-- Source/server skill907ff16b…/catalog17764f9a… сохранены; stage5–8 открыты,stage9/full35 deferred; серверный skill сохраняется.
+- Source/server skill907ff16b…/catalog17764f9a… сохранены; stage5–8 открыты,stage9/full35 deferred. Local diagnostic sequences25 bwrap exits+25 installed baseline help:50 cleanup PASS, hang не воспроизведён. Protected diff0 против fresh evals b30dcbe5f; следующий шаг: новый frozen harness/условия локального стенда/обе smoke стороны, затем полный90; промежуточная phase запись не подтверждает успех или cause.
 - Owner-loss/resume drivers: host-owned budgets и новая skill activation исправлены через TDD,6 PASS/typecheck PASS/21 A/B adapter pins unchanged; native ещё pending. Evidence: writer-release и runtime-acceptance-contract reports; чужой evals worktree не изменяется.
 
 ### 2026-10-08 — ACTIVE, локальные запуски

@@ -486,3 +486,44 @@ SHA256 `084760453d2b0a37328014992d85ab1e91b48f49df536c97aa06c2a3d010190a`.
 Readback проверен после записи; чужие недоступные FD и отказ первого observer
 scan (shell содержал собственный текст проверки) явно сохранены без ослабления
 вывода. Профиль незавершённой попытки не архивировался и не очищался.
+
+
+## Локальная диагностика и промежуточное evidence supervisor
+
+На текущей системе две последовательности через старый495 supervisor:
+25 быстрых `/usr/bin/true` в bubblewrap и25 `--help` установленного baseline
+CLI с отдельным пустым профилем. Все50 exit0/process cleanup confirmed,
+максимальная длительность532/614ms; model/judge/Loginom запросов не запускали,
+credentials не копировали. Последовательности не воспроизвели зависание v7.
+Все50 process-cleanup SHA проверены в приватном
+`ab-local-stand-20261008/cohort-local-sequences-readback-20261009.json`.
+
+В собственном mutable harness добавлен `process-progress.jsonl`: фиксированная
+фаза и observed_at, mode600, промежуточные границы supervisor; без команды,
+окружения, paths, capsule или credentials. Последняя полная строка сообщает
+границу, не конкретный syscall и не успешный cleanup. Даже persistence не
+заменяет result/environment/process-cleanup receipts. Отказ записи сохраняет
+failed process cleanup в возвращённой и записанной квитанции. Продукт, судья,
+near-miss/tasks и правила admission/retry/таймаутов не изменены.
+
+TDD RED: running phase отсутствует,1 FAIL/1 assertion. После реализации тест
+уточнён: читать свежий файл и дождаться собственного fixture ready до abort.
+Первый GREEN assertion отказал; точная причина чтения не установлена. Следующий
+тест оборвался на15s после раннего abort до готовности child. Остаток этого
+собственного fixture569834/birth84613049 закрыт через frozen signalProcess
+после проверки UID/exe/group и точного cwd/marker; PID отсутствует. Это отдельный
+тестовый startup race, не установленная причина formal v7. Все неудачные логи
+сохранены. Итоговый live-phase test1 PASS/12 assertions; guard записи PASS.
+
+Связанные modules29 PASS/0 FAIL/140 assertions/71.14s; typecheck exit0.
+Full suite session23188:486 PASS/2 SKIP/0 FAIL/2080 assertions/581.74s;
+controller terminal0, process cleanup confirmed/error null/remaining0 в обеих
+проверках. Коммит own harness `d08be6baf8f5aea53f83c228cd0984c9d2bf0494`,
+clean; source hashes/full receipt read-back:
+`ab-local-stand-20261008/process-progress-full-readback-20261009.json`
+SHA256 `56ca3f5c787e902c35da5efce582f2d01455094b0891e9283b6e55ad1d105152`.
+Protected diff0 против свежего evals `b30dcbe5f2768a740abab18d3fec436aada9ab2b`.
+Это source-only проверка, причина native hang UNKNOWN. Следующие запуски только
+локально; новый frozen worktree/common conditions/обе smoke стороны ещё не
+созданы. До formal comparison нужны полный90 и cold/structure gates. V7
+остаётся19/45 INCOMPLETE и не сравнивается как полный baseline.
