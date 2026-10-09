@@ -48,6 +48,6 @@
 - Physical preexec digest/numericID/CreateTime/Timeout cause не восстановлены; old markers45/48 NOT_RECONCILED/immutable.
 - Mac09:00UTC complete8rows/2packages/hash0ad7… MATCH, same3128/admin bucket1; prior3119/3123 absent; не new-operation proof.
 - Reviewer supplement также разбудил Worker через default comment/replay; новые comments используют steer_task_ids+suppress остальных.
-- Два лишних source turns завершили HOLD11:29:30/11:33:40; draft сохранён, source201a не изменён; старые messages не редактируются.
+- Mas09:27UTC59 exact old PID/start_ticks absent; complete240FD dirs/control MATCH/no targetFD-locks;7cfg/2markers unchanged, archive pending.
 - 08:35UTC mas CPU12/load0.014, MemAvailable30115072KiB/free408509128704B; daemon212379 active1/wait0/report0; provider retry count unavailable.
 - Next: полный исправленный clean candidate→независимый review→old-effects proof→bound runtime qualification→те же8; schedules/merge-release0.
