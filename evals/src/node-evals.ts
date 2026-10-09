@@ -6,7 +6,7 @@ import { readdir } from "node:fs/promises"
 import { checkNodeXml, readNodeXml } from "./node-xml"
 import { checkNodeEvidence } from "./node-evidence"
 import { nodeCaseIds } from "./node-cases"
-import { textImportIds, validateTextImportAttempt } from "./text-import"
+import { textImportIds, textImportChecks, validateTextImportAttempt } from "./text-import"
 
 export async function validateNodeAttempt(taskDir: string, attemptDir: string, packagePath?: string) {
   const task = await Bun.file(path.join(taskDir, "task.json")).json() as { id: string; checklist: { id: string; required?: boolean }[] }
@@ -58,10 +58,10 @@ async function validateRun(runDir: string, taskIds: string[], tasksDir: string) 
     summary.tasks.length !== taskIds.length || summary.tasks.some(t => !taskIds.includes(t.id)) || new Set(summary.tasks.map(t => t.id)).size !== taskIds.length)
     errors.push("incomplete/unexpected task collection or repeat")
   for (const id of taskIds) {
-    if (!(nodeCaseIds as readonly string[]).includes(id)) errors.push(`unsupported node case: ${id}`)
+    if (!(nodeCaseIds as readonly string[]).includes(id) && !textImportIds.includes(id)) errors.push(`unsupported node case: ${id}`)
     const task = await Bun.file(path.join(tasksDir, id, "task.json")).json()
     if (task.id !== id) errors.push(`${id}: task identity differs`)
-    for (const item of task.checklist) if (item.required && !["input", "crosstable", "graph", "export", "result", "sequence"].includes(item.id))
+    for (const item of task.checklist) if (item.required && !(textImportIds.includes(id) ? textImportChecks : ["input", "crosstable", "graph", "export", "result", "sequence"]).includes(item.id))
       errors.push(`${id}: unknown required ID: ${item.id}`)
   }
   for (const task of summary.tasks) for (const attempt of task.attempts) {

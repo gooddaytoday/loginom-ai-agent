@@ -38,3 +38,25 @@ test("runner отклоняет режимы с судьёй и сохранен
   }
   expect(await runNodeEvals(["--unknown-flag"], {})).toMatchObject({ code: 2, runDir: null })
 })
+
+test("text import diagnostic pipeline completes without a package but does not certify missing refusal evidence", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "import-runner-"))
+  const server = Bun.serve({ port: 0, fetch: () => Response.json({ result: { revision: "fixture" } }) })
+  try {
+    const tasks = path.join(root, "tasks"), id = "txt-ambiguous-headers"
+    await cp(path.join(evalsRoot, "drafts/text-import", id), path.join(tasks, id), { recursive: true })
+    const result = await runNodeEvals(["--tasks", tasks], { EVAL_CLI_MODE: "fake", EVAL_AGENT_MODEL: "fake/model",
+      EVAL_PROFILE_DIR: path.join(root, "profile"), EVAL_RESULTS_DIR: path.join(root, "results"), EVAL_WORKSPACE_ROOT: path.join(root, "work"),
+      EVAL_ARTIFACT_SOURCE: `dir:${path.join(evalsRoot, "fixtures/storage")}`, LOGINOM_DOCK_API_KEY: "fixture",
+      LOGINOM_URL: `http://127.0.0.1:${server.port}`, LOGINOM_DOCK_BASE_URL: `http://127.0.0.1:${server.port}`,
+      EVAL_AGENT_PROVIDER_ID: "fake", EVAL_AGENT_PROVIDER_BASE_URL: "http://fixture", EVAL_AGENT_PROVIDER_API_KEY: "fixture",
+      EVAL_AGENT_PROVIDER_MODEL_ID: "model" })
+    expect(result.code).toBe(1)
+    const summary = await Bun.file(path.join(result.runDir!, "summary.json")).json()
+    expect(summary.tasks[0].attempts[0]).toMatchObject({ status: "completed", package_path: null, environment_cleanup: { status: "confirmed" } })
+    const verdict = await Bun.file(path.join(result.runDir!, "code-verdict.json")).json()
+    expect(verdict).toMatchObject({ verdict: "FAIL", code: 1, errors: [] })
+    expect(verdict.failures.join(" ")).toContain("prepare")
+    expect(await Bun.file(path.join(result.runDir!, id, "1/native-import.json")).exists()).toBe(true)
+  } finally { server.stop(true); await rm(root, { recursive: true, force: true }) }
+}, 30000)
