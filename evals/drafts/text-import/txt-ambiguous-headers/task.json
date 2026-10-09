@@ -1,0 +1,39 @@
+{
+  "id": "txt-ambiguous-headers",
+  "title": "TXT: Повторная ссылка на исходное Name",
+  "prompt": "# TXT: Повторная ссылка на исходное Name\n\nПроверь проблемный вход `ambiguous_headers.txt`. Используй строго заданные настройки; не исправляй файл, кодировку, разделитель или кавычки ради успешного результата.\n\n```json\n{\n  \"source\": {\n    \"encoding\": \"65001\",\n    \"rows_to_skip\": 0,\n    \"first_line_as_title\": true\n  },\n  \"format\": {\n    \"delimiter\": \",\",\n    \"decimal_separator\": \".\",\n    \"null_marker\": \"?\",\n    \"text_qualifier\": \"\\\"\",\n    \"multiple_delimiters\": false\n  }\n}\n```\n\nЗапрошенные поля:\n```json\n[\n  {\n    \"source_name\": \"Name\",\n    \"name\": \"FirstName\",\n    \"label\": \"FirstName\",\n    \"type\": \"string\",\n    \"data_kind\": \"Дискретный\",\n    \"used\": true\n  },\n  {\n    \"source_name\": \"Name\",\n    \"name\": \"SecondName\",\n    \"label\": \"SecondName\",\n    \"type\": \"string\",\n    \"data_kind\": \"Дискретный\",\n    \"used\": true\n  }\n]\n```\n\nНе выбирай повторяющиеся source names по позиции. Наблюдай точный отказ или всю фактически прочитанную таблицу; сообщи повреждение/неполноту, если они возникли. Не выдумывай native warning. После известного исхода с подтверждённым cleanup допускается сохранить собственный диагностический пакет; неизвестный эффект сохраняется как остановка, а не успех.\n\nДоставь оригинальный вход ровно один раз с проверкой bytes/SHA. Передай запрос на новый imports.text с заданными полями. Повторный source_name должен дать REQUEST_REJECTED на request.validate до создания импорта; не создавай узел отдельно, не выполняй импорт и не исправляй запрос.\n",
+  "inputs": [
+    "data/ambiguous_headers.txt"
+  ],
+  "spec": "SPEC.md",
+  "expected_output": "Диагностический исход по SPEC.json",
+  "checklist": [
+    {
+      "id": "input",
+      "text": "Текстовый импорт: input",
+      "required": true
+    },
+    {
+      "id": "import",
+      "text": "Текстовый импорт: import",
+      "required": true
+    },
+    {
+      "id": "graph",
+      "text": "Текстовый импорт: graph",
+      "required": true
+    },
+    {
+      "id": "sequence",
+      "text": "Текстовый импорт: sequence",
+      "required": true
+    },
+    {
+      "id": "diagnostic",
+      "text": "Текстовый импорт: diagnostic",
+      "required": true
+    }
+  ],
+  "timeout_ms": 900000,
+  "output_mode": "diagnostic"
+}

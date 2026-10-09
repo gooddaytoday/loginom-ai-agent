@@ -1,0 +1,45 @@
+{
+  "source_path": "analytical/analytic-txt-multiline-values",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 2146,
+      "sha256": "340d315b3061a1f99a191330ebfdc94c2b8edbc412c20b75e831e883160cf2cc"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 4143,
+      "sha256": "33b99ed51eaf65e7760fad666ff2091551e14ccfac958b112474592a1f617812"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5754,
+      "sha256": "598ec040a45b2f3c7d4f5284e16a9fbc947cbbc58490bd4785f9f29eb45b9fad"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3466,
+      "sha256": "59e27c89f68c0f09f0babc414e037ba962f63c51d10c5591ef728bf207ae2ead"
+    },
+    {
+      "path": "data/pipe_multiline.txt",
+      "bytes": 204,
+      "sha256": "586ac210d58bc0025c019b0e3669fc03807b13202320eef0de0aba2713f7b927"
+    },
+    {
+      "path": "expected/REPORT.md",
+      "bytes": 1369,
+      "sha256": "324d5a38ae75092a04b6b6e98a94cf3043e38c58dd9f2f43715f7db2ac859cb7"
+    },
+    {
+      "path": "expected/table.json",
+      "bytes": 1885,
+      "sha256": "a9b3c295a6baa04c3259d3ef65c993724207d19d7c25d8a5200d183390d404a4"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

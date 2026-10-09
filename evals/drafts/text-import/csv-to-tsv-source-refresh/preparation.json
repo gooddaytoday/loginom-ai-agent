@@ -1,0 +1,52 @@
+{
+  "source_path": "technical/regressions/csv-to-tsv-source-refresh",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 2560,
+      "sha256": "6f3f1ac8c9313ca1101944bc4de4450d16b48df68c0a8b743b47acc6830e136e"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 6484,
+      "sha256": "79e5f0de00d01216f937d2b9f7fffc23d2865f93166ed75f1616ccccc8f7898c"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 6391,
+      "sha256": "445652e4cd351972ebf72abe413d47c9033ded7f026187671612dc628464ac66"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 4126,
+      "sha256": "914101cffbdd976a4e02d62d980d4e824fd390d715c35da7e9b62ca49d8a79a6"
+    },
+    {
+      "path": "data/base.csv",
+      "bytes": 200,
+      "sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19"
+    },
+    {
+      "path": "data/changed.tsv",
+      "bytes": 244,
+      "sha256": "af26b4c2281e4426279ea811cf29d5cd2d56fa5dfee103d9778f3db321f022ce"
+    },
+    {
+      "path": "expected/stage-1.json",
+      "bytes": 1879,
+      "sha256": "1cd04ea52121acea352cfa0ec74c00efc3a594c1e0575d9dc05f60464f847084"
+    },
+    {
+      "path": "expected/stage-2.json",
+      "bytes": 2258,
+      "sha256": "4febf3a0110ef0372a7bb0b8bfe7091a03f2b8b999cf79db76915ba717355d83"
+    }
+  ],
+  "adaptations": [
+    "oracle_recipe source bytes/SHA corrected: data/changed.tsv",
+    "explicit CSV stage 1 and TSV stage 2",
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

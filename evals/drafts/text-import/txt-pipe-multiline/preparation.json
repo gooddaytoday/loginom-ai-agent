@@ -1,0 +1,40 @@
+{
+  "source_path": "technical/txt/txt-pipe-multiline",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1750,
+      "sha256": "1fb224df17ddb666ed6381d04f6e983b52619dbea3ca9d665972dbfb7f160814"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 3934,
+      "sha256": "43e2d534b1d3732964cac983572b577d6a05167c9d56dac2a9a8c31e7249d77c"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5302,
+      "sha256": "ce9ef97949e98a2982a15f58efb1321b29428eea8d0e355b328a45e0267bba63"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3802,
+      "sha256": "a2daf33d64969ce3a62f04e87a0e2447f6d6677c25118f797a4abb08889fe952"
+    },
+    {
+      "path": "data/pipe_multiline.txt",
+      "bytes": 204,
+      "sha256": "586ac210d58bc0025c019b0e3669fc03807b13202320eef0de0aba2713f7b927"
+    },
+    {
+      "path": "expected/table.json",
+      "bytes": 1885,
+      "sha256": "a9b3c295a6baa04c3259d3ef65c993724207d19d7c25d8a5200d183390d404a4"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

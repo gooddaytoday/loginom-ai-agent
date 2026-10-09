@@ -1,0 +1,45 @@
+{
+  "source_path": "analytical/analytic-txt-null-empty-zero",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 2137,
+      "sha256": "16019e0bad1569f9bfa2988b7c95c24962f2104930d795dd14c73a0b4711a1b5"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 4104,
+      "sha256": "e0782734803cf9846d5813f1935ddf5c2d1e3ecd23b93c9a366233a89cc06c75"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5736,
+      "sha256": "ec7f33a9899d08de1d542a5e9cbfe760ae23766008d80d570458233d733828ba"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3475,
+      "sha256": "51216d917825ece81953e576ee41b5bd30030beff0d8ab09ec1364281ec635b1"
+    },
+    {
+      "path": "data/comma_utf8.txt",
+      "bytes": 200,
+      "sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19"
+    },
+    {
+      "path": "expected/REPORT.md",
+      "bytes": 1325,
+      "sha256": "b85bd34f994d609ad7abcfeac8560e826f94a5f8e7ab0fbe90a30a41c6e8ecb3"
+    },
+    {
+      "path": "expected/table.json",
+      "bytes": 1879,
+      "sha256": "1cd04ea52121acea352cfa0ec74c00efc3a594c1e0575d9dc05f60464f847084"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

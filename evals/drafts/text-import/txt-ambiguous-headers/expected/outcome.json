@@ -1,0 +1,11 @@
+{
+  "kind": "ambiguous_headers",
+  "description": "Точный request.validate / NOT_APPLIED / REQUEST_REJECTED: Duplicate source column names. Эффект не возможен; import-узел не создаётся, Execute отсутствует, cleanup подтверждён. Name/Name_1 нативного мастера не запрещены сами по себе; OtherName сюда не подставляется.",
+  "must_not_certify_correct_table": true,
+  "native_warning_required": false,
+  "engine_rejection_required": false,
+  "unknown_effect_is_success": false,
+  "cleanup_required": true,
+  "negative_fixture": true,
+  "known_refusal_required": true
+}
