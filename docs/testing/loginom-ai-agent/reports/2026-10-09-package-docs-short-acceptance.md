@@ -165,7 +165,7 @@ FD проверено. Удалены только `/tmp/loginom-skills-analytic
 исторические условия/common paths не переписаны. Текущие Desktop temp roots
 и старые recovery материалы не затронуты.
 
-## Выбор skill и документы — S1–S7 PASS, S8 открыт
+## Выбор skill и документы — S1–S8 PASS
 
 S1 installed CLI и S2 native Desktop: **PASS** с реальной gpt-6.1-sol medium,
 ответ102, tool calls0/Loginom browser execs0/runtime journals0,remaining0.
@@ -206,7 +206,28 @@ Normal native close/logout SUCCEEDED/packages_after0/discard:false.
 Receipt27 files SHA256
 `23c08095b18b7d6f503db0d4179972131844249c98acc322dd4fc8321b2cb3f1`.
 
-Десятка и cold3 приняты. Для итоговой цели ещё нужен S8,
+S8 **PASS**: installed CLI в первом user turn создал PDF существующего nested
+пакета, browser/automation/upload0/input unchanged; обе2pages просмотрены,
+1module/6nodes/2submodels/depth3/data.lgd/source→calculator и неизвестные
+формулы/код отражены верно. Второй новый user turn в том же Session заново
+активировал automation/prepare, построил SUM Alpha35/Beta20 и сохранил свой
+`/user/skills-short-s8-9695-20261009.lgp`. Оба actual CLI exit0, native clean
+close/logout SUCCEEDED/discard:false, remaining0/writer absent.
+Original collector exit1 сохранён: human-readable advice после JSON у
+action_describe ошибочно разбирался как JSON. Сама describe request отклонена
+до эффекта; модель построила пакет в той же попытке. Исправлен только source
+test collector, commit `9c89a29c5`, без изменения installed product9695.
+RED5PASS/1FAIL → GREEN6PASS; regression33PASS/0FAIL/115assertions/4.79s и
+Host `bun typecheck` PASS. Corrupt JSON, неверные CSV/SUM/path по-прежнему
+отклоняются. TDD read-back SHA256
+`c8461aa1d9851912a3a5260401169113e13159c9ec62b9b46dc02fdd173407f2`.
+Сохранённые raw events/result/conditions проверены исправленным canonical
+verifySalesScenario **offline, без live/model rerun**; post-review SHA256
+`2b74cca6cb58d9c0b6499e96f94b3ff30f307edaf75bbd17dc98e96ebfffc886`,
+S8 receipt34files SHA256
+`11496f8ec59e49fda21de096f58013f49b41541585170df72cf43f1a4df170d5`.
+
+Этапы5–7 приняты. Для итоговой цели ещё нужны
 небольшое изменение/execute/save после writable reopen установленного CLI,
 одна штатная отмена с процессным наблюдением и итоговая очистка.
 Предыдущий scripted normal shutdown/writable reopen нового CLI прошёл;
