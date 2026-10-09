@@ -174,23 +174,23 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 
 ## Checkpoint — новая параллельная волна восьми узлов, 09.10.2026
 
-- Docs prechange b8f71474c; baseline4e626d547/basef9bf332c; loginom0ca исключён; назначения узлов сохранены.
+- Docs prechange f4c94ac43; baseline4e626d547/basef9bf332c; loginom0ca исключён; назначения узлов сохранены.
 - Node SHA: LAB45 a00b0203/PR42,46 41e0b170/PR43,47 c92a3bfd;48–52 4e626d547; старый PASS не переносится.
 - Caps8/8/8/runtime24aa…/daemon12/stock3m сохранены; восемь реальных приёмок и нагрузка12 NOT_PROVED.
 - Installed CLI597/version-dev и Multica0.6.1/source2ea — разные артефакты; global launcher не менялся.
-- Central instructions8d7a… неизменны: target CLI selection/native/Eval/caps сохранены; LAB53 live hold действует.
+- Central instructions8d7a…: target CLI selection/native/Eval/caps сохранены; LAB53 live hold ещё действует.
 - LAB53 approved scope d4241c818; [draft PR44](https://github.com/gooddaytoday/loginom-ai-agent/pull/44) common-preparation→shared-oauth.
-- Новый clean published SHA9e2ccc724a3b8616f2f878dc7719cd10bb957a94/tree87acd6d7…; delta4 файла в утверждённом scope.
-- SHA9b93201…: независимые25offline PASS, дополнительные cases выявили2P2/REQUEST_CHANGES; история сохранена.
-- SHA9e2ccc724: F1/F2 CLOSED, независимые33offline+5собственных cases PASS; новых findings в delta0.
-- Worker completed04:39:32MSK, повторный Reviewer completed04:46:26MSK; штатные handoff в той же карточке, дублей0.
-- Parent: Worker attachments2 и Reviewer3 APIbytes/SHA/manifest PASS; tree и19/19candidatefiles сверены независимо.
-- Source-only PASS: обе live entrypoints закрыты; полный lifecycle/install/rollback/runtime qualification NOT_ACCEPTED/NOT_RUN.
-- Root cause Timeout48 NOT_ESTABLISHED; адресные source-исправления не доказывают причину исторических45/48 failures.
-- LAB45 attempt6d13… numericNOT_CAPTURED/serverUNKNOWN/marker9595…; LAB48 attempt8d6f… numeric/causeNOT_ESTABLISHED/marker74f25….
-- Root47 старые3117/3118 PASS лишь для прежних effects; observer3119 serverabsence PENDING; markers/history сохранены.
-- Owner: existing Admin browser наmas; discovery/SSH не нашли browser/CDP/GUI/headless; actual endpoint/access pending.
-- Fresh Dispatcher/mstSelf NOT_READ; Reviewer85fixture/collector records absent/nonlive; не server proof. Loginom/model/build/install0.
-- 04:50MSK все8 node cards blocked, новых Worker/Reviewer node runs0; provider counters NOT_EXPOSED, APIcompleted не absence proof.
-- 01:52UTC mas CPU12/load0/0/0/MemAvailable30240748kB/free408545464320B; daemon212379/cap12/3m argv PASS; workload12 не проверен.
-- [SHA/результаты/границы](reports/2026-10-08-node-recheck/parallel8-restart.json). Далее existing Admin доступ→finite45/48/3119+полный LAB53 runtime→те же8; schedules/merge-release0.
+- Source9e2ccc724a3b8616f2f878dc7719cd10bb957a94/tree87acd6d7… опубликован clean; новый lifecycle SHA ещё не принят.
+- Source9b93201…: независимые25offline PASS, дополнительные cases выявили2P2/REQUEST_CHANGES; история immutable.
+- Source9e2ccc724: F1/F2 CLOSED, независимые33offline+5собственных cases PASS; только source fixes, не live qualification.
+- Parent: Worker2+Reviewer3 attachments APIbytes/SHA/manifest PASS; tree и19/19candidatefiles сверены независимо.
+- LAB53 Worker01a11f28-af02… running08:35:25MSK; handoff01a11f28-aeda… продолжил согласованный source-only lifecycle в той же карточке.
+- Обе live entrypoints закрыты; полный lifecycle/install/rollback/runtime qualification NOT_ACCEPTED/NOT_RUN.
+- Cause Timeout48 NOT_ESTABLISHED; source-исправления не устанавливают причину исторических45/48 failures.
+- LAB45 attempt6d13… marker9595… и LAB48 attempt8d6f… marker74f25… сохранены; account/process/FD binding перед сверкой PENDING.
+- Observer3119 отсутствует в новом калиброванном server inventory; archive marker/history PENDING собственных process/FD proof.
+- Владелец уточнил Mac; existing Chrome Admin3123/unique mstSelf/connected, GUIDhash3abc…; сеанс владельца сохранён.
+- 05:40UTC Dispatcher: count8/8=roots8, nodes10/packages2, масок0, Info proxies/type/name совпали; parent login/Close/Stop0.
+- 05:23UTC mas CPU12/load0/0/0/MemAvailable30257896kB/free408541442048B; 05:26UTC daemon212379 active/running/wait/report0 до нового Worker.
+- Все8 node cards пока blocked; итоговые Worker/Reviewer model acceptance0; provider counters NOT_EXPOSED, APIcompleted не absence proof.
+- [Admin readback](reports/2026-10-08-node-recheck/existing-admin-mac-readback.json): далее exact old effects→полный LAB53/review→те же8; schedules/merge-release0.
