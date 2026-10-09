@@ -1,7 +1,7 @@
 # Checkpoint текстового импорта
 
 - Текущий этап ЗАВЕРШЁН: код/материалы подготовлены, 8 backlog карточек созданы без запуска.
-- Ветка text-import-evals; база 7a45abd845f830610f376e2f21631acc8a48e8b2, frozen code 59ab36329c13f1399dab4313e94f3e9c6954301b доступен в remote.
+- Ветки evals и text-import-evals синхронизируются на итоговом documentation commit и публикуются в origin; база 7a45abd845f830610f376e2f21631acc8a48e8b2, frozen code 59ab36329c13f1399dab4313e94f3e9c6954301b доступен в remote.
 - Изменения только evals/; runtime продукта/default CLI не менялись.
 - Rich/Ben/Evaler неизменны: gpt-6.1-sol/xhigh, concurrency=1, прежний runtime.
 - Reference/product Loginom AI Agent назначен openai/gpt-6-luna/high; фактическая модель пока NOT_RUN.
