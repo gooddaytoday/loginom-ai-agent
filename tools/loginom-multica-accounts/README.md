@@ -54,11 +54,17 @@ and Logout/Disconnect through explicit adapter hooks. Failure retains its cause;
 cleanup does not extend the original deadline. A successful UI component returns
 `UI_QUALIFIED_CLEANUP_PENDING`, `ready: false`. The final readback validator checks
 fresh complete rows/counts/packages, observer calibration and exact own effects.
-It is a component validator, not a receipt importer or live authorization.
+It is a component validator, not live authorization.
 
-Both the production UI adapter (`UI_LIFECYCLE_ADAPTER_NOT_QUALIFIED`) and the
-existing-Admin server transport (`FINAL_SERVER_READBACK_NOT_IMPLEMENTED`) remain
-unqualified. The old login/probe/create body is preserved verbatim in baseline;
+The production UI adapter now implements source-backed owned Login/Users/
+Logout and original-connector disposal. Numeric nonadmin identity remains
+`ACCOUNT_NUMERIC_IDENTITY_NOT_EXPOSED`; the complete lifecycle is unqualified.
+The private parent request/response reader and loaded Dispatcher collector are
+implemented as offline components. They use the existing authorized Mac native
+CUA handoff, with no new callable endpoint or observer. The production path
+still stops before final readback and has no ready/archive transition. See
+`parent-readback-plan.md` for exact formats, ordering and the unresolved numeric
+identity question. The old login/probe/create body is preserved verbatim in baseline;
 its early `saveState('ready')` is no longer present in the candidate. No candidate
 code writes ready, archives active markers or admits live use from partial proof.
 Live UI integration, fresh independent server readback, exact process/FD closure
@@ -108,8 +114,8 @@ files and version metadata from the retained installed bundle; it must never
 restore older mutable account state. Baseline files here are source evidence,
 not proof that rollback has run. Installation and rollback remain NOT_RUN.
 
-See `finite-cleanup.md` for the existing Mac Admin calibration and unfinished
-adapter boundary. After common
+See `finite-cleanup.md` for the existing Mac Admin calibration and
+`parent-readback-plan.md` for the source component boundary. After common
 preparation/cleanup proof and independent review, the same eight cards resume
 under the existing authorization. No additional owner launch approval is needed;
 merge, release and changes to shared contracts remain separate decisions.

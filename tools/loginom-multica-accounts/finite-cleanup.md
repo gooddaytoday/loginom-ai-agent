@@ -1,6 +1,6 @@
 # Finite readback proposal and current boundary
 
-Status: **source adapter NOT_IMPLEMENTED / no live activation**. The parent
+Status: **source components implemented / lifecycle incomplete / no live activation**. The parent
 attached to the already open owner Chrome Admin tab on Mac and performed a
 complete calibrated Dispatcher refresh without a new browser or Loginom login.
 The existing owner tab/session is preserved. LAB53 does not search mas for a
@@ -20,8 +20,15 @@ for the final independent readback. Attaching to that exact existing tab, or
 owner-assisted readback in it, must not instantiate a new Loginom application,
 open another login tab or create an observer session. Its pre-existing ownership
 and session identity are recorded separately from all task-created effects.
-The parent can perform a fresh readback for a future operation. The accounts
-candidate has no admitted transport or receipt importer for this view.
+The parent can perform a fresh readback for a future operation through the
+ordinary supplement/handoff in this card, using native CUA. No callable mas/CDP
+endpoint exists. Private source-only request/response components are described
+in `parent-readback-plan.md`; they are not runtime-qualified or a gate bypass.
+The old3123 receipt has been superseded for historical reconciliation by
+shared-oauth `fafacd15848ea5ac1943deae76380c75fe368e6a`,
+`existing-admin-mac-readback-3128.json`, SHA256
+`ce2545af4b5d61811b06b73d752dd41f2311b614ffdaff11c7f0df7647832471`.
+Neither historical snapshot can satisfy a future-operation UUID/nonce request.
 
 1. Identify the owner-authorized device, browser/profile and exact connected tab.
    Establish observer identity and its connected unique mstSelf/RemoteGUID
@@ -29,10 +36,14 @@ candidate has no admitted transport or receipt importer for this view.
 2. Use the standard Dispatcher refresh, with complete cached manager/store/count
    equality, package traversal and refresh completion. Capture the observation
    privately; publish only normalized counts, target bindings and hashes.
-3. For LAB45/LAB48, no numeric session binding was captured. An empty account
-   bucket in a complete calibrated inventory may establish absence. A nonempty
-   bucket is UNKNOWN until exact ID/CreateTime/GUID ownership is available; it
-   never authorizes closing by username.
+3. For LAB45/LAB48, no numeric session binding was captured. Owner-approved
+   historical account-bucket exclusion may establish a separate current server
+   component when the complete inventory bucket is empty or contains only the
+   positively bound current owner self with a different comparably hashed GUID.
+   Retained collector algorithm/provenance must be established independently;
+   old missing numeric/helper facts remain immutable. Other nonempty buckets
+   are UNKNOWN. This never authorizes closing by username, archival, or weaker
+   new-effect validation; new effects still require exact ID/CreateTime/GUID.
 4. Observer3119 has its retained exact ID/CreateTime/GUID binding. Only its owner
    may reconcile a present disconnected/packages0 row with standard Close and
    confirmation; a fresh complete inventory must prove absence afterward. LAB53

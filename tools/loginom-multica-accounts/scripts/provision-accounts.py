@@ -17,9 +17,18 @@ from common import (read_private, write_private, private_snapshot, account_guard
                     process_identity, new_evidence_directory, append_evidence)
 
 
-def run_foreground(command, guards, evidence_dir, timeout=300, stop_timeout=10):
+def run_foreground(command, guards, evidence_dir, timeout=300, stop_timeout=10, operation_binding=None):
     # Descendant ownership is scoped to a dedicated subreaper, independent of
     # session/process-group changes. The caller never adopts unrelated children.
+    if operation_binding is not None:
+        if set(operation_binding) != {'issue_id', 'operation_id', 'source_sha'}:
+            raise RuntimeError('ACCOUNT_OPERATION_BINDING_INVALID')
+        for key in ('issue_id', 'operation_id'):
+            if str(UUID(operation_binding[key])) != operation_binding[key]:
+                raise RuntimeError('ACCOUNT_OPERATION_BINDING_INVALID')
+        source = operation_binding['source_sha']
+        if not isinstance(source, str) or len(source) != 40 or any(c not in '0123456789abcdef' for c in source):
+            raise RuntimeError('ACCOUNT_OPERATION_BINDING_INVALID')
     module_spec = importlib.util.spec_from_file_location('account_supervisor', Path(__file__).with_name('process-supervisor.py'))
     supervisor = importlib.util.module_from_spec(module_spec)
     module_spec.loader.exec_module(supervisor)
@@ -115,7 +124,8 @@ def run_foreground(command, guards, evidence_dir, timeout=300, stop_timeout=10):
             for signum, handler in previous.items(): signal.signal(signum, handler)
             append_evidence(directory, {'phase': 'process-cleanup', 'state': 'UNKNOWN', 'process_cleanup': cleanup,
                 'processes': records, 'failure': failure, 'server_absence': 'NOT_PROVED',
-                'returncode': result.get('returncode'), 'parent_guard_fds_retained': list(descriptors)})
+                'returncode': result.get('returncode'), 'parent_guard_fds_retained': list(descriptors),
+                **(operation_binding or {})})
 
 
 def require_finite_cleanup():
@@ -255,7 +265,8 @@ def prepare_pair(issue, operator_path, directory, previous_processes, evidence_d
             command = [context['operator']['node'], Path(__file__).with_name('provision-account.mjs'),
                 '--config', config, '--operator', operator_path, '--pair-worker', configs[0], '--pair-reviewer', configs[1],
                 '--evidence-dir', evidence]
-            if run_foreground(command, guards, evidence):
+            if run_foreground(command, guards, evidence, operation_binding={
+                    'issue_id': issue, 'operation_id': attempt, 'source_sha': source_sha}):
                 raise RuntimeError('ACCOUNT_PROVISION_FAILED')
         # No ready write, marker archive or release authorization is possible
         # from local proofs. The existing connected Admin adapter is unfinished.

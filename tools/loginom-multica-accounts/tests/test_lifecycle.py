@@ -111,19 +111,21 @@ if mode!='normal':
  time.sleep(30)
 ''')
             run_dir = context['evidence_dir'] / 'child'
+            binding = {'issue_id': self.issue, 'operation_id': attempt, 'source_sha': 'a' * 40}
             if mode == 'normal':
                 self.assertEqual(provision.run_foreground([sys.executable, script, capture, mode], guards, run_dir,
-                                                        timeout=3, stop_timeout=.15), 0)
+                                                        timeout=3, stop_timeout=.15, operation_binding=binding), 0)
             else:
                 expected = {'cancel': 'CANCELLED', 'orphan': 'CHILDREN_REMAINED', 'timeout': 'TIMEOUT'}[mode]
                 with self.assertRaisesRegex(RuntimeError, expected):
                     provision.run_foreground([sys.executable, script, capture, mode], guards, run_dir,
-                                             timeout=.4, stop_timeout=.15)
+                                             timeout=.4, stop_timeout=.15, operation_binding=binding)
             self.assertEqual(len(json.loads(capture.read_text())), 4)
             receipts = [json.loads(p.read_text()) for p in run_dir.glob('event-*.json')]
             cleanup = next(r for r in receipts if r.get('phase') == 'process-cleanup')
             self.assertEqual(cleanup['process_cleanup'], 'PASS')
             self.assertEqual(cleanup['state'], 'UNKNOWN')
+            for key, value in binding.items(): self.assertEqual(cleanup[key], value)
             self.assertEqual(cleanup['server_absence'], 'NOT_PROVED')
             self.assertGreaterEqual(len(cleanup['processes']), 1 if mode == 'normal' else 2)
             self.assert_absent(cleanup['processes'])
@@ -165,11 +167,15 @@ if mode!='normal':
             code = '''import {readFileSync} from 'node:fs';
 import {verifyPairBindings} from './scripts/qualify-accounts.mjs';
 import {verifyInheritedGuards,verifyRecordedEffects} from './scripts/account-lifecycle.mjs';
+import {verifyHeldAccountGuard} from './scripts/account-identity.mjs';
 const [operatorFile,...files]=process.argv.slice(1);
 const operator=JSON.parse(readFileSync(operatorFile));
 const configs=files.map(path=>JSON.parse(readFileSync(path)));
 verifyPairBindings(configs,operator,operatorFile);
-verifyRecordedEffects(verifyInheritedGuards(process.env.LOGINOM_ACCOUNTS_GUARDS_FILE,configs,operator),configs,operator);
+const envelope=verifyInheritedGuards(process.env.LOGINOM_ACCOUNTS_GUARDS_FILE,configs,operator);
+verifyRecordedEffects(envelope,configs,operator);
+for (const username of [operator.admin_user,...configs.map(config=>config.loginom.username)])
+  verifyHeldAccountGuard(envelope.guards.find(guard=>guard.path.endsWith('/'+username+'.lock')),username);
 '''
             guards = [context['pair_guard'], *context['guards'].values()]
             command = [node, '--input-type=module', '--eval', code, self.operator, *configs]

@@ -2,6 +2,7 @@ import {readFileSync, fstatSync, statSync, lstatSync} from 'node:fs';
 import {basename, dirname, isAbsolute} from 'node:path';
 import {createHash} from 'node:crypto';
 import {verifyPairBindings} from './qualify-accounts.mjs';
+import {consumeParentResponse} from './parent-readback.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const isHash = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
@@ -64,15 +65,25 @@ export function verifyRecordedEffects(envelope, configs, operator) {
     if ([operator, ...configs].some(value => !bound.includes(JSON.stringify(value)))) fail('ACCOUNT_EFFECT_BINDING_INVALID');
   }
   if (attempts.size !== 1 || sources.size !== 1) fail('ACCOUNT_EFFECT_BINDING_INVALID');
-  return {state: 'UNKNOWN', issue_id: configs[0].issue_id};
+  return {state: 'UNKNOWN', issue_id: configs[0].issue_id, attempt_id: [...attempts][0], source_sha: [...sources][0]};
 }
 
 function verifyIdentity(identity, config) {
   if (identity?.username !== config.loginom.username || identity.connected !== true
     || identity.stand !== config.loginom.url
-    || identity.mst_self_count !== 1 || !isHash(identity.guid_hash)
+    || !isHash(identity.guid_hash)
     || identity.user_hash !== hash(config.loginom.username)
-    || !Number.isSafeInteger(identity.session_id) || identity.session_id <= 0 || !isTime(identity.create_time)) fail('ACCOUNT_IDENTITY_UNCONFIRMED');
+    || !Number.isSafeInteger(identity.session_id) || identity.session_id <= 0 || !isTime(identity.create_time)
+    || identity.own_session_positive?.connected !== true
+    || identity.own_session_positive.guid_hash !== identity.guid_hash
+    || identity.own_session_positive.user_hash !== identity.user_hash
+    || identity.own_session_positive.role !== config.role
+    || identity.own_session_positive.stand !== config.loginom.url
+    || identity.own_session_count !== 1 || !isHash(identity.causal_proof_sha256)
+    || identity.observer_positive?.mst_self_count !== 1 || identity.observer_positive.connected !== true
+    || !isHash(identity.observer_positive.guid_hash) || identity.observer_positive.guid_hash === identity.guid_hash
+    || !Number.isSafeInteger(identity.observer_positive.session_id) || !isTime(identity.observer_positive.create_time))
+    fail('ACCOUNT_IDENTITY_UNCONFIRMED');
 }
 
 function verifyRights(rights) {
@@ -119,10 +130,10 @@ export async function runAccountLifecycle({config, configs, operator, operatorFi
     diagnostics_sha256: diagnostics.sha256};
 }
 
-export function verifyFinalReadback(readback, effects, after) {
+export function verifyCalibratedInventory(readback, after) {
   const observer = readback?.observer;
   const rows = readback?.rows;
-  if (!Array.isArray(effects) || !effects.length || !isTime(after)
+  if (!isTime(after)
     || !readback || readback.source !== 'existing-authorized-admin' || readback.loaded !== true
     || readback.refresh_complete !== true || readback.packages_complete !== true || !isTime(readback.refreshed_at)
     || Date.parse(readback.refreshed_at) < Date.parse(after) || !Array.isArray(rows)
@@ -138,6 +149,12 @@ export function verifyFinalReadback(readback, effects, after) {
   const self = rows.filter(row => row.type === 'mstSelf');
   if (self.length !== 1 || self[0].guid_hash !== observer.guid_hash || self[0].session_id !== observer.session_id
     || self[0].create_time !== observer.create_time || self[0].user_hash !== observer.user_hash) fail('FINAL_SERVER_CALIBRATION_UNCONFIRMED');
+}
+
+export function verifyFinalReadback(readback, effects, after) {
+  if (!Array.isArray(effects) || !effects.length) fail('FINAL_SERVER_READBACK_INCOMPLETE');
+  verifyCalibratedInventory(readback, after);
+  const rows = readback.rows, observer = readback.observer;
   for (const effect of effects) {
     if (!isHash(effect.guid_hash) || !isHash(effect.user_hash) || !Number.isSafeInteger(effect.session_id) || effect.session_id <= 0
       || !isTime(effect.create_time) || effect.stand !== readback.stand || effect.guid_hash === observer.guid_hash) fail('FINAL_SERVER_EFFECT_UNBOUND');
@@ -147,10 +164,25 @@ export function verifyFinalReadback(readback, effects, after) {
   return {status: 'SERVER_COMPONENT_CHECKED', ready: false};
 }
 
-export async function readFinalServerInventory() {
-  // Parent is calibrating the already connected Mac Admin tab. This accounts
-  // source has no admitted transport, receipt importer or observer login.
-  fail('FINAL_SERVER_READBACK_NOT_IMPLEMENTED');
+// Separate owner-approved historical account-bucket component. It never fills
+// missing old numeric IDs, changes history, archives a marker, or validates a
+// new operation. Comparable old GUID hashing must be independently established.
+export function verifyHistoricalAccountBucket(readback, historical, after) {
+  verifyCalibratedInventory(readback, after);
+  if (!isHash(historical?.user_hash) || !isHash(historical.guid_hash)
+    || historical.guid_algorithm !== 'sha256-utf8-exact-guid-string'
+    || !isHash(historical.collector_sha256) || !isHash(historical.algorithm_receipt_sha256))
+    fail('HISTORICAL_GUID_ALGORITHM_NOT_ESTABLISHED');
+  const bucket = readback.rows.filter(row => row.user_hash === historical.user_hash);
+  if (bucket.length && (bucket.length !== 1 || bucket[0].type !== 'mstSelf'
+    || bucket[0].guid_hash !== readback.observer.guid_hash || bucket[0].guid_hash === historical.guid_hash))
+    fail('HISTORICAL_ACCOUNT_BUCKET_UNKNOWN');
+  return {status: 'HISTORICAL_SERVER_COMPONENT_CHECKED', ready: false, history_reconciled: false};
+}
+
+export async function readFinalServerInventory(options) {
+  if (!options) fail('FINAL_SERVER_READBACK_NOT_IMPLEMENTED');
+  return consumeParentResponse({...options, expected: {...options.expected, verify: verifyFinalReadback}});
 }
 
 export function sourceOnlyUIAdapter(recordEffect) {
