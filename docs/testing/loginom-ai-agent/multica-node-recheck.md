@@ -31,23 +31,23 @@
 
 ## Checkpoint наблюдения — новая параллельная волна, 09.10.2026
 
-- Docs prechange f4c94ac43; baseline4e626d547/basef9bf332c; loginom0ca исключён; назначения узлов сохранены.
-- Node SHA: LAB45 a00b0203/PR42,46 41e0b170/PR43,47 c92a3bfd;48–52 4e626d547; старый PASS не переносится.
-- Caps8/8/8/runtime24aa…/daemon12/stock3m сохранены; восемь реальных приёмок и нагрузка12 NOT_PROVED.
-- Installed CLI597/version-dev и Multica0.6.1/source2ea — разные артефакты; global launcher не менялся.
-- Central instructions8d7a…: target CLI selection/native/Eval/caps сохранены; LAB53 live hold ещё действует.
+- Docs prechange541e17e34; node baseline4e626d547/basef9bf332c; loginom0ca исключён; назначения сохранены.
+- Node SHA: LAB45 a00b0203/PR42,46 41e0b170/PR43,47 c92a3bfd;48–52 4e626d547; PASS не переносится.
+- Runtime24aa…/caps8/8/8/daemon12/stock3m сохранены; восемь реальных приёмок и нагрузка12 NOT_PROVED.
+- CLI597/version-dev и Multica0.6.1/source2ea — разные артефакты; installed/global launcher не менялись.
+- Central instructions8d7a…: настройки внутреннего CLI/native/Eval сохранены; модель берётся только из сквада.
 - LAB53 approved scope d4241c818; [draft PR44](https://github.com/gooddaytoday/loginom-ai-agent/pull/44) common-preparation→shared-oauth.
-- Source9e2ccc724a3b8616f2f878dc7719cd10bb957a94/tree87acd6d7… опубликован clean; новый lifecycle SHA ещё не принят.
-- Source9b93201…: независимые25offline PASS, дополнительные cases выявили2P2/REQUEST_CHANGES; история immutable.
-- Source9e2ccc724: F1/F2 CLOSED, независимые33offline+5собственных cases PASS; только source fixes, не live qualification.
-- Parent: Worker2+Reviewer3 attachments APIbytes/SHA/manifest PASS; tree и19/19candidatefiles сверены независимо.
-- LAB53 Worker01a11f28-af02… running08:35:25MSK; handoff01a11f28-aeda… продолжил согласованный source-only lifecycle в той же карточке.
-- Обе live entrypoints закрыты; полный lifecycle/install/rollback/runtime qualification NOT_ACCEPTED/NOT_RUN.
-- Cause Timeout48 NOT_ESTABLISHED; source-исправления не устанавливают причину исторических45/48 failures.
-- LAB45 attempt6d13… marker9595… и LAB48 attempt8d6f… marker74f25… сохранены; account/process/FD binding перед сверкой PENDING.
-- Observer3119 отсутствует в новом калиброванном server inventory; archive marker/history PENDING собственных process/FD proof.
-- Владелец уточнил Mac; existing Chrome Admin3123/unique mstSelf/connected, GUIDhash3abc…; сеанс владельца сохранён.
-- 05:40UTC Dispatcher: count8/8=roots8, nodes10/packages2, масок0, Info proxies/type/name совпали; parent login/Close/Stop0.
-- 05:23UTC mas CPU12/load0/0/0/MemAvailable30257896kB/free408541442048B; 05:26UTC daemon212379 active/running/wait/report0 до нового Worker.
-- Все8 node cards пока blocked; итоговые Worker/Reviewer model acceptance0; provider counters NOT_EXPOSED, APIcompleted не absence proof.
-- [Admin readback](reports/2026-10-08-node-recheck/existing-admin-mac-readback.json): далее exact old effects→полный LAB53/review→те же8; schedules/merge-release0.
+- Published clean source6a97eb3cd264059dc95f3de9302e494683921f67/tree1d391b6b…; source-only F3 CLOSED.
+- Source4d880827: независимый detached-child RED/P2 сохранён; source6a97: независимые68+4cases PASS.
+- Parent: Reviewer3 APIbytes/hash,2manifest artifacts,23candidatefiles/16VERSION bindings и tree независимо сверены.
+- [Source review](reports/2026-10-08-node-recheck/common-source-f3-review.json) не означает server cleanup/full LAB53/model acceptance.
+- Worker01a11f7d-3749… running10:07:42MSK: UI lifecycle/finite parent-readback adapters в той же карточке/PR.
+- Оба unconditional gates закрыты; полный lifecycle/install/runtime NOT_ACCEPTED; готовы только source-части.
+- Cause Timeout48/45 executed-helper bytes NOT_ESTABLISHED; исправления F1/F2/F3 не объявлены причиной старых сбоев.
+- LAB45/48 old marker/history retained; operator hashes MATCH/MATCH и59 exact retained PID nonlive — прежние наблюдения.
+- Новая existing Mac Admin3128/unique mstSelf/connected/GUIDhash8d9e…; owner сохранён, parent login/Close/Stop0.
+- 07:24:45UTC readback: count8/8=roots8, nodes10/packages2, Info/type/name/date equality, masks0, hashed inventory6628….
+- Operator bucket содержит только positively bound owner3128; observer3119/priorowner3123 absent; old GUID algorithm binding PENDING.
+- Старый3123 receipt immutable; [новый3128](reports/2026-10-08-node-recheck/existing-admin-mac-readback-3128.json) не покрывает будущие операции.
+- 07:30UTC mas CPU12/load0, MemAvailable30140616kB/free408538505216B; daemon212379 active/running1/wait0/report0;8blocked/model acceptance0.
+- Next: old-effects exact reconciliation→полные adapters/review→fresh operation-bound live proof→те же8; schedules/merge-release0.
