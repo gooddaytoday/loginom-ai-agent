@@ -1,0 +1,45 @@
+{
+  "source_path": "analytical/analytic-txt-types-identifiers",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 2167,
+      "sha256": "2b2c070dbcb48219de00c06023fa4ddc0875a55ec90dbae7dfe9296339cf16a7"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 4149,
+      "sha256": "0ede0b0150597fd60e0df15cac4307153183fa6f40d7c2233aa5a909b1bc4569"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5764,
+      "sha256": "e631a0ca3ddbf8327bf276090914b6c971a51cc3560ab60e3aab0fdf65a1c599"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3545,
+      "sha256": "66c45bc2772dbd4a6d9a752ad0c768347585911712f51cbeba67b620f80a3845"
+    },
+    {
+      "path": "data/semicolon_cp1251_decimal.txt",
+      "bytes": 150,
+      "sha256": "94821af546f6454601f5338d6fe32b8bf7a85bf7208b34df2bc522e55e2ab4dd"
+    },
+    {
+      "path": "expected/REPORT.md",
+      "bytes": 1362,
+      "sha256": "6fa0154eac5a716838c44ad5907ebdc151f5c714d9469e00f9d3522b5a083e8c"
+    },
+    {
+      "path": "expected/table.json",
+      "bytes": 1879,
+      "sha256": "abf40935b2e8bea034a03c9e4399d884fa8879a1d8be1917ad2b520da45ae057"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

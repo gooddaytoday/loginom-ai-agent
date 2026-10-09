@@ -1,0 +1,45 @@
+{
+  "source_path": "analytical/analytic-csv-null-empty-zero",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 2135,
+      "sha256": "051fa17d9364c81a6852128e0bafb2070e345d7e3fc7e0e2045489a9f4e1f426"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 4104,
+      "sha256": "38780c67b80d5ad0fbda32000a216c2871057c5378ebd6efa97a372ac1019895"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5736,
+      "sha256": "01b8fba66b2b1b1ea9da463918151c7e96f95eb778325b5e4fdb7a090ffcb0ee"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3475,
+      "sha256": "a8fb44286471e8e41ef91d7b2943e5da4cc2bbf9b6c47c9d764577d9d4bc8330"
+    },
+    {
+      "path": "data/comma_utf8.csv",
+      "bytes": 200,
+      "sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19"
+    },
+    {
+      "path": "expected/REPORT.md",
+      "bytes": 1325,
+      "sha256": "b85bd34f994d609ad7abcfeac8560e826f94a5f8e7ab0fbe90a30a41c6e8ecb3"
+    },
+    {
+      "path": "expected/table.json",
+      "bytes": 1879,
+      "sha256": "1cd04ea52121acea352cfa0ec74c00efc3a594c1e0575d9dc05f60464f847084"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

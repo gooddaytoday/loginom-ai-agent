@@ -1,0 +1,158 @@
+{
+  "id": "csv-utf8-bom",
+  "title": "CSV: UTF-8 с BOM",
+  "group": "csv-matrix",
+  "eval_status": "NOT_RUN",
+  "case_readiness": "OFFLINE_VALIDATED",
+  "runner_adaptation": "NOT_IMPLEMENTED",
+  "historical_evidence": "HISTORICAL_SCOPED_PASS",
+  "inputs": [
+    {
+      "path": "data/utf8_bom.csv",
+      "bytes": 203,
+      "sha256": "e525330244d5ab399e53b1216c9da23648ad3660a83190185427123016c80c8a",
+      "encoding": "utf-8",
+      "bom": true
+    }
+  ],
+  "settings": {
+    "source": {
+      "encoding": "65001",
+      "rows_to_skip": 0,
+      "first_line_as_title": true
+    },
+    "format": {
+      "delimiter": ",",
+      "text_qualifier": "\"",
+      "decimal_separator": ".",
+      "null_marker": "?",
+      "multiple_delimiters": false,
+      "date_format": "yyyy/mm/dd",
+      "date_separator": "-"
+    }
+  },
+  "columns": [
+    {
+      "name": "Id",
+      "label": "Идентификатор",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "name": "Name",
+      "label": "Название",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "name": "Amount",
+      "label": "Сумма",
+      "type": "real",
+      "data_kind": "Непрерывный",
+      "used": true
+    },
+    {
+      "name": "Date",
+      "label": "Дата",
+      "type": "datetime",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "name": "Note",
+      "label": "Текст",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    }
+  ],
+  "source_headers": [
+    "Идентификатор",
+    "Название",
+    "Сумма",
+    "Дата",
+    "Текст"
+  ],
+  "stages": [],
+  "expected": [
+    "expected/table.json"
+  ],
+  "oracle_recipe": [
+    {
+      "input": "data/utf8_bom.csv",
+      "expected": "expected/table.json",
+      "parse": {
+        "source": {
+          "name": "utf8_bom.csv",
+          "bytes": 203,
+          "sha256": "e525330244d5ab399e53b1216c9da23648ad3660a83190185427123016c80c8a",
+          "encoding": "utf-8",
+          "bom": true
+        },
+        "settings": {
+          "source": {
+            "encoding": "65001",
+            "rows_to_skip": 0,
+            "first_line_as_title": true
+          },
+          "format": {
+            "delimiter": ",",
+            "text_qualifier": "\"",
+            "decimal_separator": ".",
+            "null_marker": "?",
+            "multiple_delimiters": false,
+            "date_format": "yyyy/mm/dd",
+            "date_separator": "-"
+          }
+        },
+        "columns": [
+          {
+            "name": "Id",
+            "label": "Идентификатор",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "name": "Name",
+            "label": "Название",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "name": "Amount",
+            "label": "Сумма",
+            "type": "real",
+            "data_kind": "Непрерывный",
+            "used": true
+          },
+          {
+            "name": "Date",
+            "label": "Дата",
+            "type": "datetime",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "name": "Note",
+            "label": "Текст",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          }
+        ],
+        "source_headers": [
+          "Идентификатор",
+          "Название",
+          "Сумма",
+          "Дата",
+          "Текст"
+        ]
+      }
+    }
+  ],
+  "privacy": "synthetic"
+}

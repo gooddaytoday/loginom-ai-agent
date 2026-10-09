@@ -1,0 +1,40 @@
+{
+  "source_path": "technical/txt/txt-multiline-lf",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1744,
+      "sha256": "75b16b20e18b0fd121bd0a9214b59942efad6f7b8618f495e9a88088496ff7f7"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 3897,
+      "sha256": "6939bc0ca2f5863c936809f8eace0c09aad01a419b250a96cdadce49a1ef8c48"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5289,
+      "sha256": "84ad9efc027ac4715336cec112ac79970ad42175b3ab03326048295f5529f395"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3771,
+      "sha256": "350b78d15a06d9552c25a4b7158ea76ba4c9f44ce9ccf397a30a9354eb1e108c"
+    },
+    {
+      "path": "data/multiline_lf.txt",
+      "bytes": 203,
+      "sha256": "9abcbfaef88b3bd01797b85cda8da40ca09b303a9fa130b6cd986c786b9de369"
+    },
+    {
+      "path": "expected/table.json",
+      "bytes": 1883,
+      "sha256": "c4bdb5ba38e67773dc7f9d1d59f78f14743fca85ac7e430a6db63fd65b81734b"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

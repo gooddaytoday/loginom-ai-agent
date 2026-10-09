@@ -1,0 +1,104 @@
+{
+  "schema": [
+    {
+      "name": "Id",
+      "label": "Идентификатор",
+      "type": "string",
+      "data_kind": "Дискретный"
+    },
+    {
+      "name": "Name",
+      "label": "Название",
+      "type": "string",
+      "data_kind": "Дискретный"
+    },
+    {
+      "name": "Amount",
+      "label": "Сумма",
+      "type": "real",
+      "data_kind": "Непрерывный"
+    },
+    {
+      "name": "Date",
+      "label": "Дата",
+      "type": "datetime",
+      "data_kind": "Дискретный"
+    },
+    {
+      "name": "Note",
+      "label": "Текст",
+      "type": "string",
+      "data_kind": "Дискретный"
+    }
+  ],
+  "row_count": 3,
+  "comparison": "ordered",
+  "rows": [
+    [
+      {
+        "type": "string",
+        "value": "0001"
+      },
+      {
+        "type": "string",
+        "value": "Привет"
+      },
+      {
+        "type": "real",
+        "value": "12.25"
+      },
+      {
+        "type": "datetime",
+        "value": "2026-10-05T00:00:00.000"
+      },
+      {
+        "type": "string",
+        "value": ""
+      }
+    ],
+    [
+      {
+        "type": "string",
+        "value": "0002"
+      },
+      {
+        "type": "string",
+        "value": "Мир"
+      },
+      {
+        "type": "real",
+        "value": "0"
+      },
+      {
+        "type": "datetime",
+        "value": "2026-10-06T00:00:00.000"
+      },
+      {
+        "type": "string",
+        "value": null
+      }
+    ],
+    [
+      {
+        "type": "string",
+        "value": "0003"
+      },
+      {
+        "type": "string",
+        "value": "Юникод"
+      },
+      {
+        "type": "real",
+        "value": "-2.5"
+      },
+      {
+        "type": "datetime",
+        "value": "2026-10-07T00:00:00.000"
+      },
+      {
+        "type": "string",
+        "value": "first\r\nsecond, \"quoted\""
+      }
+    ]
+  ]
+}

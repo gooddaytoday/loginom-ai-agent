@@ -1,0 +1,45 @@
+{
+  "source_path": "technical/txt/txt-wrong-encoding",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1749,
+      "sha256": "233888a004e06eb27bd072b635af05757f16e1deed6aaf424b7ef0494b533849"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 1236,
+      "sha256": "84c36901d6fc91cea1df6f9a8669e28fa168614fab2c1c1531ccea6508b1243e"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5617,
+      "sha256": "6ea00e62c8f27cfa1c327a86f842f2530956c199ce085f4f722dae0f2f232769"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3752,
+      "sha256": "176e153e6f177d8acb7f81c91ef3710468bd2484e5516a6cf46a541d6e4c2ea0"
+    },
+    {
+      "path": "data/wrong_encoding.txt",
+      "bytes": 21,
+      "sha256": "97f88be2af869453bc726e51889dcb10c5bd1d2a8fd7b96cca6f125b888d3ee6"
+    },
+    {
+      "path": "expected/OUTCOME.md",
+      "bytes": 910,
+      "sha256": "0afab5aaf610dda0be57d76d723bf622458745901d801fe366fe8fc404c0f621"
+    },
+    {
+      "path": "expected/outcome.json",
+      "bytes": 547,
+      "sha256": "d52629aa99ed1f6f1d858a6e8bb9cb5f522ee7008ddc6bdfc91c745f42b9a93e"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

@@ -1,0 +1,45 @@
+{
+  "source_path": "technical/regressions/missing-source-column",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1944,
+      "sha256": "f12b14c802ce5710854941eec991cdf6d2f52ebf22c0b773d010fd8175bbfc78"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 1266,
+      "sha256": "21b31d387ffaa1e0b84a19b741725d20e15620ea044218a629680a0b9756b93a"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5517,
+      "sha256": "e7a4f06f83abf751a890107574038aae2ab2736a0a34468b1c772f9e5cb94882"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3370,
+      "sha256": "cc020b40baa0a782ed704ec88438bd215b6f9ffdf342761a278d701100e4690a"
+    },
+    {
+      "path": "data/ambiguous_headers.txt",
+      "bytes": 23,
+      "sha256": "c7519031b5932dc11febfd15807c8205d9892229ab7913321eea7d96eabd7bba"
+    },
+    {
+      "path": "expected/OUTCOME.md",
+      "bytes": 794,
+      "sha256": "8d8b40cbf83335b45bb384016450093198425712d4bb18627b6a21a7cdbc4056"
+    },
+    {
+      "path": "expected/outcome.json",
+      "bytes": 464,
+      "sha256": "2c3888b0b9aae7c555bcf241a35b647d899443abe6bd1b31d2f9edc7d8fd376a"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

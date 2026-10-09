@@ -1,0 +1,126 @@
+{
+  "schema": [
+    {
+      "name": "Id",
+      "label": "Идентификатор",
+      "type": "string",
+      "data_kind": "Дискретный"
+    },
+    {
+      "name": "Name",
+      "label": "Название",
+      "type": "string",
+      "data_kind": "Дискретный"
+    },
+    {
+      "name": "Amount",
+      "label": "Сумма",
+      "type": "real",
+      "data_kind": "Непрерывный"
+    },
+    {
+      "name": "Date",
+      "label": "Дата",
+      "type": "datetime",
+      "data_kind": "Дискретный"
+    },
+    {
+      "name": "Note",
+      "label": "Текст",
+      "type": "string",
+      "data_kind": "Дискретный"
+    }
+  ],
+  "row_count": 4,
+  "comparison": "ordered",
+  "rows": [
+    [
+      {
+        "type": "string",
+        "value": "0101"
+      },
+      {
+        "type": "string",
+        "value": "Новый"
+      },
+      {
+        "type": "real",
+        "value": "20.125"
+      },
+      {
+        "type": "datetime",
+        "value": "2026-10-08T00:00:00.000"
+      },
+      {
+        "type": "string",
+        "value": ""
+      }
+    ],
+    [
+      {
+        "type": "string",
+        "value": "0102"
+      },
+      {
+        "type": "string",
+        "value": "Обновлённый"
+      },
+      {
+        "type": "real",
+        "value": "0"
+      },
+      {
+        "type": "datetime",
+        "value": "2026-10-09T00:00:00.000"
+      },
+      {
+        "type": "string",
+        "value": null
+      }
+    ],
+    [
+      {
+        "type": "string",
+        "value": "0103"
+      },
+      {
+        "type": "string",
+        "value": "Кириллица"
+      },
+      {
+        "type": "real",
+        "value": "-7.5"
+      },
+      {
+        "type": "datetime",
+        "value": "2026-10-10T00:00:00.000"
+      },
+      {
+        "type": "string",
+        "value": "tab\tinside"
+      }
+    ],
+    [
+      {
+        "type": "string",
+        "value": "0104"
+      },
+      {
+        "type": "string",
+        "value": "Ещё"
+      },
+      {
+        "type": "real",
+        "value": "4.25"
+      },
+      {
+        "type": "datetime",
+        "value": "2026-10-11T00:00:00.000"
+      },
+      {
+        "type": "string",
+        "value": "last"
+      }
+    ]
+  ]
+}

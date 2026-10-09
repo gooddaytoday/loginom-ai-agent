@@ -1,0 +1,50 @@
+{
+  "source_path": "technical/regressions/txt-six-to-five-correction",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1940,
+      "sha256": "de9a8efdf94e7f8c2783f80f37c1c9bf063ca81b72ee160d5a5eeeb30d63cc63"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 4450,
+      "sha256": "83de57697698916ec57811c24ccc198e9c4797eec45d948a2bffcb00591d40be"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 7454,
+      "sha256": "f8812b6266309614e12d7c4e762235584a29560c141d7e88a792f68628ae9064"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 4084,
+      "sha256": "0b30d25d9a4055ed8e46b422c939bbad063d34a85c60c7b76b82497a087bb7a9"
+    },
+    {
+      "path": "data/comma_utf8.txt",
+      "bytes": 200,
+      "sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19"
+    },
+    {
+      "path": "expected/OUTCOME.md",
+      "bytes": 1595,
+      "sha256": "4f722b9ed6668786f84bfae01781c0fd1ed33df23f63aa9b550eab78dd56cac7"
+    },
+    {
+      "path": "expected/final.json",
+      "bytes": 1879,
+      "sha256": "1cd04ea52121acea352cfa0ec74c00efc3a594c1e0575d9dc05f60464f847084"
+    },
+    {
+      "path": "expected/outcome.json",
+      "bytes": 909,
+      "sha256": "6a45007ca0b5e6990a3fa5571d54a26df4e3808febb7d5e9bcfc423f9c17b383"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

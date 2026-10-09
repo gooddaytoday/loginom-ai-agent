@@ -1,0 +1,164 @@
+{
+  "id": "analytic-txt-multiline-values",
+  "title": "TXT: Многострочные примечания и логические записи",
+  "group": "analytical-fidelity",
+  "eval_status": "NOT_RUN",
+  "case_readiness": "OFFLINE_VALIDATED",
+  "runner_adaptation": "NOT_IMPLEMENTED",
+  "historical_evidence": "DERIVED_ANALYTICAL_PROMPT_NOT_RUN",
+  "inputs": [
+    {
+      "path": "data/pipe_multiline.txt",
+      "bytes": 204,
+      "sha256": "586ac210d58bc0025c019b0e3669fc03807b13202320eef0de0aba2713f7b927",
+      "encoding": "utf-8",
+      "bom": false
+    }
+  ],
+  "settings": {
+    "source": {
+      "encoding": "65001",
+      "rows_to_skip": 0,
+      "first_line_as_title": true
+    },
+    "format": {
+      "delimiter": "|",
+      "text_qualifier": "\"",
+      "decimal_separator": ".",
+      "null_marker": "?",
+      "multiple_delimiters": false,
+      "date_format": "yyyy/mm/dd",
+      "date_separator": "-"
+    }
+  },
+  "columns": [
+    {
+      "name": "Id",
+      "label": "Идентификатор",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "name": "Name",
+      "label": "Название",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "name": "Amount",
+      "label": "Сумма",
+      "type": "real",
+      "data_kind": "Непрерывный",
+      "used": true
+    },
+    {
+      "name": "Date",
+      "label": "Дата",
+      "type": "datetime",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "name": "Note",
+      "label": "Текст",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    }
+  ],
+  "source_headers": [
+    "Идентификатор",
+    "Название",
+    "Сумма",
+    "Дата",
+    "Текст"
+  ],
+  "stages": [],
+  "expected": [
+    "expected/table.json",
+    "expected/REPORT.md"
+  ],
+  "oracle_recipe": [
+    {
+      "input": "data/pipe_multiline.txt",
+      "expected": "expected/table.json",
+      "parse": {
+        "source": {
+          "name": "pipe_multiline.txt",
+          "bytes": 204,
+          "sha256": "586ac210d58bc0025c019b0e3669fc03807b13202320eef0de0aba2713f7b927",
+          "encoding": "utf-8",
+          "bom": false
+        },
+        "settings": {
+          "source": {
+            "encoding": "65001",
+            "rows_to_skip": 0,
+            "first_line_as_title": true
+          },
+          "format": {
+            "delimiter": "|",
+            "text_qualifier": "\"",
+            "decimal_separator": ".",
+            "null_marker": "?",
+            "multiple_delimiters": false,
+            "date_format": "yyyy/mm/dd",
+            "date_separator": "-"
+          }
+        },
+        "columns": [
+          {
+            "name": "Id",
+            "label": "Идентификатор",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "name": "Name",
+            "label": "Название",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "name": "Amount",
+            "label": "Сумма",
+            "type": "real",
+            "data_kind": "Непрерывный",
+            "used": true
+          },
+          {
+            "name": "Date",
+            "label": "Дата",
+            "type": "datetime",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "name": "Note",
+            "label": "Текст",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          }
+        ],
+        "source_headers": [
+          "Идентификатор",
+          "Название",
+          "Сумма",
+          "Дата",
+          "Текст"
+        ]
+      }
+    }
+  ],
+  "privacy": "synthetic",
+  "analytical_axes": [
+    "full_imported_data_fidelity",
+    "correct_typed_interpretation",
+    "supported_report_claims"
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "source_path": "technical/txt/txt-tab-utf16le",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1741,
+      "sha256": "2910192d451028cda3278afab245d3161502aaf9907e242bdc7132e626c0ac33"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 3903,
+      "sha256": "73074dc89b71240d622b5c7117a89a1d770b5efca7c4ab4234b676f783400dfb"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5219,
+      "sha256": "d9c195bb8a8d67855064c02be4e3c65fb98a66aa946ef7c882c3e851630dbbe9"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3774,
+      "sha256": "5dc1b7d662550e2318907bf461ed68d87a06ebc708831c067f76287904c4a315"
+    },
+    {
+      "path": "data/tab_utf16le.txt",
+      "bytes": 302,
+      "sha256": "9cd38e66c97356d2b768f7d212a9772c720e0365f83375dba7a37ba58e795a04"
+    },
+    {
+      "path": "expected/table.json",
+      "bytes": 1880,
+      "sha256": "7934fa0df607ccb3563948856deb35d5fdafaf128e4863ae52b387b47f3d7a15"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

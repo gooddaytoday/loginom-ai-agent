@@ -1,0 +1,14 @@
+{
+  "kind": "known_refusal_then_correction",
+  "description": "Приложенный pipe_multiline.csv: первый apply намеренно использует запятую и запрашивает пять полей. Зафиксируй известный отказ requested 5 / observed 1, no Execute и cleanup. Второй и единственный existing apply использует |, полный settings.source.source_path из подтверждённой первой delivery и остальные исходные настройки. Ровно два apply, один create/upload, тот же GUID; никаких третьих попыток.",
+  "engine_rejection_required": false,
+  "cleanup_required": true,
+  "counts": {
+    "deliveries": 1,
+    "creates": 1,
+    "applies": 2
+  },
+  "same_guid_required": true,
+  "negative_fixture": false,
+  "known_refusal_required": true
+}

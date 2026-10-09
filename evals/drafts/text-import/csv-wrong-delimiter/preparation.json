@@ -1,0 +1,45 @@
+{
+  "source_path": "technical/csv/csv-wrong-delimiter",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1750,
+      "sha256": "92f1b0559385c0978d4482b84fbe6de044d5e56504bdc6ee4515835f88f7769d"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 1242,
+      "sha256": "5934f3d5c566c0dd64ee7228104ef44443ac87dfacc5064dfa2e28d44dd4f641"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5604,
+      "sha256": "eebf34773460e932fdbcb7b1ae9382468b9b9f6c082b0ffa8e42ebacc30daf85"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3757,
+      "sha256": "7fa8d8b9990ba559331bd9589e19c0b60f145befd2d017178d9a893e7e804fb1"
+    },
+    {
+      "path": "data/wrong_delimiter.csv",
+      "bytes": 20,
+      "sha256": "92441055dd7d146da19c049e44e6632d6977eb67ae06d7237786ea4439515cbb"
+    },
+    {
+      "path": "expected/OUTCOME.md",
+      "bytes": 899,
+      "sha256": "a19e8f8ac7f4092367b69c383bc78f8e0f568efa9ffb899c41db5ebb8e7f0cd3"
+    },
+    {
+      "path": "expected/outcome.json",
+      "bytes": 559,
+      "sha256": "c8ef44381305f6bfdfcce1aa3f07294944709fa8e1b181a5cb3ec9e987adb43d"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

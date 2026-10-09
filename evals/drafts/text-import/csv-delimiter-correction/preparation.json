@@ -1,0 +1,50 @@
+{
+  "source_path": "technical/regressions/csv-delimiter-correction",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1944,
+      "sha256": "ce568ad5ba843f5e0579c3aa6c4bb825b6d99ddefe38c0f56dbbedf315ca787b"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 4487,
+      "sha256": "462c5a8525770fec35ab90db36ba2fce090c6d6a3326da69eafcc8ac8846f61b"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 7478,
+      "sha256": "de996307592a0c2ee17eca06980f89f46627f899ceaf2e2a860c6b77d6f35670"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 4102,
+      "sha256": "f0e4537ce942d9e611599cd36117e961d39b561db9b6b490b4cec5845012f6a0"
+    },
+    {
+      "path": "data/pipe_multiline.csv",
+      "bytes": 204,
+      "sha256": "586ac210d58bc0025c019b0e3669fc03807b13202320eef0de0aba2713f7b927"
+    },
+    {
+      "path": "expected/OUTCOME.md",
+      "bytes": 1603,
+      "sha256": "7f771446ee103fa9cebbbdab133b7798af99d18877d03dedde84f3e8695bb306"
+    },
+    {
+      "path": "expected/final.json",
+      "bytes": 1885,
+      "sha256": "a9b3c295a6baa04c3259d3ef65c993724207d19d7c25d8a5200d183390d404a4"
+    },
+    {
+      "path": "expected/outcome.json",
+      "bytes": 913,
+      "sha256": "a06df20f7d4c750287b290548b029d3f3c8a1f49c0d50cf3409f332388abc9a7"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}
