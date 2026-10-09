@@ -1,0 +1,25 @@
+{
+  "source_commit": "c1b73577f0dc347a67a2c8f0e86742cf8b5c53f6",
+  "source_bundle_sha256": "07e3649440d80b5067838fba5018057e85a573beab5f2ca6e94d790e96d9180f",
+  "files": {
+    "scripts/common.py": "2f5ebbf82fa470fbe77e5c68aae5daa96f5476d82f80ee9854985db7fb1625e3",
+    "scripts/provision-accounts.py": "7ad2c05579a1e64a95c296ab884a5002de3e8dc2efcaa5041891a57e9a3941fc",
+    "scripts/provision-account.mjs": "d45d8b5dd11d1071e54699f54c9dfe9fe1a630923466aec80203b98014932169"
+  },
+  "mode": "loginom-accounts-only",
+  "deployed_at": "2026-10-08",
+  "local_patches": [
+    {
+      "issue_id": "01a11b0a-0742-763a-953b-048d57e92b7d",
+      "scope": "standard Playwright launchOptions.proxy from private operator config",
+      "base_file_sha256": "ec19e39225af87e5b06882e2070988febae64a1987de41df06f4337cecf5bc10",
+      "file_sha256": "c44ad85f75210c070d17fd7d73205d98db231720bb773291251e8940bddea341"
+    },
+    {
+      "issue_id": "01a11b0a-0742-763a-953b-048d57e92b7d",
+      "scope": "explicit Playwright chromiumSandbox true",
+      "base_file_sha256": "c44ad85f75210c070d17fd7d73205d98db231720bb773291251e8940bddea341",
+      "file_sha256": "d45d8b5dd11d1071e54699f54c9dfe9fe1a630923466aec80203b98014932169"
+    }
+  ]
+}

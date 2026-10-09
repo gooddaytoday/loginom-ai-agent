@@ -1,0 +1,33 @@
+{
+  "schema": "loginom-lab53-source-version-v1",
+  "version": "lab53-source-only-v1",
+  "scope_sha": "d4241c818b4a59f65a42dcf756034eec20e620b3",
+  "status": "SOURCE_ONLY_LIVE_BLOCKED",
+  "baseline": {
+    "snapshot": "baseline/SOURCE_SNAPSHOT.json",
+    "historical_source_label": "c1b73577f0dc347a67a2c8f0e86742cf8b5c53f6",
+    "historical_archive_reverified": false
+  },
+  "files": {
+    "scripts/account-ui.mjs": "a26dc7ec90272876931eec2c45965d818d85434fe3482c29fd82720b13ac9362",
+    "scripts/common.py": "6a4695934258beaececb9b73b4e3512d7c4205e34c88140ca85a6886c6b74e3f",
+    "scripts/provision-account.mjs": "a6fde6c93ff53d2a57390c6625e301d98bb5d1d2f6c6d0f106334636b6d9aea0",
+    "scripts/provision-accounts.py": "de5dc32b54e1350ba85a1b37b3363f0dab339b6c7c071a735ddec1f9f1472782",
+    "scripts/qualify-accounts.mjs": "63394a0542572ff926e542f3b96e893e4db62ee79598165bfb47c65267723f22",
+    "tests/account-ui.test.mjs": "df5a13de15089aca7529d83e5e57b30add0bccef19dad141ffc437e0ee8c4ec0",
+    "tests/test_accounts.py": "b32c69f154a658d98e80621ae7eadce40e1086f7df70dd13325468f2b2277559",
+    "tests/test_manifest.py": "f94c4063c53238b65e7512ce2fb1da45147410d8b501d39cac986dc8f6b8ba7f",
+    "fixtures/navigation.html": "b3bde2f068797b70e7c7975a31f1d64a03ac2686c6943abf2462ee5e5a0b4733",
+    "README.md": "da5b17f9f8db892de39643316b700235eb85962965c8cd6eca136e61bcb6c8c8",
+    "finite-cleanup.md": "afaacd767a1891f6d137b3f9dae5ece9e87c6e86a6ee4b175cad1f065e6fdce5",
+    ".gitignore": "862263fa1f46c20f0d1e4dac5ffcc75abd55c08211b2c3864c5f8764b9d87793"
+  },
+  "deployment": {
+    "installed_tool_modified": false,
+    "install": "NOT_RUN",
+    "rollback": "NOT_RUN",
+    "backup": "retain exact installed accounts-only files and VERSION before future deployment",
+    "readback": "verify all file hashes and independent finite cleanup before activation",
+    "mutable_state": "never replace credentials, markers, configs, OAuth or account history"
+  }
+}
