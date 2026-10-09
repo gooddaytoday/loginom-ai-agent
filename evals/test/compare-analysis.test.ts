@@ -2,6 +2,20 @@ import { expect, test } from "bun:test"
 import { analyzeComparison } from "../src/compare-analysis"
 import { comparisonSummary } from "./helpers/compare-summary"
 
+test("model experiments permit only declared product differences and preserve unknown/judge guards", () => {
+  const a = comparisonSummary([{ successes: 3, attempts: 3 }])
+  const b = comparisonSummary([{ successes: 0, attempts: 3 }])
+  b.agent.model = "openai/other"
+  b.agent.variant = "high"
+  expect(analyzeComparison(a, b).compatibility).toContain("agent.model")
+  expect(analyzeComparison(a, b, { experiment: ["model"] }).compatibility).toEqual(["agent.variant"])
+  expect(analyzeComparison(a, b, { experiment: ["model", "reasoning"] }).axes.completion.observed).toEqual({ a: 1, b: 0, drop: 1 })
+  b.judge!.model = "different-judge"
+  expect(analyzeComparison(a, b, { experiment: ["model", "reasoning"] }).compatibility).toContain("judge.model")
+  delete b.agent.variant
+  expect(analyzeComparison(a, b, { experiment: ["model", "reasoning"] }).compatibility).toContain("agent.variant")
+})
+
 test("analysis: задачи имеют равный вес при разных числах попыток", () => {
   const a = comparisonSummary([{ successes: 3, attempts: 3 }, { successes: 0, attempts: 1 }])
   const b = comparisonSummary([{ successes: 0, attempts: 3 }, { successes: 1, attempts: 1 }])

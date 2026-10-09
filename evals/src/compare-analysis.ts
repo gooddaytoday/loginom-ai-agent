@@ -2,7 +2,7 @@ import { EvalFailure } from "./fail"
 import { evaluationContractHash, sameRubricSnapshot } from "./evaluation"
 import type { AttemptResult, RunSummary } from "./report"
 
-export type ComparePolicy = { margin: number; confidence: number; k: number | null }
+export type ComparePolicy = { margin: number; confidence: number; k: number | null; experiment?: ("model" | "reasoning")[] }
 export type ComparisonAxis = {
   task_count: number
   observed: { a: number; b: number; drop: number } | null
@@ -14,6 +14,8 @@ export type ComparisonAxis = {
 export type ComparisonAnalysis = ReturnType<typeof analyzeComparison>
 
 export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial<ComparePolicy> = {}) {
+  if (options.experiment && (new Set(options.experiment).size !== options.experiment.length ||
+    options.experiment.some(change => !["model", "reasoning"].includes(change)))) throw new EvalFailure("Некорректное объявление эксперимента", 2)
   const policy = { margin: options.margin === undefined ? 0.5 : options.margin, confidence: options.confidence === undefined ? 0.95 : options.confidence,
     k: options.k === undefined ? a.config.repeat === b.config.repeat ? a.config.repeat : null : options.k }
   if (!Number.isFinite(policy.margin) || policy.margin < 0 || policy.margin >= 1 ||
@@ -39,7 +41,9 @@ export function analyzeComparison(a: RunSummary, b: RunSummary, options: Partial
       ["judge.schema_sha256", a.judge?.schema_sha256, b.judge?.schema_sha256],
     ] as [string, unknown, unknown][]),
   ]
-  const compatibility = identity.filter(([, first, second]) => first == null || second == null || first === "" || second === "" || first !== second).map(([name]) => name)
+  const compatibility = identity.filter(([name, first, second]) => first == null || second == null || first === "" || second === "" ||
+    first !== second && !(name === "agent.model" && options.experiment?.includes("model") ||
+      name === "agent.variant" && options.experiment?.includes("reasoning"))).map(([name]) => name)
   if (a.task_ids.length !== b.task_ids.length || a.task_ids.some((id) => !bTasks.has(id))) compatibility.push("task_ids")
   if (compatibility.length) return { policy, compatibility, reliability: { k: policy.k, a: { pass1: null, passk: null }, b: { pass1: null, passk: null }, reasons: compatibility }, tasks: [], axes: { completion: axis([], policy, compatibility), oracle: axis([], policy, ["snapshot_unavailable"]), structure: axis([], policy, ["structure_unavailable"]) } }
   const contractA = evaluationContractHash({rubric_hash:a.rubric_hash,judge:a.judge,pass_threshold:a.config.pass_threshold})

@@ -61,6 +61,7 @@ export function compare(a: RunSummary, b: RunSummary, options: Partial<ComparePo
     "",
     `Агент A → B: ${[a, b].map((run) => cell(`CLI ${run.agent.cli_version ?? "неизвестен"}, source ${run.agent.source_commit ?? (run.agent.cli_mode === "source" ? run.agent.git_sha : null) ?? "неизвестен"}${run.agent.source_dirty ? "-dirty" : ""}, binary ${run.agent.binary_sha256 ?? "—"}, variant ${run.agent.variant ?? "неизвестен"}`)).join(" → ")}.`,
     `Повторов: ${a.config.repeat} → ${b.config.repeat}. Попыток: ${a.metrics.total} → ${b.metrics.total}.`,
+    ...(options.experiment?.length ? [`Объявленный эксперимент: ${options.experiment.join(", ")}. Вывод относится к совокупности изменений. Три повтора сами по себе не доказывают статистическую значимость.`] : []),
     `Метод: Hoeffding по независимым группам задач; равный вес задач. margin=${analysis.policy.margin} (${(analysis.policy.margin*100).toFixed(1)} п.п.), confidence=${analysis.policy.confidence}. Бюджет: шесть односторонних границ, alpha_tail=${((1-analysis.policy.confidence)/6).toPrecision(4)}.`,
     "Зависимость повторов внутри задачи допустима. Интервал относится к ожидаемому падению на объявленном наборе; перенос на новые задачи не обещается.",
     analysis.policy.margin === 0.5 && analysis.policy.confidence === 0.95 ?
@@ -128,9 +129,15 @@ export async function compareMain(argv: string[], env: Record<string,string|unde
   const args = argv.values()
   for (const arg of args) {
     if (!arg.startsWith("--")) { ids.push(arg); continue }
-    if (!["--margin","--confidence","--k"].includes(arg) || seen.has(arg)) throw new EvalFailure("Неверные аргументы compare",2)
+    if (!["--margin","--confidence","--k","--experiment"].includes(arg) || seen.has(arg)) throw new EvalFailure("Неверные аргументы compare",2)
     seen.add(arg)
     const value = args.next().value
+    if (arg === "--experiment") {
+      const changes = value?.split(",")
+      if (!changes?.length || changes.some(change => change !== "model" && change !== "reasoning")) throw new EvalFailure("Некорректное объявление эксперимента", 2)
+      options.experiment = changes as ("model" | "reasoning")[]
+      continue
+    }
     if (value === undefined || !value.trim() || !Number.isFinite(Number(value))) throw new EvalFailure("Неверное число compare",2)
     if (arg === "--margin") options.margin = Number(value)
     if (arg === "--confidence") options.confidence = Number(value)
