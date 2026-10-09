@@ -58,31 +58,31 @@ test('missing prepared tab refuses before native package close', async () => {
 - [x] GREEN, затем отдельные отрицательные тесты foreign tab/package binding
   и смены tab после server read; весь package-cleanup набор. Коммит.
 
-## Task2: Штатный user-v1 shutdown
+## Task2 — выполнено: Штатный user-v1 shutdown
 
 **Files:** `client/lib/bridge.mjs`,
 `client/test/support/package-cleanup-bridge.mjs`,
 `client/test/package-cleanup-bridge.test.mjs`.
 
-- [ ] Добавить в имеющийся публичный MCP lifecycle fixture один
+- [x] Добавить в имеющийся публичный MCP lifecycle fixture один
   `product-success`: `resultProfile:'user-v1'`, без acceptanceCleanupPackage.
   Через настоящий bridge выполнить prepare/save; close должен получить
   SUCCEEDED native receipt до browser close, repeated close idempotent.
-- [ ] RED через `node --experimental-test-module-mocks --test
+- [x] RED через `node --experimental-test-module-mocks --test
   --test-name-pattern='product-success' test/support/package-cleanup-bridge.mjs`.
-- [ ] Минимальная реализация: product target выбирается из existing save map
+- [x] Минимальная реализация: product target выбирается из existing save map
   только при user-v1 и одном пути. Существующая bounded native cleanup
   процедура вызывается при полном idle state до и внутри browser gate.
   Строгий acceptance-only отказ сохраняется; обычный native BLOCKED
   сохраняется в `package_cleanup` и evidence, затем выполняется browser close.
-- [ ] GREEN. По одному добавить lifecycle тесты retained unsettled без running,
+- [x] GREEN. По одному добавить lifecycle тесты retained unsettled без running,
   busy/change внутри gate, no-save, multiple-path и native refusal. Проверить
   отсутствие native действия при отказах и подтверждать только process close.
-- [ ] Отдельный RED: после save создать directory вместо
+- [x] Отдельный RED: после save создать directory вместо
   `package-cleanup.json` (реальный EISDIR), close всё равно достигает browser.
   Затем отдельный execution-journal EISDIR. Для product возвращать явный
   BLOCKED/CLEANUP_EVIDENCE_UNCONFIRMED; raw errors не публиковать. GREEN.
-- [ ] Узкие bridge/native-close suites; upstream suite из `client/` с pinned
+- [x] Узкие bridge/native-close suites; upstream suite из `client/` с pinned
   Node. Сохранить commands/counts/exits и обновить owning AGENTS. Коммит.
 
 ## Task3: Installed приёмка нового кандидата

@@ -118,3 +118,36 @@ browser/auth исключены. Новый helper SHA
 `bb8183e7e52af8a71c53e439c58b18ddcaacdbd7d468ae48ec1301f694945a1e`.
 Это не installed приёмка новой сборки. Дизайн review Approved;
 штатный product user-v1 cleanup (Task2) ещё не реализован.
+
+## Штатный user-v1 shutdown: Task2 source выполнен
+
+Product path выбирается из одного подтверждённого save path собственного
+bridge. Существующая native процедура проверяет свежий dirty state,
+account/document/package/tab identity и quiescence. Full unsettled work,
+clipboard uncertainty и leases проверяются до и внутри browser gate.
+При native refusal/потере/невалидном ответе browser close продолжается;
+при ошибке evidence возвращается BLOCKED/CLEANUP_EVIDENCE_UNCONFIRMED.
+Acceptance-only strict refusal сохранён. No-save/multiple paths не вызывают
+native cleanup; product не устанавливает acceptanceCleanupPackage.
+
+TDD: product-success RED ENOENT → GREEN; retained unsettled RED SUCCEEDED
+→ GREEN; native refusal RED missing returned receipt → GREEN; реальный
+package-cleanup.json EISDIR RED rejection → GREEN. Отдельные gate-state,
+execution-journal EISDIR, no-save/multiple paths/busy/native-error/malformed
+regressions PASS. Lifecycle18/18, native helper22/22, wrapper1 PASS.
+Product fixture использует replayBootstrap=false/replayLoginUser=null,
+account из workspace preparation. Repeated close idempotent.
+
+Первый полный suite:2563 PASS/1 FAIL/10 SKIP, exit1/190788ms; причина —
+ошибочная fixture с включённым test-login без account. Исходный отказ сохранён.
+После исправления только fixture полный pinned Node24.19.0 suite:
+2574 tests/2564 PASS/10 SKIP/0 FAIL, exit0/192185ms.
+Команда из client/: `node --test test/*.test.mjs`. У JS runtime отсутствует
+отдельный typecheck script; TypeScript/public IPC не менялись.
+Readback24 TDD/test/cleanup files SHA
+`0fb80a1aeab9965ebe4754d1e776933af5670e651d328a780deb51c525da4c85`.
+Own EISDIR tmp fixture удалена, process refs0/denied3 явно сохранены,
+receipt42a0688cfb…; первая проверка отказала из-за self-containing shell command.
+
+Новых model/judge calls0. Installed CLI/Desktop нового snapshot ещё не собраны;
+Task3/native writable reopen и полная матрица pending. V9 hang этим не исправлен.
