@@ -1,8 +1,10 @@
 import { afterAll, beforeAll, expect, test } from "bun:test"
-import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
+import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { buildNodeHost } from "../script/build-node-host"
+import { buildKeychain } from "../script/build-keychain"
 import { launchNodeHost } from "../src/node-client"
 import { connectionStore } from "../src/connection/connection-store"
 import { cliCredentials } from "../src/connection/cli-credentials"
@@ -150,7 +152,8 @@ test.each(["ready", "close"])(
       `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser forbidden');`,
     )
     await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
-    const store = connectionStore(join(root, "connection"), cliCredentials("linux"))
+    if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
+    const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
     await store.stage({
       generation: 1,
       revision: 1,
@@ -195,6 +198,13 @@ test.each(["ready", "close"])(
       release.resolve()
       await host.close().catch(() => {})
       for (const callback of cleanup) await callback()
+      if (process.platform === "darwin") {
+        const child = Bun.spawn([
+          "/usr/bin/security", "delete-generic-password", "-s", "com.loginom.aiagent.cli.profile-key.v1",
+          "-a", createHash("sha256").update(await realpath(root)).digest("hex"),
+        ], { stdout: "ignore", stderr: "ignore" })
+        expect([0, 44]).toContain(await child.exited)
+      }
     }
   },
   45_000,

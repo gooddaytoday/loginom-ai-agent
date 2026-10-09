@@ -100,6 +100,26 @@ test("the product builder emits a standalone Node script and its actual license 
   } finally { await rm(directory, { recursive: true, force: true }) }
 }, 20_000)
 
+test.skipIf(process.platform === "win32")("Node CLI runs through a symlink without executing when imported", async () => {
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
+  const directory = await mkdtemp(join(tmpdir(), "loginom-docs-symlink-entry-"))
+  try {
+    const entry = join(directory, "package-docs.mjs")
+    await symlink(join(output, "package-docs.mjs"), entry)
+    const child = Bun.spawn([node, entry, "extract", "--lgp", join(fixtures, "demo.lgp"), "--directory", directory],
+      { cwd: directory, stdout: "pipe", stderr: "pipe" })
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+    expect(stdout).not.toBe("")
+    expect(await Bun.file(JSON.parse(stdout).structure).json()).toEqual(await Bun.file(join(fixtures, "structure.json")).json())
+    const imported = Bun.spawn([node, "--input-type=module", "-e", "await import(process.argv[1]); console.log('imported')", pathToFileURL(entry).href],
+      { cwd: directory, stdout: "pipe", stderr: "pipe" })
+    const [importCode, importOut, importError] = await Promise.all([imported.exited, new Response(imported.stdout).text(), new Response(imported.stderr).text()])
+    expect({ code: importCode, stdout: importOut, stderr: importError }).toEqual({ code: 0, stdout: "imported\n", stderr: "" })
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test("Node CLI extracts an unchanged package into a session-owned work directory", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")

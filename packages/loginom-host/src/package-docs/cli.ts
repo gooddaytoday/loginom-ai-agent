@@ -93,7 +93,12 @@ function isErrno(error: unknown, code: string) {
   return !!error && typeof error === "object" && "code" in error && error.code === code
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Node resolves module URLs through symlinks; argv retains the launch path.
+// Keep this explicit: Bun lowers import.meta.main incorrectly for bundled ESM.
+const entry = process.argv[1] && isAbsolute(process.argv[1])
+  ? await realpath(process.argv[1]).catch(() => undefined)
+  : undefined
+if (entry && import.meta.url === pathToFileURL(entry).href) {
   await main(process.argv.slice(2)).catch((error: unknown) => {
     process.stderr.write((error instanceof Error && /^PACKAGE_DOCS_[A-Z_]+$/.test(error.message) ? error.message : "PACKAGE_DOCS_FAILED") + "\n")
     process.exitCode = 1

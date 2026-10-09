@@ -9,7 +9,7 @@ import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.
 const script = resolve(import.meta.dir, "../script/skills-acceptance.ts")
 const linuxTest = test.skipIf(process.platform !== "linux" || process.arch !== "x64")
 
-linuxTest.skipIf(!Bun.which("docker")).each([
+test.skipIf(process.platform !== "linux" || process.arch !== "x64" || !Bun.which("docker")).each([
   { id: "default-translation", connection: undefined, error: "SKILLS_ACCEPTANCE_COMMAND_FAILED" },
   {
     id: "scenario-create",
