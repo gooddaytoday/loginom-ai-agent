@@ -1052,7 +1052,14 @@ Core имеет разметку осей, но без CSV oracle. По доку
   frozen/21pins/оба full CLI/external after проверены повторно; fresh refb30dcbe5f,
   protected diff0. Activation+1 provider-turn/skill1 PASS; total turns16/18
   и tools17/20 измерены отдельно, Loginom13/13/errors0. Formal v7 baseline
-  запущен/session81639; candidate formal ещё не запускался.
+  session81639/run220203 прерван terminal143:19 closed (13 PASS/6 FAIL),
+  cohort#2 INCOMPLETE без terminal files. Child exit0 receipt не заменяет
+  результат или cleanup. Все19 result/cleanup/process-cleanup SHA проверены,
+  raw profile/leases20 сохранены. Свои controller/launcher/sandbox PID отсутствуют,
+  исходные server/client продолжают работать. Candidate/cold/compare не начаты.
+  До новой live пары воспроизвести и устранить зависание; при изменении harness
+  заново freeze, обе smoke стороны и полный90. Частичный v7 не подставлять
+  как полный baseline и не повторять выборочно только неуспешные попытки.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой
   повторно проверить актуальный ref и условия. Старые v3–v6 не подставляются
   в новую пару. Подробнее: `reports/2026-10-09-package-docs-writer-release.md`.

@@ -2,7 +2,8 @@
 
 Новая локальная A/B smoke-пара v7 на frozen495 прошла судью, структуру,
 warm oracle и installed cold. Полный clean suite484 PASS/2 SKIP/0 FAIL,
-typecheck PASS; formal baseline v7 запущен. Приёмка90 ещё не завершена.
+typecheck PASS; formal baseline v7 прерван после19 завершённых попыток.
+Приёмка90 ещё не завершена.
 Продуктовые binary/resources49b1584f2 не изменены. Прежний formal v6 отказал
 в management preflight до задач; его FAIL и evidence сохраняются отдельно.
 
@@ -443,3 +444,45 @@ model или judge calls. Это не воспроизвело live задерж
 cleanup незавершённой cohort#2. Полный suite не повторялся, source/guards не
 менялись; frozen495 HEAD и clean worktree проверены. Лог и source hashes:
 `ab-local-stand-20261008/cohort-second-receipt-signal-20261009.{log,json}`.
+
+
+## Formal v7: подтверждённая остановка неполного прогона
+
+После effective task timeout30 минут и окна cleanup результата cohort#2
+по-прежнему не было. Контроллеру246016/starttime83429397 передан SIGINT через
+frozen `signalProcess` с проверкой UID/birth/executable/group; подтверждения
+обработчика не последовало. Первоначальный guard закрытия launcher отказал:
+оставался дочерний процесс. Зависимый вызов прочитал отсутствующий request и
+завершился до сигнала; это отклонение порядка зафиксировано, процессов не затронуло.
+Свежая проверка установила, что единственный потомок — известный sandbox496829,
+состояние Z, birth84315691 совпадает с receipt. Исполняющихся потомков нет.
+
+Только после этой проверки собственный launcher496816/birth84315688 закрыт
+SIGTERM через тот же identity guard. Sandbox исчез; launcher стал Z под
+контроллером. Контроллер продолжал не выдавать результат и был закрыт SIGTERM
+после повторной проверки, что его единственный потомок — этот же Z launcher.
+Exec session81639 вернул terminal143. При свежем readback PID246016/496816/496829
+отсутствуют; доступные cmdline/FD прочих процессов не ссылаются на этот run.
+FD трёх сторонних sd-pam/ssh-agent/gpg-agent недоступны: это ограниченная
+проверка, а не подтверждение штатного harness cleanup попытки20. Сигналов
+сторонним процессам не было. Исходные server/client и собственные контейнеры
+работают с прежними ID/StartedAt; остановки или reset контейнеров не выполнялись.
+
+Все19 завершённых result/cleanup/process-cleanup совпадают с SHA snapshot19:
+13 PASS/6 FAIL,14 сохранённых пакетов. Для cohort#2 сохранены prompt, пустые
+stderr/events, raw profile и leases; result/cleanup/process-cleanup/run отсутствуют.
+Не создавать искусственный результат, summary или receipt штатного cleanup.
+Прогон INCOMPLETE, непригоден для сравнения; candidate formal, formal cold и
+compare не начаты, ручных retries0. Ни причина пустого CLI exit0, ни причина
+неотзывчивости контроллера не установлены. Это не доказанный дефект Bun или
+конкретной фазы supervisor. До нового live — воспроизведение и TDD исправление
+подтверждённой причины в собственном mutable harness; при смене условий нужны
+новый freeze, обе smoke стороны и полный90. Все дальнейшие запуски локально,
+стенд10.200.13.152 не используется.
+
+Приватный evidence: `formal-v7-cohort-attempt2-live-observations-20261009/`
+содержит request/signal identities, zombie guards и `interruption-readback.json`
+SHA256 `084760453d2b0a37328014992d85ab1e91b48f49df536c97aa06c2a3d010190a`.
+Readback проверен после записи; чужие недоступные FD и отказ первого observer
+scan (shell содержал собственный текст проверки) явно сохранены без ослабления
+вывода. Профиль незавершённой попытки не архивировался и не очищался.
