@@ -31,21 +31,21 @@
 
 ## Checkpoint наблюдения — новая параллельная волна, 09.10.2026
 
-- Docs prechange d502f4de3; node baseline 4e626d547/base f9bf332c; loginom0ca исключён, назначения сохранены.
+- Docs prechange59a6b841b; node baseline4e626d547/basef9bf332c; loginom0ca исключён, назначения сохранены.
 - Node SHA: LAB45 a00b0203/PR42, LAB46 41e0b170/PR43, LAB47 c92a3bfd; LAB48–52 4e626d547; PASS не переносится.
-- Runtime24aa…/caps8/8/8/daemon12/stock3m сохранены; одновременная нагрузка12 NOT_PROVED.
+- Runtime24aa…/caps8/8/8/daemon12/stock3m сохранены; нагрузка12 NOT_PROVED, Eval/LAB29/LAB30 не менялись.
 - Installed CLI597/executable20305a8d… и central8d7a… сохранены; CLI catalog целевых настроек есть, inference/model acceptance0.
-- LAB53 approved scoped4241c818; draft PR44 common-preparation→shared-oauth; merge/release0, schedules0.
-- Published b1d002933bc7aec3eec8ebfdd009c905025bb7a3/tree cf2b733c…; VERSIONv8/7794acd2….
-- Source Reviewer01a1205c-87ee… completed14:20:25MSK/errornull: SOURCE_ONLY_PASS, F9 CLOSED_SOURCE_OFFLINE.
-- Независимо сверены API attachments3/manifest2/VERSION38/candidate45/snapshot5;140 tests и469 own records — report claims.
-- Strict validator не ослаблен: namespace positive PASS; непривилегированный host census INCOMPLETE, errors не фильтровались.
-- Actual legacy operation2fd00c7a… exit0 completed11:42:57UTC; независимый локальный verifier проверил bindings/predicates.
-- Fresh nonce-bound Mac Refresh11:39UTC:8rows/2packages/counts8; прежний observer3128/GUIDhash8d9e… сохранён.
-- Privileged FD11:42:57UTC:244/244 inventories equal, errors0/0,14targets; только exact guardian/control holders.
-- Два прежних admin markers архивированы с исходными bytes/hash/inode;12 config/lock bindings неизменны;59 старых tuples absent.
-- History UNKNOWN_PRESERVED; missing executed bytes/numericID/CreateTime/start_ticks/old causes остаются UNKNOWN.
-- Qualification54cc6d7b… NOT_LAUNCHED: grant assertion из-за retained LAB45 worker marker; Loginom/helper actions0, guard не вызывался.
-- Marker retired_cleanup_confirmed/612B/a7513042… не является свежим cleanup proof; остальные15 role markers отсутствовали12:04UTC.
-- Stock LAB53 handoff01a1208e-b040…→Worker01a1208e-b0c7… running15:06:28MSK; те же8 HELD, pair/model/node NOT_ACCEPTED.
-- Next: адресная поддержка retained marker→exact-SHA review→полная9-response runtime qualification→те же8; критерии/gates сохранены.
+- LAB53 approved scoped4241c818; draft PR44 common-preparation→shared-oauth; те же8 HELD, merge/release/schedules0.
+- Published e1af46079cf5f16208384740eebf580332193a24/tree41d69aa2…; VERSION2f514da4….
+- Native Reviewer01a120aa-373e… completed15:49:21MSK/errornull: SOURCE_ONLY_PASS; Worker/Reviewer146tests — report claims.
+- Независимо сверены API attachments3/manifest2/source51/VERSION44/snapshot5; runtime/model/node NOT_ACCEPTED.
+- Atomic-publication doc finding NOT_DOCUMENTED в review evidence; unchanged-reader caller явно применил staged complete→fsync→atomic link.
+- Actual retired-worker operation4795739a… exit0 completed13:00:07UTC; текущий proof only, readyfalse, newLoginomlogins/accounts0.
+- Fresh nonce-bound Mac Refresh12:57UTC/readback12:58UTC:8rows/3packages; прежний observer3128/GUIDhash8d9e… сохранён.
+- Privileged FD13:00:07UTC:246/246 inventories equal, errors0/0,15targets; exact role-guardian/control holders, потом absence.
+- Marker612B/a7513042… архивирован с original inode2396042; root post13:02:45 configs7/locks5 unchanged, canonical marker absent.
+- Root post:15 exact old records и2 partial numeric PIDs absent; ticks/profile/executed bytes/old causes UNKNOWN_PRESERVED.
+- Независимо сверены36/36 legacy artifacts иactual e1af pure/FD predicates на момент13:02:45UTC; remote assertions не новый live census.
+- Full-pair global operator flock даёт ACCOUNT_BUSY: нужны ранее разрешённые8 admins; bounded bootstrap/probe и own operator_file migration в LAB53.
+- Stock Worker01a120bb-9607… running15:55:28MSK: source/offline helper+atomic doc fix→Reviewer; central pin/gates пока сохранены.
+- Next: exact-SHA review→существующий Gen LAB53 bounded serial8admin bootstrap/live qualification+Mac readback→те же8Gen parallel distinct operators.
