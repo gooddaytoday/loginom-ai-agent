@@ -16,5 +16,5 @@
 - Technical manifest bed77af4-b5fe-4a53-b67b-014bc4f6bcc4; incomplete/0 measured; 2026-10-09 00:02 MSK release/FREE.
 - First prepare error сохранён; Dock URL исправлен до серий; независимый post-release check: 5 profiles clean/storage EMPTY/browser 0.
 - LAB-32 исходный Calc provider FAIL/0 tokens/no artifact сохранён; новый calc 2f8b3b19-dfd3-45c4-819a-315a7beae02d PASS/100/oracle/actual medium (10 DB messages)/release.
-- LAB-54 calc attachment 01a11f86-b4a8-74cd-99cf-903649731eaf: 24085 bytes/15 members, SHA256 62df969cba807e8d59d7762daa2ea0659b3f947ed0a17e3565d4cd27ce639bd3, delivery verified.
-- Readiness 1/2; LAB-54 node run 01a11f8b-957f-760b-82b6-60e9be9e61cf dispatched 10:23:23 MSK, один crosstable-fixed-sum; далее node evidence/release → full card/start + heartbeat 30m.
+- LAB-54 node 38aa02d9-2568-4e87-95c3-f74264525d7b: no_artifact/code FAIL; 19 DB messages actual medium; cleanup/release/FREE. Calc и node delivery bytes/SHA/15+11 members verified.
+- Readiness 1/2; LAB-54 blocked: CLI F3 guard отвергает auto-label с ';'. Исходные результаты/пины сохранены; далее решение владельца о критерии допуска либо новых продуктовых пинах → full card/start + heartbeat 30m.
