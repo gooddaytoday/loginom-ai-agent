@@ -666,6 +666,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | abc-pareto-groups | 3 | PASS100 | Есть / PASS | 31 / 30 / 26 | 4640 / 20930500 | 3 / 9107352 |
 | articles-by-author | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4600 / 15892038 | 3 / 4038019 |
 | articles-by-author | 2 | PASS100 | Есть / PASS | 21 / 21 / 17 | 4600 / 15910931 | 3 / 4045637 |
+| articles-by-author | 3 | PASS100 | Есть / PASS | 21 / 21 / 17 | 4600 / 15910992 | 3 / 4040201 |
 | campaign-roi-by-channel | 1 | PASS100 | Есть / PASS | 19 / 19 / 15 | 4610 / 16655815 | 3 / 4687353 |
 | campaign-roi-by-channel | 2 | PASS100 | Есть / PASS | 17 / 16 / 16 | 4612 / 17586705 | 3 / 5620442 |
 | cohort-spend-activity | 1 | FAIL0/no_artifact | Нет / не выполнялись | 22 / 21 / 18 | 4563 / 15206251 | 3 / 3337376 |
@@ -1280,3 +1281,17 @@ Progress32 SHA `1c48de09b50e03a9b9576c6215989fc684fe734a94079d05e2354526a22af4c7
 metrics32 SHA `77eed560fd009cb7ab374383eba5c418f68e0554d34dea446429210020c53e53`.
 Common020c08059…/controller identity совпали. Closed32/45:23 PASS100/9 FAIL0,
 articles#3 running; candidate/cold/compare0/retries0, полный90 не принят.
+
+Тридцать третий closed formal v9 `articles-by-author#3` PASS100:
+structure/warm oracle PASS, cleanup6 stages/processes confirmed/error null/
+remaining0×2; history/diagnostics full roundtrip (объёмы в таблице).
+Trace/result counters match:21 finishes/21 tools/17 Loginom/skill0/prepare1/errors0.
+У ab-revenue/ABC/articles повторно проверены judge100/structure/warm3/3 PASS;
+formal cold этих9 пакетов pending, candidate/NI не доказаны. Help error1
+в articles#2 сохранён в его исходном trace и метриках, не подменён errors0 третьего.
+Все33 results/cleanup/process-cleanup/архивы, предыдущие32 trace SHA и
+reviews24/cold indexes15+24+30/batch8+9 receipts повторно проверены.
+Progress33 SHA `b85efd19a4db5ef4b22c8ea688cad15cfeb2bdc4e1c2cf6e814fba2efe0a800f`;
+metrics33 SHA `fd8831f8ff53cdec2c876f8ec83470923784f3571beb5529445c3af61203d5a8`.
+Common020c08059…/controller identity совпали. Closed33/45:24 PASS100/9 FAIL0,
+campaign#3 running; candidate/cold/compare0/retries0, полный90 не принят.
