@@ -1,0 +1,18 @@
+{
+  "name": "EvalRunner",
+  "description": "Последовательное измерение Loginom eval и сравнение с принятым baseline по назначенной карточке",
+  "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+  "runtime_mode": "local",
+  "runtime_config": {},
+  "model": "gpt-6.1-sol",
+  "thinking_level": "xhigh",
+  "max_concurrent_tasks": 1,
+  "permission_mode": "public_to",
+  "visibility": "workspace",
+  "invocation_targets": [{"target_type": "workspace", "target_id": "dcf616e7-66eb-470a-9b04-6462f220cf3b"}],
+  "custom_args": ["-c", "model_reasoning_effort=\"xhigh\""],
+  "squad_memberships": [],
+  "project_id": "de16c24b-4121-45c3-9f5a-e16ddabb90e8",
+  "instructions_file": "evals/docs/evalrunner/agent.md",
+  "activation": "DEFERRED_UNTIL_LAB55_VERIFIED_COMPLETE"
+}

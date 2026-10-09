@@ -1,0 +1,18 @@
+{
+  "extends": "private verified active v2 config; preserve rich, ben, evalbaseline, offline and container fields",
+  "version": 3,
+  "roles": {
+    "evalrunner": {
+      "checkout": "/home/user/.local/share/loginom-evals-runtime/checkouts/evalrunner/loginom-ai-agent",
+      "evalProfile": "/home/user/.local/share/loginom-evals-runtime/roles/evalrunner/eval-profile",
+      "workRoots": ["/home/user/.local/share/loginom-evals-runtime/roles/evalrunner/agent-work"],
+      "resultsRoot": "/home/user/.local/share/loginom-evals-runtime/roles/evalrunner/results",
+      "cliBin": "/home/user/.local/share/loginom-evals-runtime/cli/APPROVED_IMMUTABLE_BUILD/bin/loginom-ai-agent-cli",
+      "product": {"version": "EXPLICIT_VERSION", "source": "FULL_SOURCE_SHA", "manifestSha256": "MANIFEST_SHA256", "binarySha256": "BINARY_SHA256"},
+      "readinessIssue": "EXPLICIT_PREPARATION_ISSUE_UUID",
+      "baselineRegistry": "/home/user/.local/share/loginom-evals-runtime/operations/accepted-baselines/registry.json",
+      "replayEvidence": "/home/user/.local/share/loginom-evals-runtime/operations/evalrunner-replay/proof.json",
+      "apparmorProfiles": ["loginom-evals-bwrap", "loginom-evals-chromium", "loginom-evalrunner-chromium"]
+    }
+  }
+}

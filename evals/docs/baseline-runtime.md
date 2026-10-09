@@ -170,3 +170,17 @@ UUID допуска сохраняется в неизменяемом manifest;
 кодовую оценку, cleanup/release, complete calc и все пины кроме обновлённого operational harness SHA.
 EVAL_CORPUS_SHA сохраняет прежний корпус и проверяет дерево evals/tasks; штатный default — HEAD.
 Без этого явного исключения прежний readiness gate сохраняется. Контроль основного чата — каждые 15 минут.
+
+## EvalRunner и config v3
+
+Независимая eval-only роль EvalRunner использует собственные checkout/profile/work/results
+и ту же stand.lease. Config v1/v2 и manifest v1 сохраняются; EvalRunner создаёт manifest v2
+с frozen product, accepted baseline и declared changes. `prepare/smoke --role evalrunner`,
+дальнейшие команды читают роль из manifest. Registry принятия — отдельная CAS операция
+оператора; `check --export` сравнивает с конкретным закреплённым baseline.
+Strict comparator по умолчанию; model/reasoning эксперименты включаются явно.
+Необъяснённые изменения условий дают INCOMPARABLE. Readiness EvalRunner требует два
+измеренных/освобождённых smoke и отдельный offline replay настоящих evidence; product
+no_artifact не наследует исключение LAB-55. Подробности: [runbook](evalrunner/runbook.md).
+Активация config/helper/агента и live-приёмка **отложены до завершения LAB-55** по gate
+из [согласованного плана](evalrunner-plan.md). Сейчас подготовлена только локальная реализация.
