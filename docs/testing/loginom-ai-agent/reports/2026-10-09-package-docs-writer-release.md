@@ -667,6 +667,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | campaign-roi-by-channel | 1 | PASS100 | Есть / PASS | 19 / 19 / 15 | 4610 / 16655815 | 3 / 4687353 |
 | campaign-roi-by-channel | 2 | PASS100 | Есть / PASS | 17 / 16 / 16 | 4612 / 17586705 | 3 / 5620442 |
 | cohort-spend-activity | 1 | FAIL0/no_artifact | Нет / не выполнялись | 22 / 21 / 18 | 4563 / 15206251 | 3 / 3337376 |
+| cohort-spend-activity | 2 | FAIL0 | Нет / не выполнялось | 21 / 21 / 19 | 4564 / 15352878 | 3 / 3489173 |
 | customer-activity-segments | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4608 / 17448322 | 3 / 5497845 |
 | first-last-touch | 1 | FAIL0/no_artifact | Нет / не выполнялись | 26 / 25 / 23 | 4585 / 15440708 | 3 / 3550529 |
 | low-liquidity-companies | 1 | FAIL0/no_artifact | Нет / не выполнялись | 23 / 23 / 21 | 4487 / 15707741 | 3 / 4075869 |
@@ -975,3 +976,34 @@ PID676156/UID/birth/exe/inode неизменны. Closed19/45:16 PASS100/3 no_ar
 FAIL0, cohort#2 running с непустой CLI trace. Это текущая v9 попытка;
 исторический v7 cohort#2 остаётся INCOMPLETE с неизвестной причиной.
 Candidate/cold/compare0/retries0, полный90 не принят.
+
+Двадцатый closed formal v9 `cohort-spend-activity#2` no_artifact FAIL0:
+package_not_created, CLI exit0, timeout/interrupted=false, judge_attempts0.
+LGP/CSV отсутствуют, structure/warm/cold не выполнялись. Калькулятор
+`calc-cohort-2` остановлен на output_mapping: readiness полного output definition
+page at0 не подтверждена. Wait/status/cancel сохраняют
+AMBIGUOUS/NODE_APPLY_STOPPED, effectPossible=true/cleanupComplete=false.
+Последующее ожидание вернуло OUTPUT_MAPPING_RECOVERY_UNVERIFIED:
+Original output Done reference unavailable. Operation recover error —
+plain text2668bytes, SHA256
+`02e495d0c8ff4707bb2013c73de8c8cc2e08bd38ea938a5948d807171584bcee`;
+в тексте наблюдаются REQUEST_REJECTED/AMBIGUOUS/OUTPUT_MAPPING_RECOVERY_UNVERIFIED,
+structured phase/effect/cleanup для него не придуманы. Оригиналы ошибок
+сохранены в private trace; native root cause и semantic recovery UNKNOWN.
+
+Очистка окружения подтверждена независимо от semantic FAIL:
+все6 cleanup stages/processes confirmed/error null/remaining0×2.
+History4564/15352878bytes и diagnostics3/3489173bytes full roundtrip.
+Trace/result counters match:21 finishes/21 tools/19 Loginom/skill0/prepare1/
+errors5. Отказ сохранён в общей серии без исключения или ручного повторного запуска.
+Это завершённая v9 попытка, отдельная от historical v7 cohort#2 INCOMPLETE.
+
+Private progress20 SHA256
+`4742f8799c99fb045fc15777e54c039244a337dc0a29d93a2ac10fa9c15675f3`,
+metrics20 SHA256
+`9996c3d2ad40cdf10dc3416e58a79a73d85bae987cbc1ad15d0f1aa0f9b5d609`.
+Все20 closed results/cleanup/process-cleanup и архивы, предыдущие19 traces
+и cold index15 повторно проверены по SHA; batch8 receipt/readback SHA
+совпали, common020c08059… и PID676156/UID/birth/exe/inode неизменны.
+Closed20/45:16 PASS100/4 no_artifact FAIL0, customer#2 running;
+candidate/cold/compare0/retries0. Полный90 не принят.
