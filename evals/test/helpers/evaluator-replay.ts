@@ -8,7 +8,7 @@ export async function replayFixture(directory: string) {
   const nodeRun = path.join(directory, "node")
   const task = (await loadTasks(path.join(evalsRoot, "tasks"), ["calc-data-double"]))[0]!
   await Bun.write(path.join(regularRun, "summary.json"), JSON.stringify({ task_ids: [task.id], tasks: [{ id: task.id, attempts: [{ attempt: 1, status: "completed", score: 100, pass: true, oracle_pass: null }] }] }))
-  await Bun.write(path.join(regularRun, task.id, "1/verdict.json"), JSON.stringify({ confidence: "high", summary: "saved fixture verdict", checklist: task.checklist.map(item => ({ id: item.id, passed: true, evidence: "fixture" })) }))
+  await Bun.write(path.join(regularRun, task.id, "1/judge/verdict.json"), JSON.stringify({ confidence: "high", summary: "saved fixture verdict", checklist: task.checklist.map(item => ({ id: item.id, passed: true, evidence: "fixture" })) }))
   const out = path.join(nodeRun, "crosstable-fixed-sum/1")
   await cp(path.join(evalsRoot, "tasks/node-evals/crosstable-fixed-sum/reference.lgp"), path.join(out, "artifact/package.lgp"), { recursive: true })
   const proc = Bun.spawn(["unzip", "-q", path.join(out, "artifact/package.lgp"), "-d", path.join(out, "artifact/unpacked")], { stdout: "pipe", stderr: "pipe" })

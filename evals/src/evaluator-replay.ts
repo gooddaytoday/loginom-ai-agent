@@ -33,7 +33,7 @@ export async function replayEvaluatorEvidence(checkout: string, sources: { regul
     attempt?.attempt !== 1 || attempt.status !== "completed" || attempt.judge_status === "error") throw new BaselineFailure("REGULAR_REPLAY_SOURCE_REQUIRED")
   const task = (await loadTasks(path.join(checkout, "evals/tasks"), [regularTask.id]))[0]!
   const out = path.join(sources.regularRun, task.id, "1")
-  const verdict = parseVerdict(await Bun.file(path.join(out, "verdict.json")).text())
+  const verdict = parseVerdict(await Bun.file(path.join(out, "judge/verdict.json")).text())
   if (!verdict) throw new BaselineFailure("REGULAR_REPLAY_FAILED")
   const scored = scoreVerdict(task.checklist, verdict, threshold)
   const oracle = await checkOracle(task, path.join(out, "artifact"))
