@@ -286,7 +286,27 @@ def diagnostic(spec, task_dir, attempt_dir, calls, events, workspace, transfers)
     else:
         require(settings == {**wanted, 'columns': spec['columns']}, 'diagnostic: exact assigned settings required')
     result = settled_receipt(calls, call)['result']
-    if spec['id'].endswith(('wrong-encoding', 'unclosed-quote')) and result.get('status') == 'SUCCEEDED':
+    damaged = spec['id'].endswith(('wrong-encoding', 'unclosed-quote'))
+    if damaged and result.get('execution', {}).get('status') == 'failed':
+        execution = result['execution']
+        require(result.get('status') == 'FAILED' and result.get('cleanup_complete') is True
+            and result.get('error', {}).get('code') == 'NODE_EXECUTION_FAILED'
+            and execution.get('failure_verified') is True and execution.get('root_id') and execution.get('group_id')
+            and execution.get('group_record_id') and execution.get('execution_id') == workspace['document_id'] + ':' + execution['root_id'] + ':' + execution['group_id']
+            and result.get('output', {}).get('status') == 'not_refreshed', 'diagnostic: verified terminal engine failure required')
+        observed, rows = native_application(events, call, result)
+        configuration_matches(spec, observed, transfers[0]['output']['destination'])
+        proofs = [row['receipt'].get('value', {}) for row in rows if row.get('phase') == 'node_phase_completed'
+            and row.get('receipt', {}).get('phase') == 'execute' and row['receipt'].get('status') == 'verified']
+        node = result.get('node', {})
+        require(node.get('document_id') == workspace['document_id'] and node.get('workflow_id') == workspace['workflow_ref']['workflow_id']
+            and len(proofs) == 1 and proofs[0].get('node') == node and proofs[0].get('owner_verified') is True
+            and proofs[0].get('failure_verified') is True and proofs[0].get('output_refreshed') is False
+            and proofs[0].get('execution_id') == execution['execution_id'], 'diagnostic: native terminal owner proof required')
+        if (attempt_dir / 'artifact/package.lgp').exists():
+            package_graph(attempt_dir, node['node_id'], transfers[0]['output']['destination'])
+        return
+    if damaged and result.get('status') == 'SUCCEEDED':
         require(result.get('cleanup_complete') is True and result.get('node', {}).get('document_id') == workspace['document_id']
             and result.get('node', {}).get('workflow_id') == workspace['workflow_ref']['workflow_id'], 'diagnostic: owned full read required')
         observed, _ = native_application(events, call, result)
