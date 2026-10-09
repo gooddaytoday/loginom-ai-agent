@@ -1087,7 +1087,12 @@ Core имеет разметку осей, но без CSV oracle. По доку
   AMBIGUOUS/OUTPUT_MAPPING_RECOVERY_UNVERIFIED. Пакета нет, structure/warm/cold
   не выполнялись; cleanup6 stages/remaining0×2/history+diag roundtrip PASS
   не доказывают semantic recovery. Progress5 SHA651b01e174…;
-  customer#1 running, closed5/45/PASS4/FAIL1, candidate/cold/compare0/retries0.
+  Шестой closed customer#1 PASS100/structure/warm/cleanup6/remaining0×2,
+  history+diag full roundtrip. Progress6 SHAb06e790893…;
+  first-last#1 running, closed6/45/PASS5/FAIL1, candidate/cold/compare0/retries0.
+  Cohort read-only разбор SHAfcc694fe0f… уточнил calc-cohort/output_mapping:
+  step69,47 SUCCEEDED reads/15s, unverified_definition_page. Native root cause
+  остаётся UNKNOWN; deadline/recovery guards и frozen builds не изменялись.
   Частичный v7 не подставлять
   как полный baseline и не повторять выборочно только неуспешные попытки.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой

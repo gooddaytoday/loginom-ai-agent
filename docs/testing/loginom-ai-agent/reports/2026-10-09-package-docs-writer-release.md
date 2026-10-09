@@ -663,12 +663,13 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | articles-by-author | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4600 / 15892038 | 3 / 4038019 |
 | campaign-roi-by-channel | 1 | PASS100 | Есть / PASS | 19 / 19 / 15 | 4610 / 16655815 | 3 / 4687353 |
 | cohort-spend-activity | 1 | FAIL0/no_artifact | Нет / не выполнялись | 22 / 21 / 18 | 4563 / 15206251 | 3 / 3337376 |
+| customer-activity-segments | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4608 / 17448322 | 3 / 5497845 |
 
-Последний private snapshot `formal-v9-progress-5-20261009.json` SHA256
-`651b01e17428094dd3b593b401e04ca9fd195f42bd2e96c711ce93f45e07ef05`:
-пять result/cleanup/process-cleanup/preservation, четыре review и archive SHA
+Последний private snapshot `formal-v9-progress-6-20261009.json` SHA256
+`b06e790893093ec47e08234abfe19dff34e2424a8bb54a96aae285115a35f2d5`:
+шесть result/cleanup/process-cleanup/preservation, пять review и archive SHA
 повторно проверены. Controller идентичность живого PID676156 совпала;
-customer-activity-segments#1 running. Closed5/45/PASS4/FAIL1/manual retries0,
+first-last-touch#1 running. Closed6/45/PASS5/FAIL1/manual retries0,
 common020c08059… неизменен. Новый private `formal-v9-observe.py` read-only,
 SHA256 `eb9111bcc5191527eafcc49b5af07633709a3cc63276bb60f7a40b5c696a6e9a`,
 проверен на живом процессе; не входит в исполняемый harness/21 adapters.
@@ -710,3 +711,23 @@ full roundtrip и absence guards; failed-cleanup/incomplete raw profiles v5/v7/v
 для cohort22 provider finishes/21 tools/18 Loginom/errors4/skills0/prepare1,
 counters совпали с result. Прежние четыре result/trace SHA повторно проверены;
 progress5 содержит SHA предыдущего progress4. Пятый FAIL остаётся в серии.
+
+Customer#1: structure/warm PASS,6 cleanup stages confirmed/remaining0×2,
+history4608/17448322bytes+diag3/5497845bytes full roundtrip. Метрики6
+`formal-v9-base-metrics-6-20261009.json` SHA256
+`304f271fc1707b3b3feb0f6f40142a452412cd6600628f531cbb6feba4eca1df`:
+customer21 finishes/20 tools/16 Loginom/errors0/skills0/prepare1; counters match.
+Все прежние result/trace/archive SHA проверены; progress6 сохраняет chain5.
+
+Cohort private read-only review `formal-v9-cohort-readonly-20261009.json` SHA256
+`fcc694fe0fa4b22f5a6e9560c350b73152e6c4f6b4e1b41f746d3dfcd13959dc`:
+archive и extracted execution journal hashes совпали с preservation inventory;
+journal1392 events, calculator calc-cohort/output_mapping/step69. Все47 samples
+0–46:workspace.observe SUCCEEDED/effect false, wizard output_mapping,
+output page unverified_definition_page/fields0, readiness false. Original
+semantic_condition_v2 timeout15000ms, observed15011.93ms. Последнее workspace
+чтение cleanup true не заменяет outcome node.apply cleanup false/recovery
+unverified. Bundled baseline source требует подтверждённую definition page и
+retained Done receipt для recovery; hashes двух source files сохранены.
+Native root cause UNKNOWN; model/Help/native/judge calls0, продукт/harness/
+deadlines/guards не изменены, причина старого v7 hang из этого не выводится.
