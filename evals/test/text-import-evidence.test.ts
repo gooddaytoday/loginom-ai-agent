@@ -244,3 +244,20 @@ test("cold preparation binds the exact saved package and independent typed expec
     await expect(prepareTextImportCold(f.task, f.attempt, dir, "/eval/result.lgp")).rejects.toThrow()
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
+
+test("damaged input may be refused by a verified terminal engine failure", async () => {
+  const f = await positiveFixture("txt-unclosed-quote")
+  try {
+    const execution = { status: "failed", execution_id: "doc:root:group", failure_verified: true, root_id: "root", group_id: "group", group_record_id: "record" }
+    Object.assign(f.output, { status: "FAILED", execution, output: { status: "not_refreshed", ports: [] },
+      error: { code: "NODE_EXECUTION_FAILED", message: "Unclosed quote" } })
+    f.events.push(JSON.parse(JSON.stringify({ operation_id: "import", phase: "node_phase_completed", receipt: {
+      phase: "execute", status: "verified", value: { ...execution, verified: true, owner_verified: true,
+        node: f.output.node, output_refreshed: false } } })))
+    await f.write()
+    expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    Object.assign(f.output.execution, { failure_verified: false })
+    await f.write()
+    expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("terminal")
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
