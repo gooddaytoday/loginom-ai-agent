@@ -1101,3 +1101,21 @@ metrics24 SHA256
 Common020c08059… и controller identity совпали. Closed24/45:18 PASS100/
 6 no_artifact FAIL0, NPS#2 running; candidate/cold/compare0/retries0.
 Полный90 не принят.
+
+Подготовлен partial cold index для closed24,18 сохранённых пакетов:
+`formal-v9-partial-cold-index-24-20261009.json`, SHA256
+`8eecd96824cbbf119aaba9aa2e1fdb983430837fb94983791731497b13220c6f`.
+Для всех18 повторно проверены request/review/package SHA, exact local artifact
+path и соответствие server packagePath результату harness. Все входные CSV
+и oracle сопоставлены по SHA с неизменным task snapshot manifest. Все24
+result/cleanup/process-cleanup SHA и полная cleanup подтверждены. Шесть
+no_artifact сохраняются как FAIL и не получают фиктивный cold PASS.
+
+Первый read-only индексатор ошибочно сравнил local request.package с server
+result.package_path; assertion отказала до записи. Исправлено сравнение
+request.packagePath с result.package_path и exact local artifact/package.lgp.
+Все18 пары проверены; correction сохранена в private receipt. Продукт,
+исполняемый harness и модели не изменены, retries0/new Loginom calls0.
+Статус PARTIAL_BASELINE_ONLY_COLD_PENDING: это подготовка будущего replay,
+не его выполнение и не полная90/NI приёмка. Старый first-repeat index15
+SHA25f7fe5287… сохранён отдельно без изменений.

@@ -1050,7 +1050,9 @@ Core имеет разметку осей, но без CSV oracle. По доку
   semantic recovery этим не доказывается, native root causes UNKNOWN.
   Для18 пакетов structure/warm oracle PASS. Progress24 SHA73f418ef2e…,
   metrics24 SHA2fd2efbcc0…, первый cold index15 SHA25f7fe5287… подтверждает
-  request/package/input SHA для12 пакетов первого повтора. NPS#2 выполняется; candidate formal,
+  request/package/input SHA для12 пакетов первого повтора. Partial closed24 cold index
+  SHA8eecd96824… проверяет18 request/package/input/oracle SHA; cold ещё не выполнен.
+  NPS#2 выполняется; candidate formal,
   formal cold и compare не начаты. Ручных повторов0; первый повтор не заменяет
   baseline45/candidate45, cold каждого сохранённого пакета и итоговый compare.
 
