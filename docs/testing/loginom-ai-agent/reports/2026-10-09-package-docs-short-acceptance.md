@@ -125,14 +125,17 @@ Harness `pass:true` оценивает артефакт, но полный ис�
 его не засчитываем в минимум8 CLI PASS. Ручного модельного повтора нет.
 Articles-by-author **PASS100**: CLI exit0, judge scored/checklist, structure0,
 warm CSV oracle PASS, process terminal и6 cleanup stages confirmed. Итого
-закрыты7/10:6 полных PASS,1 полный FAIL; cold3/3 PASS. Campaign ROI
+закрыты8/10:7 полных PASS,1 полный FAIL; cold3/3 PASS. Campaign ROI
 также PASS100/CLI0/structure0/warm oracle/cleanup confirmed. Его independent
 cold PASS/bytes unchanged/native close/logout/remaining0, read-back18files
 `fa9649c4a74465347debd369da6e8ede7e0ba55163757b7ae9c4f47bc08310b0`.
 Customer-activity-segments также **PASS100/CLI0/structure/warm/cleanup**.
 Monthly-demand **PASS100/CLI0/structure/warm/cleanup**.
 Ab-revenue-per-converter **PASS100/CLI0/structure/warm/cleanup**.
-Следующей выполняется risky-approved-claims. Progress4 receipt SHA256
+Risky-approved-claims **PASS100/CLI0/structure/warm/cleanup**. Первоначальное
+имя узла с `>` отклонено с `NOT_APPLIED/effect_possible:false`; исправленный
+запрос выполнен в пределах той же попытки, без ручного перезапуска.
+Следующей выполняется slow-supplier-deliveries. Progress4 receipt SHA256
 `b8959507b3e5d9f1c8f35a9f862adba00179df6e41b3ad4da7841aeebd2eaca0`. Оставшиеся задачи ведёт отдельный serial controller: каждый процесс по одному,
 между ними terminal/cleanup/structure/oracle gates, для campaign обязательный
 cold. Подготовки ABC сохранены
