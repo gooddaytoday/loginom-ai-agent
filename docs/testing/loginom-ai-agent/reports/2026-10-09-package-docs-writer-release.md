@@ -1323,3 +1323,22 @@ Private receipt `formal-v9-cohort-attempt3-readonly-live-20261009.json`,
 SHA `2ea8c4b2319993fbc40d9afd7ba5cb8936f04d067084059b600669bca96ac797`,
 mode600/read-back PASS. Итог попытки и native cause ещё UNKNOWN;
 счётчики closed34/PASS25/FAIL9 не меняются, ручных повторов0.
+
+На06:51Z отсутствовали два ещё необходимых own `/tmp` входа:
+`loginom-skills-analytic-source-20261008/sources/analytic-evals` и
+`loginom-cold-control-plan.ts`. Причина удаления UNKNOWN. Восстановлены
+по тем же путям из ранее сохранённых private copies: полный snapshot281
+файл SHA совпал с исходным manifest до/после копирования, helper243bytes
+совпал с закреплённым SHA `eff56b20df…`. Все21 adapter pins повторно PASS;
+common020c08059… побитово unchanged. Private restoration receipt
+`formal-v9-tmp-input-restoration-20261009.json`, SHA
+`5a2879831db2bf10b18b1d5a54b3fdcccb8d011b60d2d43874e3124cdf15fc88`,
+mode600/read-back PASS. Контроллер не прерывался, native/model calls0/retries0;
+полная сопоставимость остаётся зависимой от итоговых condition checks.
+Индивидуальный task timeout cohort подтверждён как1800000ms из сохранённого
+task.json; общий900000ms не отменяет этот override.
+По обновлённому указанию пользователя own `/tmp` очищать регулярно после
+завершения использования. На06:54Z в проверенном own наборе
+`loginom-skills-*`/`loginom-cold-*` остались только два восстановленных,
+ещё необходимых входа; неиспользуемых кандидатов в этом наборе0.
+Это не утверждение об очистке всех временных файлов системы.
