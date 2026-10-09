@@ -10,9 +10,11 @@
 - Проверки: первый полный bun test 570 PASS / 9 SKIP / 0 FAIL; финальные fixture/offline 91 PASS + role 1 PASS; bun typecheck PASS.
 - Повторный полный bun test на 50cd54cc6 остановлен SIGTERM143: local docker create/run зависают до ID. Daemon/чужие контейнеры не менялись; полный повтор не пройден.
 - Private config draft + readonly v2 + hashes: evals/.bundle/evalrunner-preparation/; не активированы, readinessIssue ещё не задан.
-- LAB-55 read-only 2026-10-09 11:38 UTC: in_progress, journal recorded 15/144, running 1, pending 128, release отсутствует, stand.lease существует. Manifest SHA неизменен. Gate B не выполнен.
+- LAB-55 read-only 2026-10-09 15:08 UTC: in_progress, journal recorded 30/144, running 1, pending 113, release отсутствует, stand.lease существует. Manifest SHA неизменен. Gate B не выполнен.
 - Этап B ОТЛОЖЕН ДО ЗАВЕРШЕНИЯ LAB-55: регистрация первого baseline, серверные поставка/config/helper/AppArmor/профиль/MCP, создание агента без squad, live-приёмка.
-- Агент/карточки/расписания не создавались; LAB-55 карточка, монитор, leases, journal, manifest и результаты не изменялись этими работами.
+- Multica агент/карточки/расписания не создавались; LAB-55 карточка, монитор, leases, journal, manifest и результаты не изменялись этими работами.
 - Инструкции: evals/docs/evalrunner/agent.md; настройки: agent-settings.json; этап B/команды: runbook.md; карточка: task-template.md.
 - Локальная immutable поставка + Git bundle: evals/.bundle/evalrunner-delivery/<source SHA>/delivery-receipt.json; file-set/hash/mode/tar/bundle verify. Активация отложена. Следующий шаг A: восстановить local Docker без вмешательства в чужую работу и повторить полный bun test.
 - Следующий шаг B: свежие 144+judgements+cleanup/history+valid release+download/hash receipts И FREE без active/queued/processes/harness leases/recovery; статус/idle/PID недостаточны.
+- По поручению владельца включён Codex heartbeat evalrunner-lab-55 этого чата каждые 6 h; первая следующая проверка около 00:08 МСК 2026-10-10. После полного gate создать Goal и автономно закончить B.
+- После доказанной готовности агента завершить Goal и удалить только этот heartbeat; private state /home/kiselev/.local/share/loginom-evalrunner-control/loop-state.json. Исходный монитор LAB-55 не менять.
