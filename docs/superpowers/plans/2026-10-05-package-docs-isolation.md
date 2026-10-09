@@ -1093,6 +1093,11 @@ Core имеет разметку осей, но без CSV oracle. По доку
   Cohort read-only разбор SHAfcc694fe0f… уточнил calc-cohort/output_mapping:
   step69,47 SUCCEEDED reads/15s, unverified_definition_page. Native root cause
   остаётся UNKNOWN; deadline/recovery guards и frozen builds не изменялись.
+  Седьмой closed first-last#1 no_artifact FAIL0/judge0/4 tool errors:
+  join-metrics/input_mapping, Done readiness timeout, resume rejected.
+  Cleanup6/remaining0×2/history+diag roundtrip PASS не означает recovery PASS.
+  Progress7 SHA31b83e6101…; low-liquidity#1 running, closed7/45/PASS5/FAIL2,
+  candidate/cold/compare0/retries0. Отказы не исключаются из итоговой серии.
   Частичный v7 не подставлять
   как полный baseline и не повторять выборочно только неуспешные попытки.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой
