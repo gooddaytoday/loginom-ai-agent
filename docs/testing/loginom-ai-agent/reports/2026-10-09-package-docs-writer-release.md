@@ -425,3 +425,11 @@ Launcher намеренно сохраняет subreaper boundary до пров�
 Это read-only signal, не успешный кейс и не повод перезапускать серию по таймауту
 наблюдения. Текущий controller сохраняется, новые live/judge calls0,
 product/harness edits0; очистка/архивирование активного профиля не выполнялись.
+
+Дополнительно сохранён `identity.json`: текущие UID/birth/executable dev/inode,
+PGID/SID launcher сняты без сигналов; group=session=PID496816. После terminal
+результата сравнить эту live identity с сохранённой identity в process cleanup,
+не объявляя расхождение заранее. Manifest закрепляет effective timeout cohort
+1800000ms: task override30 минут, global default900000ms; `taskTimeoutMs` в
+frozen harness выбирает explicit override → task → global. Ожидание результата
+продолжается на том же handle81639; причина задержки пока UNKNOWN.
