@@ -237,17 +237,51 @@ def package_graph(attempt_dir, node_id=None, source_path=None, empty=False):
             and not imports[0]['inputs'] and len(imports[0]['outputs']) == 1, 'graph: persisted import owner/source differs')
 
 
+def settled_receipt(calls, call):
+    receipts = [row for row in calls if row['result'].get('operation_id') == call['input']['operation_id']]
+    require(receipts and receipts[-1]['result'].get('state') == 'settled'
+        and (receipts[-1] == call or after(receipts[-1], call)), 'sequence: settled receipt required')
+    require(all(row['result'].get('status') not in ('AMBIGUOUS', 'TIMED_OUT') for row in receipts), 'sequence: unknown effect preserved')
+    return receipts[-1]
+
+
+def known_refusal(call, calls, events, workspace):
+    result = settled_receipt(calls, call)['result']
+    require(result.get('status') in ('FAILED', 'NOT_APPLIED') and result.get('cleanup_complete') is True
+        and result.get('execution', {}).get('status') == 'not_requested'
+        and result.get('execution', {}).get('execution_id') is None
+        and result.get('error', {}).get('code') == 'NODE_APPLY_STOPPED'
+        and result.get('error', {}).get('message'), 'diagnostic: known refusal before Execute required')
+    node = result.get('node', {})
+    require(node.get('document_id') == workspace['document_id'] and node.get('workflow_id') == workspace['workflow_ref']['workflow_id']
+        and node.get('node_id'), 'diagnostic: owned refusal node required')
+    rows = [event for event in events if event.get('operation_id') == call['input']['operation_id']]
+    refused = [event.get('receipt', {}) for event in rows if event.get('phase') == 'node_phase_refused']
+    require(len(refused) == 1 and refused[0].get('phase') == 'configure' and refused[0].get('status') == 'FAILED'
+        and refused[0].get('verification') in ('text_import_binding_draft_discarded', 'text_import_readiness_draft_discarded', 'text_import_initial_settings_draft_discarded')
+        and refused[0].get('settings_unchanged') is True and refused[0].get('cleanup_complete') is True, 'diagnostic: native draft refusal required')
+    closed = refused[0].get('proof', {}).get('closed', {})
+    context = closed.get('node_context', {})
+    require(closed.get('verified') is True and closed.get('cleanup_complete') is True and closed.get('draft_discarded') is True
+        and closed.get('settings_applied') is False and closed.get('execution_started') is False
+        and context.get('verified') is True and context.get('surface') == 'graph'
+        and all(context.get(key) == node.get(key) for key in ('document_id', 'workflow_id', 'node_id')), 'diagnostic: owned draft cleanup required')
+    require(not any(event.get('receipt', {}).get('phase') == 'execute' or
+        event.get('action', {}).get('verb') in ('execute_wizard', 'execute_node', 'launch_graph') for event in rows), 'diagnostic: Execute forbidden')
+    return result
+
+
 def positive(spec, task_dir, attempt_dir, calls, events, workspace, transfers, package_path):
     applies = [call for call in calls if call['tool'].endswith('node_apply')]
-    require(len(applies) == 1, 'sequence: one import apply required')
-    call = applies[0]
+    correction = spec['id'] in ('missing-source-path-correction', 'txt-six-to-five-correction', 'csv-delimiter-correction')
+    require(len(applies) == (2 if correction else 1), 'sequence: exact import apply count required')
+    call = applies[-1]
     request_owner(call, workspace, transfers[0])
     request = call['input']
-    require(request.get('target', {}).get('kind') == 'new' and request['target'].get('type') == 'imports.text'
+    require(request.get('target', {}).get('kind') == ('existing' if correction else 'new') and request['target'].get('type') == 'imports.text'
         and request.get('finish') == 'execute', 'import: new executing import required')
-    settled = [row for row in calls if row['result'].get('operation_id') == request['operation_id'] and row['result'].get('state') == 'settled']
-    require(settled and after(settled[-1], call) or settled and settled[-1] == call, 'sequence: settled receipt required')
-    result = settled[-1]['result']
+    settled = settled_receipt(calls, call)
+    result = settled['result']
     require(result.get('status') == 'SUCCEEDED' and result.get('cleanup_complete') is True, 'import: known success/cleanup required')
     node = result.get('node', {})
     require(node.get('document_id') == workspace['document_id'] and node.get('workflow_id') == workspace['workflow_ref']['workflow_id']
@@ -261,6 +295,23 @@ def positive(spec, task_dir, attempt_dir, calls, events, workspace, transfers, p
     configuration_matches(spec, readback, path)
     configurations = request.get('parameters', {}).get('settings', {})
     configuration_matches(spec, configurations, path)
+    if correction:
+        first = applies[0]
+        request_owner(first, workspace, transfers[0])
+        require(first['input'].get('target', {}).get('kind') == 'new' and first['input']['target'].get('type') == 'imports.text'
+            and first['input'].get('finish') == 'execute', 'sequence: first new import required')
+        refused = known_refusal(first, calls, events, workspace)
+        require(refused.get('node') == node and request['target'].get('ref') == node
+            and first['input']['operation_id'] != request['operation_id'] and after(call, settled_receipt(calls, first)),
+            'sequence: same GUID after known refusal required')
+        initial = first['input'].get('parameters', {}).get('settings', {})
+        if spec['id'] == 'missing-source-path-correction':
+            require('source_path' not in initial.get('source', {}) and initial.get('columns') == spec['columns'], 'sequence: first source_path omission required')
+        if spec['id'] == 'txt-six-to-five-correction':
+            require(len(initial.get('columns', [])) == 6 and initial['columns'][-1].get('name') == 'Extra', 'sequence: initial sixth Extra field required')
+        if spec['id'] == 'csv-delimiter-correction':
+            require(initial.get('format', {}).get('delimiter') == ',' and len(initial.get('columns', [])) == 5, 'sequence: first comma/5 fields required')
+        rows = [event for event in events if event.get('operation_id') == first['input']['operation_id']]
     graphs = [row.get('target_state', {}) for row in rows if row.get('phase') == 'node_target_checkpoint'
         and row.get('target_state', {}).get('completed') is True]
     require(graphs and graphs[-1].get('result', {}).get('created') is True, 'sequence: original creation proof required')
@@ -270,7 +321,7 @@ def positive(spec, task_dir, attempt_dir, calls, events, workspace, transfers, p
     expected = json.loads((task_dir / spec['oracle_recipe'][0]['expected']).read_text())
     compare(expected, typed_table(result))
     saves = [row for row in calls if row['tool'].endswith('action_run') and row['input'].get('action_key') == 'package.save_checkpoint'
-        and after(row, settled[-1]) and row['result'].get('status') == 'SUCCEEDED' and row['result'].get('cleanup_complete') is True]
+        and after(row, settled) and row['result'].get('status') == 'SUCCEEDED' and row['result'].get('cleanup_complete') is True]
     require(saves and saves[-1]['result'].get('output', {}).get('save_completed') is True
         and saves[-1]['result']['output'].get('workflow_preserved') is True
         and saves[-1]['input'].get('parameters', {}).get('path') == saves[-1]['result']['output'].get('package_ref', {}).get('path')

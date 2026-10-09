@@ -53,7 +53,8 @@ async function positiveFixture(id = "txt-comma-utf8") {
   const task = path.join(root, id), attempt = path.join(root, "attempt")
   await cp(path.join(evalsRoot, "drafts/text-import", id), task, { recursive: true })
   const spec = await Bun.file(path.join(task, "SPEC.json")).json()
-  const expected = await Bun.file(path.join(task, spec.oracle_recipe[0].expected)).json()
+  const expected = spec.oracle_recipe.length ? await Bun.file(path.join(task, spec.oracle_recipe[0].expected)).json()
+    : { schema: spec.columns, row_count: 0, rows: [] }
   const file = spec.inputs[0], destination = `/eval/${path.basename(file.path)}`
   const node = { document_id: "doc", workflow_id: "flow", node_id: "node" }
   const workspace = { status: "READY", ownership_verified: true, loginom_account: "eval",
@@ -107,7 +108,7 @@ p=pathlib.Path(sys.argv[1]);data=b'<Root xmlns:xsi="http://www.w3.org/2001/XMLSc
 (p/'unpacked/Unit_1').mkdir(parents=True);(p/'unpacked/Unit_1/Unit.xml').write_bytes(data)
 with zipfile.ZipFile(p/'package.lgp','w') as z:z.writestr('Unit_1/Unit.xml',data)`, path.join(attempt, "artifact")], { stdout: "pipe", stderr: "pipe" })
   expect(await pack.exited).toBe(0)
-  return { root, task, attempt, calls, output, port, events, write }
+  return { root, task, attempt, calls, apply, output, port, events, write }
 }
 
 test("text import checks full typed warm data and raw native settings", async () => {
@@ -117,5 +118,31 @@ test("text import checks full typed warm data and raw native settings", async ()
     f.port.sample[0][0].value = "1"
     await f.write()
     expect((await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).failures.join(" ")).toContain("VALUES")
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("text import preserves a known first refusal and corrects the same GUID exactly once", async () => {
+  const f = await positiveFixture("csv-delimiter-correction")
+  try {
+    const original = JSON.parse(JSON.stringify(f.calls[2]))
+    original.input.operation_id = "refused"
+    original.input.parameters.settings.format.delimiter = ","
+    original.output = { operation_id: "refused", state: "settled", status: "FAILED", cleanup_complete: true,
+      node: f.output.node, execution: { status: "not_requested", execution_id: null },
+      error: { code: "NODE_APPLY_STOPPED", message: "Requested column count 5 differs from observed 1" } }
+    f.calls.splice(2, 0, original)
+    const corrected = f.apply
+    Object.assign(corrected.input, { target: { kind: "existing", type: "imports.text", ref: f.output.node } })
+    f.events[0]!.operation_id = "refused"
+    f.events.push(JSON.parse(JSON.stringify({ operation_id: "refused", phase: "node_phase_refused",
+      receipt: { phase: "configure", status: "FAILED", verification: "text_import_binding_draft_discarded",
+        effect_possible: true, cleanup_complete: true, settings_unchanged: true,
+        proof: { closed: { verified: true, cleanup_complete: true, draft_discarded: true, settings_applied: false,
+          execution_started: false, node_context: { ...f.output.node, verified: true, surface: "graph", locked: false } } } } })))
+    await f.write()
+    expect(await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).toEqual({ errors: [], failures: [] })
+    Object.assign(corrected.input.target, { ref: { ...f.output.node, node_id: "other" } })
+    await f.write()
+    expect((await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).failures.join(" ")).toContain("same")
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
