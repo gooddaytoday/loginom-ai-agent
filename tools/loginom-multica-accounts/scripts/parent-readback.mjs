@@ -98,13 +98,14 @@ export function createParentRequest({directory, issueId, operationId, source, st
 }
 
 export function verifyParentEnvelope(request, response) {
-  const capture = ['before-operation', 'while-connected'].includes(request?.phase);
+  const historical = request?.phase === 'historical-reconciliation';
+  const capture = historical || ['before-operation', 'while-connected'].includes(request?.phase);
   if (request?.schema !== 'lab53-parent-readback-request-v1' || (!capture && request.phase !== 'post-cleanup')
     || !isUUID(request.issue_id) || !isUUID(request.operation_id) || !isHash(request.nonce)
     || !Number.isFinite(time(request.after)) || !isSHA(request.source?.sha) || !isSHA(request.source.tree)
     || !isHash(request.source.manifest_sha256)
     || (!capture && (!isHash(request.cleanup_sha256) || !isHash(request.logout_sha256) || !request.effects?.length))
-    || request.configs?.length !== 3 || !Array.isArray(request.effects)
+    || request.configs?.length !== (historical ? 7 : 3) || !Array.isArray(request.effects)
     || response?.schema !== 'lab53-parent-readback-response-v1'
     || response.issue_id !== request.issue_id || response.operation_id !== request.operation_id
     || response.nonce !== request.nonce || response.request_sha256 !== hash(JSON.stringify(request))

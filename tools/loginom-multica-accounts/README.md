@@ -56,7 +56,7 @@ cleanup does not extend the original deadline. A successful UI component returns
 fresh complete rows/counts/packages, observer calibration and exact own effects.
 It is a component validator, not live authorization.
 
-The bounded production implementation is present behind the closed gates.
+The fixed qualification-coordinator.py / qualify-preparation.mjs production entry is separate from the closed ordinary gates. It checks source, owner/config binding, real parent lineage, four inherited OFDs and seccomp; direct or invalid admission fails. See parent-readback-plan.md for the exact commands.
 `preparation-runtime.mjs` uses a fixed private before/during capture provider,
 never an arbitrary callback. Admin positive/causal capture occurs before Users
 or provisioning. Both admin effects and the worker/reviewer effects contribute
@@ -68,7 +68,7 @@ permanent-lock/writer identity before preserving original marker bytes in histor
 Only the fully proved pair transition writes `account_state=ready`; partial UI,
 process, logout or server facts cannot reach it. A ready-write failure retains
 history and restores original values under UNKNOWN markers. Unbound historical
-legacy markers always block; they are not repaired or archived by this route.
+legacy markers always block preparation. The separate owner-reconcile.py route requires new held-lock process/FD/config/marker proof and a fresh bound parent account-bucket response before original-byte archival; missing provenance remains UNKNOWN.
 
 The child inherits a kernel seccomp barrier installed in its isolated supervisor
 which forbids all flock syscalls, including unlock/relock on duplicated FDs.

@@ -35,7 +35,8 @@ def run_foreground(command, guards, evidence_dir, timeout=300, stop_timeout=10, 
     module_spec.loader.exec_module(supervisor)
     directory = new_evidence_directory(evidence_dir)
     descriptors = tuple(guard['fd'] for guard in guards)
-    read_only_collector = not descriptors and len(command) >= 2 and Path(command[1]).resolve() == Path(__file__).with_name('finalize-preparation.mjs').resolve()
+    read_only_collector = not descriptors and len(command) >= 2 and Path(command[1]).resolve() in {
+        Path(__file__).with_name(name).resolve() for name in ['finalize-preparation.mjs', 'historical-readback.mjs']}
     if (not descriptors and not read_only_collector) or len(set(descriptors)) != len(descriptors):
         raise RuntimeError('ACCOUNT_FD_BINDING_INVALID')
     for guard in guards:
@@ -152,13 +153,12 @@ def finish_qualified_pair(context, configs, operation, verify_file, proof_file, 
     spec = importlib.util.spec_from_file_location('account_owner_archive', Path(__file__).with_name('owner-archive.py'))
     owner = importlib.util.module_from_spec(spec); spec.loader.exec_module(owner)
     snapshots = [private_snapshot(path) for path in [context['operator_path'], *configs]]
-    # Archive only exact canonical effects of this operation, under the same
-    # retained permanent OFDs. Historical legacy ownership remains UNKNOWN.
-    for name, guard in context['guards'].items():
-        owner.archive_owned(guard, markers[name], snapshots, operation, verify_file, proof_file, processes,
-                            context['evidence_dir'] / ('history-' + guard['role']))
-    before = {path: read_private(path) for path in configs}
+    before = {Path(item['path']): item['data'] for item in snapshots[1:]}
     try:
+        # The entire archive/ready transaction is covered by failure handling.
+        for name, guard in context['guards'].items():
+            owner.archive_owned(guard, markers[name], snapshots, operation, verify_file, proof_file, processes,
+                                context['evidence_dir'] / ('history-' + guard['role']))
         for path, config in before.items(): write_private(path, {**config, 'account_state': 'ready'})
         current = [private_snapshot(path) for path in configs]
         for snapshot in current:
@@ -169,14 +169,23 @@ def finish_qualified_pair(context, configs, operation, verify_file, proof_file, 
             for item in current], 'changed_keys': ['account_state'], 'server_absence': 'BOUND_FINAL_PROOF'})
         return {'status': 'PAIR_QUALIFIED', 'ready': True, 'operation_id': operation['operation_id'], 'receipt': str(receipt)}
     except BaseException:
-        # All guards remain held. Restore original values, retain archived
-        # history and create new UNKNOWN owner-transition markers to block any
-        # partial ready state/reuse. This never deletes historical evidence.
-        updated = [private_snapshot(path) for path in [context['operator_path'], *configs]]
-        for name, guard in context['guards'].items():
-            guard['configs'] = updated
-            begin_account_effect(guard, operation['issue_id'], guard['role'], operation['operation_id'], operation['source']['sha'])
+        # All guards remain held. Restore the exact original UNKNOWN inodes and
+        # bytes from immutable history, and restore the planned config values.
         failures = []
+        for name, guard in context['guards'].items():
+            for item in markers[name]:
+                path = Path(item['path'])
+                archived = context['evidence_dir'] / ('history-' + guard['role']) / (path.name + '-' + operation['operation_id'])
+                try:
+                    retained = path if path.exists() else archived
+                    stat = retained.lstat()
+                    if retained.is_symlink() or (stat.st_dev, stat.st_ino, hashlib.sha256(retained.read_bytes()).hexdigest()) != (
+                            item['device'], item['inode'], item['sha256']): raise RuntimeError('ACCOUNT_UNKNOWN_RESTORE_UNCONFIRMED')
+                    if not path.exists(): os.link(archived, path, follow_symlinks=False)
+                    fd = os.open(path.parent, os.O_RDONLY)
+                    try: os.fsync(fd)
+                    finally: os.close(fd)
+                except Exception as error: failures.append(type(error).__name__)
         for path, config in before.items():
             try: write_private(path, config)
             except Exception as error: failures.append(type(error).__name__)
@@ -311,10 +320,16 @@ def prepare_pair(issue, operator_path, directory, previous_processes, evidence_d
     authorization = parent_binding['data']
     if authorization.get('issue_id') != issue or authorization.get('operation_id') != attempt or authorization.get('source') != source:
         raise RuntimeError('PRIVATE_PARENT_BINDING_REQUIRED')
+    config_paths = [operator_path, *[Path(directory) / issue / (role + '.json') for role in ['worker', 'reviewer']]]
+    initial = [private_snapshot(path) for path in config_paths]
+    config_bindings = [{key: item[key] for key in ['path', 'device', 'inode', 'sha256']} for item in initial]
+    if authorization.get('configs') != config_bindings: raise RuntimeError('PRIVATE_PARENT_CONFIG_BINDING_REQUIRED')
     with preparation_guard(issue, operator_path, directory, previous_processes, evidence_dir, lock_directory) as context:
         configs = allocate(issue, operator_path, directory, held_pair=context['pair_guard'])
         context['operator_path'] = operator_path
         current_configs = [private_snapshot(operator_path), *[private_snapshot(config) for config in configs]]
+        if [{key: item[key] for key in ['path', 'device', 'inode', 'sha256']} for item in current_configs] != config_bindings:
+            raise RuntimeError('PRIVATE_PARENT_CONFIG_BINDING_REQUIRED')
         for guard in context['guards'].values():
             for before in guard['configs']:
                 after = next(item for item in current_configs if item['path'] == before['path'])
@@ -333,17 +348,19 @@ def prepare_pair(issue, operator_path, directory, previous_processes, evidence_d
         guards = [context['pair_guard'], *context['guards'].values()]
         operation = {'schema': 'lab53-preparation-operation-v1', 'issue_id': issue, 'operation_id': attempt,
             'source': source, 'stand': context['operator']['url'], 'expected_observer': authorization['expected_observer'],
+            'configs': config_bindings,
             'parent_authorization': {key: parent_binding[key] for key in ['path', 'device', 'inode', 'sha256']}}
         operation_file = append_evidence(context['evidence_dir'], operation)
         receipts, processes = [], []
         for config in configs:
             evidence = context['evidence_dir'] / config.stem
-            command = [context['operator']['node'], Path(__file__).with_name('provision-account.mjs'),
+            command = [context['operator']['node'], Path(__file__).with_name('qualify-preparation.mjs'),
                 '--config', config, '--operator', operator_path, '--pair-worker', configs[0], '--pair-reviewer', configs[1],
                 '--evidence-dir', evidence, '--operation-file', operation_file]
             audit = {'schema': 'parent-held-audited-harness-v1', 'source_sha': source_sha,
-                'manifest_sha256': source['manifest_sha256'], 'entrypoint': 'provision-account.mjs',
-                'parent': process_identity(os.getpid())}
+                'manifest_sha256': source['manifest_sha256'], 'entrypoint': 'qualify-preparation.mjs',
+                'parent': process_identity(os.getpid()), 'parent_command_sha256': hashlib.sha256(json.dumps(
+                    Path('/proc/self/cmdline').read_bytes().decode().split('\0')[:-1], separators=(',', ':')).encode()).hexdigest()}
             if run_foreground(command, guards, evidence, operation_binding={
                     'issue_id': issue, 'operation_id': attempt, 'source_sha': source_sha},
                     guard_barrier=True, harness_audit=audit):
@@ -396,8 +413,8 @@ def prepare_pair(issue, operator_path, directory, previous_processes, evidence_d
             'responseFile': str(response), 'expected': expected})
         if run_foreground([*collector, 'verify', verify_file], [], final / 'verify-collector', timeout=10):
             raise RuntimeError('FINAL_SERVER_READBACK_UNKNOWN')
-        # Reachable only after public gate admission and ALL strict proofs. No
-        # receipt/config flag opens either unconditional gate in this candidate.
+        # Reachable only through the fixed qualification coordinator and ALL
+        # strict proofs. Ordinary public gates remain unconditional.
         return finish_qualified_pair(context, configs, operation, verify_file, final / 'final-proof.json', markers, processes)
 
 

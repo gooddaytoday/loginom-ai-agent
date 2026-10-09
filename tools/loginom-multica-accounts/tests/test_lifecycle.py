@@ -194,7 +194,7 @@ assert os.waitpid(pid,0)[1]==0
             operation = {'issue_id': self.issue, 'operation_id': attempt, 'source': source, 'stand': 'about:blank', 'expected_observer': expected}
             operation_file = context['evidence_dir'] / 'operation.json'; write_private(operation_file, operation)
             audit = {'schema': 'parent-held-audited-harness-v1', 'source_sha': source_sha,
-                'manifest_sha256': source['manifest_sha256'], 'entrypoint': 'provision-account.mjs', 'parent': process_identity(os.getpid())}
+                'manifest_sha256': source['manifest_sha256'], 'entrypoint': 'qualify-preparation.mjs', 'parent': process_identity(os.getpid())}
             responder = subprocess.Popen([sys.executable, SCRIPTS.parent / 'tests/parent-fixture.py', context['evidence_dir'], mode])
             responder_record = process_identity(responder.pid)
             old = os.environ.get('LAB53_FIXTURE_DEPENDENCIES'); os.environ['LAB53_FIXTURE_DEPENDENCIES'] = str(dependencies_file)
@@ -208,7 +208,7 @@ assert os.waitpid(pid,0)[1]==0
                     extra = read_private(directory / 'fixture-browser.json').get('observed_processes', []) if (directory / 'fixture-browser.json').exists() else []
                     write_private(Path(os.environ['LAB53_PROCESS_RECEIPT_DIR']) / ('linked-start-' + mode + '.json'),
                         {'processes': saved['processes'] + extra + [responder_record]})
-                self.assertEqual(result, 0 if mode in ['normal', 'readback', 'ready-write-failure', 'archive-stale'] else 1,
+                self.assertEqual(result, 0 if mode in ['normal', 'readback', 'ready-write-failure', 'archive-stale', 'archive-second-fault'] else 1,
                     (directory / 'stderr.log').read_text()[-3500:])
                 if mode == 'identity': self.assertIn('FINAL_SERVER_READBACK_INCOMPLETE', (directory / 'stderr.log').read_text())
                 if mode == 'rights': self.assertIn('ACCOUNT_RIGHTS_UNCONFIRMED', (directory / 'stderr.log').read_text())
@@ -218,7 +218,7 @@ assert os.waitpid(pid,0)[1]==0
                 browser = read_private(directory / 'fixture-browser.json')
                 self.assertEqual(browser['network_requests'], 0); self.assertTrue(browser['sandbox'])
                 self.assert_absent(browser['observed_processes'])
-                if mode in ['normal', 'readback', 'ready-write-failure', 'archive-stale']:
+                if mode in ['normal', 'readback', 'ready-write-failure', 'archive-stale', 'archive-second-fault']:
                     completion = read_private(directory / 'ui-completion.json'); receipts = completion['receipts']
                     self.assertEqual([item['role'] for item in receipts], ['admin', 'worker', 'admin', 'reviewer'])
                     self.assertTrue(all(item['logout']['transport_disconnected'] for item in receipts))
@@ -270,6 +270,28 @@ assert os.waitpid(pid,0)[1]==0
                                 provision.finish_qualified_pair(context, configs, operation, verify_file, proof_file, all_markers, cleanup['processes'])
                             for path, original in original_configs.items(): self.assertEqual(read_private(path), original)
                             self.assertTrue(all(Path(path).exists() for path in marker_bytes))
+                        elif mode == 'archive-second-fault':
+                            calls = 0; original_link = os.link
+                            def fail_second_archive(source, destination, **kwargs):
+                                nonlocal calls
+                                if 'history-' in str(destination):
+                                    calls += 1
+                                    if calls == 2: raise OSError('synthetic second archive failure')
+                                return original_link(source, destination, **kwargs)
+                            with patch.object(os, 'link', fail_second_archive):
+                                with self.assertRaisesRegex(OSError, 'synthetic second archive failure'):
+                                    provision.finish_qualified_pair(context, configs, operation, verify_file, proof_file, all_markers, cleanup['processes'])
+                            self.assertEqual(calls, 2)
+                            for path, original in original_configs.items(): self.assertEqual(read_private(path), original)
+                            for entries in all_markers.values():
+                                for entry in entries:
+                                    p = Path(entry['path'])
+                                    self.assertEqual(p.read_bytes(), marker_bytes[str(p)])
+                                    self.assertEqual(p.stat().st_ino, entry['inode'])
+                                    self.assertEqual(read_private(p)['state'], 'UNKNOWN')
+                            failure = next(read_private(p) for p in context['evidence_dir'].glob('event-*.json')
+                                if read_private(p).get('phase') == 'pair-qualified-write-failed')
+                            self.assertEqual(failure['restore_failures'], [])
                         elif mode == 'ready-write-failure':
                             calls = 0; original_write = provision.write_private
                             def fail_second_ready(path, data):
@@ -292,7 +314,7 @@ assert os.waitpid(pid,0)[1]==0
                             self.assertFalse(any(Path(path).exists() for path in marker_bytes))
                         for guard in context['guards'].values():
                             history = context['evidence_dir'] / ('history-' + guard['role'])
-                            if mode != 'archive-stale':
+                            if mode not in ['archive-stale', 'archive-second-fault']:
                                 self.assertEqual(len(list(history.iterdir())), 1)
                                 self.assertIn(next(history.iterdir()).read_bytes(), marker_bytes.values())
                             self.assertTrue(Path(guard['path']).exists())
@@ -315,6 +337,7 @@ assert os.waitpid(pid,0)[1]==0
     def test_fixed_harness_incomplete_logout_stays_unknown(self): self.run_linked_harness('logout')
     def test_fixed_harness_incomplete_final_readback_stays_unknown(self): self.run_linked_harness('readback')
     def test_ready_write_failure_preserves_history_and_blocks_partial_pair(self): self.run_linked_harness('ready-write-failure')
+    def test_first_archive_success_second_link_failure_restores_exact_unknown_markers_and_planned_pair(self): self.run_linked_harness('archive-second-fault')
     def test_recreated_marker_cannot_reuse_an_earlier_same_operation_proof(self): self.run_linked_harness('archive-stale')
     def test_timeout_cleans_exact_children_without_erasing_unknown(self): self.run_child('timeout')
     def test_cancel_cleans_exact_children_without_erasing_unknown(self): self.run_child('cancel')

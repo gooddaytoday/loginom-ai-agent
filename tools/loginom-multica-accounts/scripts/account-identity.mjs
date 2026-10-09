@@ -99,7 +99,7 @@ export function verifyCausalCapture({binding, before, during, childBefore, child
     || trace.guard_audit?.schema !== 'parent-held-audited-harness-v1'
     || !isHash(trace.guard_audit.receipt_sha256) || !isHash(trace.guard_audit.manifest_sha256)
     || trace.guard_audit.source_sha !== binding.source_sha
-    || trace.guard_audit.entrypoint !== 'provision-account.mjs'
+    || trace.guard_audit.entrypoint !== 'qualify-preparation.mjs'
     || !Number.isSafeInteger(trace.guard_audit.parent?.pid) || !/^\d+$/.test(trace.guard_audit.parent?.start_ticks)
     || trace.config_sha256 !== binding.config_sha256)
     fail('CAUSAL_CONTINUITY_UNCONFIRMED');

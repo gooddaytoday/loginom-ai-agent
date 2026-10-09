@@ -8,8 +8,8 @@ import {makePrivateCaptureHarness} from './capture-harness.mjs';
 import {privatePath, savePrivateArtifact} from './parent-readback.mjs';
 import {trackVendorSources} from './vendor-provenance.mjs';
 
-// Internal production implementation, called only after the unconditional
-// public gate. Fixtures exercise the same adapters on isolated offline pages.
+// Internal production implementation, called by the fixed guarded qualification
+// child. Ordinary public gates stay closed. Offline fixtures use isolated pages.
 export async function runUIPreparation({configFile, operatorFile, configsFiles, evidenceDir, operationFile}) {
   for (const path of [configFile, operatorFile, operationFile, ...configsFiles]) privatePath(path);
   const operator = JSON.parse(readFileSync(operatorFile));

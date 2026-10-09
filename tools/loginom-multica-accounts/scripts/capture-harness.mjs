@@ -16,7 +16,7 @@ const live = record => {
 export function verifyHarnessGuards(envelope, operation) {
   const audit = envelope.audit;
   if (audit?.schema !== 'parent-held-audited-harness-v1' || audit.source_sha !== operation.source.sha
-    || audit.manifest_sha256 !== operation.source.manifest_sha256 || audit.entrypoint !== 'provision-account.mjs'
+    || audit.manifest_sha256 !== operation.source.manifest_sha256 || audit.entrypoint !== 'qualify-preparation.mjs'
     || !Number.isSafeInteger(audit.parent?.pid) || !/^\d+$/.test(audit.parent?.start_ticks)) fail('CAPTURE_GUARD_AUDIT_UNKNOWN');
   live(audit.parent);
   const root = dirname(dirname(new URL(import.meta.url).pathname));
@@ -50,9 +50,17 @@ export function verifyHarnessGuards(envelope, operation) {
     || hash(JSON.stringify(command)) !== proof.command_sha256 || JSON.stringify(command) !== JSON.stringify(proof.command))
     fail('CAPTURE_PARENT_PROVENANCE_UNKNOWN');
   const entrypoint = command[1];
-  const production = join(root, 'scripts/provision-account.mjs');
+  const production = join(root, 'scripts/qualify-preparation.mjs');
   const fixture = join(root, 'tests/linked-harness.mjs');
   if (![production, fixture].includes(entrypoint)) fail('CAPTURE_FIXED_HARNESS_REQUIRED');
+  if (entrypoint === production) {
+    const parentCommand = readFileSync(`/proc/${audit.parent.pid}/cmdline`, 'utf8').split('\0').filter(Boolean);
+    if (parentCommand[1] !== join(root, 'scripts/qualification-coordinator.py')
+      || hash(JSON.stringify(parentCommand)) !== audit.parent_command_sha256)
+      fail('CAPTURE_FIXED_COORDINATOR_REQUIRED');
+    if (envelope.guards.length !== 4 || new Set(envelope.guards.map(g => g.fd)).size !== 4)
+      fail('CAPTURE_GUARD_AUDIT_UNKNOWN');
+  }
   for (const pid of [process.pid, proof.supervisor.pid]) {
     const status = readFileSync(`/proc/${pid}/status`, 'utf8');
     if (!/^NoNewPrivs:\s+1$/m.test(status) || !/^Seccomp:\s+2$/m.test(status)) fail('CAPTURE_FLOCK_BARRIER_UNKNOWN');
@@ -65,7 +73,7 @@ export function verifyHarnessGuards(envelope, operation) {
   }
   return {...audit, receipt_sha256: hash(raw), barrier_program_sha256: proof.program_sha256,
     executed_entrypoint: entrypoint, executed_entrypoint_sha256: hash(readFileSync(entrypoint)),
-    execution_kind: entrypoint === production ? 'production-gated' : 'offline-fixture'};
+    execution_kind: entrypoint === production ? 'production-qualification' : 'offline-fixture'};
 }
 
 export async function awaitPrivateResponse(directory, name, diagnostics) {

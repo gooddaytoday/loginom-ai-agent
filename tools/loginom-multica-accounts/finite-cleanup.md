@@ -86,3 +86,12 @@ facts and cannot replace server proof.
 LAB48 TimeoutError cause remains NOT_ESTABLISHED. LAB45 reconstructed source is
 not executed-byte evidence. The common source fixes candidate selection and
 diagnostic loss; offline tests do not retroactively identify either error.
+
+The fixed source-hashed qualification coordinator now has a distinct guarded
+child entry: qualification-coordinator.py -> qualify-preparation.mjs. Ordinary
+public gates remain unchanged. Exact production before-request/cancellation is
+checked without creating a browser/login. The separate legacy owner route and
+its fresh privileged FD/parent handoff are documented in parent-readback-plan.md.
+Full bounded live qualification remains NOT_RUN; no historical proof activates
+new operations. Archive/ready rollback covers mkdir/link/fsync/config writes and
+restores original UNKNOWN bytes/inodes under the same held guards.

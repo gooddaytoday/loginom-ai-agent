@@ -673,7 +673,7 @@ function causalCase() {
     receipt_sha256: syntheticHash('synthetic-continuity-fixture'), transport_count: 1, disconnects: 0, reconnects: 0,
     native_lifetime: {connected: true, disposed: false, do_connect_count: 1, connect_to_server_count: 1, reconnect_count: 0,
       events: [{kind: 'call', name: 'DoConnect'}, {kind: 'call', name: 'ConnectToServer'}]},
-    guard_audit: {schema: 'parent-held-audited-harness-v1', source_sha: binding.source_sha, entrypoint: 'provision-account.mjs', receipt_sha256: syntheticHash('audit'), manifest_sha256: syntheticHash('manifest'), parent: {pid: 1, start_ticks: '1'}}, account_lock: binding.account_lock, config_sha256: binding.config_sha256}};
+    guard_audit: {schema: 'parent-held-audited-harness-v1', source_sha: binding.source_sha, entrypoint: 'qualify-preparation.mjs', receipt_sha256: syntheticHash('audit'), manifest_sha256: syntheticHash('manifest'), parent: {pid: 1, start_ticks: '1'}}, account_lock: binding.account_lock, config_sha256: binding.config_sha256}};
   return {binding, before, during, childBefore, childAfter};
 }
 test('matching native counters without observed native events cannot qualify continuity', () => {

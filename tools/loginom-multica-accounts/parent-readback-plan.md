@@ -2,7 +2,7 @@
 
 Status: source candidate for independent review; runtime qualification NOT_RUN.
 Both public entrypoints unconditionally stop with BLOCKED_FINITE_SERVER_CLEANUP.
-No receipt, input flag or config enables a Loginom operation. Installed helpers
+No receipt, input flag or config opens an ordinary entrypoint. The separate fixed qualification entry requires the complete source/owner/guard admission described below. Installed helpers
 are unchanged. Historical LAB45/LAB48 remain NOT_RECONCILED.
 
 ## Private parent handoff
@@ -21,6 +21,7 @@ Before future admission, the parent supplies a private 0600 authorization:
 {
   "issue_id": "<LAB53 UUID>", "operation_id": "<new UUID>",
   "source": {"sha": "<clean published SHA40>", "tree": "<tree SHA40>", "manifest_sha256": "<VERSION digest>"},
+  "configs": [{"path": "<operator absolute path>", "device": 1, "inode": 1, "sha256": "<SHA256>"}, "<worker binding>", "<reviewer binding>"],
   "expected_observer": {
     "user_hash": "<SHA256>", "guid_hash": "<SHA256 exact UTF8 GUID string>",
     "session_id": 1, "create_time": "<exact ISO UTC>",
@@ -133,12 +134,15 @@ It never invents a numeric RemoteSession getter or treats opaque objectId as GUI
    retains history and UNKNOWN markers, attempts to restore original config
    values and records restoration failures; it never reports qualification.
 
-The owner archival route cannot bind historical legacy attempts with missing
-ownership facts. They remain blocked/immutable, including LAB45 executed-helper
-and LAB48 original numeric/CreateTime/Timeout-cause gaps. The separate historical
-account-bucket validator requires independently proven exact GUID hash algorithm
-and never substitutes for the new ID/CreateTime/GUID validator or archives state.
-Historical snapshots3123/3128 are inputs only, not fresh operation responses.
+A separate `owner-reconcile.py` route handles ONLY the two exact retained
+LAB45/LAB48 marker byte hashes. It does not change old UNKNOWN facts or pretend
+that missing numeric/CreateTime/helper/start/Timeout-cause facts were captured.
+It requires a positively bound current sole owner account bucket, a different
+comparable exact-string GUID, independently audited retained collector execution
+and algorithm provenance, and a NEW operation-bound parent response. A missing
+collector/source/task-chain binding returns HISTORICAL_*_NOT_ESTABLISHED before
+any archive. This route cannot silently use a reconstructed helper as executed
+collector proof. Historical snapshots3123/3128 remain inputs only.
 
 ## Independent qualification required
 
@@ -164,20 +168,81 @@ operation/source/observer/phase/freshness and writes once. Returning the private
 response through the existing supplement/SSH handoff adds no callable endpoint.
 Never include raw inventory, GUID, configs or credentials in a public comment.
 
-The future production coordinator interface is `prepare_pair(issue,
-operator_path, directory, previous_processes, evidence_dir, source_sha,
-parent_binding_file=authorization_path, operation_id=new_uuid)`. It implements
-the full guarded operation and final admission transition; the public CLI gates
-remain unconditional in this source result. Direct invocation is NOT authorized
-now. A subsequent independently admitted qualification must use this exact
-reviewed source and complete parent bridge, with its entry/admission audited;
-there is no flag waiver or historical-receipt shortcut. Offline callers use
-isolated test files, never the real paths. Root's current local59 PID/FD receipt
-is historical input, not the required new held-flock proof or final response.
+The executable qualification interface is fixed and source-hashed:
+
+```sh
+python3 /ABS/ACCOUNT_HELPER/scripts/qualification-coordinator.py --issue ISSUE_UUID --operator /PRIVATE/operator.json --directory /PRIVATE/cards --previous-processes /PRIVATE/previous.json --evidence-dir /PRIVATE/new-operation --source-sha CLEAN_SHA --operation-id NEW_UUID --parent-binding-file /PRIVATE/authorization.json
+```
+
+It validates the clean SHA/tree/VERSION and private operation/observer plus
+ALL THREE config path/device/inode/hash bindings before guarded effects. Role
+configs must already exist; this route does not secretly allocate a new admin.
+It invokes ONLY `qualify-preparation.mjs` under the fixed subreaper and kernel
+flock barrier. The child verifies its real direct supervisor, actual coordinator
+PID/start_ticks/command hash, all four inherited and parent-held OFDs, seccomp,
+source/manifest and exact owner/config binding BEFORE dependency/browser work.
+Direct child invocation or missing/invalid binding/guards/lineage fails UNKNOWN.
+No env, ready/PASS boolean, arbitrary executable, flag or runtime source patch
+opens this path. Ordinary `provision-accounts.py` / `provision-account.mjs`
+remain unconditionally gated. The SAME reviewed source can execute bounded
+qualification; only all-effects proof completes its pair-ready transition.
+This turn runs source/offline checks only, not this command on real accounts.
+
+The historical owner route is executable separately:
+
+```sh
+python3 /ABS/ACCOUNT_HELPER/scripts/owner-reconcile.py --authorization /PRIVATE/historical-owner-binding.json --evidence-dir /PRIVATE/new-historical-operation --source-sha CLEAN_SHA
+```
+
+The private grant schema is `lab53-historical-owner-binding-v1`, with LAB53
+issue_id, fresh operation_id, exact source, expected_observer and `lock` (the
+existing permanent admin path/device/inode/hash, inode2396017 for these real
+attempts). `configs` contains all7 closed config bindings with the current
+operator first; `locks` all5 exact bindings, including `lock`; `markers` contains
+exactly both existing legacy marker paths (account.active.json and
+account.lock.active.json), original issue_id/attempt_uuid, device/inode/sha256
+and guid_hash. `previous_processes` contains the audited59 unique exact
+PID/start_ticks records (strings for ticks). No missing original process fact
+is invented to populate this list.
+
+Each marker has `collector`: source_file/source_sha256 and
+execution_receipt/execution_sha256. The private receipt schema
+`lab53-retained-guid-collector-v1` binds issue/attempt, original_task_id,
+source_sha256, exact expression, algorithm `sha256-utf8-exact-guid-string`,
+guid_sha256/user_sha256 and execution_bindings input/ack/readback path/hashes.
+`provenance_mode=owner-audited-original-task-chain` names the explicit existing
+owner audit trust boundary, not a PASS flag or byte-hash proof of execution.
+Parent must first establish that these are original task/collector facts; an
+unavailable source/execution chain remains NOT_ESTABLISHED. The helper verifies
+retained bytes twice; it cannot independently authenticate arbitrary writers.
+
+Under the held existing permanent OFD the route rechecks all14 target hashes,
+config/operator identity and exact historical process absence. It emits
+`parent-request.json` phase `historical-reconciliation`, fresh nonce and seven
+config bindings; the same read-only parent bridge returns a NEW complete sole
+owner bucket proof. Only afterward does it emit `fd-request.json` for the
+existing privileged parent SSH channel. Run the fixed read-only collector there:
+
+```sh
+python3 /ABS/ACCOUNT_HELPER/scripts/own-fd-inventory.py /PRIVATE/fd-request.json > /PRIVATE/fd-response.json
+```
+
+Return this file only after the foreground collector ends. The route requires
+both complete identical PID inventories, zero denied/racing/error FD reads,
+actual positive control FD observation, ONLY that ended collector control and
+the exact guardian FD as target holders, same guardian PID/start_ticks, exact
+device/inode kernel locks and fresh request-bound hashes. Other holders,
+unestablished access, altered source/targets or stale server/FD proof is UNKNOWN.
+It then rechecks live OFD, all current hashes, collector provenance and process
+absence. Both originals are durably hardlinked BEFORE either marker is removed;
+receipt persistence is in the same rollback boundary. Link/unlink/fsync/receipt
+failure restores exact original UNKNOWN bytes/inodes and preserves any history.
+Permanent locks, configs and historical fact values are never rewritten.
+Root's09:27 local59/FD receipt is historical input, not this new held-lock proof.
 
 Offline full-harness fixtures exercise actual sandboxed Chromium, foreground
 children, inherited locks, capture ordering, ALL receipts, one-use final proof,
-owner archival and ready-write failure on isolated synthetic files. Negative
+owner archival and ready-write and second-archive failure on isolated synthetic files. The exact production qualification command is also checked through its before-request boundary and cancellation, before any browser/Loginom action. Negative
 rights/identity/logout/readback, observer/tuple substitution, saved vendor
 Reconnect and real forked unlock/relock probes reject. These do not qualify the
 live loaded object shape, supported getters, native instrumentation, seccomp
