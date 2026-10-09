@@ -86,7 +86,7 @@ server reset не используется.
 **11 PASS/0 FAIL/40 assertions/2.35s**, без модели/судьи/Loginom/браузера.
 Проверены reset на новый user turn, запрет automation внутри docs без нового
 запроса, доверенная activation и replay/revert, отказ foreign/malformed history,
-локальная семантика вложений. Хэши исходников равны product9695; checkout4257
+точный текст preview и его лимиты. Хэши исходников равны product9695; checkout4257
 отличается от product только документами. Повтор понадобился для точной
 привязки к source: ранний сохранённый лог не содержал достаточного SHA запуска.
 Private receipt SHA256 `5cd6a622efb1f8e5ecc7a1f0d09e4ab0c6781ee46fa6a377c25b99102fe1aeda`.
@@ -125,8 +125,12 @@ Harness `pass:true` оценивает артефакт, но полный ис�
 его не засчитываем в минимум8 CLI PASS. Ручного модельного повтора нет.
 Articles-by-author **PASS100**: CLI exit0, judge scored/checklist, structure0,
 warm CSV oracle PASS, process terminal и6 cleanup stages confirmed. Итого
-закрыты3/10:2 полных PASS,1 полный FAIL; cold2/3 PASS. Следующей выполняется
-campaign-roi-by-channel. Оставшиеся задачи ведёт отдельный serial controller: каждый процесс по одному,
+закрыты4/10:3 полных PASS,1 полный FAIL; cold3/3 PASS. Campaign ROI
+также PASS100/CLI0/structure0/warm oracle/cleanup confirmed. Его independent
+cold PASS/bytes unchanged/native close/logout/remaining0, read-back18files
+`fa9649c4a74465347debd369da6e8ede7e0ba55163757b7ae9c4f47bc08310b0`.
+Следующей выполняется customer-activity-segments. Progress4 receipt SHA256
+`b8959507b3e5d9f1c8f35a9f862adba00179df6e41b3ad4da7841aeebd2eaca0`. Оставшиеся задачи ведёт отдельный serial controller: каждый процесс по одному,
 между ними terminal/cleanup/structure/oracle gates, для campaign обязательный
 cold. Подготовки ABC сохранены
 как pre-model admission refusals с нулём модельных попыток: внешний debugger
