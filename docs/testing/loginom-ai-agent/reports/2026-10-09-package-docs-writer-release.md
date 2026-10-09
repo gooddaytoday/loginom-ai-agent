@@ -681,6 +681,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | risky-approved-claims | 1 | PASS100 | Есть / PASS | 20 / 21 / 17 | 4531 / 16301844 | 3 / 4666374 |
 | risky-approved-claims | 2 | PASS100 | Есть / PASS | 21 / 21 / 17 | 4531 / 16273731 | 3 / 4637187 |
 | sales-by-category | 1 | PASS100 | Есть / PASS | 16 / 17 / 13 | 4507 / 15561728 | 3 / 4000100 |
+| sales-by-category | 2 | PASS100 | Есть / PASS | 17 / 17 / 13 | 4507 / 15570944 | 3 / 4007473 |
 | slow-supplier-deliveries | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4618 / 17032000 | 3 / 5128503 |
 | support-by-priority | 1 | PASS100 | Есть / PASS | 24 / 23 / 19 | 4622 / 17776466 | 3 / 5863398 |
 | trial-dosage-outcomes | 1 | PASS100 | Есть / PASS | 20 / 21 / 17 | 4606 / 16932603 | 3 / 5046893 |
@@ -1167,3 +1168,15 @@ metrics26 SHA256
 batch8 receipt/readback SHA совпали. Common020c08059… и controller identity
 совпали. Closed26/45:19 PASS100/7 no_artifact FAIL0, sales#2 running;
 candidate/cold/compare0/retries0. Полный90 не принят.
+
+Двадцать седьмой closed formal v9 `sales-by-category#2` PASS100:
+structure/warm oracle PASS, cleanup6 stages/processes confirmed/error null/
+remaining0×2; history/diagnostics full roundtrip (объёмы и метрики в таблице).
+Trace/result counters match:17 finishes/17 tools/13 Loginom/skill0/prepare1/
+errors0. Промежуточный PASS100 с cleanup not_run не принимался до полной очистки.
+Все27 results/cleanup/process-cleanup/архивы, предыдущие26 trace SHA и
+reviews20/cold indexes15+24/batch8 receipts повторно проверены.
+Progress27 SHA `317723f5dd28728405d95fdd0dfe3702c1d65d0943f759ac2e256381341bfdfa`;
+metrics27 SHA `f7fceb513de557b0a091923abb9a3a93788ae0cfca5b46170ef43d87c0332e70`.
+Common020c08059…/controller identity совпали. Closed27/45:20 PASS100/7 FAIL0,
+slow-supplier#2 running; candidate/cold/compare0/retries0, полный90 не принят.
