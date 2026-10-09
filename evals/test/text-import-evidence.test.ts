@@ -275,10 +275,31 @@ test("cold verdict requires original downloaded bytes, fresh complete values and
       fresh_execution: { status: "completed", execution_id: "cold-execution", verified: true, owner_verified: true }, port,
       source: { bytes: source.byteLength, sha256: expected.source.sha256, bytes_verified: true, download_completion_verified: true },
       configuration: f.output.configuration.readback, cleanup: { package_closed: true, logged_out: true } }
+    await Bun.write(path.join(cold, "graph.json"), JSON.stringify({ complete: true, nodes: [
+      { ref: { ...f.output.node, document_id: "cold-doc", workflow_id: "cold-flow" }, type: "imports.text", inputs: [], outputs: [0] }], links: [] }))
     await Bun.write(path.join(cold, "result.json"), JSON.stringify(report))
     expect(await validateTextImportCold(f.task, f.attempt, cold)).toEqual({ errors: [], failures: [] })
     report.port.sample[2][1].value = ""
     await Bun.write(path.join(cold, "result.json"), JSON.stringify(report))
     expect((await validateTextImportCold(f.task, f.attempt, cold)).failures).not.toHaveLength(0)
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("cold verdict rejects a saved graph with another import GUID despite a positive report flag", async () => {
+  const f = await positiveFixture()
+  try {
+    const cold = path.join(f.root, "cold")
+    await prepareTextImportCold(f.task, f.attempt, cold, "/eval/result.lgp")
+    const spec = await Bun.file(path.join(f.task, "SPEC.json")).json()
+    const source = await Bun.file(path.join(f.task, spec.inputs[0].path)).bytes()
+    await Bun.write(path.join(cold, "source-0.csv"), source)
+    const port = JSON.parse(JSON.stringify(f.port)); port.execution_id = "cold-execution"
+    await Bun.write(path.join(cold, "result.json"), JSON.stringify({ status: "CHECK_VALUES", package_path: "/eval/result.lgp", graph_verified: true,
+      fresh_execution: { status: "completed", execution_id: "cold-execution", verified: true, owner_verified: true }, port,
+      source: { bytes: source.byteLength, sha256: spec.inputs[0].sha256, bytes_verified: true, download_completion_verified: true },
+      configuration: f.output.configuration.readback, cleanup: { package_closed: true, logged_out: true } }))
+    await Bun.write(path.join(cold, "graph.json"), JSON.stringify({ complete: true, nodes: [
+      { ref: { ...f.output.node, node_id: "other" }, type: "imports.text", inputs: [], outputs: [0] }], links: [] }))
+    expect((await validateTextImportCold(f.task, f.attempt, cold)).failures.join(" ")).toContain("graph")
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
