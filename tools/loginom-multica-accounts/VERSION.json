@@ -40,7 +40,7 @@
     "scripts/native-lifetime.mjs": "3e27dfd313e5a5ce05fcfd67c623beb57d937ab98164aed943fbbb105e3f7cd6",
     "scripts/own-fd-inventory.py": "23ae7105d89a685c2fd76afb02d108b8038b902c230d83b4a42366602572498f",
     "scripts/owner-archive.py": "84e35e4047ef85db58f29d3d4b26a90587629d4ed087b0da303add55db77037a",
-    "scripts/owner-card-observer.py": "14c54997635d280aef011114bac78c9699931e3bdadfa2570d162ea5d7bf54c9",
+    "scripts/owner-card-observer.py": "9c19c763978d4d3b4c6545a0e54f7c873892513c672c7671573f98f3496976fb",
     "scripts/owner-reconcile.py": "b2ccb4434f21627e3d6adf4062a15dabb34d56f9cefab422fa083151105ecbbb",
     "scripts/owner-retired-worker.py": "ff6c88718488ffbc71928df6bf137ecc06ff82ccfc20adfeb76cf9e977be3090",
     "scripts/parent-bridge.mjs": "01cd73cd869fff4c617ca9c56c533873794bba0b4acb91dcadb0ae4947d0126b",

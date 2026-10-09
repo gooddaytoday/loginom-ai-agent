@@ -38,7 +38,15 @@ def origin_records(marker,origins):
         raise RuntimeError('CARD47_ORIGIN_UNKNOWN')
     exact={};partial=set()
     for name in ['observer-main-process.json','observer-key-initial-process.json']:
-        data=read_private(base/name);partial.add(data['child_pid'])
+        data=read_private(base/name)
+        leader=next((r for r in data['observed_exact_process_tree'] if r.get('pid')==data['child_pid']),None)
+        if leader is None:raise RuntimeError('CARD47_PROCESS_UNKNOWN')
+        # The retained direct parent PID is also a known numeric fact, but its
+        # start tick was not captured. Require current absence without asserting
+        # an old owned identity, inventing ticks or signalling a reused PID.
+        parent=leader.get('ppid')
+        if not isinstance(parent,int) or isinstance(parent,bool) or parent<=0:raise RuntimeError('CARD47_PROCESS_UNKNOWN')
+        partial.add(parent)
         for record in data['observed_exact_process_tree']:
             pid,ticks=record.get('pid'),record.get('start_ticks')
             if not isinstance(pid,int) or isinstance(pid,bool) or pid<=0:raise RuntimeError('CARD47_PROCESS_UNKNOWN')
