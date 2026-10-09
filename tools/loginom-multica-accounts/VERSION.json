@@ -1,6 +1,6 @@
 {
   "schema": "loginom-lab53-source-version-v1",
-  "version": "lab53-source-only-v1",
+  "version": "lab53-source-only-v2",
   "scope_sha": "d4241c818b4a59f65a42dcf756034eec20e620b3",
   "status": "SOURCE_ONLY_LIVE_BLOCKED",
   "baseline": {
@@ -9,12 +9,12 @@
     "historical_archive_reverified": false
   },
   "files": {
-    "scripts/account-ui.mjs": "a26dc7ec90272876931eec2c45965d818d85434fe3482c29fd82720b13ac9362",
+    "scripts/account-ui.mjs": "66673585250673fb9b6af04e7e4cbdc8c716e341bba39ba597dbc65abc585fe6",
     "scripts/common.py": "6a4695934258beaececb9b73b4e3512d7c4205e34c88140ca85a6886c6b74e3f",
-    "scripts/provision-account.mjs": "a6fde6c93ff53d2a57390c6625e301d98bb5d1d2f6c6d0f106334636b6d9aea0",
+    "scripts/provision-account.mjs": "0efb20d80094f2f42cb24e73e6d91354916b6d4b5307060b710bfecd183b8f74",
     "scripts/provision-accounts.py": "de5dc32b54e1350ba85a1b37b3363f0dab339b6c7c071a735ddec1f9f1472782",
     "scripts/qualify-accounts.mjs": "63394a0542572ff926e542f3b96e893e4db62ee79598165bfb47c65267723f22",
-    "tests/account-ui.test.mjs": "df5a13de15089aca7529d83e5e57b30add0bccef19dad141ffc437e0ee8c4ec0",
+    "tests/account-ui.test.mjs": "a2d8d8e07da792d81bad655ac76a4d7df1e7c567bf5815b31e33b28fa1141a37",
     "tests/test_accounts.py": "b32c69f154a658d98e80621ae7eadce40e1086f7df70dd13325468f2b2277559",
     "tests/test_manifest.py": "f94c4063c53238b65e7512ce2fb1da45147410d8b501d39cac986dc8f6b8ba7f",
     "fixtures/navigation.html": "b3bde2f068797b70e7c7975a31f1d64a03ac2686c6943abf2462ee5e5a0b4733",

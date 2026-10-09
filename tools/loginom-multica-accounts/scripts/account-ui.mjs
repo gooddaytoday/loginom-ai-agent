@@ -72,6 +72,18 @@ export class Diagnostics {
     }
   }
 
+  recordError(phase, action, selector, error) {
+    // Recording an already observed failure is not permission for another
+    // operation. Preserve its cause even when the original deadline expired.
+    const event = {phase, action, selector, started_at: new Date().toISOString(),
+      elapsed_ms: Date.now() - this.started, deadline_at: new Date(this.deadline).toISOString(),
+      status: 'FAIL', candidates: structuredClone(this.candidates),
+      visible_candidate_count: this.candidates.length, error: errorDetails(error)};
+    this.events.push(event);
+    this.save();
+    return this.publicReceipt(error);
+  }
+
   save() {
     // Each snapshot is immutable; raw Playwright errors never go to stdout.
     const path = join(this.directory, `diagnostic-${randomUUID()}.json`);
@@ -167,18 +179,22 @@ export async function navigate(page, target, diagnostics) {
     await diagnostics.run('navigation', 'wait-navigator', treeTarget(target), () => waitNavigation(page, target, diagnostics));
     items = await diagnostics.run('navigation', 'observe-candidates', treeTarget(target), () => candidates(page, target, diagnostics));
   }
-  if (!items.some(item => item.kind === 'target')) {
-    await diagnostics.run('navigation', 'expand-admin', folder, async () => {
-      const chosen = select(await candidates(page, target, diagnostics), 'folder');
+  if (!items.some(item => item.kind === 'target' && item.ready)) {
+    const scope = await diagnostics.run('navigation', 'expand-admin', folder, async () => {
+      const observed = await candidates(page, target, diagnostics);
+      if (observed.some(item => !item.scope)) throw Object.assign(Error('NAVIGATION_UNQUALIFIED'), {code: 'NAVIGATION_UNQUALIFIED'});
+      const chosen = select(observed, 'folder');
       if (!chosen || chosen.expanded !== false) throw Object.assign(Error('NAVIGATION_NOT_READY'), {code: 'NAVIGATION_NOT_READY'});
       const expander = page.locator(tid(chosen.tid) + ':visible').locator('xpath=ancestor::tr[1]').locator('.x-tree-expander:visible');
       if (await expander.count() !== 1) throw Object.assign(Error('NAVIGATION_AMBIGUOUS'), {code: 'NAVIGATION_AMBIGUOUS'});
       await expander.click({timeout: diagnostics.remaining()});
+      return chosen.scope;
     });
-    await diagnostics.run('navigation', 'wait-target', treeTarget(target), () => page.waitForFunction(target =>
-      [...document.querySelectorAll('[data-tid]')].some(element => element.getAttribute('data-tid').endsWith(target)
-        && element.getBoundingClientRect().width && element.getBoundingClientRect().height),
-    treeTarget(target), {timeout: diagnostics.remaining()}));
+    await diagnostics.run('navigation', 'wait-target', scope + treeTarget(target), () => page.waitForFunction(target =>
+      [...document.querySelectorAll('[data-tid]')].some(element => element.getAttribute('data-tid') === target
+        && element.getBoundingClientRect().width && element.getBoundingClientRect().height
+        && getComputedStyle(element).visibility !== 'hidden'),
+    scope + treeTarget(target), {timeout: diagnostics.remaining()}));
   }
   // Re-observe immediately before the gesture; never reuse an earlier choice.
   await diagnostics.run('navigation', 'click-target', treeTarget(target), async () => {

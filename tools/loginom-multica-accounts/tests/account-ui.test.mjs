@@ -108,6 +108,54 @@ test('collapsed navigator and collapsed Admin folder', () => withPage([
     'MF;TF;AdminStartForm;MapTreeForm;colNavigation_Сервер>Администрирование>Пользователи;TreeText']);
 }));
 
+for (const scope of ['MF;', 'MF;TF;AdminStartForm;']) {
+  for (const reversed of [false, true]) {
+    test(`ready collapsed scope ${scope}, reversed DOM ${reversed}`, () => withPage(
+      (reversed ? [false, true] : [true, false]).map(ready => ({
+        prefix: ready ? scope : scope === 'MF;' ? 'MF;TF;AdminStartForm;' : 'MF;',
+        ready, expanded: !ready,
+      })), async (page, diagnostics) => {
+        await navigate(page, 'Пользователи', diagnostics);
+        assert.deepEqual(await page.evaluate(() => window.clicks), [`expand:${scope}`,
+          `${scope}MapTreeForm;colNavigation_Сервер>Администрирование>Пользователи;TreeText`]);
+      }));
+  }
+}
+
+test('ready collapsed scope waits for its delayed target despite stale visible target', () => withPage([
+  {ready: false}, {prefix: 'MF;TF;AdminStartForm;', expanded: false},
+], async (page, diagnostics) => {
+  await page.evaluate(() => {
+    const tree = document.querySelectorAll('.x-tree-view')[1];
+    const expander = tree.querySelector('.x-tree-expander');
+    const original = expander.onclick;
+    expander.onclick = () => {
+      original();
+      tree.querySelectorAll('tr')[1].hidden = true;
+      setTimeout(() => { tree.querySelectorAll('tr')[1].hidden = false; }, 100);
+    };
+  });
+  await navigate(page, 'Пользователи', diagnostics);
+  assert.deepEqual(await page.evaluate(() => window.clicks), ['expand:MF;TF;AdminStartForm;',
+    'MF;TF;AdminStartForm;MapTreeForm;colNavigation_Сервер>Администрирование>Пользователи;TreeText']);
+}));
+
+test('ready collapsed scopes reject ambiguity before expansion', () => withPage([
+  {expanded: false}, {prefix: 'MF;TF;AdminStartForm;', expanded: false},
+], async (page, diagnostics) => {
+  await assert.rejects(navigate(page, 'Пользователи', diagnostics), {code: 'NAVIGATION_AMBIGUOUS'});
+  assert.deepEqual(await page.evaluate(() => window.clicks), []);
+}));
+
+test('ready collapsed scope beside unknown visible target blocks before expansion', () => withPage([
+  {expanded: false}, {prefix: 'Unexpected;', ready: false},
+], async (page, diagnostics) => {
+  // Leave only the unknown target: folder-only selection must not hide it.
+  await page.evaluate(() => document.querySelectorAll('.x-tree-view')[1].querySelector('tr').hidden = true);
+  await assert.rejects(navigate(page, 'Пользователи', diagnostics), {code: 'NAVIGATION_UNQUALIFIED'});
+  assert.deepEqual(await page.evaluate(() => window.clicks), []);
+}));
+
 test('unqualified suffix rejects selection', () => withPage([
   {prefix: 'Unexpected;'},
 ], async (page, diagnostics) => {
@@ -168,6 +216,44 @@ test('private diagnostics retain cause chain, public receipt allowlists fields',
   assert.equal(statSync(diagnostics.directory).mode & 0o777, 0o700);
   assert.equal(diagnostics.publicReceipt(error).code, 'UI_ERROR');
   assert.ok(!JSON.stringify(diagnostics.publicReceipt(error)).includes('SYNTHETIC'));
+});
+
+test('expired deadline preserves original provision error without authorizing a gesture', async () => {
+  const diagnostics = new Diagnostics(mkdtempSync(join(temporary, 'evidence-')), -1);
+  const deadline = diagnostics.deadline;
+  const native = Object.assign(new Error('SYNTHETIC_NATIVE_PASSWORD'), {
+    get_message: () => 'SYNTHETIC_NATIVE_MESSAGE', get_stack: () => 'SYNTHETIC_NATIVE_STACK',
+  });
+  const original = Object.assign(new Error('SYNTHETIC_ORIGINAL_PASSWORD', {cause: native}), {
+    code: 'SYNTHETIC_PRIVATE_CODE', get_message: () => 'SYNTHETIC_RPC_MESSAGE', get_stack: () => 'SYNTHETIC_RPC_STACK',
+    browser_error: {name: 'EBGException', message: 'SYNTHETIC_BROWSER_MESSAGE', get_stack: 'SYNTHETIC_BROWSER_STACK'},
+  });
+  const receipt = diagnostics.recordError('provision', 'failure', 'private-selector', original);
+  const snapshot = diagnostics.path;
+  const raw = readFileSync(snapshot, 'utf8');
+  const failure = JSON.parse(raw).events.at(-1);
+  assert.equal(failure.phase, 'provision');
+  assert.equal(failure.action, 'failure');
+  assert.equal(failure.error.message, original.message);
+  assert.equal(failure.error.stack, original.stack);
+  assert.equal(failure.error.code, original.code);
+  assert.equal(failure.error.get_message, 'SYNTHETIC_RPC_MESSAGE');
+  assert.equal(failure.error.get_stack, 'SYNTHETIC_RPC_STACK');
+  assert.equal(failure.error.cause.get_message, 'SYNTHETIC_NATIVE_MESSAGE');
+  assert.equal(failure.error.cause.get_stack, 'SYNTHETIC_NATIVE_STACK');
+  assert.deepEqual(failure.error.browser_error, original.browser_error);
+  assert.equal(diagnostics.deadline, deadline);
+  assert.equal(failure.deadline_at, new Date(deadline).toISOString());
+  assert.equal(statSync(snapshot).mode & 0o777, 0o600);
+  assert.equal(receipt.code, 'UI_ERROR');
+  assert.deepEqual(Object.keys(receipt).sort(), ['code', 'diagnostics_sha256', 'schema', 'status']);
+  assert.ok(!JSON.stringify(receipt).includes('SYNTHETIC'));
+  let gestures = 0;
+  await assert.rejects(diagnostics.run('navigation', 'blocked-after-deadline', null, async () => gestures++),
+    {code: 'NAVIGATION_DEADLINE'});
+  assert.equal(gestures, 0);
+  assert.equal(readFileSync(snapshot, 'utf8'), raw);
+  assert.equal(diagnostics.deadline, deadline);
 });
 
 test('finite method cannot be enabled with receipt/config booleans', () => {

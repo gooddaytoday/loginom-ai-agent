@@ -127,8 +127,7 @@ try {
   console.log(JSON.stringify({role: config.role, username: account.username, state, login: 'ok'}));
 } catch (error) {
   // Save raw causes before producing the public allowlisted receipt.
-  await diagnostics.run('provision', 'failure', null, async () => { throw error; }).catch(() => {});
-  console.error(JSON.stringify(diagnostics.publicReceipt(error)));
+  console.error(JSON.stringify(diagnostics.recordError('provision', 'failure', null, error)));
   process.exitCode = 1;
 } finally {
   await browser.close();
