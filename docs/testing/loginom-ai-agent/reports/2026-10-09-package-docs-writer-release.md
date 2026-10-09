@@ -669,6 +669,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | cohort-spend-activity | 1 | FAIL0/no_artifact | Нет / не выполнялись | 22 / 21 / 18 | 4563 / 15206251 | 3 / 3337376 |
 | cohort-spend-activity | 2 | FAIL0 | Нет / не выполнялось | 21 / 21 / 19 | 4564 / 15352878 | 3 / 3489173 |
 | customer-activity-segments | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4608 / 17448322 | 3 / 5497845 |
+| customer-activity-segments | 2 | PASS100 | Есть / PASS | 21 / 21 / 17 | 4604 / 16817553 | 3 / 4888921 |
 | first-last-touch | 1 | FAIL0/no_artifact | Нет / не выполнялись | 26 / 25 / 23 | 4585 / 15440708 | 3 / 3550529 |
 | low-liquidity-companies | 1 | FAIL0/no_artifact | Нет / не выполнялись | 23 / 23 / 21 | 4487 / 15707741 | 3 / 4075869 |
 | monthly-demand | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4604 / 16230213 | 3 / 4358291 |
@@ -1006,4 +1007,20 @@ metrics20 SHA256
 и cold index15 повторно проверены по SHA; batch8 receipt/readback SHA
 совпали, common020c08059… и PID676156/UID/birth/exe/inode неизменны.
 Closed20/45:16 PASS100/4 no_artifact FAIL0, customer#2 running;
+candidate/cold/compare0/retries0. Полный90 не принят.
+
+Двадцать первый closed formal v9 `customer-activity-segments#2` PASS100:
+structure/warm oracle PASS, cleanup6 stages/processes confirmed,
+error null/remaining0×2. History4604/16817553bytes и diagnostics3/4888921bytes
+full roundtrip. Trace/result counters match:21 finishes/21 tools/17 Loginom/
+skill0/prepare1/errors0.
+
+Private progress21 SHA256
+`3231e4b2382b130064bd7ad5f4fb55fa126364fdd300a5a5f952ee610f3a910a`,
+metrics21 SHA256
+`599b3301f10a9a7263696ae0504d843f7e9d89c31db3797e44544a7f4d8ea790`.
+Все21 closed results/cleanup/process-cleanup и архивы, предыдущие20 traces
+и cold index15 повторно проверены по SHA; batch8 receipt/readback SHA
+совпали, common020c08059… и PID676156/UID/birth/exe/inode неизменны.
+Closed21/45:17 PASS100/4 no_artifact FAIL0, first-last#2 running;
 candidate/cold/compare0/retries0. Полный90 не принят.
