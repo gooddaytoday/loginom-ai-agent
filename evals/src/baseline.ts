@@ -405,7 +405,7 @@ export async function checkBaseline(directory: string) {
   const smokeVerification = manifest.kind === "smoke" ? await verifySmokeMeasurements(manifest, rows) : null
   return { id: manifest.id, kind: manifest.kind, status: journal.release?.abandoned ? "abandoned" : coverage.measured === coverage.expected && cleanup && journal.release && (smokeVerification?.verified ?? true) ? "complete" : "incomplete",
     abandoned: journal.release?.abandoned ?? null,
-    manifest, coverage, cleanup, released: Boolean(journal.release), groups, spending, infrastructure, smokeVerification, recoveries, executions, cleanupResolutions,
+    manifest, manifestSha256: journal.manifestSha256, checkout: journal.checkout, coverage, cleanup, released: Boolean(journal.release), groups, spending, infrastructure, smokeVerification, recoveries, executions, cleanupResolutions,
     nodes: manifest.cases.filter(item => item.collection === "node").map(item => ({ id: item.id, expected: manifest.kind === "smoke" ? 1 : 3,
       passed: rows.filter(row => row.caseKey === item.key && row.verdict === "PASS").length,
       measured: rows.filter(row => row.caseKey === item.key && row.measured).length })), rows }
@@ -1087,7 +1087,21 @@ async function writeBaselineComparison(out: string, before: Awaited<ReturnType<t
   const { compare } = await import("./compare")
   const { compareBaselineConditions } = await import("./baseline-comparison")
   const conditions = await compareBaselineConditions(before, after)
-  await writeFile(path.join(out, "comparison.json"), JSON.stringify(conditions, null, 2), { flag: "wx", mode: 0o600 })
+  const cases = after.manifest.cases.map(item => {
+    const summarize = (report: Awaited<ReturnType<typeof checkBaseline>>) => {
+      const rows = report.rows.filter(row => row.caseKey === item.key)
+      return { passed: rows.filter(row => row.verdict === "PASS").length, failed: rows.filter(row => row.verdict === "FAIL").length,
+        measured: rows.filter(row => row.measured).length, expected: 3, completion: rows.filter(row => row.result?.status === "completed").length,
+        oracle: rows.map(row => row.result?.oracle_pass ?? null), scores: item.collection === "node" ? null : rows.map(row => row.result?.score ?? null),
+        verdicts: rows.map(row => row.verdict), statuses: rows.map(row => row.result?.status ?? null) }
+    }
+    const a = summarize(before)
+    const b = summarize(after)
+    return { key: item.key, collection: item.collection, before: a, after: b, transitions: a.verdicts.map((verdict, index) => `${verdict ?? "UNKNOWN"}→${b.verdicts[index] ?? "UNKNOWN"}`) }
+  })
+  await writeFile(path.join(out, "comparison.json"), JSON.stringify({ ...conditions, coverage: { before: before.coverage, after: after.coverage }, cases,
+    spending: { before: before.spending, after: after.spending }, infrastructure: { before: before.infrastructure, after: after.infrastructure },
+    recoveries: { before: before.recoveries.length, after: after.recoveries.length } }, null, 2), { flag: "wx", mode: 0o600 })
   const environment = `${conditions.status}: ${conditions.reasons.join(", ") || "все обязательные условия подтверждены"}. ${conditions.interpretation}`
   for (const collection of ["regular", "analytic"] as const) {
     const keys = [...new Set([...before.manifest.cases, ...after.manifest.cases].filter(item => item.collection === collection).map(item => item.key))]
@@ -1105,7 +1119,7 @@ async function writeBaselineComparison(out: string, before: Awaited<ReturnType<t
       before: before.nodes.find(node => node.id === id) ?? null, after: after.nodes.find(node => node.id === id) ?? null })) }, null, 2), { flag: "wx", mode: 0o600 })
 }
 
-async function baselineCaseSummary(report: Awaited<ReturnType<typeof checkBaseline>>, key: string): Promise<RunSummary | undefined> {
+export async function baselineCaseSummary(report: Awaited<ReturnType<typeof checkBaseline>>, key: string): Promise<RunSummary | undefined> {
   const rows = report.rows.filter(row => row.caseKey === key && row.runDir)
   if (!rows.length) return undefined
   const summaries = await Promise.all(rows.map(async row => Bun.file(path.join(row.runDir!, "summary.json")).json() as Promise<RunSummary>))

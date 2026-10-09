@@ -23,10 +23,21 @@ test("full model experiment compares fixed conditions and rejects unexplained en
     expect(await compareBaselineConditions(a, b)).toMatchObject({ status: "COMPARABLE", experiment: ["model", "reasoning"] })
     const changed = { ...b, manifest: { ...b.manifest, pins: { ...b.manifest.pins, isolationSha256: "0".repeat(64) } } }
     expect(await compareBaselineConditions(a, changed)).toMatchObject({ status: "INCOMPARABLE", reasons: ["isolationSha256"] })
+    changed.manifest.operationalEquivalence = { version: 1, baselineId: a.id, previousIsolationSha256: a.manifest.pins.isolationSha256,
+      currentIsolationSha256: changed.manifest.pins.isolationSha256, previousOpsConfigSha256: a.manifest.pins.opsConfigSha256,
+      currentOpsConfigSha256: changed.manifest.pins.opsConfigSha256, previousHarnessSha: a.manifest.pins.harnessSha,
+      currentHarnessSha: changed.manifest.pins.harnessSha, evaluatorSha256: (await (await import("../src/evaluator-replay")).evaluatorFingerprint(repoRoot, a.manifest.pins.harnessSha)),
+      decision: "operator verified equivalent isolation after role/path migration", changes: ["role", "paths"] }
+    expect((await compareBaselineConditions(a, changed)).status).toBe("COMPARABLE")
+    changed.manifest.operationalEquivalence.baselineId = "foreign"
+    expect((await compareBaselineConditions(a, changed)).status).toBe("INCOMPARABLE")
     const judge = { ...b, manifest: { ...b.manifest, pins: { ...b.manifest.pins, judgeModel: "other" } } }
     expect((await compareBaselineConditions(a, judge)).reasons).toContain("judgeModel")
     const output = await (await import("../src/baseline")).runBaseline(["check", "--series", after.series, "--export"], {})
     expect(output.code).toBe(0)
-    expect(await Bun.file(path.join(String(output.reportDir), "comparison.json")).json()).toMatchObject({ status: "COMPARABLE", before: a.id, after: b.id })
+    const report = await Bun.file(path.join(String(output.reportDir), "comparison.json")).json()
+    expect(report).toMatchObject({ status: "COMPARABLE", before: a.id, after: b.id })
+    expect(report.cases).toHaveLength(48)
+    expect(report.cases.find((item: { collection: string }) => item.collection === "node")).toMatchObject({ before: { passed: 0, measured: 3 }, after: { passed: 0, measured: 3 } })
   } finally { await rm(directory, { recursive: true, force: true }) }
 }, 90_000)
