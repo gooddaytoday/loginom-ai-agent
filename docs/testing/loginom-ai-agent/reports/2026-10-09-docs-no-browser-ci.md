@@ -29,6 +29,12 @@
 - **Вложения:** сохранены обе доработки message-v2: исключение локального .lgp и
   безопасное описание CSV для провайдера. Приватное отложенное admission проверяет
   исходные CP1251-байты, ownership, compaction/revert и отсутствие передачи в Help.
+- **Дедлайн подготовки:** PR gate на `b3b56ffdb` получил UI_BUILD_MISMATCH вместо
+  DEADLINE, push gate того же SHA прошёл. `remaining()` дважды читал часы и мог
+  вернуть ноль без исключения, после чего цикл завершался без результата.
+  Отдельные управляемые часы VM воспроизводят этот случай детерминированно
+  (RED); одно чтение часов устраняет его (GREEN). Исходный предел времени и
+  проверки отсутствия мутации сохранены, глобальные часы не подменяются.
 
 ## Проверено до повторного GitHub CI
 
@@ -38,6 +44,9 @@
 - Desktop artifact + HostPort: три повтора, каждый 12 PASS / 2 platform SKIP.
 - resume-oracle: три повтора под отдельным Xvfb, каждый PASS / 5 assertions.
 - Typecheck agent и loginom-host: PASS.
+- Полный loginom-host после merge: 313 PASS / 7 platform SKIP, 1982 assertions.
+- Management после merge: PASS, все 111 assertions.
+- Исправленный ранний Node contract gate: 173 PASS / 0 FAIL.
 
 Проверка всех GitHub тестов и candidate-сборок продолжается на новом SHA.
 Окончательный SHA, ссылки на runs и результаты фиксируются в PR #46 и отдельном

@@ -109,10 +109,10 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
     locator, async waitForTimeout() {entryDelay=Math.max(0,entryDelay-1);busyTicks=Math.max(0,busyTicks-1);},
   } };
 }
-const execute = async (fixture, options = {}) => runInNewContext(makeWorkspacePrepareCode({
+const execute = async (fixture, options = {}, clock = Date) => runInNewContext(makeWorkspacePrepareCode({
   loginomUrl: 'http://loginom.example/app?testable=true',
   compatibility: { profile_id: 'tested-ui', loginom_build: build, platform: 'macos', browser: 'chromium' }, platform: 'darwin', ...options,
-}))(fixture.page);
+}), {Date:clock})(fixture.page);
 
 test('normal preparation opens Loginom and asks for login without assuming test credentials', async () => {
   const fixture = pageFixture();
@@ -288,7 +288,10 @@ test('opening an exact package verifies its cached path without executing or sav
 
 test('preparation deadline returns the last named phase with no mutation', async () => {
   const fixture=pageFixture({actualBuild:null});
-  const state=await execute(fixture,{timeoutMs:2});
+  // Cross the deadline between the old predicate and subtraction in remaining().
+  // The clock is scoped to this generated-code VM; no process-global clock changes.
+  const ticks=[0,0,0,1,2];
+  const state=await execute(fixture,{timeoutMs:2},{now:()=>ticks.shift()??2});
   assert.equal(state.reason,'DEADLINE');assert.equal(state.phase,'ui_build');
   assert.equal(state.effect_possible,false);assert.equal(fixture.tabs.filter(t=>t.graph).length,0);
 });
