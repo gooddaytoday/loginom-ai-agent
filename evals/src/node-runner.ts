@@ -5,7 +5,7 @@ import { loadTasks } from "./task"
 import { validateNodeRun } from "./node-evals"
 import { coverageCaseIds, nodeCaseIds } from "./node-cases"
 import { collectNodeNativeEvidence } from "./node-native"
-import { textImportIds, textImportChecks, collectTextImportEvidence } from "./text-import"
+import { textImportIds, textImportChecks, collectTextImportEvidence, assertTextImportModel } from "./text-import"
 
 export async function runNodeEvals(argv: string[], env: Record<string, string | undefined>) {
   try { return await executeNodeEvals(argv, env) }
@@ -18,6 +18,7 @@ async function executeNodeEvals(argv: string[], env: Record<string, string | und
   const args = ["--tasks", path.join(evalsRoot, "tasks/node-evals"), ...argv, "--skip-judge", "--repeat", "1"]
   const config = loadConfig(args, env)
   const tasks = await loadTasks(config.tasksDir, config.only)
+  if (tasks.some(task => textImportIds.includes(task.id))) assertTextImportModel(config)
   for (const task of tasks) {
     if (!(nodeCaseIds as readonly string[]).includes(task.id) && !textImportIds.includes(task.id)) throw Error(`unsupported node case: ${task.id}`)
     for (const item of task.checklist) if (item.required && !(textImportIds.includes(task.id) ? textImportChecks : ["input", "crosstable", "graph", "export", "result", "sequence"]).includes(item.id))

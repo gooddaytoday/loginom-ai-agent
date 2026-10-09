@@ -60,3 +60,16 @@ test("text import diagnostic pipeline completes without a package but does not c
     expect(await Bun.file(path.join(result.runDir!, id, "1/native-import.json")).exists()).toBe(true)
   } finally { server.stop(true); await rm(root, { recursive: true, force: true }) }
 }, 30000)
+
+test("text import live admission refuses inherited non-Luna model before touching a profile", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "import-model-"))
+  try {
+    const tasks = path.join(root, "tasks")
+    await cp(path.join(evalsRoot, "drafts/text-import/txt-ambiguous-headers"), path.join(tasks, "txt-ambiguous-headers"), { recursive: true })
+    const result = await runNodeEvals(["--tasks", tasks], { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/usr/bin/false", EVAL_AGENT_MODEL: "openai/gpt-6.1-sol",
+      EVAL_AGENT_VARIANT: "high", LOGINOM_DOCK_API_KEY: "fixture", EVAL_PROFILE_DIR: path.join(root, "profile") })
+    expect(result).toMatchObject({ code: 2, runDir: null })
+    expect(result.error).toContain("gpt-6-luna/high")
+    expect(await Bun.file(path.join(root, "profile.harness-lease/owner.json")).exists()).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
