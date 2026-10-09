@@ -583,3 +583,34 @@ SHA256 `c019ba636696ef9535cfc3b504ce753fc1b129d687052184c27abbb506bac646`.
 turns through prepare1. Это smoke, не доказательство statistical non-inferiority.
 Candidate smoke session80478 запущен на том же common020c08059…;
 formal90 и compare ещё не начаты.
+
+
+## Smoke-пара v9 принята; formal baseline запущен
+
+Candidate session80478 terminal0/run20261009-015934-d08be6baf: completed/score100,
+pass/oracle true, structure/warm PASS, все6 cleanup stages/process cleanup
+confirmed/error null. Cold20548 terminal0/PASS: fresh server execution/oracle,
+package/input unchanged, settingsReapplied false, close/logout/remaining0,
+owned storage и cold container удалены. History1927/9027240bytes и diagnostics3/
+3884116bytes сохранены с полным inventory/restore roundtrip, mode600.
+
+Повторно проверены frozen658 hashes,21 adapters, оба полных CLI inventories,
+281 task snapshot files, judge executable pins и fresh external snapshot после
+пары. Protected diff0 против текущего evals b30. Candidate completed skill
+metadata.activation: name/profile loginom-automation, digest
+`2a6ffec0d043a9e78e0a3640ffe231deecade7d63f75d631e97a04bc09019b44`.
+Уникальные provider finishes18/18, tool calls17/20, Loginom13/14, errors0,
+skills0/1; turns through prepare1/2 — ровно+1 activation turn. Прочие различия
+не маскируются activation allowance; это не statistical NI доказательство.
+
+`ab-smoke-v9-pair-accepted-20261009/review.json` SHA256
+`94fea2d339bcc117874a5562bb42254bcd4ccc086648343f0027287b1551078d`;
+common020c08059… одинаков у обеих сторон. После принятой пары запущен formal
+baseline session60189/run20261009-021118-d08be6baf,45 scheduled attempts.
+Controller PID676156/UID1001/birth/executable/group/session проверен живым;
+resume `ab-local-stand-20261008/formal-v9-resume-20261009.json`
+SHA256 `2e312d35d14d46027e362f9e4b77fe02ae0d7e93f209ce63f70db2f1a5ea49b7`.
+Candidate formal/cold/compare не запускались. Не перезапускать по timeout
+наблюдения; использовать тот же handle60189. После обеих45 необходимы полный
+индекс сохранённых артефактов, structure/cold и compare. V7/V8 отдельно сохранены
+и не подставляются в эту пару. Stage5–8 остаются открыты; stage9/full35 deferred.

@@ -1069,8 +1069,12 @@ Core имеет разметку осей, но без CSV oracle. По доку
   raw profiles сохранены. V9 conditions storage-clean/SHA020c08059… закрепляют
   те же658/281/21 pins и оба CLI. Baseline smoke79154 terminal0/score100,
   structure/warm/cold24704 PASS, close/logout/remaining0/bytes unchanged;
-  baseline accepted receipt сохранён. Candidate smoke80478 запущен на тех же
-  условиях; обе стороны/полный90/compare пока не приняты.
+  baseline accepted receipt сохранён. Candidate smoke80478/cold20548 terminal0,
+  score100/structure/warm/cold/cleanup PASS. Pair accepted94fea2d339…; frozen658,
+  task281, adapters21, оба полных CLI и fresh external после пары повторно PASS.
+  Activation+1 turn/skill1 PASS, provider finishes18/18, tools17/20/Loginom13/14
+  измерены отдельно. Formal baseline60189/run021118 запущен:45 scheduled,
+  candidate formal/cold/compare ещё не начаты; полный90 пока не принят.
   Частичный v7 не подставлять
   как полный baseline и не повторять выборочно только неуспешные попытки.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой

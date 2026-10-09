@@ -4447,9 +4447,9 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-09 — ACTIVE, baseline v9 принят; candidate smoke запущен
+### 2026-10-09 — ACTIVE, smoke-пара v9 принята; formal baseline запущен
 
-- HEAD до checkpoint `0072df593`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
+- HEAD до checkpoint `3ca800fe1`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client и чужие профили/процессы не изменялись.
 - Own mutable harness `d08be6baf8f5aea53f83c228cd0984c9d2bf0494` clean: промежуточный process-progress.jsonl через TDD; modules29 PASS/typecheck PASS/full486 PASS/2 SKIP/0 FAIL/2080 assertions/581.74s, terminal0/process cleanup confirmed. Frozen495 не редактировался; новый detached frozen d08 на own storage/loginom-skills-frozen-progress-20261009, install/typecheck PASS/clean,658 pins; обе новые smoke стороны ещё не приняты.
 - Writer post-open real-IO RED→GREEN; release/persistent-empty/replacement guards×5 PASS; modules77 PASS/0 FAIL/241 assertions.
@@ -4457,11 +4457,11 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Fresh full495/session12760 terminal0:484 PASS/2 SKIP/0 FAIL/2063 assertions/576.34s; порог пространства сохранён, новый own executable TMPDIR в /dev/shm.
 - Exact own immutable dedupe:26568 old frozen source files,612 browser files,13285 new frozen source files; bytes/modes/pins и clean Git проверены до/после; чужие данные не очищались.
 - Dedupe receipts3 сохранены;68 confirmed closed archives720949856bytes перенесены пятью batch на own ext4 storage, archive paths→links/цели600/каталоги700/readback34+12+6+6+10/native tar3+2+2+2+2 PASS; около2GiB free. Frozen sources/resources не редактировать.
-- Новые conditions ab-conditions-storage-clean-20261009/common.json SHA020c08059d809d417e03b977911407c570a51b8861cc3eeb21786c4fce1b162a:658 harness/281 task/21 adapter pins/5389+5651 build inventory PASS, fresh evals b30/protected diff0. Baseline smoke79154/run014845 terminal0/score100/structure/warm/cold24704 PASS/close/logout/remaining0/bytes unchanged; accepted receipt сохранён. Candidate smoke80478 запущен; formal90/compare не начаты.
+- Новые conditions ab-conditions-storage-clean-20261009/common.json SHA020c08059d809d417e03b977911407c570a51b8861cc3eeb21786c4fce1b162a:658 harness/281 task/21 adapter pins/5389+5651 build inventory PASS, fresh evals b30/protected diff0. Baseline smoke79154/run014845 terminal0/score100/structure/warm/cold24704 PASS/close/logout/remaining0/bytes unchanged; accepted receipt сохранён. Candidate smoke80478/cold20548 terminal0/score100/structure/warm/cold PASS. Pair accepted receipt94fea2d339…, обоим сборкам полный inventory/21pins/fresh external PASS; formal baseline60189 live/run021118,45 scheduled/candidate0/cold0/compare0.
 - На freeze evals ref992fca12badf209169f13b569b9bd291e4d70e99; после пары fresh b30dcbe5f/protected diff0, с freeze изменён только соседний docs-файл; frozen495/658files/21pins/оба full CLI повторно PASS.
-- Те же15 задач×3×2=90; primary openai/gpt-6.1-sol medium/judge gpt-6-astra high. Smoke metrics16/18 provider turns,17/20 tools,13/13 Loginom; activation delta1/skill1 PASS, прочий рост отдельно.
-- Baseline smoke v7/session30063 terminal0/run214239:score100/oracle/structure/installed cold21564 PASS; close/logout/remaining0/bytes unchanged; accepted receipt сохранён.
-- Candidate v7/session95877 terminal0/run215120:score100/oracle/structure/cold22429 PASS/cleanup confirmed; pair accepted receipt ab-smoke-v7-pair-accepted-20261009, fresh refb30dcbe5f/protected diff0.
+- Те же15 задач×3×2=90; primary openai/gpt-6.1-sol medium/judge gpt-6-astra high. V9 smoke metrics18/18 provider turns,17/20 tools,13/14 Loginom/errors0; bundled activation digest2a6ffec0…, turns through prepare1/2, delta1/skill1 PASS; smoke не statistical NI.
+- Baseline v9 accepted c019ba636…:history4506/15452718bytes+diag3/3882841bytes full roundtrip; candidate history1927/9027240+diag3/3884116 roundtrip PASS. Все закрытые данные600/own dirs700, raw failed/incomplete profiles не архивируются.
+- V9 candidate accepted/pair receipts:ab-smoke-v9-{candidate,pair}-accepted-20261009. Fresh evals b30/protected diff0; same common020c08059…/658 harness/281 tasks/21 adapters/оба CLI/full source486 PASS. Formal resume JSON:60189/PID676156/birth сохранены; не перезапускать по observation timeout.
 - Formal v7 baseline81639/run220203 terminal143 после identity-guarded SIGINT→SIGTERM;19 closed/13 PASS/6 FAIL/14 пакетов сохранены, SHA всех result/cleanup/process-cleanup19 повторно PASS. Cohort#2 INCOMPLETE: exit0 child receipt/пустые outputs/terminal files отсутствуют; cause UNKNOWN, raw profile/leases сохранены. PID controller/launcher/sandbox отсутствуют; bounded own-run references0, чужие fd недоступны. Interruption readback сохранён; targeted tests2 PASS не воспроизводят hang. Candidate/cold/compare не начаты; полный90 не принят,retries0.
 - V5 formal1287 terminal1 на13/45:13-я analytic PASS100/process cleanup FAIL; historical PID4050199 errno/operation UNKNOWN; profile не очищен, candidate0/cold0.
 - CLI modify3 FAIL:21 file occurrence hashes PASS, readonly3/3/UNKNOWN_PREPARED_WORKFLOW3/3/active-source refusal2/3; candidate49 bridge/managed-entry exact source hashes PASS, explicit package/logout cleanup test-only; native writer owner/cause UNKNOWN. Docs-after-build CLI3 accepted/Desktop cold1 PASS2 FAIL; new cold native только после90 closed.
