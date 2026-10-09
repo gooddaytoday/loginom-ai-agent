@@ -2,9 +2,10 @@ import { expect, test } from "bun:test"
 import { chmod, cp, lstat, mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease, runBaseline, verifyBaselineInstallation, baselineHash, captureBaselinePins, admitBaselineSmoke, checkBaselineReadiness } from "../src/baseline"
+import { prepareBaseline, beginBaselineMeasurement, recordBaselineMeasurement, checkBaseline, sealBaselineRelease, runBaseline, verifyBaselineInstallation, baselineHash, captureBaselinePins, admitBaselineSmoke, checkBaselineReadiness, verifyBaselineCorpus } from "../src/baseline"
 import { acquireNodeStand, type NodeOpsConfig } from "../src/node-eval-ops"
 import { repoRoot, evalsRoot } from "../src/config"
+import { validateNodeRun } from "../src/node-evals"
 
 import { baselineFixturePins } from "../fixtures/baseline"
 
@@ -107,6 +108,122 @@ test("concurrent smoke admissions cannot reserve two series for the same case", 
     expect(admissions.filter(admission => admission.status === "rejected")).toHaveLength(1)
     expect(await checkBaselineReadiness(fixture.config)).toMatchObject({ admitted: 1, complete: 0, ready: false })
   } finally { await fixture.close() }
+})
+
+async function completedReadinessFixture(nodeStatus = "no_artifact", releaseNode = true) {
+  const fixture = await readinessFixture()
+  const pins = { ...fixture.pins, mode: "live" as const }
+  const lease = await acquireNodeStand(fixture.config, { issue: "LAB-32", task: "fixture-smokes", role: "evalbaseline", phase: "eval", sha: pins.harnessSha })
+  const series: string[] = []
+  const manifests = []
+  for (const id of ["calc-data-double", "crosstable-fixed-sum"]) {
+    const regular = id === "calc-data-double"
+    const directory = path.join(fixture.config.roles.evalbaseline!.resultsRoot, id)
+    const manifest = await prepareBaseline(directory, { checkout: fixture.checkout, pins, config: fixture.config, smoke: true, smokeCase: id })
+    await Bun.write(path.join(directory, "stand-handle.json"), JSON.stringify(lease))
+    await chmod(path.join(directory, "stand-handle.json"), 0o600)
+    const job = await beginBaselineMeasurement(directory, manifest.jobs[0]!.key, { checkout: fixture.checkout, pins })
+    if (!regular && nodeStatus === "running") { series.push(directory); manifests.push(manifest); continue }
+    const run = path.join(job.resultsDir, "fixture")
+    await Bun.write(path.join(run, "summary.json"), JSON.stringify({ run_id: id, task_ids: [id], storage_leftovers: [],
+      agent: { cli_version: pins.cliVersion, source_commit: pins.cliSource, source_dirty: false, binary_sha256: pins.binarySha256, model: pins.model, variant: pins.variant },
+      harness: { git_sha: pins.harnessSha, dirty: false }, loginom: { image_digest: pins.imageDigest }, dock: { skill_revision: pins.dockRevision },
+      judge: { model: pins.judgeModel, reasoning: pins.judgeReasoning, prompt_sha256: pins.promptSha256, schema_sha256: pins.schemaSha256 },
+      config: { repeat: 1, infra_retries: 0, timeout_ms: pins.timeoutMs, judge_timeout_ms: pins.judgeTimeoutMs, pass_threshold: pins.threshold },
+      tasks: [{ id, attempts: [{ task_id: id, attempt: 1, status: regular ? "completed" : nodeStatus, judge_status: regular ? "scored" : "skipped",
+        judge_attempts: regular ? 1 : 0, package_path: regular ? "package.lgp" : null, pass: regular, score: regular ? 100 : null,
+        environment_cleanup: { status: "confirmed" }, tokens: { input: 0, output: 0, reasoning: 0 },
+        counters: { toolCalls: 0, toolErrors: 0, memoryToolCalls: 0 }, duration_ms: 1, cost: 0 }] }] }))
+    await Bun.write(path.join(run, id, "1/cleanup.json"), JSON.stringify({ result: { status: "confirmed" }, processes: { status: "confirmed" },
+      stages: ["processes", "diagnostics", "writer", "ready", "profile_history", "storage"].map(stage => ({ stage, status: "confirmed" })) }))
+    if (regular) {
+      await Bun.write(path.join(run, id, "1/artifact/package.lgp"), await Bun.file(path.join(evalsRoot, "tasks/calc-data-double/reference.lgp")).bytes())
+      await Bun.write(path.join(run, id, "1/artifact/results/export.result.csv"), "Amount,Double\n10,20\n20,40\n")
+    }
+    if (!regular) await Bun.write(path.join(run, "code-verdict.json"), JSON.stringify(await validateNodeRun(run, [id], path.join(fixture.checkout, "evals/tasks/node-evals"))))
+    await recordBaselineMeasurement(directory, manifest.jobs[0]!.key, run)
+    const archive = path.join(fixture.directory, "operations/completed", id)
+    const receiptPath = path.join(archive, "release.json")
+    await Bun.write(receiptPath, JSON.stringify({ status: "RELEASED", acquiredAt: lease.acquiredAt, owner: lease, archive,
+      containerId: pins.containerId, evidenceSha256: "5".repeat(64) }))
+    if (regular || releaseNode) await sealBaselineRelease(directory, { status: "RELEASED", evidenceSha256: "5".repeat(64), receiptPath })
+    series.push(directory); manifests.push(manifest)
+  }
+  return { ...fixture, pins, series, manifests }
+}
+
+test("explicit acceptance permits only the measured node no_artifact while preserving raw readiness and evidence", async () => {
+  const fixture = await completedReadinessFixture()
+  try {
+    const original = await Bun.file(path.join(fixture.series[1]!, "journal.json")).text()
+    expect(await checkBaselineReadiness(fixture.config)).toMatchObject({ complete: 1, ready: false, accepted: false })
+    const result = await checkBaselineReadiness(fixture.config, { ...fixture.pins, harnessSha: "9".repeat(40) }, fixture.manifests[1]!.id)
+    expect(result).toMatchObject({ complete: 1, ready: false, accepted: true })
+    expect((await checkBaseline(fixture.series[1]!)).status).toBe("incomplete")
+    expect(await Bun.file(path.join(fixture.series[1]!, "journal.json")).text()).toBe(original)
+  } finally { await fixture.close() }
+})
+
+test("prepare persists the accepted node manifest for start and resume and rejects acceptance on smoke", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-acceptance-"))
+  try {
+    const acceptedNodeSmokeNoArtifact = crypto.randomUUID()
+    const manifest = await prepareBaseline(path.join(directory, "series"), { checkout: repoRoot, pins: baselineFixturePins, acceptedNodeSmokeNoArtifact })
+    expect(manifest.acceptedNodeSmokeNoArtifact).toBe(acceptedNodeSmokeNoArtifact)
+    expect((await checkBaseline(path.join(directory, "series"))).manifest.acceptedNodeSmokeNoArtifact).toBe(acceptedNodeSmokeNoArtifact)
+    await expect(prepareBaseline(path.join(directory, "smoke"), { checkout: repoRoot, pins: baselineFixturePins, smoke: true,
+      smokeCase: "crosstable-fixed-sum", acceptedNodeSmokeNoArtifact })).rejects.toThrow("ACCEPTANCE_ONLY_FOR_BASELINE")
+    expect(await runBaseline(["smoke", "--case", "crosstable-fixed-sum", "--series", path.join(directory, "cli"),
+      "--accept-node-smoke-no-artifact", acceptedNodeSmokeNoArtifact], {})).toMatchObject({ code: 2, reason: "ACCEPTANCE_ONLY_FOR_BASELINE" })
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("acceptance refuses a foreign node manifest, measurement pin drift, infrastructure outcomes and changed evidence", async () => {
+  const fixture = await completedReadinessFixture()
+  try {
+    await expect(checkBaselineReadiness(fixture.config, fixture.pins, crypto.randomUUID())).rejects.toThrow("READINESS_ACCEPTANCE_REFUSED")
+    for (const pins of [{ ...fixture.pins, corpusSha: "9".repeat(40) }, { ...fixture.pins, variant: "high" },
+      { ...fixture.pins, isolationSha256: "9".repeat(64) }, { ...fixture.pins, judgeReasoning: "medium" }]) {
+      await expect(checkBaselineReadiness(fixture.config, pins, fixture.manifests[1]!.id)).rejects.toThrow("READINESS_PINS_CHANGED")
+    }
+    const file = path.join((await checkBaseline(fixture.series[1]!)).rows[0]!.runDir!, "code-verdict.json")
+    await chmod(file, 0o600)
+    await Bun.write(file, "{}")
+    await expect(checkBaselineReadiness(fixture.config, fixture.pins, fixture.manifests[1]!.id)).rejects.toThrow("EVIDENCE_CHANGED")
+  } finally { await fixture.close() }
+  const infrastructure = await completedReadinessFixture("infra_error")
+  try {
+    await expect(checkBaselineReadiness(infrastructure.config, infrastructure.pins, infrastructure.manifests[1]!.id))
+      .rejects.toThrow("READINESS_ACCEPTANCE_REFUSED")
+  } finally { await infrastructure.close() }
+})
+
+test("acceptance never admits an unknown node outcome or an unreleased smoke", async () => {
+  for (const fixture of [await completedReadinessFixture("running"), await completedReadinessFixture("no_artifact", false)]) {
+    try {
+      await expect(checkBaselineReadiness(fixture.config, fixture.pins, fixture.manifests[1]!.id)).rejects.toThrow("READINESS_ACCEPTANCE_REFUSED")
+    } finally { await fixture.close() }
+  }
+})
+
+test("a frozen corpus survives operational commits but refuses changed or untracked cases", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-corpus-pin-"))
+  try {
+    await Bun.$`git -C ${directory} init`.quiet()
+    await Bun.write(path.join(directory, "evals/tasks/case/task.json"), "{}")
+    await Bun.$`git -C ${directory} add .`.quiet()
+    await Bun.$`git -C ${directory} -c user.name=Fixture -c user.email=fixture@example.test commit -m corpus`.quiet()
+    const sha = (await Bun.$`git -C ${directory} rev-parse HEAD`.quiet()).text().trim()
+    await Bun.write(path.join(directory, "evals/src/baseline.ts"), "operational update")
+    await Bun.$`git -C ${directory} add .`.quiet()
+    await Bun.$`git -C ${directory} -c user.name=Fixture -c user.email=fixture@example.test commit -m harness`.quiet()
+    expect(await verifyBaselineCorpus(directory, sha)).toBe(sha)
+    await Bun.write(path.join(directory, "evals/tasks/case/task.json"), "changed")
+    await expect(verifyBaselineCorpus(directory, sha)).rejects.toThrow("CORPUS_PIN_CHANGED")
+    await Bun.$`git -C ${directory} restore evals/tasks/case/task.json`.quiet()
+    await Bun.write(path.join(directory, "evals/tasks/untracked/task.json"), "{}")
+    await expect(verifyBaselineCorpus(directory, sha)).rejects.toThrow("CORPUS_PIN_CHANGED")
+  } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
 test("readiness refuses the wrong card, changed pins and altered admission evidence", async () => {

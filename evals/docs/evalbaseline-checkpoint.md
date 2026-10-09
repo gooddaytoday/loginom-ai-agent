@@ -6,7 +6,7 @@
 - Infrastructure/judge recovery, retries, abandon, reconcile, execution budget и cleanup resolutions проверены.
 - Config v2 активна; readinessIssue LAB-54 01a11f72-c385-7d3e-bfd7-6911b3a7bdf2; профиль/CLI EvalBaseline и параметры Rich/Ben сохранены.
 - Supplement 733 файла; manifest SHA256 9f78455de8c03996e3dbfc12696b0fed5197597f664553cd2502b349ba5e0aae.
-- Локально: 553 PASS/9 clean-host SKIP/0 FAIL, 562 теста/48 файлов; bun typecheck PASS.
+- Локально после допуска владельца: 558 PASS/9 clean-host SKIP/0 FAIL, 567 тестов/48 файлов/2752 assertions; bun typecheck PASS.
 - Server helper+writer/registration: 51 PASS/0 SKIP; все 9 clean-host fixtures пройдены.
 - Единичный fixture CLEANUP_UNKNOWN не воспроизведён в 6 повторах и полном suite; причина не установлена.
 - Original bytes/failed cleanup/retry/verdict immutable; отдельный cleanup proof разрешает безопасное продолжение.
@@ -17,4 +17,4 @@
 - First prepare error сохранён; Dock URL исправлен до серий; независимый post-release check: 5 profiles clean/storage EMPTY/browser 0.
 - LAB-32 исходный Calc provider FAIL/0 tokens/no artifact сохранён; новый calc 2f8b3b19-dfd3-45c4-819a-315a7beae02d PASS/100/oracle/actual medium (10 DB messages)/release.
 - LAB-54 node 38aa02d9-2568-4e87-95c3-f74264525d7b: no_artifact/code FAIL; 19 DB messages actual medium; cleanup/release/FREE. Calc и node delivery bytes/SHA/15+11 members verified.
-- Readiness 1/2; LAB-54 blocked: CLI F3 guard отвергает auto-label с ';'. Исходные результаты/пины сохранены; далее решение владельца о критерии допуска либо новых продуктовых пинах → full card/start + heartbeat 30m.
+- Readiness 1/2; владелец разрешил full CLI 0.1.17 без новых smoke: принять node manifest 38aa02d9-2568-4e87-95c3-f74264525d7b; далее проверенный supplement → full card/start + heartbeat 15m.

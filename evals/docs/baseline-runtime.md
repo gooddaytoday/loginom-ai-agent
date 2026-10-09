@@ -160,3 +160,13 @@ guards, profiles/auth/history/DB исключаются. Verifier проверя
 manifest, уникальность имён и обычные файловые типы без извлечения. Absolute/escaping paths,
 links, extra files и изменённые bytes запрещены; распакованный лимит 2 GiB. Скачанный архив
 Multica проверяется тем же verifier; доставка не заменяет полноту и live-приёмку.
+
+## Явное исключение текущего node smoke
+
+Разрешение владельца 2026-10-09: продолжить полный baseline CLI 0.1.17 без новых smoke.
+При prepare полной серии записать `--accept-node-smoke-no-artifact 38aa02d9-2568-4e87-95c3-f74264525d7b`.
+Исходный node smoke остаётся incomplete/FAIL; raw readiness 1/2 и отдельное accepted=true.
+UUID допуска сохраняется в неизменяемом manifest; start/resume сверяют истинный no_artifact,
+кодовую оценку, cleanup/release, complete calc и все пины кроме обновлённого operational harness SHA.
+EVAL_CORPUS_SHA сохраняет прежний корпус и проверяет дерево evals/tasks; штатный default — HEAD.
+Без этого явного исключения прежний readiness gate сохраняется. Контроль основного чата — каждые 15 минут.
