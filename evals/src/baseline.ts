@@ -223,14 +223,14 @@ export async function beginBaselineMeasurement(directory: string, key: string, c
 /** An immutable per-case admission survives a crash and replacement series directories. */
 export async function admitBaselineSmoke(directory: string, config: NodeOpsConfig, owner: { issue: string; task: string }) {
   const { manifest, journal } = await readBaseline(directory)
-  const role = config.roles.evalbaseline
+  const role = config.roles[baselineRole(manifest)]
   if (manifest.kind !== "smoke" || manifest.cases.length !== 1 || manifest.jobs.length !== 1 || manifest.jobs[0]!.attempt !== 1 ||
     !role || journal.checkout !== role.checkout || !directory.startsWith(role.resultsRoot + path.sep) || await realpath(directory) !== directory ||
     baselineHash(JSON.stringify(config)) !== manifest.pins.opsConfigSha256 || owner.issue !== role.readinessIssue ||
     typeof owner.task !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(owner.task)) throw new BaselineFailure("SMOKE_ADMISSION_REFUSED")
   const item = manifest.cases[0]!
   if (smokeCaseKey(item.id) !== item.key) throw new BaselineFailure("SMOKE_CASE_REFUSED")
-  const root = await readinessRoot(config, true)
+  const root = await readinessRoot(config, true, baselineRole(manifest))
   const file = path.join(root!, item.id + ".json")
   const admission: SmokeAdmission = { version: 1, issue: owner.issue, task: owner.task, caseKey: item.key, seriesDir: directory,
     baselineId: manifest.id, manifestSha256: journal.manifestSha256 }
@@ -247,8 +247,10 @@ export async function admitBaselineSmoke(directory: string, config: NodeOpsConfi
 }
 
 /** Readiness comes from both immutable smoke reports and their distinct verified releases. */
-export async function checkBaselineReadiness(config: NodeOpsConfig, pins?: BaselinePins, acceptedNodeSmokeNoArtifact?: string) {
-  const root = await readinessRoot(config, false)
+export async function checkBaselineReadiness(config: NodeOpsConfig, pins?: BaselinePins, acceptedNodeSmokeNoArtifact?: string, executorRole: BaselineRole = "evalbaseline") {
+  if (executorRole === "evalrunner" && acceptedNodeSmokeNoArtifact) throw new BaselineFailure("LEGACY_ACCEPTANCE_REFUSED")
+  const role = config.roles[executorRole]
+  const root = await readinessRoot(config, false, executorRole)
   const checks: { caseKey: string; admitted: boolean; complete: boolean; acceptedNoArtifact?: boolean; baselineId?: string; pins?: BaselinePins; release?: BaselineRelease }[] = []
   for (const id of ["calc-data-double", "crosstable-fixed-sum"]) {
     const caseKey = smokeCaseKey(id)
@@ -258,15 +260,16 @@ export async function checkBaselineReadiness(config: NodeOpsConfig, pins?: Basel
     }
     const saved = await readPrivateBaselineJson(file) as SmokeAdmission
     const { manifest, journal } = await readBaseline(saved.seriesDir)
-    if (saved.version !== 1 || saved.issue !== config.roles.evalbaseline!.readinessIssue || saved.caseKey !== caseKey ||
+    if (saved.version !== 1 || saved.issue !== role!.readinessIssue || saved.caseKey !== caseKey ||
       saved.baselineId !== manifest.id || saved.manifestSha256 !== journal.manifestSha256 || manifest.kind !== "smoke" || manifest.cases.length !== 1 ||
-      manifest.cases[0]!.key !== caseKey || !saved.seriesDir.startsWith(config.roles.evalbaseline!.resultsRoot + path.sep) ||
+      baselineRole(manifest) !== executorRole || manifest.cases[0]!.key !== caseKey || !saved.seriesDir.startsWith(role!.resultsRoot + path.sep) ||
       baselineHash(JSON.stringify(config)) !== manifest.pins.opsConfigSha256) throw new BaselineFailure("READINESS_EVIDENCE_CHANGED")
     // The accepted smoke predates the operational supplement; all measurement pins still match.
     if (pins && JSON.stringify(acceptedNodeSmokeNoArtifact ? { ...pins, harnessSha: manifest.pins.harnessSha } : pins) !== JSON.stringify(manifest.pins))
       throw new BaselineFailure("READINESS_PINS_CHANGED")
     const report = await checkBaseline(saved.seriesDir)
-    checks.push({ caseKey, admitted: true, complete: report.status === "complete" && manifest.pins.mode === "live",
+    checks.push({ caseKey, admitted: true, complete: manifest.pins.mode === "live" && (executorRole === "evalbaseline" ? report.status === "complete" :
+        report.coverage.measured === 1 && report.coverage.unknown === 0 && report.cleanup && report.released),
       acceptedNoArtifact: caseKey === "node:crosstable-fixed-sum" && manifest.id === acceptedNodeSmokeNoArtifact && manifest.pins.mode === "live" &&
         report.coverage.measured === 1 && report.coverage.unknown === 0 && report.cleanup && report.released &&
         report.rows[0]?.result?.status === "no_artifact" && report.rows[0].verdict === "FAIL" && report.smokeVerification?.checks[0]?.evaluator === true,
@@ -280,15 +283,19 @@ export async function checkBaselineReadiness(config: NodeOpsConfig, pins?: Basel
   const accepted = Boolean(acceptedNodeSmokeNoArtifact && checks.find(check => check.caseKey === "regular:calc-data-double")?.complete &&
     checks.find(check => check.caseKey === "node:crosstable-fixed-sum")?.acceptedNoArtifact)
   if (acceptedNodeSmokeNoArtifact && !accepted) throw new BaselineFailure("READINESS_ACCEPTANCE_REFUSED")
-  return { issue: config.roles.evalbaseline!.readinessIssue, expected: 2, admitted: admitted.length,
-    complete: checks.filter(check => check.complete).length, ready: checks.every(check => check.complete), accepted, checks }
+  const replay = executorRole === "evalbaseline" || !role?.replayEvidence ? executorRole === "evalbaseline" : await (async () => {
+    const { verifyEvaluatorReplay } = await import("./evaluator-replay")
+    return (await verifyEvaluatorReplay(role.replayEvidence!, role.checkout, pins?.threshold ?? 70)).mode === "live"
+  })()
+  return { issue: role!.readinessIssue, expected: 2, admitted: admitted.length,
+    complete: checks.filter(check => check.complete).length, ready: checks.every(check => check.complete) && replay, replay, accepted, checks }
 }
 
-async function readinessRoot(config: NodeOpsConfig, create: boolean) {
-  const issue = config.roles.evalbaseline?.readinessIssue
-  if (config.version !== 2 || !issue || !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(issue) || !path.isAbsolute(config.runtimeRoot))
+async function readinessRoot(config: NodeOpsConfig, create: boolean, executorRole: BaselineRole) {
+  const issue = config.roles[executorRole]?.readinessIssue
+  if (config.version < 2 || executorRole === "evalrunner" && config.version !== 3 || !issue || !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(issue) || !path.isAbsolute(config.runtimeRoot))
     throw new BaselineFailure("READINESS_CONFIGURATION_REQUIRED")
-  const root = path.join(config.runtimeRoot, "operations/baseline-readiness", issue)
+  const root = path.join(config.runtimeRoot, executorRole === "evalbaseline" ? "operations/baseline-readiness" : "operations/evalrunner-readiness", issue)
   if (create) await mkdir(root, { recursive: true, mode: 0o700 })
   const info = await lstat(root).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error })
   if (!info) return undefined
@@ -644,7 +651,7 @@ async function executeLiveBaseline(directory: string, config: NodeOpsConfig, env
   if (JSON.stringify(pins) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
   if (!options.resume && journal.jobs.some(job => job.state !== "pending")) throw new BaselineFailure("USE_RESUME")
   if (journal.release) return { code: 0, ...await writeCheckResult(directory) }
-  const readiness = await checkBaselineReadiness(config, pins, manifest.acceptedNodeSmokeNoArtifact)
+  const readiness = await checkBaselineReadiness(config, pins, manifest.acceptedNodeSmokeNoArtifact, baselineRole(manifest))
   if (manifest.kind === "baseline" && !readiness.ready && !readiness.accepted) throw new BaselineFailure("BASELINE_READINESS_INCOMPLETE")
   if (manifest.kind === "smoke") {
     const previous = readiness.checks.find(check => check.caseKey === manifest.cases[0]!.key)

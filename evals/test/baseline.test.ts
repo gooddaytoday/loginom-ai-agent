@@ -76,26 +76,33 @@ test("smoke rejects a missing or foreign case before live configuration or dispa
     .toMatchObject({ code: 2, reason: "CASE_ONLY_FOR_SMOKE" })
 })
 
-async function readinessFixture() {
+async function readinessFixture(executorRole: "evalbaseline" | "evalrunner" = "evalbaseline") {
   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-readiness-"))
   const results = path.join(directory, "results")
   await mkdir(results)
-  const checkout = path.join(directory, "checkouts/evalbaseline")
+  const checkout = path.join(directory, `checkouts/${executorRole}`)
   await cp(path.join(evalsRoot, "tasks"), path.join(checkout, "evals/tasks"), { recursive: true })
-  const role = { checkout, evalProfile: path.join(directory, "roles/evalbaseline/profile"), workRoots: [path.join(directory, "roles/evalbaseline/work")], resultsRoot: results,
+  const role = { checkout, evalProfile: path.join(directory, `roles/${executorRole}/profile`), workRoots: [path.join(directory, `roles/${executorRole}/work`)], resultsRoot: results,
     cliBin: path.join(directory, "cli-baseline/bin/cli"), readinessIssue: "LAB-32" }
   const worker = (name: string) => ({ checkout: path.join(directory, "checkouts", name), referenceProfile: path.join(directory, "roles", name, "reference"),
     evalProfile: path.join(directory, "roles", name, "eval"), workRoots: [path.join(directory, "roles", name, "work")], resultsRoot: path.join(directory, "roles", name, "results") })
-  const config: NodeOpsConfig = { version: 2, runtimeRoot: directory, endpoint: "http://fixture", container: { name: "fixture", id: "b".repeat(64), storageDir: "/workdir/UserStorage/user" },
+  const config: NodeOpsConfig = { version: executorRole === "evalrunner" ? 3 : 2, runtimeRoot: directory, endpoint: "http://fixture", container: { name: "fixture", id: "b".repeat(64), storageDir: "/workdir/UserStorage/user" },
     cliBin: path.join(directory, "cli-old/bin/cli"), roles: { rich: worker("rich"), ben: worker("ben"), evalbaseline: role } }
+  if (executorRole === "evalrunner") {
+    const baseline = worker("evalbaseline")
+    config.roles.evalbaseline = { ...baseline, referenceProfile: undefined, cliBin: path.join(directory, "cli-baseline-other/bin/cli"), readinessIssue: "LAB-32" }
+    config.roles.evalrunner = { ...role, product: { version: baselineFixturePins.cliVersion, source: baselineFixturePins.cliSource,
+      manifestSha256: baselineFixturePins.cliManifestSha256, binarySha256: baselineFixturePins.binarySha256, model: baselineFixturePins.model, variant: baselineFixturePins.variant } }
+  }
   for (const item of Object.values(config.roles)) for (const root of [item.checkout, item.evalProfile, item.referenceProfile, ...item.workRoots, item.resultsRoot])
     if (root) await mkdir(root, { recursive: true, mode: 0o700 })
   await Bun.write(config.cliBin, "fixture CLI never executed")
   await Bun.write(role.cliBin, "fixture CLI never executed")
+  if (config.roles.evalbaseline?.cliBin) await Bun.write(config.roles.evalbaseline.cliBin, "fixture CLI never executed")
   const pins = { ...baselineFixturePins, opsConfigSha256: baselineHash(JSON.stringify(config)) }
-  return { directory, checkout, config, pins, async prepare(name: string, smokeCase = "calc-data-double") {
+  return { directory, checkout, config, pins, executorRole, async prepare(name: string, smokeCase = "calc-data-double") {
     const series = path.join(results, name)
-    await prepareBaseline(series, { checkout, pins, config, smoke: true, smokeCase })
+    await prepareBaseline(series, { checkout, pins, config, smoke: true, smokeCase, executorRole, product: config.roles[executorRole]?.product })
     return series
   }, close: () => rm(directory, { recursive: true, force: true }) }
 }
@@ -129,16 +136,16 @@ test("concurrent smoke admissions cannot reserve two series for the same case", 
   } finally { await fixture.close() }
 })
 
-async function completedReadinessFixture(nodeStatus = "no_artifact", releaseNode = true) {
-  const fixture = await readinessFixture()
+async function completedReadinessFixture(nodeStatus = "no_artifact", releaseNode = true, executorRole: "evalbaseline" | "evalrunner" = "evalbaseline") {
+  const fixture = await readinessFixture(executorRole)
   const pins = { ...fixture.pins, mode: "live" as const }
-  const lease = await acquireNodeStand(fixture.config, { issue: "LAB-32", task: "fixture-smokes", role: "evalbaseline", phase: "eval", sha: pins.harnessSha })
+  const lease = await acquireNodeStand(fixture.config, { issue: "LAB-32", task: "fixture-smokes", role: executorRole, phase: "eval", sha: pins.harnessSha })
   const series: string[] = []
   const manifests = []
   for (const id of ["calc-data-double", "crosstable-fixed-sum"]) {
     const regular = id === "calc-data-double"
-    const directory = path.join(fixture.config.roles.evalbaseline!.resultsRoot, id)
-    const manifest = await prepareBaseline(directory, { checkout: fixture.checkout, pins, config: fixture.config, smoke: true, smokeCase: id })
+    const directory = path.join(fixture.config.roles[executorRole]!.resultsRoot, id)
+    const manifest = await prepareBaseline(directory, { checkout: fixture.checkout, pins, config: fixture.config, smoke: true, smokeCase: id, executorRole, product: fixture.config.roles[executorRole]?.product })
     await Bun.write(path.join(directory, "stand-handle.json"), JSON.stringify(lease))
     await chmod(path.join(directory, "stand-handle.json"), 0o600)
     const job = await beginBaselineMeasurement(directory, manifest.jobs[0]!.key, { checkout: fixture.checkout, pins })
@@ -577,4 +584,15 @@ test("judge and infrastructure errors retain retry expenditure and stop admissio
       expect(await Bun.file(path.join(series, "journal.json")).text()).toBe(before)
     }
   } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+
+test("EvalRunner accepts measured product no_artifact only after independent evaluator replay and release", async () => {
+  const fixture = await completedReadinessFixture("no_artifact", true, "evalrunner")
+  try {
+    expect(await checkBaselineReadiness(fixture.config, fixture.pins, undefined, "evalrunner")).toMatchObject({ complete: 2, ready: false, replay: false })
+    await expect(checkBaselineReadiness(fixture.config, fixture.pins, fixture.manifests[1]!.id, "evalrunner")).rejects.toThrow("LEGACY_ACCEPTANCE_REFUSED")
+    expect((await checkBaseline(fixture.series[1]!)).status).toBe("incomplete")
+    expect(await checkBaselineReadiness(fixture.config)).toMatchObject({ admitted: 0 })
+  } finally { await fixture.close() }
 })
