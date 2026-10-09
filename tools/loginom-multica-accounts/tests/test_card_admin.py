@@ -247,9 +247,10 @@ class ExactCard47Origin(unittest.TestCase):
         route=load('exact_card47_test','owner-card-observer.py')
         base=Path('/home/user/multica_workspaces/lab-6462f220cf3b/lab-47-fac8fe178ede/workdir/evidence-private/card-observer-504fb604-40c6-4ccf-9f64-c784cb1bb136')
         marker=read_private(base/'observer-marker-final-checkpoint.private.json');original=json.dumps(marker)
-        origins=[card.binding(base/name) for name in route.ORIGINS]
+        origins=[*[card.binding(base/name) for name in route.ORIGINS],*[card.binding(route.ROOT_ORIGIN_DIR/name) for name in route.ROOT_ORIGINS]]
         exact,partial=route.origin_records(marker,origins);self.assertGreaterEqual(len(exact),23);self.assertEqual(len(partial),2)
         self.assertEqual(json.dumps(marker),original)
+        self.assertEqual(len(route.root_origin_records()),11)
         for field,value in [('attempt_uuid',str(uuid4())),('original_card_config_hash','0'*64)]:
             with self.assertRaisesRegex(RuntimeError,'ORIGIN_UNKNOWN'):route.origin_records({**marker,field:value},origins)
         with self.assertRaisesRegex(RuntimeError,'ORIGINAL_BYTES_REQUIRED'):route.origin_records(marker,origins[:-1])

@@ -20,6 +20,39 @@ ORIGINS={
  'observer-publication-verification.private.json':'5e0cb54f5fe1b52e6854763f2c91ffe679b8f3d508971be77579e4599818728e',
  'session-Observer-secrets.private.json':'9b5c6f8a085da7bcf95320ed8aef779f03c1ed52fa0f2f89744c0537c7ecbdaf',
  'observer.mjs':'9bbf3c388a2ce33962e7dcae86326cfdc7a4c8c06c248e5b478d5bccc4088abd'}
+ROOT_ORIGIN_DIR=Path('/home/user/.local/share/loginom-lab53-root/99fbf02c-13f1-4d4c-8c20-9c02d502cd37/admin47-origin-inputs')
+ROOT_ORIGINS={
+ 'loginom-common53-original47-card-admin-marker-binding-private.json':'38c1e6fa55025f6770e3e70c196c28bead2f95dbfc07716f1c37d1c0d5e345b1',
+ 'loginom-common53-original47-card-admin-marker-private.json':MARKER_SHA,
+ 'loginom-common53-original47-observer-result-private.json':'3f992d2346344bdf42955cfa037b3204bdcf9690df3d20e889ce013efe2fdc7b',
+ 'loginom-rootfinal-generator-root-reconciliation-manifest.json':'540fd195ee0b4ac79558d922adfd9f2fc1ba97aead64b1a7f0e75e72cb052620',
+ 'loginom-rootfinal-generator-root-reconciliation-receipt.json':'b0c434a5b29677b7d54a89c03008f046709974a87110c7ab8d09aaa973ae638b',
+ 'loginom-rootfinal-generator-root-reconciliation-cleanup.json':'25355b4f6816a122ade49ea88dedadd4055f25512f98144bef97b247bc5ca58b',
+ 'loginom-rootfinal-generator-root-reconciliation-resources.json':'179a230496cc7883bda33131633f82f19720cdf2b540af3aa0c82da81b29d432'}
+def root_origin_records():
+    manifest=read_private(ROOT_ORIGIN_DIR/'loginom-rootfinal-generator-root-reconciliation-manifest.json')
+    if manifest.get('issue_id')!=CARD or manifest.get('attempt_uuid')!=ATTEMPT or manifest.get('scope')!='ROOT RECONCILIATION ONLY; observer3119/server and node acceptance excluded':
+        raise RuntimeError('CARD47_ROOT_ORIGIN_UNKNOWN')
+    if len(manifest.get('artifacts',[]))!=3:raise RuntimeError('CARD47_ROOT_ORIGIN_UNKNOWN')
+    for item in manifest['artifacts']:
+        path=ROOT_ORIGIN_DIR/('loginom-rootfinal-'+item['filename'])
+        if path.name not in ROOT_ORIGINS or item['sha256']!=ROOT_ORIGINS[path.name] or path.stat().st_size!=item['bytes']:
+            raise RuntimeError('CARD47_ROOT_ORIGIN_UNKNOWN')
+    cleanup=read_private(ROOT_ORIGIN_DIR/'loginom-rootfinal-generator-root-reconciliation-cleanup.json')
+    if cleanup['issue_id']!=CARD or cleanup['attempt_uuid']!=ATTEMPT or cleanup['exact_own_tree_columns']!=['pid','ppid','start_ticks','comm'] or (
+            cleanup['previous_observed_own_tree_count']!=15 or cleanup['historical_uncaptured_tree_limits_preserved'] is not True):
+        raise RuntimeError('CARD47_ROOT_ORIGIN_UNKNOWN')
+    tree=cleanup['exact_own_root_FD_readback_tree']
+    if len(tree)!=11:raise RuntimeError('CARD47_ROOT_ORIGIN_UNKNOWN')
+    records=[]
+    for row in tree:
+        if len(row)!=4 or not isinstance(row[0],int) or isinstance(row[0],bool) or row[0]<=0 or not isinstance(row[2],str) or not row[2].isdigit():
+            raise RuntimeError('CARD47_PROCESS_UNKNOWN')
+        records.append({'pid':row[0],'start_ticks':row[2]})
+    # ROOT-only old outcome and its missing 15-tree facts never supply server
+    # absence or fill missing identities. Only the 11 retained exact rows enter
+    # the NEW current absence check (deduplicated against observer collectors).
+    return records
 def origin_records(marker,origins):
     if marker.get('issue_id')!=CARD or marker.get('attempt_uuid')!=ATTEMPT or marker.get('task_id')!=TASK or marker.get('original_card_config_hash')!=CONFIG_SHA:
         raise RuntimeError('CARD47_ORIGIN_UNKNOWN')
@@ -29,6 +62,7 @@ def origin_records(marker,origins):
         or checkpoint['root_manifest_sha256']!='540fd195ee0b4ac79558d922adfd9f2fc1ba97aead64b1a7f0e75e72cb052620'
         or len(session)!=1 or session[0]['session_id']!=3119 or session[0]['guid_sha256']!=GUID_SHA):raise RuntimeError('CARD47_ORIGIN_UNKNOWN')
     base=Path(marker['private_evidence']);expected={str(base/name):sha for name,sha in ORIGINS.items()}
+    expected.update({str(ROOT_ORIGIN_DIR/name):sha for name,sha in ROOT_ORIGINS.items()})
     if {x['path']:x['sha256'] for x in origins}!=expected:raise RuntimeError('CARD47_ORIGINAL_BYTES_REQUIRED')
     card.require_bindings(origins)
     secret=read_private(base/'session-Observer-secrets.private.json')
@@ -36,7 +70,7 @@ def origin_records(marker,origins):
     result=read_private(base/'observer.json')
     if result['issue_id']!=CARD or result['attempt_uuid']!=ATTEMPT or result['observer_login_attempts']!=1:
         raise RuntimeError('CARD47_ORIGIN_UNKNOWN')
-    exact={};partial=set()
+    exact={(r['pid'],r['start_ticks']):r for r in root_origin_records()};partial=set()
     for name in ['observer-main-process.json','observer-key-initial-process.json']:
         data=read_private(base/name)
         leader=next((r for r in data['observed_exact_process_tree'] if r.get('pid')==data['child_pid']),None)
@@ -103,6 +137,8 @@ def reconcile(authorization_file,evidence_dir,source_sha):
             'operation_id':operation_id,'source':source,'current_proof':'CURRENT_CARD47_PROOF_ONLY','ready':False,'history_state':'UNKNOWN_PRESERVED',
             'history_facts_modified':False,'origins':origins,'known_exact_records':exact,'partial_numeric_pids':partial,
             'guid_algorithm':'sha256-utf8-exact-guid-string','historical_executed_bytes':'NOT_ESTABLISHED',
+            'root_origin_scope':'ROOT_RECONCILIATION_ONLY_NOT_TRANSFERRED','previous_observed_own_tree_count':15,
+            'historical_uncaptured_tree_limits_preserved':True,
             'server_proof':card.binding(consumed),'fd_proof':fd_proof,'marker_original_status':old.get('phase')})
     finally:os.close(fd)
 if __name__=='__main__':

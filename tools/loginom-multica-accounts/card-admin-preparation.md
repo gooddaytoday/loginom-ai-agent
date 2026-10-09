@@ -193,6 +193,13 @@ fails closed. A fresh response is mandatory; historical3128 snapshots are inputs
 only, not this proof. Origins are exact retained observer result, two original
 process collectors, publication record, secret GUID file and observer source
 from marker.private_evidence; file digests are pinned in source. The secret GUID
+and seven owner-copied original47 inputs are byte-bound. The original770-byte
+root-final manifest SHA540fd195… binds all three receipt/cleanup/resources
+artifacts; its scope excludes observer3119/server/node acceptance. The retained
+cleanup supplies11 available exact records, deduplicated against the observer
+collectors. previousObservedOwnTreeCount15 and uncaptured-old-tree TRUE remain
+unknown historical limits, never invented PID trees/ticks or a transferred PASS.
+All originals are included in the NEW held-flock FD/hash checks. The secret GUID
 is hashed as its actual UTF8 string and compared privately with captured hash;
 no normalization or opaque ID substitution. This never establishes executed
 source bytes or replaces old unknown causes.
