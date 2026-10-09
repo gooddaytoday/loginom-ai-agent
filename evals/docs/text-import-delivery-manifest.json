@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "runtime": "NOT_RUN",
+  "groups": [
+    {
+      "card": 1,
+      "ids": [
+        "txt-comma-utf8",
+        "csv-comma-utf8",
+        "txt-semicolon-cp1251-decimal",
+        "csv-pipe-multiline",
+        "tsv-utf8",
+        "tsv-utf16le"
+      ],
+      "file": "text-import-card-1-inputs.zip",
+      "bytes": 11986,
+      "sha256": "f175fe6b01793e451ad334a0b5ee8b8b91f3e569d732027e4360c025571beccd"
+    },
+    {
+      "card": 2,
+      "ids": [
+        "txt-tab-utf16le",
+        "txt-tab-utf16be",
+        "txt-utf8-bom",
+        "txt-cp1252",
+        "csv-tab-utf16le",
+        "csv-tab-utf16be",
+        "csv-utf8-bom",
+        "csv-cp1252",
+        "csv-semicolon-cp1251-decimal"
+      ],
+      "file": "text-import-card-2-inputs.zip",
+      "bytes": 17537,
+      "sha256": "3cab0866997e36677b816050eab1b709c56c663fb9db945811fd93fbaffe6a63"
+    },
+    {
+      "card": 3,
+      "ids": [
+        "txt-no-header",
+        "txt-skip-header",
+        "txt-no-header-skip",
+        "txt-space",
+        "txt-merge-on",
+        "txt-merge-off",
+        "csv-no-header",
+        "csv-skip-header",
+        "csv-no-header-skip",
+        "csv-space",
+        "csv-merge-on",
+        "csv-merge-off"
+      ],
+      "file": "text-import-card-3-inputs.zip",
+      "bytes": 23143,
+      "sha256": "14c81f76a19c1ca931ffaf22d45fa8587b5d5adb5d86cd14bae7cd0c32967deb"
+    },
+    {
+      "card": 4,
+      "ids": [
+        "txt-single-quote",
+        "txt-backtick-quote",
+        "txt-no-quote",
+        "txt-multiline-crlf",
+        "txt-multiline-lf",
+        "csv-single-quote",
+        "csv-backtick-quote",
+        "csv-no-quote",
+        "csv-multiline-crlf",
+        "csv-multiline-lf",
+        "txt-pipe-multiline"
+      ],
+      "file": "text-import-card-4-inputs.zip",
+      "bytes": 21476,
+      "sha256": "1acbf1603bd1fe4839d71434bc3122c6270eb3f2156de52f06951d7b23c1bac5"
+    },
+    {
+      "card": 5,
+      "ids": [
+        "txt-unclosed-quote",
+        "txt-wrong-encoding",
+        "txt-wrong-delimiter",
+        "txt-ambiguous-headers",
+        "csv-unclosed-quote",
+        "csv-wrong-encoding",
+        "csv-wrong-delimiter",
+        "csv-ambiguous-headers",
+        "initial-incomplete-settings",
+        "missing-source-column"
+      ],
+      "file": "text-import-card-5-inputs.zip",
+      "bytes": 17169,
+      "sha256": "9a4a82e8a0d9b8ec21741578f0702c0117407be317e8de04031507bc4919d85a"
+    },
+    {
+      "card": 6,
+      "ids": [
+        "missing-source-path-correction",
+        "txt-six-to-five-correction",
+        "csv-delimiter-correction",
+        "csv-to-tsv-source-refresh"
+      ],
+      "file": "text-import-card-6-inputs.zip",
+      "bytes": 9223,
+      "sha256": "f7587bc14fe331f9b2fa4a3396a6ff05667848569582a4a002c7d4bb8482a868"
+    },
+    {
+      "card": 7,
+      "ids": [
+        "analytic-txt-types-identifiers",
+        "analytic-txt-null-empty-zero",
+        "analytic-txt-multiline-values",
+        "analytic-csv-types-identifiers",
+        "analytic-csv-null-empty-zero",
+        "analytic-csv-multiline-values"
+      ],
+      "file": "text-import-card-7-inputs.zip",
+      "bytes": 11932,
+      "sha256": "2886eed7582dfd91a752d739b52f947affecff1ce06e68fcaf24b884220d899a"
+    }
+  ]
+}

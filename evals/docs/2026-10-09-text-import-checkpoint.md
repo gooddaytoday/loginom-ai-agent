@@ -1,14 +1,16 @@
 # Checkpoint подготовки текстового импорта
 
-- Ветка `text-import-evals`, база `7a45abd845f830610f376e2f21631acc8a48e8b2`; кодовая точка `bd29fc792923c26364526b0da02dd820a976d99e`.
-- Модели Rich/Ben/Evaler неизменны. Reference/product Loginom AI Agent — `openai/gpt-6-luna/high`; live admission отклоняет другой выбор.
-- LAB-55 при начале подготовки: in_progress, активный run `01a11fc8-1ebb-7371-907b-16e7d26c14f4`; её сервер и pins не изменены.
-- Подготовлены 58 synthetic drafts/59 inputs; bytes/SHA и независимые typed oracles проверены; private transactions исключены.
-- Исправлены два вложенных source metadata и противоречия negative/refresh prompts; изменения записаны в preparation.json.
-- Добавлены diagnostic task/hash/prompt, typed warm validator, source-bound collector, runner/reference integration, same-GUID correction и CSV→TSV sequence.
-- Добавлена offline-подготовка cold-контракта. Ни модель, ни Loginom live/reference/product/cold не запускались.
-- Адресные тесты и `bun typecheck` прошли; полный `bun test` выполняется, лог `.bundle/text-import-verification/bun-test.log`.
-- Осталось: полноценный cold helper/verification и saved settings checks, дополнительные mutations/все case families, readiness/finalization и skill 1.0.7.
-- Осталось: inputs-only ZIPs, immutable delivery manifests/CLI preparation, повторные offline checks, push exact SHA.
-- Затем создать 8 backlog карточек существующего squad с `--no-start`, вложениями и pins; проверить runs/wakeups и сохранить readback.
-- Карточки ещё не созданы; цель активна. После создания карточек запуск возможен только отдельным этапом по команде владельца.
+- Ветка `text-import-evals`; база `7a45abd845f830610f376e2f21631acc8a48e8b2`, изменения только evals/.
+- Код/документация/skill 1.0.7 подготовлены; точный публикуемый SHA задаётся manifest комплекта.
+- Rich/Ben/Evaler неизменны: gpt-6.1-sol/xhigh. Reference/product Loginom AI Agent — openai/gpt-6-luna/high.
+- LAB-55 подтверждена in_progress/running; сервер, runtime, profiles, pins не изменены. Подготовка локальная.
+- 58 drafts/59 inputs: bytes/SHA/typed oracles проверены; private transactions исключены; новых reference нет.
+- Diagnostic/hash/prompt, typed validator/raw collector, runner/reference, corrections/refresh, cold/finalization готовы.
+- Skill 1.0.7 и шаблон назначения фиксируют отдельный CLI pin 5cd74d8ee5d6125692d953eb327b4d4f833c27a1.
+- Семь inputs-only ZIP воспроизводимы, manifest — text-import-delivery-manifest.json; oracle не включены.
+- Полный изолированный bun test: 544 pass/0 fail; bun typecheck/corpus/ZIP/native syntax: PASS.
+- Отчёт: 2026-10-09-text-import-preparation-report.md; original host-native guard отказы сохранены, чужие процессы не остановлены.
+- Model/reference/product/cold/live compatibility: NOT_RUN. CLI не собран/не активирован; defaults не менялись.
+- Осталось опубликовать exact SHA/immutable комплект и создать 8 backlog карточек squad через --no-start.
+- Затем readback вложений/hashes/статусов и отсутствие runs/wakeups, сохранить ссылки; без запуска работников.
+- Следующее исполнение допускается только отдельной командой владельца; последовательность 0→1→2→3→4→5→6→7.
