@@ -1081,7 +1081,9 @@ Core имеет разметку осей, но без CSV oracle. По доку
   remaining0×2, history+diagnostics full roundtrip. Progress2 SHAe8dc4fedbe…;
   Третий closed articles#1 PASS100/structure/warm/6 stages/remaining0×2;
   history+diagnostics full roundtrip. Progress3 SHAe0fd71b357…;
-  campaign#1 running, closed3/45, candidate/cold/compare0.
+  Четвёртый closed campaign#1 PASS100/structure/warm/6 stages/remaining0×2,
+  history+diagnostics full roundtrip. Progress4 SHAd4ae57bc21…;
+  cohort#1 running, closed4/45, candidate/cold/compare0.
   Частичный v7 не подставлять
   как полный baseline и не повторять выборочно только неуспешные попытки.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой

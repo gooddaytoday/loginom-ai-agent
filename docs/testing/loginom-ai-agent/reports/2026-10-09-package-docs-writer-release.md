@@ -661,12 +661,13 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | ab-revenue-per-converter | 1 | PASS100 | 21 / 20 / 16 | 4604 / 17048407 | 3 / 5110421 |
 | abc-pareto-groups | 1 | PASS100 | 36 / 35 / 31 | 4640 / 21348941 | 3 / 9371065 |
 | articles-by-author | 1 | PASS100 | 22 / 22 / 18 | 4600 / 15892038 | 3 / 4038019 |
+| campaign-roi-by-channel | 1 | PASS100 | 19 / 19 / 15 | 4610 / 16655815 | 3 / 4687353 |
 
-Последний private snapshot `formal-v9-progress-3-20261009.json` SHA256
-`e0fd71b357af1a35239d0229ff93e78dfe4507b60b56692c846657bdf0c369e2`:
-три result/cleanup/process-cleanup/review/preservation receipts и archive SHA
+Последний private snapshot `formal-v9-progress-4-20261009.json` SHA256
+`d4ae57bc21c5121c801ae68b61898b44fd8925430e2f15696d4ee9dfeec89a03`:
+четыре result/cleanup/process-cleanup/review/preservation receipts и archive SHA
 повторно проверены. Controller идентичность живого PID676156 совпала;
-campaign-roi-by-channel#1 running. Closed3/45/PASS3/FAIL0/manual retries0,
+cohort-spend-activity#1 running. Closed4/45/PASS4/FAIL0/manual retries0,
 common020c08059… неизменен. Новый private `formal-v9-observe.py` read-only,
 SHA256 `eb9111bcc5191527eafcc49b5af07633709a3cc63276bb60f7a40b5c696a6e9a`,
 проверен на живом процессе; не входит в исполняемый harness/21 adapters.
@@ -685,3 +686,11 @@ turns through prepare1. Tokens/duration/reported cost и SHA traces закреп
 Первое измерение отклонено assertion из-за неверного имени prepare в observer;
 исправлено на наблюдаемый loginom_dock_prepare. Частичный файл не записан,
 guards неизменны, новых product/model/judge попыток0; отказ сохранён в receipt.
+
+После campaign#1 метрики дополнены: `formal-v9-base-metrics-4-20261009.json`,
+SHA256 `03b78992bdc21ef102a2a7353be4f13abebbc2e7628ce55d7afa6058ad3711ee`.
+19 provider finishes/19 tools/15 Loginom/errors0/skills0/prepare1; harness
+counters совпали. Три прежних result/trace hashes повторно проверены без
+пересчёта изменённых данных; progress4 хранит SHA предыдущего progress3.
+Старый cohort#2 v7 INCOMPLETE отдельно сохранён, не подставляется в новую
+попытку и не считается причиной или предсказанием её результата.
