@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util"
-import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
+import { launchNodeHost, NodeHostStartupError } from "@loginom-ai-agent/loginom-host/node-client"
 import type { cliProfile } from "@loginom-ai-agent/product/cli-profile"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import { loginomManagement } from "./loginom-management"
@@ -71,7 +71,10 @@ export async function standaloneCommand(args: string[], paths: ReturnType<typeof
     failure("CLI_ARGUMENT_INVALID")
     return
   }
-  const bundle = await standaloneBundle().catch((error) => { failure(error); return undefined })
+  const bundle = await standaloneBundle().catch((error) => {
+    failure(error)
+    return undefined
+  })
   if (!bundle) return
   const host = await launchNodeHost({
     node: bundle.node,
@@ -81,7 +84,13 @@ export async function standaloneCommand(args: string[], paths: ReturnType<typeof
     headless: parsed.values.headless && !parsed.values["no-headless"],
     environment: process.env,
     strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
+  }).catch((error: unknown) => {
+    if (!(error instanceof NodeHostStartupError) || !error.cleanupConfirmed)
+      throw new Error("LOGINOM_HOST_CLEANUP_FAILED", { cause: error })
+    failure(error)
+    return undefined
   })
+  if (!host) return
   try {
     const result = await loginomManagement(host, parsed.positionals[1], {
       stdinJSON: parsed.values["stdin-json"],

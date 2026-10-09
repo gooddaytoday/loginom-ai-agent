@@ -14,6 +14,8 @@ const require = createRequire(new URL("../client/package.json", import.meta.url)
 process.umask(0o077)
 const state = {
   starting: false,
+  startupController: new AbortController(),
+  startupCleanupFailed: false,
   closing: undefined,
   bridge: undefined,
   client: undefined,
@@ -34,6 +36,7 @@ const send = (message, disconnect = false) => {
 function close() {
   if (state.closing) return state.closing
   state.controller?.abort()
+  state.startupController.abort(Error("LOGINOM_HOST_CLOSED"))
   state.closing = (async () => {
     await Promise.allSettled([...requests])
     const results = []
@@ -42,7 +45,7 @@ function close() {
     }
     if (state.browserProfile)
       results.push(...(await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])))
-    if (results.some((result) => result.status === "rejected")) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    if (state.startupCleanupFailed || results.some((result) => result.status === "rejected")) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
   })()
   return state.closing
 }
@@ -95,6 +98,7 @@ async function handle(message) {
         profile: browserProfile,
         candidate: input.connection,
         headless: input.headless === true,
+        signal: state.startupController.signal,
       }
       if (input.validation === true) {
         await loginBrowser(login)
@@ -226,6 +230,8 @@ async function handle(message) {
       state.controller = undefined
     }
   } catch (error) {
+    if (message.operation === "start" && error?.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
+      state.startupCleanupFailed = true
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
     send({ id: message.id, error: code }, message.operation === "close")
     if (message.operation === "start") {

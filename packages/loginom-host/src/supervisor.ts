@@ -86,26 +86,39 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
 
 // One browser child per generation/chat; knowledge has one child per generation.
 // Both use the same private transport and acknowledged cleanup contract.
-export async function supervise(input: Launch) {
+export async function supervise(input: Launch, signal?: AbortSignal) {
   if (!isAbsolute(input.resources)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   // Browser validation follows the separate key-only Help check in Host.
   const runtime = await superviseProcess(
-    input, { ...input, environment: undefined, protocol: 1 }, input.validation ? 210_000 : 120_000,
+    input,
+    { ...input, environment: undefined, protocol: 1 },
+    input.validation ? 210_000 : 120_000,
+    signal,
   )
   const ready = runtime.ready
-  if (input.validation
-    ? !("checked" in ready) || ready.checked !== true
-    : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat) {
+  if (
+    input.validation
+      ? !("checked" in ready) || ready.checked !== true
+      : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat
+  ) {
     await runtime.close()
     throw new Error("LOGINOM_HANDSHAKE_INVALID")
   }
   return runtime
 }
 
-export async function superviseKnowledge(input: KnowledgeLaunch) {
-  const runtime = await superviseProcess(input, {
-    protocol: 1, generation: input.generation, endpoint: input.endpoint, apiKey: input.apiKey,
-  })
+export async function superviseKnowledge(input: KnowledgeLaunch, signal?: AbortSignal) {
+  const runtime = await superviseProcess(
+    input,
+    {
+      protocol: 1,
+      generation: input.generation,
+      endpoint: input.endpoint,
+      apiKey: input.apiKey,
+    },
+    120_000,
+    signal,
+  )
   const ready = runtime.ready
   if (!("started" in ready) || ready.started !== true) {
     await runtime.close()
@@ -114,10 +127,11 @@ export async function superviseKnowledge(input: KnowledgeLaunch) {
   return { ...runtime, ready }
 }
 
-async function superviseProcess(input: ProcessLaunch, start: unknown, timeout = 120_000) {
-  if (![input.node, input.entry, input.stateDir].every(isAbsolute))
-    throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
+async function superviseProcess(input: ProcessLaunch, start: unknown, timeout = 120_000, signal?: AbortSignal) {
+  signal?.throwIfAborted()
+  if (![input.node, input.entry, input.stateDir].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   await mkdir(input.stateDir, { recursive: true, mode: 0o700 })
+  signal?.throwIfAborted()
   const child = fork(input.entry, [], {
     execPath: input.node,
     execArgv: ["--use-system-ca"],
@@ -198,22 +212,32 @@ async function superviseProcess(input: ProcessLaunch, start: unknown, timeout = 
     })()
     return closing.promise
   }
-  const ready = await request("start", start, timeout).catch(
-    async (error: Error) => {
-      await close()
-      throw error
-    },
-  )
-  if (
-    !ready ||
-    typeof ready !== "object" ||
-    !("protocol" in ready) ||
-    ready.protocol !== 1 ||
-    !("generation" in ready) ||
-    ready.generation !== input.generation
-  ) {
-    await close()
-    throw new Error("LOGINOM_HANDSHAKE_INVALID")
+  const cancel = () => {
+    void close().catch(() => undefined)
   }
-  return { ready, request, close, exited }
+  signal?.addEventListener("abort", cancel, { once: true })
+  try {
+    const ready = await request("start", start, timeout).catch(async (error: Error) => {
+      await close()
+      throw signal?.aborted ? signal.reason : error
+    })
+    if (signal?.aborted) {
+      await close()
+      signal.throwIfAborted()
+    }
+    if (
+      !ready ||
+      typeof ready !== "object" ||
+      !("protocol" in ready) ||
+      ready.protocol !== 1 ||
+      !("generation" in ready) ||
+      ready.generation !== input.generation
+    ) {
+      await close()
+      throw new Error("LOGINOM_HANDSHAKE_INVALID")
+    }
+    return { ready, request, close, exited }
+  } finally {
+    signal?.removeEventListener("abort", cancel)
+  }
 }

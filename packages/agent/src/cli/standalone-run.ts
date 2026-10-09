@@ -1,7 +1,7 @@
 import { Option, Schema } from "effect"
 import { Loginom } from "@loginom-ai-agent/schema/loginom"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
-import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
+import { launchNodeHost, NodeHostStartupError } from "@loginom-ai-agent/loginom-host/node-client"
 import type { cliProfile } from "@loginom-ai-agent/product/cli-profile"
 import { Product } from "@loginom-ai-agent/product"
 import { standaloneCancellation } from "./standalone-cancellation"
@@ -63,7 +63,8 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     environment: process.env,
     strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
   }).catch((error: unknown) => {
-    // The host child is already stopped. Returning lets the profile guard release; a throw would leave PROFILE_BUSY.
+    if (!(error instanceof NodeHostStartupError) || !error.cleanupConfirmed)
+      throw new Error("LOGINOM_HOST_CLEANUP_FAILED", { cause: error })
     failure(error instanceof Error && /^LOGINOM_[A-Z_]+$/.test(error.message) ? error.message : "CLI_START_FAILED", 1)
     return undefined
   })

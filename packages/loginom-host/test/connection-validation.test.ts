@@ -3,12 +3,31 @@ import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:f
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
+import { watch } from "node:fs"
 import { createLoginomHost } from "../src/host"
 import { credentials } from "../src/connection/credentials"
 import { connectionStore } from "../src/connection/connection-store"
 import { knowledgeServer } from "../../loginom-runtime/client/test/support/knowledge-server.mjs"
+import { launchNodeHost } from "../src/node-client"
 
-async function fixture(error: string, options: Parameters<typeof knowledgeServer>[1] = {}) {
+async function buildNodeHost(output: string) {
+  // Isolate Bun.build: repeated in-process builds in Bun's test runner can fail
+  // reading otherwise unchanged dependencies (EISDIR / Unseekable reading).
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, "../script/build-node-host.ts"), output], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const error = new Response(child.stderr).text()
+  expect({ code: await child.exited, error: await error }).toEqual({ code: 0, error: "" })
+  return join(output, "node-host.mjs")
+}
+
+async function fixture(
+  error: string,
+  options: Parameters<typeof knowledgeServer>[1] = {},
+  holdStart = false,
+  failClose = false,
+) {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "connection-validation-"))
@@ -28,14 +47,20 @@ async function fixture(error: string, options: Parameters<typeof knowledgeServer
   await writeFile(
     join(resources, "runtime/src/managed-entry.mjs"),
     `import {writeFileSync} from 'node:fs';
+    let starting;
+    function ready() {
+      process.send(${JSON.stringify(error)} ? {id:starting.id,error:${JSON.stringify(error)}}
+        : {id:starting.id,result:{protocol:1,generation:starting.input.generation,checked:true,ready:true,chat:starting.input.chat}});
+    }
+    process.on('SIGUSR1', ready);
     process.on('disconnect', () => process.exit(0));
     process.on('message', message => {
       if (message.operation === 'start') {
+        starting = message;
         writeFileSync(${JSON.stringify(marker)}, JSON.stringify({validation:message.input.validation,pid:process.pid}));
-        process.send(${JSON.stringify(error)} ? {id:message.id,error:${JSON.stringify(error)}}
-          : {id:message.id,result:{protocol:1,generation:message.input.generation,checked:true,ready:true,chat:message.input.chat}});
+        if (!${holdStart}) ready();
       }
-      if (message.operation === 'close') process.send({id:message.id,result:{closed:true}},()=>process.disconnect());
+      if (message.operation === 'close') process.send({id:message.id,result:{closed:${!failClose}}},()=>process.exit(${failClose ? 1 : 0}));
     });`,
   )
   await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
@@ -54,12 +79,105 @@ async function fixture(error: string, options: Parameters<typeof knowledgeServer
       password: { operation: "replace" as const, value: "PRIVATE-NONSECRET-PASSWORD" },
     },
     async close() {
-      await host.close()
-      for (const callback of cleanup) await callback()
-      await rm(directory, { recursive: true, force: true })
+      try {
+        await host.close()
+      } finally {
+        for (const callback of cleanup) await callback()
+        await rm(directory, { recursive: true, force: true })
+      }
     },
   }
 }
+
+test.each(["host", "node"])(
+  "Host shutdown cancels browser validation while its handshake is pending: %s",
+  async (mode) => {
+    const f = await fixture("", {}, true)
+    const owner =
+      mode === "host"
+        ? f.host
+        : await launchNodeHost({
+            node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
+            entry: await buildNodeHost(join(f.resources, "host")),
+            root: f.root,
+            resources: f.resources,
+            headless: true,
+            environment: {},
+          })
+    const started = Promise.withResolvers<void>()
+    const watcher = watch(join(f.marker, ".."), (_, name) => {
+      if (name === "browser-validation") started.resolve()
+    })
+    const checking = "api" in owner ? owner.api.check(f.candidate) : owner.request("connection.check", f.candidate)
+    void checking.catch(() => {})
+    let closing: Promise<void> | undefined
+    const deadline = { timer: undefined as ReturnType<typeof setTimeout> | undefined }
+    try {
+      await started.promise
+      closing = owner.close()
+      await Promise.race([
+        closing,
+        new Promise((_, reject) => {
+          deadline.timer = setTimeout(() => reject(Error("BROWSER_VALIDATION_DID_NOT_CANCEL")), 1500)
+        }),
+      ])
+      await expect(checking).rejects.toThrow("LOGINOM_HOST_CLOSED")
+      const browser = JSON.parse(await readFile(f.marker, "utf8"))
+      expect(() => process.kill(browser.pid, 0)).toThrow()
+      await expect(f.host.api.save({ revision: 0, validationId: "never-issued" })).rejects.toThrow()
+    } finally {
+      clearTimeout(deadline.timer)
+      watcher.close()
+      const browser = JSON.parse(await readFile(f.marker, "utf8"))
+      try {
+        process.kill(browser.pid, "SIGUSR1")
+      } catch {}
+      await closing
+      await checking.catch(() => {})
+      await f.close()
+    }
+  },
+  15_000,
+)
+
+test.each(["host", "node"])(
+  "cancelled browser validation cannot hide failed cleanup: %s",
+  async (mode) => {
+    const f = await fixture("", {}, true, true)
+    const owner =
+      mode === "host"
+        ? f.host
+        : await launchNodeHost({
+            node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
+            entry: await buildNodeHost(join(f.resources, "host")),
+            root: f.root,
+            resources: f.resources,
+            headless: true,
+            environment: {},
+          })
+    const started = Promise.withResolvers<void>()
+    const watcher = watch(join(f.marker, ".."), (_, name) => {
+      if (name === "browser-validation") started.resolve()
+    })
+    const checking = "api" in owner ? owner.api.check(f.candidate) : owner.request("connection.check", f.candidate)
+    void checking.catch(() => {})
+    try {
+      await started.promise
+      await expect(owner.close()).rejects.toThrow(
+        mode === "host" ? "LOGINOM_RUNTIME_CLEANUP_FAILED" : "LOGINOM_HOST_CLEANUP_FAILED",
+      )
+      await expect(checking).rejects.toThrow("LOGINOM_HOST_CLOSED")
+      const browser = JSON.parse(await readFile(f.marker, "utf8"))
+      expect(() => process.kill(browser.pid, 0)).toThrow()
+    } finally {
+      watcher.close()
+      await checking.catch(() => {})
+      await owner.close().catch(() => {})
+      await f.close().catch(() => {})
+    }
+  },
+  15_000,
+)
 
 test.each([
   "LOGINOM_LOGIN_UNAVAILABLE",
@@ -80,7 +198,9 @@ test.each([
       expect(browser.validation).toBe(true)
       await expect(access(`/proc/${browser.pid}`)).rejects.toMatchObject({ code: "ENOENT" })
       expect(f.server.requests.length).toBeGreaterThan(0)
-      expect(f.server.requests.every((request) => request.authorization === "Bearer UNIT-NONSECRET")).toBe(true)
+      expect(f.server.requests.map((request) => request.authorization)).toEqual(
+        f.server.requests.map(() => "Bearer UNIT-NONSECRET"),
+      )
       await f.host.api.save({ validationId: validation.validationId, revision: 0 })
       await f.host.settled()
       await f.host.catalog(1)

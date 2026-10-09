@@ -67,6 +67,15 @@ async function dispatch(message: unknown) {
     return
   const input = "input" in message ? message.input : undefined
   try {
+    if (message.method === "close") {
+      // Close is also valid after a rejected or still pending start. Exclude
+      // this close request from its own drain.
+      void stop().then(
+        () => reply({ id: message.id, result: { closed: true } }, true),
+        () => reply({ id: message.id, error: "LOGINOM_HOST_CLEANUP_FAILED" }, true),
+      )
+      return
+    }
     if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
     if (message.method === "start") {
       if (state.starting || state.host) throw new Error("LOGINOM_HANDSHAKE_INVALID")
@@ -105,17 +114,6 @@ async function dispatch(message: unknown) {
       return
     }
     if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
-    if (message.method === "close") {
-      // Stop admission now, but exclude this close request from its own drain.
-      const closing = stop()
-      void closing.then(
-        () => reply({ id: message.id, result: { closed: true } }, true),
-        () => {
-          reply({ id: message.id, error: "LOGINOM_HOST_CLEANUP_FAILED" }, true)
-        },
-      )
-      return
-    }
     if (!message.method.startsWith("connection.")) {
       events.emit("message", { data: message })
       return
@@ -175,13 +173,15 @@ function stop() {
   state.closed = true
   stopped.resolve()
   events.emit("close")
+  state.host?.beginClose()
   state.stopping = (async () => {
-    await state.starting
+    await state.starting?.catch(() => undefined)
+    state.host?.beginClose()
     const cancellation = Promise.allSettled([state.host?.interruptAll()])
-    await Promise.all([...operations])
-    await state.port?.close()
+    const drained = await Promise.allSettled([...operations])
+    const ports = await Promise.allSettled([state.port?.close()])
     const results = await Promise.allSettled([state.host?.close()])
-    if ([...(await cancellation), ...results].some((result) => result.status === "rejected"))
+    if ([...(await cancellation), ...drained, ...ports, ...results].some((result) => result.status === "rejected"))
       throw new Error("LOGINOM_HOST_CLEANUP_FAILED")
   })()
   return state.stopping

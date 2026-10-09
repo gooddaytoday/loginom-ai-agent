@@ -47,10 +47,12 @@ export async function loginPage(page, candidate) {
   return { authenticated: true }
 }
 
-export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false }) {
+export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, signal }) {
+  signal?.throwIfAborted()
   const { chromium } = require("playwright-core")
   const launch = browserLaunch(headless)
   await mkdir(profile, { recursive: true, mode: 0o700 })
+  signal?.throwIfAborted()
   const context = await chromium
     .launchPersistentContext(profile, {
       executablePath: browserPath,
@@ -80,20 +82,29 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     .catch(() => {
       throw Error("LOGINOM_BROWSER_START_FAILED")
     })
+  const closing = { promise: undefined }
+  const close = () => closing.promise ??= context.close()
+  const cancel = () => { void close().catch(() => undefined) }
+  signal?.addEventListener("abort", cancel, { once: true })
   try {
+    signal?.throwIfAborted()
     // This authenticated page predates MCP; its capability choice must already
     // match the executor's download/byte-verification path on the first load.
     await context.addInitScript({ content: browserDownloadScript(candidate.url) })
     const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate)
+    signal?.throwIfAborted()
     if (!keepOpen) {
-      await context.close()
+      await close()
       return result
     }
     // MCP receives this same live context through its public contextGetter API.
     return { ...result, context }
   } catch (error) {
-    await context.close().catch(() => undefined)
+    await close().catch(() => { throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED") })
+    signal?.throwIfAborted()
     if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED"].includes(error?.message)) throw error
     throw Error("LOGINOM_LOGIN_UNAVAILABLE")
+  } finally {
+    signal?.removeEventListener("abort", cancel)
   }
 }

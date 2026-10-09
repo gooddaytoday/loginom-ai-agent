@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test"
-import { access, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { buildNodeHost } from "../script/build-node-host"
@@ -16,6 +16,67 @@ beforeAll(async () => {
 })
 afterAll(async () => {
   if (fixture.directory) await rm(fixture.directory, { recursive: true, force: true })
+})
+
+test.each(["rejected", "invalid"])(
+  "failed host startup confirms cleanup and exit before rejecting: %s",
+  async (mode) => {
+    const marker = join(fixture.directory, "startup-" + mode)
+    const entry = marker + ".mjs"
+    await writeFile(
+      entry,
+      `import {writeFileSync} from 'node:fs';
+      process.on('SIGTERM', () => {});
+      process.on('message', m => {
+        if (m.method === 'start') {
+          writeFileSync(${JSON.stringify(marker)}, String(process.pid));
+          process.send({id:m.id,${mode === "rejected" ? "error:'LOGINOM_HANDSHAKE_INVALID'" : "result:{protocol:1,ready:false,pid:process.pid}"}});
+        }
+        if (m.method === 'close') process.send({id:m.id,result:{closed:true}},()=>process.exit(0));
+      });`,
+    )
+    try {
+      const error = await launchNodeHost({
+        node: fixture.node,
+        entry,
+        root: fixture.directory,
+        resources: fixture.directory,
+        headless: true,
+      }).catch((error: unknown) => error)
+      expect(error).toMatchObject({ message: "LOGINOM_HANDSHAKE_INVALID", cleanupConfirmed: true })
+      const pid = Number(await readFile(marker, "utf8"))
+      expect(() => process.kill(pid, 0)).toThrow()
+    } finally {
+      const pid = Number(await readFile(marker, "utf8"))
+      try {
+        process.kill(pid, "SIGKILL")
+      } catch {}
+    }
+  },
+  15_000,
+)
+
+test("a failed host constructor is closed without masking its startup error", async () => {
+  const root = join(fixture.directory, "not-a-directory")
+  await writeFile(root, "blocked")
+  await expect(
+    launchNodeHost({ node: fixture.node, entry: fixture.entry, root, resources: fixture.directory, headless: true }),
+  ).rejects.toMatchObject({
+    message: "LOGINOM_HOST_REQUEST_FAILED",
+    cleanupConfirmed: true,
+  })
+})
+
+test("an executable that could not spawn needs no cleanup acknowledgement", async () => {
+  await expect(
+    launchNodeHost({
+      node: join(fixture.directory, "missing-node"),
+      entry: fixture.entry,
+      root: fixture.directory,
+      resources: fixture.directory,
+      headless: true,
+    }),
+  ).rejects.toMatchObject({ cleanupConfirmed: true })
 })
 
 test("bundled Node host handshakes without Electron, manages its profile and closes completely", async () => {
@@ -55,7 +116,7 @@ test("a non-boolean recovery mode is rejected before the host starts", async () 
       headless: true,
       strictRecovery: "yes" as unknown as boolean,
     }),
-  ).rejects.toThrow("LOGINOM_HANDSHAKE_INVALID")
+  ).rejects.toMatchObject({ message: "LOGINOM_HANDSHAKE_INVALID", cleanupConfirmed: true })
 }, 15_000)
 
 test.each(["ready", "close"])(

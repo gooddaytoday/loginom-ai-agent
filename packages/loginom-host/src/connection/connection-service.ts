@@ -32,6 +32,7 @@ export async function connectionService(
     writing?: boolean
     closing?: boolean
     recovering?: Promise<void>
+    checkCleanupFailed?: boolean
   } = { revision: 0, generation: 0, phase: "unconfigured", readiness: "starting", browser: { state: "unknown" } }
   const validations = new Map<
     string,
@@ -107,6 +108,12 @@ export async function connectionService(
   function clearValidations() {
     validations.forEach((entry) => clearTimeout(entry.timer))
     validations.clear()
+  }
+  function beginClose() {
+    if (state.closing) return
+    state.closing = true
+    clearValidations()
+    for (const controller of checks.keys()) controller.abort(Error("LOGINOM_HOST_CLOSED"))
   }
   function view(): Loginom.View {
     const current = state.active
@@ -269,6 +276,8 @@ export async function connectionService(
       checks.set(controller, checking)
       const browser = (await checking
         .catch((error: unknown) => {
+          if (error instanceof Error && error.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
+            state.checkCleanupFailed = true
           controller.signal.throwIfAborted()
           const code =
             error instanceof Error &&
@@ -350,6 +359,7 @@ export async function connectionService(
   }
   progress()
   return {
+    beginClose,
     api,
     browserStatus(generation: number, browser: Loginom.BrowserStatus) {
       if (state.closing || generation !== state.active?.generation) return
@@ -395,8 +405,7 @@ export async function connectionService(
       while (state.applying) await state.applying
     },
     async close() {
-      state.closing = true
-      for (const controller of checks.keys()) controller.abort(Error("LOGINOM_HOST_CLOSED"))
+      beginClose()
       await Promise.allSettled([...checks.values()])
       state.pending = undefined
       clearValidations()
@@ -405,6 +414,7 @@ export async function connectionService(
       await state.handle?.close()
       state.handle = undefined
       state.phase = state.active ? "recoverable-error" : "unconfigured"
+      if (state.checkCleanupFailed) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
     },
   }
 }

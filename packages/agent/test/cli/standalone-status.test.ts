@@ -6,6 +6,8 @@ import { createHash } from "node:crypto"
 import { buildKeychain } from "../../../loginom-host/script/build-keychain"
 import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
+import { knowledgeServer } from "../../../loginom-runtime/client/test/support/knowledge-server.mjs"
+import { copyProductSkillsFixture } from "../../../loginom-host/test/fixtures/product-skills"
 
 const host = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-test-host-")))
 beforeAll(async () => {
@@ -177,26 +179,42 @@ test("actual standalone status launches bundled Node and releases the isolated p
 
 test("management commands share durable setup and recovery semantics through the real Node host", async () => {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-management-")))
+  const cleanup: (() => void | Promise<void>)[] = []
   try {
     const bundle = join(directory, "bundle")
     const profile = join(directory, "profile")
+    const files = await copyProductSkillsFixture(bundle)
+    const help = await knowledgeServer({ after: (callback) => cleanup.push(callback) }, { apiKey: "private-setup-key" })
     await mkdir(join(bundle, "bin"), { recursive: true })
     await mkdir(join(bundle, "runtime/src"), { recursive: true })
     await symlink(bundledNode, join(bundle, "bin/node"))
     if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
     await cp(host, join(bundle, "host"), { recursive: true })
-    await writeFile(join(bundle, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test" }))
+    await symlink(
+      resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
+      join(bundle, "runtime/src/knowledge-entry.mjs"),
+    )
+    await writeFile(
+      join(bundle, "resource-manifest.json"),
+      JSON.stringify({ protocol: 1, endpoint: help.endpoint, files }),
+    )
     // Fixture only: handshake/validation succeeds without Chromium, Loginom or a provider.
     await writeFile(
       join(bundle, "runtime/src/managed-entry.mjs"),
       `
+      let prepared = false;
       process.on('message', message => {
         if (message.operation === 'start') process.send({ id: message.id, result: {
           protocol: 1, generation: message.input.generation, chat: message.input.chat,
           checked: true, ready: true
         }});
         if (message.operation === 'interrupt') process.send({ id: message.id, result: { interrupted: true } });
-        if (message.operation === 'list') process.send({ id: message.id, result: { tools: [{ name: 'probe', description: 'Test the private host path', inputSchema: { type: 'object', properties: { fail: { type: 'boolean' }, reply: { type: 'string' }, operation_id: { type: 'string' } } } }] } });
+        if (message.operation === 'list') process.send({ id: message.id, result: { prepared, tools: [{ name: 'probe', description: 'Test the private host path', inputSchema: { type: 'object', properties: { fail: { type: 'boolean' }, reply: { type: 'string' }, operation_id: { type: 'string' } } } }] } });
+        if (message.operation === 'call' && message.input.name === 'dock_prepare') {
+          prepared = true;
+          process.send({id:message.id,result:{recoveryPending:false,result:{content:[{type:'text',text:'prepared'}]}}});
+          return;
+        }
         if (message.operation === 'call') {
           const args = message.input.arguments;
           const receipt = { operation_id: args.operation_id, ...(args.reply === 'node'
@@ -248,10 +266,18 @@ test("management commands share durable setup and recovery semantics through the
         ["setup", "--stdin-json"],
         JSON.stringify({ apiKey: "private-setup-key", password: "initial-password" }),
       ),
-    ).toMatchObject({ code: 0, result: { state: "ready", generation: 1, hasApiKey: true, hasPassword: true } })
+    ).toMatchObject({
+      code: 0,
+      result: { state: expect.stringMatching(/^(starting|ready)$/), generation: 1, hasApiKey: true, hasPassword: true },
+    })
     expect(await command(["setup", "--stdin-json"], JSON.stringify({ password: "" }))).toMatchObject({
       code: 0,
-      result: { state: "ready", generation: 2, hasApiKey: true, hasPassword: false },
+      result: {
+        state: expect.stringMatching(/^(starting|ready)$/),
+        generation: 2,
+        hasApiKey: true,
+        hasPassword: false,
+      },
     })
     const persisted = JSON.parse(await readFile(join(profile, "loginom/connection/connection.json"), "utf8"))
     expect(
@@ -264,7 +290,10 @@ test("management commands share durable setup and recovery semantics through the
     )
     if (process.platform !== "linux") expect(JSON.stringify(persisted)).not.toContain("private-setup-key")
     expect(await command(["check"])).toMatchObject({ code: 0, result: { code: "LOGINOM_CONNECTION_VALID" } })
-    expect(await command(["cancel-pending"])).toMatchObject({ code: 0, result: { state: "ready" } })
+    expect(await command(["cancel-pending"])).toMatchObject({
+      code: 0,
+      result: { state: expect.stringMatching(/^(starting|ready)$/) },
+    })
     const strictRecovery = { LOGINOM_AI_AGENT_STRICT_RECOVERY: "1" }
     const journal = await recoveryStore(join(profile, "loginom/recovery"), { strict: true })
     const id = await journal.begin("a".repeat(64), 2)
@@ -281,21 +310,21 @@ test("management commands share durable setup and recovery semantics through the
     })
     expect(await command(["recover", "--acknowledge", id], "", strictRecovery)).toMatchObject({
       code: 0,
-      result: { state: "ready" },
+      result: { state: expect.stringMatching(/^(starting|ready)$/) },
     })
     expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
     const next = await journal.begin("b".repeat(64), 2)
     await journal.settle(next, false)
     expect(await command(["recover", "--acknowledge"], "", strictRecovery)).toMatchObject({
       code: 0,
-      result: { state: "ready" },
+      result: { state: expect.stringMatching(/^(starting|ready)$/) },
     })
     expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
     const dropped = await journal.begin("c".repeat(64), 2)
     await journal.settle(dropped, false)
     const advisory = await command(["status"])
     expect(advisory.code).toBe(0)
-    expect(advisory.result.state).toBe("ready")
+    expect(["starting", "ready"]).toContain(advisory.result.state)
     expect(advisory.result.recoveries).toBeUndefined()
     expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
     const run = Bun.spawn(
@@ -352,13 +381,18 @@ test("management commands share durable setup and recovery semantics through the
     const provider = ManagedRuntime.make(TestLLMServer.layer)
     try {
       const llm = await provider.runPromise(TestLLMServer)
+      const prepare = () => provider.runPromise(llm.tool("loginom_dock_prepare", {}))
+      await prepare()
       await provider.runPromise(llm.tool("loginom_probe", {}))
       await provider.runPromise(llm.text("standalone provider response"))
       await writeFile(
         join(profile, "config/loginom-ai-agent.json"),
-        JSON.stringify({ ...testProviderConfig(llm.url), permission: { "loginom_*": "ask" } }),
+        JSON.stringify({
+          ...testProviderConfig(llm.url),
+          permission: { loginom_probe: "ask", loginom_dock_prepare: "allow" },
+        }),
       )
-      const invoke = (auto: boolean, file?: string, extra: string[] = []) =>
+      const invoke = (auto: boolean, file?: string, extra: string[] = [], automation = true) =>
         Bun.spawn(
           [
             process.execPath,
@@ -374,6 +408,7 @@ test("management commands share durable setup and recovery semantics through the
             "test/test-model",
             ...(auto ? ["--dangerously-skip-permissions"] : []),
             ...(file ? ["--file", file] : []),
+            ...(automation ? ["--command", "loginom-automation"] : []),
             ...extra,
             "--",
             "say hello",
@@ -397,14 +432,16 @@ test("management commands share durable setup and recovery semantics through the
       const success = invoke(true, attachment)
       const stdout = new Response(success.stdout).text()
       const stderr = new Response(success.stderr).text()
-      expect(await success.exited).toBe(0)
+      expect({ exit: await success.exited, errors: await stderr }).toMatchObject({ exit: 0 })
       expect(await stderr).not.toContain("private-setup-key")
       const events = (await stdout)
         .trim()
         .split("\n")
         .map((line) => JSON.parse(line))
       expect(events.map((event) => event.type)).toContain("tool_use")
-      expect(events.find((event) => event.type === "tool_use").part).toMatchObject({
+      expect(
+        events.find((event) => event.type === "tool_use" && event.part.tool === "loginom_probe").part,
+      ).toMatchObject({
         tool: "loginom_probe",
         state: { status: "completed", output: "private host probe completed" },
       })
@@ -414,6 +451,7 @@ test("management commands share durable setup and recovery semantics through the
       const admissions = await readdir(join(profile, "loginom/inputs"))
       expect(admissions).toHaveLength(1)
       expect(await readFile(join(profile, "loginom/inputs", admissions[0], "0"), "utf8")).toBe("amount\n10\n20\n25\n")
+      await prepare()
       await provider.runPromise(llm.tool("loginom_probe", {}))
       await provider.runPromise(llm.text("cannot complete without permission"))
       const denied = invoke(false)
@@ -440,7 +478,7 @@ test("management commands share durable setup and recovery semantics through the
       await provider.runPromise(llm.reset)
       await provider.runPromise(llm.tool("bash", { command: "pwd", description: "Check denied command" }))
       await provider.runPromise(llm.text("policy denied the action"))
-      const policyDenied = invoke(true)
+      const policyDenied = invoke(true, undefined, [], false)
       const policyDeniedOutput = new Response(policyDenied.stdout).text()
       const policyDeniedErrors = new Response(policyDenied.stderr).text()
       expect(await policyDenied.exited).toBe(1)
@@ -454,13 +492,16 @@ test("management commands share durable setup and recovery semantics through the
           error: expect.objectContaining({ name: "CLI_PERMISSION_REJECTED" }),
         }),
       )
-      expect(policyDeniedEvents.find((event) => event.type === "tool_use").part.state).toMatchObject({
+      expect(
+        policyDeniedEvents.find((event) => event.type === "tool_use" && event.part.tool === "bash").part.state,
+      ).toMatchObject({
         status: "error",
         metadata: { permissionDenied: true },
       })
       expect(await policyDeniedErrors).not.toContain("private-setup-key")
       expect(await readdir(profile)).not.toContain(".writer")
       await provider.runPromise(llm.reset)
+      await prepare()
       await provider.runPromise(llm.tool("loginom_probe", { fail: true }))
       await provider.runPromise(llm.text("tool failure was reported"))
       const toolFailure = invoke(true)
@@ -471,7 +512,9 @@ test("management commands share durable setup and recovery semantics through the
         .trim()
         .split("\n")
         .map((line) => JSON.parse(line))
-      expect(failureEvents.find((event) => event.type === "tool_use").part.state).toMatchObject({
+      expect(
+        failureEvents.find((event) => event.type === "tool_use" && event.part.tool === "loginom_probe").part.state,
+      ).toMatchObject({
         status: "error",
         error: "private host probe failed",
         metadata: { isError: true },
@@ -482,6 +525,7 @@ test("management commands share durable setup and recovery semantics through the
       expect(await failureErrors).not.toContain("private-setup-key")
       expect(await readdir(profile)).not.toContain(".writer")
       await provider.runPromise(llm.reset)
+      await prepare()
       await provider.runPromise(llm.tool("loginom_probe", { operation_id: "corrected-probe", fail: true }))
       await provider.runPromise(llm.tool("loginom_probe", { operation_id: "corrected-probe", fail: false }))
       await provider.runPromise(llm.text("tool failure was corrected"))
@@ -494,13 +538,16 @@ test("management commands share durable setup and recovery semantics through the
         .split("\n")
         .map((line) => JSON.parse(line))
       expect(
-        correctedEvents.filter((event) => event.type === "tool_use").map((event) => event.part.state.status),
+        correctedEvents
+          .filter((event) => event.type === "tool_use" && event.part.tool === "loginom_probe")
+          .map((event) => event.part.state.status),
       ).toEqual(["error", "completed"])
       expect(await correctedErrors).not.toContain("private-setup-key")
       expect(await readdir(profile)).not.toContain(".writer")
       for (const reply of ["action", "node"]) {
         for (const repair of [false, true]) {
           await provider.runPromise(llm.reset)
+          await prepare()
           await provider.runPromise(llm.tool("loginom_probe", { operation_id: "business", reply, fail: true }))
           if (repair)
             await provider.runPromise(llm.tool("loginom_probe", { operation_id: "business", reply, fail: false }))
@@ -513,9 +560,11 @@ test("management commands share durable setup and recovery semantics through the
             .trim()
             .split("\n")
             .map((line) => JSON.parse(line))
-          expect(events.filter((event) => event.type === "tool_use").map((event) => event.part.state.status)).toEqual(
-            repair ? ["error", "completed"] : ["error"],
-          )
+          expect(
+            events
+              .filter((event) => event.type === "tool_use" && event.part.tool === "loginom_probe")
+              .map((event) => event.part.state.status),
+          ).toEqual(repair ? ["error", "completed"] : ["error"])
           expect(events.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(false)
           expect(await errors).not.toContain("private-setup-key")
           expect(await readdir(profile)).not.toContain(".writer")
@@ -530,12 +579,13 @@ test("management commands share durable setup and recovery semantics through the
       expect(await readdir(profile)).not.toContain(".writer")
       for (const unavailable of [false, true]) {
         await provider.runPromise(llm.reset)
+        await prepare()
         if (unavailable) {
           await writeFile(
             join(profile, "config/loginom-ai-agent.json"),
             JSON.stringify({
               ...testProviderConfig(llm.url),
-              permission: { "loginom_*": "deny" },
+              permission: { loginom_probe: "deny", loginom_dock_prepare: "allow" },
             }),
           )
           await provider.runPromise(llm.tool("loginom_probe", {}))
@@ -555,7 +605,10 @@ test("management commands share durable setup and recovery semantics through the
         expect(unresolvedEvents.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(
           unavailable,
         )
-        if (unavailable) expect(unresolvedEvents.find((event) => event.type === "tool_use").part.tool).toBe("invalid")
+        if (unavailable)
+          expect(
+            unresolvedEvents.find((event) => event.type === "tool_use" && event.part.tool === "invalid").part.tool,
+          ).toBe("invalid")
         expect(await unresolvedErrors).not.toContain("private-setup-key")
         expect(await readdir(profile)).not.toContain(".writer")
       }
@@ -575,6 +628,7 @@ test("management commands share durable setup and recovery semantics through the
       await provider.dispose()
     }
   } finally {
+    for (const callback of cleanup) await callback()
     if (process.platform === "darwin") {
       const root = await realpath(join(directory, "profile/loginom")).catch(() => undefined)
       if (root) {

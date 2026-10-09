@@ -53,23 +53,26 @@ export async function createLoginomHost(options: {
     })
     return tracked
   }
-  async function launch(connection: ActiveConnection, chat: string, validation = false) {
+  async function launch(connection: ActiveConnection, chat: string, validation = false, signal?: AbortSignal) {
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
-    return supervise({
-      node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
-      entry: join(resources, "runtime/src/managed-entry.mjs"),
-      resources,
-      stateDir: join(root, validation ? "validation" : "runtime"),
-      generation: connection.generation,
-      chat,
-      connection,
-      validation,
-      headless: validation || options.headless === true,
-      environment,
-      endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
-      actionManifestUri: manifest.actionManifestUri,
-      actionManifestSha256: manifest.actionManifestSha256,
-    })
+    return supervise(
+      {
+        node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
+        entry: join(resources, "runtime/src/managed-entry.mjs"),
+        resources,
+        stateDir: join(root, validation ? "validation" : "runtime"),
+        generation: connection.generation,
+        chat,
+        connection,
+        validation,
+        headless: validation || options.headless === true,
+        environment,
+        endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
+        actionManifestUri: manifest.actionManifestUri,
+        actionManifestSha256: manifest.actionManifestSha256,
+      },
+      signal,
+    )
   }
   const service = await connectionService(
     connectionStore(join(root, "connection"), options.codec),
@@ -79,15 +82,18 @@ export async function createLoginomHost(options: {
         const chat = randomUUID()
         try {
           const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
-          const knowledge = await superviseKnowledge({
-            node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
-            entry: join(resources, "runtime/src/knowledge-entry.mjs"),
-            stateDir: join(root, "validation", "knowledge", chat),
-            generation: connection.generation,
-            endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
-            apiKey: connection.apiKey,
-            environment,
-          })
+          const knowledge = await superviseKnowledge(
+            {
+              node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
+              entry: join(resources, "runtime/src/knowledge-entry.mjs"),
+              stateDir: join(root, "validation", "knowledge", chat),
+              generation: connection.generation,
+              endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
+              apiKey: connection.apiKey,
+              environment,
+            },
+            signal,
+          )
           const cancel = () => {
             void knowledge.close().catch(() => undefined)
           }
@@ -101,13 +107,14 @@ export async function createLoginomHost(options: {
             await knowledge.close()
           }
           signal?.throwIfAborted()
-          const child = await launch(connection, chat, true).catch((error: unknown) => {
+          const child = await launch(connection, chat, true, signal).catch((error: unknown) => {
             if (error instanceof Error && Schema.is(Loginom.BrowserFailure)(error.message))
               return { state: "failed" as const, failure: error.message }
             throw error
           })
           if ("state" in child) return child
           await child.close()
+          signal?.throwIfAborted()
           return { state: "verified" as const }
         } finally {
           await Promise.all([
