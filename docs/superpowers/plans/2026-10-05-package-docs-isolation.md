@@ -1083,7 +1083,11 @@ Core имеет разметку осей, но без CSV oracle. По доку
   history+diagnostics full roundtrip. Progress3 SHAe0fd71b357…;
   Четвёртый closed campaign#1 PASS100/structure/warm/6 stages/remaining0×2,
   history+diagnostics full roundtrip. Progress4 SHAd4ae57bc21…;
-  cohort#1 running, closed4/45, candidate/cold/compare0.
+  Пятый closed cohort#1 no_artifact FAIL0/judge0/4 tool errors: output mapping
+  AMBIGUOUS/OUTPUT_MAPPING_RECOVERY_UNVERIFIED. Пакета нет, structure/warm/cold
+  не выполнялись; cleanup6 stages/remaining0×2/history+diag roundtrip PASS
+  не доказывают semantic recovery. Progress5 SHA651b01e174…;
+  customer#1 running, closed5/45/PASS4/FAIL1, candidate/cold/compare0/retries0.
   Частичный v7 не подставлять
   как полный baseline и не повторять выборочно только неуспешные попытки.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой

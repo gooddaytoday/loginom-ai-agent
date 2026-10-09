@@ -651,23 +651,24 @@ candidate formal/cold/compare0/manual retries0. Полный90 ещё не пр�
 
 ## Formal v9: сохранённые результаты текущей серии
 
-Baseline run `20261009-021118-d08be6baf`, session60189. Во всех строках
-structure/warm oracle PASS, все6 cleanup stages confirmed, process cleanup
-confirmed/error null/remaining0×2 и full inventory/restore roundtrip архивов.
+Baseline run `20261009-021118-d08be6baf`, session60189. Для сохранённых пакетов
+structure/warm oracle PASS. Во всех строках все6 cleanup stages confirmed,
+process cleanup confirmed/error null/remaining0×2 и full restore roundtrip архивов.
 Cold formal ещё не выполнялся; candidate formal и compare не начаты.
 
-| Задача | Повтор | Judge | Provider finishes / tools / Loginom | History entries / gzip bytes | Diagnostics entries / gzip bytes |
-| --- | --- | --- | --- | --- | --- |
-| ab-revenue-per-converter | 1 | PASS100 | 21 / 20 / 16 | 4604 / 17048407 | 3 / 5110421 |
-| abc-pareto-groups | 1 | PASS100 | 36 / 35 / 31 | 4640 / 21348941 | 3 / 9371065 |
-| articles-by-author | 1 | PASS100 | 22 / 22 / 18 | 4600 / 15892038 | 3 / 4038019 |
-| campaign-roi-by-channel | 1 | PASS100 | 19 / 19 / 15 | 4610 / 16655815 | 3 / 4687353 |
+| Задача | Повтор | Итог | Пакет / structure+warm | Provider finishes / tools / Loginom | History entries / gzip bytes | Diagnostics entries / gzip bytes |
+| --- | --- | --- | --- | --- | --- | --- |
+| ab-revenue-per-converter | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4604 / 17048407 | 3 / 5110421 |
+| abc-pareto-groups | 1 | PASS100 | Есть / PASS | 36 / 35 / 31 | 4640 / 21348941 | 3 / 9371065 |
+| articles-by-author | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4600 / 15892038 | 3 / 4038019 |
+| campaign-roi-by-channel | 1 | PASS100 | Есть / PASS | 19 / 19 / 15 | 4610 / 16655815 | 3 / 4687353 |
+| cohort-spend-activity | 1 | FAIL0/no_artifact | Нет / не выполнялись | 22 / 21 / 18 | 4563 / 15206251 | 3 / 3337376 |
 
-Последний private snapshot `formal-v9-progress-4-20261009.json` SHA256
-`d4ae57bc21c5121c801ae68b61898b44fd8925430e2f15696d4ee9dfeec89a03`:
-четыре result/cleanup/process-cleanup/review/preservation receipts и archive SHA
+Последний private snapshot `formal-v9-progress-5-20261009.json` SHA256
+`651b01e17428094dd3b593b401e04ca9fd195f42bd2e96c711ce93f45e07ef05`:
+пять result/cleanup/process-cleanup/preservation, четыре review и archive SHA
 повторно проверены. Controller идентичность живого PID676156 совпала;
-cohort-spend-activity#1 running. Closed4/45/PASS4/FAIL0/manual retries0,
+customer-activity-segments#1 running. Closed5/45/PASS4/FAIL1/manual retries0,
 common020c08059… неизменен. Новый private `formal-v9-observe.py` read-only,
 SHA256 `eb9111bcc5191527eafcc49b5af07633709a3cc63276bb60f7a40b5c696a6e9a`,
 проверен на живом процессе; не входит в исполняемый harness/21 adapters.
@@ -694,3 +695,18 @@ counters совпали. Три прежних result/trace hashes повтор�
 пересчёта изменённых данных; progress4 хранит SHA предыдущего progress3.
 Старый cohort#2 v7 INCOMPLETE отдельно сохранён, не подставляется в новую
 попытку и не считается причиной или предсказанием её результата.
+
+Cohort#1: CLI exit0, timeout/interruption false, status no_artifact,
+build_failure package_not_created, judge_attempts0; пакета и result CSV нет.
+Четыре trace errors: node_wait/NODE_APPLY_STOPPED/AMBIGUOUS; второй node_wait
+и node_cancel/OUTPUT_MAPPING_RECOVERY_UNVERIFIED; operation_recover также
+REQUEST_REJECTED. Нативная первопричина не подтверждена. Process/environment
+cleanup отдельно confirmed; semantic recovery не считается успешной.
+Closed history/diagnostics сохранены только после подтверждённой cleanup,
+full roundtrip и absence guards; failed-cleanup/incomplete raw profiles v5/v7/v8
+не архивировались. Выборочного повторного model прогона нет.
+Метрики5 `formal-v9-base-metrics-5-20261009.json` SHA256
+`f775807def4870bcd68f0fc2cb9e555657d72fba80050d23de5491b4fa76edd2`:
+для cohort22 provider finishes/21 tools/18 Loginom/errors4/skills0/prepare1,
+counters совпали с result. Прежние четыре result/trace SHA повторно проверены;
+progress5 содержит SHA предыдущего progress4. Пятый FAIL остаётся в серии.
