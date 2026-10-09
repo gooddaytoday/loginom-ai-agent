@@ -10,6 +10,14 @@ requires new bound parent pair absence and privileged complete FD proof under
 both role flocks. It preserves the original marker inode/status and old gaps;
 it never admits a marker through the ordinary guard or sets pair readiness.
 
+[Pinned card-admin bootstrap/probe and operator_file-only migration](card-admin-preparation.md)
+are separate fixed accounts-only routes. They use the eight retained identities,
+new source/operation/observer-bound proofs and complete all-effects cleanup.
+LAB46/47 and unknown histories cannot be recreated from a missing receipt.
+The exact LAB47 observer3119 marker has its own fixed read-only owner route.
+Live bootstrap, migration and qualification are deferred to parent after review;
+these sources do not activate either public gate or the central source pin.
+
 The exact installed source snapshot is retained in `baseline/`, including
 VERSION, README and the three original scripts with proxy and sandbox patches.
 The historical c1b73577f label and archive digest are provenance labels; the
@@ -126,7 +134,7 @@ census or server absence. A real extra target FD rejects. Unprivileged host
 denials/races and malformed/incomplete proofs remain UNKNOWN. The collector
 holds `os.scandir` through every FD stat; no error or PID is filtered for PASS.
 
-Run `tests/account-ui.test.mjs` with `--test` using the pinned Node executable
+Run `tests/account-ui.test.mjs` and `tests/admin-bootstrap.test.mjs` with `--test` using the pinned Node executable
 from the private operator config. The tests read only its Node/Chromium/
 Playwright dependency paths. Chromium runs with sandbox and default certificate
 verification; network requests are aborted and cause failure. Fixtures are

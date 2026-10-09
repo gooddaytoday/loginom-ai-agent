@@ -69,8 +69,15 @@ unchanged bridge:
 ```sh
 NODE scripts/parent-bridge.mjs /private/NEW-operation-directory/parent-request.json \
   /private/new-raw.json /private/new-refresh.json /private/authorization.json \
-  /private/NEW-operation-directory/parent-response.json
+  /private/NEW-operation-directory/parent-response.pending.json
+python3 scripts/publish-handoff.py /private/NEW-operation-directory/parent-response.pending.json \
+  /private/NEW-operation-directory/parent-response.json --bytes COMPLETE_BYTES --sha256 COMPLETE_SHA256
 ```
+
+Wait for successful foreground bridge completion, parse complete private JSON,
+measure bytes/SHA256 and publish the closed sibling exactly once. The awaited
+final path must not exist during collection. Never redirect or write there
+directly; `publish-handoff.py` links atomically without replacement.
 
 The request has existing phase `historical-reconciliation`, a new one-use nonce,
 purpose `exact-retired-worker45-current-absence`, source/config/marker/original
@@ -86,9 +93,15 @@ access, in the guardian's PID/user namespaces, and writes closed JSON:
 
 ```sh
 python3 scripts/retired-fd-inventory.py /private/NEW-operation-directory/fd-request.json \
-  > /private/NEW-operation-directory/fd-response.json
+  > /private/NEW-operation-directory/fd-response.pending.json
+python3 scripts/publish-handoff.py /private/NEW-operation-directory/fd-response.pending.json \
+  /private/NEW-operation-directory/fd-response.json --bytes COMPLETE_BYTES --sha256 COMPLETE_SHA256
 ```
 
+Use new private sibling staging (0700 directory/0600 file, runtime-owner UID,
+parent-shell noclobber/umask077). Wait for collector success AND exact control
+absence, validate full JSON/bytes/hash and only then publish; retain staging.
+Partial output, producer failure or cleanup uncertainty remains unpublished.
 This requires actual UID/EUID 0. The wrapper calls the unchanged full collector;
 its source digest and observed UID/namespaces are also bound. Both actual role
 guard FDs/kernel locks plus the real transient control must be observed. All

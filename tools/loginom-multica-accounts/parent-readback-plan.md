@@ -151,7 +151,8 @@ before/during/final phase. Run with the approved Node dependency and the exact
 reviewed helper checkout; all inputs and the output directory must be private.
 
 ```sh
-NODE scripts/parent-bridge.mjs REQUEST.json RAW.json REFRESH.json AUTHORIZATION.json RESPONSE.json
+NODE scripts/parent-bridge.mjs REQUEST.json RAW.json REFRESH.json AUTHORIZATION.json RESPONSE.pending.json
+python3 scripts/publish-handoff.py /PRIVATE/RESPONSE.pending.json /PRIVATE/RESPONSE.json --bytes COMPLETE_BYTES --sha256 COMPLETE_SHA256
 ```
 
 `REQUEST.json` is the immutable phase request produced by the foreground
@@ -164,7 +165,13 @@ receipt. `AUTHORIZATION.json` is the exact operation grant above. Preserve
 the request filename prefix: `capture-N-PHASE-request.json` must receive
 `capture-N-PHASE-response.json`; final `parent-request.json` must receive
 `parent-response.json` in the same private directory. The bridge verifies
-operation/source/observer/phase/freshness and writes once. Returning the private
+operation/source/observer/phase/freshness and writes once to a new private sibling
+staging path. Wait for the foreground bridge to finish, parse the complete JSON
+and measure its bytes/SHA256 before calling `publish-handoff.py`; use absolute
+0700/0600 paths owned by the runtime owner. Publication is an atomic hard link
+that refuses an existing final path and retains staging bytes. Never write or
+redirect directly to an awaited response path: readers act as soon as it exists.
+Returning the private
 response through the existing supplement/SSH handoff adds no callable endpoint.
 Never include raw inventory, GUID, configs or credentials in a public comment.
 
@@ -233,10 +240,18 @@ owner bucket proof. Only afterward does it emit `fd-request.json` for the
 existing privileged parent SSH channel. Run the fixed read-only collector there:
 
 ```sh
-python3 /ABS/ACCOUNT_HELPER/scripts/own-fd-inventory.py /PRIVATE/fd-request.json > /PRIVATE/fd-response.json
+python3 /ABS/ACCOUNT_HELPER/scripts/own-fd-inventory.py /PRIVATE/fd-request.json > /PRIVATE/fd-response.pending.json
+python3 /ABS/ACCOUNT_HELPER/scripts/publish-handoff.py /PRIVATE/fd-response.pending.json /PRIVATE/fd-response.json --bytes COMPLETE_BYTES --sha256 COMPLETE_SHA256
 ```
 
-Return this file only after the foreground collector ends. The route requires
+Use a new sibling staging path in the same private directory, with noclobber
+and umask077 in the parent shell. The existing privileged transport must return
+closed 0600 stdout owned by the runtime owner. Wait for successful foreground
+completion and exact collector/control cleanup, parse the complete bytes and
+independently measure bytes/SHA256, then publish once without overwriting the
+final path. `publish-handoff.py` also rejects a still-live exact control.
+An empty/partial JSON, failed collector or incomplete cleanup is not published.
+The route requires
 both complete identical PID inventories, zero denied/racing/error FD reads,
 actual positive control FD observation, ONLY that ended collector control and
 the exact guardian FD as target holders, same guardian PID/start_ticks, exact

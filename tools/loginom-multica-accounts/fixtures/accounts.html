@@ -12,7 +12,7 @@
 <div id="user-form" hidden></div>
 <div id="dispatcher" style="width: 400px; height: 80px" data-tid="MF;TF;SessionsManagerForm;trpSessions" hidden></div>
 <script>
-window.installAccounts = ({policy, existing = false, brokenDisconnect = false, wrongUser = false, reject = false} = {}) => {
+window.installAccounts = ({policy, existing = false, initialRecord = null, adminUsers = ['admin'], brokenDisconnect = false, wrongUser = false, reject = false} = {}) => {
   const by = name => document.querySelector(`[data-tid="${name}"]`);
   const rights = {IsDesigner: true, IsViewer: true, IsAdmin: false, AllowPublish: false,
     AllowPasswordSave: false, UseGlobalFileStorage: false, SchedulerFullAccess: false,
@@ -53,7 +53,7 @@ window.installAccounts = ({policy, existing = false, brokenDisconnect = false, w
     if (reject) { const error = document.createElement('span'); error.className = 'x-form-error-wrap'; error.textContent = 'Rejected'; document.body.append(error); return; }
     const username = wrongUser ? 'foreign' : by('LoginForm;Login;edtUsername').querySelector('input').value;
     const user = {get_Name: async () => username};
-    for (const [name, value] of Object.entries(rights)) user['get_' + name] = async () => name === 'IsAdmin' ? username === 'admin' : value;
+    for (const [name, value] of Object.entries(rights)) user['get_' + name] = async () => name === 'IsAdmin' ? adminUsers.includes(username) : value;
     const remote = {get_Guid: async () => window.accountGuid, $S: 'synthetic-session'};
     const con = new bg.app.ServerConnection();
     con.UserName = username; con.user = user; con.remote = remote;
@@ -62,7 +62,7 @@ window.installAccounts = ({policy, existing = false, brokenDisconnect = false, w
     app.FMainForm = {FMapTree: {PackageNodes: {Count: 0}}};
     document.querySelector('#login').hidden = true;
     by('MF;cntMain;tlbMainToolbar;btnAvatar').hidden = false;
-    if (username === 'admin') document.querySelector('#users').hidden = false;
+    if (adminUsers.includes(username)) document.querySelector('#users').hidden = false;
   };
   by('MF;cntMain;tlbMainToolbar;btnAvatar').onclick = () => {
     actions.push('avatar'); document.querySelector('#menu').hidden = false;
@@ -85,7 +85,7 @@ window.installAccounts = ({policy, existing = false, brokenDisconnect = false, w
     by(prefix + name + ';DisplayEl').onclick = () => by(prefix + name).classList.toggle('x-form-cb-checked');
   }
   for (const name of ['btnApply', 'btnCancel']) form.insertAdjacentHTML('beforeend', `<button data-tid="${prefix + name}">${name}</button>`);
-  let saved = existing ? {username: 'worker', marker: 'fixture-owned-marker', policy} : null;
+  let saved = initialRecord ?? (existing ? {username: 'worker', marker: 'fixture-owned-marker', policy} : null);
   const input = name => by(prefix + name).querySelector('input');
   const show = values => {
     form.hidden = false; input('edtLogin').value = values?.username ?? ''; input('edtFullName').value = values?.marker ?? '';

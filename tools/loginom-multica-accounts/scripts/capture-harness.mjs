@@ -3,7 +3,8 @@ import {dirname, join, basename} from 'node:path';
 import {createHash, randomBytes} from 'node:crypto';
 import {privatePath, savePrivateArtifact, configBindings, verifyParentEnvelope} from './parent-readback.mjs';
 import {verifyBeforeBucket, verifyHeldAccountGuard, requireSameObserver} from './account-identity.mjs';
-import {verifyCalibratedInventory} from './account-lifecycle.mjs';
+import {verifyCalibratedInventory, verifyFinalReadback} from './account-lifecycle.mjs';
+import {bootstrapBindings} from './admin-bindings.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const fail = code => {throw Object.assign(Error(code), {code});};
@@ -52,13 +53,16 @@ export function verifyHarnessGuards(envelope, operation) {
   const entrypoint = command[1];
   const production = join(root, 'scripts/qualify-preparation.mjs');
   const fixture = join(root, 'tests/linked-harness.mjs');
-  if (![production, fixture].includes(entrypoint)) fail('CAPTURE_FIXED_HARNESS_REQUIRED');
+  const bootstrapFixture = join(root, 'tests/admin-harness.mjs');
+  if (![production, fixture, bootstrapFixture].includes(entrypoint)) fail('CAPTURE_FIXED_HARNESS_REQUIRED');
   if (entrypoint === production) {
+    const bootstrap = operation.schema === 'lab53-admin-bootstrap-operation-v1';
     const parentCommand = readFileSync(`/proc/${audit.parent.pid}/cmdline`, 'utf8').split('\0').filter(Boolean);
-    if (parentCommand[1] !== join(root, 'scripts/qualification-coordinator.py')
+    if (parentCommand[1] !== join(root, bootstrap ? 'scripts/admin-bootstrap.py' : 'scripts/qualification-coordinator.py')
       || hash(JSON.stringify(parentCommand)) !== audit.parent_command_sha256)
       fail('CAPTURE_FIXED_COORDINATOR_REQUIRED');
-    if (envelope.guards.length !== 4 || new Set(envelope.guards.map(g => g.fd)).size !== 4)
+    const count = bootstrap ? 3 : 4;
+    if (envelope.guards.length !== count || new Set(envelope.guards.map(g => g.fd)).size !== count)
       fail('CAPTURE_GUARD_AUDIT_UNKNOWN');
   }
   for (const pid of [process.pid, proof.supervisor.pid]) {
@@ -89,6 +93,15 @@ export async function awaitPrivateResponse(directory, name, diagnostics) {
 // The only production capture provider. No callback, executable, network,
 // observer creation, credential or caller-supplied child identity is accepted.
 export function makePrivateCaptureHarness({directory, operation, envelope, configs, diagnostics}) {
+  return privateHarness({directory, operation, envelope, configs, diagnostics}, false);
+}
+
+export function makePrivateBootstrapHarness(options) {
+  if (options.operation.schema !== 'lab53-admin-bootstrap-operation-v1') fail('BOOTSTRAP_OPERATION_UNKNOWN');
+  return privateHarness(options, true);
+}
+
+function privateHarness({directory, operation, envelope, configs, diagnostics}, bootstrap) {
   privatePath(directory, true);
   const source = operation.source;
   const expectedObserver = operation.expected_observer;
@@ -97,11 +110,14 @@ export function makePrivateCaptureHarness({directory, operation, envelope, confi
     || !/^[a-f0-9]{64}$/.test(source.manifest_sha256)) fail('CAPTURE_SOURCE_UNKNOWN');
   const guards = () => verifyHarnessGuards(envelope, operation);
   guards();
-  const {bindings} = configBindings(configs, operation.issue_id, operation.stand);
+  const readBindings = () => bootstrap ? bootstrapBindings(configs, operation.issue_id, operation.stand)
+    : configBindings(configs, operation.issue_id, operation.stand);
+  const {bindings} = readBindings();
   let sequence = 0;
+  const retiredEffects = [];
   const sessions = new Map();
   const checkConfigs = () => {
-    const now = configBindings(configs, operation.issue_id, operation.stand).bindings;
+    const now = readBindings().bindings;
     if (JSON.stringify(now) !== JSON.stringify(bindings)) fail('CAPTURE_CONFIG_CHANGED');
   };
   const phase = async (binding, phase) => {
@@ -116,6 +132,7 @@ export function makePrivateCaptureHarness({directory, operation, envelope, confi
     const response = await awaitPrivateResponse(directory, name + '-response.json', diagnostics);
     const readback = verifyParentEnvelope(request, response);
     verifyCalibratedInventory(readback, request.after);
+    if (bootstrap && retiredEffects.length && phase === 'before-operation') verifyFinalReadback(readback, retiredEffects, request.after);
     checkConfigs(); guards();
     savePrivateArtifact(directory, 'consumed-' + nonce + '.json', {request_sha256: hash(JSON.stringify(request)),
       response_sha256: hash(JSON.stringify(response)), operation_id: operation.operation_id, state: 'UNKNOWN'});
@@ -124,9 +141,10 @@ export function makePrivateCaptureHarness({directory, operation, envelope, confi
     return {...common, phase, readback};
   };
   const harness = Object.freeze({async before(config, role) {
-    const index = role === 'admin' ? 0 : role === 'worker' ? 1 : 2;
-    if (!['admin', 'worker', 'reviewer'].includes(role) || hash(config.loginom.username) !==
-      configBindings(configs, operation.issue_id, operation.stand).users[index]) fail('CAPTURE_TARGET_UNKNOWN');
+    const users = readBindings().users;
+    const index = bootstrap ? users.indexOf(hash(config.loginom.username)) : role === 'admin' ? 0 : role === 'worker' ? 1 : 2;
+    if ((bootstrap ? role !== 'admin' || index < 0 : !['admin', 'worker', 'reviewer'].includes(role))
+      || hash(config.loginom.username) !== users[index]) fail('CAPTURE_TARGET_UNKNOWN');
     const guard = envelope.guards.find(item => basename(item.path) === config.loginom.username + '.lock');
     const accountLock = verifyHeldAccountGuard(guard, config.loginom.username);
     const binding = {schema: 'lab53-causal-binding-v1', issue_id: operation.issue_id, operation_id: operation.operation_id,
@@ -136,13 +154,14 @@ export function makePrivateCaptureHarness({directory, operation, envelope, confi
       ...(role === 'admin' && expectedObserver.user_hash === hash(config.loginom.username) ? {owner_baseline: expectedObserver} : {})};
     const before = await phase(binding, 'before-operation');
     verifyBeforeBucket(binding, before.readback);
+    if (bootstrap && index === 0 && before.readback.rows.some(row => row.user_hash === users[1])) fail('BOOTSTRAP_TARGET_BUCKET_NOT_EMPTY');
     const token = Object.freeze({}); sessions.set(token, {binding, before}); return token;
   }, async during(token) {
     const session = sessions.get(token); if (!session || session.used) fail('CAPTURE_TOKEN_UNKNOWN');
     session.used = true;
     const during = await phase(session.binding, 'while-connected');
     return {...session, during, guard_audit: guards()};
-  }, guards});
+  }, ...(bootstrap ? {retired(effect) {retiredEffects.push(effect);}} : {}), guards});
   registered.add(harness); return harness;
 }
 
