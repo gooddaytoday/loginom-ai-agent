@@ -1098,6 +1098,11 @@ Core имеет разметку осей, но без CSV oracle. По доку
   Cleanup6/remaining0×2/history+diag roundtrip PASS не означает recovery PASS.
   Progress7 SHA31b83e6101…; low-liquidity#1 running, closed7/45/PASS5/FAIL2,
   candidate/cold/compare0/retries0. Отказы не исключаются из итоговой серии.
+  Восьмой closed low-liquidity#1 no_artifact FAIL0/judge0/8 errors: filter label
+  rejected/effect false/cleanup true, затем sort/output_mapping readiness timeout.
+  Cleanup6/remaining0×2/history+diag full roundtrip; recovery не подтверждена.
+  Progress8 SHA3355d82607…; monthly#1 running, closed8/45/PASS5/FAIL3,
+  candidate/cold/compare0/retries0. Native root cause UNKNOWN, критерий не снижен.
   Частичный v7 не подставлять
   как полный baseline и не повторять выборочно только неуспешные попытки.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой

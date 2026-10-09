@@ -665,12 +665,13 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | cohort-spend-activity | 1 | FAIL0/no_artifact | Нет / не выполнялись | 22 / 21 / 18 | 4563 / 15206251 | 3 / 3337376 |
 | customer-activity-segments | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4608 / 17448322 | 3 / 5497845 |
 | first-last-touch | 1 | FAIL0/no_artifact | Нет / не выполнялись | 26 / 25 / 23 | 4585 / 15440708 | 3 / 3550529 |
+| low-liquidity-companies | 1 | FAIL0/no_artifact | Нет / не выполнялись | 23 / 23 / 21 | 4487 / 15707741 | 3 / 4075869 |
 
-Последний private snapshot `formal-v9-progress-7-20261009.json` SHA256
-`31b83e61013b762ea17e07caa2ec01534777254c1cabb7a850299fa77b1c8b1b`:
-семь result/cleanup/process-cleanup/preservation, пять review и archive SHA
+Последний private snapshot `formal-v9-progress-8-20261009.json` SHA256
+`3355d82607c6a813c42e74deb583acc350370655911a3a41cf947d29e44b3a7a`:
+восемь result/cleanup/process-cleanup/preservation, пять review и archive SHA
 повторно проверены. Controller идентичность живого PID676156 совпала;
-low-liquidity-companies#1 running. Closed7/45/PASS5/FAIL2/manual retries0,
+monthly-demand#1 running. Closed8/45/PASS5/FAIL3/manual retries0,
 common020c08059… неизменен. Новый private `formal-v9-observe.py` read-only,
 SHA256 `eb9111bcc5191527eafcc49b5af07633709a3cc63276bb60f7a40b5c696a6e9a`,
 проверен на живом процессе; не входит в исполняемый harness/21 adapters.
@@ -747,3 +748,17 @@ History4585/15440708bytes+diag3/3550529bytes full roundtrip/600 PASS.
 Все прежние SHA/archives повторно PASS, progress7 сохраняет chain6 и отдельно
 unreviewed results при продолжающемся runner; сейчас их0. Это не старый
 first-last v7 с package/score89; результаты не подставляются друг вместо друга.
+
+Low-liquidity#1: CLI exit0/timeout false, no_artifact/package_not_created,
+judge0/oracle artifact absent. Из8 trace errors первый filter-liquidity-1
+REQUEST_REJECTED/NOT_APPLIED/Unsupported node label/effect false/cleanup true.
+Затем sort-liquidity-1/output_mapping NODE_APPLY_STOPPED/AMBIGUOUS: readiness
+timeout complete output definition page at0, effect true/cleanup false;
+cancel сохраняет отказ, resume требует original checkpoint, observe/inspect/
+recover также rejected. Native root cause и semantic recovery UNKNOWN.
+Environment/process cleanup6 stages/remaining0×2 confirmed; без пакета
+structure/warm/cold не выполнялись. History4487/15707741bytes+diag3/4075869bytes
+full roundtrip/600 PASS, весь отказ сохраняется в серии.
+Метрики8 SHA256 `8f3dc44e6a685f417a5d9da1d3292b440c80a30882fb4f38ae698eb7b2c07a08`:
+23 finishes/23 tools/21 Loginom/errors8/skills0/prepare1, counters match;
+прежние7 SHA/archives повторно PASS, progress8 сохраняет chain7/unreviewed0.
