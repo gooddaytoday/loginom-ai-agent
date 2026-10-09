@@ -43,6 +43,8 @@ LAB-55 и соседний агент 01a10b2c-f744-7552-a6e6-338f31569ef3 ис�
 
 В первом frontend `server.json` имел `wsproxy=auto`: Loginom сначала выбирал прямой ws://127.0.0.1:8080/ws/, а не отдельный proxy. Фактический маршрут зафиксирован после cold read-only отказа. Поэтому первоначальные native attempts сохранены с invalid isolated-stand provenance; их нельзя использовать как подтверждение cleanup отдельного backend. На собственном frontend установлен поддерживаемый `wsproxy=true` с readback, затем наблюдены только ws://127.0.0.1:32770/app/ws/ и собственный физический storage. Неверная ручная passwordless-конфигурация собственного образа заменена штатно сгенерированным Users.cfg; raw auth/config остаются private. Адреса созданных при неверном маршруте файлов записаны в отдельный residual ledger, очистка отложена до освобождения общего backend другим агентом. Общий сервер не перезапускался, чужие процессы не завершались.
 
+После подтверждения освобождения ресурсов соседним агентом пять собственных common файлов удалены адресно: перед мутацией повторно сверены SHA256, regular/non-symlink file identity и две свежие проверки отсутствия собственных процессов. Два последующих чтения подтвердили отсутствие этих файлов и прежний StartedAt общего сервера. Package lock к этому моменту уже отсутствовал; его не удаляли, отсутствие подтверждено дважды отдельно. Никаких новых UI/model запусков или изменений чужих profiles/leases/files. Первоначальные deferred receipts остаются историческими; окончательное разрешение — в cleanup-resolution supplement.
+
 ## Установленный комплект и немодельная проверка
 
 Чистый CLI `0.1.18-lab31.2` собран официальным build-cli из e15d41a047598edb8cb5dabae6c28f30ac037440. Harness и skill 1.0.5 закреплены отдельно на 6150a3c0b7569e09e81728f0d16f634c13a8d77f. Build manifest, SHA256 всех архивов, skill manifest/ссылки и readback распаковки проверены. Комплект лежит в ignored `evals/.bundle/lab31-fixes-e15d41a04/`; `release-pins.json` имеет STAGED_ONLY. LAB-55, исторические результаты и действующие installation pins не переключались. Новая независимая приёмка Ben этого комплекта не выполнялась.
@@ -53,13 +55,17 @@ Cold saved-graph проверен через установленный runtime 
 
 Перед cold graph собственный пустой package lock оставил read-only toast. После минимальной диагностики, двух свежих проверок отсутствия своих процессов, сверки package hash/empty lock/container identity выполнена адресная очистка только этого lock. Отдельный тест обычного recovery → release → следующий admission уже покрывает такой lock ledger и удаление собственных registration/harness. Это Docker network-none fixture с немодельным management CLI, не installed-native recovery приёмка.
 
-14 немодельных попыток учтены в attempt ledger, включая NOT_STARTED, первоначальные ошибки test adapter и неверного маршрута. Подготовлены 31 безопасный history/event файл с original/private и safe SHA256; raw auth/env/browser DB исключены. Собственные два контейнера и сеть удалены после архивирования storage/history; две проверки подтвердили отсутствие контейнеров/сети, финальные две проверки — отсутствие своих CLI/browser процессов. Исторический writer marker setup, не дошедшего до dispatch, сохранён: его не удаляли по PID/возрасту. Общие residual files из ошибочного маршрута остаются адресно учтёнными и ожидают свободного backend; полного общего cleanup здесь нет.
+14 немодельных попыток учтены в attempt ledger, включая NOT_STARTED, первоначальные ошибки test adapter и неверного маршрута. Подготовлены 31 безопасный history/event файл с original/private и safe SHA256; raw auth/env/browser DB исключены. Собственные два контейнера и сеть удалены после архивирования storage/history; две проверки подтвердили отсутствие контейнеров/сети, финальные две проверки — отсутствие своих CLI/browser процессов обоих frozen кандидатов. Исторический writer marker setup, не дошедшего до dispatch, сохранён: его не удаляли по PID/возрасту, профиль не переиспользуется. Общие residual files из ошибочного маршрута очищены после освобождения ресурса, подтверждение доставлено отдельным supplement.
 
 ## Доставка
 
 Комплект доставлен через существующий SSH ControlMaster в новый private каталог `/home/user/.local/share/loginom-evals-runtime/staging/lab31-fixes-e15d41a04`. На сервере совпали sizes/SHA256 10 entries bundle manifest; readback CLI metadata (5406 manifest entries), всех 16 файлов skill и всех 206 файлов evidence прошёл. `delivery-readback.json` сохранён на сервере и локально в комплекте. Bundle manifest SHA256 df6651550fa85ec9945610dd991f66a6fae754d9a816b5908d8a585067543c2e. Это доставка/readback, не native проверка сервера; active pins/lease/profiles и модели не менялись.
 
 Дополнительный read-only ownership supplement подтвердил пять common residual файлов: четыре CSV по исходным hashes и LGP по save receipt, ровно трём созданным native GUID и пути собственного input CSV. Текущие bytes архивированы; удаление допускает только свежую сверку тех же hashes после освобождения общего backend. Supplement archive SHA256 961357d14fd4701756c28ef307447ed4377c771c0cf616f2807ff5f66588198b, manifest d80dcfc4a47916eeaaa6c1c0db355960f99c22755a35f93b5fcf6dc3f278d6b8; локальный и server readback PASS. Backend не мутировался.
+
+Окончательный cleanup-resolution архив SHA256 1f2af3fbf79b3f7e2f022d03fb40d88401bbd33dbc44e0926654ee343a91468c, manifest f6a5c0307d1356e8888902f9a6b02545f1039ea10489be08e875a705726506e3. Он доставлен в тот же staging; локальный и server SHA256/readback PASS. Исходные три поставки и первый verification archive неизменны.
+
+Окончательный `final-bundle-manifest.json` SHA256 7a5fa9c8b97dc839b9276a277f43e25db2fa44d87fd5dff94810f17f55614dbc проверен на сервере по всем 17 entries. `FINAL-STATUS.md` явно отделяет первоначальный deferred snapshot от подтверждённого cleanup. Activation остаётся STAGED_ONLY.
 
 ## Checkpoint
 
@@ -72,5 +78,7 @@ Cold saved-graph проверен через установленный runtime 
 - Lifecycle recovery/release/next admission PASS в nonmodel fixture; installed-native recovery не заявляется проверенным.
 - Evidence archive SHA256: 5119416ff5fac0f745a076de6deb3b1c99952abba4a253696e61acd274dda92e; manifest 02aa709969af929d4dea1d44ca6d7c8b1cc137b98a5299e2a9b0687671d58f18; readback/secret scan PASS.
 - Доставлено в runtime staging/lab31-fixes-e15d41a04; server manifest/archive/readback PASS, activation STAGED_ONLY.
-- Ограничения: STAGED_ONLY, Ben комплекта ещё не принимал; common residual cleanup отложен; provider/product FAIL остаются возможны.
-- Следующий шаг: на свободном общем backend адресно проверить/очистить residual ledger; переключить только будущие назначения по новым pins.
+- Final bundle manifest SHA256: 7a5fa9c8b97dc839b9276a277f43e25db2fa44d87fd5dff94810f17f55614dbc, все 17 entries совпали на сервере.
+- Cleanup: свои контейнеры/сеть/processes и пять common residual файлов CONFIRMED; package lock отсутствует. Cleanup supplement 1f2af3fbf79b3f7e2f022d03fb40d88401bbd33dbc44e0926654ee343a91468c, server readback PASS.
+- Ограничения: STAGED_ONLY, Ben комплекта ещё не принимал; исторический NOT_STARTED private writer marker оставлен, профиль не используется; provider/product FAIL остаются возможны.
+- Следующий шаг: после освобождения runtime stand переключить только будущие назначения по новым pins; LAB-55 и исторические результаты сохранить.
