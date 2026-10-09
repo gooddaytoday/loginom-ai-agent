@@ -711,7 +711,7 @@
     "sha256": "7242dca9becfc3d7a7d111e4a0271e51caf845ad295b8dfdbbcce4ac0736ed73",
     "bytes": 3148
   },
-  "next_step": "LAB53 common preparation task running Generator since03:37:44MSK; exact causes/shared fix/review then original8 readiness/handoff. Stock3m/8/8/8/daemon12; no schedules/merge/release.",
+  "next_step": "LAB53 Worker source candidate and existing owner Admin browser on mas read-only discovery; exact45/48/3119 server/process cleanup, Reviewer proof then same8 resume under existing authorization; stock3m/caps8/8/8/daemon12, no schedules/merge/release.",
   "verified_fresh_diagnostic_attachments": [
     {
       "id": "01a11d95-301f-714a-b520-d68c5f95d975",
@@ -2366,5 +2366,134 @@
         }
       ]
     }
+  },
+  "common53_generator_handoff": {
+    "observed_at": "2026-10-09T00:50:18.435100+00:00",
+    "scope_sha": "d4241c818b4a59f65a42dcf756034eec20e620b3",
+    "candidate_branch": "common-preparation",
+    "PR_target": "shared-oauth",
+    "task_runs": [
+      {
+        "id": "01a11e21-bff2-74fa-95c4-531de66c3fc4",
+        "agent_id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+        "status": "running",
+        "created_at": "2026-10-09T03:48:10+03:00",
+        "started_at": "2026-10-09T03:48:11+03:00",
+        "completed_at": null,
+        "failure_reason": null,
+        "attempt": 1,
+        "max_attempts": 2
+      },
+      {
+        "id": "01a11e18-2ca9-79b2-9905-3629039a5c53",
+        "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+        "status": "completed",
+        "created_at": "2026-10-09T03:37:43+03:00",
+        "started_at": "2026-10-09T03:37:44+03:00",
+        "completed_at": "2026-10-09T03:48:43+03:00",
+        "failure_reason": null,
+        "attempt": 1,
+        "max_attempts": 2
+      }
+    ],
+    "handoff_comment_id": "01a11e21-bfdc-7b68-a3ed-1d94477b0c1a",
+    "verified_attachments": [
+      {
+        "id": "01a11e21-bcac-71b7-bd40-7c1df9df1720",
+        "name": "common-preparation-assignment.md",
+        "bytes": 19069,
+        "sha256": "acbd169057b2949a6bf92aaaa817af8fb8b04ecadc3ed940b2db338b6a6c8972"
+      },
+      {
+        "id": "01a11e21-bd7b-772d-9bb5-450e9b68037f",
+        "name": "generator-preparation-report.json",
+        "bytes": 35644,
+        "sha256": "7a727a49654c6d9f72b013f44151a70bf972ed30905fa35c5b7cc1857047ccf7"
+      },
+      {
+        "id": "01a11e21-be46-7839-9e43-fed218a5b32c",
+        "name": "accounts-only-source-baseline.tar.gz",
+        "bytes": 8854,
+        "sha256": "1d0f05db9b027a2ce92b326e2d8bf112d6986f7fb3c6b980165fe72e2a4f8e49"
+      },
+      {
+        "id": "01a11e21-bf0f-78b7-b9cc-9f5de712aa47",
+        "name": "generator-handoff-manifest.json",
+        "bytes": 734,
+        "sha256": "f692124b5b73fa9d853c1d71dd23febf12c66fc24eb520244581fababc188b02"
+      }
+    ],
+    "attachment_API_bytes_4of4": true,
+    "manifest_artifact_bytes_SHA_3of3": true,
+    "archive_regular_safe_files": 6,
+    "stock_VERSION_3of3": true,
+    "SOURCE_SNAPSHOT_5of5": true,
+    "independent_scope_review": "PASS only source/handoff; live cleanup/node acceptance NOT_CONFIRMED",
+    "facts": {
+      "marker_paths": "LAB48 <account>.active.json vs LAB45 <account>.lock.active.json; same permanent flock inode2396017; both read AFTER flock, not proven race/cached-precheck cause",
+      "retained_marker_hashes": [
+        "74f25f19294cc007923e4deb04763a9203fea294d93177d68d4e5a2f548d425e",
+        "9595e0bb0d748a5e04a67c62f97c3e59b0c5ce839500eeb56716e1ec77630a90"
+      ],
+      "stock_provisioning_LAB48": "NOT_STARTED; stock openUsers already has main/visible-suffix fallback",
+      "scope": "one common qualification/lifecycle layer; post-flock both-legacy gate, exact observed main/AdminStart navigation and private error details",
+      "prior_observed_exact_PID_starttick_records_absent": 59,
+      "PID_absence_is_server_proof": false,
+      "current_source_bytes_not_executed_byte_proof_when_reconstructed": true
+    },
+    "resource_snapshot": {
+      "captured_at": "2026-10-09T00:43:37.232084+00:00",
+      "logical_cpu_count": 12,
+      "load": [
+        0.01220703125,
+        0.03125,
+        0.00341796875
+      ],
+      "memory": {
+        "MemTotal": "31604384 kB",
+        "MemAvailable": "30145972 kB",
+        "SwapTotal": "8388604 kB"
+      },
+      "disk_free_bytes": 409321377792,
+      "model_build_runs": 0,
+      "Loginom_logins": 0,
+      "admin_accounts_created": 0
+    },
+    "native_queue": {
+      "pid": 212379,
+      "active_task_count": 1,
+      "running_task_count": 1,
+      "resource_wait_task_count": 0,
+      "pending_terminal_report_count": 0,
+      "failed_terminal_report_count": 0
+    },
+    "common_implementation_and_independent_runtime_review": "pending"
+  },
+  "common53_central_gate_readback": {
+    "observed_at": "2026-10-09T00:55:29.676914+00:00",
+    "squad_id": "8ff41bd5-f794-4b5b-a063-026f3874628e",
+    "before_instructions_sha256": "1aae8f88bf57b7e04140cde0dee442d939bd2d22e03e599aaef665a2bd3fffa6",
+    "after_instructions_sha256": "8d7a2fb19518fac1e1a8522cdccbfb1158b90c09ae71e411159e397d37ff2c32",
+    "prior_instruction_bytes_preserved": true,
+    "protected_fields_unchanged": true,
+    "scope": "LAB53 factual gate/current owner authorization; target model paragraph untouched; no extra permission required to resume original8 after proof",
+    "worker_supplement_id": "6e5ec783-3c5e-4666-a31d-b68c2d1025d1"
+  },
+  "common53_existing_admin_access": {
+    "issue_id": "01a11e17-b869-7550-8450-35e5e17119d4",
+    "task_id": "01a11e21-bff2-74fa-95c4-531de66c3fc4",
+    "owner_answer": "Existing authorized Admin session in browser on mas",
+    "supplement_id": "f2741971-19cd-4f47-8cc3-a8dc340d69ac",
+    "new_browser_or_login_authorized": false,
+    "scope": "discover/attach/read/Refresh existing context; preserve user session; exact own proof required before narrow cleanup/marker transition",
+    "availability": "owner confirms existing browser on mas; actual CDP/tab discovery and independent readback pending",
+    "local_available_surfaces": "IAB/MCP Apps had no Loginom tab or matching window; no new tab/login created"
+  },
+  "common53_resume_permission_correction": {
+    "assignment_line": 47,
+    "old_phrase": "and owner command before original8 resume",
+    "interpretation": "original owner launch authorization and approved scope5 already allow resume after proof/common independent review; no new approval gate",
+    "worker_supplement_id": "6e5ec783-3c5e-4666-a31d-b68c2d1025d1",
+    "merge_release_or_new_common_contract_criteria": "still separate owner command"
   }
 }

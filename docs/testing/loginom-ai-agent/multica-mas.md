@@ -174,23 +174,23 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 
 ## Checkpoint — новая параллельная волна восьми узлов, 09.10.2026
 
-- Документация до продолжения099ae19c9; baseline4e626d547/basef9bf332c; loginom0ca не включён; remote SHA/PR40 OPEN draft сверены.
-- Node SHA: LAB45 a00b0203/PR42, LAB46 41e0b170/PR43, LAB47 c92a3bfd; LAB48–52 4e626d547; назначения сохранены.
-- Caps8/8/8, daemon12; владелец оставил штатный3m;8 одновременно NOT_CONFIRMED/load12 NOT_RUN.
-- Временные5s отменены ранее stock idle restart/terminal_reports0; daemon PID212379/argv3m0s+12; активные задачи не прерывались.
-- Installed CLI597/version-dev identity и source2ea Multica0.6.1 подтверждены; server exact SHA NOT_OBSERVED; native/Eval unchanged.
-- Central instructions SHA1aae8f88 readback: target selection сохранён; новых итоговых CLI/Reviewer попыток после resume0.
-- Root47 старые3117/3118 effects exact cleanup+independent artifact review PASS; результат ограничен прежними попытками.
-- Root47 observer3119 UI/logout/PID/FD PASS; server absence PENDING; own card marker47 сохраняется.
-- Семь Генераторов resume03:05MSK штатно;03:31 все8 cards blocked/latest runs completed; новых Worker/Reviewer handoff0.
-- LAB48 attempt8d6f150f: один новый Root login; TimeoutError до Dispatcher calibration; numericID/cause NOT_ESTABLISHED.
-- LAB48 UI/logout/observedPID PASS, server absence NOT_CONFIRMED; own marker74f25f… сохраняется, не покрыт Root47 receipt.
-- LAB45 attempt6d13d38b: ожидаемый MF;MapTreeForm vs observed AdminStartForm tree; local selector fix browser NOT_RUN.
-- LAB45 numericID NOT_CAPTURED/server UNKNOWN/marker9595e0…; executed helper prehash отсутствует, recovered-history не execution proof.
-- LAB46/49/50/51/52 новых Loginom login0; удержаны новым LAB48 marker; LAB48 natural3119 readback не достигнут.
-- LAB48 attachments3 bytes/hash/manifest PASS; LAB45 bytes совпали/computed digest сохранён, published expected artifact checksum отсутствует.
-- LAB48 source files hash SSH readback PASS: generic first() navigation/catch drops error details; happy path also sets admin-absence BLOCKED.
-- 00:30UTC load0.00/0.018/0.011, MemAvailable30237796kB/free409704574976B; API roles nonterminal0 не доказывает process/server absence.
-- Владелец согласовал [LAB53 — общую подготовку](reports/2026-10-08-node-recheck/common-preparation-draft.md); Generator running03:37:44MSK, common helper changes0.
-- [SHA/tasks/hashes/история](reports/2026-10-08-node-recheck/parallel8-restart.json); schedules0/new pools0/merge-release0; чужие изменения сохранены.
-- Следующий шаг: LAB53 Генератор→Исполнитель→Ревьюер, exact45/48/3119 cleanup→те же8 readiness; node acceptance NOT_CONFIRMED.
+- Документация до продолженияeb1e3a5a6; baseline4e626d547/basef9bf332c; loginom0ca не включён; назначения сохранены.
+- Node SHA: LAB45 a00b0203/PR42, LAB46 41e0b170/PR43, LAB47 c92a3bfd; LAB48–52 4e626d547; remote heads совпали.
+- Caps8/8/8/runtime24aa… readback PASS, daemon12/штатный3m сохраняются;8 одновременно NOT_CONFIRMED/load12 NOT_RUN.
+- Installed CLI597/version-dev и Multica0.6.1/source2ea — отдельные идентичности; server exact SHA NOT_OBSERVED.
+- Central partialPUT/readback1aae…→8d7a…: LAB53 hold и прежнее разрешение resume8; target CLI selection/native/Eval/caps сохранены.
+- LAB53 scope d4241c818/common-preparation→shared-oauth; Generator task01a11e18… completed03:48:43MSK.
+- LAB53 Worker task01a11e21… running03:48:11MSK; source-only common qualification/lifecycle candidate, независимый review pending.
+- Gen53 attachments4 APIbytesPASS,3 manifest artifacts bytes/SHA PASS; tar6 safe files, stockVERSION3/3+sourceSnapshot5/5 PASS.
+- Independent handoff scope review PASS; не live readiness, не исполненные восстановленные bytes и не node/model acceptance.
+- Marker mismatch установлен: LAB48 .active.json vs LAB45 .lock.active.json, один flock2396017; обе проверки после lock, race не доказана.
+- Stock provisioning LAB48 NOT_STARTED/openUsers fallback уже есть; исправляется qualification/gate/navigation/private diagnostics.
+- LAB45 attempt6d13… numericNOT_CAPTURED/serverUNKNOWN/marker9595…; LAB48 attempt8d6f… numeric/causeNOT_ESTABLISHED/marker74f25….
+- Root47 старые3117/3118 cleanup PASS только для прежних effects; observer3119 server absence PENDING; новые45/48 effects отдельно.
+- Gen53 59 old exact PID/starttick records absent, browser/Host/login/model/build/marker mutations0; это не server absence.
+- 03:50MSK все8 node cards blocked/latest Gen completed, новыхruns/comments/attachments0; свежих Worker/Reviewer handoff0.
+- Owner сообщил existing Admin browser НА MAS; Worker получил attach/read/Refresh discovery, пользовательский browser/session сохраняется.
+- Local IAB/MCP Apps Loginom не показывают; новыйbrowser/context/login0; существующий remote context/полныйreadback пока не подтверждён.
+- 00:43UTC load0.012/0.031/0.003, MemAvailable30145972kB/free409321377792B; daemonactive1/running1/wait0/terminalreports0.
+- [Handoff/SHA/hashes/границы](reports/2026-10-08-node-recheck/parallel8-restart.json); schedules0/new pools0/merge-release0; чужие изменения сохранены.
+- Следующий шаг: LAB53 fix+finite exact45/48/3119 cleanup+Reviewer→те же8 без нового approval; target-model full acceptance NOT_CONFIRMED.
