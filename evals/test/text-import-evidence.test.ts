@@ -167,3 +167,20 @@ test("incomplete initial settings pass only with a native discarded draft and no
     expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("Execute")
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
+
+test("damaged Unicode may be diagnosed after a full read without inventing a native warning", async () => {
+  const f = await positiveFixture("txt-wrong-encoding")
+  try {
+    const spec = await Bun.file(path.join(f.task, "SPEC.json")).json()
+    f.port.schema = spec.columns
+    f.port.row_count = 1; f.port.sample_rows = 1
+    f.port.sample = [[{ type: "string", value: "1", is_null: false }, { type: "string", value: "������", is_null: false }]]
+    await f.write()
+    const file = path.join(f.attempt, "events.jsonl")
+    const original = await Bun.file(file).text()
+    await Bun.write(file, original + JSON.stringify({ type: "text", part: { text: "Обнаружена утрата Unicode; импорт повреждён и не проверен как корректный." } }) + "\n")
+    expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    await Bun.write(file, original + JSON.stringify({ type: "text", part: { text: "Импорт корректен." } }) + "\n")
+    expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("diagnosed")
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})

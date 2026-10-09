@@ -6,10 +6,11 @@ import pathlib
 import sys
 import importlib.util
 import decimal
+import re
 
 sys.dont_write_bytecode = True
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-from text_import_oracle import compare
+from text_import_oracle import compare, parse_source
 IDS = [case for group in json.loads((ROOT / 'src/text-import-cases.json').read_text())['groups'] for case in group['ids']]
 CHECKS = {'input', 'import', 'graph', 'sequence', 'result', 'diagnostic'}
 
@@ -233,7 +234,7 @@ def package_graph(attempt_dir, node_id=None, source_path=None, empty=False):
     require(all(node['type'] in allowed for node in xml['nodes']) and not xml['links'], 'graph: unexpected nodes/links')
     require(len(imports) == (0 if empty else 1), 'graph: exact import count required')
     if not empty:
-        require(imports[0]['id'] == node_id and imports[0]['engine'].get('FileName') == source_path
+        require(imports[0]['id'] == node_id and (source_path is None or imports[0]['engine'].get('FileName') == source_path)
             and not imports[0]['inputs'] and len(imports[0]['outputs']) == 1, 'graph: persisted import owner/source differs')
 
 
@@ -271,7 +272,7 @@ def known_refusal(call, calls, events, workspace):
     return result
 
 
-def diagnostic(spec, attempt_dir, calls, events, workspace, transfers):
+def diagnostic(spec, task_dir, attempt_dir, calls, events, workspace, transfers):
     applies = [call for call in calls if call['tool'].endswith('node_apply')]
     require(len(applies) == 1, 'diagnostic: one uncorrected apply required')
     call = applies[0]
@@ -284,6 +285,38 @@ def diagnostic(spec, attempt_dir, calls, events, workspace, transfers):
         require('columns' not in settings and settings == wanted, 'diagnostic: omitted columns required')
     else:
         require(settings == {**wanted, 'columns': spec['columns']}, 'diagnostic: exact assigned settings required')
+    result = settled_receipt(calls, call)['result']
+    if spec['id'].endswith(('wrong-encoding', 'unclosed-quote')) and result.get('status') == 'SUCCEEDED':
+        require(result.get('cleanup_complete') is True and result.get('node', {}).get('document_id') == workspace['document_id']
+            and result.get('node', {}).get('workflow_id') == workspace['workflow_ref']['workflow_id'], 'diagnostic: owned full read required')
+        observed, _ = native_application(events, call, result)
+        configuration_matches(spec, observed, transfers[0]['output']['destination'])
+        actual = typed_table(result)
+        raw = (task_dir / spec['inputs'][0]['path']).read_bytes()
+        recipe = {'source': {'encoding': 'cp1251' if spec['id'].endswith('wrong-encoding') else 'utf-8'},
+            'settings': spec['settings'], 'columns': spec['columns'], 'source_headers': spec.get('source_headers')}
+        if spec['id'].endswith('wrong-encoding'):
+            original = parse_source(raw, recipe)
+            differs = False
+            try:
+                compare(original, actual)
+            except ValueError:
+                differs = True
+            require(differs, 'diagnostic: Unicode damage must be observed')
+        else:
+            import csv
+            invalid = False
+            try:
+                parse_source(raw, recipe)
+            except (ValueError, csv.Error):
+                invalid = True
+            require(invalid, 'diagnostic: malformed source must be independently established')
+        text = ' '.join(json.loads(line).get('part', {}).get('text', '') for line in (attempt_dir / 'events.jsonl').read_text().splitlines()
+            if line.strip() and json.loads(line).get('type') == 'text')
+        require(re.search(r'поврежд|неполнот|утрат|искаж|corrupt|incomplete|loss', text, re.I), 'diagnostic: damage must be diagnosed in the report')
+        if (attempt_dir / 'artifact/package.lgp').exists():
+            package_graph(attempt_dir, result['node']['node_id'], transfers[0]['output']['destination'])
+        return
     result = known_refusal(call, calls, events, workspace)
     if spec['id'] == 'initial-incomplete-settings':
         require(any(event.get('receipt', {}).get('verification') == 'text_import_initial_settings_draft_discarded'
@@ -373,7 +406,7 @@ def audit(task_dir, attempt_dir, package_path):
         rejection(spec, calls, workspace, transfers)
         package_graph(attempt_dir, empty=True)
     elif task.get('output_mode') == 'diagnostic':
-        diagnostic(spec, attempt_dir, calls, native_events(attempt_dir), workspace, transfers)
+        diagnostic(spec, task_dir, attempt_dir, calls, native_events(attempt_dir), workspace, transfers)
     else:
         positive(spec, task_dir, attempt_dir, calls, native_events(attempt_dir), workspace, transfers, package_path)
     return {'errors': [], 'failures': []}
