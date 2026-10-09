@@ -1,0 +1,116 @@
+{
+  "schema": "lab53-root-independent-source-review-v1",
+  "observed_at": "2026-10-09T08:15:06.232057+00:00",
+  "source_sha": "201a9371889947638ba6215f514a48de3da9b47b",
+  "tree": "dd8355597fe570c00eac06faf6f3c7d6c98288bd",
+  "previous_source_sha": "6a97eb3cd264059dc95f3de9302e494683921f67",
+  "published_pr": 44,
+  "scope_changed_files": [
+    "tools/loginom-multica-accounts/README.md",
+    "tools/loginom-multica-accounts/VERSION.json",
+    "tools/loginom-multica-accounts/finite-cleanup.md",
+    "tools/loginom-multica-accounts/fixtures/accounts.html",
+    "tools/loginom-multica-accounts/parent-readback-plan.md",
+    "tools/loginom-multica-accounts/scripts/account-identity.mjs",
+    "tools/loginom-multica-accounts/scripts/account-lifecycle.mjs",
+    "tools/loginom-multica-accounts/scripts/account-session-ui.mjs",
+    "tools/loginom-multica-accounts/scripts/parent-readback.mjs",
+    "tools/loginom-multica-accounts/scripts/provision-account.mjs",
+    "tools/loginom-multica-accounts/scripts/provision-accounts.py",
+    "tools/loginom-multica-accounts/tests/account-ui.test.mjs",
+    "tools/loginom-multica-accounts/tests/test_lifecycle.py"
+  ],
+  "scope_only_accounts_helpers": true,
+  "diff_check": true,
+  "artifacts_directory": "/tmp/loginom-common53-source201a-artifacts-971a0ec9-6730-4eec-95c6-85821ababd6f",
+  "manifest_deliverables": [
+    {
+      "file": "worker-adapters-source.md",
+      "bytes": 3882,
+      "sha256": "481946b01364e6f64dc65b092e665b5421c8b5f67557294e0148daa002c6bc6c",
+      "manifest_match": true
+    },
+    {
+      "file": "worker-adapters-source-report.json",
+      "bytes": 17005,
+      "sha256": "e116068b21c1c61cd46abc8ddb56dc5eaa282d7567754a8b2e017be38f3b970e",
+      "manifest_match": true
+    },
+    {
+      "file": "retained-guid-collector-algorithms.json",
+      "bytes": 1702,
+      "sha256": "9ba063ef11ba7208331e3a422137237399ed4c9b9bb332b0465e5bd9828a32dd",
+      "manifest_match": true
+    }
+  ],
+  "manifest_sha256": "0cb5a69e1b6b18d95cb80b16fc8ea2d0678ac54622994921e052ea282018958f",
+  "manifest_sha_tree_match": true,
+  "candidate_files_verified": 28,
+  "all_candidate_bytes_hash_match": true,
+  "version_file_bindings_verified": 21,
+  "all_version_hash_match": true,
+  "worker_report_claims": {
+    "offline_passed": 105,
+    "Python": 26,
+    "Chromium": 79,
+    "network_requests": 0,
+    "own_fixture_records_absent_or_nonlive": 661
+  },
+  "independent_checks": "Git bytes/hash, scope, diff-check and static source review; tests/installed runtime/process/server checks not rerun",
+  "live_acceptance": "NOT_ACCEPTED",
+  "gates": "public unconditional gates remain closed; no ready/archive writer",
+  "source_findings": [
+    {
+      "id": "R1",
+      "file": "tools/loginom-multica-accounts/scripts/account-session-ui.mjs",
+      "lines": [
+        246,
+        268,
+        278,
+        280
+      ],
+      "finding": "guard_release_count zero is fabricated from endpoint-only FLOCK checks; no continuous critical-section provenance admitted",
+      "minimal_fix": "fixed reviewed production phase provider under continuously held parent account_guard OFD lifetime; derive provenance from controlled guard lifecycle, never trust arbitrary callback flags; missing proof UNKNOWN"
+    },
+    {
+      "id": "R2",
+      "file": "tools/loginom-multica-accounts/scripts/parent-readback.mjs",
+      "lines": [
+        78,
+        82,
+        87,
+        109
+      ],
+      "finding": "post-cleanup request does not bind expected causal observer GUID/numeric ID/CreateTime/authorized tab provenance",
+      "minimal_fix": "bind exact expected observer tuple and tab receipt across pre/during/final requests, require response equality; changes UNKNOWN"
+    },
+    {
+      "id": "R3",
+      "file": "tools/loginom-multica-accounts/scripts/account-identity.mjs",
+      "lines": [
+        44,
+        47
+      ],
+      "finding": "empty target bucket and target!=observer account cannot capture common operator admin while current owner uses same account",
+      "minimal_fix": "explicit exact calibrated owner-only baseline; sole new child tuple delta and unchanged owner; nonadmin preempty retained, no username-only exemption"
+    }
+  ],
+  "remaining_full_operation": {
+    "pre_login_phase": "production pre-operation hook before first admin/role login missing",
+    "admin_capture": "exact admin numeric tuple before provisioning missing",
+    "all_effects": "aggregate every admin/worker/reviewer effect plus exact logout/process/FD receipts; current loop creates multiple admin effects",
+    "native_parent_exchange": "admitted finite pre/during/post same-card private handoff provider missing",
+    "qualification": "complete one finite isolated source-bound harness and independent runtime review before gate admission, not repeated component-only publication"
+  },
+  "history": "old Root45/48 not reconciled; retained collector expressions/hash match do not fill missing executed-byte or LAB48 raw GUID proof",
+  "actions": {
+    "source_edits": 0,
+    "api_mutations": 0,
+    "loginom_calls": 0,
+    "logins": 0,
+    "ssh": 0,
+    "install": 0,
+    "model_runs": 0
+  },
+  "repo_preserved": true
+}

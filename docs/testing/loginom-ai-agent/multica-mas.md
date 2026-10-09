@@ -174,23 +174,23 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 
 ## Checkpoint — новая параллельная волна восьми узлов, 09.10.2026
 
-- Docs prechange541e17e34; node baseline4e626d547/basef9bf332c; loginom0ca исключён; назначения сохранены.
+- Docs prechangefafacd158; node baseline4e626d547/basef9bf332c; loginom0ca исключён; назначения сохранены.
 - Node SHA: LAB45 a00b0203/PR42,46 41e0b170/PR43,47 c92a3bfd;48–52 4e626d547; PASS не переносится.
 - Runtime24aa…/caps8/8/8/daemon12/stock3m сохранены; восемь реальных приёмок и нагрузка12 NOT_PROVED.
-- CLI597/version-dev и Multica0.6.1/source2ea — разные артефакты; installed/global launcher не менялись.
-- Central instructions8d7a…: настройки внутреннего CLI/native/Eval сохранены; модель берётся только из сквада.
+- CLI597/version-dev: installed executable20305a8d… вновь совпал; global launcher/native/Eval не менялись.
+- Central instructions8d7a…: внутренний CLI берёт настройки только из сквада; model acceptance0.
 - LAB53 approved scope d4241c818; [draft PR44](https://github.com/gooddaytoday/loginom-ai-agent/pull/44) common-preparation→shared-oauth.
-- Published clean source6a97eb3cd264059dc95f3de9302e494683921f67/tree1d391b6b…; source-only F3 CLOSED.
-- Source4d880827: независимый detached-child RED/P2 сохранён; source6a97: независимые68+4cases PASS.
-- Parent: Reviewer3 APIbytes/hash,2manifest artifacts,23candidatefiles/16VERSION bindings и tree независимо сверены.
-- [Source review](reports/2026-10-08-node-recheck/common-source-f3-review.json) не означает server cleanup/full LAB53/model acceptance.
-- Worker01a11f7d-3749… running10:07:42MSK: UI lifecycle/finite parent-readback adapters в той же карточке/PR.
-- Оба unconditional gates закрыты; полный lifecycle/install/runtime NOT_ACCEPTED; готовы только source-части.
-- Cause Timeout48/45 executed-helper bytes NOT_ESTABLISHED; исправления F1/F2/F3 не объявлены причиной старых сбоев.
-- LAB45/48 old marker/history retained; operator hashes MATCH/MATCH и59 exact retained PID nonlive — прежние наблюдения.
-- Новая existing Mac Admin3128/unique mstSelf/connected/GUIDhash8d9e…; owner сохранён, parent login/Close/Stop0.
-- 07:24:45UTC readback: count8/8=roots8, nodes10/packages2, Info/type/name/date equality, masks0, hashed inventory6628….
-- Operator bucket содержит только positively bound owner3128; observer3119/priorowner3123 absent; old GUID algorithm binding PENDING.
-- Старый3123 receipt immutable; [новый3128](reports/2026-10-08-node-recheck/existing-admin-mac-readback-3128.json) не покрывает будущие операции.
-- 07:30UTC mas CPU12/load0, MemAvailable30140616kB/free408538505216B; daemon212379 active/running1/wait0/report0;8blocked/model acceptance0.
-- Next: old-effects exact reconciliation→полные adapters/review→fresh operation-bound live proof→те же8; schedules/merge-release0.
+- Published source201a9371889947638ba6215f514a48de3da9b47b/tree dd835559…; полный lifecycle/live NOT_ACCEPTED.
+- 6a97 source-only F3 CLOSED/68+4cases; старый detached-child RED4d880827 сохранён, PASS не переносится.
+- Parent source201a:4 APIattachments/3deliverables/28candidatefiles/21VERSION/tree hash MATCH; worker105 checks — отдельный report.
+- Native Reviewer01a11fb7… completed11:45:03MSK: REQUEST_CHANGES5P2; report105suite+8probes/241own records, artifact bindings MATCH.
+- Блокеры201a: shared-admin/continuity/NEW tuple/observer/selector; root дополнительно выявил virtual rows; live gates закрыты.
+- Mac readonly shape: tid selector0; один visible ExtSessionsManagerForm/Controller/store/rootLoaded; это не полное inventory.
+- Worker01a11fd0… running: полный pre/admin/roles/logout/processFD/final harness; final addendum и virtual rows доставлены адресно.
+- LAB48 original API seq73–90: created collector331b…=retained, ack/Popen/readback94134…; формула exact UTF8 подтверждена командной цепочкой.
+- Physical preexec digest/numericID/CreateTime/Timeout cause не восстановлены; old markers45/48 NOT_RECONCILED/immutable.
+- Mac09:00UTC complete8rows/2packages/hash0ad7… MATCH, same3128/admin bucket1; prior3119/3123 absent; не new-operation proof.
+- Reviewer supplement также разбудил Worker через default comment/replay; новые comments используют steer_task_ids+suppress остальных.
+- Два лишних source turns завершили HOLD11:29:30/11:33:40; draft сохранён, source201a не изменён; старые messages не редактируются.
+- 08:35UTC mas CPU12/load0.014, MemAvailable30115072KiB/free408509128704B; daemon212379 active1/wait0/report0; provider retry count unavailable.
+- Next: полный исправленный clean candidate→независимый review→old-effects proof→bound runtime qualification→те же8; schedules/merge-release0.

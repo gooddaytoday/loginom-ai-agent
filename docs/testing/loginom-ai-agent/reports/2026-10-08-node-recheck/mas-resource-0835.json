@@ -1,0 +1,26 @@
+{
+  "observed_at_utc": "2026-10-09T08:35:38.924682+00:00",
+  "cpu_logical": 12,
+  "load": [
+    0.013671875,
+    0.11767578125,
+    0.1181640625
+  ],
+  "mem_available_kib": 30115072,
+  "swap_free_kib": 8385592,
+  "disk_free_bytes": 408509128704,
+  "daemon": {
+    "pid": 212379,
+    "status": "running",
+    "active_task_count": 1,
+    "running_task_count": 1,
+    "resource_wait_task_count": 0,
+    "pending_terminal_report_count": 0,
+    "failed_terminal_report_count": 0,
+    "cli_version": "0.6.1"
+  },
+  "installed_cli_executable_sha256": "20305a8d848f785c2120d03c56e3fc77129d0156d7319a9f43beca3bc0b70d03",
+  "provider_errors_retries": "not_exposed_in_snapshot",
+  "model_acceptance": "NOT_RUN",
+  "parent_ssh_closed_normally": true
+}
