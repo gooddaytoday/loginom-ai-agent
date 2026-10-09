@@ -667,6 +667,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | first-last-touch | 1 | FAIL0/no_artifact | Нет / не выполнялись | 26 / 25 / 23 | 4585 / 15440708 | 3 / 3550529 |
 | low-liquidity-companies | 1 | FAIL0/no_artifact | Нет / не выполнялись | 23 / 23 / 21 | 4487 / 15707741 | 3 / 4075869 |
 | monthly-demand | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4604 / 16230213 | 3 / 4358291 |
+| nps-segments-by-tier | 1 | PASS100 | Есть / PASS | 23 / 22 / 18 | 4605 / 16613250 | 3 / 4745354 |
 
 Последний private snapshot `formal-v9-progress-9-20261009.json` SHA256
 `bd3dfd6fadbe73a2f9bff01ee31681692d1fb6da52d92f348a5351bfaba04702`:
@@ -772,3 +773,22 @@ diagnostics3/4358291bytes full inventory/restore roundtrip/600 PASS.
 Все прежние8 result/trace/archive SHA повторно PASS; progress9 сохраняет
 chain8/unreviewed0. Три no-artifact FAIL остаются в серии, новая попытка
 NPS#1 выполняется на том же common020c08059…; полный90 ещё не принят.
+
+Десятый closed formal v9 `nps-segments-by-tier#1` принят с score100:
+структура/warm oracle PASS, все6 cleanup stages confirmed,
+process cleanup/error null/remaining0×2. History4605/16613250bytes и
+diagnostics3/4745354bytes сохранены с полным roundtrip. Trace/result counters
+match:23 finishes/22 tools/18 Loginom/skill0/prepare1/error1. Ошибка
+`node_apply` — REQUEST_REJECTED/NOT_APPLIED, Unsupported node label,
+effectPossible=false/cleanupComplete=true; она сохранена в исходной трассе.
+Ручного повторного запуска не было. Cold этой formal попытки ещё не выполнялся.
+
+Private progress10 SHA256
+`2066b2870a0c1dd494098f1bf8cbf8b5597cd392b7ffe516120b028c11a1f68d`,
+metrics10 SHA256
+`a4b85716bc1640de51a6bfcd6785ac541da515079cf3258e2527721316fd69ee`.
+Все10 закрытых результатов/cleanup/process-cleanup, архивы и traces предыдущих
+девяти повторно проверены по SHA. Контроллер60189/PID676156/birth84924950
+жив с совпадающими UID/exe/inode, common020c08059… неизменен.
+Итого closed10/45:7 PASS100/3 no_artifact FAIL0; risky-approved-claims#1
+выполняется. Candidate formal/cold/compare не начаты, полный90 не принят.

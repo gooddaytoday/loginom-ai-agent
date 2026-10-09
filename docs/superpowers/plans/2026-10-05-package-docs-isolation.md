@@ -1105,7 +1105,11 @@ Core имеет разметку осей, но без CSV oracle. По доку
   candidate/cold/compare0/retries0. Native root cause UNKNOWN, критерий не снижен.
   Девятый closed monthly#1 PASS100/structure/warm/cleanup6/remaining0×2,
   history+diag full roundtrip. Progress9 SHAbd3dfd6fad…;
-  NPS#1 running, closed9/45/PASS6/FAIL3, candidate/cold/compare0/retries0.
+  Десятый closed NPS#1 PASS100/structure/warm/6 stages/remaining0×2;
+  history4605/16613250bytes+diag3/4745354bytes full roundtrip. Единственный
+  node label REQUEST_REJECTED/NOT_APPLIED сохранён; trace/result counters match.
+  Progress10 SHA2066b2870a…/metrics a4b85716bc…; risky-approved-claims#1 running,
+  closed10/45/PASS7/FAIL3, candidate/cold/compare0/retries0.
   Частичный v7 не подставлять
   как полный baseline и не повторять выборочно только неуспешные попытки.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой
