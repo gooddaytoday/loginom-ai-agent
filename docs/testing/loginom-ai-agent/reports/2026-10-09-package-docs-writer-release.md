@@ -660,6 +660,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | --- | --- | --- | --- | --- | --- | --- |
 | ab-revenue-per-converter | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4604 / 17048407 | 3 / 5110421 |
 | ab-revenue-per-converter | 2 | PASS100 | Есть / PASS | 20 / 20 / 16 | 4604 / 17083652 | 3 / 5138263 |
+| ab-revenue-per-converter | 3 | PASS100 | Есть / PASS | 20 / 20 / 16 | 4604 / 17064225 | 3 / 5127521 |
 | abc-pareto-groups | 1 | PASS100 | Есть / PASS | 36 / 35 / 31 | 4640 / 21348941 | 3 / 9371065 |
 | abc-pareto-groups | 2 | PASS100 | Есть / PASS | 36 / 35 / 31 | 4642 / 20953453 | 3 / 8976043 |
 | articles-by-author | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4600 / 15892038 | 3 / 4038019 |
@@ -1251,3 +1252,17 @@ FAIL/FAIL,3 mixed (NPS/support/trial). Третий повтор обязате�
 не доказывают стабильность3/3 или NI. Статус
 TWO_BASELINE_REPETITIONS_ONLY_COLD_PENDING, live cold ещё не выполнялся.
 Предыдущие indexes15/24 сохранены без изменений.
+
+Тридцать первый closed formal v9 `ab-revenue-per-converter#3` PASS100:
+structure/warm oracle PASS, cleanup6 stages/processes confirmed/error null/
+remaining0×2; history/diagnostics full roundtrip (объёмы в таблице).
+Trace/result counters match:20 finishes/20 tools/16 Loginom/skill0/prepare1/errors0.
+Промежуточный PASS100 с cleanup not_run не принимался. У задачи повторно
+проверены все3 baseline outcomes: judge100/structure/warm3/3 PASS; formal
+cold этих3 ещё pending, candidate/NI не доказаны.
+Все31 results/cleanup/process-cleanup/архивы, предыдущие30 trace SHA и
+reviews22/cold indexes15+24+30/batch8 receipts повторно проверены.
+Progress31 SHA `8178e7295e6b2dc7d4f9a790b80931c4281ca1244685be0bfabf9becb313f257`;
+metrics31 SHA `1052402afdb73a1e4f5092f78a25c9a82320592a3a46f40b51390b86f27aac5c`.
+Common020c08059…/controller identity совпали. Closed31/45:22 PASS100/9 FAIL0,
+ABC#3 running; candidate/cold/compare0/retries0, полный90 не принят.
