@@ -1395,3 +1395,11 @@ source manifest. Это не делает незавершённую пару п
 детерминированно и исправить через RED→GREEN, сохранив admission/ownership/
 cleanup guards. Старую v9 не дополнять выборочным повтором; новый harness
 требует новых общих условий, обеих smoke сторон и полной90-попытковой пары.
+
+Последующая диагностика: шесть новых private public controls PASS, в том
+числе два в host scope599/600proc entries; original hang не воспроизведён,
+source/harness clean unchanged. Первый host observer ESRCH отказал отдельно,
+исправлена только его private copy; INCOMPLETE evidence сохранён.
+Collector74files/98373bytes сохранён с full hash read-back, ненужный own
+scratch удалён из `/tmp` после проверки references. Cause/stability UNKNOWN,
+исправления harness нет. [Подробный сигнал](2026-10-09-package-docs-harness-hang-signal.md).

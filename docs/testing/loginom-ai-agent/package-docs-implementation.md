@@ -4449,7 +4449,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ### 2026-10-09 — ACTIVE, v9 terminal143; closed34/45, PASS25/FAIL9; cohort#3 INCOMPLETE
 
-- HEAD до checkpoint `fb2ad20f8`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
+- HEAD до checkpoint `74c69fd75`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client и чужие профили/процессы не изменялись.
 - Own mutable harness `d08be6baf8f5aea53f83c228cd0984c9d2bf0494` clean: промежуточный process-progress.jsonl через TDD; modules29 PASS/typecheck PASS/full486 PASS/2 SKIP/0 FAIL/2080 assertions/581.74s, terminal0/process cleanup confirmed. Frozen495 не редактировался; новый detached frozen d08 на own storage/loginom-skills-frozen-progress-20261009, install/typecheck PASS/clean,658 pins; обе новые smoke стороны приняты.
 - Writer post-open real-IO RED→GREEN; release/persistent-empty/replacement guards×5 PASS; modules77 PASS/0 FAIL/241 assertions.
@@ -4468,7 +4468,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Linux installed CLI/Desktop49 по5 ОС PASS; TUI/native opening/headless docs и upgrade PASS; lifecycle/independence и remaining natural transitions открыты.
 - MiMo429/quota exhausted; новых secondary-model calls нет, ответ о вторичной модели ещё ожидается.
 - V8 smoke47153 terminal1/EvalFailure2 до0 задач: storage admission отказал на одном cohort CSV30094bytes. Exact SHA совпал с нашим snapshot, backup600/readback PASS; только этот файл удалён после повторных ID/marker/SHA/no selected-native-process checks, storage/SessionBackup empty. Raw v7/v8 profiles сохранены; не retrospective cleanup proof. V9 новые каталоги/обе smoke затем90. Source/server skill907ff16b/catalog17764f9a сохранены; stage5–8 открыты,stage9/full35 deferred.
-- Owner-loss/resume drivers: host-owned budgets и новая skill activation исправлены через TDD,6 PASS/typecheck PASS/21 A/B adapter pins unchanged; native ещё pending. Evidence: writer-release и runtime-acceptance-contract reports; чужой evals worktree не изменяется. Следующий шаг: own mutable harness RED→GREEN для зависания child-exit0; frozen v9 не редактировать, новую пару выполнять целиком после новых conditions/обеих smoke.
+- Owner-loss/resume drivers: host-owned budgets и новая skill activation исправлены через TDD,6 PASS/typecheck PASS/21 A/B adapter pins unchanged; native ещё pending. Evidence: writer-release и runtime-acceptance-contract reports; чужой evals worktree не изменяется. Новые narrow public controls6 PASS, включая host599/600proc entries; original hang не воспроизведён/source clean, host observer ESRCH отдельно INCOMPLETE и исправлен только private copy. Collector74files98373bytes сохранены/readback5fd6bc22c3…, unused own scratch удалён/receipt16e9cfa4e5…, combined controls d9006dff2d…. Следующий шаг: own mutable harness RED→GREEN для зависания child-exit0; frozen v9 не редактировать, новую пару выполнять целиком после новых conditions/обеих smoke.
 
 ### 2026-10-08 — ACTIVE, локальные запуски
 
