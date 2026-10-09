@@ -91,3 +91,33 @@ phase logs или успешные короткие controls не считать
 После изменения harness зафиксировать новые общие conditions, принять обе
 smoke стороны и выполнить полную пару90; незавершённую v9 не дополнять
 выборочным повтором.
+
+## Проверка накопленного состояния в одном контроллере
+
+Отдельный локальный private probe выполнил45 последовательных публичных
+`superviseProcess` в одном Bun-процессе. Для каждого использован настоящий
+bubblewrap с user/PID/IPC/network namespaces и status fd3, свой каталог
+вывода и Python CLI, выдающий ровно1MiB stdout. В35-м цикле CLI работал20s
+при supervisor budget30s; остальные имели0.1s задержку и budget3s.
+Loginom, модель и судья не вызывались.
+
+Все45: exit0/no timeout/no interruption/sandboxError null, cleanup confirmed/
+error null/capture complete, verification `[0,0]`, полный набор9 phase records
+и фактический захват1048576bytes. Controller terminal0, outer timeout false,
+remaining0/actions0, total47147ms. RSS на границах циклов80.5–104.0MB;
+35-й цикл20495ms. Эти измерения не воспроизводят многочасовое накопление
+памяти formal v9 и не устанавливают его причину.
+
+Evidence: private `harness-hang-sequential-signal-20261009`,236 payload files
+прочитаны обратно по SHA. Readback SHA
+`99d71ff70bd0e2e51fd40c2ee2316c12a4b2309e476a10a7d63888904c79621b`;
+source manifest SHA
+`007d19ab81057e06cb0ffe49a0b4c467fc63591454b4b81c5f2597f834ee2f99`.
+Файлы600/каталоги700, рабочий harness d08 clean; исходное зависание
+по-прежнему UNKNOWN, продуктовых изменений нет. Probe создан сразу
+в долговременном own каталоге, лишних файлов в `/tmp` не осталось.
+
+После этой проверки можно продолжать независимую native диагностику
+штатного закрытия CLI и readonly второго пользовательского хода на собственном
+локальном стенде. Raw incomplete v9 profile/leases сохраняются; её частичную
+пару нельзя дополнять выборочными повторами или выдавать за полную приёмку.
