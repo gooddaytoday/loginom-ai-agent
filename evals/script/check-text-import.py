@@ -271,6 +271,32 @@ def known_refusal(call, calls, events, workspace):
     return result
 
 
+def diagnostic(spec, attempt_dir, calls, events, workspace, transfers):
+    applies = [call for call in calls if call['tool'].endswith('node_apply')]
+    require(len(applies) == 1, 'diagnostic: one uncorrected apply required')
+    call = applies[0]
+    request_owner(call, workspace, transfers[0])
+    request = call['input']
+    require(request.get('target', {}).get('kind') == 'new' and request['target'].get('type') == 'imports.text', 'diagnostic: new import required')
+    settings = request.get('parameters', {}).get('settings', {})
+    wanted = {**spec['settings'], 'source': {**spec['settings']['source'], 'source_path': transfers[0]['output']['destination']}}
+    if spec['id'] == 'initial-incomplete-settings':
+        require('columns' not in settings and settings == wanted, 'diagnostic: omitted columns required')
+    else:
+        require(settings == {**wanted, 'columns': spec['columns']}, 'diagnostic: exact assigned settings required')
+    result = known_refusal(call, calls, events, workspace)
+    if spec['id'] == 'initial-incomplete-settings':
+        require(any(event.get('receipt', {}).get('verification') == 'text_import_initial_settings_draft_discarded'
+            for event in events if event.get('operation_id') == request['operation_id']), 'diagnostic: initial settings refusal required')
+    if spec['id'] == 'missing-source-column':
+        require('OtherName' in result['error']['message'], 'diagnostic: missing OtherName refusal required')
+    if spec['id'].endswith('wrong-delimiter'):
+        message = result['error']['message'].lower()
+        require('column' in message or 'field' in message or 'пол' in message, 'diagnostic: typed binding/count refusal required')
+    if (attempt_dir / 'artifact/package.lgp').exists():
+        package_graph(attempt_dir, result['node']['node_id'])
+
+
 def positive(spec, task_dir, attempt_dir, calls, events, workspace, transfers, package_path):
     applies = [call for call in calls if call['tool'].endswith('node_apply')]
     correction = spec['id'] in ('missing-source-path-correction', 'txt-six-to-five-correction', 'csv-delimiter-correction')
@@ -346,6 +372,8 @@ def audit(task_dir, attempt_dir, package_path):
     if task['id'].endswith('ambiguous-headers'):
         rejection(spec, calls, workspace, transfers)
         package_graph(attempt_dir, empty=True)
+    elif task.get('output_mode') == 'diagnostic':
+        diagnostic(spec, attempt_dir, calls, native_events(attempt_dir), workspace, transfers)
     else:
         positive(spec, task_dir, attempt_dir, calls, native_events(attempt_dir), workspace, transfers, package_path)
     return {'errors': [], 'failures': []}

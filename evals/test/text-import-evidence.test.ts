@@ -146,3 +146,24 @@ test("text import preserves a known first refusal and corrects the same GUID exa
     expect((await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).failures.join(" ")).toContain("same")
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
+
+test("incomplete initial settings pass only with a native discarded draft and no Execute", async () => {
+  const f = await positiveFixture("initial-incomplete-settings")
+  try {
+    delete f.apply.input.parameters.settings.columns
+    Object.assign(f.output, { status: "FAILED", configuration: {}, execution: { status: "not_requested", execution_id: null },
+      error: { code: "NODE_APPLY_STOPPED", message: "Initial settings require columns" } })
+    f.events.splice(1)
+    f.events.push(JSON.parse(JSON.stringify({ operation_id: "import", phase: "node_phase_refused", receipt: {
+      phase: "configure", status: "FAILED", verification: "text_import_initial_settings_draft_discarded",
+      cleanup_complete: true, settings_unchanged: true, proof: { closed: { verified: true, cleanup_complete: true,
+        draft_discarded: true, settings_applied: false, execution_started: false,
+        node_context: { ...f.output.node, verified: true, surface: "graph", locked: false } } } } })))
+    await rm(path.join(f.attempt, "artifact"), { recursive: true })
+    await f.write()
+    expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    f.events.push(JSON.parse(JSON.stringify({ operation_id: "import", phase: "node_step_prepared", action: { verb: "execute_wizard" } })))
+    await f.write()
+    expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("Execute")
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
