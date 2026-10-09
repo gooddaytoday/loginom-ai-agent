@@ -711,7 +711,7 @@
     "sha256": "7242dca9becfc3d7a7d111e4a0271e51caf845ad295b8dfdbbcce4ac0736ed73",
     "bytes": 3148
   },
-  "next_step": "Same LAB47 new finite attempt after addressable private selector fix, max2rootprofiles/new UUID/profiles; independent server cleanup and2-profile proof required; stock3m kept, node/model/build/handoff held, no new schedule/source/contracts.",
+  "next_step": "Owner agreed separate common preparation/own-admin-cleanup task; create one common card, preserve all45/48/3119 effects and prior evidence; stock3m,8/8/8,daemon12 unchanged; no schedules/merge/release.",
   "verified_fresh_diagnostic_attachments": [
     {
       "id": "01a11d95-301f-714a-b520-d68c5f95d975",
@@ -1162,7 +1162,8 @@
     "executable_current_sha256": "20305a8d848f785c2120d03c56e3fc77129d0156d7319a9f43beca3bc0b70d03",
     "cli_manifest_current_sha256": "1d518db83c2e3ae625fc93b707edaaeb837a6f2cfcc99a1ed0824093f9b70768",
     "raw_secret_logs_saved": false,
-    "private_audit_dir": "/home/user/.local/state/loginom-recheck/ws-claim-10ab22971920"
+    "private_audit_dir": "/home/user/.local/state/loginom-recheck/ws-claim-10ab22971920",
+    "final_owner_preference": "stock cadence may remain; it does not prevent node processing; no further cadence changes"
   },
   "instrumented_shared_admin_continuation": {
     "observed_at": "2026-10-08T23:07:04.790253+00:00",
@@ -2017,7 +2018,334 @@
     "task_id": "01a11dfa-b0ef-71dc-8e40-cd98fbef9dcb",
     "supplement_id": "92860405-8027-4fc6-829d-b683c0f38b6b",
     "scope": "optional read-only exact3119/CreateTime in naturally existing own Admin view; no extra login/browser/foreign cleanup; no delay of own Stage0",
-    "status": "requested; not observed yet",
+    "status": "NOT_REACHED; LAB48 initial Dispatcher navigation failed; no absence proof",
     "on_confirmed_absence_handoff_supplement_id": "71578ecf-4290-4d23-844b-fa0f9a1f4a07"
+  },
+  "post_resume_all8_blocked": {
+    "observed_at": "2026-10-09T00:31:44.664088+00:00",
+    "cards": [
+      {
+        "card": "LAB-45",
+        "issue_id": "01a11d36-053e-78da-b06c-e313de5319e3",
+        "source_sha": "a00b0203026f7719f10403bfc4fa02810aa8502e",
+        "issue_status": "blocked",
+        "latest_task_run": {
+          "id": "01a11dfa-b109-7e53-95ae-565261a747a6",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "created_at": "2026-10-09T03:05:31+03:00",
+          "started_at": "2026-10-09T03:08:10+03:00",
+          "completed_at": "2026-10-09T03:26:13+03:00",
+          "failure_reason": null,
+          "attempt": 1,
+          "max_attempts": 2
+        },
+        "latest_comment": {
+          "id": "01a11e0d-10e7-73f1-b2c8-3a936378e7fc",
+          "created_at": "2026-10-09T03:25:35+03:00",
+          "source_task_id": "01a11dfa-b109-7e53-95ae-565261a747a6",
+          "type": "comment"
+        }
+      },
+      {
+        "card": "LAB-46",
+        "issue_id": "01a11d36-10b0-702f-930d-e91315129205",
+        "source_sha": "41e0b170a4528537bb9a5137756878f2ca950c92",
+        "issue_status": "blocked",
+        "latest_task_run": {
+          "id": "01a11dfa-b23c-73ce-a8a7-a3efc09e3ef3",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "created_at": "2026-10-09T03:05:31+03:00",
+          "started_at": "2026-10-09T03:17:06+03:00",
+          "completed_at": "2026-10-09T03:29:08+03:00",
+          "failure_reason": null,
+          "attempt": 1,
+          "max_attempts": 2
+        },
+        "latest_comment": {
+          "id": "01a11e10-2703-7858-9f25-54496d04095c",
+          "created_at": "2026-10-09T03:28:57+03:00",
+          "source_task_id": "01a11dfa-b23c-73ce-a8a7-a3efc09e3ef3",
+          "type": "comment"
+        }
+      },
+      {
+        "card": "LAB-47",
+        "issue_id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+        "source_sha": "c92a3bfd1005ab4ff181c7a15626aa39f9394a49",
+        "issue_status": "blocked",
+        "latest_task_run": {
+          "id": "01a11dea-c6a1-781f-80c9-596eb304a5b6",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "created_at": "2026-10-09T02:48:07+03:00",
+          "started_at": "2026-10-09T02:48:09+03:00",
+          "completed_at": "2026-10-09T03:03:49+03:00",
+          "failure_reason": null,
+          "attempt": 1,
+          "max_attempts": 2
+        },
+        "latest_comment": {
+          "id": "01a11df8-f11b-7166-9814-1dd20351365c",
+          "created_at": "2026-10-09T03:03:36+03:00",
+          "source_task_id": "01a11dea-c6a1-781f-80c9-596eb304a5b6",
+          "type": "comment"
+        }
+      },
+      {
+        "card": "LAB-48",
+        "issue_id": "01a11d36-2811-71ba-a493-0e397e3e60f2",
+        "source_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+        "issue_status": "blocked",
+        "latest_task_run": {
+          "id": "01a11dfa-b0ef-71dc-8e40-cd98fbef9dcb",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "created_at": "2026-10-09T03:05:30+03:00",
+          "started_at": "2026-10-09T03:05:32+03:00",
+          "completed_at": "2026-10-09T03:20:16+03:00",
+          "failure_reason": null,
+          "attempt": 1,
+          "max_attempts": 2
+        },
+        "latest_comment": {
+          "id": "01a11e07-ae94-7ae2-96b4-4e45060e326b",
+          "created_at": "2026-10-09T03:19:42+03:00",
+          "source_task_id": "01a11dfa-b0ef-71dc-8e40-cd98fbef9dcb",
+          "type": "comment"
+        }
+      },
+      {
+        "card": "LAB-49",
+        "issue_id": "01a11d36-33ae-732e-b618-5618ed5301cd",
+        "source_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+        "issue_status": "blocked",
+        "latest_task_run": {
+          "id": "01a11dfa-b1c8-73a8-b412-1eb9363572db",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "created_at": "2026-10-09T03:05:31+03:00",
+          "started_at": "2026-10-09T03:16:13+03:00",
+          "completed_at": "2026-10-09T03:20:46+03:00",
+          "failure_reason": null,
+          "attempt": 1,
+          "max_attempts": 2
+        },
+        "latest_comment": {
+          "id": "01a11e08-93e5-7a38-90de-611ca197a521",
+          "created_at": "2026-10-09T03:20:41+03:00",
+          "source_task_id": "01a11dfa-b1c8-73a8-b412-1eb9363572db",
+          "type": "comment"
+        }
+      },
+      {
+        "card": "LAB-50",
+        "issue_id": "01a11d36-3f2a-7df1-bd81-d5401bdcdd16",
+        "source_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+        "issue_status": "blocked",
+        "latest_task_run": {
+          "id": "01a11dfa-b1a0-7838-82d0-30c4f8cfb9ad",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "created_at": "2026-10-09T03:05:31+03:00",
+          "started_at": "2026-10-09T03:10:50+03:00",
+          "completed_at": "2026-10-09T03:19:17+03:00",
+          "failure_reason": null,
+          "attempt": 1,
+          "max_attempts": 2
+        },
+        "latest_comment": {
+          "id": "01a11e07-385d-719e-9baa-47cca88d2675",
+          "created_at": "2026-10-09T03:19:12+03:00",
+          "source_task_id": "01a11dfa-b1a0-7838-82d0-30c4f8cfb9ad",
+          "type": "comment"
+        }
+      },
+      {
+        "card": "LAB-51",
+        "issue_id": "01a11d36-4ace-7dd4-a0d4-498195f7d2e9",
+        "source_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+        "issue_status": "blocked",
+        "latest_task_run": {
+          "id": "01a11dfa-b1b2-7eff-a4cd-aa5ac39de0b1",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "created_at": "2026-10-09T03:05:31+03:00",
+          "started_at": "2026-10-09T03:13:29+03:00",
+          "completed_at": "2026-10-09T03:17:05+03:00",
+          "failure_reason": null,
+          "attempt": 1,
+          "max_attempts": 2
+        },
+        "latest_comment": {
+          "id": "01a11e05-17a9-7f03-87e3-8def044eadbe",
+          "created_at": "2026-10-09T03:16:52+03:00",
+          "source_task_id": "01a11dfa-b1b2-7eff-a4cd-aa5ac39de0b1",
+          "type": "comment"
+        }
+      },
+      {
+        "card": "LAB-52",
+        "issue_id": "01a11d36-5670-7786-bfe1-e9a4a4462e6e",
+        "source_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+        "issue_status": "blocked",
+        "latest_task_run": {
+          "id": "01a11dfa-b0ec-790c-bad3-a503156ce556",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "created_at": "2026-10-09T03:05:30+03:00",
+          "started_at": "2026-10-09T03:05:32+03:00",
+          "completed_at": "2026-10-09T03:22:24+03:00",
+          "failure_reason": null,
+          "attempt": 1,
+          "max_attempts": 2
+        },
+        "latest_comment": {
+          "id": "01a11e0a-162e-78c4-917b-afcb189b7255",
+          "created_at": "2026-10-09T03:22:19+03:00",
+          "source_task_id": "01a11dfa-b0ec-790c-bad3-a503156ce556",
+          "type": "comment"
+        }
+      }
+    ],
+    "fresh_worker_reviewer_handoffs": 0,
+    "node_acceptance": "NOT_CONFIRMED",
+    "note": "all8 latest native runs completed; node cards blocked; completed is not server/process cleanup"
+  },
+  "post_resume_role_api_snapshot": {
+    "observed_at": "2026-10-09T00:33:17.946692+00:00",
+    "roles": [
+      {
+        "role": "Generator",
+        "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+        "response_type": "list",
+        "response_keys": [],
+        "returned_count": 143,
+        "status_counts": {
+          "completed": 129,
+          "failed": 2,
+          "cancelled": 12
+        },
+        "nonterminal_returned": [],
+        "resource_wait_count_from_this_API": "NOT_EXPOSED unless explicit resource_wait status/field is present",
+        "pagination_note": "Only returned tasks counted; full daemon/native process absence not established"
+      },
+      {
+        "role": "Worker",
+        "agent_id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+        "response_type": "list",
+        "response_keys": [],
+        "returned_count": 61,
+        "status_counts": {
+          "completed": 59,
+          "failed": 2
+        },
+        "nonterminal_returned": [],
+        "resource_wait_count_from_this_API": "NOT_EXPOSED unless explicit resource_wait status/field is present",
+        "pagination_note": "Only returned tasks counted; full daemon/native process absence not established"
+      },
+      {
+        "role": "Reviewer",
+        "agent_id": "027d102c-5d25-402c-a8fb-58a3e810013c",
+        "response_type": "list",
+        "response_keys": [],
+        "returned_count": 19,
+        "status_counts": {
+          "cancelled": 3,
+          "completed": 16
+        },
+        "nonterminal_returned": [],
+        "resource_wait_count_from_this_API": "NOT_EXPOSED unless explicit resource_wait status/field is present",
+        "pagination_note": "Only returned tasks counted; full daemon/native process absence not established"
+      }
+    ],
+    "full_daemon_process_absence": "NOT_ESTABLISHED_BY_API"
+  },
+  "new_own_admin_effects": {
+    "LAB45": {
+      "attempt_uuid": "6d13d38b-9d1f-4084-ade1-1cffcb844658",
+      "attachment_id": "01a11e0d-1025-77dc-85d4-e013c8156cf2",
+      "bytes": 15892,
+      "downloaded_sha256": "ea1e25f3b96221c7aa5419f83fa366cbfa8b10bf5e0bf85de5877fab7ea0ab10",
+      "API_bytes_match": true,
+      "published_expected_artifact_digest": "NOT_PUBLISHED; comment digest is own GUID, internal manifest does not include checkpoint",
+      "numeric_session_id": "NOT_CAPTURED",
+      "server_absence": "UNKNOWN",
+      "own_marker_sha256": "9595e0bb0d748a5e04a67c62f97c3e59b0c5ce839500eeb56716e1ec77630a90",
+      "source_cause": "receipt reports expected MF;MapTreeForm vs actual MF;TF;AdminStartForm;MapTreeForm; private local selector fix untested",
+      "executed_helper_digest": "NOT_CAPTURED_BEFORE_EXECUTION; failed-history reconstructed from patch is not byte-execution proof",
+      "actual_global_username_binding": "NOT_ESTABLISHED_BY_PUBLIC_RECEIPT"
+    },
+    "LAB48": {
+      "attempt_uuid": "8d6f150f-37e4-4680-a903-66009afc0144",
+      "own_root_logins": 1,
+      "numeric_session_id": "NOT_ESTABLISHED",
+      "GUID_sha256": "94134f2a6cf93cc7bb8f8561d2dd0de6051a2631c121cda1e3962f3f8fca01f1",
+      "server_absence": "NOT_CONFIRMED",
+      "own_marker_sha256": "74f25f19294cc007923e4deb04763a9203fea294d93177d68d4e5a2f548d425e",
+      "phase": "initial Dispatcher navigation before complete calibrated inventory",
+      "actual_cause": "NOT_ESTABLISHED; failure persisted only code TimeoutError, no locator/action/message/stack",
+      "native_logout_and_observed_exact_process_absence": true,
+      "verified_public_attachments": [
+        {
+          "id": "01a11e07-ac26-770e-b3a8-f9445f18a54f",
+          "name": "generator-blocked-public-v2.json",
+          "bytes": 21562,
+          "sha256": "1278fc2318545068a1f0bcf5fddbf3fbbf9e4d3bc9cc8a6ce733eb84b80f05fc"
+        },
+        {
+          "id": "01a11e07-aced-7af8-89cc-ba6faa2f85f4",
+          "name": "evidence-manifest-v2.json",
+          "bytes": 5438,
+          "sha256": "a4b4b6a9c70b5316afc60397a2b89783b90925cb40a6a9e8fc773fcf534ca7d1"
+        },
+        {
+          "id": "01a11e07-adbe-76e5-9605-d10e82778c69",
+          "name": "observer3119-not-confirmed.json",
+          "bytes": 807,
+          "sha256": "5986448100e05f13f03094ada1bed3ea8be4cfb86260ac12535687b28a7d72d6"
+        }
+      ],
+      "comment_bytes_hash_verified": true,
+      "independent_artifact_review": "PASS limited to public attachment/manifest bytes and factual bounds; no readiness PASS",
+      "source_files_SSH_readback": {
+        "ui.mjs": {
+          "bytes": 7015,
+          "sha256": "c30fbbed5aec2add23f948439e348f7a8a33403cb03b8191fa8dd591e0088b40"
+        },
+        "qualification.mjs": {
+          "bytes": 12116,
+          "sha256": "331b4596ea86f7ac397dc08a179d721991bc83e1abc88075d4b48b388f47f2c6"
+        }
+      },
+      "source_observation": "navigate uses generic visible suffix first(); catch retains only error code; even happy path sets BLOCKED_OWN_ADMIN_SERVER_ABSENCE. This does not prove actual timeout locator or Loginom defect."
+    },
+    "observer3119": "NOT_CONFIRMED; natural LAB48 readback not reached",
+    "previous_root47_receipt_scope": "older effects only; no transfer to new45/48 attempts",
+    "history_and_markers": "retained; no unknown effect reclassified"
+  },
+  "fresh_readonly_resources": {
+    "observed_at": "2026-10-09T00:30:37Z",
+    "load": [
+      0.0,
+      0.017578125,
+      0.01123046875
+    ],
+    "MemAvailable_kB": 30237796,
+    "disk_free_bytes": 409704574976,
+    "CPU_utilization_percent": "NOT_MEASURED_BY_THIS_SNAPSHOT",
+    "SSH_session": "closed after read-only source/resource inspection",
+    "scope": "low load at blocked wave; not load12 or8 node/model qualification"
+  },
+  "common_preparation_owner_approval": {
+    "approved": true,
+    "date": "2026-10-09",
+    "owner_answer": "Согласовать отдельную общую карточку",
+    "scope_document": "common-preparation-draft.md",
+    "new_card_created": false,
+    "common_helper_source_changes": 0,
+    "node_contract_or_criteria_changes": 0,
+    "next_step": "publish agreed scope, create one separate common card in existing squad; Generator freezes cause/files then Worker fix and independent Reviewer; same8 node cards remain held until exact cleanup/readiness"
   }
 }
