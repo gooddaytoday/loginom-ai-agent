@@ -677,6 +677,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | monthly-demand | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4604 / 16230213 | 3 / 4358291 |
 | monthly-demand | 2 | PASS100 | Есть / PASS | 21 / 21 / 17 | 4605 / 16339085 | 3 / 4482084 |
 | nps-segments-by-tier | 1 | PASS100 | Есть / PASS | 23 / 22 / 18 | 4605 / 16613250 | 3 / 4745354 |
+| nps-segments-by-tier | 2 | FAIL0/no_artifact | Нет / не выполнялись | 25 / 24 / 22 | 4573 / 15360166 | 3 / 3529110 |
 | risky-approved-claims | 1 | PASS100 | Есть / PASS | 20 / 21 / 17 | 4531 / 16301844 | 3 / 4666374 |
 | sales-by-category | 1 | PASS100 | Есть / PASS | 16 / 17 / 13 | 4507 / 15561728 | 3 / 4000100 |
 | slow-supplier-deliveries | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4618 / 17032000 | 3 / 5128503 |
@@ -1119,3 +1120,31 @@ request.packagePath с result.package_path и exact local artifact/package.lgp.
 Статус PARTIAL_BASELINE_ONLY_COLD_PENDING: это подготовка будущего replay,
 не его выполнение и не полная90/NI приёмка. Старый first-repeat index15
 SHA25f7fe5287… сохранён отдельно без изменений.
+
+Двадцать пятый closed formal v9 `nps-segments-by-tier#2` no_artifact FAIL0:
+package_not_created, CLI exit0, timeout/interrupted=false, judge_attempts0;
+structure/warm/cold не выполнялись. Unsupported node label и затем Invalid
+mappings.fields: full output list must include every configured source field
+дали NOT_APPLIED/effectPossible=false/cleanupComplete=true. Последующий
+output_mapping остановлен с AMBIGUOUS/NODE_APPLY_STOPPED: complete output
+definition page at0 readiness не подтверждена. Cancel сохраняет AMBIGUOUS;
+последующее wait вернуло OUTPUT_MAPPING_RECOVERY_UNVERIFIED, Original output
+Done reference unavailable. Для этой остановки effectPossible=true/
+cleanupComplete=false; связи с предыдущими отказами и native cause UNKNOWN.
+Все5 ошибок имеют JSON-формат и сохранены в private trace. Первый повтор
+задачи PASS100 не заменяет второй FAIL и не доказывает стабильность3/3.
+
+Все6 cleanup stages/processes confirmed/error null/remaining0×2.
+History4573/15360166bytes и diagnostics3/3529110bytes full roundtrip.
+Trace/result counters match:25 finishes/24 tools/22 Loginom/skill0/prepare1/
+errors5. Отказ сохранён без исключения или ручного повторного запуска.
+
+Private progress25 SHA256
+`9bc1f8a6714e48c4a9e995a5caf68547d6e2de9df1b49c765135f12a9c5b55ac`,
+metrics25 SHA256
+`821d43c9c4e06ef71987d207cf1a26d9014bfc56e40e1a26b7e9dc10aaa3295e`.
+Все25 results/cleanup/process-cleanup/архивы и предыдущие24 trace SHA
+проверены; reviews18/first-repeat cold index15/partial closed24 cold index/
+batch8 receipt/readback SHA совпали. Common020c08059… и controller identity
+совпали. Closed25/45:18 PASS100/7 no_artifact FAIL0, risky#2 running;
+candidate/cold/compare0/retries0. Полный90 не принят.
