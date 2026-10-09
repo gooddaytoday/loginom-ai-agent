@@ -48,6 +48,7 @@ Root-only cleanup прежних попыток независимо прове�
 закрытый глобальный operator config. Короткая операция с общим admin защищена
 постоянным account flock до подтверждённого собственного logout/server/process cleanup.
 Уже созданные и запланированные card operator configs/credentials сохраняются.
+Актуальное решение о восьми отдельных admin и границе проверки — в последнем checkpoint и [отчёте](parallel8-completion.md); описанные выше диагностические остановки являются историческими.
 В собственных role configs допускается сменить только operator_file с before/after
 hash/key diff; identities/credentials/история остаются прежними. Worker/reviewer
 разные и без Admin; данные operator закрыты и не передаются внутренней модели.
@@ -192,3 +193,14 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 - Full-pair global operator flock даёт ACCOUNT_BUSY: нужны ранее разрешённые8 admins; bounded bootstrap/probe и own operator_file migration в LAB53.
 - Stock Worker01a120bb-9607… running15:55:28MSK: source/offline helper+atomic doc fix→Reviewer; central pin/gates пока сохранены.
 - Next: exact-SHA review→существующий Gen LAB53 bounded serial8admin bootstrap/live qualification+Mac readback→те же8Gen parallel distinct operators.
+
+## Checkpoint — завершение параллельности, 09.10.2026
+
+- Владелец отделил готовность8 обработок от полной приёмки8 узлов; [отчёт](parallel8-completion.md).
+- Docs base2a0eb9deb; LAB53 source-only ae8915989, live NOT_ACCEPTED.
+- API caps8/8/8/runtime mas подтверждены; central инструкции3ролей+сквада обновлены/readback, модели сохранены.
+- Генератор LAB53 task01a1213f-56cb-7ac7-b0b2-39f33460e94c запущен после проверки active/wakeups0.
+- Назначены private settings50/51 и конфигурационные account/observer bindings без повторных source pins.
+- SSH mas PASS; существующий Mac Admin доступен, свежий manager/store8/read-only identity PASS, не operation proof.
+- Реальные8 node CLI/handoff/reuse/cleanup NOT_RUN; полная матрица остаётся в карточках.
+- Далее source review→live preparation→те же8; Eval/LAB29/30/merge/release/schedules неизменны.
