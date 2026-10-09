@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test"
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { delimiter, join } from "node:path"
+import { delimiter, dirname, join } from "node:path"
 
 import { checkAppExists, resolveAppPath } from "./apps"
 
@@ -18,7 +18,7 @@ test.skipIf(process.platform !== "win32")("resolves a Windows executable directl
   directories.push(directory)
   const executable = join(directory, "sample-editor.exe")
   await writeFile(executable, "fixture")
-  process.env.PATH = `${directory}${delimiter}${originalPath ?? ""}`
+  setFixturePath(directory)
 
   expect(await checkAppExists("sample-editor")).toBe(true)
   expect(await resolveAppPath("sample-editor")).toBe(await realpath(executable))
@@ -28,7 +28,7 @@ test.skipIf(process.platform !== "win32")("does not return an unresolved command
   const directory = await mkdtemp(join(tmpdir(), "loginom-app-"))
   directories.push(directory)
   await writeFile(join(directory, "missing-editor.cmd"), "@missing-editor.exe %*\r\n")
-  process.env.PATH = `${directory}${delimiter}${originalPath ?? ""}`
+  setFixturePath(directory)
 
   expect(await checkAppExists("missing-editor")).toBe(false)
   expect(await resolveAppPath("missing-editor")).toBeNull()
@@ -41,8 +41,15 @@ test.skipIf(process.platform !== "win32")("resolves an executable behind a comma
   await mkdir(join(directory, "bin"))
   await writeFile(executable, "fixture")
   await writeFile(join(directory, "sample-wrapper.cmd"), '@"%~dp0bin\\sample editor.exe" %*\r\n')
-  process.env.PATH = `${directory}${delimiter}${originalPath ?? ""}`
+  setFixturePath(directory)
 
   expect(await checkAppExists("sample-wrapper")).toBe(true)
   expect(await resolveAppPath("sample-wrapper")).toBe(await realpath(executable))
 })
+
+function setFixturePath(directory: string) {
+  const resolver = Bun.which("where.exe")
+  if (!resolver) throw new Error("Native Windows where.exe is required")
+  // where.exe searches every PATH directory, including unrelated CI build tools.
+  process.env.PATH = [directory, dirname(resolver)].join(delimiter)
+}

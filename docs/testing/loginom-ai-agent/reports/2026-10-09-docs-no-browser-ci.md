@@ -51,6 +51,15 @@
   Новый POSIX symlink regression получил RED с OUTPUT_ESCAPE. Исполнитель теперь
   проверяет canonical parent на точное совпадение с session directory, сохраняет
   ограничения имени/суффикса, exclusive publication и запрет внешних каталогов.
+- **Windows application fixture:** полный candidate на `1cc1eb64a` получил
+  timeout 5000 ms в первом вызове `where.exe`; Bun завершил dangling child,
+  откуда возник вторичный false/unhandled assertion. Та же проверка ранее
+  прошла за 370 ms и также прошла в PR job текущего SHA — это flaky signal.
+  Фикстура наследовала весь PATH runner. Теперь поиск ограничен своим каталогом
+  и каталогом настоящего where.exe; продуктовый resolver, assertions и бюджет
+  времени не изменены. Native workflow проверяет пять свежих процессов на каждой
+  из Windows 2022/2025 без повторной попытки при ошибке. GREEN подтверждается
+  далее нативным CI, Linux skip не считается проверкой этих случаев.
 
 ## Проверено до повторного GitHub CI
 

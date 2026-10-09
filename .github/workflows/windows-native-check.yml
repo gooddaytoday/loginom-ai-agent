@@ -5,6 +5,8 @@ on:
     branches: ["**"]
     paths:
       - "packages/loginom-host/**"
+      - "packages/desktop/src/main/apps.ts"
+      - "packages/desktop/src/main/apps.test.ts"
       - "packages/agent/src/cli/profile-windows.ts"
       - "packages/agent/test/cli/profile-windows.test.ts"
       - "script/test-windows-profile.ps1"
@@ -39,5 +41,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Native host tests failed" }
       - name: Verify native profile
         run: ./script/test-windows-profile.ps1
+      - name: Verify native application resolution in fresh processes
+        working-directory: packages/desktop
+        run: |
+          # Each repetition must pass; these are independent cold starts, not retries.
+          1..5 | ForEach-Object {
+            bun test src/main/apps.test.ts
+            if ($LASTEXITCODE -ne 0) { throw "Native application resolution failed on repetition $_" }
+          }
       - name: Read system proxy
         run: bun packages/loginom-host/script/system-proxy-smoke.ts
