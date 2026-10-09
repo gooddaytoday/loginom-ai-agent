@@ -59,10 +59,15 @@ results/profile/workspace/artifacts. Следующий admission требует
 result и подтверждённый cleanup предыдущего. Ручных повторов нет.
 
 Private evidence root: `/home/kiselev/.local/share/loginom-ai-agent-acceptance/package-docs-20261006`.
-Условия: `ab-short-conditions-9695e61e3-20261009/common.json`, SHA256
-`570d1578f57d64a249611a4bb3efc324d6d9a757e9c28273c5c14dc7cfb5e0e9`;
+Действующие условия: `ab-short-conditions-9695e61e3-v2-20261009/common.json`, SHA256
+`67c0f3000502fa8b418e3b42f546a8df4cee650370ab12736d4ce3ebf9390c4f`;
 dispatch manifest SHA256
-`86979bc4d0d150404547c72123ed1a1ae17f4e589a6b564757c5f37deeed7a55`.
+`1ee3b447185442982194ec869f080b170fe20e2e68e21f7c135e4453a6406b08`.
+Предыдущие условия сохранены отдельно: до модельной попытки native admission
+отказал из-за ошибочно скопированных ранних конфигураций нового own стенда.
+Попыток0/модельных и judge calls0,6 management cleanup confirmed. Исправлены
+только собственные Users/Components.cfg; штатный native connection check
+подтвердил Help ready/browser verified/profile idle до нового dispatch.
 
 Новый собственный локальный стенд использует endpoint `http://127.0.0.1:32769/app/`,
 network `loginom-skills-short-20261009`, server ID
@@ -74,8 +79,28 @@ server reset не используется.
 
 ## Открытые проверки
 
-Первой запущена sales-by-category, один формальный запуск. Итог десятки,
-judge/structure/CSV, cold3 и S1–S8 ещё не приняты. Нужны native Desktop,
+Текущая десятка: sales-by-category **PASS100**, judge scored/structure0/warm
+CSV oracle PASS/environment cleanup confirmed, process terminal0. Cold этого
+пакета **PASS**: независимый native reader из той же installed9695 сборки,
+исходные package/input bytes неизменны, без перенастройки и server reset,
+свежий CSV oracle PASS/close/logout/remaining0;18 public files read-back
+`f0ab94e3ce474ca1d844e947396fb80fd77c3f8d808108a97ef83994fac1ba21`.
+Унаследованные cold-reader49/image поля common — историческая справка,
+фактический current-host replay использует полный final candidate9695, как
+записано в его result/read-back. Новая серия не является сравнением двух reader.
+ABC запущена второй; остальные8 ещё не запущены.
+
+S1 installed CLI и S2 native Desktop: **PASS** с реальной gpt-6.1-sol medium,
+ответ102, tool calls0/Loginom browser execs0/runtime journals0,remaining0.
+S1 writer отсутствует; Desktop собственные каталоги удалены. Read-back S1
+`f3b32b4e2508b63a0b16444e6f5ea992b0fba44f398a535c655f6a93ee95c090`,
+S2 `9ba065aee0e1959a5486df45f147a0729dfd8fc58afea5e5f29d1bcb74535a7d`.
+S3 **PASS**: Help loginom_find completed и содержательный ответ о Калькуляторе,
+Loginom endpoint127.0.0.1:9 недоступен, skill activation/browser execs/runtime
+journals0,remaining0; read-back
+`10ce2e105f4928291a51f024076482405376c15bf2102d9513b1e4d07df005fa`.
+S4 Desktop nested `.lgp`+PNG запущен, результат ещё открыт. Итог десятки,
+всех cold3 и S1–S8 ещё не принят. Нужны оставшиеся docs/Desktop переходы,
 небольшое изменение/execute/save после writable reopen установленного CLI,
 одна штатная отмена с процессным наблюдением и итоговая очистка.
 Предыдущий scripted normal shutdown/writable reopen нового CLI прошёл;

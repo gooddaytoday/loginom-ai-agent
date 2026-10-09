@@ -4456,12 +4456,12 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Уже начатые offline матрицы завершены:CLI5/5,Desktop5/5,network:none; own containers10 удалены; read-back47files SHA dc84c279e6….
 - CLI установлен штатно в private HOME вне checkout,5651 inventory entries/root:root4755/unconfigured PASS; Desktop AppImage доставлен, native проверки pending.
 - Frozen harnessd08 clean/658 pins; свежий evals ref7318ec61fef3, protected judge/calibration/tasks unchanged. Принятый judge contract сохранён.
-- Fixed10/cold3 сохранены до первого live; common SHA570d1578f5…, dispatch86979bc4d0…. Каждая задача — отдельный процесс, следующая только после terminal+cleanup gate.
+- Fixed10/cold3 сохранены до первого live; v2 common SHA67c0f30005…, dispatch1ee3b44718… (первичный pre-model отказ0 попыток сохранён; own configs исправлены/native check PASS). Каждая задача — отдельный процесс, следующая только после terminal+cleanup gate.
 - Модель openai/gpt-6.1-sol medium,judge gpt-6-astra high,threshold70/checklist; effective task timeout1800000ms сохранён.
 - Новый own stand127.0.0.1:32769/server8ef472ee…/network loginom-skills-short-20261009; admission PASS. Старый v9 и original server/client не изменены.
-- Первый single-task sales-by-category запущен; итоговая десятка/S1–S8/cold3 пока не приняты. Ручных повторов0.
+- Sales single-task PASS100/judge/structure/CSV/cleanup confirmed; независимый installed9695 cold PASS/bytes unchanged/no reset/remaining0. ABC запущена второй. Ручных модельных повторов0.
 - Историческая v9:34closed/25PASS/9FAIL,cohort#3 INCOMPLETE; hang cause UNKNOWN, raw recovery evidence сохранён, в новую приёмку не засчитывается.
-- Следующий шаг: terminal result/cleanup/structure/CSV sales; затем остальные fixed tasks, S1–S8/cold3/native lifecycle; см. новый short-acceptance report.
+- S1 CLI/S2 Desktop/S3 Help PASS на реальной основной модели, browser/runtime journals0/remaining0; S4 native Desktop docs запущен. Следующий шаг: ABC terminal/review/cold, остальные fixed tasks/S4–S8/native lifecycle.
 
 ### 2026-10-09 — ACTIVE, v9 terminal143; closed34/45, PASS25/FAIL9; cohort#3 INCOMPLETE
 
