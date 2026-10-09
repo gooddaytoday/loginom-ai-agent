@@ -1023,7 +1023,7 @@ Core имеет разметку осей, но без CSV oracle. По доку
   результаты отдельно; после повторной фиксации условий выполнить новую пару
   теми же сохранёнными CLI, а не только повторить одну сторону.
 
-  **Текущая серия v9, checkpoint 17 (2026-10-09):** frozen harness
+  **Текущая серия v9, checkpoint 18 (2026-10-09):** frozen harness
   `d08be6baf8f5aea53f83c228cd0984c9d2bf0494`, source-only полный suite
   486 PASS/2 SKIP/0 FAIL, install/typecheck PASS. Общие условия:
   `ab-conditions-storage-clean-20261009/common.json`, SHA256
@@ -1041,15 +1041,15 @@ Core имеет разметку осей, но без CSV oracle. По доку
   Дополнительная активация candidate:1 provider-turn/1 skill-вызов;
   прочий рост tools/Loginom измерен отдельно и не разрешает новые отказы.
   Formal baseline session60189/run20261009-021118-d08be6baf продолжается:
-  closed17/45:14 PASS100/3 no_artifact FAIL0. Первый повтор15 завершён:
-  12 PASS100/3 FAIL (cohort/first-last/low-liquidity). Ab-revenue#2 и ABC#2 PASS100,
+  closed18/45:15 PASS100/3 no_artifact FAIL0. Первый повтор15 завершён:
+  12 PASS100/3 FAIL (cohort/first-last/low-liquidity). Ab-revenue#2, ABC#2 и articles#2 PASS100,
   structure/warm oracle PASS; третий повтор остаётся обязательным.
-  Всем17 подтверждены6 cleanup stages,
+  Всем18 подтверждены6 cleanup stages,
   process cleanup/error null/remaining0×2, history/diagnostics full roundtrip;
   semantic recovery этим не доказывается, native root causes UNKNOWN.
-  Для14 пакетов structure/warm oracle PASS. Progress17 SHA64eab54cb0…,
-  metrics17 SHAf41c16436f…, первый cold index15 SHA25f7fe5287… подтверждает
-  request/package/input SHA для12 пакетов первого повтора. Articles#2 выполняется; candidate formal,
+  Для15 пакетов structure/warm oracle PASS. Progress18 SHAcd4b193bcd…,
+  metrics18 SHAc4c40094cd…, первый cold index15 SHA25f7fe5287… подтверждает
+  request/package/input SHA для12 пакетов первого повтора. Campaign#2 выполняется; candidate formal,
   formal cold и compare не начаты. Ручных повторов0; первый повтор не заменяет
   baseline45/candidate45, cold каждого сохранённого пакета и итоговый compare.
 

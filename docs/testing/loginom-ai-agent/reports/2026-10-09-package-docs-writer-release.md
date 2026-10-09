@@ -663,6 +663,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | abc-pareto-groups | 1 | PASS100 | Есть / PASS | 36 / 35 / 31 | 4640 / 21348941 | 3 / 9371065 |
 | abc-pareto-groups | 2 | PASS100 | Есть / PASS | 36 / 35 / 31 | 4642 / 20953453 | 3 / 8976043 |
 | articles-by-author | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4600 / 15892038 | 3 / 4038019 |
+| articles-by-author | 2 | PASS100 | Есть / PASS | 21 / 21 / 17 | 4600 / 15910931 | 3 / 4045637 |
 | campaign-roi-by-channel | 1 | PASS100 | Есть / PASS | 19 / 19 / 15 | 4610 / 16655815 | 3 / 4687353 |
 | cohort-spend-activity | 1 | FAIL0/no_artifact | Нет / не выполнялись | 22 / 21 / 18 | 4563 / 15206251 | 3 / 3337376 |
 | customer-activity-segments | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4608 / 17448322 | 3 / 5497845 |
@@ -930,3 +931,28 @@ metrics17 SHA256
 и cold index15 повторно проверены по SHA; common020c08059… и
 PID676156/UID/birth/exe/inode неизменны. Closed17/45:14 PASS100/3 no_artifact
 FAIL0, articles#2 running; candidate/cold/compare0/retries0. Полный90 не принят.
+
+Восемнадцатый closed formal v9 `articles-by-author#2` PASS100:
+structure/warm oracle PASS, cleanup6 stages/processes confirmed,
+error null/remaining0×2. History4600/15910931bytes и diagnostics3/4045637bytes
+full roundtrip. Trace/result counters match:21 finishes/21 tools/17 Loginom/
+skill0/prepare1/error1. Наблюдавшийся result PASS100/environment not_run
+не принимался до подтверждения всех6 этапов.
+
+Единственная ошибка — `loginom_search`, plain text74bytes; оригинал сохранён
+в private events.jsonl, SHA256 текста
+`c7cbb0b34648843841df603f97891cd731de54b760bef51d8d8f48e346612d18`.
+Причина не классифицирована; structured codes/semantic cleanup не придуманы.
+Первоначальный read-only observer ошибочно предположил JSON и получил
+JSONDecodeError; отказ сохранён в metrics18, дальнейшее наблюдение учло
+фактический текстовый формат. Harness/продукт/критерии не менялись,
+model/manual retry отсутствует; ошибка инструмента остаётся в счётчиках.
+
+Private progress18 SHA256
+`cd4b193bcd6d09b4aed617aae7c87c8b0fe27751b0f4d54583c5380d7c9edabf`,
+metrics18 SHA256
+`c4c40094cdf5637547f9107c640ef5d6636c9d39bc348219be82bb6dc5f38861`.
+Все18 closed results/cleanup/process-cleanup и архивы, предыдущие17 traces
+и cold index15 повторно проверены по SHA; common020c08059… и
+PID676156/UID/birth/exe/inode неизменны. Closed18/45:15 PASS100/3 no_artifact
+FAIL0, campaign#2 running; candidate/cold/compare0/retries0. Полный90 не принят.
