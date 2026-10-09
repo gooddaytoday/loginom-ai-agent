@@ -1041,19 +1041,21 @@ Core имеет разметку осей, но без CSV oracle. По доку
   Дополнительная активация candidate:1 provider-turn/1 skill-вызов;
   прочий рост tools/Loginom измерен отдельно и не разрешает новые отказы.
   Formal baseline session60189/run20261009-021118-d08be6baf продолжается:
-  closed29/45:21 PASS100/8 no_artifact FAIL0. Первый повтор15 завершён:
-  12 PASS100/3 FAIL (cohort/first-last/low-liquidity). Второй повтор:9 PASS100/5 FAIL0; у созданных пакетов
+  closed30/45:21 PASS100/9 no_artifact FAIL0. Первый повтор15 завершён:
+  12 PASS100/3 FAIL (cohort/first-last/low-liquidity). Второй повтор завершён:9 PASS100/6 FAIL0; у созданных пакетов
   structure/warm oracle PASS; третий повтор остаётся обязательным.
-  Cohort#2, first-last#2, low-liquidity#2, NPS#2, support#2 no_artifact FAIL0:
+  Cohort#2, first-last#2, low-liquidity#2, NPS#2, support#2, trial#2 no_artifact FAIL0:
   readiness/recovery не подтверждены.
-  Всем29 подтверждены6 cleanup stages,
+  Всем30 подтверждены6 cleanup stages,
   process cleanup/error null/remaining0×2, history/diagnostics full roundtrip;
   semantic recovery этим не доказывается, native root causes UNKNOWN.
-  Для21 пакета structure/warm oracle PASS. Progress29 SHAb1a1d22792…,
-  metrics29 SHA627be3080a…, первый cold index15 SHA25f7fe5287… подтверждает
+  Для21 пакета structure/warm oracle PASS. Progress30 SHA53408abe3d…,
+  metrics30 SHAccc67b12ea…, первый cold index15 SHA25f7fe5287… подтверждает
   request/package/input SHA для12 пакетов первого повтора. Partial closed24 cold index
-  SHA8eecd96824… проверяет18 request/package/input/oracle SHA; cold ещё не выполнен.
-  Trial#2 выполняется; candidate formal,
+  SHA8eecd96824… сохранён; two-repeat cold index30 SHA942b6964c6… проверяет21
+  request/package/input/oracle SHA; cold ещё не выполнен. По первым двум повторам:
+  9 задач PASS/PASS,3 FAIL/FAIL,3 mixed; стабильность3/3 ещё не доказана.
+  Ab-revenue#3 выполняется; candidate formal,
   formal cold и compare не начаты. Ручных повторов0; первый повтор не заменяет
   baseline45/candidate45, cold каждого сохранённого пакета и итоговый compare.
 

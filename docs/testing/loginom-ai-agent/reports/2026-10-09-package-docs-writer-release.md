@@ -687,6 +687,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | support-by-priority | 1 | PASS100 | Есть / PASS | 24 / 23 / 19 | 4622 / 17776466 | 3 / 5863398 |
 | support-by-priority | 2 | FAIL0/no_artifact | Нет / не выполнялись | 20 / 21 / 19 | 4578 / 15761243 | 3 / 3906956 |
 | trial-dosage-outcomes | 1 | PASS100 | Есть / PASS | 20 / 21 / 17 | 4606 / 16932603 | 3 / 5046893 |
+| trial-dosage-outcomes | 2 | FAIL0/no_artifact | Нет / не выполнялись | 25 / 24 / 21 | 4574 / 15704805 | 3 / 3850992 |
 
 Последний private snapshot `formal-v9-progress-9-20261009.json` SHA256
 `bd3dfd6fadbe73a2f9bff01ee31681692d1fb6da52d92f348a5351bfaba04702`:
@@ -1217,3 +1218,36 @@ Progress29 SHA `b1a1d22792aa8b634d5203dec5199f23788422d52672059808c5f9f12206a2ba
 metrics29 SHA `627be3080ab086e92942123a82add56b945ccf5df84d200da094167cd655d4d0`.
 Common020c08059…/controller identity совпали. Closed29/45:21 PASS100/8 FAIL0,
 trial#2 running; candidate/cold/compare0/retries0, полный90 не принят.
+
+Тридцатый closed formal v9 `trial-dosage-outcomes#2` no_artifact FAIL0:
+package_not_created, CLI exit0, timeout/interrupted=false, judge_attempts0;
+structure/warm/cold не выполнялись. Output_mapping readiness addressed output
+definition page at0 не подтверждена: AMBIGUOUS/NODE_APPLY_STOPPED. Последующее
+wait/cancel вернуло OUTPUT_MAPPING_RECOVERY_UNVERIFIED: Original output Done
+reference unavailable; effectPossible=true/cleanupComplete=false. Два recover
+error — plain text2656bytes, SHA
+`e327e4d7ffe5979b172b8e5cbb68a6305f8b4d32009c71eb7ff925323a57529e`.
+Наблюдаются REQUEST_REJECTED/AMBIGUOUS/OUTPUT_MAPPING_RECOVERY_UNVERIFIED;
+structured semantics для текста не выведены. Native cause/recovery UNKNOWN.
+Все6 cleanup stages/processes confirmed/error null/remaining0×2;
+history/diagnostics full roundtrip (объёмы в таблице).
+Trace/result counters match:25 finishes/24 tools/21 Loginom/skill0/prepare1/errors5.
+Все30 results/cleanup/process-cleanup/архивы, предыдущие29 trace SHA и
+reviews21/cold indexes15+24/batch8 receipts повторно проверены.
+Progress30 SHA `53408abe3d7205591303b0f95d07b91915e69a55447669c8f2a93fb0e32a2c87`;
+metrics30 SHA `ccc67b12ea64ee71ceffbec220ed9980e0093a1d26a9233d4b508f074023698d`.
+Common020c08059…/controller identity совпали. Первый повтор12 PASS/3 FAIL,
+второй9 PASS/6 FAIL; всего30/45:21 PASS100/9 FAIL0, ab-revenue#3 running.
+Candidate/cold/compare0/retries0, полный90 не принят.
+
+Индекс двух завершённых повторов:
+`formal-v9-two-repeat-cold-index-30-20261009.json`, SHA
+`942b6964c64e55fbec29332a1ea95a7df0988d9743cf430216d5e4b253d4af38`.
+Проверено exact15 selected tasks×attempts1/2, result/cleanup/process-cleanup SHA
+и полная cleanup30; у21 пакета request/review/package/input/oracle SHA
+сопоставлены с неизменным snapshot manifest. Девять no_artifact сохранены как
+FAIL без фиктивного cold PASS. В первых двух повторах9 задач PASS/PASS,3
+FAIL/FAIL,3 mixed (NPS/support/trial). Третий повтор обязателен; эти данные
+не доказывают стабильность3/3 или NI. Статус
+TWO_BASELINE_REPETITIONS_ONLY_COLD_PENDING, live cold ещё не выполнялся.
+Предыдущие indexes15/24 сохранены без изменений.
