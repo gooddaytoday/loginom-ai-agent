@@ -157,6 +157,14 @@ native test reader не выдаётся за обычное поведение 
 37937/36905 закрыты, helper PID1440162/1440164 отсутствуют; прежняя failed cleanup
 receipt не переписана, точная принадлежность helper не доказана.
 
+После окончания десятки её временный task snapshot281 files и cold helper
+архивированы вне `/tmp`, исходные/сохранённые SHA сверены, отсутствие открытых
+FD проверено. Удалены только `/tmp/loginom-skills-analytic-source-20261008` и
+`/tmp/loginom-cold-control-plan.ts`. Receipt282 files SHA256
+`a319249d1ce1f6b0e28c5b045fbaf8694ef61df10ecaa306b4e1f50809397afd`;
+исторические условия/common paths не переписаны. Текущие Desktop temp roots
+и старые recovery материалы не затронуты.
+
 ## Выбор skill и документы — S1–S6 PASS, S7/S8 открыты
 
 S1 installed CLI и S2 native Desktop: **PASS** с реальной gpt-6.1-sol medium,
