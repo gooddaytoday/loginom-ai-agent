@@ -29,7 +29,8 @@ async function main() {
   // The complete loader requires reference.lgp before dispatch. Builder has no judge/rubric;
   // finalization must separately load the completed collection through loadTasks.
   const task: Task = { id: raw.id, dir, title: raw.title, prompt: raw.prompt,
-    inputs: raw.inputs, reference: raw.reference, spec: raw.spec, checklist: [],
+    inputs: raw.inputs, reference: raw.output_mode === "diagnostic" ? "" : raw.reference, spec: raw.spec, checklist: [],
+    ...(raw.output_mode === "diagnostic" ? { outputMode: "diagnostic" as const } : {}),
     expectedOutput: raw.expected_output, timeoutMs: raw.timeout_ms,
     oracle: await Bun.file(path.join(dir, "oracle.csv")).exists() ? "oracle.csv" : undefined,
     oracleTolerance: raw.oracle_tolerance ?? 0.01 }
