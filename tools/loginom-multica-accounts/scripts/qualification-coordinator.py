@@ -6,11 +6,15 @@ source. It does not accept a ready/PASS flag or replace public preparation.
 """
 import argparse
 import importlib.util
+import signal
 from pathlib import Path
 from common import read_private
 
 
 def main():
+    def cancel(_signum, _frame):
+        raise RuntimeError('BOUNDED_QUALIFICATION_CANCELLED')
+    for signum in [signal.SIGTERM, signal.SIGINT]: signal.signal(signum, cancel)
     parser = argparse.ArgumentParser()
     parser.add_argument('--issue', required=True)
     parser.add_argument('--operator', type=Path, required=True)

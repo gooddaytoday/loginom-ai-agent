@@ -208,8 +208,17 @@ is invented to populate this list.
 Each marker has `collector`: source_file/source_sha256 and
 execution_receipt/execution_sha256. The private receipt schema
 `lab53-retained-guid-collector-v1` binds issue/attempt, original_task_id,
-source_sha256, exact expression, algorithm `sha256-utf8-exact-guid-string`,
+source_sha256 (declared retained/API/reference representation ONLY), exact expression, algorithm `sha256-utf8-exact-guid-string`,
 guid_sha256/user_sha256 and execution_bindings input/ack/readback path/hashes.
+`source_role` is `api-redacted-source-representation`, `retained-created-source`
+or `retained-compatible-reference`; `executed_source_sha256` remains null and
+`byte_gaps` retains `physical-preexec-not-captured` plus all original redaction/
+unredacted/helper gaps. Original LAB45 task input is partially API-redacted:
+its representation digest is never called an executed-source digest, and a
+compatible reconstructed reference never becomes executed-byte proof. The
+owner's original command-chain audit can establish exact-string algorithm
+comparability while these gaps stay UNKNOWN. Unavailable unredacted executed
+bytes are NOT required for this separate CURRENT bucket exclusion route.
 `provenance_mode=owner-audited-original-task-chain` names the explicit existing
 owner audit trust boundary, not a PASS flag or byte-hash proof of execution.
 Parent must first establish that these are original task/collector facts; an

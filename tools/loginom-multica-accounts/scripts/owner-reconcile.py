@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import signal
 import time
 from uuid import UUID
 from common import read_private, process_identity, write_private, new_evidence_directory
@@ -123,6 +124,35 @@ def validate_fd_proof(request, proof):
                 raise RuntimeError('HISTORICAL_KERNEL_LOCK_UNKNOWN')
 
 
+def validate_retained_collector(item, operator_user_hash):
+    provenance = item['collector']; source = binding(provenance['source_file']); receipt_binding = binding(provenance['execution_receipt'])
+    receipt = read_private(provenance['execution_receipt'])
+    if source['sha256'] != provenance['source_sha256'] or receipt_binding['sha256'] != provenance['execution_sha256'] or (
+            receipt.get('schema') != 'lab53-retained-guid-collector-v1' or receipt.get('issue_id') != item['issue_id']
+            or receipt.get('attempt_uuid') != item['attempt_uuid'] or receipt.get('source_sha256') != source['sha256']
+            or receipt.get('guid_sha256') != item['guid_hash'] or receipt.get('user_sha256') != operator_user_hash
+            or receipt.get('algorithm') != 'sha256-utf8-exact-guid-string'):
+        raise RuntimeError('HISTORICAL_GUID_ALGORITHM_NOT_ESTABLISHED')
+    # This digest binds the declared retained/API/reference representation,
+    # never the unavailable unredacted physically executed historical bytes.
+    source_role = receipt.get('source_role')
+    if source_role not in {'api-redacted-source-representation', 'retained-created-source', 'retained-compatible-reference'} or (
+            receipt.get('executed_source_sha256') is not None or not isinstance(receipt.get('byte_gaps'), list)
+            or 'physical-preexec-not-captured' not in receipt['byte_gaps']):
+        raise RuntimeError('HISTORICAL_SOURCE_ROLE_NOT_ESTABLISHED')
+    expression = receipt.get('expression')
+    if receipt.get('provenance_mode') != 'owner-audited-original-task-chain':
+        raise RuntimeError('HISTORICAL_COLLECTOR_EXECUTION_NOT_ESTABLISHED')
+    UUID(receipt['original_task_id'])
+    if not expression or expression not in Path(provenance['source_file']).read_text(): raise RuntimeError('HISTORICAL_GUID_ALGORITHM_NOT_ESTABLISHED')
+    records = receipt.get('execution_bindings', {})
+    if set(records) != {'input', 'ack', 'readback'}: raise RuntimeError('HISTORICAL_COLLECTOR_EXECUTION_NOT_ESTABLISHED')
+    for record in records.values():
+        if binding(record['path'])['sha256'] != record['sha256']: raise RuntimeError('HISTORICAL_COLLECTOR_EXECUTION_NOT_ESTABLISHED')
+    return {'user_hash': operator_user_hash, 'guid_hash': item['guid_hash'], 'guid_algorithm': receipt['algorithm'],
+        'collector_sha256': source['sha256'], 'collector_source_role': source_role, 'executed_source_sha256': None,
+        'byte_gaps': receipt['byte_gaps'], 'algorithm_receipt_sha256': receipt_binding['sha256']}
+
 def historical_targets(grant, operator_user_hash):
     old = []
     if {item['issue_id'] for item in grant['markers']} != set(LEGACY): raise RuntimeError('HISTORICAL_SCOPE_UNKNOWN')
@@ -132,25 +162,7 @@ def historical_targets(grant, operator_user_hash):
         if item['sha256'] != LEGACY[item['issue_id']] or binding(item['path']) != expected or (
                 marker.get('issue_id') != item['issue_id'] or marker.get('attempt_uuid') != item['attempt_uuid']):
             raise RuntimeError('HISTORICAL_MARKER_CHANGED')
-        provenance = item['collector']; source = binding(provenance['source_file']); receipt_binding = binding(provenance['execution_receipt'])
-        receipt = read_private(provenance['execution_receipt'])
-        if source['sha256'] != provenance['source_sha256'] or receipt_binding['sha256'] != provenance['execution_sha256'] or (
-                receipt.get('schema') != 'lab53-retained-guid-collector-v1' or receipt.get('issue_id') != item['issue_id']
-                or receipt.get('attempt_uuid') != item['attempt_uuid'] or receipt.get('source_sha256') != source['sha256']
-                or receipt.get('guid_sha256') != item['guid_hash'] or receipt.get('user_sha256') != operator_user_hash
-                or receipt.get('algorithm') != 'sha256-utf8-exact-guid-string'):
-            raise RuntimeError('HISTORICAL_GUID_ALGORITHM_NOT_ESTABLISHED')
-        expression = receipt.get('expression')
-        if receipt.get('provenance_mode') != 'owner-audited-original-task-chain':
-            raise RuntimeError('HISTORICAL_COLLECTOR_EXECUTION_NOT_ESTABLISHED')
-        UUID(receipt['original_task_id'])
-        if not expression or expression not in Path(provenance['source_file']).read_text(): raise RuntimeError('HISTORICAL_GUID_ALGORITHM_NOT_ESTABLISHED')
-        records = receipt.get('execution_bindings', {})
-        if set(records) != {'input', 'ack', 'readback'}: raise RuntimeError('HISTORICAL_COLLECTOR_EXECUTION_NOT_ESTABLISHED')
-        for record in records.values():
-            if binding(record['path'])['sha256'] != record['sha256']: raise RuntimeError('HISTORICAL_COLLECTOR_EXECUTION_NOT_ESTABLISHED')
-        old.append({'user_hash': operator_user_hash, 'guid_hash': item['guid_hash'], 'guid_algorithm': receipt['algorithm'],
-            'collector_sha256': source['sha256'], 'algorithm_receipt_sha256': receipt_binding['sha256']})
+        old.append(validate_retained_collector(item, operator_user_hash))
     return old
 
 
@@ -175,6 +187,7 @@ def reconcile(authorization_file, evidence_dir, source_sha):
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         for target in targets:
             if binding(target['path']) != target: raise RuntimeError('HISTORICAL_TARGET_CHANGED')
+        if len(grant['previous_processes']) != 59: raise RuntimeError('HISTORICAL_PROCESS_RECORDS_REQUIRED')
         check_absent(grant['previous_processes'])
         historical = historical_targets(grant, user_hash)
         input_data = {k: grant[k] for k in ['issue_id', 'operation_id', 'source', 'expected_observer']}
@@ -221,6 +234,8 @@ def reconcile(authorization_file, evidence_dir, source_sha):
 
 
 if __name__ == '__main__':
+    def cancel(_signum, _frame): raise RuntimeError('HISTORICAL_RECONCILIATION_CANCELLED')
+    for signum in [signal.SIGTERM, signal.SIGINT]: signal.signal(signum, cancel)
     parser = argparse.ArgumentParser(); parser.add_argument('--authorization', type=Path, required=True)
     parser.add_argument('--evidence-dir', type=Path, required=True); parser.add_argument('--source-sha', required=True)
     args = parser.parse_args()

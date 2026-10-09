@@ -170,6 +170,34 @@ class LegacyTransaction(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'PROCESS_RECORDS_REQUIRED'): owner.check_absent([{'pid': 999999999, 'start_ticks': 1}])
         with self.assertRaisesRegex(RuntimeError, 'WRITER_PRESENT'): owner.check_absent([process_identity(os.getpid())])
 
+    def test_redacted_original_chain_comparability_never_claims_executed_bytes(self):
+        source = self.root / 'redacted-representation.js'
+        expression = 'String(await con.FRemoteSession.get_Guid())'
+        source.write_text(expression + '; /* API redacted fragment remains unknown */'); source.chmod(0o600)
+        records = {}
+        for name in ['input', 'ack', 'readback']:
+            path = self.root / (name + '.json'); write_private(path, {'fixture_original_chain': name})
+            records[name] = {'path': str(path), 'sha256': owner.binding(str(path))['sha256']}
+        item = {'issue_id': str(uuid4()), 'attempt_uuid': str(uuid4()), 'guid_hash': 'd' * 64,
+            'collector': {'source_file': str(source), 'source_sha256': owner.binding(str(source))['sha256']}}
+        receipt = {'schema': 'lab53-retained-guid-collector-v1', 'issue_id': item['issue_id'], 'attempt_uuid': item['attempt_uuid'],
+            'source_sha256': item['collector']['source_sha256'], 'guid_sha256': item['guid_hash'], 'user_sha256': 'e' * 64,
+            'algorithm': 'sha256-utf8-exact-guid-string', 'source_role': 'api-redacted-source-representation',
+            'executed_source_sha256': None, 'byte_gaps': ['physical-preexec-not-captured', 'api-redacted-fragments'],
+            'expression': expression, 'provenance_mode': 'owner-audited-original-task-chain',
+            'original_task_id': str(uuid4()), 'execution_bindings': records}
+        file = self.root / 'collector-audit.json'
+        def bind_receipt(value):
+            write_private(file, value); item['collector'].update(execution_receipt=str(file), execution_sha256=owner.binding(str(file))['sha256'])
+        bind_receipt(receipt)
+        result = owner.validate_retained_collector(item, 'e' * 64)
+        self.assertIsNone(result['executed_source_sha256']); self.assertIn('api-redacted-fragments', result['byte_gaps'])
+        for field, value in [('executed_source_sha256', 'a' * 64), ('source_role', 'executed-source'), ('byte_gaps', [])]:
+            bind_receipt({**receipt, field: value})
+            with self.assertRaisesRegex(RuntimeError, 'SOURCE_ROLE_NOT_ESTABLISHED'): owner.validate_retained_collector(item, 'e' * 64)
+        bind_receipt({**receipt, 'execution_bindings': {}})
+        with self.assertRaisesRegex(RuntimeError, 'EXECUTION_NOT_ESTABLISHED'): owner.validate_retained_collector(item, 'e' * 64)
+
     def test_real_readonly_census_controls_and_denials_never_become_absence(self):
         lock = self.root / 'fixture.lock'; lock.touch(mode=0o600)
         fd = os.open(lock, os.O_RDWR); fcntl.flock(fd, fcntl.LOCK_EX)

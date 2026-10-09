@@ -619,6 +619,38 @@ for (const option of ['duplicate', 'changing']) {
   }));
 }
 
+test('historical executable collector binds all seven configs, fresh owner bucket and consumes once without admitting a new effect', () => withPage([], async page => {
+  const operation = parentOperation();
+  const directory = mkdtempSync(join(temporary, 'historical-'));
+  const paths = [...operation.inputs.configs];
+  for (let i = 0; i < 4; i++) {
+    const path = join(directory, 'closed-config-' + i + '.json');
+    writeFileSync(path, JSON.stringify({fixture: i}), {mode: 0o600}); paths.push(path);
+  }
+  const configs = paths.map(path => {const info = statSync(path); return {path, device: info.dev, inode: info.ino, sha256: syntheticHash(readFileSync(path))};});
+  const historical = [0, 1].map(i => ({user_hash: operation.inputs.expectedObserver.user_hash,
+    guid_hash: syntheticHash('old-guid-' + i), guid_algorithm: 'sha256-utf8-exact-guid-string',
+    collector_sha256: syntheticHash('retained-collector-' + i), algorithm_receipt_sha256: syntheticHash('audit-' + i)}));
+  const inputFile = join(directory, 'input.json');
+  const input = {directory, issue_id: operation.request.issue_id, operation_id: operation.request.operation_id,
+    source: operation.request.source, stand: 'about:blank', expected_observer: operation.inputs.expectedObserver, configs, historical};
+  writeFileSync(inputFile, JSON.stringify(input), {mode: 0o600});
+  const command = [fileURLToPath(new URL('../scripts/historical-readback.mjs', import.meta.url))];
+  let result = spawnSync(operator.node, [...command, 'request', inputFile], {encoding: 'utf8'});
+  assert.equal(result.status, 0, result.stderr);
+  operation.request = JSON.parse(readFileSync(join(directory, 'parent-request.json'))); operation.directory = directory;
+  assert.equal(operation.request.phase, 'historical-reconciliation'); assert.equal(operation.request.configs.length, 7);
+  const {responseFile} = await parentResponse(page, operation);
+  writeFileSync(inputFile, JSON.stringify({...input, requestFile: join(directory, 'parent-request.json'), responseFile}));
+  result = spawnSync(operator.node, [...command, 'verify', inputFile], {encoding: 'utf8'});
+  assert.equal(result.status, 0, result.stderr);
+  const consumed = JSON.parse(readFileSync(join(directory, 'historical-consumed-' + operation.request.nonce + '.json')));
+  assert.equal(consumed.historical.length, 2); assert.equal(consumed.readback.rows.length, 2);
+  result = spawnSync(operator.node, [...command, 'verify', inputFile], {encoding: 'utf8'});
+  assert.notEqual(result.status, 0); assert.match(result.stderr, /EEXIST/);
+  await assert.rejects(readFinalServerInventory({...operation, requestFile: join(directory, 'parent-request.json'), responseFile}));
+}));
+
 test('historical owner-self bucket component preserves old gaps and never replaces new effect identity', () => {
   const {readback, effect} = syntheticReadback();
   const old = {user_hash: readback.observer.user_hash, guid_hash: syntheticHash('old-admin-guid'),
