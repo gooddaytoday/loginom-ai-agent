@@ -14,7 +14,9 @@ root:root4755 совпали. Desktop AppImage доставлен; native S2/S4 
 структурой/CSV, cold3, S1–S8 и минимальный installed lifecycle. A/B90, полная
 TUI/recovery матрица, вторая модель и stage9 отложены. Десятка завершена:
 9 full PASS/1 full FAIL (ABC CLI exit1), все10 judge100/structure/CSV/cleanup;
-cold3/3 PASS. S1–S6 PASS, S7/S8 и installed lifecycle ещё открыты.
+cold3/3 PASS. S1–S8 PASS, installed modify/save/cancel lifecycle ещё открыт.
+S8 test collector исправлен через TDD; raw live receipts проверены offline,
+нового модельного прогона нет. Installed payload source9695 не менялся.
 Итоги всей приёмки ещё не приняты. Предыдущая v9 остаётся INCOMPLETE, не доказательство
 неухудшения. Полные hashes и текущая граница:
 [сокращённая приёмка](../testing/loginom-ai-agent/reports/2026-10-09-package-docs-short-acceptance.md).

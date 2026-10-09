@@ -227,6 +227,19 @@ verifySalesScenario **offline, без live/model rerun**; post-review SHA256
 S8 receipt34files SHA256
 `11496f8ec59e49fda21de096f58013f49b41541585170df72cf43f1a4df170d5`.
 
+Ручной installed modify/cancel пока **INCOMPLETE**. Первый adapter передал
+устаревший `workflow_ref.tab_tid`: запрос отклонён до эффекта
+(NOT_APPLIED/effect_possible:false), package bytes unchanged, CLI exit0,
+writer absent/remaining0. Этот клиент не сохранял пакет в своей runtime-сессии,
+поэтому guard штатного shutdown не подтверждал native close/logout.
+Исправленный public `workflow_id` adapter при следующем fresh open увидел
+только чтение и завершился до создания узла/сохранения: exit0/remaining0.
+Обе исходные попытки и диагностические receipts сохранены отдельно; это
+scripted provider, real model/judge calls0, повторов S8 нет.
+Освобождение disconnected server session ещё проверяется; сервер не
+перезапускается, пароль/роль/чужие данные не меняются. Процессная очистка сама
+по себе не выдаётся за подтверждённый server logout.
+
 Этапы5–7 приняты. Для итоговой цели ещё нужны
 небольшое изменение/execute/save после writable reopen установленного CLI,
 одна штатная отмена с процессным наблюдением и итоговая очистка.
