@@ -8,6 +8,21 @@ import { evalsRoot, loadConfig } from "../src/config"
 import { signalProcess, superviseProcess, type ProcessIdentity } from "../src/process-supervisor"
 import { archiveDiagnostics } from "../src/diagnostics"
 
+test("supervisor retains the live launcher until the terminated CLI exit receipt is observed", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-exit-receipt-"))
+  try {
+    const run = await superviseProcess({
+      cmd: [process.execPath, "-e", "process.on('SIGINT', () => {}); console.log('ready'); await Bun.sleep(120_000)"],
+      cwd: root, env: { PATH: process.env.PATH ?? "" }, timeoutMs: 2_000,
+    })
+    expect(run.stdout).toContain("ready")
+    expect(run.timedOut).toBe(true)
+    expect(run.exitCode).toBe(143)
+    expect(run.processCleanup).toMatchObject({ status: "confirmed", error: null, capture_complete: true })
+    expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 45_000)
+
 test("trusted unit: native commands cannot request observation after exit", async () => {
   await expect(superviseProcess({ cmd: [process.execPath, "-e", "process.exit(0)"], cwd: evalsRoot,
     env: { PATH: process.env.PATH ?? "" }, timeoutMs: 1000, observationMode: "unit_after_exit" })).rejects.toThrow("Trusted unit observation requires")

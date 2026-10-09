@@ -30,3 +30,7 @@ LAB-55 и соседний агент 01a10b2c-f744-7552-a6e6-338f31569ef3 ис�
 - Положительная обычная recovery → release → next admission немодельного fixture: PASS в отдельном PID namespace, собственный network-none Docker stand. Исходный ERROR неизменен, .process-group и .harness-lease удалены по evidence.
 - Skill memory-policy/provider/bubblewrap регрессии PASS. Typecheck PASS. Остальные адресные/final проверки продолжаются.
 - Соседний агент и LAB-55 активны; их docs/pins/профили сохранены. Native installed CLI ещё NOT_RUN; будущий комплект не активирован.
+
+## Дополнительная подтверждённая гонка
+
+Изолированный полный набор воспроизвёл потерю настоящего exit receipt после SIGTERM CLI: subreaper записывал exit_code=143, но supervisor завершал launcher до чтения receipt. Новый RED-тест воспроизвёл exitCode=-1. Supervisor теперь ждёт receipt при живой проверенной identity launcher в пределах прежнего пятисекундного остатка и общего cleanup-бюджета. После исправления supervisor/transition/sandbox: 41 PASS, typecheck PASS. Sandbox-тест проверяет недоступность внешнего файла через /proc/PID/root; наличие самого root в повторно использованном PID namespace не означает утечку.
