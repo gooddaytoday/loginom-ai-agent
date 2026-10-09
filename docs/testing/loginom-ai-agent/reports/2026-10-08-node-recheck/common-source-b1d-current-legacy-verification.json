@@ -1,0 +1,378 @@
+{
+  "schema": "lab53-source-b1d-current-legacy-public-verification-v1",
+  "observed_at": "2026-10-09T11:58:18.168594+00:00",
+  "private_verification_receipt": {
+    "bytes": 11699,
+    "sha256": "db5e72c868dd399858a75abeb93f2d9d3b75ef6859ff89be45a66ad2cb4ec8e5",
+    "contents": "PRIVATE_NOT_PUBLISHED"
+  },
+  "operation_id": "2fd00c7a-ec14-432d-b74a-47623719b326",
+  "source": {
+    "sha": "b1d002933bc7aec3eec8ebfdd009c905025bb7a3",
+    "tree": "cf2b733c40f1626a941dc5cb4b9d8f505952786c",
+    "manifest_sha256": "7794acd26f21ce4dbba42268875b9ee2f20b14cc7edbfddc56476c645b37680f"
+  },
+  "scope": "CURRENT_LEGACY_OWNER_RECONCILIATION_ONLY",
+  "result": "RECORDED_CURRENT_PROOF_BINDINGS_AND_PREDICATES_VERIFIED",
+  "recorded_owner_execution": {
+    "result_receipt_sha256": "7d447c54ea9a5e7400a7ac4bd6ec4d3169f606895af326d7ea9b5b10485b7cdf",
+    "exit": 0,
+    "error_code": null,
+    "completed_at": "2026-10-09T11:42:57.830695+00:00",
+    "execution_not_replayed_by_this_verifier": true
+  },
+  "checks": {
+    "exact_source": true,
+    "exact_operation": true,
+    "same_expected_observer": true,
+    "source_VERSION": true,
+    "grant_digest": true,
+    "same_parent_nonce": true,
+    "native_action_digest": true,
+    "native_action_tab": true,
+    "action_refresh_times": true,
+    "parent_request_compact_digest": true,
+    "configs_effects_digests": true,
+    "consumed_raw_digests": true,
+    "consumed_payloads": true,
+    "archive_proof_digests": true,
+    "post_archive_digest": true,
+    "fd_foreground_bytes_identical": true,
+    "publish_digests": true,
+    "foreground_exit_absence_recorded": true,
+    "recorded_owner_exit": true,
+    "history_UNKNOWN_preserved": true,
+    "chronology": true,
+    "server_fresh_at_completion": true,
+    "fd_fresh_at_completion": true,
+    "exact14targets": true,
+    "59unique_process_tuples": true,
+    "59pids_absent_recorded_censuses": true,
+    "unknown220867_absent_censuses": true,
+    "historical_ticks_UNKNOWN": true,
+    "fd_binding": true,
+    "fd_inventory_equal": true,
+    "fd_before_predicates": true,
+    "fd_after_predicates": true,
+    "2original_marker_bytes_match": true,
+    "actual_JS_pure_functions": true,
+    "fresh_guardian_identity_absence_recorded": true
+  },
+  "historical_freshness": {
+    "at_recorded_completed_at": "2026-10-09T11:42:57.830695+00:00",
+    "server_age_seconds": 206.719695,
+    "fd_age_seconds": 0.2457,
+    "current_age_not_used": true
+  },
+  "actual_source_imports": {
+    "owner_sha256": "b2ccb4434f21627e3d6adf4062a15dabb34d56f9cefab422fa083151105ecbbb",
+    "common_sha256": "ceb400d2c1b5617cfa7598f75419a569e3b3cc52d13c6533dd7436fa39396743",
+    "fd_collector_b1d_sha256": "23ae7105d89a685c2fd76afb02d108b8038b902c230d83b4a42366602572498f",
+    "python_pure_functions": [
+      "digest",
+      "compact"
+    ],
+    "strict_fd_validator_directly_called": false,
+    "reason": "strict validator binds current time and remote /proc; evaluated recorded predicates at execution time, no time/proc monkeypatch or simulated PASS",
+    "Linux_device_encoding": "explicit Linux dev_t encoding for kernel tokens; Darwin os.major/minor not used"
+  },
+  "fd_recorded_samples": [
+    {
+      "sample": "before",
+      "visible_pids": 244,
+      "errors": 0,
+      "target_count": 14,
+      "targets_equal": true,
+      "control_observed": true,
+      "guardian_exact": true,
+      "exact_guard_control_holders": true,
+      "holder_count": 2,
+      "held_guard_FLOCK": true,
+      "all14kernel_locks": true
+    },
+    {
+      "sample": "after",
+      "visible_pids": 244,
+      "errors": 0,
+      "target_count": 14,
+      "targets_equal": true,
+      "control_observed": true,
+      "guardian_exact": true,
+      "exact_guard_control_holders": true,
+      "holder_count": 2,
+      "held_guard_FLOCK": true,
+      "all14kernel_locks": true
+    }
+  ],
+  "control_absence_boundary": "Foreground publish receipt records collector exit and both controls ABSENT before atomic publication; no new remote /proc read by this verifier.",
+  "actual_parent_source_pure_validation": {
+    "functions": [
+      "verifyParentEnvelope",
+      "verifyHistoricalAccountBucket",
+      "buildParentResponse"
+    ],
+    "checks": {
+      "rebuilt_exact": true,
+      "observer_GUID_hash": true,
+      "observer_user_hash": true,
+      "collector_literal_digest": true,
+      "literal_exact_source": true
+    },
+    "buckets": [
+      {
+        "status": "HISTORICAL_SERVER_COMPONENT_CHECKED",
+        "ready": false,
+        "history_reconciled": false
+      },
+      {
+        "status": "HISTORICAL_SERVER_COMPONENT_CHECKED",
+        "ready": false,
+        "history_reconciled": false
+      }
+    ],
+    "rows": 8,
+    "manager_count": 8,
+    "store_count": 8,
+    "packages": 2,
+    "inventory_sha256": "3b5d6fc0b76e6ab1f3aec5cbb891bfd350df2671faac16f9e5c0b2a483646886",
+    "raw_sha256": "ff4f844fb46aee43f2455446e51aa4eb7e3428f4aac7c938c823c81c3f017ce0",
+    "collector_literal_sha256": "602bf66d3e3e82edd1c21bb2ec631e06630629b3b010409891025d28e3cdb913",
+    "browser_Loginom_proc_calls": 0
+  },
+  "original_markers": [
+    {
+      "issue_id": "01a11d36-053e-78da-b06c-e313de5319e3",
+      "attempt_uuid": "6d13d38b-9d1f-4084-ade1-1cffcb844658",
+      "bytes": 883,
+      "sha256": "9595e0bb0d748a5e04a67c62f97c3e59b0c5ce839500eeb56716e1ec77630a90",
+      "downloaded_original_bytes_match": true,
+      "original_remote_inode": 2398121,
+      "inode_preserved_remote_claim": true,
+      "canonical_absent_remote_claim": true
+    },
+    {
+      "issue_id": "01a11d36-2811-71ba-a493-0e397e3e60f2",
+      "attempt_uuid": "8d6f150f-37e4-4680-a903-66009afc0144",
+      "bytes": 835,
+      "sha256": "74f25f19294cc007923e4deb04763a9203fea294d93177d68d4e5a2f548d425e",
+      "downloaded_original_bytes_match": true,
+      "original_remote_inode": 2398112,
+      "inode_preserved_remote_claim": true,
+      "canonical_absent_remote_claim": true
+    }
+  ],
+  "recorded_post_operation": {
+    "config_lock_unchanged_count_claim": 12,
+    "previous59_states_claim": {
+      "ABSENT": 59
+    },
+    "all59_numericPIDs_absent_in_both_complete_recorded_censuses": true,
+    "unknown220867_current_census_absent": true,
+    "historical_ticks": null,
+    "history_state": "UNKNOWN_PRESERVED",
+    "history_facts_modified": false,
+    "old_guardian_current_label_not_used": true,
+    "fresh_existing45_guardian_readback_sha256": "644c579217a7107e51da54ae985467df7885edcf39d9a872c6d78c2bc595389f",
+    "fresh_guardian_current_claim": null
+  },
+  "historical_gaps_preserved": [
+    {
+      "collector_source_role": "api-redacted-source-representation",
+      "executed_source_sha256": null,
+      "byte_gaps": [
+        "physical-preexec-not-captured",
+        "physical-executed-source-not-established",
+        "original-unredacted-assignment-prefix-not-captured",
+        "API-source-contains-one-redaction-placeholder"
+      ]
+    },
+    {
+      "collector_source_role": "retained-created-source",
+      "executed_source_sha256": null,
+      "byte_gaps": [
+        "physical-preexec-not-captured",
+        "physical-executed-source-not-established"
+      ]
+    }
+  ],
+  "limitations": [
+    "Independent local artifact/pure-source verification; no new SSH/UI/Loginom/proc/FD collection.",
+    "Both original marker contents were independently verified from downloaded bytes. Remote inode preservation/canonical absence and post-archive 12 config/lock unchanged bindings remain remote assertions; original targets are not local files.",
+    "The observed whole census belongs to the recorded historical operation; this is not a fresh live host absence claim.",
+    "Control absence and owner exit are recorded foreground/root receipts; no live process recheck by this verifier.",
+    "Missing physical executed bytes, historical numericID/CreateTime/start_ticks and original failure causes remain UNKNOWN.",
+    "Current legacy reconciliation does not establish new all-effects preparation readiness, model/node acceptance or cold reopen."
+  ],
+  "acceptance_boundary": {
+    "current_legacy_proof_verified": true,
+    "pair_runtime_qualification": "NOT_ESTABLISHED",
+    "model_node_acceptance": "NOT_ESTABLISHED",
+    "historical_PASS_transferred": false
+  },
+  "evidence_digest_bindings": [
+    {
+      "bytes": 1188,
+      "sha256": "c72c7174e9dc7ef8749b0b6d7dd6afbd424177f3b17810ac845eb1c0db9ba1a9",
+      "mode": "0o600",
+      "artifact_label": "current-owner-reconciled.json"
+    },
+    {
+      "bytes": 821,
+      "sha256": "29835af8903c609740e2e843de56b6f126574d6b68fadb55e33a4214a305f1bd",
+      "mode": "0o600",
+      "artifact_label": "fd-foreground-publish-receipt.json"
+    },
+    {
+      "bytes": 4093,
+      "sha256": "4c29cb5e5ecd530ca0f8f861290c481ffd2788ca02098e04d4ef5deabc4b8ca7",
+      "mode": "0o600",
+      "artifact_label": "fd-request.json"
+    },
+    {
+      "bytes": 11199,
+      "sha256": "7de526d5aab1c8f00a6b8cf218f98f1a45f2838dffa8cad7876cde751804489c",
+      "mode": "0o600",
+      "artifact_label": "fd-response-foreground.json"
+    },
+    {
+      "bytes": 11199,
+      "sha256": "7de526d5aab1c8f00a6b8cf218f98f1a45f2838dffa8cad7876cde751804489c",
+      "mode": "0o600",
+      "artifact_label": "fd-response.json"
+    },
+    {
+      "bytes": 7392,
+      "sha256": "256555c1f52a9fd0eca87204abec3a0f41e2770be404fa3378968e4d8e95c69c",
+      "mode": "0o600",
+      "artifact_label": "historical-consumed-response"
+    },
+    {
+      "bytes": 9939,
+      "sha256": "ae29bb768815b8cbb70a0bc82ef7e39984ffb70958e20dbc29f8565e3a543f00",
+      "mode": "0o600",
+      "artifact_label": "historical-owner-binding.json"
+    },
+    {
+      "bytes": 918,
+      "sha256": "e0518ae1e7798dae2d4606fb44d54d9571f1e57364b918898d1e155060da5f87",
+      "mode": "0o600",
+      "artifact_label": "history-download-receipt.json"
+    },
+    {
+      "bytes": 835,
+      "sha256": "74f25f19294cc007923e4deb04763a9203fea294d93177d68d4e5a2f548d425e",
+      "mode": "0o600",
+      "artifact_label": "immutable-history-marker-LAB48"
+    },
+    {
+      "bytes": 883,
+      "sha256": "9595e0bb0d748a5e04a67c62f97c3e59b0c5ce839500eeb56716e1ec77630a90",
+      "mode": "0o600",
+      "artifact_label": "immutable-history-marker-LAB45"
+    },
+    {
+      "bytes": 4489,
+      "sha256": "daafb0ffe541f8b482fe8de3194a43fa93193bb127a5ae03506784681b1979f9",
+      "mode": "0o600",
+      "artifact_label": "input.json"
+    },
+    {
+      "bytes": 993,
+      "sha256": "d7c0e681543581afc1ad0acdab197d680d78c019c849805628c7f1f2dd9a2928",
+      "mode": "0o600",
+      "artifact_label": "native-refresh-action.json"
+    },
+    {
+      "bytes": 212,
+      "sha256": "56cac4de0c312d36f73b696e1846b54225b6879237982fa2f8e5ea31fbb831ac",
+      "mode": "0o600",
+      "artifact_label": "parent-bridge-receipt.json"
+    },
+    {
+      "bytes": 4270,
+      "sha256": "80cb30ee2eb40a76ee463f3733537d184c8aa9c773ccb1888f79134800f9ac88",
+      "mode": "0o600",
+      "artifact_label": "parent-request.json"
+    },
+    {
+      "bytes": 6705,
+      "sha256": "d91f195f5e07cb79b8aa46fc4ce33425f4421e8f2ee9f676d80f828cb6be2afd",
+      "mode": "0o600",
+      "artifact_label": "parent-response.json"
+    },
+    {
+      "bytes": 1277,
+      "sha256": "ae05ba5ff9527c12d8a2a88bd461578f689c6fcdae703ebd92c3cbda50bda579",
+      "mode": "0o600",
+      "artifact_label": "post-operation-readback.json"
+    },
+    {
+      "bytes": 1772,
+      "sha256": "ff4f844fb46aee43f2455446e51aa4eb7e3428f4aac7c938c823c81c3f017ce0",
+      "mode": "0o600",
+      "artifact_label": "private-native-collector-RAW"
+    },
+    {
+      "bytes": 211,
+      "sha256": "fabb55c53c9ace83dd90fc168e94a5dc7041b3833a098721e3319c84cbb9af80",
+      "mode": "0o600",
+      "artifact_label": "refresh.json"
+    },
+    {
+      "bytes": 6182,
+      "sha256": "3fab04b7f2464e63b11b5ca882e73d0f51bcc6cd09a106f973251aa54d0ca715",
+      "mode": "0o600",
+      "artifact_label": "private-native-AX"
+    }
+  ],
+  "post_operation_gate_observation": {
+    "scope": "READ_ONLY_ACCOUNT_MARKER_CENSUS_NOT_A_PROCESS_OR_SERVER_ABSENCE_PROOF",
+    "observed_at": "2026-10-09T12:04:00.302986+00:00",
+    "private_census_receipt": {
+      "bytes": 3234,
+      "sha256": "c6e318572f7de0a6a2b8c7800d6fcdaea0ba610c65c623c0127936b6f90a0440",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    "role_accounts_observed": 16,
+    "other_role_accounts_without_canonical_markers": 15,
+    "LAB45_worker_marker": {
+      "sha256": "a7513042bdf7319d61c02611faa4e92563441f3263e5a227457584a8c2ca466b",
+      "bytes": 612,
+      "device": 64512,
+      "inode": 2396042,
+      "issue_id": "01a11d36-053e-78da-b06c-e313de5319e3",
+      "attempt": "57854c38-db97-405d-9e46-c227615c3059",
+      "state": "retired_cleanup_confirmed",
+      "pid": 176775,
+      "start_ticks": null
+    },
+    "worker_identity_hash": "1610ad1ae48e139d989dc589da6dafaac537188bc299f641b217d2e3889e8e1f",
+    "permanent_worker_lock_inode_root_observed": 2396009,
+    "root_grant_preparation": {
+      "operation_id": "54cc6d7b-679f-4c23-99f5-fb91724418f0",
+      "state": "NOT_LAUNCHED",
+      "result": "ASSERTION_BEFORE_HELPER_LAUNCH",
+      "Loginom_actions": 0,
+      "helper_guard_not_called": true,
+      "expected_guard_block_if_called": "ACCOUNT_EFFECT_UNRESOLVED"
+    },
+    "boundary": "retired_cleanup_confirmed is retained marker data, not accepted fresh process/session cleanup. Historical start_ticks remains UNKNOWN; no whitelist or deletion was applied.",
+    "root_reported_stock_followup": {
+      "card": "LAB53",
+      "comment_id_prefix": "01a1208e-b040",
+      "worker_task_id": "01a1208e-b0c7-748a-ac11-1edfc61e34fd",
+      "status": "running",
+      "started_at": "2026-10-09T15:06:28+03:00",
+      "error": null
+    },
+    "Loginom_actions": 0,
+    "mutations": 0
+  },
+  "mutations_by_independent_verifier": {
+    "repository_files": 0,
+    "multica_api": 0,
+    "loginom_ui": 0,
+    "ssh": 0,
+    "real_markers_configs_locks": 0
+  }
+}

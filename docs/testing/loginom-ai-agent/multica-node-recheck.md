@@ -31,23 +31,21 @@
 
 ## Checkpoint наблюдения — новая параллельная волна, 09.10.2026
 
-- Docs prechange9428bfbbf; node baseline4e626d547/basef9bf332c; loginom0ca исключён; назначения сохранены.
-- Node SHA: LAB45 a00b0203/PR42,46 41e0b170/PR43,47 c92a3bfd;48–52 4e626d547; PASS не переносится.
-- Runtime24aa…/caps8/8/8/daemon12/stock3m сохранены; восемь приёмок и нагрузка12 NOT_PROVED.
-- Installed CLI597/version-dev/executable20305a8d…; global launcher/native/Eval не менялись.
-- Central8d7a…; fresh CLI catalog подтвердил целевую модель/variant, cache2eb27be…; inference0/model acceptance0.
-- LAB53 approved scoped4241c818; draft PR44 common-preparation→shared-oauth; merge/release0.
-- Published6ffea08a383d3122601f60a40f4ee7be0905024e/tree5e41959f…; runtime/install/node NOT_ACCEPTED.
-- Root APIattachments3/manifest2/VERSION37/candidate44/baseline5/tree MATCH; VERSION0d921417….
-- Worker fd0 completed13:40:54MSK:139tests/613current/3306retained records — report claims, не runtime proof.
-- Reviewer01a12040-2de6… completed13:57:38MSK/errornull:REQUEST_CHANGES ONEF9;3attachments/manifest2 MATCH,139+2probes claims.
-- Fixed qualification-coordinator достигает guarded child; обычные public gates closed, SAME-SHA route без flag waiver.
-- Root operational6ff: own-fd-inventory Path.iterdir закрывает own enumeration FD; strict validator закономерно отвергает census.
-- F9 stock handoff01a1204e…→Worker01a1204e-ea84… running13:56:46MSK; scandir+positive strict-validator probe требуются.
-- Mac10:43UTC exact6ff collector после nativeRefresh:8rows/2packages/8manager/8store; same3128/GUID8d9e… connected.
-- Private full RAWbde3970a… сохранён; ownConsole closed/tab preserved; это preflight без new-operation nonce.
-- Original45/48 command-chain exact UTF8 сравним; LAB45 API-redacted source явно отделён от unknown executed bytes.
-- Physical preexec/numericID/CreateTime/oldcause остаются UNKNOWN; old markers45/48 NOT_RECONCILED, immutable.
-- Replay historical addendum вновь запустил Worker6b5b; stock HOLD01a12041…→completed13:43:29MSK, без повторной правки.
-- Root mas private cleancheckout6ff/37bindings подготовлен10:48UTC; Loginom/locks/install0; старые59/FD proofs не новые.
-- Next: адресный FD fix→exact-SHA review→held old-effects proof→9-response bound runtime qualification→те же8; schedules0.
+- Docs prechange d502f4de3; node baseline 4e626d547/base f9bf332c; loginom0ca исключён, назначения сохранены.
+- Node SHA: LAB45 a00b0203/PR42, LAB46 41e0b170/PR43, LAB47 c92a3bfd; LAB48–52 4e626d547; PASS не переносится.
+- Runtime24aa…/caps8/8/8/daemon12/stock3m сохранены; одновременная нагрузка12 NOT_PROVED.
+- Installed CLI597/executable20305a8d… и central8d7a… сохранены; CLI catalog целевых настроек есть, inference/model acceptance0.
+- LAB53 approved scoped4241c818; draft PR44 common-preparation→shared-oauth; merge/release0, schedules0.
+- Published b1d002933bc7aec3eec8ebfdd009c905025bb7a3/tree cf2b733c…; VERSIONv8/7794acd2….
+- Source Reviewer01a1205c-87ee… completed14:20:25MSK/errornull: SOURCE_ONLY_PASS, F9 CLOSED_SOURCE_OFFLINE.
+- Независимо сверены API attachments3/manifest2/VERSION38/candidate45/snapshot5;140 tests и469 own records — report claims.
+- Strict validator не ослаблен: namespace positive PASS; непривилегированный host census INCOMPLETE, errors не фильтровались.
+- Actual legacy operation2fd00c7a… exit0 completed11:42:57UTC; независимый локальный verifier проверил bindings/predicates.
+- Fresh nonce-bound Mac Refresh11:39UTC:8rows/2packages/counts8; прежний observer3128/GUIDhash8d9e… сохранён.
+- Privileged FD11:42:57UTC:244/244 inventories equal, errors0/0,14targets; только exact guardian/control holders.
+- Два прежних admin markers архивированы с исходными bytes/hash/inode;12 config/lock bindings неизменны;59 старых tuples absent.
+- History UNKNOWN_PRESERVED; missing executed bytes/numericID/CreateTime/start_ticks/old causes остаются UNKNOWN.
+- Qualification54cc6d7b… NOT_LAUNCHED: grant assertion из-за retained LAB45 worker marker; Loginom/helper actions0, guard не вызывался.
+- Marker retired_cleanup_confirmed/612B/a7513042… не является свежим cleanup proof; остальные15 role markers отсутствовали12:04UTC.
+- Stock LAB53 handoff01a1208e-b040…→Worker01a1208e-b0c7… running15:06:28MSK; те же8 HELD, pair/model/node NOT_ACCEPTED.
+- Next: адресная поддержка retained marker→exact-SHA review→полная9-response runtime qualification→те же8; критерии/gates сохранены.
