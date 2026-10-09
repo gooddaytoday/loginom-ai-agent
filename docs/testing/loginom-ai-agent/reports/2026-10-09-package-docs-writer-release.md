@@ -671,6 +671,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | risky-approved-claims | 1 | PASS100 | Есть / PASS | 20 / 21 / 17 | 4531 / 16301844 | 3 / 4666374 |
 | sales-by-category | 1 | PASS100 | Есть / PASS | 16 / 17 / 13 | 4507 / 15561728 | 3 / 4000100 |
 | slow-supplier-deliveries | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4618 / 17032000 | 3 / 5128503 |
+| support-by-priority | 1 | PASS100 | Есть / PASS | 24 / 23 / 19 | 4622 / 17776466 | 3 / 5863398 |
 
 Последний private snapshot `formal-v9-progress-9-20261009.json` SHA256
 `bd3dfd6fadbe73a2f9bff01ee31681692d1fb6da52d92f348a5351bfaba04702`:
@@ -842,4 +843,19 @@ metrics13 SHA256
 Все13 closed results/cleanup/process-cleanup и архивы, предыдущие12 traces
 повторно проверены по SHA; common020c08059… и PID676156/UID/birth/exe/inode
 неизменны. Closed13/45:10 PASS100/3 no_artifact FAIL0, support-by-priority#1
+running. Candidate/cold/compare не начаты, retries0; полный90 не принят.
+
+Четырнадцатый closed formal v9 `support-by-priority#1` PASS100:
+structure/warm oracle PASS, все6 cleanup stages/processes confirmed,
+error null/remaining0×2. History4622/17776466bytes и diagnostics3/5863398bytes
+сохранены с full roundtrip. Trace/result counters match:24 finishes/23 tools/
+19 Loginom/skill0/prepare1/errors0. Formal cold pending.
+
+Private progress14 SHA256
+`137eab28fc6574fce3d3f203831b80da5a6dd90b4f3a54f060a68ec5feb703c5`,
+metrics14 SHA256
+`f2c3a2c653bcd83875768a91744520c90bb06432ce5ed498d5d3199ff81251db`.
+Все14 closed results/cleanup/process-cleanup и архивы, предыдущие13 traces
+повторно проверены по SHA; common020c08059… и PID676156/UID/birth/exe/inode
+неизменны. Closed14/45:11 PASS100/3 no_artifact FAIL0, trial-dosage-outcomes#1
 running. Candidate/cold/compare не начаты, retries0; полный90 не принят.

@@ -1120,7 +1120,10 @@ Core имеет разметку осей, но без CSV oracle. По доку
   history4618/17032000bytes+diag3/5128503bytes full roundtrip, errors0.
   Это не воспроизведение и не установление причины historical v5 cleanup FAIL.
   Progress13 SHA9a8189ce9a…/metrics99949cd70d…; support-by-priority#1 running,
-  closed13/45/PASS10/FAIL3, candidate/cold/compare0/retries0.
+  Четырнадцатый closed support#1 PASS100/structure/warm/6 stages/remaining0×2;
+  history4622/17776466bytes+diag3/5863398bytes full roundtrip, errors0.
+  Progress14 SHA137eab28fc…/metricsf2c3a2c653…; trial-dosage-outcomes#1 running,
+  closed14/45/PASS11/FAIL3, candidate/cold/compare0/retries0.
   Частичный v7 не подставлять
   как полный baseline и не повторять выборочно только неуспешные попытки.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой
