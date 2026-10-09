@@ -31,23 +31,23 @@
 
 ## Checkpoint наблюдения — новая параллельная волна, 09.10.2026
 
-- Docs prechangeed7aeca92; baseline4e626d547/basef9bf332c; loginom0ca исключён; node assignments сохранены.
-- Node SHA:45 a00b0203/PR42,46 41e0b170/PR43,47 c92a3bfd;48–52 4e626d547; старыйPASS не переносится.
-- Caps8/8/8/runtime24aa…/daemon12/stock3m сохранены;8 реальных параллельных приёмок и нагрузка12 NOT_PROVED.
+- Docs prechange b8f71474c; baseline4e626d547/basef9bf332c; loginom0ca исключён; назначения узлов сохранены.
+- Node SHA: LAB45 a00b0203/PR42,46 41e0b170/PR43,47 c92a3bfd;48–52 4e626d547; старый PASS не переносится.
+- Caps8/8/8/runtime24aa…/daemon12/stock3m сохранены; восемь реальных приёмок и нагрузка12 NOT_PROVED.
 - Installed CLI597/version-dev и Multica0.6.1/source2ea — разные артефакты; global launcher не менялся.
-- Central instructions8d7a… unchanged: target CLI selection/native/Eval/caps сохранены, LAB53 live hold действует.
-- LAB53 approved scope d4241c818; Generator completed03:48:43MSK, Worker completed04:12:57MSK.
-- [Draft PR44](https://github.com/gooddaytoday/loginom-ai-agent/pull/44) common-preparation→shared-oauth; clean publishedSHA9b93201de2007d013bb9f57416a9e33452677f78.
-- Parent verified Worker attachments2/APIbytesPASS, report manifest bytes/SHA PASS, tree7f60a518… и19/19publishedfilesbytes/SHA PASS.
-- Native Reviewer независимо25/25offline PASS (Python12/Chromium13, network0); дополнительныеfixtures выявили2P2, итогREQUEST_CHANGES_SOURCE_ONLY.
-- Reviewer completed04:27:40MSK; штатный Worker01a11e45… running04:27:07MSK в той жеLAB53/PR44; дубль не создавался.
-- Candidate nondeployable: обе live entrypoints останавливаются доLoginom; lifecycle/install/rollback/runtime qualification NOT_RUN.
-- Исправить2P2: unready target мешаетexpand ready scope; error capture послеdeadline теряетcause. Source-only, cause48 NOT_ESTABLISHED.
+- Central instructions8d7a… неизменны: target CLI selection/native/Eval/caps сохранены; LAB53 live hold действует.
+- LAB53 approved scope d4241c818; [draft PR44](https://github.com/gooddaytoday/loginom-ai-agent/pull/44) common-preparation→shared-oauth.
+- Новый clean published SHA9e2ccc724a3b8616f2f878dc7719cd10bb957a94/tree87acd6d7…; delta4 файла в утверждённом scope.
+- SHA9b93201…: независимые25offline PASS, дополнительные cases выявили2P2/REQUEST_CHANGES; история сохранена.
+- SHA9e2ccc724: F1/F2 CLOSED, независимые33offline+5собственных cases PASS; новых findings в delta0.
+- Worker completed04:39:32MSK, повторный Reviewer completed04:46:26MSK; штатные handoff в той же карточке, дублей0.
+- Parent: Worker attachments2 и Reviewer3 APIbytes/SHA/manifest PASS; tree и19/19candidatefiles сверены независимо.
+- Source-only PASS: обе live entrypoints закрыты; полный lifecycle/install/rollback/runtime qualification NOT_ACCEPTED/NOT_RUN.
+- Root cause Timeout48 NOT_ESTABLISHED; адресные source-исправления не доказывают причину исторических45/48 failures.
 - LAB45 attempt6d13… numericNOT_CAPTURED/serverUNKNOWN/marker9595…; LAB48 attempt8d6f… numeric/causeNOT_ESTABLISHED/marker74f25….
-- Root47 старые3117/3118 cleanup PASS только для прежнихeffects; observer3119 serverabsence PENDING; markers/history сохранены.
-- Owner: existingAdmin browser наmas; Worker /proc/CDP/profiles и parentSSH baremas не нашлиbrowser/GUI; endpoint/access pending.
-- Fresh Dispatcher/mstSelf NOT_READ; Reviewer60exact fixture/collector PID records absent. Неserverproof; Loginom/admin/model/build0.
-- 04:19MSK все8 node cards blocked/latestGeneratorcompleted; новыхWorker/Reviewer nodehandoff0.
-- 01:18:26UTC mas CPU12/load0/0/0/MemAvailable30120016kB/free408564547584B; это не workload12/serverabsence proof.
-- [SHA/hashes/границы](reports/2026-10-08-node-recheck/parallel8-restart.json); schedules/pools/merge-release0; чужие изменения сохранены.
-- Далее: sameWorker2fixes→newSHA/Reviewer; existingAdmin доступ→finite45/48/3119+полный lifecycle/runtime review→те же8 без новогоapproval.
+- Root47 старые3117/3118 PASS лишь для прежних effects; observer3119 serverabsence PENDING; markers/history сохранены.
+- Owner: existing Admin browser наmas; discovery/SSH не нашли browser/CDP/GUI/headless; actual endpoint/access pending.
+- Fresh Dispatcher/mstSelf NOT_READ; Reviewer85fixture/collector records absent/nonlive; не server proof. Loginom/model/build/install0.
+- 04:50MSK все8 node cards blocked, новых Worker/Reviewer node runs0; provider counters NOT_EXPOSED, APIcompleted не absence proof.
+- 01:52UTC mas CPU12/load0/0/0/MemAvailable30240748kB/free408545464320B; daemon212379/cap12/3m argv PASS; workload12 не проверен.
+- [SHA/результаты/границы](reports/2026-10-08-node-recheck/parallel8-restart.json). Далее existing Admin доступ→finite45/48/3119+полный LAB53 runtime→те же8; schedules/merge-release0.

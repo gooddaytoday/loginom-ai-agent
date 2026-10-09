@@ -711,7 +711,7 @@
     "sha256": "7242dca9becfc3d7a7d111e4a0271e51caf845ad295b8dfdbbcce4ac0736ed73",
     "bytes": 3148
   },
-  "next_step": "Same LAB53 Worker fixes independently reproduced F1/F2 in PR44, publishes new clean SHA and same-card independent Reviewer. Actual existing owner Admin tab/CDP access still pending; finite45/48/3119 cleanup and complete lifecycle/runtime qualification required before original8 resume under existing authorization. Stock3m/caps8/8/8/daemon12; schedules/merge/release0.",
+  "next_step": "Source F1/F2 accepted only on9e2ccc724. Await exact existing owner Admin tab/console/CDP access; obtain finite45/48/3119 server/process proof, then implement/integrate and independently qualify full lifecycle in sameLAB53. Do not activate incomplete source candidate. After full runtime proof resume original8 under existing authorization for central target-model full CLI/independent/cold acceptance. Stock3m/caps8/8/8/daemon12; schedules/merge/release0.",
   "verified_fresh_diagnostic_attachments": [
     {
       "id": "01a11d95-301f-714a-b520-d68c5f95d975",
@@ -2486,7 +2486,7 @@
     "supplement_id": "f2741971-19cd-4f47-8cc3-a8dc340d69ac",
     "new_browser_or_login_authorized": false,
     "scope": "discover/attach/read/Refresh existing context; preserve user session; exact own proof required before narrow cleanup/marker transition",
-    "availability": "Owner confirms browser on mas; Worker /proc/CDP/profile discovery and parent SSH to bare mas found no running browser/GUI process. Actual endpoint/tab access pending owner answer; no new Loginom login.",
+    "availability": "Owner says existing Admin browser on mas; Worker discovery and two parent SSH process inventories (including headless in final check) did not locate a running browser. Actual endpoint/tab/console access still pending owner answer; no new observer/login.",
     "local_available_surfaces": "IAB/MCP Apps had no Loginom tab or matching window; no new tab/login created"
   },
   "common53_resume_permission_correction": {
@@ -2842,5 +2842,366 @@
     },
     "server_effects": "45/48/3119 UNKNOWN/NOT_PROVED; no Loginom login/model/build/install/marker/server mutations",
     "PASS_transfer_permitted": false
+  },
+  "common53_source_fix_round2": {
+    "source_sha": "9e2ccc724a3b8616f2f878dc7719cd10bb957a94",
+    "git_tree": "87acd6d7fb57fe4f0788e46ab03f18fdb78d09e5",
+    "PR": "https://github.com/gooddaytoday/loginom-ai-agent/pull/44",
+    "candidate_status": "SOURCE_ONLY_LIVE_BLOCKED",
+    "worker_task": {
+      "id": "01a11e45-63ce-75b5-961d-d6ec0f37baf1",
+      "started_at": "2026-10-09T04:27:07+03:00",
+      "completed_at": "2026-10-09T04:39:32+03:00"
+    },
+    "worker_verified_attachments": [
+      {
+        "id": "01a11e50-8671-7b2d-87d7-e27442cff0b0",
+        "filename": "worker-source-fix-report.json",
+        "bytes": 24310,
+        "sha256": "bc273511ad0e8b9989dfa3b9af33b1c4a8347e56b099dfa109293fe1bf99e43c",
+        "api_bytes_match": true,
+        "handoff_sha256_match": true
+      },
+      {
+        "id": "01a11e50-8743-7d68-9c32-aaef010aa434",
+        "filename": "worker-source-fix-manifest.json",
+        "bytes": 4184,
+        "sha256": "ca44efe554b150ddfbc6aa781e2869a4e686a2e79be5d53cc7d483a7d480d20f",
+        "api_bytes_match": true,
+        "handoff_sha256_match": true
+      }
+    ],
+    "worker_candidate_files_19_bytes_sha256_match": true,
+    "worker_report_manifest_match": true,
+    "addressed_delta_paths": [
+      "tools/loginom-multica-accounts/VERSION.json",
+      "tools/loginom-multica-accounts/scripts/account-ui.mjs",
+      "tools/loginom-multica-accounts/scripts/provision-account.mjs",
+      "tools/loginom-multica-accounts/tests/account-ui.test.mjs"
+    ],
+    "approved_scope_unchanged": true,
+    "reviewer_task": {
+      "id": "01a11e50-8863-75c4-ad45-eb675a220173",
+      "status": "completed",
+      "started_at": "2026-10-09T04:39:17+03:00",
+      "completed_at": "2026-10-09T04:46:26+03:00"
+    },
+    "reviewer_verified_attachments": [
+      {
+        "id": "01a11e56-f07a-7147-a1ed-f141b7a0fdcd",
+        "filename": "reviewer-source-recheck.md",
+        "bytes": 5120,
+        "sha256": "28980ce4445c608dd98011d99294976de29a0019ef236b2dfad2abe24937bdc3",
+        "api_bytes_match": true
+      },
+      {
+        "id": "01a11e56-f208-7c6f-88a9-a8f331806732",
+        "filename": "reviewer-source-recheck-report.json",
+        "bytes": 33495,
+        "sha256": "e52e07bbc2162ba1e1c74fb8051ae1db4293b55cd12748f9253289b0b9cf9f9a",
+        "api_bytes_match": true
+      },
+      {
+        "id": "01a11e56-f2d4-78d4-be64-0a53a0505808",
+        "filename": "reviewer-source-recheck-manifest.json",
+        "bytes": 736,
+        "sha256": "47f3b734634830314a6ddfb23da5ac6b94253ab061ec3ede75f918f9b8deddc5",
+        "api_bytes_match": true
+      }
+    ],
+    "reviewer_report_note_manifest_matches": true,
+    "reviewer_source_tree_match": true,
+    "result": "PASS_SOURCE_FIXES_ONLY_LIVE_NOT_ACCEPTED",
+    "full_LAB53_acceptance": "NOT_ACCEPTED",
+    "findings_resolution": [
+      {
+        "id": "F1",
+        "previous_priority": "P2",
+        "status": "CLOSED_ON_THIS_SHA",
+        "source": "scripts/account-ui.mjs:182-203",
+        "evidence": "33-test rerun and four independent Chromium main/AdminStart x DOM-order fixtures",
+        "behavior": "Ready-target-aware expansion, exact selected-scope target wait, fresh pre-click observation; ambiguous/unknown scopes blocked",
+        "historical_LAB45_LAB48_error_cause": "NOT_ESTABLISHED"
+      },
+      {
+        "id": "F2",
+        "previous_priority": "P2",
+        "status": "CLOSED_ON_THIS_SHA",
+        "source": "scripts/account-ui.mjs:75-84; scripts/provision-account.mjs:130",
+        "evidence": "33-test rerun plus independent real elapsed deadline reproduction (5 ms deadline, 20 ms wait)",
+        "behavior": "Original message/stack/code/native/cause preserved, public allowlist and immutable0600 snapshot retained, no new operation admitted or deadline extended"
+      }
+    ],
+    "new_source_findings_in_delta": [],
+    "independent_validation": {
+      "python": {
+        "passed": 12,
+        "failed": 0
+      },
+      "chromium": {
+        "passed": 21,
+        "failed": 0
+      },
+      "candidate_suite_total": 33,
+      "additional_case_count": 5,
+      "sandbox": true,
+      "network_requests": 0,
+      "Loginom_logins": 0,
+      "live_entrypoint_body_executed": false
+    },
+    "offline_cleanup_summary": {
+      "observed_descendant_PID_start_ticks": 84,
+      "additional_foreground_collector": 1,
+      "final_exact_records": 85,
+      "all_absent_or_nonlive": true,
+      "collector_reaped": true,
+      "own_processes_terminated": 0,
+      "foreign_processes_terminated": 0,
+      "server_absence": "NOT_APPLICABLE_NO_LOGIN; historical server effects remain NOT_PROVED"
+    },
+    "native_observation": {
+      "central_instructions_sha256": "8d7a2fb19518fac1e1a8522cdccbfb1158b90c09ae71e411159e397d37ff2c32",
+      "issue_active_tasks": 1,
+      "tasks": [
+        {
+          "id": "01a11e50-8863-75c4-ad45-eb675a220173",
+          "agent_id": "027d102c-5d25-402c-a8fb-58a3e810013c",
+          "status": "running",
+          "attempt": 1,
+          "error": null
+        }
+      ],
+      "daemon": {
+        "pid": 212379,
+        "active_task_count": 1,
+        "running_task_count": 1,
+        "resource_wait_task_count": 0,
+        "status": "running"
+      },
+      "native_message_count": 31,
+      "last_sequence": 31,
+      "message_types": [
+        "text",
+        "tool_result",
+        "tool_use"
+      ],
+      "native_provider_error_retry_counters": "NOT_EXPOSED_BY_TASK_MESSAGES_ENDPOINTS; task.error null does not establish counters",
+      "CLI_provider_errors_retries": "NOT_APPLICABLE_NO_CLI_MODEL_RUN"
+    },
+    "public_resource_numbers": "NOT_EXPOSED; private snapshot names/hashes only",
+    "remaining_live_gaps": [
+      "Both entrypoints remain blocked by unconditional finite-cleanup gate",
+      "Account descriptors, previous process provenance, evidence directory and pair binding checks are not integrated/qualified in live flow",
+      "Retained probe/create body does not prove complete rights/identity/logout/server/process/FD lifecycle",
+      "Existing owner Admin endpoint/profile/access remains pending; no new observer chain",
+      "Fresh complete Dispatcher count/store and positive connected caller mstSelf/GUID readback NOT_READ",
+      "LAB45/LAB48/observer3119 UNKNOWN/NOT_PROVED; Root47 historical PASS not transferred"
+    ],
+    "source_only_PASS_does_not_enable_live_or_install": true,
+    "parent_addressed_source_review": "newSHA delta4 files; no new findings;2manifest tests and real expired-deadline error-preservation probe PASS on macOS/Node25.9.0; no browser/Loginom calls; old25PASS not transferred",
+    "final_issue_status": "blocked",
+    "final_known_common_tasks": [
+      {
+        "id": "01a11e56-f3ce-7adb-bfb7-33c17e75c500",
+        "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+        "status": "completed",
+        "started_at": "2026-10-09T04:46:18+03:00",
+        "completed_at": "2026-10-09T04:46:58+03:00",
+        "error": null,
+        "attempt": 1,
+        "max_attempts": 2
+      },
+      {
+        "id": "01a11e50-8863-75c4-ad45-eb675a220173",
+        "agent_id": "027d102c-5d25-402c-a8fb-58a3e810013c",
+        "status": "completed",
+        "started_at": "2026-10-09T04:39:17+03:00",
+        "completed_at": "2026-10-09T04:46:26+03:00",
+        "error": null,
+        "attempt": 1,
+        "max_attempts": 2
+      },
+      {
+        "id": "01a11e45-63ce-75b5-961d-d6ec0f37baf1",
+        "agent_id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+        "status": "completed",
+        "started_at": "2026-10-09T04:27:07+03:00",
+        "completed_at": "2026-10-09T04:39:32+03:00",
+        "error": null,
+        "attempt": 1,
+        "max_attempts": 2
+      },
+      {
+        "id": "01a11e3c-8528-7554-b299-1f2f56fd8522",
+        "agent_id": "027d102c-5d25-402c-a8fb-58a3e810013c",
+        "status": "completed",
+        "started_at": "2026-10-09T04:17:26+03:00",
+        "completed_at": "2026-10-09T04:27:40+03:00",
+        "error": null,
+        "attempt": 1,
+        "max_attempts": 2
+      },
+      {
+        "id": "01a11e21-bff2-74fa-95c4-531de66c3fc4",
+        "agent_id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+        "status": "completed",
+        "started_at": "2026-10-09T03:48:11+03:00",
+        "completed_at": "2026-10-09T04:12:57+03:00",
+        "error": null,
+        "attempt": 1,
+        "max_attempts": 2
+      },
+      {
+        "id": "01a11e18-2ca9-79b2-9905-3629039a5c53",
+        "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+        "status": "completed",
+        "started_at": "2026-10-09T03:37:44+03:00",
+        "completed_at": "2026-10-09T03:48:43+03:00",
+        "error": null,
+        "attempt": 1,
+        "max_attempts": 2
+      }
+    ],
+    "source_PASS_not_node_acceptance": true
+  },
+  "common53_latest_original8_readback": {
+    "observed_at": "2026-10-09T01:50:03.631172+00:00",
+    "all8_blocked": true,
+    "cards": [
+      {
+        "id": "01a11d36-053e-78da-b06c-e313de5319e3",
+        "identifier": "LAB-45",
+        "status": "blocked",
+        "latest_run": {
+          "id": "01a11dfa-b109-7e53-95ae-565261a747a6",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "started_at": "2026-10-09T03:08:10+03:00",
+          "completed_at": "2026-10-09T03:26:13+03:00",
+          "error": null
+        }
+      },
+      {
+        "id": "01a11d36-10b0-702f-930d-e91315129205",
+        "identifier": "LAB-46",
+        "status": "blocked",
+        "latest_run": {
+          "id": "01a11dfa-b23c-73ce-a8a7-a3efc09e3ef3",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "started_at": "2026-10-09T03:17:06+03:00",
+          "completed_at": "2026-10-09T03:29:08+03:00",
+          "error": null
+        }
+      },
+      {
+        "id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+        "identifier": "LAB-47",
+        "status": "blocked",
+        "latest_run": {
+          "id": "01a11dea-c6a1-781f-80c9-596eb304a5b6",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "started_at": "2026-10-09T02:48:09+03:00",
+          "completed_at": "2026-10-09T03:03:49+03:00",
+          "error": null
+        }
+      },
+      {
+        "id": "01a11d36-2811-71ba-a493-0e397e3e60f2",
+        "identifier": "LAB-48",
+        "status": "blocked",
+        "latest_run": {
+          "id": "01a11dfa-b0ef-71dc-8e40-cd98fbef9dcb",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "started_at": "2026-10-09T03:05:32+03:00",
+          "completed_at": "2026-10-09T03:20:16+03:00",
+          "error": null
+        }
+      },
+      {
+        "id": "01a11d36-33ae-732e-b618-5618ed5301cd",
+        "identifier": "LAB-49",
+        "status": "blocked",
+        "latest_run": {
+          "id": "01a11dfa-b1c8-73a8-b412-1eb9363572db",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "started_at": "2026-10-09T03:16:13+03:00",
+          "completed_at": "2026-10-09T03:20:46+03:00",
+          "error": null
+        }
+      },
+      {
+        "id": "01a11d36-3f2a-7df1-bd81-d5401bdcdd16",
+        "identifier": "LAB-50",
+        "status": "blocked",
+        "latest_run": {
+          "id": "01a11dfa-b1a0-7838-82d0-30c4f8cfb9ad",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "started_at": "2026-10-09T03:10:50+03:00",
+          "completed_at": "2026-10-09T03:19:17+03:00",
+          "error": null
+        }
+      },
+      {
+        "id": "01a11d36-4ace-7dd4-a0d4-498195f7d2e9",
+        "identifier": "LAB-51",
+        "status": "blocked",
+        "latest_run": {
+          "id": "01a11dfa-b1b2-7eff-a4cd-aa5ac39de0b1",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "started_at": "2026-10-09T03:13:29+03:00",
+          "completed_at": "2026-10-09T03:17:05+03:00",
+          "error": null
+        }
+      },
+      {
+        "id": "01a11d36-5670-7786-bfe1-e9a4a4462e6e",
+        "identifier": "LAB-52",
+        "status": "blocked",
+        "latest_run": {
+          "id": "01a11dfa-b0ec-790c-bad3-a503156ce556",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "completed",
+          "started_at": "2026-10-09T03:05:32+03:00",
+          "completed_at": "2026-10-09T03:22:24+03:00",
+          "error": null
+        }
+      }
+    ],
+    "new_worker_reviewer_node_runs": 0
+  },
+  "common53_parent_final_ssh_resource_readback": {
+    "captured_at": "2026-10-09T01:52:03.677888+00:00",
+    "hostname": "mas",
+    "logical_cpu_count": 12,
+    "load": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "memory_kB": {
+      "MemTotal": 31604384,
+      "MemAvailable": 30240748,
+      "SwapTotal": 8388604,
+      "SwapFree": 8385832
+    },
+    "disk_free_bytes": 408545464320,
+    "observed_browser_gui_including_headless_processes": 0,
+    "daemon": {
+      "pid": 212379,
+      "max_concurrent_tasks": 12,
+      "claim_cadence": "3m0s"
+    },
+    "CLI_daemon_status": {
+      "exit_code": 0,
+      "output_format": "NOT_JSON_NOT_PRINTED",
+      "post_terminal_queue_counts": "NOT_PARSED"
+    },
+    "scope": "numeric snapshot plus known daemon argv only; no server absence or load12 readiness claim; SSH commands terminated normally; no Loginom login"
   }
 }
