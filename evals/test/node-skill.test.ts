@@ -34,6 +34,99 @@ async function execute(draft: string, env: Record<string, string | undefined>, a
   return { code, stdout, stderr }
 }
 
+async function nativeFixture(id: string, nativeFile: string, outcome = "completed") {
+  const f = await fixture(id)
+  const checkout = path.join(f.root, "checkout")
+  await cp(path.join(evalsRoot, "src"), path.join(checkout, "evals/src"), { recursive: true })
+  await cp(path.join(evalsRoot, "fixtures"), path.join(checkout, "evals/fixtures"), { recursive: true })
+  const native = await Bun.file(path.join(evalsRoot, "test/fixtures/node-evals", nativeFile)).json() as {
+    observations: { operation_id: string; recorded_at?: string; node_crosstable: unknown }[]
+    local_variable_observations?: { operation_id: string; internal_operation_id: string; action_key: string; output: unknown }[]
+  }
+  const events = [
+    ...native.observations.map(observation => ({ operation_id: observation.operation_id,
+      recorded_at: observation.recorded_at, phase: "node_observation_completed",
+      outcome: { status: "SUCCEEDED", output: { node_crosstable: observation.node_crosstable } } })),
+    ...(native.local_variable_observations ?? []).map(observation => ({ operation_id: observation.operation_id,
+      internal_operation_id: observation.internal_operation_id, phase: "node_step_completed",
+      outcome: { status: "SUCCEEDED", cleanup_complete: true, action_key: observation.action_key, output: observation.output } })),
+  ].map(event => JSON.stringify(event)).join("\n") + "\n"
+  const fake = path.join(checkout, "evals/fixtures/fake-cli.ts")
+  // Only the private fake process is adapted; supervisor, archive and collector remain the real harness.
+  await Bun.write(fake, `if (Bun.argv[2] === "run") {
+    process.env.EVAL_FAKE_RUNTIME_EVENTS = await Bun.file(new URL("native-events.jsonl", import.meta.url)).text()
+    ${outcome === "unknown-cleanup" ? 'process.env.EVAL_FAKE_CHANGED_WRITER = "1"' : ""}
+  }\n` + await Bun.file(fake).text())
+  await Bun.write(path.join(checkout, "evals/fixtures/native-events.jsonl"), events)
+  await cp(path.join(evalsRoot, "fixtures/fake/group-sum-qty.jsonl"), path.join(checkout, `evals/fixtures/fake/${id}.jsonl`))
+  if (outcome === "failed") await Bun.write(path.join(checkout, `evals/fixtures/fake/${id}.exit`), "1")
+  f.env.AGENT_REPO = checkout
+  f.env.EVAL_ARTIFACT_SOURCE = `dir:${path.join(checkout, "evals/fixtures/storage")}`
+  return { ...f, native }
+}
+
+test("node skill: completed CrossTable references collect native proof from their own confirmed archive", async () => {
+  for (const [id, nativeFile] of [
+    ["crosstable-string-counts-null", "string-counts-native.json"],
+    ["crosstable-column-cartesian", "cartesian-native.json"],
+    ["crosstable-multi-facts", "multi-facts-native.json"],
+    ["crosstable-local-variable-bindings", "bindings-native.json"],
+    ["crosstable-min-max", "min-max-native.json"],
+  ] as const) {
+    const f = await nativeFixture(id, nativeFile)
+    try {
+      const run = await execute(f.draft, f.env)
+      expect(run.stderr).toBe("")
+      expect(run.code).toBe(0)
+      const report = JSON.parse(run.stdout)
+      expect(report.result).toMatchObject({ status: "completed", environment_cleanup: { status: "confirmed" } })
+      const file = Bun.file(path.join(report.attempt_dir, "native-crosstable.json"))
+      expect(await file.exists()).toBe(true)
+      const proof = await file.json()
+      expect(proof.observations.map((observation: { node_crosstable: unknown }) => observation.node_crosstable))
+        .toEqual(f.native.observations.map(observation => observation.node_crosstable))
+      expect(proof.local_variable_observations.map((observation: { output: unknown }) => observation.output))
+        .toEqual((f.native.local_variable_observations ?? []).map(observation => observation.output))
+      const cleanup = await Bun.file(path.join(report.attempt_dir, "cleanup.json")).json()
+      const archive = cleanup.stages.find((stage: { stage: string }) => stage.stage === "profile_history").path
+      for (const observation of [...proof.observations, ...proof.local_variable_observations])
+        expect(observation.source_sha256).toBe(new Bun.CryptoHasher("sha256")
+          .update(await Bun.file(path.join(archive, observation.source)).bytes()).digest("hex"))
+      expect(await Bun.file(path.join(f.root, "profile.harness-lease/owner.json")).exists()).toBe(false)
+    } finally { await f.close() }
+  }
+}, 90000)
+
+test("node skill: failed CrossTable reference keeps observations archived without publishing native proof", async () => {
+  const f = await nativeFixture("crosstable-string-counts-null", "string-counts-native.json", "failed")
+  try {
+    const run = await execute(f.draft, f.env)
+    expect(run.stderr).toBe("")
+    expect(run.code).toBe(1)
+    const report = JSON.parse(run.stdout)
+    expect(report.result).toMatchObject({ status: "failed", environment_cleanup: { status: "confirmed" } })
+    expect(await Bun.file(path.join(report.attempt_dir, "native-crosstable.json")).exists()).toBe(false)
+    const cleanup = await Bun.file(path.join(report.attempt_dir, "cleanup.json")).json()
+    const archive = cleanup.stages.find((stage: { stage: string }) => stage.stage === "profile_history").path
+    const journal = path.join(archive, "loginom/runtime/generations/1/chats/fake/attempts")
+    expect(await Array.fromAsync(new Bun.Glob("*/execution-events.jsonl").scan(journal))).toHaveLength(1)
+    expect(await Bun.file(path.join(f.root, "profile.harness-lease/owner.json")).exists()).toBe(false)
+  } finally { await f.close() }
+}, 30000)
+
+test("node skill: unconfirmed CrossTable cleanup retains lease and does not publish native proof", async () => {
+  const f = await nativeFixture("crosstable-column-cartesian", "cartesian-native.json", "unknown-cleanup")
+  try {
+    const run = await execute(f.draft, f.env)
+    expect(run.code).toBe(2)
+    const report = JSON.parse(run.stdout)
+    expect(report.result).toMatchObject({ status: "completed", environment_cleanup: { status: "failed" } })
+    expect(await Bun.file(path.join(report.attempt_dir, "native-crosstable.json")).exists()).toBe(false)
+    expect(await Bun.file(path.join(f.root, "profile.harness-lease/owner.json")).exists()).toBe(true)
+    expect(await Bun.file(path.join(report.attempt_dir, "result.json")).json()).toEqual(report.result)
+  } finally { await f.close() }
+}, 30000)
+
 async function readSandboxSettings(root: string, profile: string, file = "loginom-ai-agent.json") {
   const installation = await mkdtemp(path.join(root, "probe-installation-"))
   const workspace = await mkdtemp(path.join(root, "probe-workspace-"))

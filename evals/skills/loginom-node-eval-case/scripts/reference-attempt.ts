@@ -16,6 +16,7 @@ async function main() {
   const { parseArtifactSource } = await import(path.join(repo, "evals/src/artifact.ts")) as typeof import("../../../src/artifact")
   const { preflight } = await import(path.join(repo, "evals/src/preflight.ts")) as typeof import("../../../src/preflight")
   const { acquireRunHarnessLease } = await import(path.join(repo, "evals/src/node-eval-ops.ts")) as typeof import("../../../src/node-eval-ops")
+  const { coverageCaseIds } = await import(path.join(repo, "evals/src/node-cases.ts")) as typeof import("../../../src/node-cases")
   const { assertAuth, assertProfileClean, agentConfigJson } = await import(path.join(repo, "evals/src/profile.ts")) as typeof import("../../../src/profile")
   const dir = path.resolve(draft)
   const raw = await Bun.file(path.join(dir, "task.json")).json()
@@ -95,7 +96,7 @@ async function main() {
   const out = path.join(runDir, task.id, number!)
   const cleanup = await afterAttempt(config, { ...command, cleanupDir: path.join(out, "management") }, attempt.result, out)
   const clean = attempt.result.environment_cleanup?.status === "confirmed" && !attempt.result.cleanup_error && !("stop" in cleanup)
-  if (clean && task.id === "crosstable-min-max" && attempt.result.status === "completed") {
+  if (clean && (task.id === "crosstable-min-max" || coverageCaseIds.includes(task.id)) && attempt.result.status === "completed") {
     const { collectNodeNativeEvidence } = await import(path.join(repo, "evals/src/node-native.ts")) as typeof import("../../../src/node-native")
     await collectNodeNativeEvidence(out, config.profileDir)
   }

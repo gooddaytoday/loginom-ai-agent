@@ -76,8 +76,14 @@ Wrapper вызывает штатные preflight, изоляцию, runAttempt 
 файлы, чтобы их объединение не переносило wildcard после точных запретов памяти.
 Остальные значения каждого файла сохраняются; JSONC записывается в допустимом JSON.
 Черновой Task не требует наличия reference.lgp; окончательную загрузку коллекции
-проверить отдельно. Для min/max после cleanup вызывается существующий collector
-реальных native observations из собственного архива.
+проверить отдельно. Для min/max и четырёх coverage-кейсов
+(`crosstable-string-counts-null`, `crosstable-column-cartesian`,
+`crosstable-multi-facts`, `crosstable-local-variable-bindings`) после completed
+и подтверждённой cleanup вызывается существующий collector реальных native
+observations и local variable observations из собственного архива. Он записывает
+`native-crosstable.json` с provenance архивного journal. При failed или
+неподтверждённой cleanup этот proof не создаётся; история и измеренный исход
+сохраняются по штатным правилам harness.
 
 Результаты: `$EVAL_RESULTS_DIR/reference-<id>-<n>/`, внутри `<id>/<n>/` — текущий
 layout harness (`result.json`, `cleanup.json`, `events.jsonl`, `artifact/package.lgp`).
