@@ -17,4 +17,4 @@
 - First prepare error сохранён; Dock URL исправлен до серий; независимый post-release check: 5 profiles clean/storage EMPTY/browser 0.
 - Calc smoke 889c9f8e-819a-431d-9ed1-2082e839ae00: ProviderModelNotFoundError, artifact отсутствует, tokens/tool calls 0; release/FREE; delivery 11 файлов PASS.
 - Каталог CLI/bubblewrap: точные gpt-6.1-sol/medium зарегистрированы, model/judge calls=0, pins unchanged/clean/FREE; attachment 01a11d73-d5ba-70d4-9cb5-deeb96cc85a3 verified.
-- Новый цикл явно разрешён пользователем; LAB-54 создана, config изменена только по readinessIssue при FREE/clean/paused dispatch, runtime active; далее отдельные calc/node и full+heartbeat по этапам 7–8.
+- Новый цикл разрешён; LAB-54/run 01a11f76-dedf-7df4-b1af-1eee633ce9e3 running calc-only с 10:00:46 MSK; config changed only readinessIssue, runtime active; далее calc evidence/release → node → full+heartbeat.

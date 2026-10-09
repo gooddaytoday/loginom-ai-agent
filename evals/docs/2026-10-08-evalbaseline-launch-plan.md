@@ -195,6 +195,8 @@ Calc outcome: manifest `889c9f8e-819a-431d-9ed1-2082e839ae00`, logical job `regu
 
 Локальный временный checkout отсутствовал после ожидания ответа. Ветка и коммиты сохранились; собственный checkout восстановлен на прежнем HEAD `43a400baf4c5697de640d3818883733e77a9d227` в `/home/kiselev/.codex/worktrees/baseline-runtime/loginom-ai-agent`. Основной checkout и серверные результаты не изменены. Дальнейшие документы коммитить здесь, server pin не обновлять ради операторских записей.
 
+- [x] Допустить только calc нового цикла: LAB-54 назначена EvalBaseline штатным assign; единственный run `01a11f76-dedf-7df4-b1af-1eee633ce9e3`, `running` с 2026-10-09 10:00:46 MSK. Runtime `eval-tests`, agent model/thinking/concurrency `gpt-6.1-sol/xhigh/1` подтверждены readback. Это допуск управляющего задания; результат продуктового smoke ещё требуется отдельно. Node и full не допущены.
+
 Команды с `--case` ниже — интерфейс, реализованный и проверенный в 3.1. Для нового цикла использовать UUID LAB-54 и новые отдельные каталоги `readiness2-calc-data-double-20261009` / `readiness2-crosstable-fixed-sum-20261009` внутри configured resultsRoot. Исходная ошибочная серия LAB-32 не открывается заново.
 
 ```sh
