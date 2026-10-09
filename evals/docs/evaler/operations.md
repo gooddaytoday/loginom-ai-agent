@@ -166,3 +166,25 @@ Report имеет native comment ID, issue/task, phase rich|ben, actual full SHA
 Personal templates `evaler.md`, `rich.md`, `ben.md` публикуются как полные активные инструкции; `squad.md` — leader-only briefing. Вместе с контрактом/операторской инструкцией они входят в отдельный новый nonsecret immutable operational supplement с SHA256 manifest. Это заменяет старые route/status/runtime override правила, а не редактирует прежний archive. Дополнительные reference/eval env и auth Evaler не создаются.
 
 Перед переключением read-only проверить очередь/процессы/stand и отсутствие pending cleanup. Обновить настройки без запуска; readback whitelist model/thinking/concurrency/runtime/leader/members/instruction hash. Не печатать raw MCP env. До следующего user-prepared node pilot корректная формулировка — «настроено и проверено статически». LAB-16, аналитический baseline и model smoke автоматически не запускаются.
+
+## Допуск после устранённого авторского инцидента
+
+Исторический `product=ERROR` сохраняется. Evaler может добавить к **своему проверенному** handoff evidence необязательное поле `review_admission: {kind: "recovered_author", resolution_sha256: "<SHA256 отдельного resolution receipt>"}`. Это разрешает только первоначально предусмотренный независимый Rich → Ben прогон на exact clean frozen SHA; не разрешает повтор Rich, смену модели, увеличение recovery/quality budget или ACCEPT при ERROR Ben.
+
+До выдачи допуска Evaler offline проверяет доступность exact SHA, доставленный архив и manifest/SHA256, готовность reference/cold/обязательных позитивов и негативов всех назначенных case IDs. Отдельный resolution receipt связывает issue/task/SHA/manifest, перечисляет **каждый** назначенный кейс и каждую попытку (включая ERROR и not_started), содержит hashes источников инцидентов и подтверждённые recovery completion, архивы истории, cleanup и stand release. Непроверенные заявления автора не становятся confirmed. Receipt и его hash входят в доставленный manifest; исходные ERROR/summary не переписываются. Неполное evidence, stale SHA, незавершённая очистка и ERROR Ben блокируют передачу. Receipt не заменяет offline verification.
+
+## Диагностика перед следующей попыткой
+
+Повторяемый технический отказ reference требует сначала минимальной немодельной диагностики того же отказа. Оставшиеся три попытки не расходуются на неизменившуюся известную причину. Исправление проверяется адресно; требования reference/cold/oracle не ослабляются, специальное переименование узла для F3 не требуется.
+
+После подтверждённого provider headers timeout 300 секунд с нулевыми tokens выполняется один ограниченный немодельный HEAD probe через назначенное приватное окружение. Операторский classified receipt (`kind=provider_headers_timeout`, `tokens=0`, `timeout_ms=300000`) связывается с исходной неизменной попыткой и evidence SHA. `script/provider-route-probe.ts <classified.json> <new-private-probe.json>` использует только назначенные provider base URL/key, 5-секундный timeout, без redirects/генерации/fallback/retry. Receipt резервируется до dispatch; второе использование запрещено даже после NO_HEADERS. Любые полученные headers (в том числе HTTP 401/405) подтверждают ответ маршрута, но не авторизацию или успешную генерацию. Исходная ошибка остаётся самостоятельным результатом.
+
+## Новый admission/recovery комплект — только будущие задания
+
+Product и reference runner получают `EVAL_NODE_OPS_CONFIG=<private config>` и `EVAL_NODE_STAND_LEASE=<private lease handle>`. До dispatch helper проверяет исходный admission/owner и точный профиль, создаёт закрытые harness receipt + `.stand` attestation внутри lease. Не передавать эти пути/receipt/owner bytes в product prompt, sandbox или evidence delivery; публикуются безопасные hashes и операторские итоги.
+
+Обычный `recover` при attested writer-release settlement допускает собственную остаточную `.process-group` только после `registrationIdentity`/`verifyOwnedRegistration` до расходования единственной reservation; затем повторно проверяет identity при удалении. Он архивирует историю, проверяет storage, адресно retire-ит attested harness guard и оставляет общий stand guard до `release`. Старый harness guard без receipt не принимается. Чужой owner/identity, живые или неизвестные процессы и unknown cleanup сохраняют блокировки. `lab31-owned-registration` остаётся закрытым историческим исключением, не повторным recovery API.
+
+`--diagnostic <new-private-file>` сохраняет operation/stage/reason/dispatch `not_started|started|unknown`, включая отказ до management. По умолчанию receipt находится внутри owned lease/archive. `unknown` нельзя считать разрешением повторить dispatch. Секреты, raw env и raw exception text не включаются. После неоднозначного ответа сначала readback.
+
+Skill 1.0.5 и соответствующие CLI/harness pins переключаются только в новых назначениях после освобождения стенда. LAB-55 и принятые исторические результаты используют прежние pins.

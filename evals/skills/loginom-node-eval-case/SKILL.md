@@ -6,7 +6,7 @@ description: >-
   и evidence. Использовать для узлового eval, reference.lgp или task.json в node-evals;
   работает локально и в роли автора/независимого приёмщика Multica.
 metadata:
-  version: 1.0.4
+  version: 1.0.5
 ---
 
 # Eval отдельного узла Loginom
@@ -60,3 +60,15 @@ Node eval использует code-only runner (`--skip-judge`, repeat=1). Ав
 ACCEPT/REJECT/BLOCKED и измеренный product PASS/FAIL/ERROR учитывать отдельно.
 Неизвестная очистка или инфраструктурный ERROR прекращают дальнейшие исполнения;
 диагностика и восстановление идут по существующему operational-контракту.
+
+## Допуск после устранённого авторского инцидента
+
+Исторический `product=ERROR` сохраняется. Evaler может добавить к **своему проверенному** handoff evidence необязательное поле `review_admission: {kind: "recovered_author", resolution_sha256: "<SHA256 отдельного resolution receipt>"}`. Это разрешает только первоначально предусмотренный независимый Rich → Ben прогон на exact clean frozen SHA; не разрешает повтор Rich, смену модели, увеличение recovery/quality budget или ACCEPT при ERROR Ben.
+
+До выдачи допуска Evaler offline проверяет доступность exact SHA, доставленный архив и manifest/SHA256, готовность reference/cold/обязательных позитивов и негативов всех назначенных case IDs. Отдельный resolution receipt связывает issue/task/SHA/manifest, перечисляет **каждый** назначенный кейс и каждую попытку (включая ERROR и not_started), содержит hashes источников инцидентов и подтверждённые recovery completion, архивы истории, cleanup и stand release. Непроверенные заявления автора не становятся confirmed. Receipt и его hash входят в доставленный manifest; исходные ERROR/summary не переписываются. Неполное evidence, stale SHA, незавершённая очистка и ERROR Ben блокируют передачу. Receipt не заменяет offline verification.
+
+## Диагностика перед следующей попыткой
+
+Повторяемый технический отказ reference требует сначала минимальной немодельной диагностики того же отказа. Оставшиеся три попытки не расходуются на неизменившуюся известную причину. Исправление проверяется адресно; требования reference/cold/oracle не ослабляются, специальное переименование узла для F3 не требуется.
+
+После подтверждённого provider headers timeout 300 секунд с нулевыми tokens выполняется один ограниченный немодельный HEAD probe через назначенное приватное окружение. Операторский classified receipt (`kind=provider_headers_timeout`, `tokens=0`, `timeout_ms=300000`) связывается с исходной неизменной попыткой и evidence SHA. `script/provider-route-probe.ts <classified.json> <new-private-probe.json>` использует только назначенные provider base URL/key, 5-секундный timeout, без redirects/генерации/fallback/retry. Receipt резервируется до dispatch; второе использование запрещено даже после NO_HEADERS. Любые полученные headers (в том числе HTTP 401/405) подтверждают ответ маршрута, но не авторизацию или успешную генерацию. Исходная ошибка остаётся самостоятельным результатом.
