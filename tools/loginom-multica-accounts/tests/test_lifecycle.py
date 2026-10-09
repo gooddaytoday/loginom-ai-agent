@@ -1,4 +1,5 @@
 import fcntl
+import ctypes
 import importlib.util
 import json
 import os
@@ -7,6 +8,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from uuid import uuid4
 
@@ -179,6 +181,152 @@ verifyRecordedEffects(verifyInheritedGuards(process.env.LOGINOM_ACCOUNTS_GUARDS_
                 self.assert_absent(receipt['processes'])
                 if os.environ.get('LAB53_PROCESS_RECEIPT_DIR'):
                     write_private(Path(os.environ['LAB53_PROCESS_RECEIPT_DIR']) / (name + '.json'), receipt)
+
+    def run_detached(self, mode):
+        # Only the fixture collector becomes a subreaper, so a failing baseline
+        # cannot orphan its known escaped PID under init. Restore on every exit.
+        libc = ctypes.CDLL(None, use_errno=True)
+        previous = ctypes.c_int()
+        self.assertEqual(libc.prctl(37, ctypes.byref(previous), 0, 0, 0), 0)
+        self.assertEqual(libc.prctl(36, 1, 0, 0, 0), 0)
+        foreign = subprocess.Popen([sys.executable, '-c', 'import sys;sys.stdin.read()'], stdin=subprocess.PIPE,
+                                   start_new_session=True)
+        foreign_record = process_identity(foreign.pid)
+        escaped = self.root / 'escaped.json'
+        try:
+            with self.guard() as context:
+                guards = [context['pair_guard'], *context['guards'].values()]
+                attempt = str(uuid4())
+                for role, name in context['role_names'].items():
+                    begin_account_effect(context['guards'][name], self.issue, role, attempt, 'a' * 40)
+                markers = {str(p): p.read_bytes() for g in context['guards'].values()
+                           for p in marker_paths(g['path']) if p.exists()}
+                script = self.root / 'detached.py'
+                script.write_text('''import os,sys,json,signal,time
+from pathlib import Path
+guards=json.loads(Path(os.environ['LOGINOM_ACCOUNTS_GUARDS_FILE']).read_text())['guards']
+mode=sys.argv[2]
+if os.fork()==0:
+ os.setsid()
+ if mode=='double-fork' and os.fork()!=0:os._exit(0)
+ signal.signal(signal.SIGTERM,signal.SIG_IGN)
+ for guard in guards:
+  info=os.fstat(guard['fd']);assert (info.st_dev,info.st_ino)==(guard['device'],guard['inode'])
+ fields=Path('/proc/self/stat').read_text().rsplit(')',1)[1].split()
+ fd=os.open(sys.argv[1],os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+ with os.fdopen(fd,'w') as stream:json.dump({'pid':os.getpid(),'start_ticks':fields[19],'pgid':int(fields[2]),'sid':int(fields[3]),'fds':len(guards)},stream)
+ while True:time.sleep(30)
+while not Path(sys.argv[1]).exists():time.sleep(.001)
+if mode in ('success','double-fork'):os._exit(0)
+if mode=='cancel':os.kill(os.getppid(),signal.SIGTERM)
+time.sleep(30)
+''')
+                run_dir = context['evidence_dir'] / 'detached'
+                expected = {'success': 'CHILDREN_REMAINED', 'double-fork': 'CHILDREN_REMAINED',
+                            'timeout': 'TIMEOUT', 'cancel': 'CANCELLED'}[mode]
+                try:
+                    with self.assertRaisesRegex(RuntimeError, expected):
+                        provision.run_foreground([sys.executable, script, escaped, mode], guards, run_dir,
+                                                 timeout=.5, stop_timeout=.15)
+                    leaf = json.loads(escaped.read_text())
+                    self.assertEqual(leaf['fds'], 4)
+                    receipts = [json.loads(p.read_text()) for p in run_dir.glob('event-*.json')]
+                    cleanup = next(r for r in receipts if r.get('phase') == 'process-cleanup')
+                    self.assertEqual(cleanup['process_cleanup'], 'PASS')
+                    self.assertIsNotNone(cleanup['failure'])
+                    self.assertTrue(any(r['pid'] == leaf['pid'] and r['start_ticks'] == leaf['start_ticks']
+                                        for r in cleanup['processes']))
+                    self.assert_absent(cleanup['processes'])
+                    self.assertEqual(process_identity(foreign.pid)['start_ticks'], foreign_record['start_ticks'])
+                    self.assertNotIn(foreign.pid, [r['pid'] for r in cleanup['processes']])
+                    for path, raw in markers.items(): self.assertEqual(Path(path).read_bytes(), raw)
+                    for g in guards: self.assertEqual(os.fstat(g['fd']).st_ino, g['inode'])
+                    if os.environ.get('LAB53_PROCESS_RECEIPT_DIR'):
+                        write_private(Path(os.environ['LAB53_PROCESS_RECEIPT_DIR']) / ('detached-' + mode + '.json'), cleanup)
+                finally:
+                    # Safety for expected RED against reviewed source. Signal
+                    # only this exact captured leaf, after a fresh daemon check.
+                    if escaped.exists():
+                        leaf = json.loads(escaped.read_text())
+                        current = process_identity(leaf['pid'])
+                        if current and current['start_ticks'] == leaf['start_ticks'] and current['state'] not in {'Z', 'X'}:
+                            daemon = json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json'], text=True))
+                            self.assertNotEqual(leaf['pid'], daemon['pid'])
+                            fd = os.pidfd_open(leaf['pid'])
+                            try:
+                                self.assertEqual(process_identity(leaf['pid'])['start_ticks'], leaf['start_ticks'])
+                                signal.pidfd_send_signal(fd, signal.SIGKILL)
+                            finally: os.close(fd)
+                        try: os.waitpid(leaf['pid'], 0)
+                        except ChildProcessError: pass
+            for g in guards:
+                fd = os.open(g['path'], os.O_RDWR)
+                try: fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                finally: os.close(fd)
+        finally:
+            foreign.communicate(timeout=3)
+            self.assertEqual(libc.prctl(36, previous.value, 0, 0, 0), 0)
+
+    def test_detached_success_is_rejected_and_exact_child_reaped(self): self.run_detached('success')
+    def test_detached_timeout_cleans_exact_child(self): self.run_detached('timeout')
+    def test_detached_cancel_cleans_exact_child(self): self.run_detached('cancel')
+    def test_rapid_double_fork_is_adopted_and_cleans_exact_child(self): self.run_detached('double-fork')
+
+    def test_exec_failure_does_not_run_supervisor_result_writer_in_child(self):
+        with self.guard() as context:
+            guards = [context['pair_guard'], *context['guards'].values()]
+            directory = context['evidence_dir'] / 'missing-executable'
+            self.assertEqual(provision.run_foreground(['/no-such-lab53-fixture-command'], guards, directory,
+                                                     timeout=3, stop_timeout=.15), 127)
+            receipt = read_private(directory / 'supervisor-result.json')
+            self.assertEqual(receipt['process_cleanup'], 'PASS')
+            self.assertEqual(receipt['returncode'], 127)
+            self.assertEqual(len(receipt['processes']), 1)
+            self.assertTrue(receipt['processes'][0]['reaped'])
+            self.assert_absent(receipt['processes'])
+
+    def test_unknown_child_provenance_blocks_exec_and_cleanup_pass(self):
+        # Fault injection is confined to this isolated fixture process, at the
+        # actual child stat read before exec ACK; production has no test flag.
+        driver = self.root / 'unknown-provenance.py'
+        driver.write_text('''import os,sys,json,importlib.util
+from pathlib import Path
+sys.path.insert(0,sys.argv[1])
+spec=importlib.util.spec_from_file_location('fixture_supervisor',Path(sys.argv[1])/'process-supervisor.py')
+supervisor=importlib.util.module_from_spec(spec);spec.loader.exec_module(supervisor)
+original=supervisor.record
+faulted=False
+def record(pid):
+ global faulted
+ if pid!=os.getpid() and not faulted:
+  faulted=True
+  raise RuntimeError('ACCOUNT_PROVISION_PROVENANCE_UNCONFIRMED')
+ return original(pid)
+supervisor.record=record
+directory=Path(sys.argv[2]);directory.mkdir(mode=0o700)
+effect=directory/'must-not-exist'
+read_fd,write_fd=os.pipe();os.write(write_fd,b'1');os.close(write_fd)
+sys.argv=['fixture',str(read_fd),str(os.getppid()),'3','.15',str(directory),sys.executable,'-c',
+          'from pathlib import Path;Path('+repr(str(effect))+').write_text("unexpected effect")']
+assert supervisor.main()==1
+receipt=json.loads((directory/'supervisor-result.json').read_text())
+assert faulted and not effect.exists()
+assert receipt['process_cleanup']=='UNKNOWN' and receipt['failure'] is not None
+assert receipt['processes'] and all(p['reaped'] for p in receipt['processes'])
+for item in receipt['processes']:
+ current=original(item['pid'])
+ assert current is None or not supervisor.same(current,item) or current['state'] in {'Z','X'}
+if os.environ.get('LAB53_PROCESS_RECEIPT_DIR'):
+ from common import write_private
+ write_private(Path(os.environ['LAB53_PROCESS_RECEIPT_DIR'])/'unknown-provenance-inner.json',receipt)
+''')
+        with self.guard() as context:
+            guards = [context['pair_guard'], *context['guards'].values()]
+            directory = context['evidence_dir'] / 'unknown-provenance-outer'
+            self.assertEqual(provision.run_foreground([sys.executable, driver, SCRIPTS,
+                context['evidence_dir'] / 'unknown-provenance-inner'], guards, directory, timeout=5), 0)
+            receipt = read_private(directory / 'supervisor-result.json')
+            self.assert_absent(receipt['processes'])
 
 
 if __name__ == '__main__': unittest.main()

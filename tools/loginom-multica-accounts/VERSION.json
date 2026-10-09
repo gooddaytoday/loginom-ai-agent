@@ -1,6 +1,6 @@
 {
   "schema": "loginom-lab53-source-version-v1",
-  "version": "lab53-source-only-v3",
+  "version": "lab53-source-only-v4",
   "scope_sha": "d4241c818b4a59f65a42dcf756034eec20e620b3",
   "status": "SOURCE_ONLY_LIVE_BLOCKED",
   "baseline": {
@@ -10,19 +10,20 @@
   },
   "files": {
     ".gitignore": "862263fa1f46c20f0d1e4dac5ffcc75abd55c08211b2c3864c5f8764b9d87793",
-    "README.md": "f4114e014959f119eace0b27248443dc7d18e1e1fe1dd24310d9e78048efd665",
+    "README.md": "53e5e9c906899872f22e059cd4ea9a45ba60223a70ebebb6ed37ee371f71f4a6",
     "finite-cleanup.md": "42604e784650619c9f85a14e69ee9c654652fde54ecf6d31fc853ee486583cda",
     "fixtures/lifecycle.html": "1c348c66325ef6f4998f308ad7dc2dbf02b90003ddf9a1406db26514412133eb",
     "fixtures/navigation.html": "b3bde2f068797b70e7c7975a31f1d64a03ac2686c6943abf2462ee5e5a0b4733",
     "scripts/account-lifecycle.mjs": "b95f4f35d7651241c74871809636632527829dd44baaba95d7d9969135bcce0f",
     "scripts/account-ui.mjs": "66673585250673fb9b6af04e7e4cbdc8c716e341bba39ba597dbc65abc585fe6",
     "scripts/common.py": "ceb400d2c1b5617cfa7598f75419a569e3b3cc52d13c6533dd7436fa39396743",
+    "scripts/process-supervisor.py": "bda1c555ca4b99f05b6005c0d791478a268b62824d07af77821b670c808355af",
     "scripts/provision-account.mjs": "7425da33df98b8c56a807ee0dc1d5dc28aed78d14d5eddf203bc562ab0935c98",
-    "scripts/provision-accounts.py": "d240213b93d19b36a24b23d87d5eca96713661f79fee1b23d75a1d6ab0de8fee",
+    "scripts/provision-accounts.py": "f3bd0ec3b3a4754c8592cb956c9db0b2820746a49e65758b5191c9c63b7f7149",
     "scripts/qualify-accounts.mjs": "87f2e1bf3edbdf2678901b7d7d3407a9f7864e26eac549ab488cc4daa09db2c3",
     "tests/account-ui.test.mjs": "51b783b0ae18dd9fb1fd86d5c1212e3495b9d0bd93373a2cd7711248e6e7cd36",
     "tests/test_accounts.py": "971ef937be5a4193293b5e3ff7defd6e58fe78c668b4701f3df56b404e4727ad",
-    "tests/test_lifecycle.py": "c837741188325439595350c41fcb85e37f4025dd3aa81750aa23ae2969f41e78",
+    "tests/test_lifecycle.py": "8e7ea75f47641f3aa134c33256d22cda4af8c22a5324ef59618c65caf156f0a9",
     "tests/test_manifest.py": "f94c4063c53238b65e7512ce2fb1da45147410d8b501d39cac986dc8f6b8ba7f"
   },
   "deployment": {

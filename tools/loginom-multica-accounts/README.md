@@ -34,11 +34,19 @@ Public receipts contain only allowlisted codes and evidence digests.
 and requires explicit exact previous process records for every account. Planned
 identities are locked before allocation; an existing pair is read under its pair
 lock. Allocation reuses that FD. New configs are bound before all three UNKNOWN
-effects are fsynced. `run_foreground` passes all four FDs through an exec barrier:
-the exact child PID/start_ticks and guards envelope are saved before its command
-can act. Timeout/cancellation terminates only that owned process group, checks
-recorded identities and keeps immutable cleanup evidence, UNKNOWN markers and
-the parent guards through shutdown. Local cleanup never authorizes reuse.
+effects are fsynced. `run_foreground` passes all four FDs through exec barriers:
+the isolated supervisor and command PID/start_ticks and guards envelope are
+saved before the command can act. The per-operation Linux supervisor is a
+subreaper, not a daemon or queue. Kernel child lists and orphan adoption establish
+exact descendant ownership across threads, `setsid()` and rapid double-fork;
+PGID/SID and account/FD resemblance do not establish ownership. WNOWAIT retains
+exited children until their provenance is saved. Timeout/cancellation signals
+only exact owned identities through pidfds, reaps children, checks the kernel
+has no children left and retains parent guards through supervisor shutdown.
+Success with a surviving child is rejected even after local cleanup. Unsupported
+supervision or incomplete provenance/cleanup remains UNKNOWN and cannot return
+PASS. Immutable evidence and UNKNOWN markers are retained. The caller/Multica
+daemon does not become a subreaper. Local cleanup never authorizes reuse.
 
 `scripts/account-lifecycle.mjs` connects pair/operator bindings, recorded effect,
 provision/login, unique connected identity, the existing effective rights policy
@@ -82,7 +90,11 @@ verification; network requests are aborted and cause failure. Fixtures are
 synthetic layouts with observed data-tids, not recorded private DOM. Optional
 `LAB53_OFFLINE_RECEIPT` writes exact owned browser PID/start_ticks and absence
 after shutdown to a new private file. Python tests use actual flock and inherited
-child descriptors, plus isolated synthetic configs and markers.
+child descriptors, plus isolated synthetic configs and markers. Detached
+children are exercised at success, timeout and cancellation, including a
+SIGTERM-resistant leaf and rapid double-fork. Each case checks exact descendant
+absence, all four flock releases, unchanged UNKNOWN markers and an unrelated
+live process that must remain untouched.
 
 ## Installation and rollback
 

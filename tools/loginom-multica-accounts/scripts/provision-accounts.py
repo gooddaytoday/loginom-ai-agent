@@ -2,12 +2,14 @@
 """Persist a pair before UI creation; retries reuse identities and reconcile uncertainty."""
 import argparse
 import fcntl
+import importlib.util
 import json
 import os
 from pathlib import Path
 import secrets
 import signal
 import subprocess
+import sys
 import time
 from uuid import UUID, uuid4
 from contextlib import ExitStack, contextmanager
@@ -15,75 +17,12 @@ from common import (read_private, write_private, private_snapshot, account_guard
                     process_identity, new_evidence_directory, append_evidence)
 
 
-def process_group_alive(pid):
-    try:
-        os.killpg(pid, 0)
-    except ProcessLookupError:
-        return False
-    # An exited orphan can remain a zombie until init reaps it. Zombies have
-    # closed their descriptors and cannot retain the accounts lock or browser.
-    try:
-        result = subprocess.run(['ps', '-e', '-o', 'pgid=', '-o', 'stat='], stdout=subprocess.PIPE,
-                                stderr=subprocess.DEVNULL, text=True, timeout=2)
-    except (OSError, subprocess.TimeoutExpired):
-        raise RuntimeError('ACCOUNT_PROVISION_PROCESS_STOP_UNCONFIRMED') from None
-    if result.returncode:
-        raise RuntimeError('ACCOUNT_PROVISION_PROCESS_STOP_UNCONFIRMED')
-    return any(len(fields) == 2 and fields[0] == str(pid) and not fields[1].startswith('Z')
-               for fields in (line.split() for line in result.stdout.splitlines()))
-
-
-def stop_process_group(process, grace):
-    try:
-        had_children = process_group_alive(process.pid)
-    except RuntimeError:
-        # A failed inspection must not prevent best-effort group termination.
-        had_children = True
-    for signum in [signal.SIGTERM, signal.SIGKILL]:
-        try:
-            os.killpg(process.pid, signum)
-        except ProcessLookupError:
-            break
-        deadline = time.monotonic() + grace
-        while True:
-            process.poll()
-            try:
-                if not process_group_alive(process.pid):
-                    break
-            except RuntimeError:
-                break
-            if time.monotonic() >= deadline:
-                break
-            time.sleep(0.02)
-        try:
-            if not process_group_alive(process.pid):
-                break
-        except RuntimeError:
-            continue
-    if process_group_alive(process.pid):
-        raise RuntimeError('ACCOUNT_PROVISION_PROCESS_STOP_UNCONFIRMED')
-    try:
-        process.wait(timeout=grace)
-    except subprocess.TimeoutExpired:
-        raise RuntimeError('ACCOUNT_PROVISION_PROCESS_STOP_UNCONFIRMED') from None
-    return had_children
-
-
-def group_records(process):
-    records = []
-    for path in Path('/proc').iterdir():
-        if not path.name.isdigit():
-            continue
-        try:
-            fields = (path / 'stat').read_text().rsplit(')', 1)[1].split()
-        except (FileNotFoundError, ProcessLookupError):
-            continue
-        if fields[2] == str(process.pid) and fields[3] == str(process.pid):
-            records.append({'pid': int(path.name), 'start_ticks': fields[19]})
-    return records
-
-
 def run_foreground(command, guards, evidence_dir, timeout=300, stop_timeout=10):
+    # Descendant ownership is scoped to a dedicated subreaper, independent of
+    # session/process-group changes. The caller never adopts unrelated children.
+    module_spec = importlib.util.spec_from_file_location('account_supervisor', Path(__file__).with_name('process-supervisor.py'))
+    supervisor = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(supervisor)
     directory = new_evidence_directory(evidence_dir)
     descriptors = tuple(guard['fd'] for guard in guards)
     if not descriptors or len(set(descriptors)) != len(descriptors):
@@ -99,88 +38,84 @@ def run_foreground(command, guards, evidence_dir, timeout=300, stop_timeout=10):
                     if key in guard} for guard in guards]})
     environment = {**os.environ, 'LOGINOM_ACCOUNTS_GUARDS_FILE': str(envelope)}
     process = None
-    cancelled = None
+    owner = None
+    cancelled = False
     previous = {}
-    owned = {}
     read_fd, write_fd = os.pipe()
     failure = None
     cleanup = 'UNKNOWN'
+    records = []
+    result = {}
 
-    def interrupt(signum, _frame):
+    def interrupt(_signum, _frame):
         nonlocal cancelled
-        cancelled = signum
+        cancelled = True
 
     try:
-        for signum in [signal.SIGTERM, signal.SIGINT]:
+        for signum in (signal.SIGTERM, signal.SIGINT):
             previous[signum] = signal.signal(signum, interrupt)
         with open(directory / 'stdout.log', 'x', opener=lambda path, flags: os.open(path, flags, 0o600)) as stdout, open(
                 directory / 'stderr.log', 'x', opener=lambda path, flags: os.open(path, flags, 0o600)) as stderr:
-            # The exec barrier keeps the child from performing any action until
-            # its exact PID/start_ticks and inherited guards are durably saved.
-            trampoline = 'import os,sys;fd=int(sys.argv[1]);ok=os.read(fd,1);os.close(fd);ok==b"1" or sys.exit(1);os.execvpe(sys.argv[2],sys.argv[2:],os.environ)'
             try:
-                process = subprocess.Popen([__import__('sys').executable, '-c', trampoline, str(read_fd), *map(str, command)],
+                process = subprocess.Popen([sys.executable, Path(__file__).with_name('process-supervisor.py'),
+                    str(read_fd), str(os.getpid()), str(timeout), str(stop_timeout), str(directory), *map(str, command)],
                     stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr, env=environment,
                     pass_fds=(*descriptors, read_fd), start_new_session=True)
             except OSError:
                 raise RuntimeError('ACCOUNT_PROVISION_PROCESS_START_FAILED') from None
-            record = process_identity(process.pid)
-            if not record:
-                raise RuntimeError('ACCOUNT_PROVISION_PROVENANCE_UNKNOWN')
-            owned[(record['pid'], record['start_ticks'])] = record
-            append_evidence(directory, {'phase': 'process-start', 'state': 'UNKNOWN', 'process': record,
+            owner = process_identity(process.pid)
+            if owner is None: raise RuntimeError('ACCOUNT_PROVISION_PROVENANCE_UNCONFIRMED')
+            records.append(owner)
+            append_evidence(directory, {'phase': 'process-start', 'state': 'UNKNOWN', 'process': owner,
                                        'guards_file': str(envelope)})
-            if cancelled:
-                raise RuntimeError('ACCOUNT_PROVISION_CANCELLED')
+            if cancelled: raise RuntimeError('ACCOUNT_PROVISION_CANCELLED')
             os.write(write_fd, b'1')
-            deadline = time.monotonic() + timeout
-            while True:
-                for record in group_records(process):
-                    owned[(record['pid'], record['start_ticks'])] = record
-                if cancelled:
-                    raise RuntimeError('ACCOUNT_PROVISION_CANCELLED')
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise RuntimeError('ACCOUNT_PROVISION_TIMEOUT')
-                try:
-                    code = process.wait(timeout=min(0.02, remaining))
-                    break
-                except subprocess.TimeoutExpired:
-                    pass
+            deadline = time.monotonic() + timeout + 2 * stop_timeout + 5
+            while process.poll() is None:
+                if cancelled: supervisor.signal_exact(owner, signal.SIGTERM)
+                if time.monotonic() >= deadline:
+                    supervisor.signal_exact(owner, signal.SIGTERM)
+                    raise RuntimeError('ACCOUNT_PROVISION_PROCESS_STOP_UNCONFIRMED')
+                time.sleep(.005)
+            process.wait()
+            result = read_private(directory / 'supervisor-result.json')
+            if result.get('schema') != 'account-process-supervisor-v1' or not supervisor.same(result.get('subreaper'), owner):
+                raise RuntimeError('ACCOUNT_PROVISION_PROVENANCE_UNCONFIRMED')
+            records.extend(result['processes'])
+            failure = result['failure']
+            if cancelled: failure = 'ACCOUNT_PROVISION_CANCELLED'
+            if result['process_cleanup'] != 'PASS':
+                raise RuntimeError('ACCOUNT_PROVISION_PROCESS_STOP_UNCONFIRMED')
+            for item in records:
+                current = process_identity(item['pid'])
+                if current and current['start_ticks'] == item['start_ticks'] and current['state'] not in {'Z', 'X'}:
+                    raise RuntimeError('ACCOUNT_PROVISION_PROCESS_STOP_UNCONFIRMED')
+            cleanup = 'PASS'
+            if failure: raise RuntimeError(failure)
+            if not isinstance(result['returncode'], int): raise RuntimeError('ACCOUNT_PROVISION_PROVENANCE_UNCONFIRMED')
+            return result['returncode']
     except BaseException as error:
-        failure = type(error).__name__ + ': ' + str(error)
+        failure = str(error) if isinstance(error, RuntimeError) else 'ACCOUNT_PROVISION_SUPERVISOR_FAILED'
         raise
     finally:
         try:
-            if process is not None:
-                for record in group_records(process):
-                    owned[(record['pid'], record['start_ticks'])] = record
-                leader = next(iter(owned.values()))
-                current = process_identity(process.pid)
-                if current and current['start_ticks'] != leader['start_ticks']:
-                    raise RuntimeError('ACCOUNT_PROVISION_PROCESS_IDENTITY_CHANGED')
-                had_children = stop_process_group(process, stop_timeout)
-                for record in owned.values():
-                    current = process_identity(record['pid'])
-                    if current and current['start_ticks'] == record['start_ticks'] and current['state'] not in {'Z', 'X'}:
-                        raise RuntimeError('ACCOUNT_PROVISION_PROCESS_STOP_UNCONFIRMED')
-                cleanup = 'PASS'
-                if process.returncode == 0 and had_children and failure is None:
-                    failure = 'ACCOUNT_PROVISION_CHILDREN_REMAINED'
+            # EOF cancels an owner that never received the durable start ACK.
+            os.close(write_fd)
+            write_fd = None
+            if process is not None and process.poll() is None and owner is not None:
+                # Let the isolated owner finish exact descendant cleanup; do not
+                # blindly kill its group and lose detached children to init.
+                supervisor.signal_exact(owner, signal.SIGTERM)
+                process.wait(timeout=2 * stop_timeout + 5)
+            elif process is not None:
+                process.wait(timeout=2 * stop_timeout + 5)
         finally:
             os.close(read_fd)
-            os.close(write_fd)
-            for signum, handler in previous.items():
-                signal.signal(signum, handler)
+            if write_fd is not None: os.close(write_fd)
+            for signum, handler in previous.items(): signal.signal(signum, handler)
             append_evidence(directory, {'phase': 'process-cleanup', 'state': 'UNKNOWN', 'process_cleanup': cleanup,
-                'processes': list(owned.values()), 'failure': failure, 'server_absence': 'NOT_PROVED',
-                'returncode': process.returncode if process is not None else None,
-                'parent_guard_fds_retained': list(descriptors)})
-    if cancelled:
-        raise RuntimeError('ACCOUNT_PROVISION_CANCELLED')
-    if code == 0 and had_children:
-        raise RuntimeError('ACCOUNT_PROVISION_CHILDREN_REMAINED')
-    return code
+                'processes': records, 'failure': failure, 'server_absence': 'NOT_PROVED',
+                'returncode': result.get('returncode'), 'parent_guard_fds_retained': list(descriptors)})
 
 
 def require_finite_cleanup():
