@@ -711,7 +711,7 @@
     "sha256": "7242dca9becfc3d7a7d111e4a0271e51caf845ad295b8dfdbbcce4ac0736ed73",
     "bytes": 3148
   },
-  "next_step": "Owner agreed separate common preparation/own-admin-cleanup task; create one common card, preserve all45/48/3119 effects and prior evidence; stock3m,8/8/8,daemon12 unchanged; no schedules/merge/release.",
+  "next_step": "LAB53 common preparation task running Generator since03:37:44MSK; exact causes/shared fix/review then original8 readiness/handoff. Stock3m/8/8/8/daemon12; no schedules/merge/release.",
   "verified_fresh_diagnostic_attachments": [
     {
       "id": "01a11d95-301f-714a-b520-d68c5f95d975",
@@ -2343,9 +2343,28 @@
     "date": "2026-10-09",
     "owner_answer": "Согласовать отдельную общую карточку",
     "scope_document": "common-preparation-draft.md",
-    "new_card_created": false,
+    "new_card_created": true,
     "common_helper_source_changes": 0,
     "node_contract_or_criteria_changes": 0,
-    "next_step": "publish agreed scope, create one separate common card in existing squad; Generator freezes cause/files then Worker fix and independent Reviewer; same8 node cards remain held until exact cleanup/readiness"
+    "next_step": "LAB53 Generator active; freeze common cause/source/files, same-card Worker fix and independent Reviewer; exact45/48/3119 cleanup required before continuing original8",
+    "card": {
+      "issue_id": "01a11e17-b869-7550-8450-35e5e17119d4",
+      "identifier": "LAB-53",
+      "title": "fix(accounts): подготовка Loginom и очистка admin",
+      "documentation_sha": "d4241c818b4a59f65a42dcf756034eec20e620b3",
+      "squad_id": "8ff41bd5-f794-4b5b-a063-026f3874628e",
+      "project_id": "99a293e9-cce8-4256-82eb-97153d0a625e",
+      "dispatch_comment_id": "01a11e18-2c9b-7731-85db-80ef5300ab99",
+      "dispatch_at": "2026-10-09T03:37:43+03:00",
+      "post_dispatch_task_runs": [
+        {
+          "id": "01a11e18-2ca9-79b2-9905-3629039a5c53",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "status": "running",
+          "started_at": "2026-10-09T03:37:44+03:00",
+          "created_at": "2026-10-09T03:37:43+03:00"
+        }
+      ]
+    }
   }
 }

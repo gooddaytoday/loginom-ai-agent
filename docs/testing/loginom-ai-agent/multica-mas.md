@@ -191,6 +191,6 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 - LAB48 attachments3 bytes/hash/manifest PASS; LAB45 bytes совпали/computed digest сохранён, published expected artifact checksum отсутствует.
 - LAB48 source files hash SSH readback PASS: generic first() navigation/catch drops error details; happy path also sets admin-absence BLOCKED.
 - 00:30UTC load0.00/0.018/0.011, MemAvailable30237796kB/free409704574976B; API roles nonterminal0 не доказывает process/server absence.
-- Владелец согласовал [отдельную общую подготовку](reports/2026-10-08-node-recheck/common-preparation-draft.md); задача создаётся, common helper changes0.
+- Владелец согласовал [LAB53 — общую подготовку](reports/2026-10-08-node-recheck/common-preparation-draft.md); Generator running03:37:44MSK, common helper changes0.
 - [SHA/tasks/hashes/история](reports/2026-10-08-node-recheck/parallel8-restart.json); schedules0/new pools0/merge-release0; чужие изменения сохранены.
-- Следующий шаг: общая карточка Генератор→Исполнитель→Ревьюер, exact45/48/3119 cleanup→те же8 readiness; node acceptance NOT_CONFIRMED.
+- Следующий шаг: LAB53 Генератор→Исполнитель→Ревьюер, exact45/48/3119 cleanup→те же8 readiness; node acceptance NOT_CONFIRMED.
