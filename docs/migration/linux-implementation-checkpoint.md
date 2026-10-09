@@ -1,5 +1,24 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-09 — подтверждённое закрытие Host и отмена браузерной проверки
+
+`docs-no-browser`: исправлены три замечания к `42cf2d27b` через TDD.
+CLI сохраняет `.writer` при неподтверждённой очистке старта; Node entry принимает
+close до готовности. Закрытие отменяет проверки до drain; сигнал достигает
+supervisor и Chromium context, ошибка очистки запрещает успешный close.
+Management fixture обновлена под отдельный Help и явную automation preparation.
+Host79/79, Agent32/32 плюс расширенная startup-матрица, Desktop38/38,
+runtime30/30, упаковочные12 PASS; три package typecheck PASS.
+Свежие CLI/Desktop `prod 0.1.17` из чистого `5aff2d88e570c7afb12a07e6cf8d9b8357db09c2`:
+CLI archive/manifest roundtrip и Desktop DEB/AppImage static verification PASS.
+Native CLI error/retry и Desktop quit на навигации/форме PASS; exit0,
+43 собственных PID и четыре реальные debugger-порта отсутствуют после закрытия.
+Пользовательская установка, исходный Loginom server/client и чужие worktree
+не изменены. Модели/evals и Windows/macOS не запускались; системная DEB installation
+этим регрессионным набором не проверялась. Артефакты не опубликованы.
+Подробности, SHA/hashes и неуспешные попытки:
+[отдельный отчёт](../testing/loginom-ai-agent/reports/2026-10-09-host-shutdown-fixes.md).
+
 ## 2026-10-09 — package-docs: финальный candidate9695 и сокращённая приёмка
 
 CLI/Desktop из чистого `9695e61e358ac5e6043c08eb56d183faa03d7a28`, версия0.1.17,
