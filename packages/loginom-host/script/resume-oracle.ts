@@ -52,6 +52,7 @@ try {
       },
     })
     try {
+      await child.request("call", { name: "skill", arguments: { name: "loginom-automation" } })
       const prepared = (await child.request("call", {
         name: "dock_prepare",
         arguments: { intent: "open_package", package_path: saved.path, operation_id: `resume-${randomUUID()}` },
@@ -86,12 +87,12 @@ try {
       .map((row) => JSON.parse(row.data) as { type: string; tool?: string; state?: { status: string } })
       .filter((part) => part.type === "tool")
     if (
-      parts.length !== 2 ||
+      parts.length !== 3 ||
       parts.some((part) => part.state?.status !== "completed") ||
       parts
         .map((part) => part.tool)
         .sort()
-        .join(",") !== "loginom_dock_prepare,loginom_dock_workspace_observe"
+        .join(",") !== "loginom_dock_prepare,loginom_dock_workspace_observe,skill"
     )
       throw Error("RESUME_FRESH_TOOLS_MISSING")
     console.log(JSON.stringify({ status: "PASS", ...run, session, freshTools: parts.length }))

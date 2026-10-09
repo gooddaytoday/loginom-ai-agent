@@ -6,6 +6,8 @@ import { createHash } from "node:crypto"
 import { buildKeychain } from "../../../loginom-host/script/build-keychain"
 import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
+import { knowledgeServer } from "../../../loginom-runtime/client/test/support/knowledge-server.mjs"
+import { copyProductSkillsFixture } from "../../../loginom-host/test/fixtures/product-skills"
 
 const host = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-test-host-")))
 beforeAll(async () => {
@@ -107,6 +109,36 @@ test("actual standalone status launches bundled Node and releases the isolated p
     expect((await readdir(directory)).sort()).toEqual(["bundle", "profile"])
     expect(await readdir(join(directory, "profile"))).not.toContain(".writer")
     expect(await readdir(join(directory, "profile", "loginom"))).not.toContain("runtime")
+    const resourceProbe = Bun.spawn(
+      [
+        process.execPath,
+        "--eval",
+        `
+        import { standalone } from './src/cli/standalone.ts';
+        import { standaloneRun } from './src/cli/standalone-run.ts';
+        await standalone(['run', '--command=loginom-automation', 'probe'], (args, paths) => standaloneRun(args, paths));
+        console.log(JSON.stringify({ resources: process.env.LOGINOM_AI_AGENT_RESOURCES }));
+      `,
+      ],
+      {
+        cwd: resolve(import.meta.dir, "../.."),
+        env: {
+          ...process.env,
+          BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+          LOGINOM_AI_AGENT_CLI_PROFILE: join(directory, "profile"),
+          LOGINOM_AI_AGENT_CLI_BUNDLE: bundle,
+          LOGINOM_AI_AGENT_RESOURCES: "/untrusted/shell/resources",
+        },
+        stdin: "ignore",
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    )
+    const probeOutput = new Response(resourceProbe.stdout).text()
+    const probeErrors = new Response(resourceProbe.stderr).text()
+    expect(await resourceProbe.exited).toBe(2)
+    expect(await probeErrors).toBe("LOGINOM_CONFIG_REQUIRED\n")
+    expect(JSON.parse(await probeOutput)).toEqual({ resources: bundle })
     const run = Bun.spawn(
       [
         process.execPath,
@@ -114,6 +146,8 @@ test("actual standalone status launches bundled Node and releases the isolated p
         "./src/standalone.ts",
         "run",
         "--headless",
+        "--command",
+        "loginom-automation",
         "--format",
         "json",
         "Do not execute without Loginom setup",
@@ -143,28 +177,49 @@ test("actual standalone status launches bundled Node and releases the isolated p
   }
 }, 15_000)
 
-test("management commands share durable setup and recovery semantics through the real Node host", async () => {
-  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-management-")))
-  try {
-    const bundle = join(directory, "bundle")
-    const profile = join(directory, "profile")
-    await mkdir(join(bundle, "bin"), { recursive: true })
-    await mkdir(join(bundle, "runtime/src"), { recursive: true })
-    await symlink(bundledNode, join(bundle, "bin/node"))
-    if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
-    await cp(host, join(bundle, "host"), { recursive: true })
-    await writeFile(join(bundle, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test" }))
-    // Fixture only: handshake/validation succeeds without Chromium, Loginom or a provider.
-    await writeFile(
-      join(bundle, "runtime/src/managed-entry.mjs"),
-      `
+test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
+  "management commands share durable setup and recovery semantics through the real Node host: %s",
+  async (phase) => {
+    const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-management-")))
+    const cleanup: (() => void | Promise<void>)[] = []
+    try {
+      const bundle = join(directory, "bundle")
+      const profile = join(directory, "profile")
+      const files = await copyProductSkillsFixture(bundle)
+      const help = await knowledgeServer(
+        { after: (callback) => cleanup.push(callback) },
+        { apiKey: "private-setup-key" },
+      )
+      await mkdir(join(bundle, "bin"), { recursive: true })
+      await mkdir(join(bundle, "runtime/src"), { recursive: true })
+      await symlink(bundledNode, join(bundle, "bin/node"))
+      if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
+      await cp(host, join(bundle, "host"), { recursive: true })
+      await symlink(
+        resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
+        join(bundle, "runtime/src/knowledge-entry.mjs"),
+      )
+      await writeFile(
+        join(bundle, "resource-manifest.json"),
+        JSON.stringify({ protocol: 1, endpoint: help.endpoint, files }),
+      )
+      // Fixture only: handshake/validation succeeds without Chromium, Loginom or a provider.
+      await writeFile(
+        join(bundle, "runtime/src/managed-entry.mjs"),
+        `
+      let prepared = false;
       process.on('message', message => {
         if (message.operation === 'start') process.send({ id: message.id, result: {
           protocol: 1, generation: message.input.generation, chat: message.input.chat,
           checked: true, ready: true
         }});
         if (message.operation === 'interrupt') process.send({ id: message.id, result: { interrupted: true } });
-        if (message.operation === 'list') process.send({ id: message.id, result: { tools: [{ name: 'probe', description: 'Test the private host path', inputSchema: { type: 'object', properties: { fail: { type: 'boolean' }, reply: { type: 'string' }, operation_id: { type: 'string' } } } }] } });
+        if (message.operation === 'list') process.send({ id: message.id, result: { prepared, tools: [{ name: 'probe', description: 'Test the private host path', inputSchema: { type: 'object', properties: { fail: { type: 'boolean' }, reply: { type: 'string' }, operation_id: { type: 'string' } } } }] } });
+        if (message.operation === 'call' && message.input.name === 'dock_prepare') {
+          prepared = true;
+          process.send({id:message.id,result:{recoveryPending:false,result:{content:[{type:'text',text:'prepared'}]}}});
+          return;
+        }
         if (message.operation === 'call') {
           const args = message.input.arguments;
           const receipt = { operation_id: args.operation_id, ...(args.reply === 'node'
@@ -178,156 +233,112 @@ test("management commands share durable setup and recovery semantics through the
         if (message.operation === 'close') process.send({ id: message.id, result: { closed: true } }, () => process.disconnect());
       });
     `,
-    )
-    async function command(args: string[], input = "", extra: NodeJS.ProcessEnv = {}) {
-      const child = Bun.spawn(
-        [process.execPath, "run", "./src/standalone.ts", "loginom", ...args, "--format", "json"],
-        {
-          cwd: resolve(import.meta.dir, "../.."),
-          env: {
-            ...process.env,
-            BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
-            LOGINOM_AI_AGENT_CLI_PROFILE: profile,
-            LOGINOM_AI_AGENT_CLI_BUNDLE: bundle,
-            ...extra,
+      )
+      async function command(args: string[], input = "", extra: NodeJS.ProcessEnv = {}) {
+        const child = Bun.spawn(
+          [process.execPath, "run", "./src/standalone.ts", "loginom", ...args, "--format", "json"],
+          {
+            cwd: resolve(import.meta.dir, "../.."),
+            env: {
+              ...process.env,
+              BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+              LOGINOM_AI_AGENT_CLI_PROFILE: profile,
+              LOGINOM_AI_AGENT_CLI_BUNDLE: bundle,
+              ...extra,
+            },
+            stdin: new Blob([input]),
+            stdout: "pipe",
+            stderr: "pipe",
           },
-          stdin: new Blob([input]),
-          stdout: "pipe",
-          stderr: "pipe",
+        )
+        const stdout = new Response(child.stdout).text()
+        const stderr = new Response(child.stderr).text()
+        const code = await child.exited
+        const text = await stdout
+        const errors = await stderr
+        expect(text + errors).not.toContain("private-setup-key")
+        expect(await readdir(profile)).not.toContain(".writer")
+        return { code, result: JSON.parse(text), errors }
+      }
+      expect(await command(["check"])).toMatchObject({ code: 2, result: { code: "LOGINOM_CONFIG_REQUIRED" } })
+      expect(await command(["setup"])).toMatchObject({ code: 2, result: { code: "CLI_STDIN_REQUIRED" } })
+      expect(await command(["setup", "--stdin-json"], "private-setup-key")).toMatchObject({
+        code: 2,
+        result: { code: "CLI_SETUP_INVALID" },
+      })
+      expect(
+        await command(
+          ["setup", "--stdin-json"],
+          JSON.stringify({ apiKey: "private-setup-key", password: "initial-password" }),
+        ),
+      ).toMatchObject({
+        code: 0,
+        result: {
+          state: expect.stringMatching(/^(starting|ready)$/),
+          generation: 1,
+          hasApiKey: true,
+          hasPassword: true,
         },
-      )
-      const stdout = new Response(child.stdout).text()
-      const stderr = new Response(child.stderr).text()
-      const code = await child.exited
-      const text = await stdout
-      const errors = await stderr
-      expect(text + errors).not.toContain("private-setup-key")
-      expect(await readdir(profile)).not.toContain(".writer")
-      return { code, result: JSON.parse(text), errors }
-    }
-    expect(await command(["check"])).toMatchObject({ code: 2, result: { code: "LOGINOM_CONFIG_REQUIRED" } })
-    expect(await command(["setup"])).toMatchObject({ code: 2, result: { code: "CLI_STDIN_REQUIRED" } })
-    expect(await command(["setup", "--stdin-json"], "private-setup-key")).toMatchObject({
-      code: 2,
-      result: { code: "CLI_SETUP_INVALID" },
-    })
-    expect(
-      await command(
-        ["setup", "--stdin-json"],
-        JSON.stringify({ apiKey: "private-setup-key", password: "initial-password" }),
-      ),
-    ).toMatchObject({ code: 0, result: { state: "ready", generation: 1, hasApiKey: true, hasPassword: true } })
-    expect(await command(["setup", "--stdin-json"], JSON.stringify({ password: "" }))).toMatchObject({
-      code: 0,
-      result: { state: "ready", generation: 2, hasApiKey: true, hasPassword: false },
-    })
-    const persisted = JSON.parse(await readFile(join(profile, "loginom/connection/connection.json"), "utf8"))
-    expect(
-      await cliCredentials(process.platform, { root: join(profile, "loginom"), resources: bundle }).decode(
-        persisted.secrets,
-      ),
-    ).toEqual({ apiKey: "private-setup-key", password: "" })
-    expect(persisted.secrets.protection).toBe(
-      process.platform === "darwin" ? "keychain" : process.platform === "win32" ? "dpapi" : "plaintext",
-    )
-    if (process.platform !== "linux") expect(JSON.stringify(persisted)).not.toContain("private-setup-key")
-    expect(await command(["check"])).toMatchObject({ code: 0, result: { code: "LOGINOM_CONNECTION_VALID" } })
-    expect(await command(["cancel-pending"])).toMatchObject({ code: 0, result: { state: "ready" } })
-    const strictRecovery = { LOGINOM_AI_AGENT_STRICT_RECOVERY: "1" }
-    const journal = await recoveryStore(join(profile, "loginom/recovery"), { strict: true })
-    const id = await journal.begin("a".repeat(64), 2)
-    await journal.settle(id, false)
-    expect(await command(["recover"], "", strictRecovery)).toMatchObject({
-      code: 4,
-      result: { code: "LOGINOM_RECOVERY_CONFIRMATION_REQUIRED" },
-    })
-    expect(
-      await command(["recover", "--acknowledge", "00000000-0000-0000-0000-000000000000"], "", strictRecovery),
-    ).toMatchObject({
-      code: 3,
-      result: { code: "LOGINOM_RECOVERY_CONFLICT" },
-    })
-    expect(await command(["recover", "--acknowledge", id], "", strictRecovery)).toMatchObject({
-      code: 0,
-      result: { state: "ready" },
-    })
-    expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
-    const next = await journal.begin("b".repeat(64), 2)
-    await journal.settle(next, false)
-    expect(await command(["recover", "--acknowledge"], "", strictRecovery)).toMatchObject({
-      code: 0,
-      result: { state: "ready" },
-    })
-    expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
-    const dropped = await journal.begin("c".repeat(64), 2)
-    await journal.settle(dropped, false)
-    const advisory = await command(["status"])
-    expect(advisory.code).toBe(0)
-    expect(advisory.result.state).toBe("ready")
-    expect(advisory.result.recoveries).toBeUndefined()
-    expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
-    const run = Bun.spawn(
-      [
-        process.execPath,
-        "run",
-        "./src/standalone.ts",
-        "run",
-        "--headless",
-        "--format",
-        "json",
-        "--dir",
-        directory,
-        "--model",
-        "__standalone_no_provider__/missing",
-        "test",
-      ],
-      {
-        cwd: resolve(import.meta.dir, "../.."),
-        env: {
-          ...process.env,
-          BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
-          LOGINOM_AI_AGENT_PURE: "1",
-          LOGINOM_AI_AGENT_CLI_PROFILE: profile,
-          LOGINOM_AI_AGENT_CLI_BUNDLE: bundle,
+      })
+      expect(await command(["setup", "--stdin-json"], JSON.stringify({ password: "" }))).toMatchObject({
+        code: 0,
+        result: {
+          state: expect.stringMatching(/^(starting|ready)$/),
+          generation: 2,
+          hasApiKey: true,
+          hasPassword: false,
         },
-        stdin: "ignore",
-        stdout: "pipe",
-        stderr: "pipe",
-      },
-    )
-    const output = new Response(run.stdout).text()
-    const errors = new Response(run.stderr).text()
-    expect(await run.exited).toBe(1)
-    const text = await output
-    expect(text + (await errors)).not.toContain("private-setup-key")
-    expect(
-      text
-        .trim()
-        .split("\n")
-        .map((line) => JSON.parse(line)),
-    ).toContainEqual(
-      expect.objectContaining({
-        type: "error",
-        error: expect.objectContaining({
-          data: expect.objectContaining({ message: "Model not found: __standalone_no_provider__/missing." }),
-        }),
-      }),
-    )
-    expect(await readdir(profile)).not.toContain(".writer")
-    const { ManagedRuntime } = await import("effect")
-    const { TestLLMServer } = await import("../lib/llm-server")
-    const { testProviderConfig } = await import("../lib/test-provider")
-    const provider = ManagedRuntime.make(TestLLMServer.layer)
-    try {
-      const llm = await provider.runPromise(TestLLMServer)
-      await provider.runPromise(llm.tool("loginom_probe", {}))
-      await provider.runPromise(llm.text("standalone provider response"))
-      await writeFile(
-        join(profile, "config/loginom-ai-agent.json"),
-        JSON.stringify({ ...testProviderConfig(llm.url), permission: { "loginom_*": "ask" } }),
+      })
+      const persisted = JSON.parse(await readFile(join(profile, "loginom/connection/connection.json"), "utf8"))
+      expect(
+        await cliCredentials(process.platform, { root: join(profile, "loginom"), resources: bundle }).decode(
+          persisted.secrets,
+        ),
+      ).toEqual({ apiKey: "private-setup-key", password: "" })
+      expect(persisted.secrets.protection).toBe(
+        process.platform === "darwin" ? "keychain" : process.platform === "win32" ? "dpapi" : "plaintext",
       )
-      const invoke = (auto: boolean, file?: string, extra: string[] = []) =>
-        Bun.spawn(
+      if (process.platform !== "linux") expect(JSON.stringify(persisted)).not.toContain("private-setup-key")
+      if (phase === "setup-recovery") {
+        expect(await command(["check"])).toMatchObject({ code: 0, result: { code: "LOGINOM_CONNECTION_VALID" } })
+        expect(await command(["cancel-pending"])).toMatchObject({
+          code: 0,
+          result: { state: expect.stringMatching(/^(starting|ready)$/) },
+        })
+        const strictRecovery = { LOGINOM_AI_AGENT_STRICT_RECOVERY: "1" }
+        const journal = await recoveryStore(join(profile, "loginom/recovery"), { strict: true })
+        const id = await journal.begin("a".repeat(64), 2)
+        await journal.settle(id, false)
+        expect(await command(["recover"], "", strictRecovery)).toMatchObject({
+          code: 4,
+          result: { code: "LOGINOM_RECOVERY_CONFIRMATION_REQUIRED" },
+        })
+        expect(
+          await command(["recover", "--acknowledge", "00000000-0000-0000-0000-000000000000"], "", strictRecovery),
+        ).toMatchObject({
+          code: 3,
+          result: { code: "LOGINOM_RECOVERY_CONFLICT" },
+        })
+        expect(await command(["recover", "--acknowledge", id], "", strictRecovery)).toMatchObject({
+          code: 0,
+          result: { state: expect.stringMatching(/^(starting|ready)$/) },
+        })
+        expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
+        const next = await journal.begin("b".repeat(64), 2)
+        await journal.settle(next, false)
+        expect(await command(["recover", "--acknowledge"], "", strictRecovery)).toMatchObject({
+          code: 0,
+          result: { state: expect.stringMatching(/^(starting|ready)$/) },
+        })
+        expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
+        const dropped = await journal.begin("c".repeat(64), 2)
+        await journal.settle(dropped, false)
+        const advisory = await command(["status"])
+        expect(advisory.code).toBe(0)
+        expect(["starting", "ready"]).toContain(advisory.result.state)
+        expect(advisory.result.recoveries).toBeUndefined()
+        expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
+        const run = Bun.spawn(
           [
             process.execPath,
             "run",
@@ -339,12 +350,8 @@ test("management commands share durable setup and recovery semantics through the
             "--dir",
             directory,
             "--model",
-            "test/test-model",
-            ...(auto ? ["--dangerously-skip-permissions"] : []),
-            ...(file ? ["--file", file] : []),
-            ...extra,
-            "--",
-            "say hello",
+            "__standalone_no_provider__/missing",
+            "test",
           ],
           {
             cwd: resolve(import.meta.dir, "../.."),
@@ -360,210 +367,314 @@ test("management commands share durable setup and recovery semantics through the
             stderr: "pipe",
           },
         )
-      const attachment = join(directory, "sales.csv")
-      await writeFile(attachment, "amount\n10\n20\n25\n")
-      const success = invoke(true, attachment)
-      const stdout = new Response(success.stdout).text()
-      const stderr = new Response(success.stderr).text()
-      expect(await success.exited).toBe(0)
-      expect(await stderr).not.toContain("private-setup-key")
-      const events = (await stdout)
-        .trim()
-        .split("\n")
-        .map((line) => JSON.parse(line))
-      expect(events.map((event) => event.type)).toContain("tool_use")
-      expect(events.find((event) => event.type === "tool_use").part).toMatchObject({
-        tool: "loginom_probe",
-        state: { status: "completed", output: "private host probe completed" },
-      })
-      expect(events.find((event) => event.type === "text").part.text).toBe("standalone provider response")
-      expect(await readdir(profile)).not.toContain(".writer")
-      expect(await provider.runPromise(llm.calls)).toBeGreaterThan(0)
-      const admissions = await readdir(join(profile, "loginom/inputs"))
-      expect(admissions).toHaveLength(1)
-      expect(await readFile(join(profile, "loginom/inputs", admissions[0], "0"), "utf8")).toBe("amount\n10\n20\n25\n")
-      await provider.runPromise(llm.tool("loginom_probe", {}))
-      await provider.runPromise(llm.text("cannot complete without permission"))
-      const denied = invoke(false)
-      const deniedOutput = new Response(denied.stdout).text()
-      const deniedErrors = new Response(denied.stderr).text()
-      expect(await denied.exited).toBe(1)
-      expect(await deniedErrors).not.toContain("private-setup-key")
-      expect(
-        (await deniedOutput)
-          .trim()
-          .split("\n")
-          .map((line) => JSON.parse(line)),
-      ).toContainEqual(
-        expect.objectContaining({
-          type: "error",
-          error: { name: "CLI_PERMISSION_REJECTED", data: { message: "CLI_PERMISSION_REJECTED" } },
-        }),
-      )
-      expect(await readdir(profile)).not.toContain(".writer")
-      await writeFile(
-        join(profile, "config/loginom-ai-agent.json"),
-        JSON.stringify({ ...testProviderConfig(llm.url), permission: { bash: { "*": "allow", pwd: "deny" } } }),
-      )
-      await provider.runPromise(llm.reset)
-      await provider.runPromise(llm.tool("bash", { command: "pwd", description: "Check denied command" }))
-      await provider.runPromise(llm.text("policy denied the action"))
-      const policyDenied = invoke(true)
-      const policyDeniedOutput = new Response(policyDenied.stdout).text()
-      const policyDeniedErrors = new Response(policyDenied.stderr).text()
-      expect(await policyDenied.exited).toBe(1)
-      const policyDeniedEvents = (await policyDeniedOutput)
-        .trim()
-        .split("\n")
-        .map((line) => JSON.parse(line))
-      expect(policyDeniedEvents).toContainEqual(
-        expect.objectContaining({
-          type: "error",
-          error: expect.objectContaining({ name: "CLI_PERMISSION_REJECTED" }),
-        }),
-      )
-      expect(policyDeniedEvents.find((event) => event.type === "tool_use").part.state).toMatchObject({
-        status: "error",
-        metadata: { permissionDenied: true },
-      })
-      expect(await policyDeniedErrors).not.toContain("private-setup-key")
-      expect(await readdir(profile)).not.toContain(".writer")
-      await provider.runPromise(llm.reset)
-      await provider.runPromise(llm.tool("loginom_probe", { fail: true }))
-      await provider.runPromise(llm.text("tool failure was reported"))
-      const toolFailure = invoke(true)
-      const failureOutput = new Response(toolFailure.stdout).text()
-      const failureErrors = new Response(toolFailure.stderr).text()
-      expect(await toolFailure.exited).toBe(0)
-      const failureEvents = (await failureOutput)
-        .trim()
-        .split("\n")
-        .map((line) => JSON.parse(line))
-      expect(failureEvents.find((event) => event.type === "tool_use").part.state).toMatchObject({
-        status: "error",
-        error: "private host probe failed",
-        metadata: { isError: true },
-      })
-      expect(failureEvents.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(
-        false,
-      )
-      expect(await failureErrors).not.toContain("private-setup-key")
-      expect(await readdir(profile)).not.toContain(".writer")
-      await provider.runPromise(llm.reset)
-      await provider.runPromise(llm.tool("loginom_probe", { operation_id: "corrected-probe", fail: true }))
-      await provider.runPromise(llm.tool("loginom_probe", { operation_id: "corrected-probe", fail: false }))
-      await provider.runPromise(llm.text("tool failure was corrected"))
-      const corrected = invoke(true)
-      const correctedOutput = new Response(corrected.stdout).text()
-      const correctedErrors = new Response(corrected.stderr).text()
-      expect(await corrected.exited).toBe(0)
-      const correctedEvents = (await correctedOutput)
-        .trim()
-        .split("\n")
-        .map((line) => JSON.parse(line))
-      expect(
-        correctedEvents.filter((event) => event.type === "tool_use").map((event) => event.part.state.status),
-      ).toEqual(["error", "completed"])
-      expect(await correctedErrors).not.toContain("private-setup-key")
-      expect(await readdir(profile)).not.toContain(".writer")
-      for (const reply of ["action", "node"]) {
-        for (const repair of [false, true]) {
-          await provider.runPromise(llm.reset)
-          await provider.runPromise(llm.tool("loginom_probe", { operation_id: "business", reply, fail: true }))
-          if (repair)
-            await provider.runPromise(llm.tool("loginom_probe", { operation_id: "business", reply, fail: false }))
-          await provider.runPromise(llm.text("business outcome inspected"))
-          const child = invoke(true)
-          const output = new Response(child.stdout).text()
-          const errors = new Response(child.stderr).text()
-          expect(await child.exited).toBe(0)
-          const events = (await output)
+        const output = new Response(run.stdout).text()
+        const errors = new Response(run.stderr).text()
+        expect(await run.exited).toBe(1)
+        const text = await output
+        expect(text + (await errors)).not.toContain("private-setup-key")
+        expect(
+          text
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line)),
+        ).toContainEqual(
+          expect.objectContaining({
+            type: "error",
+            error: expect.objectContaining({
+              data: expect.objectContaining({ message: "Model not found: __standalone_no_provider__/missing." }),
+            }),
+          }),
+        )
+        expect(await readdir(profile)).not.toContain(".writer")
+        return
+      }
+      const { ManagedRuntime } = await import("effect")
+      const { TestLLMServer } = await import("../lib/llm-server")
+      const { testProviderConfig } = await import("../lib/test-provider")
+      const provider = ManagedRuntime.make(TestLLMServer.layer)
+      try {
+        const llm = await provider.runPromise(TestLLMServer)
+        const prepare = () => provider.runPromise(llm.tool("loginom_dock_prepare", {}))
+        await writeFile(
+          join(profile, "config/loginom-ai-agent.json"),
+          JSON.stringify({
+            ...testProviderConfig(llm.url),
+            permission: { loginom_probe: "ask", loginom_dock_prepare: "allow" },
+          }),
+        )
+        const invoke = (auto: boolean, file?: string, extra: string[] = [], automation = true) =>
+          Bun.spawn(
+            [
+              process.execPath,
+              "run",
+              "./src/standalone.ts",
+              "run",
+              "--headless",
+              "--format",
+              "json",
+              "--dir",
+              directory,
+              "--model",
+              "test/test-model",
+              ...(auto ? ["--dangerously-skip-permissions"] : []),
+              ...(file ? ["--file", file] : []),
+              ...(automation ? ["--command", "loginom-automation"] : []),
+              ...extra,
+              "--",
+              "say hello",
+            ],
+            {
+              cwd: resolve(import.meta.dir, "../.."),
+              env: {
+                ...process.env,
+                BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+                LOGINOM_AI_AGENT_PURE: "1",
+                LOGINOM_AI_AGENT_CLI_PROFILE: profile,
+                LOGINOM_AI_AGENT_CLI_BUNDLE: bundle,
+              },
+              stdin: "ignore",
+              stdout: "pipe",
+              stderr: "pipe",
+            },
+          )
+        if (phase === "permissions") {
+          await prepare()
+          await provider.runPromise(llm.tool("loginom_probe", {}))
+          await provider.runPromise(llm.text("standalone provider response"))
+          const attachment = join(directory, "sales.csv")
+          await writeFile(attachment, "amount\n10\n20\n25\n")
+          const success = invoke(true, attachment)
+          const stdout = new Response(success.stdout).text()
+          const stderr = new Response(success.stderr).text()
+          expect({ exit: await success.exited, errors: await stderr }).toMatchObject({ exit: 0 })
+          expect(await stderr).not.toContain("private-setup-key")
+          const events = (await stdout)
             .trim()
             .split("\n")
             .map((line) => JSON.parse(line))
-          expect(events.filter((event) => event.type === "tool_use").map((event) => event.part.state.status)).toEqual(
-            repair ? ["error", "completed"] : ["error"],
-          )
-          expect(events.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(false)
-          expect(await errors).not.toContain("private-setup-key")
+          expect(events.map((event) => event.type)).toContain("tool_use")
+          expect(
+            events.find((event) => event.type === "tool_use" && event.part.tool === "loginom_probe").part,
+          ).toMatchObject({
+            tool: "loginom_probe",
+            state: { status: "completed", output: "private host probe completed" },
+          })
+          expect(events.find((event) => event.type === "text").part.text).toBe("standalone provider response")
           expect(await readdir(profile)).not.toContain(".writer")
-        }
-      }
-      const invalid = invoke(true, undefined, ["--fork"])
-      const invalidOutput = new Response(invalid.stdout).text()
-      const invalidErrors = new Response(invalid.stderr).text()
-      expect(await invalid.exited).toBe(2)
-      expect(await invalidOutput).toContain("CLI_ARGUMENT_INVALID")
-      expect(await invalidErrors).toContain("CLI_ARGUMENT_INVALID")
-      expect(await readdir(profile)).not.toContain(".writer")
-      for (const unavailable of [false, true]) {
-        await provider.runPromise(llm.reset)
-        if (unavailable) {
-          await writeFile(
-            join(profile, "config/loginom-ai-agent.json"),
-            JSON.stringify({
-              ...testProviderConfig(llm.url),
-              permission: { "loginom_*": "deny" },
+          expect(await provider.runPromise(llm.calls)).toBeGreaterThan(0)
+          const admissions = await readdir(join(profile, "loginom/inputs"))
+          expect(admissions).toHaveLength(1)
+          expect(await readFile(join(profile, "loginom/inputs", admissions[0], "0"), "utf8")).toBe(
+            "amount\n10\n20\n25\n",
+          )
+          await prepare()
+          await provider.runPromise(llm.tool("loginom_probe", {}))
+          await provider.runPromise(llm.text("cannot complete without permission"))
+          const denied = invoke(false)
+          const deniedOutput = new Response(denied.stdout).text()
+          const deniedErrors = new Response(denied.stderr).text()
+          expect(await denied.exited).toBe(1)
+          expect(await deniedErrors).not.toContain("private-setup-key")
+          expect(
+            (await deniedOutput)
+              .trim()
+              .split("\n")
+              .map((line) => JSON.parse(line)),
+          ).toContainEqual(
+            expect.objectContaining({
+              type: "error",
+              error: { name: "CLI_PERMISSION_REJECTED", data: { message: "CLI_PERMISSION_REJECTED" } },
             }),
           )
-          await provider.runPromise(llm.tool("loginom_probe", {}))
-        } else {
-          await provider.runPromise(llm.tool("loginom_probe", { operation_id: "failed-one", fail: true }))
-          await provider.runPromise(llm.tool("loginom_probe", { operation_id: "different-one", fail: false }))
+          expect(await readdir(profile)).not.toContain(".writer")
+          await writeFile(
+            join(profile, "config/loginom-ai-agent.json"),
+            JSON.stringify({ ...testProviderConfig(llm.url), permission: { bash: { "*": "allow", pwd: "deny" } } }),
+          )
+          await provider.runPromise(llm.reset)
+          await provider.runPromise(llm.tool("bash", { command: "pwd", description: "Check denied command" }))
+          await provider.runPromise(llm.text("policy denied the action"))
+          const policyDenied = invoke(true, undefined, [], false)
+          const policyDeniedOutput = new Response(policyDenied.stdout).text()
+          const policyDeniedErrors = new Response(policyDenied.stderr).text()
+          expect(await policyDenied.exited).toBe(1)
+          const policyDeniedEvents = (await policyDeniedOutput)
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line))
+          expect(policyDeniedEvents).toContainEqual(
+            expect.objectContaining({
+              type: "error",
+              error: expect.objectContaining({ name: "CLI_PERMISSION_REJECTED" }),
+            }),
+          )
+          expect(
+            policyDeniedEvents.find((event) => event.type === "tool_use" && event.part.tool === "bash").part.state,
+          ).toMatchObject({
+            status: "error",
+            metadata: { permissionDenied: true },
+          })
+          expect(await policyDeniedErrors).not.toContain("private-setup-key")
+          expect(await readdir(profile)).not.toContain(".writer")
+          const invalid = invoke(true, undefined, ["--fork"])
+          const invalidOutput = new Response(invalid.stdout).text()
+          const invalidErrors = new Response(invalid.stderr).text()
+          expect(await invalid.exited).toBe(2)
+          expect(await invalidOutput).toContain("CLI_ARGUMENT_INVALID")
+          expect(await invalidErrors).toContain("CLI_ARGUMENT_INVALID")
+          expect(await readdir(profile)).not.toContain(".writer")
+          return
         }
-        await provider.runPromise(llm.text("a final answer cannot erase the failure"))
-        const unresolved = invoke(true)
-        const unresolvedOutput = new Response(unresolved.stdout).text()
-        const unresolvedErrors = new Response(unresolved.stderr).text()
-        expect(await unresolved.exited).toBe(unavailable ? 1 : 0)
-        const unresolvedEvents = (await unresolvedOutput)
-          .trim()
-          .split("\n")
-          .map((line) => JSON.parse(line))
-        expect(unresolvedEvents.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(
-          unavailable,
-        )
-        if (unavailable) expect(unresolvedEvents.find((event) => event.type === "tool_use").part.tool).toBe("invalid")
-        expect(await unresolvedErrors).not.toContain("private-setup-key")
+        if (phase === "outcomes") {
+          await provider.runPromise(llm.reset)
+          await prepare()
+          await provider.runPromise(llm.tool("loginom_probe", { fail: true }))
+          await provider.runPromise(llm.text("tool failure was reported"))
+          const toolFailure = invoke(true)
+          const failureOutput = new Response(toolFailure.stdout).text()
+          const failureErrors = new Response(toolFailure.stderr).text()
+          expect(await toolFailure.exited).toBe(0)
+          const failureEvents = (await failureOutput)
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line))
+          expect(
+            failureEvents.find((event) => event.type === "tool_use" && event.part.tool === "loginom_probe").part.state,
+          ).toMatchObject({
+            status: "error",
+            error: "private host probe failed",
+            metadata: { isError: true },
+          })
+          expect(failureEvents.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(
+            false,
+          )
+          expect(await failureErrors).not.toContain("private-setup-key")
+          expect(await readdir(profile)).not.toContain(".writer")
+          await provider.runPromise(llm.reset)
+          await prepare()
+          await provider.runPromise(llm.tool("loginom_probe", { operation_id: "corrected-probe", fail: true }))
+          await provider.runPromise(llm.tool("loginom_probe", { operation_id: "corrected-probe", fail: false }))
+          await provider.runPromise(llm.text("tool failure was corrected"))
+          const corrected = invoke(true)
+          const correctedOutput = new Response(corrected.stdout).text()
+          const correctedErrors = new Response(corrected.stderr).text()
+          expect(await corrected.exited).toBe(0)
+          const correctedEvents = (await correctedOutput)
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line))
+          expect(
+            correctedEvents
+              .filter((event) => event.type === "tool_use" && event.part.tool === "loginom_probe")
+              .map((event) => event.part.state.status),
+          ).toEqual(["error", "completed"])
+          expect(await correctedErrors).not.toContain("private-setup-key")
+          expect(await readdir(profile)).not.toContain(".writer")
+          for (const reply of ["action", "node"]) {
+            for (const repair of [false, true]) {
+              await provider.runPromise(llm.reset)
+              await prepare()
+              await provider.runPromise(llm.tool("loginom_probe", { operation_id: "business", reply, fail: true }))
+              if (repair)
+                await provider.runPromise(llm.tool("loginom_probe", { operation_id: "business", reply, fail: false }))
+              await provider.runPromise(llm.text("business outcome inspected"))
+              const child = invoke(true)
+              const output = new Response(child.stdout).text()
+              const errors = new Response(child.stderr).text()
+              expect(await child.exited).toBe(0)
+              const events = (await output)
+                .trim()
+                .split("\n")
+                .map((line) => JSON.parse(line))
+              expect(
+                events
+                  .filter((event) => event.type === "tool_use" && event.part.tool === "loginom_probe")
+                  .map((event) => event.part.state.status),
+              ).toEqual(repair ? ["error", "completed"] : ["error"])
+              expect(events.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(
+                false,
+              )
+              expect(await errors).not.toContain("private-setup-key")
+              expect(await readdir(profile)).not.toContain(".writer")
+            }
+          }
+          for (const unavailable of [false, true]) {
+            await provider.runPromise(llm.reset)
+            await prepare()
+            if (unavailable) {
+              await writeFile(
+                join(profile, "config/loginom-ai-agent.json"),
+                JSON.stringify({
+                  ...testProviderConfig(llm.url),
+                  permission: { loginom_probe: "deny", loginom_dock_prepare: "allow" },
+                }),
+              )
+              await provider.runPromise(llm.tool("loginom_probe", {}))
+            } else {
+              await provider.runPromise(llm.tool("loginom_probe", { operation_id: "failed-one", fail: true }))
+              await provider.runPromise(llm.tool("loginom_probe", { operation_id: "different-one", fail: false }))
+            }
+            await provider.runPromise(llm.text("a final answer cannot erase the failure"))
+            const unresolved = invoke(true)
+            const unresolvedOutput = new Response(unresolved.stdout).text()
+            const unresolvedErrors = new Response(unresolved.stderr).text()
+            expect(await unresolved.exited).toBe(unavailable ? 1 : 0)
+            const unresolvedEvents = (await unresolvedOutput)
+              .trim()
+              .split("\n")
+              .map((line) => JSON.parse(line))
+            expect(
+              unresolvedEvents.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED"),
+            ).toBe(unavailable)
+            if (unavailable)
+              expect(
+                unresolvedEvents.find((event) => event.type === "tool_use" && event.part.tool === "invalid").part.tool,
+              ).toBe("invalid")
+            expect(await unresolvedErrors).not.toContain("private-setup-key")
+            expect(await readdir(profile)).not.toContain(".writer")
+          }
+          return
+        }
+        await provider.runPromise(llm.reset)
+        const calls = await provider.runPromise(llm.calls)
+        await provider.runPromise(llm.hang)
+        const cancelled = invoke(true)
+        const cancelledOutput = new Response(cancelled.stdout).text()
+        const cancelledErrors = new Response(cancelled.stderr).text()
+        await provider.runPromise(llm.wait(calls + 1))
+        cancelled.kill("SIGINT")
+        expect(await cancelled.exited).toBe(130)
+        expect(await cancelledErrors).not.toContain("private-setup-key")
+        expect(await cancelledOutput).toContain('"name":"CLI_CANCELLED"')
         expect(await readdir(profile)).not.toContain(".writer")
+      } finally {
+        await provider.dispose()
       }
-      await provider.runPromise(llm.reset)
-      const calls = await provider.runPromise(llm.calls)
-      await provider.runPromise(llm.hang)
-      const cancelled = invoke(true)
-      const cancelledOutput = new Response(cancelled.stdout).text()
-      const cancelledErrors = new Response(cancelled.stderr).text()
-      await provider.runPromise(llm.wait(calls + 1))
-      cancelled.kill("SIGINT")
-      expect(await cancelled.exited).toBe(130)
-      expect(await cancelledErrors).not.toContain("private-setup-key")
-      expect(await cancelledOutput).toContain('"name":"CLI_CANCELLED"')
-      expect(await readdir(profile)).not.toContain(".writer")
     } finally {
-      await provider.dispose()
-    }
-  } finally {
-    if (process.platform === "darwin") {
-      const root = await realpath(join(directory, "profile/loginom")).catch(() => undefined)
-      if (root) {
-        // Delete only this test's profile key, without changing Keychain settings.
-        const cleanup = Bun.spawn(
-          [
-            "/usr/bin/security",
-            "delete-generic-password",
-            "-s",
-            "com.loginom.aiagent.cli.profile-key.v1",
-            "-a",
-            createHash("sha256").update(root).digest("hex"),
-          ],
-          { stdout: "ignore", stderr: "ignore" },
-        )
-        expect([0, 44]).toContain(await cleanup.exited)
+      for (const callback of cleanup) await callback()
+      if (process.platform === "darwin") {
+        const root = await realpath(join(directory, "profile/loginom")).catch(() => undefined)
+        if (root) {
+          // Delete only this test's profile key, without changing Keychain settings.
+          const cleanup = Bun.spawn(
+            [
+              "/usr/bin/security",
+              "delete-generic-password",
+              "-s",
+              "com.loginom.aiagent.cli.profile-key.v1",
+              "-a",
+              createHash("sha256").update(root).digest("hex"),
+            ],
+            { stdout: "ignore", stderr: "ignore" },
+          )
+          expect([0, 44]).toContain(await cleanup.exited)
+        }
       }
+      await rm(directory, { recursive: true, force: true })
     }
-    await rm(directory, { recursive: true, force: true })
-  }
-}, 90_000)
+  },
+  90_000,
+)
 
 // Bun.build inside the test runner intermittently fails with EISDIR on bundled dependencies
 // (seen with fast-check under effect), so the host is built by the script in its own process.

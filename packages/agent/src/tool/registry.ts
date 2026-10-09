@@ -83,6 +83,7 @@ export interface Interface {
     modelID: ModelV2.ID
     agent: Agent.Info
     permission?: PermissionV1.Ruleset
+    allowed?: (tool: Tool.Def) => boolean
   }) => Effect.Effect<Tool.Def[]>
 }
 
@@ -255,7 +256,10 @@ const layer = Layer.effect(
 
     const all: Interface["all"] = Effect.fn("ToolRegistry.all")(function* () {
       const s = yield* InstanceState.get(state)
-      return [...s.builtin, ...s.custom] as Tool.Def[]
+      return [
+        ...s.builtin.map((tool) => ({ ...tool, origin: "builtin" as const })),
+        ...s.custom.map((tool) => ({ ...tool, origin: "external" as const })),
+      ]
     })
 
     const ids: Interface["ids"] = Effect.fn("ToolRegistry.ids")(function* () {
@@ -290,6 +294,7 @@ const layer = Layer.effect(
 
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
       const filtered = (yield* all()).filter((tool) => {
+        if (input.allowed && !input.allowed(tool)) return false
         if (tool.id === WebSearchTool.id) {
           return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })
         }
@@ -322,6 +327,7 @@ const layer = Layer.effect(
               : undefined
           return {
             id: tool.id,
+            origin: tool.origin,
             description: [
               output.description,
               tool.id === TaskTool.id ? yield* describeTask(input.agent) : undefined,

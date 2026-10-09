@@ -1,12 +1,17 @@
+import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
-import { chmod, cp, mkdir, readdir, readFile, readlink, realpath, rename, rm, stat } from "node:fs/promises"
+import { cp, mkdir, readFile, realpath, rename, rm, stat } from "node:fs/promises"
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { $ } from "bun"
 import { nativeResourceCandidates } from "./native-resource-candidates"
 import { buildPhase } from "./build-phase"
 import { buildKeychain } from "./build-keychain"
+import { buildPackageDocs } from "./build-package-docs"
+import { collectBuildNotices } from "./collect-build-notices"
 import release from "../../product/loginom-release.json"
 import catalogs from "../../product/loginom-catalogs.json"
+import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
+import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 
 export function actionCatalogForPlatform(platform: string) {
   const target =
@@ -53,13 +58,14 @@ export async function stageResources(input: {
   if (![input.destination, input.node, input.browsers].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const source = resolve(import.meta.dir, "../../loginom-runtime")
+  const docsSource = resolve(import.meta.dir, "../src/package-docs")
   const destination = resolve(input.destination)
   const node = input.node
   const browsers = input.browsers
   const staging = destination + ".staging"
   for (const paths of [
-    [destination, staging, source, node, browsers],
-    await Promise.all([destination, staging, source, node, browsers].map(canonicalBuildPath)),
+    [destination, staging, source, node, browsers, productSkillsDirectory, docsSource],
+    await Promise.all([destination, staging, source, node, browsers, productSkillsDirectory, docsSource].map(canonicalBuildPath)),
   ]) {
     if (
       paths
@@ -94,6 +100,7 @@ export async function stageResources(input: {
   }
   await rm(staging, { recursive: true, force: true })
   await mkdir(join(staging, "bin"), { recursive: true })
+  await cp(productSkillsDirectory, join(staging, "skills"), { recursive: true, verbatimSymlinks: true })
   await cp(node, join(staging, pins.node))
   await cp(browsers, join(staging, "browsers"), {
     recursive: true,
@@ -146,14 +153,17 @@ export async function stageResources(input: {
   if (process.platform === "linux") {
     // Chrome for Testing ships chrome_sandbox, while Chromium's fallback looks for chrome-sandbox.
     // DEB installs these files as root; retain the standard setuid sandbox for kernels without user namespaces.
-    await cp(
-      join(dirname(join(staging, browser)), "chrome_sandbox"),
-      join(dirname(join(staging, browser)), "chrome-sandbox"),
-    )
-    await chmod(join(dirname(join(staging, browser)), "chrome-sandbox"), 0o4755)
+    // Bun's fs.chmod clears the setuid bit, so the mode has to be applied by /bin/chmod.
+    const sandbox = join(dirname(join(staging, browser)), "chrome-sandbox")
+    await cp(join(dirname(join(staging, browser)), "chrome_sandbox"), sandbox)
+    await setLinuxSandboxMode(sandbox)
   }
   if (process.platform === "darwin" && input.flavor === "cli") await buildKeychain(join(staging, "bin"))
   await mkdir(join(staging, "licenses"))
+  const docs = await buildPhase(`${input.flavor}-package-docs`, () =>
+    buildPackageDocs(join(staging, "skills/package-docs/scripts")))
+  await collectBuildNotices(join(staging, "licenses/package-docs"), [{ root: docs.root, metafile: docs.metafile }])
+  await cp(join(productSkillsDirectory, "package-docs/assets/fonts/OFL.txt"), join(staging, "licenses/Golos-OFL.txt"))
   await cp(resolve(source, "../../LICENSE"), join(staging, "licenses/OpenCode-MIT.txt"))
   await cp(
     resolve(dirname(node), process.platform === "win32" ? "LICENSE" : "../LICENSE"),
@@ -167,40 +177,14 @@ export async function stageResources(input: {
   Loginom AI Agent includes code derived from OpenCode (MIT) and Loginom Dock (AGPL-3.0).
   The original copyright/license notices are preserved in licenses/.
   Node.js license and bundled dependency notices are in licenses/Node.txt.
+  Package documentation uses Golos Text under the SIL Open Font License (licenses/Golos-OFL.txt).
+  Its emitted npm dependency notices are in licenses/package-docs/.
   Playwright, MCP and their dependency license files are included alongside their package sources in runtime/client/node_modules/.
   ${input.flavor === "desktop" ? "Electron notices are included at the application root by electron-builder; the managed Chromium also exposes chrome://credits/." : "The bundled Chromium exposes its notices at chrome://credits/. Linux CLI archives also export them under licenses/chromium/ at the archive root. Browser-side license files remain under browsers/. Electron is not included."}
   The active Dock JavaScript sources are included in runtime/.
   `,
   )
-  // Windows package isolation can expose a path through a virtualized alias.
-  // Compare canonical paths on both sides so a legitimate staged file does
-  // not look like an escape while real symlinks/junctions still fail closed.
-  const canonicalStaging = await realpath(staging)
-  const files: Array<{ path: string; sha256: string; link?: string; directory?: boolean }> = []
-  async function collect(directory: string): Promise<void> {
-    const entries = await readdir(directory, { withFileTypes: true })
-    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-      const path = join(directory, entry.name)
-      if (entry.isDirectory()) {
-        await collect(path)
-        continue
-      }
-      const link = entry.isSymbolicLink() ? await readlink(path) : undefined
-      const targetPath = relative(canonicalStaging, await realpath(path))
-      if (targetPath === ".." || targetPath.startsWith(".." + sep) || isAbsolute(targetPath))
-        throw Error("LOGINOM_BUILD_RESOURCE_ESCAPE")
-      const directoryLink = link !== undefined && (await stat(path)).isDirectory()
-      files.push({
-        path: relative(staging, path).split(sep).join("/"),
-        sha256: createHash("sha256")
-          .update(directoryLink ? link! : await readFile(path))
-          .digest("hex"),
-        ...(link !== undefined ? { link } : {}),
-        ...(directoryLink ? { directory: true } : {}),
-      })
-    }
-  }
-  await buildPhase(`${input.flavor}-resource-inventory`, () => collect(staging))
+  const files = await buildPhase(`${input.flavor}-resource-inventory`, () => resourceInventory(staging))
   await Bun.write(
     join(staging, "resource-manifest.json"),
     JSON.stringify(
@@ -222,6 +206,17 @@ export async function stageResources(input: {
   await rm(destination, { recursive: true, force: true })
   await buildPhase(`${input.flavor}-resource-publish`, () => rename(staging, destination))
   return { files: files.length, destination }
+}
+
+// Chromium refuses to start unless this helper is mode 4755. Ownership is applied later, at install or package time.
+export async function setLinuxSandboxMode(path: string) {
+  await new Promise<void>((resolve, reject) => {
+    execFile("/bin/chmod", ["4755", path], { timeout: 30_000 }, (error) => {
+      if (error) reject(error)
+      else resolve()
+    })
+  })
+  if (((await stat(path)).mode & 0o7777) !== 0o4755) throw new Error("LOGINOM_SANDBOX_MODE_INVALID")
 }
 
 // Catalog compatibility is pinned independently of runtime binaries. Selecting

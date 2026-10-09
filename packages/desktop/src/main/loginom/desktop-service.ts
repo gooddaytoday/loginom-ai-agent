@@ -3,12 +3,16 @@ import { join, resolve } from "node:path"
 import { createLoginomHost } from "@loginom-ai-agent/loginom-host/host"
 import { credentials } from "./credentials"
 
+export function loginomResources() {
+  return app.isPackaged
+    ? join(process.resourcesPath, "loginom")
+    : resolve(import.meta.dirname, "../../resources/loginom")
+}
+
 export function desktopLoginom() {
   return createLoginomHost({
     root: join(app.getPath("userData"), "loginom"),
-    resources: app.isPackaged
-      ? join(process.resourcesPath, "loginom")
-      : resolve(import.meta.dirname, "../../resources/loginom"),
+    resources: loginomResources(),
     codec: credentials(process.platform, safeStorage),
     environment: process.env,
     headless:

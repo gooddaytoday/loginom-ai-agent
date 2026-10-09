@@ -7,6 +7,7 @@ import { usePlatform } from "@/context/platform"
 import { uuid } from "@/utils/uuid"
 import { getCursorPosition } from "./editor-dom"
 import { createBlobReference, type DraftStore } from "@/utils/draft-store"
+import { LOGINOM_PACKAGE_MIME } from "@/constants/file-picker"
 import { attachmentMime } from "./files"
 import { normalizePaste, pasteMode } from "./paste"
 
@@ -51,13 +52,19 @@ export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
       return false
     }
 
+    const sourcePath = input.getPathForFile?.(file) || undefined
     const attachment: ImageAttachmentPart = {
       type: "image",
       id: uuid(),
       filename: file.name,
-      sourcePath: input.getPathForFile?.(file) || undefined,
+      sourcePath,
       mime,
-      blob: input.draftStore ? await input.draftStore.putBlob(file) : await createBlobReference(file),
+      blob:
+        mime === LOGINOM_PACKAGE_MIME
+          ? { id: `lgp:${sourcePath ?? file.name}:${file.size}`, url: "" }
+          : input.draftStore
+            ? await input.draftStore.putBlob(file)
+            : await createBlobReference(file),
     }
     target.prompt.set([...target.prompt.current(), attachment], target.cursor)
     return true

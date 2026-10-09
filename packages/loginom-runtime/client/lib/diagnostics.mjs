@@ -1,4 +1,4 @@
-import { skillTransport, validateManifest } from './skill.mjs';
+import { createSkillLoader } from './skill.mjs';
 
 const sources = ['ai-skills', 'e2e-tests', 'loginom-help'];
 export const supportedAgents = { codex: '0.149.1', hermes: '0.21.0' };
@@ -22,12 +22,18 @@ export function agentVersionGuidance(agent, result) {
   return '';
 }
 
-export async function diagnoseConnection(config, { fetcher = fetch, manifest = () => skillTransport(config).manifest(),
+export async function diagnoseConnection(config, { fetcher = fetch,
   platform = process.platform, environment = process.env } = {}) {
   const displayAvailable = platform !== 'linux' || Boolean(environment.DISPLAY || environment.WAYLAND_DISPLAY);
   const checks = { browserEnvironment: displayAvailable
     ? { ok: true, browserLaunch: 'not_checked' }
     : { ok: false, message: 'Для видимого браузера Dock нужна графическая сессия Linux. Запустите агент в рабочем столе с DISPLAY или WAYLAND_DISPLAY.' } };
+  try {
+    const skill = await createSkillLoader({ resources: config.resources }).prepare();
+    checks.skill = { ok: true, source: skill.detail.source, revision: skill.detail.revision };
+  } catch {
+    checks.skill = { ok: false, message: 'Встроенный skill повреждён или не найден. Переустановите приложение и проверьте корень ресурсов.' };
+  }
   async function dock(path) {
     try {
       const response = await fetcher(new URL(path, config.endpoint), {
@@ -48,8 +54,6 @@ export async function diagnoseConnection(config, { fetcher = fetch, manifest = (
       return [name, result.ok && result.value.status === 'ok'];
     }));
     checks.sources = { ok: results.every(([, ok]) => ok), available: Object.fromEntries(results) };
-    try { const detail = validateManifest(await manifest()); checks.skill = { ok: true, revision: detail.revision }; }
-    catch { checks.skill = { ok: false, message: 'Пакет инструкций Dock недоступен или не прошёл проверку целостности.' }; }
   }
   if (!config.loginomUrl) checks.loginom = { ok: false, message: 'Адрес Loginom не задан.' };
   else if (new URL(config.loginomUrl).searchParams.get('testable') !== 'true') {

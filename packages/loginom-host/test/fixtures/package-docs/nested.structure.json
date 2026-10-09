@@ -1,0 +1,258 @@
+{
+  "schema_version": "package_docs.structure.v1",
+  "package": {
+    "file_name": "nested.lgp",
+    "name": "demo",
+    "application_version": "7.4.0",
+    "guid": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    "external_references": []
+  },
+  "stats": {
+    "modules": 1,
+    "notes": 0,
+    "nodes": 6,
+    "submodels": 2,
+    "programming_nodes": 1,
+    "reference_nodes": 1,
+    "derived_nodes": 1
+  },
+  "modules": [
+    {
+      "id": "Unit_0",
+      "index": 1,
+      "name": "Unit1",
+      "display_name": "Демо",
+      "guid": "11111111-1111-1111-1111-111111111111",
+      "stats": {
+        "notes": 0,
+        "nodes": 6,
+        "submodels": 2,
+        "programming_nodes": 1,
+        "reference_nodes": 1,
+        "derived_nodes": 1,
+        "nesting_depth": 3
+      },
+      "view_nodes": [],
+      "workflow_nodes": [
+        {
+          "guid": "aaaaaaaa-0000-0000-0000-000000000001",
+          "name": "",
+          "display_name": "Источник",
+          "label": "Источник",
+          "service_name": "ImportNative",
+          "engine_type": "TBGImportNative",
+          "vendor_guid": "35a6e054-ee0c-42f6-bda6-af10b57a36aa",
+          "input_ports": [],
+          "output_ports": [
+            {
+              "guid": "58f7e6c3-511e-39d7-8853-036e0a1a7612",
+              "name": "DataSet",
+              "display_name": "DataSet"
+            }
+          ],
+          "service_input_ports": [],
+          "service_output_ports": [],
+          "settings_main": {
+            "FileName": "data.lgd"
+          },
+          "path": "Unit_0",
+          "depth": 0,
+          "hierarchy_token": "Источник:ImportNative:aaaaaaaa-0000-0000-0000-000000000001"
+        },
+        {
+          "guid": "aaaaaaaa-0000-0000-0000-000000000002",
+          "name": "",
+          "display_name": "Калькулятор",
+          "label": "Калькулятор",
+          "service_name": "CalcData",
+          "engine_type": "TBGCalcData",
+          "vendor_guid": "c7b69712-557f-4e51-bba5-db9cc2659e7a",
+          "input_ports": [
+            {
+              "guid": "9dc72a3f-56bf-3bfc-84ec-f979daf4da6b",
+              "name": "DataSource",
+              "display_name": "DataSource"
+            }
+          ],
+          "output_ports": [
+            {
+              "guid": "58f7e6c3-511e-39d7-8853-036e0a1a7612",
+              "name": "DataSet",
+              "display_name": "DataSet"
+            }
+          ],
+          "service_input_ports": [],
+          "service_output_ports": [],
+          "settings_main": {},
+          "path": "Unit_0",
+          "depth": 0,
+          "hierarchy_token": "Калькулятор:CalcData:aaaaaaaa-0000-0000-0000-000000000002"
+        },
+        {
+          "guid": "model-1",
+          "name": "",
+          "display_name": "Вложенная модель",
+          "label": "Вложенная модель",
+          "service_name": "Подмодель",
+          "engine_type": "TBGModelGenericComponentEngine",
+          "vendor_guid": "",
+          "input_ports": [],
+          "output_ports": [],
+          "service_input_ports": [],
+          "service_output_ports": [],
+          "settings_main": {},
+          "path": "Unit_0",
+          "depth": 0,
+          "hierarchy_token": "Вложенная модель:Подмодель:model-1"
+        }
+      ],
+      "links": [
+        {
+          "source_node_guid": "aaaaaaaa-0000-0000-0000-000000000001",
+          "source_port_guid": "58f7e6c3-511e-39d7-8853-036e0a1a7612",
+          "target_node_guid": "aaaaaaaa-0000-0000-0000-000000000002",
+          "target_port_guid": "9dc72a3f-56bf-3bfc-84ec-f979daf4da6b",
+          "source_label": "Источник",
+          "target_label": "Калькулятор",
+          "source_port_name": "DataSet",
+          "target_port_name": "DataSource",
+          "readable": "Источник.DataSet → Калькулятор.DataSource"
+        }
+      ],
+      "hierarchy": [
+        {
+          "Source": "Источник:ImportNative:aaaaaaaa-0000-0000-0000-000000000001",
+          "Target": "Калькулятор:CalcData:aaaaaaaa-0000-0000-0000-000000000002"
+        },
+        {
+          "Source": null,
+          "Target": "Источник:ImportNative:aaaaaaaa-0000-0000-0000-000000000001"
+        },
+        {
+          "Source": "Калькулятор:CalcData:aaaaaaaa-0000-0000-0000-000000000002",
+          "Target": null
+        },
+        {
+          "Source": null,
+          "Target": "Вложенная модель:Подмодель:model-1"
+        },
+        {
+          "Source": "Вложенная модель:Подмодель:model-1",
+          "Target": null
+        }
+      ],
+      "notes": [],
+      "submodels": [
+        {
+          "label": "Вложенная модель",
+          "guid": "model-1",
+          "depth": 1,
+          "path": "Unit_0/Вложенная модель",
+          "workflow_nodes": [
+            {
+              "guid": "python-node",
+              "name": "",
+              "display_name": "Программа",
+              "label": "Программа",
+              "service_name": "Python",
+              "engine_type": "TBGPython",
+              "vendor_guid": "",
+              "input_ports": [],
+              "output_ports": [],
+              "service_input_ports": [],
+              "service_output_ports": [],
+              "settings_main": {},
+              "path": "Unit_0/Вложенная модель",
+              "depth": 1,
+              "hierarchy_token": "Программа:Python:python-node"
+            },
+            {
+              "guid": "model-2",
+              "name": "",
+              "display_name": "Ещё глубже",
+              "label": "Ещё глубже",
+              "service_name": "Подмодель",
+              "engine_type": "TBGModelGenericComponentEngine",
+              "vendor_guid": "",
+              "input_ports": [],
+              "output_ports": [],
+              "service_input_ports": [],
+              "service_output_ports": [],
+              "settings_main": {},
+              "path": "Unit_0/Вложенная модель",
+              "depth": 1,
+              "hierarchy_token": "Ещё глубже:Подмодель:model-2"
+            }
+          ],
+          "links": [],
+          "hierarchy": [
+            {
+              "Source": null,
+              "Target": "Программа:Python:python-node"
+            },
+            {
+              "Source": "Программа:Python:python-node",
+              "Target": null
+            },
+            {
+              "Source": null,
+              "Target": "Ещё глубже:Подмодель:model-2"
+            },
+            {
+              "Source": "Ещё глубже:Подмодель:model-2",
+              "Target": null
+            }
+          ],
+          "notes": [],
+          "submodels": [
+            {
+              "label": "Ещё глубже",
+              "guid": "model-2",
+              "depth": 2,
+              "path": "Unit_0/Вложенная модель/Ещё глубже",
+              "workflow_nodes": [
+                {
+                  "guid": "derived-node",
+                  "name": "",
+                  "display_name": "Ссылка",
+                  "label": "Ссылка",
+                  "service_name": "DerivedReference",
+                  "engine_type": "TBGDerivedReference",
+                  "vendor_guid": "",
+                  "input_ports": [],
+                  "output_ports": [],
+                  "service_input_ports": [],
+                  "service_output_ports": [],
+                  "settings_main": {},
+                  "path": "Unit_0/Вложенная модель/Ещё глубже",
+                  "depth": 2,
+                  "hierarchy_token": "Ссылка:DerivedReference:derived-node"
+                }
+              ],
+              "links": [],
+              "hierarchy": [
+                {
+                  "Source": null,
+                  "Target": "Ссылка:DerivedReference:derived-node"
+                },
+                {
+                  "Source": "Ссылка:DerivedReference:derived-node",
+                  "Target": null
+                }
+              ],
+              "notes": [],
+              "submodels": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "unique_engine_types": [
+    "TBGCalcData",
+    "TBGDerivedReference",
+    "TBGImportNative",
+    "TBGModelGenericComponentEngine",
+    "TBGPython"
+  ]
+}

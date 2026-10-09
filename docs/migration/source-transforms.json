@@ -6,8 +6,8 @@
   },
   "packages/loginom-runtime/client/lib/bridge.mjs": {
     "baseHash": "c56450b8f4db74c4ccfbf3162d1a7d6dc7422bab3ac35704f7d45923282630c3",
-    "hash": "9fc063185cfd888c807325e4da4c1f29efdd31505d4441295b19914d8d95dfee",
-    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets."
+    "hash": "183720e49eae59022d8811695fd54997156a7f56c274179669da15144f8c20c2",
+    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests. Align scenario bootstrap instructions with bundled skill activation and keep Help, diagnostics and local reports independent of prepare."
   },
   "packages/loginom-runtime/client/lib/executor.mjs": {
     "baseHash": "df21720858bb89bb40d6c4fe46620728b1d6e86b0d9d7aafa4992c8f2cf93a6e",
@@ -1951,13 +1951,13 @@
   },
   "services/loginom-ai/docs/loginom-dock/operations.md": {
     "baseHash": "7407f2f64cdd3af827bb696218bcd35682891d823b3a205bb0cdb1a4922a6da1",
-    "hash": "8ffa9017b434f5d8b8718c94a4d3edd59b9cb810fbe98e6e57a93d6161dc7a8c",
-    "reason": "Label related legacy documentation and replace obsolete checkout requirement with an explicit historical reference; original version retained in recorded Git commit."
+    "hash": "10b9c52abc08e4963998f9a6a4d834c3dd9129ace9072b70dd699d56119063a8",
+    "reason": "Label related legacy documentation and replace obsolete checkout requirement with an explicit historical reference; original version retained in recorded Git commit. Retain historical operations evidence and link the current fail-only publisher/product delivery checkpoint (fb175e4d1)."
   },
   "services/loginom-ai/docs/loginom-dock/agent-handoff.md": {
     "baseHash": "3ea2f67253ef2d70a720f203b59fe024a6d7eb9535cc00b7b93a6573c5311f8b",
-    "hash": "3b76063268769cd8a62d083d8252fef92537a905b1b2ecbe0af4b364cb4d62bc",
-    "reason": "Label related legacy documentation and replace obsolete checkout requirement with an explicit historical reference; original version retained in recorded Git commit."
+    "hash": "f54d017ac3a5e3b44cc7268f9175b7e5930b274ecb4a4ae80a2bc251c0590754",
+    "reason": "Label related legacy documentation and replace obsolete checkout requirement with an explicit historical reference; original version retained in recorded Git commit. Retain historical handoff evidence and link the current product skill delivery checkpoint (fb175e4d1)."
   },
   "services/loginom-ai/tools/project-memory/adapter.patch": {
     "baseHash": "697293ff468a7e3594c52e5d6d9345ab79e64294b084ea28af18527472d6f872",
@@ -2008,5 +2008,145 @@
     "baseHash": "1fb5d7d07fb6fa868127a15b31b6ba6e880c1d25f292518f9edcf40f42b0e29d",
     "hash": "cf92229b08aa83d26eb3b90b0900f323302df868836db1f30ba0b3fbcee9e25c",
     "reason": "Regress private login followed by workspace preparation using the same canonical public/custom URL; preserve strict foreign-page rejection."
+  },
+  "packages/product/skills/loginom-automation/SKILL.md": {
+    "baseHash": "b6c82e54976d232bcac64b536cc3dca7d638c62ae935d98e30db2affd24cfebb",
+    "hash": "f516bd12110071852baccca5197e86fc7bb6641d6adccd8c30634fa7bfd784ce",
+    "reason": "Deliver the canonical product skill locally; adapt the entrypoint and references to the current managed user-v1 workflow, including CrossTable, result verification, cancellation and checkpoint saves; preserve upstream attribution."
+  },
+  "packages/product/skills/loginom-automation/references/browser.md": {
+    "baseHash": "e7d22269d1cd0c405a351a1ac5364e54c8e463566b73c28c64ec571e4f9f7c79",
+    "hash": "a6b73339f4c3432b76a8c2bfe0466980a76741b01afd04dab0c8d3306e0b5cf2",
+    "reason": "Deliver the canonical product skill locally; adapt the entrypoint and references to the current managed user-v1 workflow, including CrossTable, result verification, cancellation and checkpoint saves; preserve upstream attribution."
+  },
+  "packages/product/skills/loginom-automation/references/canvas.md": {
+    "baseHash": "3038df86030641f5b04b2552ae9e62c6f4490f64de7633e0739e6f8091299c9c",
+    "hash": "d4ea54fb8d756f00a0c7c781de08daa7ddf5536b3645b51e24fe95b51747d088",
+    "reason": "Deliver the canonical product skill locally; adapt the entrypoint and references to the current managed user-v1 workflow, including CrossTable, result verification, cancellation and checkpoint saves; preserve upstream attribution."
+  },
+  "packages/product/skills/loginom-automation/references/sources.md": {
+    "baseHash": "aaeb63c94a7c5a38cfd8880a37f45defe0c23395100b85cc9c93b056c0be905f",
+    "hash": "b364a93fa87b383a79fa304fb98309373c0748013eed5efbe0b21dec6e05f98f",
+    "reason": "Deliver the canonical product skill locally; adapt the entrypoint and references to the current managed user-v1 workflow, including CrossTable, result verification, cancellation and checkpoint saves; preserve upstream attribution."
+  },
+  "packages/product/skills/loginom-automation/references/workflow.md": {
+    "baseHash": "a43862d340aae90097fbf16d88a47aa2c9f73a5150359774e1134830490affe3",
+    "hash": "389bffb12e37462b89b2452e9eb9c6d22d910dbc0fb56a10ad46458496370b6d",
+    "reason": "Deliver the canonical product skill locally; adapt the entrypoint and references to the current managed user-v1 workflow, including CrossTable, result verification, cancellation and checkpoint saves; preserve upstream attribution."
+  },
+  "packages/loginom-runtime/client/lib/config.mjs": {
+    "baseHash": "3b4ae9857acbcd1032ae92e6893ff20ac4380a03cd984ccdaf3f60fa272d55b5",
+    "hash": "1c395e69e708830b4461718d108e39ac78106d2c59fd5758b50b71217387a201",
+    "reason": "Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests."
+  },
+  "packages/loginom-runtime/client/lib/diagnostics.mjs": {
+    "baseHash": "1a2c07de162ec3a5cd011f1d96bd5f10da656f53b41809165d125d1094d8d07c",
+    "hash": "c3afd76c4507bf5f1ed40b586108cdae21baa6ab30f769efc3ee6f2abbb2d822",
+    "reason": "Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests."
+  },
+  "packages/loginom-runtime/client/lib/skill.mjs": {
+    "baseHash": "bcec7b42c0f2f5dff478afce54a202aa7c60a19f3c75207db9f32e06520c5310",
+    "hash": "20f77929108a466522da79a31d3a5530d7ebfdbef90759151aaaa0220abaebc7",
+    "reason": "Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests. Share the complete bundled skill verifier across Host and all runtime modes with the same pinned YAML parser; preserve local revision and reference/generated integrity."
+  },
+  "packages/loginom-runtime/client/lib/user-results.mjs": {
+    "baseHash": "eac6f265dbc083c8be2e17331681a063d4b91d332c5e634dcb2204439962af9a",
+    "hash": "695073f2a2362a75900b86bc109115d2d55443e44ecadc735a5883103b1efc78",
+    "reason": "Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests."
+  },
+  "packages/loginom-runtime/client/test/config.test.mjs": {
+    "baseHash": "82b4eefb01f40e0966b7305300eb43cb28f514e6e1a3aace3805dafc164ca99c",
+    "hash": "00e9f7ac8922a57954d8a6efffe8d896106279c0423e31c18a60a4d6e2836369",
+    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks."
+  },
+  "packages/loginom-runtime/client/test/diagnostics.test.mjs": {
+    "baseHash": "a10508de667544133812c59d62b8ea3498c0b021f7d96eb7e5700415874a5b9e",
+    "hash": "0949a87720def0408b65b5ef2e96c8c02c095926a76b4bb3d838b93516d5d319",
+    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks."
+  },
+  "packages/loginom-runtime/client/test/skill.test.mjs": {
+    "baseHash": "b0f04fac63c68cfa5b344c95069e927b7dd2762fca788b432482a5a748310719",
+    "hash": "03c1638433518de8c279539a5aec41416694cf428af43cd53dbeb2b4124d0864",
+    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks. Share the complete bundled skill verifier across Host and all runtime modes with the same pinned YAML parser; preserve local revision and reference/generated integrity. Validate Agent Skills field types/bounds and the generated-resource exception only before staging."
+  },
+  "packages/loginom-runtime/client/test/support/bridge-contract.mjs": {
+    "baseHash": "7a9ed0443eef7105eaef18878eaf6e9ca68c83840955278f88eecb3d6eadd5b6",
+    "hash": "10bd0e1516fab794af7dbf7d9e917399fd6e643151714a4d82b4a97f56086293",
+    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks. Align scenario bootstrap instructions with bundled skill activation and keep Help, diagnostics and local reports independent of prepare."
+  },
+  "packages/loginom-runtime/client/test/support/package-cleanup-bridge.mjs": {
+    "baseHash": "f2e051aa0b71c34f3f8a704bb8944506026f10ba0414189bb921f7277da215bd",
+    "hash": "318b3a3de64df7b792c7acc4c02cd5e403073340085c582e1c5dc33460eb8ce4",
+    "reason": "Replace network skill/cache fixtures with a real Product resource bundle and preserve runtime behavior checks."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/date-time-current-pins.mjs": {
+    "baseHash": "02402a080e354b966b4714ea3ad4f7cebd1d67bcb7056cd6680727f6b9edd58c",
+    "hash": "b44812377efe90f9e61bdb45b2715c93e621a431cc622cc0f2f2c396dfd49993",
+    "reason": "Read loginom-automation from the verified Product resource root, share its per-skill revision, and return dynamic preparation data without duplicate static workflow instructions or Skills API requests."
+  },
+  "packages/loginom-runtime/client/package-lock.json": {
+    "baseHash": "e05c8ba33f055e321f04760d55eb9e23b00bfe011fe5a68a1118461cc2ae095a",
+    "reason": " Share the complete bundled skill verifier across Host and all runtime modes with the same pinned YAML parser; preserve local revision and reference/generated integrity.",
+    "hash": "1e9c65c695505bcc8e94afdee82b844da93c44bf937fbe4a80afe4a9cb784a93"
+  },
+  "packages/loginom-runtime/client/package.json": {
+    "baseHash": "4acacab41dea58cf19135522580a232165076718a39e7aaec9a88cc97126df56",
+    "reason": " Share the complete bundled skill verifier across Host and all runtime modes with the same pinned YAML parser; preserve local revision and reference/generated integrity.",
+    "hash": "b1634010630f2f427f5f30beda2cada925b6da38cc32eef69ed22543419d3e1f"
+  },
+  "packages/loginom-runtime/client/lib/hermes-router.mjs": {
+    "baseHash": "e0837e03ce8c1375cac4290dd8da182c3c1edcabea047bbdd2c1eb41230fa9c1",
+    "hash": "efc2fc8e20a9ba6318ce8d6df7d180d0a9379c969bb9571c5b890d83d1bdf10d",
+    "reason": "Align scenario bootstrap instructions with bundled skill activation and keep Help, diagnostics and local reports independent of prepare."
+  },
+  "packages/loginom-runtime/client/lib/host-inputs.mjs": {
+    "baseHash": "b169f8f6a2702b11a6fcb970206648fa0c5f7b709ff00dfba915d366981f9056",
+    "hash": "3bd88f86794690803ae5195bb62316edbde9a59c5770a1e72729e08948200138",
+    "reason": "Align scenario bootstrap instructions with bundled skill activation and keep Help, diagnostics and local reports independent of prepare."
+  },
+  "packages/loginom-runtime/client/test/hermes-router.test.mjs": {
+    "baseHash": "00b426de7a2047b095116743988e4839b412aef5e5e15150d8c8114335aa0a2f",
+    "hash": "cd46ae54d38da7c2238577975e7c4f88ac9f40a9b533b1d81212fe1cf3fd362b",
+    "reason": "Align scenario bootstrap instructions with bundled skill activation and keep Help, diagnostics and local reports independent of prepare."
+  },
+  "packages/loginom-runtime/client/test/host-inputs.test.mjs": {
+    "baseHash": "9f535e6bce66222b5ee78a673b2c14c29d6270d3c12833106acd7226faa7a11d",
+    "hash": "76d1446cf4dc605858add8f3d4ea12a71cbbf76c67c0c66579007b1ddf1e7106",
+    "reason": "Align scenario bootstrap instructions with bundled skill activation and keep Help, diagnostics and local reports independent of prepare."
+  },
+  "services/loginom-ai/deploy/loginom-dock/publish-skill.py": {
+    "baseHash": "5bcf01c8c08f6d8a47597f6a4dd8ac0e132b315b27e97188e9c6ed7ec9f5ac7a",
+    "hash": "e45aa1b2982cae45d88537c7347ef2a4d017ffb4a7e0e8587100f1394ef4b03f",
+    "reason": "Disable product skill publication before reading caller configuration or starting network work; retain a fail-only compatibility entrypoint (fb175e4d1)."
+  },
+  "services/loginom-ai/docs/loginom-dock/implementation-status.md": {
+    "baseHash": "ebbc021a32183fb4d8f0d59033b0e98f4a4d5d68071e01e825e6e3481f2e63dc",
+    "hash": "cb3c11593ffd3b061589784c45361cfe0a693d32c3f2a7ca2dd604b07c3b20d5",
+    "reason": "Retain historical implementation evidence and link the current product skill delivery checkpoint (fb175e4d1)."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/audit.py": {
+    "baseHash": "47272a7173ec3d909ed6174c5d171edcbfd006c8d6190b52c1a8183ac5ade789",
+    "hash": "9da1dc1cfecbba30cc011c323a5ff2f995cdb50da893948eb22ebeaa72e51744",
+    "reason": "Exclude the retired remote product skill URI from current knowledge evidence while preserving Help/E2E/ai-skills sources."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/replacement_session_evidence.py": {
+    "baseHash": "d81b45ec00f288594a53173d0e3bb2af0bad1dd3d3a0abefd53e42a7d968af9f",
+    "hash": "dc689209f5b9b7ff4b81f4644f7817312701aec72ced500f8c5c4a0abe36568c",
+    "reason": "Audit the local bundled skill directory and its UTF-8 JSON-pair digest; require the independently pinned resource root and manifest, rejecting legacy session download paths."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/test_knowledge.py": {
+    "baseHash": "054dfb2d6d31d2f29146c0e718eb32ca30bddd0c6a8e5159a2502c27eb1a1ae5",
+    "hash": "6786ff03c9521934d40ac6ac92b69c8931c72a15008c3b95ae1ddcd64e8cb31a",
+    "reason": "Verify that current evidence rejects the remote product skill URI while retaining ai-skills Help provenance."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/test_replacement_session_evidence.py": {
+    "baseHash": "dfd25ae4a119c9fb558d553c6f4f91441848f1e45525f143960948afb370110e",
+    "hash": "91a370918aee82bdc93541a25d832abd8f4911701d2f51d3dcb14394ac650fea",
+    "reason": "Use a local resource bundle with a pinned manifest; cover altered manifests/skill bytes, legacy paths and the pinned Node digest golden value."
+  },
+  "packages/loginom-runtime/client/lib/catalog.mjs": {
+    "baseHash": "bf8946cdbbb55b78cac4f4f8631db1ce7a206f9eaea7a41263138b8263f3dc92",
+    "hash": "e2eebfd9666b1e096f0b14ce984268e193b34d0c5371f60d42e71d02dc497e96",
+    "reason": "Propagate an optional startup AbortSignal through existing MCP initialization and paginated catalog reads for the independent knowledge process; preserve default calls and the bounded one-time transient retry."
   }
 }

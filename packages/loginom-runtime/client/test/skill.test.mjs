@@ -1,122 +1,141 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { mkdtemp, rm, readdir, readFile, writeFile, symlink } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdir, rm, readFile, writeFile, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createSkillLoader, validateManifest, manifestRevision, skillUri, skillTransport } from '../lib/skill.mjs';
+import { createSkillLoader } from '../lib/skill.mjs';
+import { bundledSkillInventory } from '../lib/bundled-skill-manifest.mjs';
+import { createBundledSkillFixture, refreshSkillFixtureManifest } from './support/bundled-skill-fixture.mjs';
 
-const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-function fixture(content = '# Loginom\nРусский текст 😀\n') {
-  const bytes = new Map([['SKILL.md', Buffer.from(content)], ['references/связь.md', Buffer.from('reference')]]);
-  const files = [{ path: 'references', uri: `${skillUri}/references`, is_dir: true },
-    ...[...bytes].map(([path, data]) => ({ path, uri: `${skillUri}/${path}`, is_dir: false, size: data.length, sha256: hash(data) }))];
-  const detail = { files, content, content_sha256: hash(bytes.get('SKILL.md')), revision: manifestRevision(files) };
-  return { bytes, detail, transport: { async manifest() { return structuredClone(detail); }, async download(file) { return bytes.get(file.path); } } };
-}
-async function sandbox(t) {
-  const directory = await mkdtemp(join(tmpdir(), 'dock-skill-'));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  return directory;
-}
-
-test('complete package activates once, remains pinned and supports concurrent prepare', async t => {
-  const directory = await sandbox(t);
-  const source = fixture();
-  let reads = 0;
-  source.transport.manifest = async () => { reads++; return structuredClone(source.detail); };
-  const loader = createSkillLoader({ directory, transport: source.transport });
-  const [a, b] = await Promise.all([loader.prepare(), loader.prepare()]);
-  assert.equal(a, b);
-  assert.equal(reads, 2);
-  assert.equal(await readFile(a.main, 'utf8'), source.detail.content);
-  source.detail = fixture('new revision').detail;
-  const pinned = await loader.prepare();
-  assert.equal(pinned, a);
-  assert.equal(reads, 2);
-  assert.deepEqual(await readdir(directory), [`skill-${a.detail.revision}`]);
+test('local product skill preparation never reads the Skills API and returns the shared revision', async t => {
+  const source = await createBundledSkillFixture(t);
+  let requests = 0;
+  const loader = createSkillLoader({ resources: source.resources, transport: {
+    async manifest() { requests++; throw Error('Skills API must not be called'); },
+    async download() { requests++; throw Error('Skills API must not be called'); },
+  } });
+  const [first, second] = await Promise.all([loader.prepare(), loader.prepare()]);
+  assert.equal(requests, 0);
+  assert.equal(first, second);
+  assert.equal(first.directory, source.directory);
+  assert.equal(first.main, source.main);
+  assert.equal(first.detail.revision, bundledSkillInventory(source.files)[0].digest);
+  assert.equal(first.detail.source, 'bundled');
+  assert.equal(first.detail.files.length, source.files.length);
+  assert.equal(first.detail.content_sha256, source.files.find(file => file.path.endsWith('/SKILL.md')).sha256);
+  assert.equal(first.detail.content, await readFile(source.main, 'utf8'));
+  assert.equal(await loader.prepare(), first);
 });
 
-test('unsafe paths, case collisions, parent conflicts and dishonest revision fail before download', () => {
-  for (const path of ['../escape', '/absolute', 'a\\b', 'a/%2e%2e', 'a\0b', 'a:b', 'a//b', 'a/./b', 'trailing.', 'e\u0301']) {
-    const { detail } = fixture();
-    detail.files.push({ path, uri: `${skillUri}/${path}`, is_dir: true });
-    detail.revision = manifestRevision(detail.files);
-    assert.throws(() => validateManifest(detail), /Unsafe/);
+test('local preparation rejects a skill file not covered by the resource manifest', async t => {
+  const source = await createBundledSkillFixture(t);
+  await writeFile(join(source.directory, 'unlisted.mjs'), 'unlisted');
+  await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(), /LOGINOM_SKILL_UNMANIFESTED_FILE/);
+});
+
+test('local preparation rejects a required reference removed together with its manifest entry', async t => {
+  const source = await createBundledSkillFixture(t);
+  await rm(join(source.directory, 'references/workflow.md'));
+  await refreshSkillFixtureManifest(source.resources);
+  await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(), /LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING/);
+});
+
+test('local bundle verification enforces frontmatter, required assets and generated files', async t => {
+  for (const variant of ['frontmatter', 'font', 'generated']) {
+    const source = await createBundledSkillFixture(t);
+    const content = await readFile(source.main, 'utf8');
+    const changed = variant === 'frontmatter' ? content.replace('name: loginom-automation', 'name: wrong-name')
+      : variant === 'font' ? content + '\n[Font](assets/missing.ttf)\n'
+      : content.replace('\n---\n', '\nmetadata:\n  loginom-generated: scripts/missing.mjs\n---\n');
+    assert.notEqual(changed, content);
+    await writeFile(source.main, changed);
+    await refreshSkillFixtureManifest(source.resources);
+    await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(),
+      variant === 'frontmatter' ? /LOGINOM_SKILL_FRONTMATTER_INVALID/ : /LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING/);
   }
-  for (const mutate of [
-    d => d.files.push({ ...d.files[1], path: 'skill.md', uri: `${skillUri}/skill.md` }),
-    d => d.files.splice(0, 1),
-    d => { d.files[2].path = 'References/связь.md'; d.files[2].uri = `${skillUri}/${d.files[2].path}`; },
-    d => { d.files[1].uri = 'viking://resources/elsewhere/SKILL.md'; },
-    d => { d.files[1].size = 64 * 1024 * 1024; },
-    d => { d.content = 'changed'; },
+});
+
+test('bundled skill frontmatter rejects fields outside the Agent Skills specification', async t => {
+  const source = await createBundledSkillFixture(t);
+  const content = await readFile(source.main, 'utf8');
+  await writeFile(source.main, content.replace('\n---\n', '\nunsupported: value\n---\n'));
+  await refreshSkillFixtureManifest(source.resources);
+  await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(), /LOGINOM_SKILL_FRONTMATTER_INVALID/);
+});
+
+test('bundled skill frontmatter enforces description, compatibility and metadata value types', async t => {
+  for (const header of [
+    'description: []', 'description: ""', 'description: ' + 'x'.repeat(1025),
+    'description: Build.\ncompatibility: ' + 'x'.repeat(501),
+    'description: Build.\nmetadata:\n  purpose: 1',
+    'description: Build.\nlicense: []',
+    'description: Build.\nallowed-tools: []',
   ]) {
-    const { detail } = fixture(); mutate(detail);
-    detail.revision = manifestRevision(detail.files);
-    assert.throws(() => validateManifest(detail));
-  }
-  const { detail } = fixture(); detail.revision = '0'.repeat(64);
-  assert.throws(() => validateManifest(detail), /integrity/);
-});
-
-test('bad bytes or server revision race leaves no partial cache and permits retry', async t => {
-  for (const failure of ['bytes', 'revision']) {
-    const directory = await sandbox(t);
-    const source = fixture(); let reads = 0;
-    const loader = createSkillLoader({ directory, transport: {
-      async manifest() { reads++; return reads > 1 && failure === 'revision' ? fixture('changed').detail : source.detail; },
-      async download(file) { return failure === 'bytes' ? Buffer.from('bad') : source.bytes.get(file.path); },
-    } });
-    await assert.rejects(loader.prepare(), /integrity|changed during/);
-    assert.deepEqual(await readdir(directory), []);
-    const retry = createSkillLoader({ directory, transport: source.transport });
-    assert.equal((await retry.prepare()).detail.revision, source.detail.revision);
+    const source = await createBundledSkillFixture(t);
+    await writeFile(source.main, '---\nname: loginom-automation\n' + header + '\n---\n\n# Build\n');
+    await refreshSkillFixtureManifest(source.resources);
+    await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(), /LOGINOM_SKILL_FRONTMATTER_INVALID/);
   }
 });
 
-test('pinned package detects local modification and symlink substitution', async t => {
-  for (const change of ['content', 'symlink', 'extra']) {
-    const directory = await sandbox(t);
-    const source = fixture();
-    const loader = createSkillLoader({ directory, transport: source.transport });
-    const pinned = await loader.prepare();
-    if (change === 'content') await writeFile(pinned.main, 'tampered');
-    if (change === 'extra') await writeFile(join(pinned.directory, 'extra'), 'extra');
-    if (change === 'symlink') {
-      await rm(pinned.main);
-      await symlink('/etc/hosts', pinned.main);
-    }
-    await assert.rejects(loader.prepare(), /cache/);
+test('a manifested symlink cannot read a different skill within the resource root', async t => {
+  const source = await createBundledSkillFixture(t);
+  await mkdir(join(source.resources, 'skills/other'));
+  await writeFile(join(source.resources, 'skills/other/SKILL.md'), '---\nname: other\ndescription: Other skill.\n---\n\n# Other\n');
+  await rm(join(source.directory, 'references/workflow.md'));
+  await symlink('../../other/SKILL.md', join(source.directory, 'references/workflow.md'));
+  await refreshSkillFixtureManifest(source.resources);
+  await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(), /LOGINOM_SKILL_RESOURCE_ESCAPE/);
+});
+
+test('pinned local bundle rejects modified bytes, missing files and escaping symlinks', async t => {
+  for (const change of ['content', 'missing', 'symlink']) {
+    const source = await createBundledSkillFixture(t);
+    const loader = createSkillLoader({ resources: source.resources });
+    await loader.prepare();
+    if (change === 'content') await writeFile(source.main, 'tampered');
+    if (change === 'missing' || change === 'symlink') await rm(source.main);
+    if (change === 'symlink') await symlink('/etc/hosts', source.main);
+    await assert.rejects(loader.prepare(), change === 'content' ? /LOGINOM_SKILL_HASH_MISMATCH/
+      : change === 'symlink' ? /LOGINOM_SKILL_RESOURCE_ESCAPE/ : { code: 'ENOENT' });
   }
 });
 
-test('transport uses only configured origin, rejects redirects and bounds streaming bytes', async () => {
-  const config = { endpoint: 'https://dock.example/mcp', apiKey: 'fixture-secret' };
-  let request;
-  const transport = skillTransport(config, async (url, options) => {
-    request = { url, options };
-    return new Response('12345');
-  });
-  await assert.rejects(transport.download({ uri: `${skillUri}/SKILL.md`, size: 4 }), /size limit/);
-  assert.equal(request.url.origin, 'https://dock.example');
-  assert.equal(request.options.redirect, 'error');
-  assert.equal(request.options.headers.Authorization, 'Bearer fixture-secret');
-  const failed = skillTransport(config, async () => { throw new Error('fixture-secret'); });
-  await assert.rejects(failed.manifest(), error => !error.message.includes(config.apiKey));
+test('bundle replacement cannot change the revision pinned by the chat', async t => {
+  const source = await createBundledSkillFixture(t);
+  const loader = createSkillLoader({ resources: source.resources });
+  const first = await loader.prepare();
+  await writeFile(source.main, first.detail.content + '\nNew product revision.\n');
+  await refreshSkillFixtureManifest(source.resources);
+  await assert.rejects(loader.prepare(), /LOGINOM_SKILL_REVISION_CHANGED/);
+  assert.notEqual((await createSkillLoader({ resources: source.resources }).prepare()).detail.revision, first.detail.revision);
 });
 
-test('skill GET retries one interrupted connection but does not retry rejected credentials', async () => {
-  const config = { endpoint: 'https://dock.example/mcp', apiKey: 'fixture-secret' };
-  let attempts = 0;
-  const interrupted = skillTransport(config, async () => {
-    if (++attempts === 1) throw new Error('connection interrupted');
-    return new Response('ok');
-  });
-  assert.equal((await interrupted.download({ uri: `${skillUri}/SKILL.md`, size: 2 })).toString(), 'ok');
-  assert.equal(attempts, 2);
-  attempts = 0;
-  const rejected = skillTransport(config, async () => { attempts++; return new Response('', { status: 401 }); });
-  await assert.rejects(rejected.manifest(), /401/);
-  assert.equal(attempts, 1);
+test('manifest entry order cannot change a pinned skill revision', async t => {
+  const source = await createBundledSkillFixture(t);
+  const loader = createSkillLoader({ resources: source.resources });
+  const first = await loader.prepare();
+  await writeFile(join(source.resources, 'resource-manifest.json'), JSON.stringify({ protocol: 1, files: source.files.toReversed() }));
+  assert.equal(await loader.prepare(), first);
+});
+
+test('invalid resource roots fail locally and never use the legacy transport', async () => {
+  for (const resources of [undefined, '', 'relative/resources', '/nonexistent/loginom-product-skills']) {
+    let requests = 0;
+    const loader = createSkillLoader({ resources, transport: { async manifest() { requests++; throw Error('Unexpected network'); } } });
+    await assert.rejects(loader.prepare(), resources?.startsWith('/') ? { code: 'ENOENT' } : /LOGINOM_SKILL_RESOURCES_INVALID/);
+    assert.equal(requests, 0);
+  }
+});
+
+test('unsafe manifest paths and duplicate entries fail before file reads', async t => {
+  const source = await createBundledSkillFixture(t);
+  for (const path of ['skills/loginom-automation/../escape', 'skills/loginom-automation/a\\b',
+    'skills/loginom-automation/a//b', 'skills/loginom-automation/./x']) {
+    await writeFile(join(source.resources, 'resource-manifest.json'), JSON.stringify({ protocol: 1,
+      files: [{ path, sha256: '0'.repeat(64) }, ...source.files] }));
+    await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(), /LOGINOM_SKILL_MANIFEST_INVALID/);
+  }
+  await writeFile(join(source.resources, 'resource-manifest.json'), JSON.stringify({ protocol: 1,
+    files: [...source.files, source.files[0]] }));
+  await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(), /LOGINOM_SKILL_MANIFEST_INVALID/);
 });

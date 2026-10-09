@@ -56,6 +56,12 @@ async function closeOwnedPackage(page, options) {
       if (m.PackageNodes?.Count !== 1) return {reason:'PACKAGE_INVENTORY_CHANGED'};
       const node = m.PackageNodes.Items(0), normalized = value => typeof value === 'string' && value ? '/'+value.replaceAll('\\','/').replace(/^\/+/, '') : null;
       if (normalized(node.PackageFileName) !== o.packagePath || node.ReadOnly !== o.diagnosticReadOnly) return {reason:'PACKAGE_IDENTITY_CHANGED'};
+      const prepared = [...prep.receipts.values()].find(r => {
+        try { return JSON.parse(r.request).session === o.sessionId && r.packageNode === node && r.tab?.getAttribute('data-tid') === o.tabTid; }
+        catch { return false; }
+      });
+      const tabBound = () => prepared?.packageNode === node && prepared.tab?.getAttribute('data-tid') === o.tabTid && document.contains(prepared.tab);
+      if (!tabBound()) return {reason:'TAB_IDENTITY_CHANGED'};
       if (node.HasRunningNodes() !== false || m.HasRunningNodes() !== false) return {reason:'RUNNING_NODES'};
       const modified = await m.FServerConnection.Session.IsPackageModified(node.Package);
       if (modified !== false && !(modified === true && o.diagnosticDiscard === true)) return {reason:'UNSAVED_CHANGES'};
@@ -64,6 +70,7 @@ async function closeOwnedPackage(page, options) {
       // answers it; independent QA can explicitly discard its temporary views.
       if (m.PackageNodes.Count !== 1 || m.PackageNodes.Items(0) !== node || normalized(node.PackageFileName) !== o.packagePath
           || node.ReadOnly !== o.diagnosticReadOnly || m.FServerConnection.UserName !== o.account || node.HasRunningNodes() !== false) return {reason:'PACKAGE_CHANGED_DURING_CHECK'};
+      if (!tabBound()) return {reason:'TAB_IDENTITY_CHANGED'};
       const state = globalThis.__loginomDockCleanupV1 = {identity, document, done:false, closed:false};
       Promise.resolve().then(() => m.ClosePackage(node, false, true)).then(value => {
         state.closed = value === true && m.PackageNodes.Count === 0;

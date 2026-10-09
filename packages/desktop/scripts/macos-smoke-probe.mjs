@@ -43,16 +43,18 @@ export async function withProbe(registry, timeout, execute) {
   }
 }
 
-export function runProbe(executable, code, options) {
+export function runProbe(executable, code, options, launch = childProcess.spawnSync, kill = process.kill) {
   const registry = join(options.cwd, `probe-${randomUUID()}.jsonl`)
-  const result = childProcess.spawnSync(
+  const result = launch(
     executable,
     [
       "--input-type=module",
       "--eval",
       `
     import { createRequire } from "node:module";
+    import { appendFileSync } from "node:fs";
     import { withProbe } from ${JSON.stringify(import.meta.url)};
+    appendFileSync(${JSON.stringify(registry)}, JSON.stringify({ owner: process.pid }) + "\\n");
     await withProbe(${JSON.stringify(registry)}, ${options.timeout}, async (ownClose) => {
       ${code}
     });
@@ -69,9 +71,14 @@ export function runProbe(executable, code, options) {
     },
   )
   const active = new Map()
+  const groups = new Set()
   try {
     for (const line of readFileSync(registry, "utf8").trim().split("\n").filter(Boolean)) {
       const entry = JSON.parse(line)
+      if (entry.owner !== undefined) {
+        if (!Number.isSafeInteger(entry.owner) || entry.owner <= 1) throw Error("SMOKE_PROBE_REGISTRY_INVALID")
+        groups.add(-entry.owner)
+      }
       if (entry.exit && !active.get(entry.exit)) active.delete(entry.exit)
       if (entry.pid) active.set(entry.pid, entry.detached)
     }
@@ -80,14 +87,18 @@ export function runProbe(executable, code, options) {
   }
   // The probe's group covers non-detached descendants; Playwright groups are
   // addressed only by PIDs recorded by this probe's spawn wrapper.
-  const groups = [...active].map(([pid, detached]) => (detached ? -pid : pid))
-  if (result.pid) groups.push(-result.pid)
-  const remaining = () => groups.filter((pid) => signal(pid, 0))
+  // A launch-result PID is not an ownership record after a timeout. Use the
+  // process identity registered by the probe itself before starting any work.
+  for (const [pid, detached] of active) {
+    if (!Number.isSafeInteger(pid) || pid <= 1) throw Error("SMOKE_PROBE_REGISTRY_INVALID")
+    groups.add(detached ? -pid : pid)
+  }
+  const remaining = () => [...groups].filter((pid) => signal(pid, 0, kill))
   const leaked = remaining().length
-  remaining().forEach((pid) => signal(pid, "SIGTERM"))
+  remaining().forEach((pid) => signal(pid, "SIGTERM", kill))
   const until = Date.now() + 1_000
   while (remaining().length && Date.now() < until) childProcess.spawnSync("/bin/sleep", ["0.05"])
-  remaining().forEach((pid) => signal(pid, "SIGKILL"))
+  remaining().forEach((pid) => signal(pid, "SIGKILL", kill))
   const killed = Date.now() + 2_000
   while (remaining().length && Date.now() < killed) childProcess.spawnSync("/bin/sleep", ["0.05"])
   if (remaining().length) throw Error("SMOKE_PROBE_CLEANUP_FAILED")
@@ -102,12 +113,39 @@ export function runProbe(executable, code, options) {
   return result.stdout.trim()
 }
 
-function signal(pid, value) {
+function signal(pid, value, kill) {
   try {
-    process.kill(pid, value)
+    kill(pid, value)
     return true
   } catch (error) {
     if (error.code === "ESRCH") return false
-    throw error
+    if (error.code === "EPERM" && pid < -1 && value === 0) {
+      // A group probe can report EPERM after its last process exits. Confirm that
+      // the native process table contains no members before declaring it gone.
+      const table = childProcess.spawnSync("/bin/ps", ["-axo", "pid=,pgid=,uid=,stat="], {
+        encoding: "utf8",
+        timeout: 1000,
+        killSignal: "SIGKILL",
+      })
+      const rows =
+        table.stdout
+          ?.trim()
+          .split("\n")
+          .map((line) => line.trim().split(/\s+/)) ?? []
+      if (
+        !table.error &&
+        table.status === 0 &&
+        rows.length &&
+        rows.every((row) => row.length === 4 && row.slice(0, 3).every((value) => /^\d+$/.test(value)))
+      ) {
+        const members = rows.filter((row) => Number(row[1]) === -pid)
+        if (!members.length) return false
+        throw Error(
+          `SMOKE_PROBE_SIGNAL_FAILED: pid=${pid} signal=${value} code=${error.code} members=${JSON.stringify(members.slice(0, 16))}`,
+          { cause: error },
+        )
+      }
+    }
+    throw Error(`SMOKE_PROBE_SIGNAL_FAILED: pid=${pid} signal=${value} code=${error.code}`, { cause: error })
   }
 }

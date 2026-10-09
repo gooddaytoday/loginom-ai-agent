@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body>
+<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Русский </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>отчёт</w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve"> &amp; XML</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Раздел</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Подраздел</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Детали</w:t></w:r></w:p><w:p><w:pPr><w:ind w:left="360"/></w:pPr><w:r><w:t xml:space="preserve">Цитата &lt;значение&gt; и </w:t></w:r><w:r><w:t>код</w:t></w:r><w:r><w:t>.</w:t></w:r></w:p><w:p><w:pPr><w:ind w:left="360"/></w:pPr><w:r><w:t xml:space="preserve">• </w:t></w:r><w:r><w:t xml:space="preserve">Первый </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>важный</w:t></w:r><w:r><w:t xml:space="preserve"> пункт</w:t></w:r></w:p><w:p><w:pPr><w:ind w:left="720"/></w:pPr><w:r><w:t xml:space="preserve">• </w:t></w:r><w:r><w:t>Вложенный пункт</w:t></w:r></w:p><w:p><w:pPr><w:ind w:left="360"/></w:pPr><w:r><w:t xml:space="preserve">1. </w:t></w:r><w:r><w:t>Первый номер</w:t></w:r></w:p><w:p><w:pPr><w:ind w:left="720"/></w:pPr><w:r><w:t xml:space="preserve">1. </w:t></w:r><w:r><w:t>Вложенный номер</w:t></w:r></w:p><w:p><w:pPr><w:ind w:left="360"/></w:pPr><w:r><w:t xml:space="preserve">2. </w:t></w:r><w:r><w:t>Второй номер</w:t></w:r></w:p><w:p><w:r><w:t xml:space="preserve">Два  пробела, </w:t></w:r><w:r><w:t>x &lt; 2</w:t></w:r><w:r><w:t xml:space="preserve"> и </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>жирный текст</w:t></w:r><w:r><w:t>.</w:t></w:r></w:p>
+<w:sectPr>
+<w:pgSz w:w="11906" w:h="16838"/>
+<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/>
+</w:sectPr>
+</w:body>
+</w:document>

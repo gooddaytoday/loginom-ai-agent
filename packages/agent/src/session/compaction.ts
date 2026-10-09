@@ -497,9 +497,30 @@ const layer = Layer.effect(
                 : part
             yield* session.updatePart({
               ...replayPart,
+              ...(replayPart.type === "text" && {
+                metadata: {
+                  ...("metadata" in replayPart ? replayPart.metadata : undefined),
+                  compaction_replay_of: original.id,
+                },
+              }),
               id: PartID.ascending(),
               messageID: replayMsg.id,
               sessionID: input.sessionID,
+            })
+          }
+          // File parts have no metadata field; retain the replay link without changing the public schema.
+          if (
+            !replay.parts.some((part) => part.type === "text" || (part.type === "file" && MessageV2.isMedia(part.mime)))
+          ) {
+            yield* session.updatePart({
+              id: PartID.ascending(),
+              messageID: replayMsg.id,
+              sessionID: input.sessionID,
+              type: "text",
+              text: "",
+              synthetic: true,
+              ignored: true,
+              metadata: { compaction_replay_of: original.id },
             })
           }
         }

@@ -20,8 +20,9 @@ def skill_bundle_revision(directory):
         require(not path.is_symlink(),'skill_symlink')
         is_dir=path.is_dir()
         require(is_dir or path.is_file(),'skill_special_file')
-        entries.append(dict(is_dir=is_dir,path=path.relative_to(directory).as_posix(),sha256=None if is_dir else digest(path),size=None if is_dir else path.stat().st_size))
-    return hashlib.sha256(json.dumps(entries,ensure_ascii=True,separators=(',',':')).encode()).hexdigest()
+        if not is_dir:entries.append([path.relative_to(directory).as_posix(),digest(path)])
+    # Independent evidence audit of the runtime's sorted UTF-8 JSON-pair contract.
+    return hashlib.sha256(json.dumps(entries,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
 
 def metadata_pins(meta,path,request,pin):
     expected=dict(client='0.1.0-dev.20260910.3',runtimeRelease=None,agent='hermes',adapterRevision='0.1.0-rc.4-acceptance',mode='executor-replay',resultProfile='user-v1',
@@ -83,7 +84,10 @@ def verify_session_evidence(directory,request,evidence,pin,skill_revision,requir
         working=[p for p in paths if p.parent.name==sid];require(len(working)==1,'working_metadata_missing')
         path=working[0];meta=read(path);metadata_pins(meta,path,request,pin)
         require(meta['workspaceReady'] is True and meta['skillRevision']==skill_revision and meta['targetIdentity']==pin['compatibility'],'working_state_or_skill_pin')
-        skill=Path(meta['skillPath']).resolve();require(skill==path.parent.resolve()/('skill-'+skill_revision)/'SKILL.md' and skill.is_file() and skill_bundle_revision(skill.parent)==skill_revision,'skill_file_pin')
+        resources=Path(request['bundled_resources']['path']);require(resources.is_absolute(),'skill_resource_root')
+        require(digest(resources/'resource-manifest.json')==request['bundled_resources']['manifest_sha256'],'skill_manifest_pin')
+        skill=Path(meta['skillPath']);require(skill.is_absolute() and skill.resolve()==resources.resolve()/'skills/loginom-automation'
+            and skill.is_dir() and (skill/'SKILL.md').is_file() and skill_bundle_revision(skill)==skill_revision,'skill_file_pin')
         raw=[json.loads(line) for line in (path.parent/'execution-events.jsonl').read_text().splitlines() if line.strip()]
         require(raw==evidence['events'],'raw_journal_export_substitution')
         require(meta['workspacePreparation']['state']==preps[-1]['result']['workspace'] and meta['workflowRef']==preps[-1]['result']['workspace']['workflow_ref'],'metadata_prepare_substitution')

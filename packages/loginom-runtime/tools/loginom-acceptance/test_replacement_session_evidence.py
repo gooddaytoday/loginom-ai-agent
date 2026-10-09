@@ -5,8 +5,13 @@ from replacement_session_evidence import verify_session_evidence,digest,geometry
 from evidence import PREFIX
 class SessionEvidenceTests(unittest.TestCase):
  def setUp(self):
-  self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.root=Path(self.temp.name);seed=self.root/'seed';seed.mkdir();(seed/'SKILL.md').write_bytes(b'skill');self.skill=skill_bundle_revision(seed)
+  self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.root=Path(self.temp.name)
+  self.resources=self.root/'resources/loginom';self.skill_directory=self.resources/'skills/loginom-automation'
+  self.skill_directory.mkdir(parents=True);(self.skill_directory/'SKILL.md').write_bytes(b'skill')
+  self.skill=skill_bundle_revision(self.skill_directory)
+  self.write(self.resources/'resource-manifest.json',dict(protocol=1,files=[dict(path='skills/loginom-automation/SKILL.md',sha256=digest(self.skill_directory/'SKILL.md'))]))
   self.req=dict(loginom_url='https://loginom.test/app/?testable=true',runtime_source_pin=dict(client_revision='runtime',inputs={'client/lib/a.mjs':'source'}),dependencies=dict(node='24.19.0',playwright='pw',sdk='sdk',playwright_mcp='mcp',chromium_revision='1243',chromium_version='chrome'))
+  self.req['bundled_resources']=dict(path=str(self.resources),manifest_sha256=digest(self.resources/'resource-manifest.json'))
   self.pin=dict(manifest_sha256='manifest',catalog_version='candidate',readback_files={'actions.json':'actions','selectors.json':'selectors'},e2e_commit='e2e',compatibility={'loginom_build':'7.4.2'})
   state=dict(status='READY',session_id='working',operation_id='prepare',document_id='document',workflow_ref={'workflow_id':'workflow'})
   state['browser_geometry']=dict(version=1,source='prepare_same_browser_page',session_id='working',operation_id='prepare',document_id='document',workflow_ref=state['workflow_ref'],runtime_revision='runtime',manifest_sha256='manifest',viewport=None,observed_at='2026-09-13T08:00:00Z',observed=dict(document_id='document',origin='https://loginom.test/',pathname='/app/',visibility='visible',inner_width=1508,inner_height=862,outer_width=1508,outer_height=949,available_width=1512,available_height=949,screen_x=4,screen_y=33,available_left=0,available_top=33))
@@ -19,7 +24,7 @@ class SessionEvidenceTests(unittest.TestCase):
    self.write(p/'tools.json',[])
    meta=dict(client='0.1.0-dev.20260910.3',runtimeRelease=None,toolCatalogSha256=hashlib.sha256(b'[]').hexdigest(),sessionId=sid,agent='hermes',adapterRevision='0.1.0-rc.4-acceptance',mode='executor-replay',resultProfile='user-v1',loginomUrl=self.req['loginom_url'],clientRevision='runtime',actionManifestDigest='manifest',actionCatalogVersion='candidate',actionCatalogDigest='actions',selectorCatalogDigest='selectors',e2eCommit='e2e',compatibilityProfile=self.pin['compatibility'],capabilityAbi=1,executorRevision='1.2.0',catalogLifecycleStatus='candidate',acceptanceVerified=False,acceptanceDigest=None,browserViewport=None,browserWindowMode='maximized',node='24.19.0',playwright='pw',sdk='sdk',playwrightMcp='mcp',chromiumRevision='1243',chromiumVersion='chrome',profile=str(p/'browser-profile'),artifacts=str(p/'artifacts'),clientSourceManifest=[{'path':'./a.mjs','sha256':'source'}],workspaceReady=False,skillRevision=None)
    if sid=='working':
-    skill=p/('skill-'+self.skill)/'SKILL.md';skill.parent.mkdir();skill.write_bytes(b'skill');meta.update(workspaceReady=True,skillRevision=self.skill,targetIdentity=self.pin['compatibility'],skillPath=str(skill),workspacePreparation={'state':state},workflowRef=state['workflow_ref']);(p/'execution-events.jsonl').write_text(json.dumps(event)+'\n')
+    meta.update(workspaceReady=True,skillRevision=self.skill,targetIdentity=self.pin['compatibility'],skillPath=str(self.skill_directory),workspacePreparation={'state':state},workflowRef=state['workflow_ref']);(p/'execution-events.jsonl').write_text(json.dumps(event)+'\n')
    self.write(p/'session.json',meta)
   self.origin=dict(version=1,source='official_stdio_transport',session_id='precheck',pid=123,runtime_revision='runtime',manifest_sha256='manifest',initialized_client='loginom-acceptance-tool-precheck/1',closed=True,overflow=False,methods=['initialize','notifications/initialized','tools/list']);self.proof()
  def path(self,sid):return self.root/'private/dock-state/sessions'/sid
@@ -28,6 +33,26 @@ class SessionEvidenceTests(unittest.TestCase):
   p=self.path('precheck');self.write(p/'mcp-origin.json',self.origin);self.write(self.root/'tool-precheck.json',dict(available=True,provenance=dict(version=1,session_id='precheck',pid=123,origin_sha256=digest(p/'mcp-origin.json'),metadata_sha256=digest(p/'session.json'))))
  def audit(self):return verify_session_evidence(self.root,self.req,self.evidence,self.pin,self.skill)
  def test_positive(self):self.assertTrue(self.audit()['passed'],self.audit())
+ def test_skill_digest_matches_pinned_node_json_pair_contract(self):
+  # Captured from bundledSkillInventory under product-pinned Node 24.19.0.
+  self.assertEqual(self.skill,'3a9063bcfdea95880a301049e73a88d9070573761632efff4a5331466fe4f3b8')
+  (self.skill_directory/'empty').mkdir()
+  self.assertEqual(skill_bundle_revision(self.skill_directory),self.skill)
+ def test_changed_or_unpinned_manifest_is_rejected(self):
+  (self.resources/'resource-manifest.json').write_text('{}')
+  self.assertFalse(self.audit()['passed'])
+  self.req.pop('bundled_resources')
+  self.assertFalse(self.audit()['passed'])
+ def test_legacy_cache_and_skill_file_paths_are_rejected(self):
+  path=self.path('working')/'session.json';meta=json.loads(path.read_text())
+  for location in [self.skill_directory/'SKILL.md',self.path('working')/('skill-'+self.skill)]:
+   with self.subTest(location=location):
+    meta['skillPath']=str(location);self.write(path,meta);self.assertFalse(self.audit()['passed'])
+ def test_changed_or_unlisted_skill_bytes_are_rejected(self):
+  (self.skill_directory/'extra.md').write_bytes(b'unlisted')
+  self.assertFalse(self.audit()['passed'])
+  (self.skill_directory/'extra.md').unlink();(self.skill_directory/'SKILL.md').write_bytes(b'changed')
+  self.assertFalse(self.audit()['passed'])
  def test_unknown_session_directory(self):
   self.path('unknown').mkdir();self.assertFalse(self.audit()['passed'])
  def test_unknown_extra(self):

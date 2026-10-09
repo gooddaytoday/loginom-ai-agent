@@ -207,7 +207,7 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
             }
 
             if (permission === "read") {
-              const raw = data.filePath
+              const raw = data.filePath ?? props.request.metadata?.filepath
               const filePath = typeof raw === "string" ? raw : ""
               return {
                 icon: "→",

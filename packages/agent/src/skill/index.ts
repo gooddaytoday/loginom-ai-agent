@@ -1,5 +1,6 @@
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import path from "path"
+import { realpath } from "node:fs/promises"
 import { Effect, Layer, Context, Schema } from "effect"
 import { NamedError } from "@loginom-ai-agent/core/util/error"
 import type { Agent } from "@/agent/agent"
@@ -17,6 +18,8 @@ import { Glob } from "@loginom-ai-agent/core/util/glob"
 import { Discovery } from "./discovery"
 import { isRecord } from "@/util/record"
 import { escapeHtml } from "@/util/html"
+import { verifyProductSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
+import { isReservedSkillName, reservedSkillNames } from "@loginom-ai-agent/product/skills"
 
 const CLAUDE_EXTERNAL_DIR = ".claude"
 const AGENTS_EXTERNAL_DIR = ".agents"
@@ -39,6 +42,8 @@ export const Info = Schema.Struct({
   description: Schema.optional(Schema.String),
   location: Schema.String,
   content: Schema.String,
+  source: Schema.optional(Schema.Literals(["builtin", "bundled", "external", "project", "config", "url"])),
+  digest: Schema.optional(Schema.String),
 })
 export type Info = Schema.Schema.Type<typeof Info>
 
@@ -75,23 +80,25 @@ export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Ski
   available: Schema.Array(Schema.String),
 }) {
   override get message() {
-    return `Skill "${this.name}" not found. Available skills: ${this.available.join(", ") || "none"}`
+    const hint = reservedSkillNames.some((name) => name === this.name)
+      ? " Bundled skills are unavailable. Verify the Loginom resource path or reinstall the application."
+      : ""
+    return `Skill "${this.name}" not found. Available skills: ${this.available.join(", ") || "none"}${hint}`
   }
 }
 
 type State = {
   skills: Record<string, Info>
   dirs: Set<string>
+  paths: Set<string>
 }
 
 type DiscoveryState = {
-  matches: string[]
-  dirs: string[]
+  matches: { location: string; source: NonNullable<Info["source"]> }[]
 }
 
 type ScanState = {
-  matches: Set<string>
-  dirs: Set<string>
+  matches: Map<string, NonNullable<Info["source"]>>
 }
 
 export interface Interface {
@@ -102,7 +109,17 @@ export interface Interface {
   readonly available: (agent?: Agent.Info) => Effect.Effect<Info[]>
 }
 
-const add = Effect.fnUntraced(function* (state: State, match: string, events: EventV2Bridge.Service["Service"]) {
+const add = Effect.fnUntraced(function* (
+  state: State,
+  location: string,
+  events: EventV2Bridge.Service["Service"],
+  origin: { source: Info["source"]; digest?: string } = { source: "config" },
+) {
+  const match = yield* Effect.tryPromise(() => realpath(location)).pipe(
+    Effect.catch(() => Effect.succeed(undefined)),
+  )
+  if (!match || state.paths.has(match)) return
+  state.paths.add(match)
   const md = yield* Effect.tryPromise({
     try: () => ConfigMarkdown.parse(match),
     catch: (err) => err,
@@ -122,6 +139,17 @@ const add = Effect.fnUntraced(function* (state: State, match: string, events: Ev
 
   if (!isSkillFrontmatter(md.data)) return
 
+  if (origin.source !== "bundled" && isReservedSkillName(md.data.name)) {
+    yield* Effect.logWarning("ignored reserved product skill from an untrusted source", { skill: match })
+    const { Session } = yield* Effect.promise(() => import("@/session/session"))
+    yield* events.publish(Session.Event.Error, {
+      error: new NamedError.Unknown({
+        message: `Ignored external skill '${md.data.name}': this name is reserved for a bundled Loginom skill.`,
+      }).toObject(),
+    })
+    return
+  }
+
   if (state.skills[md.data.name]) {
     yield* Effect.logWarning("duplicate skill name", {
       name: md.data.name,
@@ -136,6 +164,7 @@ const add = Effect.fnUntraced(function* (state: State, match: string, events: Ev
     description: md.data.description,
     location: match,
     content: md.content,
+    ...origin,
   }
 })
 
@@ -143,7 +172,7 @@ const scan = Effect.fnUntraced(function* (
   state: ScanState,
   root: string,
   pattern: string,
-  opts?: { dot?: boolean; scope?: string },
+  opts?: { dot?: boolean; scope?: string; source?: NonNullable<Info["source"]> },
 ) {
   const matches = yield* Effect.tryPromise({
     try: () =>
@@ -164,9 +193,8 @@ const scan = Effect.fnUntraced(function* (
     }),
   )
 
-  for (const match of matches) {
-    state.matches.add(match)
-    state.dirs.add(path.dirname(match))
+  for (const match of matches.toSorted()) {
+    state.matches.set(match, opts?.source ?? "config")
   }
 })
 
@@ -180,7 +208,7 @@ const discoverSkills = Effect.fnUntraced(function* (
   directory: string,
   worktree: string,
 ) {
-  const state: ScanState = { matches: new Set(), dirs: new Set() }
+  const state: ScanState = { matches: new Map() }
 
   const externalDirs: string[] = []
   if (!disableExternalSkills) {
@@ -190,7 +218,7 @@ const discoverSkills = Effect.fnUntraced(function* (
     for (const dir of externalDirs) {
       const root = path.join(global.home, dir)
       if (!(yield* fsys.isDir(root))) continue
-      yield* scan(state, root, EXTERNAL_SKILL_PATTERN, { dot: true, scope: "global" })
+      yield* scan(state, root, EXTERNAL_SKILL_PATTERN, { dot: true, scope: "global", source: "external" })
     }
 
     const upDirs = yield* fsys
@@ -198,7 +226,7 @@ const discoverSkills = Effect.fnUntraced(function* (
       .pipe(Effect.catch(() => Effect.succeed([] as string[])))
 
     for (const root of upDirs) {
-      yield* scan(state, root, EXTERNAL_SKILL_PATTERN, { dot: true, scope: "project" })
+      yield* scan(state, root, EXTERNAL_SKILL_PATTERN, { dot: true, scope: "project", source: "project" })
     }
   }
 
@@ -222,13 +250,12 @@ const discoverSkills = Effect.fnUntraced(function* (
   for (const url of cfg.skills?.urls ?? []) {
     const pulledDirs = yield* discovery.pull(url)
     for (const dir of pulledDirs) {
-      yield* scan(state, dir, SKILL_PATTERN)
+      yield* scan(state, dir, SKILL_PATTERN, { source: "url" })
     }
   }
 
   return {
-    matches: Array.from(state.matches),
-    dirs: Array.from(state.dirs),
+    matches: Array.from(state.matches, ([location, source]) => ({ location, source })),
   }
 })
 
@@ -237,10 +264,9 @@ const loadSkills = Effect.fnUntraced(function* (
   discovered: DiscoveryState,
   events: EventV2Bridge.Service["Service"],
 ) {
-  yield* Effect.forEach(discovered.matches, (match) => add(state, match, events), {
-    concurrency: "unbounded",
-    discard: true,
-  })
+  // Declared source order determines overrides. Parallel reads must not decide
+  // which skill wins when different files declare the same ordinary name.
+  for (const match of discovered.matches) yield* add(state, match.location, events, { source: match.source })
 
   yield* Effect.logInfo("init", { count: Object.keys(state.skills).length })
 })
@@ -272,7 +298,7 @@ const layer = Layer.effect(
     )
     const state = yield* InstanceState.make(
       Effect.fn("Skill.state")(function* () {
-        const s: State = { skills: {}, dirs: new Set() }
+        const s: State = { skills: {}, dirs: new Set(), paths: new Set() }
         // Register the built-in skill BEFORE disk discovery so a user-disk
         // skill with the same name can override it.
         s.skills[CUSTOMIZE_OPENCODE_SKILL_NAME] = {
@@ -280,6 +306,24 @@ const layer = Layer.effect(
           description: CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION,
           location: "<built-in>",
           content: CUSTOMIZE_OPENCODE_SKILL_BODY,
+          source: "builtin",
+        }
+        if (flags.loginomResources) {
+          const bundled = yield* Effect.tryPromise(() => verifyProductSkills(flags.loginomResources!)).pipe(
+            Effect.catch(
+              Effect.fnUntraced(function* () {
+                const { Session } = yield* Effect.promise(() => import("@/session/session"))
+                yield* events.publish(Session.Event.Error, {
+                  error: new NamedError.Unknown({
+                    message: "Bundled skills are unavailable. Verify the Loginom resource path or reinstall the application.",
+                  }).toObject(),
+                })
+                yield* Effect.logWarning("bundled skill verification failed")
+                return []
+              }),
+            ),
+          )
+          for (const skill of bundled) yield* add(s, skill.location, events, { source: "bundled", digest: skill.digest })
         }
         yield* loadSkills(s, yield* InstanceState.get(discovered), events)
         return s
@@ -304,7 +348,7 @@ const layer = Layer.effect(
     })
 
     const dirs = Effect.fn("Skill.dirs")(function* () {
-      return (yield* InstanceState.get(discovered)).dirs
+      return [...(yield* InstanceState.get(state)).dirs]
     })
 
     const available = Effect.fn("Skill.available")(function* (agent?: Agent.Info) {

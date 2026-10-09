@@ -9,6 +9,7 @@ import os from "os"
 import { SessionID, MessageID, PartID } from "./schema"
 import { MessageV2 } from "./message-v2"
 import { SessionRevert } from "./revert"
+import { TaskScope } from "./task-scope"
 import { Session } from "./session"
 import { Agent } from "../agent/agent"
 import { Provider } from "@/provider/provider"
@@ -28,6 +29,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CrossSpawnSpawner } from "@loginom-ai-agent/core/cross-spawn-spawner"
 import * as Stream from "effect/Stream"
 import { Command } from "../command"
+import { Skill } from "../skill"
 import { pathToFileURL, fileURLToPath } from "url"
 import { Config } from "@/config/config"
 import { ConfigMarkdown } from "@/config/markdown"
@@ -41,6 +43,7 @@ import { LLM } from "./llm"
 import { Shell } from "@loginom-ai-agent/core/shell"
 import { ShellID } from "@/tool/shell/id"
 import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { AppProcess } from "@loginom-ai-agent/core/process"
 import { Truncate } from "@/tool/truncate"
 import { Image } from "@/image/image"
 import { decodeDataUrl } from "@/util/data-url"
@@ -125,9 +128,11 @@ const layer = Layer.effect(
     const compaction = yield* SessionCompaction.Service
     const plugin = yield* Plugin.Service
     const commands = yield* Command.Service
+    const skills = yield* Skill.Service
     const config = yield* Config.Service
     const permission = yield* Permission.Service
     const fsys = yield* FSUtil.Service
+    const appProcess = yield* AppProcess.Service
     const mcp = yield* MCP.Service
     const lsp = yield* LSP.Service
     const registry = yield* ToolRegistry.Service
@@ -186,7 +191,12 @@ const layer = Layer.effect(
             type: "file",
             url: pathToFileURL(filepath).href,
             filename: name,
-            mime: stat.type === "Directory" ? "application/x-directory" : "text/plain",
+            mime:
+              stat.type === "Directory"
+                ? "application/x-directory"
+                : FSUtil.mimeType(filepath) === "application/x-loginom-package"
+                  ? "application/x-loginom-package"
+                  : "text/plain",
           })
         }),
         { concurrency: "unbounded", discard: true },
@@ -263,7 +273,9 @@ const layer = Layer.effect(
       sessionID: SessionID
       session: Session.Info
       msgs: SessionV1.WithParts[]
+      profile: TaskScope.Profile
     }) {
+      if (input.profile !== "default") return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
       const { task, model, lastUser, sessionID, session, msgs } = input
       const ctx = yield* InstanceState.context
       const promptOps = yield* ops()
@@ -636,7 +648,10 @@ const layer = Layer.effect(
       return yield* provider.defaultModel().pipe(Effect.orDie)
     })
 
-    const createUserMessage = Effect.fn("SessionPrompt.createUserMessage")(function* (input: PromptInput) {
+    const createUserMessage = Effect.fn("SessionPrompt.createUserMessage")(function* (
+      input: PromptInput,
+      grant?: TaskScope.Activation,
+    ) {
       const agentName = input.agent
       const ag = agentName ? yield* agents.get(agentName) : yield* agents.defaultInfo()
       if (!ag) {
@@ -814,6 +829,24 @@ const layer = Layer.effect(
             case "file:": {
               yield* Effect.logInfo("file", { mime: part.mime })
               const filepath = fileURLToPath(part.url)
+              if (part.mime === "application/x-loginom-package" || filepath.toLowerCase().endsWith(".lgp")) {
+                return [
+                  {
+                    messageID: info.id,
+                    sessionID: input.sessionID,
+                    type: "text",
+                    synthetic: true,
+                    text: `Attached Loginom package path: ${filepath}`,
+                  },
+                  {
+                    ...part,
+                    mime: "application/x-loginom-package",
+                    filename: part.filename ?? path.basename(filepath),
+                    messageID: info.id,
+                    sessionID: input.sessionID,
+                  },
+                ]
+              }
               const mime = (yield* fsys.isDir(filepath)) ? "application/x-directory" : part.mime
 
               const { read } = yield* registry.named()
@@ -1015,7 +1048,12 @@ const layer = Layer.effect(
       })
 
       const resolvedParts = yield* Effect.forEach(input.parts, resolvePart, { concurrency: "unbounded" }).pipe(
-        Effect.map((x) => x.flat().map(assign)),
+        Effect.map((x) =>
+          x
+            .flat()
+            .map(assign)
+            .map((part) => TaskScope.sanitize(part)),
+        ),
       )
 
       yield* plugin.trigger(
@@ -1030,16 +1068,24 @@ const layer = Layer.effect(
         { message: info, parts: resolvedParts },
       )
 
-      const parts = yield* Effect.forEach(resolvedParts, (part) =>
-        part.type === "file" && part.mime.startsWith("image/")
-          ? image.normalize(part).pipe(
-              Effect.catchIf(
-                (error) => error instanceof Image.ResizerUnavailableError,
-                () => Effect.succeed(part),
-              ),
-            )
-          : Effect.succeed(part),
+      const parts = yield* Effect.forEach(
+        resolvedParts.map((part) => TaskScope.sanitize(part)),
+        (part) =>
+          part.type === "file" && part.mime.startsWith("image/")
+            ? image.normalize(part).pipe(
+                Effect.catchIf(
+                  (error) => error instanceof Image.ResizerUnavailableError,
+                  () => Effect.succeed(part),
+                ),
+              )
+            : Effect.succeed(part),
       )
+
+      if (grant) {
+        const body = parts.find((part) => part.type === "text" && !part.synthetic && !part.ignored)
+        if (body?.type !== "text") return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
+        body.metadata = { ...body.metadata, skill_activation_pending: grant }
+      }
 
       const parsed = decodeMessageInfo(info, { errors: "all", propertyOrder: "original" })
       if (Exit.isFailure(parsed)) {
@@ -1071,12 +1117,16 @@ const layer = Layer.effect(
       return { info, parts }
     }, Effect.scoped)
 
-    const prompt: (input: PromptInput) => Effect.Effect<SessionV1.WithParts, Image.Error> = Effect.fn(
-      "SessionPrompt.prompt",
-    )(function* (input: PromptInput) {
+    const prompt: (
+      input: PromptInput,
+      grant?: TaskScope.Activation,
+    ) => Effect.Effect<SessionV1.WithParts, Image.Error> = Effect.fn("SessionPrompt.prompt")(function* (
+      input: PromptInput,
+      grant?: TaskScope.Activation,
+    ) {
       const session = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
       yield* revert.cleanup(session)
-      const message = yield* createUserMessage(input)
+      const message = yield* createUserMessage(input, grant)
       yield* sessions.touch(input.sessionID)
 
       const permissions: PermissionV1.Rule[] = []
@@ -1089,7 +1139,7 @@ const layer = Layer.effect(
       }
 
       if (input.noReply === true) return message
-      return yield* loop({ sessionID: input.sessionID })
+      return yield* loop({ sessionID: input.sessionID }, message.info.id)
     })
 
     const lastAssistant = Effect.fnUntraced(function* (sessionID: SessionID) {
@@ -1140,16 +1190,126 @@ const layer = Layer.effect(
         )
         const ctx = yield* InstanceState.context
         let structured: unknown
+        let activation:
+          | { scope: TaskScope.Info; grant: TaskScope.Activation; messageID: MessageID; callID: string }
+          | undefined
         let step = 0
-        const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
-
         while (true) {
+          const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
           yield* status.set(sessionID, { type: "busy" })
           yield* Effect.logInfo("loop", { "session.id": sessionID, step })
 
-          let msgs = yield* MessageV2.filterCompactedEffect(sessionID).pipe(
-            Effect.provideService(Database.Service, database),
+          const history = yield* sessions.messages({ sessionID }).pipe(Effect.orDie)
+          const currentTask = TaskScope.derive({ sessionID, messages: history, revert: session.revert })
+          const commandMessage = TaskScope.visible({ sessionID, messages: history, revert: session.revert }).find(
+            (message) => message.info.id === currentTask?.taskMessageID,
           )
+          const commandPart = commandMessage?.parts.find(
+            (part) => part.type === "text" && TaskScope.activation(part.metadata?.skill_activation_pending),
+          )
+          const commandGrant =
+            commandPart?.type === "text"
+              ? TaskScope.activation(commandPart.metadata?.skill_activation_pending)
+              : undefined
+          if (currentTask && commandMessage?.info.role === "user" && commandPart?.type === "text" && commandGrant) {
+            const part = history
+              .find((message) => message.info.id === commandMessage.info.id)
+              ?.parts.find((part) => part.id === commandPart.id)
+            if (part?.type === "text") {
+              const updated = yield* Effect.gen(function* () {
+                const agent = yield* agents.get(commandMessage.info.agent)
+                if (!agent || !loginom) return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
+                yield* permission
+                  .ask({
+                    sessionID,
+                    permission: "skill",
+                    metadata: {},
+                    patterns: [commandGrant.name],
+                    always: [commandGrant.name],
+                    ruleset: Permission.merge(agent.permission, session.permission ?? []),
+                  })
+                  .pipe(Effect.orDie)
+                yield* Effect.promise((signal) =>
+                  loginom.scope(
+                    "bind",
+                    { taskMessageID: currentTask.taskMessageID, profile: currentTask.profile },
+                    signal,
+                  ),
+                )
+                yield* Effect.promise((signal) =>
+                  loginom.scope(
+                    "request",
+                    { taskMessageID: currentTask.taskMessageID, profile: commandGrant.profile },
+                    signal,
+                  ),
+                )
+                return yield* Effect.gen(function* () {
+                  yield* Effect.promise((signal) =>
+                    loginom.scope(
+                      "apply",
+                      { taskMessageID: currentTask.taskMessageID, profile: commandGrant.profile },
+                      signal,
+                    ),
+                  )
+                  return yield* sessions.updatePart({
+                    ...part,
+                    metadata: { ...TaskScope.cleanMetadata(part.metadata), skill_activation: commandGrant },
+                  })
+                }).pipe(Effect.uninterruptible)
+              }).pipe(
+                Effect.catchCause((cause) =>
+                  sessions
+                    .updatePart({ ...part, metadata: TaskScope.cleanMetadata(part.metadata) })
+                    .pipe(Effect.andThen(Effect.failCause(cause)), Effect.uninterruptible),
+                ),
+              )
+              const message = history.find((message) => message.info.id === updated.messageID)
+              if (message) message.parts = message.parts.map((part) => (part.id === updated.id ? updated : part))
+            }
+          }
+          const pending = activation
+          activation = undefined
+          if (pending && loginom) {
+            const task = TaskScope.derive({ sessionID, messages: history, revert: session.revert })
+            const visible = TaskScope.visible({ sessionID, messages: history, revert: session.revert })
+            const message = history.find((message) => message.info.id === pending.messageID)
+            const part = message?.parts.find(
+              (part) => part.type === "tool" && part.tool === "skill" && part.callID === pending.callID,
+            )
+            if (
+              task?.taskMessageID === pending.scope.taskMessageID &&
+              part?.type === "tool" &&
+              part.state.status === "completed" &&
+              visible.some((message) => message.parts.some((candidate) => candidate.id === part.id))
+            ) {
+              const state = part.state
+              const updated = yield* Effect.gen(function* () {
+                const applied = yield* Effect.promise((signal) =>
+                  loginom.scope("apply", { taskMessageID: task.taskMessageID, profile: pending.grant.profile }, signal),
+                ).pipe(
+                  Effect.map(() => true),
+                  Effect.catchCause(() => Effect.succeed(false)),
+                )
+                return yield* sessions.updatePart({
+                  ...part,
+                  state: applied
+                    ? {
+                        ...state,
+                        metadata: { ...TaskScope.cleanMetadata(state.metadata), activation: pending.grant },
+                      }
+                    : {
+                        status: "error",
+                        input: state.input,
+                        error: "LOGINOM_SCOPE_DENIED",
+                        metadata: TaskScope.cleanMetadata(state.metadata),
+                        time: { start: state.time.start, end: Date.now() },
+                      },
+                })
+              }).pipe(Effect.uninterruptible)
+              if (message) message.parts = message.parts.map((part) => (part.id === updated.id ? updated : part))
+            }
+          }
+          let msgs = MessageV2.filterCompacted(history.toReversed())
 
           const { user: lastUser, assistant: lastAssistant, finished: lastFinished, tasks } = MessageV2.latest(msgs)
 
@@ -1200,7 +1360,15 @@ const layer = Layer.effect(
           const task = tasks.pop()
 
           if (task?.type === "subtask") {
-            yield* handleSubtask({ task, model, lastUser, sessionID, session, msgs })
+            yield* handleSubtask({
+              task,
+              model,
+              lastUser,
+              sessionID,
+              session,
+              msgs,
+              profile: TaskScope.derive({ sessionID, messages: history, revert: session.revert })?.profile ?? "default",
+            })
             continue
           }
 
@@ -1290,7 +1458,29 @@ const layer = Layer.effect(
               processor: handle,
               bypassAgentCheck,
               messages: msgs,
+              history,
               promptOps,
+              activate: (skill, source) =>
+                Effect.gen(function* () {
+                  const grant = TaskScope.bundledActivation(skill)
+                  if (!grant) return
+                  if (!loginom) return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
+                  yield* Effect.promise((signal) =>
+                    loginom
+                      .scope(
+                        "request",
+                        {
+                          taskMessageID: source.scope.taskMessageID,
+                          profile: grant.profile,
+                        },
+                        signal,
+                      )
+                      .catch(() => {
+                        throw Error("LOGINOM_SCOPE_DENIED")
+                      }),
+                  )
+                  activation = { ...source, grant }
+                }),
             }).pipe(
               Effect.provideService(Plugin.Service, plugin),
               Effect.provideService(Permission.Service, permission),
@@ -1298,6 +1488,10 @@ const layer = Layer.effect(
               Effect.provideService(MCP.Service, mcp),
               Effect.provideService(Truncate.Service, truncate),
               Effect.provideService(RuntimeFlags.Service, flags),
+              Effect.provideService(FSUtil.Service, fsys),
+              Effect.provideService(Session.Service, sessions),
+              Effect.provideService(Agent.Service, agents),
+              Effect.provideService(AppProcess.Service, appProcess),
             )
 
             if (lastUser.format?.type === "json_schema") {
@@ -1333,7 +1527,7 @@ const layer = Layer.effect(
                   ]
                 : loginom
                   ? [
-                      "Loginom is available through the bundled loginom_* tools. Start Loginom work with loginom_dock_prepare and follow its verified instructions. All Dock tool names mentioned there have the loginom_ prefix here. Connection credentials are managed privately by the desktop; never ask the model to enter or reveal them.",
+                      "Loginom is available through the bundled loginom_* tools. To create, change or execute a scenario, first activate the bundled loginom-automation skill. Browser Loginom tools are available after activation; then use loginom_dock_prepare for dynamic readiness and input artifacts. Help and diagnostics do not require loginom_dock_prepare. For a documentation-only request about a Loginom scenario, always activate package-docs before replying, including when the local .lgp is missing or only a server package is named. Then request the missing local package; never search for it in the browser. Dock tool names in skills have the loginom_ prefix here. Connection credentials are managed privately by the desktop; never ask the model to enter or reveal them.",
                     ]
                   : []),
               ...(skills ? [skills] : []),
@@ -1412,10 +1606,22 @@ const layer = Layer.effect(
       Effect.scoped,
     )
 
-    const loop: (input: LoopInput) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.loop")(function* (
-      input: LoopInput,
-    ) {
-      return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID))
+    const loop: (input: LoopInput, messageID?: MessageID) => Effect.Effect<SessionV1.WithParts> = Effect.fn(
+      "SessionPrompt.loop",
+    )(function* (input: LoopInput, messageID?: MessageID) {
+      return yield* state.ensureRunning(
+        input.sessionID,
+        lastAssistant(input.sessionID),
+        runLoop(input.sessionID),
+        // A prompt may join a run already releasing its Host lease. Restart
+        // through SessionRunState so the new run remains registered/cancellable.
+        messageID
+          ? (result) =>
+              result.info.role === "assistant" && result.info.parentID !== messageID
+                ? loop({ sessionID: input.sessionID })
+                : Effect.succeed(result)
+          : undefined,
+      )
     })
 
     const shell: (input: ShellInput) => Effect.Effect<SessionV1.WithParts, Session.BusyError> = Effect.fn(
@@ -1440,6 +1646,8 @@ const layer = Layer.effect(
         throw error
       }
       const agentName = cmd.agent ?? input.agent
+      const commandSkill = cmd.source === "skill" ? yield* skills.require(cmd.name).pipe(Effect.orDie) : undefined
+      const commandGrant = commandSkill ? TaskScope.bundledActivation(commandSkill) : undefined
 
       const raw = input.arguments.match(argsRegex) ?? []
       const args = raw.map((arg) => arg.replace(quoteTrimRegex, ""))
@@ -1466,7 +1674,7 @@ const layer = Layer.effect(
         template = template + "\n\n" + input.arguments
       }
 
-      const shellMatches = ConfigMarkdown.shell(template)
+      const shellMatches = commandGrant ? [] : ConfigMarkdown.shell(template)
       if (shellMatches.length > 0) {
         const cfg = yield* config.get()
         const sh = Shell.preferred(cfg.shell)
@@ -1503,7 +1711,9 @@ const layer = Layer.effect(
 
       const templateParts = yield* resolvePromptParts(template)
       const inputFiles = new Set(
-        input.parts?.filter((part) => new URL(part.url).protocol === "file:").map((part) => fileURLToPath(part.url)),
+        input.parts?.flatMap((part) =>
+          part.type === "file" && new URL(part.url).protocol === "file:" ? [fileURLToPath(part.url)] : [],
+        ),
       )
       const uniqueTemplateParts = templateParts.filter(
         (part) => part.type !== "file" || !inputFiles.has(fileURLToPath(part.url)),
@@ -1517,7 +1727,17 @@ const layer = Layer.effect(
               description: cmd.description ?? "",
               command: input.command,
               model: { providerID: taskModel.providerID, modelID: taskModel.modelID },
-              prompt: templateParts.find((y) => y.type === "text")?.text ?? "",
+              // Subtasks receive text, so retain attachment context after template and shell expansion.
+              prompt: [
+                templateParts.find((y) => y.type === "text")?.text ?? "",
+                ...(input.parts?.flatMap((part) => {
+                  if (part.type === "text") return part.ignored ? [] : [part.text]
+                  if (part.mime === "application/x-loginom-package" && part.url.startsWith("file:")) {
+                    return [`Attached Loginom package path: ${fileURLToPath(part.url)}`]
+                  }
+                  return []
+                }) ?? []),
+              ].join("\n\n"),
             },
           ]
         : [...uniqueTemplateParts, ...(input.parts ?? [])]
@@ -1535,14 +1755,17 @@ const layer = Layer.effect(
         { parts },
       )
 
-      const result = yield* prompt({
-        sessionID: input.sessionID,
-        messageID: input.messageID,
-        model: userModel,
-        agent: userAgent,
-        parts,
-        variant: input.variant,
-      })
+      const result = yield* prompt(
+        {
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+          model: userModel,
+          agent: userAgent,
+          parts,
+          variant: input.variant,
+        },
+        commandGrant,
+      )
       yield* events.publish(Command.Event.Executed, {
         name: input.command,
         sessionID: input.sessionID,
@@ -1619,6 +1842,7 @@ export const CommandInput = Schema.Struct({
   parts: Schema.optional(
     Schema.Array(
       Schema.Union([
+        SessionV1.TextPartInput,
         Schema.Struct({
           id: Schema.optional(PartID),
           type: Schema.Literal("file"),
@@ -1679,9 +1903,11 @@ export const node = LayerNode.make({
     SessionCompaction.node,
     Plugin.node,
     Command.node,
+    Skill.node,
     Config.node,
     Permission.node,
     FSUtil.node,
+    AppProcess.node,
     MCP.node,
     LSP.node,
     ToolRegistry.node,

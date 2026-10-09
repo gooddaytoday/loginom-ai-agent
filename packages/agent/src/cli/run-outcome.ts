@@ -3,9 +3,30 @@ import type { ToolPart } from "@loginom-ai-agent/sdk/v2"
 // Correlation is deliberately explicit: a different successful operation does not repair a failure.
 export function runToolOutcome() {
   const unresolved = new Set<string>()
+  const connectionFailures = new Map<string, "LOGINOM_CONFIG_REQUIRED" | "LOGINOM_CONNECTION_NOT_READY">()
   return {
     observe(part: ToolPart) {
       if (part.state.status !== "completed" && part.state.status !== "error") return
+      if (part.tool === "loginom_dock_prepare") {
+        const key = JSON.stringify(canonical(part.state.input))
+        if (part.state.status === "error") {
+          if (part.state.error === "LOGINOM_CONFIG_REQUIRED") connectionFailures.set(key, part.state.error)
+          // Browser admission now happens lazily; retain the former connection preflight exit contract.
+          if (
+            [
+              "LOGINOM_CONNECTION_NOT_READY",
+              "LOGINOM_LOGIN_REJECTED",
+              "LOGINOM_ACCOUNT_MISMATCH",
+              "LOGINOM_LOGIN_UNAVAILABLE",
+              "LOGINOM_BROWSER_START_FAILED",
+            ].includes(part.state.error)
+          )
+            connectionFailures.set(key, "LOGINOM_CONNECTION_NOT_READY")
+        }
+        if (part.state.status === "completed" && !part.state.metadata?.isError && !part.state.metadata?.loginomPending)
+          connectionFailures.delete(key)
+        return
+      }
       // A failed Loginom scenario must not fail the whole run. Permission denials
       // and invalid calls stay on their own tool names.
       if (part.tool.startsWith("loginom_")) return
@@ -22,6 +43,7 @@ export function runToolOutcome() {
       unresolved.delete(key)
     },
     failed: () => unresolved.size > 0,
+    connectionFailure: () => [...connectionFailures.values()].at(-1),
   }
 }
 

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
-import { loginBrowser, checkConnection, loginomAddress } from "./connection-check.mjs"
+import { loginBrowser, loginomAddress } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts } from "../client/lib/artifacts.mjs"
 import { createBridge } from "../client/lib/bridge.mjs"
@@ -14,6 +14,8 @@ const require = createRequire(new URL("../client/package.json", import.meta.url)
 process.umask(0o077)
 const state = {
   starting: false,
+  startupController: new AbortController(),
+  startupCleanupFailed: false,
   closing: undefined,
   bridge: undefined,
   client: undefined,
@@ -34,6 +36,7 @@ const send = (message, disconnect = false) => {
 function close() {
   if (state.closing) return state.closing
   state.controller?.abort()
+  state.startupController.abort(Error("LOGINOM_HOST_CLOSED"))
   state.closing = (async () => {
     await Promise.allSettled([...requests])
     const results = []
@@ -42,7 +45,7 @@ function close() {
     }
     if (state.browserProfile)
       results.push(...(await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])))
-    if (results.some((result) => result.status === "rejected")) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    if (state.startupCleanupFailed || results.some((result) => result.status === "rejected")) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
   })()
   return state.closing
 }
@@ -95,15 +98,17 @@ async function handle(message) {
         profile: browserProfile,
         candidate: input.connection,
         headless: input.headless === true,
+        signal: state.startupController.signal,
       }
       if (input.validation === true) {
-        await checkConnection({ ...login, endpoint: input.endpoint })
+        await loginBrowser(login)
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
       const authenticated = await loginBrowser({ ...login, keepOpen: true })
       state.browser = authenticated.context
       const config = {
+        resources: input.resources,
         endpoint: input.endpoint,
         apiKey: input.connection.apiKey,
         // Preparation must bind to the same canonical path used by private login.
@@ -167,6 +172,17 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (message.operation === "work") {
+      send({
+        id: message.id,
+        result: {
+          activeWork: state.bridge.hasActiveWork(),
+          unsettledWork: state.bridge.hasUnsettledWork(),
+          dispatching: state.controller !== undefined,
+        },
+      })
+      return
+    }
     if (message.operation === "admit") {
       if (typeof message.input.userMessage !== "string" || !message.input.userMessage)
         throw Error("LOGINOM_INPUT_INVALID")
@@ -181,7 +197,10 @@ async function handle(message) {
       return
     }
     if (message.operation === "list") {
-      send({ id: message.id, result: await state.client.listTools() })
+      send({
+        id: message.id,
+        result: { ...(await state.client.listTools()), prepared: state.session.metadata.workspaceReady === true },
+      })
       return
     }
     if (message.operation === "interrupt") {
@@ -199,13 +218,20 @@ async function handle(message) {
         signal: controller.signal,
         timeout: 105_000,
       })
-      send({ id: message.id, result: {
-        result, recoveryPending: state.bridge.hasUnsettledWork(), activeWork: state.bridge.hasActiveWork(),
-      } })
+      send({
+        id: message.id,
+        result: {
+          result,
+          recoveryPending: state.bridge.hasUnsettledWork(),
+          activeWork: state.bridge.hasActiveWork(),
+        },
+      })
     } finally {
       state.controller = undefined
     }
   } catch (error) {
+    if (message.operation === "start" && error?.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
+      state.startupCleanupFailed = true
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
     send({ id: message.id, error: code }, message.operation === "close")
     if (message.operation === "start") {

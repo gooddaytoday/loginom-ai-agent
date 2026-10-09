@@ -15,13 +15,14 @@ import { useSDK, type DirectorySDK } from "@/context/sdk"
 import { useSync, type DirectorySync } from "@/context/sync"
 import { Identifier } from "@/utils/id"
 import { Worktree as WorktreeState } from "@/utils/worktree"
-import { buildRequestParts } from "./build-request-parts"
+import { buildAttachmentParts, buildRequestParts } from "./build-request-parts"
 import { setCursorPosition } from "./editor-dom"
 import { formatServerError } from "@/utils/server-errors"
 import { ScopedKey } from "@/utils/server-scope"
 import { createPromptSubmissionState } from "./submission-state"
 import { normalizeSessionInfo } from "@/utils/session"
 import { Event } from "@loginom-ai-agent/schema/event"
+import { LOGINOM_PACKAGE_MIME } from "@/constants/file-picker"
 import { blobDataUrl } from "@/utils/draft-store"
 
 type PendingPrompt = {
@@ -54,6 +55,22 @@ type FollowupSendInput = {
 const draftText = (prompt: Prompt) => prompt.map((part) => ("content" in part ? part.content : "")).join("")
 
 const draftImages = (prompt: Prompt) => prompt.filter((part): part is ImageAttachmentPart => part.type === "image")
+
+async function buildCommandAttachments(text: string, images: ImageAttachmentPart[]) {
+  const parts = buildAttachmentParts(
+    await Promise.all(
+      images.map(async (attachment) => ({
+        ...attachment,
+        dataUrl: attachment.mime === LOGINOM_PACKAGE_MIME ? "" : await blobDataUrl(attachment.blob, attachment.mime),
+      })),
+    ),
+  )
+  return {
+    arguments: text,
+    files: parts.flatMap((part) => (part.type === "file" ? [{ uri: part.url, name: part.filename }] : [])),
+    ...(parts.length ? { legacyParts: parts.filter((part) => part.type === "text" || part.type === "file") } : {}),
+  }
+}
 
 export async function sendFollowupDraft(input: FollowupSendInput) {
   const text = draftText(input.draft.prompt)
@@ -89,19 +106,13 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
         sessionID: input.draft.sessionID,
         id: messageID,
         command: cmd,
-        arguments: tail.join(" "),
+        ...(await buildCommandAttachments(tail.join(" "), images)),
         agent: input.draft.agent,
         model: {
           id: input.draft.model.modelID,
           providerID: input.draft.model.providerID,
           variant: input.draft.variant,
         },
-        files: await Promise.all(
-          images.map(async (attachment) => ({
-            uri: await blobDataUrl(attachment.blob, attachment.mime),
-            name: attachment.filename,
-          })),
-        ),
       })
       return true
     } catch (err) {
@@ -114,7 +125,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
   const encodedImages = await Promise.all(
     images.map(async (attachment) => ({
       ...attachment,
-      dataUrl: await blobDataUrl(attachment.blob, attachment.mime),
+      dataUrl: attachment.mime === LOGINOM_PACKAGE_MIME ? "" : await blobDataUrl(attachment.blob, attachment.mime),
     })),
   )
   const { requestParts, optimisticParts } = buildRequestParts({
@@ -522,15 +533,9 @@ export function createPromptSubmit(input: PromptSubmitInput) {
             sessionID: session.id,
             id: messageID,
             command: commandName,
-            arguments: args.join(" "),
+            ...(await buildCommandAttachments(args.join(" "), images)),
             agent,
             model: { id: model.modelID, providerID: model.providerID, variant },
-            files: await Promise.all(
-              images.map(async (attachment) => ({
-                uri: await blobDataUrl(attachment.blob, attachment.mime),
-                name: attachment.filename,
-              })),
-            ),
           })
           .catch((err) => {
             serverSync().session.set("session_status", session.id, { type: "idle" })

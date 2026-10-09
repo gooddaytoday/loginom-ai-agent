@@ -1,0 +1,48 @@
+{
+  "tools": [
+    {
+      "tool": "skill",
+      "state": {
+        "status": "completed",
+        "metadata": {
+          "activation": {
+            "name": "loginom-automation",
+            "profile": "loginom-automation",
+            "digest": "2a6ffec0d043a9e78e0a3640ffe231deecade7d63f75d631e97a04bc09019b44"
+          }
+        }
+      }
+    },
+    {
+      "tool": "loginom_dock_prepare",
+      "state": {
+        "status": "completed",
+        "output": "{\"input_artifacts\": [{\"artifact_id\": \"d730b207-4ca9-409d-bf7d-8c7bec3c9433\", \"name\": \"0719141a381855f91742df91e2a6de0132ef0a2ba502baf73f5bed05f3ddf6ff-0-sales.csv\", \"bytes\": 42, \"sha256\": \"98aa522befcb544089edf626c2713e1cf69aaf54f93a0a92a0df7e3e4a10fcd5\", \"upload\": {\"grant_id\": \"8ad1e3cf-be55-496d-bb76-2471192096e1\", \"directory\": \"/user\", \"overwrite\": \"reject\", \"destination\": \"/user/0719141a381855f91742df91e2a6de0132ef0a2ba502baf73f5bed05f3ddf6ff-0-sales.csv\"}}]}"
+      }
+    },
+    {
+      "tool": "loginom_dock_node_wait",
+      "state": {
+        "status": "completed",
+        "output": "{\"result_version\": \"user-v1\", \"operation_id\": \"import-sales\", \"attempt\": 1, \"state\": \"settled\", \"cancel_requested\": false, \"server_stop_requested\": false, \"status\": \"SUCCEEDED\", \"action_key\": \"node.apply\", \"phase\": \"node_ready\", \"effect_possible\": true, \"cleanup_complete\": true, \"node\": {\"document_id\": \"aaa00439-0646-4639-9c31-4ea71fd30552\", \"workflow_id\": \"aaa00439-0646-4639-9c31-4ea71fd30552-1\", \"node_id\": \"b3f5b2ba-0a24-49d9-ad52-8aa2988bce71\"}, \"execution\": {\"status\": \"completed\", \"execution_id\": \"aaa00439-0646-4639-9c31-4ea71fd30552:877:1\"}, \"package_saved\": false, \"configuration\": {\"status\": \"applied\", \"readback\": {\"kind\": \"text_import\", \"scope\": \"observed_before_verified_finish\", \"node\": {\"document_id\": \"aaa00439-0646-4639-9c31-4ea71fd30552\", \"workflow_id\": \"aaa00439-0646-4639-9c31-4ea71fd30552-1\", \"node_id\": \"b3f5b2ba-0a24-49d9-ad52-8aa2988bce71\"}, \"receipt_ids\": [\"import-sales:configure\", \"import-sales:output_mapping\", \"import-sales:finish\"], \"values_are\": \"observed_ui_values\", \"source\": {\"source_path\": \"/user/0719141a381855f91742df91e2a6de0132ef0a2ba502baf73f5bed05f3ddf6ff-0-sales.csv\", \"connection\": \"Локальное\", \"encoding\": \"UTF-8 (65001)\", \"rows_to_skip\": \"0\", \"first_line_as_title\": true}, \"format\": {\"delimiter\": \";\", \"text_qualifier\": \"\\\"\", \"null_marker\": \"\", \"decimal_separator\": \".\"}, \"columns\": [{\"index\": 0, \"name\": \"Category\", \"label\": \"Category\", \"type\": \"string\", \"data_kind\": \"Дискретный\", \"used\": true}, {\"index\": 1, \"name\": \"amount\", \"label\": \"amount\", \"type\": \"integer\", \"data_kind\": \"Непрерывный\", \"used\": true}], \"output_mapping\": {\"port\": 0, \"autosync\": true, \"fields\": [{\"index\": 0, \"name\": \"Category\", \"label\": \"Category\", \"type\": \"string\", \"data_kind\": \"Дискретный\", \"source_name\": \"Category\"}, {\"index\": 1, \"name\": \"amount\", \"label\": \"amount\", \"type\": \"integer\", \"data_kind\": \"Непрерывный\", \"source_name\": \"amount\"}]}, \"package_persistence_verified\": false}}, \"output\": {\"status\": \"complete\", \"evidence_ref\": \"import-sales:read\", \"execution_id\": \"aaa00439-0646-4639-9c31-4ea71fd30552:877:1\", \"ports\": [{\"port\": 0, \"port_guid\": \"58f7e6c3-511e-39d7-8853-036e0a1a7612\", \"fresh\": true, \"execution_id\": \"aaa00439-0646-4639-9c31-4ea71fd30552:877:1\", \"schema\": [{\"index\": 0, \"name\": \"Category\", \"label\": \"Category\", \"type\": \"string\", \"data_kind\": \"Дискретный\"}, {\"index\": 1, \"name\": \"amount\", \"label\": \"amount\", \"type\": \"integer\", \"data_kind\": \"Непрерывный\"}], \"row_count\": 3, \"sample\": [[{\"type\": \"string\", \"value\": \"Alpha\", \"representation\": \"cached_display_text\", \"precision\": \"display_text\", \"is_null\": false}, {\"type\": \"integer\", \"representation\": \"formatted_display\", \"display_text\": \"10\", \"precision\": \"unverified\", \"is_null\": false}], [{\"type\": \"string\", \"value\": \"Beta\", \"representation\": \"cached_display_text\", \"precision\": \"display_text\", \"is_null\": false}, {\"type\": \"integer\", \"representation\": \"formatted_display\", \"display_text\": \"20\", \"precision\": \"unverified\", \"is_null\": false}], [{\"type\": \"string\", \"value\": \"Alpha\", \"representation\": \"cached_display_text\", \"precision\": \"display_text\", \"is_null\": false}, {\"type\": \"integer\", \"representation\": \"formatted_display\", \"display_text\": \"25\", \"precision\": \"unverified\", \"is_null\": false}]], \"sample_rows\": 3, \"sample_complete\": true, \"precision\": {\"numbers_verified\": false, \"limitations\": [\"numeric_display_precision\"], \"strings\": \"cached UI text; source completeness requires independent audit\"}, \"table\": {\"view_guid\": \"f3af76e9-de1d-4147-9390-d404e8b2494c\", \"port_guid\": \"58f7e6c3-511e-39d7-8853-036e0a1a7612\", \"table_tid\": \"MF;TF-1;ViewsForm;BrowseView\"}}], \"workflow_returned\": true}, \"error\": null, \"limitations\": []}"
+      }
+    },
+    {
+      "tool": "loginom_dock_action_run",
+      "state": {
+        "status": "completed",
+        "output": "{\"status\": \"SUCCEEDED\", \"action_key\": \"package.save_checkpoint\", \"action_revision\": \"2\", \"operation_id\": \"save-sales-package\", \"phase\": \"verified\", \"effect_possible\": true, \"output\": {\"package_ref\": {\"kind\": \"package\", \"path\": \"/user/skills-acceptance-ac6eefeb72fc-docs-after-build-1.lgp\", \"active_identity\": \"/user/skills-acceptance-ac6eefeb72fc-docs-after-build-1.lgp\"}, \"reopened\": false, \"workflow_preserved\": true, \"save_completed\": true, \"persisted_content_verified\": false, \"workflow_continuations\": [{\"document_id\": \"aaa00439-0646-4639-9c31-4ea71fd30552\", \"workflow_ref\": {\"tab_tid\": \"MF;cntMain;cntWorkspace;Workspace;t.br;tb-1\", \"prefix\": \"MF;TF-1\", \"workflow_id\": \"aaa00439-0646-4639-9c31-4ea71fd30552-1\", \"navigation_path\": [{\"tid\": \"MF;TF-1;cnrNaviMode;b.s_Сервер\", \"label\": \"\"}, {\"tid\": \"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты\", \"label\": \"Пакеты\"}, {\"tid\": \"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>skills_acceptance_ac6eefeb72fc_docs_after_build_1\", \"label\": \"skills_acceptance_ac6eefeb72fc_docs_after_build_1\"}, {\"tid\": \"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>skills_acceptance_ac6eefeb72fc_docs_after_build_1>Модуль1\", \"label\": \"Модуль1\"}, {\"tid\": \"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>skills_acceptance_ac6eefeb72fc_docs_after_build_1>Модуль1>Сценарий\", \"label\": \"Сценарий\"}]}}], \"reporting_constraints\": [\"Сохранение подтверждает пакет, но не правильность итогового текста. Для каждого численного вывода используй прочитанное поле результата узла. Разности, изменения в п.п. и темпы роста тоже должны быть вычислены в узлах; не вычитай округлённые проценты. Если нужного показателя нет, вычисли его или не добавляй необязательное число.\", \"Ноль и отсутствие наблюдения различаются. Не объявляй нули пропусками или будущими периодами без явного признака в исходных данных либо условия задания. Интерпретацию, не подтверждённую данными, обозначай как гипотезу.\"]}, \"error\": null, \"cleanup_complete\": true, \"result_version\": \"user-v1\"}\n\n{\"kind\": \"dock_outcome_verification\", \"schema_version\": 1, \"operation_id\": \"save-sales-package\", \"action_key\": \"package.save_checkpoint\", \"receipt_sha256\": \"a8acfaff0aa24c9eed75b4c90f41a6e4bae6e274633823aa51436f9b72d180ea\", \"gesture\": {\"state\": \"not_proven\"}, \"domain_effect\": {\"state\": \"verified\", \"kind\": \"persist\"}, \"observation\": {\"state\": \"not_provided\", \"completeness\": \"not_proven\", \"limitations\": []}, \"settings\": {\"state\": \"not_checked\"}, \"data\": {\"state\": \"not_checked\"}, \"goal\": {\"state\": \"not_verified\", \"obligations\": []}}"
+      }
+    }
+  ],
+  "options": {
+    "skills": [
+      {
+        "name": "loginom-automation",
+        "digest": "2a6ffec0d043a9e78e0a3640ffe231deecade7d63f75d631e97a04bc09019b44"
+      }
+    ],
+    "csvSha256": "98aa522befcb544089edf626c2713e1cf69aaf54f93a0a92a0df7e3e4a10fcd5",
+    "packagePath": "/user/skills-acceptance-ac6eefeb72fc-docs-after-build-1.lgp"
+  }
+}

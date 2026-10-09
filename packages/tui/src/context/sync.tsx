@@ -32,6 +32,8 @@ import { batch, onMount } from "solid-js"
 import path from "path"
 import { useKV } from "./kv"
 import { usePermission } from "./permission"
+import { useToast } from "../ui/toast"
+import { errorMessage } from "../util/error"
 
 const emptyConsoleState: ConsoleState = {
   consoleManagedProviders: [],
@@ -146,6 +148,7 @@ export const {
     const event = useEvent()
     const project = useProject()
     const sdk = useSDK()
+    const toast = useToast()
 
     const fullSyncedSessions = new Set<string>()
     const syncingSessions = new Map<string, Promise<void>>()
@@ -175,6 +178,14 @@ export const {
 
     event.subscribe((event, { directory, workspace }) => {
       switch (event.type) {
+        // Catalog diagnostics arrive before SyncProvider renders App.
+        case "session.error": {
+          if (workspace !== project.workspace.current()) break
+          const error = event.properties.error
+          if (error?.name === "MessageAbortedError") break
+          toast.show({ variant: "error", message: errorMessage(error), duration: 5000 })
+          break
+        }
         case "server.instance.disposed":
           void bootstrap()
           break

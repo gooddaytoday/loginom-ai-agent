@@ -209,7 +209,12 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
             text: part.text,
           })
         // text/plain and directory files are converted into text parts, ignore them
-        if (part.type === "file" && part.mime !== "text/plain" && part.mime !== "application/x-directory") {
+        if (
+          part.type === "file" &&
+          part.mime !== "text/plain" &&
+          part.mime !== "application/x-directory" &&
+          part.mime !== "application/x-loginom-package"
+        ) {
           // The original inline CSV remains in user.parts for Loginom admission.
           // Non-UTF8 bytes cannot be sent as a provider file part or decoded as text.
           if (

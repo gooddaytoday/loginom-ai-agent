@@ -9,6 +9,7 @@ import { storageDirectories, storagePath } from './storage-policy.mjs';
 const SHA256 = /^[a-f0-9]{64}$/;
 
 export async function loadConfig({ configPath, stateDir, agent, adapterRevision, mode,
+  resources = process.env.LOGINOM_AI_AGENT_RESOURCES,
   actionManifestUri = null, actionManifestSha256 = null, replayBootstrap = false, replayLoginUser = null, replayLoginomUrl = null,
   acceptanceCleanupPackage = null }) {
   if (!configPath) throw new Error('An explicit Dock config path is required');
@@ -79,6 +80,7 @@ export async function loadConfig({ configPath, stateDir, agent, adapterRevision,
   }
   return Object.freeze({
     endpoint: endpoint.href, apiKey: data.api_key, loginomUrl,
+    resources,
     account: data.account, user: data.user, agent, adapterRevision, mode,
     actionManifestUri, actionManifestSha256, replayBootstrap, replayLoginUser, acceptanceCleanupPackage,
     resultProfile: profile?.result_profile ?? 'diagnostic',

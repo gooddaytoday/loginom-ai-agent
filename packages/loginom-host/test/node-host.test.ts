@@ -1,9 +1,14 @@
 import { afterAll, beforeAll, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
+import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { buildNodeHost } from "../script/build-node-host"
+import { buildKeychain } from "../script/build-keychain"
 import { launchNodeHost } from "../src/node-client"
+import { connectionStore } from "../src/connection/connection-store"
+import { cliCredentials } from "../src/connection/cli-credentials"
+import { knowledgeServer } from "../../loginom-runtime/client/test/support/knowledge-server.mjs"
 
 const fixture = { directory: "", entry: "", node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? "" }
 beforeAll(async () => {
@@ -13,6 +18,67 @@ beforeAll(async () => {
 })
 afterAll(async () => {
   if (fixture.directory) await rm(fixture.directory, { recursive: true, force: true })
+})
+
+test.each(["rejected", "invalid"])(
+  "failed host startup confirms cleanup and exit before rejecting: %s",
+  async (mode) => {
+    const marker = join(fixture.directory, "startup-" + mode)
+    const entry = marker + ".mjs"
+    await writeFile(
+      entry,
+      `import {writeFileSync} from 'node:fs';
+      process.on('SIGTERM', () => {});
+      process.on('message', m => {
+        if (m.method === 'start') {
+          writeFileSync(${JSON.stringify(marker)}, String(process.pid));
+          process.send({id:m.id,${mode === "rejected" ? "error:'LOGINOM_HANDSHAKE_INVALID'" : "result:{protocol:1,ready:false,pid:process.pid}"}});
+        }
+        if (m.method === 'close') process.send({id:m.id,result:{closed:true}},()=>process.exit(0));
+      });`,
+    )
+    try {
+      const error = await launchNodeHost({
+        node: fixture.node,
+        entry,
+        root: fixture.directory,
+        resources: fixture.directory,
+        headless: true,
+      }).catch((error: unknown) => error)
+      expect(error).toMatchObject({ message: "LOGINOM_HANDSHAKE_INVALID", cleanupConfirmed: true })
+      const pid = Number(await readFile(marker, "utf8"))
+      expect(() => process.kill(pid, 0)).toThrow()
+    } finally {
+      const pid = Number(await readFile(marker, "utf8"))
+      try {
+        process.kill(pid, "SIGKILL")
+      } catch {}
+    }
+  },
+  15_000,
+)
+
+test("a failed host constructor is closed without masking its startup error", async () => {
+  const root = join(fixture.directory, "not-a-directory")
+  await writeFile(root, "blocked")
+  await expect(
+    launchNodeHost({ node: fixture.node, entry: fixture.entry, root, resources: fixture.directory, headless: true }),
+  ).rejects.toMatchObject({
+    message: "LOGINOM_HOST_REQUEST_FAILED",
+    cleanupConfirmed: true,
+  })
+})
+
+test("an executable that could not spawn needs no cleanup acknowledgement", async () => {
+  await expect(
+    launchNodeHost({
+      node: join(fixture.directory, "missing-node"),
+      entry: fixture.entry,
+      root: fixture.directory,
+      resources: fixture.directory,
+      headless: true,
+    }),
+  ).rejects.toMatchObject({ cleanupConfirmed: true })
 })
 
 test("bundled Node host handshakes without Electron, manages its profile and closes completely", async () => {
@@ -32,7 +98,8 @@ test("bundled Node host handshakes without Electron, manages its profile and clo
       .catch((error: Error) => error.message)
     expect(error).not.toContain("private-sentinel")
     expect(error).toBe("LOGINOM_CANDIDATE_INVALID")
-    expect(await host.request("acquire", { run: "test", session: "chat" })).toBeNull()
+    expect(await host.request("acquire", { run: "test", session: "chat" })).toEqual({ generation: 0 })
+    expect(await host.request("release", { run: "test" })).toBe(true)
   } finally {
     await host.close()
   }
@@ -51,10 +118,100 @@ test("a non-boolean recovery mode is rejected before the host starts", async () 
       headless: true,
       strictRecovery: "yes" as unknown as boolean,
     }),
-  ).rejects.toThrow("LOGINOM_HANDSHAKE_INVALID")
+  ).rejects.toMatchObject({ message: "LOGINOM_HANDSHAKE_INVALID", cleanupConfirmed: true })
 }, 15_000)
 
-test("saved-connection readiness can finish after the former 30s startup deadline", async () => {
+test.each(["ready", "close"])(
+  "private Help preflight waits for the catalog or cancels on shutdown: %s",
+  async (mode) => {
+    const cleanup: (() => void | Promise<void>)[] = []
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const server = await knowledgeServer(
+      { after: (callback) => cleanup.push(callback) },
+      {
+        list: async () => {
+          entered.resolve()
+          await release.promise
+          return { tools: server.tools }
+        },
+      },
+    )
+    const resources = join(fixture.directory, "knowledge-resources-" + mode)
+    const root = join(fixture.directory, "knowledge-profile-" + mode)
+    const marker = join(root, "forbidden-browser")
+    await mkdir(join(resources, "bin"), { recursive: true })
+    await mkdir(join(resources, "runtime/src"), { recursive: true })
+    await symlink(fixture.node, join(resources, "bin/node"))
+    await symlink(
+      join(import.meta.dir, "../../loginom-runtime/src/knowledge-entry.mjs"),
+      join(resources, "runtime/src/knowledge-entry.mjs"),
+    )
+    await writeFile(
+      join(resources, "runtime/src/managed-entry.mjs"),
+      `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser forbidden');`,
+    )
+    await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
+    await mkdir(root, { recursive: true, mode: 0o700 })
+    if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
+    const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
+    await store.stage({
+      generation: 1,
+      revision: 1,
+      apiKey: "UNIT-NONSECRET",
+      password: "PRIVATE-NONSECRET",
+      username: "user",
+      url: "http://127.0.0.1:1/app/?custom=preserve",
+    })
+    await store.activate(1)
+    const host = await launchNodeHost({
+      node: fixture.node,
+      entry: fixture.entry,
+      root,
+      resources,
+      headless: true,
+      environment: {},
+    })
+    try {
+      expect(await host.request("connection.status", {})).toMatchObject({
+        state: "starting",
+        generation: 1,
+        url: "http://127.0.0.1:1/app/?custom=preserve",
+      })
+      await entered.promise
+      const settled = { value: false }
+      const readiness = host.request("connection.ready", {}).finally(() => {
+        settled.value = true
+      })
+      void readiness.catch(() => {})
+      await host.request("connection.status", {})
+      expect(settled.value).toBe(false)
+      if (mode === "ready") {
+        release.resolve()
+        expect(await readiness).toMatchObject({ state: "ready", generation: 1, hasApiKey: true })
+      } else {
+        await host.close()
+        await expect(readiness).rejects.toThrow("LOGINOM_HOST_CLOSED")
+        expect(await host.exited).toEqual({ code: 0, signal: null })
+      }
+      await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
+    } finally {
+      release.resolve()
+      await host.close().catch(() => {})
+      for (const callback of cleanup) await callback()
+      if (process.platform === "darwin") {
+        const child = Bun.spawn([
+          "/usr/bin/security", "delete-generic-password", "-s", "com.loginom.aiagent.cli.profile-key.v1",
+          "-a", createHash("sha256").update(await realpath(root)).digest("hex"),
+        ], { stdout: "ignore", stderr: "ignore" })
+        expect([0, 44]).toContain(await child.exited)
+      }
+    }
+  },
+  45_000,
+)
+
+test("private host handshake retains its upper budget beyond the former 30s deadline", async () => {
   const entry = join(fixture.directory, "slow-readiness.mjs")
   await writeFile(
     entry,

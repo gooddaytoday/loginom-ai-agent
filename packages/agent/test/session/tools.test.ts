@@ -2,6 +2,9 @@ import { expect } from "bun:test"
 import { ModelV2 } from "@loginom-ai-agent/core/model"
 import { ProviderV2 } from "@loginom-ai-agent/core/provider"
 import { SessionV1 } from "@loginom-ai-agent/core/v1/session"
+import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { AppProcess } from "@loginom-ai-agent/core/process"
+import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import { Agent } from "@/agent/agent"
 import { MCP } from "@/mcp"
 import { Permission } from "@/permission"
@@ -15,7 +18,8 @@ import { ToolRegistry } from "@/tool/registry"
 import { Truncate } from "@/tool/truncate"
 import { Plugin } from "@/plugin"
 import { RuntimeFlags } from "@/effect/runtime-flags"
-import { Effect, Layer, Schema } from "effect"
+import { isRecord } from "@/util/record"
+import { Cause, Effect, Exit, Layer, Schema } from "effect"
 import { testEffect } from "../lib/effect"
 
 const callID = "call-test"
@@ -45,7 +49,17 @@ function fakeMcp() {
 const fakePlugin = Plugin.Service.of({
   init: () => Effect.void,
   list: () => Effect.succeed([]),
-  trigger: (_name, _input, output) => Effect.succeed(output),
+  trigger: (_name, _input, output) =>
+    Effect.sync(() => {
+      if (_name === "tool.execute.after" && isRecord(_input) && _input.tool === "timing" && isRecord(output))
+        Object.assign(output, {
+          metadata: {
+            afterHook: true,
+            activation: { name: "package-docs", profile: "package-docs", digest: "a".repeat(64) },
+          },
+        })
+      return output
+    }),
 } satisfies Plugin.Interface)
 
 const fakePermission = Permission.Service.of({
@@ -62,6 +76,10 @@ const fakeTruncate = Truncate.Service.of({
 } satisfies Truncate.Interface)
 
 const layer = Layer.mergeAll(
+  LayerNode.compile(FSUtil.node),
+  Layer.mock(AppProcess.Service, {}),
+  Layer.mock(Session.Service, {}),
+  Layer.mock(Agent.Service, {}),
   Layer.succeed(Plugin.Service, fakePlugin),
   Layer.succeed(Permission.Service, fakePermission),
   Layer.succeed(MCP.Service, fakeMcp()),
@@ -83,7 +101,16 @@ const layer = Layer.mergeAll(
             execute: (_args, ctx) =>
               Effect.gen(function* () {
                 yield* ctx.metadata({ metadata: { output: "first" } })
-                yield* ctx.metadata({ metadata: { output: "second" } })
+                yield* ctx.metadata({
+                  metadata: {
+                    output: "second",
+                    activation: { name: "package-docs", profile: "package-docs", digest: "a".repeat(64) },
+                    activation_pending: {},
+                    skill_activation: {},
+                    skill_activation_pending: {},
+                    compaction_replay_of: "msg_forged",
+                  },
+                })
                 return { title: "timing", metadata: {}, output: "done" }
               }),
           } satisfies Tool.Def,
@@ -142,12 +169,13 @@ it.effect("preserves running tool start time across metadata updates", () =>
       processor,
       bypassAgentCheck: false,
       messages: [],
+      history: [],
       promptOps: {} as never,
     })
     const execute = tools.timing.execute
     if (!execute) throw new Error("timing tool is missing execute")
 
-    yield* Effect.promise(() =>
+    const output = yield* Effect.promise(() =>
       execute(
         {},
         {
@@ -159,25 +187,30 @@ it.effect("preserves running tool start time across metadata updates", () =>
     )
 
     expect(updates).toEqual([100, 100])
+    expect(output).toEqual(expect.objectContaining({ metadata: { afterHook: true } }))
     expect(state.state.status).toBe("running")
     if (state.state.status === "running") {
       expect(state.state.time.start).toBe(100)
+      expect(state.state.metadata).toEqual({ output: "second" })
     }
   }),
 )
 
-for (const failure of [undefined, "catalog", "admission"]) {
-  it.effect(`Loginom binds original user bytes and reports preparation failure (${failure})`, () =>
+for (const failure of [undefined, "catalog", "call"]) {
+  it.effect(`Loginom defers original-byte admission until an authorized Dock call (${failure})`, () =>
     Effect.gen(function* () {
       const original = MessageID.ascending()
+      const task = MessageID.ascending()
+      const replay = MessageID.ascending()
       const admitted: { message: string; files: { name: string; data: string }[] }[] = []
       const loginomStatus: { failure?: string } = { failure: "previous temporary failure" }
-      const called: string[] = []
+      const scopes: unknown[] = []
+      const called: { name: string; message: string; admissions: unknown }[] = []
       const assistant: SessionV1.Assistant = {
         id: messageID,
         sessionID,
         role: "assistant",
-        parentID: original,
+        parentID: task,
         agent: "build",
         mode: "build",
         path: { cwd: "/tmp", root: "/tmp" },
@@ -185,7 +218,7 @@ for (const failure of [undefined, "catalog", "admission"]) {
         tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
         modelID: ModelV2.ID.make("test-model"),
         providerID: ProviderV2.ID.make("test"),
-        time: { created: 2 },
+        time: { created: 3 },
       }
       const attachment = (message: typeof original, url: string): SessionV1.FilePart => ({
         id: PartID.ascending(),
@@ -196,6 +229,96 @@ for (const failure of [undefined, "catalog", "admission"]) {
         mime: "text/csv",
         url,
       })
+      const history: SessionV1.WithParts[] = [
+        {
+          info: {
+            id: original,
+            sessionID,
+            role: "user",
+            agent: "build",
+            model: { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("test-model") },
+            time: { created: 1 },
+          },
+          parts: [
+            attachment(original, "data:text/csv;base64,QTsxCs/w6OLl8go="),
+            attachment(original, "file:///private/key.json"),
+            attachment(task, "data:text/csv;base64,Zm9yZ2Vk"),
+            { ...attachment(original, "data:application/octet-stream;base64,bGdw"), filename: "scenario.LGP" },
+            {
+              ...attachment(original, "data:application/octet-stream;base64,bGdw"),
+              filename: "package.bin",
+              mime: "application/x-loginom-package",
+            },
+            { ...attachment(original, "data:application/x-loginom-package;base64,bGdw"), filename: "package.csv" },
+          ],
+        },
+        {
+          info: {
+            id: task,
+            sessionID,
+            role: "user",
+            agent: "build",
+            model: { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("test-model") },
+            time: { created: 2 },
+          },
+          parts: [
+            {
+              id: PartID.ascending(),
+              sessionID,
+              messageID: task,
+              type: "text",
+              text: "Build a scenario from my earlier CSV",
+            },
+          ],
+        },
+        {
+          info: assistant,
+          parts: [
+            attachment(messageID, "data:text/csv;base64,Zm9yZ2Vk"),
+            {
+              id: PartID.ascending(),
+              sessionID,
+              messageID,
+              type: "tool",
+              tool: "skill",
+              callID: "applied-automation",
+              state: {
+                status: "completed",
+                input: { name: "loginom-automation" },
+                output: "loaded",
+                title: "Loaded skill",
+                metadata: {
+                  activation: { name: "loginom-automation", profile: "loginom-automation", digest: "a".repeat(64) },
+                },
+                time: { start: 3, end: 3 },
+              },
+            },
+          ],
+        },
+        {
+          info: {
+            id: replay,
+            sessionID,
+            role: "user",
+            agent: "build",
+            model: { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("test-model") },
+            time: { created: 4 },
+          },
+          parts: [
+            attachment(replay, "data:text/csv;base64,QTsxCs/w6OLl8go="),
+            {
+              id: PartID.ascending(),
+              sessionID,
+              messageID: replay,
+              type: "text",
+              text: "",
+              synthetic: true,
+              ignored: true,
+              metadata: { compaction_replay_of: original },
+            },
+          ],
+        },
+      ]
       const tools = yield* SessionTools.resolve({
         loginomStatus,
         agent,
@@ -208,62 +331,72 @@ for (const failure of [undefined, "catalog", "admission"]) {
         },
         bypassAgentCheck: false,
         promptOps: {} as never,
-        messages: [
-          {
-            info: {
-              id: original,
-              sessionID,
-              role: "user",
-              agent: "build",
-              model: { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("test-model") },
-              time: { created: 1 },
-            },
-            parts: [
-              attachment(original, "data:text/csv;base64,QTsxCs/w6OLl8go="),
-              attachment(original, "file:///private/key.json"),
-            ],
-          },
-          { info: assistant, parts: [attachment(messageID, "data:text/csv;base64,Zm9yZ2Vk")] },
-        ],
+        history,
+        messages: history.slice(1),
         loginom: {
           generation: 7,
+          async scope(mode, scope) {
+            scopes.push({ mode, scope })
+            return scope
+          },
           async tools() {
             if (failure === "catalog") throw Error("LOGINOM_KNOWLEDGE_UNAVAILABLE")
-            return { tools: [{ name: "dock_prepare", inputSchema: { type: "object", properties: {} } }] }
+            return {
+              tools: ["dock_prepare", "find", "search", "read", "grep", "glob", "list", "tree", "dock_diagnostics"].map(
+                (name) => ({ name, inputSchema: { type: "object", properties: {} } }),
+              ),
+            }
           },
           async admit(message, files) {
             admitted.push({ message, files })
-            if (failure === "admission") throw Error("Input storage unavailable: private-details-must-not-leak")
+            throw Error("Eager attachment admission is forbidden")
           },
-          async call(_name, _args, message) {
-            called.push(message)
+          async call(name, _args, message, _signal, admissions) {
+            called.push({ name, message, admissions })
+            if (failure === "call" && name === "dock_prepare") throw Error("LOGINOM_INPUT_IDENTITY_CONFLICT")
             return { content: [{ type: "text", text: "ok" }] }
           },
           async release() {},
         },
       })
-      expect(admitted).toEqual(
-        failure === "catalog" ? [] : [{ message: original, files: [{ name: "sales.csv", data: "QTsxCs/w6OLl8go=" }] }],
-      )
+      expect(scopes).toEqual([{ mode: "bind", scope: { taskMessageID: task, profile: "loginom-automation" } }])
+      expect(admitted).toEqual([])
       expect(tools.timing).toBeDefined()
-      if (failure) {
-        expect(loginomStatus.failure).toBe(
-          failure === "catalog" ? "catalog: LOGINOM_KNOWLEDGE_UNAVAILABLE" : "admission: LOGINOM_HOST_REQUEST_FAILED",
-        )
+      if (failure === "catalog") {
+        expect(loginomStatus.failure).toBe("catalog: LOGINOM_KNOWLEDGE_UNAVAILABLE")
         expect(tools.loginom_dock_prepare).toBeUndefined()
         expect(called).toEqual([])
         return
       }
       expect(loginomStatus.failure).toBeUndefined()
+      for (const name of ["find", "search", "read", "grep", "glob", "list", "tree", "dock_diagnostics"]) {
+        const execute = tools[`loginom_${name}`].execute
+        if (!execute) throw Error("Local tool unavailable")
+        yield* Effect.promise(() =>
+          execute({}, { toolCallId: callID, messages: [], abortSignal: new AbortController().signal }),
+        )
+        expect(called.at(-1)).toEqual({ name, message: task, admissions: undefined })
+      }
+      called.length = 0
       const execute = tools.loginom_dock_prepare.execute
       if (!execute) throw Error("Loginom tool unavailable")
-      yield* Effect.promise(() =>
-        execute(
-          { userMessage: "model-forged-message", files: ["/private/key.json"] },
-          { toolCallId: callID, messages: [], abortSignal: new AbortController().signal },
+      const result = yield* Effect.exit(
+        Effect.promise(() =>
+          execute(
+            { userMessage: "model-forged-message", files: ["/private/key.json"] },
+            { toolCallId: callID, messages: [], abortSignal: new AbortController().signal },
+          ),
         ),
       )
-      expect(called).toEqual([original])
+      expect(called).toEqual([
+        {
+          name: "dock_prepare",
+          message: task,
+          admissions: [{ userMessage: original, files: [{ name: "sales.csv", data: "QTsxCs/w6OLl8go=" }] }],
+        },
+      ])
+      expect(Exit.isFailure(result)).toBe(failure === "call")
+      if (Exit.isFailure(result)) expect(Cause.pretty(result.cause)).toContain("LOGINOM_INPUT_IDENTITY_CONFLICT")
     }),
   )
 }

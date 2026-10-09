@@ -1,28 +1,58 @@
 import { expect, test } from "bun:test"
 import { MessageChannel } from "node:worker_threads"
-import type { MessagePortMain } from "electron"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { loginomHostPort } from "./host-port"
-import { connectionService } from "./connection-service"
-import { connectionStore } from "./connection-store"
+import { createLoginomHost } from "@loginom-ai-agent/loginom-host/host"
+import { createHash } from "node:crypto"
+import { stageKnowledgeFixture, waitForKnowledge } from "../../../../loginom-host/test/fixtures/knowledge"
 import { credentials } from "./credentials"
-import type { desktopLoginom } from "./desktop-service"
 import { transport } from "@loginom-ai-agent/loginom-host/transport"
-import { recoveryStore } from "./recovery-store"
-import { inputStore } from "@loginom-ai-agent/loginom-host/inputs"
 
 test.each(["call", "tools", "admit", "interrupt"])(
   "release during %s retains the generation until the actual request finishes",
   async (method) => {
     const directory = await mkdtemp(join(tmpdir(), "loginom-port-"))
-    const service = await connectionService(connectionStore(directory, credentials("linux")), {
-      async check() {},
-      async prepare() {
-        return { async close() {} }
-      },
-    })
+    const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+    if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
+    const resources = join(directory, "resources")
+    const root = join(directory, "profile")
+    await stageKnowledgeFixture(resources)
+    await mkdir(join(resources, "bin"))
+    await symlink(node, join(resources, "bin/node"))
+    await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test/mcp" }))
+    await writeFile(
+      join(resources, "runtime/src/managed-entry.mjs"),
+      `
+      let pending, entered, armed = false;
+      const reply = (id, result) => process.send({id,result});
+      const tools = {prepared:true,tools:[{name:'dock_node_wait',inputSchema:{type:'object'}}]};
+      process.on('message', m => {
+        if (m.operation === 'start') return reply(m.id, m.input.validation
+          ? {protocol:1,generation:m.input.generation,checked:true}
+          : {protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true});
+        if (m.operation === 'close') return process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+        if (m.operation === 'arm') { armed = true; return reply(m.id, true); }
+        if (m.operation === 'call' && m.input.name === 'dock_prepare')
+          return reply(m.id, {result:{content:[]},recoveryPending:false,activeWork:false});
+        if (m.operation === 'list' && !armed) return reply(m.id, tools);
+        if (m.operation === 'entered') {
+          if (pending) return reply(m.id, true);
+          entered = m.id; return;
+        }
+        if (m.operation === 'finish') {
+          if (pending) reply(pending.id, pending.operation === 'call'
+            ? {result:{content:[]},recoveryPending:false}
+            : pending.operation === 'list' ? tools : pending.operation === 'admit' ? [] : true);
+          pending = undefined; return reply(m.id, true);
+        }
+        pending = m;
+        if (entered) reply(entered, true);
+      });
+    `,
+    )
+    const service = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
     const initial = {
       revision: 0,
       url: "http://example.test/app/",
@@ -32,10 +62,8 @@ test.each(["call", "tools", "admit", "interrupt"])(
     }
     const validation = await service.api.check(initial)
     await service.api.save({ revision: 0, validationId: validation.validationId })
-    await service.settled()
+    await waitForKnowledge(service)
     const channel = new MessageChannel()
-    const launched = Promise.withResolvers<void>()
-    const entered = Promise.withResolvers<void>()
     const main = {
       on(event: string, listener: (value: { data: unknown }) => void) {
         channel.port1.on(event, event === "message" ? (data) => listener({ data }) : listener)
@@ -58,39 +86,24 @@ test.each(["call", "tools", "admit", "interrupt"])(
         channel.port2.postMessage(value)
       },
     })
-    loginomHostPort(
-      main as unknown as MessagePortMain,
-      {
-        ...service,
-        journal: await recoveryStore(join(directory, "recovery")),
-        recoveries: new Map(),
-        resetRestarts() {},
-        markRuntimeStale() {},
-        async retireRuntime() {},
-        async inputs(generation: number, chat: string, message: string, files: []) {
-          return inputStore(join(directory, "inputs")).admit(`${generation}:${chat}`, message, files, "/user")
-        },
-        async runtime() {
-          entered.resolve()
-          await launched.promise
-          return {
-            async request() {
-              return { result: { content: [] }, recoveryPending: false }
-            },
-          }
-        },
-      } as unknown as Awaited<ReturnType<typeof desktopLoginom>>,
-    )
+    const port = loginomHostPort(main, service)
+    const runtime = await service.runtime(1, createHash("sha256").update("chat").digest("hex"))
     try {
       expect(await client.request("acquire", { run: "first", session: "chat" })).toEqual({ generation: 1 })
+      await client.request("scope", {
+        run: "first", mode: "bind", scope: { taskMessageID: "msg_original", profile: "loginom-automation" },
+      })
+      await client.request("call", { run: "first", name: "dock_prepare", userMessage: "msg_original", args: {} })
+      await client.request("tools", { run: "first" })
+      await runtime.request("arm")
       const call = client.request(method, {
         run: "first",
-        name: "tool",
-        userMessage: "original-user",
+        name: "dock_node_wait",
+        userMessage: "msg_original",
         args: {},
         files: [],
       })
-      await entered.promise
+      await runtime.request("entered")
       await client.request("release", { run: "first" })
       const next = await service.api.check({ ...initial, revision: 1, username: "other" })
       await service.api.save({ revision: 1, validationId: next.validationId })
@@ -99,13 +112,15 @@ test.each(["call", "tools", "admit", "interrupt"])(
         .request("call", { run: "first", name: "tool", userMessage: "original-user", args: {} }, 1000)
         .catch((error: Error) => error.message)
       expect(rejected).toBe("LOGINOM_HOST_REQUEST_FAILED")
-      launched.resolve()
+      await runtime.request("finish")
       await call
-      await service.settled()
+      await port.close()
+      await waitForKnowledge(service)
       expect(await service.api.status()).toMatchObject({ state: "ready", generation: 2 })
     } finally {
-      launched.resolve()
+      await runtime.request("finish").catch(() => undefined)
       client.close()
+      await port.close()
       channel.port1.close()
       channel.port2.close()
       await service.close()

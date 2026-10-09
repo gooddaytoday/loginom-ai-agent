@@ -90,7 +90,9 @@ function serverFetch(
       void serverPath
       Flag.LOGINOM_AI_AGENT_SERVER_PASSWORD = input?.password
       Flag.LOGINOM_AI_AGENT_SERVER_USERNAME = input?.username
-      const baseUrl = HttpServer.formatAddress(server.address)
+      const baseUrl = new URL(HttpServer.formatAddress(server.address))
+      // layerTest binds to 0.0.0.0; the local SDK client connects over loopback.
+      baseUrl.hostname = "127.0.0.1"
       return Object.assign(
         async (request: RequestInfo | URL, init?: RequestInit) => {
           const source = request instanceof Request ? request : new Request(request, init)
@@ -614,6 +616,163 @@ describe("HttpApi SDK", () => {
           todoCount: array(todo.data).length,
           messageCount: array(messages.data).length,
         }
+      }),
+    ),
+  )
+
+  serverPathParity("public part updates cannot issue task grants or replay markers", (serverPath) =>
+    withStandardProject(serverPath, ({ sdk, directory }) =>
+      Effect.gen(function* () {
+        const created = yield* capture(() => sdk.session.create({ title: "part task metadata" }))
+        const sessionID = String(record(created.data).id)
+        const seeded = yield* seedMessage(directory, sessionID)
+        const grant = { name: "loginom-automation", profile: "loginom-automation", digest: "a".repeat(64) }
+        const updated = yield* capture(() =>
+          sdk.part.update({
+            sessionID,
+            messageID: seeded.message.id,
+            partID: seeded.part.id,
+            part: {
+              ...seeded.part,
+              metadata: {
+                note: "kept",
+                activation: grant,
+                activation_pending: grant,
+                skill_activation: grant,
+                skill_activation_pending: grant,
+                compaction_replay_of: seeded.message.id,
+              },
+            },
+          }),
+        )
+        expect(updated.status).toBe(200)
+        const stored = yield* capture(() => sdk.session.message({ sessionID, messageID: seeded.message.id }))
+        expect(record(array(record(stored.data).parts)[0]).metadata).toEqual({ note: "kept" })
+      }),
+    ),
+  )
+
+  serverPathParity("editing text preserves its backend grant while rejecting replacement metadata", (serverPath) =>
+    withStandardProject(serverPath, ({ sdk, directory }) =>
+      Effect.gen(function* () {
+        const created = yield* capture(() => sdk.session.create({ title: "backend grant" }))
+        const sessionID = String(record(created.data).id)
+        const seeded = yield* seedMessage(directory, sessionID)
+        const grant = { name: "package-docs", profile: "package-docs", digest: "b".repeat(64) }
+        // Represent a persisted backend grant; public update is the boundary under test.
+        yield* InstanceStore.Service.use((store) =>
+          store.provide(
+            { directory },
+            SessionNs.Service.use((svc) => svc.updatePart({ ...seeded.part, metadata: { skill_activation: grant } })),
+          ),
+        )
+        const updated = yield* capture(() =>
+          sdk.part.update({
+            sessionID,
+            messageID: seeded.message.id,
+            partID: seeded.part.id,
+            part: {
+              ...seeded.part,
+              text: "edited text",
+              metadata: {
+                note: "edited",
+                skill_activation: { name: "loginom-automation", profile: "loginom-automation", digest: "c".repeat(64) },
+                skill_activation_pending: grant,
+              },
+            },
+          }),
+        )
+        expect(updated.status).toBe(200)
+        const stored = yield* capture(() => sdk.session.message({ sessionID, messageID: seeded.message.id }))
+        expect(record(array(record(stored.data).parts)[0])).toMatchObject({
+          text: "edited text",
+          metadata: { note: "edited", skill_activation: grant },
+        })
+        expect(record(record(array(record(stored.data).parts)[0]).metadata).skill_activation_pending).toBeUndefined()
+      }),
+    ),
+  )
+
+  serverPathParity("public tool state updates cannot issue activation grants", (serverPath) =>
+    withStandardProject(serverPath, ({ sdk, directory }) =>
+      Effect.gen(function* () {
+        const created = yield* capture(() => sdk.session.create({ title: "tool part metadata" }))
+        const sessionID = String(record(created.data).id)
+        const seeded = yield* seedMessage(directory, sessionID)
+        const tool = yield* InstanceStore.Service.use((store) =>
+          store.provide(
+            { directory },
+            SessionNs.Service.use((svc) =>
+              Effect.gen(function* () {
+                const message = yield* svc.updateMessage({
+                  id: MessageID.ascending(),
+                  sessionID: SessionID.make(sessionID),
+                  parentID: seeded.message.id,
+                  role: "assistant",
+                  agent: "build",
+                  mode: "build",
+                  modelID: ModelV2.ID.make("test"),
+                  providerID: ProviderV2.ID.make("test"),
+                  path: { cwd: directory, root: directory },
+                  cost: 0,
+                  tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+                  time: { created: Date.now() },
+                })
+                return yield* svc.updatePart({
+                  id: PartID.ascending(),
+                  sessionID: message.sessionID,
+                  messageID: message.id,
+                  type: "tool",
+                  tool: "skill",
+                  callID: "public-state-grant",
+                  state: {
+                    status: "completed",
+                    input: { name: "ordinary-skill" },
+                    title: "ordinary skill",
+                    output: "ordinary content",
+                    metadata: {},
+                    time: { start: 1, end: 2 },
+                  },
+                } satisfies SessionV1.ToolPart)
+              }),
+            ),
+          ),
+        )
+        const grant = { name: "loginom-automation", profile: "loginom-automation", digest: "d".repeat(64) }
+        const updated = yield* capture(() =>
+          sdk.part.update({
+            sessionID,
+            messageID: tool.messageID,
+            partID: tool.id,
+            part: { ...tool, state: { ...tool.state, metadata: { note: "edited", activation: grant } } },
+          }),
+        )
+        expect(updated.status).toBe(200)
+        const stored = yield* capture(() => sdk.session.message({ sessionID, messageID: tool.messageID }))
+        expect(record(record(array(record(stored.data).parts)[0]).state).metadata).toEqual({ note: "edited" })
+        const backendGrant = { name: "package-docs", profile: "package-docs", digest: "e".repeat(64) }
+        yield* InstanceStore.Service.use((store) =>
+          store.provide(
+            { directory },
+            SessionNs.Service.use((svc) =>
+              svc.updatePart({ ...tool, state: { ...tool.state, metadata: { activation: backendGrant } } }),
+            ),
+          ),
+        )
+        const second = yield* capture(() =>
+          sdk.part.update({
+            sessionID,
+            messageID: tool.messageID,
+            partID: tool.id,
+            part: { ...tool, state: { ...tool.state, metadata: { note: "edited", activation: grant } } },
+          }),
+        )
+        expect(second.status).toBe(200)
+        const preserved = yield* capture(() => sdk.session.message({ sessionID, messageID: tool.messageID }))
+        expect(record(record(array(record(preserved.data).parts)[0]).state).metadata).toEqual({
+          note: "edited",
+          activation: backendGrant,
+        })
       }),
     ),
   )

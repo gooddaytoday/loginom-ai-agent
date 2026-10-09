@@ -3,7 +3,10 @@ import { Cause, Deferred, Effect, Exit, Fiber, Latch, Schema, Scope, Synchronize
 export interface Runner<A, E = never> {
   readonly state: State<A, E>
   readonly busy: boolean
-  readonly ensureRunning: (work: Effect.Effect<A, E>) => Effect.Effect<A, E>
+  readonly ensureRunning: (
+    work: Effect.Effect<A, E>,
+    onJoined?: (result: A) => Effect.Effect<A, E>,
+  ) => Effect.Effect<A, E>
   readonly startShell: (work: Effect.Effect<A, E>, ready?: Latch.Latch) => Effect.Effect<A, E | Busy>
   readonly cancel: Effect.Effect<void>
 }
@@ -61,8 +64,11 @@ export const make = <A, E = never>(
       ? Deferred.fail(done, new Cancelled()).pipe(Effect.asVoid)
       : Deferred.done(done, exit).pipe(Effect.asVoid)
 
-  const awaitDone = (done: Deferred.Deferred<A, E | Cancelled>) =>
-    Deferred.await(done).pipe(Effect.catchTag("RunnerCancelled", (e) => onInterrupt ?? Effect.die(e)))
+  const awaitDone = (done: Deferred.Deferred<A, E | Cancelled>, continuation?: (result: A) => Effect.Effect<A, E>) =>
+    Deferred.await(done).pipe(
+      Effect.flatMap((result) => continuation?.(result) ?? Effect.succeed(result)),
+      Effect.catchTag("RunnerCancelled", (e) => onInterrupt ?? Effect.die(e)),
+    )
 
   const idleIfCurrent = () =>
     SynchronizedRef.modify(ref, (st) => [st._tag === "Idle" ? idle : Effect.void, st] as const).pipe(Effect.flatten)
@@ -112,14 +118,17 @@ export const make = <A, E = never>(
       yield* Fiber.interrupt(shell.fiber)
     })
 
-  const ensureRunning = (work: Effect.Effect<A, E>) =>
+  const ensureRunning = (
+    work: Effect.Effect<A, E>,
+    onJoined?: (result: A) => Effect.Effect<A, E>,
+  ): Effect.Effect<A, E> =>
     SynchronizedRef.modifyEffect(
       ref,
       Effect.fnUntraced(function* (st) {
         switch (st._tag) {
           case "Running":
           case "ShellThenRun":
-            return [awaitDone(st.run.done), st] as const
+            return [awaitDone(st.run.done, onJoined), st] as const
           case "Shell": {
             const run = {
               id: next(),

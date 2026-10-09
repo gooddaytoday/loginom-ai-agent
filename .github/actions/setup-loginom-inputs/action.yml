@@ -99,19 +99,28 @@ runs:
         esac
         rm -f "$NODE_ROOT/$ARCHIVE" "$NODE_ROOT/SHASUMS256.txt"
 
-    - name: Install pinned Chromium
-      if: steps.cache.outputs.cache-hit != 'true'
+    - name: Install locked runtime dependencies
       shell: bash
       # The only in-repo write is the gitignored node_modules; release scripts require a clean tree.
       working-directory: packages/loginom-runtime/client
       env:
         NODE: ${{ steps.pins.outputs.node }}
         NPM: ${{ steps.pins.outputs.npm }}
+      run: |
+        set -euo pipefail
+        # The cache contains Node and browser distributions, never this checkout's npm dependencies.
+        "$NODE" "$NPM" ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
+
+    - name: Install pinned Chromium
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: packages/loginom-runtime/client
+      env:
+        NODE: ${{ steps.pins.outputs.node }}
         PLAYWRIGHT_BROWSERS_PATH: ${{ steps.pins.outputs.browsers }}
       run: |
         set -euo pipefail
         rm -rf "$PLAYWRIGHT_BROWSERS_PATH"
-        "$NODE" "$NPM" ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
         "$NODE" node_modules/playwright/cli.js install chromium
 
     - name: Export pinned inputs
@@ -139,6 +148,7 @@ runs:
         {
           echo "LOGINOM_AI_AGENT_NODE_SOURCE=$NODE"
           echo "LOGINOM_AI_AGENT_TEST_NODE=$NODE"
+          echo "LOGINOM_AI_AGENT_TEST_BROWSERS=$BROWSERS"
           echo "LOGINOM_AI_AGENT_BROWSER_SOURCE=$BROWSERS"
           echo "PLAYWRIGHT_BROWSERS_PATH=$BROWSERS"
         } >> "$GITHUB_ENV"

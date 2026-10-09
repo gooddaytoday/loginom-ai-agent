@@ -33,6 +33,12 @@ async function fixture(t,options={}){
  const call=async(token,args={},name='dock_prepare')=>JSON.parse((await client.callTool({name,arguments:{...args,[nativeSessionKey]:token}})).content[0].text);
  return {root,config,router,client,created,closed,calls,ticket,call,source};
 }
+test('native router bootstrap reserves preparation for an activated scenario skill',async t=>{
+ const f=await fixture(t);
+ assert.match(f.client.getInstructions(),/activate.*loginom-automation/i);
+ assert.match(f.client.getInstructions(),/Help, diagnostics, and package reports do not require/i);
+ assert.deepEqual(f.created,['discovery']);
+});
 test('two GUI conversations retain separate sessions and artifacts across turns',async t=>{
  const f=await fixture(t),a=await f.ticket('A'),b=await f.ticket('B');
  const ia=await produceHostInputTicket(f.config,{session_id:'A',turn_id:'turn',paths:[f.source]});

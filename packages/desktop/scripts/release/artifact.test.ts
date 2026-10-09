@@ -4,6 +4,7 @@ import { verifyMacArtifact, verifyMacBrowserSignature } from "./verify-macos"
 import { chmod, mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { copyProductSkillsFixture } from "../../../loginom-host/test/fixtures/product-skills"
 import {
   decodeManifest,
   hash,
@@ -12,6 +13,23 @@ import {
   verifyResourceTree,
   verifyWindowsApplication,
 } from "./manifest"
+
+test("Desktop artifact verification rejects a complete manifest without Product skills", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-desktop-product-skills-"))
+  try {
+    const executable = Buffer.alloc(64)
+    executable.write("\x7fELF")
+    executable[4] = 2
+    executable.writeUInt16LE(62, 18)
+    for (const path of ["node", "chrome"]) await writeFile(join(directory, path), executable, { mode: 0o755 })
+    const manifest = JSON.stringify({ protocol: 1, target: "linux-x64", node: "node", browser: "chrome",
+      files: ["node", "chrome"].map((path) => ({ path, sha256: hash(executable) })) })
+    await writeFile(join(directory, "resource-manifest.json"), manifest)
+    await expect(verifyResourceTree(directory, hash(manifest))).rejects.toThrow("LOGINOM_PRODUCT_SKILLS_INCOMPLETE")
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
 
 test("static extraction validation detects missing, altered, escaped and foreign architecture resources", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-static-test-"))
@@ -26,14 +44,31 @@ test("static extraction validation detects missing, altered, escaped and foreign
     browser: "chrome",
     files: ["node", "chrome"].map((path) => ({ path, sha256: hash(executable) })),
   }
-  const manifest = JSON.stringify(resource)
   try {
+    resource.files.push(...await copyProductSkillsFixture(directory))
+    const manifest = JSON.stringify(resource)
     await writeFile(join(directory, "resource-manifest.json"), manifest)
     for (const file of ["node", "chrome"]) {
       await writeFile(join(directory, file), executable)
       await chmod(join(directory, file), 0o755)
     }
-    expect((await verifyResourceTree(directory, hash(manifest))).files).toBe(2)
+    expect((await verifyResourceTree(directory, hash(manifest))).files).toBe(resource.files.length)
+    for (const path of ["skills/package-docs/scripts/package-docs.mjs", "skills/package-docs/assets/fonts/GolosText-Regular.ttf"]) {
+      const content = await readFile(join(directory, path))
+      const files = resource.files
+      await unlink(join(directory, path))
+      resource.files = files.filter((file) => file.path !== path)
+      const incomplete = JSON.stringify(resource)
+      await writeFile(join(directory, "resource-manifest.json"), incomplete)
+      await expect(verifyResourceTree(directory, hash(incomplete))).rejects.toThrow("LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING")
+      await writeFile(join(directory, path), content)
+      resource.files = files
+      await writeFile(join(directory, "resource-manifest.json"), manifest)
+    }
+    const unlisted = join(directory, "skills/package-docs/unlisted.mjs")
+    await writeFile(unlisted, "unlisted")
+    await expect(verifyResourceTree(directory, hash(manifest))).rejects.toThrow("LOGINOM_SKILL_UNMANIFESTED_FILE")
+    await unlink(unlisted)
     await expect(verifyResourceTree(directory, "0".repeat(64))).rejects.toThrow("RELEASE_RESOURCES_MANIFEST_MISMATCH")
     await writeFile(join(directory, "chrome"), "modified")
     await expect(verifyResourceTree(directory, hash(manifest))).rejects.toThrow("RELEASE_RESOURCE_HASH_MISMATCH")

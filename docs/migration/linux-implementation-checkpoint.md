@@ -1,5 +1,133 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-09 — подтверждённое закрытие Host и отмена браузерной проверки
+
+`docs-no-browser`: исправлены три замечания к `42cf2d27b` через TDD.
+CLI сохраняет `.writer` при неподтверждённой очистке старта; Node entry принимает
+close до готовности. Закрытие отменяет проверки до drain; сигнал достигает
+supervisor и Chromium context, ошибка очистки запрещает успешный close.
+Management fixture обновлена под отдельный Help и явную automation preparation.
+Host79/79, Agent32/32 плюс расширенная startup-матрица, Desktop38/38,
+runtime30/30, упаковочные12 PASS; три package typecheck PASS.
+Свежие CLI/Desktop `prod 0.1.17` из чистого `5aff2d88e570c7afb12a07e6cf8d9b8357db09c2`:
+CLI archive/manifest roundtrip и Desktop DEB/AppImage static verification PASS.
+Native CLI error/retry и Desktop quit на навигации/форме PASS; exit0,
+43 собственных PID и четыре реальные debugger-порта отсутствуют после закрытия.
+Пользовательская установка, исходный Loginom server/client и чужие worktree
+не изменены. Модели/evals и Windows/macOS не запускались; системная DEB installation
+этим регрессионным набором не проверялась. Артефакты не опубликованы.
+Подробности, SHA/hashes и неуспешные попытки:
+[отдельный отчёт](../testing/loginom-ai-agent/reports/2026-10-09-host-shutdown-fixes.md).
+
+## 2026-10-09 — package-docs: финальный candidate9695 и сокращённая приёмка
+
+CLI/Desktop из чистого `9695e61e358ac5e6043c08eb56d183faa03d7a28`, версия0.1.17,
+собраны в новые каталоги и проверены по manifests/resources. Уже запущенная
+матрица Ubuntu22/24/26, Debian12/13 завершена: **CLI5/5 и Desktop5/5 PASS**,
+non-root/network:none,10 собственных контейнеров удалены. Это offline проверки.
+CLI установлен штатно в private HOME текущего Linux; payload5651 entries и
+root:root4755 совпали. Desktop AppImage доставлен; native S2/S4 PASS.
+Пользовательская установка не заменена, артефакты не опубликованы.
+
+По решению пользователя текущая цель:10 fixed CLI задач×1,≥8 PASS с судьёй/
+структурой/CSV, cold3, S1–S8 и минимальный installed lifecycle. A/B90, полная
+TUI/recovery матрица, вторая модель и stage9 отложены. Десятка завершена:
+9 full PASS/1 full FAIL (ABC CLI exit1), все10 judge100/structure/CSV/cleanup;
+cold3/3 PASS. S1–S8 и installed modify/save/cancel lifecycle PASS.
+SIGINT provider-turn exit130/native close/logout/discard:false, writer absent,
+remaining0; прежние source/grouping GUID сохранены, Calculator20/40/50 выполнен
+и сохранён. S8 test collector исправлен через TDD; raw events проверены offline,
+нового модельного прогона нет. Installed payload source9695 не менялся.
+Сокращённая цель принята; этапы0–8 выполнены. Own containers4 остановлены,
+workdir/raw receipts сохранены; original server/client running/ID/StartedAt
+не изменены. Server Docker stop exit137 записан отдельно, не выдаётся за native
+shutdown продукта. Выпуск не опубликован. Предыдущая v9 остаётся INCOMPLETE, не доказательство
+неухудшения. Полные hashes и текущая граница:
+[сокращённая приёмка](../testing/loginom-ai-agent/reports/2026-10-09-package-docs-short-acceptance.md).
+
+## 2026-10-08 — package-docs: кандидат49 и текущая граница приёмки
+
+Чистый source `49b1584f23b4aa47e18b26119389d6f45623fc94`, версия0.1.17:
+полный CLI TAR.GZ и Desktop DEB/AppImage проверены по manifests. Установленная
+матрица Ubuntu22/24/26, Debian12/13 — **5/5 PASS для каждого продукта**,
+non-root/network:none, root:root4755 Chromium sandbox. Все10 собственных
+контейнеров удалены; пользовательские launcher/profile не заменялись.
+
+CLI native upgrade669→49 сохранил настройки, auth fixture, user skill и
+историю, продолжение Session до/после замены PASS, второй writer —
+PROFILE_BUSY/3 без смены owner. Desktop DEB upgrade сохранил обычный
+постоянный HOME/XDG и public history; ASAR/resources совпали с candidate.
+Это synthetic/offline проверки обновления; исходные неудачные попытки
+сохранены. Установленный TUI attachment/permission/command smoke6/6 прошёл
+с просмотром всех4 PDF-страниц и cleanup; provider был синтетическим.
+
+Основная live-модель закреплена `openai/gpt-6.1-sol/medium`. Естественный
+`docs-attached-pdf` прошёл3/3 отдельно в Desktop и CLI, факты/все17 PDF-страниц
+проверены, source `.lgp` неизменён/browser execs0. CLI docs-after-build3/3
+имеет independent cold PASS; Desktop тот же переход warm3/3, cold1 PASS2
+readonly FAIL и пока не принят полностью. Остальные transitions/lifecycle/
+одновременная независимость продуктов и вторичная модель остаются открытыми.
+
+Парный A/B functional smoke baselinefc/candidate49 на frozen harnessd1b364a98
+прошёл judge100/structure/warm oracle/cold/native cleanup для обеих сторон.
+Серия15 задач×3×2=90 выполняется; compare и cold всех formal артефактов ещё
+не приняты. Все запуски локально на собственном выделенном стенде; исходные
+Loginom server/client не переключались. Stage9/server skill removal отложен
+вне текущей цели; серверная публикация сохраняется. Эти данные не означают
+завершение release, Windows/macOS или всей Linux live-матрицы.
+
+Полные hashes/receipts/ограничения: [отчёт кандидата и live-проверок](../testing/loginom-ai-agent/reports/2026-10-08-package-docs-live.md),
+[приёмка harness](../testing/loginom-ai-agent/reports/2026-10-08-package-docs-harness.md),
+[активный checkpoint](../testing/loginom-ai-agent/package-docs-implementation.md#checkpoint).
+
+## 2026-10-07 — package-docs: новый единый кандидат669
+
+Desktop DEB/AppImage и полный CLI0.1.17 из чистого
+`669822296615accbd6579c09244dacb24f77a056` статически проверены. На каждом
+из Ubuntu22/24/26 и Debian12/13 установленные Desktop/CLI прошли автономную
+матрицу, network=none, nonroot/sandbox. Все10 containers removed. Installed
+Node docs executor подтвердил PDF label fix на обеих просмотренных страницах,
+неизменность `.lgp` и PDF/DOCX/MD outputs. AppImage native opening4/4 PASS,
+Evince/Writer/gedit и awaited process cleanup подтверждены без модели/справки.
+Три сохранённых Desktop bc6 SUM-пакета холодно выполнены установленным CLI669:
+точные35/20, настройки не применялись, файлы неизменны, пакеты закрыты/logout.
+Host collector EACCES/exit1 сохранён; native receipts восстановлены без повторов.
+
+Это новый установленный локальный gate, не полный release/model PASS. Help
+TLS/direct недоступны; corpus/TUI/lifecycle/independence/A-B остаются открытыми. Общий стенд,
+человеческие launcher/profile не менялись; Windows/macOS не проверялись.
+Hashes/команды/evidence — в
+[отчёте](../testing/loginom-ai-agent/reports/2026-10-07-package-docs-openai-resume.md)
+и [checkpoint](../testing/loginom-ai-agent/package-docs-implementation.md#checkpoint).
+
+Отдельная Ubuntu24 offline замена payload Desktop/CLI669 сохранила настройки,
+auth fixture, user skill и историю. CLI продолжил прежнюю сессию до/после
+обновления и подтвердил PROFILE_BUSY/3 для второго writer. Desktop использовал
+обычный постоянный HOME/XDG, настоящий backend/noReply и native store.
+Обе проверки exit0, own containers removed/processes0; первоначальные отказы
+драйверов сохранены. Версия0.1.17 не менялась; живой provider и независимость
+параллельных browser sessions этим не проверены.
+[Отчёт обновления](../testing/loginom-ai-agent/reports/2026-10-07-package-docs-upgrade.md).
+
+## 2026-10-07 — прежние смешанные кандидаты 3ece/bc6
+
+В `docs-no-browser` Desktop из `3ece19aff72f5d95f88347564bb61566029cae52`
+и CLI из `bc6e7e1648e211bcf411fbfd86564b950a2aaf75` прошли автономную
+установленную матрицу Ubuntu22/24/26, Debian12/13:5/5 каждый. Полные manifests,
+настоящий Chromium sandbox и запуск от обычного пользователя проверены;
+CLI install/status/uninstall сохраняет профиль. Все собственные контейнеры
+удалены, сеть отключена. Native Desktop открытие двух PDF, Word и Markdown
+прошло4/4 на новой AppImage через настоящий local-file IPC и просмотрщики.
+
+Сборки unsigned и не опубликованы; установленный launcher и профиль пользователя
+не менялись. Live матрица основной модели `openai/gpt-6.1-sol/medium` завершена
+с сохранёнными native/infra отказами; Help TLS сейчас недоступен. Полные
+corpus/TUI/cold/A-B gates остаются открытыми; Windows/macOS не проверялись.
+SHA256, исходные ошибки и границы доказательств:
+[отчёт приёмки](../testing/loginom-ai-agent/reports/2026-10-07-package-docs-openai-resume.md),
+[checkpoint](../testing/loginom-ai-agent/package-docs-implementation.md#checkpoint).
+Это не новый release PASS и не переустановка рабочей версии ниже.
+
 ## 2026-09-25 — scale-fix Desktop 0.1.16 установлен локально
 
 Из `scale-fix` commit `9b68f346d6784cd0a7ad65ee211a568810c78e91`
@@ -373,6 +501,39 @@ managed/MCP 2 PASS. Изолированный текущий runtime на на�
 запрещённого `budgets`; автоматический resume в диагностической копии отключён.
 Подробности и хеши — в browser-scale отчёте. Официальные установщики не пересобраны.
 
+## 2026-10-07 — clean skills catalog и installed TUI669
+
+Installed Desktop669: empty HOME/workspace, PATHnone, backend catalog обоих
+verified skills/digest64 и полная integrity PASS. CLI669 native PTY6/6, четыре
+PDF целиком QA PASS, public install/uninstall, input unchanged, browser/writer/
+processes0. Отдельный CLI restart/new user сбросил docs→default и сохранил
+исторический grant без повторного применения. Synthetic provider, live Help/
+Loginom/model calls0; общие gates открыты.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-07-package-docs-local-installed.md).
+
+## Package docs — checkpoint 2026-10-08
+
+Source49b1584f2:TDD/docs57 PASS/678/typecheck; CLI/DEB/AppImage0.1.17 manifest PASS.
+Установленный CLI Ubuntu22/24/26+Debian12/13 5/5 PASS, containers removed.
+Exact669 failing Markdown → установленный49 PDF3 страницы visual QA PASS;
+DOCX XML/MD проверены, `.lgp` неизменён, модель/Loginom calls0.
+Новый seed5651 hash/mode, UID1200, sandbox4755 и canonical empty profile PASS.
+Desktop Ubuntu22/24/26+Debian12/13 5/5 PASS, containers removed.
+LivePDF×3 отдельно CLI/Desktop: факты/механика/вёрстка6/6 PASS, все17 страниц
+просмотрены; input unchanged, Chromium0/cleanup0. Исходный669 FAIL сохранён.
+Single-turn49:84 completed(14×3 each), docs33+/21− QA/30 default core answers;
+3 optional Desktop URLs invalid-specific/recorded. Outer143 retained/cleanup0.
+OS-opening4/4/TUI6/6/4PDF QA и headless live docs49/PDF2pages QA PASS/cleanup0.
+CLI669→49/DEB upgrade/configured scope v3 PASS; old Docker2/3/180s FAIL сохранены.
+Cold planner:TDD10/reference35 offline PASS; reader:TDD4/final88 PASS/783/typecheck;
+own XML reference warm+2 cold PASS/oracle/cleanup0, own9 files archived/removed.
+Harness clean9d7b463c4:460 PASS/2 SKIP/typecheck; отдельный frozen worktree.
+A/B12–15 заранее выбранных задач ×3×2 с judge/structure/cold replay ещё открыт;
+CLI49 attempts1,3 warm+cold PASS;2 FAIL. Desktop3 warm PASS; cold readonly FAIL/owner unknown.
+Journal live Desktop3 PASS; readonly cleanup TDD/93 PASS/801/typecheck; SSH/подмодель pending.
+Этап9/full35 отложены/server skill retained; исходные server/client не переключались.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-08-package-docs-live.md).
+
 ## 2026-10-06 — локальная совместимость OpenCode на Mac
 
 - База `f6f9b0106`; ветка `opencode-compatibility`; совместимость провайдера отделена от версии Loginom.
@@ -383,3 +544,18 @@ managed/MCP 2 PASS. Изолированный текущий runtime на на�
 - Полный pipeline FAIL: завис CLI source snapshot; остаточные проверки завершены отдельно штатными helpers.
 - Dev оставлен открытым; evidence, ограничения и путь — [отчёт](../testing/loginom-ai-agent/reports/2026-10-06-opencode-compatibility/report.md).
 - Следующий шаг: ручная проверка Dev; перед выпуском устранить зависание и повторить pipeline. Push/PR/релиза не было.
+
+## 2026-10-09 — PR docs-no-browser и исправления CI
+
+Исходный HEAD `4a4d4abe5` отправлен на origin; [PR #46](https://github.com/gooddaytoday/loginom-ai-agent/pull/46)
+направлен в loginom. Объединена актуальная база `0ca9e75bc7bb6897f46ac1ddc880b9758e993dc9`.
+Сохранены scoped skills, CP1251/контекст вложений и исправление выхода runtime
+во время journal admission; неотправленная запись не создаёт ложный strict recovery.
+CI setup устанавливает nested npm dependencies при cache hit; Desktop получает
+pinned Node, unit — отдельный Xvfb без отключения наблюдателя native windows.
+Agent250 PASS/2 SKIP; HostPort16 PASS + strict PASS; cache-hit regression PASS.
+Desktop12 PASS/2 SKIP ×3; resume-oracle под Xvfb PASS ×3; agent/host typecheck PASS.
+Повторные GitHub tests и candidate Linux/Windows/macOS ещё должны завершиться;
+результаты и финальный SHA — в PR, подробности — [CI отчёт](../testing/loginom-ai-agent/reports/2026-10-09-docs-no-browser-ci.md).
+Installed/live приёмка предыдущего Linux payload не переносится на этот SHA.
+Следующий шаг: довести все CI gates до успеха; merge и publication не выполняются.

@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { createRoot } from "solid-js"
 import { Product } from "@loginom-ai-agent/product"
 import type { Loginom } from "@loginom-ai-agent/schema/loginom"
-import { createLoginomSettings, watchLoginomApplication } from "../src/components/settings-loginom-state"
+import {
+  createLoginomSettings,
+  loginomBrowserMessage,
+  watchLoginomApplication,
+} from "../src/components/settings-loginom-state"
 
 function setup(initial: Partial<Loginom.View> = {}) {
   let view: Loginom.View = {
@@ -55,6 +59,82 @@ function setup(initial: Partial<Loginom.View> = {}) {
 }
 
 describe("Loginom settings", () => {
+  test("browser status messages distinguish unchecked sign-in and keep account warnings compatible with saving", () => {
+    expect(loginomBrowserMessage()).toBe("loginom.browserUnknown")
+    expect(loginomBrowserMessage({ state: "unknown" })).toBe("loginom.browserUnknown")
+    expect(loginomBrowserMessage({ state: "verified" })).toBe("loginom.browserVerified")
+    expect(loginomBrowserMessage({ state: "failed", failure: "LOGINOM_ACCOUNT_MISMATCH" })).toBe(
+      "loginom.browserAccountMismatch",
+    )
+    expect(loginomBrowserMessage({ state: "failed", failure: "LOGINOM_LOGIN_REJECTED" })).toBe(
+      "loginom.invalidPassword",
+    )
+    expect(loginomBrowserMessage({ state: "failed", failure: "LOGINOM_LOGIN_UNAVAILABLE" })).toBe(
+      "loginom.webUnavailable",
+    )
+    expect(loginomBrowserMessage({ state: "failed", failure: "LOGINOM_BROWSER_START_FAILED" })).toBe(
+      "loginom.browserFailed",
+    )
+  })
+  test("a browser warning keeps Help successful and still permits saving", async () => {
+    const f = setup({ browser: { state: "unknown" } })
+    const browser: Loginom.BrowserStatus = { state: "failed", failure: "LOGINOM_ACCOUNT_MISMATCH" }
+    f.api.check = async () => ({ validationId: "checked", expiresAt: Date.now() + 10000, browser })
+    try {
+      await f.form.load()
+      f.form.edit({ apiKey: "replacement" })
+      await f.form.submit(false)
+      expect(f.form.state.message).toBe("loginom.helpChecked")
+      expect(f.form.state.checkedBrowser).toEqual(browser)
+      expect(f.form.state.failed).toBe(false)
+      expect(f.form.canSave()).toBe(true)
+      f.update({ browser })
+      await f.form.submit(true)
+      expect(f.saves).toHaveLength(1)
+      expect(f.closed[0].browser).toEqual(browser)
+      expect(f.form.state.apiKey).toBe("")
+    } finally {
+      f.dispose()
+    }
+  })
+  test("checking an unknown or failed browser never claims successful sign-in", async () => {
+    for (const browser of [
+      { state: "unknown" as const },
+      { state: "failed" as const, failure: "LOGINOM_LOGIN_REJECTED" as const },
+    ]) {
+      const f = setup()
+      f.api.check = async () => ({ validationId: "checked", expiresAt: Date.now() + 10000, browser })
+      try {
+        await f.form.load()
+        await f.form.submit(false)
+        expect(f.form.state.message).toBe("loginom.helpCheckedSaved")
+        expect(f.form.state.checkedBrowser).toEqual(browser)
+        f.form.edit({ username: "draft" })
+        expect(f.form.state.checkedBrowser).toBeUndefined()
+      } finally {
+        f.dispose()
+      }
+    }
+  })
+  test("deferred activation reports Help ready with the separate current browser warning", async () => {
+    const f = setup({ state: "pending", revision: 2, browser: { state: "unknown" } })
+    try {
+      const saved = await f.api.read()
+      f.update({ state: "ready", generation: 2, browser: { state: "failed", failure: "LOGINOM_LOGIN_UNAVAILABLE" } })
+      const notices: { result: string; browser?: Loginom.BrowserStatus }[] = []
+      await watchLoginomApplication(
+        f.api,
+        saved,
+        (result, current) => {
+          notices.push({ result, browser: current?.browser })
+        },
+        async () => {},
+      )
+      expect(notices).toEqual([{ result: "ready", browser: { state: "failed", failure: "LOGINOM_LOGIN_UNAVAILABLE" } }])
+    } finally {
+      f.dispose()
+    }
+  })
   test("initial form uses the product connection defaults", () => {
     const f = setup()
     try {

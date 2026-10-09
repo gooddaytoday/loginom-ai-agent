@@ -1,3 +1,5 @@
+> Текущий источник skills приложения и отключение publisher: [checkpoint продукта](product-skills-checkpoint.md). Записи ниже сохраняют исторические версии и результаты.
+
 ## Разрешён конфликт PR #2 с основной веткой — 16 сентября 2026
 
 В `wow-landing` объединена `main` из `kartamyshev-dev/loginom-dock`

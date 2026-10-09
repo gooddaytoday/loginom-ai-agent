@@ -106,6 +106,7 @@ const timer = setTimeout(() => {
   child.kill("SIGINT")
 }, 120000)
 try {
+  await provider.request("call", { name: "skill", arguments: { name: "loginom-automation" } })
   const response = (await provider.request("call", {
     name: "dock_prepare",
     arguments: {
@@ -147,7 +148,6 @@ try {
       finish: "execute",
       mode: "delimited",
       read: { ports: [0], sample_rows: 10, require_exact_numbers: true, coverage: "sample" },
-      budgets: { configure_ms: 120000, execute_ms: 60000, total_ms: 180000 },
       parameters: {
         source: { artifact_id: artifact.artifact_id, upload_operation_id: delivery.output.upload_operation_id },
         settings: {

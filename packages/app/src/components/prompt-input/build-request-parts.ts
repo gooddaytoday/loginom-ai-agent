@@ -1,4 +1,5 @@
 import { getFilename } from "@loginom-ai-agent/core/util/path"
+import { LOGINOM_PACKAGE_MIME } from "@/constants/file-picker"
 import { type AgentPartInput, type FilePartInput, type Part, type TextPartInput } from "@loginom-ai-agent/sdk/v2/client"
 import type { FileSelection } from "@/context/file"
 import { encodeFilePath } from "@/context/file/path"
@@ -194,20 +195,50 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
     ]
   })
 
-  const images = input.images.map((attachment) => {
-    return {
-      id: Identifier.ascending("part"),
-      type: "file",
-      mime: attachment.mime,
-      url: attachment.dataUrl,
-      filename: attachment.sourcePath ?? attachment.filename,
-    } satisfies PromptRequestPart
-  })
-
-  requestParts.push(...files, ...context, ...agents, ...images)
+  requestParts.push(...files, ...context, ...agents, ...buildAttachmentParts(input.images))
 
   return {
     requestParts,
     optimisticParts: requestParts.map((part) => toOptimisticPart(part, input.sessionID, input.messageID)),
   }
+}
+
+export function buildAttachmentParts(images: BuildRequestPartsInput["images"]) {
+  const packages = images.flatMap((attachment): PromptRequestPart[] => {
+    if (attachment.mime !== LOGINOM_PACKAGE_MIME) return []
+    if (!attachment.sourcePath) {
+      return [
+        {
+          id: Identifier.ascending("part"),
+          type: "text",
+          synthetic: true,
+          text: `Attached Loginom package ${attachment.filename} has no disk path. Ask the user for an absolute path to the .lgp file.`,
+        },
+      ]
+    }
+    return [
+      {
+        id: Identifier.ascending("part"),
+        type: "file",
+        mime: LOGINOM_PACKAGE_MIME,
+        url: `file://${encodeFilePath(attachment.sourcePath)}`,
+        filename: getFilename(attachment.sourcePath),
+      },
+    ]
+  })
+
+  const files = images.flatMap((attachment) => {
+    if (attachment.mime === LOGINOM_PACKAGE_MIME) return []
+    return [
+      {
+        id: Identifier.ascending("part"),
+        type: "file" as const,
+        mime: attachment.mime,
+        url: attachment.dataUrl,
+        filename: attachment.sourcePath ?? attachment.filename,
+      },
+    ]
+  })
+
+  return [...packages, ...files]
 }

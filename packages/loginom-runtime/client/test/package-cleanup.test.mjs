@@ -16,7 +16,9 @@ function fixture(overrides = {}) {
     Package:{}, HasRunningNodes:() => state.running};
   const m = {PackageNodes:{get Count(){return state.count;}, Items:() => node}, HasRunningNodes:() => state.running,
     FServerConnection:{get UserName(){return state.account;}, Connected:true, Session:{IsPackageModified:async () => {
-      events.push('modified-read'); if (state.racePath) state.path = state.racePath; if(state.raceReadOnly!==undefined)state.readonly=state.raceReadOnly; return state.modified;
+      events.push('modified-read'); if (state.racePath) state.path = state.racePath; if(state.raceReadOnly!==undefined)state.readonly=state.raceReadOnly;
+      if(state.raceTab)state.tab=false; if(state.raceTabTid)state.tabTid=state.raceTabTid;
+      return state.modified;
     }}}, async ClosePackage(target, suppressEvents, processAfterCall) {
       events.push('close'); assert.equal(target,node); assert.equal(suppressEvents,false); assert.equal(processAfterCall,true);
       if (state.closePrompt || state.modified) { state.dialog=true; return new Promise(resolve => {
@@ -27,10 +29,12 @@ function fixture(overrides = {}) {
       return state.closeResult;
     }};
   const dialog = {getBoundingClientRect:() => ({width:10,height:10})};
-  const doc = {querySelectorAll:() => state.dialog ? [dialog] : []};
+  const tab = {getAttribute:() => state.tabTid ?? options.tabTid};
+  const doc = {querySelectorAll:() => state.dialog ? [dialog] : [], contains:value => value === tab && state.tab};
   const context = vm.createContext({document:doc, location:{origin:'http://loginom.invalid'},
+    ownedPackage:state.foreignPreparedPackage ? {} : node, ownedTab:tab,
     getComputedStyle:() => ({visibility:'visible'}), bg:{app:{Version:'7.4.2', Application:{FInstance:{FMainForm:{FMapTree:m}}}}}});
-  vm.runInContext(`globalThis.__loginomDockPreparationV1={document,id:'owned-document',receipts:new Map([['prepare',{request:JSON.stringify({session:'owned-session'})}]])}`,context);
+  vm.runInContext(`globalThis.__loginomDockPreparationV1={document,id:'owned-document',receipts:new Map([['prepare',{request:JSON.stringify({session:'owned-session'}),packageNode:ownedPackage,tab:ownedTab}]])}`,context);
   const locator = query => ({
     locator:() => locator(query+' input'),
     async waitFor() {
@@ -57,6 +61,29 @@ test('saved owned package closes with native guards, tabs disappear, then logout
   assert.equal(result.unsaved_changes_discarded,false);
   assert.deepEqual(f.events,['modified-read','close','tab-detached','avatar','logout','login-visible']);
   const again=await f.run();assert.equal(again.reason,'CLEANUP_ALREADY_ATTEMPTED');assert.equal(f.events.filter(e=>e==='close').length,1);
+});
+
+test('missing prepared tab refuses before native package close', async () => {
+  const f=fixture({tab:false}), result=await f.run();
+  assert.equal(result.status,'BLOCKED');assert.equal(result.reason,'TAB_IDENTITY_CHANGED');
+  assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+});
+
+test('prepared tab changes during dirty-state read refuse before native close', async () => {
+  for(const changed of [{raceTab:true},{raceTabTid:'foreign-tab'}]){
+    const f=fixture(changed), result=await f.run();
+    assert.equal(result.status,'BLOCKED');assert.equal(result.reason,'TAB_IDENTITY_CHANGED');
+    assert.deepEqual(f.events,['modified-read']);
+  }
+});
+
+test('foreign prepared package or tab refuses before native close', async () => {
+  for(const changed of [{foreignPreparedPackage:true},{tabTid:'foreign-tab'}]){
+    const f=fixture(changed), result=await f.run();
+    assert.equal(result.reason,'TAB_IDENTITY_CHANGED');assert.deepEqual(f.events,[]);
+  }
+  const f=fixture();assert.equal((await f.run({tabTid:'foreign-tab'})).reason,'TAB_IDENTITY_CHANGED');
+  assert.deepEqual(f.events,[]);
 });
 
 for (const [change,reason] of [

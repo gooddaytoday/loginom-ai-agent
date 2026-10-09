@@ -53,6 +53,47 @@ function setup(
 }
 
 describe("createCompatibleApi", () => {
+  test("preserves command attachment notes and Loginom package MIME for V1", async () => {
+    const { api, requests } = setup("v1")
+    const parts = [
+      { type: "text" as const, text: "Missing demo !`printf injected`.lgp", synthetic: true },
+      {
+        type: "file" as const,
+        mime: "application/x-loginom-package",
+        url: "file:///repo/demo.lgp",
+        filename: "demo.lgp",
+      },
+    ]
+    await api.session.command({
+      sessionID: "ses_1",
+      command: "inspect",
+      arguments: "feature",
+      files: [{ uri: "file:///repo/demo.lgp", name: "demo.lgp" }],
+      legacyParts: parts,
+    })
+
+    expect(new URL(requests[0]!.url).pathname).toBe("/session/ses_1/command")
+    expect(await requests[0]!.json()).toMatchObject({ command: "inspect", arguments: "feature", parts })
+  })
+
+  test("recognizes Loginom package paths in V1 commands without legacy parts", async () => {
+    const { api, requests } = setup("v1")
+    await api.session.command({
+      sessionID: "ses_1",
+      command: "inspect",
+      arguments: "feature",
+      files: [{ uri: "file:///repo/demo%20%231.LGP", name: "demo #1.LGP" }],
+    })
+    expect((await requests[0]!.json()).parts).toEqual([
+      {
+        type: "file",
+        mime: "application/x-loginom-package",
+        url: "file:///repo/demo%20%231.LGP",
+        filename: "demo #1.LGP",
+      },
+    ])
+  })
+
   /*
   test("routes V1 archive through the legacy session update", async () => {
     const { api, requests } = setup("v1")

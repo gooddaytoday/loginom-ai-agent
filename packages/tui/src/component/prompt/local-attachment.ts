@@ -1,15 +1,17 @@
-import { readFile } from "node:fs/promises"
+import { readFile, stat } from "node:fs/promises"
 import path from "node:path"
 
 export type LocalFiles = Readonly<{
   readText(path: string): Promise<string>
   readBytes(path: string): Promise<Uint8Array>
   mime(path: string): Promise<string>
+  isFile(path: string): Promise<boolean>
 }>
 
 export type LocalAttachment =
   | Readonly<{ type: "text"; mime: "image/svg+xml"; content: string }>
   | Readonly<{ type: "binary"; mime: string; content: Uint8Array }>
+  | Readonly<{ type: "path"; mime: "application/x-loginom-package"; path: string }>
 
 export function readLocalAttachment(file: string) {
   return readLocalAttachmentWith(
@@ -17,12 +19,14 @@ export function readLocalAttachment(file: string) {
       readText: (value) => readFile(value, "utf8"),
       readBytes: (value) => readFile(value),
       mime: async (value) => mimeTypes[path.extname(value).toLowerCase()] ?? "application/octet-stream",
+      isFile: async (value) => (await stat(value)).isFile(),
     },
     file,
   )
 }
 
 const mimeTypes: Record<string, string> = {
+  ".lgp": "application/x-loginom-package",
   ".avif": "image/avif",
   ".gif": "image/gif",
   ".jpeg": "image/jpeg",
@@ -33,16 +37,20 @@ const mimeTypes: Record<string, string> = {
   ".webp": "image/webp",
 }
 
-export async function readLocalAttachmentWith(files: LocalFiles, path: string): Promise<LocalAttachment | undefined> {
-  const mime = await files.mime(path).catch(() => undefined)
+export async function readLocalAttachmentWith(files: LocalFiles, file: string): Promise<LocalAttachment | undefined> {
+  const mime = await files.mime(file).catch(() => undefined)
   if (!mime) return
+  if (mime === "application/x-loginom-package") {
+    if (!(await files.isFile(file).catch(() => false))) return
+    return { type: "path", mime, path: path.resolve(file) }
+  }
   if (mime === "image/svg+xml") {
-    const content = await files.readText(path).catch(() => undefined)
+    const content = await files.readText(file).catch(() => undefined)
     if (!content) return
     return { type: "text", mime, content }
   }
   if (!mime.startsWith("image/") && mime !== "application/pdf") return
-  const content = await files.readBytes(path).catch(() => undefined)
+  const content = await files.readBytes(file).catch(() => undefined)
   if (!content) return
   return { type: "binary", mime, content }
 }

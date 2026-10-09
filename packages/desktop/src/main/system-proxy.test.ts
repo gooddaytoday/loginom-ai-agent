@@ -7,6 +7,16 @@ import { join } from "node:path"
 import { assignProxyEnvironment, SidecarStartError, startWithProxyFallback } from "./proxy-env"
 import { formatSystemProxyLog, loopbackNoProxy, sidecarEnvironment, startSystemProxyDetection } from "./system-proxy"
 
+test("sidecar receives the application resource root independently of shell and proxy values", () => {
+  const base = { LOGINOM_AI_AGENT_RESOURCES: "/untrusted/shell", DEBUG: "trace" }
+  for (const proxy of [undefined, { HTTP_PROXY: "http://proxy.test:8080", LOGINOM_AI_AGENT_RESOURCES: "/untrusted/proxy" }]) {
+    const env = sidecarEnvironment(base, proxy, "/application/resources/loginom")
+    expect(env.LOGINOM_AI_AGENT_RESOURCES).toBe("/application/resources/loginom")
+    expect(env.DEBUG).toBeUndefined()
+  }
+  expect(base.LOGINOM_AI_AGENT_RESOURCES).toBe("/untrusted/shell")
+})
+
 test("a later proxy message replaces only proxy variables", () => {
   const env = { HOME: "/tmp", HTTP_PROXY: "http://old:1", NO_PROXY: "old" }
   assignProxyEnvironment(env, { HTTP_PROXY: "http://127.0.0.1:8080", NO_PROXY: "localhost" })

@@ -4,6 +4,16 @@ import { EventEmitter } from "node:events"
 import { runtimeEnvironment } from "./supervisor"
 import { transport, type Port } from "./transport"
 
+export class NodeHostStartupError extends Error {
+  constructor(
+    cause: unknown,
+    readonly cleanupConfirmed: boolean,
+  ) {
+    super(cause instanceof Error ? cause.message : "LOGINOM_HOST_REQUEST_FAILED", { cause })
+    this.name = "NodeHostStartupError"
+  }
+}
+
 export async function launchNodeHost(input: {
   node: string
   entry: string
@@ -14,16 +24,22 @@ export async function launchNodeHost(input: {
   strictRecovery?: boolean
 }) {
   if (![input.node, input.entry, input.root, input.resources].every(isAbsolute))
-    throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
+    throw new NodeHostStartupError(new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED"), true)
   const environment = runtimeEnvironment(input.environment ?? process.env)
-  const child = fork(input.entry, [], {
-    execPath: input.node,
-    execArgv: ["--use-system-ca"],
-    env: environment,
-    stdio: ["ignore", "ignore", "ignore", "ipc"],
-  })
+  const child = await Promise.resolve()
+    .then(() =>
+      fork(input.entry, [], {
+        execPath: input.node,
+        execArgv: ["--use-system-ca"],
+        env: environment,
+        stdio: ["ignore", "ignore", "ignore", "ipc"],
+      }),
+    )
+    .catch((error: unknown) => {
+      throw new NodeHostStartupError(error, true)
+    })
   const events = new EventEmitter()
-  const state = { closed: false, closing: undefined as Promise<void> | undefined }
+  const state = { closed: false, spawnFailed: false, closing: undefined as Promise<void> | undefined }
   const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
     child.once("exit", (code, signal) => {
       closePort()
@@ -31,7 +47,11 @@ export async function launchNodeHost(input: {
     })
     child.once("error", () => {
       closePort()
-      resolve({ code: 1, signal: null })
+      // An IPC/send error after spawn is not evidence that the process exited.
+      if (child.pid === undefined) {
+        state.spawnFailed = true
+        resolve({ code: 1, signal: null })
+      }
     })
   })
   function closePort() {
@@ -61,7 +81,31 @@ export async function launchNodeHost(input: {
     start() {},
   }
   const client = transport(port)
-  const ready = await client
+  function close() {
+    if (state.closing) return state.closing
+    state.closing = (async () => {
+      const result = await client.request("close", {}, 30_000).catch(() => undefined)
+      const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
+      try {
+        const outcome = await exited
+        if (
+          !state.spawnFailed &&
+          (!result ||
+            typeof result !== "object" ||
+            !("closed" in result) ||
+            result.closed !== true ||
+            outcome.code !== 0 ||
+            outcome.signal)
+        )
+          throw new Error("LOGINOM_HOST_CLEANUP_FAILED")
+      } finally {
+        clearTimeout(timer)
+        client.close()
+      }
+    })()
+    return state.closing
+  }
+  await client
     .request(
       "start",
       {
@@ -71,29 +115,31 @@ export async function launchNodeHost(input: {
         headless: input.headless,
         ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
       },
-      // Startup restores the saved connection and waits for browser/MCP readiness.
-      // Use the normal bounded RPC budget; browser login alone can exceed 30s.
+      // Restored startup acknowledges local activation independently of the Help catalog.
+      // Preserve the bounded private-host budget; explicit Help preflight is a separate request.
       180_000,
     )
-    .catch(async (error: unknown) => {
-      child.kill("SIGTERM")
-      client.close()
-      throw error
+    .then((ready) => {
+      if (
+        !ready ||
+        typeof ready !== "object" ||
+        !("protocol" in ready) ||
+        ready.protocol !== 1 ||
+        !("ready" in ready) ||
+        ready.ready !== true ||
+        !("pid" in ready) ||
+        ready.pid !== child.pid
+      )
+        throw new Error("LOGINOM_HANDSHAKE_INVALID")
+      return ready
     })
-  if (
-    !ready ||
-    typeof ready !== "object" ||
-    !("protocol" in ready) ||
-    ready.protocol !== 1 ||
-    !("ready" in ready) ||
-    ready.ready !== true ||
-    !("pid" in ready) ||
-    ready.pid !== child.pid
-  ) {
-    child.kill("SIGTERM")
-    client.close()
-    throw new Error("LOGINOM_HANDSHAKE_INVALID")
-  }
+    .catch(async (error: unknown) => {
+      const cleanupConfirmed = await close().then(
+        () => true,
+        () => false,
+      )
+      throw new NodeHostStartupError(error, cleanupConfirmed)
+    })
   return {
     port,
     exited,
@@ -101,30 +147,6 @@ export async function launchNodeHost(input: {
     get alive() {
       return !state.closed
     },
-    close() {
-      if (state.closing) return state.closing
-      state.closing = (async () => {
-        const result = await client.request("close", {}, 30_000).catch(() => undefined)
-        // An acknowledgement alone does not prove exit. Bound a stuck host while
-        // retaining a failed cleanup result so the caller keeps its profile guard.
-        const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
-        try {
-          const outcome = await exited
-          if (
-            !result ||
-            typeof result !== "object" ||
-            !("closed" in result) ||
-            result.closed !== true ||
-            outcome.code !== 0 ||
-            outcome.signal
-          )
-            throw new Error("LOGINOM_HOST_CLEANUP_FAILED")
-        } finally {
-          clearTimeout(timer)
-          client.close()
-        }
-      })()
-      return state.closing
-    },
+    close,
   }
 }

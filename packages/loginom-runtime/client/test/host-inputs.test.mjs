@@ -33,6 +33,8 @@ test('attachment limits have safe distinct errors without leaking paths',async t
 });
 test('native attachment snapshot retains exact bytes and only one owning Dock session', async t => {
   const f = await fixture(t), context = await codexDatasetContext(f.config,input(f.path));
+  assert.match(context.hookSpecificOutput.additionalContext,/после активации.*loginom-automation/i);
+  assert.match(context.hookSpecificOutput.additionalContext,/Справка и локальная документация не требуют dock_prepare/);
   const token = context.hookSpecificOutput.additionalContext.match(/[a-f0-9]{64}/)[0];
   const ticket = JSON.parse(await readFile(join(f.root,'host-inputs',token+'.json')));
   assert.equal(ticket.version,2);assert.equal(ticket.agent,'codex');assert.equal(ticket.turn_id,'turn-one');

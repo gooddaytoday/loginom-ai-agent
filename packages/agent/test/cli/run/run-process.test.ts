@@ -4,11 +4,84 @@
 // `opencode.run(message, opts?)` to spawn `bun src/index.ts run ...` with
 // `LOGINOM_AI_AGENT_CONFIG_CONTENT` providing the test provider config inline.
 import { describe, expect } from "bun:test"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
+import { SessionV1 } from "@loginom-ai-agent/core/v1/session"
+import { pathToFileURL } from "node:url"
 import { reply } from "../../lib/llm-server"
 import { cliIt } from "../../lib/cli-process"
+import { testProviderConfig } from "../../lib/test-provider"
 
 describe("opencode run (non-interactive subprocess)", () => {
+  for (const cliRoot of [false, true]) {
+    for (const command of [undefined, "inspect-lgp"]) {
+      cliIt.live(
+        `stores an attached Loginom package as a local path (CLI_ROOT=${cliRoot}, command=${command ?? "none"})`,
+        ({ llm, opencode, home }) =>
+          Effect.gen(function* () {
+            const file = `${home}/Сценарий test.LGP`
+            yield* Effect.promise(() => Bun.write(file, "<Package>private-lgp-byte-marker</Package>"))
+            yield* llm.text("package path received")
+            const env = {
+              ...(cliRoot ? { LOGINOM_AI_AGENT_CLI_ROOT: `${home}/profile` } : {}),
+              LOGINOM_AI_AGENT_DB: `${home}/profile-test.sqlite`,
+              LOGINOM_AI_AGENT_CONFIG_CONTENT: JSON.stringify({
+                ...testProviderConfig(llm.url),
+                command: { "inspect-lgp": { template: "Document the attached package." } },
+              }),
+            }
+            const result = yield* opencode.run("document the package", {
+              format: "json",
+              command,
+              extraArgs: ["--file", file, "--"],
+              env,
+            })
+            opencode.expectExit(result, 0)
+            const sessionID = opencode.parseJsonEvents(result.stdout)[0]?.sessionID
+            if (typeof sessionID !== "string") throw Error("CLI did not emit a session ID")
+            const exported = yield* opencode.spawn(["export", sessionID], { env })
+            opencode.expectExit(exported, 0)
+            const transcript = Schema.decodeUnknownSync(Schema.Struct({ messages: Schema.Array(SessionV1.WithParts) }))(
+              Schema.decodeUnknownSync(Schema.UnknownFromJsonString)(exported.stdout),
+            )
+            const attachments = transcript.messages
+              .filter((message) => message.info.role === "user")
+              .flatMap((message) => message.parts)
+              .filter((part) => part.type === "file")
+            expect(attachments).toMatchObject([
+              { url: pathToFileURL(file).href, mime: "application/x-loginom-package", filename: "Сценарий test.LGP" },
+            ])
+            const inputs = JSON.stringify(yield* llm.inputs)
+            expect(inputs).toContain(`Attached Loginom package path: ${file}`)
+            expect(inputs).not.toContain("private-lgp-byte-marker")
+          }),
+        60_000,
+      )
+    }
+  }
+
+  cliIt.live(
+    "forwards --file attachments when running a command",
+    ({ llm, opencode, home }) =>
+      Effect.gen(function* () {
+        const file = `${home}/attached.txt`
+        yield* Effect.promise(() => Bun.write(file, "command-attachment-unique-content"))
+        yield* llm.text("attachment received")
+        const result = yield* opencode.run("inspect the attachment", {
+          command: "inspect-file",
+          extraArgs: ["--file", file, "--"],
+          env: {
+            LOGINOM_AI_AGENT_CONFIG_CONTENT: JSON.stringify({
+              ...testProviderConfig(llm.url),
+              command: { "inspect-file": { template: "Explain the attached text." } },
+            }),
+          },
+        })
+        opencode.expectExit(result, 0)
+        expect(JSON.stringify(yield* llm.inputs)).toContain("command-attachment-unique-content")
+      }),
+    60_000,
+  )
+
   // Happy path: prompt completes, output reaches stdout, process exits 0.
   // If this fails, all the others likely will too — debug here first.
   cliIt.concurrent(

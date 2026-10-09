@@ -3223,3 +3223,103 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   40 crate sources std, проверенных по upstream checksum/lock; host typecheck PASS.
 - **На момент записи оставалось / не подтверждалось:** Отдельная будущая работа: полный юридический аудит и actual relinking.
   Native Windows/macOS и production release также не объявляются выполненными.
+
+### Package docs isolation: ленивый preflight run (2026-10-06)
+
+- Реализовано и проверено из source: обычный `run` до выбора task profile
+  допускается без Loginom API key и готовности Help; strict recovery остаётся
+  обязательным до модели и сохраняет exit 4.
+- Явный `--command loginom-automation` (обе формы argv) сохраняет ранний exit 2
+  без ключа и ждёт настоящий Help catalog через private `connection.ready`.
+  Local Host startup acknowledgement не считается готовностью каталога.
+  Недоступный Help возвращает exit 1 `LOGINOM_CONNECTION_NOT_READY`; ordinary
+  ответ при том же отказе остаётся успешным. SIGINT во время ожидания — 130
+  после подтверждённого Host shutdown и release `.writer`.
+- Focused CLI regression: 12 PASS / 81 assertions; Host readiness/lifecycle:
+  15 PASS / 90 assertions; Agent и Host typecheck PASS. Использованы actual
+  standalone process, compiled Node Host, HTTP MCP и контролируемый provider.
+  Проверки выполнены без DISPLAY/Wayland с запрещённым browser entry.
+- Открыто: local run/catalog без connection lease, lazy exit codes конкретных
+  Loginom tool отказов в natural task, TaskScope и установленная Linux приёмка.
+  TUI startup logic сохранена. Автоматический выбор skill по естественному
+  запросу эти deterministic тесты не подтверждают.
+
+[Журнал и checkpoint](../../testing/loginom-ai-agent/package-docs-implementation.md).
+
+### Package docs isolation: local run и generation lease (2026-10-06)
+
+- Source implementation допускает Host run без готового подключения; каталог
+  local descriptors и диагностика не ждут Help/network. Connection lease
+  появляется при первой внешней операции и сохраняет generation/recovery
+  ownership до её завершения и release run. Local run не блокирует save.
+- Adapter обновляет observed/bound generation из private reply header после
+  смены настроек до первой операции. MCP result body остаётся прежним.
+- Full Host: 194 PASS / 7 SKIP / 0 FAIL (1052 assertions); Desktop actual Host
+  lease checks: 4 PASS; actual standalone: 6 PASS; Host/Agent typecheck PASS.
+  Linux source checks не заменяют installed acceptance и live skill selection.
+- Открыто: TaskScope/catalog allowlists, natural-tool lazy exit codes,
+  validation/save с раздельным browser status и установленные Linux кандидаты.
+
+
+### Package docs isolation: lazy connection exit contract (2026-10-07)
+
+- Natural run keeps strict recovery before the model and admits ordinary requests
+  without mandatory hasApiKey/ready. Explicit loginom-automation still uses Help
+  preflight. When actual lazy prepare is refused, source CLI now emits
+  LOGINOM_CONFIG_REQUIRED/2 or LOGINOM_CONNECTION_NOT_READY/1. The latter also
+  covers the four recognized browser login/start failures; the original tool
+  error stays in the event stream. Exact confirmed prepare retry clears the
+  failure; pending and unrelated calls do not.
+- Actual standalone source-process tests cover missing configuration, unavailable
+  Help and a controlled browser login refusal after valid Help. Ordinary chat
+  without configuration and with unavailable Help, cancellation, strict recovery
+  and management contracts pass. Outcome fixtures cover all four browser failure
+  codes, ordinary Help and scenario errors. 22 PASS, 103 assertions; additional
+  actual HTTP MCP Help-refusal/outcome control: 2 PASS, 14 assertions; RunCommand
+  and bootstrap regression: 26 PASS, 112 assertions. Agent final typecheck PASS.
+  Native/installed acceptance of this change remains open.
+- This supersedes the lazy exit-code item in the dated local-run progress above.
+  [Current implementation evidence](../../testing/loginom-ai-agent/package-docs-implementation.md).
+
+### Package docs isolation: installed Linux candidate and profile update (2026-10-07)
+
+- Clean source `669822296615accbd6579c09244dacb24f77a056` produced complete
+  CLI TAR.GZ and Desktop DEB/AppImage, version0.1.17. Installed network-free
+  Ubuntu22/24/26 and Debian12/13 checks pass for both products (5/5 each),
+  including inventory, public launchers, root-owned4755 Chromium sandbox and
+  owned cleanup. These are isolated candidates, not the user's installation.
+- CLI update from `bc6e7e164` retained config/auth fixture/user skill/history
+  and resumed the saved Session in a new process before and after replacement.
+  Second writer refusal was PROFILE_BUSY/3 with the same owner nonce; no guard
+  remained after confirmed cleanup. The provider was synthetic; there were no
+  model/Help/Loginom calls. Desktop separately retained its persistent normal
+  HOME/XDG profile and public noReply history across dpkg payload replacement.
+- The first CLI acceptance resume timeout came from an unclosed execFile stdin
+  pipe. EOF framing was reproduced3/3 and corrected only in the private driver;
+  product code and180s budget were unchanged. Initial failures remain recorded.
+- Complete live skill-selection/TUI/lifecycle/independence and evals A/B gates
+  remain open. Linux evidence does not certify Windows/macOS or release.
+
+[Versioned update evidence](../../testing/loginom-ai-agent/reports/2026-10-07-package-docs-upgrade.md).
+
+
+### Package docs isolation: candidate49 and ongoing live acceptance (2026-10-08)
+
+- Clean source `49b1584f23b4aa47e18b26119389d6f45623fc94`, version0.1.17,
+  delivered full CLI TAR.GZ and Desktop DEB/AppImage. Installed offline
+  Ubuntu22/24/26 and Debian12/13 pass5/5 for each product; owned containers
+  removed, actual manifests and root-owned4755 sandbox verified.
+- Native CLI update669→49 retained config/auth fixture/user skill/history and
+  resumed the saved Session; PROFILE_BUSY/3 preserved the owner nonce. The
+  synthetic update does not prove live provider/browser lifecycle. Desktop
+  public persistent profile/history update separately passed; Docker/controller
+  preparation failures remain recorded. The user installation was not changed.
+- Main model is OpenAI gpt-6.1-sol/medium. Both A/B functional smoke sides passed
+  judge100/structure/warm oracle/independent cold/native cleanup on frozen
+  harnessd1b364a98. Formal15×3×2 attempts, compare, remaining transitions,
+  lifecycle/independence and second-model gates remain open. Stage9/server
+  publication removal is deferred outside the current goal.
+
+[Current Linux evidence](../../testing/loginom-ai-agent/reports/2026-10-08-package-docs-live.md),
+[A/B evidence](../../testing/loginom-ai-agent/reports/2026-10-08-package-docs-harness.md),
+[active checkpoint](../../testing/loginom-ai-agent/package-docs-implementation.md#checkpoint).

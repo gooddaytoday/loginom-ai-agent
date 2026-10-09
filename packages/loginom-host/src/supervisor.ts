@@ -22,6 +22,9 @@ export type Launch = {
   acceptanceCleanupPackage?: string
 }
 
+type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment">
+export type KnowledgeLaunch = ProcessLaunch & Pick<Launch, "endpoint"> & { apiKey: string }
+
 export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = process.platform) {
   const env: NodeJS.ProcessEnv = {}
   const keys = [
@@ -81,11 +84,54 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
   return env
 }
 
-// One child per generation/chat. Credentials travel only through Node's private IPC pipe.
-export async function supervise(input: Launch) {
-  if (![input.node, input.entry, input.resources, input.stateDir].every(isAbsolute))
-    throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
+// One browser child per generation/chat; knowledge has one child per generation.
+// Both use the same private transport and acknowledged cleanup contract.
+export async function supervise(input: Launch, signal?: AbortSignal) {
+  if (!isAbsolute(input.resources)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
+  // Browser validation follows the separate key-only Help check in Host.
+  const runtime = await superviseProcess(
+    input,
+    { ...input, environment: undefined, protocol: 1 },
+    input.validation ? 210_000 : 120_000,
+    signal,
+  )
+  const ready = runtime.ready
+  if (
+    input.validation
+      ? !("checked" in ready) || ready.checked !== true
+      : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat
+  ) {
+    await runtime.close()
+    throw new Error("LOGINOM_HANDSHAKE_INVALID")
+  }
+  return runtime
+}
+
+export async function superviseKnowledge(input: KnowledgeLaunch, signal?: AbortSignal) {
+  const runtime = await superviseProcess(
+    input,
+    {
+      protocol: 1,
+      generation: input.generation,
+      endpoint: input.endpoint,
+      apiKey: input.apiKey,
+    },
+    120_000,
+    signal,
+  )
+  const ready = runtime.ready
+  if (!("started" in ready) || ready.started !== true) {
+    await runtime.close()
+    throw new Error("LOGINOM_HANDSHAKE_INVALID")
+  }
+  return { ...runtime, ready }
+}
+
+async function superviseProcess(input: ProcessLaunch, start: unknown, timeout = 120_000, signal?: AbortSignal) {
+  signal?.throwIfAborted()
+  if (![input.node, input.entry, input.stateDir].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   await mkdir(input.stateDir, { recursive: true, mode: 0o700 })
+  signal?.throwIfAborted()
   const child = fork(input.entry, [], {
     execPath: input.node,
     execArgv: ["--use-system-ca"],
@@ -166,32 +212,32 @@ export async function supervise(input: Launch) {
     })()
     return closing.promise
   }
-  // Connection validation can spend 30 seconds on MCP initialization and up
-  // to 150 seconds navigating/authenticating Loginom. Do not race that
-  // documented budget with the ordinary 120-second runtime handshake.
-  const ready = await request(
-    "start",
-    { ...input, environment: undefined, protocol: 1 },
-    input.validation ? 210_000 : 120_000,
-  ).catch(
-    async (error: Error) => {
-      await close()
-      throw error
-    },
-  )
-  if (
-    !ready ||
-    typeof ready !== "object" ||
-    !("protocol" in ready) ||
-    ready.protocol !== 1 ||
-    !("generation" in ready) ||
-    ready.generation !== input.generation ||
-    (input.validation
-      ? !("checked" in ready) || ready.checked !== true
-      : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat)
-  ) {
-    await close()
-    throw new Error("LOGINOM_HANDSHAKE_INVALID")
+  const cancel = () => {
+    void close().catch(() => undefined)
   }
-  return { ready, request, close, exited }
+  signal?.addEventListener("abort", cancel, { once: true })
+  try {
+    const ready = await request("start", start, timeout).catch(async (error: Error) => {
+      await close()
+      throw signal?.aborted ? signal.reason : error
+    })
+    if (signal?.aborted) {
+      await close()
+      signal.throwIfAborted()
+    }
+    if (
+      !ready ||
+      typeof ready !== "object" ||
+      !("protocol" in ready) ||
+      ready.protocol !== 1 ||
+      !("generation" in ready) ||
+      ready.generation !== input.generation
+    ) {
+      await close()
+      throw new Error("LOGINOM_HANDSHAKE_INVALID")
+    }
+    return { ready, request, close, exited }
+  } finally {
+    signal?.removeEventListener("abort", cancel)
+  }
 }

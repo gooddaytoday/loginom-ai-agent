@@ -5,8 +5,9 @@ async function prepareWorkspace(page, options) {
   const trace = [];
   let authenticated = false;
   const remaining = () => {
-    if (Date.now() >= deadline) throw new Error('DEADLINE');
-    return deadline - Date.now();
+    const now = Date.now();
+    if (now >= deadline) throw new Error('DEADLINE');
+    return deadline - now;
   };
   const tid = value => page.locator(`[data-tid=${JSON.stringify(value)}]`);
   const wait = async (name, probe) => {

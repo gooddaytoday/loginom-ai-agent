@@ -5,9 +5,9 @@ import { Product } from "@loginom-ai-agent/product"
 import { connectionStore, type ActiveConnection } from "./connection-store"
 import type { recoveryStore } from "./recovery-store"
 
-export type RuntimeHandle = { close(): Promise<void>; reset?(): Promise<void> }
+export type RuntimeHandle = { close(): Promise<void>; reset?(): Promise<void>; ready?: Promise<void> }
 export type ConnectionRuntime = {
-  check(candidate: ActiveConnection): Promise<void>
+  check(candidate: ActiveConnection, signal?: AbortSignal): Promise<void | Loginom.BrowserStatus>
   prepare(candidate: ActiveConnection): Promise<RuntimeHandle>
 }
 const decodeCandidate = Schema.decodeUnknownOption(Loginom.Candidate)
@@ -23,18 +23,28 @@ export async function connectionService(
     revision: number
     generation: number
     pending?: ActiveConnection
+    browser: Loginom.BrowserStatus
+    pendingBrowser?: Loginom.BrowserStatus
     phase: Loginom.View["state"]
+    readiness: "starting" | "ready" | "recoverable-error"
     applying?: Promise<void>
     failure?: string
     writing?: boolean
     closing?: boolean
     recovering?: Promise<void>
-  } = { revision: 0, generation: 0, phase: "unconfigured" }
+    checkCleanupFailed?: boolean
+  } = { revision: 0, generation: 0, phase: "unconfigured", readiness: "starting", browser: { state: "unknown" } }
   const validations = new Map<
     string,
-    { candidate: ActiveConnection; expiresAt: number; timer: ReturnType<typeof setTimeout> }
+    {
+      candidate: ActiveConnection
+      browser: Loginom.BrowserStatus
+      expiresAt: number
+      timer: ReturnType<typeof setTimeout>
+    }
   >()
   const leases = new Map<string, { generation: number; recovery: boolean; active: boolean }>()
+  const checks = new Map<AbortController, Promise<void | Loginom.BrowserStatus>>()
   state.active = await store.read().catch(() => {
     state.phase = "recoverable-error"
     return undefined
@@ -64,7 +74,7 @@ export async function connectionService(
       .then(
         (handle) => {
           state.handle = handle
-          state.phase = state.pending ? "pending" : "ready"
+          observeReadiness(handle)
         },
         () => {
           state.phase = "recoverable-error"
@@ -76,9 +86,34 @@ export async function connectionService(
       })
   }
 
+  function observeReadiness(handle: RuntimeHandle) {
+    state.readiness = handle.ready ? "starting" : "ready"
+    state.phase = state.pending ? "pending" : state.readiness
+    if (!handle.ready) return
+    void handle.ready.then(
+      () => {
+        if (state.closing || state.handle !== handle) return
+        state.readiness = "ready"
+        state.phase = state.pending ? "pending" : "ready"
+      },
+      () => {
+        if (state.closing || state.handle !== handle) return
+        state.readiness = "recoverable-error"
+        state.failure = "LOGINOM_RUNTIME_START_FAILED"
+        state.phase = state.pending ? "pending" : "recoverable-error"
+      },
+    )
+  }
+
   function clearValidations() {
     validations.forEach((entry) => clearTimeout(entry.timer))
     validations.clear()
+  }
+  function beginClose() {
+    if (state.closing) return
+    state.closing = true
+    clearValidations()
+    for (const controller of checks.keys()) controller.abort(Error("LOGINOM_HOST_CLOSED"))
   }
   function view(): Loginom.View {
     const current = state.active
@@ -90,6 +125,7 @@ export async function connectionService(
       folder: `/${current?.username ?? Product.connection.username}`,
       hasApiKey: !!current?.apiKey,
       hasPassword: !!current?.password,
+      browser: { ...state.browser },
       state:
         recovery?.pending().length || state.failure === "LOGINOM_STORE_READ_FAILED" ? "recoverable-error" : state.phase,
       ...(recovery?.pending().length ? { recoveries: recovery.pending() } : {}),
@@ -109,10 +145,12 @@ export async function connectionService(
       if (!prepared) {
         if (state.pending === candidate) {
           state.pending = undefined
-          state.phase = state.handle ? "ready" : "recoverable-error"
+          state.phase = state.handle ? state.readiness : "recoverable-error"
         }
         return
       }
+      // Local activation may commit before the background catalog request settles.
+      void prepared.ready?.catch(() => undefined)
       if (state.pending !== candidate) {
         await prepared.close().catch(() => undefined)
         return
@@ -152,14 +190,16 @@ export async function connectionService(
         state.failure = "LOGINOM_STORE_WRITE_FAILED"
         await prepared.close().catch(() => undefined)
         state.pending = undefined
-        state.phase = state.handle ? "ready" : "recoverable-error"
+        state.phase = state.handle ? state.readiness : "recoverable-error"
         return
       }
       const previous = state.handle
       state.active = candidate
+      state.browser = state.pendingBrowser ?? { state: "unknown" }
+      state.pendingBrowser = undefined
       state.handle = prepared
       state.pending = undefined
-      state.phase = "ready"
+      observeReadiness(prepared)
       await store.clearPending().catch(() => {
         state.failure = "LOGINOM_STORE_WRITE_FAILED"
       })
@@ -231,24 +271,39 @@ export async function connectionService(
         apiKey,
         password,
       }
-      await runtime.check(record).catch((error: unknown) => {
-        const code =
-          error instanceof Error &&
-          [
-            "LOGINOM_KNOWLEDGE_AUTH_FAILED",
-            "LOGINOM_KNOWLEDGE_UNAVAILABLE",
-            "LOGINOM_LOGIN_REJECTED",
-            "LOGINOM_ACCOUNT_MISMATCH",
-            "LOGINOM_LOGIN_UNAVAILABLE",
-            "LOGINOM_BROWSER_START_FAILED",
-          ].includes(error.message)
-            ? error.message
-            : "LOGINOM_CONNECTION_CHECK_FAILED"
-        throw new Error(code)
-      })
+      const controller = new AbortController()
+      const checking = Promise.resolve().then(() => runtime.check(record, controller.signal))
+      checks.set(controller, checking)
+      const browser = (await checking
+        .catch((error: unknown) => {
+          if (error instanceof Error && error.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
+            state.checkCleanupFailed = true
+          controller.signal.throwIfAborted()
+          const code =
+            error instanceof Error &&
+            [
+              "LOGINOM_KNOWLEDGE_AUTH_FAILED",
+              "LOGINOM_KNOWLEDGE_UNAVAILABLE",
+              "LOGINOM_LOGIN_REJECTED",
+              "LOGINOM_ACCOUNT_MISMATCH",
+              "LOGINOM_LOGIN_UNAVAILABLE",
+              "LOGINOM_BROWSER_START_FAILED",
+            ].includes(error.message)
+              ? error.message
+              : "LOGINOM_CONNECTION_CHECK_FAILED"
+          throw new Error(code)
+        })
+        .finally(() => checks.delete(controller))) ?? { state: "unknown" as const }
       if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")
       if (candidate.revision !== state.revision || state.applying || state.writing)
         throw new Error("LOGINOM_REVISION_CONFLICT")
+      if (
+        state.active?.url === record.url &&
+        state.active.username === record.username &&
+        state.active.apiKey === record.apiKey &&
+        state.active.password === record.password
+      )
+        state.browser = { ...browser }
       const validationId = randomUUID()
       const expiresAt = Date.now() + 5 * 60_000
       validations.forEach((entry, key) => {
@@ -256,8 +311,8 @@ export async function connectionService(
       })
       const timer = setTimeout(() => validations.delete(validationId), 5 * 60_000)
       timer.unref()
-      validations.set(validationId, { candidate: record, expiresAt, timer })
-      return { validationId, expiresAt }
+      validations.set(validationId, { candidate: record, browser, expiresAt, timer })
+      return { validationId, expiresAt, browser: { ...browser } }
     },
     async save(input) {
       if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")
@@ -277,6 +332,7 @@ export async function connectionService(
       state.generation = candidate.generation
       state.revision = candidate.revision
       state.pending = candidate
+      state.pendingBrowser = validation.browser
       state.phase = "pending"
       progress()
       return view()
@@ -294,15 +350,21 @@ export async function connectionService(
         state.writing = false
       }
       state.pending = undefined
+      state.pendingBrowser = undefined
       state.revision++
       clearValidations()
-      state.phase = state.handle ? "ready" : state.active ? "recoverable-error" : "unconfigured"
+      state.phase = state.handle ? state.readiness : state.active ? "recoverable-error" : "unconfigured"
       return view()
     },
   }
   progress()
   return {
+    beginClose,
     api,
+    browserStatus(generation: number, browser: Loginom.BrowserStatus) {
+      if (state.closing || generation !== state.active?.generation) return
+      state.browser = { ...browser }
+    },
     acquire(run: string) {
       if (
         state.closing ||
@@ -343,7 +405,8 @@ export async function connectionService(
       while (state.applying) await state.applying
     },
     async close() {
-      state.closing = true
+      beginClose()
+      await Promise.allSettled([...checks.values()])
       state.pending = undefined
       clearValidations()
       await state.recovering?.catch(() => undefined)
@@ -351,6 +414,7 @@ export async function connectionService(
       await state.handle?.close()
       state.handle = undefined
       state.phase = state.active ? "recoverable-error" : "unconfigured"
+      if (state.checkCleanupFailed) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
     },
   }
 }

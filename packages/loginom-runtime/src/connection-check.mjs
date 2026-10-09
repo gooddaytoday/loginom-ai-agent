@@ -47,33 +47,12 @@ export async function loginPage(page, candidate) {
   return { authenticated: true }
 }
 
-export async function checkKnowledge(endpoint, apiKey) {
-  const { Client } = require("@modelcontextprotocol/sdk/client/index.js")
-  const { StreamableHTTPClientTransport } = require("@modelcontextprotocol/sdk/client/streamableHttp.js")
-  const client = new Client({ name: "loginom-ai-agent-connection-check", version: "0.1.0" })
-  try {
-    await client.connect(
-      new StreamableHTTPClientTransport(new URL(endpoint), {
-        requestInit: { headers: { Authorization: `Bearer ${apiKey}` }, redirect: "error" },
-      }),
-      { timeout: 30_000 },
-    )
-    // Initialize/authentication is sufficient; no user file requests are made here.
-  } catch (error) {
-    throw Error(
-      [401, 403].includes(error?.code ?? error?.status)
-        ? "LOGINOM_KNOWLEDGE_AUTH_FAILED"
-        : "LOGINOM_KNOWLEDGE_UNAVAILABLE",
-    )
-  } finally {
-    await client.close().catch(() => undefined)
-  }
-}
-
-export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false }) {
+export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, signal }) {
+  signal?.throwIfAborted()
   const { chromium } = require("playwright-core")
   const launch = browserLaunch(headless)
   await mkdir(profile, { recursive: true, mode: 0o700 })
+  signal?.throwIfAborted()
   const context = await chromium
     .launchPersistentContext(profile, {
       executablePath: browserPath,
@@ -103,25 +82,29 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     .catch(() => {
       throw Error("LOGINOM_BROWSER_START_FAILED")
     })
+  const closing = { promise: undefined }
+  const close = () => closing.promise ??= context.close()
+  const cancel = () => { void close().catch(() => undefined) }
+  signal?.addEventListener("abort", cancel, { once: true })
   try {
+    signal?.throwIfAborted()
     // This authenticated page predates MCP; its capability choice must already
     // match the executor's download/byte-verification path on the first load.
     await context.addInitScript({ content: browserDownloadScript(candidate.url) })
     const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate)
+    signal?.throwIfAborted()
     if (!keepOpen) {
-      await context.close()
+      await close()
       return result
     }
     // MCP receives this same live context through its public contextGetter API.
     return { ...result, context }
   } catch (error) {
-    await context.close().catch(() => undefined)
+    await close().catch(() => { throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED") })
+    signal?.throwIfAborted()
     if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED"].includes(error?.message)) throw error
     throw Error("LOGINOM_LOGIN_UNAVAILABLE")
+  } finally {
+    signal?.removeEventListener("abort", cancel)
   }
-}
-
-export async function checkConnection(options) {
-  await checkKnowledge(options.endpoint, options.candidate.apiKey)
-  return loginBrowser(options)
 }

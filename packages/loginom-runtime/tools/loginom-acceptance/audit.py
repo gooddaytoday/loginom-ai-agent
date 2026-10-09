@@ -61,8 +61,7 @@ def sha(data):
 
 SOURCE_ROOTS = ("viking://resources/loginom-dock/sources/e2e-tests",
                 "viking://resources/loginom-dock/sources/loginom-help")
-READ_ROOTS = SOURCE_ROOTS + ("viking://resources/loginom-dock/sources/ai-skills",
-                            "viking://agent/skills/loginom-automation")
+READ_ROOTS = SOURCE_ROOTS + ("viking://resources/loginom-dock/sources/ai-skills",)
 
 
 def scoped_uri(uri, root):

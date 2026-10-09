@@ -1,10 +1,13 @@
 import { describe, expect } from "bun:test"
 import { SessionV1 } from "@loginom-ai-agent/core/v1/session"
+import { ProviderV2 } from "@loginom-ai-agent/core/provider"
+import { ModelV2 } from "@loginom-ai-agent/core/model"
 import { EventV2 } from "@loginom-ai-agent/core/event"
 import { SessionProjector } from "@loginom-ai-agent/core/session/projector"
 import { Deferred, Effect, Exit, Layer } from "effect"
 import { Session as SessionNs } from "@/session/session"
 import { MessageV2 } from "../../src/session/message-v2"
+import { TaskScope } from "../../src/session/task-scope"
 import { MessageID, PartID, type SessionID } from "../../src/session/schema"
 import { CrossSpawnSpawner } from "@loginom-ai-agent/core/cross-spawn-spawner"
 import { provideInstance, tmpdirScoped } from "../fixture/fixture"
@@ -267,6 +270,62 @@ describe("Session", () => {
 
       expect((yield* session.messages({ sessionID: beforeWrap.id })).map((msg) => msg.info.time.created)).toEqual([1])
       expect((yield* session.messages({ sessionID: afterWrap.id })).map((msg) => msg.info.time.created)).toEqual([1, 2])
+    }),
+  )
+
+  it.instance("fork remaps durable task replay links without changing the original history", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionNs.Service
+      const created = yield* Effect.acquireRelease(session.create({}), (info) =>
+        session.remove(info.id).pipe(Effect.ignore),
+      )
+      const first = MessageID.ascending()
+      const replay = MessageID.ascending()
+      for (const [index, id] of [first, replay].entries()) {
+        yield* session.updateMessage({
+          id,
+          sessionID: created.id,
+          role: "user",
+          time: { created: index + 1 },
+          agent: "build",
+          model: { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("test") },
+        })
+        yield* session.updatePart({
+          id: PartID.ascending(),
+          sessionID: created.id,
+          messageID: id,
+          type: "text",
+          text: "Документируй пакет",
+          metadata: index ? { compaction_replay_of: first } : undefined,
+        })
+      }
+      yield* session.updatePart({
+        id: PartID.ascending(),
+        sessionID: created.id,
+        messageID: first,
+        type: "text",
+        text: "Bundled skill body",
+        synthetic: true,
+        metadata: { skill_activation: { name: "package-docs", profile: "package-docs", digest: "a".repeat(64) } },
+      })
+      const fork = yield* Effect.acquireRelease(session.fork({ sessionID: created.id }), (info) =>
+        session.remove(info.id).pipe(Effect.ignore),
+      )
+      const copied = yield* session.messages({ sessionID: fork.id })
+      expect(copied).toHaveLength(2)
+      expect(TaskScope.replayOf(copied[1])).toBe(copied[0].info.id)
+      expect(TaskScope.derive({ sessionID: fork.id, messages: copied })).toEqual({
+        sessionID: fork.id,
+        taskMessageID: copied[0].info.id,
+        profile: "package-docs",
+      })
+      const original = yield* session.messages({ sessionID: created.id })
+      expect(TaskScope.replayOf(original[1])).toBe(first)
+      expect(TaskScope.derive({ sessionID: created.id, messages: original })).toEqual({
+        sessionID: created.id,
+        taskMessageID: first,
+        profile: "package-docs",
+      })
     }),
   )
 

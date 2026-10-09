@@ -2,7 +2,6 @@ import { execFile } from "node:child_process"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
-import { chmod } from "node:fs/promises"
 import { linuxPermissions } from "./scripts/linux-permissions"
 import type { Configuration } from "electron-builder"
 import { Product, productChannel, productName, productSlug } from "@loginom-ai-agent/product"
@@ -43,11 +42,12 @@ const config: Configuration = {
   async afterPack(context) {
     if (context.electronPlatformName !== "linux") return
     await linuxPermissions(context.appOutDir)
-    // Resource copying normalizes modes. Restore the Chromium fallback before DEB ownership becomes root.
-    await chmod(
+    // Resource copying normalizes modes. Bun's fs.chmod clears setuid, so restore the bit with /bin/chmod
+    // before DEB ownership becomes root.
+    await execFileAsync("/bin/chmod", [
+      "4755",
       path.join(context.appOutDir, "resources/loginom/browsers/chromium-1243/chrome-linux64/chrome-sandbox"),
-      0o4755,
-    )
+    ])
   },
   directories: { output: "dist", buildResources: "resources" },
   extraMetadata: {

@@ -4,6 +4,7 @@ import { SessionV1 } from "@loginom-ai-agent/core/v1/session"
 import type { JSONSchema7 } from "@ai-sdk/provider"
 import type { MessageV2 } from "../session/message-v2"
 import type { Permission } from "../permission"
+import type { Skill } from "../skill"
 import type { SessionID, MessageID } from "../session/schema"
 import * as Truncate from "./truncate"
 import { Agent } from "@/agent/agent"
@@ -41,6 +42,8 @@ export type Context<M extends Metadata = Metadata> = {
   callID?: string
   extra?: { [key: string]: unknown }
   messages: SessionV1.WithParts[]
+  /** Supplied only to the backend-owned skill implementation. */
+  activate?(skill: Skill.Info): Effect.Effect<void>
   metadata(input: { title?: string; metadata?: M }): Effect.Effect<void>
   ask(input: Omit<PermissionV1.Request, "id" | "sessionID" | "tool">): Effect.Effect<void>
 }
@@ -57,6 +60,8 @@ export interface Def<
   M extends Metadata = Metadata,
 > {
   id: string
+  /** Assigned by the backend registry, never by a model or plugin definition. */
+  origin?: "builtin" | "external"
   description: string
   parameters: Parameters
   jsonSchema?: JSONSchema7

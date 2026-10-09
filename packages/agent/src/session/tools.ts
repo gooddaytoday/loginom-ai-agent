@@ -21,6 +21,7 @@ import { type Tool as AITool, type JSONSchema7, tool, jsonSchema, type ToolExecu
 import { Effect } from "effect"
 import { MessageV2 } from "./message-v2"
 import { Session } from "./session"
+import { TaskScope } from "./task-scope"
 import { SessionProcessor } from "./processor"
 import { PartID } from "./schema"
 import { EffectBridge } from "@/effect/bridge"
@@ -28,12 +29,27 @@ import { ProviderV2 } from "@loginom-ai-agent/core/provider"
 import { ModelV2 } from "@loginom-ai-agent/core/model"
 import { isRecord } from "@/util/record"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import type { Skill } from "@/skill"
+import type { MessageID } from "./schema"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
   listTemplates: "list_mcp_resource_templates",
   read: "read_mcp_resource",
 } as const
+const LOGINOM_LOCAL_TOOLS = new Set(["find", "search", "read", "grep", "glob", "list", "tree", "dock_diagnostics"])
+const DOCS_BUILTINS = new Set([
+  "read",
+  "glob",
+  "grep",
+  "edit",
+  "write",
+  "apply_patch",
+  "todowrite",
+  "question",
+  "skill",
+  "package_docs_run",
+])
 const MAX_MCP_RESOURCE_BLOB_BYTES = 10 * 1024 * 1024
 const SUPPORTED_MCP_RESOURCE_ATTACHMENT_MIMES = new Set([
   "application/pdf",
@@ -52,7 +68,12 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   processor: Pick<SessionProcessor.Handle, "message" | "updateToolCall" | "completeToolCall">
   bypassAgentCheck: boolean
   messages: SessionV1.WithParts[]
+  history: SessionV1.WithParts[]
   promptOps: TaskPromptOps
+  activate?: (
+    skill: Skill.Info,
+    source: { scope: TaskScope.Info; messageID: MessageID; callID: string },
+  ) => Effect.Effect<void>
 }) {
   const tools: Record<string, AITool> = {}
   const run = yield* EffectBridge.make()
@@ -62,6 +83,21 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const mcp = yield* MCP.Service
   const truncate = yield* Truncate.Service
   const flags = yield* RuntimeFlags.Service
+  const history = TaskScope.visible({
+    sessionID: input.session.id,
+    messages: input.history,
+    revert: input.session.revert,
+  })
+  const task = TaskScope.derive({ sessionID: input.session.id, messages: history })
+  const profile = task?.profile ?? "default"
+  if (input.loginom && task) {
+    const loginom = input.loginom
+    yield* Effect.promise((signal) =>
+      loginom.scope("bind", { taskMessageID: task.taskMessageID, profile }, signal).catch((error) => {
+        throw Error(hostError(error))
+      }),
+    )
+  }
 
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
@@ -78,7 +114,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           ...match,
           state: {
             title: val.title,
-            metadata: val.metadata,
+            metadata: val.metadata ? TaskScope.cleanMetadata(val.metadata) : undefined,
             status: "running",
             input: args,
             time: match.state.status === "running" ? match.state.time : { start: Date.now() },
@@ -110,12 +146,22 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         ),
   })
 
-  for (const item of yield* registry.tools({
+  const definitions = yield* registry.tools({
     modelID: ModelV2.ID.make(input.model.api.id),
     providerID: input.model.providerID,
     agent: input.agent,
     permission: input.session.permission,
-  })) {
+    allowed: (item) => permitsTool(profile, item.id, item.origin),
+  })
+  if (profile === "package-docs") {
+    const { PackageDocsTool } = yield* Effect.promise(() => import("@/tool/package-docs"))
+    const docs = yield* PackageDocsTool
+    definitions.push({ ...(yield* Tool.init(docs)), origin: "builtin" })
+  }
+  for (const item of definitions) {
+    const origin = item.origin
+    const id = item.id
+    if (!permitsTool(profile, id, origin)) continue
     const schema = ProviderTransform.schema(input.model, ToolJsonSchema.fromTool(item))
     tools[item.id] = tool({
       description: item.description,
@@ -123,7 +169,12 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       execute(args, options) {
         return run.promise(
           Effect.gen(function* () {
+            if (!permitsTool(profile, id, origin)) return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
             const ctx = context(args, options)
+            const activate = input.activate
+            if (id === "skill" && origin === "builtin" && task && activate)
+              ctx.activate = (skill) =>
+                activate(skill, { scope: task, messageID: input.processor.message.id, callID: options.toolCallId })
             yield* plugin.trigger(
               "tool.execute.before",
               { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
@@ -144,6 +195,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args },
               output,
             )
+            output.metadata = TaskScope.cleanMetadata(output.metadata)
             if (options.abortSignal?.aborted) {
               yield* input.processor.completeToolCall(options.toolCallId, output)
             }
@@ -154,9 +206,9 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     })
   }
 
-  const hasMcpResourceServer = Object.values(yield* mcp.clients()).some(
-    (client) => !!client.getServerCapabilities()?.resources,
-  )
+  const hasMcpResourceServer =
+    profile !== "package-docs" &&
+    Object.values(yield* mcp.clients()).some((client) => !!client.getServerCapabilities()?.resources)
   if (hasMcpResourceServer) {
     tools[MCP_RESOURCE_TOOLS.list] = tool({
       description:
@@ -406,9 +458,10 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     })
   }
 
-  if (flags.experimentalCodeMode) return tools
-
-  for (const [key, entry] of Object.entries(yield* mcp.tools())) {
+  for (const [key, entry] of Object.entries(
+    profile === "package-docs" || flags.experimentalCodeMode ? {} : yield* mcp.tools(),
+  )) {
+    if (!permitsTool(profile, key, "external")) continue
     const item = McpCatalog.convertTool(entry.def, entry.client, entry.timeout)
     const execute = item.execute
     if (!execute) continue
@@ -484,7 +537,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
 
           const truncated = yield* truncate.output(textParts.join("\n\n"), {}, input.agent)
           const metadata = {
-            ...result.metadata,
+            ...TaskScope.cleanMetadata(result.metadata),
             truncated: truncated.truncated,
             ...(truncated.truncated && { outputPath: truncated.outputPath }),
           }
@@ -526,28 +579,26 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         }),
     )
     if (!catalog) return tools
-    const user = input.messages.findLast((message) => message.info.role === "user")
-    if (user) {
-      const files = user.parts.flatMap((part) => {
-        if (part.type !== "file" || !part.url.startsWith("data:") || !part.filename) return []
-        const match = part.url.match(/^data:[^,]*;base64,([A-Za-z0-9+/=]*)$/)
-        return match ? [{ name: part.filename, data: match[1] }] : []
-      })
-      if (files.length) {
-        const admitted = yield* Effect.promise(() =>
-          loginom.admit(user.info.id, files).then(
-            () => true,
-            (error) => {
-              failed("admission", error)
-              return false
-            },
-          ),
+    const admissions = history.flatMap((message) => {
+      if (message.info.role !== "user" || TaskScope.replayOf(message)) return []
+      const files = message.parts.flatMap((part) => {
+        if (
+          part.type !== "file" ||
+          !part.url.startsWith("data:") ||
+          !part.filename ||
+          part.filename.toLowerCase().endsWith(".lgp") ||
+          part.mime.toLowerCase().split(";")[0] === "application/x-loginom-package"
         )
-        if (!admitted) return tools
-      }
-    }
-    if (user && catalog)
+          return []
+        const match = part.url.match(/^data:([^,]*);base64,([A-Za-z0-9+/=]*)$/)
+        if (!match || match[1].toLowerCase().split(";")[0] === "application/x-loginom-package") return []
+        return [{ name: part.filename, data: match[2] }]
+      })
+      return files.length ? [{ userMessage: message.info.id, files }] : []
+    })
+    if (task && catalog)
       for (const definition of catalog.tools) {
+        if (profile !== "loginom-automation" && !LOGINOM_LOCAL_TOOLS.has(definition.name)) continue
         const key = `loginom_${definition.name}`
         tools[key] = tool({
           description: definition.description,
@@ -565,6 +616,8 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           execute(args, options) {
             return run.promise(
               Effect.gen(function* () {
+                if (profile !== "loginom-automation" && !LOGINOM_LOCAL_TOOLS.has(definition.name))
+                  return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
                 const ctx = context(args, options)
                 yield* plugin.trigger(
                   "tool.execute.before",
@@ -574,7 +627,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
                 const result = yield* Effect.promise(async () =>
                   CallToolResultSchema.parse(
-                    await loginom.call(definition.name, args, user.info.id, options.abortSignal),
+                    await loginom.call(
+                      definition.name,
+                      args,
+                      task.taskMessageID,
+                      options.abortSignal,
+                      LOGINOM_LOCAL_TOOLS.has(definition.name) ? undefined : admissions,
+                    ),
                   ),
                 )
                 yield* plugin.trigger(
@@ -633,6 +692,11 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
 
   return tools
 })
+
+function permitsTool(profile: TaskScope.Profile, id: string, origin: Tool.Def["origin"]) {
+  if (profile === "package-docs") return origin === "builtin" && DOCS_BUILTINS.has(id)
+  return id !== "package_docs_run" && (profile !== "loginom-automation" || id !== "task")
+}
 
 function toRecord(value: unknown) {
   if (isRecord(value)) return value

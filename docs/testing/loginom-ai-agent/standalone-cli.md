@@ -21,6 +21,42 @@ scripted; реальный Xiaomi smoke Desktop проверен отдельн�
 
 ## Linux: текущая установка и исторические проверки
 
+**Актуальный изолированный кандидат package-docs, 2026-10-08:** чистый
+`49b1584f23b4aa47e18b26119389d6f45623fc94`,0.1.17, полный CLI TAR.GZ SHA256
+`3de2ad8eabb0625dee91076ea02e12c2b09a71f82abdc140adbd80824a661f4f`, manifest
+`13896844e3ec3c3620d3c082aea2d426c3c64ac0ca10fb86da8bf931c06024f7`.
+Установленные Ubuntu22/24/26, Debian12/13 —5/5 PASS без сети/non-root,
+root:root4755 sandbox, public install/status/uninstall и сохранение профиля.
+Native upgrade669→49: настройки/auth fixture/user skill/history/Session
+preserved, PROFILE_BUSY/3 без смены owner, собственные процессы завершены.
+Synthetic provider и model/Help/Loginom0 в update; прежние Docker FAIL сохранены.
+Native TUI attachment/permission/command smoke6/6 PASS, все4 PDF-страницы
+просмотрены; это synthetic transport проверка, не full live TUI gate.
+
+Live `openai/gpt-6.1-sol/medium`: локальная PDF-документация3/3 прошла факты,
+вёрстку, реальную Help и browser0; CLI docs-after-build3/3 прошёл independent
+cold. Парный A/B functional smoke с сохранённым baselinefc прошёл полностью
+на frozen harnessd1b364a98; formal baseline45/candidate45 и compare ещё не
+завершены. Прочие natural transitions, lifecycle/owner-loss, независимость
+Desktop/CLI и second-model gate остаются открытыми. Установка пользователя и
+исходный Loginom server/client не изменяются. Детали и конкретные ограничения:
+[отчёт live/installed](reports/2026-10-08-package-docs-live.md),
+[отчёт A/B](reports/2026-10-08-package-docs-harness.md),
+[активный checkpoint](package-docs-implementation.md#checkpoint).
+
+**Изолированный кандидат package-docs, 2026-10-07:** чистый
+`669822296615accbd6579c09244dacb24f77a056`, версия `0.1.17`, полный CLI tar.gz
+SHA256 `79c287c4cc70f8c62fd33353f1cd0699b3d8d870f31234cb6cf05b74cc8fb4b0`.
+Public install/status/Chromium sandbox/uninstall и сохранение profile sentinel
+прошли на Ubuntu22/24/26, Debian12/13 без сети. Отдельное обновление со старого
+`bc6e7e164` сохранило config, auth fixture, user skill и историю; холодное
+продолжение того же sessionID до/после замены PASS. Второй writer получил exit3
+`PROFILE_BUSY` без смены owner nonce. Provider в этой проверке синтетический,
+Loginom/Help не вызывались. [Отчёт об обновлении](reports/2026-10-07-package-docs-upgrade.md).
+Установка пользователя не заменялась; оставшаяся live/TUI/lifecycle/A-B матрица
+отражена в [журнале](package-docs-implementation.md). Результаты отдельных
+кандидатов не распространяются на новую сборку автоматически.
+
 **Актуальная пользовательская установка Linux — 2026-09-18:** Desktop и CLI
 `0.1.4-local.20260918.697cc2e5a` собраны из чистого snapshot и установлены.
 Desktop GUI/ASAR/4365 runtime hashes и CLI help/version/status PASS.
@@ -404,6 +440,29 @@ uninstall из installed payload → profile sentinel сохранён. Это d
 live Loginom/Chromium, Desktop regression и license review не выполнены.
 
 
+### Native regression gate: установка Linux CLI обычным пользователем
+
+Запускать в отдельной Linux-среде без пользовательской установки: UID не 0,
+полный распакованный CLI archive, системные зависимости закреплённого Chromium
+и sudo для смены owner и восстановления mode sandbox. После `chown` Linux
+сбрасывает setuid; installer должен восстановить root:root/4755 до выдачи launcher.
+Не отключать sandbox браузера. Из `packages/loginom-host`:
+
+```sh
+LOGINOM_AI_AGENT_TEST_CLI_ARTIFACT=/absolute/path/to/extracted-cli \
+LOGINOM_AI_AGENT_TEST_ARTIFACTS=/absolute/path/to/new-evidence-directory \
+/absolute/path/to/extracted-cli/resources/loginom/bin/node test/cli-install-native.mjs
+```
+
+Driver создаёт отдельный temporary HOME, выполняет настоящий `install.sh`,
+проверяет installed launcher/status без bundle override, manifest и права
+sandbox, запускает поставленный Chromium и удаляет payload штатным
+`uninstall.sh`. Profile sentinel должен сохраниться. Evidence directory должна
+быть новой; stdout/stderr каждого шага и итог сохраняются даже при отказе.
+Этот gate проверяет install/uninstall и browser mechanics; live Loginom,
+история обновления, docs routing и TUI проверяются отдельно. Source-only тесты
+не заменяют этот прогон. Исторические results выше относятся к своим candidates.
+
 ### Автоматический архив Linux
 
 `build-cli.ts` теперь создаёт рядом с новым payload файлы
@@ -573,3 +632,12 @@ Active-import driver также принимает SIGINT. Для этого с�
 
 Обязательная матрица и текущие исходные доказательства: [browser-scale](browser-scale.md).
 Исторические результаты этого runbook не подтверждают исправленный payload.
+
+## Package docs: установленный TUI и restart, 2026-10-07
+
+CLI669 прошёл native PTY paste/`@`/slash и external-path allow/read/deny —6/6.
+Четыре PDF полностью прочитаны и просмотрены, источник не менялся, браузер0,
+guard/processes0, public uninstall выполнен. Отдельный холодный новый запрос
+в прежнем sessionID сбросил docs-профиль в default, сохранив исторический grant.
+Provider синтетический; полная живая TUI/lifecycle матрица этим не закрывается.
+[Отчёт локальной приёмки](reports/2026-10-07-package-docs-local-installed.md).

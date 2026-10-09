@@ -66,8 +66,14 @@ export async function loginomManagement(
   }
   if (command === "check") {
     if (!current.hasApiKey) throw new Error("LOGINOM_CONFIG_REQUIRED")
-    await host.request("connection.check", setupCandidate("{}", current))
-    return { ok: true, code: "LOGINOM_CONNECTION_VALID" }
+    const checked = validation(await host.request("connection.check", setupCandidate("{}", current)))
+    if (Option.isNone(checked)) throw new Error("LOGINOM_REPLY_INVALID")
+    return {
+      ok: true,
+      code: "LOGINOM_CONNECTION_VALID",
+      help: { state: "ready" },
+      browser: checked.value.browser ?? { state: "unknown" },
+    }
   }
   if (command !== "setup") throw new Error("CLI_ARGUMENT_INVALID")
   const candidate = options.stdinJSON ? setupCandidate(await readSetup(), current) : await interactiveSetup(current)

@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { SessionV1 } from "@loginom-ai-agent/schema/v1/session"
 import { createHash } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { mkdir, mkdtemp, readdir, rm, symlink } from "node:fs/promises"
@@ -10,6 +11,7 @@ import { credentials } from "../src/connection/credentials"
 import { createLoginomHost } from "../src/host"
 import { loginomHostPort } from "../src/host-port"
 import { transport } from "../src/transport"
+import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
 
 test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnect", "other-chat", "direct"])(
   "parallel calls preserve ownership: %s",
@@ -19,6 +21,7 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
     const directory = await mkdtemp(join(tmpdir(), "loginom-parallel-"))
     const resources = join(directory, "resources")
     await mkdir(join(resources, "runtime/src"), { recursive: true })
+    await stageKnowledgeFixture(resources)
     await mkdir(join(resources, "bin"))
     await symlink(node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
     await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
@@ -37,6 +40,7 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
           started = m.id;
           return;
         }
+        if (m.operation === 'list') return reply(m.id, { prepared: true, tools: ['upload','describe','save-description','independent'].map(name => ({ name, inputSchema: { type: 'object' } })) });
         if (m.operation === 'inspect') return reply(m.id, calls);
         if (m.operation === 'interrupts') return reply(m.id, interrupts);
         if (m.operation === 'interrupt' || m.operation === 'finish') {
@@ -90,11 +94,16 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
     const client = transport(connection)
     LoginomHost.connect(connection)
     try {
-      await host.settled()
+      await waitForKnowledge(host)
       const run = await LoginomHost.acquire("chat")
       expect(run).toBeDefined()
       if (!run) throw Error("missing run")
       const runtime = await host.runtime(1, createHash("sha256").update("chat").digest("hex"))
+      await run.scope("bind", {
+        taskMessageID: SessionV1.MessageID.make("msg_original"),
+        profile: "loginom-automation",
+      })
+      await run.tools()
       const controller = new AbortController()
       const first = run.call("upload", {}, "original", ending === "interrupt" ? controller.signal : undefined)
       await runtime.request("started")
@@ -129,7 +138,14 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
       await Bun.sleep(100)
       if (ending === "other-chat") {
         const other = await LoginomHost.acquire("other")
-        expect(await other?.call("independent", {}, "original")).toEqual({ name: "independent" })
+        if (!other) throw Error("missing other run")
+        await host.runtime(1, createHash("sha256").update("other").digest("hex"))
+        await other.scope("bind", {
+          taskMessageID: SessionV1.MessageID.make("msg_original"),
+          profile: "loginom-automation",
+        })
+        await other.tools()
+        expect(await other.call("independent", {}, "original")).toEqual({ name: "independent" })
         await other?.release()
       }
       if (ending === "cancel" || ending === "interrupt") controller.abort()

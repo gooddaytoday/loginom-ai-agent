@@ -19,6 +19,7 @@ export class Service extends ConfigService.Service<Service>()("@loginom-ai-agent
   disableDefaultPlugins: bool("LOGINOM_AI_AGENT_DISABLE_DEFAULT_PLUGINS"),
   disableEmbeddedWebUi: bool("LOGINOM_AI_AGENT_DISABLE_EMBEDDED_WEB_UI"),
   disableExternalSkills: bool("LOGINOM_AI_AGENT_DISABLE_EXTERNAL_SKILLS"),
+  loginomResources: Config.string("LOGINOM_AI_AGENT_RESOURCES").pipe(Config.option, Config.map(Option.getOrUndefined)),
   disableLspDownload: bool("LOGINOM_AI_AGENT_DISABLE_LSP_DOWNLOAD"),
   disableClaudeCodePrompt: Config.all({
     broad: bool("LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE"),

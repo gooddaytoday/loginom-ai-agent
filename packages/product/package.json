@@ -6,7 +6,8 @@
   "license": "MIT",
   "exports": {
     ".": "./src/index.ts",
-    "./cli-profile": "./src/cli-profile.ts"
+    "./cli-profile": "./src/cli-profile.ts",
+    "./skills": "./src/skills.ts"
   },
   "scripts": {
     "test": "bun test",

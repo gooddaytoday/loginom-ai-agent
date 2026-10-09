@@ -48,11 +48,65 @@ bun test/loginom/docker/run-matrix.ts --artifact dist/loginom-ai-agent-linux-amd
 
 Матрица: Ubuntu 22.04, 24.04, 26.04; Debian 12 и 13. Каждый образ устанавливает DEB в чистую ОС. Затем тест работает как UID 1200, с отключённой сетью, запускает встроенный Chromium с sandbox и настоящий Electron-мастер. Проверяются все resource hashes, четыре поля, начальные значения и отсутствие секретов/placeholder пароля. `--only ubuntu22` ограничивает диагностический прогон одной системой. Отчёт и отдельные build/smoke logs сохраняются в указанном каталоге.
 
+Для параллельной работы задать собственный `--image-prefix`, например
+`loginom-package-docs-<source-sha>`, и отдельный `--output`: runner не заменит
+Docker tags другого направления. Каталоги результатов и artifact остаются
+абсолютными; существующие чужие images/containers не удалять.
+
 Docker запускается с `--init` для корректного Xvfb startup, `seccomp=unconfined` и `apparmor=unconfined`, чтобы ограничения контейнера не запрещали Chromium создавать собственные namespaces. Это параметры тестовой среды, а не отключение sandbox браузера. Во время построения одноразового образа dpkg использует `--force-unsafe-io` для сокращения fsync на диске Docker. Проверки надёжности хранилища приложения выполняются отдельно с обычным fsync.
 
 Контейнеры не доказывают работу физических GPU, Wayland/portal, AppArmor политики конкретного desktop-дистрибутива, системного keyring или автообновления. Эти пункты проверяются нативно.
 
 ## Нативные проверки
+
+`test/loginom/product-skills-smoke.mjs` проверяет холодное обнаружение bundled
+skills и фильтр `.lgp` в composer. `test/loginom/package-docs-permissions.mjs`
+проверяет отправленное оригинальное вложение, разрешение/отказ чтения текстового
+пути и явные read/edit deny через GUI. Для каждого запуска задать абсолютные `LOGINOM_AI_AGENT_TEST_EXECUTABLE`,
+`LOGINOM_AI_AGENT_TEST_RESOURCES` и новый `LOGINOM_AI_AGENT_TEST_ARTIFACTS`, затем
+из `packages/desktop` выполнить `xvfb-run -a <pinned-node> <test-path>` как nonroot.
+Второй тест использует управляемый provider и проверяет механику прав доступа;
+выбор skill живой моделью и OS file picker проверяются отдельно. Оба теста
+сохраняют sampling собственных процессов и запрещают `--no-sandbox`.
+
+Для проверки видимой диагностики подмены bundled skills и команд первый тест
+запустить с `LOGINOM_AI_AGENT_TEST_RESERVED_SKILLS=1`. Он создаёт только свои
+внешние copies/config, требует trusted catalog и активные уведомления для
+canonical/obsolete имён, сохраняет screenshots и удаляет свой temporary root.
+
+Проверку целостности в GUI тот же driver запускает с
+`LOGINOM_AI_AGENT_TEST_SKILL_DAMAGE=modified`, `missing` или `unlisted`.
+В этом режиме EXECUTABLE должен указывать `linux-unpacked/loginom-ai-agent`:
+driver копирует весь unpacked artifact в свой temporary root и повреждает
+только эту копию. Исходные DEB/AppImage/resources не изменяются. Проверяются
+reinstall diagnostic, отсутствие bundled skills/команд и внешнего fallback;
+видимые передние уведомления читаются и закрываются обычными GUI-действиями.
+Это контролируемая повреждённая копия native Desktop, отдельная от проверки
+неизменного установленного артефакта.
+
+Native TUI проверяет `packages/agent/test/cli/tui/package-docs-pty.py`:
+из `packages/agent` задать абсолютные `--binary`, новый `--artifacts` и
+`--attachment paste`/`mention` либо `--text-permission allow`/`deny`.
+`--reserved-diagnostics skills`/`commands` создаёт только собственные внешние
+коллизии и требует видимое предупреждение. `--modified-skill` вместе с paste
+и reserved skills проверяет отказ без fallback через собственную копию
+resources и CLI_BUNDLE. Python — внешний test driver; продукт использует
+поставляемый Node. Provider управляемый, естественная активация проверяется
+отдельно; sampling процессов и profile cleanup сохраняются в evidence.
+
+CLI startup/Help/exit проверить из `packages/agent` командой
+`bun test test/cli/standalone-preflight.test.ts -t 'ordinary standalone chat reaches|real Help refusal|lazy scenario preparation|Help preflight stays'`
+с абсолютными `LOGINOM_AI_AGENT_TEST_CLI_BIN` и `LOGINOM_AI_AGENT_TEST_NODE`.
+Native режим покрывает восемь случаев через compiled ресурсы: обычный чат без
+Loginom, Help refusal при обычном ответе, lazy exit2/exit1, явный automation
+preflight ready/cancel/unavailable и обычный ответ при unavailable Help.
+Endpoint меняется только в собственной копии manifest; browser/knowledge entry
+сохраняются настоящими, PATH продукта `/nonexistent`, DISPLAY отсутствует.
+Проверяются результаты, profile release и отсутствие runtime directory;
+этот адаптер не делает process sampling и не заменяет browser cleanup gate.
+Остальные source cases, включая искусственный browser refusal, strict recovery
+и management validation, этот выбор не запускает. Без CLI_BIN весь файл
+остаётся source regression suite.
 
 `test/loginom/gui-smoke.mjs` запускается закреплённым Node под Xvfb либо в отдельной Wayland-сессии. `LOGINOM_AI_AGENT_TEST_EXECUTABLE` указывает установленный бинарник; без переменной проверяется локальная сборка. `LOGINOM_AI_AGENT_TEST_CONFIG` — абсолютный путь к приватному тестовому конфигу Dock с разрешённой passwordless учётной записью. Значение ключа не передаётся в аргументах процесса или выводе. Проверка использует отдельный временный профиль, выполняет check/save, проверяет plaintext/0600 и повторный запуск без мастера.
 

@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import { createHash } from "node:crypto"
 import { lstat, readdir, readFile, readlink, realpath, stat } from "node:fs/promises"
 import { isAbsolute, join, relative, sep } from "node:path"
+import { verifyProductSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
 
 const text = Schema.String
 const nullable = Schema.Union([text, Schema.Null])
@@ -179,6 +180,7 @@ export async function verifyResourceTree(
       if (!((await stat(join(directory, entry))).mode & 0o111)) throw Error("RELEASE_EXECUTABLE_INVALID")
     }
   }
+  if (manifest.target === "linux-x64") await verifyProductSkills(directory)
   return { target: manifest.target, files: seen.size, node: manifest.node, browser: manifest.browser }
 }
 

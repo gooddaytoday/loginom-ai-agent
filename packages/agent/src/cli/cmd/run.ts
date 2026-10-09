@@ -406,6 +406,21 @@ export const RunCommand = effectCmd({
             exitCli(1)
           }
 
+          const detected = FSUtil.mimeType(resolvedPath)
+          if (!args.attach && detected === "application/x-loginom-package") {
+            if (!stat?.isFile()) {
+              UI.error(`Cannot attach a non-regular Loginom package: ${filePath}`)
+              exitCli(1)
+            }
+            files.push({
+              type: "file",
+              url: pathToFileURL(resolvedPath).href,
+              filename: path.basename(resolvedPath),
+              mime: detected,
+            })
+            continue
+          }
+
           const content = await (async () => {
             if (!args.attach && !process.env.LOGINOM_AI_AGENT_CLI_ROOT) return
             return fileSnapshot(resolvedPath).catch((error: Error) => {
@@ -413,7 +428,6 @@ export const RunCommand = effectCmd({
               return exitCli(1)
             })
           })()
-          const detected = FSUtil.mimeType(resolvedPath)
           const text = content?.toString("utf8")
           // Retain non-UTF8 snapshots verbatim with their detected MIME. Model
           // serialization may describe CSV, but admission receives this data URL.
@@ -823,10 +837,15 @@ export const RunCommand = effectCmd({
 
             if (event.type === "session.error") {
               const props = event.properties
-              if (props.sessionID !== sessionID || !props.error) continue
+              if ((props.sessionID !== undefined && props.sessionID !== sessionID) || !props.error) continue
               let err = String(props.error.name)
               if ("data" in props.error && props.error.data && "message" in props.error.data) {
                 err = String(props.error.data.message)
+              }
+              if (props.sessionID === undefined) {
+                // Discovery diagnostics are global and do not fail the active run.
+                UI.println(UI.Style.TEXT_WARNING_BOLD + "!", UI.Style.TEXT_NORMAL, err)
+                continue
               }
               error = error ? error + EOL + err : err
               // Stop on the error event. Waiting for idle is the #27371 hang:
@@ -871,6 +890,11 @@ export const RunCommand = effectCmd({
               }
             }
           }
+          const connectionFailure = outcome.connectionFailure()
+          if (process.env.LOGINOM_AI_AGENT_CLI_ROOT && connectionFailure && !error) {
+            error = connectionFailure
+            if (!emit("error", { error: { name: error, data: { message: error } } })) UI.error(error)
+          }
           if (process.env.LOGINOM_AI_AGENT_CLI_ROOT && outcome.failed() && !error) {
             error = "CLI_TOOL_FAILED"
             if (!emit("error", { error: { name: error, data: { message: error } } })) UI.error(error)
@@ -906,7 +930,7 @@ export const RunCommand = effectCmd({
           async function finish() {
             if (args.attach) return
             const error = await completed
-            if (error) process.exitCode = 1
+            if (error) process.exitCode = error === "LOGINOM_CONFIG_REQUIRED" ? 2 : 1
           }
           let rejected = false
 
@@ -923,6 +947,7 @@ export const RunCommand = effectCmd({
                 command: args.command,
                 arguments: message,
                 variant: args.variant,
+                parts: files,
               })
               if (result.error) {
                 if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))

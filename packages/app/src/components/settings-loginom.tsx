@@ -7,7 +7,7 @@ import { useDialog } from "@loginom-ai-agent/ui/context/dialog"
 import { usePlatform } from "@/context/platform"
 import { useLanguage } from "@/context/language"
 import { dismissToast, showToast } from "@/utils/toast"
-import { createLoginomSettings, watchLoginomApplication } from "./settings-loginom-state"
+import { createLoginomSettings, loginomBrowserMessage, watchLoginomApplication } from "./settings-loginom-state"
 
 export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => void; wizard?: boolean }) {
   const platform = usePlatform()
@@ -15,25 +15,31 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
   const dialog = useDialog()
   const form = createLoginomSettings(platform.loginom, (view) => {
     const pending = view.state === "pending"
+    const warning = view.browser?.state === "failed"
     const toast = showToast({
       title: language.t("loginom.saved"),
-      description: language.t(pending ? "loginom.savedPending" : "loginom.ready"),
-      variant: pending ? "default" : "success",
-      persistent: pending,
+      description: language.t(
+        pending ? "loginom.savedPending" : warning ? "loginom.savedBrowserWarning" : "loginom.helpReady",
+      ),
+      variant: pending || warning ? "default" : "success",
+      persistent: pending || warning,
     })
     if (pending && platform.loginom) {
       const messages = {
-        ready: language.t("loginom.ready"),
+        ready: language.t("loginom.helpReady"),
         failed: language.t("loginom.applyFailed"),
         unknown: language.t("loginom.statusUnavailable"),
       }
-      void watchLoginomApplication(platform.loginom, view, (result) => {
+      void watchLoginomApplication(platform.loginom, view, (result, current) => {
         dismissToast(toast)
         if (result === "superseded") return
         showToast({
-          description: messages[result],
-          variant: result === "ready" ? "success" : "error",
-          persistent: result !== "ready",
+          description:
+            result === "ready" && current?.browser?.state === "failed"
+              ? language.t("loginom.savedBrowserWarning")
+              : messages[result],
+          variant: result === "ready" ? (current?.browser?.state === "failed" ? "default" : "success") : "error",
+          persistent: result !== "ready" || current?.browser?.state === "failed",
         })
       })
     }
@@ -144,6 +150,18 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
                     {language.t("loginom.folder")}: <code>{`/${form.state.username}`}</code>
                   </p>
                 </fieldset>
+                <div role="status" class="loginom-feedback" data-component="loginom-connection-status">
+                  <p>
+                    {language.t(
+                      form.state.checkedBrowser || form.state.view?.state === "ready"
+                        ? "loginom.helpReady"
+                        : "loginom.helpNotReady",
+                    )}
+                  </p>
+                  <p data-browser-state={(form.state.checkedBrowser ?? form.state.view?.browser)?.state ?? "unknown"}>
+                    {language.t(loginomBrowserMessage(form.state.checkedBrowser ?? form.state.view?.browser))}
+                  </p>
+                </div>
                 <Show when={form.pending()}>
                   <p role="status" class="loginom-feedback">
                     {language.t(form.state.view?.state === "starting" ? "loginom.applying" : "loginom.savedPending")}

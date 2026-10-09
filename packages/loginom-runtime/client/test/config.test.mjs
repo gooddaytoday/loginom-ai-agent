@@ -4,9 +4,21 @@ import { mkdtemp, writeFile, chmod, symlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadConfig } from '../lib/config.mjs';
+import { createBundledSkillFixture } from './support/bundled-skill-fixture.mjs';
 
 const actor = { agent: 'codex', adapterRevision: 'test-1' };
 const valid = { endpoint: 'https://dock.example/mcp', api_key: 'test-only', account: 'loginom-dock', user: 'loginom-dock' };
+
+test('classic and diagnostic configuration preserve the explicit product resource root', async t => {
+  const source = await createBundledSkillFixture(t);
+  const path = join(source.resources, 'config.json');
+  await writeFile(path, JSON.stringify({ ...valid, resources: '/ignored-credential-file-root' }), { mode: 0o600 });
+  for (const mode of ['classic', 'executor-preview']) {
+    const config = await loadConfig({ ...actor, configPath: path, stateDir: source.resources, resources: source.resources, mode });
+    assert.equal(config.resources, source.resources);
+    assert.equal(config.resultProfile, 'diagnostic');
+  }
+});
 
 test('ordinary workflow profile enables both agents with explicit directories and manual login', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'dock-workflow-profile-'));

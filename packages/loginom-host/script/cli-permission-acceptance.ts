@@ -103,6 +103,7 @@ const stderr = new Response(child.stderr).text()
 void child.exited.then(() => provider.exited())
 const timer = setTimeout(() => child.kill("SIGINT"), 120000)
 try {
+  await provider.request("call", { name: "skill", arguments: { name: "loginom-automation" } })
   await provider
     .request("call", {
       name: "dock_prepare",
@@ -154,6 +155,10 @@ try {
       })()
     : events.filter((event) => event.type === "tool_use")
   const guarded = (await readdir(profile)).includes(".writer")
+  const activation = tools.findLast(
+    (event) => event.part.tool === "skill" && event.part.state.status === "completed",
+  )?.part.state.metadata?.activation
+  const preparations = tools.filter((event) => event.part.tool === "loginom_dock_prepare")
   const terminal = tui ? await Bun.file(join(directory, "tui-exit.json")).json() : undefined
   const rejected = tui
     ? terminal.permission_rejected === true && terminal.forced === false
@@ -170,6 +175,7 @@ try {
     code,
     guarded,
     rejected,
+    activation,
     tools: tools.map((event) => ({ tool: event.part.tool, status: event.part.state.status })),
   }
   await Bun.write(join(directory, tui ? "terminal.txt" : "events.jsonl"), output)
@@ -181,31 +187,32 @@ try {
     (allow
       ? terminal.permission_approved !== true || terminal.forced !== false || (onceScope ? !rejected : rejected)
       : !rejected) ||
-    tools.length !== (onceScope || always ? 2 : 1) ||
-    tools[0].part.tool !== "loginom_dock_prepare" ||
-    tools[0].part.state.status !== (allow ? "completed" : "error")
+    activation?.profile !== "loginom-automation" ||
+    !/^[a-f0-9]{64}$/.test(activation?.digest ?? "") ||
+    preparations.length !== (onceScope || always ? 2 : 1) ||
+    preparations[0].part.state.status !== (allow ? "completed" : "error")
   )
     throw Error("PERMISSION_ACCEPTANCE_FAILED")
-  if (onceScope && (tools[1].part.tool !== "loginom_dock_prepare" || tools[1].part.state.status !== "error"))
+  if (onceScope && preparations[1].part.state.status !== "error")
     throw Error("PERMISSION_ONCE_SCOPE_FAILED")
   if (
     always &&
     (terminal.always_confirmed !== true ||
-      tools[1].part.tool !== "loginom_dock_prepare" ||
-      tools[1].part.state.status !== "completed")
+      preparations[1].part.state.status !== "completed")
   )
     throw Error("PERMISSION_ALWAYS_FAILED")
   if (allow) {
-    for (const tool of tools.filter((event) => event.part.state.status === "completed")) {
+    for (const tool of preparations.filter((event) => event.part.state.status === "completed")) {
       const receipt = JSON.parse(tool.part.state.output.split("\n\n")[0])
       if (!receipt.prepared || receipt.workspace?.package_ref?.path !== savedPath)
         throw Error("PERMISSION_PREPARE_FAILED")
     }
   }
-  if (previous && tools[0].part.sessionID !== previous.session) throw Error("PERMISSION_RESUME_SESSION_CHANGED")
+  if (previous && preparations[0].part.sessionID !== previous.session) throw Error("PERMISSION_RESUME_SESSION_CHANGED")
   console.log(JSON.stringify({ status: "PASS", ...result }))
 } finally {
   clearTimeout(timer)
   if (child.exitCode === null) child.kill("SIGINT")
+  await child.exited
   provider.stop()
 }
