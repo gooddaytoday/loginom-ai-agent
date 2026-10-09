@@ -36,8 +36,9 @@
 | Объект | Значение |
 |---|---|
 | Основной чат-контроллер | `01a11a65-5025-7050-8d46-cee03e4023f3` |
-| Локальный checkout | `/tmp/loginom-baseline-runtime` |
-| Последний проверенный код / развёрнутый срез | `3ce983703bbeca5d759f1cd7bfc8b9a8196c7f64` / `53d03a35b0ee2901b40c1a1bbb0170804d59e865` |
+| Локальный checkout | `/home/kiselev/.codex/worktrees/baseline-runtime/loginom-ai-agent`, ветка `baseline-runtime` |
+| Закреплённый operational harness / сервер | `ee7861513be1c4309fdf1678ccae78ad89522973`; поздние doc-коммиты не redeploy |
+| Закреплённый корпус | `53d03a35b0ee2901b40c1a1bbb0170804d59e865`, 48 кейсов / 144 измерения |
 | Проверки recovery и native helper | `077d0b5b109b182787d3964e46412e0e899fcc63` |
 | Сервер / runtime root | `user@10.200.13.152`; `/home/user/.local/share/loginom-evals-runtime` (`R` ниже) |
 | Собственный checkout | `R/checkouts/evalbaseline/loginom-ai-agent` |
@@ -49,11 +50,11 @@
 | EvalBaseline | `77032943-ad18-4ae9-a2c6-668769077c86` |
 | Runtime | `a5fa993f-2903-4997-a832-955ffbb1203c` |
 | Подготовка и smoke | LAB-32, `01a11ae4-fa45-79ce-aec6-edd7170dafc7` |
-| Карточка полного baseline | **Создать новую на этапе 7**, связать с LAB-32; не подменять созданием файла или сменой статуса LAB-32 |
+| Карточка полного baseline | [LAB-55](https://mas.kartamyshev.dev/lab/issues/LAB-55), `01a11fc1-8ded-7600-8251-66d97a4add78`, реально запущена; manifest `f8c70eb0-88b6-457d-99a0-cd4ccb44d0b9` |
 
 Основной чат отвечает за изменения harness, активацию общей среды, мониторинг и устранение блокеров. EvalBaseline отвечает за исполнение серии, сохранение доказательств и отчёт; он не исправляет продукт или критерии оценки. Rich, Ben и Evaler сохраняют свои роли и порядок приёмки.
 
-Уже проверено: полный CLI manifest — 5389 файлов, AppArmor/sandbox, setup READY, чистота собственного профиля, настоящий MCP search с actor scope и автоматическим Git Peer, Multica readback и доставка evidence. Последний полный локальный suite: 553 PASS, 9 clean-host SKIP, 0 FAIL; typecheck PASS. На выделенном сервере helper и writer/registration fixtures: 51 PASS, 0 SKIP, 0 FAIL, включая дополнительную native cleanup проверку. Это исходные свидетельства, а не замена проверки изменившегося состояния перед исполнением.
+Уже проверено: полный CLI manifest — 5389 файлов, AppArmor/sandbox, setup READY, чистота собственного профиля, настоящий MCP search с actor scope и автоматическим Git Peer, Multica readback и доставка evidence. Последний полный локальный suite: 558 PASS, 9 clean-host SKIP, 0 FAIL; typecheck PASS. На выделенном сервере helper и writer/registration fixtures: 51 PASS, 0 SKIP, 0 FAIL, включая дополнительную native cleanup проверку. Это исходные свидетельства, а не замена проверки изменившегося состояния перед исполнением.
 
 ## 3. Подготовить недостающие возможности harness до живых запусков
 
@@ -293,11 +294,11 @@ multica issue get "$BASELINE_CARD_UUID" --output json
 
 Эти команды — действия исполнения плана. При его составлении карточка полного baseline не создаётся и не запускается.
 
-## 8. Контроль из этого чата каждые 15 минут через `/loop`
+## 8. Контроль из этого чата каждые 15 минут через `/loop` — включён, сопровождение продолжается
 
 Heartbeat `lab-55-baseline-cli-0-1-17` создан штатным инструментом, ACTIVE, thread `01a11a65-5025-7050-8d46-cee03e4023f3`, интервал **15 минут** по уточнению владельца. View и сохранённая конфигурация подтвердили статус/target/интервал; первый контроль карточки и среды выполнен сразу до assign. Private состояние: `controller/baseline-monitor-state.json`.
 
-После фактического `start` выполнен дополнительный контроль: один native run `running`, manifest 48/144, первый продуктовый slot активен, общий lease и профильный harness lease присутствуют у текущего исполнителя. Фактические UUID manifest/run сохранены в карточке, checkpoint и private state. Для мутаций используется `controller/monitor.lock` с неблокирующим OS flock и свежим чтением Multica/journal/двух leases внутри удерживаемого lock; контракт добавлен в сохранённое heartbeat-поручение и проверен при обновлении карточки без нового запуска. Регистрация расписания подтверждена; первое периодическое пробуждение ещё не наблюдалось.
+После фактического `start` выполнен дополнительный контроль: один native run `running`, manifest 48/144, первый продуктовый slot активен, общий lease и профильный harness lease присутствуют у текущего исполнителя. Фактические UUID manifest/run сохранены в карточке, checkpoint и private state. Для мутаций используется `controller/monitor.lock` с неблокирующим OS flock и свежим чтением Multica/journal/двух leases внутри удерживаемого lock; контракт добавлен в сохранённое heartbeat-поручение и проверен при обновлении карточки без нового запуска. Первое периодическое пробуждение основного чата получено 2026-10-09 11:40:56.854 МСК: повторная проверка подтвердила один живой executor/CLI/bubblewrap, правильные leases, чистый pinned checkout и неизменный manifest; события первого job записываются (74764 bytes к 11:42:31 МСК). Блокеров и оснований для повторного запуска не обнаружено; полнота ещё не достигнута. Private heartbeat proof/cursor сохранены, расписание остаётся активным.
 
 **Владелец мониторинга — основной чат, не Multica squad и не новая задача Codex.** Каждое пробуждение запускает проверку агента-контроллера; оно не перезапускает EvalBaseline или продукт каждые 15 минут.
 

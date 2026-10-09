@@ -14,7 +14,7 @@
 - Владелец разрешил full текущего CLI; acceptedNodeSmokeNoArtifact закрепляется в новом immutable manifest; accepted=true проверен на настоящих evidence.
 - LAB-55 https://mas.kartamyshev.dev/lab/issues/LAB-55, UUID 01a11fc1-8ded-7600-8251-66d97a4add78; in_progress, один run 01a11fc8-1ebb-7371-907b-16e7d26c14f4 running с 11:29:32 МСК.
 - Series R/roles/evalbaseline/results/full-baseline-20261009-cli017-53d03a35b; manifest f8c70eb0-88b6-457d-99a0-cd4ccb44d0b9, 48/144/три круга/hash journal verified.
-- Heartbeat lab-55-baseline-cli-0-1-17 ACTIVE, 15 минут, main thread 01a11a65-5025-7050-8d46-cee03e4023f3; readback PASS.
+- Heartbeat lab-55-baseline-cli-0-1-17 ACTIVE, 15 минут, main thread 01a11a65-5025-7050-8d46-cee03e4023f3; первый tick 11:40:56 МСК, живой calc#1/events/leases/pins подтверждены.
 - Private controller /home/kiselev/.local/share/loginom-evalbaseline-control/20261009/controller; monitor state/cursors/receipts/secrets вне Git/results.
 - MCP actor/automatic own Git Peer verified; lease exact LAB-55/run/ee786; executor birth/CLI017/bwrap verified, calc#1 source run 20261009-083411-ee7861513 с 11:34:09 МСК.
 - Далее: монитор 15m единственной текущей серии до 144 measured/cleanup/release/delivery → in_review → отключить heartbeat; не повторять smoke/измеренные FAIL и не запускать второй executor.
