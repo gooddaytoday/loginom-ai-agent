@@ -6,7 +6,7 @@ description: >-
   и evidence. Использовать для узлового eval, reference.lgp или task.json в node-evals;
   работает локально и в роли автора/независимого приёмщика Multica.
 metadata:
-  version: 1.0.6
+  version: 1.0.7
 ---
 
 # Eval отдельного узла Loginom
@@ -34,6 +34,9 @@ Skill описывает методику и артефакты; назначе�
 Подготовка попытки — [execution](references/execution.md).
 Критерий готовности и проверка происхождения — [verification](references/verification.md).
 Окружение и роли — [integrations](references/integrations.md), открыть для выбранной среды.
+Для 58 кейсов `imports.text / delimited` обязательно прочитать
+[text-import](references/text-import.md): диагностический исход, raw journals,
+точная типизированная таблица, pinned cold reader и финализация имеют отдельный контракт.
 
 ## Порядок автора
 
