@@ -4,7 +4,7 @@ import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { once } from "node:events"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import { knowledgeServer } from "../../../loginom-runtime/client/test/support/knowledge-server.mjs"
 
@@ -43,10 +43,10 @@ for (const phase of ["navigation", "login-form"]) {
       response.setHeader("Content-Type", "text/html")
       response.end(
         phase === "login-form"
-          ? `<script>fetch('/release').then(()=>{
+          ? `<script>addEventListener('DOMContentLoaded',()=>requestAnimationFrame(()=>fetch('/release').then(()=>{
         document.body.innerHTML='<div data-tid="MF;cntMain;tlbMainToolbar;btnAvatar">user</div>';
         window.bg={app:{Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:'user'}}}}}}};
-      });</script>`
+      })));</script>`
           : '<div data-tid="MF;cntMain;tlbMainToolbar;btnAvatar">user</div><script>window.bg={app:{Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:"user"}}}}}}};</script>',
       )
       return
@@ -122,6 +122,9 @@ for (const phase of ["navigation", "login-form"]) {
       "BROWSER_NOT_STARTED",
     )
     const before = await processes()
+    // The private artifact path also identifies owned crash handlers that may
+    // already have been reparented outside the Electron descendant tree.
+    for (const entry of before) if (entry.args.includes(dirname(executable))) owned.add(entry.pid)
     for (let changed = true; changed; ) {
       changed = false
       for (const entry of before)

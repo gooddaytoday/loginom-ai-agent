@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { watch } from "node:fs"
 
-test.each(["run", "management"])(
+test.each(["run", "tui", "management"])(
   "startup failure releases the profile only after confirmed cleanup: %s",
   async (mode) => {
     const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
@@ -47,7 +47,7 @@ test.each(["run", "management"])(
             ...(process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN
               ? [process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN]
               : [process.execPath, "run", "./src/standalone.ts"]),
-            ...(mode === "run" ? ["run", "--headless"] : ["loginom", "status"]),
+            ...(mode === "run" ? ["run", "--headless"] : mode === "tui" ? [] : ["loginom", "status"]),
             "--format=json",
           ],
           {
@@ -236,6 +236,7 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN)(
       }
     }
     try {
+      expect(await invoke(["providers", "list"])).toMatchObject({ code: 0, stderr: "" })
       for (const args of [
         ["run", "--format=json"],
         ["loginom", "status", "--format=json"],
