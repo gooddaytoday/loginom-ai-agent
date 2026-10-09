@@ -82,3 +82,20 @@ PASS:4600/3 entries, совпадает с исходным inventory. Preservat
 targets600/parents700. Root free2022912000→2120806400bytes на момент batch.
 Активный campaign#2, failed-cleanup13 v5, исходные результаты, frozen builds,
 harness и условия A/B не перемещались и не изменялись.
+
+Шестой batch: `closed-archive-storage-20261009/batch-6` с отдельными
+plan/receipt/readback/tar-readback. Перенесены8 confirmed closed архивов:
+оба smoke v9, formal v9 ab-revenue#1 и закрытый formal v7 campaign#2,
+77664673bytes. У всех prior full roundtrip, result/cleanup/process-cleanup
+confirmed/remaining0×2 и все6 environment stages; hashes receipts и archive,
+UID/GID/mode/xattrs/inode и отсутствие доступных process/FD references
+повторно проверены. Недоступные `/proc` наблюдения учтены в receipt;
+не заявляется аудит чужих недоступных дескрипторов.
+
+Copy2/fsync/atomic links и readback8 PASS. Штатный tar через две исходные
+ссылки PASS:3/4506 entries, совпадают с исходным inventory. Receipt SHA256
+`b04fa080619f6ae05769e463025ff5a718286fcde962f875e4720d5695038905`;
+readback SHA256 `2998a9e685fe8a0cb66bdd1ab1985b7f9defc702c30a24dbde909386e64b250c`.
+Итого76 архивов798614529bytes вне root, targets600/parents700; root free
+1827414016bytes после batch при продолжающемся formal запуске. Активный
+abc#1, failed/incomplete profiles, frozen CLI/harness и условия не изменены.

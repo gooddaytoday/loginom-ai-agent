@@ -4449,14 +4449,14 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ### 2026-10-09 — ACTIVE, smoke-пара v9 принята; первый formal результат сохранён
 
-- HEAD до checkpoint `091fba22a`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
+- HEAD до checkpoint `2cdfe394c`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client и чужие профили/процессы не изменялись.
 - Own mutable harness `d08be6baf8f5aea53f83c228cd0984c9d2bf0494` clean: промежуточный process-progress.jsonl через TDD; modules29 PASS/typecheck PASS/full486 PASS/2 SKIP/0 FAIL/2080 assertions/581.74s, terminal0/process cleanup confirmed. Frozen495 не редактировался; новый detached frozen d08 на own storage/loginom-skills-frozen-progress-20261009, install/typecheck PASS/clean,658 pins; обе новые smoke стороны приняты.
 - Writer post-open real-IO RED→GREEN; release/persistent-empty/replacement guards×5 PASS; modules77 PASS/0 FAIL/241 assertions.
 - Первый full495/session80830 terminal1:447 PASS/2 SKIP/37 FAIL/2 errors; cwd640MiB ниже1GiB.31 прямой space FAIL,6 downstream supported; весь evidence сохранён.
 - Fresh full495/session12760 terminal0:484 PASS/2 SKIP/0 FAIL/2063 assertions/576.34s; порог пространства сохранён, новый own executable TMPDIR в /dev/shm.
 - Exact own immutable dedupe:26568 old frozen source files,612 browser files,13285 new frozen source files; bytes/modes/pins и clean Git проверены до/после; чужие данные не очищались.
-- Dedupe receipts3 сохранены;68 confirmed closed archives720949856bytes перенесены пятью batch на own ext4 storage, archive paths→links/цели600/каталоги700/readback34+12+6+6+10/native tar3+2+2+2+2 PASS; около2GiB free. Frozen sources/resources не редактировать.
+- Dedupe receipts3 сохранены;76 confirmed closed archives798614529bytes перенесены шестью batch на own ext4 storage, archive paths→links/цели600/каталоги700/readback34+12+6+6+10+8/native tar3+2+2+2+2+2 PASS. Batch6 SHA/metadata/receipt readback PASS; active abc#1/raw failed profiles/conditions unchanged, root около1.8GiB free. Frozen sources/resources не редактировать.
 - Новые conditions ab-conditions-storage-clean-20261009/common.json SHA020c08059d809d417e03b977911407c570a51b8861cc3eeb21786c4fce1b162a:658 harness/281 task/21 adapter pins/5389+5651 build inventory PASS, fresh evals b30/protected diff0. Baseline smoke79154/run014845 terminal0/score100/structure/warm/cold24704 PASS/close/logout/remaining0/bytes unchanged; accepted receipt сохранён. Candidate smoke80478/cold20548 terminal0/score100/structure/warm/cold PASS. Pair accepted receipt94fea2d339…, обоим сборкам полный inventory/21pins/fresh external PASS; formal baseline60189 live/run021118,45 scheduled/candidate0/cold0/compare0.
 - На freeze evals ref992fca12badf209169f13b569b9bd291e4d70e99; после пары fresh b30dcbe5f/protected diff0, с freeze изменён только соседний docs-файл; frozen495/658files/21pins/оба full CLI повторно PASS.
 - Те же15 задач×3×2=90; primary openai/gpt-6.1-sol medium/judge gpt-6-astra high. V9 smoke metrics18/18 provider turns,17/20 tools,13/14 Loginom/errors0; bundled activation digest2a6ffec0…, turns through prepare1/2, delta1/skill1 PASS; smoke не statistical NI.
