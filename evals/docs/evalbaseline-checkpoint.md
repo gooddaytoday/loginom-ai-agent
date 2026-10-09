@@ -16,5 +16,5 @@
 - Series R/roles/evalbaseline/results/full-baseline-20261009-cli017-53d03a35b; manifest f8c70eb0-88b6-457d-99a0-cd4ccb44d0b9, 48/144/три круга/hash journal verified.
 - Heartbeat lab-55-baseline-cli-0-1-17 ACTIVE, 15 минут, main thread 01a11a65-5025-7050-8d46-cee03e4023f3; первый tick 11:40:56 МСК, живой calc#1/events/leases/pins подтверждены.
 - Private controller /home/kiselev/.local/share/loginom-evalbaseline-control/20261009/controller; monitor state/cursors/receipts/secrets вне Git/results.
-- MCP actor/automatic own Git Peer verified; lease exact LAB-55/run/ee786; executor birth/CLI017/bwrap verified, calc#1 source run 20261009-083411-ee7861513 с 11:34:09 МСК.
+- Root check: 3/144 measured, regular попытка 1 PASS/100/cleanup, infra=[]; analytic-ab-revenue-per-converter#1 активен; private copies 43 assistant messages actual medium, original DB/WAL/SHM hashes unchanged.
 - Далее: монитор 15m единственной текущей серии до 144 measured/cleanup/release/delivery → in_review → отключить heartbeat; не повторять smoke/измеренные FAIL и не запускать второй executor.
