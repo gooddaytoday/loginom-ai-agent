@@ -661,6 +661,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | ab-revenue-per-converter | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4604 / 17048407 | 3 / 5110421 |
 | ab-revenue-per-converter | 2 | PASS100 | Есть / PASS | 20 / 20 / 16 | 4604 / 17083652 | 3 / 5138263 |
 | abc-pareto-groups | 1 | PASS100 | Есть / PASS | 36 / 35 / 31 | 4640 / 21348941 | 3 / 9371065 |
+| abc-pareto-groups | 2 | PASS100 | Есть / PASS | 36 / 35 / 31 | 4642 / 20953453 | 3 / 8976043 |
 | articles-by-author | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4600 / 15892038 | 3 / 4038019 |
 | campaign-roi-by-channel | 1 | PASS100 | Есть / PASS | 19 / 19 / 15 | 4610 / 16655815 | 3 / 4687353 |
 | cohort-spend-activity | 1 | FAIL0/no_artifact | Нет / не выполнялись | 22 / 21 / 18 | 4563 / 15206251 | 3 / 3337376 |
@@ -914,3 +915,18 @@ FAIL0, ABC#2 running; candidate/cold/compare0/retries0. Полный90 не пр
 В плане накопленная хронология сведена к текущему статусу и ссылкам на этот
 отчёт/checkpoint; все97 checklist lines и критерии сохранены без изменений.
 Подробные outcomes и historical failures остаются в отчётах и private evidence.
+
+Семнадцатый closed formal v9 `abc-pareto-groups#2` PASS100:
+structure/warm oracle PASS, cleanup6 stages/processes confirmed,
+error null/remaining0×2. History4642/20953453bytes и diagnostics3/8976043bytes
+full roundtrip. Trace/result counters match:36 finishes/35 tools/31 Loginom/
+skill0/prepare1/errors0. Два успешных повтора не заменяют stable baseline3/3.
+
+Private progress17 SHA256
+`64eab54cb03849c5a48f57cf71c567d45708c027d8b8be301a1219231a4ba772`,
+metrics17 SHA256
+`f41c16436f710ca5a9f0f7728a9afc24d4c415f8b888723b0425bc9cb2a5c002`.
+Все17 closed results/cleanup/process-cleanup и архивы, предыдущие16 traces
+и cold index15 повторно проверены по SHA; common020c08059… и
+PID676156/UID/birth/exe/inode неизменны. Closed17/45:14 PASS100/3 no_artifact
+FAIL0, articles#2 running; candidate/cold/compare0/retries0. Полный90 не принят.
