@@ -1123,7 +1123,13 @@ Core имеет разметку осей, но без CSV oracle. По доку
   Четырнадцатый closed support#1 PASS100/structure/warm/6 stages/remaining0×2;
   history4622/17776466bytes+diag3/5863398bytes full roundtrip, errors0.
   Progress14 SHA137eab28fc…/metricsf2c3a2c653…; trial-dosage-outcomes#1 running,
-  closed14/45/PASS11/FAIL3, candidate/cold/compare0/retries0.
+  Пятнадцатый closed trial#1 PASS100/structure/warm/6 stages/remaining0×2;
+  history4606/16932603bytes+diag3/5046893bytes full roundtrip, errors0.
+  Первый повтор15 завершён:12 PASS100/3 no_artifact FAIL0. Cold index15
+  SHA25f7fe5287… подтверждает12 packages/request/input SHA;21 adapter pins PASS.
+  Progress15 SHA346ceeefe6…/metricscf14c23a5b…; ab-revenue#2 running,
+  closed15/45/PASS12/FAIL3, candidate/cold/compare0/retries0.
+  Первый повтор не заменяет baseline45/candidate45, cold и compare.
   Частичный v7 не подставлять
   как полный baseline и не повторять выборочно только неуспешные попытки.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой

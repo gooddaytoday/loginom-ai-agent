@@ -672,6 +672,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | sales-by-category | 1 | PASS100 | Есть / PASS | 16 / 17 / 13 | 4507 / 15561728 | 3 / 4000100 |
 | slow-supplier-deliveries | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4618 / 17032000 | 3 / 5128503 |
 | support-by-priority | 1 | PASS100 | Есть / PASS | 24 / 23 / 19 | 4622 / 17776466 | 3 / 5863398 |
+| trial-dosage-outcomes | 1 | PASS100 | Есть / PASS | 20 / 21 / 17 | 4606 / 16932603 | 3 / 5046893 |
 
 Последний private snapshot `formal-v9-progress-9-20261009.json` SHA256
 `bd3dfd6fadbe73a2f9bff01ee31681692d1fb6da52d92f348a5351bfaba04702`:
@@ -859,3 +860,37 @@ metrics14 SHA256
 повторно проверены по SHA; common020c08059… и PID676156/UID/birth/exe/inode
 неизменны. Closed14/45:11 PASS100/3 no_artifact FAIL0, trial-dosage-outcomes#1
 running. Candidate/cold/compare не начаты, retries0; полный90 не принят.
+
+Пятнадцатый closed formal v9 `trial-dosage-outcomes#1` PASS100:
+structure/warm oracle PASS, все6 cleanup stages/processes confirmed,
+error null/remaining0×2. History4606/16932603bytes и diagnostics3/5046893bytes
+сохранены с full roundtrip. Trace/result counters match:20 finishes/21 tools/
+17 Loginom/skill0/prepare1/errors0. Ранее наблюдённый result PASS100 с
+environment_cleanup=not_run не принимался до confirmed всех этапов.
+
+Первый повтор всех15 заранее выбранных задач завершён:12 PASS100,
+cohort/first-last/low-liquidity no_artifact FAIL0. Для12 пакетов структура и
+warm oracle PASS, но formal cold ещё не выполнялся. У всех15 подтверждены
+6 cleanup stages/process cleanup/error null/remaining0×2; semantic recovery
+ошибочных node operations этим не доказывается.
+
+Private progress15 SHA256
+`346ceeefe6bab469ed6f4eb125a690df5dec46ff3b2c0ce24d3b4da55a6e0821`,
+metrics15 SHA256
+`cf14c23a5bdcf6750900e5cc3e52c6b9684f69f819d7023da496b238b82e46eb`.
+Все15 closed results/cleanup/process-cleanup и архивы, предыдущие14 traces
+повторно проверены по SHA; common020c08059… и PID676156/UID/birth/exe/inode
+неизменны. Все21 adapter pins повторно PASS.
+
+`formal-v9-first-repeat-cold-index-15-20261009.json` SHA256
+`25f7fe52873b17d5c5d859a574e15095175762426f3f94944b0260344cdda8b0`
+содержит все15 outcomes и12 фактических cold requests с проверенными
+request/package/input SHA. Три отсутствующих пакета сохранены как FAIL,
+им не приписаны structure/warm/cold PASS. Индекс частичный: для формального
+cold нужен полный индекс двух сторон по90 исходам, каждому сохранённому
+пакету требуется отдельное повторное выполнение.
+
+Контроллер продолжает второй повтор, ab-revenue-per-converter#2 running.
+Baseline closed15/45/candidate0/cold0/compare0/manual retries0. Первый повтор
+не доказывает stable baseline3/3 или statistical non-inferiority; полный90
+остаётся открытым.
