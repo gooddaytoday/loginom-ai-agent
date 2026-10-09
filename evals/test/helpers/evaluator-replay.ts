@@ -20,4 +20,3 @@ export async function replayFixture(directory: string) {
   await Bun.write(path.join(nodeRun, "summary.json"), JSON.stringify({ task_ids: ["crosstable-fixed-sum"], config: { repeat: 1 }, storage_leftovers: [], tasks: [{ id: "crosstable-fixed-sum", attempts: [{ attempt: 1, status: "completed", package_path: "/user/node-evals-crosstable-fixed-sum-3.lgp", environment_cleanup: { status: "confirmed" } }] }] }))
   return { regularRun, nodeRun }
 }
-
