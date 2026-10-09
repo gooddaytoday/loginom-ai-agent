@@ -79,6 +79,21 @@ network `loginom-skills-short-20261009`, server ID
 исходные server/client ID/StartedAt не изменены. Между пользовательскими ходами
 server reset не используется.
 
+## Адресная проверка scope и вложений
+
+Из `packages/agent` выполнен один короткий source run:
+`bun test test/session/task-scope.test.ts test/util/attachment-preview.test.ts` —
+**11 PASS/0 FAIL/40 assertions/2.35s**, без модели/судьи/Loginom/браузера.
+Проверены reset на новый user turn, запрет automation внутри docs без нового
+запроса, доверенная activation и replay/revert, отказ foreign/malformed history,
+локальная семантика вложений. Хэши исходников равны product9695; checkout4257
+отличается от product только документами. Повтор понадобился для точной
+привязки к source: ранний сохранённый лог не содержал достаточного SHA запуска.
+Private receipt SHA256 `5cd6a622efb1f8e5ecc7a1f0d09e4ab0c6781ee46fa6a377c25b99102fe1aeda`.
+Все24 файла shutdown RED/GREEN/regression/full-upstream evidence повторно
+сверены с ранее сохранённым read-back. Runtime изменение — JS, публичные
+TypeScript/IPC не менялись; отдельного runtime typecheck script нет.
+
 ## Неизменённый генератор: сохранённые проверки
 
 Сопоставлены полные `skills/package-docs/` и `bin/node` установленного final9695
