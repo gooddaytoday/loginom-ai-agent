@@ -6,6 +6,7 @@ import { evalsRoot } from "../src/config"
 import { validateNodeAttempt } from "../src/node-evals"
 import { collectTextImportEvidence } from "../src/text-import"
 import { prepareTextImportCold, validateTextImportCold } from "../src/text-import-cold"
+import { finalizeTextImportCase } from "../src/text-import-finalize"
 
 async function rejectionFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "text-import-refusal-"))
@@ -46,6 +47,17 @@ test("text import request validation can PASS without a fictitious package and d
     f.calls[1]!.output.output!.sha256 = "0".repeat(64)
     await f.write()
     expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("source")
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("finalization admits a checked diagnostic without a reference and never overwrites a collection case", async () => {
+  const f = await rejectionFixture()
+  try {
+    const collection = path.join(f.root, "final")
+    await finalizeTextImportCase(f.task, f.attempt, collection)
+    expect(await Bun.file(path.join(collection, "txt-ambiguous-headers/reference.lgp")).exists()).toBe(false)
+    expect(await Bun.file(path.join(collection, "txt-ambiguous-headers/provenance.json")).json()).toMatchObject({ case_id: "txt-ambiguous-headers", outcome: "diagnostic", warm: "PASS", cold: "NOT_APPLICABLE" })
+    await expect(finalizeTextImportCase(f.task, f.attempt, collection)).rejects.toThrow()
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
 
