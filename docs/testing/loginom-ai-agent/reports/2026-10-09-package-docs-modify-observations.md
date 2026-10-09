@@ -100,3 +100,21 @@ package release для минимального сохранённого пак�
 отключённой проверке соединения. Настройки данного сервера не выводятся из
 значений документации по умолчанию. Минимальный дизайн product исправления:
 [закрытие чистого сохранённого пакета](../../../superpowers/specs/2026-10-09-clean-saved-package-shutdown.md).
+
+## Защита native tab перед закрытием: Task1 выполнен
+
+TDD: missing tab RED (SUCCEEDED вместо BLOCKED) → GREEN; отдельный
+race после server dirty read также RED → GREEN. Exact preparation receipt
+теперь связывается с native packageNode и attached tab исходного tabTid;
+проверка повторяется после await. Foreign package/tab и смена ID отклоняются
+до close/logout. Узкие package-cleanup + bridge suites:23 PASS/0 FAIL, exit0.
+
+Native source-only контроль `native-tab-guard-control-20261009` на installed49
+browser: неверный tabId BLOCKED/TAB_IDENTITY_CHANGED, пакет остаётся открыт;
+правильный tab затем close/logout SUCCEEDED, discard=false/remaining0.
+Model/judge calls0. Readback7 public files SHA
+`3aa2fda4d9b1cbb1f0c124af80f8c3a5d9554699155d50dab4e1946e9146c810`;
+browser/auth исключены. Новый helper SHA
+`bb8183e7e52af8a71c53e439c58b18ddcaacdbd7d468ae48ec1301f694945a1e`.
+Это не installed приёмка новой сборки. Дизайн review Approved;
+штатный product user-v1 cleanup (Task2) ещё не реализован.

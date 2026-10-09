@@ -29,12 +29,12 @@ read-only review Approved после трёх обязательных уточ�
 - Исправление не является доказательством исправления v9 hang. Полная новая A/B90
   требует новых общих conditions и обоих smoke. Stage9 остаётся отложенным.
 
-## Task1: Проверить tab до native закрытия
+## Task1 — выполнено: Проверить tab до native закрытия
 
 **Files:** `packages/loginom-runtime/client/lib/package-cleanup.mjs`,
 `client/test/package-cleanup.test.mjs`.
 
-- [ ] В существующую fixture добавить native tab object и связь prepare receipt
+- [x] В существующую fixture добавить native tab object и связь prepare receipt
   с exact native package node; внешний DOM остаётся fixture, исполняется реальный
   сериализованный browser body. Добавить один тест:
 
@@ -49,13 +49,13 @@ test('missing prepared tab refuses before native package close', async () => {
 });
 ```
 
-- [ ] Получить RED через pinned Node из `client/`:
+- [x] Получить RED через pinned Node из `client/`:
   `node --test --test-name-pattern='missing prepared tab' test/package-cleanup.test.mjs`.
-- [ ] Перед dirty-state read выбрать receipt того же session с exact
+- [x] Перед dirty-state read выбрать receipt того же session с exact
   packageNode и tab; проверить `document.contains(tab)` и tabTid. Повторить
   эту проверку после await server modified read. Использовать одну локальную
   проверку binding дважды; не обходить native ClosePackage.
-- [ ] GREEN, затем отдельные отрицательные тесты foreign tab/package binding
+- [x] GREEN, затем отдельные отрицательные тесты foreign tab/package binding
   и смены tab после server read; весь package-cleanup набор. Коммит.
 
 ## Task2: Штатный user-v1 shutdown
