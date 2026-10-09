@@ -363,3 +363,17 @@ Snapshot `formal-v7-progress-16-20261009.json`:16 terminal,10 PASS/6 FAIL,
 11 сохранённых пакетов, environment/process cleanup confirmed16;
 common SHA совпадает. Controller81639 live; остальные baseline29,
 candidate45, formal cold и compare pending. Ручных retries0.
+
+## Formal v7: семнадцатая попытка
+
+Abc-pareto-groups#2 completed/score100/pass=true/oracle=true,679027ms.
+Структура/warm oracle отдельно PASS, cold request/plan сохранены.
+Environment cleanup6 stages и process cleanup confirmed, оба owned_remaining=0,
+cleanup_error отсутствует. History4648entries/21424792archive bytes и
+diagnostics3entries/9443164bytes сохранены с full roundtrip.
+Snapshot `formal-v7-progress-17-20261009.json`:17 terminal,11 PASS/6 FAIL,
+12 сохранённых пакетов, environment/process cleanup confirmed17;
+common SHA совпадает, controller81639 live. Первый ABC повтор остаётся
+no_artifact/FAIL; второй — отдельный предусмотренный повтор. Эти два результата
+не устанавливают точную причину первого отказа или native stable/flaky.
+Baseline ещё28/candidate45/formal cold/compare pending; manual retries0.
