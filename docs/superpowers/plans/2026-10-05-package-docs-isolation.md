@@ -1025,7 +1025,7 @@ SHA256 `e0f9443d48a5c266ac7c7c80a26eec54f64d34f54fd1d06037690a76a150ac30`.
 и `cohort-spend-activity`. Их FAIL/INCOMPLETE сохранены; отсутствие их проверки,
 а также соединений и построения подмоделей указать как ограничение охвата.
 
-- [ ] После окончания минимального product fix сохранить final candidate CLI/Desktop,
+- [x] После окончания минимального product fix сохранить final candidate CLI/Desktop,
   manifests и SHA. Закрепить выбранный собственный harness SHA/lockfile,
   verifier/adapter hashes, snapshot этих10 задач, модель/variant, исходные
   effective timeouts, судью/промпт/schema/рубрики/порог и image digest стенда.
@@ -1353,7 +1353,7 @@ Core имеет разметку осей, но без CSV oracle. По доку
 аварийная матрица отложены. Прежние PASS остаются доказательствами для прежних
 SHA; для final candidate нужны следующие минимальные проверки.
 
-- [ ] Завершить [исправление штатного закрытия сохранённого пакета](../specs/2026-10-09-clean-saved-package-shutdown.md)
+- [x] Завершить [исправление штатного закрытия сохранённого пакета](../specs/2026-10-09-clean-saved-package-shutdown.md)
   через TDD и адресные runtime/shutdown/bridge тесты; проверить типы затронутых
   пакетов. Приоритет: свой чистый сохранённый пакет освобождается, чужой/грязный/
   выполняющийся не закрывается принудительно; browser cleanup остаётся проверяемым.

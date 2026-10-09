@@ -1,5 +1,22 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-09 — package-docs: финальный candidate9695 и сокращённая приёмка
+
+CLI/Desktop из чистого `9695e61e358ac5e6043c08eb56d183faa03d7a28`, версия0.1.17,
+собраны в новые каталоги и проверены по manifests/resources. Уже запущенная
+матрица Ubuntu22/24/26, Debian12/13 завершена: **CLI5/5 и Desktop5/5 PASS**,
+non-root/network:none,10 собственных контейнеров удалены. Это offline проверки.
+CLI установлен штатно в private HOME текущего Linux; payload5651 entries и
+root:root4755 совпали. Desktop AppImage доставлен; его native live ещё pending.
+Пользовательская установка не заменена, артефакты не опубликованы.
+
+По решению пользователя текущая цель:10 fixed CLI задач×1,≥8 PASS с судьёй/
+структурой/CSV, cold3, S1–S8 и минимальный installed lifecycle. A/B90, полная
+TUI/recovery матрица, вторая модель и stage9 отложены. Первая задача запущена,
+итоги ещё не приняты. Предыдущая v9 остаётся INCOMPLETE, не доказательство
+неухудшения. Полные hashes и текущая граница:
+[сокращённая приёмка](../testing/loginom-ai-agent/reports/2026-10-09-package-docs-short-acceptance.md).
+
 ## 2026-10-08 — package-docs: кандидат49 и текущая граница приёмки
 
 Чистый source `49b1584f23b4aa47e18b26119389d6f45623fc94`, версия0.1.17:

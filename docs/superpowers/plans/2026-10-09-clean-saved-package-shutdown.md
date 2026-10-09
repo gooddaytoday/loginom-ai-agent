@@ -26,8 +26,10 @@ read-only review Approved после трёх обязательных уточ�
 - Не save/discard/cancel, не CloseAllPackages, не RPC-обход native close guard.
 - Product не передаёт acceptanceCleanupPackage. Foreign data/profile/server неизменны.
 - Frozen baseline/candidate49 не изменяются; новый candidate получает новый каталог.
-- Исправление не является доказательством исправления v9 hang. Полная новая A/B90
-  требует новых общих conditions и обоих smoke. Stage9 остаётся отложенным.
+- Исправление не является доказательством исправления v9 hang. По решению
+  пользователя2026-10-09 текущая приёмка заменена сокращённым этапом7 основного
+  плана `94627858a`:10×1 candidate,≥8 PASS/judge/structure/CSV,cold3,S1–S8.
+  Новая baseline/A/B90 и stage9 отложены.
 
 ## Task1 — выполнено: Проверить tab до native закрытия
 
@@ -87,15 +89,16 @@ test('missing prepared tab refuses before native package close', async () => {
 
 ## Task3: Installed приёмка нового кандидата
 
-- [ ] Собрать полный CLI/Desktop в новые own каталоги по штатным builders;
+- [x] Собрать полный CLI/Desktop в новые own каталоги по штатным builders;
   manifests/source SHA/resources фиксируют фактический новый snapshot.
 - [x] Повторить normal CLI shutdown observation без acceptance-only параметра;
   новый клиент должен открыть exact saved package writable без server reset.
   Native close/logout и process remaining0 требуют отдельных receipts.
-- [ ] Полные scenario-modify/create/transitions/cleanup/owner-loss/resume и
-  Linux Desktop/CLI gates основной цели. Не переносить старые PASS на новую
-  сборку автоматически и не выдавать scripted provider за real-model выбор.
-- [ ] Новый общий freeze и оба smoke, затем full90/structure/judge/cold/compare;
-  исходный subset15 не переотбирать. Не дополнять incomplete v9.
+- [ ] Минимальные installed Linux/lifecycle, small modify/execute/save,
+  Desktop S7 и одна штатная отмена по этапу8 основного плана; S1–S8 по этапу6.
+  Scripted provider не выдавать за real-model выбор; расширенная матрица отложена.
+- [ ] Сокращённая fixed10 candidate серия/judge/structure/CSV и cold3 по этапу7
+  основного плана. Условия сохранены до первого single-task live; не дополнять
+  incomplete v9 и не заменять неудачные задачи.
 - [ ] Checkpoint максимум20 строк, source-only/installed ограничения явно;
   удалять лишь свои unused `/tmp` после сохранения и проверки отсутствия процессов.

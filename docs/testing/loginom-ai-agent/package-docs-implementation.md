@@ -4447,6 +4447,22 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
+### 2026-10-09 — ACTIVE, сокращённая приёмка candidate9695
+
+- Каноническая граница `94627858a`:10×1 CLI,≥8 PASS/judge/structure/CSV,cold3,S1–S8,installed Linux/lifecycle; A/B90/TUI/расширенный recovery/stage9 отложены.
+- Финальные CLI/Desktop source `9695e61e358ac5e6043c08eb56d183faa03d7a28`,clean,0.1.17; manifests/static resources PASS.
+- Runtime shutdown TDD и full upstream2564 PASS/10 SKIP/0 FAIL; TypeScript/public IPC не изменены, runtime typecheck script отсутствует.
+- CLI scripted normal close→fresh writable reopen без server reset PASS/native close/logout/remaining0; small modify/execute/save ещё открыт.
+- Уже начатые offline матрицы завершены:CLI5/5,Desktop5/5,network:none; own containers10 удалены; read-back47files SHA dc84c279e6….
+- CLI установлен штатно в private HOME вне checkout,5651 inventory entries/root:root4755/unconfigured PASS; Desktop AppImage доставлен, native проверки pending.
+- Frozen harnessd08 clean/658 pins; свежий evals ref7318ec61fef3, protected judge/calibration/tasks unchanged. Принятый judge contract сохранён.
+- Fixed10/cold3 сохранены до первого live; common SHA570d1578f5…, dispatch86979bc4d0…. Каждая задача — отдельный процесс, следующая только после terminal+cleanup gate.
+- Модель openai/gpt-6.1-sol medium,judge gpt-6-astra high,threshold70/checklist; effective task timeout1800000ms сохранён.
+- Новый own stand127.0.0.1:32769/server8ef472ee…/network loginom-skills-short-20261009; admission PASS. Старый v9 и original server/client не изменены.
+- Первый single-task sales-by-category запущен; итоговая десятка/S1–S8/cold3 пока не приняты. Ручных повторов0.
+- Историческая v9:34closed/25PASS/9FAIL,cohort#3 INCOMPLETE; hang cause UNKNOWN, raw recovery evidence сохранён, в новую приёмку не засчитывается.
+- Следующий шаг: terminal result/cleanup/structure/CSV sales; затем остальные fixed tasks, S1–S8/cold3/native lifecycle; см. новый short-acceptance report.
+
 ### 2026-10-09 — ACTIVE, v9 terminal143; closed34/45, PASS25/FAIL9; cohort#3 INCOMPLETE
 
 - HEAD до checkpoint `74c69fd75`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
