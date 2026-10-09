@@ -656,11 +656,11 @@ structure/warm oracle PASS, все6 cleanup stages confirmed, process cleanup
 confirmed/error null/remaining0×2 и full inventory/restore roundtrip архивов.
 Cold formal ещё не выполнялся; candidate formal и compare не начаты.
 
-| Задача | Повтор | Judge | History entries / gzip bytes | Diagnostics entries / gzip bytes |
-| --- | --- | --- | --- | --- |
-| ab-revenue-per-converter | 1 | PASS100 | 4604 / 17048407 | 3 / 5110421 |
-| abc-pareto-groups | 1 | PASS100 | 4640 / 21348941 | 3 / 9371065 |
-| articles-by-author | 1 | PASS100 | 4600 / 15892038 | 3 / 4038019 |
+| Задача | Повтор | Judge | Provider finishes / tools / Loginom | History entries / gzip bytes | Diagnostics entries / gzip bytes |
+| --- | --- | --- | --- | --- | --- |
+| ab-revenue-per-converter | 1 | PASS100 | 21 / 20 / 16 | 4604 / 17048407 | 3 / 5110421 |
+| abc-pareto-groups | 1 | PASS100 | 36 / 35 / 31 | 4640 / 21348941 | 3 / 9371065 |
+| articles-by-author | 1 | PASS100 | 22 / 22 / 18 | 4600 / 15892038 | 3 / 4038019 |
 
 Последний private snapshot `formal-v9-progress-3-20261009.json` SHA256
 `e0fd71b357af1a35239d0229ff93e78dfe4507b60b56692c846657bdf0c369e2`:
@@ -673,3 +673,15 @@ SHA256 `eb9111bcc5191527eafcc49b5af07633709a3cc63276bb60f7a40b5c696a6e9a`,
 Наблюдался промежуточный result PASS100 с environment cleanup not_run;
 архивирование начато только после отдельной подтверждённой полной cleanup.
 Его метка RESULT не является terminal cleanup доказательством.
+
+Метрики трёх закрытых попыток сохранены отдельно в private
+`formal-v9-base-metrics-3-20261009.json`, SHA256
+`51bbcc35a92e4ff2416809c1aeb0696c411eb16a0044e95d5bccc06a3396a13e`.
+Provider finishes считаются по уникальным part.id, tools по последнему событию
+каждого callID, first prepare — по числу упорядоченных уникальных messageID.
+Tool/Loginom/error counters совпали с result.json у всех3; errors0, skills0,
+turns through prepare1. Tokens/duration/reported cost и SHA traces закреплены
+в receipt. Это partial baseline, без вывода о candidate или non-inferiority.
+Первое измерение отклонено assertion из-за неверного имени prepare в observer;
+исправлено на наблюдаемый loginom_dock_prepare. Частичный файл не записан,
+guards неизменны, новых product/model/judge попыток0; отказ сохранён в receipt.
