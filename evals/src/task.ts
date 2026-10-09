@@ -39,6 +39,9 @@ async function loadTask(dir: string) {
   if (raw.id !== id) throw new EvalFailure(`${id}: поле id ("${String(raw.id)}") должно совпадать с именем каталога`, 2)
   if (raw.output_mode !== undefined && raw.output_mode !== "diagnostic")
     throw new EvalFailure(`${id}: output_mode должен быть diagnostic или отсутствовать`, 2)
+  const checkerFiles = strings(raw, "checker_files", id)
+  if (new Set(checkerFiles).size !== checkerFiles.length || checkerFiles.some(file => !file || path.isAbsolute(file) || file.split(/[\\/]/).includes("..")))
+    throw new EvalFailure(`${id}: checker_files должны быть уникальными относительными путями`, 2)
   const task = {
     id,
     dir,
@@ -47,6 +50,7 @@ async function loadTask(dir: string) {
     inputs: strings(raw, "inputs", id),
     reference: raw.output_mode === "diagnostic" ? "" : text(raw, "reference", id),
     ...(raw.output_mode === "diagnostic" ? { outputMode: "diagnostic" as const } : {}),
+    ...(checkerFiles.length ? { checkerFiles } : {}),
     spec: text(raw, "spec", id),
     checklist: checklist(raw, id),
     expectedOutput: text(raw, "expected_output", id),
@@ -54,7 +58,7 @@ async function loadTask(dir: string) {
     oracle: await Bun.file(path.join(dir, "oracle.csv")).exists() ? "oracle.csv" : undefined,
     oracleTolerance: oracleTolerance(raw, id),
   }
-  for (const rel of [task.reference, task.spec, ...task.inputs].filter(Boolean)) {
+  for (const rel of [task.reference, task.spec, ...task.inputs, ...checkerFiles].filter(Boolean)) {
     if (!(await Bun.file(path.join(dir, rel)).exists())) throw new EvalFailure(`${id}: файл "${rel}" не найден`, 2)
   }
   return task
@@ -164,6 +168,8 @@ export async function rubricHash(tasks: Task[]) {
     hashPart(hasher, "spec", await Bun.file(path.join(task.dir, task.spec)).bytes())
     if (task.outputMode) hashPart(hasher, "output_mode", task.outputMode)
     if (task.reference) hashPart(hasher, "reference", await Bun.file(path.join(task.dir, task.reference)).bytes())
+    for (const file of [...(task.checkerFiles ?? [])].sort())
+      hashPart(hasher, `checker:${file}`, await Bun.file(path.join(task.dir, file)).bytes())
     if (task.oracle) {
       hashPart(hasher, "oracle", await Bun.file(path.join(task.dir, task.oracle)).bytes())
       hashPart(hasher, "oracle_tolerance", String(task.oracleTolerance))

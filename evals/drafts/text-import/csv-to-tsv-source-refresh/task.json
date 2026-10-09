@@ -36,5 +36,11 @@
     }
   ],
   "timeout_ms": 900000,
-  "reference": "reference.lgp"
+  "reference": "reference.lgp",
+  "checker_files": [
+    "SPEC.json",
+    "acceptance.json",
+    "expected/stage-1.json",
+    "expected/stage-2.json"
+  ]
 }
