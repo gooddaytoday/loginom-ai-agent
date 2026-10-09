@@ -243,29 +243,32 @@ Node evidence: attachment `01a11f99-736b-74cb-b29e-fa4a5b714241`, 9373 bytes, SH
 
 Проверено на сервере 2026-10-09: operational SHA `ee7861513be1c4309fdf1678ccae78ad89522973`, corpus SHA `53d03a35b0ee2901b40c1a1bbb0170804d59e865`, immutable supplement 733 файла, manifest SHA256 `67a877dae2e6962da7c70a741ed617d65d88d7b569280e875ad9d7a95f4de8ea`. Runtime был остановлен только при FREE/пустых очередях/чистых профилях, затем возобновлён. Config bytes и 148 файлов smoke неизменны; все настройки четырёх исполнителей сохранены, instructions/starters проверены readback. Немодельный live pin/readiness check дал `accepted=true`; CLI/source/модель/судья/изоляция/корпус прежние. Proof: `R/evidence/baseline-accepted-readiness-ee7861513.json`, backup/activation: `R/operations/acceptance-update-ee7861513/`. Последующие doc-коммиты не меняют этот серверный SHA.
 
-## 7. Обязательно создать карточку полного baseline и запустить её в работу
+## 7. Обязательно создать карточку полного baseline и запустить её в работу — выполнено
 
 **Этот этап обязателен. Реализация не заканчивается готовым агентом, планом, `prepare`, новой карточкой в backlog или отчётом smoke.**
 
 Создана [LAB-55](https://mas.kartamyshev.dev/lab/issues/LAB-55), UUID `01a11fc1-8ded-7600-8251-66d97a4add78`, existing project/префикс/метка baseline проверены. Создана без assignee/run до регистрации монитора. Путь единственной серии `R/roles/evalbaseline/results/full-baseline-20261009-cli017-53d03a35b`; описание и инструкция EvalBaseline закрепляют это поручение, исходный corpus и node exception. Private create intent/receipt сохранены; дубликата карточки нет.
+
+Штатный assign выполнен один раз после включения монитора. Readback: карточка `in_progress`, один native run `01a11fc8-1ebb-7371-907b-16e7d26c14f4` — `running`, начало 2026-10-09 11:29:32 Europe/Moscow; EvalBaseline/runtime `eval-tests`. Агент подтвердил настоящий MCP actor search/read с автоматическим Git Peer собственного checkout, выполнил `prepare` и `start`. Manifest `f8c70eb0-88b6-457d-99a0-cd4ccb44d0b9`, SHA256 `48b60d07dc71b3b6b528297a04cfd395fe9299507600acc2058e91031096d689`: 48 кейсов (3 regular/35 analytic/10 node), 144 уникальных задания в трёх кругах; hash journal совпадает. Закреплены corpus `53d03a35b`, supplement `ee7861513`, исходный node exception и остальные пины. Root проверил owner общего lease с точными card/run UUID, birth identity executor и первый продуктовый CLI 0.1.17 внутри bubblewrap. Первый job `regular-calc-data-double-1` начат в 11:34:09 МСК; source run `20261009-083411-ee7861513`. Это подтверждает начало полной серии; итоговая полнота ещё не достигнута.
 
 - [x] После прохождения этапов 3–6 (с явным исключением 6.1) **создать новую карточку Multica** в проекте `Loginom node evals`: заголовок `[Baseline] CLI 0.1.17 — <короткий corpus SHA> — 3 попытки`; метка `baseline`; исполнитель EvalBaseline `77032943-ad18-4ae9-a2c6-668769077c86`; вне squad. Связать её с readiness/evidence LAB-32.
 - [x] В описание записать задание на полный корпус, все пины и фактический N, три круга, лимиты, единственный lease, правила добора/UNKNOWN/immutable evidence, путь результатов, критерий complete и запрет повторять валидное измерение ради качества. При повторном входе сначала найти карточку по сохранённому UUID/маркеру этого запуска, чтобы не создать дубликат.
 - [x] При создании сохранить UUID/ссылку карточки и локатор будущей серии в checkpoint до 20 строк. Ещё не запускать продукт до включения контроля этапа 8.
 - [x] Обновить инструкцию EvalBaseline: прежнее требование нового разрешения на полный baseline для **этой созданной карточки** заменено настоящим поручением. Автономные расписания/выбор следующей карточки самому EvalBaseline не добавлять.
 - [x] Включить `/loop 15m` в основном чате по этапу 8, проверить регистрацию пробуждений и выполнить первый контроль сразу.
-- [ ] **Запустить новую карточку в работу** штатным Multica start/assign без `--no-start`. Если API уже создал run, второй раз start/rerun не вызывать. Сохранить настоящий run UUID.
-- [ ] Проверить readback: нужный исполнитель/runtime, один run `queued → running`, карточка `in_progress` согласно нативному workflow. Смена статуса вручную без реального run не подтверждает запуск. При занятом runtime оставить единственный queued run и сопровождать до `running`.
-- [ ] В реальном задании EvalBaseline выполнить `prepare`, сохранить UUID manifest и путь серии в карточке/checkpoint, проверить N × 3 jobs, затем **выполнить `start`**:
+- [x] **Запустить новую карточку в работу** штатным Multica start/assign без `--no-start`. Если API уже создал run, второй раз start/rerun не вызывать. Сохранить настоящий run UUID.
+- [x] Проверить readback: нужный исполнитель/runtime, один реальный run `running`, карточка `in_progress` согласно нативному workflow. Смена статуса вручную без реального run не подтверждает запуск. При занятом runtime оставить единственный queued run и сопровождать до `running`.
+- [x] В реальном задании EvalBaseline выполнить `prepare`, сохранить UUID manifest и путь серии в карточке/checkpoint, проверить N × 3 jobs, затем **выполнить `start`**:
 
 ```sh
-run_baseline prepare --config "$CFG" --series "$BASELINE_SERIES"
+run_baseline prepare --config "$CFG" --series "$BASELINE_SERIES" \
+  --accept-node-smoke-no-artifact 38aa02d9-2568-4e87-95c3-f74264525d7b
 run_baseline start --config "$CFG" --series "$BASELINE_SERIES" \
   --issue "$BASELINE_CARD_UUID" --task "$BASELINE_MULTICA_RUN_UUID"
 ```
 
-- [ ] Подтвердить фактический запуск executor, правильного owner общего lease и первого продуктового измерения. UUID карточки, UUID Multica run и UUID manifest различны; не подставлять один вместо другого.
-- [ ] Передать пользователю ссылку созданной карточки, baseline ID, corpus SHA, N × 3, время начала и время следующей проверки по Europe/Moscow.
+- [x] Подтвердить фактический запуск executor, правильного owner общего lease и первого продуктового измерения. UUID карточки, UUID Multica run и UUID manifest различны; не подставлять один вместо другого.
+- [x] Передать пользователю ссылку созданной карточки, baseline ID, corpus SHA, N × 3 и время начала по Europe/Moscow; контроль — каждые 15 минут штатным heartbeat.
 
 **Проверенные точки входа Multica CLI:** создание без assignee не запускает работу; assign без `--no-start` запускает. Выполнять в уже настроенном контексте workspace `dcf616e7-66eb-470a-9b04-6462f220cf3b` / `https://mas.kartamyshev.dev`, не выводя credentials. `BASELINE_TITLE` формируется из закреплённого corpus SHA, `BASELINE_DESCRIPTION_FILE` содержит задание выше, `CONTROL_DIR` — собственный private каталог контроллера. UUID извлекается из фактического ответа создания.
 
@@ -294,13 +297,15 @@ multica issue get "$BASELINE_CARD_UUID" --output json
 
 Heartbeat `lab-55-baseline-cli-0-1-17` создан штатным инструментом, ACTIVE, thread `01a11a65-5025-7050-8d46-cee03e4023f3`, интервал **15 минут** по уточнению владельца. View и сохранённая конфигурация подтвердили статус/target/интервал; первый контроль карточки и среды выполнен сразу до assign. Private состояние: `controller/baseline-monitor-state.json`.
 
-**Владелец мониторинга — основной чат, не Multica squad и не новая задача Codex.** Каждое пробуждение запускает проверку агента-контроллера; оно не перезапускает EvalBaseline или продукт каждые полчаса.
+После фактического `start` выполнен дополнительный контроль: один native run `running`, manifest 48/144, первый продуктовый slot активен, общий lease и профильный harness lease присутствуют у текущего исполнителя. Фактические UUID manifest/run сохранены в карточке, checkpoint и private state. Для мутаций используется `controller/monitor.lock` с неблокирующим OS flock и свежим чтением Multica/journal/двух leases внутри удерживаемого lock; контракт добавлен в сохранённое heartbeat-поручение и проверен при обновлении карточки без нового запуска. Регистрация расписания подтверждена; первое периодическое пробуждение ещё не наблюдалось.
+
+**Владелец мониторинга — основной чат, не Multica squad и не новая задача Codex.** Каждое пробуждение запускает проверку агента-контроллера; оно не перезапускает EvalBaseline или продукт каждые 15 минут.
 
 - [x] Проверить существующие loop/heartbeat и устойчивое состояние контроллера; повторный вход не создаёт дубликат расписания или executor.
 - [x] Включить `/loop 15m` с приведённым ниже поручением и идентификаторами созданной карточки/серии. Сначала выполнить один контроль сразу; следующий — через 15 минут.
 - [x] Подтвердить регистрацию механизма пробуждений именно **этого** чата. Skill `loop` описывает monitored output с `notify_on_output`; в интерфейсе `exec_command`, доступном при составлении плана, этого параметра нет. Поэтому для исполнения использовать доступный штатный thread heartbeat `automation_update` с интервалом 15 минут и этим же поручением. Не считать фоновый `sleep` подтверждением работающего мониторинга; OS cron и отдельную standalone Codex-задачу не создавать.
 - [x] Сохранить ID loop/heartbeat, thread ID, карточку, manifest ID/путь (ID заполняется после реального prepare), source SHA, последнее завершённое измерение, наблюдаемое текущее исполнение, активный incident и следующую проверку. Публичный checkpoint — до 20 строк; private receipts/guards хранить отдельно, без публикации tokens.
-- [ ] Защитить действия контроллера от перекрывающихся тиков. Перед любой мутацией повторно прочитать Multica run, journal и обе блокировки. Читающий subagent допустим; действия над стендом выполняет один контроллер.
+- [x] Защитить действия контроллера от перекрывающихся тиков. Перед любой мутацией получить private `monitor.lock` через `fcntl.flock(LOCK_EX | LOCK_NB)` и внутри удерживаемого fd повторно прочитать Multica run, journal и обе блокировки. При занятом lock пропустить мутацию; действия над стендом выполняет один контроллер.
 
 **Поручение для `/loop 15m` / thread heartbeat:**
 

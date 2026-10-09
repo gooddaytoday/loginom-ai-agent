@@ -12,9 +12,9 @@
 - Node 38aa02d9-2568-4e87-95c3-f74264525d7b no_artifact/code FAIL; actual medium (19 messages)/cleanup/release/delivery verified.
 - Причина node: CLI F3 guard отвергает имя с ';'; original raw readiness 1/2 и ошибки сохраняются, новые smoke запрещены.
 - Владелец разрешил full текущего CLI; acceptedNodeSmokeNoArtifact закрепляется в новом immutable manifest; accepted=true проверен на настоящих evidence.
-- LAB-55 https://mas.kartamyshev.dev/lab/issues/LAB-55, UUID 01a11fc1-8ded-7600-8251-66d97a4add78; prefix/project/label baseline verified, без run до монитора.
-- Series R/roles/evalbaseline/results/full-baseline-20261009-cli017-53d03a35b; baseline ID и run ID ожидают реальный prepare/start.
+- LAB-55 https://mas.kartamyshev.dev/lab/issues/LAB-55, UUID 01a11fc1-8ded-7600-8251-66d97a4add78; in_progress, один run 01a11fc8-1ebb-7371-907b-16e7d26c14f4 running с 11:29:32 МСК.
+- Series R/roles/evalbaseline/results/full-baseline-20261009-cli017-53d03a35b; manifest f8c70eb0-88b6-457d-99a0-cd4ccb44d0b9, 48/144/три круга/hash journal verified.
 - Heartbeat lab-55-baseline-cli-0-1-17 ACTIVE, 15 минут, main thread 01a11a65-5025-7050-8d46-cee03e4023f3; readback PASS.
 - Private controller /home/kiselev/.local/share/loginom-evalbaseline-control/20261009/controller; monitor state/cursors/receipts/secrets вне Git/results.
-- Original smoke 148 files/config неизменны; native FREE/5 clean profiles/storage EMPTY перед переключением; runtime снова active.
-- Далее: один штатный assign/start LAB-55 → сохранить фактические run/manifest → монитор 15m до 144 measured/cleanup/release/delivery → отключить heartbeat.
+- MCP actor/automatic own Git Peer verified; lease exact LAB-55/run/ee786; executor birth/CLI017/bwrap verified, calc#1 source run 20261009-083411-ee7861513 с 11:34:09 МСК.
+- Далее: монитор 15m единственной текущей серии до 144 measured/cleanup/release/delivery → in_review → отключить heartbeat; не повторять smoke/измеренные FAIL и не запускать второй executor.
