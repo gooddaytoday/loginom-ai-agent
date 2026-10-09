@@ -31,23 +31,23 @@
 
 ## Checkpoint наблюдения — новая параллельная волна, 09.10.2026
 
-- Документация до продолженияf0569f424; baseline4e626d547/basef9bf332c; loginom0ca не включён; remote SHA сверены.
+- Документация до продолжения5661466a1; baseline4e626d547/basef9bf332c; loginom0ca не включён; remote SHA сверены.
 - Node SHA: LAB45 a00b0203/PR42, LAB46 41e0b170/PR43, LAB47 c92a3bfd; LAB48–52 4e626d547; назначения сохранены.
-- Caps8/8/8, daemon12;8 running одновременно NOT_CONFIRMED; штатный3m claim cadence оставлен по команде владельца.
-- Owner SSH verified; временные5s отменены; два stock restart idle/terminal_reports0, interruption0; тот же daemon/runtime/profile.
-- daemon PID212379/argv3m0s+12/readback PASS; installed Multica0.6.1/source2ea; server exact SHA NOT_OBSERVED.
+- Caps8/8/8, daemon12; штатный3m claim cadence оставлен;8 running одновременно NOT_CONFIRMED/load12 NOT_RUN.
+- Owner SSH verified; временные5s отменены; stock restart idle/terminal_reports0, interruption0; daemon PID212379/argv3m0s+12.
+- Installed Multica0.6.1/source2ea; server exact SHA NOT_OBSERVED; native models/roles/Eval unchanged.
 - Native capacity classified model_not_found_or_unavailable, auto retry не назначен; stock rerun сохранён, модели не менялись.
-- Старые manifests/receipts сохранены; новый shared2:4 attachments/3 artifacts bytes/hash PASS; это только admin diagnostic.
-- Private exact MF;MapTreeForm selector runtime PASS; два отдельных root profiles A3117/B3118 connected одновременно PASS.
-- Caller-specific views9/9: mstSelf/client меняются местами, разные GUID/key/ID; worker/reviewer независимость не проверялась.
-- Старые3114/3113 absence в complete8/8 store с own A3117 positive PASS; старые IDs не закрывались/не изменялись.
-- Settings multi-session разрешают входы; keepalive30min; UI logout=disconnect; mstSelf штатной UI строкой не закрывается.
-- B clean socket close сделал stock Reconnect терминальным; его return1 НЕ recorded RPC1841 negative; общий дефект не установлен.
-- A3117 UI logout ack/actual key1 некалиброван; B3118 logout AMBIGUOUS/server cleanup PENDING; marker/history сохранены.
-- Exact own PID/startticks/FD absence PASS; permanent lock inodes сохранены; foreign sessions unchanged.
-- mas02:30MSK CPU1.333%,load0.108/0.098/0.040,MemAvailable30141876KiB,disk409814499328B,queue1/0wait.
-- Installed CLI source597/version/checksums сверены; CLI/model/build0; новых admin аккаунтов не создавали.
-- Новый key-only LAB47 task01a11ddf-9f91-75c7-89a2-a218d127c31f running; fresh transport/exact B key; без CreateSession/нового входа.
-- Остальные приёмки удержаны; scheduled observer не возобновлён/не создан; source/контракты/критерии unchanged.
-- [SHA/tasks/hashes/ограничения](reports/2026-10-08-node-recheck/parallel8-restart.json);8 acceptance NOT_CONFIRMED/load12 NOT_RUN; PR40 draft/no merge/release.
-- Следующий шаг: finite B key reconciliation и exact cleanup; затем продолжить8 узлов; общий fix согласовывать отдельно.
+- История/AMBIGUOUS/manifests сохранены; shared2/key-only/root-only:по4 attachments/3 artifacts bytes/hash PASS.
+- Private exact MF;MapTreeForm selector runtime PASS; два isolated root profiles3117/3118 connected одновременно PASS.
+- B actualRPC1841 success0; GetMainObject/query EBGException, currentGUID/key UNKNOWN; stockReconnect1 не server negative.
+- Root3117 absent;3118 disconnected/pkg0 exact standard Close+confirm+refreshed9→8 absence PASS, own3119 positive.
+- Root bucket пуст/старые effects absent; ownPID/FD/lock2396017 свободны; marker finished/history archive hash сохранён.
+- Root-only independent artifact review PASS; это не observer3119 readiness, node/model или8-profile/load12 PASS.
+- Observer3119 UI logout/ownPID/FD PASS, actualkey1 uncalibrated/server absence PENDING; отдельный card marker47 сохранён.
+- UI cause correction: снимок до завершения подготовки; current Published error не записан/PrepareAdminArea не вызывался; old cause UNKNOWN.
+- Central partialPUT/readback: existing common admin по условному разрешению; новые admin не нужны, planned/created configs preserved.
+- На03:05MSK7 cards resume пакетно без дублей;03:13LAB45/48/50/51/52 running,46/49 queued;47 awaits own3119 proof.
+- LAB48 requested optional readonly3119 в естественном ownAdmin view; extra verifier logins0, foreign mutations0.
+- All8 full accepted-scope CLI+cold+independent matrices confirmed; Root proof не переносится; Stage0 readiness каждой отдельно.
+- [SHA/tasks/hashes/ограничения](reports/2026-10-08-node-recheck/parallel8-restart.json); installed597 verified; schedules0/common source changes0/merge-release0.
+- Следующий шаг: own3119 natural readback, свои7 pair readiness→Worker→Reviewer; full acceptance8 NOT_CONFIRMED; общие критерии согласовать отдельно.

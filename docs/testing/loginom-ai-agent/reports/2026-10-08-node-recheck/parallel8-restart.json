@@ -1512,10 +1512,512 @@
     "issue_id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
     "comment_id": "01a11ddf-9f7a-7b7d-937e-ad4ee4772cca",
     "task_id": "01a11ddf-9f91-75c7-89a2-a218d127c31f",
-    "status": "running",
+    "status": "completed",
     "created_at": "2026-10-09T02:35:57+03:00",
     "started_at": "2026-10-09T02:35:58+03:00",
     "scope": "one own captured B3118 key on separate fresh transport; actual method1841, not stock wrapper; bind same GUID/current key if available; no CreateSession/new login/schedule/model; source and early receipts private",
-    "unknown_effects": "old attempts and uncalibrated A3117 remain immutable; marker retained until exact calibrated cleanup"
+    "unknown_effects": "old attempts and uncalibrated A3117 remain immutable; marker retained until exact calibrated cleanup",
+    "completed_at": "2026-10-09T02:45:52+03:00"
+  },
+  "B3118_key_only_result": {
+    "attachments": [
+      {
+        "id": "01a11de8-5eb8-769e-bcf4-ab907921e38b",
+        "name": "generator-B-key-receipt.json",
+        "bytes": 6549,
+        "sha256": "399081e68e2a1f3dc93457a00af009ff7e45b1afb72c78ed53a2d56ba4e57d96"
+      },
+      {
+        "id": "01a11de8-5f8b-7715-a644-5bc061aebd60",
+        "name": "generator-B-key-cleanup.json",
+        "bytes": 3301,
+        "sha256": "64fc1322f34713790579ae7eab6441ac5c0a39e1c9fd85eff5d7535b49df290e"
+      },
+      {
+        "id": "01a11de8-6055-7411-8145-980129913201",
+        "name": "generator-B-key-resources.json",
+        "bytes": 2417,
+        "sha256": "fe39df1b10159036b1cd5273449fbe6467984fb1aa99646ed2a1d62e69852e3e"
+      },
+      {
+        "id": "01a11de8-6126-7c85-91b9-4d9984c43b30",
+        "name": "generator-B-key-manifest.json",
+        "bytes": 737,
+        "sha256": "ab0998732df7c815a5e21f1d316d4d7c7e41d8eb20f5889b83161ff7ca6ae390"
+      }
+    ],
+    "three_artifacts_bytes_hash_manifest_verified": true,
+    "attempt_uuid": "9288ab66-7a05-4da4-86b8-8f0cad5de0e1",
+    "actual_network_result": {
+      "method": "IBGRemoteDeductorServer.ConnectToSession",
+      "method_id": 1841,
+      "observed_RPC_method_ids": [
+        1841
+      ],
+      "reply": 0,
+      "enum": "rcrSuccess",
+      "replied_at": "2026-10-08T23:39:40.833Z",
+      "positive_saved_B_key_control": true,
+      "previous_stock_return1_is_not_actual_method_reply": true,
+      "no_stock_Reconnect_no_fallback_no_password_login": true
+    },
+    "current_binding_limit": {
+      "phase": "own-scope.GetMainObject-query-GUID-current-key",
+      "attempt": "stock GetMainObject query for IBGRemoteDeductorServerSession; method3 from source",
+      "error": "page.evaluate: EBGException; server detail not preserved across Playwright",
+      "private_exception_sha256": "8542e2fb1b8dfc0adb983fee7dac685dcf2e73a4ab1d321169119354d53b17ee",
+      "DOM_sha256": "474686469017a6e8b2e77d1edb649437d377406c7f9be1737f5ea21f09956392",
+      "fresh_same_GUID_readback": "NOT_OBTAINED",
+      "current_reconnect_key_readback": "NOT_OBTAINED",
+      "key_rotated": "UNKNOWN; do not re-use prior key after success as absence proof",
+      "mapping_numeric3118": "historical exact GUID/key/mstSelf proof preserved; fresh GUID binding unavailable",
+      "API_interface_unsupported_or_common_source_defect": "NOT_ESTABLISHED; opaque EBGException is insufficient"
+    },
+    "prepared_private_error_recorder": {
+      "original_executed_sha256": "51049592116852952df977dc36c488390b5c6563ca1ba6e9afb5284ef8cf356b",
+      "prepared_candidate_sha256": "4cee2654fbc03344a698a5ebbce935c760d35a7d4e2a74ae10cf498b3ac97b94",
+      "candidate_runtime": "NOT_RUN; no second key RPC",
+      "private_changes": [
+        "capture Saltarelle get_message/get_stack/innerException inside browser before Playwright serialization",
+        "record own transport wire method IDs including GetMainObject3"
+      ],
+      "syntax_exit_code": 0,
+      "syntax_child": {
+        "pid": 215338,
+        "start_ticks": "11899919"
+      },
+      "syntax_child_absent": true,
+      "common_source_provisioner_changes": 0,
+      "current_generic_EBGException_detail": "historical lost detail cannot be reconstructed; no unsupported-interface claim",
+      "minimum_next_readback": {
+        "action": "Independent read-only Dispatcher refresh from an already active authorized Admin view; no new root login here",
+        "exact_own_targets": [
+          {
+            "session_id": 3117,
+            "created_at": "2026-10-08T23:26:29.506Z"
+          },
+          {
+            "session_id": 3118,
+            "created_at": "2026-10-08T23:26:34.191Z"
+          }
+        ],
+        "proof": "complete loaded-store/count agreement + unique connected observer mstSelf positive control; exact IDs/CreateTime/private ownership hashes; no close by username/age",
+        "ownership": "LAB47 own GUID hashes and attempt provenance preserved privately",
+        "if_absent": "publish public receipt/hash, then LAB47 may finish own marker only after full own server/process criteria are satisfied",
+        "if_present": "record exact state and ask for bounded targeted cleanup; no foreign/self session mutation during readback"
+      }
+    },
+    "root_login_CreateSession_calls": 0,
+    "historical_unknown_effects_preserved": true,
+    "full_own_server_cleanup": "NOT_PROVED; marker retained",
+    "exact_own_transport_browser_PID_startticks_and_FD_absence": "PASS",
+    "node_acceptance_handoff_model_build": 0,
+    "source_contract_criteria_changes": 0
+  },
+  "own_operator_finite_cleanup_continuation": {
+    "issue_id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+    "comment_id": "01a11dea-c68d-7740-acac-3f242123ddaa",
+    "task_id": "01a11dea-c6a1-781f-80c9-596eb304a5b6",
+    "status": "completed",
+    "created_at": "2026-10-09T02:48:07+03:00",
+    "started_at": "2026-10-09T02:48:09+03:00",
+    "scope": "one fresh UI view via existing own card operator Admin; no root login or account creation; exact3117/3118 current ownership/complete store positive check, standard own close if disconnected/no packages; exact cleanup; no repeated verifier login chain; normal Stage0 then Worker only when ready",
+    "source_contract_criteria_changes": 0,
+    "completed_at": "2026-10-09T03:03:49+03:00"
+  },
+  "eight_card_fresh_readonly_audit": {
+    "statuses": "all8 blocked; only LAB47 finite diagnostic active",
+    "fresh_worker_reviewer_successors": 0,
+    "verified_local_attachments": 17,
+    "scope": "already-downloaded protocol/causal/selector/shared2 bytes/hash recomputed; newer card artifacts not verified here",
+    "LAB46_additional_blocker": "own Dispatcher/numeric-ID/server cleanup not calibrated",
+    "node_stage0_or_acceptance_ready": "NOT_CONFIRMED"
+  },
+  "accepted_scope_readonly_review": {
+    "scope": "registry plus all8 canonical plans and git show assignedSHA; no live node acceptance; expected/oracle not sent to model",
+    "all8_assignments": "implemented/accepted_scope_maintenance; stage0 full recheck of accepted scope; assignedSHA plans equal current plans",
+    "Worker_Reviewer_required": "independent CLI scenarios, same clean publishedSHA and separate candidate/accounts/profiles/Host/browser/packages; full values/types/graph and cold reopen, package_closed/logged_out",
+    "row_filter_cold": "both output ports from one fresh execution after reopen; generic port0 cold checker insufficient",
+    "sorting_cold": "actual key order plus multiset; unordered checker insufficient; equal-key stability not promised",
+    "common_documentation_alignment_pending": [
+      {
+        "path": "docs/node-development/RUNBOOK.md",
+        "line": 45,
+        "issue": "universal Stage0 investigation wording conflicts with implemented-node recheck assignments"
+      },
+      {
+        "path": "docs/node-development/workflow/acceptance-cli.md",
+        "line": 9,
+        "issue": "universal Stage0 investigation wording; current explicit assignments/plans/central instructions require full implemented-scope recheck"
+      },
+      {
+        "path": "docs/node-development/registry.json",
+        "line": 29,
+        "issue": "active readiness policy retains historical concrete model/variant selection; central instructions and owner assignment take precedence; historical evidence must remain"
+      }
+    ],
+    "common_source_criteria_regulations_changes": 0,
+    "blocks_explicit_owner_assignment": false,
+    "next_common_fix": "separate agreed documentation alignment; no unapproved common changes or new cards created"
+  },
+  "root_reconciliation_completed": {
+    "attachments": [
+      {
+        "id": "01a11df5-7344-72b9-ab75-e6b81db73f90",
+        "name": "generator-root-reconciliation-manifest.json",
+        "bytes": 770,
+        "sha256": "540fd195ee0b4ac79558d922adfd9f2fc1ba97aead64b1a7f0e75e72cb052620"
+      },
+      {
+        "id": "01a11df5-742f-7cc7-9013-83f643f79429",
+        "name": "generator-root-reconciliation-receipt.json",
+        "bytes": 7319,
+        "sha256": "b0c434a5b29677b7d54a89c03008f046709974a87110c7ab8d09aaa973ae638b"
+      },
+      {
+        "id": "01a11df5-750f-7023-9621-19783fcf449e",
+        "name": "generator-root-reconciliation-cleanup.json",
+        "bytes": 2408,
+        "sha256": "25355b4f6816a122ade49ea88dedadd4055f25512f98144bef97b247bc5ca58b"
+      },
+      {
+        "id": "01a11df5-75e9-7551-8332-c349583ea681",
+        "name": "generator-root-reconciliation-resources.json",
+        "bytes": 2077,
+        "sha256": "179a230496cc7883bda33131633f82f19720cdf2b540af3aa0c82da81b29d432"
+      }
+    ],
+    "three_artifacts_bytes_hash_manifest_verified": true,
+    "receipt": {
+      "issue_id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+      "trigger_comment_id": "01a11dea-c68d-7740-acac-3f242123ddaa",
+      "attempt_uuid": "504fb604-40c6-4ccf-9f64-c784cb1bb136",
+      "observed_at": "2026-10-08T23:59:33.052547+00:00",
+      "scope": "ROOT BOOTSTRAP / prior related effects ONLY; new card observer3119 excluded",
+      "outcome": "ROOT_RECONCILIATION_PASS",
+      "previous_manifest_sha256": "ab0998732df7c815a5e21f1d316d4d7c7e41d8eb20f5889b83161ff7ca6ae390",
+      "previous_three_artifacts_bytes_hash": "PASS",
+      "observer_account": "existing separate own card operator; no root login",
+      "observer_ID": 3119,
+      "observer_GUID_key_early_private_fsync_readback": true,
+      "observer_executed_helper_sha256": "9bbf3c388a2ce33962e7dcae86326cfdc7a4c8c06c248e5b478d5bccc4088abd",
+      "private_observer_receipt_sha256": "3f992d2346344bdf42955cfa037b3204bdcf9690df3d20e889ce013efe2fdc7b",
+      "own_source_provenance": [
+        {
+          "session_id": 3117,
+          "created_at": "2026-10-08T23:26:29.506Z",
+          "previous_own_mstSelf_GUID_proof": true,
+          "GUID_sha256": "b958be60e0ca5e57d1b51671e49852c3e5cafbb74ebe0271e7d64a738c4ed182",
+          "private_key_fsync_readback_before_navigation": true,
+          "immutable_attempt_receipt_sha256": "b1750dd829509afceaa7b7a92a087a81fed5b36dfec55c91335592e7ea52e55d"
+        },
+        {
+          "session_id": 3118,
+          "created_at": "2026-10-08T23:26:34.191Z",
+          "previous_own_mstSelf_GUID_proof": true,
+          "GUID_sha256": "b85c14b244c45e19a831bfbc27c67f5f90d47fdb71749780966cc88a2d7220ba",
+          "private_key_fsync_readback_before_navigation": true,
+          "immutable_attempt_receipt_sha256": "b1750dd829509afceaa7b7a92a087a81fed5b36dfec55c91335592e7ea52e55d"
+        }
+      ],
+      "complete_refreshed_views": [
+        {
+          "name": "login-Observer",
+          "at": "2026-10-08T23:54:14.553Z",
+          "complete_loaded_store": true,
+          "store_count": 9,
+          "manager_count": 9,
+          "connected_unique_mstSelf_positive": {
+            "session_id": 3119,
+            "created_at": "2026-10-08T23:54:12.928Z",
+            "session_type": 1,
+            "pending_disconnect": false,
+            "package_count": 0,
+            "same_RemoteSession_GUID_sha256": "b898c6aee54ebfd9cf99762a978565508720322de8368e3fa3e551a7a28e99cc"
+          },
+          "owned_root_rows": [
+            {
+              "session_id": 3118,
+              "created_at": "2026-10-08T23:26:34.191Z",
+              "session_type": 0,
+              "pending_disconnect": true,
+              "role_value": 1,
+              "package_count": 0
+            }
+          ]
+        },
+        {
+          "name": "before-own-close-3117",
+          "at": "2026-10-08T23:54:14.619Z",
+          "complete_loaded_store": true,
+          "store_count": 9,
+          "manager_count": 9,
+          "connected_unique_mstSelf_positive": {
+            "session_id": 3119,
+            "created_at": "2026-10-08T23:54:12.928Z",
+            "session_type": 1,
+            "pending_disconnect": false,
+            "package_count": 0,
+            "same_RemoteSession_GUID_sha256": "b898c6aee54ebfd9cf99762a978565508720322de8368e3fa3e551a7a28e99cc"
+          },
+          "owned_root_rows": [
+            {
+              "session_id": 3118,
+              "created_at": "2026-10-08T23:26:34.191Z",
+              "session_type": 0,
+              "pending_disconnect": true,
+              "role_value": 1,
+              "package_count": 0
+            }
+          ]
+        },
+        {
+          "name": "before-own-close-3118",
+          "at": "2026-10-08T23:54:14.686Z",
+          "complete_loaded_store": true,
+          "store_count": 9,
+          "manager_count": 9,
+          "connected_unique_mstSelf_positive": {
+            "session_id": 3119,
+            "created_at": "2026-10-08T23:54:12.928Z",
+            "session_type": 1,
+            "pending_disconnect": false,
+            "package_count": 0,
+            "same_RemoteSession_GUID_sha256": "b898c6aee54ebfd9cf99762a978565508720322de8368e3fa3e551a7a28e99cc"
+          },
+          "owned_root_rows": [
+            {
+              "session_id": 3118,
+              "created_at": "2026-10-08T23:26:34.191Z",
+              "session_type": 0,
+              "pending_disconnect": true,
+              "role_value": 1,
+              "package_count": 0
+            }
+          ]
+        },
+        {
+          "name": "after-own-close-3118",
+          "at": "2026-10-08T23:54:14.953Z",
+          "complete_loaded_store": true,
+          "store_count": 8,
+          "manager_count": 8,
+          "connected_unique_mstSelf_positive": {
+            "session_id": 3119,
+            "created_at": "2026-10-08T23:54:12.928Z",
+            "session_type": 1,
+            "pending_disconnect": false,
+            "package_count": 0,
+            "same_RemoteSession_GUID_sha256": "b898c6aee54ebfd9cf99762a978565508720322de8368e3fa3e551a7a28e99cc"
+          },
+          "owned_root_rows": []
+        },
+        {
+          "name": "root-effects-reconciled",
+          "at": "2026-10-08T23:54:15.038Z",
+          "complete_loaded_store": true,
+          "store_count": 8,
+          "manager_count": 8,
+          "connected_unique_mstSelf_positive": {
+            "session_id": 3119,
+            "created_at": "2026-10-08T23:54:12.928Z",
+            "session_type": 1,
+            "pending_disconnect": false,
+            "package_count": 0,
+            "same_RemoteSession_GUID_sha256": "b898c6aee54ebfd9cf99762a978565508720322de8368e3fa3e551a7a28e99cc"
+          },
+          "owned_root_rows": []
+        }
+      ],
+      "cleanup3117": {
+        "action": "none; already absent in calibrated complete store",
+        "server_absence": true,
+        "historical_key_reply1_uncalibrated_boundary_preserved": true
+      },
+      "cleanup3118": {
+        "exact_id": 3118,
+        "created_at": "2026-10-08T23:26:34.191Z",
+        "pre_close_pending_disconnect": true,
+        "pre_close_session_type": 0,
+        "packages": 0,
+        "ownership": "exact prior own mstSelf/GUID/CreateTime/account config proof; inherited permanent account flock",
+        "standard_UI_close": true,
+        "exact_unique_DOM_and_Ext_context_record": true,
+        "confirmation_full_exact_account_colon_numericID_checked": true,
+        "confirmation_Yes_unique": true,
+        "refreshed_count_before": 9,
+        "refreshed_count_after": 8,
+        "refreshed_exact_absence": true,
+        "verification_basis": "executed helper guards + result PASS + complete after-own-close-3118 snapshot",
+        "prior_logout_AMBIGUOUS_not_rewritten": true,
+        "old_unverified_rotated_key_not_reused": true
+      },
+      "all_related_known_root_IDs_current_absence": [
+        3087,
+        3103,
+        3109,
+        3112,
+        3114,
+        3117,
+        3118
+      ],
+      "related_old_card_admin_IDs_current_absence": [
+        3106,
+        3113
+      ],
+      "final_root_account_bucket": [],
+      "prior_unknown_root_creation_effects": "history preserved; refreshed complete root account bucket empty; no username-only closure",
+      "marker_finished_basis": "all related previous root/bootstrap effects resolved by current calibrated readback; checksummed history preserved",
+      "root_marker_before_sha256": "a06dcf156ebc4de28f238a10f9f2249fd8c1200b8eb77673f050e142a4056277",
+      "root_marker_final_history_sha256": "10c5ee2407c663137cf0a1385e0535598664a63aae3e89bf4e4b806aa0c4a1a3",
+      "root_marker_after": "ABSENT",
+      "root_marker_finished": true,
+      "limitations": {
+        "observer3119_UI_logout": true,
+        "observer3119_exact_process_cleanup": true,
+        "observer3119_server_absence": "PENDING, own card marker retained separately",
+        "LAB47_readiness_Worker_handoff": "HELD",
+        "model_node_acceptance": "NOT_RUN",
+        "other_cards": "no changes or global readiness barrier",
+        "historical_errors_unknown_causes_and_uncaptured_PID_tree_limits": "preserved immutable"
+      }
+    },
+    "independent_readonly_review": "PASS for Root-only bootstrap/reconciliation; no live re-read/node/model/observer3119 acceptance",
+    "root_PID_startticks_FD_permanent_lock_absence": "PASS",
+    "observer3119_server_cleanup": "PENDING; separate own card marker",
+    "historical_UI_cause": "latest native correction: initial snapshot preceded UI preparation; no current LoadPublishedFileNames error recorded/no explicit PrepareAdminArea call; old cause remains UNKNOWN"
+  },
+  "central_root_resume_instructions": {
+    "squad_id": "8ff41bd5-f794-4b5b-a063-026f3874628e",
+    "before_instructions_sha256": "9ea8f31975f67a6ecc7235727663068a2c433b0be758c336862c76883a442ee4",
+    "after_instructions_sha256": "1aae8f88bf57b7e04140cde0dee442d939bd2d22e03e599aaef665a2bd3fffa6",
+    "protected_fields_unchanged": true,
+    "target_model_paragraphs_unchanged": true,
+    "scope": "root-only reconciliation completed; use existing global admin because extra admins conditional/not needed; resume own7 readiness and normal handoffs; LAB47 own observer pending; all acceptance/identity/cleanup criteria preserved"
+  },
+  "seven_card_resume_after_root_reconciliation": {
+    "observed_at": "2026-10-09T00:05:31.653520+00:00",
+    "cards": [
+      {
+        "card": "LAB45",
+        "slug": "calculator",
+        "issue_id": "01a11d36-053e-78da-b06c-e313de5319e3",
+        "source_sha": "a00b0203026f7719f10403bfc4fa02810aa8502e",
+        "branch": "recheck-calculator",
+        "comment_id": "01a11dfa-b0ea-7002-9122-b1ea7b431b73",
+        "created_at": "2026-10-09T03:05:30+03:00",
+        "status": "running",
+        "task_id": "01a11dfa-b109-7e53-95ae-565261a747a6",
+        "started_at": "2026-10-09T03:08:10+03:00",
+        "created_at_task": "2026-10-09T03:05:31+03:00",
+        "completed_at": null,
+        "failure_reason": null,
+        "error": null
+      },
+      {
+        "card": "LAB46",
+        "slug": "field-parameters",
+        "issue_id": "01a11d36-10b0-702f-930d-e91315129205",
+        "source_sha": "41e0b170a4528537bb9a5137756878f2ca950c92",
+        "branch": "recheck-fields",
+        "comment_id": "01a11dfa-b224-7a0a-a69f-0618d67d459f",
+        "created_at": "2026-10-09T03:05:31+03:00",
+        "status": "queued",
+        "task_id": "01a11dfa-b23c-73ce-a8a7-a3efc09e3ef3",
+        "started_at": null,
+        "created_at_task": "2026-10-09T03:05:31+03:00",
+        "completed_at": null,
+        "failure_reason": null,
+        "error": null
+      },
+      {
+        "card": "LAB48",
+        "slug": "grouping",
+        "issue_id": "01a11d36-2811-71ba-a493-0e397e3e60f2",
+        "source_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+        "branch": "recheck-grouping",
+        "comment_id": "01a11dfa-b0de-7c62-9c22-49a5a75c7ac9",
+        "created_at": "2026-10-09T03:05:30+03:00",
+        "status": "running",
+        "task_id": "01a11dfa-b0ef-71dc-8e40-cd98fbef9dcb",
+        "started_at": "2026-10-09T03:05:32+03:00",
+        "created_at_task": "2026-10-09T03:05:30+03:00",
+        "completed_at": null,
+        "failure_reason": null,
+        "error": null
+      },
+      {
+        "card": "LAB49",
+        "slug": "sorting",
+        "issue_id": "01a11d36-33ae-732e-b618-5618ed5301cd",
+        "source_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+        "branch": "recheck-sorting",
+        "comment_id": "01a11dfa-b1b1-745e-b2e0-c19037248295",
+        "created_at": "2026-10-09T03:05:31+03:00",
+        "status": "queued",
+        "task_id": "01a11dfa-b1c8-73a8-b412-1eb9363572db",
+        "started_at": null,
+        "created_at_task": "2026-10-09T03:05:31+03:00",
+        "completed_at": null,
+        "failure_reason": null,
+        "error": null
+      },
+      {
+        "card": "LAB50",
+        "slug": "join",
+        "issue_id": "01a11d36-3f2a-7df1-bd81-d5401bdcdd16",
+        "source_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+        "branch": "recheck-join",
+        "comment_id": "01a11dfa-b18e-7434-bee0-91342f34075d",
+        "created_at": "2026-10-09T03:05:31+03:00",
+        "status": "running",
+        "task_id": "01a11dfa-b1a0-7838-82d0-30c4f8cfb9ad",
+        "started_at": "2026-10-09T03:10:50+03:00",
+        "created_at_task": "2026-10-09T03:05:31+03:00",
+        "completed_at": null,
+        "failure_reason": null,
+        "error": null
+      },
+      {
+        "card": "LAB51",
+        "slug": "union",
+        "issue_id": "01a11d36-4ace-7dd4-a0d4-498195f7d2e9",
+        "source_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+        "branch": "recheck-union",
+        "comment_id": "01a11dfa-b1a2-79c6-a91d-9cfcd3b9be20",
+        "created_at": "2026-10-09T03:05:31+03:00",
+        "status": "running",
+        "task_id": "01a11dfa-b1b2-7eff-a4cd-aa5ac39de0b1",
+        "started_at": "2026-10-09T03:13:29+03:00",
+        "created_at_task": "2026-10-09T03:05:31+03:00",
+        "completed_at": null,
+        "failure_reason": null,
+        "error": null
+      },
+      {
+        "card": "LAB52",
+        "slug": "replacement",
+        "issue_id": "01a11d36-5670-7786-bfe1-e9a4a4462e6e",
+        "source_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+        "branch": "recheck-replacement",
+        "comment_id": "01a11dfa-b0d2-71f9-9c2f-3305ce73f3b7",
+        "created_at": "2026-10-09T03:05:30+03:00",
+        "status": "running",
+        "task_id": "01a11dfa-b0ec-790c-bad3-a503156ce556",
+        "started_at": "2026-10-09T03:05:32+03:00",
+        "created_at_task": "2026-10-09T03:05:30+03:00",
+        "completed_at": null,
+        "failure_reason": null,
+        "error": null
+      }
+    ]
+  },
+  "observer3119_natural_independent_readback": {
+    "issue_id": "01a11d36-2811-71ba-a493-0e397e3e60f2",
+    "task_id": "01a11dfa-b0ef-71dc-8e40-cd98fbef9dcb",
+    "supplement_id": "92860405-8027-4fc6-829d-b683c0f38b6b",
+    "scope": "optional read-only exact3119/CreateTime in naturally existing own Admin view; no extra login/browser/foreign cleanup; no delay of own Stage0",
+    "status": "requested; not observed yet",
+    "on_confirmed_absence_handoff_supplement_id": "71578ecf-4290-4d23-844b-fa0f9a1f4a07"
   }
 }
