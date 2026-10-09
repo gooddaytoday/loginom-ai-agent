@@ -5,7 +5,7 @@ import { cp, mkdtemp, rm } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
 import { validateNodeAttempt } from "../src/node-evals"
 import { collectTextImportEvidence } from "../src/text-import"
-import { prepareTextImportCold } from "../src/text-import-cold"
+import { prepareTextImportCold, validateTextImportCold } from "../src/text-import-cold"
 
 async function rejectionFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "text-import-refusal-"))
@@ -259,5 +259,26 @@ test("damaged input may be refused by a verified terminal engine failure", async
     Object.assign(f.output.execution, { failure_verified: false })
     await f.write()
     expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("terminal")
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("cold verdict requires original downloaded bytes, fresh complete values and confirmed cleanup", async () => {
+  const f = await positiveFixture()
+  try {
+    const cold = path.join(f.root, "cold")
+    await prepareTextImportCold(f.task, f.attempt, cold, "/eval/result.lgp")
+    const expected = await Bun.file(path.join(cold, "expected.json")).json()
+    const source = await Bun.file(path.join(f.task, expected.source.path)).bytes()
+    await Bun.write(path.join(cold, "source-0.csv"), source)
+    const port = JSON.parse(JSON.stringify(f.port)); port.execution_id = "cold-execution"
+    const report = { status: "CHECK_VALUES", package_path: "/eval/result.lgp", graph_verified: true,
+      fresh_execution: { status: "completed", execution_id: "cold-execution", verified: true, owner_verified: true }, port,
+      source: { bytes: source.byteLength, sha256: expected.source.sha256, bytes_verified: true, download_completion_verified: true },
+      configuration: f.output.configuration.readback, cleanup: { package_closed: true, logged_out: true } }
+    await Bun.write(path.join(cold, "result.json"), JSON.stringify(report))
+    expect(await validateTextImportCold(f.task, f.attempt, cold)).toEqual({ errors: [], failures: [] })
+    report.port.sample[2][1].value = ""
+    await Bun.write(path.join(cold, "result.json"), JSON.stringify(report))
+    expect((await validateTextImportCold(f.task, f.attempt, cold)).failures).not.toHaveLength(0)
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })

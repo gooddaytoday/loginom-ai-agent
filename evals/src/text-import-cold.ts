@@ -1,6 +1,15 @@
 import path from "node:path"
 import { mkdir } from "node:fs/promises"
 import { validateTextImportAttempt } from "./text-import"
+import { evalsRoot } from "./config"
+
+export async function validateTextImportCold(taskDir: string, attemptDir: string, coldDir: string) {
+  const child = Bun.spawn(["python3", path.join(evalsRoot, "script/check-text-import-cold.py"), taskDir, attemptDir, coldDir],
+    { stdout: "pipe", stderr: "pipe" })
+  const [code, output, error] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  if (error || ![0, 1, 2].includes(code)) return { errors: [`cold checker: ${error}`], failures: [] }
+  return JSON.parse(output) as { errors: string[]; failures: string[] }
+}
 
 export async function prepareTextImportCold(taskDir: string, attemptDir: string, outputDir: string, packagePath: string) {
   const verdict = await validateTextImportAttempt(taskDir, attemptDir, packagePath)
