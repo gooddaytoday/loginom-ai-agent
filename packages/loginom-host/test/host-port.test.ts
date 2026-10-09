@@ -39,16 +39,22 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
     await Bun.write(
       join(resources, "runtime/src/managed-entry.mjs"),
       `
-      import { appendFileSync } from 'node:fs';
+      import { appendFileSync, writeFileSync } from 'node:fs';
+      import { MessageChannel } from 'node:worker_threads';
+      const owner = new MessageChannel();
       process.on('message', m => {
         if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
-        if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+        if (m.operation === 'close') { owner.port1.close(); owner.port2.close(); process.send({id:m.id,result:{closed:true}},()=>process.disconnect()); }
         if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
         if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
         if (m.operation !== 'call') return;
         const action = m.input.arguments.action;
         appendFileSync(${JSON.stringify(join(directory, "calls.jsonl"))}, JSON.stringify({ action }) + '\\n');
-        if (action === 'disconnect') { process.disconnect(); return; }
+        if (action === 'disconnect') {
+          owner.port1.on('message', () => {});
+          writeFileSync(${JSON.stringify(join(directory, "disconnected.pid"))}, String(process.pid));
+          process.disconnect(); return;
+        }
         if (action === 'kill') { process.kill(process.pid, 'SIGKILL'); return; }
         process.send({id:m.id,result:{result:{action},recoveryPending:action!=='finish',activeWork:action!=='uncertain'&&action!=='finish'}});
       });
@@ -129,9 +135,14 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
     } finally {
       client.close()
       await port.close()
-      // Disconnect leaves the runtime process owned. Exit drops it, so shutdown
-      // only has to close runtimes that are still alive.
-      if (ending === "disconnect") await expect(host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      // The fixture's referenced MessagePort keeps the disconnected owner alive.
+      // Exit drops it, so shutdown only has to close runtimes that are still alive.
+      if (ending === "disconnect") {
+        const pid = Number(await readFile(join(directory, "disconnected.pid"), "utf8"))
+        expect(() => process.kill(pid, 0)).not.toThrow()
+        await expect(host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
+        expect(() => process.kill(pid, 0)).toThrow()
+      }
       if (ending !== "disconnect") await host.close()
       if (ending !== "finish") {
         const calls = await readFile(join(directory, "calls.jsonl"), "utf8")
