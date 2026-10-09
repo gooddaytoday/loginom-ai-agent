@@ -1103,6 +1103,9 @@ Core имеет разметку осей, но без CSV oracle. По доку
   Cleanup6/remaining0×2/history+diag full roundtrip; recovery не подтверждена.
   Progress8 SHA3355d82607…; monthly#1 running, closed8/45/PASS5/FAIL3,
   candidate/cold/compare0/retries0. Native root cause UNKNOWN, критерий не снижен.
+  Девятый closed monthly#1 PASS100/structure/warm/cleanup6/remaining0×2,
+  history+diag full roundtrip. Progress9 SHAbd3dfd6fad…;
+  NPS#1 running, closed9/45/PASS6/FAIL3, candidate/cold/compare0/retries0.
   Частичный v7 не подставлять
   как полный baseline и не повторять выборочно только неуспешные попытки.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой

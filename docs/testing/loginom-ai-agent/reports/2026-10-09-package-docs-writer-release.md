@@ -666,12 +666,13 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | customer-activity-segments | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4608 / 17448322 | 3 / 5497845 |
 | first-last-touch | 1 | FAIL0/no_artifact | Нет / не выполнялись | 26 / 25 / 23 | 4585 / 15440708 | 3 / 3550529 |
 | low-liquidity-companies | 1 | FAIL0/no_artifact | Нет / не выполнялись | 23 / 23 / 21 | 4487 / 15707741 | 3 / 4075869 |
+| monthly-demand | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4604 / 16230213 | 3 / 4358291 |
 
-Последний private snapshot `formal-v9-progress-8-20261009.json` SHA256
-`3355d82607c6a813c42e74deb583acc350370655911a3a41cf947d29e44b3a7a`:
-восемь result/cleanup/process-cleanup/preservation, пять review и archive SHA
+Последний private snapshot `formal-v9-progress-9-20261009.json` SHA256
+`bd3dfd6fadbe73a2f9bff01ee31681692d1fb6da52d92f348a5351bfaba04702`:
+девять result/cleanup/process-cleanup/preservation, шесть review и archive SHA
 повторно проверены. Controller идентичность живого PID676156 совпала;
-monthly-demand#1 running. Closed8/45/PASS5/FAIL3/manual retries0,
+nps-segments-by-tier#1 running. Closed9/45/PASS6/FAIL3/manual retries0,
 common020c08059… неизменен. Новый private `formal-v9-observe.py` read-only,
 SHA256 `eb9111bcc5191527eafcc49b5af07633709a3cc63276bb60f7a40b5c696a6e9a`,
 проверен на живом процессе; не входит в исполняемый harness/21 adapters.
@@ -762,3 +763,12 @@ full roundtrip/600 PASS, весь отказ сохраняется в сери�
 Метрики8 SHA256 `8f3dc44e6a685f417a5d9da1d3292b440c80a30882fb4f38ae698eb7b2c07a08`:
 23 finishes/23 tools/21 Loginom/errors8/skills0/prepare1, counters match;
 прежние7 SHA/archives повторно PASS, progress8 сохраняет chain7/unreviewed0.
+
+Monthly#1: PASS100/scored/structure/warm, все6 cleanup stages confirmed,
+process cleanup error null/remaining0×2. History4604/16230213bytes и
+diagnostics3/4358291bytes full inventory/restore roundtrip/600 PASS.
+Метрики9 SHA256 `8fa1154d3f230acf682f12b158589406dce811569c8aec9cb64b76ef07271aa9`:
+21 finishes/20 tools/16 Loginom/errors0/skills0/prepare1, counters match.
+Все прежние8 result/trace/archive SHA повторно PASS; progress9 сохраняет
+chain8/unreviewed0. Три no-artifact FAIL остаются в серии, новая попытка
+NPS#1 выполняется на том же common020c08059…; полный90 ещё не принят.
