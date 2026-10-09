@@ -377,3 +377,20 @@ common SHA совпадает, controller81639 live. Первый ABC повто
 no_artifact/FAIL; второй — отдельный предусмотренный повтор. Эти два результата
 не устанавливают точную причину первого отказа или native stable/flaky.
 Baseline ещё28/candidate45/formal cold/compare pending; manual retries0.
+
+## Formal v7: восемнадцатая попытка
+
+Articles-by-author#2 completed/score100/pass=true/oracle=true,360663ms.
+Финальные environment cleanup6 stages и process cleanup confirmed,
+оба owned_remaining=0, cleanup_error отсутствует. Структура/warm oracle
+отдельно PASS; cold request/plan сохранены. History4600entries/15920392archive
+bytes и diagnostics3entries/4052595bytes сохранены с full roundtrip.
+Первый combined closed guard отказал до вызовов review/archive; значения
+того чтения не были сняты, точная причина UNKNOWN. Повторное чтение тех же
+файлов и тот же guard PASS; live/judge повторов или ослабления guard не было.
+Это наблюдение сохранено в progress-18; финальный результат соответствует
+подтверждённым result/cleanup SHA, первоначальный отказ не скрыт.
+Snapshot `formal-v7-progress-18-20261009.json`:18 terminal,12 PASS/6 FAIL,
+13 сохранённых пакетов, environment/process cleanup confirmed18;
+common SHA совпадает, controller81639 live. Baseline ещё27/candidate45/
+formal cold/compare pending; manual retries0.
