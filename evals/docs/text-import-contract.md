@@ -31,3 +31,21 @@ profile_history. Checker перечитывает оригиналы и срав
 только готовит cold-контракт после code checks: последний source при refresh,
 независимый oracle, точный package hash и исходные events. Он не выполняет
 Loginom, не заменяет cold rerun и не финализирует reference.
+
+`script/text-import-cold/reader.mjs` подготовлен из принятого CLI source pin;
+provenance и исходные/адаптированные SHA — рядом. Проверка неправильного pin
+останавливается до загрузки браузера. Warm XML проверяет граф/GUID/путь;
+полные сохранённые настройки/columns/mapping подтверждаются native cold readback
+без Apply. `check-text-import-cold.py` связывает граф/GUID, новый execution,
+скачанные исходные bytes, readback, полную typed таблицу и close/logout.
+
+`script/finalize-text-import.ts CASE ATTEMPT NEW_COLLECTION [COLD]` переносит
+положительный пакет только после warm и cold PASS; diagnostic требует warm PASS
+без положительного reference. Каталог кейса создаётся эксклюзивно. Helper проверяет
+loadTasks и записывает CODE_CHECKS_ONLY provenance; operational ACCEPT требует
+проверки actual модели/бюджета/CLI/skill/leases и cleanup по skill 1.0.7.
+
+`script/bundle-text-import.py --out NEW_DIR` создаёт семь детерминированных ZIP
+по allowlist TASK.md и task.inputs; source bytes сверяются с исходным SPEC.
+В каждом внутренний manifest/hash; внешний manifest содержит ID и ZIP SHA256.
+Checker-side SPEC/oracle/reference/results и private transactions исключены.
