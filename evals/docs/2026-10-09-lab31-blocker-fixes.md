@@ -55,6 +55,12 @@ Cold saved-graph проверен через установленный runtime 
 
 14 немодельных попыток учтены в attempt ledger, включая NOT_STARTED, первоначальные ошибки test adapter и неверного маршрута. Подготовлены 31 безопасный history/event файл с original/private и safe SHA256; raw auth/env/browser DB исключены. Собственные два контейнера и сеть удалены после архивирования storage/history; две проверки подтвердили отсутствие контейнеров/сети, финальные две проверки — отсутствие своих CLI/browser процессов. Исторический writer marker setup, не дошедшего до dispatch, сохранён: его не удаляли по PID/возрасту. Общие residual files из ошибочного маршрута остаются адресно учтёнными и ожидают свободного backend; полного общего cleanup здесь нет.
 
+## Доставка
+
+Комплект доставлен через существующий SSH ControlMaster в новый private каталог `/home/user/.local/share/loginom-evals-runtime/staging/lab31-fixes-e15d41a04`. На сервере совпали sizes/SHA256 10 entries bundle manifest; readback CLI metadata (5406 manifest entries), всех 16 файлов skill и всех 206 файлов evidence прошёл. `delivery-readback.json` сохранён на сервере и локально в комплекте. Bundle manifest SHA256 df6651550fa85ec9945610dd991f66a6fae754d9a816b5908d8a585067543c2e. Это доставка/readback, не native проверка сервера; active pins/lease/profiles и модели не менялись.
+
+Дополнительный read-only ownership supplement подтвердил пять common residual файлов: четыре CSV по исходным hashes и LGP по save receipt, ровно трём созданным native GUID и пути собственного input CSV. Текущие bytes архивированы; удаление допускает только свежую сверку тех же hashes после освобождения общего backend. Supplement archive SHA256 961357d14fd4701756c28ef307447ed4377c771c0cf616f2807ff5f66588198b, manifest d80dcfc4a47916eeaaa6c1c0db355960f99c22755a35f93b5fcf6dc3f278d6b8; локальный и server readback PASS. Backend не мутировался.
+
 ## Checkpoint
 
 - Code SHA: e15d41a047598edb8cb5dabae6c28f30ac037440; принятые четыре case dirs побайтно соответствуют 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad.
@@ -65,5 +71,6 @@ Cold saved-graph проверен через установленный runtime 
 - Installed fresh full read/export/save PASS; cold saved graph/CSV/F3 PASS. Public CLI cold full read — guarded refusal, не PASS.
 - Lifecycle recovery/release/next admission PASS в nonmodel fixture; installed-native recovery не заявляется проверенным.
 - Evidence archive SHA256: 5119416ff5fac0f745a076de6deb3b1c99952abba4a253696e61acd274dda92e; manifest 02aa709969af929d4dea1d44ca6d7c8b1cc137b98a5299e2a9b0687671d58f18; readback/secret scan PASS.
+- Доставлено в runtime staging/lab31-fixes-e15d41a04; server manifest/archive/readback PASS, activation STAGED_ONLY.
 - Ограничения: STAGED_ONLY, Ben комплекта ещё не принимал; common residual cleanup отложен; provider/product FAIL остаются возможны.
 - Следующий шаг: на свободном общем backend адресно проверить/очистить residual ledger; переключить только будущие назначения по новым pins.
