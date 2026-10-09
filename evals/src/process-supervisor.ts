@@ -705,8 +705,14 @@ export async function superviseProcess(input: {
     if ((await remaining(true)).length) cleanup.error ??= "Sandbox processes did not terminate"
   }
   await checkedScan()
-  if (root) await signalProcess(identity(root), "SIGTERM").catch((error) => { cleanup.error ??= message(error) })
   const launcherDeadline = Math.min(deadline, Date.now() + 5_000)
+  // The child can be gone while the subreaper is still publishing its exit
+  // receipt. Admit that receipt against the live launcher before terminating it.
+  while (cliExitCode === undefined && proc.exitCode === null && proc.signalCode === null && Date.now() < launcherDeadline) {
+    await checkedScan()
+    if (cliExitCode === undefined) await Bun.sleep(10)
+  }
+  if (root) await signalProcess(identity(root), "SIGTERM").catch((error) => { cleanup.error ??= message(error) })
   while (proc.exitCode === null && proc.signalCode === null && Date.now() < launcherDeadline) await Bun.sleep(100)
   if (root && proc.exitCode === null && proc.signalCode === null) {
     await checkedScan()

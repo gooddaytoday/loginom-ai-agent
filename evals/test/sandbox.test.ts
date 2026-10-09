@@ -44,7 +44,9 @@ test("sandboxCommand: Python читает только входы и writable-п
       path.join(evalsRoot, "tasks/analytic/sales-by-category/oracle.csv"), path.join(evalsRoot, "tasks/analytic/sales-by-category/oracle.py"),
       "/home/kiselev/git/agent-validation/sources/analytic-evals/sales-by-category/reference.lgp",
       path.join(evalsRoot, "results"), path.join(evalsRoot, ".profile/agent.history"), path.join(evalsRoot, "calibration"),
-      path.join(path.dirname(evalsRoot), ".git"), `/proc/${process.pid}/root`, "/run", "/var/run/docker.sock"]
+      // Nested PID namespaces can reuse the caller's numeric PID. What must
+      // remain inaccessible is the outside file through any such root alias.
+      path.join(path.dirname(evalsRoot), ".git"), `/proc/${process.pid}/root${path.join(dir, "oracle.csv")}`, "/run", "/var/run/docker.sock"]
     await Bun.write(hidden[0]!, "answer\n10\n")
     const script = "import json,os,pathlib,sys; p=pathlib.Path(sys.argv[1]); " +
       "p.write_text('refreshed'); pathlib.Path('result.csv').write_text(pathlib.Path('dataset.csv').read_text()); " +
