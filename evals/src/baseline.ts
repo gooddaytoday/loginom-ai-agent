@@ -137,6 +137,23 @@ export async function prepareBaseline(directory: string, options: { checkout: st
   const executorRole = options.executorRole ?? "evalbaseline"
   if (executorRole === "evalrunner" && options.acceptedNodeSmokeNoArtifact !== undefined) throw new BaselineFailure("LEGACY_ACCEPTANCE_REFUSED")
   validatePins(options.pins, executorRole, options.product)
+  const previous = executorRole === "evalrunner" && !options.smoke ? await (async () => {
+    if (!options.baseline) throw new BaselineFailure("ACCEPTED_BASELINE_REQUIRED")
+    const { verifyBaselineReference } = await import("./baseline-registry")
+    return verifyBaselineReference(options.baseline)
+  })() : undefined
+  if (previous && (previous.manifest.pins.mode !== options.pins.mode || previous.manifest.pins.corpusSha !== options.pins.corpusSha))
+    throw new BaselineFailure("BASELINE_CORPUS_CHANGED")
+  if (previous) {
+    const changes = options.declaredChanges ?? []
+    if (new Set(changes).size !== changes.length || changes.some(change => !["cli", "model", "reasoning"].includes(change)))
+      throw new BaselineFailure("INVALID_DECLARED_CHANGES")
+    const old = previous.manifest.pins
+    const changed: BaselineChange[] = [
+      ...(["cliVersion", "cliSource", "cliManifestSha256", "binarySha256"] as const).some(key => old[key] !== options.pins[key]) ? ["cli" as const] : [],
+      ...(old.model !== options.pins.model ? ["model" as const] : []), ...(old.variant !== options.pins.variant ? ["reasoning" as const] : [])]
+    if (changed.some(change => !changes.includes(change))) throw new BaselineFailure("UNDECLARED_PRODUCT_CHANGE")
+  }
   if (options.acceptedNodeSmokeNoArtifact && options.smoke) throw new BaselineFailure("ACCEPTANCE_ONLY_FOR_BASELINE")
   if (options.acceptedNodeSmokeNoArtifact !== undefined && !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(options.acceptedNodeSmokeNoArtifact))
     throw new BaselineFailure("ACCEPTANCE_MANIFEST_REQUIRED")
@@ -153,6 +170,8 @@ export async function prepareBaseline(directory: string, options: { checkout: st
     }
   }
   if (selected && cases.length !== 1) throw new BaselineFailure("SMOKE_CORPUS_INCOMPLETE")
+  if (previous && (cases.length !== 48 || JSON.stringify(cases) !== JSON.stringify(previous.manifest.cases)))
+    throw new BaselineFailure("BASELINE_CORPUS_CHANGED")
   const manifest: BaselineManifest = { version: executorRole === "evalrunner" ? 2 : 1, id: crypto.randomUUID(), kind: options.smoke ? "smoke" : "baseline",
     ...(executorRole === "evalrunner" ? { executorRole, product: options.product, baseline: options.baseline, declaredChanges: options.declaredChanges ?? [] } : {}),
     createdAt: new Date().toISOString(), pins: options.pins, cases, infraRetries: options.smoke ? 0 : 1,
@@ -174,6 +193,10 @@ export async function beginBaselineMeasurement(directory: string, key: string, c
   return mutateBaseline(directory, async (manifest, journal) => {
     if (journal.release) throw new BaselineFailure("SERIES_RELEASED")
     if (JSON.stringify(manifest.pins) !== JSON.stringify(current.pins) || journal.checkout !== current.checkout) throw new BaselineFailure("PINS_CHANGED")
+    if (manifest.baseline) {
+      const { verifyBaselineReference } = await import("./baseline-registry")
+      await verifyBaselineReference(manifest.baseline)
+    }
     for (const item of manifest.cases) if (JSON.stringify(await snapshotDirectory(path.join(current.checkout, "evals", item.directory))) !== JSON.stringify(item.files))
       throw new BaselineFailure("CORPUS_CHANGED")
     const job = journal.jobs.find(item => item.key === key)

@@ -29,7 +29,8 @@ def verify(archive, expected):
         for item in manifest["files"]:
             if sha(stream.extractfile(item["path"]).read()) != item["sha256"]:
                 raise ValueError("DELIVERY_FILE_CHANGED")
-    return {"verified": True, "baselineId": manifest["baselineId"], "files": names}
+        manifest_sha = sha(stream.extractfile("manifest.json").read()) if "manifest.json" in names else None
+    return {"verified": True, "baselineId": manifest["baselineId"], "manifestSha256": manifest_sha, "files": names}
 
 
 if sys.argv[1] == "create":
