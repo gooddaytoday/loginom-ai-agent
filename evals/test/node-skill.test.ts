@@ -242,6 +242,21 @@ test("node skill: draft without reference runs one fake attempt and archives cle
   } finally { await f.close() }
 }, 30000)
 
+test("node skill: diagnostic reference attempt collects its own import journal without requiring LGP", async () => {
+  const f = await fixture("txt-ambiguous-headers")
+  try {
+    const file = path.join(f.draft, "task.json")
+    const raw = await Bun.file(file).json()
+    await Bun.write(file, JSON.stringify({ ...raw, output_mode: "diagnostic", reference: undefined }))
+    const run = await execute(f.draft, f.env)
+    expect(run.stderr).toBe("")
+    expect(run.code).toBe(0)
+    const report = JSON.parse(run.stdout)
+    expect(report.result).toMatchObject({ status: "completed", package_path: null, environment_cleanup: { status: "confirmed" } })
+    expect(await Bun.file(path.join(report.attempt_dir, "native-import.json")).exists()).toBe(true)
+  } finally { await f.close() }
+}, 30000)
+
 test("node skill: failed measurement is preserved and confirmed cleanup releases profile", async () => {
   const f = await fixture("filter-active-rows")
   try {

@@ -17,6 +17,7 @@ async function main() {
   const { preflight } = await import(path.join(repo, "evals/src/preflight.ts")) as typeof import("../../../src/preflight")
   const { acquireRunHarnessLease } = await import(path.join(repo, "evals/src/node-eval-ops.ts")) as typeof import("../../../src/node-eval-ops")
   const { coverageCaseIds } = await import(path.join(repo, "evals/src/node-cases.ts")) as typeof import("../../../src/node-cases")
+  const { textImportIds, collectTextImportEvidence } = await import(path.join(repo, "evals/src/text-import.ts")) as typeof import("../../../src/text-import")
   const { assertAuth, assertProfileClean, agentConfigJson } = await import(path.join(repo, "evals/src/profile.ts")) as typeof import("../../../src/profile")
   const dir = path.resolve(draft)
   const raw = await Bun.file(path.join(dir, "task.json")).json()
@@ -101,6 +102,8 @@ async function main() {
     const { collectNodeNativeEvidence } = await import(path.join(repo, "evals/src/node-native.ts")) as typeof import("../../../src/node-native")
     await collectNodeNativeEvidence(out, config.profileDir)
   }
+  if (clean && textImportIds.includes(task.id) && attempt.result.status === "completed")
+    await collectTextImportEvidence(out, config.profileDir)
   const unchanged = (await Promise.all(Object.entries(hashes).map(async ([file, hash]) =>
     new Bun.CryptoHasher("sha256").update(await Bun.file(path.join(dir, file)).bytes()).digest("hex") === hash))).every(Boolean)
   const report = { run_dir: runDir, attempt_dir: out, result: attempt.result, stop: attempt.stop,
