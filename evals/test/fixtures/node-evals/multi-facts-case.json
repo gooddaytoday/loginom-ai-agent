@@ -1,0 +1,7 @@
+{
+  "id": "crosstable-multi-facts",
+  "input": "Region,Category,Amount,Units\nN,A,10,1\nN,A,5,4\nN,B,7,2\nS,A,3,3\nS,B,2,5\n",
+  "oracle": "Region,A_amount_sum,A_units_max,B_amount_sum,B_units_max\nN,15,4,7,2\nS,3,3,2,5\n",
+  "result_basename": "eval-reference-crosstable-multi-facts-1-crosstable-multi-facts-1.result.csv",
+  "source": "actual builder protocol; outputs checked against pre-builder independent oracle"
+}

@@ -1,10 +1,10 @@
 import path from "node:path"
-import { mkdir, mkdtemp, lstat, readdir, realpath, rename, rm, rmdir, stat } from "node:fs/promises"
+import { mkdir, mkdtemp, lstat, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises"
 import { repoRoot, type EvalConfig } from "./config"
 import type { AgentCommand } from "./cli"
 import { EvalFailure } from "./fail"
 import { groupProcesses } from "./process-group"
-import { superviseProcess, writerIdentity, type ProcessCleanup, type WriterIdentity } from "./process-supervisor"
+import { superviseProcess, verifyOwnedRegistration, writerIdentity, type OwnedRegistration, type ProcessCleanup, type WriterIdentity } from "./process-supervisor"
 import { archiveDiagnostics } from "./diagnostics"
 
 type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean }
@@ -130,11 +130,18 @@ export function parseView(text: string): View | undefined {
 }
 
 // Guard снимаем только когда ни один процесс не ссылается на профиль (Chromium держит путь в argv).
-export async function releaseStaleWriter(profileDir: string, expected?: WriterIdentity | null) {
+export async function releaseStaleWriter(profileDir: string, expected?: WriterIdentity | null, registration?: OwnedRegistration) {
   const profile = await canonicalProfilePath(profileDir)
   const writer = path.join(profile, ".writer")
   const busy = await profileProcesses(profile)
   if (busy.trim()) throw new EvalFailure(`Профиль ${profileDir} занят процессами:\n${busy.trim()}`, 2)
+  if (registration) {
+    if (profile !== profileDir || await writerIdentity(profile)) throw new EvalFailure("Registration profile/writer changed", 2)
+    await verifyOwnedRegistration(profile, registration)
+    // Only the exact attested file. The native caller must durably spend its once allowance first.
+    await unlink(`${profile}.process-group`)
+    return true
+  }
   if (!(await exists(writer))) return false
   if (expected !== undefined && JSON.stringify(await writerIdentity(profile)) !== JSON.stringify(expected))
     throw new EvalFailure("Writer identity changed before release", 1)

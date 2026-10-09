@@ -1,0 +1,24 @@
+{
+  "independent_before_builder": true,
+  "original_before_builder": {
+    "independent_before_builder": true,
+    "input_archive_sha256": "b22e16ccb91e82224bea12f90f7d9e7cf23f99aea69f1a0d7e0416bc62b8270b",
+    "hashes": {
+      "prompt.md": "43e191c1eebbd1e2665e5863eb24e9954f23a22e52c40f860919052b0578cdc9",
+      "data/sales.csv": "7bb5c56a3d2655ef4e200be6fe1fa4202359993b27c433923ed9ab97786b43f0",
+      "oracle.py": "7693018ebe671065650c861b0b11c91c84c73c9c950fb79054db0a54baee80d7",
+      "oracle.csv": "a8ad1a5221898c761d62c4aa6fc60d6f340f1f2528495479301e31b3eab52851",
+      "task.json": "19869d4b479301b853f328f84c3b139795c5810c258081074a58fa42e24b0deb"
+    }
+  },
+  "original_program_evidence": "commands/prepare_oracles.py",
+  "portable_program_added_after_builder": true,
+  "portable_result_matches_original_bytes": true,
+  "hashes": {
+    "prompt.md": "43e191c1eebbd1e2665e5863eb24e9954f23a22e52c40f860919052b0578cdc9",
+    "task.json": "19869d4b479301b853f328f84c3b139795c5810c258081074a58fa42e24b0deb",
+    "data/sales.csv": "7bb5c56a3d2655ef4e200be6fe1fa4202359993b27c433923ed9ab97786b43f0",
+    "oracle.py": "d6c50814fe04c0e4eb289b53f7e4b83fe3ccd351863699373784a5275a70de49",
+    "oracle.csv": "a8ad1a5221898c761d62c4aa6fc60d6f340f1f2528495479301e31b3eab52851"
+  }
+}

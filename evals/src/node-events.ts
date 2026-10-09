@@ -1,5 +1,5 @@
 import { compareCsv } from "./oracle"
-import { nodeCase } from "./node-cases"
+import { coverageOutputFields, nodeCase } from "./node-cases"
 
 // Public tool protocol is heterogeneous; inspect complete raw tool-parts, never truncated nodeReceipts.
 type ObjectValue = Record<string, any>
@@ -88,7 +88,16 @@ function tableCsv(output: ObjectValue, execution: string, node: ObjectValue, id:
   if (!Array.isArray(rows) || rows.length !== port.row_count || (!port.exact_table && port.sample_rows !== rows.length)) return null
   const names = port.schema.map((c: ObjectValue) => c.name)
   if (new Set(names).size !== names.length || !contract.keys.every(n => names.includes(n))) return null
-  if (contract.native) {
+  if (contract.coverage) {
+    const fields = coverageOutputFields(id)
+    if (!native || port.sample_complete !== true || port.sample_rows !== port.row_count || port.sample?.length !== port.row_count ||
+      names.length !== fields.length + 1 || port.schema.some((c: ObjectValue) => c.type !== (c.name === "Region" ? "string" : fields.find(f => f.name === c.name)?.type)) ||
+      port.category_fields?.length !== fields.length || !fields.every(f => port.category_fields.filter((c: ObjectValue) =>
+        c.field === f.name && c.fact === f.fact && c.function === f.fn && c.type === f.type && c.category_kind === "value" &&
+        c.label === port.schema.find((s: ObjectValue) => s.name === f.name)?.label &&
+        (f.categories.length === 1 ? c.category === f.categories[0] : c.categories?.length === 2 && c.categories.every((d: ObjectValue, i: number) =>
+          d.dimension === contract.dimensions[i] && d.caption === f.categories[i] && d.value === f.categories[i] && d.kind === "value"))).length === 1)) return null
+  } else if (contract.native) {
     // dock_node_read has no coverage=full option. Its complete fresh sample is
     // used only after the initial native full read, source change and same-node checks below.
     if ((!native && !completeReread) || port.sample_complete!==true || port.sample_rows!==port.row_count || port.sample?.length!==port.row_count ||
@@ -110,13 +119,22 @@ function tableCsv(output: ObjectValue, execution: string, node: ObjectValue, id:
     if (!Array.isArray(row) || row.length !== names.length) return null
     const cells: string[] = []
     for (const cell of row) {
+      if (contract.coverage && cell?.is_null === true) {
+        if (id !== "crosstable-column-cartesian" || !["A_shop", "B_web"].includes(names[cells.length]) || cell.value !== null ||
+          cell.type !== port.schema[cells.length].type || cell.precision !== "exact_native" || cell.native?.tag !== 1 || cell.native.encoding !== "null") return null
+        cells.push(""); continue
+      }
       if (!cell || cell.is_null !== false || !["string", "number"].includes(typeof cell.value)) return null
       if (native) {
         const proof = cell.native
         if (cell.precision !== "exact_native" || !proof) return null
-        if (proof.encoding !== (contract.keys.includes(names[cells.length]) ? "utf8" : "ieee754-binary64-le")) return null
+        const expectedType = contract.coverage ? port.schema[cells.length].type : contract.keys.includes(names[cells.length]) ? "string" : "real"
+        if (contract.coverage && (cell.type !== expectedType || proof.tag !== ({ string: 8, integer: 20, real: 5 } as Record<string, number>)[expectedType])) return null
+        if (proof.encoding !== (expectedType === "string" ? "utf8" : expectedType === "integer" ? "signed-int64-le" : "ieee754-binary64-le")) return null
         if (proof.encoding === "utf8") {
           if (typeof proof.utf8_hex !== "string" || !/^(?:[\da-f]{2})*$/i.test(proof.utf8_hex) || Buffer.from(proof.utf8_hex, "hex").toString("utf8") !== cell.value) return null
+        } else if (proof.encoding === "signed-int64-le" && proof.bits === 64 && /^[\da-f]{16}$/i.test(proof.bytes_le ?? "") && /^-?\d+$/.test(String(cell.value))) {
+          if (Buffer.from(proof.bytes_le, "hex").readBigInt64LE() !== BigInt(cell.value)) return null
         } else if (proof.encoding === "ieee754-binary64-le" && proof.bits === 64 && /^[\da-f]{16}$/i.test(proof.bytes_le ?? "")) {
           const value = Buffer.from(proof.bytes_le, "hex").readDoubleLE()
           if (!Number.isFinite(value) || value !== Number(cell.value)) return null
@@ -140,6 +158,16 @@ export function checkNodeSequence(events: NodeEvents, id: string, crossId: strin
       pair.request.input.document_id === node.document_id && pair.request.input.workflow_ref?.workflow_id === node.workflow_id
   })
   if (!creation) failures.push("sequence: fresh CrossTable creation proof required")
+  if (contract.coverage && creation) {
+    const p = creation.request.input.parameters
+    const dimensions = p?.columns ?? (p?.column ? [p.column] : [])
+    if (creation.request.input.mode !== "pivot" || creation.request.input.inputs?.length !== 1 ||
+      JSON.stringify(p?.row_keys?.map((f: ObjectValue) => [f.kind, f.name])) !== JSON.stringify(contract.keys.map(name => ["input_field", name])) ||
+      JSON.stringify(dimensions.map((f: ObjectValue) => [f.kind, f.name])) !== JSON.stringify(contract.dimensions.map(name => ["input_field", name])) ||
+      JSON.stringify(p?.facts?.map((f: ObjectValue) => [f.field?.kind, f.field?.name, [...(f.functions ?? [])].sort()])) !== JSON.stringify(contract.facts.map(f => ["input_field", f.name, [...f.functions].sort()])) ||
+      p?.category_mode !== contract.mode || (contract.mode === "fixed" ? p.include_null !== false || p.include_other !== false : p.include_null !== undefined || p.include_other !== undefined))
+      failures.push("sequence: full assigned initial CrossTable configuration required")
+  }
   const reads: { request: NodeCall; receipt: NodeCall; application: { request: NodeCall; receipt: NodeCall }; config: ObjectValue; execution: string; csv: string }[] = []
   for (const pair of receipts) {
     const r = pair.receipt.output
@@ -168,6 +196,14 @@ export function checkNodeSequence(events: NodeEvents, id: string, crossId: strin
   const mode = contract.mode
   function matches(read: typeof reads[number], expectedAggregate: string | string[], expected: string) {
     const c = read.config
+    if (contract.coverage) return c.category_mode === contract.mode &&
+      JSON.stringify(c.row_keys?.map((f: ObjectValue) => [f.name, f.type, f.order])) === JSON.stringify(contract.keys.map((name, order) => [name, "string", order])) &&
+      JSON.stringify(c.columns?.map((f: ObjectValue) => [f.name, f.type, f.order])) === JSON.stringify(contract.dimensions.map((name, order) => [name, "string", order])) &&
+      JSON.stringify(c.facts?.map((f: ObjectValue) => [f.name, f.type, f.order, [...f.functions].sort()])) === JSON.stringify(contract.facts.map((f, order) => [f.name, f.type, order, [...f.functions].sort()])) &&
+      c.options?.include_null === false && c.options?.include_other === false && c.options?.min_values === 0 &&
+      (id === "crosstable-local-variable-bindings" ? c.options.limit === 1 && c.options.unique_names === true && c.options.separator === "." &&
+        Object.keys(c.options.variable_bindings ?? {}).sort().join(",") === "limit,separator,unique_names" : c.options.limit === 0 && Object.keys(c.options.variable_bindings ?? {}).length === 0) &&
+      compareCsv(expected, read.csv, 0).passed
     const functions=typeof expectedAggregate==="string"?[expectedAggregate]:expectedAggregate
     return c.category_mode === mode && c.row_keys?.length === contract.keys.length && c.row_keys.every((key:ObjectValue,index:number)=>key.name===contract.keys[index] && (!contract.native || key.type==="string" && key.order===index)) &&
       c.column?.name === "Category" && c.facts?.length === 1 && c.facts[0].name === "Amount" &&

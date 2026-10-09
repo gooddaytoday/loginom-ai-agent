@@ -1,0 +1,287 @@
+{
+  "version": 1,
+  "observations": [
+    {
+      "operation_id": "cross-sales-001",
+      "recorded_at": "2026-10-08T10:33:44.857Z",
+      "node_crosstable": {
+        "verified": true,
+        "inventory_complete": true,
+        "state_source": "cached_crosstable_source_store",
+        "input_fields": [
+          {
+            "record_id": "472",
+            "index": 0,
+            "label": "Region",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "disposition": 2,
+            "order": 0,
+            "functions": 0,
+            "available_functions": 1934,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          },
+          {
+            "record_id": "473",
+            "index": 1,
+            "label": "Category",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "disposition": 1,
+            "order": 0,
+            "functions": 0,
+            "available_functions": 1934,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          },
+          {
+            "record_id": "474",
+            "index": 2,
+            "label": "Amount",
+            "type": "real",
+            "data_kind": "Непрерывный",
+            "disposition": 3,
+            "order": 0,
+            "functions": 1,
+            "available_functions": 2047,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          },
+          {
+            "record_id": "475",
+            "index": 3,
+            "label": "Units",
+            "type": "integer",
+            "data_kind": "Непрерывный",
+            "disposition": 3,
+            "order": 1,
+            "functions": 8,
+            "available_functions": 2047,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          }
+        ],
+        "service_fields": [
+          {
+            "record_id": "476",
+            "index": 4,
+            "label": "Количество",
+            "type": "integer",
+            "data_kind": "Дискретный",
+            "disposition": 0,
+            "order": 0,
+            "functions": 2,
+            "available_functions": 2,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0,
+            "count": true
+          }
+        ],
+        "selected_available": [],
+        "selected_used": [
+          "475"
+        ],
+        "options": {
+          "pedDisplayNameSeparator": {
+            "value": "|",
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": false
+          },
+          "pedSlidingUniqueValues": {
+            "value": false,
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": false
+          },
+          "pedSlidingUniqueValuesLimit": {
+            "value": 0,
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": true
+          },
+          "pedUniqueValueNames": {
+            "value": true,
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": false
+          }
+        },
+        "dialogs": [],
+        "settings_applied": false,
+        "node_context": {
+          "verified": true,
+          "document_id": "7bb01073-2024-400f-bc41-846ec887bc3e",
+          "workflow_id": "7bb01073-2024-400f-bc41-846ec887bc3e-1",
+          "node_id": "d6ca3521-25eb-4634-a78a-9855af8f6add",
+          "surface": "wizard",
+          "tid": "MF;TF-1;WizrdMCF"
+        }
+      },
+      "source": "loginom/runtime/generations/4/chats/1c323cdc2f44a57a504ff6fb236aa0644a613d12429141e7b12e264da7a31139/attempts/6fb56b20-73fc-4a4c-8fe6-52c6339b96a9/execution-events.jsonl",
+      "source_sha256": "7ad7bbdac37d0f4a1d118edaccd681fbfa63e1402c4aa3c3dbe1cb559a6b466d",
+      "source_line": 680
+    },
+    {
+      "operation_id": "cross-sales-names-001",
+      "recorded_at": "2026-10-08T10:34:24.113Z",
+      "node_crosstable": {
+        "verified": true,
+        "inventory_complete": true,
+        "state_source": "cached_crosstable_source_store",
+        "input_fields": [
+          {
+            "record_id": "533",
+            "index": 0,
+            "label": "Region",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "disposition": 2,
+            "order": 0,
+            "functions": 0,
+            "available_functions": 1934,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          },
+          {
+            "record_id": "534",
+            "index": 1,
+            "label": "Category",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "disposition": 1,
+            "order": 0,
+            "functions": 0,
+            "available_functions": 1934,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          },
+          {
+            "record_id": "535",
+            "index": 2,
+            "label": "Amount",
+            "type": "real",
+            "data_kind": "Непрерывный",
+            "disposition": 3,
+            "order": 0,
+            "functions": 1,
+            "available_functions": 2047,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          },
+          {
+            "record_id": "536",
+            "index": 3,
+            "label": "Units",
+            "type": "integer",
+            "data_kind": "Непрерывный",
+            "disposition": 3,
+            "order": 1,
+            "functions": 8,
+            "available_functions": 2047,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0
+          }
+        ],
+        "service_fields": [
+          {
+            "record_id": "537",
+            "index": 4,
+            "label": "Количество",
+            "type": "integer",
+            "data_kind": "Дискретный",
+            "disposition": 0,
+            "order": 0,
+            "functions": 2,
+            "available_functions": 2,
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0,
+            "count": true
+          }
+        ],
+        "selected_available": [],
+        "selected_used": [],
+        "options": {
+          "pedDisplayNameSeparator": {
+            "value": "|",
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": false
+          },
+          "pedSlidingUniqueValues": {
+            "value": false,
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": false
+          },
+          "pedSlidingUniqueValuesLimit": {
+            "value": 0,
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": true
+          },
+          "pedUniqueValueNames": {
+            "value": true,
+            "variable": null,
+            "switch_pressed": false,
+            "disabled": false
+          }
+        },
+        "dialogs": [],
+        "settings_applied": false,
+        "node_context": {
+          "verified": true,
+          "document_id": "7bb01073-2024-400f-bc41-846ec887bc3e",
+          "workflow_id": "7bb01073-2024-400f-bc41-846ec887bc3e-1",
+          "node_id": "d6ca3521-25eb-4634-a78a-9855af8f6add",
+          "surface": "wizard",
+          "tid": "MF;TF-1;WizrdMCF"
+        }
+      },
+      "source": "loginom/runtime/generations/4/chats/1c323cdc2f44a57a504ff6fb236aa0644a613d12429141e7b12e264da7a31139/attempts/6fb56b20-73fc-4a4c-8fe6-52c6339b96a9/execution-events.jsonl",
+      "source_sha256": "7ad7bbdac37d0f4a1d118edaccd681fbfa63e1402c4aa3c3dbe1cb559a6b466d",
+      "source_line": 860
+    }
+  ],
+  "local_variable_observations": [
+    {
+      "operation_id": "cross-sales-names-001",
+      "internal_operation_id": "cross-sales-names-001:n21",
+      "action_key": "node.crosstable.local_variables.internal",
+      "output": {
+        "status": "SUCCEEDED",
+        "verified": true,
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "node_context": {
+          "verified": true,
+          "document_id": "7bb01073-2024-400f-bc41-846ec887bc3e",
+          "workflow_id": "7bb01073-2024-400f-bc41-846ec887bc3e-1",
+          "node_id": "d6ca3521-25eb-4634-a78a-9855af8f6add",
+          "surface": "graph",
+          "tid": "MF;TF-1;Graph;Кросс-таблица_продаж",
+          "locked": false
+        },
+        "variables": [],
+        "changed": [],
+        "settings_changed": false,
+        "settings_applied": false,
+        "draft_discarded": true
+      },
+      "source": "loginom/runtime/generations/4/chats/1c323cdc2f44a57a504ff6fb236aa0644a613d12429141e7b12e264da7a31139/attempts/6fb56b20-73fc-4a4c-8fe6-52c6339b96a9/execution-events.jsonl",
+      "source_sha256": "7ad7bbdac37d0f4a1d118edaccd681fbfa63e1402c4aa3c3dbe1cb559a6b466d",
+      "source_line": 840
+    }
+  ]
+}

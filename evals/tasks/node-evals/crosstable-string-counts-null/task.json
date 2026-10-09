@@ -1,0 +1,47 @@
+{
+  "id": "crosstable-string-counts-null",
+  "title": "crosstable-string-counts-null",
+  "prompt": "Начни с приложенного sales.csv и самостоятельно создай новый текстовый импорт и ровно одну настоящую Кросс-таблицу в новом пакете. UTF-8, запятая, первая строка — заголовки. Допустимы вспомогательная сортировка и один CSV-экспорт. Результат должен происходить из выхода Кросс-таблицы; ручные таблицы и расчёт результата другими узлами запрещены. Полностью выполни и прочитай свежий результат. Строки N, затем S; набор колонок точный, порядок колонок несущественен. Экспортируй итог из выхода узла в CSV с запятой и заголовком и сохрани выполненный пакет после чтения и экспорта. Импортируй Region, Category и Text как строковые дискретные поля; явно настрой ? как маркер пропуска, а не строковое значение. Создай фиксированную Кросс-таблицу: строки Region, категории Category, единственный факт Text. Выбери только количество записей, количество уникальных значений и количество пропусков; остальные функции выключи. Категории Прочее и Пропущенные выключи. Количество записей включает пропуски, уникальные значения их исключают. Настрой собственные выходные имена Region,A_count,A_unique,A_null,B_count,B_unique,B_null с правильным соответствием каждой категории и функции. Все шесть счётчиков — целые числа.\n",
+  "inputs": [
+    "data/sales.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "timeout_ms": 1800000,
+  "oracle_tolerance": 0,
+  "expected_output": "Region,A_count,A_unique,A_null,B_count,B_unique,B_null\nN,3,1,1,1,1,0\nS,1,0,1,2,2,0\n",
+  "checklist": [
+    {
+      "id": "input",
+      "text": "Exact input bytes, delivery and new native import with the assigned scalar types/data kinds/NULL marker.",
+      "required": true
+    },
+    {
+      "id": "crosstable",
+      "text": "Exact ordered roles, types, functions/masks, category mode/options, native mapping or local bindings persisted in XML.",
+      "required": true
+    },
+    {
+      "id": "graph",
+      "text": "Импорт → Кросс-таблица → реальный CSV-экспорт; разрешена только вспомогательная сортировка.",
+      "required": true
+    },
+    {
+      "id": "sequence",
+      "text": "Fresh complete initial configuration, creation and owned full native read including exact null/typed identity.",
+      "required": true
+    },
+    {
+      "id": "export",
+      "text": "Реальный выход экспортирован в UTF-8 CSV с запятой и заголовком; выполненный пакет сохранён после окончательного чтения и экспорта. Содержимое проверяется пунктом result.",
+      "required": true
+    },
+    {
+      "id": "result",
+      "text": "Region,A_count,A_unique,A_null,B_count,B_unique,B_null\nN,3,1,1,1,1,0\nS,1,0,1,2,2,0\n",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2
+    }
+  ]
+}

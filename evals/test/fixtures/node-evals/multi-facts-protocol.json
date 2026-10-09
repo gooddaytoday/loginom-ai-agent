@@ -1,0 +1,683 @@
+[
+  {
+    "type": "tool_use",
+    "timestamp": 1791455492413,
+    "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+    "part": {
+      "type": "tool",
+      "tool": "loginom_dock_prepare",
+      "callID": "call_fb660787eda94814abbe70c42383c440",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "prepare-sales-cross-001",
+          "intent": "new_draft"
+        },
+        "output": "{\"prepared\":true,\"sessionId\":\"cbf41f1e-0d22-4c8b-abdc-1aa428ed502f\",\"skillRevision\":\"907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148\",\"loginomUrl\":\"http://localhost/app/?testable=true\",\"workspace\":{\"status\":\"READY\",\"reason\":null,\"phase\":\"exact_workflow_ready\",\"target\":{\"profile_id\":\"loginom-7.4.2-linux-chromium-ru\",\"loginom_build\":\"7.4.2\",\"platform\":\"linux\",\"browser\":\"chromium\"},\"authenticated\":true,\"created_draft\":true,\"effect_possible\":true,\"operation_id\":\"prepare-sales-cross-001\",\"session_id\":\"cbf41f1e-0d22-4c8b-abdc-1aa428ed502f\",\"trace\":[{\"condition\":\"ui_build\",\"satisfied\":true},{\"condition\":\"login_or_workspace\",\"satisfied\":true},{\"condition\":\"workspace_entry_ready\",\"satisfied\":true},{\"condition\":\"package_menu_ready\",\"satisfied\":true},{\"condition\":\"exact_workflow_ready\",\"satisfied\":true}],\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"loginom_account\":\"user\",\"workflow_ref\":{\"tab_tid\":\"MF;cntMain;cntWorkspace;Workspace;t.br;tb-1\",\"prefix\":\"MF;TF-1\",\"navigation_path\":[{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер\",\"label\":\"\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты\",\"label\":\"Пакеты\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1\",\"label\":\"Package1\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1\",\"label\":\"Модуль1\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий\",\"label\":\"Сценарий\"}],\"workflow_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e-1\"},\"package_ref\":{\"path\":null,\"name\":\"Package1\",\"persisted\":false},\"preserved_workflows\":[],\"ownership_verified\":true,\"target_verified\":true,\"interaction_readiness\":\"driver_verification_required\",\"window\":{\"width\":1280,\"height\":800,\"outer_width\":1280,\"outer_height\":800,\"available_width\":1280,\"available_height\":800},\"replayed\":false,\"browser_geometry\":{\"version\":1,\"source\":\"prepare_same_browser_page\",\"session_id\":\"cbf41f1e-0d22-4c8b-abdc-1aa428ed502f\",\"operation_id\":\"prepare-sales-cross-001\",\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"runtime_revision\":\"71a63f1762b3e637d0b3a6e4e7a3f47482d926d8f920331f3c07ed569e179e10\",\"manifest_sha256\":\"17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4\",\"workflow_ref\":{\"tab_tid\":\"MF;cntMain;cntWorkspace;Workspace;t.br;tb-1\",\"prefix\":\"MF;TF-1\",\"navigation_path\":[{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер\",\"label\":\"\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты\",\"label\":\"Пакеты\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1\",\"label\":\"Package1\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1\",\"label\":\"Модуль1\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий\",\"label\":\"Сценарий\"}],\"workflow_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e-1\"},\"observed_at\":\"2026-10-08T10:31:32.296Z\",\"viewport\":{\"width\":1280,\"height\":800},\"observed\":{\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"origin\":\"http://localhost/\",\"pathname\":\"/app/\",\"visibility\":\"visible\",\"inner_width\":1280,\"inner_height\":800,\"outer_width\":1280,\"outer_height\":800,\"screen_x\":10,\"screen_y\":10,\"device_pixel_ratio\":1,\"screen_width\":1280,\"screen_height\":800,\"visual_viewport\":{\"width\":1280,\"height\":800,\"scale\":1,\"offset_left\":0,\"offset_top\":0},\"available_left\":0,\"available_top\":0,\"available_width\":1280,\"available_height\":800}}},\"result_version\":\"user-v1\",\"input_artifacts\":[{\"artifact_id\":\"4510a0bc-516a-4ce5-8be0-1c8127c695b9\",\"name\":\"632c80067e6fca5756edfb93f19122c5452322093359027db68cd91a1c8fa467-0-sales.csv\",\"bytes\":70,\"sha256\":\"684e60cd4cab04ad523f2fa2e2a1580a1b4b8a262e39332b1609f31e9d1da31f\",\"upload\":{\"grant_id\":\"686c3c10-fede-4d98-a60a-e4ad09566854\",\"directory\":\"/user\",\"overwrite\":\"reject\",\"destination\":\"/user/632c80067e6fca5756edfb93f19122c5452322093359027db68cd91a1c8fa467-0-sales.csv\"}}],\"storage_directories\":{\"inputs\":\"/user\",\"exports\":\"/user\",\"packages\":\"/user\"},\"knowledge\":{\"version\":\"user-v1\",\"session_manifest\":{\"capabilityAbi\":1,\"executorRevision\":\"1.3.0\",\"actionCatalogVersion\":\"2026.09.14-rc6-linux-candidate\",\"actionCatalogDigest\":\"bd3fb15512674a102d7b63d240389e6ea00f553d22c597eadd77ee55547f1e09\",\"selectorCatalogDigest\":\"32f5671322db1950d21023c9e9df9abafbda9395ec090e3fa0806cb4307433ba\",\"e2eCommit\":\"2cad5602158fd2e4836d821d644a2b8d92f571a2\",\"actionManifestDigest\":\"17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4\",\"catalogLifecycleStatus\":\"candidate\",\"acceptanceVerified\":false,\"acceptanceDigest\":null,\"compatibilityProfile\":{\"profile_id\":\"loginom-7.4.2-linux-chromium-ru\",\"loginom_build\":\"7.4.2\",\"platform\":\"linux\",\"browser\":\"chromium\"}},\"actions\":[{\"action_key\":\"package.save_checkpoint\",\"revision\":\"2\",\"input_schema\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\",\"minLength\":2,\"maxLength\":1024,\"pattern\":\"^/[^\\\\\\\\\\\\x00-\\\\x1f\\\\x7f]+$\"},\"conflict_policy\":{\"type\":\"string\",\"enum\":[\"fail\",\"replace\"]}},\"required\":[\"path\",\"conflict_policy\"],\"additionalProperties\":false},\"effect\":{\"kind\":\"persist\",\"resource\":\"package\",\"destination_policy\":\"session_storage\"}}],\"node_types\":[{\"type\":\"transform.cross_table\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"186c1e95b43e40308db93b059cd725cb2f89b0d341185fb9dddd5e436a9013ea\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"crosstable-v3-internal-1\",\"semantics\":\"Pivot summary: row keys × column categories × numeric fact aggregates. fixed preserves captured categories with optional NULL/Other groups; sliding changes categories after source updates. Reread the SAME node with dock_node_read and its original source_operation_id; never reconfigure to refresh categories.\",\"modes\":[\"pivot\"]},{\"type\":\"exports.text\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"228c2fefa9926aa6a56381778f0b1e49c2285a13ba53ce7841d5948662f036a9\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"text-export-v1-candidate\",\"semantics\":\"Текстовый файл\",\"modes\":[\"delimited\"]},{\"type\":\"transform.collapse_columns\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"a08de577d0dff59831428f4234fb1d36de4eb0cee7c34c4ba6ada43c0b3afdc9\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"collapse-v1-internal-1\",\"semantics\":\"Свертка столбцов\",\"modes\":[\"unpivot\"]},{\"type\":\"preprocessing.data_recovery\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"e2830bfa4e9604c15c539a21782d07cadf0453756af8aea197160c1d6ff36349\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"missing-values-v1-internal-1\",\"semantics\":\"Заполнение пропусков\",\"modes\":[\"impute\"]},{\"type\":\"transform.date_time\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"a9d64cbd8b1e3e3d7ae514c94291057e360ac8c06b6b314450615b6223c820fd\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"date-time-v1-internal-1\",\"semantics\":\"Дата и время\",\"modes\":[\"calendar\"]},{\"type\":\"research.duplicates\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"c84adb3448065297c72bad2ec57b9d485d6082bc4d1b6dd30e2fb49bebe89321\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"duplicates-v1-internal-1\",\"semantics\":\"Mark all copies and contradictions; retain all rows. Filtering Duplicate=false removes every member of a duplicate group. Unassigned fields are preserved and ignored. No automatic deduplication or conflict resolution.\",\"modes\":[\"mark\"]},{\"type\":\"transform.replace_columns\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"fd4936c127981efa196ad9a731fccc7f7bdf4ae264c641b6c88ebd6e3fa7c3bc\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"replacement-v1-internal-2\",\"semantics\":\"Замена\",\"modes\":[\"exact\"]},{\"type\":\"imports.text\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"76747dc8dc8ce6f25d1e30ad08b49d2eea0fa411ce2a5170fa6a055b3efb6564\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"text-import-output-v2\",\"semantics\":\"Текстовый файл\",\"modes\":[\"delimited\"]},{\"type\":\"transform.calculator\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"a0a46c5452e29eaa6161dd6ead01153647063fd52956f3c92c6253e43cf2788f\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"calculator-v3-internal-2\",\"semantics\":\"Калькулятор\",\"modes\":[\"expression\"]},{\"type\":\"transform.group_data\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"8d04d8b1a02e7acb6c6c4209702ca76b7da2c128da0dc4bff16119d0d0926f0d\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"grouping-v3-internal-1\",\"semantics\":\"Группировка\",\"modes\":[\"aggregate\"]},{\"type\":\"transform.sorting\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"c352ef0dbbf9a5e5626e9af4b2a59d5568b41fa3cdb92e158ec89ee01f71e814\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"sorting-v3-internal-1\",\"semantics\":\"Сортировка\",\"modes\":[\"keys\"]},{\"type\":\"transform.reform_columns\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"8d2191fee08910fb604c05134a0e4f44ca4adb2df5341f0668e4ea7abfec17f2\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"reform-v3-internal-1\",\"semantics\":\"Параметры полей\",\"modes\":[\"scalar\"]},{\"type\":\"transform.filter_data\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"17a2b900500c46f2f5cf25ed1846fc16333324d8b926d37c20ee9fb127576269\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"filter-v3-internal-1\",\"semantics\":\"Фильтр строк\",\"modes\":[\"conditions\",\"row_number\"]},{\"type\":\"transform.join_data\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"acc0cfc8a92163eb5836eca9ca2dff745d8967262a89c5d1c1fd5de9c13ae2b6\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"join-v4-internal-1\",\"semantics\":\"Join two tables by keys; not positional Соединение.\",\"modes\":[\"inner\",\"left\"]},{\"type\":\"transform.union_data\",\"contract_revision\":\"1.0.0\",\"cache_key\":\"28bd2cc049593d67217e74d6d4dc122a5330b431fd009e0626dc5ea343e8d68f\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"configuration_handler\":\"union-v4-internal-1\",\"semantics\":\"Append rows, preserving duplicates; not UNION DISTINCT.\",\"modes\":[\"append_all\"]}]},\"instructions\":\"Используй закреплённые описания операций и локальный кеш знаний всю сессию.\\nДля каждого поддержанного узла используй dock_node_apply. Он сам возвращается\\nиз хранилища к нужному сценарию. Перед первым узлом данного типа запроси\\ndock_action_describe({node_types:[тип]}) и следуй его parameter_schema.\\nНе используй node.add для обхода ошибки параметров. Терминал, read_file и\\nexecute_code недоступны; вложение передаётся через input_artifacts.\\nКоординаты, mappings, read и budgets можно опустить. По умолчанию выходные поля\\nсохраняются, Execute читает обычную выборку; это не полный аудит таблицы.\\nУ точных чисел значение может быть только в decimal; отсутствие дублирующего\\nvalue не означает NULL. Учитывай type, precision и is_null каждой ячейки.\\nДля отдельных переименований/исключений используй output mappings.changes;\\nDock сохранит остальные поля. mappings.fields — полный список всех полей.\\nОба способа одновременно запрещены; обязательные поля узла исключать нельзя.\\nУ нового текстового импорта source_path можно опустить после успешной доставки:\\nDock возьмёт точный путь по upload_operation_id. По умолчанию UTF-8, заголовок\\nв первой строке, пропуск0, разделитель запятая, десятичная точка, пустой NULL,\\nдвойная кавычка; явные значения сохраняются. Типы и имена колонок задаёшь ты.\\nУ нового текстового экспорта требуется destination в назначенной папке. Обычный\\nCSV по умолчанию: UTF-8, запятая, header=names, bom=false, LF, десятичная точка,\\nпустой NULL и двойная кавычка. Явный формат сохраняется; существующий узел\\nполучает только заданные изменения. Перезапись существующего файла не включается\\nавтоматически: для неё нужны overwrite=replace и явный destination.\\nПострой граф и параметры по заданию. Доступные обработчики и режимы перечислены\\nв knowledge.node_types; профиль ограничен Loginom 7.4.2.\\nКросс-таблица (transform.cross_table, pivot) строит строки × категории × агрегаты\\nподдерживаемых скалярных и Variant-фактов. После смены источника повторно выполняй и читай тот же узел\\nчерез dock_node_read с исходным source_operation_id; Sliding возвращает новую\\nсхему и актуальное соответствие категории/факта/функции полю. Настройка узла\\nдля обновления категорий не требуется. Fixed сохраняет начальный состав.\\nМинимальное число категорий резервирует пустые колонки; limit отдельно ограничивает\\nчисло категорий. Настройки limit, unique_names и separator можно привязать к\\nлокальным управляющим переменным через local_variables и bindings, затем менять\\nих значения на том же узле. Собственный выход CrossTable допускает переименование,\\nпорядок и автосинхронизацию при finish=execute; его обязательные источники нельзя\\nисключать. Для исключения добавь отдельный downstream transform.reform_columns.\\nОтказ исключения Required=true — ожидаемая отрицательная проверка, затем выполняй\\nисправленное действие под новым operation_id.\\nВсе новые числовые показатели отчёта вычисляй в узлах сценария и читай их выход.\\nЕсли показателя нет в выходе, добавь вычисление; не досчитывай средние, суммы или\\nпроценты в тексте ответа по просмотренной таблице. Округление лишь оформляет результат.\\nСначала выдели каждый требуемый результат из задания. Перед завершением сопоставь\\nкаждый пункт с выполненным узлом и прочитанным результатом. Два разреза в одном\\nпункте требуют проверки обоих. Если пункт не выполнен, продолжи работу или явно\\nукажи конкретное ограничение; сохранённый пакет сам по себе не означает полноту анализа.\\nПри LOGIN_REQUIRED войди в открытом браузере и повтори dock_prepare.\\nИспользуй выбранные storage_directories для пакетов, входных файлов и экспорта.\\nПрикреплённые пользователем файлы поступают в input_artifacts через native hook.\\nЕсли их нет, сообщи, что передача вложения не подтверждена; не придумывай путь\\nна сервере и не считай текстовый фрагмент из сообщения полным датасетом.\\nЕсли файл уже есть в input_artifacts, ошибка каталога или подготовки не означает\\nпотерю вложения. Актуальный список доступен через dock_action_describe({}); новый\\nпакет для этого не требуется. При ARTIFACT_DESTINATION_UNAVAILABLE сопоставь\\nвыбранную папку с вошедшим аккаунтом; повторное вложение не исправит доступ.\\nЗагрузи input_artifacts через dock_artifact_deliver, сохрани подтверждённую identity\\nисточника для импорта. Каждый node.apply сам проверяет настройки и выполнение.\\nДля dock_node_resume передавай только исходный operation_id; запрос хранится в Dock.\\nДля повторного чтения выхода без изменения вычислений используй dock_node_read\\nс новым operation_id, source_operation_id успешной локальной операции и read\\n(например, sample_rows:100, require_exact_numbers:true). Dock выполняет существующий\\nузел и читает свежий выход без мастера настройки; не передавай формулы, mappings и finish.\\nПри running жди тот же ID через dock_node_wait.\\nДля исправления уже завершённого узла используй dock_node_apply с новым operation_id,\\ntarget.kind=existing, выданным target.ref и inputs:[] для сохранения связей.\\nНовый operation_id с target.kind=new создаёт ещё один узел.\\nДля узла сохранённого исходного пакета идентификатор ref.node_id — постоянный\\nGUID, не имя/label узла. Если исходные данные содержат манифест kind=source_only\\nс package_basename и node_ids, он задаёт только постоянные GUID этого пакета;\\nбери document_id/workflow_id из свежего dock_prepare для открытого пакета.\\nНе угадывай GUID и не подставляй имя вместо него.\\nДля transform.collapse_columns, служащего промежуточным источником в расширенном\\nграфе, допускается finish=\\\"execute\\\" с read:{ports:[0],sample_rows:0,\\nrequire_exact_numbers:false}; это выполняет узел без чтения промежуточной таблицы.\\nИзолированный reader Collapse не читает произвольный расширенный граф.\\nТочное полное чтение transform.cross_table: read.coverage=\\\"full\\\" с\\nrequire_exact_numbers:true. Оно доступно только для проверенной статической\\nцепочки import→CrossTable или import→Collapse→CrossTable, собственного завершённого\\nисполнения, подтверждённых байтов исходника и неизменных схемы/топологии/исполнения.\\nГраницы: 50 строк, 8 полей, 1 MiB; фиксированный readonly protocol 321, subtype\\nи native DateTime проверяются клиентом. Отображаемая строка Variant не доказывает\\nзначение. Для более широких скалярных отчётов используй обычное точное чтение\\nбез coverage=\\\"full\\\", например read:{ports:[0],sample_rows:100,\\nrequire_exact_numbers:true}; проверяй sample_complete и полный состав схемы.\\nПосле отказа полного native-чтения не обходи его обычным чтением Variant.\\nВ dock_node_apply передавай workflow_ref только как {workflow_id}, используя\\nвыданные document_id и workflow_id. Длинный путь навигации клиент хранит локально;\\nне копируй и не восстанавливай tab_tid, prefix, navigation_path в запросе узла.\\nВ компактном ответе configuration.readback содержит наблюдённые настройки и\\nпривязку к узлу и квитанциям; сравни их с задачей. Выборка output.ports сохраняет\\nзапрошенные строки в пределах бюджета операции. Для проверки этих же настроек\\nне открывай мастер повторно; сохранение подтверждай отдельной квитанцией пакета.\\nВ итоговом отчёте используй только подтверждённые результаты выполненных узлов.\\nЕсли sample_complete=false, это часть таблицы: не дополняй её невидимыми строками,\\nдругим концом рейтинга или предположениями из фрагмента CSV. Запрашивай нужный\\nразрез и объём результата через узлы. Общие суммы и средние тоже вычисляй узлом,\\nа не вручную из групповых средних; явно называй, по каким строкам рассчитан показатель.\\nНе выдавай причины отклонений и эффективность подразделений за установленный факт,\\nесли данные показывают только суммы. Отделяй рекомендации от доказанных результатов.\\nНе повторяй уже подтверждённые проверки. При running жди тот же operation_id;\\nпри неопределённом результате сначала восстанови его, не начинай заменяющую операцию.\\nОшибку параметров исправляй по установленной схеме. Дополнительные знания ищи,\\nесли имеющегося описания и наблюдённого состояния недостаточно.\\nДля обычного чтения задавай require_exact_numbers:false: отображение не доказывает\\nточность числа. Для проверки точных значений и конверсий задавай\\nrequire_exact_numbers:true; обработчик временно меняет формат и восстанавливает его.\\nПовторное выполнение Параметров полей без перенастройки: parameters:{changes:[]},\\ninputs:[], mappings:[]; поля выбираются по входным именам, даже после переименования.\\nЭкспорт текста exports.text возвращает output.file_artifacts с размером и SHA-256\\nфактического файла после Execute; портов данных на выходе у него нет. Сверь\\nназначение и формат с заданием. Done и Close файл не подтверждают.\\nСохрани готовый пакет в конце через package.save_checkpoint, дождись квитанции.\\nЕсли dock_saved_package_state сообщает modified:true, выполни его следующий шаг\\nсохранения того же собственного пакета с новым ID перед завершением. Не отбрасывай\\nизменения и не повторяй переоткрытие для устранения dirty-state.\\nПромежуточное сохранение — по просьбе пользователя или перед риском потери работы.\\npackage.save_as с переоткрытием используй при запросе переоткрытия. package_saved:false\\nу узла описывает границы node.apply и не требует дополнительного сохранения.\\nНе приписывай данным валюту, если она не указана. Полные квитанции и диагностика\\nсохраняются локально; ограничения результата остаются обязательными для вывода.\"}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_prepare",
+        "time": {
+          "start": 1791455490603,
+          "end": 1791455492395
+        }
+      },
+      "metadata": {
+        "openai": {
+          "itemId": "fc_0e0e630e585892ca016ac771020b448191879cc96622155775"
+        }
+      },
+      "id": "prt_11b11701c001wEBO2cw0oqcAG0",
+      "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+      "messageID": "msg_11b0fdfcb001Peo1Hoif72EepN"
+    }
+  },
+  {
+    "type": "tool_use",
+    "timestamp": 1791455504056,
+    "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+    "part": {
+      "type": "tool",
+      "tool": "loginom_dock_action_describe",
+      "callID": "call_c505c5bc170e4167aa3f6f519387e85d",
+      "state": {
+        "status": "completed",
+        "input": {
+          "node_types": [
+            "imports.text",
+            "transform.cross_table",
+            "exports.text"
+          ],
+          "action_keys": [
+            "package.save_checkpoint"
+          ]
+        },
+        "output": "{\"actions\":[{\"action_key\":\"package.save_checkpoint\",\"revision\":\"2\",\"status\":\"candidate\",\"capability\":\"package.save_checkpoint.v1\",\"input_schema\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\",\"minLength\":2,\"maxLength\":1024,\"pattern\":\"^/[^\\\\\\\\\\\\x00-\\\\x1f\\\\x7f]+$\"},\"conflict_policy\":{\"type\":\"string\",\"enum\":[\"fail\",\"replace\"]}},\"required\":[\"path\",\"conflict_policy\"],\"additionalProperties\":false},\"output_schema\":{\"type\":\"object\",\"properties\":{\"package_ref\":{\"type\":\"object\",\"properties\":{\"kind\":{\"type\":\"string\",\"enum\":[\"package\"]},\"path\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":1000},\"active_identity\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":1000,\"description\":\"Exact normalized package storage path read from the active package cache of the pinned Loginom UI build\"}},\"required\":[\"kind\",\"path\",\"active_identity\"],\"additionalProperties\":false},\"reopened\":{\"type\":\"boolean\",\"enum\":[false]},\"workflow_preserved\":{\"type\":\"boolean\",\"enum\":[true]},\"save_completed\":{\"type\":\"boolean\",\"enum\":[true]},\"persisted_content_verified\":{\"type\":\"boolean\",\"enum\":[false]},\"workflow_continuations\":{\"type\":\"array\",\"maxItems\":32,\"items\":{\"type\":\"object\",\"properties\":{\"document_id\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":160},\"workflow_ref\":{\"type\":\"object\",\"properties\":{\"tab_tid\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":2048},\"prefix\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":256},\"workflow_id\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":160},\"navigation_path\":{\"type\":\"array\",\"minItems\":3,\"maxItems\":32,\"items\":{\"type\":\"object\",\"properties\":{\"tid\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":2048},\"label\":{\"type\":\"string\",\"maxLength\":240}},\"required\":[\"tid\",\"label\"],\"additionalProperties\":false}}},\"required\":[\"tab_tid\",\"prefix\",\"workflow_id\",\"navigation_path\"],\"additionalProperties\":false},\"previous_workflow_ref\":{\"type\":\"object\",\"properties\":{\"tab_tid\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":2048},\"prefix\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":256},\"workflow_id\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":160},\"navigation_path\":{\"type\":\"array\",\"minItems\":3,\"maxItems\":32,\"items\":{\"type\":\"object\",\"properties\":{\"tid\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":2048},\"label\":{\"type\":\"string\",\"maxLength\":240}},\"required\":[\"tid\",\"label\"],\"additionalProperties\":false}}},\"required\":[\"tab_tid\",\"prefix\",\"workflow_id\",\"navigation_path\"],\"additionalProperties\":false}},\"required\":[\"document_id\",\"workflow_ref\",\"previous_workflow_ref\"],\"additionalProperties\":false}}},\"required\":[\"package_ref\",\"reopened\",\"workflow_preserved\",\"save_completed\",\"persisted_content_verified\"],\"additionalProperties\":false},\"selector_symbols\":[\"loginom.ready_avatar\",\"workspace.active_tab\",\"workflow.graph\",\"packages.menu\",\"packages.save_as\",\"file_dialog.file_name\",\"file_dialog.confirm\",\"message.text\",\"message.error\",\"message.yes\",\"message.no\"],\"evidence\":[{\"path\":\"bg/helpers/packages.ts\",\"line_start\":215,\"line_end\":342,\"commit\":\"2cad5602158fd2e4836d821d644a2b8d92f571a2\",\"sha256\":\"203d7002abdfc8c88bb59bc500a21ff3003f5dc537b500c2f9802afba21d4a8f\",\"role\":\"helper\"},{\"path\":\"bg/helpers/filedialog.ts\",\"line_start\":42,\"line_end\":58,\"commit\":\"2cad5602158fd2e4836d821d644a2b8d92f571a2\",\"sha256\":\"a6f7aa54eb48a3d1e330820c5322e03d7d139a172f82f344253b534e48897696\",\"role\":\"helper\"}],\"preconditions\":[\"active package and Packages menu resolve\",\"path is normalized below an allowed Loginom storage root\",\"conflict policy is explicit\"],\"postconditions\":[\"the awaited native Save As flow completed without an error\",\"exact normalized destination path is observed in the same active workflow\",\"the same graph remains open; no package close or reopen\",\"persisted content requires separate final reopen acceptance\"],\"effect\":{\"kind\":\"persist\",\"resource\":\"package\",\"destination_policy\":\"session_storage\"},\"idempotency\":{\"policy\":\"reconcile_before_retry\",\"reconcile\":\"completed browser receipt only; never repeat an unknown save\"},\"timeout_ms\":180000,\"retry_budget\":0,\"required_capabilities\":[\"package.save_checkpoint.v1\"],\"min_executor_revision\":\"1.3.0\",\"cleanup\":[\"close transient menu and dialog on a conclusive conflict\",\"preserve the active workflow after success\"]}],\"node_types\":[{\"type\":\"imports.text\",\"title\":\"Текстовый файл\",\"palette_group\":\"Импорт\",\"icon_class\":\"bg-vendor-icon-importtextfile\",\"contract_revision\":\"1.0.0\",\"tabular_inputs\":0,\"tabular_outputs\":1,\"additional_tabular_inputs\":false,\"modes\":[\"delimited\"],\"semantics\":\"Текстовый файл\",\"graph_handler\":\"node_target_v1\",\"graph_handler_status\":\"internal_candidate\",\"configuration_handler\":\"text-import-output-v2\",\"configuration_status\":\"candidate_pending_autonomous_acceptance\",\"sources\":{\"e2e\":[\"bg/helpers/workflow/node.ts\",\"bg/helpers/workflow/ports.ts\",\"bg/helpers/workflow/links.ts\"],\"help_root\":\"viking://resources/loginom-dock/sources/loginom-help\",\"help_path\":\"data/integration/import/txt/README.md\"},\"catalog_add_available\":true,\"platform_availability\":\"requires_live_preflight\",\"full_node_apply_available\":false,\"cache_key\":\"76747dc8dc8ce6f25d1e30ad08b49d2eea0fa411ce2a5170fa6a055b3efb6564\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"candidate_modes\":[\"delimited\"],\"parameter_schema\":{\"type\":\"object\",\"properties\":{\"source\":{\"type\":\"object\",\"properties\":{\"artifact_id\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":128,\"pattern\":\"^[A-Za-z0-9_.:-]+$\"},\"upload_operation_id\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":128,\"pattern\":\"^[A-Za-z0-9_.:-]+$\"},\"bytes\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":16777216},\"sha256\":{\"type\":\"string\",\"minLength\":64,\"maxLength\":64,\"pattern\":\"^[a-f0-9]{64}$\"}},\"required\":[\"artifact_id\",\"upload_operation_id\"],\"additionalProperties\":false,\"description\":\"Use artifact_id and upload_operation_id from the completed, verified artifact delivery. Optional bytes and sha256 must match that receipt.\"},\"settings\":{\"type\":\"object\",\"properties\":{\"source\":{\"type\":\"object\",\"properties\":{\"source_path\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":2048},\"encoding\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":80},\"rows_to_skip\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":1000000},\"first_line_as_title\":{\"type\":\"boolean\"}},\"required\":[],\"additionalProperties\":false},\"format\":{\"type\":\"object\",\"properties\":{\"delimiter\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":1},\"decimal_separator\":{\"type\":\"string\",\"enum\":[\".\",\",\"]},\"null_marker\":{\"type\":\"string\",\"maxLength\":256},\"text_qualifier\":{\"type\":\"string\",\"maxLength\":1}},\"required\":[],\"additionalProperties\":false},\"columns\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"source_name\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":120,\"description\":\"Original observed technical name or an unambiguous original CSV header/label. Do not guess transliteration. name selects the resulting technical name; label selects its display title.\"},\"name\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":120,\"pattern\":\"^[A-Za-z_][A-Za-z0-9_]{0,127}$\",\"description\":\"Technical field name: ASCII letters, digits and underscore; first character is a letter or underscore. Put a human-readable or Russian name in label.\"},\"label\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":120},\"type\":{\"type\":\"string\",\"enum\":[\"integer\",\"real\",\"string\",\"boolean\",\"datetime\"]},\"data_kind\":{\"type\":\"string\",\"enum\":[\"Неопределенное\",\"Непрерывный\",\"Дискретный\"]},\"used\":{\"type\":\"boolean\"}},\"required\":[],\"additionalProperties\":false},\"maxItems\":1000,\"minItems\":1}},\"required\":[],\"additionalProperties\":false,\"description\":\"For target.kind=new supply all three objects: source, format, columns. source requires source_path (the verified delivery destination), encoding, rows_to_skip, first_line_as_title. format requires delimiter, decimal_separator, null_marker, text_qualifier. columns must describe every CSV field with name, label, type, data_kind, used; source_name optionally identifies an original field when renaming. At least one field must be used. For target.kind=existing settings is a patch: omitted settings are preserved, and settings:{} reuses the saved configuration. A column patch identifies its field by source_name or name.\"}},\"required\":[\"source\",\"settings\"],\"additionalProperties\":false},\"session_manifest\":{\"capabilityAbi\":1,\"executorRevision\":\"1.3.0\",\"actionCatalogVersion\":\"2026.09.14-rc6-linux-candidate\",\"actionCatalogDigest\":\"bd3fb15512674a102d7b63d240389e6ea00f553d22c597eadd77ee55547f1e09\",\"selectorCatalogDigest\":\"32f5671322db1950d21023c9e9df9abafbda9395ec090e3fa0806cb4307433ba\",\"e2eCommit\":\"2cad5602158fd2e4836d821d644a2b8d92f571a2\",\"actionManifestDigest\":\"17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4\",\"catalogLifecycleStatus\":\"candidate\",\"acceptanceVerified\":false,\"acceptanceDigest\":null,\"compatibilityProfile\":{\"profile_id\":\"loginom-7.4.2-linux-chromium-ru\",\"loginom_build\":\"7.4.2\",\"platform\":\"linux\",\"browser\":\"chromium\"},\"skillRevision\":\"907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148\",\"loginomProfile\":{\"profile_id\":\"loginom-7.4.2-linux-chromium-ru\",\"loginom_build\":\"7.4.2\",\"platform\":\"linux\",\"browser\":\"chromium\"}}},{\"type\":\"transform.cross_table\",\"title\":\"Кросс-таблица\",\"palette_group\":\"Трансформация\",\"icon_class\":\"bg-vendor-icon-crosstab\",\"contract_revision\":\"1.0.0\",\"tabular_inputs\":1,\"tabular_outputs\":1,\"additional_tabular_inputs\":false,\"modes\":[\"pivot\"],\"semantics\":\"Pivot summary: row keys × column categories × numeric fact aggregates. fixed preserves captured categories with optional NULL/Other groups; sliding changes categories after source updates. Reread the SAME node with dock_node_read and its original source_operation_id; never reconfigure to refresh categories.\",\"graph_handler\":\"node_target_v1\",\"graph_handler_status\":\"internal_candidate\",\"configuration_handler\":\"crosstable-v3-internal-1\",\"configuration_status\":\"candidate_pending_autonomous_acceptance\",\"sources\":{\"e2e\":[\"bg/helpers/workflow/node.ts\",\"bg/helpers/workflow/ports.ts\",\"bg/helpers/workflow/links.ts\"],\"help_root\":\"viking://resources/loginom-dock/sources/loginom-help\",\"help_path\":\"data/processors/transformation/cross-table.html\"},\"catalog_add_available\":false,\"platform_availability\":\"requires_live_preflight\",\"full_node_apply_available\":false,\"cache_key\":\"186c1e95b43e40308db93b059cd725cb2f89b0d341185fb9dddd5e436a9013ea\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"candidate_modes\":[\"pivot\"],\"parameter_schema\":{\"type\":\"object\",\"properties\":{\"row_keys\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"kind\":{\"type\":\"string\",\"enum\":[\"input_field\"],\"description\":\"Reference an existing input field.\"},\"name\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":128,\"pattern\":\"^[A-Za-z_][A-Za-z0-9_]{0,127}$\",\"description\":\"Exact observed technical input field name.\"}},\"required\":[\"kind\",\"name\"],\"additionalProperties\":false,\"description\":\"Use a field from the verified upstream schema.\"},\"maxItems\":128,\"minItems\":0,\"description\":\"Ordered discrete row grouping fields; empty creates an overall summary.\"},\"column\":{\"type\":\"object\",\"properties\":{\"kind\":{\"type\":\"string\",\"enum\":[\"input_field\"],\"description\":\"Reference an existing input field.\"},\"name\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":128,\"pattern\":\"^[A-Za-z_][A-Za-z0-9_]{0,127}$\",\"description\":\"Exact observed technical input field name.\"}},\"required\":[\"kind\",\"name\"],\"additionalProperties\":false,\"description\":\"Legacy shorthand for one discrete column dimension; omit when columns is supplied.\"},\"columns\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"kind\":{\"type\":\"string\",\"enum\":[\"input_field\"],\"description\":\"Reference an existing input field.\"},\"name\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":128,\"pattern\":\"^[A-Za-z_][A-Za-z0-9_]{0,127}$\",\"description\":\"Exact observed technical input field name.\"}},\"required\":[\"kind\",\"name\"],\"additionalProperties\":false,\"description\":\"Use a field from the verified upstream schema.\"},\"maxItems\":128,\"minItems\":0,\"description\":\"Ordered discrete column dimensions; empty creates one summary column group. Do not combine with column.\"},\"facts\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"field\":{\"type\":\"object\",\"properties\":{\"kind\":{\"type\":\"string\",\"enum\":[\"input_field\"],\"description\":\"Reference an existing input field.\"},\"name\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":128,\"pattern\":\"^[A-Za-z_][A-Za-z0-9_]{0,127}$\",\"description\":\"Exact observed technical input field name.\"}},\"required\":[\"kind\",\"name\"],\"additionalProperties\":false,\"description\":\"Existing integer, real, string, Boolean, datetime or Variant fact. Variant exact reads require coverage=full and a verified static prepared source.\"},\"functions\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"enum\":[\"sum\",\"count\",\"min\",\"max\",\"avg\",\"stddev\",\"sum_squares\",\"unique_count\",\"null_count\",\"first\",\"last\"]},\"maxItems\":11,\"minItems\":1,\"description\":\"Complete aggregate set. count includes NULL; unique_count excludes NULL; first/last include NULL in input order. Scalar min/max skip NULL; Variant min includes NULL as the lowest value. Numeric: all functions; string/Boolean/Variant: count,min,max,unique_count,null_count,first,last; datetime additionally avg and stddev (days). stddev uses n-1 and is zero for one non-NULL value.\"}},\"required\":[\"field\",\"functions\"],\"additionalProperties\":false},\"maxItems\":128,\"minItems\":1,\"description\":\"Ordered typed facts and native functions; incompatible functions refuse before target creation.\"},\"category_mode\":{\"type\":\"string\",\"enum\":[\"fixed\",\"sliding\"],\"description\":\"fixed captures initial categories; sliding regenerates categories on each fresh execution.\"},\"include_null\":{\"type\":\"boolean\",\"description\":\"Required for fixed: create a separate missing-category group; omit for sliding.\"},\"include_other\":{\"type\":\"boolean\",\"description\":\"Required for fixed: new categories enter Other; omit for sliding.\"},\"min_values\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":1000,\"description\":\"Minimum category slots per column dimension, including empty reserved slots; independent of limit.\"},\"limit\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":1000,\"description\":\"Maximum category values; zero is unlimited. A positive limit can truncate reserved slots.\"},\"separator\":{\"type\":\"string\",\"enum\":[\"|\",\".\",\"->\",\" \"],\"description\":\"Native category/fact/function label separator; labels preserve meaningful whitespace.\"},\"unique_names\":{\"type\":\"boolean\",\"description\":\"Use native category-derived names with transliteration and collision suffixes. Read observed names; never guess them.\"},\"local_variables\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":128,\"pattern\":\"^[A-Za-z_][A-Za-z0-9_]{0,127}$\",\"description\":\"Technical field name: ASCII letters, digits and underscore; first character is a letter or underscore. Put a human-readable or Russian name in label.\"},\"type\":{\"type\":\"string\",\"enum\":[\"integer\",\"boolean\",\"string\"]},\"value\":{\"anyOf\":[{\"type\":\"integer\",\"minimum\":0,\"maximum\":1000},{\"type\":\"boolean\"},{\"type\":\"string\",\"minLength\":1,\"maxLength\":120}]}},\"required\":[\"name\",\"type\",\"value\"],\"additionalProperties\":false},\"maxItems\":3,\"minItems\":0,\"description\":\"Create or update up to three local control-port default values. Existing names retain their IDs and types. Only local variables are supported; other local values are preserved.\"},\"bindings\":{\"type\":\"object\",\"properties\":{\"limit\":{\"type\":\"object\",\"properties\":{\"variable\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":128,\"pattern\":\"^[A-Za-z_][A-Za-z0-9_]{0,127}$\",\"description\":\"Technical field name: ASCII letters, digits and underscore; first character is a letter or underscore. Put a human-readable or Russian name in label.\"}},\"required\":[\"variable\"],\"additionalProperties\":false},\"unique_names\":{\"type\":\"object\",\"properties\":{\"variable\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":128,\"pattern\":\"^[A-Za-z_][A-Za-z0-9_]{0,127}$\",\"description\":\"Technical field name: ASCII letters, digits and underscore; first character is a letter or underscore. Put a human-readable or Russian name in label.\"}},\"required\":[\"variable\"],\"additionalProperties\":false},\"separator\":{\"type\":\"object\",\"properties\":{\"variable\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":128,\"pattern\":\"^[A-Za-z_][A-Za-z0-9_]{0,127}$\",\"description\":\"Technical field name: ASCII letters, digits and underscore; first character is a letter or underscore. Put a human-readable or Russian name in label.\"}},\"required\":[\"variable\"],\"additionalProperties\":false}},\"required\":[],\"additionalProperties\":false,\"description\":\"Bind schema settings to exact local variable names. New bindings need local_variables declarations; never supply the same static setting. Existing parameters containing only local_variables/bindings preserve roles and change actual variable values.\"}},\"required\":[],\"additionalProperties\":false,\"description\":\"New CrossTable requires row_keys, column or columns, facts and category_mode. fixed also requires explicit include_null/include_other. Existing parameters={} preserves supported settings; refresh output with dock_node_read instead. Explicit category lists are unsupported. Output mappings require execute and exact configured_field names: rename, label, order and autosync are supported; own output fields are mandatory. Exclusion requires a separate downstream Field Parameters node.\"},\"session_manifest\":{\"capabilityAbi\":1,\"executorRevision\":\"1.3.0\",\"actionCatalogVersion\":\"2026.09.14-rc6-linux-candidate\",\"actionCatalogDigest\":\"bd3fb15512674a102d7b63d240389e6ea00f553d22c597eadd77ee55547f1e09\",\"selectorCatalogDigest\":\"32f5671322db1950d21023c9e9df9abafbda9395ec090e3fa0806cb4307433ba\",\"e2eCommit\":\"2cad5602158fd2e4836d821d644a2b8d92f571a2\",\"actionManifestDigest\":\"17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4\",\"catalogLifecycleStatus\":\"candidate\",\"acceptanceVerified\":false,\"acceptanceDigest\":null,\"compatibilityProfile\":{\"profile_id\":\"loginom-7.4.2-linux-chromium-ru\",\"loginom_build\":\"7.4.2\",\"platform\":\"linux\",\"browser\":\"chromium\"},\"skillRevision\":\"907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148\",\"loginomProfile\":{\"profile_id\":\"loginom-7.4.2-linux-chromium-ru\",\"loginom_build\":\"7.4.2\",\"platform\":\"linux\",\"browser\":\"chromium\"}}},{\"type\":\"exports.text\",\"title\":\"Текстовый файл\",\"palette_group\":\"Экспорт\",\"icon_class\":\"bg-vendor-icon-exporttextfile\",\"contract_revision\":\"1.0.0\",\"tabular_inputs\":1,\"tabular_outputs\":0,\"additional_tabular_inputs\":false,\"modes\":[\"delimited\"],\"semantics\":\"Текстовый файл\",\"graph_handler\":\"node_target_v1\",\"graph_handler_status\":\"internal_candidate\",\"configuration_handler\":\"text-export-v1-candidate\",\"configuration_status\":\"candidate_pending_autonomous_acceptance\",\"sources\":{\"e2e\":[\"bg/helpers/workflow/node.ts\",\"bg/helpers/workflow/ports.ts\",\"bg/helpers/workflow/links.ts\"],\"help_root\":\"viking://resources/loginom-dock/sources/loginom-help\",\"help_path\":\"data/integration/export/txt-csv.md\"},\"catalog_add_available\":false,\"platform_availability\":\"requires_live_preflight\",\"full_node_apply_available\":false,\"cache_key\":\"228c2fefa9926aa6a56381778f0b1e49c2285a13ba53ce7841d5948662f036a9\",\"candidate_node_apply_available\":true,\"candidate_apply_tool\":\"dock_node_apply\",\"candidate_modes\":[\"delimited\"],\"parameter_schema\":{\"type\":\"object\",\"properties\":{\"destination\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":512},\"overwrite\":{\"type\":\"string\",\"enum\":[\"reject\",\"replace\"]},\"encoding\":{\"type\":\"string\",\"enum\":[\"UTF-8\"]},\"delimiter\":{\"type\":\"string\",\"enum\":[\";\",\",\",\"\\t\"]},\"header\":{\"type\":\"string\",\"enum\":[\"none\",\"names\",\"labels\"]},\"bom\":{\"type\":\"boolean\"},\"line_ending\":{\"type\":\"string\",\"enum\":[\"LF\",\"CRLF\"]},\"text_qualifier\":{\"type\":\"string\",\"enum\":[\"\\\"\"]},\"decimal_separator\":{\"type\":\"string\",\"enum\":[\".\",\",\"]},\"date_separator\":{\"type\":\"string\",\"enum\":[\".\",\"/\",\"\\\\\",\"-\"]},\"time_separator\":{\"type\":\"string\",\"enum\":[\":\",\".\"]},\"null_marker\":{\"type\":\"string\",\"enum\":[\"\",\"?\",\"null\",\"NULL\"]},\"true_value\":{\"type\":\"string\",\"enum\":[\"True\",\"Истина\",\"Да\"]},\"false_value\":{\"type\":\"string\",\"enum\":[\"False\",\"Ложь\",\"Нет\"]},\"date_format\":{\"type\":\"string\",\"enum\":[\"dd/mm/yyyy\",\"mm/dd/yyyy\",\"yyyy/mm/dd\",\"dd/mm/yy\",\"mm/dd/yy\",\"yy/mm/dd\"]},\"time_format\":{\"type\":\"string\",\"enum\":[\"h:mm\",\"hh:mm\",\"h:mm:ss\",\"hh:mm:ss\"]}},\"required\":[],\"additionalProperties\":false,\"description\":\"For target.kind=new, destination is required and omitted technical settings use creation_defaults. Explicit settings are preserved. For existing nodes, parameters remain a patch; omitted settings are unchanged. Overwrite defaults to reject.\"},\"session_manifest\":{\"capabilityAbi\":1,\"executorRevision\":\"1.3.0\",\"actionCatalogVersion\":\"2026.09.14-rc6-linux-candidate\",\"actionCatalogDigest\":\"bd3fb15512674a102d7b63d240389e6ea00f553d22c597eadd77ee55547f1e09\",\"selectorCatalogDigest\":\"32f5671322db1950d21023c9e9df9abafbda9395ec090e3fa0806cb4307433ba\",\"e2eCommit\":\"2cad5602158fd2e4836d821d644a2b8d92f571a2\",\"actionManifestDigest\":\"17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4\",\"catalogLifecycleStatus\":\"candidate\",\"acceptanceVerified\":false,\"acceptanceDigest\":null,\"compatibilityProfile\":{\"profile_id\":\"loginom-7.4.2-linux-chromium-ru\",\"loginom_build\":\"7.4.2\",\"platform\":\"linux\",\"browser\":\"chromium\"},\"skillRevision\":\"907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148\",\"loginomProfile\":{\"profile_id\":\"loginom-7.4.2-linux-chromium-ru\",\"loginom_build\":\"7.4.2\",\"platform\":\"linux\",\"browser\":\"chromium\"}},\"creation_defaults\":{\"required_parameters\":[\"destination\"],\"parameters\":{\"encoding\":\"UTF-8\",\"delimiter\":\",\",\"header\":\"names\",\"bom\":false,\"line_ending\":\"LF\",\"decimal_separator\":\".\",\"null_marker\":\"\",\"text_qualifier\":\"\\\"\"}}}],\"session_manifest\":{\"capabilityAbi\":1,\"executorRevision\":\"1.3.0\",\"actionCatalogVersion\":\"2026.09.14-rc6-linux-candidate\",\"actionCatalogDigest\":\"bd3fb15512674a102d7b63d240389e6ea00f553d22c597eadd77ee55547f1e09\",\"selectorCatalogDigest\":\"32f5671322db1950d21023c9e9df9abafbda9395ec090e3fa0806cb4307433ba\",\"e2eCommit\":\"2cad5602158fd2e4836d821d644a2b8d92f571a2\",\"actionManifestDigest\":\"17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4\",\"catalogLifecycleStatus\":\"candidate\",\"acceptanceVerified\":false,\"acceptanceDigest\":null,\"compatibilityProfile\":{\"profile_id\":\"loginom-7.4.2-linux-chromium-ru\",\"loginom_build\":\"7.4.2\",\"platform\":\"linux\",\"browser\":\"chromium\"}}}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_action_describe",
+        "time": {
+          "start": 1791455503994,
+          "end": 1791455504053
+        }
+      },
+      "metadata": {
+        "openai": {
+          "itemId": "fc_05ca49e68432ea46016ac7710d324c8191bd4f122d2081335a"
+        }
+      },
+      "id": "prt_11b11a675001eJ9cmyhjPXJeyX",
+      "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+      "messageID": "msg_11b119103001hRDXJGmOGEvnpA"
+    }
+  },
+  {
+    "type": "tool_use",
+    "timestamp": 1791455506773,
+    "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+    "part": {
+      "type": "tool",
+      "tool": "loginom_dock_artifact_deliver",
+      "callID": "call_70b1dedfdbff4d6fbdbcaf1b64a6e3b8",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "deliver-sales-001",
+          "artifact_id": "4510a0bc-516a-4ce5-8be0-1c8127c695b9",
+          "upload_grant_id": "686c3c10-fede-4d98-a60a-e4ad09566854",
+          "budget_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"deliver-sales-001\",\"state\":\"settled\",\"status\":\"SUCCEEDED\",\"cleanup_complete\":true,\"output\":{\"status\":\"SUCCEEDED\",\"upload_operation_id\":\"deliver-sales-001:upload\",\"destination\":\"/user/632c80067e6fca5756edfb93f19122c5452322093359027db68cd91a1c8fa467-0-sales.csv\",\"bytes\":70,\"sha256\":\"684e60cd4cab04ad523f2fa2e2a1580a1b4b8a262e39332b1609f31e9d1da31f\",\"verification_id\":\"deliver-sales-001:verify\",\"cleanup_complete\":true,\"upload_completion_verified\":true},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_artifact_deliver",
+        "time": {
+          "start": 1791455504000,
+          "end": 1791455506760
+        }
+      },
+      "metadata": {
+        "openai": {
+          "itemId": "fc_05ca49e68432ea46016ac7710fe40c8191adb39c348f82cb45"
+        }
+      },
+      "id": "prt_11b11a67c0013MhXW9EzpWMheF",
+      "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+      "messageID": "msg_11b119103001hRDXJGmOGEvnpA"
+    }
+  },
+  {
+    "type": "tool_use",
+    "timestamp": 1791455517299,
+    "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+    "part": {
+      "type": "tool",
+      "tool": "loginom_dock_node_apply",
+      "callID": "call_dac4cea077514f76988c0c469b035813",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "import-sales-001",
+          "contract_revision": "1.0.0",
+          "document_id": "7bb01073-2024-400f-bc41-846ec887bc3e",
+          "workflow_ref": {
+            "workflow_id": "7bb01073-2024-400f-bc41-846ec887bc3e-1"
+          },
+          "target": {
+            "kind": "new",
+            "type": "imports.text",
+            "label": "Импорт sales.csv"
+          },
+          "inputs": [],
+          "mode": "delimited",
+          "parameters": {
+            "source": {
+              "artifact_id": "4510a0bc-516a-4ce5-8be0-1c8127c695b9",
+              "upload_operation_id": "deliver-sales-001:upload",
+              "bytes": 70,
+              "sha256": "684e60cd4cab04ad523f2fa2e2a1580a1b4b8a262e39332b1609f31e9d1da31f"
+            },
+            "settings": {
+              "source": {
+                "source_path": "/user/632c80067e6fca5756edfb93f19122c5452322093359027db68cd91a1c8fa467-0-sales.csv",
+                "encoding": "UTF-8",
+                "rows_to_skip": 0,
+                "first_line_as_title": true
+              },
+              "format": {
+                "delimiter": ",",
+                "decimal_separator": ".",
+                "null_marker": "",
+                "text_qualifier": "\""
+              },
+              "columns": [
+                {
+                  "name": "Region",
+                  "label": "Region",
+                  "type": "string",
+                  "data_kind": "Дискретный",
+                  "used": true
+                },
+                {
+                  "name": "Category",
+                  "label": "Category",
+                  "type": "string",
+                  "data_kind": "Дискретный",
+                  "used": true
+                },
+                {
+                  "name": "Amount",
+                  "label": "Amount",
+                  "type": "real",
+                  "data_kind": "Непрерывный",
+                  "used": true
+                },
+                {
+                  "name": "Units",
+                  "label": "Units",
+                  "type": "integer",
+                  "data_kind": "Непрерывный",
+                  "used": true
+                }
+              ]
+            }
+          },
+          "finish": "execute",
+          "read": {
+            "ports": [
+              0
+            ],
+            "sample_rows": 100,
+            "require_exact_numbers": true
+          }
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"import-sales-001\",\"attempt\":1,\"state\":\"running\",\"cancel_requested\":false,\"server_stop_requested\":false,\"progress\":null,\"output\":{},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false,
+          "loginomPending": true
+        },
+        "title": "dock_node_apply",
+        "time": {
+          "start": 1791455517249,
+          "end": 1791455517296
+        }
+      },
+      "metadata": {
+        "openai": {
+          "itemId": "fc_071388cd58515faf016ac77115287081919dbe8eaab60e4776"
+        }
+      },
+      "id": "prt_11b11baec001NCHcqLysczAycV",
+      "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+      "messageID": "msg_11b11b152001CM7FFus5WRKhls"
+    }
+  },
+  {
+    "type": "tool_use",
+    "timestamp": 1791455571673,
+    "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+    "part": {
+      "type": "tool",
+      "tool": "loginom_dock_node_wait",
+      "callID": "call_64bc691b14f34fcfa1e6aafe35e60d02",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "import-sales-001",
+          "timeout_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"import-sales-001\",\"attempt\":1,\"state\":\"settled\",\"cancel_requested\":false,\"server_stop_requested\":false,\"status\":\"SUCCEEDED\",\"action_key\":\"node.apply\",\"phase\":\"node_ready\",\"effect_possible\":true,\"cleanup_complete\":true,\"node\":{\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"workflow_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e-1\",\"node_id\":\"e7ff65d0-c510-4e7d-b859-58d51c9c69aa\"},\"execution\":{\"status\":\"completed\",\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:1\"},\"package_saved\":false,\"configuration\":{\"status\":\"applied\",\"readback\":{\"kind\":\"text_import\",\"scope\":\"observed_before_verified_finish\",\"node\":{\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"workflow_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e-1\",\"node_id\":\"e7ff65d0-c510-4e7d-b859-58d51c9c69aa\"},\"receipt_ids\":[\"import-sales-001:configure\",\"import-sales-001:output_mapping\",\"import-sales-001:finish\"],\"values_are\":\"observed_ui_values\",\"source\":{\"source_path\":\"/user/632c80067e6fca5756edfb93f19122c5452322093359027db68cd91a1c8fa467-0-sales.csv\",\"connection\":\"Локальное\",\"encoding\":\"UTF-8 (65001)\",\"rows_to_skip\":\"0\",\"first_line_as_title\":true},\"format\":{\"delimiter\":\",\",\"text_qualifier\":\"\\\"\",\"null_marker\":\"\",\"decimal_separator\":\".\"},\"columns\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"used\":true},{\"index\":1,\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"used\":true},{\"index\":2,\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"data_kind\":\"Непрерывный\",\"used\":true},{\"index\":3,\"name\":\"Units\",\"label\":\"Units\",\"type\":\"integer\",\"data_kind\":\"Непрерывный\",\"used\":true}],\"output_mapping\":{\"port\":0,\"autosync\":true,\"fields\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"source_name\":\"Region\"},{\"index\":1,\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"source_name\":\"Category\"},{\"index\":2,\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"data_kind\":\"Непрерывный\",\"source_name\":\"Amount\"},{\"index\":3,\"name\":\"Units\",\"label\":\"Units\",\"type\":\"integer\",\"data_kind\":\"Непрерывный\",\"source_name\":\"Units\"}]},\"package_persistence_verified\":false}},\"output\":{\"status\":\"complete\",\"evidence_ref\":\"import-sales-001:read\",\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:1\",\"ports\":[{\"port\":0,\"port_guid\":\"58f7e6c3-511e-39d7-8853-036e0a1a7612\",\"fresh\":true,\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:1\",\"schema\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\"},{\"index\":1,\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"data_kind\":\"Дискретный\"},{\"index\":2,\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"data_kind\":\"Непрерывный\"},{\"index\":3,\"name\":\"Units\",\"label\":\"Units\",\"type\":\"integer\",\"data_kind\":\"Непрерывный\"}],\"row_count\":5,\"sample\":[[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"A\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":10,\"decimal\":\"1E+01\",\"representation\":\"binary64\",\"display_text\":\"1E+01\",\"precision\":\"17_significant_digits\",\"is_null\":false},{\"type\":\"integer\",\"value\":\"1\",\"representation\":\"decimal_integer\",\"precision\":\"exact_integer\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"A\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":5,\"decimal\":\"5E+00\",\"representation\":\"binary64\",\"display_text\":\"5E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false},{\"type\":\"integer\",\"value\":\"4\",\"representation\":\"decimal_integer\",\"precision\":\"exact_integer\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"B\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":7,\"decimal\":\"7E+00\",\"representation\":\"binary64\",\"display_text\":\"7E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false},{\"type\":\"integer\",\"value\":\"2\",\"representation\":\"decimal_integer\",\"precision\":\"exact_integer\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"S\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"A\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":3,\"decimal\":\"3E+00\",\"representation\":\"binary64\",\"display_text\":\"3E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false},{\"type\":\"integer\",\"value\":\"3\",\"representation\":\"decimal_integer\",\"precision\":\"exact_integer\",\"is_null\":false}],[{\"type\":\"string\",\"value\":\"S\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"string\",\"value\":\"B\",\"representation\":\"cached_display_text\",\"precision\":\"display_text\",\"is_null\":false},{\"type\":\"real\",\"value\":2,\"decimal\":\"2E+00\",\"representation\":\"binary64\",\"display_text\":\"2E+00\",\"precision\":\"17_significant_digits\",\"is_null\":false},{\"type\":\"integer\",\"value\":\"5\",\"representation\":\"decimal_integer\",\"precision\":\"exact_integer\",\"is_null\":false}]],\"sample_rows\":5,\"sample_complete\":true,\"precision\":{\"numbers_verified\":true,\"limitations\":[],\"strings\":\"cached UI text; source completeness requires independent audit\"},\"table\":{\"view_guid\":\"433eaf16-42b7-4beb-b77d-4eb6f74b32fe\",\"port_guid\":\"58f7e6c3-511e-39d7-8853-036e0a1a7612\",\"table_tid\":\"MF;TF-1;ViewsForm;BrowseView\"}}],\"format_restoration\":{\"restored\":true,\"table\":{\"view_guid\":\"433eaf16-42b7-4beb-b77d-4eb6f74b32fe\",\"port_guid\":\"58f7e6c3-511e-39d7-8853-036e0a1a7612\",\"table_tid\":\"MF;TF-1;ViewsForm;BrowseView\"}},\"workflow_returned\":true},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_node_wait",
+        "time": {
+          "start": 1791455520366,
+          "end": 1791455571659
+        }
+      },
+      "metadata": {
+        "openai": {
+          "itemId": "fc_0a960b75bb493a79016ac7711fd0748191b6e09f5084b0383d"
+        }
+      },
+      "id": "prt_11b11e472001xi8npO188LiSOV",
+      "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+      "messageID": "msg_11b11da8a001ewj20wuAHQWmQ8"
+    }
+  },
+  {
+    "type": "tool_use",
+    "timestamp": 1791455589105,
+    "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+    "part": {
+      "type": "tool",
+      "tool": "loginom_dock_node_apply",
+      "callID": "call_4c9beab555d74cd992b30f93b55c6e6d",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "cross-sales-001",
+          "contract_revision": "1.0.0",
+          "document_id": "7bb01073-2024-400f-bc41-846ec887bc3e",
+          "workflow_ref": {
+            "workflow_id": "7bb01073-2024-400f-bc41-846ec887bc3e-1"
+          },
+          "target": {
+            "kind": "new",
+            "type": "transform.cross_table",
+            "label": "Кросс-таблица продаж"
+          },
+          "inputs": [
+            {
+              "source": {
+                "document_id": "7bb01073-2024-400f-bc41-846ec887bc3e",
+                "workflow_id": "7bb01073-2024-400f-bc41-846ec887bc3e-1",
+                "node_id": "e7ff65d0-c510-4e7d-b859-58d51c9c69aa"
+              },
+              "output": 0,
+              "input": 0
+            }
+          ],
+          "mode": "pivot",
+          "parameters": {
+            "row_keys": [
+              {
+                "kind": "input_field",
+                "name": "Region"
+              }
+            ],
+            "columns": [
+              {
+                "kind": "input_field",
+                "name": "Category"
+              }
+            ],
+            "facts": [
+              {
+                "field": {
+                  "kind": "input_field",
+                  "name": "Amount"
+                },
+                "functions": [
+                  "sum"
+                ]
+              },
+              {
+                "field": {
+                  "kind": "input_field",
+                  "name": "Units"
+                },
+                "functions": [
+                  "max"
+                ]
+              }
+            ],
+            "category_mode": "fixed",
+            "include_null": false,
+            "include_other": false,
+            "min_values": 0,
+            "limit": 0,
+            "separator": "|",
+            "unique_names": true
+          },
+          "finish": "execute",
+          "read": {
+            "ports": [
+              0
+            ],
+            "sample_rows": 100,
+            "require_exact_numbers": true,
+            "coverage": "full"
+          }
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"cross-sales-001\",\"attempt\":1,\"state\":\"running\",\"cancel_requested\":false,\"server_stop_requested\":false,\"progress\":null,\"output\":{},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false,
+          "loginomPending": true
+        },
+        "title": "dock_node_apply",
+        "time": {
+          "start": 1791455589047,
+          "end": 1791455589103
+        }
+      },
+      "metadata": {
+        "openai": {
+          "itemId": "fc_032dc2e820aa3464016ac7715e6a68819194c1b2d6bf6a38ee"
+        }
+      },
+      "id": "prt_11b12d8fb001tmD5RtoftrVwwC",
+      "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+      "messageID": "msg_11b12cee8001jhcqKxqK9Od9W5"
+    }
+  },
+  {
+    "type": "tool_use",
+    "timestamp": 1791455640709,
+    "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+    "part": {
+      "type": "tool",
+      "tool": "loginom_dock_node_wait",
+      "callID": "call_e0040222c5b447f78d18518ca7eed084",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "cross-sales-001",
+          "timeout_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"cross-sales-001\",\"attempt\":1,\"state\":\"settled\",\"cancel_requested\":false,\"server_stop_requested\":false,\"status\":\"SUCCEEDED\",\"action_key\":\"node.apply\",\"phase\":\"node_ready\",\"effect_possible\":true,\"cleanup_complete\":true,\"node\":{\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"workflow_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e-1\",\"node_id\":\"d6ca3521-25eb-4634-a78a-9855af8f6add\"},\"execution\":{\"status\":\"completed\",\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:3\"},\"package_saved\":false,\"configuration\":{\"status\":\"applied\",\"readback\":{\"kind\":\"crosstable\",\"scope\":\"observed_before_verified_finish\",\"values_are\":\"observed_ui_values\",\"node\":{\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"workflow_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e-1\",\"node_id\":\"d6ca3521-25eb-4634-a78a-9855af8f6add\"},\"receipt_ids\":[\"cross-sales-001:input_mapping\",\"cross-sales-001:configure\",\"cross-sales-001:node_finish\",\"cross-sales-001:output_mapping\",\"cross-sales-001:finish\",\"cross-sales-001:execute\",\"cross-sales-001:read\"],\"mode\":\"pivot\",\"category_mode\":\"fixed\",\"row_keys\":[{\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"order\":0}],\"column\":{\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\"},\"columns\":[{\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"order\":0}],\"facts\":[{\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"order\":0,\"functions\":[\"sum\"]},{\"name\":\"Units\",\"label\":\"Units\",\"type\":\"integer\",\"order\":1,\"functions\":[\"max\"]}],\"options\":{\"separator\":\"|\",\"unique_names\":true,\"limit\":0,\"min_values\":0,\"min_values_by_dimension\":[{\"field\":\"Category\",\"value\":0}],\"variable_bindings\":{},\"include_null\":false,\"include_other\":false},\"output_scope\":\"observed_after_verified_execution\",\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:3\",\"category_fields\":[{\"category\":\"A\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"A_Amount_Sum\",\"label\":\"A|Amount|Сумма\",\"type\":\"real\"},{\"category\":\"A\",\"category_kind\":\"value\",\"fact\":\"Units\",\"function\":\"max\",\"field\":\"A_Units_Max\",\"label\":\"A|Units|Максимум\",\"type\":\"integer\"},{\"category\":\"B\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"B_Amount_Sum\",\"label\":\"B|Amount|Сумма\",\"type\":\"real\"},{\"category\":\"B\",\"category_kind\":\"value\",\"fact\":\"Units\",\"function\":\"max\",\"field\":\"B_Units_Max\",\"label\":\"B|Units|Максимум\",\"type\":\"integer\"}],\"package_persistence_verified\":false}},\"output\":{\"status\":\"complete\",\"evidence_ref\":\"cross-sales-001:read\",\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:3\",\"ports\":[{\"port\":0,\"port_guid\":\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\",\"fresh\":true,\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:3\",\"category_fields\":[{\"category\":\"A\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"A_Amount_Sum\",\"label\":\"A|Amount|Сумма\",\"type\":\"real\"},{\"category\":\"A\",\"category_kind\":\"value\",\"fact\":\"Units\",\"function\":\"max\",\"field\":\"A_Units_Max\",\"label\":\"A|Units|Максимум\",\"type\":\"integer\"},{\"category\":\"B\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"B_Amount_Sum\",\"label\":\"B|Amount|Сумма\",\"type\":\"real\"},{\"category\":\"B\",\"category_kind\":\"value\",\"fact\":\"Units\",\"function\":\"max\",\"field\":\"B_Units_Max\",\"label\":\"B|Units|Максимум\",\"type\":\"integer\"}],\"schema\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\"},{\"index\":1,\"name\":\"A_Amount_Sum\",\"label\":\"A|Amount|Сумма\",\"type\":\"real\"},{\"index\":2,\"name\":\"A_Units_Max\",\"label\":\"A|Units|Максимум\",\"type\":\"integer\"},{\"index\":3,\"name\":\"B_Amount_Sum\",\"label\":\"B|Amount|Сумма\",\"type\":\"real\"},{\"index\":4,\"name\":\"B_Units_Max\",\"label\":\"B|Units|Максимум\",\"type\":\"integer\"}],\"row_count\":2,\"sample\":[[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"native_string\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"string\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4e\"}},{\"type\":\"real\",\"value\":\"15\",\"decimal\":\"15\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000002e40\",\"bits\":64}},{\"type\":\"integer\",\"value\":\"4\",\"decimal\":\"4\",\"representation\":\"decimal_integer\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"integer\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0400000000000000\",\"bits\":64}},{\"type\":\"real\",\"value\":\"7\",\"decimal\":\"7\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000001c40\",\"bits\":64}},{\"type\":\"integer\",\"value\":\"2\",\"decimal\":\"2\",\"representation\":\"decimal_integer\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"integer\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0200000000000000\",\"bits\":64}}],[{\"type\":\"string\",\"value\":\"S\",\"representation\":\"native_string\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"string\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"53\"}},{\"type\":\"real\",\"value\":\"3\",\"decimal\":\"3\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000840\",\"bits\":64}},{\"type\":\"integer\",\"value\":\"3\",\"decimal\":\"3\",\"representation\":\"decimal_integer\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"integer\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0300000000000000\",\"bits\":64}},{\"type\":\"real\",\"value\":\"2\",\"decimal\":\"2\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000040\",\"bits\":64}},{\"type\":\"integer\",\"value\":\"5\",\"decimal\":\"5\",\"representation\":\"decimal_integer\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"integer\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0500000000000000\",\"bits\":64}}]],\"sample_rows\":2,\"sample_complete\":true,\"precision\":{\"numbers_verified\":true,\"limitations\":[\"no_server_snapshot\",\"unobserved_aba_risk\"],\"strings\":\"exact_native\"},\"exact_table\":{\"rows\":[[{\"type\":\"string\",\"cell_type\":\"string\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4e\"},\"value\":\"N\",\"representation\":\"native_string\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000002e40\",\"bits\":64},\"value\":\"15\",\"decimal\":\"15\",\"representation\":\"binary64_decimal\"},{\"type\":\"integer\",\"cell_type\":\"integer\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0400000000000000\",\"bits\":64},\"value\":\"4\",\"decimal\":\"4\",\"representation\":\"decimal_integer\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000001c40\",\"bits\":64},\"value\":\"7\",\"decimal\":\"7\",\"representation\":\"binary64_decimal\"},{\"type\":\"integer\",\"cell_type\":\"integer\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0200000000000000\",\"bits\":64},\"value\":\"2\",\"decimal\":\"2\",\"representation\":\"decimal_integer\"}],[{\"type\":\"string\",\"cell_type\":\"string\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"53\"},\"value\":\"S\",\"representation\":\"native_string\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000840\",\"bits\":64},\"value\":\"3\",\"decimal\":\"3\",\"representation\":\"binary64_decimal\"},{\"type\":\"integer\",\"cell_type\":\"integer\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0300000000000000\",\"bits\":64},\"value\":\"3\",\"decimal\":\"3\",\"representation\":\"decimal_integer\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000040\",\"bits\":64},\"value\":\"2\",\"decimal\":\"2\",\"representation\":\"binary64_decimal\"},{\"type\":\"integer\",\"cell_type\":\"integer\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0500000000000000\",\"bits\":64},\"value\":\"5\",\"decimal\":\"5\",\"representation\":\"decimal_integer\"}]],\"complete\":true},\"read_coverage\":{\"cells_read\":10,\"rows_read\":2,\"columns_read\":5,\"table_complete\":true},\"read_consistency\":{\"kind\":\"observed_local\",\"changed\":false,\"exclusive_operation\":true,\"stability_basis\":\"owned_static_completed_fixture\",\"atomic_snapshot\":false,\"unobserved_aba_excluded\":false},\"cell_precision\":{\"cells\":\"exact_native\",\"temporal\":\"native_serial_only\"},\"binding\":{\"read_id\":\"native-1fd69614a09b7e0dca85f2350c13ff4767d29f86df3fdfb7\",\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"workflow_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e-1\",\"package_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:7bb01073-2024-400f-bc41-846ec887bc3e-1\",\"node_id\":\"d6ca3521-25eb-4634-a78a-9855af8f6add\",\"port_guid\":\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\",\"execution\":{\"status\":\"completed\",\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:3\"}},\"limitations\":[\"no_server_snapshot\",\"unobserved_aba_risk\"]}],\"workflow_returned\":true},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_node_wait",
+        "time": {
+          "start": 1791455592278,
+          "end": 1791455640690
+        }
+      },
+      "metadata": {
+        "openai": {
+          "itemId": "fc_09abaa1475396930016ac77167da6481919eaa78eb18a1c29f"
+        }
+      },
+      "id": "prt_11b12fdd8001LKU9dXHNiYwn1o",
+      "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+      "messageID": "msg_11b12f3070016gdJ0EeFsVDINa"
+    }
+  },
+  {
+    "type": "tool_use",
+    "timestamp": 1791455652507,
+    "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+    "part": {
+      "type": "tool",
+      "tool": "loginom_dock_node_apply",
+      "callID": "call_84ec73891f4a4beb9bab9b4d75268127",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "cross-sales-names-001",
+          "contract_revision": "1.0.0",
+          "document_id": "7bb01073-2024-400f-bc41-846ec887bc3e",
+          "workflow_ref": {
+            "workflow_id": "7bb01073-2024-400f-bc41-846ec887bc3e-1"
+          },
+          "target": {
+            "kind": "existing",
+            "type": "transform.cross_table",
+            "ref": {
+              "document_id": "7bb01073-2024-400f-bc41-846ec887bc3e",
+              "workflow_id": "7bb01073-2024-400f-bc41-846ec887bc3e-1",
+              "node_id": "d6ca3521-25eb-4634-a78a-9855af8f6add"
+            }
+          },
+          "inputs": [],
+          "mode": "pivot",
+          "parameters": {},
+          "mappings": [
+            {
+              "direction": "output",
+              "port": 0,
+              "autosync": false,
+              "changes": [
+                {
+                  "source": {
+                    "kind": "configured_field",
+                    "name": "A_Amount_Sum"
+                  },
+                  "name": "A_amount_sum",
+                  "label": "A_amount_sum"
+                },
+                {
+                  "source": {
+                    "kind": "configured_field",
+                    "name": "A_Units_Max"
+                  },
+                  "name": "A_units_max",
+                  "label": "A_units_max"
+                },
+                {
+                  "source": {
+                    "kind": "configured_field",
+                    "name": "B_Amount_Sum"
+                  },
+                  "name": "B_amount_sum",
+                  "label": "B_amount_sum"
+                },
+                {
+                  "source": {
+                    "kind": "configured_field",
+                    "name": "B_Units_Max"
+                  },
+                  "name": "B_units_max",
+                  "label": "B_units_max"
+                }
+              ]
+            }
+          ],
+          "finish": "execute",
+          "read": {
+            "ports": [
+              0
+            ],
+            "sample_rows": 100,
+            "require_exact_numbers": true,
+            "coverage": "full"
+          }
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"cross-sales-names-001\",\"attempt\":1,\"state\":\"running\",\"cancel_requested\":false,\"server_stop_requested\":false,\"progress\":null,\"output\":{},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false,
+          "loginomPending": true
+        },
+        "title": "dock_node_apply",
+        "time": {
+          "start": 1791455652436,
+          "end": 1791455652495
+        }
+      },
+      "metadata": {
+        "openai": {
+          "itemId": "fc_0cd7b3bee4c1415e016ac7719d0a2c8191b61e7fb87fa3181a"
+        }
+      },
+      "id": "prt_11b13cd9e001Gce9QpKV5rcDCS",
+      "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+      "messageID": "msg_11b13bc81001zC28t80UtMTLZN"
+    }
+  },
+  {
+    "type": "tool_use",
+    "timestamp": 1791455707646,
+    "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+    "part": {
+      "type": "tool",
+      "tool": "loginom_dock_node_wait",
+      "callID": "call_b3a765490bbc488f855abcf3c350fd9d",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "cross-sales-names-001",
+          "timeout_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"cross-sales-names-001\",\"attempt\":1,\"state\":\"settled\",\"cancel_requested\":false,\"server_stop_requested\":false,\"status\":\"SUCCEEDED\",\"action_key\":\"node.apply\",\"phase\":\"node_ready\",\"effect_possible\":true,\"cleanup_complete\":true,\"node\":{\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"workflow_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e-1\",\"node_id\":\"d6ca3521-25eb-4634-a78a-9855af8f6add\"},\"execution\":{\"status\":\"completed\",\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:5\"},\"package_saved\":false,\"configuration\":{\"status\":\"applied\",\"readback\":{\"kind\":\"crosstable\",\"scope\":\"observed_before_verified_finish\",\"values_are\":\"observed_ui_values\",\"node\":{\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"workflow_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e-1\",\"node_id\":\"d6ca3521-25eb-4634-a78a-9855af8f6add\"},\"receipt_ids\":[\"cross-sales-names-001:input_mapping\",\"cross-sales-names-001:configure\",\"cross-sales-names-001:node_finish\",\"cross-sales-names-001:output_mapping\",\"cross-sales-names-001:finish\",\"cross-sales-names-001:execute\",\"cross-sales-names-001:read\"],\"mode\":\"pivot\",\"category_mode\":\"fixed\",\"row_keys\":[{\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"order\":0}],\"column\":{\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\"},\"columns\":[{\"name\":\"Category\",\"label\":\"Category\",\"type\":\"string\",\"order\":0}],\"facts\":[{\"name\":\"Amount\",\"label\":\"Amount\",\"type\":\"real\",\"order\":0,\"functions\":[\"sum\"]},{\"name\":\"Units\",\"label\":\"Units\",\"type\":\"integer\",\"order\":1,\"functions\":[\"max\"]}],\"options\":{\"separator\":\"|\",\"unique_names\":true,\"limit\":0,\"min_values\":0,\"min_values_by_dimension\":[{\"field\":\"Category\",\"value\":0}],\"variable_bindings\":{},\"include_null\":false,\"include_other\":false},\"output_scope\":\"observed_after_verified_execution\",\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:5\",\"category_fields\":[{\"category\":\"A\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"A_amount_sum\",\"label\":\"A_amount_sum\",\"type\":\"real\"},{\"category\":\"A\",\"category_kind\":\"value\",\"fact\":\"Units\",\"function\":\"max\",\"field\":\"A_units_max\",\"label\":\"A_units_max\",\"type\":\"integer\"},{\"category\":\"B\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"B_amount_sum\",\"label\":\"B_amount_sum\",\"type\":\"real\"},{\"category\":\"B\",\"category_kind\":\"value\",\"fact\":\"Units\",\"function\":\"max\",\"field\":\"B_units_max\",\"label\":\"B_units_max\",\"type\":\"integer\"}],\"package_persistence_verified\":false,\"output_mapping\":{\"verified\":true,\"inventory_complete\":true,\"source_identity_verified\":true,\"node_context\":{\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"workflow_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e-1\",\"node_id\":\"d6ca3521-25eb-4634-a78a-9855af8f6add\",\"verified\":true,\"output_port\":{\"port\":0}},\"autosync\":false,\"source_fields\":[{\"record_id\":\"569\",\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"required\":true},{\"record_id\":\"570\",\"name\":\"A_Amount_Sum\",\"label\":\"A|Amount|Сумма\",\"type\":\"real\",\"required\":true},{\"record_id\":\"571\",\"name\":\"A_Units_Max\",\"label\":\"A|Units|Максимум\",\"type\":\"integer\",\"required\":true},{\"record_id\":\"572\",\"name\":\"B_Amount_Sum\",\"label\":\"B|Amount|Сумма\",\"type\":\"real\",\"required\":true},{\"record_id\":\"573\",\"name\":\"B_Units_Max\",\"label\":\"B|Units|Максимум\",\"type\":\"integer\",\"required\":true}],\"target_fields\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"excluded\":false,\"source\":{\"record_id\":\"569\",\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\"}},{\"index\":1,\"name\":\"A_amount_sum\",\"label\":\"A_amount_sum\",\"type\":\"real\",\"excluded\":false,\"source\":{\"record_id\":\"570\",\"name\":\"A_Amount_Sum\",\"label\":\"A|Amount|Сумма\",\"type\":\"real\"}},{\"index\":2,\"name\":\"A_units_max\",\"label\":\"A_units_max\",\"type\":\"integer\",\"excluded\":false,\"source\":{\"record_id\":\"571\",\"name\":\"A_Units_Max\",\"label\":\"A|Units|Максимум\",\"type\":\"integer\"}},{\"index\":3,\"name\":\"B_amount_sum\",\"label\":\"B_amount_sum\",\"type\":\"real\",\"excluded\":false,\"source\":{\"record_id\":\"572\",\"name\":\"B_Amount_Sum\",\"label\":\"B|Amount|Сумма\",\"type\":\"real\"}},{\"index\":4,\"name\":\"B_units_max\",\"label\":\"B_units_max\",\"type\":\"integer\",\"excluded\":false,\"source\":{\"record_id\":\"573\",\"name\":\"B_Units_Max\",\"label\":\"B|Units|Максимум\",\"type\":\"integer\"}}]}}},\"output\":{\"status\":\"complete\",\"evidence_ref\":\"cross-sales-names-001:read\",\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:5\",\"ports\":[{\"port\":0,\"port_guid\":\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\",\"fresh\":true,\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:5\",\"category_fields\":[{\"category\":\"A\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"A_amount_sum\",\"label\":\"A_amount_sum\",\"type\":\"real\"},{\"category\":\"A\",\"category_kind\":\"value\",\"fact\":\"Units\",\"function\":\"max\",\"field\":\"A_units_max\",\"label\":\"A_units_max\",\"type\":\"integer\"},{\"category\":\"B\",\"category_kind\":\"value\",\"fact\":\"Amount\",\"function\":\"sum\",\"field\":\"B_amount_sum\",\"label\":\"B_amount_sum\",\"type\":\"real\"},{\"category\":\"B\",\"category_kind\":\"value\",\"fact\":\"Units\",\"function\":\"max\",\"field\":\"B_units_max\",\"label\":\"B_units_max\",\"type\":\"integer\"}],\"schema\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\"},{\"index\":1,\"name\":\"A_amount_sum\",\"label\":\"A_amount_sum\",\"type\":\"real\"},{\"index\":2,\"name\":\"A_units_max\",\"label\":\"A_units_max\",\"type\":\"integer\"},{\"index\":3,\"name\":\"B_amount_sum\",\"label\":\"B_amount_sum\",\"type\":\"real\"},{\"index\":4,\"name\":\"B_units_max\",\"label\":\"B_units_max\",\"type\":\"integer\"}],\"row_count\":2,\"sample\":[[{\"type\":\"string\",\"value\":\"N\",\"representation\":\"native_string\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"string\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4e\"}},{\"type\":\"real\",\"value\":\"15\",\"decimal\":\"15\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000002e40\",\"bits\":64}},{\"type\":\"integer\",\"value\":\"4\",\"decimal\":\"4\",\"representation\":\"decimal_integer\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"integer\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0400000000000000\",\"bits\":64}},{\"type\":\"real\",\"value\":\"7\",\"decimal\":\"7\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000001c40\",\"bits\":64}},{\"type\":\"integer\",\"value\":\"2\",\"decimal\":\"2\",\"representation\":\"decimal_integer\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"integer\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0200000000000000\",\"bits\":64}}],[{\"type\":\"string\",\"value\":\"S\",\"representation\":\"native_string\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"string\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"53\"}},{\"type\":\"real\",\"value\":\"3\",\"decimal\":\"3\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000840\",\"bits\":64}},{\"type\":\"integer\",\"value\":\"3\",\"decimal\":\"3\",\"representation\":\"decimal_integer\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"integer\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0300000000000000\",\"bits\":64}},{\"type\":\"real\",\"value\":\"2\",\"decimal\":\"2\",\"representation\":\"binary64_decimal\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"real\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000040\",\"bits\":64}},{\"type\":\"integer\",\"value\":\"5\",\"decimal\":\"5\",\"representation\":\"decimal_integer\",\"precision\":\"exact_native\",\"is_null\":false,\"cell_type\":\"integer\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0500000000000000\",\"bits\":64}}]],\"sample_rows\":2,\"sample_complete\":true,\"precision\":{\"numbers_verified\":true,\"limitations\":[\"no_server_snapshot\",\"unobserved_aba_risk\"],\"strings\":\"exact_native\"},\"exact_table\":{\"rows\":[[{\"type\":\"string\",\"cell_type\":\"string\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"4e\"},\"value\":\"N\",\"representation\":\"native_string\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000002e40\",\"bits\":64},\"value\":\"15\",\"decimal\":\"15\",\"representation\":\"binary64_decimal\"},{\"type\":\"integer\",\"cell_type\":\"integer\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0400000000000000\",\"bits\":64},\"value\":\"4\",\"decimal\":\"4\",\"representation\":\"decimal_integer\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000001c40\",\"bits\":64},\"value\":\"7\",\"decimal\":\"7\",\"representation\":\"binary64_decimal\"},{\"type\":\"integer\",\"cell_type\":\"integer\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0200000000000000\",\"bits\":64},\"value\":\"2\",\"decimal\":\"2\",\"representation\":\"decimal_integer\"}],[{\"type\":\"string\",\"cell_type\":\"string\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":8,\"encoding\":\"utf8\",\"utf8_hex\":\"53\"},\"value\":\"S\",\"representation\":\"native_string\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000840\",\"bits\":64},\"value\":\"3\",\"decimal\":\"3\",\"representation\":\"binary64_decimal\"},{\"type\":\"integer\",\"cell_type\":\"integer\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0300000000000000\",\"bits\":64},\"value\":\"3\",\"decimal\":\"3\",\"representation\":\"decimal_integer\"},{\"type\":\"real\",\"cell_type\":\"real\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":5,\"encoding\":\"ieee754-binary64-le\",\"bytes_le\":\"0000000000000040\",\"bits\":64},\"value\":\"2\",\"decimal\":\"2\",\"representation\":\"binary64_decimal\"},{\"type\":\"integer\",\"cell_type\":\"integer\",\"is_null\":false,\"precision\":\"exact_native\",\"native\":{\"tag\":20,\"encoding\":\"signed-int64-le\",\"bytes_le\":\"0500000000000000\",\"bits\":64},\"value\":\"5\",\"decimal\":\"5\",\"representation\":\"decimal_integer\"}]],\"complete\":true},\"read_coverage\":{\"cells_read\":10,\"rows_read\":2,\"columns_read\":5,\"table_complete\":true},\"read_consistency\":{\"kind\":\"observed_local\",\"changed\":false,\"exclusive_operation\":true,\"stability_basis\":\"owned_static_completed_fixture\",\"atomic_snapshot\":false,\"unobserved_aba_excluded\":false},\"cell_precision\":{\"cells\":\"exact_native\",\"temporal\":\"native_serial_only\"},\"binding\":{\"read_id\":\"native-f84f4cfaa9341797da47de3139424308f1e1ac935261c58a\",\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"workflow_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e-1\",\"package_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:7bb01073-2024-400f-bc41-846ec887bc3e-1\",\"node_id\":\"d6ca3521-25eb-4634-a78a-9855af8f6add\",\"port_guid\":\"4ba0e2c2-69ad-3a32-bbdc-75714efe7a51\",\"execution\":{\"status\":\"completed\",\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:5\"}},\"limitations\":[\"no_server_snapshot\",\"unobserved_aba_risk\"]}],\"workflow_returned\":true},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_node_wait",
+        "time": {
+          "start": 1791455657690,
+          "end": 1791455707632
+        }
+      },
+      "metadata": {
+        "openai": {
+          "itemId": "fc_083bb3d18904f6e3016ac771a9231c8191b121db4e11a84acc"
+        }
+      },
+      "id": "prt_11b13fcfa001nnf6ngdgCYOfK2",
+      "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+      "messageID": "msg_11b13ea98001mqoxpUhcbLQORU"
+    }
+  },
+  {
+    "type": "tool_use",
+    "timestamp": 1791455721576,
+    "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+    "part": {
+      "type": "tool",
+      "tool": "loginom_dock_node_apply",
+      "callID": "call_58985842c5e14ecb8eb38e004becfc65",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "export-sales-cross-001",
+          "contract_revision": "1.0.0",
+          "document_id": "7bb01073-2024-400f-bc41-846ec887bc3e",
+          "workflow_ref": {
+            "workflow_id": "7bb01073-2024-400f-bc41-846ec887bc3e-1"
+          },
+          "target": {
+            "kind": "new",
+            "type": "exports.text",
+            "label": "Экспорт результата CSV"
+          },
+          "inputs": [
+            {
+              "source": {
+                "document_id": "7bb01073-2024-400f-bc41-846ec887bc3e",
+                "workflow_id": "7bb01073-2024-400f-bc41-846ec887bc3e-1",
+                "node_id": "d6ca3521-25eb-4634-a78a-9855af8f6add"
+              },
+              "output": 0,
+              "input": 0
+            }
+          ],
+          "mode": "delimited",
+          "parameters": {
+            "destination": "/user/eval-reference-crosstable-multi-facts-1-crosstable-multi-facts-1.result.csv",
+            "overwrite": "reject",
+            "encoding": "UTF-8",
+            "delimiter": ",",
+            "header": "names",
+            "bom": false,
+            "line_ending": "LF",
+            "text_qualifier": "\"",
+            "decimal_separator": ".",
+            "null_marker": ""
+          },
+          "finish": "execute",
+          "read": {
+            "ports": []
+          }
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"export-sales-cross-001\",\"attempt\":1,\"state\":\"running\",\"cancel_requested\":false,\"server_stop_requested\":false,\"progress\":null,\"output\":{},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false,
+          "loginomPending": true
+        },
+        "title": "dock_node_apply",
+        "time": {
+          "start": 1791455721520,
+          "end": 1791455721564
+        }
+      },
+      "metadata": {
+        "openai": {
+          "itemId": "fc_04c3d00c247bc940016ac771e3fd70819197ce697fb3a2d84c"
+        }
+      },
+      "id": "prt_11b14e2c9001dnE9GkVxKXh7oq",
+      "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+      "messageID": "msg_11b14d890001kUBVkFGsxRznpR"
+    }
+  },
+  {
+    "type": "tool_use",
+    "timestamp": 1791455751716,
+    "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+    "part": {
+      "type": "tool",
+      "tool": "loginom_dock_node_wait",
+      "callID": "call_ac85ae9c239e46b59bcac31b6c736634",
+      "state": {
+        "status": "completed",
+        "input": {
+          "operation_id": "export-sales-cross-001",
+          "timeout_ms": 60000
+        },
+        "output": "{\"result_version\":\"user-v1\",\"operation_id\":\"export-sales-cross-001\",\"attempt\":1,\"state\":\"settled\",\"cancel_requested\":false,\"server_stop_requested\":false,\"status\":\"SUCCEEDED\",\"action_key\":\"node.apply\",\"phase\":\"node_ready\",\"effect_possible\":true,\"cleanup_complete\":true,\"node\":{\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"workflow_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e-1\",\"node_id\":\"140fbfde-b042-45b2-aebd-edf98accc64c\"},\"execution\":{\"status\":\"completed\",\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:6\"},\"package_saved\":false,\"configuration\":{\"status\":\"applied\",\"readback\":{\"kind\":\"text_export\",\"scope\":\"observed_before_verified_finish\",\"node\":{\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"workflow_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e-1\",\"node_id\":\"140fbfde-b042-45b2-aebd-edf98accc64c\"},\"receipt_ids\":[\"export-sales-cross-001:input_mapping\",\"export-sales-cross-001:configure\",\"export-sales-cross-001:finish\"],\"values_are\":\"observed_ui_values\",\"destination\":\"/user/eval-reference-crosstable-multi-facts-1-crosstable-multi-facts-1.result.csv\",\"settings\":{\"destination\":\"/user/eval-reference-crosstable-multi-facts-1-crosstable-multi-facts-1.result.csv\",\"text_qualifier\":\"\\\"\",\"decimal_separator\":\".\",\"date_separator\":\"\",\"time_separator\":\"\",\"true_value\":\"True\",\"false_value\":\"False\",\"null_marker\":\"\",\"date_format\":\"\",\"time_format\":\"\",\"delimiter\":\",\",\"encoding\":65001,\"bom\":false,\"line_ending\":0,\"header\":1},\"input_mapping\":{\"port\":0,\"autosync\":true,\"fields\":[{\"index\":0,\"name\":\"Region\",\"label\":\"Region\",\"type\":\"string\",\"data_kind\":\"Дискретный\",\"source_name\":\"Region\"},{\"index\":1,\"name\":\"A_amount_sum\",\"label\":\"A_amount_sum\",\"type\":\"real\",\"data_kind\":\"Непрерывный\",\"source_name\":\"A_amount_sum\"},{\"index\":2,\"name\":\"A_units_max\",\"label\":\"A_units_max\",\"type\":\"integer\",\"data_kind\":\"Непрерывный\",\"source_name\":\"A_units_max\"},{\"index\":3,\"name\":\"B_amount_sum\",\"label\":\"B_amount_sum\",\"type\":\"real\",\"data_kind\":\"Непрерывный\",\"source_name\":\"B_amount_sum\"},{\"index\":4,\"name\":\"B_units_max\",\"label\":\"B_units_max\",\"type\":\"integer\",\"data_kind\":\"Непрерывный\",\"source_name\":\"B_units_max\"}]},\"package_persistence_verified\":false}},\"output\":{\"status\":\"complete\",\"evidence_ref\":\"export-sales-cross-001:read\",\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:6\",\"ports\":[],\"file_artifacts\":[{\"artifact_id\":\"e90a1f73-57d0-4ae1-845b-6ebbb5634191\",\"destination\":\"/user/eval-reference-crosstable-multi-facts-1-crosstable-multi-facts-1.result.csv\",\"bytes\":78,\"sha256\":\"c90c1cdcca904d9ded52f22c5d9a1c42a101b1223b84d917e202ae8be4ac7761\",\"execution_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e:145:6\",\"verification_id\":\"export-sales-cross-001:export-download-1\",\"freshness_basis\":\"native_absence_check_and_completed_execution\"}]},\"error\":null,\"limitations\":[]}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_node_wait",
+        "time": {
+          "start": 1791455725452,
+          "end": 1791455751703
+        }
+      },
+      "metadata": {
+        "openai": {
+          "itemId": "fc_0970918cb91d99bb016ac771ed0b34819187b193df4f85b010"
+        }
+      },
+      "id": "prt_11b150628001DpiFmBwCq5FHMb",
+      "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+      "messageID": "msg_11b14f865001fABF3J660YXbsS"
+    }
+  },
+  {
+    "type": "tool_use",
+    "timestamp": 1791455757860,
+    "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+    "part": {
+      "type": "tool",
+      "tool": "loginom_dock_action_run",
+      "callID": "call_db4c281fcba84403a9d9b74b511b30bf",
+      "state": {
+        "status": "completed",
+        "input": {
+          "action_key": "package.save_checkpoint",
+          "parameters": {
+            "path": "/user/eval-reference-crosstable-multi-facts-1-crosstable-multi-facts-1.lgp",
+            "conflict_policy": "fail"
+          },
+          "operation_id": "save-sales-cross-001"
+        },
+        "output": "{\"status\":\"SUCCEEDED\",\"action_key\":\"package.save_checkpoint\",\"action_revision\":\"2\",\"operation_id\":\"save-sales-cross-001\",\"phase\":\"verified\",\"effect_possible\":true,\"output\":{\"package_ref\":{\"kind\":\"package\",\"path\":\"/user/eval-reference-crosstable-multi-facts-1-crosstable-multi-facts-1.lgp\",\"active_identity\":\"/user/eval-reference-crosstable-multi-facts-1-crosstable-multi-facts-1.lgp\"},\"reopened\":false,\"workflow_preserved\":true,\"save_completed\":true,\"persisted_content_verified\":false,\"workflow_continuations\":[{\"document_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e\",\"workflow_ref\":{\"tab_tid\":\"MF;cntMain;cntWorkspace;Workspace;t.br;tb-1\",\"prefix\":\"MF;TF-1\",\"workflow_id\":\"7bb01073-2024-400f-bc41-846ec887bc3e-1\",\"navigation_path\":[{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер\",\"label\":\"\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты\",\"label\":\"Пакеты\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>eval_reference_crosstable_multi_facts_1_crosstable_multi_facts_1\",\"label\":\"eval_reference_crosstable_multi_facts_1_crosstable_multi_facts_1\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>eval_reference_crosstable_multi_facts_1_crosstable_multi_facts_1>Модуль1\",\"label\":\"Модуль1\"},{\"tid\":\"MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>eval_reference_crosstable_multi_facts_1_crosstable_multi_facts_1>Модуль1>Сценарий\",\"label\":\"Сценарий\"}]}}],\"reporting_constraints\":[\"Сохранение подтверждает пакет, но не правильность итогового текста. Для каждого численного вывода используй прочитанное поле результата узла. Разности, изменения в п.п. и темпы роста тоже должны быть вычислены в узлах; не вычитай округлённые проценты. Если нужного показателя нет, вычисли его или не добавляй необязательное число.\",\"Ноль и отсутствие наблюдения различаются. Не объявляй нули пропусками или будущими периодами без явного признака в исходных данных либо условия задания. Интерпретацию, не подтверждённую данными, обозначай как гипотезу.\"]},\"error\":null,\"cleanup_complete\":true,\"result_version\":\"user-v1\"}\n\n{\"kind\":\"dock_saved_package_state\",\"save_operation_id\":\"save-sales-cross-001\",\"package_path\":\"/user/eval-reference-crosstable-multi-facts-1-crosstable-multi-facts-1.lgp\",\"modified\":false,\"persisted_content_verified\":false}\n\n{\"kind\":\"dock_outcome_verification\",\"schema_version\":1,\"operation_id\":\"save-sales-cross-001\",\"action_key\":\"package.save_checkpoint\",\"receipt_sha256\":\"3aad13244f2511fc195582b5ebd4005e4e4ec0f5d88da4280654cac05ddebaae\",\"gesture\":{\"state\":\"not_proven\"},\"domain_effect\":{\"state\":\"verified\",\"kind\":\"persist\"},\"observation\":{\"state\":\"not_provided\",\"completeness\":\"not_proven\",\"limitations\":[]},\"settings\":{\"state\":\"not_checked\"},\"data\":{\"state\":\"not_checked\"},\"goal\":{\"state\":\"not_verified\",\"obligations\":[]}}",
+        "metadata": {
+          "generation": 4,
+          "truncated": false
+        },
+        "title": "dock_action_run",
+        "time": {
+          "start": 1791455755649,
+          "end": 1791455757848
+        }
+      },
+      "metadata": {
+        "openai": {
+          "itemId": "fc_0fc36e1e611e1e9b016ac7720a75208191ab88509a5b6f95f5"
+        }
+      },
+      "id": "prt_11b15791c0016ehD7DFVEzw8LR",
+      "sessionID": "ses_ee4f02092ffeCj7b16FVAiDutT",
+      "messageID": "msg_11b156e200018zVK9klHL9OXQ3"
+    }
+  }
+]
