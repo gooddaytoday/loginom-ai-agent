@@ -673,6 +673,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | first-last-touch | 1 | FAIL0/no_artifact | Нет / не выполнялись | 26 / 25 / 23 | 4585 / 15440708 | 3 / 3550529 |
 | first-last-touch | 2 | FAIL0/no_artifact | Нет / не выполнялись | 24 / 24 / 22 | 4585 / 15423157 | 3 / 3531856 |
 | low-liquidity-companies | 1 | FAIL0/no_artifact | Нет / не выполнялись | 23 / 23 / 21 | 4487 / 15707741 | 3 / 4075869 |
+| low-liquidity-companies | 2 | FAIL0/no_artifact | Нет / не выполнялись | 24 / 23 / 21 | 4487 / 15712963 | 3 / 4062618 |
 | monthly-demand | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4604 / 16230213 | 3 / 4358291 |
 | nps-segments-by-tier | 1 | PASS100 | Есть / PASS | 23 / 22 / 18 | 4605 / 16613250 | 3 / 4745354 |
 | risky-approved-claims | 1 | PASS100 | Есть / PASS | 20 / 21 / 17 | 4531 / 16301844 | 3 / 4666374 |
@@ -1052,3 +1053,33 @@ metrics22 SHA256
 Cold index15 SHA совпал; common020c08059… и controller identity совпали.
 Closed22/45:17 PASS100/5 no_artifact FAIL0, low-liquidity#2 running;
 candidate/cold/compare0/retries0. Полный90 не принят.
+
+Двадцать третий closed formal v9 `low-liquidity-companies#2` no_artifact FAIL0:
+package_not_created, CLI exit0, timeout/interrupted=false, judge_attempts0;
+structure/warm/cold не выполнялись. Node apply отказал с unsupported node label:
+NOT_APPLIED/REQUEST_REJECTED/effectPossible=false/cleanupComplete=true.
+Позднее output_mapping остановлен с AMBIGUOUS/NODE_APPLY_STOPPED:
+complete output definition page at0 readiness не подтверждена,
+effectPossible=true/cleanupComplete=false. Связь отказа по названию с этой
+остановкой не доказана. Resume/recovery отказали, cancel/status сохраняют
+AMBIGUOUS. Всего7 ошибок; workspace observe и operation recover — plain text
+2739/2729bytes, SHA256 соответственно
+`8763acce8b333b52f3b7bf0c1d97baede41d15f15a1718852dccf739096d2ace` и
+`620d1f178b1092a6c8e704aeec1b3d0d90a402f6166fb740d7a1c46140e7c438`.
+Оригиналы сохранены; structured semantics для текста не выведены.
+Native cause и semantic recovery UNKNOWN.
+
+Все6 cleanup stages/processes confirmed/error null/remaining0×2.
+History4487/15712963bytes и diagnostics3/4062618bytes full roundtrip.
+Trace/result counters match:24 finishes/23 tools/21 Loginom/skill0/prepare1/
+errors7. Отказ сохранён без исключения или ручного повторного запуска.
+
+Private progress23 SHA256
+`72aba11436f8849eb86d64cb9d68629eefac9cedc37e0b7e6acc12ad3e5e6d9c`,
+metrics23 SHA256
+`cf35eafb307391956912e19493f4f3f9336028aacf1a6738ce061a48c57852b3`.
+Все23 results/cleanup/process-cleanup/архивы и предыдущие22 trace SHA
+проверены; reviews17/cold index15/batch8 receipt/readback SHA совпали.
+Common020c08059… и controller identity совпали. Closed23/45:17 PASS100/
+6 no_artifact FAIL0, monthly#2 running; candidate/cold/compare0/retries0.
+Полный90 не принят.
