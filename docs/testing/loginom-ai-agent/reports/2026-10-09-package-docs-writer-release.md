@@ -632,3 +632,19 @@ Controller60189/PID676156 повторно совпал по UID/birth/executabl
 вторая задача abc-pareto-groups#1 running. Candidate formal/cold/compare0,
 manual retries0. Первый результат не заменяет45/45 и общий90; активный
 профиль и frozen условия не изменены, endpoint остаётся собственным локальным.
+
+## Второй закрытый formal результат v9
+
+Baseline `abc-pareto-groups#1` завершён: completed/PASS/score100/judge scored,
+structure и warm oracle PASS. Все6 environment stages и process cleanup
+confirmed/error null/remaining0×2; все9 process phases сохранены отдельно.
+Closed history4640 entries/21348941bytes и diagnostics3/9371065bytes full
+inventory/restore roundtrip PASS, mode600; активный profile не архивировался.
+
+Private `ab-local-stand-20261008/formal-v9-progress-2-20261009.json` SHA256
+`e8dc4fedbeeb48fa0f8cab53a00320bd28707a3c6b8265fc549318c4d3db2ebc`:
+обе закрытые попытки/result/cleanup/process-cleanup/review/preservation SHA
+повторно проверены, controller60189/PID676156/UID/birth/executable/inode жив
+и совпал. `articles-by-author#1` running; closed2/45/PASS2/FAIL0,
+candidate formal/cold/compare0/manual retries0. Полный90 ещё не принят;
+исторический ABC FAIL v7 не удалён и не объявлен доказанной flaky ошибкой.

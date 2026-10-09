@@ -1077,7 +1077,9 @@ Core имеет разметку осей, но без CSV oracle. По доку
   candidate formal/cold/compare ещё не начаты; полный90 пока не принят.
   Первый formal closed ab-revenue-per-converter#1 PASS100: structure/warm,
   все6 cleanup stages/remaining0×2; закрытые history/diagnostics сохранены
-  с full roundtrip. Progress1 SHA5a577bd985…; abc#1 running.
+  с full roundtrip. Второй closed abc#1 PASS100/structure/warm/6 stages/
+  remaining0×2, history+diagnostics full roundtrip. Progress2 SHAe8dc4fedbe…;
+  articles#1 running, closed2/45, candidate/cold/compare0.
   Частичный v7 не подставлять
   как полный baseline и не повторять выборочно только неуспешные попытки.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой
