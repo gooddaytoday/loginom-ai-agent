@@ -107,6 +107,28 @@ test('node reference from another selected workflow is rejected before mouse int
   assert.equal(outcome.status, 'FAILED'); assert.equal(page.drops, 0); assert.equal(page.upCalls, 0);
 });
 
+test('link selectors preserve semicolons only in the exact observed graph node names', async () => {
+  const page = linkPage();
+  page.nodes[0].label = 'Кросс-таблица_(Region;_Category;_Amount)';
+  page.nodes[1].label = 'Приёмник;(Count;Value)';
+  const parameters = { ...linkParameters(page), source_node: page.ref(page.nodes[0].label), target_node: page.ref(page.nodes[1].label) };
+  const outcome = await run(page, 'link.create', parameters);
+  assert.equal(outcome.status, 'SUCCEEDED');
+  assert.equal(outcome.output.link_ref.tid, `${page.prefix};Graph;${page.nodes[0].label}|Output_Data-0|${page.nodes[1].label}|Input_Data-1`);
+  assert.equal(page.drops, 1);
+});
+
+test('graph selectors refuse unobserved names, port suffix injection and unsafe observed labels before effect', async () => {
+  for (const label of ['Чужой;узел', 'Источник;Output_Data-0', 'Источник|Output_Data-0|Приёмник', 'Источник;"selector']) {
+    const page = linkPage(), parameters = linkParameters(page);
+    if (label.includes('|') || label.includes('"')) page.nodes[0].label = label;
+    parameters.source_node.node_label = label;
+    const outcome = await run(page, 'link.create', parameters);
+    assert.equal(outcome.status, 'FAILED'); assert.equal(outcome.effect_possible, false);
+    assert.equal(page.drops, 0);
+  }
+});
+
 test('save succeeds after close/reopen with exact cached package path and the same graph, regardless of workflow caption', async () => {
   const page = linkPage();
   const outcome = await run(page, 'package.save_as', { path: '/user/data/packages/proof.lgp', conflict_policy: 'fail' });

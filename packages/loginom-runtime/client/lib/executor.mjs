@@ -444,15 +444,19 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     for (let index = 0; index < count; index++) if (await locator.nth(index).isVisible()) matches.push(locator.nth(index));
     return matches;
   };
-  const encode = (value, encoder) => {
+  const encode = (value, encoder, graphNames) => {
     if (encoder === 'integer') {
       if (!Number.isInteger(value) || value < 0 || value > 999) throw new Error('Unsafe selector integer');
       return String(value);
     }
-    if (typeof value !== 'string' || !value || value.length > 200 || /[;|<>"'\\\r\n]/.test(value)) {
+    if (typeof value !== 'string' || !value || value.length > 200 || /[|<>"'\\\r\n]/.test(value)) {
       throw new Error('Unsafe Loginom selector parameter');
     }
-    return value.replace(/\s/g, '_').replace(/,/g, '');
+    const encoded = value.replace(/\s/g, '_').replace(/,/g, '');
+    // Automatic node titles contain semicolons. Admit their full literal TID
+    // only from the current owned graph; callers cannot append a port/path.
+    if (value.includes(';') && !graphNames?.includes(encoded)) throw new Error('Unsafe Loginom selector parameter');
+    return encoded;
   };
   const activePrefix = async () => {
     const tabs = await visible(tid('^', 'MF;cntMain;cntWorkspace;Workspace;t.br;tb', '.x-tab-active'));
@@ -466,9 +470,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     }
     return prefix;
   };
-  const interpolate = (definition, bindings) => definition.value.replace(/\{([a-z][a-z0-9_]*)\}/g, (_, name) => {
+  const interpolate = (definition, bindings, graph) => definition.value.replace(/\{([a-z][a-z0-9_]*)\}/g, (_, name) => {
     if (!(name in bindings)) throw new Error(`Missing selector binding ${name}`);
-    return encode(bindings[name], definition.parameters[name]);
+    return encode(bindings[name], definition.parameters[name], name === 'node_label' ? graph?.nodes.map(node => node.label) : undefined);
   });
   const ownedGraph = async prefix => {
     if(await activePrefix()!==prefix)throw new Error('Graph workflow changed');
@@ -510,12 +514,14 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     ensureDeadline();
     const definition = task.selectors[symbol];
     if (!definition || !task.action.selector_symbols.includes(symbol)) throw new Error(`Selector ${symbol} is not allowed by the action`);
-    let value = interpolate(definition, bindings);
+    const graph = ['activeTab', 'activeWorkflow'].includes(definition.scope) && definition.value.startsWith('Graph;')
+      ? options.graphCapture ?? await ownedGraph(await activePrefix()) : null;
+    let value = interpolate(definition, bindings, graph);
     let match = definition.match,ownedContainer=null;
     if (['activeTab', 'activeWorkflow'].includes(definition.scope)) {
       const prefix = await activePrefix();
       if(value.startsWith('Graph;')) {
-        const graph=options.graphCapture??await ownedGraph(prefix);if(!graph.binding.native_prefix)throw new Error('Graph selector has no observed namespace');
+        if(!graph.binding.native_prefix)throw new Error('Graph selector has no observed namespace');
         value=graph.binding.native_prefix+value.slice('Graph;'.length);ownedContainer=graph.container;
       } else value = `${prefix};${value}`;
       match = 'exact';
