@@ -1,20 +1,20 @@
 # EvalBaseline — checkpoint 2026-10-09
-- Branch baseline-runtime; checkout /home/kiselev/.codex/worktrees/baseline-runtime/loginom-ai-agent восстановлен из сохранённых коммитов; основной checkout сохранён.
-- Code SHA 3ce983703bbeca5d759f1cd7bfc8b9a8196c7f64; frozen server/supplement SHA 53d03a35b0ee2901b40c1a1bbb0170804d59e865.
-- LAB-31 принят на 958b7aaac2bdea0c21f6a8e8dfd51cc090564dad; корпус 48 кейсов/144 измерения.
-- Этапы 0, 3.0, 3.1, 3.2, 4 и 5 выполнены; full start gated двумя отдельными smoke.
-- Infrastructure/judge recovery, retries, abandon, reconcile, execution budget и cleanup resolutions проверены.
-- Config v2 активна; readinessIssue LAB-54 01a11f72-c385-7d3e-bfd7-6911b3a7bdf2; профиль/CLI EvalBaseline и параметры Rich/Ben сохранены.
-- Supplement 733 файла; manifest SHA256 9f78455de8c03996e3dbfc12696b0fed5197597f664553cd2502b349ba5e0aae.
-- Локально после допуска владельца: 558 PASS/9 clean-host SKIP/0 FAIL, 567 тестов/48 файлов/2752 assertions; bun typecheck PASS.
-- Server helper+writer/registration: 51 PASS/0 SKIP; все 9 clean-host fixtures пройдены.
-- Единичный fixture CLEANUP_UNKNOWN не воспроизведён в 6 повторах и полном suite; причина не установлена.
-- Original bytes/failed cleanup/retry/verdict immutable; отдельный cleanup proof разрешает безопасное продолжение.
-- CLI 0.1.17 / fc3d97dbf695c2ed8dba942feb6fe83591a33944; модель openai/gpt-6.1-sol/medium; judge gpt-6-astra/high.
-- Multica readback v2 четырёх ролей/трёх starters/squad PASS; runtime service active/running после переключения.
-- LAB-32 01a11ae4-fa45-79ce-aec6-edd7170dafc7; native run 01a11d4f-9de4-7da6-a096-1d403753da8c READY/release PASS; MCP actor PASS.
-- Technical manifest bed77af4-b5fe-4a53-b67b-014bc4f6bcc4; incomplete/0 measured; 2026-10-09 00:02 MSK release/FREE.
-- First prepare error сохранён; Dock URL исправлен до серий; независимый post-release check: 5 profiles clean/storage EMPTY/browser 0.
-- LAB-32 исходный Calc provider FAIL/0 tokens/no artifact сохранён; новый calc 2f8b3b19-dfd3-45c4-819a-315a7beae02d PASS/100/oracle/actual medium (10 DB messages)/release.
-- LAB-54 node 38aa02d9-2568-4e87-95c3-f74264525d7b: no_artifact/code FAIL; 19 DB messages actual medium; cleanup/release/FREE. Calc и node delivery bytes/SHA/15+11 members verified.
-- Readiness 1/2; владелец разрешил full CLI 0.1.17 без новых smoke: принять node manifest 38aa02d9-2568-4e87-95c3-f74264525d7b; далее проверенный supplement → full card/start + heartbeat 15m.
+- Branch baseline-runtime; checkout /home/kiselev/.codex/worktrees/baseline-runtime/loginom-ai-agent; основной checkout evals и его незавершённая работа сохранены.
+- Frozen server/helper SHA ee7861513be1c4309fdf1678ccae78ad89522973; последующие doc-коммиты не redeploy.
+- Corpus SHA 53d03a35b0ee2901b40c1a1bbb0170804d59e865: 48 cases/144 jobs, три круга; дерево evals/tasks неизменно.
+- CLI 0.1.17/source fc3d97dbf695c2ed8dba942feb6fe83591a33944; product openai/gpt-6.1-sol/medium; judge gpt-6-astra/high/70.
+- Supplement 733 файла; manifest SHA256 67a877dae2e6962da7c70a741ed617d65d88d7b569280e875ad9d7a95f4de8ea; прежний supplement сохранён.
+- Локально: 558 PASS/9 clean-host SKIP/0 FAIL, 567 tests/48 files/2752 assertions; bun typecheck PASS.
+- Server прежние helper/writer checks 51 PASS/0 SKIP; новая native pin/readiness/733 files verification PASS.
+- v2 config bytes/параметры Rich/Ben/Evaler сохранены; EvalBaseline отдельные профиль/CLI, вне squad; четырёхролевая Multica readback PASS.
+- LAB-32 исходный Calc provider FAIL сохранён; LAB-54 01a11f72-c385-7d3e-bfd7-6911b3a7bdf2 — подготовка in_review с исключением владельца.
+- Новый calc 2f8b3b19-dfd3-45c4-819a-315a7beae02d PASS/100/oracle/actual medium (10 messages)/release/delivery verified.
+- Node 38aa02d9-2568-4e87-95c3-f74264525d7b no_artifact/code FAIL; actual medium (19 messages)/cleanup/release/delivery verified.
+- Причина node: CLI F3 guard отвергает имя с ';'; original raw readiness 1/2 и ошибки сохраняются, новые smoke запрещены.
+- Владелец разрешил full текущего CLI; acceptedNodeSmokeNoArtifact закрепляется в новом immutable manifest; accepted=true проверен на настоящих evidence.
+- LAB-55 https://mas.kartamyshev.dev/lab/issues/LAB-55, UUID 01a11fc1-8ded-7600-8251-66d97a4add78; prefix/project/label baseline verified, без run до монитора.
+- Series R/roles/evalbaseline/results/full-baseline-20261009-cli017-53d03a35b; baseline ID и run ID ожидают реальный prepare/start.
+- Heartbeat lab-55-baseline-cli-0-1-17 ACTIVE, 15 минут, main thread 01a11a65-5025-7050-8d46-cee03e4023f3; readback PASS.
+- Private controller /home/kiselev/.local/share/loginom-evalbaseline-control/20261009/controller; monitor state/cursors/receipts/secrets вне Git/results.
+- Original smoke 148 files/config неизменны; native FREE/5 clean profiles/storage EMPTY перед переключением; runtime снова active.
+- Далее: один штатный assign/start LAB-55 → сохранить фактические run/manifest → монитор 15m до 144 measured/cleanup/release/delivery → отключить heartbeat.
