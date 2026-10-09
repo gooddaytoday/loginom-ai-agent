@@ -15,6 +15,6 @@
 - LAB-32 01a11ae4-fa45-79ce-aec6-edd7170dafc7; native run 01a11d4f-9de4-7da6-a096-1d403753da8c READY/release PASS; MCP actor PASS.
 - Technical manifest bed77af4-b5fe-4a53-b67b-014bc4f6bcc4; incomplete/0 measured; 2026-10-09 00:02 MSK release/FREE.
 - First prepare error сохранён; Dock URL исправлен до серий; независимый post-release check: 5 profiles clean/storage EMPTY/browser 0.
-- Calc smoke 889c9f8e-819a-431d-9ed1-2082e839ae00: ProviderModelNotFoundError, artifact отсутствует, tokens/tool calls 0; release/FREE; delivery 11 файлов PASS.
-- Каталог CLI/bubblewrap: точные gpt-6.1-sol/medium зарегистрированы, model/judge calls=0, pins unchanged/clean/FREE; attachment 01a11d73-d5ba-70d4-9cb5-deeb96cc85a3 verified.
-- Новый цикл разрешён; LAB-54/run 01a11f76-dedf-7df4-b1af-1eee633ce9e3 running calc-only с 10:00:46 MSK; config changed only readinessIssue, runtime active; далее calc evidence/release → node → full+heartbeat.
+- LAB-32 исходный Calc provider FAIL/0 tokens/no artifact сохранён; новый calc 2f8b3b19-dfd3-45c4-819a-315a7beae02d PASS/100/oracle/actual medium (10 DB messages)/release.
+- LAB-54 calc attachment 01a11f86-b4a8-74cd-99cf-903649731eaf: 24085 bytes/15 members, SHA256 62df969cba807e8d59d7762daa2ea0659b3f947ed0a17e3565d4cd27ce639bd3, delivery verified.
+- Новый цикл разрешён; LAB-54 calc run 01a11f76-dedf-7df4-b1af-1eee633ce9e3 completed; readiness 1/2, queues empty; далее отдельный node → full card/start + heartbeat 30m.
