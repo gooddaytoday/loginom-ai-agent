@@ -70,3 +70,15 @@ receipts не изменены. Итого58 архивов618653673bytes на �
 диске, targets600/parents700. Root free2005716992→2070642688bytes на момент
 batch. Активные профили, failed-cleanup13 v5, результаты, frozen builds,
 harness и условия A/B не перемещались и не изменялись.
+
+Пятый batch: `closed-archive-storage-20261009/batch-5` с отдельными
+plan/receipt/readback/tar-readback. Перенесены10 confirmed closed архивов
+support#1/trial#1/ab-revenue#2/abc#2/articles#2,102296183bytes.
+Matching result/cleanup и prior full roundtrip, отсутствие process/FD
+references, original inode, SHA/size/UID/GID/mode/xattrs проверены до и после
+copy2/fsync/atomic links; readback10 PASS. Штатный tar через две исходные ссылки
+PASS:4600/3 entries, совпадает с исходным inventory. Preservation receipts
+неизменны. Фактический inventory task-owned storage:68 архивов720949856bytes,
+targets600/parents700. Root free2022912000→2120806400bytes на момент batch.
+Активный campaign#2, failed-cleanup13 v5, исходные результаты, frozen builds,
+harness и условия A/B не перемещались и не изменялись.

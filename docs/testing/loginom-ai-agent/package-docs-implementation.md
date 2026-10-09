@@ -4449,14 +4449,14 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ### 2026-10-09 — ACTIVE, smoke-пара v7 принята; formal baseline запущен
 
-- HEAD до checkpoint `b3a8c18b4`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
+- HEAD до checkpoint `e494bd6cb`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client и чужие профили/процессы не изменялись.
 - Own mutable harness495463543 clean; новый detached skills-evals-release на полном SHA495463543901f1a69888b8d6375cd77996ef157b, frozen install/typecheck PASS.
 - Writer post-open real-IO RED→GREEN; release/persistent-empty/replacement guards×5 PASS; modules77 PASS/0 FAIL/241 assertions.
 - Первый full495/session80830 terminal1:447 PASS/2 SKIP/37 FAIL/2 errors; cwd640MiB ниже1GiB.31 прямой space FAIL,6 downstream supported; весь evidence сохранён.
 - Fresh full495/session12760 terminal0:484 PASS/2 SKIP/0 FAIL/2063 assertions/576.34s; порог пространства сохранён, новый own executable TMPDIR в /dev/shm.
 - Exact own immutable dedupe:26568 old frozen source files,612 browser files,13285 new frozen source files; bytes/modes/pins и clean Git проверены до/после; чужие данные не очищались.
-- Dedupe receipts3 сохранены;58 confirmed closed archives618653673bytes перенесены четырьмя batch на own ext4 storage, archive paths→links/цели600/каталоги700/readback34+12+6+6/native tar3+2+2+2 PASS; около2GiB free. Frozen sources/resources не редактировать.
+- Dedupe receipts3 сохранены;68 confirmed closed archives720949856bytes перенесены пятью batch на own ext4 storage, archive paths→links/цели600/каталоги700/readback34+12+6+6+10/native tar3+2+2+2+2 PASS; около2GiB free. Frozen sources/resources не редактировать.
 - Conditions ab-conditions-release-20261009/common.json SHAa268a81e8b4ea163f50ac52ee99817559b3fab9a08ffc09652dc96c00fcd2ed4:658 harness/281 task/21 adapter pins/5389+5651 build inventory PASS.
 - На freeze evals ref992fca12badf209169f13b569b9bd291e4d70e99; после пары fresh b30dcbe5f/protected diff0, с freeze изменён только соседний docs-файл; frozen495/658files/21pins/оба full CLI повторно PASS.
 - Те же15 задач×3×2=90; primary openai/gpt-6.1-sol medium/judge gpt-6-astra high. Smoke metrics16/18 provider turns,17/20 tools,13/13 Loginom; activation delta1/skill1 PASS, прочий рост отдельно.
