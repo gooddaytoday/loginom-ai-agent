@@ -14,10 +14,15 @@ root:root4755 совпали. Desktop AppImage доставлен; native S2/S4 
 структурой/CSV, cold3, S1–S8 и минимальный installed lifecycle. A/B90, полная
 TUI/recovery матрица, вторая модель и stage9 отложены. Десятка завершена:
 9 full PASS/1 full FAIL (ABC CLI exit1), все10 judge100/structure/CSV/cleanup;
-cold3/3 PASS. S1–S8 PASS, installed modify/save/cancel lifecycle ещё открыт.
-S8 test collector исправлен через TDD; raw live receipts проверены offline,
+cold3/3 PASS. S1–S8 и installed modify/save/cancel lifecycle PASS.
+SIGINT provider-turn exit130/native close/logout/discard:false, writer absent,
+remaining0; прежние source/grouping GUID сохранены, Calculator20/40/50 выполнен
+и сохранён. S8 test collector исправлен через TDD; raw events проверены offline,
 нового модельного прогона нет. Installed payload source9695 не менялся.
-Итоги всей приёмки ещё не приняты. Предыдущая v9 остаётся INCOMPLETE, не доказательство
+Сокращённая цель принята; этапы0–8 выполнены. Own containers4 остановлены,
+workdir/raw receipts сохранены; original server/client running/ID/StartedAt
+не изменены. Server Docker stop exit137 записан отдельно, не выдаётся за native
+shutdown продукта. Выпуск не опубликован. Предыдущая v9 остаётся INCOMPLETE, не доказательство
 неухудшения. Полные hashes и текущая граница:
 [сокращённая приёмка](../testing/loginom-ai-agent/reports/2026-10-09-package-docs-short-acceptance.md).
 

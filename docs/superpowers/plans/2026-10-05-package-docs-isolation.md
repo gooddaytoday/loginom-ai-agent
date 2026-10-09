@@ -1347,7 +1347,7 @@ Core имеет разметку осей, но без CSV oracle. По доку
 
 </details>
 
-### Этап 8. Принять финальные Desktop и CLI на текущей Linux-системе
+### Этап 8. Принять финальные Desktop и CLI на текущей Linux-системе — выполнен
 
 Повторная матрица пяти дистрибутивов, всех способов обновления и полная TUI/
 аварийная матрица отложены. Прежние PASS остаются доказательствами для прежних
@@ -1363,20 +1363,31 @@ SHA; для final candidate нужны следующие минимальные
   каталоги; проверить manifests/resources. Установить CLI и один штатный Desktop
   артефакт на текущей Linux-системе вне checkout; проверить наличие обоих bundled
   skills и запуск без пользовательского Python/Node/Dock. Сборка не публикуется.
-- [ ] На installed CLI сохранить пакет, штатно завершить клиента, открыть его
+- [x] На installed CLI сохранить пакет, штатно завершить клиента, открыть его
   новым клиентом и подтвердить доступность для изменения. Сделать одно небольшое
   изменение, выполнить и сохранить; затем подтвердить close/logout/remaining0.
   Рестарт сервера между пользовательскими ходами не подставлять вместо исправления.
 - [x] Выполнить Desktop S7: CSV-вложение → построение → выполнение → сохранение →
   документация по соответствующему локальному `.lgp`. Один кейс закрывает этот
   пункт и связанный S7; подтвердить native package/result и shutdown.
-- [ ] Один контроль штатной отмены активной операции и нормального завершения:
+- [x] Один контроль штатной отмены активной операции и нормального завершения:
   собственные backend/host/Chromium и их debugger endpoints прекращают работу,
   `.writer` освобождён, нет собственного незавершённого recovery. При проверке
   применять фактический транспорт и процессное наблюдение, не только exit code.
-- [ ] Свести результаты этапов5–8, reused evidence с точными SHA и ограничения.
+- [x] Свести результаты этапов5–8, reused evidence с точными SHA и ограничения.
   Нет потери данных/чужих изменений, новых систематических отказов, browser/upload
   в docs и ложных сообщений об успехе. Отложенные проверки не отмечать `[x]`.
+
+**Приёмка 2026-10-09:** installed9695 fresh writable reopen → существующий
+источник с теми же CSV-байтами → `amount_double=amount*2` → execute20/40/50 →
+save → native close/logout/exit0 PASS. Ещё один fresh writable client → clean
+save → SIGINT активного provider turn → exit130/close/logout/remaining0 PASS;
+scripted provider, real model/judge0, без server reset и acceptance-only cleanup.
+Все actual debugger endpoints закрыты, own containers4 остановлены/данные
+сохранены, original server/client running/ID/StartedAt неизменны. Lifecycle117
+files SHA `b5e8004a6ea88529f445c17192d9950d2e625f360c22c397135eb25ecbff77eb`;
+final receipt SHA `fbdd98a0d0039d9ebba330b403954d2b47ed44d2f34a1caf12a515231de075ac`.
+[Отчёт и ограничения](../../testing/loginom-ai-agent/reports/2026-10-09-package-docs-short-acceptance.md).
 
 **Готово, когда:** final CLI/Desktop на текущей Linux проходят эти пункты,
 S1–S8 и сокращённую десятку этапа7. Windows/macOS, повторная дистрибутивная
@@ -1974,6 +1985,13 @@ Core прогнать отдельно через `--tasks "$skill_eval_root/cor
 | Постоянные правила и TDD по одному поведению | TDD; этапы 1, 4, 8 | Owning AGENTS/runbooks/progress; для каждого изменения записаны ожидаемый RED и фактический GREEN |
 
 ## 6. Состояние плана
+
+- 2026-10-09: сокращённая цель выполнена, этапы0–8 закрыты:9/10 CLI PASS,
+  все10 judge100/structure/CSV, cold3/3, S1–S8, installed CLI/Desktop и
+  modify/save/cancel lifecycle PASS. Новых ручных повторов модели0.
+  Собственные ресурсы остановлены, материалы сохранены; выпуск не опубликован.
+  Расширенные проверки и этап9 остаются отложенными; серверный skill сохранён.
+  [Итоговый отчёт](../../testing/loginom-ai-agent/reports/2026-10-09-package-docs-short-acceptance.md).
 
 - 2026-10-09: пользователь утвердил сокращение для завершения сегодня:
   final candidate/10 ранее успешных задач×1,≥8 PASS, judge для каждого пакета,

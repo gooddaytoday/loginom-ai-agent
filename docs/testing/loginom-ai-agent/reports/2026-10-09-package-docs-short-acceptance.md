@@ -1,5 +1,9 @@
 # Сокращённая приёмка package-docs — 2026-10-09
 
+**Согласованная сокращённая цель выполнена:** 9/10 CLI PASS, cold3/3,
+S1–S8 PASS, установленный Linux CLI/Desktop и минимальный lifecycle PASS.
+Этапы0–8 закрыты в текущем объёме; выпуск не опубликован.
+
 Текущая граница — решение пользователя и план `94627858a`: десять независимых
 CLI-задач по одному запуску, минимум8 PASS с судьёй/структурой/CSV; три заранее
 выбранных cold replay; S1–S8; установленный CLI/Desktop и штатное завершение.
@@ -227,7 +231,7 @@ verifySalesScenario **offline, без live/model rerun**; post-review SHA256
 S8 receipt34files SHA256
 `11496f8ec59e49fda21de096f58013f49b41541585170df72cf43f1a4df170d5`.
 
-Ручной installed modify/cancel пока **INCOMPLETE**. Первый adapter передал
+Первичные попытки ручного installed modify/cancel сохранены как **INCOMPLETE**. Первый adapter передал
 устаревший `workflow_ref.tab_tid`: запрос отклонён до эффекта
 (NOT_APPLIED/effect_possible:false), package bytes unchanged, CLI exit0,
 writer absent/remaining0. Этот клиент не сохранял пакет в своей runtime-сессии,
@@ -236,15 +240,61 @@ writer absent/remaining0. Этот клиент не сохранял пакет
 только чтение и завершился до создания узла/сохранения: exit0/remaining0.
 Обе исходные попытки и диагностические receipts сохранены отдельно; это
 scripted provider, real model/judge calls0, повторов S8 нет.
-Освобождение disconnected server session ещё проверяется; сервер не
-перезапускается, пароль/роль/чужие данные не меняются. Процессная очистка сама
-по себе не выдаётся за подтверждённый server logout.
+Последующий fresh open подтвердил writable после штатного освобождения
+disconnected session. Рестарта сервера, смены пароля/роли и чужих изменений
+нет. Следующий calculator preflight также отклонён до создания узла:
+NOT_APPLIED/effect:false/«active source output»; normal close/logout уже
+SUCCEEDED благодаря собственному раннему save. Эти failed receipts сохранены,
+процессная очистка первого no-save клиента не выдаётся за server logout.
 
-Этапы5–7 приняты. Для итоговой цели ещё нужны
-небольшое изменение/execute/save после writable reopen установленного CLI,
-одна штатная отмена с процессным наблюдением и итоговая очистка.
-Предыдущий scripted normal shutdown/writable reopen нового CLI прошёл;
-он подтверждает native lifecycle, но не выбор skill реальной моделью.
+Сводная проверка завершённых этапов:26 receipts/607 файлов повторно
+прочитаны и сверены по SHA256, без запуска тестов или модели. Private
+`short-acceptance-9695e61e3-20261009/completed-checks-readback.json`, SHA256
+`5c5cb5c9a7f90575af965a78120ec4871bb9a355545f748fb5793da5105a7c47`.
+Статус этого receipt явно оставляет installed lifecycle открытым.
+
+## Установленный CLI: изменение, сохранение и отмена — PASS
+
+Исправленный manual adapter использовал installed9695 CLI и scripted provider,
+real model/judge calls0. Новый клиент открыл тот же сохранённый пакет writable.
+Исходный импорт выполнен с теми же CSV-байтами: сохранены его GUID и прежний
+узел группировки, источник переведён на собственную доставленную копию CSV.
+Добавлен один Калькулятор `amount_double=amount*2`; canonical verifier подтвердил
+полный свежий результат Alpha10→20, Beta20→40, Alpha25→50 с точной числовой
+проверкой. Пакет сохранён; CLI exit0, native close/logout SUCCEEDED,
+packages_after0/discard:false. Сохранённый native ZIP содержит прежние GUID,
+новый calculator GUID и формулу; SHA256 `.lgp`
+`52f034ce644a810320cbfbb2b652eb6ce96368a195d37a1247007b2f76dd77c6`.
+
+Ещё один новый клиент открыл пакет writable и подтвердил чистое сохранение.
+При активном следующем запросе scripted provider отправлен публичный SIGINT:
+CLI exit130/CLI_CANCELLED, native close/logout SUCCEEDED/discard:false,
+writer absent,58 собственных наблюдавшихся процессов завершены/remaining0.
+Это отмена **provider turn после clean save**, не авария или остановка
+выполняющегося серверного узла. Server reset между ходами отсутствует.
+Private `modify-cancel-v4/acceptance.json`,117 файлов, SHA256
+`b5e8004a6ea88529f445c17192d9950d2e625f360c22c397135eb25ecbff77eb`.
+Результат источника и изменения проверен canonical `scenario-import.mjs`
+по сохранённым событиям offline, без дополнительных live запросов.
+
+## Очистка и итог — PASS
+
+Собственных CLI/Desktop/host/backend/Chromium процессов текущей приёмки нет;
+`.writer` отсутствуют. Известные фактические inspector/CDP37937/36905 и
+43417/33677, собственные endpoints32768/32769 больше не слушают.
+Четыре точно идентифицированных owner-labelled тестовых контейнера остановлены;
+workdir до/после сохранён, контейнеры оставлены остановленными для диагностики.
+Docker stop --time30 дал client exit0/server exit137/no OOM; это финальная
+остановка инфраструктуры **после** проверенного native logout, а не доказательство
+штатного server shutdown. Историческая v9 uncertainty по-прежнему INCOMPLETE,
+raw profiles/leases не переписаны. Исходные Loginom server/client сохранили
+ID/StartedAt/running; пользовательские launcher/данные и чужие процессы не менялись.
+
+Этапы0–8 приняты в сокращённом объёме. Final receipt
+`short-acceptance-9695e61e3-20261009/final-acceptance.json`, SHA256
+`fbdd98a0d0039d9ebba330b403954d2b47ed44d2f34a1caf12a515231de075ac`,
+связывает read-back завершённых проверок, lifecycle и очистку.
+Артефакты не опубликованы; серверный skill сохранён, этап9 отложен.
 
 Отбор по прошлым успехам ограничивает охват: нет statistical non-inferiority,
 полных35 задач, соединений и построения подмоделей. Причина старого long-run

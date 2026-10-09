@@ -87,18 +87,23 @@ test('missing prepared tab refuses before native package close', async () => {
 - [x] Узкие bridge/native-close suites; upstream suite из `client/` с pinned
   Node. Сохранить commands/counts/exits и обновить owning AGENTS. Коммит.
 
-## Task3: Installed приёмка нового кандидата
+## Task3 — выполнено: Installed приёмка нового кандидата
 
 - [x] Собрать полный CLI/Desktop в новые own каталоги по штатным builders;
   manifests/source SHA/resources фиксируют фактический новый snapshot.
 - [x] Повторить normal CLI shutdown observation без acceptance-only параметра;
   новый клиент должен открыть exact saved package writable без server reset.
   Native close/logout и process remaining0 требуют отдельных receipts.
-- [ ] Минимальные installed Linux/lifecycle, small modify/execute/save,
+- [x] Минимальные installed Linux/lifecycle, small modify/execute/save,
   Desktop S7 и одна штатная отмена по этапу8 основного плана; S1–S8 по этапу6.
   Scripted provider не выдавать за real-model выбор; расширенная матрица отложена.
-- [ ] Сокращённая fixed10 candidate серия/judge/structure/CSV и cold3 по этапу7
+- [x] Сокращённая fixed10 candidate серия/judge/structure/CSV и cold3 по этапу7
   основного плана. Условия сохранены до первого single-task live; не дополнять
   incomplete v9 и не заменять неудачные задачи.
-- [ ] Checkpoint максимум20 строк, source-only/installed ограничения явно;
+- [x] Checkpoint максимум20 строк, source-only/installed ограничения явно;
   удалять лишь свои unused `/tmp` после сохранения и проверки отсутствия процессов.
+
+Приёмка source9695 завершена в текущем сокращённом объёме основного плана.
+[Итоговый отчёт](../../testing/loginom-ai-agent/reports/2026-10-09-package-docs-short-acceptance.md):
+9/10 CLI PASS/cold3/S1–S8, native modify/save/close и SIGINT provider-turn PASS;
+полная A/B90/fault-injection матрица отложена, прежние failed receipts сохранены.

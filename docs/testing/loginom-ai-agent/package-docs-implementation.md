@@ -4447,27 +4447,22 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-09 — ACTIVE, сокращённая приёмка candidate9695
+### 2026-10-09 — COMPLETE, сокращённая приёмка candidate9695
 
-- Каноническая граница `94627858a`:10×1 CLI,≥8 PASS/judge/structure/CSV,cold3,S1–S8,installed Linux/lifecycle; A/B90/TUI/расширенный recovery/stage9 отложены.
-- Финальные CLI/Desktop source `9695e61e358ac5e6043c08eb56d183faa03d7a28`,clean,0.1.17; manifests/static resources PASS.
-- Runtime shutdown TDD и full upstream2564 PASS/10 SKIP/0 FAIL; TypeScript/public IPC не изменены, runtime typecheck script отсутствует.
-- CLI scripted normal close→fresh writable reopen без server reset PASS/native close/logout/remaining0; small modify/execute/save ещё открыт.
-- Уже начатые offline матрицы завершены:CLI5/5,Desktop5/5,network:none; own containers10 удалены; read-back47files SHA dc84c279e6….
-- CLI установлен штатно в private HOME вне checkout,5651 inventory entries/root:root4755/unconfigured PASS; Desktop AppImage доставлен, native запуск S2/S4 PASS.
-- Frozen harnessd08 clean/658 pins; свежий evals ref7318ec61fef3, protected judge/calibration/tasks unchanged. Принятый judge contract сохранён.
-- Fixed10/cold3 сохранены до первого live; v2 common SHA67c0f30005…, dispatch1ee3b44718… (первичный pre-model отказ0 попыток сохранён; own configs исправлены/native check PASS). Каждая задача — отдельный процесс, следующая только после terminal+cleanup gate.
-- Модель openai/gpt-6.1-sol medium,judge gpt-6-astra high,threshold70/checklist; effective task timeout1800000ms сохранён.
-- Новый own stand127.0.0.1:32769/server8ef472ee…/network loginom-skills-short-20261009; admission PASS. Старый v9 и original server/client не изменены.
-- Sales single-task PASS100/judge/structure/CSV/cleanup confirmed; независимый installed9695 cold PASS/bytes unchanged/no reset/remaining0. ABC terminal: judge100/structure/warm/cold PASS, но CLI_TOOL_FAILED/exit1; консервативно полный FAIL, не входит в минимум8. Ручных модельных повторов0.
-- Историческая v9:34closed/25PASS/9FAIL,cohort#3 INCOMPLETE; hang cause UNKNOWN, raw recovery evidence сохранён, в новую приёмку не засчитывается.
-- S1–S8 PASS на реальной основной модели: CLI/default/Help/no-file/Word/docs→new build и native Desktop/local PDF/build→docs same chat; все страницы/факты/вход unchanged/docs browser0/remaining0 проверены. S7 native close/logout/discard:false/inspector43417/CDP33677 closed. Произвольное имя DOCX не критерий S5.
-- ABC pre-model refusals2 с model attempts0 сохранены; S4 ports closed/helper1440162/1440164 absent, прежняя failed cleanup не переписана. Revision4 только новый admission3 path, все live checks строго serial.
-- Десятка10/10 terminal/cleanup:9 full PASS/1 full FAIL (ABC CLI1), все10 judge100/structure/warm CSV PASS; cold3/3 PASS. Controller89353 terminal0; final read-back SHA04ec49980a…, этап7 выполнен. Новых CLI eval tasks нет. Свои TMP snapshot/cold helper282 files архивированы/hash verified и удалены; retention SHAa319249d1c….
-- Source scope/attachments final9695:11 PASS/0 FAIL/40 assertions/2.35s, receipt5cd6a622ef…, модель/судья/Browser0; повтор из-за недостаточного source binding старого лога. Shutdown24 evidence files SHA повторно verified; runtime JS/no public TypeScript change.
-- Generator reuse: полные package-docs ресурсы+Node9/9 SHA равны source49/final9695; installed PDF/DOCX/MD и PDF3pages QA/Word XML receipts проверены; current Word all-pages S5. Receipt SHA92a2308eb9…, полной повторной матрицы нет.
-- S7 receipt23c08095b1…; S8 actual CLI0/0/normal native close, collector1 из-за advice-as-JSON; fix test-only9c89a29c5 через RED→GREEN/33PASS/typecheck, source product9695 неизменён. Offline raw revalidation PASS/receipt11496f8ec5…, live repeats0. Этапы5–7 выполнены.
-- Installed modify/cancel: legacy workflow_ref.tab_tid отклонён NOT_APPLIED/effect:false; terminal0/writer absent/remaining0/package unchanged. Исправленный adapter тоже terminal0, остановлен до изменений: свежий open только чтение из-за disconnected writer первого клиента. Admin/form diagnostics terminal/remaining0; cleanup/logout первого open не подтверждён, server reset/role/password changes0. Следующий шаг: подтвердить штатное освобождение своего пакета, small modify/save и SIGINT provider-turn; все failed receipts сохранены, live model repeats0.
+- Граница пользователя94627858a:10×1 CLI/≥8 fullPASS/judge/structure/CSV,cold3,S1–S8,installed Linux и minimal lifecycle. Этапы0–8 выполнены; расширенная A/B90/TUI/recovery/second model/Windows/macOS/stage9 отложены.
+- Финальный source9695e61e358ac5e6043c08eb56d183faa03d7a28/0.1.17: полные CLI/Desktop manifests/resources/install PASS, native AppImage S2/S4/S7. Пользовательская установка не заменена, публикации нет.
+- Shutdown TDD/full runtime2564PASS/10SKIP/0FAIL; CLI/Desktop уже начатые offline матрицы5/5 каждая завершены,10 own containers удалены. TypeScript/public IPC не менялись; runtime typecheck script отсутствует.
+- Frozen harnessd08be6baf8f5aea53f83c228cd0984c9d2bf0494 clean/pins658; модели openai/gpt-6.1-sol medium и judge gpt-6-astra high, fixed10/common67c0f30005… неизменны.
+- CLI10/10 terminal/cleanup:9 fullPASS/1 fullFAIL(ABC CLI1); все10 judge100/structure/warm CSV PASS, cold3/3 PASS/bytes unchanged/no settings reapply/no reset. Ручных модельных повторов0.
+- S1–S8 real primary PASS: разговор/Help/no-file/local PDF/DOCX и оба перехода same chat; все страницы/факты/input unchanged/docs browser/upload0/native remaining0 проверены.
+- S8 actual CLI0/0; original collector1 сохранён. Test-only9c89a29c5 через RED→GREEN/regression33PASS/typecheck; canonical offline review PASS без rerun/product payload change.
+- Installed writable reopen→existing source с теми же CSV→Calculator amount_double=amount*2→20/40/50→save/exit0/native close/logout/discard:false PASS. Прежние source/grouping GUID сохранены; own .lgp SHA52f034ce64….
+- Ещё один fresh writable client→clean save→SIGINT active provider turn→130/CLI_CANCELLED/native close/logout/discard:false PASS; backend/host/Chromium58 наблюдений/remaining0, writer absent. Это не server-node stop/fault injection.
+- Предыдущие private adapters NOT_APPLIED/effect:false и readonly INCOMPLETE сохранены; штатное освобождение writer наблюдалось, no server reset. Lifecycle117files receipt b5e8004a6e…; completed checks26receipts/607files verified/5c5cb5c9a7….
+- Own current/retired test containers4 остановлены по exact IDs/labels, workdir before/after сохранён. Clients0/servers Docker stop137/noOOM; это инфраструктурная очистка после native logout, не product shutdown PASS. Original server/client ID/StartedAt/running неизменны.
+- Inspector/CDP37937/36905/43417/33677 и own32768/32769 закрыты; current acceptance processes0/writers0. Свои TMP snapshot/cold helper282 files archived/SHA checked/removed; raw profiles/leases сохранены.
+- Историческая v9:34closed/25PASS/9FAIL/cohort#3 INCOMPLETE/hang UNKNOWN; не является current acceptance или доказательством non-inferiority. Генератор reused9/9 exact resources, source scope/attachments11PASS; ограничения в итоговом отчёте.
+- Final private receipt fbdd98a0d0039d9ebba330b403954d2b47ed44d2f34a1caf12a515231de075ac связывает checks/lifecycle/cleanup. Серверный skill сохранён. Следующий шаг вне этой цели: отдельная команда владельца на review/merge/release или отложенную матрицу.
 
 ### 2026-10-09 — ACTIVE, v9 terminal143; closed34/45, PASS25/FAIL9; cohort#3 INCOMPLETE
 

@@ -2,7 +2,8 @@
 
 Это уточнение исправления отказа из этапов6/8 согласованного
 [плана изоляции skills](../plans/2026-10-05-package-docs-isolation.md).
-Публичные инструменты и IPC-поля не меняются. Реализация ещё не начата.
+Публичные инструменты и IPC-поля не меняются. Реализация и сокращённая
+installed-приёмка завершены на source9695; [итоги](../../testing/loginom-ai-agent/reports/2026-10-09-package-docs-short-acceptance.md).
 
 ## Подтверждённый отказ
 
@@ -86,7 +87,9 @@ native close только одного подтверждённого чисто
 5. Новый candidate в новом каталоге с manifest; installed normal-close
    observation и scenario-modify, Linux Desktop/CLI lifecycle/переходы.
    Старые candidate49 и baseline неизменны. Изменение продукта требует
-   новых общих A/B conditions, обоих smoke и полной пары90.
+   новых общих A/B conditions, обоих smoke и полной пары90 в исходном объёме.
+   По решению пользователя2026-10-09 этот объём заменён сокращёнными этапами5–8
+   основного плана; полная пара и fault-injection отложены.
 
 Это не исправление зависания v9 harness: его причина UNKNOWN и приёмка
 остаётся отдельной незавершённой задачей. Старые raw profiles/leases
