@@ -174,7 +174,7 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 
 ## Checkpoint — новая параллельная волна восьми узлов, 09.10.2026
 
-- Docs prechange8b50b4181; baseline4e626d547/basef9bf332c; loginom0ca исключён; node assignments сохранены.
+- Docs prechangeed7aeca92; baseline4e626d547/basef9bf332c; loginom0ca исключён; node assignments сохранены.
 - Node SHA:45 a00b0203/PR42,46 41e0b170/PR43,47 c92a3bfd;48–52 4e626d547; старыйPASS не переносится.
 - Caps8/8/8/runtime24aa…/daemon12/stock3m сохранены;8 реальных параллельных приёмок и нагрузка12 NOT_PROVED.
 - Installed CLI597/version-dev и Multica0.6.1/source2ea — разные артефакты; global launcher не менялся.
@@ -182,15 +182,15 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 - LAB53 approved scope d4241c818; Generator completed03:48:43MSK, Worker completed04:12:57MSK.
 - [Draft PR44](https://github.com/gooddaytoday/loginom-ai-agent/pull/44) common-preparation→shared-oauth; clean publishedSHA9b93201de2007d013bb9f57416a9e33452677f78.
 - Parent verified Worker attachments2/APIbytesPASS, report manifest bytes/SHA PASS, tree7f60a518… и19/19publishedfilesbytes/SHA PASS.
-- Worker25offline claimed; parent10portablePython+3JSsyntax PASS/sourceblockingfindings0; Linux/browser native review pending, неlive/model acceptance.
-- Native Reviewer01a11e3c… running04:17:26MSK, отдельный checkout9b; толькоsource/offline review, live block сохранён.
+- Native Reviewer независимо25/25offline PASS (Python12/Chromium13, network0); дополнительныеfixtures выявили2P2, итогREQUEST_CHANGES_SOURCE_ONLY.
+- Reviewer completed04:27:40MSK; штатный Worker01a11e45… running04:27:07MSK в той жеLAB53/PR44; дубль не создавался.
 - Candidate nondeployable: обе live entrypoints останавливаются доLoginom; lifecycle/install/rollback/runtime qualification NOT_RUN.
-- Общие post-flock legacy marker gate/navigation/private diagnostics подготовлены; timeout cause48 NOT_ESTABLISHED.
+- Исправить2P2: unready target мешаетexpand ready scope; error capture послеdeadline теряетcause. Source-only, cause48 NOT_ESTABLISHED.
 - LAB45 attempt6d13… numericNOT_CAPTURED/serverUNKNOWN/marker9595…; LAB48 attempt8d6f… numeric/causeNOT_ESTABLISHED/marker74f25….
 - Root47 старые3117/3118 cleanup PASS только для прежнихeffects; observer3119 serverabsence PENDING; markers/history сохранены.
 - Owner: existingAdmin browser наmas; Worker /proc/CDP/profiles и parentSSH baremas не нашлиbrowser/GUI; endpoint/access pending.
-- Fresh complete Dispatcher inventory/caller mstSelf positive NOT_READ; новыхLoginom входов/admin/model/build0.
+- Fresh Dispatcher/mstSelf NOT_READ; Reviewer60exact fixture/collector PID records absent. Неserverproof; Loginom/admin/model/build0.
 - 04:19MSK все8 node cards blocked/latestGeneratorcompleted; новыхWorker/Reviewer nodehandoff0.
 - 01:18:26UTC mas CPU12/load0/0/0/MemAvailable30120016kB/free408564547584B; это не workload12/serverabsence proof.
 - [SHA/hashes/границы](reports/2026-10-08-node-recheck/parallel8-restart.json); schedules/pools/merge-release0; чужие изменения сохранены.
-- Далее: source review→existingAdmin доступ→finite45/48/3119 cleanup+полный lifecycle/runtime review LAB53→те же8 без новогоapproval.
+- Далее: sameWorker2fixes→newSHA/Reviewer; existingAdmin доступ→finite45/48/3119+полный lifecycle/runtime review→те же8 без новогоapproval.
