@@ -9,6 +9,28 @@ import { main, runAttempt } from "../src/run"
 import { runNodeEvals } from "../src/node-runner"
 import { loadTasks } from "../src/task"
 
+test("diagnostic runAttempt completes without LGP and retains the refusal prompt", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "eval-diagnostic-attempt-"))
+  try {
+    await mkdir(path.join(root, "storage"))
+    const config = loadConfig(["--dry-run", "--skip-judge"], { EVAL_PROFILE_DIR: path.join(root, "profile"),
+      EVAL_WORKSPACE_ROOT: path.join(root, "workspace") })
+    const [original] = await loadTasks(config.tasksDir, ["calc-data-double"])
+    const task = { ...original!, id: "txt-ambiguous-headers", reference: "", outputMode: "diagnostic" as const,
+      prompt: "Request rejection at {{PACKAGE_PATH}}" }
+    const runDir = path.join(root, "results")
+    const attempt = await runAttempt({ config, task, attempt: 1, runId: "diagnostic", runDir,
+      command: agentCommand(config), source: parseArtifactSource(`dir:${path.join(root, "storage")}`, config.loginom),
+      signal: new AbortController().signal, profileRecovered: false, skipJudge: true })
+    expect(attempt.result.status).toBe("completed")
+    expect(attempt.result.package_path).toBeNull()
+    expect(attempt.result.pass).toBeNull()
+    const prompt = await Bun.file(path.join(runDir, task.id, "1/prompt.txt")).text()
+    expect(prompt).not.toContain("Сохрани готовый пакет")
+    expect(prompt).not.toContain("{{PACKAGE_PATH}}")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("runAttempt сохраняет CSV без LGP как evidence, не превращая no_artifact в completed", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "eval-orphan-"))
   try {

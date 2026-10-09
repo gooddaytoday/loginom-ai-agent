@@ -34,6 +34,8 @@ export async function main(argv: string[], env: Record<string, string | undefine
 
 async function executeRun(config: EvalConfig) {
   const tasks = await loadTasks(config.tasksDir, config.only)
+  if (!config.skipJudge && tasks.some(task => task.outputMode === "diagnostic"))
+    throw new EvalFailure("diagnostic tasks require --skip-judge", 2)
   const source = parseArtifactSource(config.artifactSource, config.loginom)
   const environment = await preflight(config, source)
   const controller = new AbortController()
@@ -228,7 +230,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   )
   const name = `eval-${input.runId}-${task.id}-${attempt}`
   const packagePath = `/${config.loginom.username}/${name}.lgp`
-  const prompt = buildAgentPrompt(task.prompt, packagePath, `${name}.result.csv`)
+  const prompt = buildAgentPrompt(task.prompt, packagePath, `${name}.result.csv`, task.outputMode)
   await Bun.write(path.join(outDir, "prompt.txt"), prompt)
   const storageBefore = config.dryRun ? [] : await storageEntryExists(input.source, `${name}.result.csv`)
     .then(exists => exists ? [`${name}.result.csv`] : [], () => null)
@@ -265,7 +267,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
         }).catch((error: unknown) => ({ error: describe(error) }))
   const artifactError = fetched && "error" in fetched ? fetched.error : undefined
   const artifact = fetched && !("error" in fetched) ? fetched : undefined
-  const { status, stop } = artifactError ? { status: "harness_error" as const, stop: false } : statusFor(run, artifact !== undefined)
+  const { status, stop } = artifactError ? { status: "harness_error" as const, stop: false } : statusFor(run, artifact !== undefined || task.outputMode === "diagnostic")
   const cleanupError =
     !config.keepStorage && (artifact || !config.dryRun)
       ? await (artifact ? cleanupArtifact(input.source, artifact) : cleanupOrphanResult({
