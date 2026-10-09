@@ -153,3 +153,18 @@ test('verification rejects unissued file refs, wrong operation and ID collisions
     assert.deepEqual(f.counts,{uploads:1,downloads:0,verifications:0});
   } finally {await f.cleanup();}
 });
+
+test('local validation or staging failure never marks verification as dispatched and permits safe continuation',async()=>{
+ const f=await fixture();let dispatched=0;
+ try{
+  const initial=await f.request();
+  await assert.rejects(()=>f.rt.verifyArtifact({...initial,fileRef:'unissued',onDispatched:()=>dispatched++}));
+  assert.equal(dispatched,0);assert.equal(f.counts.downloads,0);
+  f.page.failJournalPhase='download_prepared';
+  await assert.rejects(()=>f.rt.verifyArtifact({...initial,onDispatched:()=>dispatched++}),/journal unavailable/);
+  assert.equal(dispatched,0);assert.equal(f.counts.downloads,0);
+  const request=await f.request();
+  const result=await f.rt.verifyArtifact({...request,onDispatched:()=>dispatched++});
+  assert.equal(result.status,'SUCCEEDED');assert.equal(dispatched,1);assert.equal(f.counts.uploads,1);assert.equal(f.counts.downloads,1);
+ }finally{await f.cleanup();}
+});

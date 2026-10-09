@@ -408,6 +408,14 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           }
           recovery.id = await service.journal.begin(run.chat, lease.generation)
           run.active.add(recovery.id)
+          if (!service.hasRuntime(lease.generation, run.chat)) {
+            // Exit during journal admission precedes dispatch. Settle this unused
+            // record, and require explicit preparation before a replacement owner.
+            await service.journal.settle(recovery.id, true)
+            run.active.delete(recovery.id)
+            recovery.id = undefined
+            throw new Error("LOGINOM_SCOPE_DENIED")
+          }
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
           const result = await runtime.request("call", {
             name: input.name,

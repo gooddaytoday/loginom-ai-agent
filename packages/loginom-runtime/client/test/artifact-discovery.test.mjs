@@ -57,3 +57,12 @@ test('host accepts a discovered reference only for the prepared document tab wor
  }
  const duplicate=structuredClone(raw);duplicate.trace.push(duplicate.trace[0]);assert.throws(()=>verifiedDiscoveryReference(artifact,binding,duplicate));
 });
+
+test('discovery preflight accepts TXT CSV TSV and keeps storage ownership and format refusals',async()=>{
+ const {makeArtifactDiscoveryDownloadCode}=await import('../lib/artifact-discovery.mjs');
+ const options={artifact:{name:'transactions.txt',upload:{directory:'/user'}},snapshot:{observation_root:{ref:'nav'},file_storage:{status:'observed',directory:'/user'},workflow_ref:{prefix:'MF;TF-2'}}};
+ const callbacks={download:()=>{},reveal:()=>{}};
+ for(const name of ['transactions.txt','transactions.TXT','sales.csv','sales.tsv'])assert.equal(typeof makeArtifactDiscoveryDownloadCode({...options,artifact:{...options.artifact,name}},callbacks),'string');
+ for(const name of ['file.lgp','file.xlsx','file.json','file.txt.lgp'])assert.throws(()=>makeArtifactDiscoveryDownloadCode({...options,artifact:{...options.artifact,name}},callbacks));
+ assert.throws(()=>makeArtifactDiscoveryDownloadCode({...options,snapshot:{...options.snapshot,file_storage:{status:'observed',directory:'/foreign'}}},callbacks));
+});

@@ -240,7 +240,7 @@ for (const failure of [undefined, "catalog", "call"]) {
             time: { created: 1 },
           },
           parts: [
-            attachment(original, "data:text/csv;base64,QTsxCg=="),
+            attachment(original, "data:text/csv;base64,QTsxCs/w6OLl8go="),
             attachment(original, "file:///private/key.json"),
             attachment(task, "data:text/csv;base64,Zm9yZ2Vk"),
             { ...attachment(original, "data:application/octet-stream;base64,bGdw"), filename: "scenario.LGP" },
@@ -305,7 +305,7 @@ for (const failure of [undefined, "catalog", "call"]) {
             time: { created: 4 },
           },
           parts: [
-            attachment(replay, "data:text/csv;base64,QTsxCg=="),
+            attachment(replay, "data:text/csv;base64,QTsxCs/w6OLl8go="),
             {
               id: PartID.ascending(),
               sessionID,
@@ -392,7 +392,7 @@ for (const failure of [undefined, "catalog", "call"]) {
         {
           name: "dock_prepare",
           message: task,
-          admissions: [{ userMessage: original, files: [{ name: "sales.csv", data: "QTsxCg==" }] }],
+          admissions: [{ userMessage: original, files: [{ name: "sales.csv", data: "QTsxCs/w6OLl8go=" }] }],
         },
       ])
       expect(Exit.isFailure(result)).toBe(failure === "call")

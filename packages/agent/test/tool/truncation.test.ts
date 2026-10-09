@@ -3,8 +3,10 @@ import { ConfigV1 } from "@loginom-ai-agent/core/v1/config/config"
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import { filesystem } from "@loginom-ai-agent/core/effect/app-node-platform"
 import { FSUtil } from "@loginom-ai-agent/core/fs-util"
-import { Effect, FileSystem } from "effect"
+import { Deferred, Effect, FileSystem, Layer, Option, Scope } from "effect"
 import { Truncate } from "@/tool/truncate"
+import { TRUNCATION_LOCK } from "@/tool/truncation-dir"
+import { attachmentContext } from "@/util/attachment-preview"
 import { Config } from "@/config/config"
 import { Identifier } from "../../src/id/id"
 import { Process } from "@/util/process"
@@ -241,6 +243,51 @@ describe("Truncate", () => {
 
   describe("cleanup", () => {
     const DAY_MS = 24 * 60 * 60 * 1000
+
+    it.live("keeps a usable snapshot when an inline attachment refresh overlaps stale cleanup", () =>
+      Effect.gen(function* () {
+        const fs = yield* FSUtil.Service
+        const scope = yield* Scope.Scope
+        const content = "cleanup-race-source\n" + "row\n".repeat(2100) + "CLEANUP_RACE_TAIL"
+        const context = yield* attachmentContext(content)
+        const snapshot = context.match(/^Full attachment snapshot saved to: (.+)$/m)?.[1]
+        if (!snapshot) throw new Error("missing attachment snapshot path")
+        yield* fs.utimes(snapshot, new Date(), new Date(Date.now() - 8 * DAY_MS))
+        const refreshed = yield* Deferred.make<string>()
+        const observed = FSUtil.Service.of({
+          ...fs,
+          stat: (file) =>
+            fs.stat(file).pipe(
+              Effect.tap(() =>
+                file !== snapshot
+                  ? Effect.void
+                  : Effect.gen(function* () {
+                      // Pause at the stale stat boundary and start a real attachment refresh.
+                      const unlocked = yield* TRUNCATION_LOCK.withPermitsIfAvailable(1)(Effect.void)
+                      yield* Deferred.complete(
+                        refreshed,
+                        attachmentContext(content).pipe(Effect.provideService(FSUtil.Service, fs)),
+                      ).pipe(Effect.forkIn(scope))
+                      // Without cleanup coordination, force refresh before the stale removal.
+                      if (Option.isSome(unlocked)) yield* Deferred.await(refreshed)
+                    }),
+              ),
+            ),
+        })
+        yield* Effect.gen(function* () {
+          const truncate = yield* Truncate.Service
+          yield* truncate.cleanup()
+          expect(yield* Deferred.await(refreshed)).toBe(context)
+          expect(yield* fs.exists(snapshot)).toBe(true)
+          expect(Buffer.from(yield* fs.readFile(snapshot)).toString("utf8")).toBe(content)
+        }).pipe(
+          Effect.provide(
+            Layer.fresh(LayerNode.compile(Truncate.node, [[FSUtil.node, Layer.succeed(FSUtil.Service, observed)]])),
+          ),
+          Effect.ensuring(fs.remove(snapshot, { force: true }).pipe(Effect.orDie)),
+        )
+      }),
+    )
 
     it.live("uses file mtime when IDs wrap", () =>
       Effect.gen(function* () {

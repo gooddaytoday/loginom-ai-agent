@@ -544,20 +544,22 @@ test("a killed runtime requires an explicit prepare before the next scenario cal
   }
 }, 15000)
 
-test("a chat runtime restarts at most twice in one turn", async () => {
-  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
-  if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
-  const directory = await mkdtemp(join(tmpdir(), "loginom-advisory-relaunch-limit-"))
-  const resources = join(directory, "resources")
-  const calls = join(directory, "calls.jsonl")
-  await mkdir(join(resources, "runtime/src"), { recursive: true })
-  await stageKnowledgeFixture(resources)
-  await mkdir(join(resources, "bin"))
-  await symlink(node, join(resources, "bin/node"))
-  await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
-  await Bun.write(
-    join(resources, "runtime/src/managed-entry.mjs"),
-    `
+test.each(["after-call", "during-admission", "strict-before-dispatch"])(
+  "a chat runtime restarts at most twice in one turn: %s",
+  async (exitAt) => {
+    const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+    if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
+    const directory = await mkdtemp(join(tmpdir(), "loginom-advisory-relaunch-limit-"))
+    const resources = join(directory, "resources")
+    const calls = join(directory, "calls.jsonl")
+    await mkdir(join(resources, "runtime/src"), { recursive: true })
+    await stageKnowledgeFixture(resources)
+    await mkdir(join(resources, "bin"))
+    await symlink(node, join(resources, "bin/node"))
+    await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
+    await Bun.write(
+      join(resources, "runtime/src/managed-entry.mjs"),
+      `
     import { appendFileSync } from 'node:fs';
     process.on('message', m => {
       if (m.operation === 'start') {
@@ -574,67 +576,106 @@ test("a chat runtime restarts at most twice in one turn", async () => {
       process.send({id:m.id,result:{result:{action},recoveryPending:false,activeWork:false}});
     });
   `,
-  )
-  const root = join(directory, "profile")
-  const store = connectionStore(join(root, "connection"), credentials("linux"))
-  await store.stage({
-    generation: 1,
-    revision: 1,
-    url: "http://example.test",
-    username: "user",
-    apiKey: "fixture",
-    password: "",
-  })
-  await store.activate(1)
-  const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
-  const requests = new EventEmitter()
-  const replies = new EventEmitter()
-  const port = loginomHostPort(
-    {
-      postMessage: (value) => replies.emit("message", { data: value }),
-      on: requests.on.bind(requests),
-      start() {},
-    },
-    host,
-  )
-  const client = transport({
-    postMessage: (value) => requests.emit("message", { data: value }),
-    on: replies.on.bind(replies),
-    start() {},
-  })
-  const call = (run: string, action: string) =>
-    client.request("call", { run, name: "dock_node_wait", args: { action }, userMessage: "original" })
-  try {
-    await waitForKnowledge(host)
-    expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
-    await prepareRun(client, "one")
-    await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
-    await prepareRun(client, "one")
-    await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
-    await prepareRun(client, "one")
-    await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
-    await expect(call("one", "finish")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
-    await expect(prepareRun(client, "one")).rejects.toThrow("LOGINOM_RUNTIME_UNAVAILABLE")
-    expect(
-      (await readFile(calls, "utf8"))
-        .trim()
-        .split("\n")
-        .map((line) => JSON.parse(line).action),
-    ).toEqual(["kill", "kill", "kill"])
-    expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toEqual([])
-    await client.request("release", { run: "one" })
-    expect(await client.request("acquire", { run: "two", session: "chat" })).toEqual({ generation: 1 })
-    await prepareRun(client, "two")
-    expect(await call("two", "finish")).toEqual({ action: "finish" })
-  } finally {
-    client.close()
-    await port.close()
-    await host.close().catch((error: Error) => {
-      if (error.message !== "LOGINOM_RUNTIME_CLEANUP_FAILED") throw error
+    )
+    const root = join(directory, "profile")
+    const store = connectionStore(join(root, "connection"), credentials("linux"))
+    await store.stage({
+      generation: 1,
+      revision: 1,
+      url: "http://example.test",
+      username: "user",
+      apiKey: "fixture",
+      password: "",
     })
-    await rm(directory, { recursive: true, force: true })
-  }
-}, 15000)
+    await store.activate(1)
+    const host = await createLoginomHost({
+      root,
+      resources,
+      codec: credentials("linux"),
+      environment: {},
+      strictRecovery: exitAt === "strict-before-dispatch",
+    })
+    const requests = new EventEmitter()
+    const replies = new EventEmitter()
+    const admission = { exit: false }
+    const port = loginomHostPort(
+      {
+        postMessage: (value) => replies.emit("message", { data: value }),
+        on: requests.on.bind(requests),
+        start() {},
+      },
+      {
+        ...host,
+        journal: {
+          ...host.journal,
+          async begin(chat, generation) {
+            const id = await host.journal.begin(chat, generation)
+            if (admission.exit) {
+              // Force a real child exit after durable admission, before the port's
+              // dispatch. No synthetic runtime refusal is supplied.
+              admission.exit = false
+              const runtime = await host.runtime(generation, chat)
+              await runtime.request("call", { arguments: { action: "kill" } }).catch(() => undefined)
+              await runtime.exited
+            }
+            return id
+          },
+        },
+      },
+    )
+    const client = transport({
+      postMessage: (value) => requests.emit("message", { data: value }),
+      on: replies.on.bind(replies),
+      start() {},
+    })
+    const call = (run: string, action: string) =>
+      client.request("call", { run, name: "dock_node_wait", args: { action }, userMessage: "original" })
+    try {
+      await waitForKnowledge(host)
+      expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
+      await prepareRun(client, "one")
+      if (exitAt === "strict-before-dispatch") {
+        admission.exit = true
+        await expect(call("one", "finish")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+        expect(host.journal.pending()).toEqual([])
+        expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toEqual([])
+        await prepareRun(client, "one")
+        expect(await call("one", "finish")).toEqual({ action: "finish" })
+        return
+      }
+      await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+      await prepareRun(client, "one")
+      await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+      await prepareRun(client, "one")
+      if (exitAt === "during-admission") {
+        admission.exit = true
+        await expect(call("one", "finish")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+      }
+      if (exitAt === "after-call") await expect(call("one", "kill")).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+      await expect(call("one", "finish")).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+      await expect(prepareRun(client, "one")).rejects.toThrow("LOGINOM_RUNTIME_UNAVAILABLE")
+      expect(
+        (await readFile(calls, "utf8"))
+          .trim()
+          .split("\n")
+          .map((line) => JSON.parse(line).action),
+      ).toEqual(["kill", "kill", "kill"])
+      expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toEqual([])
+      await client.request("release", { run: "one" })
+      expect(await client.request("acquire", { run: "two", session: "chat" })).toEqual({ generation: 1 })
+      await prepareRun(client, "two")
+      expect(await call("two", "finish")).toEqual({ action: "finish" })
+    } finally {
+      client.close()
+      await port.close()
+      await host.close().catch((error: Error) => {
+        if (error.message !== "LOGINOM_RUNTIME_CLEANUP_FAILED") throw error
+      })
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+  15000,
+)
 
 test("the next turn replaces a runtime that cannot continue", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE

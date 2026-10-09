@@ -3317,3 +3317,237 @@ noLLMServer.instance(
     }),
   { config: cfg },
 )
+
+noLLMServer.instance(
+  "bounds large data URL text outside standalone while retaining the admitted snapshot",
+  () =>
+    Effect.gen(function* () {
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const session = yield* sessions.create({})
+      const csv = "amount\n" + "1234567890\n".repeat(10000) + "HIDDEN_END"
+      const data = "data:text/plain;base64," + Buffer.from(csv).toString("base64")
+      const previous = process.env.LOGINOM_AI_AGENT_CLI_ROOT
+      delete process.env.LOGINOM_AI_AGENT_CLI_ROOT
+      try {
+        const message = yield* prompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          noReply: true,
+          parts: [{ type: "file", mime: "text/plain", filename: "large.csv", url: data }],
+        })
+        const stored = yield* MessageV2.get({ sessionID: session.id, messageID: message.info.id })
+        const text = stored.parts
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("\n")
+        expect(Buffer.byteLength(text)).toBeLessThan(52 * 1024)
+        expect(text).not.toContain("HIDDEN_END")
+        expect(text).toContain("preview truncated")
+        expect(stored.parts.filter((part) => part.type === "file").map((part) => part.url)).toEqual([data])
+      } finally {
+        if (previous === undefined) delete process.env.LOGINOM_AI_AGENT_CLI_ROOT
+        else process.env.LOGINOM_AI_AGENT_CLI_ROOT = previous
+        yield* sessions.remove(session.id)
+      }
+    }),
+  { config: cfg },
+)
+
+noLLMServer.instance(
+  "keeps a truncated inline attachment readable through its full snapshot",
+  () =>
+    Effect.gen(function* () {
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const provider = yield* ProviderSvc.Service
+      const registry = yield* ToolRegistry.Service
+      const fs = yield* FSUtil.Service
+      const truncate = yield* Truncate.Service
+      const session = yield* sessions.create({})
+      const content = "\ufeffamount\r\n" + "1234567890\r\n".repeat(2100) + "FINAL_REQUIRED_PARAGRAPH: последний абзац"
+      const data = "data:text/plain;base64," + Buffer.from(content).toString("base64")
+      const message = yield* prompt.prompt({
+        sessionID: session.id,
+        agent: "build",
+        noReply: true,
+        parts: [
+          { type: "file", mime: "text/plain", filename: "report.csv", url: data },
+          { type: "text", text: "Read the last paragraph." },
+        ],
+      })
+      const stored = yield* MessageV2.get({ sessionID: session.id, messageID: message.info.id })
+      const model = yield* provider.getModel(ref.providerID, ref.modelID)
+      const modelText = JSON.stringify(yield* MessageV2.toModelMessagesEffect([stored], model))
+      const context = stored.parts
+        .filter((part): part is SessionV1.TextPart => part.type === "text" && part.synthetic === true)
+        .map((part) => part.text)
+        .join("\n")
+      const snapshot = context.match(/^Full attachment snapshot saved to: (.+)$/m)?.[1]
+      expect(snapshot).toBeDefined()
+      if (!snapshot) throw new Error("missing full attachment snapshot path")
+      expect(path.isAbsolute(snapshot)).toBe(true)
+      expect(context.indexOf(snapshot)).toBeLessThan(context.indexOf("1234567890"))
+      expect(modelText).toContain(snapshot)
+      expect(modelText).not.toContain("FINAL_REQUIRED_PARAGRAPH")
+      expect(modelText).not.toContain(data)
+      expect(Buffer.byteLength(modelText)).toBeLessThan(52 * 1024)
+      expect(Buffer.from(yield* fs.readFile(snapshot)).toString("utf8")).toBe(content)
+      expect(
+        stored.parts.filter((part) => part.type === "file").map((part) => ({ url: part.url, filename: part.filename })),
+      ).toEqual([{ url: data, filename: "report.csv" }])
+      const expired = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
+      yield* fs.utimes(snapshot, expired, expired)
+      const repeated = yield* prompt.prompt({
+        sessionID: session.id,
+        agent: "build",
+        noReply: true,
+        parts: [{ type: "file", mime: "text/plain", filename: "same-content.csv", url: data }],
+      })
+      expect(repeated.parts.some((part) => part.type === "text" && part.text.includes(snapshot))).toBe(true)
+      yield* truncate.cleanup()
+      const tools = yield* registry.named()
+      const read = yield* tools.read.execute(
+        { filePath: snapshot, offset: 2102, limit: 1 },
+        {
+          sessionID: session.id,
+          messageID: message.info.id,
+          agent: "build",
+          abort: AbortSignal.any([]),
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+      expect(read.output).toContain("FINAL_REQUIRED_PARAGRAPH: последний абзац")
+      yield* fs.remove(snapshot)
+      yield* sessions.remove(session.id)
+    }),
+  { config: cfg },
+)
+
+Array.of(
+  { name: "data", prefix: "data:" },
+  { name: "DATA", prefix: "DATA:" },
+  { name: "leading whitespace", prefix: " \tdata:" },
+  { name: "tab in scheme", prefix: "da\tta:" },
+).forEach((scheme) =>
+  it.instance(`restores missing inline snapshots from compacted history before resume (${scheme.name})`, () =>
+    Effect.gen(function* () {
+      const { llm } = yield* useServerConfig(providerCfg)
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const fs = yield* FSUtil.Service
+      const session = yield* sessions.create({ title: "Inline snapshot recovery" })
+      const content = "recovery-header\n" + "row\n".repeat(2100) + "RECOVERED_REQUIRED_PARAGRAPH"
+      const data = `${scheme.prefix}text/plain;base64,` + Buffer.from(content).toString("base64")
+      const original = yield* prompt.prompt({
+        sessionID: session.id,
+        agent: "build",
+        noReply: true,
+        parts: [{ type: "file", mime: "text/plain", filename: "recovery.txt", url: data }],
+      })
+      const snapshot = original.parts
+        .filter((part): part is SessionV1.TextPart => part.type === "text" && part.synthetic === true)
+        .map((part) => part.text)
+        .join("\n")
+        .match(/^Full attachment snapshot saved to: (.+)$/m)?.[1]
+      if (!snapshot) throw new Error("missing full attachment snapshot path")
+      const compact = yield* sessions.updateMessage({
+        id: MessageID.ascending(),
+        role: "user",
+        sessionID: session.id,
+        agent: "build",
+        model: ref,
+        time: { created: Date.now() },
+      })
+      yield* sessions.updatePart({
+        id: PartID.ascending(),
+        messageID: compact.id,
+        sessionID: session.id,
+        type: "compaction",
+        auto: false,
+      })
+      const summaryMessage = yield* sessions.updateMessage({
+        id: MessageID.ascending(),
+        role: "assistant",
+        sessionID: session.id,
+        parentID: compact.id,
+        agent: "build",
+        mode: "build",
+        modelID: ref.modelID,
+        providerID: ref.providerID,
+        path: { cwd: "/tmp", root: "/tmp" },
+        cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        summary: true,
+        finish: "stop",
+        time: { created: Date.now(), completed: Date.now() },
+      })
+      yield* sessions.updatePart({
+        id: PartID.ascending(),
+        messageID: summaryMessage.id,
+        sessionID: session.id,
+        type: "text",
+        text: `The full inline source is saved to: ${snapshot}`,
+      })
+      yield* prompt.prompt({
+        sessionID: session.id,
+        agent: "build",
+        noReply: true,
+        parts: [{ type: "text", text: "Read the last paragraph from the saved attachment." }],
+      })
+      const active = yield* MessageV2.filterCompactedEffect(session.id)
+      expect(active.some((message) => message.info.id === original.info.id)).toBe(false)
+      expect(
+        (yield* sessions.messages({ sessionID: session.id })).some((message) => message.info.id === original.info.id),
+      ).toBe(true)
+      yield* fs.remove(snapshot)
+      expect(yield* fs.exists(snapshot)).toBe(false)
+      yield* llm.tool("read", { filePath: snapshot, offset: 2102, limit: 1 })
+      yield* llm.text("Read the final paragraph.")
+      yield* prompt.loop({ sessionID: session.id })
+      const messages = yield* sessions.messages({ sessionID: session.id })
+      const read = messages
+        .flatMap((message) => message.parts)
+        .find((part) => part.type === "tool" && part.tool === "read")
+      expect(read?.type === "tool" ? read.state.status : undefined).toBe("completed")
+      expect(read?.type === "tool" && read.state.status === "completed" ? read.state.output : "").toContain(
+        "RECOVERED_REQUIRED_PARAGRAPH",
+      )
+      expect(Buffer.from(yield* fs.readFile(snapshot)).toString("utf8")).toBe(content)
+      yield* fs.remove(snapshot)
+      yield* sessions.remove(session.id)
+    }),
+  ),
+)
+
+noLLMServer.instance(
+  "keeps small inline text exact without snapshot context",
+  () =>
+    Effect.gen(function* () {
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const provider = yield* ProviderSvc.Service
+      const session = yield* sessions.create({})
+      const content = "amount\r\n10\r\n20\r\n"
+      const data = `data:text/plain,${encodeURIComponent(content)}`
+      const message = yield* prompt.prompt({
+        sessionID: session.id,
+        agent: "build",
+        noReply: true,
+        parts: [{ type: "file", mime: "text/plain", filename: "small.csv", url: data }],
+      })
+      expect(message.parts.some((part) => part.type === "text" && part.synthetic && part.text === content)).toBe(true)
+      expect(
+        message.parts.some((part) => part.type === "text" && part.text.includes("Full attachment snapshot saved to:")),
+      ).toBe(false)
+      const model = yield* provider.getModel(ref.providerID, ref.modelID)
+      expect(JSON.stringify(yield* MessageV2.toModelMessagesEffect([message], model))).toContain(
+        JSON.stringify(content).slice(1, -1),
+      )
+      expect(message.parts.filter((part) => part.type === "file").map((part) => part.url)).toEqual([data])
+      yield* sessions.remove(session.id)
+    }),
+  { config: cfg },
+)

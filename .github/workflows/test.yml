@@ -48,11 +48,6 @@ jobs:
       - name: Setup Loginom pinned inputs
         uses: ./.github/actions/setup-loginom-inputs
 
-      # setup-loginom-inputs may hit its browser cache without installing npm dependencies.
-      - name: Install locked runtime dependencies
-        working-directory: packages/loginom-runtime/client
-        run: npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
-
       - name: Prepare isolated Linux desktop
         if: runner.os == 'Linux'
         working-directory: packages/loginom-runtime/client
@@ -61,6 +56,32 @@ jobs:
           sudo apt-get install -y xvfb xauth dbus-x11 dconf-gsettings-backend gsettings-desktop-schemas
           # Preserve the Chromium sandbox, as in the existing Linux release matrix.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      # WinINET is shared by every process on this disposable runner. Mozilla's
+      # scheduled agents can otherwise send telemetry to our proxy trap while
+      # Chromium is being checked; retain the strict zero-traffic assertion.
+      - name: Isolate Windows proxy acceptance from Mozilla background tasks
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $mozillaTasks = @(Get-ScheduledTask | Where-Object { $_.TaskPath -eq '\Mozilla\' })
+          foreach ($task in $mozillaTasks) {
+            Write-Host "Disabling background task: $($task.TaskPath)$($task.TaskName)"
+            $task | Disable-ScheduledTask | Out-Null
+            $task | Stop-ScheduledTask
+            if ((Get-ScheduledTask -TaskName $task.TaskName -TaskPath $task.TaskPath).State -ne 'Disabled') {
+              throw 'Mozilla background tasks must be disabled before proxy acceptance'
+            }
+          }
+          $mozillaProcesses = @(Get-Process -Name firefox, default-browser-agent, pingsender -ErrorAction SilentlyContinue)
+          foreach ($process in $mozillaProcesses) {
+            Write-Host "Stopping background process: $($process.ProcessName) PID=$($process.Id)"
+            $process | Stop-Process -Force -ErrorAction Stop
+          }
+          if (Get-Process -Name firefox, default-browser-agent, pingsender -ErrorAction SilentlyContinue) {
+            throw 'Mozilla background processes remain active before proxy acceptance'
+          }
 
       - name: Verify direct Chromium and browser downloads
         working-directory: packages/loginom-runtime/client
@@ -140,9 +161,14 @@ jobs:
       # order shows which package is still running when a task hangs. Two parallel
       # tasks keep the agent CLI subprocess tests (15-30 s budgets) from starving on
       # the 4-vCPU runner; the agent suite is the long pole either way.
+      - name: Prepare isolated Linux test display
+        run: sudo apt-get update && sudo apt-get install -y xvfb xauth x11-utils
+
       - name: Run unit tests
         timeout-minutes: 30
-        run: GITHUB_ACTIONS=false bun turbo test --continue --log-order=stream --concurrency=2
+        # The resume acceptance driver observes its owned X11 windows even when
+        # driven by the local CLI fixture. Keep that observer real on headless CI.
+        run: xvfb-run -a env GITHUB_ACTIONS=false bun turbo test --continue --log-order=stream --concurrency=2
 
       - name: Check generated client
         working-directory: packages/client
@@ -164,6 +190,9 @@ jobs:
         uses: ./.github/actions/setup-bun
         with:
           install-flags: --frozen-lockfile
+
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
 
       # Runs every desktop test file except src/main/draft-store.test.ts: draft-store.ts
       # imports `node:sqlite`, which Electron's Node provides but Bun 1.3.14 does not

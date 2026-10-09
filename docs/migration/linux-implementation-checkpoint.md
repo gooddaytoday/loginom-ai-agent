@@ -533,3 +533,29 @@ CLI49 attempts1,3 warm+cold PASS;2 FAIL. Desktop3 warm PASS; cold readonly FAIL/
 Journal live Desktop3 PASS; readonly cleanup TDD/93 PASS/801/typecheck; SSH/подмодель pending.
 Этап9/full35 отложены/server skill retained; исходные server/client не переключались.
 [Отчёт](../testing/loginom-ai-agent/reports/2026-10-08-package-docs-live.md).
+
+## 2026-10-06 — локальная совместимость OpenCode на Mac
+
+- База `f6f9b0106`; ветка `opencode-compatibility`; совместимость провайдера отделена от версии Loginom.
+- LLM tests: 32 PASS; macOS source checks: все этапы PASS.
+- Кандидат SHA `108aa93fc`, `0.1.17-opencode.1`, dev, macOS arm64, обычный backend v1.
+- UI PASS: два завершённых FREE-OK в одном постоянном чате `opencode/ling-3.1-flash-free`; ошибки версии нет.
+- DMG/ZIP signatures, CLI archive roundtrip и offline smoke PASS. Production 0.1.16 не заменён.
+- Полный pipeline FAIL: завис CLI source snapshot; остаточные проверки завершены отдельно штатными helpers.
+- Dev оставлен открытым; evidence, ограничения и путь — [отчёт](../testing/loginom-ai-agent/reports/2026-10-06-opencode-compatibility/report.md).
+- Следующий шаг: ручная проверка Dev; перед выпуском устранить зависание и повторить pipeline. Push/PR/релиза не было.
+
+## 2026-10-09 — PR docs-no-browser и исправления CI
+
+Исходный HEAD `4a4d4abe5` отправлен на origin; [PR #46](https://github.com/gooddaytoday/loginom-ai-agent/pull/46)
+направлен в loginom. Объединена актуальная база `0ca9e75bc7bb6897f46ac1ddc880b9758e993dc9`.
+Сохранены scoped skills, CP1251/контекст вложений и исправление выхода runtime
+во время journal admission; неотправленная запись не создаёт ложный strict recovery.
+CI setup устанавливает nested npm dependencies при cache hit; Desktop получает
+pinned Node, unit — отдельный Xvfb без отключения наблюдателя native windows.
+Agent250 PASS/2 SKIP; HostPort16 PASS + strict PASS; cache-hit regression PASS.
+Desktop12 PASS/2 SKIP ×3; resume-oracle под Xvfb PASS ×3; agent/host typecheck PASS.
+Повторные GitHub tests и candidate Linux/Windows/macOS ещё должны завершиться;
+результаты и финальный SHA — в PR, подробности — [CI отчёт](../testing/loginom-ai-agent/reports/2026-10-09-docs-no-browser-ci.md).
+Installed/live приёмка предыдущего Linux payload не переносится на этот SHA.
+Следующий шаг: довести все CI gates до успеха; merge и publication не выполняются.
