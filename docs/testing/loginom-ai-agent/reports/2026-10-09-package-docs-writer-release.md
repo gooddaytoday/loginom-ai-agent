@@ -1342,3 +1342,11 @@ task.json; общий900000ms не отменяет этот override.
 `loginom-skills-*`/`loginom-cold-*` остались только два восстановленных,
 ещё необходимых входа; неиспользуемых кандидатов в этом наборе0.
 Это не утверждение об очистке всех временных файлов системы.
+
+Дополнительно проверен actual workspace текущего cohort#3: один CSV input
+совпал по SHA с manifest и восстановленным snapshot; его mtime предшествует
+наблюдавшемуся отсутствию `/tmp` source. Harness копирует inputs до `runAgent`.
+Private receipt `formal-v9-cohort-attempt3-workspace-input-readback-20261009.json`,
+SHA `99cbfc46ab1e3517bb5acc2664ab9b96cc7653aab9a9517c1c22006653a9ca47`,
+mode600/read-back PASS. Это проверка сохранности входа одной текущей попытки,
+не итоговая оценка результата и не полный comparability verdict.
