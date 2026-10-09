@@ -4447,11 +4447,11 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-09 — ACTIVE, smoke-пара v9 принята; formal baseline запущен
+### 2026-10-09 — ACTIVE, smoke-пара v9 принята; первый formal результат сохранён
 
-- HEAD до checkpoint `3ca800fe1`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
+- HEAD до checkpoint `091fba22a`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client и чужие профили/процессы не изменялись.
-- Own mutable harness `d08be6baf8f5aea53f83c228cd0984c9d2bf0494` clean: промежуточный process-progress.jsonl через TDD; modules29 PASS/typecheck PASS/full486 PASS/2 SKIP/0 FAIL/2080 assertions/581.74s, terminal0/process cleanup confirmed. Frozen495 не редактировался; новый detached frozen d08 на own storage/loginom-skills-frozen-progress-20261009, install/typecheck PASS/clean,658 pins; обе новые smoke стороны ещё не приняты.
+- Own mutable harness `d08be6baf8f5aea53f83c228cd0984c9d2bf0494` clean: промежуточный process-progress.jsonl через TDD; modules29 PASS/typecheck PASS/full486 PASS/2 SKIP/0 FAIL/2080 assertions/581.74s, terminal0/process cleanup confirmed. Frozen495 не редактировался; новый detached frozen d08 на own storage/loginom-skills-frozen-progress-20261009, install/typecheck PASS/clean,658 pins; обе новые smoke стороны приняты.
 - Writer post-open real-IO RED→GREEN; release/persistent-empty/replacement guards×5 PASS; modules77 PASS/0 FAIL/241 assertions.
 - Первый full495/session80830 terminal1:447 PASS/2 SKIP/37 FAIL/2 errors; cwd640MiB ниже1GiB.31 прямой space FAIL,6 downstream supported; весь evidence сохранён.
 - Fresh full495/session12760 terminal0:484 PASS/2 SKIP/0 FAIL/2063 assertions/576.34s; порог пространства сохранён, новый own executable TMPDIR в /dev/shm.
@@ -4461,7 +4461,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - На freeze evals ref992fca12badf209169f13b569b9bd291e4d70e99; после пары fresh b30dcbe5f/protected diff0, с freeze изменён только соседний docs-файл; frozen495/658files/21pins/оба full CLI повторно PASS.
 - Те же15 задач×3×2=90; primary openai/gpt-6.1-sol medium/judge gpt-6-astra high. V9 smoke metrics18/18 provider turns,17/20 tools,13/14 Loginom/errors0; bundled activation digest2a6ffec0…, turns through prepare1/2, delta1/skill1 PASS; smoke не statistical NI.
 - Baseline v9 accepted c019ba636…:history4506/15452718bytes+diag3/3882841bytes full roundtrip; candidate history1927/9027240+diag3/3884116 roundtrip PASS. Все закрытые данные600/own dirs700, raw failed/incomplete profiles не архивируются.
-- V9 candidate accepted/pair receipts:ab-smoke-v9-{candidate,pair}-accepted-20261009. Fresh evals b30/protected diff0; same common020c08059…/658 harness/281 tasks/21 adapters/оба CLI/full source486 PASS. Formal resume JSON:60189/PID676156/birth сохранены; не перезапускать по observation timeout.
+- V9 candidate accepted/pair receipts:ab-smoke-v9-{candidate,pair}-accepted-20261009. Formal60189/PID676156/birth повторно live/identity PASS. Первый closed ab-revenue-per-converter#1 PASS100/structure/warm oracle/6 cleanup stages/process remaining0×2; history4604/17048407bytes+diag3/5110421bytes roundtrip PASS. Progress1 receipt SHA5a577bd985…; abc#1 running, candidate/cold/compare0. Не перезапускать по observation timeout.
 - Formal v7 baseline81639/run220203 terminal143 после identity-guarded SIGINT→SIGTERM;19 closed/13 PASS/6 FAIL/14 пакетов сохранены, SHA всех result/cleanup/process-cleanup19 повторно PASS. Cohort#2 INCOMPLETE: exit0 child receipt/пустые outputs/terminal files отсутствуют; cause UNKNOWN, raw profile/leases сохранены. PID controller/launcher/sandbox отсутствуют; bounded own-run references0, чужие fd недоступны. Interruption readback сохранён; targeted tests2 PASS не воспроизводят hang. Candidate/cold/compare не начаты; полный90 не принят,retries0.
 - V5 formal1287 terminal1 на13/45:13-я analytic PASS100/process cleanup FAIL; historical PID4050199 errno/operation UNKNOWN; profile не очищен, candidate0/cold0.
 - CLI modify3 FAIL:21 file occurrence hashes PASS, readonly3/3/UNKNOWN_PREPARED_WORKFLOW3/3/active-source refusal2/3; candidate49 bridge/managed-entry exact source hashes PASS, explicit package/logout cleanup test-only; native writer owner/cause UNKNOWN. Docs-after-build CLI3 accepted/Desktop cold1 PASS2 FAIL; new cold native только после90 closed.

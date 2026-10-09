@@ -614,3 +614,21 @@ Candidate formal/cold/compare не запускались. Не перезапу
 наблюдения; использовать тот же handle60189. После обеих45 необходимы полный
 индекс сохранённых артефактов, structure/cold и compare. V7/V8 отдельно сохранены
 и не подставляются в эту пару. Stage5–8 остаются открыты; stage9/full35 deferred.
+
+## Первый закрытый formal результат v9
+
+Baseline `ab-revenue-per-converter#1` завершён: PASS/score100/judge scored.
+Структурный verifier и warm oracle PASS; все6 environment cleanup stages
+confirmed, process cleanup confirmed/error null/owned remaining0 в обеих
+проверках. `process-progress.jsonl` содержит все9 фаз; подтверждением cleanup
+служат отдельные terminal receipts, а не фазовый журнал.
+
+Closed history4604 entries/17048407bytes и diagnostics3/5110421bytes сохранены
+с полным inventory/restore roundtrip, mode600. SHA result/cleanup/process-cleanup,
+review и preservation receipts закреплены в private
+`ab-local-stand-20261008/formal-v9-progress-1-20261009.json`, SHA256
+`5a577bd985e8303f64f0263e1ef2fc41ca3f8b028d212f6486699a9fa56f30be`.
+Controller60189/PID676156 повторно совпал по UID/birth/executable/inode и жив;
+вторая задача abc-pareto-groups#1 running. Candidate formal/cold/compare0,
+manual retries0. Первый результат не заменяет45/45 и общий90; активный
+профиль и frozen условия не изменены, endpoint остаётся собственным локальным.
