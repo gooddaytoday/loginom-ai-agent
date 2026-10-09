@@ -351,3 +351,15 @@ first-last-touch#1 включён с неизменённым judge FAIL. Сер
 на assertion до записи; это исправлено без native/model вызовов и ослабления
 SHA/structure/oracle проверок. Перед formal cold нужен полный индекс обеих
 завершённых сторон; этот снимок охватывает только первый повтор baseline.
+
+## Formal v7: второй повтор начат, шестнадцатая попытка
+
+Ab-revenue-per-converter#2 completed/score100/pass=true/oracle=true,
+380938ms. Структура/warm oracle отдельно PASS, cold request/plan сохранены.
+Все6 cleanup stages confirmed, обе process verification owned_remaining=0,
+cleanup_error отсутствует. History4607entries/17099517archive bytes и
+diagnostics3entries/5150834bytes сохранены с full roundtrip.
+Snapshot `formal-v7-progress-16-20261009.json`:16 terminal,10 PASS/6 FAIL,
+11 сохранённых пакетов, environment/process cleanup confirmed16;
+common SHA совпадает. Controller81639 live; остальные baseline29,
+candidate45, formal cold и compare pending. Ручных retries0.
