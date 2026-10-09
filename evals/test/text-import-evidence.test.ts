@@ -7,6 +7,7 @@ import { validateNodeAttempt } from "../src/node-evals"
 import { collectTextImportEvidence } from "../src/text-import"
 import { prepareTextImportCold, validateTextImportCold } from "../src/text-import-cold"
 import { finalizeTextImportCase } from "../src/text-import-finalize"
+import importCases from "../src/text-import-cases.json"
 
 async function rejectionFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "text-import-refusal-"))
@@ -320,3 +321,15 @@ test("cold verdict rejects a saved graph with another import GUID despite a posi
     expect((await validateTextImportCold(f.task, f.attempt, cold)).failures.join(" ")).toContain("graph")
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
+
+test("every ordinary positive import draft accepts exact typed evidence and rejects changed native formatting", async () => {
+  for (const id of importCases.groups.filter(group => ![5, 6].includes(group.card)).flatMap(group => group.ids)) {
+    const f = await positiveFixture(id)
+    try {
+      expect(await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).toEqual({ errors: [], failures: [] })
+      f.events[1]!.receipt!.value.format.fields.delimiter!.value = "WRONG"
+      await f.write()
+      expect((await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).failures.join(" ")).toContain("format")
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }
+}, 30000)
