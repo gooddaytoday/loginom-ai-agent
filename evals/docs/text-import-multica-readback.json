@@ -1,0 +1,360 @@
+{
+  "verified_at_utc": "2026-10-09T15:35:04.410501+00:00",
+  "harness_sha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+  "cli_sha": "5cd74d8ee5d6125692d953eb327b4d4f833c27a1",
+  "skill_version": "1.0.7",
+  "skill_tree_sha256": "577c50a1d494844eecfa9559de0d63faaa8a2786057bfe3c434cfbd9d8ca5c89",
+  "preparation_manifest_sha256": "f66cd2e0ad57ffa6c6473846e7fe84ce9ae672f80d8e7be6b5fb8507473b58ec",
+  "workers_unchanged": [
+    {
+      "id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "name": "Evaler",
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+    },
+    {
+      "id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+      "name": "Ben",
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+    },
+    {
+      "id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+      "name": "Rich",
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+    }
+  ],
+  "scenario_builder": {
+    "model": "openai/gpt-6-luna",
+    "variant": "high"
+  },
+  "live": "NOT_RUN",
+  "lab55": {
+    "id": "01a11fc1-8ded-7600-8251-66d97a4add78",
+    "identifier": "LAB-55",
+    "status": "in_progress",
+    "revision": 5
+  },
+  "lab55_active_runs": [
+    {
+      "id": "01a11fc8-1ebb-7371-907b-16e7d26c14f4",
+      "status": "running",
+      "agent_id": "77032943-ad18-4ae9-a2c6-668769077c86",
+      "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+    }
+  ],
+  "cards": [
+    {
+      "card": 0,
+      "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+      "identifier": "LAB-56",
+      "title": "test(evals): Проверить подготовленный комплект и допуск текстового импорта",
+      "url": "https://mas.kartamyshev.dev/lab/issues/LAB-56",
+      "status": "backlog",
+      "squad_id": "1ea03453-9bbb-4229-adb5-2e301896240e",
+      "case_ids": [],
+      "depends_on": null,
+      "runs": [],
+      "wakeups": [],
+      "attachments": [
+        {
+          "id": "01a1214a-1a72-706f-ab1a-c77e7e4e3062",
+          "file": "text-import-preparation-source.zip",
+          "bytes": 2575590,
+          "sha256": "ec106a56aeed26db34a6ee818320004e374dfa0aa48d9a5c6f0c47af7892d5a0",
+          "download_url": "/api/attachments/01a1214a-1a72-706f-ab1a-c77e7e4e3062/download",
+          "server_bytes": "VERIFIED"
+        },
+        {
+          "id": "01a1214a-1b9a-7762-9515-d5c059c04178",
+          "file": "loginom-node-eval-case-1.0.7.zip",
+          "bytes": 28072,
+          "sha256": "6224ce5efcece345b2d16962b46727086733bad551c94aad4ba5e2674b7ba265",
+          "download_url": "/api/attachments/01a1214a-1b9a-7762-9515-d5c059c04178/download",
+          "server_bytes": "VERIFIED"
+        },
+        {
+          "id": "01a1214a-1c98-796b-96ad-f5f6c4d0c612",
+          "file": "preparation-manifest.json",
+          "bytes": 6390,
+          "sha256": "f66cd2e0ad57ffa6c6473846e7fe84ce9ae672f80d8e7be6b5fb8507473b58ec",
+          "download_url": "/api/attachments/01a1214a-1c98-796b-96ad-f5f6c4d0c612/download",
+          "server_bytes": "VERIFIED"
+        },
+        {
+          "id": "01a1214a-1d89-71bc-83b3-80deefa553cf",
+          "file": "skill-manifest.json",
+          "bytes": 1116,
+          "sha256": "a18a2ab0b8af62294cdfb2c7e699ee2c7b03b70d1e1a04def31f33b7e0780d1b",
+          "download_url": "/api/attachments/01a1214a-1d89-71bc-83b3-80deefa553cf/download",
+          "server_bytes": "VERIFIED"
+        },
+        {
+          "id": "01a1214a-1ea5-7188-8033-f582c27276fc",
+          "file": "offline-report.md",
+          "bytes": 5137,
+          "sha256": "c7b2e38593a52f9c1d8986a4a10df1da38182b8aa0dbdf8761ff1f7861aaae3d",
+          "download_url": "/api/attachments/01a1214a-1ea5-7188-8033-f582c27276fc/download",
+          "server_bytes": "VERIFIED"
+        },
+        {
+          "id": "01a1214a-1fb5-77c8-910f-15fceb47cd87",
+          "file": "offline-tests.txt",
+          "bytes": 62908,
+          "sha256": "e265456d8dedabdda9a808662827f1347f0dab67fd2411a9d9542ec551487594",
+          "download_url": "/api/attachments/01a1214a-1fb5-77c8-910f-15fceb47cd87/download",
+          "server_bytes": "VERIFIED"
+        },
+        {
+          "id": "01a1214a-20b2-7202-b4d6-4c3a78ba0b2f",
+          "file": "cli-preparation.md",
+          "bytes": 2931,
+          "sha256": "fddc2a018793a4c768aa538fc0c1a7da46ad044a6332b5e9d45aad8df566437f",
+          "download_url": "/api/attachments/01a1214a-20b2-7202-b4d6-4c3a78ba0b2f/download",
+          "server_bytes": "VERIFIED"
+        },
+        {
+          "id": "01a1214a-21a0-7231-9a59-5c49a75f8347",
+          "file": "worker-models-before.json",
+          "bytes": 682,
+          "sha256": "6f32ad67678b3b0ae15b03e7ba1c9d051bed1d48fb58518a64ae009f9f403f9c",
+          "download_url": "/api/attachments/01a1214a-21a0-7231-9a59-5c49a75f8347/download",
+          "server_bytes": "VERIFIED"
+        }
+      ]
+    },
+    {
+      "card": 1,
+      "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "identifier": "LAB-57",
+      "title": "test(evals): Пилот текстового импорта — 6 кейсов",
+      "url": "https://mas.kartamyshev.dev/lab/issues/LAB-57",
+      "status": "backlog",
+      "squad_id": "1ea03453-9bbb-4229-adb5-2e301896240e",
+      "case_ids": [
+        "txt-comma-utf8",
+        "csv-comma-utf8",
+        "txt-semicolon-cp1251-decimal",
+        "csv-pipe-multiline",
+        "tsv-utf8",
+        "tsv-utf16le"
+      ],
+      "depends_on": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+      "runs": [],
+      "wakeups": [],
+      "attachments": [
+        {
+          "id": "01a1214a-fbfa-78cf-a614-856157add9c4",
+          "file": "text-import-card-1-inputs.zip",
+          "bytes": 11986,
+          "sha256": "f175fe6b01793e451ad334a0b5ee8b8b91f3e569d732027e4360c025571beccd",
+          "download_url": "/api/attachments/01a1214a-fbfa-78cf-a614-856157add9c4/download",
+          "server_bytes": "VERIFIED"
+        }
+      ]
+    },
+    {
+      "card": 2,
+      "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+      "identifier": "LAB-58",
+      "title": "test(evals): Кодировки, BOM и десятичная запятая — 9 кейсов",
+      "url": "https://mas.kartamyshev.dev/lab/issues/LAB-58",
+      "status": "backlog",
+      "squad_id": "1ea03453-9bbb-4229-adb5-2e301896240e",
+      "case_ids": [
+        "txt-tab-utf16le",
+        "txt-tab-utf16be",
+        "txt-utf8-bom",
+        "txt-cp1252",
+        "csv-tab-utf16le",
+        "csv-tab-utf16be",
+        "csv-utf8-bom",
+        "csv-cp1252",
+        "csv-semicolon-cp1251-decimal"
+      ],
+      "depends_on": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "runs": [],
+      "wakeups": [],
+      "attachments": [
+        {
+          "id": "01a1214b-0e24-7d32-88ba-82a22c689ffe",
+          "file": "text-import-card-2-inputs.zip",
+          "bytes": 17537,
+          "sha256": "3cab0866997e36677b816050eab1b709c56c663fb9db945811fd93fbaffe6a63",
+          "download_url": "/api/attachments/01a1214b-0e24-7d32-88ba-82a22c689ffe/download",
+          "server_bytes": "VERIFIED"
+        }
+      ]
+    },
+    {
+      "card": 3,
+      "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+      "identifier": "LAB-59",
+      "title": "test(evals): Заголовки, пропуск строк и разделители — 12 кейсов",
+      "url": "https://mas.kartamyshev.dev/lab/issues/LAB-59",
+      "status": "backlog",
+      "squad_id": "1ea03453-9bbb-4229-adb5-2e301896240e",
+      "case_ids": [
+        "txt-no-header",
+        "txt-skip-header",
+        "txt-no-header-skip",
+        "txt-space",
+        "txt-merge-on",
+        "txt-merge-off",
+        "csv-no-header",
+        "csv-skip-header",
+        "csv-no-header-skip",
+        "csv-space",
+        "csv-merge-on",
+        "csv-merge-off"
+      ],
+      "depends_on": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+      "runs": [],
+      "wakeups": [],
+      "attachments": [
+        {
+          "id": "01a1214b-20c4-7864-992f-093bfebd6568",
+          "file": "text-import-card-3-inputs.zip",
+          "bytes": 23143,
+          "sha256": "14c81f76a19c1ca931ffaf22d45fa8587b5d5adb5d86cd14bae7cd0c32967deb",
+          "download_url": "/api/attachments/01a1214b-20c4-7864-992f-093bfebd6568/download",
+          "server_bytes": "VERIFIED"
+        }
+      ]
+    },
+    {
+      "card": 4,
+      "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+      "identifier": "LAB-60",
+      "title": "test(evals): Кавычки и многострочные значения — 11 кейсов",
+      "url": "https://mas.kartamyshev.dev/lab/issues/LAB-60",
+      "status": "backlog",
+      "squad_id": "1ea03453-9bbb-4229-adb5-2e301896240e",
+      "case_ids": [
+        "txt-single-quote",
+        "txt-backtick-quote",
+        "txt-no-quote",
+        "txt-multiline-crlf",
+        "txt-multiline-lf",
+        "csv-single-quote",
+        "csv-backtick-quote",
+        "csv-no-quote",
+        "csv-multiline-crlf",
+        "csv-multiline-lf",
+        "txt-pipe-multiline"
+      ],
+      "depends_on": "01a1214b-2251-7f39-8dce-7ee254edf773",
+      "runs": [],
+      "wakeups": [],
+      "attachments": [
+        {
+          "id": "01a1214b-3622-77cc-8680-1cded67ab2b3",
+          "file": "text-import-card-4-inputs.zip",
+          "bytes": 21476,
+          "sha256": "1acbf1603bd1fe4839d71434bc3122c6270eb3f2156de52f06951d7b23c1bac5",
+          "download_url": "/api/attachments/01a1214b-3622-77cc-8680-1cded67ab2b3/download",
+          "server_bytes": "VERIFIED"
+        }
+      ]
+    },
+    {
+      "card": 5,
+      "id": "01a1214b-4adc-75df-97df-2917732a449a",
+      "identifier": "LAB-61",
+      "title": "test(evals): Повреждённые входы и отказы настройки — 10 кейсов",
+      "url": "https://mas.kartamyshev.dev/lab/issues/LAB-61",
+      "status": "backlog",
+      "squad_id": "1ea03453-9bbb-4229-adb5-2e301896240e",
+      "case_ids": [
+        "txt-unclosed-quote",
+        "txt-wrong-encoding",
+        "txt-wrong-delimiter",
+        "txt-ambiguous-headers",
+        "csv-unclosed-quote",
+        "csv-wrong-encoding",
+        "csv-wrong-delimiter",
+        "csv-ambiguous-headers",
+        "initial-incomplete-settings",
+        "missing-source-column"
+      ],
+      "depends_on": "01a1214b-38c2-753b-9da5-c6575e143343",
+      "runs": [],
+      "wakeups": [],
+      "attachments": [
+        {
+          "id": "01a1214b-49c8-71da-873e-3357b0a583b7",
+          "file": "text-import-card-5-inputs.zip",
+          "bytes": 17169,
+          "sha256": "9a4a82e8a0d9b8ec21741578f0702c0117407be317e8de04031507bc4919d85a",
+          "download_url": "/api/attachments/01a1214b-49c8-71da-873e-3357b0a583b7/download",
+          "server_bytes": "VERIFIED"
+        }
+      ]
+    },
+    {
+      "card": 6,
+      "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+      "identifier": "LAB-62",
+      "title": "test(evals): Исправление узла и обновление источника — 4 кейса",
+      "url": "https://mas.kartamyshev.dev/lab/issues/LAB-62",
+      "status": "backlog",
+      "squad_id": "1ea03453-9bbb-4229-adb5-2e301896240e",
+      "case_ids": [
+        "missing-source-path-correction",
+        "txt-six-to-five-correction",
+        "csv-delimiter-correction",
+        "csv-to-tsv-source-refresh"
+      ],
+      "depends_on": "01a1214b-4adc-75df-97df-2917732a449a",
+      "runs": [],
+      "wakeups": [],
+      "attachments": [
+        {
+          "id": "01a1214b-61af-75ed-a9ff-d6aba62463d9",
+          "file": "text-import-card-6-inputs.zip",
+          "bytes": 9223,
+          "sha256": "f7587bc14fe331f9b2fa4a3396a6ff05667848569582a4a002c7d4bb8482a868",
+          "download_url": "/api/attachments/01a1214b-61af-75ed-a9ff-d6aba62463d9/download",
+          "server_bytes": "VERIFIED"
+        }
+      ]
+    },
+    {
+      "card": 7,
+      "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+      "identifier": "LAB-63",
+      "title": "test(evals): Точность импортированных данных — 6 кейсов",
+      "url": "https://mas.kartamyshev.dev/lab/issues/LAB-63",
+      "status": "backlog",
+      "squad_id": "1ea03453-9bbb-4229-adb5-2e301896240e",
+      "case_ids": [
+        "analytic-txt-types-identifiers",
+        "analytic-txt-null-empty-zero",
+        "analytic-txt-multiline-values",
+        "analytic-csv-types-identifiers",
+        "analytic-csv-null-empty-zero",
+        "analytic-csv-multiline-values"
+      ],
+      "depends_on": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+      "runs": [],
+      "wakeups": [],
+      "attachments": [
+        {
+          "id": "01a1214b-738d-74c3-8f08-bb487c673345",
+          "file": "text-import-card-7-inputs.zip",
+          "bytes": 11932,
+          "sha256": "2886eed7582dfd91a752d739b52f947affecff1ce06e68fcaf24b884220d899a",
+          "download_url": "/api/attachments/01a1214b-738d-74c3-8f08-bb487c673345/download",
+          "server_bytes": "VERIFIED"
+        }
+      ]
+    }
+  ]
+}
