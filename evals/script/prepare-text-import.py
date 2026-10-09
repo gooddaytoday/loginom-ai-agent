@@ -103,6 +103,7 @@ def prepare(archive, output):
                 'expected_output': 'Диагностический исход по SPEC.json' if diagnostic else 'Полная типизированная таблица по SPEC.json',
                 'checklist': [{'id': item, 'text': 'Текстовый импорт: ' + item, 'required': True} for item in checks],
                 'timeout_ms': 900000}
+            task['checker_files'] = ['SPEC.json', 'acceptance.json'] + [name for name in spec['expected'] if name.endswith('.json')]
             task.update({'output_mode': 'diagnostic'} if diagnostic else {'reference': 'reference.lgp'})
             write_json(folder / 'task.json', task)
             write_json(folder / 'acceptance.json', {'family': 'text-import', 'case_id': case,

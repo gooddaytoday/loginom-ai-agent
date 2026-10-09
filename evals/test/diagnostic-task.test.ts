@@ -30,3 +30,21 @@ test("diagnostic tasks load and hash a refusal without a fictitious reference", 
     await expect(loadTasks(root)).rejects.toThrow("reference")
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("checker-side typed expectations change rubric identity without changing agent inputs", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-checker-hash-"))
+  try {
+    const dir = path.join(root, "refusal")
+    await Bun.write(path.join(dir, "task.json"), JSON.stringify({ id: "refusal", title: "Refusal", prompt: "Reject settings",
+      output_mode: "diagnostic", spec: "SPEC.md", expected_output: "refusal", inputs: [],
+      checker_files: ["expected/outcome.json"], checklist: [{ id: "diagnostic", text: "Exact outcome", required: true }] }))
+    await Bun.write(path.join(dir, "SPEC.md"), "Outcome")
+    await Bun.write(path.join(dir, "expected/outcome.json"), '{"kind":"refusal"}')
+    const before = await loadTasks(root)
+    const rubric = await rubricHash(before), inputs = await agentInputsHash(before)
+    await Bun.write(path.join(dir, "expected/outcome.json"), '{"kind":"different"}')
+    const after = await loadTasks(root)
+    expect(await rubricHash(after)).not.toBe(rubric)
+    expect(await agentInputsHash(after)).toBe(inputs)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
