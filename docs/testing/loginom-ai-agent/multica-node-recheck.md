@@ -31,23 +31,23 @@
 
 ## Checkpoint наблюдения — новая параллельная волна, 09.10.2026
 
-- Docs prechange4eefafcdb; node baseline4e626d547/basef9bf332c; loginom0ca исключён; назначения сохранены.
+- Docs prechange9428bfbbf; node baseline4e626d547/basef9bf332c; loginom0ca исключён; назначения сохранены.
 - Node SHA: LAB45 a00b0203/PR42,46 41e0b170/PR43,47 c92a3bfd;48–52 4e626d547; PASS не переносится.
-- Runtime24aa…/caps8/8/8/daemon12/stock3m сохранены; восемь реальных приёмок и нагрузка12 NOT_PROVED.
-- CLI597/version-dev: installed executable20305a8d… вновь совпал; global launcher/native/Eval не менялись.
-- Central instructions8d7a…: внутренний CLI берёт настройки только из сквада; model acceptance0.
-- LAB53 approved scope d4241c818; [draft PR44](https://github.com/gooddaytoday/loginom-ai-agent/pull/44) common-preparation→shared-oauth.
-- Published source0955f8899cb0d94148634f05446ebf2379b869df/tree dfc9fbea…; qualification/live NOT_RUN, source entry blocked.
-- 6a97 source-only F3 CLOSED/68+4cases; старый detached-child RED4d880827 сохранён, PASS не переносится.
-- Source0955 VERSION f4153938…/31file bindings MATCH; Worker128 tests/1419records claim без новых final attachments, не runtime proof.
-- Native Reviewer01a11fb7… completed11:45:03MSK: REQUEST_CHANGES5P2; report105suite+8probes/241own records, artifact bindings MATCH.
-- Root0955 REQUEST_CHANGES: coordinator вызывает unconditional blocked child; фиксированный qualification entry и legacy owner archive ещё нужны.
-- Mac09:54 readonly0955 shape: unique controller/tree-store/RPCAdmin MATCH, count8; без Refresh/nonce/full collector, не qualification.
-- Worker01a11fd0… running; entry defect01a12014… адресно доставлен тому же run, кандидат исправляется до Reviewer handoff.
-- LAB48 original API seq73–90: created collector331b…=retained, ack/Popen/readback94134…; формула exact UTF8 подтверждена командной цепочкой.
-- Physical preexec digest/numericID/CreateTime/Timeout cause не восстановлены; old markers45/48 NOT_RECONCILED/immutable.
-- Mac09:00UTC complete8rows/2packages/hash0ad7… MATCH, same3128/admin bucket1; prior3119/3123 absent; не new-operation proof.
-- Reviewer supplement также разбудил Worker через default comment/replay; новые comments используют steer_task_ids+suppress остальных.
-- Mas09:27UTC59 exact old PID/start_ticks absent; complete240FD dirs/control MATCH/no targetFD-locks;7cfg/2markers unchanged, archive pending.
-- 09:56UTC mas CPU12/load0/0.02/0.04, MemAvailable30098120KiB/free408497704960B; daemon212379 active1/wait0/report0; provider retries unavailable.
-- Next: полный исправленный clean candidate→независимый review→old-effects proof→bound runtime qualification→те же8; schedules/merge-release0.
+- Runtime24aa…/caps8/8/8/daemon12/stock3m сохранены; восемь приёмок и нагрузка12 NOT_PROVED.
+- Installed CLI597/version-dev/executable20305a8d…; global launcher/native/Eval не менялись.
+- Central8d7a…; fresh CLI catalog подтвердил целевую модель/variant, cache2eb27be…; inference0/model acceptance0.
+- LAB53 approved scoped4241c818; draft PR44 common-preparation→shared-oauth; merge/release0.
+- Published6ffea08a383d3122601f60a40f4ee7be0905024e/tree5e41959f…; runtime/install/node NOT_ACCEPTED.
+- Root APIattachments3/manifest2/VERSION37/candidate44/baseline5/tree MATCH; VERSION0d921417….
+- Worker fd0 completed13:40:54MSK:139tests/613current/3306retained records — report claims, не runtime proof.
+- Reviewer01a12040-2de6… completed13:57:38MSK/errornull:REQUEST_CHANGES ONEF9;3attachments/manifest2 MATCH,139+2probes claims.
+- Fixed qualification-coordinator достигает guarded child; обычные public gates closed, SAME-SHA route без flag waiver.
+- Root operational6ff: own-fd-inventory Path.iterdir закрывает own enumeration FD; strict validator закономерно отвергает census.
+- F9 stock handoff01a1204e…→Worker01a1204e-ea84… running13:56:46MSK; scandir+positive strict-validator probe требуются.
+- Mac10:43UTC exact6ff collector после nativeRefresh:8rows/2packages/8manager/8store; same3128/GUID8d9e… connected.
+- Private full RAWbde3970a… сохранён; ownConsole closed/tab preserved; это preflight без new-operation nonce.
+- Original45/48 command-chain exact UTF8 сравним; LAB45 API-redacted source явно отделён от unknown executed bytes.
+- Physical preexec/numericID/CreateTime/oldcause остаются UNKNOWN; old markers45/48 NOT_RECONCILED, immutable.
+- Replay historical addendum вновь запустил Worker6b5b; stock HOLD01a12041…→completed13:43:29MSK, без повторной правки.
+- Root mas private cleancheckout6ff/37bindings подготовлен10:48UTC; Loginom/locks/install0; старые59/FD proofs не новые.
+- Next: адресный FD fix→exact-SHA review→held old-effects proof→9-response bound runtime qualification→те же8; schedules0.

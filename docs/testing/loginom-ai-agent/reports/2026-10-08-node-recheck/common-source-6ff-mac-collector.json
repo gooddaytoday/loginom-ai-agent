@@ -1,0 +1,146 @@
+{
+  "schema": "lab53-root-exact-collector-preflight-v1",
+  "source_sha": "6ffea08a383d3122601f60a40f4ee7be0905024e",
+  "source_tree": "5e41959f44bfe480d72784dfd70589a7ea978e90",
+  "collector_literal_sha256": "602bf66d3e3e82edd1c21bb2ec631e06630629b3b010409891025d28e3cdb913",
+  "raw_sha256": "bde3970a553ad5c9e362cbe206f7a4577182767dde55776638f2ed91d24dc1cc",
+  "raw_bytes": 1773,
+  "raw_kept_private": true,
+  "refresh": {
+    "action": "native-Refresh",
+    "started_at": "2026-10-09T10:42:50.602Z",
+    "completed_at": "2026-10-09T10:42:51.369Z",
+    "access": "existing-owner-Mac-Admin-native-CUA",
+    "new_browser_or_login": false,
+    "close_actions": 0,
+    "source_sha": "6ffea08a383d3122601f60a40f4ee7be0905024e",
+    "collector_literal_sha256": "602bf66d3e3e82edd1c21bb2ec631e06630629b3b010409891025d28e3cdb913",
+    "result_sha256": "bde3970a553ad5c9e362cbe206f7a4577182767dde55776638f2ed91d24dc1cc",
+    "state_sha256": "d33c080d9b79f185eaa162ccb467186b563b3bcd463bb31de9b0d8224a9ce507",
+    "limitations": [
+      "preflight-only",
+      "no-operation-request-or-nonce",
+      "not-server-cleanup-qualification"
+    ]
+  },
+  "observed_at": "2026-10-09T10:43:09.411Z",
+  "rows": [
+    {
+      "row_index": 0,
+      "name_sha256": "89997a025972d76170ed48f79744d1dbf4c0fbec55c2f1eec56cfa2314d69238",
+      "type": 0,
+      "create_time": "2026-09-27T19:25:26.436Z",
+      "pending_disconnect": false,
+      "package_count": 0,
+      "same_client_proxy": true,
+      "packages": []
+    },
+    {
+      "row_index": 1,
+      "name_sha256": "76c347b535636527e7980ae6e9cb4e94d4180bd3c9b5334b97072694ebef0f7b",
+      "type": 0,
+      "create_time": "2026-10-08T08:35:53.281Z",
+      "pending_disconnect": false,
+      "package_count": 0,
+      "same_client_proxy": true,
+      "packages": []
+    },
+    {
+      "row_index": 2,
+      "name_sha256": "f6c76d039a48fab887a907ae8ebe6006f0f303680d4ec78bc8c7feb799366371",
+      "type": 0,
+      "create_time": "2026-10-08T08:57:56.091Z",
+      "pending_disconnect": false,
+      "package_count": 1,
+      "same_client_proxy": true,
+      "packages": [
+        {
+          "name_sha256": "3c7903457c2e23b745e04ca1b1f3cb1e1445e4c4f1d817dfa407fe5b1df95c29",
+          "path_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "CreateTime": "2026-10-09T04:19:22.880Z",
+          "ModifyTime": "2026-10-09T07:43:06.879Z",
+          "Version": "1.0.0",
+          "ReadOnly": false,
+          "ReferenceCount": -1
+        }
+      ]
+    },
+    {
+      "row_index": 3,
+      "name_sha256": "77c5c045588f47090a24b1efa78ae1f76e1a1224b888a26efc180e2e15b0a17e",
+      "type": 1,
+      "create_time": "2026-10-09T04:14:57.984Z",
+      "pending_disconnect": false,
+      "package_count": 0,
+      "same_client_proxy": true,
+      "packages": []
+    },
+    {
+      "row_index": 4,
+      "name_sha256": "91419f31fedf02cf20cec81bd4b235706c913b2ecc5c4b61fe20831c43ca8c36",
+      "type": 0,
+      "create_time": "2026-10-09T05:21:02.312Z",
+      "pending_disconnect": false,
+      "package_count": 0,
+      "same_client_proxy": true,
+      "packages": []
+    },
+    {
+      "row_index": 5,
+      "name_sha256": "049329a03cbaaca3296a6c52d0de7b77730221e337de4e23fa8beb4bdc549396",
+      "type": 0,
+      "create_time": "2026-10-09T06:16:16.012Z",
+      "pending_disconnect": false,
+      "package_count": 1,
+      "same_client_proxy": true,
+      "packages": [
+        {
+          "name_sha256": "efec5b3413f8ef344dc7426a44a4fa3dd8a2d1a85c1f2880811e75c588f9ab08",
+          "path_sha256": "61d439aa82522ec1af312e568b72cddff1ed4797bc8f4ff8c437036e159a0734",
+          "CreateTime": "2026-10-09T06:16:33.854Z",
+          "ModifyTime": "2026-10-09T06:58:13.332Z",
+          "Version": "1.0.0",
+          "ReadOnly": false,
+          "ReferenceCount": -1
+        }
+      ]
+    },
+    {
+      "row_index": 6,
+      "name_sha256": "e7126dd9ff016dcfa532eb8a5311c2add3b7925dda3feaf52e17505f1e7db82f",
+      "type": 2,
+      "create_time": "2026-09-27T19:25:25.877Z",
+      "pending_disconnect": false,
+      "package_count": 0,
+      "same_client_proxy": true,
+      "packages": []
+    },
+    {
+      "row_index": 7,
+      "name_sha256": "eaba3fc5d214f3475febc4d300021b97408a60a6cc453e52810de1afa4c8747d",
+      "type": 3,
+      "create_time": "2026-09-27T19:25:25.877Z",
+      "pending_disconnect": false,
+      "package_count": 0,
+      "same_client_proxy": true,
+      "packages": []
+    }
+  ],
+  "manager_count": 8,
+  "store_count": 8,
+  "observer_guid_sha256": "8d9e536e57f281f3d831d169e7fd5b3d24e9f56c74161cf598fae598ef2f7a92",
+  "observer_user_sha256": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+  "observer_session_id": 3128,
+  "observer_create_time": "2026-10-09T04:14:57.984Z",
+  "connected": true,
+  "loaded": true,
+  "visible_masks": 0,
+  "own_console_closed": true,
+  "owner_tab_preserved": true,
+  "acceptance": "PREFLIGHT_ONLY",
+  "limitations": [
+    "no new operation request/nonce",
+    "not process or server cleanup qualification",
+    "not node/model acceptance"
+  ]
+}

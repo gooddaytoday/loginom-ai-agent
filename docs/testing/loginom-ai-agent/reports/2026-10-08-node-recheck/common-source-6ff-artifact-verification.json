@@ -1,0 +1,853 @@
+{
+  "schema": "lab53-source6ffea-independent-artifact-verification-v1",
+  "observed_at": "2026-10-09T10:41:40.120712+00:00",
+  "source": {
+    "sha": "6ffea08a383d3122601f60a40f4ee7be0905024e",
+    "tree": "5e41959f44bfe480d72784dfd70589a7ea978e90",
+    "pr": 44,
+    "published_head_match": true,
+    "pr_draft": true,
+    "pr_state": "OPEN",
+    "base": "shared-oauth",
+    "worker_clean_claim": true,
+    "worker_checkout_readback_by_this_verifier": false
+  },
+  "version": {
+    "bytes": 4530,
+    "sha256": "0d921417dea72a90ca3dda15d7ba030da29a22fe02a0c368c74544f5f4749314",
+    "version": "lab53-source-only-v7",
+    "status": "SOURCE_ONLY_LIVE_BLOCKED",
+    "file_count": 37,
+    "hash_matches": 37
+  },
+  "version_file_bindings": [
+    {
+      "path": "tools/loginom-multica-accounts/.gitignore",
+      "bytes": 19,
+      "sha256": "862263fa1f46c20f0d1e4dac5ffcc75abd55c08211b2c3864c5f8764b9d87793",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/README.md",
+      "bytes": 9930,
+      "sha256": "c964aa32976b124b1170efbce35065c2a6eefaf5c5e47be084a9c61b783e4677",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/finite-cleanup.md",
+      "bytes": 6757,
+      "sha256": "4629897ffea0d1b04b5525096d58be17c5ad9139562028ad509924ed8da15b06",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/fixtures/accounts.html",
+      "bytes": 9842,
+      "sha256": "35bc98bfbc75af54b20190766f9cd6b4da27632220076dfc261d2d21872d8963",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/fixtures/lifecycle.html",
+      "bytes": 505,
+      "sha256": "1c348c66325ef6f4998f308ad7dc2dbf02b90003ddf9a1406db26514412133eb",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/fixtures/navigation.html",
+      "bytes": 2101,
+      "sha256": "b3bde2f068797b70e7c7975a31f1d64a03ac2686c6943abf2462ee5e5a0b4733",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/parent-readback-plan.md",
+      "bytes": 17164,
+      "sha256": "ec672c3793904f71385315447918742f13cb8dfd25504b6aadebbc1ac9824f7b",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/account-identity.mjs",
+      "bytes": 8907,
+      "sha256": "0af649e990ea23a9c00b84493f82e216708d1b51ff1b6960cef749bcf88b6b7a",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/account-lifecycle.mjs",
+      "bytes": 13243,
+      "sha256": "068c88503168347b20b46f7af0d7098c8ddd4508de75f92547d62b647b27579b",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/account-session-ui.mjs",
+      "bytes": 18733,
+      "sha256": "3f1b20e9cfc6c26799c23bf12faeb2d3db47873a2e2b8d834b602256738b4349",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/account-ui.mjs",
+      "bytes": 11429,
+      "sha256": "66673585250673fb9b6af04e7e4cbdc8c716e341bba39ba597dbc65abc585fe6",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/capture-harness.mjs",
+      "bytes": 9716,
+      "sha256": "341a586d0566fc27ea51509dd3a1641da7cd294cf71c91370665c02dc2d81db2",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/common.py",
+      "bytes": 12344,
+      "sha256": "ceb400d2c1b5617cfa7598f75419a569e3b3cc52d13c6533dd7436fa39396743",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/finalize-preparation.mjs",
+      "bytes": 1461,
+      "sha256": "0275887cfb2425dfed1f7e69105088b589646d5804d2bcede221bb786e5cad5e",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/flock-barrier.py",
+      "bytes": 1757,
+      "sha256": "c2ae2cb5cb7de931683d3bd3b875679125b55ec73872fa995b6ff0d4d2f72f2a",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/historical-readback.mjs",
+      "bytes": 2481,
+      "sha256": "a606ae043df834e4f9e02e44ad79d566e12a76c0110cbf14f99af09ba4f73b64",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/native-lifetime.mjs",
+      "bytes": 7567,
+      "sha256": "3e27dfd313e5a5ce05fcfd67c623beb57d937ab98164aed943fbbb105e3f7cd6",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/own-fd-inventory.py",
+      "bytes": 3452,
+      "sha256": "2dcb99d5367220aa71e9aba34295fdaf24298008f543efdd84c0f59f313f05e4",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/owner-archive.py",
+      "bytes": 8231,
+      "sha256": "84e35e4047ef85db58f29d3d4b26a90587629d4ed087b0da303add55db77037a",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/owner-reconcile.py",
+      "bytes": 17018,
+      "sha256": "b2ccb4434f21627e3d6adf4062a15dabb34d56f9cefab422fa083151105ecbbb",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/parent-bridge.mjs",
+      "bytes": 1763,
+      "sha256": "01cd73cd869fff4c617ca9c56c533873794bba0b4acb91dcadb0ae4947d0126b",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/parent-readback.mjs",
+      "bytes": 21906,
+      "sha256": "0e7e8b05bdddd28ade15b5bf0b0bcc542a117d6bc5a8a72c70bdf70d7afb9e1c",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/preparation-runtime.mjs",
+      "bytes": 4344,
+      "sha256": "9e4b35175adfe491bddbad7d9662cd7fe67aa08b807f6bdcdcb5da5dae4f382c",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/process-supervisor.py",
+      "bytes": 11230,
+      "sha256": "46f4b8b999438eddac67ca985fa9bd45c5812b70911327846ed6413e60ed66a8",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/provision-account.mjs",
+      "bytes": 968,
+      "sha256": "e68e0515129bfb9ebe15c633ca13d9170adff92069a6082158a48aacfb512f8c",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/provision-accounts.py",
+      "bytes": 29058,
+      "sha256": "d26304ffe0b3d29263cfdc9573b54f8b0279ebd81b8cefcbe7e49be7b8af61d0",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/qualification-coordinator.py",
+      "bytes": 1976,
+      "sha256": "ad16a34483175344936e903cd0a15bb10c27c52878ee487a4ced6180435b5878",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/qualify-accounts.mjs",
+      "bytes": 1179,
+      "sha256": "87f2e1bf3edbdf2678901b7d7d3407a9f7864e26eac549ab488cc4daa09db2c3",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/qualify-preparation.mjs",
+      "bytes": 3163,
+      "sha256": "da81248324a52b0f29615db75fe1aede2a2f8f476016d22a8e74dc711e580cb5",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/vendor-provenance.mjs",
+      "bytes": 1805,
+      "sha256": "7111f61f2f720f7634b473528ab31d5446e1b0d710efd37ba96c35cbef3d5f00",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/account-ui.test.mjs",
+      "bytes": 57823,
+      "sha256": "6f988b1bc00634b8caf2f6a2dce0133ade73bd877960e7677e512e22e5cf0c52",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/linked-harness.mjs",
+      "bytes": 4467,
+      "sha256": "2b28e6b005c4206331ea9cdf9b8e250485cf1d1492ab865be27f3be216502499",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/parent-fixture.py",
+      "bytes": 4140,
+      "sha256": "8efa606547195e5623cb80bd6a6d24c6c641dedddc65526e6498ce529b5107ea",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/test_accounts.py",
+      "bytes": 8221,
+      "sha256": "971ef937be5a4193293b5e3ff7defd6e58fe78c668b4701f3df56b404e4727ad",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/test_lifecycle.py",
+      "bytes": 37418,
+      "sha256": "0e44aafa8bc455f6cf80c15aa89d00ffad0892205328bdf6724c4862c04fdb96",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/test_manifest.py",
+      "bytes": 1569,
+      "sha256": "f94c4063c53238b65e7512ce2fb1da45147410d8b501d39cac986dc8f6b8ba7f",
+      "version_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/test_qualification.py",
+      "bytes": 15715,
+      "sha256": "7d1f9f8ecb2dd6f1da514e9aacdacff1585f5b30fda2ebaa54e144134e83eaee",
+      "version_match": true
+    }
+  ],
+  "baseline_file_bindings": [
+    {
+      "path": "tools/loginom-multica-accounts/baseline/README.md",
+      "bytes": 1591,
+      "sha256": "76743a69eb298e1b0cb8aa42c782c8ece5a6dc1ee8a635496c8aa85d1521760a",
+      "snapshot_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/VERSION.json",
+      "bytes": 1223,
+      "sha256": "848f7f7162a67f4ca51c3c6ad5e4292d07761cbc433d6181b58fd507cceb5d74",
+      "snapshot_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/scripts/common.py",
+      "bytes": 4359,
+      "sha256": "2f5ebbf82fa470fbe77e5c68aae5daa96f5476d82f80ee9854985db7fb1625e3",
+      "snapshot_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/scripts/provision-accounts.py",
+      "bytes": 9614,
+      "sha256": "7ad2c05579a1e64a95c296ab884a5002de3e8dc2efcaa5041891a57e9a3941fc",
+      "snapshot_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/scripts/provision-account.mjs",
+      "bytes": 6961,
+      "sha256": "d45d8b5dd11d1071e54699f54c9dfe9fe1a630923466aec80203b98014932169",
+      "snapshot_match": true
+    }
+  ],
+  "diff": {
+    "base_sha": "0955f8899cb0d94148634f05446ebf2379b869df",
+    "paths": [
+      "tools/loginom-multica-accounts/README.md",
+      "tools/loginom-multica-accounts/VERSION.json",
+      "tools/loginom-multica-accounts/finite-cleanup.md",
+      "tools/loginom-multica-accounts/parent-readback-plan.md",
+      "tools/loginom-multica-accounts/scripts/account-identity.mjs",
+      "tools/loginom-multica-accounts/scripts/capture-harness.mjs",
+      "tools/loginom-multica-accounts/scripts/historical-readback.mjs",
+      "tools/loginom-multica-accounts/scripts/own-fd-inventory.py",
+      "tools/loginom-multica-accounts/scripts/owner-reconcile.py",
+      "tools/loginom-multica-accounts/scripts/parent-readback.mjs",
+      "tools/loginom-multica-accounts/scripts/preparation-runtime.mjs",
+      "tools/loginom-multica-accounts/scripts/provision-accounts.py",
+      "tools/loginom-multica-accounts/scripts/qualification-coordinator.py",
+      "tools/loginom-multica-accounts/scripts/qualify-preparation.mjs",
+      "tools/loginom-multica-accounts/tests/account-ui.test.mjs",
+      "tools/loginom-multica-accounts/tests/test_lifecycle.py",
+      "tools/loginom-multica-accounts/tests/test_qualification.py"
+    ],
+    "path_count": 17,
+    "all_in_approved_tool_scope": true
+  },
+  "attachments": [
+    {
+      "id": "01a1203d-ad75-7131-87bc-528dd81d4bfb",
+      "filename": "source-result.md",
+      "bytes": 4645,
+      "api_size_bytes": 4645,
+      "api_size_match": true,
+      "sha256": "11d9bbd24bab683c4b7707d11ed2030c70d22c4391878e9e1e10b9bfcafb95f0"
+    },
+    {
+      "id": "01a1203d-b0a8-7634-8362-f68ad8590bdf",
+      "filename": "source-result.json",
+      "bytes": 11754,
+      "api_size_bytes": 11754,
+      "api_size_match": true,
+      "sha256": "ae56423394bc0a3f662c3e358c25e19823ca58ab73f363e8bd3fe10cab8efff0"
+    },
+    {
+      "id": "01a1203d-b349-7d5b-8563-00bfb040d647",
+      "filename": "manifest.json",
+      "bytes": 491,
+      "api_size_bytes": 491,
+      "api_size_match": true,
+      "sha256": "96b2f3dcc1a5b4b3fa7914e31af656ee5fd97b2dc43d9590a0384fb12eab8237"
+    }
+  ],
+  "manifest": {
+    "schema": "lab53-deliverable-manifest-v1",
+    "source_sha_match": true,
+    "source_tree_match": true,
+    "deliverable_bindings": [
+      {
+        "file": "source-result.md",
+        "bytes_match": true,
+        "sha256_match": true
+      },
+      {
+        "file": "source-result.json",
+        "bytes_match": true,
+        "sha256_match": true
+      }
+    ]
+  },
+  "worker_report_claims_not_replayed": {
+    "status": "SOURCE_ONLY_REQUEST_INDEPENDENT_REVIEW",
+    "live_acceptance": "NOT_ACCEPTED",
+    "unconditional_public_gates": "CLOSED",
+    "runtime_qualification": "NOT_RUN",
+    "node_runs": "NOT_RUN",
+    "parent_bridge": "existing owner Mac native CUA/same-card private artifact handoff; no callable endpoint",
+    "tests": {
+      "python": {
+        "passed": 44,
+        "total": 44
+      },
+      "offline_chromium": {
+        "passed": 95,
+        "total": 95,
+        "sandbox": true,
+        "network_requests": 0,
+        "private_cleanup_receipt": "node-final-browser.json"
+      },
+      "production_entry_boundary": "exact fixed qualification-coordinator command reaches admin before-request before browser/login; cancellation owned descendants/FDs cleanup; invalid bindings/direct child rejected",
+      "archive_fault": "successful first canonical archive then second link failure restores exact UNKNOWN marker bytes/inodes and planned configs",
+      "legacy_faults": "second-link and post-removal receipt failure preserve originals; successful fixture archive retains immutable bytes",
+      "historical_handoff": "seven bindings/new parent envelope consumed once; cannot validate new-effects final proof"
+    },
+    "source_bindings": {
+      "version_checks": {
+        ".gitignore": true,
+        "README.md": true,
+        "finite-cleanup.md": true,
+        "fixtures/accounts.html": true,
+        "fixtures/lifecycle.html": true,
+        "fixtures/navigation.html": true,
+        "parent-readback-plan.md": true,
+        "scripts/account-identity.mjs": true,
+        "scripts/account-lifecycle.mjs": true,
+        "scripts/account-session-ui.mjs": true,
+        "scripts/account-ui.mjs": true,
+        "scripts/capture-harness.mjs": true,
+        "scripts/common.py": true,
+        "scripts/finalize-preparation.mjs": true,
+        "scripts/flock-barrier.py": true,
+        "scripts/historical-readback.mjs": true,
+        "scripts/native-lifetime.mjs": true,
+        "scripts/own-fd-inventory.py": true,
+        "scripts/owner-archive.py": true,
+        "scripts/owner-reconcile.py": true,
+        "scripts/parent-bridge.mjs": true,
+        "scripts/parent-readback.mjs": true,
+        "scripts/preparation-runtime.mjs": true,
+        "scripts/process-supervisor.py": true,
+        "scripts/provision-account.mjs": true,
+        "scripts/provision-accounts.py": true,
+        "scripts/qualification-coordinator.py": true,
+        "scripts/qualify-accounts.mjs": true,
+        "scripts/qualify-preparation.mjs": true,
+        "scripts/vendor-provenance.mjs": true,
+        "tests/account-ui.test.mjs": true,
+        "tests/linked-harness.mjs": true,
+        "tests/parent-fixture.py": true,
+        "tests/test_accounts.py": true,
+        "tests/test_lifecycle.py": true,
+        "tests/test_manifest.py": true,
+        "tests/test_qualification.py": true
+      },
+      "snapshot_checks": {
+        "README.md": true,
+        "VERSION.json": true,
+        "scripts/common.py": true,
+        "scripts/provision-accounts.py": true,
+        "scripts/provision-account.mjs": true
+      },
+      "installed_checks": {
+        "scripts/common.py": true,
+        "scripts/provision-accounts.py": true,
+        "scripts/provision-account.mjs": true
+      },
+      "sha": "6ffea08a383d3122601f60a40f4ee7be0905024e",
+      "tree": "5e41959f44bfe480d72784dfd70589a7ea978e90",
+      "clean": true,
+      "version_sha256": "0d921417dea72a90ca3dda15d7ba030da29a22fe02a0c368c74544f5f4749314",
+      "candidate_files": {
+        "parent-readback-plan.md": "ec672c3793904f71385315447918742f13cb8dfd25504b6aadebbc1ac9824f7b",
+        "VERSION.json": "0d921417dea72a90ca3dda15d7ba030da29a22fe02a0c368c74544f5f4749314",
+        ".gitignore": "862263fa1f46c20f0d1e4dac5ffcc75abd55c08211b2c3864c5f8764b9d87793",
+        "finite-cleanup.md": "4629897ffea0d1b04b5525096d58be17c5ad9139562028ad509924ed8da15b06",
+        "README.md": "c964aa32976b124b1170efbce35065c2a6eefaf5c5e47be084a9c61b783e4677",
+        "fixtures/lifecycle.html": "1c348c66325ef6f4998f308ad7dc2dbf02b90003ddf9a1406db26514412133eb",
+        "fixtures/accounts.html": "35bc98bfbc75af54b20190766f9cd6b4da27632220076dfc261d2d21872d8963",
+        "fixtures/navigation.html": "b3bde2f068797b70e7c7975a31f1d64a03ac2686c6943abf2462ee5e5a0b4733",
+        "scripts/parent-readback.mjs": "0e7e8b05bdddd28ade15b5bf0b0bcc542a117d6bc5a8a72c70bdf70d7afb9e1c",
+        "scripts/finalize-preparation.mjs": "0275887cfb2425dfed1f7e69105088b589646d5804d2bcede221bb786e5cad5e",
+        "scripts/account-session-ui.mjs": "3f1b20e9cfc6c26799c23bf12faeb2d3db47873a2e2b8d834b602256738b4349",
+        "scripts/account-identity.mjs": "0af649e990ea23a9c00b84493f82e216708d1b51ff1b6960cef749bcf88b6b7a",
+        "scripts/account-lifecycle.mjs": "068c88503168347b20b46f7af0d7098c8ddd4508de75f92547d62b647b27579b",
+        "scripts/native-lifetime.mjs": "3e27dfd313e5a5ce05fcfd67c623beb57d937ab98164aed943fbbb105e3f7cd6",
+        "scripts/parent-bridge.mjs": "01cd73cd869fff4c617ca9c56c533873794bba0b4acb91dcadb0ae4947d0126b",
+        "scripts/qualification-coordinator.py": "ad16a34483175344936e903cd0a15bb10c27c52878ee487a4ced6180435b5878",
+        "scripts/common.py": "ceb400d2c1b5617cfa7598f75419a569e3b3cc52d13c6533dd7436fa39396743",
+        "scripts/own-fd-inventory.py": "2dcb99d5367220aa71e9aba34295fdaf24298008f543efdd84c0f59f313f05e4",
+        "scripts/historical-readback.mjs": "a606ae043df834e4f9e02e44ad79d566e12a76c0110cbf14f99af09ba4f73b64",
+        "scripts/account-ui.mjs": "66673585250673fb9b6af04e7e4cbdc8c716e341bba39ba597dbc65abc585fe6",
+        "scripts/provision-account.mjs": "e68e0515129bfb9ebe15c633ca13d9170adff92069a6082158a48aacfb512f8c",
+        "scripts/owner-archive.py": "84e35e4047ef85db58f29d3d4b26a90587629d4ed087b0da303add55db77037a",
+        "scripts/vendor-provenance.mjs": "7111f61f2f720f7634b473528ab31d5446e1b0d710efd37ba96c35cbef3d5f00",
+        "scripts/process-supervisor.py": "46f4b8b999438eddac67ca985fa9bd45c5812b70911327846ed6413e60ed66a8",
+        "scripts/qualify-accounts.mjs": "87f2e1bf3edbdf2678901b7d7d3407a9f7864e26eac549ab488cc4daa09db2c3",
+        "scripts/capture-harness.mjs": "341a586d0566fc27ea51509dd3a1641da7cd294cf71c91370665c02dc2d81db2",
+        "scripts/owner-reconcile.py": "b2ccb4434f21627e3d6adf4062a15dabb34d56f9cefab422fa083151105ecbbb",
+        "scripts/qualify-preparation.mjs": "da81248324a52b0f29615db75fe1aede2a2f8f476016d22a8e74dc711e580cb5",
+        "scripts/flock-barrier.py": "c2ae2cb5cb7de931683d3bd3b875679125b55ec73872fa995b6ff0d4d2f72f2a",
+        "scripts/provision-accounts.py": "d26304ffe0b3d29263cfdc9573b54f8b0279ebd81b8cefcbe7e49be7b8af61d0",
+        "scripts/preparation-runtime.mjs": "9e4b35175adfe491bddbad7d9662cd7fe67aa08b807f6bdcdcb5da5dae4f382c",
+        "tests/test_accounts.py": "971ef937be5a4193293b5e3ff7defd6e58fe78c668b4701f3df56b404e4727ad",
+        "tests/parent-fixture.py": "8efa606547195e5623cb80bd6a6d24c6c641dedddc65526e6498ce529b5107ea",
+        "tests/test_qualification.py": "7d1f9f8ecb2dd6f1da514e9aacdacff1585f5b30fda2ebaa54e144134e83eaee",
+        "tests/test_lifecycle.py": "0e44aafa8bc455f6cf80c15aa89d00ffad0892205328bdf6724c4862c04fdb96",
+        "tests/account-ui.test.mjs": "6f988b1bc00634b8caf2f6a2dce0133ade73bd877960e7677e512e22e5cf0c52",
+        "tests/linked-harness.mjs": "2b28e6b005c4206331ea9cdf9b8e250485cf1d1492ab865be27f3be216502499",
+        "tests/test_manifest.py": "f94c4063c53238b65e7512ce2fb1da45147410d8b501d39cac986dc8f6b8ba7f",
+        "baseline/VERSION.json": "848f7f7162a67f4ca51c3c6ad5e4292d07761cbc433d6181b58fd507cceb5d74",
+        "baseline/SOURCE_SNAPSHOT.json": "d0bc1f6af0dc80840ba80ef7f0cd94d103b5d5268f11e8666532426b8522ea9d",
+        "baseline/README.md": "76743a69eb298e1b0cb8aa42c782c8ece5a6dc1ee8a635496c8aa85d1521760a",
+        "baseline/scripts/common.py": "2f5ebbf82fa470fbe77e5c68aae5daa96f5476d82f80ee9854985db7fb1625e3",
+        "baseline/scripts/provision-account.mjs": "d45d8b5dd11d1071e54699f54c9dfe9fe1a630923466aec80203b98014932169",
+        "baseline/scripts/provision-accounts.py": "7ad2c05579a1e64a95c296ab884a5002de3e8dc2efcaa5041891a57e9a3941fc"
+      }
+    },
+    "cleanup": {
+      "current_corrected_attempt_records_absent_nonlive": 613,
+      "retained_union_records_absent_nonlive": 3306,
+      "retained_union_scope": "all retained records, includes previous/imported evidence; not all are owned by this attempt",
+      "foreground_collectors": "COMPLETED",
+      "server_absence": "NOT_PROVED",
+      "permanent_inode": 2396017,
+      "legacy_marker_sha256": [
+        "74f25f19294cc007923e4deb04763a9203fea294d93177d68d4e5a2f548d425e",
+        "9595e0bb0d748a5e04a67c62f97c3e59b0c5ce839500eeb56716e1ec77630a90"
+      ],
+      "real_markers": "UNCHANGED"
+    },
+    "history": {
+      "LAB45": "NOT_RECONCILED",
+      "LAB48": "NOT_RECONCILED",
+      "observer3119": "local/marker reconciliation pending; parent historical snapshot absence not future proof",
+      "LAB45_original_chain": "Root reports original task command chain and visible String(await get_Guid()) -> hash(secret.guid) -> crypto.update(v); API representation has redacted fragments",
+      "LAB45_proof_on_mas": "NOT_RECEIVED; rootMac reported14464 bytes SHA2569ee1f5ee7c82df1c91a40db364236dd9c83f868008e9b03389e90947f1cda3e4",
+      "historical_executed_byte_sha256": "NOT_CAPTURED",
+      "historical_missing_numeric_create_time_timeout_cause": "PRESERVED",
+      "source_representation_rule": "declared retained/API/reference digest never substituted for executed bytes; original-chain audit can establish algorithm comparability independently",
+      "Root47": "PASS_NOT_TRANSFERRED"
+    },
+    "routing": {
+      "next": "one addressed native source-only Reviewer after complete published candidate",
+      "suppress_nonrecipients": true
+    },
+    "native": {
+      "task_id": "01a11fd0-59b6-7207-99da-c6ad53b10433",
+      "task_error": null,
+      "provider_errors_retries": "NOT_EXPOSED_BY_API",
+      "central_instructions_sha256": "8d7a2fb19518fac1e1a8522cdccbfb1158b90c09ae71e411159e397d37ff2c32",
+      "model_runtime_caps": "UNCHANGED"
+    },
+    "real_actions": {
+      "Loginom_login_observer": 0,
+      "server_close_stop": 0,
+      "real_config_marker_history_mutations": 0,
+      "model_build_install_node_runs": 0,
+      "new_cards_schedules_pools_queues_contract_changes_merge_release": 0
+    }
+  },
+  "independently_verified": [
+    "published PR head and commit tree identity",
+    "exact Git VERSION and all declared file bytes/digests",
+    "exact retained baseline byte/digest bindings",
+    "authenticated attachment bytes and API sizes",
+    "manifest source/tree and both deliverable byte/digest bindings",
+    "source-result exact SHA/tree binding",
+    "all 44 report candidate-file digests and complete exact tree path coverage"
+  ],
+  "limitations": [
+    "Source-only artifact verification; no test replay by this verifier.",
+    "Worker test/process cleanup/native runtime readbacks are retained report claims, not independent live qualification.",
+    "Retained cleanup union includes imported evidence and does not establish ownership by this attempt.",
+    "No Loginom/server/model/node acceptance or installed deployment established.",
+    "Native independent Reviewer remains a separate required acceptance step."
+  ],
+  "mutations": {
+    "repository_files": 0,
+    "multica_api": 0,
+    "loginom_ui": 0,
+    "ssh": 0
+  },
+  "report_candidate_file_bindings": {
+    "count": 44,
+    "hash_matches": 44,
+    "exact_tree_path_coverage": true,
+    "checks": [
+      {
+        "path": "tools/loginom-multica-accounts/parent-readback-plan.md",
+        "bytes": 17164,
+        "sha256": "ec672c3793904f71385315447918742f13cb8dfd25504b6aadebbc1ac9824f7b",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/VERSION.json",
+        "bytes": 4530,
+        "sha256": "0d921417dea72a90ca3dda15d7ba030da29a22fe02a0c368c74544f5f4749314",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/.gitignore",
+        "bytes": 19,
+        "sha256": "862263fa1f46c20f0d1e4dac5ffcc75abd55c08211b2c3864c5f8764b9d87793",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/finite-cleanup.md",
+        "bytes": 6757,
+        "sha256": "4629897ffea0d1b04b5525096d58be17c5ad9139562028ad509924ed8da15b06",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/README.md",
+        "bytes": 9930,
+        "sha256": "c964aa32976b124b1170efbce35065c2a6eefaf5c5e47be084a9c61b783e4677",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/fixtures/lifecycle.html",
+        "bytes": 505,
+        "sha256": "1c348c66325ef6f4998f308ad7dc2dbf02b90003ddf9a1406db26514412133eb",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/fixtures/accounts.html",
+        "bytes": 9842,
+        "sha256": "35bc98bfbc75af54b20190766f9cd6b4da27632220076dfc261d2d21872d8963",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/fixtures/navigation.html",
+        "bytes": 2101,
+        "sha256": "b3bde2f068797b70e7c7975a31f1d64a03ac2686c6943abf2462ee5e5a0b4733",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/parent-readback.mjs",
+        "bytes": 21906,
+        "sha256": "0e7e8b05bdddd28ade15b5bf0b0bcc542a117d6bc5a8a72c70bdf70d7afb9e1c",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/finalize-preparation.mjs",
+        "bytes": 1461,
+        "sha256": "0275887cfb2425dfed1f7e69105088b589646d5804d2bcede221bb786e5cad5e",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/account-session-ui.mjs",
+        "bytes": 18733,
+        "sha256": "3f1b20e9cfc6c26799c23bf12faeb2d3db47873a2e2b8d834b602256738b4349",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/account-identity.mjs",
+        "bytes": 8907,
+        "sha256": "0af649e990ea23a9c00b84493f82e216708d1b51ff1b6960cef749bcf88b6b7a",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/account-lifecycle.mjs",
+        "bytes": 13243,
+        "sha256": "068c88503168347b20b46f7af0d7098c8ddd4508de75f92547d62b647b27579b",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/native-lifetime.mjs",
+        "bytes": 7567,
+        "sha256": "3e27dfd313e5a5ce05fcfd67c623beb57d937ab98164aed943fbbb105e3f7cd6",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/parent-bridge.mjs",
+        "bytes": 1763,
+        "sha256": "01cd73cd869fff4c617ca9c56c533873794bba0b4acb91dcadb0ae4947d0126b",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/qualification-coordinator.py",
+        "bytes": 1976,
+        "sha256": "ad16a34483175344936e903cd0a15bb10c27c52878ee487a4ced6180435b5878",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/common.py",
+        "bytes": 12344,
+        "sha256": "ceb400d2c1b5617cfa7598f75419a569e3b3cc52d13c6533dd7436fa39396743",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/own-fd-inventory.py",
+        "bytes": 3452,
+        "sha256": "2dcb99d5367220aa71e9aba34295fdaf24298008f543efdd84c0f59f313f05e4",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/historical-readback.mjs",
+        "bytes": 2481,
+        "sha256": "a606ae043df834e4f9e02e44ad79d566e12a76c0110cbf14f99af09ba4f73b64",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/account-ui.mjs",
+        "bytes": 11429,
+        "sha256": "66673585250673fb9b6af04e7e4cbdc8c716e341bba39ba597dbc65abc585fe6",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/provision-account.mjs",
+        "bytes": 968,
+        "sha256": "e68e0515129bfb9ebe15c633ca13d9170adff92069a6082158a48aacfb512f8c",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/owner-archive.py",
+        "bytes": 8231,
+        "sha256": "84e35e4047ef85db58f29d3d4b26a90587629d4ed087b0da303add55db77037a",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/vendor-provenance.mjs",
+        "bytes": 1805,
+        "sha256": "7111f61f2f720f7634b473528ab31d5446e1b0d710efd37ba96c35cbef3d5f00",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/process-supervisor.py",
+        "bytes": 11230,
+        "sha256": "46f4b8b999438eddac67ca985fa9bd45c5812b70911327846ed6413e60ed66a8",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/qualify-accounts.mjs",
+        "bytes": 1179,
+        "sha256": "87f2e1bf3edbdf2678901b7d7d3407a9f7864e26eac549ab488cc4daa09db2c3",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/capture-harness.mjs",
+        "bytes": 9716,
+        "sha256": "341a586d0566fc27ea51509dd3a1641da7cd294cf71c91370665c02dc2d81db2",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/owner-reconcile.py",
+        "bytes": 17018,
+        "sha256": "b2ccb4434f21627e3d6adf4062a15dabb34d56f9cefab422fa083151105ecbbb",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/qualify-preparation.mjs",
+        "bytes": 3163,
+        "sha256": "da81248324a52b0f29615db75fe1aede2a2f8f476016d22a8e74dc711e580cb5",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/flock-barrier.py",
+        "bytes": 1757,
+        "sha256": "c2ae2cb5cb7de931683d3bd3b875679125b55ec73872fa995b6ff0d4d2f72f2a",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/provision-accounts.py",
+        "bytes": 29058,
+        "sha256": "d26304ffe0b3d29263cfdc9573b54f8b0279ebd81b8cefcbe7e49be7b8af61d0",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/scripts/preparation-runtime.mjs",
+        "bytes": 4344,
+        "sha256": "9e4b35175adfe491bddbad7d9662cd7fe67aa08b807f6bdcdcb5da5dae4f382c",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/tests/test_accounts.py",
+        "bytes": 8221,
+        "sha256": "971ef937be5a4193293b5e3ff7defd6e58fe78c668b4701f3df56b404e4727ad",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/tests/parent-fixture.py",
+        "bytes": 4140,
+        "sha256": "8efa606547195e5623cb80bd6a6d24c6c641dedddc65526e6498ce529b5107ea",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/tests/test_qualification.py",
+        "bytes": 15715,
+        "sha256": "7d1f9f8ecb2dd6f1da514e9aacdacff1585f5b30fda2ebaa54e144134e83eaee",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/tests/test_lifecycle.py",
+        "bytes": 37418,
+        "sha256": "0e44aafa8bc455f6cf80c15aa89d00ffad0892205328bdf6724c4862c04fdb96",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/tests/account-ui.test.mjs",
+        "bytes": 57823,
+        "sha256": "6f988b1bc00634b8caf2f6a2dce0133ade73bd877960e7677e512e22e5cf0c52",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/tests/linked-harness.mjs",
+        "bytes": 4467,
+        "sha256": "2b28e6b005c4206331ea9cdf9b8e250485cf1d1492ab865be27f3be216502499",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/tests/test_manifest.py",
+        "bytes": 1569,
+        "sha256": "f94c4063c53238b65e7512ce2fb1da45147410d8b501d39cac986dc8f6b8ba7f",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/baseline/VERSION.json",
+        "bytes": 1223,
+        "sha256": "848f7f7162a67f4ca51c3c6ad5e4292d07761cbc433d6181b58fd507cceb5d74",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/baseline/SOURCE_SNAPSHOT.json",
+        "bytes": 1115,
+        "sha256": "d0bc1f6af0dc80840ba80ef7f0cd94d103b5d5268f11e8666532426b8522ea9d",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/baseline/README.md",
+        "bytes": 1591,
+        "sha256": "76743a69eb298e1b0cb8aa42c782c8ece5a6dc1ee8a635496c8aa85d1521760a",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/baseline/scripts/common.py",
+        "bytes": 4359,
+        "sha256": "2f5ebbf82fa470fbe77e5c68aae5daa96f5476d82f80ee9854985db7fb1625e3",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/baseline/scripts/provision-account.mjs",
+        "bytes": 6961,
+        "sha256": "d45d8b5dd11d1071e54699f54c9dfe9fe1a630923466aec80203b98014932169",
+        "report_match": true
+      },
+      {
+        "path": "tools/loginom-multica-accounts/baseline/scripts/provision-accounts.py",
+        "bytes": 9614,
+        "sha256": "7ad2c05579a1e64a95c296ab884a5002de3e8dc2efcaa5041891a57e9a3941fc",
+        "report_match": true
+      }
+    ]
+  },
+  "report_version_digest_match": true,
+  "api_readback": {
+    "runs": [
+      {
+        "id": "01a12040-6b5b-7cfe-a474-76356b5859e9",
+        "agent_id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+        "status": "running",
+        "started_at": "2026-10-09T13:40:55+03:00",
+        "completed_at": null,
+        "error": null
+      },
+      {
+        "id": "01a12040-2de6-78d4-b223-90145c7f17e4",
+        "agent_id": "027d102c-5d25-402c-a8fb-58a3e810013c",
+        "status": "running",
+        "started_at": "2026-10-09T13:40:40+03:00",
+        "completed_at": null,
+        "error": null
+      },
+      {
+        "id": "01a11fd0-59b6-7207-99da-c6ad53b10433",
+        "agent_id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+        "status": "completed",
+        "started_at": "2026-10-09T11:38:31+03:00",
+        "completed_at": "2026-10-09T13:40:54+03:00",
+        "error": null
+      }
+    ],
+    "addressed_source_handoff_comment": "01a12040-2c9f-76e7-b3e9-8535157adf9c",
+    "source_handoff_claim_matches_exact_source": true,
+    "replay_worker_hold_comment": "01a12041-b466-73a0-819b-eb1f80152bcf"
+  },
+  "narrow_static_delta_review": {
+    "base_sha": "0955f8899cb0d94148634f05446ebf2379b869df",
+    "qualification_entry": "qualification-coordinator.py -> prepare_pair -> qualify-preparation.mjs -> runUIPreparation; lineage/command/source/config and four inherited OFDs checked",
+    "previous_child_gate_blocker_statically_removed": true,
+    "ordinary_public_gates_preserved": true,
+    "boolean_waiver_observed": false,
+    "historical_reconciliation_route_present": "exact two legacy markers; current held-lock process/FD and fresh parent proofs required; old UNKNOWN/physical-byte gaps preserved",
+    "archive_loop_in_rollback_try": true,
+    "partial_archive_restore": "exact original UNKNOWN marker bytes/inodes and config values; restoration failures recorded",
+    "source_only": true,
+    "runtime_or_test_replay_by_this_verifier": false
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "observed_at": "2026-10-09T10:53:17.024092+00:00",
+  "started_at": "2026-10-09T10:53:12.171828+00:00",
+  "operation_id": "96b76382-2a7e-41cb-8f79-c709c422158c",
+  "installed_source": "597592f5d53f86beb69ffe318af2d4db52c5f416",
+  "installed_executable_sha256": "20305a8d848f785c2120d03c56e3fc77129d0156d7319a9f43beca3bc0b70d03",
+  "exit_code": 0,
+  "target_present": true,
+  "model_inference_calls": 0,
+  "Loginom_actions": 0,
+  "profile": "/home/user/.local/share/loginom-lab53-root/99fbf02c-13f1-4d4c-8c20-9c02d502cd37/model-catalog-96b76382-2a7e-41cb-8f79-c709c422158c/profile",
+  "process": {
+    "pid": 305302,
+    "start_ticks": "15925943"
+  },
+  "own_direct_process_absent": true,
+  "profile_writer_present": false,
+  "stdout_sha256": "7f1b3693ee67601a27c02fdea128d150e81f530ed0ef824b29b0c92be3ab3ff8",
+  "stderr_sha256": "0eed60a01d6207874687b81565e2f44e2a1c58e0cfda2598e93f2edbdae23fc8",
+  "stderr_bytes": 36,
+  "catalog_command": "models openai --refresh --verbose",
+  "limits": [
+    "catalog resolution is not provider invocation",
+    "not node or load acceptance",
+    "provider internal retries not observed",
+    "fresh catalog/high variant does not prove provider inference access"
+  ],
+  "target_metadata_allowlisted": {
+    "id": "gpt-6-luna",
+    "name": "GPT-6 Luna",
+    "variants": {
+      "none": {
+        "reasoningEffort": "none",
+        "reasoningSummary": "auto",
+        "include": [
+          "reasoning.encrypted_content"
+        ]
+      },
+      "low": {
+        "reasoningEffort": "low",
+        "reasoningSummary": "auto",
+        "include": [
+          "reasoning.encrypted_content"
+        ]
+      },
+      "medium": {
+        "reasoningEffort": "medium",
+        "reasoningSummary": "auto",
+        "include": [
+          "reasoning.encrypted_content"
+        ]
+      },
+      "high": {
+        "reasoningEffort": "high",
+        "reasoningSummary": "auto",
+        "include": [
+          "reasoning.encrypted_content"
+        ]
+      },
+      "xhigh": {
+        "reasoningEffort": "xhigh",
+        "reasoningSummary": "auto",
+        "include": [
+          "reasoning.encrypted_content"
+        ]
+      },
+      "max": {
+        "reasoningEffort": "max",
+        "reasoningSummary": "auto",
+        "include": [
+          "reasoning.encrypted_content"
+        ]
+      }
+    },
+    "capabilities": {
+      "temperature": false,
+      "reasoning": true,
+      "attachment": true,
+      "toolcall": true,
+      "input": {
+        "text": true,
+        "audio": false,
+        "image": true,
+        "video": false,
+        "pdf": true
+      },
+      "output": {
+        "text": true,
+        "audio": false,
+        "image": false,
+        "video": false,
+        "pdf": false
+      },
+      "interleaved": false
+    },
+    "limit": {
+      "context": 1050000,
+      "input": 922000,
+      "output": 128000
+    }
+  },
+  "native_central_setting": "internal CLI target/variant from squad instructions",
+  "independent_SFTP_bytes_sha256": "5e67b84ee9aa94ac0779530c41a5ee18330d9a53e301451ab890a6b4ff456bb5",
+  "shared_auth_contents_retained_or_printed": false,
+  "fresh_profile_cache": {
+    "path_suffix": "profile/cache/models.json",
+    "bytes": 5374734,
+    "sha256": "2eb27be8577b5b5b17bf24013737e9799a72d5d68faeb04a66f54b485f697e88"
+  },
+  "command_stderr_classification": "Models cache refreshed"
+}
