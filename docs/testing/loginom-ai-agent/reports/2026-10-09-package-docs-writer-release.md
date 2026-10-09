@@ -665,6 +665,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | articles-by-author | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4600 / 15892038 | 3 / 4038019 |
 | articles-by-author | 2 | PASS100 | Есть / PASS | 21 / 21 / 17 | 4600 / 15910931 | 3 / 4045637 |
 | campaign-roi-by-channel | 1 | PASS100 | Есть / PASS | 19 / 19 / 15 | 4610 / 16655815 | 3 / 4687353 |
+| campaign-roi-by-channel | 2 | PASS100 | Есть / PASS | 17 / 16 / 16 | 4612 / 17586705 | 3 / 5620442 |
 | cohort-spend-activity | 1 | FAIL0/no_artifact | Нет / не выполнялись | 22 / 21 / 18 | 4563 / 15206251 | 3 / 3337376 |
 | customer-activity-segments | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4608 / 17448322 | 3 / 5497845 |
 | first-last-touch | 1 | FAIL0/no_artifact | Нет / не выполнялись | 26 / 25 / 23 | 4585 / 15440708 | 3 / 3550529 |
@@ -956,3 +957,21 @@ metrics18 SHA256
 и cold index15 повторно проверены по SHA; common020c08059… и
 PID676156/UID/birth/exe/inode неизменны. Closed18/45:15 PASS100/3 no_artifact
 FAIL0, campaign#2 running; candidate/cold/compare0/retries0. Полный90 не принят.
+
+Девятнадцатый closed formal v9 `campaign-roi-by-channel#2` PASS100:
+structure/warm oracle PASS, cleanup6 stages/processes confirmed,
+error null/remaining0×2. History4612/17586705bytes и diagnostics3/5620442bytes
+full roundtrip. Trace/result counters match:17 finishes/16 tools/16 Loginom/
+skill0/prepare1/errors0. Предварительный score100/environment not_run
+не принимался до подтверждения всех6 этапов.
+
+Private progress19 SHA256
+`4450c28d7082a79c24efd50a662d5ca482ea1c0f887ea4d724531ce7728efa07`,
+metrics19 SHA256
+`cf8a2e6e9991af876483682cf7ebae0c117b3838919dbec46b1db4528ec811eb`.
+Все19 closed results/cleanup/process-cleanup и архивы, предыдущие18 traces
+и cold index15 повторно проверены по SHA; common020c08059… и
+PID676156/UID/birth/exe/inode неизменны. Closed19/45:16 PASS100/3 no_artifact
+FAIL0, cohort#2 running с непустой CLI trace. Это текущая v9 попытка;
+исторический v7 cohort#2 остаётся INCOMPLETE с неизвестной причиной.
+Candidate/cold/compare0/retries0, полный90 не принят.
