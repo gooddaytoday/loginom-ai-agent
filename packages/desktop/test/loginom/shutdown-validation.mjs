@@ -92,7 +92,7 @@ for (const phase of ["navigation", "login-form"]) {
     })
     const page = await application.firstWindow()
     await page.waitForFunction(() => window.api?.loginom, undefined, { timeout: 90000 })
-    const data = await application.evaluate(({ app }) => app.getPath("userData"))
+    const data = await application.evaluate(({ app }) => app.getPath("sessionData"))
     const electronCdpPort = Number((await readFile(join(data, "DevToolsActivePort"), "utf8")).split("\n")[0])
     if (!Number.isInteger(electronCdpPort) || electronCdpPort < 1) throw Error("ELECTRON_CDP_PORT_UNKNOWN")
     ports.add(electronCdpPort)
@@ -111,7 +111,16 @@ for (const phase of ["navigation", "login-form"]) {
       }
     }, `http://127.0.0.1:${http.address().port}/app/`)
     void checking.catch(() => {})
-    await bounded(entered.promise, 30000, "BROWSER_NOT_STARTED")
+    await bounded(
+      Promise.race([
+        entered.promise,
+        checking.then((result) => {
+          throw Error("VALIDATION_FINISHED_BEFORE_BROWSER_BARRIER: " + JSON.stringify(result))
+        }),
+      ]),
+      30000,
+      "BROWSER_NOT_STARTED",
+    )
     const before = await processes()
     for (let changed = true; changed; ) {
       changed = false
@@ -121,9 +130,15 @@ for (const phase of ["navigation", "login-form"]) {
           changed = true
         }
     }
-    if (before.filter((entry) => owned.has(entry.pid)).every((entry) => !entry.args.includes("--user-data-dir=")))
+    if (
+      before
+        .filter((entry) => owned.has(entry.pid))
+        .every(
+          (entry) => !entry.args.includes("/resources/loginom/browsers/") || !entry.args.includes("--user-data-dir="),
+        )
+    )
       throw Error("REAL_CHROMIUM_NOT_OBSERVED")
-    // DevToolsActivePort belongs to this isolated Electron profile.
+    // DevToolsActivePort belongs to this isolated Electron sessionData directory.
     const cdp = await application.evaluate(() =>
       process.argv.find((value) => value.startsWith("--remote-debugging-port=")),
     )
