@@ -116,3 +116,30 @@ readback SHA256 `3db8a22a65572e8496273846e835b52edc536626d3a1cf0a0da8471fc4b7cc4
 Actual own storage inventory86 archives912097554bytes/targets600 PASS;
 parents700. Root free1882009600bytes после batch при live записи. Active
 first-last#1, failed-cleanup/incomplete profiles и frozen условия не перемещались.
+
+Восьмой batch: `closed-archive-storage-20261009/batch-8` с отдельными
+plan/receipt/readback/tar-readback. Перенесены26 confirmed closed архивов
+formal v9: first-last/low-liquidity/monthly/NPS/risky/sales/slow-supplier/
+support/trial#1 и ab-revenue/ABC/articles/campaign#2,284346990bytes.
+First-last и low-liquidity остаются no_artifact FAIL; подтверждённая
+процессная cleanup не означает semantic recovery. У всех до переноса
+проверены result/cleanup/process-cleanup SHA,6 cleanup stages,remaining0×2,
+prior full roundtrip, preservation receipt/archive SHA,metadata UID/GID/
+mode/xattrs/original inode и отсутствие доступных process/FD references.
+1268 permission-denied observations сохранены; аудит недоступных чужих
+дескрипторов не заявляется.
+
+Copy2/fsync/atomic links/readback26 PASS. Штатный tar через две исходные
+ссылки PASS:4585/3 entries, совпадают с preservation inventory.
+Receipt SHA256
+`5ed2da3371fb24af77b35b52372a403862f5ee4f21c68c334a5c1e5c4537a346`;
+readback SHA256
+`7d12f98b92ece270fdd6cf6ec146880d01be988dc1f648e3f377f9587df7f033`;
+tar-readback SHA256
+`d4efb52beeda13c93fd8b5303c1b40e0572d792209d01c7bda6271b8494dc3e4`.
+Actual own storage inventory112 archives1196444544bytes/UID1001/targets600
+PASS, parents700. Root free1979858944→2254327808bytes на момент batch;
+разница наблюдается при продолжающемся live прогоне. Активный cohort#2,
+raw failed-cleanup/incomplete profiles, all results/preservation receipts,
+frozen binaries/resources/harness/common не перемещались и не изменялись.
+Контроллер60189/PID676156 после переноса live/identity matched.
