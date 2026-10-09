@@ -34,6 +34,16 @@ def audit(task, attempt, cold):
     warm.require(execution.get('status') == 'completed' and execution.get('verified') is True
         and execution.get('owner_verified') is True and execution.get('execution_id'), 'cold: fresh owned execution required')
     calls = warm.calls_from(events.decode())
+    graph = json.loads((cold / 'graph.json').read_text())
+    original = next(call for call in calls if call['tool'].endswith('node_apply')
+        and call['input'].get('target', {}).get('kind') == 'new')
+    node_id = warm.settled_receipt(calls, original)['result']['node']['node_id']
+    imports = [node for node in graph.get('nodes', []) if node.get('type') == 'imports.text']
+    warm.require(graph.get('complete') is True and len(imports) == 1
+        and imports[0].get('ref', {}).get('node_id') == node_id
+        and not imports[0].get('inputs') and len(imports[0].get('outputs', [])) == 1
+        and not graph.get('links') and all(node.get('type') in ('imports.text', 'bg-vendor-icon-modelvariables')
+            for node in graph.get('nodes', [])), 'cold: persisted graph identity differs')
     executions = {call['result'].get('execution', {}).get('execution_id') for call in calls}
     warm.require(execution['execution_id'] not in executions, 'cold: fresh execution differs from warm required')
     raw = (cold / 'source-0.csv').read_bytes()
