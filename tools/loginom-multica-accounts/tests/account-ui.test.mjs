@@ -16,6 +16,7 @@ import {verifyCausalCapture, observerTuple} from '../scripts/account-identity.mj
 import {installNativeLifetime, nativePositive, nativeSnapshot} from '../scripts/native-lifetime.mjs';
 import {trackVendorSources, vendorSources} from '../scripts/vendor-provenance.mjs';
 import {writeBoundParentResponse} from '../scripts/parent-bridge.mjs';
+import {verifyEmptyPair} from '../scripts/retired-worker-readback.mjs';
 
 const operator = JSON.parse(readFileSync(join(homedir(), '.config/loginom-multica/operator.json'), 'utf8'));
 const {chromium} = await import(operator.playwright_module);
@@ -649,6 +650,50 @@ test('historical executable collector binds all seven configs, fresh owner bucke
   result = spawnSync(operator.node, [...command, 'verify', inputFile], {encoding: 'utf8'});
   assert.notEqual(result.status, 0); assert.match(result.stderr, /EEXIST/);
   await assert.rejects(readFinalServerInventory({...operation, requestFile: join(directory, 'parent-request.json'), responseFile}));
+}));
+
+test('retired worker executable handoff checks empty pair, complete virtual inventory and consumes fresh nonce once', () => withPage([], async (page, diagnostics) => {
+  const operation = parentOperation(), directory = mkdtempSync(join(temporary, 'retired-worker-'));
+  const configs = [...operation.inputs.configs];
+  for (let i = 0; i < 4; i++) {
+    const path = join(directory, 'extra-config-' + i + '.json');
+    writeFileSync(path, JSON.stringify({fixture: i}), {mode: 0o600}); configs.push(path);
+  }
+  const input = {directory, issue_id: operation.request.issue_id, operation_id: operation.request.operation_id,
+    source: operation.request.source, stand: 'about:blank', expected_observer: operation.inputs.expectedObserver,
+    pair_issue_id: operation.request.issue_id, pair_configs: operation.inputs.configs,
+    configs: configs.map(path => {const s = statSync(path); return {path, device: s.dev, inode: s.ino, sha256: syntheticHash(readFileSync(path))};}),
+    marker: {sha256: syntheticHash('fixture-original-marker')}, provenance: {historical_start_ticks: 'NOT_CAPTURED'}};
+  const inputFile = join(directory, 'input.json'); writeFileSync(inputFile, JSON.stringify(input), {mode: 0o600});
+  const command = [fileURLToPath(new URL('../scripts/retired-worker-readback.mjs', import.meta.url))];
+  const run = action => spawnSync(operator.node, [...command, action, inputFile], {encoding: 'utf8'});
+  assert.equal(run('request').status, 0);
+  const requestFile = join(directory, 'parent-request.json'), request = JSON.parse(readFileSync(requestFile));
+  await installAccounts(page); await loginOwnPage(page, {...ownConfig, loginom: {...ownConfig.loginom, username: 'admin'}}, diagnostics);
+  await page.evaluate(() => installDispatcher({virtual: true, noTid: true}));
+  const raw = await page.evaluate(collectLoadedDispatcher), stamp = new Date().toISOString(); raw.observed_at = stamp;
+  const response = buildParentResponse(request, raw, {action: 'native-Refresh', started_at: stamp, completed_at: stamp,
+    receipt_sha256: syntheticHash('new-retired-refresh')}, request.expected_observer.tab_binding_sha256);
+  const responseFile = join(directory, 'response.json');writeFileSync(responseFile, JSON.stringify(response), {mode: 0o600});
+  writeFileSync(inputFile, JSON.stringify({...input, requestFile, responseFile}));
+  let result = run('verify'); assert.equal(result.status, 0, result.stderr);
+  const consumed = JSON.parse(readFileSync(join(directory, 'retired-consumed-' + request.nonce + '.json')));
+  assert.equal(consumed.result.ready, false);assert.equal(consumed.result.current_proof, 'CURRENT_RETIRED_WORKER_PROOF_ONLY');
+  assert.equal(consumed.readback.rows.length, 4);assert.equal(consumed.readback.rows.filter(row => row.kind === 'virtual').length, 2);
+  result = run('verify');assert.notEqual(result.status, 0);assert.match(result.stderr, /EEXIST/);
+  for (const role of ['worker','reviewer']) {
+    const broken = structuredClone(response.readback); broken.rows[1].user_hash = syntheticHash(role);
+    assert.throws(() => verifyEmptyPair(broken, request.pair_targets, request.after), /RETIRED_PAIR_BUCKET_PRESENT/);
+  }
+  const partial = structuredClone(response.readback); partial.packages_complete = false;
+  assert.throws(() => verifyEmptyPair(partial, request.pair_targets, request.after), /READBACK_INCOMPLETE/);
+  for (const [field, value] of [['nonce','0'.repeat(64)], ['source', {...response.source, sha: 'f'.repeat(40)}]]) {
+    writeFileSync(responseFile, JSON.stringify({...response, [field]: value}));
+    result = run('verify');assert.notEqual(result.status, 0);assert.match(result.stderr, /BINDING_UNCONFIRMED/);
+  }
+  writeFileSync(responseFile, JSON.stringify({...response, readback: {...response.readback, observer: {...response.readback.observer, guid_hash: syntheticHash('other-observer')}}}));
+  assert.notEqual(run('verify').status, 0);
+  writeFileSync(operation.inputs.configs[1], '{}'); result = run('verify');assert.notEqual(result.status, 0);
 }));
 
 test('historical owner-self bucket component preserves old gaps and never replaces new effect identity', () => {

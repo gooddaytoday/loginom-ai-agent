@@ -5,6 +5,11 @@ pair readiness or complete LAB53. The installed accounts tool is unchanged.
 Both live entry points stop with `BLOCKED_FINITE_SERVER_CLEANUP` before any
 Loginom call. No runtime flag or uncalibrated receipt can enable them.
 
+The separate [exact retired Worker45 archival route](retired-worker-archival.md)
+requires new bound parent pair absence and privileged complete FD proof under
+both role flocks. It preserves the original marker inode/status and old gaps;
+it never admits a marker through the ordinary guard or sets pair readiness.
+
 The exact installed source snapshot is retained in `baseline/`, including
 VERSION, README and the three original scripts with proxy and sandbox patches.
 The historical c1b73577f label and archive digest are provenance labels; the

@@ -36,7 +36,7 @@ def run_foreground(command, guards, evidence_dir, timeout=300, stop_timeout=10, 
     directory = new_evidence_directory(evidence_dir)
     descriptors = tuple(guard['fd'] for guard in guards)
     read_only_collector = not descriptors and len(command) >= 2 and Path(command[1]).resolve() in {
-        Path(__file__).with_name(name).resolve() for name in ['finalize-preparation.mjs', 'historical-readback.mjs']}
+        Path(__file__).with_name(name).resolve() for name in ['finalize-preparation.mjs', 'historical-readback.mjs', 'retired-worker-readback.mjs']}
     if (not descriptors and not read_only_collector) or len(set(descriptors)) != len(descriptors):
         raise RuntimeError('ACCOUNT_FD_BINDING_INVALID')
     for guard in guards:
