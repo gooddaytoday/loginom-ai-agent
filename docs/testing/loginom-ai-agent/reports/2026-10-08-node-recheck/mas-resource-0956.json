@@ -1,0 +1,53 @@
+{
+  "observed_at": "2026-10-09T09:56:19.576092+00:00",
+  "logical_cpus": 12,
+  "load": [
+    "0.00",
+    "0.02",
+    "0.04"
+  ],
+  "mem_kib": {
+    "MemTotal": 31604384,
+    "MemAvailable": 30098120,
+    "SwapTotal": 8388604,
+    "SwapFree": 8385592
+  },
+  "disk_free_bytes": 408497704960,
+  "daemon": {
+    "active_task_count": 1,
+    "agents": [
+      "codex"
+    ],
+    "cli_version": "0.6.1",
+    "daemon_id": "01a116e7-cc72-796d-8f8a-e4e8c9f33d9e",
+    "device_name": "mas",
+    "failed_terminal_report_bytes": 0,
+    "failed_terminal_report_count": 0,
+    "os": "linux",
+    "pending_terminal_report_bytes": 0,
+    "pending_terminal_report_count": 0,
+    "pid": 212379,
+    "profile": "",
+    "resource_wait_task_count": 0,
+    "running_task_count": 1,
+    "server_url": "https://mas.kartamyshev.dev",
+    "status": "running",
+    "uptime": "10h51m10s",
+    "workspaces": [
+      {
+        "id": "dcf616e7-66eb-470a-9b04-6462f220cf3b",
+        "runtimes": [
+          "24aa980b-b8c3-43e2-b087-bad8f79c9517"
+        ]
+      }
+    ]
+  },
+  "installed_cli_sha256": "20305a8d848f785c2120d03c56e3fc77129d0156d7319a9f43beca3bc0b70d03",
+  "installed_cli_version": "0.0.0-dev-202610081651",
+  "limitations": [
+    "snapshot only; no simultaneous 12-task qualification",
+    "provider internal retries not exposed",
+    "exact source model/node acceptance not inferred",
+    "SSH local transport closed; no server-process absence inferred"
+  ]
+}

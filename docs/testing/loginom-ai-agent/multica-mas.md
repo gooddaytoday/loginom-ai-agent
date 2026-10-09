@@ -174,23 +174,23 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 
 ## Checkpoint — новая параллельная волна восьми узлов, 09.10.2026
 
-- Docs prechangefafacd158; node baseline4e626d547/basef9bf332c; loginom0ca исключён; назначения сохранены.
+- Docs prechange4eefafcdb; node baseline4e626d547/basef9bf332c; loginom0ca исключён; назначения сохранены.
 - Node SHA: LAB45 a00b0203/PR42,46 41e0b170/PR43,47 c92a3bfd;48–52 4e626d547; PASS не переносится.
 - Runtime24aa…/caps8/8/8/daemon12/stock3m сохранены; восемь реальных приёмок и нагрузка12 NOT_PROVED.
 - CLI597/version-dev: installed executable20305a8d… вновь совпал; global launcher/native/Eval не менялись.
 - Central instructions8d7a…: внутренний CLI берёт настройки только из сквада; model acceptance0.
 - LAB53 approved scope d4241c818; [draft PR44](https://github.com/gooddaytoday/loginom-ai-agent/pull/44) common-preparation→shared-oauth.
-- Published source201a9371889947638ba6215f514a48de3da9b47b/tree dd835559…; полный lifecycle/live NOT_ACCEPTED.
+- Published source0955f8899cb0d94148634f05446ebf2379b869df/tree dfc9fbea…; qualification/live NOT_RUN, source entry blocked.
 - 6a97 source-only F3 CLOSED/68+4cases; старый detached-child RED4d880827 сохранён, PASS не переносится.
-- Parent source201a:4 APIattachments/3deliverables/28candidatefiles/21VERSION/tree hash MATCH; worker105 checks — отдельный report.
+- Source0955 VERSION f4153938…/31file bindings MATCH; Worker128 tests/1419records claim без новых final attachments, не runtime proof.
 - Native Reviewer01a11fb7… completed11:45:03MSK: REQUEST_CHANGES5P2; report105suite+8probes/241own records, artifact bindings MATCH.
-- Блокеры201a: shared-admin/continuity/NEW tuple/observer/selector; root дополнительно выявил virtual rows; live gates закрыты.
-- Mac readonly shape: tid selector0; один visible ExtSessionsManagerForm/Controller/store/rootLoaded; это не полное inventory.
-- Worker01a11fd0… running: полный pre/admin/roles/logout/processFD/final harness; final addendum и virtual rows доставлены адресно.
+- Root0955 REQUEST_CHANGES: coordinator вызывает unconditional blocked child; фиксированный qualification entry и legacy owner archive ещё нужны.
+- Mac09:54 readonly0955 shape: unique controller/tree-store/RPCAdmin MATCH, count8; без Refresh/nonce/full collector, не qualification.
+- Worker01a11fd0… running; entry defect01a12014… адресно доставлен тому же run, кандидат исправляется до Reviewer handoff.
 - LAB48 original API seq73–90: created collector331b…=retained, ack/Popen/readback94134…; формула exact UTF8 подтверждена командной цепочкой.
 - Physical preexec digest/numericID/CreateTime/Timeout cause не восстановлены; old markers45/48 NOT_RECONCILED/immutable.
 - Mac09:00UTC complete8rows/2packages/hash0ad7… MATCH, same3128/admin bucket1; prior3119/3123 absent; не new-operation proof.
 - Reviewer supplement также разбудил Worker через default comment/replay; новые comments используют steer_task_ids+suppress остальных.
 - Mas09:27UTC59 exact old PID/start_ticks absent; complete240FD dirs/control MATCH/no targetFD-locks;7cfg/2markers unchanged, archive pending.
-- 08:35UTC mas CPU12/load0.014, MemAvailable30115072KiB/free408509128704B; daemon212379 active1/wait0/report0; provider retry count unavailable.
+- 09:56UTC mas CPU12/load0/0.02/0.04, MemAvailable30098120KiB/free408497704960B; daemon212379 active1/wait0/report0; provider retries unavailable.
 - Next: полный исправленный clean candidate→независимый review→old-effects proof→bound runtime qualification→те же8; schedules/merge-release0.
