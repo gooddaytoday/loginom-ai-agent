@@ -4,8 +4,8 @@ export function completedDockReceipts(tools) {
     .flatMap((tool) =>
       tool.state.output
         .split("\n\n")
-        // Inspect appends human-readable advice after its JSON receipts.
-        .filter((text) => tool.tool !== "loginom_dock_operation_inspect" || text.trimStart().startsWith("{"))
+        // Dock tools can append human-readable advice after their JSON receipts.
+        .filter((text) => text.trimStart().startsWith("{"))
         .map((text) => ({ tool, body: JSON.parse(text) })),
     )
 }

@@ -42,7 +42,7 @@ function bodies(inputHash = csvSha256, amount = 35, path = packagePath) {
   ]
 }
 
-function tools(values = bodies()) {
+function tools(values = bodies(), advice = "") {
   return [
     {
       tool: "skill",
@@ -50,12 +50,12 @@ function tools(values = bodies()) {
     },
     ...values.map((body, index) => ({
       tool: index === 0 ? "loginom_dock_prepare" : "loginom_dock_node_wait",
-      state: { status: "completed", output: JSON.stringify(body) },
+      state: { status: "completed", output: JSON.stringify(body) + (index === 1 ? advice : "") },
     })),
   ]
 }
 
-async function verify(values = bodies()) {
+async function verify(values = bodies(), advice = "") {
   const nativeNode = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!nativeNode) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
   const child = Bun.spawn(
@@ -66,7 +66,7 @@ async function verify(values = bodies()) {
       `import { verifySalesScenario } from ${JSON.stringify(new URL("../script/skills-acceptance/scenario.mjs", import.meta.url).href)}
 const input = JSON.parse(process.argv[1])
 console.log(JSON.stringify(verifySalesScenario(input.tools, input.options)))`,
-      JSON.stringify({ tools: tools(values), options: { skills, csvSha256, packagePath } }),
+      JSON.stringify({ tools: tools(values, advice), options: { skills, csvSha256, packagePath } }),
     ],
     { stdout: "pipe", stderr: "pipe" },
   )
@@ -90,11 +90,24 @@ test("scenario acceptance binds actual CSV, SUM results and saved package to rea
   expect(JSON.parse(result.stdout)).toEqual({ builtNodes: node, inputSha256: csvSha256 })
 })
 
+test("scenario acceptance reads node receipts followed by human-readable Dock advice", async () => {
+  const result = await verify(bodies(), "\n\nInspect the outcome and current state. Correct invalid parameters.")
+  expect(result.code).toBe(0)
+  expect(JSON.parse(result.stdout)).toEqual({ builtNodes: node, inputSha256: csvSha256 })
+})
+
+test("scenario acceptance rejects a malformed JSON receipt after Dock advice", async () => {
+  const result = await verify(bodies(), "\n\nInspect the outcome.\n\n{invalid receipt")
+  expect(result.code).toBe(1)
+  expect(result.stderr).toContain("SyntaxError")
+})
+
 test.each([
   ["input hash", bodies("c".repeat(64))],
   ["aggregation result", bodies(csvSha256, 34)],
   ["saved path", bodies(csvSha256, 35, "/user/foreign.lgp")],
 ])("scenario acceptance rejects a changed %s", async (_name, changed) => {
-  const result = await verify(changed)
+  const result = await verify(changed, "\n\nInspect the outcome and current state.")
   expect(result.code).toBe(1)
+  expect(result.stderr).toContain("ERR_ASSERTION")
 })
