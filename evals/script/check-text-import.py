@@ -333,11 +333,13 @@ def diagnostic(spec, task_dir, attempt_dir, calls, events, workspace, transfers)
 def positive(spec, task_dir, attempt_dir, calls, events, workspace, transfers, package_path):
     applies = [call for call in calls if call['tool'].endswith('node_apply')]
     correction = spec['id'] in ('missing-source-path-correction', 'txt-six-to-five-correction', 'csv-delimiter-correction')
-    require(len(applies) == (2 if correction else 1), 'sequence: exact import apply count required')
+    refresh = spec['id'] == 'csv-to-tsv-source-refresh'
+    require(len(applies) == (2 if correction or refresh else 1), 'sequence: exact import apply count required')
     call = applies[-1]
-    request_owner(call, workspace, transfers[0])
+    transfer = transfers[-1] if refresh else transfers[0]
+    request_owner(call, workspace, transfer)
     request = call['input']
-    require(request.get('target', {}).get('kind') == ('existing' if correction else 'new') and request['target'].get('type') == 'imports.text'
+    require(request.get('target', {}).get('kind') == ('existing' if correction or refresh else 'new') and request['target'].get('type') == 'imports.text'
         and request.get('finish') == 'execute', 'import: new executing import required')
     settled = settled_receipt(calls, call)
     result = settled['result']
@@ -346,14 +348,35 @@ def positive(spec, task_dir, attempt_dir, calls, events, workspace, transfers, p
     require(node.get('document_id') == workspace['document_id'] and node.get('workflow_id') == workspace['workflow_ref']['workflow_id']
         and node.get('node_id'), 'import: returned node owner differs')
     observed, rows = native_application(events, call, result)
-    path = transfers[0]['output']['destination']
-    configuration_matches(spec, observed, path)
+    path = transfer['output']['destination']
+    goal = {**spec, 'settings': spec['oracle_recipe'][-1]['parse']['settings']} if refresh else spec
+    configuration_matches(goal, observed, path)
     readback = result.get('configuration', {}).get('readback', {})
     require(result.get('configuration', {}).get('status') == 'applied' and readback.get('kind') == 'text_import'
         and readback.get('node') == node and readback.get('values_are') == 'observed_ui_values', 'import: observed readback required')
-    configuration_matches(spec, readback, path)
+    configuration_matches(goal, readback, path)
     configurations = request.get('parameters', {}).get('settings', {})
-    configuration_matches(spec, configurations, path)
+    if refresh and configurations == {'source': {'source_path': path}, 'format': {'delimiter': '\t'}}:
+        pass
+    else:
+        configuration_matches(goal, configurations, path)
+    if refresh:
+        first = applies[0]
+        request_owner(first, workspace, transfers[0])
+        require(first['input'].get('target', {}).get('kind') == 'new' and first['input']['target'].get('type') == 'imports.text'
+            and first['input'].get('finish') == 'execute', 'sequence: first CSV import required')
+        previous = settled_receipt(calls, first)
+        initial = previous['result']
+        require(initial.get('status') == 'SUCCEEDED' and initial.get('cleanup_complete') is True
+            and initial.get('node') == node and request['target'].get('ref') == node, 'sequence: same GUID refresh required')
+        require(initial.get('execution', {}).get('execution_id') != result.get('execution', {}).get('execution_id')
+            and first['input']['operation_id'] != request['operation_id'] and after(transfers[1]['call'], previous)
+            and after(call, transfers[1]['call']), 'sequence: fresh TSV execution after initial full read required')
+        before, creation_rows = native_application(events, first, initial)
+        configuration_matches(spec, before, transfers[0]['output']['destination'])
+        configuration_matches(spec, first['input']['parameters']['settings'], transfers[0]['output']['destination'])
+        compare(json.loads((task_dir / spec['oracle_recipe'][0]['expected']).read_text()), typed_table(initial))
+        rows = creation_rows
     if correction:
         first = applies[0]
         request_owner(first, workspace, transfers[0])
@@ -377,7 +400,7 @@ def positive(spec, task_dir, attempt_dir, calls, events, workspace, transfers, p
     graph = graphs[-1].get('final_graph', {})
     require(graph.get('complete') is True and len([n for n in graph.get('nodes', []) if n.get('type') == 'imports.text']) == 1
         and not graph.get('links') and all(n.get('type') in ('imports.text', 'bg-vendor-icon-modelvariables') for n in graph.get('nodes', [])), 'graph: native import-only graph required')
-    expected = json.loads((task_dir / spec['oracle_recipe'][0]['expected']).read_text())
+    expected = json.loads((task_dir / spec['oracle_recipe'][-1]['expected']).read_text())
     compare(expected, typed_table(result))
     saves = [row for row in calls if row['tool'].endswith('action_run') and row['input'].get('action_key') == 'package.save_checkpoint'
         and after(row, settled) and row['result'].get('status') == 'SUCCEEDED' and row['result'].get('cleanup_complete') is True]
