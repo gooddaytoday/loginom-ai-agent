@@ -1350,3 +1350,48 @@ Private receipt `formal-v9-cohort-attempt3-workspace-input-readback-20261009.jso
 SHA `99cbfc46ab1e3517bb5acc2664ab9b96cc7653aab9a9517c1c22006653a9ca47`,
 mode600/read-back PASS. Это проверка сохранности входа одной текущей попытки,
 не итоговая оценка результата и не полный comparability verdict.
+
+## V9: cohort#3 INCOMPLETE после зависания завершения
+
+После индивидуального1800000ms и дополнительного времени phase осталась
+`running`, result/cleanup/process-cleanup отсутствовали. Launcher state
+сообщал CLI exit0 и sandbox exit0. Controller676156/birth84924950 остался
+S/futex_wait_queue; его launcher1111116/birth86491048 S/ep_poll, только
+дочерний sandbox1111129/birth86491050 Z/kernel exit0. Это наблюдения,
+не установленная причина. RSS controller около1.9GB, peak около4.6GB;
+из памяти/ожиданий причину зависания не выводить.
+
+Private evidence `formal-v9-cohort-attempt3-live-observations-20261009`:
+readback SHA `3b0b429328dce2c5a96de32d9de3ee17203ee2010f58f50634d3449efba0ee47`.
+Пять копий process-progress/events/stderr/launcher-state/profile marker
+проверены read-back; UID1001/dirs700/files600. Первое чтение command.json
+получило FileNotFoundError до копирования файлов; это ожидаемый unlink
+одноразового transport capsule в process-launcher.ts. Correction записана,
+nonce с удалённым command не сравнивался, transport не захватывался.
+
+После повторных UID/birth/executable/dev/inode/parent guards отправлен
+SIGINT только controller;45s без acknowledgement/смены phase. Затем SIGTERM
+только launcher при единственном подтверждённом zombie child; bounded own-root
+references ограничены launcher,5 PermissionDenied явно учтены. Sandbox исчез,
+launcher стал Z у controller; result/cleanup не появились. После нового guard
+SIGTERM только controller при единственном zombie launcher. Exec60189
+завершён143; широких сигналов, foreign process changes и ручных повторов0.
+Signal receipts SHA576d4ec275…/a82ce9ed87…/a9fd0f3128… сохранены отдельно.
+
+Interruption readback SHA
+`06df99190965e38ea88ada35e65092d3c12b1fd017e69ad88fe711550fa4af26`:
+все34 result/cleanup/process-cleanup/history/diagnostics SHA повторно PASS,
+progress34/metrics34/common020c08059… unchanged. Все три PID отсутствуют;
+bounded own-run references0/4 PermissionDenied, глобальная доступность чужих
+FD не заявляется. Original server/client ID и StartedAt unchanged.
+Closed34/45:25 PASS100/9 FAIL0; cohort#3 отдельно INCOMPLETE, без fabricated
+result или cleanup. Raw profile/harness lease/process marker сохраняются,
+не архивируются и не удаляются как успешно очищенные. Candidate/cold/compare0.
+
+После восстановления `/tmp` отдельно повторно проверены658 frozen tracked
+files/clean Git,8 judge executable pins, оба CLI binary/model catalog/selection/
+source manifest. Это не делает незавершённую пару принятой. Следующий шаг:
+в собственном mutable harness воспроизвести зависание после child exit0
+детерминированно и исправить через RED→GREEN, сохранив admission/ownership/
+cleanup guards. Старую v9 не дополнять выборочным повтором; новый harness
+требует новых общих условий, обеих smoke сторон и полной90-попытковой пары.

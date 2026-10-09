@@ -1030,7 +1030,7 @@ Core имеет разметку осей, но без CSV oracle. По доку
   результаты отдельно; после повторной фиксации условий выполнить новую пару
   теми же сохранёнными CLI, а не только повторить одну сторону.
 
-  **Текущая серия v9, checkpoint 20 (2026-10-09):** frozen harness
+  **Текущая серия v9, checkpoint 21 (2026-10-09):** frozen harness
   `d08be6baf8f5aea53f83c228cd0984c9d2bf0494`, source-only полный suite
   486 PASS/2 SKIP/0 FAIL, install/typecheck PASS. Общие условия:
   `ab-conditions-storage-clean-20261009/common.json`, SHA256
@@ -1047,7 +1047,7 @@ Core имеет разметку осей, но без CSV oracle. По доку
   `ab-smoke-v9-pair-accepted-20261009/review.json`, SHA94fea2d339….
   Дополнительная активация candidate:1 provider-turn/1 skill-вызов;
   прочий рост tools/Loginom измерен отдельно и не разрешает новые отказы.
-  Formal baseline session60189/run20261009-021118-d08be6baf продолжается:
+  Formal baseline session60189/run20261009-021118-d08be6baf terminal143:
   closed34/45:25 PASS100/9 no_artifact FAIL0. Первый повтор15 завершён:
   12 PASS100/3 FAIL (cohort/first-last/low-liquidity). Второй повтор завершён:9 PASS100/6 FAIL0; у созданных пакетов
   structure/warm oracle PASS; третий повтор остаётся обязательным.
@@ -1062,9 +1062,16 @@ Core имеет разметку осей, но без CSV oracle. По доку
   SHA8eecd96824… сохранён; two-repeat cold index30 SHA942b6964c6… проверяет21
   request/package/input/oracle SHA; cold ещё не выполнен. По первым двум повторам:
   9 задач PASS/PASS,3 FAIL/FAIL,3 mixed. Ab-revenue/ABC/articles/campaign baseline judge/structure/warm3/3
-  PASS, formal cold12 pending. Cohort#3 выполняется; read-only journal
-  отмечает recovery_unverified/AMBIGUOUS/output_mapping/cleanup=false,
-  receipt SHA2ea8c4b231… сохранён. Это не terminal result и не причина сбоя.
+  PASS, formal cold12 pending. Cohort#3 INCOMPLETE: phase running после
+  индивидуального1800000ms, child receipts exit0, result/cleanup отсутствуют.
+  Read-only journal recovery_unverified/AMBIGUOUS не доказывает причину.
+  Own controller/launcher остановлены через повторные identity guards;
+  interruption receipt06df991909… подтверждает PID absence и сохранность34
+  results/cleanup/archive SHA. Raw incomplete profile/leases/marker retained.
+  Frozen files/658 и21 adapter pins после exact-SHA восстановления нужных
+  tmp inputs повторно PASS. До новой пары воспроизвести и исправить
+  child-exit0 hang через TDD в own mutable harness. Новый harness — новые
+  условия, обе smoke и полная90-попытковая пара; выборочный повтор запрещён.
   Candidate formal,
   formal cold и compare не начаты. Ручных повторов0; первый повтор не заменяет
   baseline45/candidate45, cold каждого сохранённого пакета и итоговый compare.
