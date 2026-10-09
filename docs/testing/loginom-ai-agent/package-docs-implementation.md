@@ -4447,17 +4447,17 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 
 ## Checkpoint
 
-### 2026-10-09 — ACTIVE, v7 неполный; harness с phase evidence проверен
+### 2026-10-09 — ACTIVE, frozen d08; baseline smoke v9 запущен
 
-- HEAD до checkpoint `581a1a346`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
+- HEAD до checkpoint `ede59f866`; продуктовые baselinefc/candidate49b1584f2 binary/resources неизменны.
 - Все запуски локально;10.200.13.152 исключён; исходные Loginom server/client и чужие профили/процессы не изменялись.
-- Own mutable harness `d08be6baf8f5aea53f83c228cd0984c9d2bf0494` clean: промежуточный process-progress.jsonl через TDD; modules29 PASS/typecheck PASS/full486 PASS/2 SKIP/0 FAIL/2080 assertions/581.74s, terminal0/process cleanup confirmed. Frozen495 остаётся прежним и не редактировался; новый freeze и обе smoke стороны ещё не выполнены.
+- Own mutable harness `d08be6baf8f5aea53f83c228cd0984c9d2bf0494` clean: промежуточный process-progress.jsonl через TDD; modules29 PASS/typecheck PASS/full486 PASS/2 SKIP/0 FAIL/2080 assertions/581.74s, terminal0/process cleanup confirmed. Frozen495 не редактировался; новый detached frozen d08 на own storage/loginom-skills-frozen-progress-20261009, install/typecheck PASS/clean,658 pins; обе новые smoke стороны ещё не приняты.
 - Writer post-open real-IO RED→GREEN; release/persistent-empty/replacement guards×5 PASS; modules77 PASS/0 FAIL/241 assertions.
 - Первый full495/session80830 terminal1:447 PASS/2 SKIP/37 FAIL/2 errors; cwd640MiB ниже1GiB.31 прямой space FAIL,6 downstream supported; весь evidence сохранён.
 - Fresh full495/session12760 terminal0:484 PASS/2 SKIP/0 FAIL/2063 assertions/576.34s; порог пространства сохранён, новый own executable TMPDIR в /dev/shm.
 - Exact own immutable dedupe:26568 old frozen source files,612 browser files,13285 new frozen source files; bytes/modes/pins и clean Git проверены до/после; чужие данные не очищались.
 - Dedupe receipts3 сохранены;68 confirmed closed archives720949856bytes перенесены пятью batch на own ext4 storage, archive paths→links/цели600/каталоги700/readback34+12+6+6+10/native tar3+2+2+2+2 PASS; около2GiB free. Frozen sources/resources не редактировать.
-- Conditions ab-conditions-release-20261009/common.json SHAa268a81e8b4ea163f50ac52ee99817559b3fab9a08ffc09652dc96c00fcd2ed4:658 harness/281 task/21 adapter pins/5389+5651 build inventory PASS.
+- Новые conditions ab-conditions-storage-clean-20261009/common.json SHA020c08059d809d417e03b977911407c570a51b8861cc3eeb21786c4fce1b162a:658 harness/281 task/21 adapter pins/5389+5651 build inventory PASS, fresh evals b30/protected diff0. Baseline smoke v9/session79154/run014845 подтверждён live, phase running; candidate не начат.
 - На freeze evals ref992fca12badf209169f13b569b9bd291e4d70e99; после пары fresh b30dcbe5f/protected diff0, с freeze изменён только соседний docs-файл; frozen495/658files/21pins/оба full CLI повторно PASS.
 - Те же15 задач×3×2=90; primary openai/gpt-6.1-sol medium/judge gpt-6-astra high. Smoke metrics16/18 provider turns,17/20 tools,13/13 Loginom; activation delta1/skill1 PASS, прочий рост отдельно.
 - Baseline smoke v7/session30063 terminal0/run214239:score100/oracle/structure/installed cold21564 PASS; close/logout/remaining0/bytes unchanged; accepted receipt сохранён.
@@ -4467,7 +4467,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - CLI modify3 FAIL:21 file occurrence hashes PASS, readonly3/3/UNKNOWN_PREPARED_WORKFLOW3/3/active-source refusal2/3; candidate49 bridge/managed-entry exact source hashes PASS, explicit package/logout cleanup test-only; native writer owner/cause UNKNOWN. Docs-after-build CLI3 accepted/Desktop cold1 PASS2 FAIL; new cold native только после90 closed.
 - Linux installed CLI/Desktop49 по5 ОС PASS; TUI/native opening/headless docs и upgrade PASS; lifecycle/independence и remaining natural transitions открыты.
 - MiMo429/quota exhausted; новых secondary-model calls нет, ответ о вторичной модели ещё ожидается.
-- Source/server skill907ff16b…/catalog17764f9a… сохранены; stage5–8 открыты,stage9/full35 deferred. Local diagnostic sequences25 bwrap exits+25 installed baseline help:50 cleanup PASS, hang не воспроизведён. Protected diff0 против fresh evals b30dcbe5f; следующий шаг: новый frozen harness/условия локального стенда/обе smoke стороны, затем полный90; промежуточная phase запись не подтверждает успех или cause.
+- V8 smoke47153 terminal1/EvalFailure2 до0 задач: storage admission отказал на одном cohort CSV30094bytes. Exact SHA совпал с нашим snapshot, backup600/readback PASS; только этот файл удалён после повторных ID/marker/SHA/no selected-native-process checks, storage/SessionBackup empty. Raw v7/v8 profiles сохранены; не retrospective cleanup proof. V9 новые каталоги/обе smoke затем90. Source/server skill907ff16b/catalog17764f9a сохранены; stage5–8 открыты,stage9/full35 deferred.
 - Owner-loss/resume drivers: host-owned budgets и новая skill activation исправлены через TDD,6 PASS/typecheck PASS/21 A/B adapter pins unchanged; native ещё pending. Evidence: writer-release и runtime-acceptance-contract reports; чужой evals worktree не изменяется.
 
 ### 2026-10-08 — ACTIVE, локальные запуски

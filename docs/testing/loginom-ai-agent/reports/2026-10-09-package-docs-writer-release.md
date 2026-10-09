@@ -527,3 +527,38 @@ Protected diff0 против свежего evals `b30dcbe5f2768a740abab18d3fec4
 локально; новый frozen worktree/common conditions/обе smoke стороны ещё не
 созданы. До formal comparison нужны полный90 и cold/structure gates. V7
 остаётся19/45 INCOMPLETE и не сравнивается как полный baseline.
+
+
+## Новый frozen d08, отказ storage admission v8 и локальный smoke v9
+
+Создан detached worktree `/home/kiselev/storage/loginom-skills-frozen-progress-20261009/loginom-ai-agent`
+на `d08be6baf8f5aea53f83c228cd0984c9d2bf0494` в собственном parent mode700.
+Install с frozen lockfile/typecheck exit0, Git clean;658 tracked evals files,
+281 task files и оба полных CLI inventories5389/5651 проверены. Fresh evals
+`b30dcbe5f2768a740abab18d3fec436aada9ab2b`, protected diff0. Старые frozen
+worktrees не менялись, оригинальные Loginom server/client продолжают работать.
+
+V8 baseline smoke/session47153 terminal1: EvalFailure exitCode2 — выделенный
+storage не пуст; tasks0, model/judge calls0, candidate не запускался.
+Проверка обнаружила только файл UserStorage/user
+`a62b18810e20236b724c8d0faac20590796adf9c066dd9d44a66676b58479bba-0-dataset.csv`,
+30094bytes. SHA256 `deeaa158ab05f0313fc11bfefce9026b3093d599ce7566d0cf1d39a697f8d2b3`
+совпал с нашим сохранённым input cohort-spend-activity. SessionBackup пуст.
+CSV скопирован в приватный `v8-preflight-storage-rejection-20261009/owned-cohort-input.csv`,
+mode600, SHA/размер/readback PASS. После повторных ID/name/owner-label/no-mount/
+marker и SHA проверок, отсутствия выбранных native exe процессов и других
+own acceptance контейнеров удалён только этот regular non-symlink CSV.
+Storage и SessionBackup после удаления пусты. Никаких unknown locks или
+quarantined raw profiles не удалялось; это не исправляет и не подтверждает
+cleanup незавершённой v7 cohort#2. Source harness/reset adapter не менялся.
+
+Preservation и exact-owned-input-cleanup receipts сохранены в том же приватном
+каталоге; SHA последнего `e4388eb796972c250d99e307eab5ef64d2f069545ab27d254965b018281a5b57`.
+V8 raw profile и failed preflight log сохранены. Для новой пары нужны новые
+каталоги: V9 helpers/21 adapter pins зафиксированы отдельным common
+`ab-conditions-storage-clean-20261009/common.json`
+SHA256 `020c08059d809d417e03b977911407c570a51b8861cc3eeb21786c4fce1b162a`.
+Тот же frozen d08, judge/model/config/15 tasks/оба payload. Baseline v9/session79154
+запущен из frozen evals, run20261009-014845-d08be6baf, phase running подтверждена;
+terminal результата ещё нет. Candidate smoke, formal90 и compare ещё не начаты.
+Все запуски локальные; никаких действий на10.200.13.152.
