@@ -125,12 +125,13 @@ Harness `pass:true` оценивает артефакт, но полный ис�
 его не засчитываем в минимум8 CLI PASS. Ручного модельного повтора нет.
 Articles-by-author **PASS100**: CLI exit0, judge scored/checklist, structure0,
 warm CSV oracle PASS, process terminal и6 cleanup stages confirmed. Итого
-закрыты5/10:4 полных PASS,1 полный FAIL; cold3/3 PASS. Campaign ROI
+закрыты6/10:5 полных PASS,1 полный FAIL; cold3/3 PASS. Campaign ROI
 также PASS100/CLI0/structure0/warm oracle/cleanup confirmed. Его independent
 cold PASS/bytes unchanged/native close/logout/remaining0, read-back18files
 `fa9649c4a74465347debd369da6e8ede7e0ba55163757b7ae9c4f47bc08310b0`.
 Customer-activity-segments также **PASS100/CLI0/structure/warm/cleanup**.
-Следующей выполняется monthly-demand. Progress4 receipt SHA256
+Monthly-demand **PASS100/CLI0/structure/warm/cleanup**.
+Следующей выполняется ab-revenue-per-converter. Progress4 receipt SHA256
 `b8959507b3e5d9f1c8f35a9f862adba00179df6e41b3ad4da7841aeebd2eaca0`. Оставшиеся задачи ведёт отдельный serial controller: каждый процесс по одному,
 между ними terminal/cleanup/structure/oracle gates, для campaign обязательный
 cold. Подготовки ABC сохранены
