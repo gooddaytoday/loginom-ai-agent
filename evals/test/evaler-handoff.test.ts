@@ -263,3 +263,26 @@ test("all accepted Ben outcomes count once and task enrichment does not recount"
     expect(conflict.state).toEqual(enriched)
   }
 })
+
+
+test('Evaler recovered-author receipt admits exactly one original Ben handoff without changing ERROR',()=>{
+ const event={...report,evidence:{...report.evidence,product:'ERROR' as const,
+  review_admission:{kind:'recovered_author',resolution_sha256:'d'.repeat(64)}}};
+ const before=JSON.stringify(event);
+ const decision=evaluateHandoff({state,event,pending_tasks:[]});
+ expect(decision.action).toBe('ready_to_dispatch');expect(decision.target).toBe('Ben');
+ expect(JSON.stringify(event)).toBe(before);
+ expect(evaluateHandoff({state:decision.state,event,pending_tasks:[]}).action).toBe('no_action');
+});
+
+
+test('recovered author admission cannot waive incomplete evidence stale SHA cleanup or Ben ERROR',()=>{
+ const evidence={...report.evidence,product:'ERROR',review_admission:{kind:'recovered_author',resolution_sha256:'d'.repeat(64)}};
+ for(const fault of [{...evidence,attachment_id:''},{...evidence,manifest_sha256:''},{...evidence,checked_sha:sha},
+  {...evidence,cleanup:'unknown'},{...evidence,validation:'unconfirmed'}]) {
+  expect(evaluateHandoff({state,event:{...report,evidence:fault},pending_tasks:[]}).action).toBe('blocked');
+ }
+ expect(evaluateHandoff({state:reviewing(),event:{...verdict,evidence},pending_tasks:[]}).action).toBe('blocked');
+ for(const resolution_sha256 of ['', 'bad', 'F'.repeat(64)])expect(()=>evaluateHandoff({state,event:{...report,evidence:{...evidence,
+  review_admission:{kind:'recovered_author',resolution_sha256}}},pending_tasks:[]})).toThrow('invalid handoff input');
+});

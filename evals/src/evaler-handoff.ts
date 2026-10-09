@@ -18,6 +18,7 @@ export type HandoffEvidence = {
   validation: "confirmed" | "unconfirmed"
   cleanup: "confirmed" | "unknown"
   product: "PASS" | "FAIL" | "ERROR"
+  review_admission?: { kind: "recovered_author"; resolution_sha256: string }
 }
 export type HandoffReport = {
   kind: "report"
@@ -77,11 +78,12 @@ export function evaluateHandoff(value: unknown): HandoffDecision {
     return { action: "blocked", reason: "delivery completion must preserve the author SHA", state: { ...input.state, phase: "blocked", executor: null } }
   const evidence = input.event.evidence
   if (!evidence || evidence.checked_sha !== input.event.actual_sha ||
-    evidence.validation !== "confirmed" || evidence.cleanup !== "confirmed" || evidence.product === "ERROR")
+    evidence.validation !== "confirmed" || evidence.cleanup !== "confirmed" || (evidence.product === "ERROR" &&
+      (input.event.phase !== "rich" || evidence.review_admission?.kind !== "recovered_author" || !/^[a-f0-9]{64}$/.test(evidence.review_admission.resolution_sha256))))
     return { action: "blocked", reason: "evidence/cleanup unconfirmed or infrastructure ERROR",
       state: { ...input.state, phase: "blocked", executor: null } }
   if (!evidence.attachment_id || !/^[a-f0-9]{64}$/.test(evidence.manifest_sha256)) {
-    if (input.event.phase !== "rich" || input.state.delivery_sha)
+    if (evidence.product === "ERROR" || input.event.phase !== "rich" || input.state.delivery_sha)
       return { action: "blocked", reason: "OWNER_ACTION_REQUIRED: incomplete delivery", state: { ...input.state, phase: "blocked", executor: null } }
     return { action: "ready_to_dispatch", target: "Rich", reason: "DELIVERABLES_REQUIRED: upload existing evidence; no new quality attempt",
       state: { ...input.state, delivery_sha: input.event.actual_sha, last_dispatch: null, processed_report_ids: [...input.state.processed_report_ids, input.event.id] } }
@@ -131,7 +133,8 @@ function parseInput(value: unknown): HandoffInput {
     phase: member(event.phase, ["rich", "ben"]), actual_sha: sha(event.actual_sha), status: member(event.status, ["READY_FOR_BEN", "ACCEPT", "REJECT", "BLOCKED"]),
     evidence: evidence ? { attachment_id: text(evidence.attachment_id, false), manifest_sha256: text(evidence.manifest_sha256, false), checked_sha: sha(evidence.checked_sha),
       validation: member(evidence.validation, ["confirmed", "unconfirmed"]), cleanup: member(evidence.cleanup, ["confirmed", "unknown"]),
-      product: member(evidence.product, ["PASS", "FAIL", "ERROR"]) } : undefined } }
+      product: member(evidence.product, ["PASS", "FAIL", "ERROR"]),
+      ...(evidence.review_admission !== undefined ? { review_admission: reviewAdmission(evidence.review_admission) } : {}) } : undefined } }
 }
 function invalid(): never { throw new Error("invalid handoff input") }
 function record(value: unknown): Record<string, unknown> {
@@ -145,4 +148,12 @@ function count(value: unknown) { if (typeof value !== "number" || !Number.isSafe
 function member<const T extends string>(value: unknown, values: readonly T[]): T {
   if (typeof value !== "string" || !values.includes(value as T)) invalid()
   return value as T
+}
+
+function reviewAdmission(value: unknown): NonNullable<HandoffEvidence["review_admission"]> {
+  const admission = record(value)
+  const resolution = text(admission.resolution_sha256)
+  if (admission.kind !== "recovered_author" || !/^[a-f0-9]{64}$/.test(resolution) ||
+    Object.keys(admission).some(key => !["kind", "resolution_sha256"].includes(key))) invalid()
+  return { kind: "recovered_author", resolution_sha256: resolution }
 }
