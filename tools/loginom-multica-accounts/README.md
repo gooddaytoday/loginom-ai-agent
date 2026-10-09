@@ -112,6 +112,15 @@ Run from this directory, never the repository root:
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
+The strict FD positive test runs the exact executable collector with a real
+guardian/flock/control in an isolated user/PID/mount namespace (`unshare` with
+its real mounted `/proc`). Complete stable visibility and zero errors are
+required; unavailable namespace support fails this test rather than skipping.
+This is privileged visibility within the fixture namespace, not a host-wide
+census or server absence. A real extra target FD rejects. Unprivileged host
+denials/races and malformed/incomplete proofs remain UNKNOWN. The collector
+holds `os.scandir` through every FD stat; no error or PID is filtered for PASS.
+
 Run `tests/account-ui.test.mjs` with `--test` using the pinned Node executable
 from the private operator config. The tests read only its Node/Chromium/
 Playwright dependency paths. Chromium runs with sandbox and default certificate

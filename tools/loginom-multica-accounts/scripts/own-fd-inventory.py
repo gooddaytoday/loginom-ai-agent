@@ -30,10 +30,13 @@ def snapshot(request):
         holders, errors, pids = [], [], sorted(int(p.name) for p in Path('/proc').iterdir() if p.name.isdigit())
         for pid in pids:
             try:
-                for path in Path(f'/proc/{pid}/fd').iterdir():
-                    info = path.stat()
-                    if (info.st_dev, info.st_ino) in expected:
-                        holders.append({'pid': pid, 'fd': int(path.name), 'device': info.st_dev, 'inode': info.st_ino})
+                # Our own listing exposes this enumeration FD. Keep it open
+                # through every stat; closing it first creates our own ENOENT.
+                with os.scandir(f'/proc/{pid}/fd') as entries:
+                    for entry in entries:
+                        info = entry.stat()
+                        if (info.st_dev, info.st_ino) in expected:
+                            holders.append({'pid': pid, 'fd': int(entry.name), 'device': info.st_dev, 'inode': info.st_ino})
             except (PermissionError, FileNotFoundError, OSError) as error: errors.append({'pid': pid, 'error': type(error).__name__})
         control_seen = {k: control[k] for k in ['pid', 'fd', 'device', 'inode']} in holders
         if not control_seen: raise RuntimeError('HISTORICAL_FD_CONTROL_UNKNOWN')

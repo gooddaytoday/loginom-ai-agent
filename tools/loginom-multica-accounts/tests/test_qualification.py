@@ -224,4 +224,34 @@ class LegacyTransaction(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'FD_BINDING_UNKNOWN'): owner.validate_fd_proof(request, broken)
         finally: os.close(fd)
 
+    def test_executable_collector_strict_positive_with_complete_real_namespace_visibility(self):
+        lock = self.root / 'outer-fixture.lock'; lock.touch(mode=0o600)
+        fd = os.open(lock, os.O_RDWR); fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            guard = {**owner.binding(str(lock)), 'fd': fd}
+            directory = self.root / 'namespace-collector'
+            command = ['unshare', '--user', '--map-root-user', '--pid', '--mount', '--fork', '--mount-proc',
+                       sys.executable, SCRIPTS.parent / 'tests/fd-census-fixture.py']
+            self.assertEqual(provision.run_foreground(command, [guard], directory, timeout=15, stop_timeout=1), 0,
+                             (directory / 'stderr.log').read_text())
+            receipt = json.loads((directory / 'stdout.log').read_text())
+            self.assertEqual(receipt['strict_validation'], 'PASS')
+            self.assertEqual(receipt['scope'], 'isolated-user-pid-mount-namespace')
+            self.assertEqual(receipt['proof']['before']['errors'], [])
+            self.assertEqual(receipt['proof']['after']['errors'], [])
+            self.assertEqual(receipt['proof']['before']['visible_pids'], [1, 2])
+            self.assertEqual(receipt['proof']['after']['visible_pids'], [1, 2])
+            self.assertEqual(len(receipt['negatives']), 6)
+            self.assertEqual(receipt['real_extra_holder'], 'HISTORICAL_FD_HOLDER_PRESENT')
+            cleanup = read_private(directory / 'supervisor-result.json')
+            self.assertEqual(cleanup['process_cleanup'], 'PASS'); self.assertIsNone(cleanup['failure'])
+            for record in cleanup['processes']:
+                current = process_identity(record['pid'])
+                self.assertTrue(current is None or current['start_ticks'] != record['start_ticks'] or current['state'] in {'Z', 'X'})
+            if os.environ.get('LAB53_PROCESS_RECEIPT_DIR'):
+                target = Path(os.environ['LAB53_PROCESS_RECEIPT_DIR'])
+                write_private(target / 'f9-namespace-host-processes.json', {'processes': cleanup['processes']})
+                write_private(target / 'f9-namespace-census.json', receipt)
+        finally: os.close(fd)
+
 if __name__ == '__main__': unittest.main()
