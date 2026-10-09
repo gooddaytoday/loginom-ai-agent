@@ -9,6 +9,25 @@ import { validateNodeRun } from "../src/node-evals"
 
 import { baselineFixturePins } from "../fixtures/baseline"
 
+test("EvalRunner smoke freezes its own role and candidate while legacy pins remain strict", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evalrunner-manifest-"))
+  try {
+    const pins = { ...baselineFixturePins, cliVersion: "0.1.18", cliSource: "9".repeat(40), model: "openai/gpt-6-sol", variant: "high" }
+    const product = { version: pins.cliVersion, source: pins.cliSource, manifestSha256: pins.cliManifestSha256,
+      binarySha256: pins.binarySha256, model: pins.model, variant: pins.variant }
+    const series = path.join(directory, "runner")
+    const manifest = await prepareBaseline(series, { checkout: repoRoot, pins, executorRole: "evalrunner", product,
+      smoke: true, smokeCase: "calc-data-double" })
+    expect(manifest).toMatchObject({ version: 2, executorRole: "evalrunner", product })
+    expect((await checkBaseline(series)).manifest).toEqual(manifest)
+    await expect(prepareBaseline(path.join(directory, "legacy"), { checkout: repoRoot, pins })).rejects.toThrow("INVALID_PINS")
+    await expect(prepareBaseline(path.join(directory, "changed"), { checkout: repoRoot, pins: { ...pins, model: "undeclared" },
+      executorRole: "evalrunner", product, smoke: true, smokeCase: "calc-data-double" })).rejects.toThrow("PRODUCT_PINS_CHANGED")
+    await expect(prepareBaseline(path.join(directory, "exception"), { checkout: repoRoot, pins, executorRole: "evalrunner", product,
+      acceptedNodeSmokeNoArtifact: crypto.randomUUID() })).rejects.toThrow("LEGACY_ACCEPTANCE_REFUSED")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test("prepared baseline includes the four accepted LAB-31 cases in each of three rounds", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "baseline-lab31-"))
   try {
@@ -318,6 +337,32 @@ test("installation verification refuses tampered payloads and extra files withou
     await Bun.write(path.join(root, "unexpected"), "extra")
     await expect(verifyBaselineInstallation(bin)).rejects.toThrow("CLI_FILE_SET_CHANGED")
   } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("an approved candidate installation keeps byte integrity checks and legacy defaults", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evalrunner-install-"))
+  try {
+    const bin = path.join(root, "bin/loginom-ai-agent-cli")
+    await Bun.write(bin, "candidate never executed")
+    await chmod(bin, 0o755)
+    const raw = JSON.stringify({ format: "loginom-cli-artifact-v1", metadata: { version: "0.1.18", sourceCommit: "9".repeat(40), sourceDirty: false },
+      files: [{ path: "bin/loginom-ai-agent-cli", sha256: baselineHash("candidate never executed"), mode: 0o755 }] })
+    await Bun.write(path.join(root, "cli-manifest.json"), raw)
+    const product = { version: "0.1.18", source: "9".repeat(40), manifestSha256: baselineHash(raw),
+      binarySha256: baselineHash("candidate never executed"), model: "openai/gpt-6-sol", variant: "high" }
+    expect((await verifyBaselineInstallation(bin, product)).metadata.version).toBe("0.1.18")
+    await expect(verifyBaselineInstallation(bin)).rejects.toThrow("CLI_MANIFEST_REFUSED")
+    await expect(verifyBaselineInstallation(bin, { ...product, manifestSha256: "0".repeat(64) })).rejects.toThrow("CLI_ARTIFACT_PIN_CHANGED")
+    await Bun.write(bin, "tampered")
+    await expect(verifyBaselineInstallation(bin, product)).rejects.toThrow("CLI_FILE_CHANGED")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("execution commands cannot override a frozen executor role", async () => {
+  expect(await runBaseline(["start", "--series", "/fixture/series", "--role", "evalbaseline"], {}))
+    .toMatchObject({ code: 2, reason: "ROLE_ONLY_FOR_PREPARE" })
+  expect(await runBaseline(["prepare", "--series", "/fixture/series", "--role", "rich"], {}))
+    .toMatchObject({ code: 2, reason: "BASELINE_ROLE_REQUIRED" })
 })
 
 test("live preparation rejects drift from the agreed product and judge settings before connecting", async () => {

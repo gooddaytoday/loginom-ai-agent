@@ -17,7 +17,9 @@ import { baselineHash, checkBaseline } from "./baseline"
 
 type OfflinePaths = { checkout: string; workRoots: string[]; resultsRoot: string }
 type RolePaths = OfflinePaths & { referenceProfile: string; evalProfile: string; cliBin?: string }
-type BaselinePaths = OfflinePaths & { referenceProfile?: never; evalProfile: string; cliBin: string; readinessIssue?: string }
+export type EvalProductPins = { version: string; source: string; manifestSha256: string; binarySha256: string; model: string; variant: string }
+type BaselinePaths = OfflinePaths & { referenceProfile?: never; evalProfile: string; cliBin: string; readinessIssue?: string;
+  product?: EvalProductPins; baselineRegistry?: string; replayEvidence?: string; apparmorProfiles?: string[] }
 export type NodeOpsConfig = { version: 1 | 2 | 3; runtimeRoot: string; endpoint: string; container: { name: string; id: string; storageDir: string }; cliBin: string; roles: { rich: RolePaths; ben: RolePaths; evalbaseline?: BaselinePaths; evalrunner?: BaselinePaths }; offline?: OfflinePaths }
 export type NodeStandOwner = { issue: string; task: string; role: "rich" | "ben" | "evalbaseline" | "evalrunner"; phase: "unit" | "reference" | "cold" | "eval" | "recovery"; sha: string }
 export type NodeStandLease = NodeStandOwner & { version: 1; token: string; device: number; inode: number; endpoint: string; containerId: string; acquiredAt: string; configSha256: string }

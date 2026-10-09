@@ -5,7 +5,7 @@ import { loadTasks } from "./task"
 import { aggregate, aggregateTask, type AttemptResult, type RunSummary } from "./report"
 import { validateNodeRun } from "./node-evals"
 import { parseArgs } from "node:util"
-import type { BaselineCleanupExecution, NodeOpsConfig, NodeStandLease, NodeStandOwner } from "./node-eval-ops"
+import type { BaselineCleanupExecution, EvalProductPins, NodeOpsConfig, NodeStandLease, NodeStandOwner } from "./node-eval-ops"
 import type { ProcessCleanup } from "./process-supervisor"
 import { dockSkillRevision } from "./preflight"
 import { compareCsv, parseCsv } from "./oracle"
@@ -19,7 +19,11 @@ export type BaselinePins = {
 }
 export type BaselineCollection = "regular" | "analytic" | "node"
 type BaselineCase = { key: string; id: string; collection: BaselineCollection; directory: string; files: { path: string; sha256: string }[] }
-export type BaselineManifest = { version: 1; id: string; kind: "baseline" | "smoke"; createdAt: string; pins: BaselinePins
+export type BaselineRole = "evalbaseline" | "evalrunner"
+export type BaselineReference = { id: string; seriesDir: string; manifestSha256: string; archiveSha256: string; issue: string; decision: string; acceptedAt: string }
+export type BaselineChange = "cli" | "model" | "reasoning"
+export type BaselineManifest = { version: 1 | 2; id: string; kind: "baseline" | "smoke"; createdAt: string; pins: BaselinePins
+  executorRole?: BaselineRole; product?: EvalProductPins; baseline?: BaselineReference; declaredChanges?: BaselineChange[]
   infraRetries: 0 | 1
   cases: BaselineCase[]; jobs: { key: string; caseKey: string; attempt: number }[]
   acceptedNodeSmokeNoArtifact?: string
@@ -46,14 +50,14 @@ type SmokeAdmission = { version: 1; issue: string; task: string; caseKey: string
 export class BaselineFailure extends Error {}
 export const baselineHash = (value: string | Uint8Array) => new Bun.CryptoHasher("sha256").update(value).digest("hex")
 
-export async function verifyBaselineInstallation(bin: string) {
+export async function verifyBaselineInstallation(bin: string, product?: EvalProductPins) {
   const root = path.dirname(path.dirname(bin))
   if (!path.isAbsolute(bin) || await realpath(bin) !== bin || await realpath(root) !== root) throw new BaselineFailure("CLI_PATH_REFUSED")
   const raw = await Bun.file(path.join(root, "cli-manifest.json")).text()
   const manifest = JSON.parse(raw) as { format: string; metadata: { version: string; sourceCommit: string; sourceDirty: boolean }
     files: { path: string; sha256: string; mode: number; link?: string }[] }
-  if (manifest.format !== "loginom-cli-artifact-v1" || manifest.metadata?.version !== "0.1.17" || manifest.metadata.sourceDirty !== false ||
-    manifest.metadata.sourceCommit !== "fc3d97dbf695c2ed8dba942feb6fe83591a33944" || !manifest.files?.length ||
+  if (manifest.format !== "loginom-cli-artifact-v1" || manifest.metadata?.version !== (product?.version ?? "0.1.17") || manifest.metadata.sourceDirty !== false ||
+    manifest.metadata.sourceCommit !== (product?.source ?? "fc3d97dbf695c2ed8dba942feb6fe83591a33944") || !manifest.files?.length ||
     new Set(manifest.files.map(item => item.path)).size !== manifest.files.length) throw new BaselineFailure("CLI_MANIFEST_REFUSED")
   for (const item of manifest.files) {
     if (path.isAbsolute(item.path) || item.path.split(path.sep).some(part => ["..", ".", ""].includes(part)) ||
@@ -69,6 +73,8 @@ export async function verifyBaselineInstallation(bin: string) {
     item.isDirectory() ? walk(path.join(directory, item.name)) : [path.relative(root, path.join(directory, item.name))]))).flat()
   if (JSON.stringify((await walk(root)).sort()) !== JSON.stringify([...manifest.files.map(item => item.path), "cli-manifest.json"].sort()))
     throw new BaselineFailure("CLI_FILE_SET_CHANGED")
+  if (product && (baselineHash(raw) !== product.manifestSha256 || baselineHash(await Bun.file(bin).bytes()) !== product.binarySha256))
+    throw new BaselineFailure("CLI_ARTIFACT_PIN_CHANGED")
   return { files: manifest.files.length, metadata: manifest.metadata, manifestSha256: baselineHash(raw), binarySha256: baselineHash(await Bun.file(bin).bytes()) }
 }
 
@@ -80,22 +86,24 @@ export async function verifyBaselineCorpus(checkout: string, sha: string) {
   return sha
 }
 
-export async function captureBaselinePins(config: NodeOpsConfig, env: Record<string, string | undefined>): Promise<BaselinePins> {
-  if (env.EVAL_AGENT_MODEL !== "openai/gpt-6.1-sol" || env.EVAL_AGENT_VARIANT !== "medium" || env.EVAL_AGENT_PROVIDER_ID)
+export async function captureBaselinePins(config: NodeOpsConfig, env: Record<string, string | undefined>, executorRole: BaselineRole = "evalbaseline"): Promise<BaselinePins> {
+  const role = config.roles[executorRole]
+  const product = executorRole === "evalrunner" ? role?.product : undefined
+  if (executorRole === "evalrunner" && !product) throw new BaselineFailure("PRODUCT_CONFIGURATION_REQUIRED")
+  if (env.EVAL_AGENT_MODEL !== (product?.model ?? "openai/gpt-6.1-sol") || env.EVAL_AGENT_VARIANT !== (product?.variant ?? "medium") || env.EVAL_AGENT_PROVIDER_ID)
     throw new BaselineFailure("MODEL_PIN_CHANGED")
   if (env.JUDGE_MODEL !== "gpt-6-astra" || env.JUDGE_REASONING !== "high" || Number(env.EVAL_PASS_THRESHOLD ?? "70") !== 70 ||
     Number(env.EVAL_JUDGE_TIMEOUT_MS ?? "300000") !== 300_000) throw new BaselineFailure("JUDGE_PIN_CHANGED")
   if (env.EVAL_JUDGE_COMMAND && env.EVAL_JUDGE_COMMAND !== "codex" && env.EVAL_JUDGE_COMMAND !== Bun.which("codex"))
     throw new BaselineFailure("JUDGE_OVERRIDE_REFUSED")
   const { nodeRoleCli, nodeStandStatus } = await import("./node-eval-ops")
-  const role = config.roles.evalbaseline
-  if (config.version !== 2 || !role || env.EVAL_CLI_MODE !== "binary" || env.EVAL_CLI_BIN !== nodeRoleCli(config, "evalbaseline") ||
+  if (config.version < 2 || executorRole === "evalrunner" && config.version !== 3 || !role || env.EVAL_CLI_MODE !== "binary" || env.EVAL_CLI_BIN !== nodeRoleCli(config, executorRole) ||
     env.EVAL_PROFILE_DIR !== role.evalProfile || env.EVAL_WORKSPACE_ROOT !== role.workRoots[0] || env.EVAL_ARTIFACT_SOURCE !== "docker" ||
     env.CODEX_HOME !== path.join(path.dirname(role.evalProfile), "judge-home") ||
     env.LOGINOM_URL !== config.endpoint || env.LOGINOM_CONTAINER !== config.container.name || env.LOGINOM_STORAGE_DIR !== config.container.storageDir)
     throw new BaselineFailure("ISOLATION_CONFIG_CHANGED")
   await nodeStandStatus(config)
-  const installed = await verifyBaselineInstallation(role.cliBin)
+  const installed = await verifyBaselineInstallation(role.cliBin, product)
   const sha = (await Bun.$`git -C ${role.checkout} rev-parse HEAD`.quiet()).text().trim()
   if (!/^[0-9a-f]{40}$/.test(sha) || (await Bun.$`git -C ${role.checkout} status --porcelain`.quiet()).text().trim()) throw new BaselineFailure("HARNESS_DIRTY_OR_UNKNOWN")
   const corpusSha = env.EVAL_CORPUS_SHA !== undefined ? await verifyBaselineCorpus(role.checkout, env.EVAL_CORPUS_SHA) : sha
@@ -112,11 +120,11 @@ export async function captureBaselinePins(config: NodeOpsConfig, env: Record<str
     sandbox: baselineHash(await Bun.file(path.join(role.checkout, "evals/src/sandbox.ts")).bytes()),
     bwrap: baselineHash(await Bun.file(bwrap).bytes()),
     bwrapBinary: baselineHash(await Bun.file("/usr/local/libexec/loginom-evals/bwrap").bytes()),
-    apparmor: await Promise.all(["loginom-evals-bwrap", "loginom-evals-chromium", "loginom-evalbaseline-chromium"].map(async name => baselineHash(await Bun.file(`/etc/apparmor.d/${name}`).bytes()))),
+    apparmor: await Promise.all((role.apparmorProfiles ?? ["loginom-evals-bwrap", "loginom-evals-chromium", `loginom-${executorRole}-chromium`]).map(async name => baselineHash(await Bun.file(`/etc/apparmor.d/${name}`).bytes()))),
     connection: Object.fromEntries(["LOGINOM_USERNAME", "LOGINOM_PASSWORD", "LOGINOM_DOCK_API_KEY", "LOGINOM_DOCK_BASE_URL", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"].map(key => [key, env[key] ?? ""])) }
   const revision = await dockSkillRevision({ apiKey: env.LOGINOM_DOCK_API_KEY ?? "", baseUrl: env.LOGINOM_DOCK_BASE_URL ?? "https://loginom.duckdns.org" })
   return { mode: "live", harnessSha: sha, corpusSha, cliVersion: installed.metadata.version, cliSource: installed.metadata.sourceCommit,
-    cliManifestSha256: installed.manifestSha256, binarySha256: installed.binarySha256, model: "openai/gpt-6.1-sol", variant: "medium",
+    cliManifestSha256: installed.manifestSha256, binarySha256: installed.binarySha256, model: product?.model ?? "openai/gpt-6.1-sol", variant: product?.variant ?? "medium",
     judgeModel: "gpt-6-astra", judgeReasoning: "high", threshold: 70, timeoutMs: 1_800_000, judgeTimeoutMs: 300_000,
     promptSha256: baselineHash(await Bun.file(path.join(role.checkout, "evals/src/judge-prompt.md")).bytes()),
     schemaSha256: baselineHash(await Bun.file(path.join(role.checkout, "evals/src/verdict.schema.json")).bytes()),
@@ -124,8 +132,11 @@ export async function captureBaselinePins(config: NodeOpsConfig, env: Record<str
     endpoint: config.endpoint, containerId: config.container.id, imageDigest: container.Image, dockRevision: revision }
 }
 
-export async function prepareBaseline(directory: string, options: { checkout: string; pins: BaselinePins; smoke?: boolean; smokeCase?: string; config?: NodeOpsConfig; acceptedNodeSmokeNoArtifact?: string }) {
-  validatePins(options.pins)
+export async function prepareBaseline(directory: string, options: { checkout: string; pins: BaselinePins; smoke?: boolean; smokeCase?: string; config?: NodeOpsConfig;
+  executorRole?: BaselineRole; product?: EvalProductPins; baseline?: BaselineReference; declaredChanges?: BaselineChange[]; acceptedNodeSmokeNoArtifact?: string }) {
+  const executorRole = options.executorRole ?? "evalbaseline"
+  if (executorRole === "evalrunner" && options.acceptedNodeSmokeNoArtifact !== undefined) throw new BaselineFailure("LEGACY_ACCEPTANCE_REFUSED")
+  validatePins(options.pins, executorRole, options.product)
   if (options.acceptedNodeSmokeNoArtifact && options.smoke) throw new BaselineFailure("ACCEPTANCE_ONLY_FOR_BASELINE")
   if (options.acceptedNodeSmokeNoArtifact !== undefined && !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(options.acceptedNodeSmokeNoArtifact))
     throw new BaselineFailure("ACCEPTANCE_MANIFEST_REQUIRED")
@@ -142,7 +153,8 @@ export async function prepareBaseline(directory: string, options: { checkout: st
     }
   }
   if (selected && cases.length !== 1) throw new BaselineFailure("SMOKE_CORPUS_INCOMPLETE")
-  const manifest: BaselineManifest = { version: 1, id: crypto.randomUUID(), kind: options.smoke ? "smoke" : "baseline",
+  const manifest: BaselineManifest = { version: executorRole === "evalrunner" ? 2 : 1, id: crypto.randomUUID(), kind: options.smoke ? "smoke" : "baseline",
+    ...(executorRole === "evalrunner" ? { executorRole, product: options.product, baseline: options.baseline, declaredChanges: options.declaredChanges ?? [] } : {}),
     createdAt: new Date().toISOString(), pins: options.pins, cases, infraRetries: options.smoke ? 0 : 1,
     ...(options.acceptedNodeSmokeNoArtifact ? { acceptedNodeSmokeNoArtifact: options.acceptedNodeSmokeNoArtifact } : {}),
     ...(selected === "regular:calc-data-double" ? { smokeOracle: await freezeSmokeOracle(options.checkout, cases[0]!) } : {}),
@@ -418,7 +430,7 @@ export async function sealBaselineRelease(directory: string, receipt: BaselineRe
         !receipt.receiptPath.startsWith(path.join(config.runtimeRoot, "operations/completed") + path.sep)) throw new BaselineFailure("RELEASE_UNCONFIRMED")
       const raw = await Bun.file(receipt.receiptPath!).bytes()
       const proof = JSON.parse(new TextDecoder().decode(raw)) as { status: string; acquiredAt: string; evidenceSha256: string; owner: NodeStandLease; archive: string; containerId: string }
-      if (proof.status !== "RELEASED" || proof.acquiredAt !== lease.acquiredAt || proof.owner.role !== "evalbaseline" || proof.owner.task !== lease.task ||
+      if (proof.status !== "RELEASED" || proof.acquiredAt !== lease.acquiredAt || proof.owner.role !== baselineRole(manifest) || proof.owner.task !== lease.task ||
         proof.owner.issue !== lease.issue || proof.owner.sha !== manifest.pins.harnessSha || proof.containerId !== manifest.pins.containerId ||
         proof.evidenceSha256 !== receipt.evidenceSha256 || receipt.receiptPath !== path.join(proof.archive, "release.json")) throw new BaselineFailure("RELEASE_UNCONFIRMED")
       receipt.receiptSha256 = baselineHash(raw)
@@ -454,7 +466,7 @@ async function resolveBaselineCleanup(directory: string, evidence: string, env: 
         return JSON.parse(new TextDecoder().decode(input)) as CleanupResolutionProof
       }
       const config = await readPrivateBaselineJson(path.join(directory, "ops-config.json")) as NodeOpsConfig
-      if (JSON.stringify(await captureBaselinePins(config, env)) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
+      if (JSON.stringify(await captureBaselinePins(config, env, baselineRole(manifest))) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
       const { verifyBaselineCleanupRecovery, NodeOpsFailure } = await import("./node-eval-ops")
       const live = await verifyBaselineCleanupRecovery(config, await readPrivateBaselineJson(path.join(directory, "stand-handle.json")) as NodeStandLease, directory, evidence)
         .catch(error => { throw error instanceof NodeOpsFailure ? new BaselineFailure(error.reason) : error })
@@ -496,7 +508,7 @@ function assertCleanupResolution(proof: CleanupResolutionProof, manifest: Baseli
     proof.pinsSha256 !== baselineHash(JSON.stringify(manifest.pins))) throw new BaselineFailure("CLEANUP_RESOLUTION_INVALID")
   if (manifest.pins.mode === "fixture") return
   const live = proof.live
-  if (!live || live.owner.role !== "evalbaseline" || live.owner.sha !== manifest.pins.harnessSha || live.configSha256 !== manifest.pins.opsConfigSha256 ||
+  if (!live || live.owner.role !== baselineRole(manifest) || live.owner.sha !== manifest.pins.harnessSha || live.configSha256 !== manifest.pins.opsConfigSha256 ||
     live.execution.runDir !== record.runDir || !Number.isFinite(Date.parse(live.acquiredAt)) || live.processes.status !== "confirmed" || live.processes.error ||
     !live.processes.capture_complete || live.processes.unknownProcesses?.length || !live.processes.verification || live.processes.verification.length < 2 ||
     live.processes.verification.some(pass => pass.owned_remaining !== 0)) throw new BaselineFailure("CLEANUP_RESOLUTION_INVALID")
@@ -515,7 +527,9 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
   try {
     const command = argv[0]
     if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke|recover-measurement|resolve-cleanup|abandon --series DIR [smoke: --case calc-data-double|crosstable-fixed-sum] [prepare: --accept-node-smoke-no-artifact MANIFEST_UUID] [recover-measurement: --job KEY --kind infrastructure|judge --evidence PRIVATE_JSON] [resolve-cleanup: --evidence RECOVERY_COMPLETION_JSON] [abandon: --reason REASON --evidence RELEASE_JSON] [--config PRIVATE --issue ID --task ID] [check: --compare SERIES --export] [resume/resolve-cleanup: --recover-executor after inspection]" }
-    const values = parseArgs({ args: argv.slice(1), strict: true, options: { series: { type: "string" }, case: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, job: { type: "string" }, kind: { type: "string" }, reason: { type: "string" }, evidence: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" }, "accept-node-smoke-no-artifact": { type: "string" } } }).values
+    const values = parseArgs({ args: argv.slice(1), strict: true, options: { role: { type: "string" }, series: { type: "string" }, case: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, job: { type: "string" }, kind: { type: "string" }, reason: { type: "string" }, evidence: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" }, "accept-node-smoke-no-artifact": { type: "string" } } }).values
+    if (values.role !== undefined && !["prepare", "smoke"].includes(command ?? "")) throw new BaselineFailure("ROLE_ONLY_FOR_PREPARE")
+    if (values.role !== undefined && !["evalbaseline", "evalrunner"].includes(values.role)) throw new BaselineFailure("BASELINE_ROLE_REQUIRED")
     const directory = values.series
     if (!directory || !path.isAbsolute(directory)) throw new BaselineFailure("SERIES_PATH_REQUIRED")
     if (values["accept-node-smoke-no-artifact"] !== undefined && command !== "prepare") throw new BaselineFailure("ACCEPTANCE_ONLY_FOR_BASELINE")
@@ -550,7 +564,7 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
       if (!values.config) throw new BaselineFailure("LIVE_CONFIGURATION_REQUIRED")
       const config = await readPrivateBaselineJson(values.config) as NodeOpsConfig
       return await admitBaselineRecovery(directory, values.job, values.kind!, values.evidence,
-        { checkout: config.roles.evalbaseline!.checkout, pins: await captureBaselinePins(config, env) }, env)
+        { checkout: config.roles[baselineRole(manifest)]!.checkout, pins: await captureBaselinePins(config, env, baselineRole(manifest)) }, env)
     }
     if (command === "check") {
       const report = await checkBaseline(directory)
@@ -582,13 +596,14 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
     if (!["prepare", "start", "resume", "smoke"].includes(command ?? "")) throw new BaselineFailure("UNKNOWN_COMMAND")
     if (typeof values.config !== "string") throw new BaselineFailure("LIVE_CONFIGURATION_REQUIRED")
     const config = await readPrivateBaselineJson(values.config) as NodeOpsConfig
-    const role = config.roles.evalbaseline
+    const executorRole = command === "prepare" || command === "smoke" ? (values.role ?? "evalbaseline") as BaselineRole : baselineRole((await readBaseline(directory)).manifest)
+    const role = config.roles[executorRole]
     if (!role || !directory.startsWith(role.resultsRoot + path.sep) || await realpath(path.dirname(directory)) !== path.dirname(directory))
       throw new BaselineFailure("SERIES_PATH_REFUSED")
-    const pins = await captureBaselinePins(config, env)
+    const pins = await captureBaselinePins(config, env, executorRole)
     if (command === "prepare" || command === "smoke") {
       const manifest = await prepareBaseline(directory, { checkout: role.checkout, pins, smoke: command === "smoke", smokeCase: values.case, config,
-        acceptedNodeSmokeNoArtifact: values["accept-node-smoke-no-artifact"] })
+        executorRole, product: role.product, acceptedNodeSmokeNoArtifact: values["accept-node-smoke-no-artifact"] })
       if (command === "prepare") return { code: 0, status: "PREPARED", id: manifest.id, expected: manifest.jobs.length, cases: manifest.cases.length }
     }
     return await executeLiveBaseline(directory, config, env, pins, { issue: typeof values.issue === "string" ? values.issue : undefined,
@@ -611,7 +626,7 @@ async function executeLiveBaseline(directory: string, config: NodeOpsConfig, env
   if (manifest.kind === "smoke") {
     const previous = readiness.checks.find(check => check.caseKey === manifest.cases[0]!.key)
     if (previous?.admitted && previous.baselineId !== manifest.id) throw new BaselineFailure("SMOKE_ALREADY_ADMITTED")
-    if (!options.resume && options.issue !== config.roles.evalbaseline!.readinessIssue) throw new BaselineFailure("SMOKE_ADMISSION_REFUSED")
+    if (!options.resume && options.issue !== config.roles[baselineRole(manifest)]!.readinessIssue) throw new BaselineFailure("SMOKE_ADMISSION_REFUSED")
   }
   const handle = path.join(directory, "stand-handle.json")
   const lease = await (async () => {
@@ -622,7 +637,7 @@ async function executeLiveBaseline(directory: string, config: NodeOpsConfig, env
     }
     if (journal.jobs.some(job => job.state !== "pending")) throw new BaselineFailure("STAND_ADMISSION_MISSING")
     if (!options.issue || !options.task) throw new BaselineFailure("CARD_AND_TASK_REQUIRED")
-    const acquired = await acquireNodeStand(config, { issue: options.issue, task: options.task, role: "evalbaseline", phase: "eval", sha: pins.harnessSha })
+    const acquired = await acquireNodeStand(config, { issue: options.issue, task: options.task, role: baselineRole(manifest), phase: "eval", sha: pins.harnessSha })
     await writeFile(handle, JSON.stringify(acquired), { flag: "wx", mode: 0o600 })
     return acquired
   })()
@@ -650,7 +665,7 @@ async function executeLiveBaseline(directory: string, config: NodeOpsConfig, env
       const recovery = job.recoveries?.find(recovery => recovery.state === "admitted")
       if (job.state !== "pending" && !recovery) throw new BaselineFailure(job.state === "running" || job.recoveries?.some(recovery => recovery.state === "running") ? "UNKNOWN_OUTCOME" : "AWAITING_RECOVERY")
       await assertNodeStandOwner(config, lease)
-      const current = await captureBaselinePins(config, env)
+      const current = await captureBaselinePins(config, env, baselineRole(manifest))
       const record = await dispatchBaselineJob(directory, job.key, { checkout: journal.checkout, pins: current }, env, recovery?.id)
       await verifyBaselineStand(config, lease, directory)
       await settleBaselineHarness(config, lease, directory)
@@ -700,7 +715,7 @@ async function reconcileRunningBaseline(directory: string) {
 }
 
 async function settleBaselineHarness(config: NodeOpsConfig, lease: NodeStandLease, directory: string) {
-  const profile = config.roles.evalbaseline!.evalProfile
+  const profile = config.roles[lease.role]!.evalProfile
   if (!await lstat(`${profile}.harness-lease`).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error })) return
   const { verifyBaselineStand } = await import("./node-eval-ops")
   await verifyBaselineStand(config, lease, directory)
@@ -805,7 +820,7 @@ async function admitBaselineRecovery(directory: string, key: string, kind: strin
       const { verifyBaselineStand, preflightNodeStand } = await import("./node-eval-ops")
       await verifyBaselineStand(config, lease, directory)
       const receipt = await preflightNodeStand(config, lease, env, path.join(config.runtimeRoot, "operations/stand.lease", `baseline-recovery-${id}`))
-      if (JSON.stringify(await captureBaselinePins(config, env)) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
+      if (JSON.stringify(await captureBaselinePins(config, env, baselineRole(manifest))) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
       return { ...receipt, admissionProof: await readPrivateBaselineJson(receipt.admission), processProof: await readPrivateBaselineJson(receipt.processEvidence) }
     })() : null
     const evidencePath = path.join(recoveryDir, "admission.json")
@@ -845,7 +860,7 @@ export async function judgeBaselineRecovery(directory: string, key: string, id: 
     throw new BaselineFailure("CORPUS_CHANGED")
   if (manifest.pins.mode === "live") {
     const config = await readPrivateBaselineJson(path.join(directory, "ops-config.json")) as NodeOpsConfig
-    if (JSON.stringify(await captureBaselinePins(config, env)) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
+    if (JSON.stringify(await captureBaselinePins(config, env, baselineRole(manifest))) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
   }
   if (manifest.pins.mode === "fixture" && (env.EVAL_BASELINE_FIXTURE !== "1" || env.EVAL_CLI_MODE !== "fake" ||
     !env.EVAL_JUDGE_COMMAND?.split(" ").includes(path.join(journal.checkout, "evals/fixtures/fake-codex.ts")))) throw new BaselineFailure("FIXTURE_JUDGE_REQUIRED")
@@ -1056,7 +1071,7 @@ async function exportBaselineReport(directory: string, reportDir: string, report
   const secrets = [env.LOGINOM_PASSWORD, env.LOGINOM_DOCK_API_KEY, env.EVAL_AGENT_PROVIDER_API_KEY].filter((value): value is string => Boolean(value && value.length > 3))
   if (report.manifest.pins.mode === "live") {
     const config = await readPrivateBaselineJson(path.join(directory, "ops-config.json")) as NodeOpsConfig
-    const auth = await readPrivateBaselineJson(path.join(config.roles.evalbaseline!.evalProfile, "data/auth.json")) as { openai?: { access?: string; refresh?: string } }
+    const auth = await readPrivateBaselineJson(path.join(config.roles[baselineRole(report.manifest)]!.evalProfile, "data/auth.json")) as { openai?: { access?: string; refresh?: string } }
     secrets.push(...[auth.openai?.access, auth.openai?.refresh].filter((value): value is string => Boolean(value)))
   }
   const selected: { source: string; target: string }[] = [
@@ -1126,8 +1141,10 @@ async function readBaseline(directory: string) {
   const raw = await Bun.file(path.join(directory, "manifest.json")).text()
   const manifest = JSON.parse(raw) as BaselineManifest
   const journal = await Bun.file(path.join(directory, "journal.json")).json() as BaselineJournal
-  if (manifest.version !== 1 || manifest.infraRetries !== (manifest.kind === "smoke" ? 0 : 1) || journal.version !== 1 || journal.manifestSha256 !== baselineHash(raw) ||
+  if (![1, 2].includes(manifest.version) || manifest.version === 1 && manifest.executorRole !== undefined ||
+    manifest.version === 2 && manifest.executorRole !== "evalrunner" || manifest.infraRetries !== (manifest.kind === "smoke" ? 0 : 1) || journal.version !== 1 || journal.manifestSha256 !== baselineHash(raw) ||
     JSON.stringify(journal.jobs.map(job => job.key)) !== JSON.stringify(manifest.jobs.map(job => job.key))) throw new BaselineFailure("MANIFEST_CHANGED")
+  validatePins(manifest.pins, baselineRole(manifest), manifest.product)
   return { manifest, journal }
 }
 
@@ -1164,10 +1181,16 @@ async function snapshotDirectory(directory: string, relative = ""): Promise<{ pa
   return files
 }
 
-function validatePins(pins: BaselinePins) {
+export const baselineRole = (manifest: BaselineManifest): BaselineRole => manifest.version === 1 ? "evalbaseline" : manifest.executorRole!
+
+function validatePins(pins: BaselinePins, role: BaselineRole = "evalbaseline", product?: EvalProductPins) {
   if (!["live", "fixture"].includes(pins.mode) || ![pins.harnessSha, pins.corpusSha, pins.cliSource].every(value => /^[0-9a-f]{40}$/.test(value)) ||
     ![pins.cliManifestSha256, pins.binarySha256, pins.promptSha256, pins.schemaSha256, pins.opsConfigSha256, pins.isolationSha256].every(value => /^[0-9a-f]{64}$/.test(value)) ||
-    pins.model !== "openai/gpt-6.1-sol" || pins.variant !== "medium" || pins.judgeModel !== "gpt-6-astra" || pins.judgeReasoning !== "high" ||
-    pins.cliVersion !== "0.1.17" || pins.cliSource !== "fc3d97dbf695c2ed8dba942feb6fe83591a33944" || pins.threshold !== 70 ||
+    pins.judgeModel !== "gpt-6-astra" || pins.judgeReasoning !== "high" || pins.threshold !== 70 ||
     pins.timeoutMs !== 1_800_000 || pins.judgeTimeoutMs !== 300_000) throw new BaselineFailure("INVALID_PINS")
+  if (role === "evalbaseline" && (pins.model !== "openai/gpt-6.1-sol" || pins.variant !== "medium" || pins.cliVersion !== "0.1.17" ||
+    pins.cliSource !== "fc3d97dbf695c2ed8dba942feb6fe83591a33944")) throw new BaselineFailure("INVALID_PINS")
+  if (role === "evalrunner" && (!product || !product.version || !product.model || !product.variant ||
+    pins.cliVersion !== product.version || pins.cliSource !== product.source || pins.cliManifestSha256 !== product.manifestSha256 ||
+    pins.binarySha256 !== product.binarySha256 || pins.model !== product.model || pins.variant !== product.variant)) throw new BaselineFailure("PRODUCT_PINS_CHANGED")
 }
