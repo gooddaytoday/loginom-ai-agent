@@ -394,3 +394,15 @@ Snapshot `formal-v7-progress-18-20261009.json`:18 terminal,12 PASS/6 FAIL,
 13 сохранённых пакетов, environment/process cleanup confirmed18;
 common SHA совпадает, controller81639 live. Baseline ещё27/candidate45/
 formal cold/compare pending; manual retries0.
+
+## Formal v7: девятнадцатая попытка
+
+Campaign-roi-by-channel#2 completed/score100/pass=true/oracle=true,405733ms.
+Структура/warm oracle отдельно PASS, cold request/plan сохранены.
+Environment cleanup6 stages и process cleanup confirmed, оба owned_remaining=0,
+cleanup_error отсутствует. History4612entries/17613386archive bytes и
+diagnostics3entries/5645544bytes сохранены с full roundtrip.
+Snapshot `formal-v7-progress-19-20261009.json`:19 terminal,13 PASS/6 FAIL,
+14 сохранённых пакетов, environment/process cleanup confirmed19;
+common SHA совпадает, controller81639 live. Baseline ещё26/candidate45/
+formal cold/compare pending; manual retries0.
