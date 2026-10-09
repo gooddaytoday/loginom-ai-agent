@@ -49,3 +49,54 @@ Bridge явно закрывает пакет и выполняет logout то�
 вызовов и изменений продукта0. В следующей native проверке не подставлять
 acceptance-only cleanup вместо штатного завершения первого CLI-хода — это
 могло бы скрыть исследуемое поведение.
+
+## Минимальная локальная проверка штатного CLI49 close
+
+Новый own пакет `/user/skills-shutdown-lock-d48e-20261009.lgp` создан
+из пустого draft, сохранён через `package.save_checkpoint`; испытуемый
+installed CLI49 и ресурсы не менялись. Первый CLI завершён штатно, второй
+CLI с тем же own profile открывает этот путь. Обоим exit0/guarded=false,
+дочерних процессов0. Second prepare содержит native navigation label
+«только чтение». Ошибка воспроизвелась без узлов/вычислений/живой модели.
+
+Prepare выставляет `ownership_verified` только для intent `new_draft`.
+Поэтому false при `open_package` не является самостоятельным доказательством
+readonly; в этой проверке доказательство — фактическая native пометка.
+Штатное закрытие server package/logout по-прежнему UNVERIFIED.
+ID конкретной retained серверной сессии/исторического writer не прочитан.
+
+Private `cli-normal-shutdown-observation-20261009`, readback12files SHA
+`1db17497827532580fd07231a52648dede044e10864b79c69a1a288cfb3898a9`.
+Физический пустой `.lgp`5070bytes также сохранён отдельно.
+Source CLI binary SHA неизменен; собственный server/client ID и исходные
+server/client ID/StartedAt проверены. Server reset, foreign locks, old
+raw incomplete v9 profiles и acceptance-only cleanup здесь не применялись.
+
+## Контроль с подтверждённым native закрытием
+
+Отдельный own пустой пакет `/user/skills-shutdown-control-d48e-20261009.lgp`
+создан тем же installed runtime49 через публичный private supervisor.
+В этом **диагностическом контроле**, а не product CLI, использован существующий
+acceptance-only `acceptanceCleanupPackage`: exact clean package close/logout
+SUCCEEDED, discard=false. Новый независимый браузер открыл тот же путь
+с native `ReadOnly=false/running=false`, затем exact own view close/logout
+SUCCEEDED, discard=false/remaining0. Model/judge calls0; сервер не сбрасывался.
+
+Readback13files SHA
+`fcd7dedb0e89a09e99ac472cb5a8d3b9e2896dd6eb844a553e7b86976c1abde0`,
+private `native-shutdown-explicit-control-20261009`. Первый запуск driver под
+Bun был отклонён до native dispatch: `verifyResources` требует реальную
+pinned Node version. Этот PREFLIGHT_REJECTED сохранён отдельно; валидный
+контроль выполнен собранным Node driver под установленным Node24.19.0.
+Validator и runtime не менялись.
+
+Наблюдения подтверждают различие между процессным завершением и server
+package release для минимального сохранённого пакета. Они не доказывают,
+что устранение этого различия закроет также active-source/unknown-workflow
+ошибки прежних model-driven modify3. Эти кейсы потребуют новой приёмки.
+
+[Справка Loginom](https://help.loginom.ru/userguide/admin/parameters/connection-parameters.html)
+описывает удержание сессии после разрыва связи и возможные блокировки при
+отключённой проверке соединения. Настройки данного сервера не выводятся из
+значений документации по умолчанию. Минимальный дизайн product исправления:
+[закрытие чистого сохранённого пакета](../../../superpowers/specs/2026-10-09-clean-saved-package-shutdown.md).
