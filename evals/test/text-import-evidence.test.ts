@@ -5,6 +5,7 @@ import { cp, mkdtemp, rm } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
 import { validateNodeAttempt } from "../src/node-evals"
 import { collectTextImportEvidence } from "../src/text-import"
+import { prepareTextImportCold } from "../src/text-import-cold"
 
 async function rejectionFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "text-import-refusal-"))
@@ -225,5 +226,21 @@ with zipfile.ZipFile(p/'package.lgp','w') as z:z.writestr('Unit_1/Unit.xml',data
     f.output.execution.execution_id = "first"; f.output.output.execution_id = "first"; f.port.execution_id = "first"
     await f.write()
     expect((await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).failures.join(" ")).toContain("fresh")
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("cold preparation binds the exact saved package and independent typed expectations without running Loginom", async () => {
+  const f = await positiveFixture()
+  try {
+    const dir = path.join(f.root, "cold")
+    await prepareTextImportCold(f.task, f.attempt, dir, "/eval/result.lgp")
+    const expected = await Bun.file(path.join(dir, "expected.json")).json()
+    expect(expected).toMatchObject({ case_id: "txt-comma-utf8", row_count: 3 })
+    expect(expected.expected_rows[0][0]).toBe("0001")
+    expect(await Bun.file(path.join(dir, "saved.json")).json()).toEqual({ path: "/eval/result.lgp" })
+    const manifest = await Bun.file(path.join(dir, "preparation.json")).json()
+    expect(manifest).toMatchObject({ runtime: "NOT_RUN", events_path: path.join(f.attempt, "events.jsonl") })
+    expect(manifest.package_sha256).toBe(new Bun.CryptoHasher("sha256").update(await Bun.file(path.join(f.attempt, "artifact/package.lgp")).bytes()).digest("hex"))
+    await expect(prepareTextImportCold(f.task, f.attempt, dir, "/eval/result.lgp")).rejects.toThrow()
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
