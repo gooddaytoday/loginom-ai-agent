@@ -1022,119 +1022,45 @@ Core имеет разметку осей, но без CSV oracle. По доку
   пометить пару несопоставимой и не делать вывод о регрессии. Сохранить старые
   результаты отдельно; после повторной фиксации условий выполнить новую пару
   теми же сохранёнными CLI, а не только повторить одну сторону.
-  V5 обе smoke стороны:judge100/structure/warm oracle/common cold/native cleanup
-  PASS; `ab-smoke-v5-pair-accepted-20261008/review.json`. Формальная baseline v5
-  остановлена на13/45 с process cleanup FAIL; candidate не запускался,
-  90 попыток/compare не завершены. Эти результаты сохраняются отдельно.
-  Для новой пары v6 frozen harness `b4661a7b68fbad21726bd4d922a8c659165f8b11`:
-  clean suite481 PASS/2 SKIP/0 FAIL/typecheck PASS, protected diff0 против
-  свежего evals refb31ebe7d0. Common `ab-conditions-inspection-20261008/common.json`
-  SHA256 `c07c876e618383b6428beb24f16819aba80c5c68f92d4c22a2f0dfb7564c4dd0`.
-  Те же baseline/candidate inventories и281 task files проверены. Baseline smoke
-  v6 baseline run204506 и candidate run205411:
-  judge100/structure/warm oracle/cold/native cleanup PASS,
-  package/input bytes unchanged; `ab-smoke-v6-pair-accepted-20261008/review.json`.
-  Formal v6 отказал в management preflight:ENOENT `.writer`, attempts0;
-  результаты и отказ сохранены. В own mutable harness выполнен real-IO
-  RED→GREEN для release после открытия owner:mutable `495463543`,
-  3 guards×5 PASS/modules77 PASS/typecheck PASS; clean full495484 PASS/2 SKIP/0 FAIL.
-  Первый full495 отказал при cwd640MiB<1GiB и сохранён отдельно; порог не менялся.
-  Создан новый frozen skills-evals-release на полном SHA
-  `495463543901f1a69888b8d6375cd77996ef157b`, frozen typecheck PASS.
-  Conditions `ab-conditions-release-20261009/common.json` SHA256
-  `a268a81e8b4ea163f50ac52ee99817559b3fab9a08ffc09652dc96c00fcd2ed4`;
-  inventories/658 harness/281 tasks/21 pins PASS, protected diff0 против
-  fresh evalsref992fca12badf209169f13b569b9bd291e4d70e99 при freeze.
-  Baseline v7 run214239 завершён exit0/score100/oracle/structure/installed cold
-  PASS, close/logout/remaining0/bytes unchanged; baseline accepted receipt сохранён.
-  Candidate v7 run215120:score100/oracle/structure/installed cold PASS,
-  cleanup confirmed. Pair receipt `ab-smoke-v7-pair-accepted-20261009/review.json`;
-  frozen/21pins/оба full CLI/external after проверены повторно; fresh refb30dcbe5f,
-  protected diff0. Activation+1 provider-turn/skill1 PASS; total turns16/18
-  и tools17/20 измерены отдельно, Loginom13/13/errors0. Formal v7 baseline
-  session81639/run220203 прерван terminal143:19 closed (13 PASS/6 FAIL),
-  cohort#2 INCOMPLETE без terminal files. Child exit0 receipt не заменяет
-  результат или cleanup. Все19 result/cleanup/process-cleanup SHA проверены,
-  raw profile/leases20 сохранены. Свои controller/launcher/sandbox PID отсутствуют,
-  исходные server/client продолжают работать. Candidate/cold/compare не начаты.
-  Локальные диагностические последовательности50 завершений cleanup PASS,
-  зависание не воспроизведено. Own harness d08be6baf сохраняет промежуточную
-  phase evidence через TDD; modules29 PASS/typecheck PASS/full486 PASS/2 SKIP/0 FAIL.
-  Это улучшение диагностики, причина native hang остаётся UNKNOWN.
-  До новой live пары проверить условия локального стенда и сохранить новый
-  frozen SHA/manifest; после изменения harness заново обе smoke стороны
-  и полный90. Диагностическую phase запись не считать подтверждением cleanup.
-  Новый frozen d08 на own storage создан/install/typecheck PASS/clean. V8 отказал
-  в storage preflight до0 задач: один наш cohort CSV сохранён и exact-SHA удалён,
-  raw profiles сохранены. V9 conditions storage-clean/SHA020c08059… закрепляют
-  те же658/281/21 pins и оба CLI. Baseline smoke79154 terminal0/score100,
-  structure/warm/cold24704 PASS, close/logout/remaining0/bytes unchanged;
-  baseline accepted receipt сохранён. Candidate smoke80478/cold20548 terminal0,
-  score100/structure/warm/cold/cleanup PASS. Pair accepted94fea2d339…; frozen658,
-  task281, adapters21, оба полных CLI и fresh external после пары повторно PASS.
-  Activation+1 turn/skill1 PASS, provider finishes18/18, tools17/20/Loginom13/14
-  измерены отдельно. Formal baseline60189/run021118 запущен:45 scheduled,
-  candidate formal/cold/compare ещё не начаты; полный90 пока не принят.
-  Первый formal closed ab-revenue-per-converter#1 PASS100: structure/warm,
-  все6 cleanup stages/remaining0×2; закрытые history/diagnostics сохранены
-  с full roundtrip. Второй closed abc#1 PASS100/structure/warm/6 stages/
-  remaining0×2, history+diagnostics full roundtrip. Progress2 SHAe8dc4fedbe…;
-  Третий closed articles#1 PASS100/structure/warm/6 stages/remaining0×2;
-  history+diagnostics full roundtrip. Progress3 SHAe0fd71b357…;
-  Четвёртый closed campaign#1 PASS100/structure/warm/6 stages/remaining0×2,
-  history+diagnostics full roundtrip. Progress4 SHAd4ae57bc21…;
-  Пятый closed cohort#1 no_artifact FAIL0/judge0/4 tool errors: output mapping
-  AMBIGUOUS/OUTPUT_MAPPING_RECOVERY_UNVERIFIED. Пакета нет, structure/warm/cold
-  не выполнялись; cleanup6 stages/remaining0×2/history+diag roundtrip PASS
-  не доказывают semantic recovery. Progress5 SHA651b01e174…;
-  Шестой closed customer#1 PASS100/structure/warm/cleanup6/remaining0×2,
-  history+diag full roundtrip. Progress6 SHAb06e790893…;
-  first-last#1 running, closed6/45/PASS5/FAIL1, candidate/cold/compare0/retries0.
-  Cohort read-only разбор SHAfcc694fe0f… уточнил calc-cohort/output_mapping:
-  step69,47 SUCCEEDED reads/15s, unverified_definition_page. Native root cause
-  остаётся UNKNOWN; deadline/recovery guards и frozen builds не изменялись.
-  Седьмой closed first-last#1 no_artifact FAIL0/judge0/4 tool errors:
-  join-metrics/input_mapping, Done readiness timeout, resume rejected.
-  Cleanup6/remaining0×2/history+diag roundtrip PASS не означает recovery PASS.
-  Progress7 SHA31b83e6101…; low-liquidity#1 running, closed7/45/PASS5/FAIL2,
-  candidate/cold/compare0/retries0. Отказы не исключаются из итоговой серии.
-  Восьмой closed low-liquidity#1 no_artifact FAIL0/judge0/8 errors: filter label
-  rejected/effect false/cleanup true, затем sort/output_mapping readiness timeout.
-  Cleanup6/remaining0×2/history+diag full roundtrip; recovery не подтверждена.
-  Progress8 SHA3355d82607…; monthly#1 running, closed8/45/PASS5/FAIL3,
-  candidate/cold/compare0/retries0. Native root cause UNKNOWN, критерий не снижен.
-  Девятый closed monthly#1 PASS100/structure/warm/cleanup6/remaining0×2,
-  history+diag full roundtrip. Progress9 SHAbd3dfd6fad…;
-  Десятый closed NPS#1 PASS100/structure/warm/6 stages/remaining0×2;
-  history4605/16613250bytes+diag3/4745354bytes full roundtrip. Единственный
-  node label REQUEST_REJECTED/NOT_APPLIED сохранён; trace/result counters match.
-  Progress10 SHA2066b2870a…/metrics a4b85716bc…; risky-approved-claims#1 running,
-  Одиннадцатый closed risky#1 PASS100/structure/warm/6 stages/remaining0×2;
-  history4531/16301844bytes+diag3/4666374bytes full roundtrip. Node label
-  REQUEST_REJECTED/NOT_APPLIED1 сохранён, trace/result counters match.
-  Progress11 SHAe5e85ebe77…/metrics7b2ffa3dfe…; sales-by-category#1 running,
-  Двенадцатый closed sales#1 PASS100/structure/warm/6 stages/remaining0×2;
-  history4507/15561728bytes+diag3/4000100bytes full roundtrip, errors0.
-  Progress12 SHA33fb9504d7…/metrics936a788901…; slow-supplier-deliveries#1 running,
-  Тринадцатый closed slow-supplier#1 PASS100/structure/warm/6 stages/remaining0×2;
-  history4618/17032000bytes+diag3/5128503bytes full roundtrip, errors0.
-  Это не воспроизведение и не установление причины historical v5 cleanup FAIL.
-  Progress13 SHA9a8189ce9a…/metrics99949cd70d…; support-by-priority#1 running,
-  Четырнадцатый closed support#1 PASS100/structure/warm/6 stages/remaining0×2;
-  history4622/17776466bytes+diag3/5863398bytes full roundtrip, errors0.
-  Progress14 SHA137eab28fc…/metricsf2c3a2c653…; trial-dosage-outcomes#1 running,
-  Пятнадцатый closed trial#1 PASS100/structure/warm/6 stages/remaining0×2;
-  history4606/16932603bytes+diag3/5046893bytes full roundtrip, errors0.
-  Первый повтор15 завершён:12 PASS100/3 no_artifact FAIL0. Cold index15
-  SHA25f7fe5287… подтверждает12 packages/request/input SHA;21 adapter pins PASS.
-  Progress15 SHA346ceeefe6…/metricscf14c23a5b…; ab-revenue#2 running,
-  closed15/45/PASS12/FAIL3, candidate/cold/compare0/retries0.
-  Первый повтор не заменяет baseline45/candidate45, cold и compare.
-  Частичный v7 не подставлять
-  как полный baseline и не повторять выборочно только неуспешные попытки.
-  После обеих новых smoke сторон необходим полный набор90; перед приёмкой
-  повторно проверить актуальный ref и условия. Старые v3–v6 не подставляются
-  в новую пару. Подробнее: `reports/2026-10-09-package-docs-writer-release.md`.
+
+  **Текущая серия v9, checkpoint 15 (2026-10-09):** frozen harness
+  `d08be6baf8f5aea53f83c228cd0984c9d2bf0494`, source-only полный suite
+  486 PASS/2 SKIP/0 FAIL, install/typecheck PASS. Общие условия:
+  `ab-conditions-storage-clean-20261009/common.json`, SHA256
+  `020c08059d809d417e03b977911407c570a51b8861cc3eeb21786c4fce1b162a`.
+  Зафиксированы 658 файлов harness, 281 файл задач, 21 adapter pin и полные
+  inventories обеих сохранённых CLI; внешние условия после smoke совпали.
+  Последний проверенный evals ref `b30dcbe5f`: protected diff0.
+  Перед живой приёмкой сверить актуальный ref заново; дерево не обновлять
+  автоматически. При изменении harness заново принять обе smoke стороны
+  и полный набор90 на новых общих условиях.
+
+  Smoke обеих сборок принят: judge100/structure/warm oracle/installed cold,
+  close/logout/remaining0 и неизменность package/input bytes. Pair receipt:
+  `ab-smoke-v9-pair-accepted-20261009/review.json`, SHA94fea2d339….
+  Дополнительная активация candidate:1 provider-turn/1 skill-вызов;
+  прочий рост tools/Loginom измерен отдельно и не разрешает новые отказы.
+  Formal baseline session60189/run20261009-021118-d08be6baf продолжается:
+  первый повтор15 завершён,12 PASS100/3 no_artifact FAIL0
+  (cohort/first-last/low-liquidity). Всем15 подтверждены6 cleanup stages,
+  process cleanup/error null/remaining0×2, history/diagnostics full roundtrip;
+  semantic recovery этим не доказывается, native root causes UNKNOWN.
+  Для12 пакетов structure/warm oracle PASS. Progress15 SHA346ceeefe6…,
+  metrics15 SHAcf14c23a5b…, первый cold index15 SHA25f7fe5287… подтверждает
+  request/package/input SHA. Второй повтор выполняется, candidate formal,
+  formal cold и compare не начаты. Ручных повторов0; первый повтор не заменяет
+  baseline45/candidate45, cold каждого сохранённого пакета и итоговый compare.
+
+  Исторические серии сохраняются отдельно: v5 formal process cleanup FAIL
+  на13/45; v6 preflight `.writer` ENOENT до0 задач; v7 formal terminal143,
+  19 closed и cohort#2 INCOMPLETE; v8 storage preflight отказал до0 задач.
+  Raw failed-cleanup/incomplete profiles и leases сохранены. Диагностика через
+  process-progress.jsonl не подтверждает cleanup и не устанавливает причину
+  прежнего native hang. Исторические/частичные серии не подставлять в текущую
+  пару; провалы не исключать и не повторять выборочно. Хронология, TDD,
+  manifests, receipts и результаты каждой попытки сохранены в
+  [отчёте приёмки](../../testing/loginom-ai-agent/reports/2026-10-09-package-docs-writer-release.md)
+  и [checkpoint реализации](../../testing/loginom-ai-agent/package-docs-implementation.md).
 - [ ] Сначала прогнать небольшой представительный smoke (импорт, преобразование,
   соединение/агрегация, сохранение) из заранее выбранных задач,
   затем весь выбранный набор из 12–15 задач с тремя повторами для каждой сборки.
