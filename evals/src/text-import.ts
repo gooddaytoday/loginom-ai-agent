@@ -2,9 +2,17 @@ import path from "node:path"
 import { readdir, realpath } from "node:fs/promises"
 import cases from "./text-import-cases.json"
 import { evalsRoot } from "./config"
+import type { EvalConfig } from "./config"
 
 export const textImportIds = cases.groups.flatMap(group => group.ids)
 export const textImportChecks = ["input", "import", "graph", "sequence", "result", "diagnostic"]
+
+export function assertTextImportModel(config: EvalConfig) {
+  if (config.agent.cliMode === "fake") return
+  if (config.agent.model !== "openai/gpt-6-luna" || config.agent.variant !== "high" ||
+    config.agent.provider && config.agent.provider.modelId !== "gpt-6-luna")
+    throw Error("text import requires openai/gpt-6-luna/high; Multica agent models stay unchanged")
+}
 
 export async function validateTextImportAttempt(taskDir: string, attemptDir: string, packagePath?: string) {
   const child = Bun.spawn(["python3", path.join(evalsRoot, "script/check-text-import.py"),

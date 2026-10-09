@@ -17,7 +17,7 @@ async function main() {
   const { preflight } = await import(path.join(repo, "evals/src/preflight.ts")) as typeof import("../../../src/preflight")
   const { acquireRunHarnessLease } = await import(path.join(repo, "evals/src/node-eval-ops.ts")) as typeof import("../../../src/node-eval-ops")
   const { coverageCaseIds } = await import(path.join(repo, "evals/src/node-cases.ts")) as typeof import("../../../src/node-cases")
-  const { textImportIds, collectTextImportEvidence } = await import(path.join(repo, "evals/src/text-import.ts")) as typeof import("../../../src/text-import")
+  const { textImportIds, collectTextImportEvidence, assertTextImportModel } = await import(path.join(repo, "evals/src/text-import.ts")) as typeof import("../../../src/text-import")
   const { assertAuth, assertProfileClean, agentConfigJson } = await import(path.join(repo, "evals/src/profile.ts")) as typeof import("../../../src/profile")
   const dir = path.resolve(draft)
   const raw = await Bun.file(path.join(dir, "task.json")).json()
@@ -37,6 +37,7 @@ async function main() {
     oracleTolerance: raw.oracle_tolerance ?? 0.01 }
   if (hint) task.prompt += `\n\n${await Bun.file(hint).text()}`
   const config = loadConfig(["--skip-judge", "--repeat", "1", "--timeout-ms", process.env.EVAL_TASK_TIMEOUT_MS!], process.env)
+  if (textImportIds.includes(task.id)) assertTextImportModel(config)
   const runId = `reference-${task.id}-${number}`
   await mkdir(config.resultsDir, { recursive: true, mode: 0o700 })
   const runDir = path.join(config.resultsDir, runId)
