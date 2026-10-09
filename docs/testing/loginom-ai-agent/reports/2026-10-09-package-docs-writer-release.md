@@ -685,6 +685,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | slow-supplier-deliveries | 1 | PASS100 | Есть / PASS | 22 / 22 / 18 | 4618 / 17032000 | 3 / 5128503 |
 | slow-supplier-deliveries | 2 | PASS100 | Есть / PASS | 23 / 23 / 19 | 4618 / 17032433 | 3 / 5127753 |
 | support-by-priority | 1 | PASS100 | Есть / PASS | 24 / 23 / 19 | 4622 / 17776466 | 3 / 5863398 |
+| support-by-priority | 2 | FAIL0/no_artifact | Нет / не выполнялись | 20 / 21 / 19 | 4578 / 15761243 | 3 / 3906956 |
 | trial-dosage-outcomes | 1 | PASS100 | Есть / PASS | 20 / 21 / 17 | 4606 / 16932603 | 3 / 5046893 |
 
 Последний private snapshot `formal-v9-progress-9-20261009.json` SHA256
@@ -1195,3 +1196,24 @@ Progress28 SHA `5ab97a0490aef8b3362e78df36ac61b51a7e56a9d56b833a814c74359f63e213
 metrics28 SHA `24d5c023b7848070ae56736578e59f9dd22162c3eb9e6bdf6d99e689317ec297`.
 Common020c08059…/controller identity совпали. Closed28/45:21 PASS100/7 FAIL0,
 support#2 running; candidate/cold/compare0/retries0, полный90 не принят.
+
+Двадцать девятый closed formal v9 `support-by-priority#2` no_artifact FAIL0:
+package_not_created, CLI exit0, timeout/interrupted=false, judge_attempts0;
+structure/warm/cold не выполнялись. Output_mapping readiness полного output
+definition page at0 не подтверждена: AMBIGUOUS/NODE_APPLY_STOPPED,
+effectPossible=true/cleanupComplete=false. Resume отказал REQUEST_REJECTED,
+cancel сохраняет AMBIGUOUS. Recover/inspect — plain text2645/2621bytes, SHA256
+`4f00c67fbc9e2bb3105b56665c9a0967b46da3293788d1ff39536138fede2898` и
+`ff10fe985adedcbfafa4b7edf269a7d58be058ebc86272b1c8c61b4be325bd63`.
+В тексте наблюдаются REQUEST_REJECTED/AMBIGUOUS/NODE_APPLY_STOPPED;
+structured semantics для него не выведены. Native cause/recovery UNKNOWN.
+Первый повтор PASS100 не подменяет второй FAIL; выборочного retry не было.
+Все6 cleanup stages/processes confirmed/error null/remaining0×2;
+history/diagnostics full roundtrip (объёмы в таблице).
+Trace/result counters match:20 finishes/21 tools/19 Loginom/skill0/prepare1/errors5.
+Все29 results/cleanup/process-cleanup/архивы, предыдущие28 trace SHA и
+reviews21/cold indexes15+24/batch8 receipts повторно проверены.
+Progress29 SHA `b1a1d22792aa8b634d5203dec5199f23788422d52672059808c5f9f12206a2ba`;
+metrics29 SHA `627be3080ab086e92942123a82add56b945ccf5df84d200da094167cd655d4d0`.
+Common020c08059…/controller identity совпали. Closed29/45:21 PASS100/8 FAIL0,
+trial#2 running; candidate/cold/compare0/retries0, полный90 не принят.
