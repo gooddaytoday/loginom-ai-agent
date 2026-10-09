@@ -5,12 +5,15 @@ import {join} from 'node:path';
 import {homedir, tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {Diagnostics, navigate, refresh, errorDetails} from '../scripts/account-ui.mjs';
 import {requireFiniteCleanup, verifyPairBindings} from '../scripts/qualify-accounts.mjs';
+import {runAccountLifecycle, verifyFinalReadback, readFinalServerInventory, accountPolicy} from '../scripts/account-lifecycle.mjs';
 
 const operator = JSON.parse(readFileSync(join(homedir(), '.config/loginom-multica/operator.json'), 'utf8'));
 const {chromium} = await import(operator.playwright_module);
 const fixture = readFileSync(new URL('../fixtures/navigation.html', import.meta.url), 'utf8');
+const lifecycleFixture = readFileSync(new URL('../fixtures/lifecycle.html', import.meta.url), 'utf8');
 const temporary = mkdtempSync(join(tmpdir(), 'lab53-offline-'));
 let browser;
 const requests = [];
@@ -283,4 +286,133 @@ test('pair binding rejects same identity, different stand and provider auth', ()
   const provider = structuredClone(configs);
   provider[0].provider_auth_files = [];
   assert.throws(() => verifyPairBindings(provider, operator), {code: 'PAIR_BINDING_MISMATCH'});
+});
+
+const syntheticHash = value => createHash('sha256').update(value).digest('hex');
+async function lifecycleCase(page, diagnostics, changes = {}) {
+  const operatorFile = '/private/synthetic-operator.json';
+  const operator = {admin_user: 'synthetic-admin', url: 'https://fixture.invalid', agents: {worker: 'w', reviewer: 'r'}, workspace_id: 'fixture'};
+  const configs = ['worker', 'reviewer'].map(role => ({role, stage: 'stage0', agent_id: operator.agents[role],
+    workspace_id: operator.workspace_id, issue_id: 'synthetic-issue', operator_file: operatorFile,
+    loginom: {url: operator.url, username: 'synthetic-' + role}}));
+  const identity = {username: configs[0].loginom.username, user_hash: syntheticHash(configs[0].loginom.username),
+    guid_hash: syntheticHash('synthetic-owned-guid'), session_id: 41, create_time: '2026-10-09T00:00:00Z',
+    stand: operator.url, mst_self_count: 1, connected: true, ...changes.identity};
+  await page.evaluate(({html, identity, rights}) => {
+    document.body.insertAdjacentHTML('beforeend', html);
+    document.querySelector('#synthetic-identity').textContent = JSON.stringify(identity);
+    document.querySelector('#synthetic-rights').textContent = JSON.stringify(rights);
+  }, {html: lifecycleFixture, identity, rights: {...accountPolicy, effective: true, ...changes.rights}});
+  const actions = [];
+  const adapter = {
+    recordEffect: async config => {
+      actions.push('record-effect');
+      await page.locator('#synthetic-effect').evaluate(element => element.textContent = 'UNKNOWN');
+      return {state: changes.effect ?? 'UNKNOWN', issue_id: config.issue_id};
+    },
+    provision: async () => {
+      actions.push('provision');
+      assert.equal(await page.locator('#synthetic-effect').textContent(), 'UNKNOWN');
+      await navigate(page, 'Пользователи', diagnostics);
+    },
+    login: async () => { actions.push('login'); await page.locator('#synthetic-login').click(); },
+    identity: async () => { actions.push('identity'); return JSON.parse(await page.locator('#synthetic-identity').textContent()); },
+    rights: async () => { actions.push('rights'); return JSON.parse(await page.locator('#synthetic-rights').textContent()); },
+    logout: async () => {
+      actions.push('logout');
+      await page.locator('#synthetic-logout').click();
+      return {ui_logout_invoked: true, transport_disconnected: changes.logout ??
+        ((await page.locator('#synthetic-connected').textContent()) === 'false'), guid_hash: identity.guid_hash};
+    },
+  };
+  return {options: {config: configs[0], configs, operator, operatorFile, diagnostics, adapter}, actions};
+}
+
+test('connected offline lifecycle records effect, verifies pair/identity/rights and logs out before pending cleanup', () => withPage([{}], async (page, diagnostics) => {
+  const fixture = await lifecycleCase(page, diagnostics);
+  const result = await runAccountLifecycle(fixture.options);
+  assert.deepEqual(fixture.actions, ['record-effect', 'provision', 'login', 'identity', 'rights', 'logout']);
+  assert.equal(result.status, 'UI_QUALIFIED_CLEANUP_PENDING');
+  assert.equal(result.state, 'UNKNOWN');
+  assert.equal(result.ready, false);
+  assert.equal(await page.locator('#synthetic-connected').textContent(), 'false');
+  await assert.rejects(readFinalServerInventory(), {code: 'FINAL_SERVER_READBACK_NOT_IMPLEMENTED'});
+}));
+
+for (const [label, rights] of [['admin', {chkAdmin: true}], ['viewer', {chkViewer: false}],
+  ['missing effective policy', {chkSchedulerFullAccess: undefined}], ['unconfirmed', {effective: false}]]) {
+  test(`lifecycle rejects incomplete rights ${label} and still attempts own logout`, () => withPage([{}], async (page, diagnostics) => {
+    const fixture = await lifecycleCase(page, diagnostics, {rights});
+    await assert.rejects(runAccountLifecycle(fixture.options), {code: 'ACCOUNT_RIGHTS_UNCONFIRMED'});
+    assert.equal(fixture.actions.at(-1), 'logout');
+    assert.equal(await page.locator('#synthetic-connected').textContent(), 'false');
+    const snapshot = JSON.parse(readFileSync(diagnostics.path));
+    assert.equal(snapshot.events.at(-1).error.code, 'ACCOUNT_RIGHTS_UNCONFIRMED');
+  }));
+}
+for (const [label, identity] of [['wrong account', {username: 'foreign'}], ['nonunique self', {mst_self_count: 2}],
+  ['missing GUID', {guid_hash: null}], ['wrong stand', {stand: 'https://foreign.invalid'}]]) {
+  test(`lifecycle rejects incomplete identity ${label}`, () => withPage([{}], async (page, diagnostics) => {
+    const fixture = await lifecycleCase(page, diagnostics, {identity});
+    await assert.rejects(runAccountLifecycle(fixture.options), {code: 'ACCOUNT_IDENTITY_UNCONFIRMED'});
+    assert.ok(!fixture.actions.includes('rights'));
+    assert.equal(fixture.actions.at(-1), 'logout');
+  }));
+}
+test('lifecycle rejects incomplete logout and does not declare ready', () => withPage([{}], async (page, diagnostics) => {
+  const fixture = await lifecycleCase(page, diagnostics, {logout: false});
+  await assert.rejects(runAccountLifecycle(fixture.options), {code: 'ACCOUNT_LOGOUT_UNCONFIRMED'});
+}));
+test('unrecorded effect blocks every potentially Loginom action', () => withPage([{}], async (page, diagnostics) => {
+  const fixture = await lifecycleCase(page, diagnostics, {effect: 'claimed-clean'});
+  await assert.rejects(runAccountLifecycle(fixture.options), {code: 'ACCOUNT_EFFECT_UNRECORDED'});
+  assert.deepEqual(fixture.actions, ['record-effect']);
+  assert.deepEqual(await page.evaluate(() => window.clicks), []);
+}));
+test('operator/pair mismatch blocks before even recording an effect', () => withPage([{}], async (page, diagnostics) => {
+  const fixture = await lifecycleCase(page, diagnostics);
+  fixture.options.configs[1].operator_file = '/foreign/operator.json';
+  await assert.rejects(runAccountLifecycle(fixture.options), {code: 'PAIR_BINDING_MISMATCH'});
+  assert.deepEqual(fixture.actions, []);
+}));
+
+function syntheticReadback() {
+  const observer = {connected: true, mst_self_count: 1, guid_hash: syntheticHash('observer'), user_hash: syntheticHash('admin'),
+    session_id: 9, create_time: '2026-10-09T00:00:00Z'};
+  const effect = {guid_hash: syntheticHash('owned'), user_hash: syntheticHash('worker'), session_id: 10,
+    create_time: '2026-10-09T00:00:00Z', stand: 'https://fixture.invalid'};
+  return {effect, readback: {source: 'existing-authorized-admin', stand: effect.stand,
+    loaded: true, refresh_complete: true, packages_complete: true, refreshed_at: '2026-10-09T00:01:00Z',
+    manager_count: 1, store_count: 1, observer, calibration: {observer_guid_hash: observer.guid_hash, stand: effect.stand},
+    rows: [{...observer, type: 'mstSelf', packages: []}]}};
+}
+test('complete calibrated server component remains insufficient for ready', () => {
+  const {readback, effect} = syntheticReadback();
+  assert.deepEqual(verifyFinalReadback(readback, [effect], '2026-10-09T00:00:30Z'), {status: 'SERVER_COMPONENT_CHECKED', ready: false});
+});
+for (const field of ['loaded', 'refresh_complete', 'packages_complete', 'manager_count', 'store_count']) {
+  test(`incomplete final readback ${field} is rejected`, () => {
+    const {readback, effect} = syntheticReadback();
+    readback[field] = typeof readback[field] === 'boolean' ? false : 2;
+    assert.throws(() => verifyFinalReadback(readback, [effect], '2026-10-09T00:00:30Z'), {code: 'FINAL_SERVER_READBACK_INCOMPLETE'});
+  });
+}
+test('stale final inventory cannot authorize the next operation', () => {
+  const {readback, effect} = syntheticReadback();
+  assert.throws(() => verifyFinalReadback(readback, [effect], '2026-10-09T00:02:00Z'), {code: 'FINAL_SERVER_READBACK_INCOMPLETE'});
+});
+test('present exact owned server effect blocks; no foreign session is closed', () => {
+  const {readback, effect} = syntheticReadback();
+  readback.rows.push({...effect, type: 'mstDisconnected', packages: []});
+  readback.manager_count = readback.store_count = 2;
+  const before = JSON.stringify(readback);
+  assert.throws(() => verifyFinalReadback(readback, [effect], '2026-10-09T00:00:30Z'), {code: 'OWN_SERVER_EFFECT_PRESENT'});
+  assert.equal(JSON.stringify(readback), before);
+});
+test('uncalibrated observer and unbound effects block final server proof', () => {
+  const {readback, effect} = syntheticReadback();
+  readback.rows[0].guid_hash = syntheticHash('foreign');
+  assert.throws(() => verifyFinalReadback(readback, [effect], '2026-10-09T00:00:30Z'), {code: 'FINAL_SERVER_CALIBRATION_UNCONFIRMED'});
+  readback.rows[0].guid_hash = readback.observer.guid_hash;
+  assert.throws(() => verifyFinalReadback(readback, [{...effect, guid_hash: null}], '2026-10-09T00:00:30Z'), {code: 'FINAL_SERVER_EFFECT_UNBOUND'});
 });

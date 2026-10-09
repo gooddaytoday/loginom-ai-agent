@@ -130,13 +130,14 @@ class AccountSafety(unittest.TestCase):
         write_private(operator, {'admin_user': 'fixture-admin', 'node': str(self.root / 'forbidden-node')})
         cards = self.root / 'cards'
         issue = str(uuid4())
-        with self.assertRaisesRegex(RuntimeError, 'BLOCKED_FINITE_SERVER_CLEANUP'):
-            with provision.preparation_guard(issue, operator, cards, self.locks):
-                self.fail('live dispatch admitted')
+        result = subprocess.run([sys.executable, str(SCRIPTS / 'provision-accounts.py'), '--issue', issue,
+            '--operator', str(operator), '--directory', str(cards), '--evidence-dir', str(self.root / 'forbidden-evidence'),
+            '--previous-processes', str(self.root / 'missing-history'), '--source-sha', 'a' * 40], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stderr.strip(), 'BLOCKED_FINITE_SERVER_CLEANUP')
         self.assertFalse(cards.exists())
         self.assertEqual(list(self.locks.glob('*.active.json')), [])
-        with account_guard('fixture-admin', lock_directory=self.locks):
-            pass  # Preflight released its own lock.
+        self.assertFalse((self.root / 'forbidden-evidence').exists())
 
     def test_allocation_preserves_pair_passwords_and_operator_binding(self):
         operator = self.root / 'operator.json'

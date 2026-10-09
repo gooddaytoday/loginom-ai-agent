@@ -6,7 +6,33 @@ import os
 from pathlib import Path
 import subprocess
 from contextlib import contextmanager
-from uuid import UUID
+from uuid import UUID, uuid4
+
+
+def new_evidence_directory(path):
+    path = Path(path)
+    if not path.is_absolute() or '..' in path.parts or any(p.is_symlink() for p in [path, *path.parents]):
+        raise RuntimeError('PRIVATE_EVIDENCE_PATH_INVALID')
+    path.mkdir(mode=0o700)  # A new attempt must never reuse an old directory.
+    if path.stat().st_uid != os.getuid() or path.stat().st_mode & 0o077:
+        raise RuntimeError('PRIVATE_EVIDENCE_PERMISSIONS_INVALID')
+    return path
+
+
+def append_evidence(directory, event):
+    path = Path(directory) / ('event-' + str(uuid4()) + '.json')
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'w') as stream:
+        json.dump(event, stream, indent=2)
+        stream.write('\n')
+        stream.flush()
+        os.fsync(stream.fileno())
+    fd = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    return path
 
 
 def read_private(path):
@@ -148,7 +174,7 @@ def check_previous_processes(records):
     """
     absent = []
     for record in records:
-        if not isinstance(record.get('pid'), int) or record['pid'] <= 0 or not str(
+        if not isinstance(record, dict) or type(record.get('pid')) is not int or record['pid'] <= 0 or not str(
                 record.get('start_ticks', '')).isdigit():
             raise RuntimeError('ACCOUNT_PROCESS_PROVENANCE_INVALID')
         try:
@@ -234,6 +260,7 @@ def begin_account_effect(guard, issue, role, attempt, source_sha):
     payload = {'schema': 'loginom-account-effect-v1', 'issue_id': str(UUID(issue)),
                'attempt_id': str(UUID(attempt)), 'role': role, 'source_sha': source_sha,
                'state': 'UNKNOWN', 'writer': guard['process'],
+               'previous_processes_absent': guard['previous_processes_absent'],
                'lock': {key: guard[key] for key in ['device', 'inode']},
                'configs': [{key: config[key] for key in ['path', 'device', 'inode', 'sha256']}
                            for config in guard['configs']]}

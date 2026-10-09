@@ -1,16 +1,27 @@
 # Finite readback proposal and current boundary
 
-Status: **NOT_ESTABLISHED / no live activation**. The owner reported an existing
-open Admin session; its device/browser and an authorized observable surface are
-being identified by the parent. LAB53 must not replace this missing access with
-another Loginom login.
+Status: **source adapter NOT_IMPLEMENTED / no live activation**. The parent
+attached to the already open owner Chrome Admin tab on Mac and performed a
+complete calibrated Dispatcher refresh without a new browser or Loginom login.
+The existing owner tab/session is preserved. LAB53 does not search mas for a
+browser or create another observer.
+
+Published normalized receipt: shared-oauth docs commit
+`541e17e34aad7a39100aad07541884c3cfd48e0d`,
+`docs/testing/loginom-ai-agent/reports/2026-10-08-node-recheck/existing-admin-mac-readback.json`,
+SHA256 `c133704943beec586ec87565b75cbe9ef0ea8b9891154cbc318bbcdfd03c09cd`.
+It records Count8/roots8/nodes10, complete session and two package proxy matches,
+unique connected mstSelf3123 and observer3119 absence at that observation time.
+This is historical calibration, not acceptance of this candidate or a reusable
+post-operation absence receipt. LAB45/LAB48 remain NOT_RECONCILED.
 
 The bounded source-backed option is to use that **already connected Admin tab**
 for the final independent readback. Attaching to that exact existing tab, or
 owner-assisted readback in it, must not instantiate a new Loginom application,
 open another login tab or create an observer session. Its pre-existing ownership
 and session identity are recorded separately from all task-created effects.
-This is a proposed use of the existing Admin inventory, not a validated adapter.
+The parent can perform a fresh readback for a future operation. The accounts
+candidate has no admitted transport or receipt importer for this view.
 
 1. Identify the owner-authorized device, browser/profile and exact connected tab.
    Establish observer identity and its connected unique mstSelf/RemoteGUID
@@ -34,8 +45,9 @@ This is a proposed use of the existing Admin inventory, not a validated adapter.
    effect. No verifier-chain is started. If the view disconnects or cannot be
    positively calibrated, stop; do not relogin automatically.
 
-The actual operation cannot start until the specific tab/access/readback is
-available and the finite method is checked. This does not relax any acceptance
+The actual operation cannot start until the complete adapters and lifecycle are
+qualified and independently reviewed, including fresh post-operation readback.
+Both public gates remain unconditional. This does not relax any acceptance
 criterion. It also does not claim all possible methods are impossible. A
 supported server inventory/journal without a new Loginom session would be an
 alternative if the owner supplies its existing authorized access.

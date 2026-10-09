@@ -4,13 +4,15 @@ export function requireFiniteCleanup() {
   throw Object.assign(Error('BLOCKED_FINITE_SERVER_CLEANUP'), {code: 'BLOCKED_FINITE_SERVER_CLEANUP'});
 }
 
-export function verifyPairBindings(configs, operator) {
+export function verifyPairBindings(configs, operator, operatorFile) {
   if (configs.length !== 2 || new Set(configs.map(config => config.loginom.username)).size !== 2
     || configs.some((config, index) => config.role !== ['worker', 'reviewer'][index]
       || config.stage !== 'stage0' || config.loginom.url !== operator.url
       || config.agent_id !== operator.agents[config.role]
       || config.workspace_id !== operator.workspace_id
       || config.issue_id !== configs[0].issue_id
+      || (operatorFile !== undefined && config.operator_file !== operatorFile)
+      || config.loginom.username === operator.admin_user
       || ['provider_auth_file', 'provider_auth_files'].some(key => key in config))) {
     throw Object.assign(Error('PAIR_BINDING_MISMATCH'), {code: 'PAIR_BINDING_MISMATCH'});
   }

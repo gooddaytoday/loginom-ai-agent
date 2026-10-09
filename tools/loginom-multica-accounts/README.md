@@ -30,15 +30,39 @@ are private (0700 directory, immutable 0600 files), with phase/action/selector,
 candidates, elapsed time, native error accessors, message, stack and cause.
 Public receipts contain only allowlisted codes and evidence digests.
 
-`scripts/qualify-accounts.mjs` holds the common finite-cleanup gate and pair
-binding validation. The original provisioning body is retained behind the gate
-as an incremental base; its probe/creation lifecycle is **not qualified**.
-Rights/identity/logout, complete Dispatcher readback and final server/process/FD
-receipts still need integration and live validation once access is established.
-Changing the hard stop alone would be unsafe and is not deployment.
+`preparation_guard` returns the held admin/worker/reviewer guards and pair flock,
+and requires explicit exact previous process records for every account. Planned
+identities are locked before allocation; an existing pair is read under its pair
+lock. Allocation reuses that FD. New configs are bound before all three UNKNOWN
+effects are fsynced. `run_foreground` passes all four FDs through an exec barrier:
+the exact child PID/start_ticks and guards envelope are saved before its command
+can act. Timeout/cancellation terminates only that owned process group, checks
+recorded identities and keeps immutable cleanup evidence, UNKNOWN markers and
+the parent guards through shutdown. Local cleanup never authorizes reuse.
+
+`scripts/account-lifecycle.mjs` connects pair/operator bindings, recorded effect,
+provision/login, unique connected identity, the existing effective rights policy
+and Logout/Disconnect through explicit adapter hooks. Failure retains its cause;
+cleanup does not extend the original deadline. A successful UI component returns
+`UI_QUALIFIED_CLEANUP_PENDING`, `ready: false`. The final readback validator checks
+fresh complete rows/counts/packages, observer calibration and exact own effects.
+It is a component validator, not a receipt importer or live authorization.
+
+Both the production UI adapter (`UI_LIFECYCLE_ADAPTER_NOT_QUALIFIED`) and the
+existing-Admin server transport (`FINAL_SERVER_READBACK_NOT_IMPLEMENTED`) remain
+unqualified. The old login/probe/create body is preserved verbatim in baseline;
+its early `saveState('ready')` is no longer present in the candidate. No candidate
+code writes ready, archives active markers or admits live use from partial proof.
+Live UI integration, fresh independent server readback, exact process/FD closure
+and runtime review remain required. Removing a hard stop is not deployment.
 
 `--issue`, `--operator`, `--directory`, `--stage stage0` and persisted pair
 credentials retain their meanings. Provider/full mode is rejected.
+Non-allocation lifecycle requires a new absolute private `--evidence-dir`, an
+explicit private `--previous-processes` per-account mapping and exact
+`--source-sha`. These inputs cannot bypass either public gate. The Node child
+also receives both pair config paths, evidence-dir and the inherited guards
+envelope. All inputs are still behind the unconditional public hard stop.
 `--allocate-only` continues to persist a planned pair without Loginom calls;
 LAB53 has not used it on real account configs. Existing role/operator binding,
 creation uncertainty and password preservation remain enforced.
@@ -72,7 +96,8 @@ files and version metadata from the retained installed bundle; it must never
 restore older mutable account state. Baseline files here are source evidence,
 not proof that rollback has run. Installation and rollback remain NOT_RUN.
 
-See `finite-cleanup.md` for the remaining access dependency. After common
+See `finite-cleanup.md` for the existing Mac Admin calibration and unfinished
+adapter boundary. After common
 preparation/cleanup proof and independent review, the same eight cards resume
 under the existing authorization. No additional owner launch approval is needed;
 merge, release and changes to shared contracts remain separate decisions.

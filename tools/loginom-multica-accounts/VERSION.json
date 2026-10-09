@@ -1,6 +1,6 @@
 {
   "schema": "loginom-lab53-source-version-v1",
-  "version": "lab53-source-only-v2",
+  "version": "lab53-source-only-v3",
   "scope_sha": "d4241c818b4a59f65a42dcf756034eec20e620b3",
   "status": "SOURCE_ONLY_LIVE_BLOCKED",
   "baseline": {
@@ -9,18 +9,21 @@
     "historical_archive_reverified": false
   },
   "files": {
-    "scripts/account-ui.mjs": "66673585250673fb9b6af04e7e4cbdc8c716e341bba39ba597dbc65abc585fe6",
-    "scripts/common.py": "6a4695934258beaececb9b73b4e3512d7c4205e34c88140ca85a6886c6b74e3f",
-    "scripts/provision-account.mjs": "0efb20d80094f2f42cb24e73e6d91354916b6d4b5307060b710bfecd183b8f74",
-    "scripts/provision-accounts.py": "de5dc32b54e1350ba85a1b37b3363f0dab339b6c7c071a735ddec1f9f1472782",
-    "scripts/qualify-accounts.mjs": "63394a0542572ff926e542f3b96e893e4db62ee79598165bfb47c65267723f22",
-    "tests/account-ui.test.mjs": "a2d8d8e07da792d81bad655ac76a4d7df1e7c567bf5815b31e33b28fa1141a37",
-    "tests/test_accounts.py": "b32c69f154a658d98e80621ae7eadce40e1086f7df70dd13325468f2b2277559",
-    "tests/test_manifest.py": "f94c4063c53238b65e7512ce2fb1da45147410d8b501d39cac986dc8f6b8ba7f",
+    ".gitignore": "862263fa1f46c20f0d1e4dac5ffcc75abd55c08211b2c3864c5f8764b9d87793",
+    "README.md": "f4114e014959f119eace0b27248443dc7d18e1e1fe1dd24310d9e78048efd665",
+    "finite-cleanup.md": "42604e784650619c9f85a14e69ee9c654652fde54ecf6d31fc853ee486583cda",
+    "fixtures/lifecycle.html": "1c348c66325ef6f4998f308ad7dc2dbf02b90003ddf9a1406db26514412133eb",
     "fixtures/navigation.html": "b3bde2f068797b70e7c7975a31f1d64a03ac2686c6943abf2462ee5e5a0b4733",
-    "README.md": "da5b17f9f8db892de39643316b700235eb85962965c8cd6eca136e61bcb6c8c8",
-    "finite-cleanup.md": "afaacd767a1891f6d137b3f9dae5ece9e87c6e86a6ee4b175cad1f065e6fdce5",
-    ".gitignore": "862263fa1f46c20f0d1e4dac5ffcc75abd55c08211b2c3864c5f8764b9d87793"
+    "scripts/account-lifecycle.mjs": "b95f4f35d7651241c74871809636632527829dd44baaba95d7d9969135bcce0f",
+    "scripts/account-ui.mjs": "66673585250673fb9b6af04e7e4cbdc8c716e341bba39ba597dbc65abc585fe6",
+    "scripts/common.py": "ceb400d2c1b5617cfa7598f75419a569e3b3cc52d13c6533dd7436fa39396743",
+    "scripts/provision-account.mjs": "7425da33df98b8c56a807ee0dc1d5dc28aed78d14d5eddf203bc562ab0935c98",
+    "scripts/provision-accounts.py": "d240213b93d19b36a24b23d87d5eca96713661f79fee1b23d75a1d6ab0de8fee",
+    "scripts/qualify-accounts.mjs": "87f2e1bf3edbdf2678901b7d7d3407a9f7864e26eac549ab488cc4daa09db2c3",
+    "tests/account-ui.test.mjs": "51b783b0ae18dd9fb1fd86d5c1212e3495b9d0bd93373a2cd7711248e6e7cd36",
+    "tests/test_accounts.py": "971ef937be5a4193293b5e3ff7defd6e58fe78c668b4701f3df56b404e4727ad",
+    "tests/test_lifecycle.py": "c837741188325439595350c41fcb85e37f4025dd3aa81750aa23ae2969f41e78",
+    "tests/test_manifest.py": "f94c4063c53238b65e7512ce2fb1da45147410d8b501d39cac986dc8f6b8ba7f"
   },
   "deployment": {
     "installed_tool_modified": false,
