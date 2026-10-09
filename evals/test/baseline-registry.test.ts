@@ -43,3 +43,10 @@ test("an incomplete LAB-55 cannot become the accepted baseline", async () => {
     expect(await Bun.file(path.join(directory, "registry.json")).exists()).toBe(false)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
+
+test("candidate product inherits omitted model/reasoning from the exact accepted baseline", async () => {
+  const { resolveEvalRunnerProduct } = await import("../src/baseline")
+  const installed = { version: "0.1.18", source: "a".repeat(40), manifestSha256: "b".repeat(64), binarySha256: "c".repeat(64) }
+  expect(resolveEvalRunnerProduct(installed, baselineFixturePins)).toEqual({ ...installed, model: baselineFixturePins.model, variant: baselineFixturePins.variant })
+  expect(resolveEvalRunnerProduct(installed, baselineFixturePins, { model: "openai/other", variant: "high" })).toMatchObject({ model: "openai/other", variant: "high" })
+})

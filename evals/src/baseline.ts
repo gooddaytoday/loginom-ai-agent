@@ -86,11 +86,20 @@ export async function verifyBaselineCorpus(checkout: string, sha: string) {
   return sha
 }
 
-export async function captureBaselinePins(config: NodeOpsConfig, env: Record<string, string | undefined>, executorRole: BaselineRole = "evalbaseline"): Promise<BaselinePins> {
+export function resolveEvalRunnerProduct(installed: Omit<EvalProductPins, "model" | "variant"> & Partial<Pick<EvalProductPins, "model" | "variant">>,
+  previous: Pick<BaselinePins, "model" | "variant">, requested: { model?: string; variant?: string } = {}): EvalProductPins {
+  if (installed.model && requested.model && installed.model !== requested.model || installed.variant && requested.variant && installed.variant !== requested.variant)
+    throw new BaselineFailure("MODEL_PIN_CHANGED")
+  return { ...installed, model: requested.model ?? installed.model ?? previous.model, variant: requested.variant ?? installed.variant ?? previous.variant }
+}
+
+export async function captureBaselinePins(config: NodeOpsConfig, env: Record<string, string | undefined>, executorRole: BaselineRole = "evalbaseline", frozenProduct?: EvalProductPins): Promise<BaselinePins> {
   const role = config.roles[executorRole]
-  const product = executorRole === "evalrunner" ? role?.product : undefined
+  const product = executorRole === "evalrunner" ? frozenProduct ?? (role?.product?.model && role.product.variant ? role.product as EvalProductPins : undefined) : undefined
+  if (product && role?.product && Object.entries(role.product).some(([key, value]) => value !== undefined && value !== product[key as keyof EvalProductPins]))
+    throw new BaselineFailure("PRODUCT_CONFIGURATION_CHANGED")
   if (executorRole === "evalrunner" && !product) throw new BaselineFailure("PRODUCT_CONFIGURATION_REQUIRED")
-  if (env.EVAL_AGENT_MODEL !== (product?.model ?? "openai/gpt-6.1-sol") || env.EVAL_AGENT_VARIANT !== (product?.variant ?? "medium") || env.EVAL_AGENT_PROVIDER_ID)
+  if ((env.EVAL_AGENT_MODEL ?? (executorRole === "evalrunner" ? product?.model : undefined)) !== (product?.model ?? "openai/gpt-6.1-sol") || (env.EVAL_AGENT_VARIANT ?? (executorRole === "evalrunner" ? product?.variant : undefined)) !== (product?.variant ?? "medium") || env.EVAL_AGENT_PROVIDER_ID)
     throw new BaselineFailure("MODEL_PIN_CHANGED")
   if (env.JUDGE_MODEL !== "gpt-6-astra" || env.JUDGE_REASONING !== "high" || Number(env.EVAL_PASS_THRESHOLD ?? "70") !== 70 ||
     Number(env.EVAL_JUDGE_TIMEOUT_MS ?? "300000") !== 300_000) throw new BaselineFailure("JUDGE_PIN_CHANGED")
@@ -496,7 +505,7 @@ async function resolveBaselineCleanup(directory: string, evidence: string, env: 
         return JSON.parse(new TextDecoder().decode(input)) as CleanupResolutionProof
       }
       const config = await readPrivateBaselineJson(path.join(directory, "ops-config.json")) as NodeOpsConfig
-      if (JSON.stringify(await captureBaselinePins(config, env, baselineRole(manifest))) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
+      if (JSON.stringify(await captureBaselinePins(config, env, baselineRole(manifest), manifest.product)) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
       const { verifyBaselineCleanupRecovery, NodeOpsFailure } = await import("./node-eval-ops")
       const live = await verifyBaselineCleanupRecovery(config, await readPrivateBaselineJson(path.join(directory, "stand-handle.json")) as NodeStandLease, directory, evidence)
         .catch(error => { throw error instanceof NodeOpsFailure ? new BaselineFailure(error.reason) : error })
@@ -557,7 +566,9 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
   try {
     const command = argv[0]
     if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke|recover-measurement|resolve-cleanup|abandon --series DIR [smoke: --case calc-data-double|crosstable-fixed-sum] [prepare: --accept-node-smoke-no-artifact MANIFEST_UUID] [recover-measurement: --job KEY --kind infrastructure|judge --evidence PRIVATE_JSON] [resolve-cleanup: --evidence RECOVERY_COMPLETION_JSON] [abandon: --reason REASON --evidence RELEASE_JSON] [--config PRIVATE --issue ID --task ID] [check: --compare SERIES --export] [resume/resolve-cleanup: --recover-executor after inspection]" }
-    const values = parseArgs({ args: argv.slice(1), strict: true, options: { role: { type: "string" }, series: { type: "string" }, case: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, job: { type: "string" }, kind: { type: "string" }, reason: { type: "string" }, evidence: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" }, "accept-node-smoke-no-artifact": { type: "string" } } }).values
+    const values = parseArgs({ args: argv.slice(1), strict: true, options: { role: { type: "string" }, changes: { type: "string" }, series: { type: "string" }, case: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, job: { type: "string" }, kind: { type: "string" }, reason: { type: "string" }, evidence: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" }, "accept-node-smoke-no-artifact": { type: "string" } } }).values
+    if (values.changes !== undefined && values.role !== "evalrunner") throw new BaselineFailure("CHANGES_REQUIRE_EVALRUNNER")
+    if (values.changes !== undefined && command !== "prepare") throw new BaselineFailure("CHANGES_ONLY_FOR_PREPARE")
     if (values.role !== undefined && !["prepare", "smoke"].includes(command ?? "")) throw new BaselineFailure("ROLE_ONLY_FOR_PREPARE")
     if (values.role !== undefined && !["evalbaseline", "evalrunner"].includes(values.role)) throw new BaselineFailure("BASELINE_ROLE_REQUIRED")
     const directory = values.series
@@ -594,7 +605,7 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
       if (!values.config) throw new BaselineFailure("LIVE_CONFIGURATION_REQUIRED")
       const config = await readPrivateBaselineJson(values.config) as NodeOpsConfig
       return await admitBaselineRecovery(directory, values.job, values.kind!, values.evidence,
-        { checkout: config.roles[baselineRole(manifest)]!.checkout, pins: await captureBaselinePins(config, env, baselineRole(manifest)) }, env)
+        { checkout: config.roles[baselineRole(manifest)]!.checkout, pins: await captureBaselinePins(config, env, baselineRole(manifest), manifest.product) }, env)
     }
     if (command === "check") {
       const report = await checkBaseline(directory)
@@ -630,10 +641,17 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
     const role = config.roles[executorRole]
     if (!role || !directory.startsWith(role.resultsRoot + path.sep) || await realpath(path.dirname(directory)) !== path.dirname(directory))
       throw new BaselineFailure("SERIES_PATH_REFUSED")
-    const pins = await captureBaselinePins(config, env, executorRole)
+    const reference = executorRole === "evalrunner" && ["prepare", "smoke"].includes(command ?? "") ? await (async () => {
+      if (!role.baselineRegistry || !role.product) throw new BaselineFailure("ACCEPTED_BASELINE_REQUIRED")
+      const { acceptedBaseline } = await import("./baseline-registry")
+      return acceptedBaseline(role.baselineRegistry)
+    })() : undefined
+    const product = executorRole !== "evalrunner" ? undefined : reference ? resolveEvalRunnerProduct(role.product!,
+      (await checkBaseline(reference.seriesDir)).manifest.pins, { model: env.EVAL_AGENT_MODEL, variant: env.EVAL_AGENT_VARIANT }) : (await readBaseline(directory)).manifest.product
+    const pins = await captureBaselinePins(config, env, executorRole, product)
     if (command === "prepare" || command === "smoke") {
       const manifest = await prepareBaseline(directory, { checkout: role.checkout, pins, smoke: command === "smoke", smokeCase: values.case, config,
-        executorRole, product: role.product, acceptedNodeSmokeNoArtifact: values["accept-node-smoke-no-artifact"] })
+        executorRole, product, baseline: command === "prepare" ? reference : undefined, declaredChanges: values.changes ? values.changes.split(",") as BaselineChange[] : [], acceptedNodeSmokeNoArtifact: values["accept-node-smoke-no-artifact"] })
       if (command === "prepare") return { code: 0, status: "PREPARED", id: manifest.id, expected: manifest.jobs.length, cases: manifest.cases.length }
     }
     return await executeLiveBaseline(directory, config, env, pins, { issue: typeof values.issue === "string" ? values.issue : undefined,
@@ -695,7 +713,7 @@ async function executeLiveBaseline(directory: string, config: NodeOpsConfig, env
       const recovery = job.recoveries?.find(recovery => recovery.state === "admitted")
       if (job.state !== "pending" && !recovery) throw new BaselineFailure(job.state === "running" || job.recoveries?.some(recovery => recovery.state === "running") ? "UNKNOWN_OUTCOME" : "AWAITING_RECOVERY")
       await assertNodeStandOwner(config, lease)
-      const current = await captureBaselinePins(config, env, baselineRole(manifest))
+      const current = await captureBaselinePins(config, env, baselineRole(manifest), manifest.product)
       const record = await dispatchBaselineJob(directory, job.key, { checkout: journal.checkout, pins: current }, env, recovery?.id)
       await verifyBaselineStand(config, lease, directory)
       await settleBaselineHarness(config, lease, directory)
@@ -850,7 +868,7 @@ async function admitBaselineRecovery(directory: string, key: string, kind: strin
       const { verifyBaselineStand, preflightNodeStand } = await import("./node-eval-ops")
       await verifyBaselineStand(config, lease, directory)
       const receipt = await preflightNodeStand(config, lease, env, path.join(config.runtimeRoot, "operations/stand.lease", `baseline-recovery-${id}`))
-      if (JSON.stringify(await captureBaselinePins(config, env, baselineRole(manifest))) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
+      if (JSON.stringify(await captureBaselinePins(config, env, baselineRole(manifest), manifest.product)) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
       return { ...receipt, admissionProof: await readPrivateBaselineJson(receipt.admission), processProof: await readPrivateBaselineJson(receipt.processEvidence) }
     })() : null
     const evidencePath = path.join(recoveryDir, "admission.json")
@@ -890,7 +908,7 @@ export async function judgeBaselineRecovery(directory: string, key: string, id: 
     throw new BaselineFailure("CORPUS_CHANGED")
   if (manifest.pins.mode === "live") {
     const config = await readPrivateBaselineJson(path.join(directory, "ops-config.json")) as NodeOpsConfig
-    if (JSON.stringify(await captureBaselinePins(config, env, baselineRole(manifest))) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
+    if (JSON.stringify(await captureBaselinePins(config, env, baselineRole(manifest), manifest.product)) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
   }
   if (manifest.pins.mode === "fixture" && (env.EVAL_BASELINE_FIXTURE !== "1" || env.EVAL_CLI_MODE !== "fake" ||
     !env.EVAL_JUDGE_COMMAND?.split(" ").includes(path.join(journal.checkout, "evals/fixtures/fake-codex.ts")))) throw new BaselineFailure("FIXTURE_JUDGE_REQUIRED")
@@ -1014,7 +1032,7 @@ async function dispatchBaselineJob(directory: string, key: string, current: { ch
   const script = admitted.case.collection === "node" ? "script/run-node-evals.ts" : "src/run.ts"
   const argv = [process.execPath, path.join(current.checkout, "evals", script), "--tasks", path.join(current.checkout, "evals", path.dirname(admitted.case.directory)),
     "--only", admitted.case.id, "--repeat", "1", "--infra-retries", String(manifest.infraRetries), "--timeout-ms", String(current.pins.timeoutMs), "--label", key]
-  const child = Bun.spawn(argv, { cwd: path.join(current.checkout, "evals"), env: { ...env, EVAL_RESULTS_DIR: admitted.resultsDir,
+  const child = Bun.spawn(argv, { cwd: path.join(current.checkout, "evals"), env: { ...env, EVAL_AGENT_MODEL: current.pins.model, EVAL_AGENT_VARIANT: current.pins.variant, EVAL_RESULTS_DIR: admitted.resultsDir,
     EVAL_HARNESS_LEASE_RECEIPT: path.join(parent, "harness-admission.json"), EVAL_REPEAT: "1",
     EVAL_PASS_THRESHOLD: String(current.pins.threshold), EVAL_JUDGE_TIMEOUT_MS: String(current.pins.judgeTimeoutMs) },
     stdout: Bun.file(path.join(parent, "harness.stdout")), stderr: Bun.file(path.join(parent, "harness.stderr")) })
@@ -1175,6 +1193,9 @@ async function readBaseline(directory: string) {
     manifest.version === 2 && manifest.executorRole !== "evalrunner" || manifest.infraRetries !== (manifest.kind === "smoke" ? 0 : 1) || journal.version !== 1 || journal.manifestSha256 !== baselineHash(raw) ||
     JSON.stringify(journal.jobs.map(job => job.key)) !== JSON.stringify(manifest.jobs.map(job => job.key))) throw new BaselineFailure("MANIFEST_CHANGED")
   validatePins(manifest.pins, baselineRole(manifest), manifest.product)
+  if (manifest.version === 2 && (manifest.acceptedNodeSmokeNoArtifact !== undefined || manifest.kind === "baseline" && !manifest.baseline ||
+    !Array.isArray(manifest.declaredChanges) || new Set(manifest.declaredChanges).size !== manifest.declaredChanges.length ||
+    manifest.declaredChanges.some(change => !["cli", "model", "reasoning"].includes(change)))) throw new BaselineFailure("MANIFEST_CHANGED")
   return { manifest, journal }
 }
 
