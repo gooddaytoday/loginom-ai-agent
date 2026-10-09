@@ -433,3 +433,13 @@ PGID/SID launcher сняты без сигналов; group=session=PID496816. �
 1800000ms: task override30 минут, global default900000ms; `taskTimeoutMs` в
 frozen harness выбирает explicit override → task → global. Ожидание результата
 продолжается на том же handle81639; причина задержки пока UNKNOWN.
+
+По новому live concern выполнен ограниченный source-only запуск двух
+существующих process-supervisor tests: protected fixture ends before unit exit
+и native writer publication/release gaps. Оба PASS/0 FAIL/12 assertions,
+1366ms, exit0; остальные17 tests отфильтрованы. Использованы реальные локальные
+fixture процессы и отдельный own TMPDIR без Loginom endpoint, browser/debugger,
+model или judge calls. Это не воспроизвело live задержку и не доказывает native
+cleanup незавершённой cohort#2. Полный suite не повторялся, source/guards не
+менялись; frozen495 HEAD и clean worktree проверены. Лог и source hashes:
+`ab-local-stand-20261008/cohort-second-receipt-signal-20261009.{log,json}`.
