@@ -143,3 +143,28 @@ PASS, parents700. Root free1979858944→2254327808bytes на момент batch;
 raw failed-cleanup/incomplete profiles, all results/preservation receipts,
 frozen binaries/resources/harness/common не перемещались и не изменялись.
 Контроллер60189/PID676156 после переноса live/identity matched.
+
+Девятый batch: `closed-archive-storage-20261009/batch-9` с отдельными
+plan/receipt/readback/tar-readback. Перенесены24 confirmed closed архива
+formal v9 attempts20–31,243054827bytes: cohort/customer/first-last/low-liquidity/
+monthly/NPS/risky/sales/slow-supplier/support/trial#2 и ab-revenue#3.
+No_artifact outcomes остаются FAIL, semantic recovery ими не доказывается.
+До переноса проверены все6 cleanup stages/error null/remaining0×2,
+result/cleanup/process-cleanup/preservation/archive SHA, prior full roundtrip,
+UID/GID/mode/xattrs/original inode/nlink1. Доступные process/FD references
+проверены до/после копирования;1236 permission-denied observations сохранены.
+Аудит недоступных чужих дескрипторов не заявляется.
+
+Copy2/fsync/atomic links/readback24 PASS. Tar через две исходные ссылки
+PASS:4564/3 entries, совпадают с preservation inventory. Receipt SHA
+`3a170dbd1f2abf731557d1c092c2f391472ce76ebea758a30c05076790fc90ad`;
+readback SHA `b89c9d0a3d6ba6f2fc531d4269a7b69a56160ee1b5339605d1f89aa77e0862da`;
+tar-readback SHA `9b4db0488a868bc4d9d4a7d42e17cb36d0da5927d9fcb7c495aa0b4f98971f70`.
+Actual own storage136 archives1439499371bytes/UID1001/targets600 PASS,
+parents700. Root free1957564416→2185396224bytes на момент batch; разница
+наблюдается при продолжающемся live прогоне. Active ABC#3, raw
+failed-cleanup/incomplete profiles, results/preservation receipts, frozen
+binaries/resources/harness/common не перемещались. Progress31/common SHA
+совпали после переноса, контроллер60189/PID676156 live/identity matched.
+Прежние пути — absolute aliases; восстановление source через временную
+копию и atomic replace, не копировать поверх ссылки.
