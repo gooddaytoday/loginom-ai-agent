@@ -4463,7 +4463,8 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Историческая v9:34closed/25PASS/9FAIL,cohort#3 INCOMPLETE; hang cause UNKNOWN, raw recovery evidence сохранён, в новую приёмку не засчитывается.
 - S1–S6 PASS на реальной основной модели: CLI/default/Help/no-file, native Desktop PDF2pages и CLI DOCX2pages; факты/все страницы/вход unchanged/browser0/remaining0 проверены. Произвольное имя DOCX не поддерживается и не критерий S5.
 - ABC pre-model refusals2 с model attempts0 сохранены; S4 ports closed/helper1440162/1440164 absent, прежняя failed cleanup не переписана. Revision4 только новый admission3 path, все live checks строго serial.
-- Остальные fixed8 запущены serial controller/session89353, текущая articles-by-author; fresh profile/results per task, никаких live параллельно. Следующий шаг: итог8/review/campaign cold, S7/S8/native lifecycle.
+- Остальные fixed8 запущены serial controller/session89353, articles PASS100/CLI0/structure/warm/cleanup, текущая campaign-roi-by-channel; fresh profile/results per task, никаких live параллельно. Следующий шаг: итог8/review/campaign cold, S7/S8/native lifecycle.
+- Generator reuse: полные package-docs ресурсы+Node9/9 SHA равны source49/final9695; installed PDF/DOCX/MD и PDF3pages QA/Word XML receipts проверены; current Word all-pages S5. Receipt SHA92a2308eb9…, полной повторной матрицы нет.
 - Private helpers подготовлены, НЕ запущены: skills-short-desktop-observer-20261009.py (S7 actual inspector/CDP), routing S7/S8 payload с exact own packageContainer, skills-short-modify-cancel-20261009.ts (после S8 PASS; small calculator + обычный SIGINT активного provider-turn, не node stop/recovery matrix). Syntax checks PASS; pending-lifecycle-adapters.json содержит hashes.
 
 ### 2026-10-09 — ACTIVE, v9 terminal143; closed34/45, PASS25/FAIL9; cohort#3 INCOMPLETE

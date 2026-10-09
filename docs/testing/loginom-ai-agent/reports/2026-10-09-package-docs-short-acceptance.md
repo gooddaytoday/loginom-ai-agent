@@ -79,6 +79,18 @@ network `loginom-skills-short-20261009`, server ID
 исходные server/client ID/StartedAt не изменены. Между пользовательскими ходами
 server reset не используется.
 
+## Неизменённый генератор: сохранённые проверки
+
+Сопоставлены полные `skills/package-docs/` и `bin/node` установленного final9695
+с полным payload source49: все9 ресурсов совпали по SHA256, включая bundle,
+SKILL.md/references/fonts. Ранее установленный49 создал PDF/DOCX/MD с input
+unchanged; его result, PDF3-page QA, DOCX XML и MD SHA сохранены, хэши четырёх
+QA-файлов повторно проверены. Current Word открытие/все страницы проверены S5.
+Это reuse неизменённого генератора, не новый модельный выбор skill.
+Private `short-acceptance-9695e61e3-20261009/reused-generator-evidence.json`, SHA256
+`92a2308eb93556e01434ea263cc23246352a1a931ccb9ca80f32ae289f3078dd`.
+Полная повторная матрица форматов/моделей не выполняется.
+
 ## Открытые проверки
 
 Текущая десятка: sales-by-category **PASS100**, judge scored/structure0/warm
@@ -96,7 +108,10 @@ PASS и cold PASS без перенастройки/bytes unchanged/remaining0. 
 CLI при этом exit1/failed/tool/CLI_TOOL_FAILED: первый вызов skill был aborted.
 Harness `pass:true` оценивает артефакт, но полный исход консервативно **FAIL**;
 его не засчитываем в минимум8 CLI PASS. Ручного модельного повтора нет.
-Остальные8 запускает отдельный serial controller: каждый процесс по одному,
+Articles-by-author **PASS100**: CLI exit0, judge scored/checklist, structure0,
+warm CSV oracle PASS, process terminal и6 cleanup stages confirmed. Итого
+закрыты3/10:2 полных PASS,1 полный FAIL; cold2/3 PASS. Следующей выполняется
+campaign-roi-by-channel. Оставшиеся задачи ведёт отдельный serial controller: каждый процесс по одному,
 между ними terminal/cleanup/structure/oracle gates, для campaign обязательный
 cold. Подготовки ABC сохранены
 как pre-model admission refusals с нулём модельных попыток: внешний debugger
