@@ -21,5 +21,10 @@
 ## Checkpoint
 
 - Исходный SHA: e4292c32cbe8fe2038acea9cec26a84fa7c997f3.
-- Результат: план зафиксирован; следующий шаг — RED regression tests.
-- Ограничения: source-only исправления, без activation/release и нового live прогона.
+- Native fix: cd7b42502; RED воспроизвёл отсутствие proof, GREEN node-skill suite 12 PASS/0 FAIL (все четыре coverage IDs + min/max, failed/unknown cleanup, policy/provider).
+- Probe fix: 4041dceca; RED воспроизвёл второй HEAD после копирования, GREEN 9 PASS/0 FAIL (45 expects), включая конкурентность и отказ записи receipt до dispatch.
+- Полный `bun test`: 522 PASS/0 FAIL, 2605 expects, 47 файлов, 605.68 секунд; `bun typecheck` и `git diff --check` PASS. Runtime/test bytes соответствуют 4041dceca; оставшиеся чужие изменения — документы и untracked файлы, сохранены.
+- Изоляция полного suite: `bwrap --unshare-pid --die-with-parent --ro-bind / / --bind /tmp /tmp --bind /home/kiselev/git/loginom-ai-agent /home/kiselev/git/loginom-ai-agent --proc /proc --dev-bind /dev /dev --chdir /home/kiselev/git/loginom-ai-agent/evals -- /home/kiselev/.bun/bin/bun test`. Без явного `/dev` JSC падал до тестов; минимальный probe подтвердил исправление окружения.
+- Независимый read-only review probe: no findings; отдельно подтверждён сохранённый расход допуска при EEXIST output receipt до dispatch.
+- Ограничения: проверены локальные fixtures; shared stand/LAB-55/реальный provider не использованы. Source skill 1.0.6 обновлён, staged 1.0.5 и действующие pins не переключены.
+- Следующий шаг для будущей поставки: отдельный новый immutable комплект с manifest/pins и назначение одного постоянного private probe ledger с учётом исторического расходования. Старые результаты/probes не повторять.
