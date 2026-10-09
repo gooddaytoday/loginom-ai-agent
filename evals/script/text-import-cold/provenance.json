@@ -1,0 +1,35 @@
+{
+  "source_sha": "5cd74d8ee5d6125692d953eb327b4d4f833c27a1",
+  "runtime": "NOT_RUN",
+  "files": [
+    {
+      "file": "diagnostic-session.mjs",
+      "source": "scripts/node-acceptance/diagnostic-session.mjs",
+      "original_sha256": "3bba6064d086a1f7e7fc82798c56995c6ac74ffe94d9d9fa7db7a8777c07f475",
+      "adaptations": [],
+      "sha256": "3bba6064d086a1f7e7fc82798c56995c6ac74ffe94d9d9fa7db7a8777c07f475"
+    },
+    {
+      "file": "static-source-proof.mjs",
+      "source": "scripts/node-acceptance/static-source-proof.mjs",
+      "original_sha256": "1bfc8ca6d5ee9e36b805949e38d387926217b41086c7b9819fd1c23c73186b27",
+      "adaptations": [
+        "extract independent server download verifier without unused CrossTable/collapse helpers"
+      ],
+      "sha256": "8c9f89ec1d2914c427c822b8cdac508b5496bafc1326ce805810f164d2341213"
+    },
+    {
+      "file": "reader.mjs",
+      "source": "docs/node-development/nodes/text-import/acceptance/matrix-cold-check.mjs",
+      "original_sha256": "62f3fedac3db5843815a15bd97faf5cac0137b7f9d3862a9bfc1935a1ca8c822",
+      "adaptations": [
+        "evals-local helper imports",
+        "explicit events argument",
+        "exact accepted CLI source pin before browser loading",
+        "final source delivery with exact one/two count",
+        "bind unique import by original GUID rather than optional node label"
+      ],
+      "sha256": "375f76c938018627a91a44d58769a5624140bf928c4f278144de55d7f5a84f42"
+    }
+  ]
+}
