@@ -174,23 +174,23 @@ LAB39 independent cleanup завершён PASS_PROCESS_AND_CALIBRATED_SERVER_AB
 
 ## Checkpoint — новая параллельная волна восьми узлов, 09.10.2026
 
-- Документация до продолженияeb1e3a5a6; baseline4e626d547/basef9bf332c; loginom0ca не включён; назначения сохранены.
-- Node SHA: LAB45 a00b0203/PR42, LAB46 41e0b170/PR43, LAB47 c92a3bfd; LAB48–52 4e626d547; remote heads совпали.
-- Caps8/8/8/runtime24aa… readback PASS, daemon12/штатный3m сохраняются;8 одновременно NOT_CONFIRMED/load12 NOT_RUN.
-- Installed CLI597/version-dev и Multica0.6.1/source2ea — отдельные идентичности; server exact SHA NOT_OBSERVED.
-- Central partialPUT/readback1aae…→8d7a…: LAB53 hold и прежнее разрешение resume8; target CLI selection/native/Eval/caps сохранены.
-- LAB53 scope d4241c818/common-preparation→shared-oauth; Generator task01a11e18… completed03:48:43MSK.
-- LAB53 Worker task01a11e21… running03:48:11MSK; source-only common qualification/lifecycle candidate, независимый review pending.
-- Gen53 attachments4 APIbytesPASS,3 manifest artifacts bytes/SHA PASS; tar6 safe files, stockVERSION3/3+sourceSnapshot5/5 PASS.
-- Independent handoff scope review PASS; не live readiness, не исполненные восстановленные bytes и не node/model acceptance.
-- Marker mismatch установлен: LAB48 .active.json vs LAB45 .lock.active.json, один flock2396017; обе проверки после lock, race не доказана.
-- Stock provisioning LAB48 NOT_STARTED/openUsers fallback уже есть; исправляется qualification/gate/navigation/private diagnostics.
+- Docs prechange8b50b4181; baseline4e626d547/basef9bf332c; loginom0ca исключён; node assignments сохранены.
+- Node SHA:45 a00b0203/PR42,46 41e0b170/PR43,47 c92a3bfd;48–52 4e626d547; старыйPASS не переносится.
+- Caps8/8/8/runtime24aa…/daemon12/stock3m сохранены;8 реальных параллельных приёмок и нагрузка12 NOT_PROVED.
+- Installed CLI597/version-dev и Multica0.6.1/source2ea — разные артефакты; global launcher не менялся.
+- Central instructions8d7a… unchanged: target CLI selection/native/Eval/caps сохранены, LAB53 live hold действует.
+- LAB53 approved scope d4241c818; Generator completed03:48:43MSK, Worker completed04:12:57MSK.
+- [Draft PR44](https://github.com/gooddaytoday/loginom-ai-agent/pull/44) common-preparation→shared-oauth; clean publishedSHA9b93201de2007d013bb9f57416a9e33452677f78.
+- Parent verified Worker attachments2/APIbytesPASS, report manifest bytes/SHA PASS, tree7f60a518… и19/19publishedfilesbytes/SHA PASS.
+- Worker25offline claimed; parent10portablePython+3JSsyntax PASS/sourceblockingfindings0; Linux/browser native review pending, неlive/model acceptance.
+- Native Reviewer01a11e3c… running04:17:26MSK, отдельный checkout9b; толькоsource/offline review, live block сохранён.
+- Candidate nondeployable: обе live entrypoints останавливаются доLoginom; lifecycle/install/rollback/runtime qualification NOT_RUN.
+- Общие post-flock legacy marker gate/navigation/private diagnostics подготовлены; timeout cause48 NOT_ESTABLISHED.
 - LAB45 attempt6d13… numericNOT_CAPTURED/serverUNKNOWN/marker9595…; LAB48 attempt8d6f… numeric/causeNOT_ESTABLISHED/marker74f25….
-- Root47 старые3117/3118 cleanup PASS только для прежних effects; observer3119 server absence PENDING; новые45/48 effects отдельно.
-- Gen53 59 old exact PID/starttick records absent, browser/Host/login/model/build/marker mutations0; это не server absence.
-- 03:50MSK все8 node cards blocked/latest Gen completed, новыхruns/comments/attachments0; свежих Worker/Reviewer handoff0.
-- Owner сообщил existing Admin browser НА MAS; Worker получил attach/read/Refresh discovery, пользовательский browser/session сохраняется.
-- Local IAB/MCP Apps Loginom не показывают; новыйbrowser/context/login0; существующий remote context/полныйreadback пока не подтверждён.
-- 00:43UTC load0.012/0.031/0.003, MemAvailable30145972kB/free409321377792B; daemonactive1/running1/wait0/terminalreports0.
-- [Handoff/SHA/hashes/границы](reports/2026-10-08-node-recheck/parallel8-restart.json); schedules0/new pools0/merge-release0; чужие изменения сохранены.
-- Следующий шаг: LAB53 fix+finite exact45/48/3119 cleanup+Reviewer→те же8 без нового approval; target-model full acceptance NOT_CONFIRMED.
+- Root47 старые3117/3118 cleanup PASS только для прежнихeffects; observer3119 serverabsence PENDING; markers/history сохранены.
+- Owner: existingAdmin browser наmas; Worker /proc/CDP/profiles и parentSSH baremas не нашлиbrowser/GUI; endpoint/access pending.
+- Fresh complete Dispatcher inventory/caller mstSelf positive NOT_READ; новыхLoginom входов/admin/model/build0.
+- 04:19MSK все8 node cards blocked/latestGeneratorcompleted; новыхWorker/Reviewer nodehandoff0.
+- 01:18:26UTC mas CPU12/load0/0/0/MemAvailable30120016kB/free408564547584B; это не workload12/serverabsence proof.
+- [SHA/hashes/границы](reports/2026-10-08-node-recheck/parallel8-restart.json); schedules/pools/merge-release0; чужие изменения сохранены.
+- Далее: source review→existingAdmin доступ→finite45/48/3119 cleanup+полный lifecycle/runtime review LAB53→те же8 без новогоapproval.
