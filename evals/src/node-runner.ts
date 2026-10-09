@@ -5,6 +5,7 @@ import { loadTasks } from "./task"
 import { validateNodeRun } from "./node-evals"
 import { coverageCaseIds, nodeCaseIds } from "./node-cases"
 import { collectNodeNativeEvidence } from "./node-native"
+import { textImportIds, textImportChecks, collectTextImportEvidence } from "./text-import"
 
 export async function runNodeEvals(argv: string[], env: Record<string, string | undefined>) {
   try { return await executeNodeEvals(argv, env) }
@@ -18,8 +19,8 @@ async function executeNodeEvals(argv: string[], env: Record<string, string | und
   const config = loadConfig(args, env)
   const tasks = await loadTasks(config.tasksDir, config.only)
   for (const task of tasks) {
-    if (!(nodeCaseIds as readonly string[]).includes(task.id)) throw Error(`unsupported node case: ${task.id}`)
-    for (const item of task.checklist) if (item.required && !["input", "crosstable", "graph", "export", "result", "sequence"].includes(item.id))
+    if (!(nodeCaseIds as readonly string[]).includes(task.id) && !textImportIds.includes(task.id)) throw Error(`unsupported node case: ${task.id}`)
+    for (const item of task.checklist) if (item.required && !(textImportIds.includes(task.id) ? textImportChecks : ["input", "crosstable", "graph", "export", "result", "sequence"]).includes(item.id))
       throw Error(`unknown required ID: ${item.id}`)
   }
   const run = await main(args, env)
@@ -27,6 +28,10 @@ async function executeNodeEvals(argv: string[], env: Record<string, string | und
   for(const task of summary.tasks) if(task.id==="crosstable-min-max" || coverageCaseIds.includes(task.id)) for(const attempt of task.attempts) {
     if(attempt.status==="completed" && attempt.environment_cleanup?.status==="confirmed")
       await collectNodeNativeEvidence(path.join(run.runDir,task.id,String(attempt.attempt)),config.profileDir)
+  }
+  for (const task of summary.tasks) if (textImportIds.includes(task.id)) for (const attempt of task.attempts) {
+    if (attempt.status === "completed" && attempt.environment_cleanup?.status === "confirmed")
+      await collectTextImportEvidence(path.join(run.runDir, task.id, String(attempt.attempt)), config.profileDir)
   }
   const verdict = await validateNodeRun(run.runDir, tasks.map((task) => task.id), config.tasksDir)
   await Bun.write(path.join(run.runDir, "code-verdict.json"), JSON.stringify(verdict, null, 2) + "\n")
