@@ -13,6 +13,7 @@ import { observeWriterReleaseSettlement, registrationIdentity, verifyOwnedRegist
 import { validateNodeRun } from "./node-evals"
 import type { RunSummary } from "./report"
 import { archiveDiagnostics } from "./diagnostics"
+import { acquireHarnessLease, retireRecordedHarnessLease } from "./lease"
 
 type OfflinePaths = { checkout: string; workRoots: string[]; resultsRoot: string }
 type RolePaths = OfflinePaths & { referenceProfile: string; evalProfile: string }
@@ -55,6 +56,26 @@ export async function acquireNodeStand(config: NodeOpsConfig, owner: NodeStandOw
   return lease
 }
 
+/** Private admission is bound before dispatch; a receipt from another lease is never recovery authority. */
+export async function acquireNodeHarnessLease(config: NodeOpsConfig, lease: NodeStandLease, profile: string) {
+  await assertNodeStandOwner(config, lease)
+  await assertOriginalAdmission(config, lease)
+  if (![config.roles[lease.role].referenceProfile, config.roles[lease.role].evalProfile].includes(profile)) throw new NodeOpsFailure("HARNESS_OWNER_UNKNOWN")
+  const receipt = path.join(directory(config), `harness-${crypto.randomUUID()}.json`)
+  const lock = await acquireHarnessLease(profile, receipt)
+  await writeFile(receipt + ".stand", JSON.stringify({ version: 1, owner: ownerOf(lease), acquiredAt: lease.acquiredAt,
+    profile, receipt, receiptSha256: await digest(receipt) }), { flag: "wx", mode: 0o600 })
+  return { ...lock, receipt }
+}
+
+/** Runner boundary shared by product and reference; generic baseline admission remains unchanged. */
+export async function acquireRunHarnessLease(profile: string, env: Record<string, string | undefined>) {
+  if (!env.EVAL_NODE_OPS_CONFIG && !env.EVAL_NODE_STAND_LEASE) return acquireHarnessLease(profile, env.EVAL_HARNESS_LEASE_RECEIPT)
+  if (!env.EVAL_NODE_OPS_CONFIG || !env.EVAL_NODE_STAND_LEASE) throw new NodeOpsFailure("HARNESS_OWNER_UNKNOWN")
+  return acquireNodeHarnessLease(await readPrivateJson(env.EVAL_NODE_OPS_CONFIG) as NodeOpsConfig,
+    await readPrivateJson(env.EVAL_NODE_STAND_LEASE) as NodeStandLease, profile)
+}
+
 export async function assertNodeStandOwner(config: NodeOpsConfig, expected: NodeStandLease) {
   await validateConfig(config)
   const current = await readLease(config)
@@ -83,11 +104,23 @@ export async function releaseNodeStand(config: NodeOpsConfig, lease: NodeStandLe
   })
 }
 
+type OperationDiagnostic = { operation: string; stage: string; dispatch: "not_started" | "started" | "unknown"; file?: string }
+
 export async function runNodeEvalOps(argv: string[], env: Record<string, string | undefined> = process.env): Promise<Record<string, unknown> & { code: number }> {
-  try { return await executeOps(argv, env) }
+  const diagnostic: OperationDiagnostic = { operation: ["status", "acquire", "preflight", "unit", "release", "recover", "check-run", "settle-writer-release", "lab31-owned-registration"].includes(argv[0] ?? "") ? argv[0]! : "unknown",
+    stage: "arguments", dispatch: "not_started" }
+  const finish = async (result: Record<string, unknown> & { code: number }) => {
+    const receipt = { version: 1, operation: diagnostic.operation, stage: diagnostic.stage, dispatch: diagnostic.dispatch,
+      reason: result.reason ?? (result.code === 0 ? "OK" : "OPERATION_FAILED"), at: new Date().toISOString() }
+    if (diagnostic.file) await writeFile(diagnostic.file, JSON.stringify(receipt), { flag: "wx", mode: 0o600 })
+    return { ...result, diagnostic: receipt, ...(diagnostic.file ? { diagnosticReceipt: diagnostic.file } : {}) }
+  }
+  try { return await finish(await executeOps(argv, env, diagnostic)) }
   catch (error) {
-    return { code: 2, status: error instanceof NodeOpsFailure && error.reason === "BUSY" ? "BUSY" : "BLOCKED",
+    const result = { code: 2, status: error instanceof NodeOpsFailure && error.reason === "BUSY" ? "BUSY" : "BLOCKED",
       reason: error instanceof NodeOpsFailure ? error.reason : "OPERATION_FAILED" }
+    return finish(result).catch(() => ({ ...result, diagnostic: { operation: diagnostic.operation, stage: diagnostic.stage,
+      dispatch: diagnostic.dispatch, reason: result.reason }, diagnosticWrite: "FAILED" }))
   }
 }
 
@@ -99,7 +132,7 @@ Commands:
   unit --lease FILE               Supervised bun test then bun typecheck, no arbitrary command.
   release --lease FILE --evidence FILE
   release --lease FILE --run DIR --ids a,b --run-sha FULL
-  recover --lease FILE --incident ID --evidence FILE
+  recover --lease FILE --incident ID --evidence FILE [--diagnostic NEW_PRIVATE_FILE]
   settle-writer-release --lease FILE --incident ID --profile reference|eval --followup-task ID --evidence ORIGINAL --receipt NEW
   lab31-owned-registration --lease FILE --evidence RECOVERY --admission OPERATOR_PROOF --followup-task ID
   check-run --run DIR --ids a,b [--tasks DIR]  Offline; never writes summary or verdict.
@@ -111,12 +144,12 @@ One operator recovery is reserved per immutable lease; incident renaming cannot 
 Successful release archives the private lease and proofs under operations/completed.
 `;
 
-async function executeOps(argv: string[], env: Record<string, string | undefined>): Promise<Record<string, unknown> & { code: number }> {
+async function executeOps(argv: string[], env: Record<string, string | undefined>, diagnostic: OperationDiagnostic): Promise<Record<string, unknown> & { code: number }> {
   if (argv.includes("--help") || !argv.length) return { code: 0, status: "HELP", help: nodeOpsHelp }
   const command = argv[0]
   if (!["status", "acquire", "preflight", "unit", "release", "recover", "check-run", "settle-writer-release", "lab31-owned-registration"].includes(command ?? "")) throw new NodeOpsFailure("UNKNOWN_COMMAND")
   const values = parseArgs({ args: argv.slice(1), strict: true, options: Object.fromEntries(
-    ["config", "lease", "issue", "task", "role", "phase", "sha", "receipt", "evidence", "incident", "run", "ids", "tasks", "run-sha", "profile", "followup-task", "admission"].map(name => [name, { type: "string" as const }])) }).values
+    ["config", "lease", "issue", "task", "role", "phase", "sha", "receipt", "evidence", "incident", "run", "ids", "tasks", "run-sha", "profile", "followup-task", "admission", "diagnostic"].map(name => [name, { type: "string" as const }])) }).values
   const required = (name: string) => {
     const value = values[name]
     if (typeof value !== "string" || !value) throw new NodeOpsFailure("MISSING_ARGUMENT")
@@ -155,15 +188,25 @@ async function executeOps(argv: string[], env: Record<string, string | undefined
   }
   const lease = await readPrivateJson(required("lease")) as NodeStandLease
   await assertNodeStandOwner(config, lease)
+  if (typeof values.diagnostic === "string") {
+    const file = values.diagnostic
+    if (!path.isAbsolute(file) || !config.roles[lease.role].workRoots.some(root => inside(file, root)) ||
+      await realpath(path.dirname(file)) !== path.dirname(file)) throw new NodeOpsFailure("RECEIPT_PATH_REFUSED")
+    diagnostic.file = file
+  } else diagnostic.file = path.join(directory(config), `diagnostic-${crypto.randomUUID()}.json`)
+  diagnostic.stage = "operation"
   if (command === "preflight") return { code: 0, ...await preflightNodeStand(config, lease, env) }
   if (command === "unit") return runNodeUnitChecks(config, lease)
   if (command === "settle-writer-release") return { code: 0, ...await settleNodeWriterRelease(config, lease, required("incident"),
     required("profile"), required("followup-task"), required("evidence"), required("receipt")) }
-  if (command === "recover") return { code: 0, ...await recoverNodeStand(config, lease, required("incident"), required("evidence"), env) }
+  if (command === "recover") return { code: 0, ...await recoverNodeStand(config, lease, required("incident"), required("evidence"), env, diagnostic) }
   if (command === "lab31-owned-registration") return { code: 0, ...await continueLab31OwnedRegistration(config, lease,
     required("evidence"), required("admission"), required("followup-task"), env) }
   const evidence = typeof values.run === "string" ? await writeEvalCompletion(config, lease, values.run, required("ids").split(","), required("run-sha")) : required("evidence")
-  return { code: 0, ...await releaseNodeStand(config, lease, evidence) }
+  const released = await releaseNodeStand(config, lease, evidence)
+  if (diagnostic.file?.startsWith(directory(config) + path.sep)) diagnostic.file = path.join(released.archive, path.basename(diagnostic.file))
+  diagnostic.stage = "released"
+  return { code: 0, ...released }
 }
 
 async function writeEvalCompletion(config: NodeOpsConfig, lease: NodeStandLease, runDir: string, caseIds: string[], runSha: string) {
@@ -322,9 +365,35 @@ async function verifyWriterReleaseSettlement(config: NodeOpsConfig, lease: NodeS
   return proof.original.path
 }
 
-export async function recoverNodeStand(config: NodeOpsConfig, lease: NodeStandLease, incident: string, evidence: string, env: Record<string, string | undefined> = process.env) {
+async function recordedNodeHarness(config: NodeOpsConfig, lease: NodeStandLease, profile: string) {
+  const guard = await lstat(`${profile}.harness-lease`).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+  if (!guard) return undefined
+  const matches: string[] = []
+  for (const name of await readdir(directory(config))) {
+    if (!/^harness-[a-f0-9-]+\.json\.stand$/.test(name)) continue
+    const binding = await readPrivateJson(path.join(directory(config), name)) as
+      { version: number; owner: NodeStandOwner; acquiredAt: string; profile: string; receipt: string; receiptSha256: string }
+    if (binding.profile !== profile) continue
+    if (binding.version !== 1 || !ownerMatches(binding.owner, lease) || binding.acquiredAt !== lease.acquiredAt ||
+      binding.receipt !== path.join(directory(config), name.slice(0, -6)) || await digest(binding.receipt) !== binding.receiptSha256)
+      throw new NodeOpsFailure("HARNESS_OWNER_UNKNOWN")
+    const receipt = await readPrivateJson(binding.receipt) as { profileDir: string; device: number; inode: number; owner: string }
+    if (receipt.profileDir === profile && receipt.device === guard.dev && receipt.inode === guard.ino &&
+      receipt.owner === await readFile(path.join(`${profile}.harness-lease`, "owner.json"), "utf8")) matches.push(binding.receipt)
+  }
+  if (matches.length !== 1) throw new NodeOpsFailure("HARNESS_ADMISSION_REQUIRED")
+  return matches[0]!
+}
+
+export async function recoverNodeStand(config: NodeOpsConfig, lease: NodeStandLease, incident: string, evidence: string, env: Record<string, string | undefined> = process.env,
+  diagnostic: OperationDiagnostic = { operation: "recover", stage: "admission", dispatch: "not_started" }) {
   return exclusive(config, lease, async () => {
+    diagnostic.stage = "admission"
     await assertOriginalAdmission(config, lease)
+    diagnostic.stage = "process_evidence"
     if (!safeName(incident)) throw new NodeOpsFailure("INVALID_INCIDENT")
     await evidencePath(config, lease, evidence)
     const recovery = await Bun.file(evidence).json() as NodeStandRecovery
@@ -344,27 +413,48 @@ export async function recoverNodeStand(config: NodeOpsConfig, lease: NodeStandLe
     await assertBrowsersClosed()
     const storage = await checkIsolatedStorage(source(config))
     if (storage.containerId !== lease.containerId) throw new NodeOpsFailure("CONTAINER_CHANGED")
+    diagnostic.stage = "registration_admission"
+    await verifyWriterReleaseSettlement(config, lease, proof, recovery.processEvidence, incident)
+    const registration: OwnedRegistration | undefined = settledOriginal && await lstat(`${profile}.process-group`).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined
+      throw error
+    }) ? { profile, acquiredAt: lease.acquiredAt, original: (await Bun.file(settledOriginal).json()).processes,
+      marker: await registrationIdentity(profile) } : undefined
+    if (registration) await verifyOwnedRegistration(profile, registration)
+    const harnessReceipt = await recordedNodeHarness(config, lease, profile)
+    diagnostic.stage = "reservation"
     const receipt = await reserveNodeRecovery(config, lease, incident)
+    diagnostic.stage = "writer_release"
     // No killing, resetting, or broad deletion: these functions inspect the saved writer and exact profile.
-    await releaseStaleWriter(profile, processes.writer)
-    return completeNodeRecovery(config, lease, incident, recovery, receipt, settledOriginal, env)
+    await releaseStaleWriter(profile, processes.writer, registration)
+    return completeNodeRecovery(config, lease, incident, recovery, receipt, settledOriginal, env, diagnostic, harnessReceipt)
   })
 }
 
 /** The normal non-model chain, shared verbatim by the narrowly admitted continuation. */
 async function completeNodeRecovery(config: NodeOpsConfig, lease: NodeStandLease, incident: string, recovery: NodeStandRecovery,
-  receipt: string, settledOriginal: string | undefined, env: Record<string, string | undefined>) {
+  receipt: string, settledOriginal: string | undefined, env: Record<string, string | undefined>, diagnostic?: OperationDiagnostic, harnessReceipt?: string) {
     const profile = recovery.profile === "reference" ? config.roles[lease.role].referenceProfile : config.roles[lease.role].evalProfile
+    if (diagnostic) diagnostic.stage = "management_configuration"
     const current = evalConfig(config, lease, env, recovery.profile)
     const command = { ...agentCommand(current, env), cleanupDir: path.join(directory(config), "recovery", incident),
       cleanupSecrets: [current.loginom.password, current.dock.apiKey, current.agent.provider?.apiKey ?? ""] }
+    if (diagnostic) { diagnostic.stage = "management"; diagnostic.dispatch = "unknown" }
     await recoverIfNeeded(command, 2)
+    if (diagnostic) { diagnostic.dispatch = "started"; diagnostic.stage = "history_archive" }
     const historyArchive = await archiveProfileHistory(profile, `node-ops-${incident}`)
     await verifyHistoryArchive(profile, historyArchive)
+    if (diagnostic) diagnostic.stage = "storage_cleanup"
     if (recovery.storageLedger) await cleanupOwnedLedger(config, lease, recovery.storageLedger, incident, settledOriginal)
     if ((await assertIsolatedStorageEmpty(source(config))).containerId !== lease.containerId) throw new NodeOpsFailure("CONTAINER_CHANGED")
+    await assertAllProfilesClean(config, harnessReceipt ? profile : undefined)
+    if (harnessReceipt) {
+      if (diagnostic) diagnostic.stage = "harness_retirement"
+      await retireRecordedHarnessLease(profile, harnessReceipt, (await Bun.file(recovery.processEvidence).json()).processes)
+    }
     await assertAllProfilesClean(config)
     await assertNodeStandOwner(config, lease)
+    if (diagnostic) diagnostic.stage = "completion"
     await writeFile(receipt, JSON.stringify({ owner: ownerOf(lease), acquiredAt: lease.acquiredAt, incident, status: "SETTLED", at: new Date().toISOString(), historyArchive,
       profile: recovery.profile, processEvidence: recovery.processEvidence }), { mode: 0o600 })
     const completion: NodeStandCompletion = { version: 1, owner: ownerOf(lease), acquiredAt: lease.acquiredAt, kind: "recovery", receipt,

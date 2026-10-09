@@ -15,7 +15,7 @@ async function main() {
   const { runAttempt, afterAttempt, installSigint, redact } = await import(path.join(repo, "evals/src/run.ts")) as typeof import("../../../src/run")
   const { parseArtifactSource } = await import(path.join(repo, "evals/src/artifact.ts")) as typeof import("../../../src/artifact")
   const { preflight } = await import(path.join(repo, "evals/src/preflight.ts")) as typeof import("../../../src/preflight")
-  const { acquireHarnessLease } = await import(path.join(repo, "evals/src/lease.ts")) as typeof import("../../../src/lease")
+  const { acquireRunHarnessLease } = await import(path.join(repo, "evals/src/node-eval-ops.ts")) as typeof import("../../../src/node-eval-ops")
   const { assertAuth, assertProfileClean, agentConfigJson } = await import(path.join(repo, "evals/src/profile.ts")) as typeof import("../../../src/profile")
   const dir = path.resolve(draft)
   const raw = await Bun.file(path.join(dir, "task.json")).json()
@@ -45,7 +45,7 @@ async function main() {
   await Bun.write(path.join(runDir, "source-hashes.json"), JSON.stringify(hashes, null, 2) + "\n")
   if (hint) await Bun.write(path.join(runDir, "hint.txt"), await Bun.file(hint).text())
   await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2) + "\n")
-  const lease = await acquireHarnessLease(config.profileDir)
+  const lease = await acquireRunHarnessLease(config.profileDir, process.env)
   config.profileDir = lease.profileDir
   const command = { ...agentCommand(config, { ...process.env, AGENT_REPO: undefined }),
     cleanupDir: path.join(runDir, "preparation"),

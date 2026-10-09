@@ -11,7 +11,7 @@ import { archiveProfileHistory, assertAuth, ensureProfile, recoverIfNeeded, rele
 import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { archiveDiagnostics } from "./diagnostics"
 import type { ProcessCleanup } from "./process-supervisor"
-import { acquireHarnessLease } from "./lease"
+import { acquireRunHarnessLease } from "./node-eval-ops"
 import { SandboxFailure } from "./sandbox"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
@@ -25,7 +25,7 @@ export async function main(argv: string[], env: Record<string, string | undefine
     const { calibrate } = await import("./calibrate")
     return calibrate(config)
   }
-  const lease = config.dryRun ? undefined : await acquireHarnessLease(config.profileDir, env.EVAL_HARNESS_LEASE_RECEIPT)
+  const lease = config.dryRun ? undefined : await acquireRunHarnessLease(config.profileDir, env)
   if (lease) config.profileDir = lease.profileDir
   const result = await executeRun(config)
   if (result.code === 0) await lease?.release()

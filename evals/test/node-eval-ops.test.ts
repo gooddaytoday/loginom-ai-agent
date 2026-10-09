@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { chmod, copyFile, mkdir, mkdtemp, rename, rm, stat, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, ownedRecoveryEntry, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, reserveOwnedRegistrationContinuation, runNodeEvalOps, runNodeUnitChecks, settleNodeWriterRelease, type NodeOpsConfig } from "../src/node-eval-ops"
+import { acquireNodeHarnessLease, acquireNodeStand, assertNodeStandOwner, nodeProcessOutput, nodeStandStatus, ownedRecoveryEntry, preflightNodeStand, recoverNodeStand, releaseNodeStand, reserveNodeRecovery, reserveOwnedRegistrationContinuation, runNodeEvalOps, runNodeUnitChecks, settleNodeWriterRelease, type NodeOpsConfig } from "../src/node-eval-ops"
 import { archiveProfileHistory } from "../src/profile"
 import { superviseProcess } from "../src/process-supervisor"
 
@@ -439,4 +439,103 @@ test.skipIf(!dockerAvailable || browserBusy)("real harness summary format releas
     const next = await acquireNodeStand(fixture.config, { ...owner, role: "ben", task: "next", sha })
     await assertNodeStandOwner(fixture.config, next)
   } finally { await fixture.dispose() }
+}, 30_000)
+
+
+test("recovery refusal before admission leaves a safe diagnostic receipt with no dispatch", async()=>{
+ const f=await runtime();
+ try {
+  const lease=await acquireNodeStand(f.config,owner),cfg=path.join(f.config.runtimeRoot,'config.json'),handle=path.join(f.config.roles.rich.workRoots[0]!,'lease.json'),diagnostic=path.join(f.config.roles.rich.workRoots[0]!,'diagnostic.json');
+  for(const [file,value] of [[cfg,f.config],[handle,lease]] as const){await Bun.write(file,JSON.stringify(value));await chmod(file,0o600)}
+  const result=await runNodeEvalOps(['recover','--config',cfg,'--lease',handle,'--incident','one','--evidence',diagnostic+'.missing','--diagnostic',diagnostic],{SECRET:'never-include-me'});
+  expect(result.reason).toBe('ADMISSION_PROOF_REQUIRED');
+  const proof=await Bun.file(diagnostic).json();
+  expect(proof).toMatchObject({operation:'recover',stage:'admission',dispatch:'not_started',reason:'ADMISSION_PROOF_REQUIRED'});
+  expect(JSON.stringify(proof)).not.toContain('never-include-me');
+  expect((await stat(diagnostic)).mode&0o777).toBe(0o600);
+ } finally {await f.dispose()}
+});
+
+
+test("node harness admission is bound to its stand owner and the exact configured profile", async()=>{
+ const f=await runtime();
+ try {
+  const lease=await acquireNodeStand(f.config,owner),admission=path.join(f.config.runtimeRoot,'operations/stand.lease/admission.json');
+  await Bun.write(admission,JSON.stringify({owner,acquiredAt:lease.acquiredAt,containerId:lease.containerId,configSha256:lease.configSha256,profiles:Object.values(f.config.roles).flatMap(r=>[r.referenceProfile,r.evalProfile])}));await chmod(admission,0o600);
+  const lock=await acquireNodeHarnessLease(f.config,lease,f.config.roles.rich.evalProfile);
+  const binding=await Bun.file(lock.receipt+'.stand').json();
+  expect(binding).toMatchObject({owner,acquiredAt:lease.acquiredAt,profile:f.config.roles.rich.evalProfile});
+  expect(binding.receiptSha256).toHaveLength(64);
+  await lock.release();
+  await expect(acquireNodeHarnessLease(f.config,lease,f.config.roles.ben.evalProfile)).rejects.toThrow('HARNESS_OWNER_UNKNOWN');
+ }finally{await f.dispose()}
+});
+
+test.skipIf(!dockerAvailable || browserBusy)("normal recovery removes its owned registration and harness guard then releases and admits the next run", async () => {
+  const f = await stand()
+  try {
+    const compiled=await Bun.$`${process.execPath} build ${path.resolve(import.meta.dir,'../fixtures/fake-cli.ts')} --compile --outfile ${f.config.cliBin}`.quiet();expect(compiled.exitCode).toBe(0)
+    // Installed management fixture has a pinned dormant browser identity; no browser or model starts.
+    const resources=path.join(path.dirname(path.dirname(f.config.cliBin)),'resources/loginom');
+    await mkdir(resources,{recursive:true});await copyFile('/bin/sleep',path.join(resources,'chrome'));
+    await Bun.write(path.join(resources,'resource-manifest.json'),JSON.stringify({browser:'chrome'}));
+    const lease = await acquireNodeStand(f.config, owner)
+    const admission = path.join(f.config.runtimeRoot, "operations/stand.lease/admission.json")
+    await Bun.write(admission, JSON.stringify({ owner, acquiredAt: lease.acquiredAt, containerId: lease.containerId,
+      configSha256: lease.configSha256, profiles: Object.values(f.config.roles).flatMap(role => [role.referenceProfile, role.evalProfile]) }))
+    await chmod(admission, 0o600)
+    const profile = f.config.roles.rich.evalProfile
+    const cfg=path.join(f.config.runtimeRoot,'config.json'),leaseFile=path.join(f.config.roles.rich.workRoots[0]!,'lease.json');
+    for(const [file,value] of [[cfg,f.config],[leaseFile,lease]] as const){await Bun.write(file,JSON.stringify(value));await chmod(file,0o600)}
+    const module=path.resolve(import.meta.dir,'../src/node-eval-ops.ts');
+    const harness=await superviseProcess({cmd:[process.execPath,'-e',`const {acquireRunHarnessLease}=await import(${JSON.stringify(module)});await acquireRunHarnessLease(${JSON.stringify(profile)},process.env);`],cwd:f.config.roles.rich.checkout,
+      env:{PATH:process.env.PATH??'',EVAL_NODE_OPS_CONFIG:cfg,EVAL_NODE_STAND_LEASE:leaseFile},timeoutMs:5000});expect(harness.exitCode).toBe(0);
+    const directory = path.join(profile, "loginom/runtime/generations/1/chats/fixture/attempts/one")
+    await mkdir(directory, { recursive: true })
+    await Bun.write(path.join(profile, ".writer/owner"), "original-owner")
+    const writer = await stat(path.join(profile, ".writer"))
+    const run = await superviseProcess({ cmd: [f.config.cliBin, "loginom", "status"],
+      cwd: f.config.roles.rich.checkout, env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000 })
+    expect(run.processCleanup.status).toBe("confirmed")
+    // Historical-error fixture; the process identities and filesystem identity are genuine observations.
+    const processes = { ...run.processCleanup, status: "failed", error: "Writer owner unavailable", runtimeDirectories: [directory],
+      writer: { device: writer.dev, inode: writer.ino, owner: "original-owner" } }
+    await rm(path.join(profile, ".writer"), { recursive: true })
+    await Bun.write(`${profile}.process-group`,String(run.processCleanup.launcher!.pid));await chmod(`${profile}.process-group`,0o600);
+    const source = path.join(f.config.roles.rich.resultsRoot, "attempt/cleanup.json")
+    await Bun.write(source, JSON.stringify({ processes, result: { status: "failed", error: processes.error } }))
+    await Bun.write(path.join(path.dirname(source), "result.json"), JSON.stringify({ status: "completed", session_id: "fixture-session",
+      package_path: "/user/fixture.lgp", environment_cleanup: { status: "failed", error: processes.error } }))
+    const before = await Bun.file(source).text()
+    const proof = path.join(f.config.roles.rich.workRoots[0]!, "settlement.json")
+    const result = await settleNodeWriterRelease(f.config, lease, "writer-incident", "eval", "followup", source, proof)
+    expect(result.status).toBe("PROCESS_SETTLED")
+    expect(await Bun.file(source).text()).toBe(before)
+    expect((await Bun.file(proof).json()).processes.observation_mode).toBe("writer_release_settlement")
+    await expect(settleNodeWriterRelease(f.config, lease, "renamed-incident", "eval", "followup", source, proof+".second")).rejects.toThrow("SETTLEMENT_ALREADY_RECORDED")
+    const recovery = path.join(f.config.roles.rich.workRoots[0]!, "recovery.json")
+    await Bun.write(recovery, JSON.stringify({ version: 1, owner, acquiredAt: lease.acquiredAt, profile: "eval", processEvidence: proof }))
+    await Bun.write(`${profile}.process-group`,'123456789');
+    await expect(recoverNodeStand(f.config,lease,'writer-incident',recovery,{})).rejects.toThrow('Registration owner unknown');
+    expect(await Bun.file(path.join(f.config.runtimeRoot,'operations/recovery-incidents')).exists()).toBe(false);
+    await Bun.write(`${profile}.process-group`,String(run.processCleanup.launcher!.pid));
+    const bindings=await Array.fromAsync(new Bun.Glob('harness-*.json.stand').scan({cwd:path.join(f.config.runtimeRoot,'operations/stand.lease'),absolute:true}));
+    expect(bindings).toHaveLength(1);
+    const attestation=await Bun.file(bindings[0]!).text();
+    await Bun.write(bindings[0]!,JSON.stringify({...JSON.parse(attestation),owner:{...owner,task:'foreign'}}));
+    await expect(recoverNodeStand(f.config,lease,'writer-incident',recovery,{})).rejects.toThrow('HARNESS_OWNER_UNKNOWN');
+    expect(await Bun.file(path.join(f.config.runtimeRoot,'operations/recovery-incidents')).exists()).toBe(false);
+    await Bun.write(bindings[0]!,attestation);
+    const done=await recoverNodeStand(f.config,lease,'writer-incident',recovery,{LOGINOM_PASSWORD:'fixture',LOGINOM_DOCK_API_KEY:'fixture',EVAL_AGENT_MODEL:'openai/fixture',EVAL_AGENT_VARIANT:'medium'});
+    expect(done.status).toBe('SETTLED');
+    expect(await Bun.file(`${profile}.process-group`).exists()).toBe(false);
+    expect(await Bun.file(path.join(`${profile}.harness-lease`,'owner.json')).exists()).toBe(false);
+    expect(await Bun.file(source).text()).toBe(before);
+    await expect(recoverNodeStand(f.config,lease,'another-name',recovery,{})).rejects.toThrow();
+    const released=await runNodeEvalOps(['release','--config',cfg,'--lease',leaseFile,'--evidence',done.evidence],{});
+    expect(released.status).toBe('RELEASED');expect(released.code).toBe(0);
+    expect((await Bun.file(released.diagnosticReceipt as string).json()).stage).toBe('released');
+    const next=await acquireNodeStand(f.config,{...owner,task:'next'});
+    expect(next.task).toBe('next');
+  } finally { await f.dispose() }
 }, 30_000)
