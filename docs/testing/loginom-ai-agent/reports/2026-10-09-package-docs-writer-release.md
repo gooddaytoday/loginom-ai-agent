@@ -406,3 +406,22 @@ Snapshot `formal-v7-progress-19-20261009.json`:19 terminal,13 PASS/6 FAIL,
 14 сохранённых пакетов, environment/process cleanup confirmed19;
 common SHA совпадает, controller81639 live. Baseline ещё26/candidate45/
 formal cold/compare pending; manual retries0.
+
+## Formal v7: незавершённая cohort#2, live observation
+
+Controller81639 подтверждён живым; собственный Bun controller PID246016
+и его launcher PID496816/starttime84315688 наблюдены живыми, связь PPID
+проверена. В приватном receipt launcher selected fields:ready=true,
+exit_code=0, sandbox_started=true/sandbox_exit_code=0, error/sandbox_error=null.
+При этом events/stderr пусты, result.json отсутствует; официального terminal
+результата и process/environment cleanup этой попытки нет. Два ограниченных
+поиска baseline CLI по argv0 и затем executable dev/inode не нашли совпадение
+в тот момент; это не замена полного процессного cleanup verifier.
+Точная причина задержки UNKNOWN. Замеры и selected fields без command capsule,
+nonce, stdin, env или credentials сохранены в приватном
+`formal-v7-cohort-attempt2-live-observations-20261009/snapshot.json`.
+Launcher намеренно сохраняет subreaper boundary до проверок supervisor;
+один живой launcher не доказывает, что CLI всё ещё исполняет запрос.
+Это read-only signal, не успешный кейс и не повод перезапускать серию по таймауту
+наблюдения. Текущий controller сохраняется, новые live/judge calls0,
+product/harness edits0; очистка/архивирование активного профиля не выполнялись.
