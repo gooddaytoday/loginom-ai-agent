@@ -103,6 +103,7 @@ async function readinessFixture(executorRole: "evalbaseline" | "evalrunner" = "e
   if (config.roles.evalbaseline?.cliBin) await Bun.write(config.roles.evalbaseline.cliBin, "fixture CLI never executed")
   if (executorRole === "evalrunner" && replay) {
     await cp(path.join(evalsRoot, "src"), path.join(checkout, "evals/src"), { recursive: true })
+    await cp(path.join(evalsRoot, "script"), path.join(checkout, "evals/script"), { recursive: true })
     const sources = await replayFixture(path.join(directory, "replay"))
     for (const run of Object.values(sources)) {
       const file = path.join(run, "summary.json")

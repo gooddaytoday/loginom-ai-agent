@@ -8,14 +8,16 @@ import { validateNodeRun } from "./node-evals"
 import type { RunSummary } from "./report"
 
 // These files define scoring, not operational scheduling. Old series are read at their exact Git revision.
-export const evaluatorFiles = ["evaluation.ts", "judge.ts", "judge-prompt.md", "verdict.schema.json", "oracle.ts", "task.ts", "report.ts",
-  "node-evals.ts", "node-xml.ts", "node-evidence.ts", "node-events.ts", "node-bindings.ts", "node-cases.ts"]
+export const evaluatorFiles = ["src/evaluation.ts", "src/judge.ts", "src/judge-prompt.md", "src/verdict.schema.json", "src/oracle.ts", "src/task.ts", "src/report.ts",
+  "src/node-evals.ts", "src/node-xml.ts", "src/node-evidence.ts", "src/node-events.ts", "src/node-bindings.ts", "src/node-cases.ts",
+  "src/node-native.ts", "src/node-runner.ts", "src/run.ts", "src/rejudge.ts", "src/cli.ts", "src/artifact.ts", "src/config.ts", "src/preflight.ts",
+  "script/inspect-node-package.py"]
 
 export async function evaluatorFingerprint(checkout: string, sha?: string) {
   const files = await Promise.all(evaluatorFiles.map(async file => {
-    if (!sha) return [file, baselineHash(await Bun.file(path.join(checkout, "evals/src", file)).bytes())]
+    if (!sha) return [file, baselineHash(await Bun.file(path.join(checkout, "evals", file)).bytes())]
     if (!/^[0-9a-f]{40}$/.test(sha)) throw new BaselineFailure("EVALUATOR_REVISION_REQUIRED")
-    const process = Bun.spawn(["git", "-C", checkout, "show", `${sha}:evals/src/${file}`], { stdout: "pipe", stderr: "pipe" })
+    const process = Bun.spawn(["git", "-C", checkout, "show", `${sha}:evals/${file}`], { stdout: "pipe", stderr: "pipe" })
     const bytes = new Uint8Array(await new Response(process.stdout).arrayBuffer())
     if (await process.exited !== 0) throw new BaselineFailure("EVALUATOR_SOURCE_UNAVAILABLE")
     return [file, baselineHash(bytes)]
