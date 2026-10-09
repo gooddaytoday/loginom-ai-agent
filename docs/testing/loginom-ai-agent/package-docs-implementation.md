@@ -4459,11 +4459,11 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - Fixed10/cold3 сохранены до первого live; v2 common SHA67c0f30005…, dispatch1ee3b44718… (первичный pre-model отказ0 попыток сохранён; own configs исправлены/native check PASS). Каждая задача — отдельный процесс, следующая только после terminal+cleanup gate.
 - Модель openai/gpt-6.1-sol medium,judge gpt-6-astra high,threshold70/checklist; effective task timeout1800000ms сохранён.
 - Новый own stand127.0.0.1:32769/server8ef472ee…/network loginom-skills-short-20261009; admission PASS. Старый v9 и original server/client не изменены.
-- Sales single-task PASS100/judge/structure/CSV/cleanup confirmed; независимый installed9695 cold PASS/bytes unchanged/no reset/remaining0. ABC запущена второй. Ручных модельных повторов0.
+- Sales single-task PASS100/judge/structure/CSV/cleanup confirmed; независимый installed9695 cold PASS/bytes unchanged/no reset/remaining0. ABC terminal: judge100/structure/warm/cold PASS, но CLI_TOOL_FAILED/exit1; консервативно полный FAIL, не входит в минимум8. Ручных модельных повторов0.
 - Историческая v9:34closed/25PASS/9FAIL,cohort#3 INCOMPLETE; hang cause UNKNOWN, raw recovery evidence сохранён, в новую приёмку не засчитывается.
 - S1–S6 PASS на реальной основной модели: CLI/default/Help/no-file, native Desktop PDF2pages и CLI DOCX2pages; факты/все страницы/вход unchanged/browser0/remaining0 проверены. Произвольное имя DOCX не поддерживается и не критерий S5.
 - ABC pre-model refusals2 с model attempts0 сохранены; S4 ports closed/helper1440162/1440164 absent, прежняя failed cleanup не переписана. Revision4 только новый admission3 path, все live checks строго serial.
-- Следующий шаг: ABC terminal/review/cold, остальные fixed tasks, S7/S8/native lifecycle.
+- Остальные fixed8 запущены serial controller/session89353, текущая articles-by-author; fresh profile/results per task, никаких live параллельно. Следующий шаг: итог8/review/campaign cold, S7/S8/native lifecycle.
 
 ### 2026-10-09 — ACTIVE, v9 terminal143; closed34/45, PASS25/FAIL9; cohort#3 INCOMPLETE
 

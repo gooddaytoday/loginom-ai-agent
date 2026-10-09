@@ -90,7 +90,15 @@ CSV oracle PASS/environment cleanup confirmed, process terminal0. Cold этог�
 Унаследованные cold-reader49/image поля common — историческая справка,
 фактический current-host replay использует полный final candidate9695, как
 записано в его result/read-back. Новая серия не является сравнением двух reader.
-ABC запущена второй; остальные8 ещё не запущены. Две её подготовки сохранены
+ABC завершена второй: штатный judge PASS100/checklist, structure0/warm oracle
+PASS и cold PASS без перенастройки/bytes unchanged/remaining0. Cold read-back
+18 файлов `108163136fbdfcbf713594758c8f8875aaea45e0d8b4c1a2fd3cbec122540c94`.
+CLI при этом exit1/failed/tool/CLI_TOOL_FAILED: первый вызов skill был aborted.
+Harness `pass:true` оценивает артефакт, но полный исход консервативно **FAIL**;
+его не засчитываем в минимум8 CLI PASS. Ручного модельного повтора нет.
+Остальные8 запускает отдельный serial controller: каждый процесс по одному,
+между ними terminal/cleanup/structure/oracle gates, для campaign обязательный
+cold. Подготовки ABC сохранены
 как pre-model admission refusals с нулём модельных попыток: внешний debugger
 собственного S4 Desktop и последующая необъяснённая helper PID при параллельном
 S5 setup. S4 debugger ports37937/36905 закрыты; helper PID1440162/1440164
