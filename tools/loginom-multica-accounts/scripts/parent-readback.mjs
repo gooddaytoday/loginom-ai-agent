@@ -2,6 +2,7 @@ import {readFileSync, lstatSync, openSync, writeFileSync, fsyncSync, closeSync} 
 import {dirname, join, isAbsolute} from 'node:path';
 import {createHash, randomBytes} from 'node:crypto';
 import {verifyPairBindings} from './qualify-accounts.mjs';
+import {requireSameObserver} from './account-identity.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const isHash = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
@@ -10,7 +11,7 @@ const isUUID = value => typeof value === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4
 const time = value => typeof value === 'string' ? Date.parse(value) : NaN;
 const fail = code => { throw Object.assign(Error(code), {code}); };
 
-function privatePath(path, directory = false) {
+export function privatePath(path, directory = false) {
   if (!isAbsolute(path)) fail('PARENT_READBACK_PRIVATE_PATH_INVALID');
   for (let current = path; current !== dirname(current); current = dirname(current)) {
     if (lstatSync(current).isSymbolicLink()) fail('PARENT_READBACK_PRIVATE_PATH_INVALID');
@@ -21,7 +22,7 @@ function privatePath(path, directory = false) {
   return info;
 }
 
-function save(directory, name, value) {
+export function savePrivateArtifact(directory, name, value) {
   privatePath(directory, true);
   const fd = openSync(join(directory, name), 'wx', 0o600);
   try { writeFileSync(fd, JSON.stringify(value, null, 2) + '\n'); fsyncSync(fd); }
@@ -41,7 +42,7 @@ function processesAbsent(records) {
   }
 }
 
-function configBindings(paths, issueId, stand) {
+export function configBindings(paths, issueId, stand) {
   if (!Array.isArray(paths) || paths.length !== 3 || new Set(paths).size !== 3) fail('PAIR_BINDING_MISMATCH');
   const bindings = paths.map(path => {
     const info = privatePath(path);
@@ -53,7 +54,7 @@ function configBindings(paths, issueId, stand) {
   return {bindings, users: [operator.admin_user, ...roles.map(role => role.loginom.username)].map(hash)};
 }
 
-export function createParentRequest({directory, issueId, operationId, source, stand, configs, effects, cleanupFile, logoutFile}) {
+export function createParentRequest({directory, issueId, operationId, source, stand, configs, effects, cleanupFile, logoutFile, expectedObserver}) {
   privatePath(cleanupFile); privatePath(logoutFile);
   const cleanup = JSON.parse(readFileSync(cleanupFile));
   const logout = JSON.parse(readFileSync(logoutFile));
@@ -71,6 +72,16 @@ export function createParentRequest({directory, issueId, operationId, source, st
       || effect.session_id <= 0 || !Number.isFinite(time(effect.create_time)) || effect.stand !== stand)
       fail('FINAL_SERVER_EFFECT_UNBOUND');
   }
+  if (new Set(effects.map(effect => effect.guid_hash)).size !== effects.length
+    || new Set(effects.map(effect => effect.session_id)).size !== effects.length) fail('FINAL_SERVER_EFFECT_UNBOUND');
+  if (!Array.isArray(logout.receipts) || logout.receipts.length !== effects.length
+    || logout.receipts.some((receipt, index) => JSON.stringify(receipt.effect) !== JSON.stringify(effects[index])
+      || receipt.logout?.guid_hash !== effects[index].guid_hash || receipt.logout.ui_logout_invoked !== true
+      || receipt.logout.transport_disconnected !== true)) fail('PARENT_READBACK_OPERATION_INCOMPLETE');
+  for (const receipt of logout.receipts) {
+    if (!isHash(receipt.causal_proof_sha256)) fail('PARENT_READBACK_OPERATION_INCOMPLETE');
+    requireSameObserver(expectedObserver, receipt.observer, stand);
+  }
   processesAbsent(cleanup.processes);
   const {bindings, users} = configBindings(configs, issueId, stand);
   if (users.some(user => !effects.some(effect => effect.user_hash === user))
@@ -79,17 +90,21 @@ export function createParentRequest({directory, issueId, operationId, source, st
     nonce: randomBytes(32).toString('hex'), phase: 'post-cleanup', source, stand, configs: bindings, effects,
     cleanup_sha256: hash(readFileSync(cleanupFile)), logout_sha256: hash(readFileSync(logoutFile)),
     cleanup_file: cleanupFile, logout_file: logoutFile,
+    expected_observer: expectedObserver,
     after: new Date().toISOString(), observer_access: 'existing-owner-Mac-Admin-native-CUA'};
-  save(directory, 'parent-request.json', request);
+  requireSameObserver(expectedObserver, {...expectedObserver, connected: true, mst_self_count: 1}, stand);
+  savePrivateArtifact(directory, 'parent-request.json', request);
   return request;
 }
 
 export function verifyParentEnvelope(request, response) {
-  if (request?.schema !== 'lab53-parent-readback-request-v1' || request.phase !== 'post-cleanup'
+  const capture = ['before-operation', 'while-connected'].includes(request?.phase);
+  if (request?.schema !== 'lab53-parent-readback-request-v1' || (!capture && request.phase !== 'post-cleanup')
     || !isUUID(request.issue_id) || !isUUID(request.operation_id) || !isHash(request.nonce)
     || !Number.isFinite(time(request.after)) || !isSHA(request.source?.sha) || !isSHA(request.source.tree)
-    || !isHash(request.source.manifest_sha256) || !isHash(request.cleanup_sha256) || !isHash(request.logout_sha256)
-    || request.configs?.length !== 3 || !Array.isArray(request.effects) || !request.effects.length
+    || !isHash(request.source.manifest_sha256)
+    || (!capture && (!isHash(request.cleanup_sha256) || !isHash(request.logout_sha256) || !request.effects?.length))
+    || request.configs?.length !== 3 || !Array.isArray(request.effects)
     || response?.schema !== 'lab53-parent-readback-response-v1'
     || response.issue_id !== request.issue_id || response.operation_id !== request.operation_id
     || response.nonce !== request.nonce || response.request_sha256 !== hash(JSON.stringify(request))
@@ -107,6 +122,7 @@ export function verifyParentEnvelope(request, response) {
     || time(response.refresh.completed_at) < time(response.refresh.started_at)
     || time(response.readback.refreshed_at) < time(response.refresh.completed_at))
     fail('PARENT_READBACK_BINDING_UNCONFIRMED');
+  requireSameObserver(request.expected_observer, response.readback.observer, request.stand);
   return response.readback;
 }
 
@@ -117,7 +133,8 @@ export function consumeParentResponse({directory, requestFile, responseFile, exp
     || request.source?.sha !== expected.source_sha || request.source?.tree !== expected.source_tree
     || request.source?.manifest_sha256 !== expected.manifest_sha256
     || JSON.stringify(request.configs?.map(config => config.path)) !== JSON.stringify(expected.config_paths)
-    || request.cleanup_file !== expected.cleanup_file || request.logout_file !== expected.logout_file)
+    || request.cleanup_file !== expected.cleanup_file || request.logout_file !== expected.logout_file
+    || JSON.stringify(request.expected_observer) !== JSON.stringify(expected.expected_observer))
     fail('PARENT_READBACK_BINDING_UNCONFIRMED');
   for (const config of request.configs ?? []) {
     const info = privatePath(config.path);
@@ -135,7 +152,7 @@ export function consumeParentResponse({directory, requestFile, responseFile, exp
   // before consuming; this callback is the existing accounts validator, not a
   // ready flag or a transport capable of opening another Loginom session.
   expected.verify(readback, request.effects, request.after);
-  save(directory, 'parent-consumed-' + request.nonce + '.json', {schema: 'lab53-parent-readback-consumed-v1',
+  savePrivateArtifact(directory, 'parent-consumed-' + request.nonce + '.json', {schema: 'lab53-parent-readback-consumed-v1',
     state: 'UNKNOWN', ready: false, operation_id: request.operation_id, request_sha256: hash(JSON.stringify(request)),
     response_sha256: hash(readFileSync(responseFile))});
   return {readback, status: 'PARENT_SERVER_COMPONENT_CHECKED', ready: false};
@@ -146,17 +163,43 @@ export function consumeParentResponse({directory, requestFile, responseFile, exp
 // application/session factory is assumed. Raw return data stays private.
 export async function collectLoadedDispatcher() {
   const visible = element => element.getBoundingClientRect().width && element.getBoundingClientRect().height;
-  const elements = [...document.querySelectorAll('[data-tid$="SessionsManagerForm;trpSessions"]')].filter(visible);
   const masks = [...document.querySelectorAll('.bg-mask-message')].filter(visible);
-  if (elements.length !== 1 || masks.length) throw Error('PARENT_DISPATCHER_NOT_READY');
-  const dispatcher = globalThis.Ext?.getCmp(elements[0].id);
-  const manager = dispatcher?.Controller?.FSessionManager;
-  const root = dispatcher?.getStore()?.getRoot();
+  const formClass = globalThis.bg?.admin?.SessionsManagerForm;
+  if (typeof formClass !== 'function' || masks.length || !globalThis.Ext?.ComponentManager?.getAll)
+    throw Error('PARENT_DISPATCHER_NOT_READY');
+  // Existing owner tabs lack testable data-tid. MainForm retains actual tab
+  // Controllers; SessionsManagerForm owns Items.trpSessions/FSessionsStore.
+  // Enumerate loaded Ext components, then require one exact visible instance.
+  const views = globalThis.Ext.ComponentManager.getAll().filter(view =>
+    view.$className === 'bg.admin.view.SessionsManagerForm' && view.isVisible?.(true)
+      && view.Controller instanceof formClass);
+  if (views.length !== 1) throw Error('PARENT_DISPATCHER_NOT_READY');
+  const controller = views[0].Controller;
+  const tree = controller.Items.trpSessions;
+  const store = controller.FSessionsStore;
+  // Retained SessionsManagerForm.AfterLoad sets Items.trpSessions to its
+  // FSessionsStore. Qualify these exact objects; a synthetic alternate view
+  // or an unrelated form/controller must not stand in for the loaded tree.
+  if (!tree?.isVisible?.(true) || tree.getStore?.() !== store)
+    throw Error('PARENT_VENDOR_SHAPE_UNCONFIRMED');
+  const manager = controller.FSessionManager;
+  const root = store?.getRoot?.();
+  const enumeration = globalThis.bg?.TBGManagedSessionType;
+  const names = ['mstClient', 'mstSelf', 'mstShared', 'mstPool', 'mstBackup'];
+  const enumShape = holder => holder && names.every((name, i) => holder[name] === i);
+  const staticShape = enumShape(enumeration), prototypeShape = enumShape(enumeration?.prototype);
+  if (!staticShape && !prototypeShape
+    || names.some((name, i) => [enumeration?.[name], enumeration?.prototype?.[name]]
+      .some(value => value !== undefined && value !== i))) throw Error('PARENT_VENDOR_ENUM_UNCONFIRMED');
+  const types = staticShape ? enumeration : enumeration.prototype;
   const app = globalThis.bg?.app?.Application?.FInstance;
   const connection = app?.FServerConnection;
   const remote = connection?.FRemoteSession;
   if (!root?.isLoaded?.() || !manager || !connection?.Connected || !remote
     || globalThis.bg?.app?.CurrentUser?.Get()?.IsAdmin !== true) throw Error('PARENT_CALIBRATION_UNCONFIRMED');
+  const currentUser = await connection.GetCurrentUser();
+  if (await currentUser.get_Name() !== connection.UserName || await currentUser.get_IsAdmin() !== true)
+    throw Error('PARENT_CALIBRATION_UNCONFIRMED');
   const children = [...root.childNodes];
   const fingerprint = () => JSON.stringify(children.map(node => ({text: node.data.text, type: node.data.SessionType,
     created: node.data.CreateTime, pending: node.data.PendingDisconnect, packages: node.childNodes.map(pkg =>
@@ -175,9 +218,11 @@ export async function collectLoadedDispatcher() {
     const name = await info.get_Name(), created = await info.get_CreateTime(), type = await info.get_SessionType();
     const pending = await info.get_PendingDisconnect();
     const packages = await info.get_Count();
+    const virtual = type === types.mstShared || type === types.mstPool;
+    const sameDate = created instanceof Date && Number.isFinite(created.getTime())
+      && created.getTime() === node.data.CreateTime?.getTime();
     if (name !== node.data.text || type !== node.data.SessionType || pending !== node.data.PendingDisconnect
-      || typeof pending !== 'boolean' || !(created instanceof Date)
-      || !Number.isFinite(created.getTime()) || created.getTime() !== node.data.CreateTime?.getTime()
+      || typeof pending !== 'boolean' || !(sameDate || (virtual && created === null && node.data.CreateTime === null))
       || !Number.isSafeInteger(packages) || packages < 0 || packages !== node.childNodes.length)
       throw Error('PARENT_INVENTORY_INCOMPLETE');
     const normalized = [];
@@ -196,14 +241,21 @@ export async function collectLoadedDispatcher() {
         || values.ReferenceCount !== record.data.ReferenceCount) throw Error('PARENT_INVENTORY_INCOMPLETE');
       normalized.push(values);
     }
-    rows.push({name, create_time: created.toISOString(), type, pending_disconnect: pending, packages: normalized,
+    rows.push({name, create_time: created === null ? null : created.toISOString(), type, pending_disconnect: pending, packages: normalized,
       same_client_session: info.$S === remote.$S});
   }
   const after = await manager.get_Count();
+  const currentViews = globalThis.Ext.ComponentManager.getAll().filter(view =>
+    view.$className === 'bg.admin.view.SessionsManagerForm' && view.isVisible?.(true)
+      && view.Controller instanceof formClass);
   if (count !== after || before !== fingerprint() || root.childNodes.length !== children.length
     || children.some((node, i) => root.childNodes[i] !== node) || app.FServerConnection !== connection
-    || connection.FRemoteSession !== remote || !connection.Connected) throw Error('PARENT_INVENTORY_CHANGED');
-  const self = rows.filter(row => row.type === globalThis.bg.TBGManagedSessionType.mstSelf);
+    || connection.FRemoteSession !== remote || !connection.Connected || currentViews.length !== 1
+    || currentViews[0] !== views[0] || views[0].Controller !== controller || controller.FSessionManager !== manager
+    || controller.FSessionsStore !== store || controller.Items.trpSessions !== tree || tree.getStore() !== store
+    || store.getRoot() !== root || !root.isLoaded() || !tree.isVisible(true)
+    || [...document.querySelectorAll('.bg-mask-message')].some(visible)) throw Error('PARENT_INVENTORY_CHANGED');
+  const self = rows.filter(row => row.type === types.mstSelf);
   if (self.length !== 1 || !self[0].same_client_session || !self[0].name.startsWith(connection.UserName + ':'))
     throw Error('PARENT_CALIBRATION_UNCONFIRMED');
   const guid = String(await remote.get_Guid());
@@ -217,24 +269,28 @@ export async function collectLoadedDispatcher() {
 // The parent writes this response through the existing supplement/handoff,
 // keeping its raw getter result and Refresh action receipt private. This
 // envelope is a helper artifact, not a new Host/Agent transport or readiness API.
-export function buildParentResponse(request, raw, refresh) {
+export function buildParentResponse(request, raw, refresh, tabBindingSHA256) {
   const stand = new URL(raw.stand); stand.searchParams.delete('testable');
   if (stand.href !== request.stand || raw.loaded !== true || raw.connected !== true || raw.visible_masks !== 0
     || raw.manager_count !== raw.rows?.length || raw.store_count !== raw.rows?.length
     || typeof raw.observer_guid !== 'string' || !raw.observer_guid) fail('PARENT_INVENTORY_INCOMPLETE');
   const types = ['mstClient', 'mstSelf', 'mstShared', 'mstPool', 'mstBackup'];
-  const rows = raw.rows.map(row => {
+  const rows = raw.rows.map((row, rowIndex) => {
+    const virtual = [2, 3].includes(row.type);
     const match = row.name?.match(/^(.*):([1-9]\d*)$/);
-    if (!match || !Number.isSafeInteger(Number(match[2])) || !types[row.type]
-      || !Number.isFinite(time(row.create_time)) || !Array.isArray(row.packages)) fail('PARENT_INVENTORY_INCOMPLETE');
-    return {user_hash: hash(match[1]), session_id: Number(match[2]), create_time: row.create_time,
+    if (row.type === 4) fail('PARENT_BACKUP_SEMANTICS_UNQUALIFIED');
+    if ((!virtual && (!match || !Number.isSafeInteger(Number(match[2])))) || !types[row.type]
+      || typeof row.name !== 'string' || !row.name || (!Number.isFinite(time(row.create_time)) && !(virtual && row.create_time === null))
+      || !Array.isArray(row.packages)) fail('PARENT_INVENTORY_INCOMPLETE');
+    return {kind: virtual ? 'virtual' : 'client', row_index: rowIndex, name_hash: hash(row.name),
+      user_hash: virtual ? null : hash(match[1]), session_id: virtual ? null : Number(match[2]), create_time: row.create_time,
       type: types[row.type], pending_disconnect: row.pending_disconnect,
       guid_hash: row.type === 1 ? hash(raw.observer_guid) : null,
       packages: row.packages.map(pkg => ({name_hash: hash(pkg.Name), path_hash: pkg.Path == null ? null : hash(pkg.Path),
         create_time: pkg.CreateTime == null ? null : new Date(pkg.CreateTime).toISOString(),
         modify_time: pkg.ModifyTime == null ? null : new Date(pkg.ModifyTime).toISOString(),
         version: pkg.Version, read_only: pkg.ReadOnly, reference_count: pkg.ReferenceCount}))};
-  }).sort((a, b) => a.session_id - b.session_id);
+  });
   const rawSelf = raw.rows.filter(row => row.type === 1);
   const self = rows.filter(row => row.type === 'mstSelf');
   if (self.length !== 1 || !rawSelf[0].same_client_session || self[0].user_hash !== hash(raw.observer_username))
@@ -242,8 +298,9 @@ export function buildParentResponse(request, raw, refresh) {
   const readback = {source: 'existing-authorized-admin', stand: request.stand, loaded: true,
     refresh_complete: true, packages_complete: true, refreshed_at: raw.observed_at,
     manager_count: raw.manager_count, store_count: raw.store_count, rows,
-    observer: {...self[0], connected: true, mst_self_count: 1},
-    calibration: {observer_guid_hash: self[0].guid_hash, stand: request.stand}, inventory_sha256: hash(JSON.stringify(rows))};
+    observer: {...self[0], connected: true, mst_self_count: 1, tab_binding_sha256: tabBindingSHA256},
+    calibration: {observer_guid_hash: self[0].guid_hash, stand: request.stand,
+      tab_binding_sha256: tabBindingSHA256}, inventory_sha256: hash(JSON.stringify(rows))};
   const response = {schema: 'lab53-parent-readback-response-v1', issue_id: request.issue_id,
     operation_id: request.operation_id, nonce: request.nonce, source: request.source,
     request_sha256: hash(JSON.stringify(request)), configs_sha256: hash(JSON.stringify(request.configs)),

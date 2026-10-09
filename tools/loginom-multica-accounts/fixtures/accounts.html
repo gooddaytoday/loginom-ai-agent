@@ -19,10 +19,35 @@ window.installAccounts = ({policy, existing = false, brokenDisconnect = false, w
     MustChangePassword: false, Blocked: false};
   const app = {FServerConnection: null, FMainForm: null};
   window.bg = {app: {Application: {FInstance: app}, CurrentUser: {Get: () => ({IsAdmin: true})}},
-    TBGManagedSessionType: {mstSelf: 1}};
+    TBGManagedSessionType: {mstClient: 0, mstSelf: 1, mstShared: 2, mstPool: 3, mstBackup: 4}};
   window.actions = [];
   window.connector = {$D: false, $T: {}, $GT() {return this.$T;}};
   window.accountGuid = 'ABCDEF00-1234-1234-1234-123456789ABC';
+  class RemoteContainer {
+    async ConnectToServer() {this.FServerConnector = connector; return true;}
+    async Reconnect() {window.nativeReconnectCalls = (window.nativeReconnectCalls ?? 0) + 1; return 0;}
+    Finalize() {this.FServerConnector.$D = true; this.FServerConnector.$T = null;}
+    get OnTransportError() {return this.FOnTransportError;}
+    set OnTransportError(value) {this.FOnTransportError = value; if (this.FServerConnector) this.FServerConnector.OnTransportError = value;}
+  }
+  class ServerConnection {
+    constructor() {this.FServerContainer = this.FRemoteServerContainer = new RemoteContainer();}
+    async DoConnect() {
+      await this.FServerContainer.ConnectToServer(); this.FConnected = true;
+      this.FServerContainer.OnTransportError = error => {this.FConnected = false; if (this.FOnTransportErrorEvent) this.FOnTransportErrorEvent(error);};
+    }
+    async PrepareSession() {this.FSession = this.FRemoteSession = this.remote;}
+    async Reconnect() {const value = await this.FRemoteServerContainer.Reconnect(); this.FConnected = value === 0; return value;}
+    get Connected() {return !!this.FConnected;}
+    get RemoteSession() {return this.FRemoteSession;}
+    set RemoteSession(value) {this.FRemoteSession = value;}
+    get Session() {return this.FSession;}
+    set Session(value) {this.FSession = value;}
+    get ServerContainer() {return this.FServerContainer;}
+    set ServerContainer(value) {this.FServerContainer = value;}
+    async GetCurrentUser() {return this.user;}
+  }
+  bg.app.ServerConnection = ServerConnection;
   by('LoginForm;Login;btnLogin').onclick = () => {
     actions.push('login');
     if (reject) { const error = document.createElement('span'); error.className = 'x-form-error-wrap'; error.textContent = 'Rejected'; document.body.append(error); return; }
@@ -30,8 +55,10 @@ window.installAccounts = ({policy, existing = false, brokenDisconnect = false, w
     const user = {get_Name: async () => username};
     for (const [name, value] of Object.entries(rights)) user['get_' + name] = async () => name === 'IsAdmin' ? username === 'admin' : value;
     const remote = {get_Guid: async () => window.accountGuid, $S: 'synthetic-session'};
-    app.FServerConnection = {Connected: true, RemoteSession: remote, FRemoteSession: remote, Session: {},
-      UserName: username, GetCurrentUser: async () => user, ServerContainer: {FServerConnector: connector}};
+    const con = new bg.app.ServerConnection();
+    con.UserName = username; con.user = user; con.remote = remote;
+    app.FServerConnection = con;
+    con.DoConnect().then(() => con.PrepareSession());
     app.FMainForm = {FMapTree: {PackageNodes: {Count: 0}}};
     document.querySelector('#login').hidden = true;
     by('MF;cntMain;tlbMainToolbar;btnAvatar').hidden = false;
@@ -80,7 +107,7 @@ window.installAccounts = ({policy, existing = false, brokenDisconnect = false, w
   };
   by(prefix + 'btnCancel').onclick = () => {actions.push('cancel'); form.hidden = true;};
 };
-window.installDispatcher = ({duplicate = false, changing = false, packages = true} = {}) => {
+window.installDispatcher = ({duplicate = false, changing = false, packages = true, virtual = false, noTid = false, backup = false} = {}) => {
   const app = bg.app.Application.FInstance, con = app.FServerConnection;
   const element = document.querySelector('#dispatcher'); element.hidden = false;
   const date = new Date('2026-10-09T00:00:00Z');
@@ -92,10 +119,23 @@ window.installDispatcher = ({duplicate = false, changing = false, packages = tru
     get_Count: async () => !i && packages ? 1 : 0, PackageInfo: async () => pkg}));
   const nodes = infos.map((info, i) => ({data: {Info: info, text: (i ? 'foreign' : con.UserName) + ':' + (90 + i),
     CreateTime: date, SessionType: i ? 0 : 1, PendingDisconnect: false}, childNodes: !i && packages ? [{data: {...pack, text: pack.Name, Info: pkg}}] : []}));
+  if (noTid) element.removeAttribute('data-tid');
+  if (virtual) for (const [type, name] of [[2, 'Общие пакеты'], [3, 'Пул пакетов']]) {
+    const info = {get_Name: async () => name, get_CreateTime: async () => null, get_SessionType: async () => type,
+      get_PendingDisconnect: async () => false, get_Count: async () => 1, PackageInfo: async () => pkg};
+    infos.push(info); nodes.push({data: {Info: info, text: name, CreateTime: null, SessionType: type, PendingDisconnect: false},
+      childNodes: [{data: {...pack, text: pack.Name, Info: pkg}}]});
+  }
+  if (backup) {nodes[1].data.SessionType = 4; infos[1].get_SessionType = async () => 4;}
   const root = {childNodes: nodes, isLoaded: () => true};
   let reads = 0;
-  const manager = {get_Count: async () => changing && reads++ ? 3 : 2, SessionInfo: async i => infos[duplicate ? 0 : i]};
-  const previous = Ext.getCmp; Ext.getCmp = id => id === 'dispatcher' ? {Controller: {FSessionManager: manager}, getStore: () => ({getRoot: () => root})} : previous(id);
+  const manager = {get_Count: async () => changing && reads++ ? nodes.length + 1 : nodes.length, SessionInfo: async i => infos[duplicate ? 0 : i]};
+  class Controller {}
+  const store = {getRoot: () => root}, tree = {isVisible: () => !element.hidden, getStore: () => store};
+  const controller = Object.assign(new Controller(), {FSessionManager: manager, FSessionsStore: store, Items: {trpSessions: tree}});
+  bg.admin = {SessionsManagerForm: Controller};
+  const view = {$className: 'bg.admin.view.SessionsManagerForm', isVisible: () => !element.hidden, Controller: controller};
+  Ext.ComponentManager = {getAll: () => [view]};
   window.dispatcherRoot = root;
 };
 </script>

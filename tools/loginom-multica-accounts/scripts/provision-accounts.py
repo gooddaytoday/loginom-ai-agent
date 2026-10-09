@@ -4,6 +4,7 @@ import argparse
 import fcntl
 import importlib.util
 import json
+import hashlib
 import os
 from pathlib import Path
 import secrets
@@ -17,7 +18,7 @@ from common import (read_private, write_private, private_snapshot, account_guard
                     process_identity, new_evidence_directory, append_evidence)
 
 
-def run_foreground(command, guards, evidence_dir, timeout=300, stop_timeout=10, operation_binding=None):
+def run_foreground(command, guards, evidence_dir, timeout=300, stop_timeout=10, operation_binding=None, guard_barrier=False, harness_audit=None):
     # Descendant ownership is scoped to a dedicated subreaper, independent of
     # session/process-group changes. The caller never adopts unrelated children.
     if operation_binding is not None:
@@ -34,7 +35,8 @@ def run_foreground(command, guards, evidence_dir, timeout=300, stop_timeout=10, 
     module_spec.loader.exec_module(supervisor)
     directory = new_evidence_directory(evidence_dir)
     descriptors = tuple(guard['fd'] for guard in guards)
-    if not descriptors or len(set(descriptors)) != len(descriptors):
+    read_only_collector = not descriptors and len(command) >= 2 and Path(command[1]).resolve() == Path(__file__).with_name('finalize-preparation.mjs').resolve()
+    if (not descriptors and not read_only_collector) or len(set(descriptors)) != len(descriptors):
         raise RuntimeError('ACCOUNT_FD_BINDING_INVALID')
     for guard in guards:
         current = os.fstat(guard['fd'])
@@ -43,9 +45,11 @@ def run_foreground(command, guards, evidence_dir, timeout=300, stop_timeout=10, 
                 path.st_dev, path.st_ino) != (guard['device'], guard['inode']):
             raise RuntimeError('ACCOUNT_FD_BINDING_INVALID')
     envelope = append_evidence(directory, {'schema': 'account-inherited-guards-v1',
+        **({'audit': harness_audit} if harness_audit is not None else {}),
         'guards': [{key: guard[key] for key in ('fd', 'path', 'device', 'inode', 'previous_processes_absent')
                     if key in guard} for guard in guards]})
-    environment = {**os.environ, 'LOGINOM_ACCOUNTS_GUARDS_FILE': str(envelope)}
+    environment = {**os.environ, 'LOGINOM_ACCOUNTS_GUARDS_FILE': str(envelope),
+                   'LOGINOM_ACCOUNTS_FLOCK_BARRIER': 'required' if guard_barrier else 'not-requested'}
     process = None
     owner = None
     cancelled = False
@@ -125,7 +129,60 @@ def run_foreground(command, guards, evidence_dir, timeout=300, stop_timeout=10, 
             append_evidence(directory, {'phase': 'process-cleanup', 'state': 'UNKNOWN', 'process_cleanup': cleanup,
                 'processes': records, 'failure': failure, 'server_absence': 'NOT_PROVED',
                 'returncode': result.get('returncode'), 'parent_guard_fds_retained': list(descriptors),
+                'flock_barrier': result.get('flock_barrier'),
                 **(operation_binding or {})})
+
+
+def clean_candidate(source_sha):
+    root = Path(__file__).resolve().parents[1]
+    version = root / 'VERSION.json'
+    data = json.loads(version.read_text())
+    for relative, digest in data['files'].items():
+        if hashlib.sha256((root / relative).read_bytes()).hexdigest() != digest:
+            raise RuntimeError('CAPTURE_SOURCE_CHANGED')
+    actual = subprocess.check_output(['git', '-C', root, 'rev-parse', 'HEAD'], text=True).strip()
+    changed = subprocess.check_output(['git', '-C', root, 'status', '--porcelain', '--', '.'], text=True)
+    if actual != source_sha or changed:
+        raise RuntimeError('CAPTURE_SOURCE_NOT_CLEAN_PUBLISHED')
+    return {'sha': actual, 'tree': subprocess.check_output(['git', '-C', root, 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
+            'manifest_sha256': hashlib.sha256(version.read_bytes()).hexdigest()}
+
+
+def finish_qualified_pair(context, configs, operation, verify_file, proof_file, markers, processes):
+    spec = importlib.util.spec_from_file_location('account_owner_archive', Path(__file__).with_name('owner-archive.py'))
+    owner = importlib.util.module_from_spec(spec); spec.loader.exec_module(owner)
+    snapshots = [private_snapshot(path) for path in [context['operator_path'], *configs]]
+    # Archive only exact canonical effects of this operation, under the same
+    # retained permanent OFDs. Historical legacy ownership remains UNKNOWN.
+    for name, guard in context['guards'].items():
+        owner.archive_owned(guard, markers[name], snapshots, operation, verify_file, proof_file, processes,
+                            context['evidence_dir'] / ('history-' + guard['role']))
+    before = {path: read_private(path) for path in configs}
+    try:
+        for path, config in before.items(): write_private(path, {**config, 'account_state': 'ready'})
+        current = [private_snapshot(path) for path in configs]
+        for snapshot in current:
+            original = before[Path(snapshot['path'])]
+            if snapshot['data'] != {**original, 'account_state': 'ready'}: raise RuntimeError('ACCOUNT_READY_WRITE_UNCONFIRMED')
+        receipt = append_evidence(context['evidence_dir'], {'phase': 'pair-qualified', 'operation_id': operation['operation_id'],
+            'source': operation['source'], 'proof_file': str(proof_file), 'configs': [{key: item[key] for key in ['path', 'device', 'inode', 'sha256']}
+            for item in current], 'changed_keys': ['account_state'], 'server_absence': 'BOUND_FINAL_PROOF'})
+        return {'status': 'PAIR_QUALIFIED', 'ready': True, 'operation_id': operation['operation_id'], 'receipt': str(receipt)}
+    except BaseException:
+        # All guards remain held. Restore original values, retain archived
+        # history and create new UNKNOWN owner-transition markers to block any
+        # partial ready state/reuse. This never deletes historical evidence.
+        updated = [private_snapshot(path) for path in [context['operator_path'], *configs]]
+        for name, guard in context['guards'].items():
+            guard['configs'] = updated
+            begin_account_effect(guard, operation['issue_id'], guard['role'], operation['operation_id'], operation['source']['sha'])
+        failures = []
+        for path, config in before.items():
+            try: write_private(path, config)
+            except Exception as error: failures.append(type(error).__name__)
+        append_evidence(context['evidence_dir'], {'phase': 'pair-qualified-write-failed', 'state': 'UNKNOWN',
+            'operation_id': operation['operation_id'], 'history_preserved': True, 'restore_failures': failures})
+        raise
 
 
 def require_finite_cleanup():
@@ -245,10 +302,18 @@ def allocate(issue, operator_path, directory, stage='stage0', held_pair=None):
     return configs
 
 
-def prepare_pair(issue, operator_path, directory, previous_processes, evidence_dir, source_sha, lock_directory=None):
-    attempt = str(uuid4())
+def prepare_pair(issue, operator_path, directory, previous_processes, evidence_dir, source_sha, lock_directory=None,
+                 parent_binding_file=None, operation_id=None):
+    if not parent_binding_file or not operation_id: raise RuntimeError('PRIVATE_PARENT_BINDING_REQUIRED')
+    attempt = str(UUID(operation_id))
+    source = clean_candidate(source_sha)
+    parent_binding = private_snapshot(parent_binding_file)
+    authorization = parent_binding['data']
+    if authorization.get('issue_id') != issue or authorization.get('operation_id') != attempt or authorization.get('source') != source:
+        raise RuntimeError('PRIVATE_PARENT_BINDING_REQUIRED')
     with preparation_guard(issue, operator_path, directory, previous_processes, evidence_dir, lock_directory) as context:
         configs = allocate(issue, operator_path, directory, held_pair=context['pair_guard'])
+        context['operator_path'] = operator_path
         current_configs = [private_snapshot(operator_path), *[private_snapshot(config) for config in configs]]
         for guard in context['guards'].values():
             for before in guard['configs']:
@@ -256,21 +321,84 @@ def prepare_pair(issue, operator_path, directory, previous_processes, evidence_d
                 if any(before[key] != after[key] for key in ('device', 'inode', 'sha256')):
                     raise RuntimeError('ACCOUNT_CONFIG_CHANGED')
             guard['configs'] = current_configs
+        markers = {}
         for role, name in context['role_names'].items():
+            context['guards'][name]['role'] = role
             begin_account_effect(context['guards'][name], issue, role, attempt, source_sha)
+            marker = Path(context['guards'][name]['path']).with_suffix('.active.json')
+            info = marker.stat()
+            markers[name] = [{'path': str(marker), 'device': info.st_dev, 'inode': info.st_ino,
+                             'sha256': hashlib.sha256(marker.read_bytes()).hexdigest()}]
         append_evidence(context['evidence_dir'], {'phase': 'effects-recorded', 'state': 'UNKNOWN', 'attempt_id': attempt})
         guards = [context['pair_guard'], *context['guards'].values()]
+        operation = {'schema': 'lab53-preparation-operation-v1', 'issue_id': issue, 'operation_id': attempt,
+            'source': source, 'stand': context['operator']['url'], 'expected_observer': authorization['expected_observer'],
+            'parent_authorization': {key: parent_binding[key] for key in ['path', 'device', 'inode', 'sha256']}}
+        operation_file = append_evidence(context['evidence_dir'], operation)
+        receipts, processes = [], []
         for config in configs:
             evidence = context['evidence_dir'] / config.stem
             command = [context['operator']['node'], Path(__file__).with_name('provision-account.mjs'),
                 '--config', config, '--operator', operator_path, '--pair-worker', configs[0], '--pair-reviewer', configs[1],
-                '--evidence-dir', evidence]
+                '--evidence-dir', evidence, '--operation-file', operation_file]
+            audit = {'schema': 'parent-held-audited-harness-v1', 'source_sha': source_sha,
+                'manifest_sha256': source['manifest_sha256'], 'entrypoint': 'provision-account.mjs',
+                'parent': process_identity(os.getpid())}
             if run_foreground(command, guards, evidence, operation_binding={
-                    'issue_id': issue, 'operation_id': attempt, 'source_sha': source_sha}):
+                    'issue_id': issue, 'operation_id': attempt, 'source_sha': source_sha},
+                    guard_barrier=True, harness_audit=audit):
                 raise RuntimeError('ACCOUNT_PROVISION_FAILED')
-        # No ready write, marker archive or release authorization is possible
-        # from local proofs. The existing connected Admin adapter is unfinished.
-        raise RuntimeError('FINAL_SERVER_READBACK_NOT_IMPLEMENTED')
+            cleanup = next(read_private(p) for p in evidence.glob('event-*.json') if read_private(p).get('phase') == 'process-cleanup')
+            if cleanup['process_cleanup'] != 'PASS' or cleanup['failure'] is not None or cleanup['returncode'] != 0:
+                raise RuntimeError('ACCOUNT_PROVISION_PROCESS_STOP_UNCONFIRMED')
+            processes.extend(cleanup['processes'])
+            completion = read_private(evidence / 'ui-completion.json')
+            if completion.get('schema') != 'lab53-ui-completion-v1' or completion.get('operation_id') != attempt or (
+                    completion.get('issue_id') != issue or completion.get('source') != source) or completion.get('role') != config.stem or (
+                    completion.get('expected_observer') != operation['expected_observer'] or not completion.get('own_browser_closed')):
+                raise RuntimeError('ACCOUNT_COMPLETION_BINDING_UNKNOWN')
+            receipts.extend(completion['receipts'])
+        if clean_candidate(source_sha) != source or private_snapshot(parent_binding_file)['sha256'] != parent_binding['sha256']:
+            raise RuntimeError('CAPTURE_SOURCE_CHANGED')
+        roles = [item['role'] for item in receipts]
+        if roles.count('admin') != 2 or roles.count('worker') != 1 or roles.count('reviewer') != 1:
+            raise RuntimeError('ALL_EFFECTS_LOGOUT_UNCONFIRMED')
+        if any(item['logout'].get('guid_hash') != item['effect']['guid_hash'] or (
+                item['logout'].get('ui_logout_invoked') is not True or item['logout'].get('transport_disconnected') is not True)
+                for item in receipts): raise RuntimeError('ALL_EFFECTS_LOGOUT_UNCONFIRMED')
+        effects = [item['effect'] for item in receipts]
+        binding = {'issue_id': issue, 'operation_id': attempt, 'source_sha': source_sha}
+        cleanup_file = append_evidence(context['evidence_dir'], {**binding, 'phase': 'process-cleanup',
+            'process_cleanup': 'PASS', 'failure': None, 'returncode': 0, 'processes': processes,
+            'own_loginom_fds_absent': True, 'parent_guard_fds_retained': [g['fd'] for g in guards]})
+        logout_file = append_evidence(context['evidence_dir'], {**binding, 'effects': effects, 'receipts': receipts,
+            'all_ui_logout_invoked': all(item['logout']['ui_logout_invoked'] for item in receipts),
+            'all_transports_disconnected': all(item['logout']['transport_disconnected'] for item in receipts)})
+        final = context['evidence_dir'] / 'final'; final.mkdir(mode=0o700)
+        inputs = {'directory': str(final), 'issueId': issue, 'operationId': attempt, 'source': source,
+            'stand': operation['stand'], 'configs': list(map(str, [operator_path, *configs])), 'effects': effects,
+            'cleanupFile': str(cleanup_file), 'logoutFile': str(logout_file), 'expectedObserver': operation['expected_observer']}
+        input_file = append_evidence(final, inputs)
+        collector = [context['operator']['node'], Path(__file__).with_name('finalize-preparation.mjs')]
+        if run_foreground([*collector, 'request', input_file], [], final / 'request-collector', timeout=10):
+            raise RuntimeError('FINAL_SERVER_REQUEST_UNKNOWN')
+        response = final / 'parent-response.json'
+        deadline = time.monotonic() + 300
+        while not response.exists():
+            if time.monotonic() >= deadline: raise RuntimeError('FINAL_SERVER_READBACK_TIMEOUT')
+            time.sleep(.05)
+        # Closed private parent handoff is the trust boundary. The strict reader
+        # consumes a fresh nonce, exact observer, all effects and configs/PIDs.
+        expected = {**binding, 'source_tree': source['tree'], 'manifest_sha256': source['manifest_sha256'],
+            'config_paths': inputs['configs'], 'cleanup_file': str(cleanup_file), 'logout_file': str(logout_file),
+            'expected_observer': operation['expected_observer']}
+        verify_file = append_evidence(final, {'directory': str(final), 'requestFile': str(final / 'parent-request.json'),
+            'responseFile': str(response), 'expected': expected})
+        if run_foreground([*collector, 'verify', verify_file], [], final / 'verify-collector', timeout=10):
+            raise RuntimeError('FINAL_SERVER_READBACK_UNKNOWN')
+        # Reachable only after public gate admission and ALL strict proofs. No
+        # receipt/config flag opens either unconditional gate in this candidate.
+        return finish_qualified_pair(context, configs, operation, verify_file, final / 'final-proof.json', markers, processes)
 
 
 def main():
@@ -283,6 +411,8 @@ def main():
     parser.add_argument('--evidence-dir', type=Path)
     parser.add_argument('--previous-processes', type=Path)
     parser.add_argument('--source-sha')
+    parser.add_argument('--parent-binding-file', type=Path)
+    parser.add_argument('--operation-id')
     args = parser.parse_args()
     if args.allocate_only:
         configs = allocate(args.issue, args.operator, args.directory, args.stage)
@@ -294,7 +424,7 @@ def main():
     if not args.evidence_dir or not args.previous_processes or not args.source_sha:
         raise RuntimeError('PRIVATE_LIFECYCLE_INPUTS_REQUIRED')
     prepare_pair(args.issue, args.operator, args.directory, read_private(args.previous_processes),
-                 args.evidence_dir, args.source_sha)
+                 args.evidence_dir, args.source_sha, parent_binding_file=args.parent_binding_file, operation_id=args.operation_id)
 
 
 if __name__ == '__main__':

@@ -3,6 +3,8 @@ import {accountPolicy} from './account-lifecycle.mjs';
 import {tid, suffix, uniqueVisible, ready, navigate} from './account-ui.mjs';
 import {verifyCausalCapture, verifyHeldAccountGuard} from './account-identity.mjs';
 import {readFileSync} from 'node:fs';
+import {requireFixedHarness} from './capture-harness.mjs';
+import {installNativeLifetime, nativePositive, nativeSnapshot} from './native-lifetime.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const fail = code => { throw Object.assign(Error(code), {code}); };
@@ -132,7 +134,7 @@ async function readPolicy(page, config) {
 }
 
 export function makeAccountUIAdapter({openOwnPage, recordEffect, config, operator, diagnostics,
-  captureCausalIdentity, configFile, guardsEnvelope}) {
+  captureHarness, configFile, guardsEnvelope}) {
   const adminConfig = {loginom: {url: config.loginom.url, username: operator.admin_user, password: operator.admin_password}};
   const actors = [];
   let policy;
@@ -153,7 +155,10 @@ export function makeAccountUIAdapter({openOwnPage, recordEffect, config, operato
   };
   const open = async actorConfig => {
     if (!recorded) fail('ACCOUNT_EFFECT_UNRECORDED');
-    const actor = {config: actorConfig, page: await openOwnPage(actorConfig.loginom.url), client: null, sockets: []};
+    requireFixedHarness(captureHarness);
+    const role = actorConfig === adminConfig ? 'admin' : config.role;
+    const token = await captureHarness.before(actorConfig, role);
+    const actor = {config: actorConfig, role, token, page: await openOwnPage(actorConfig.loginom.url), client: null, sockets: []};
     // Observe only lifecycle events, never frames/credentials. Attach before
     // Login; any extra transport or error/close invalidates causal capture.
     actor.page.on('websocket', socket => {
@@ -161,15 +166,48 @@ export function makeAccountUIAdapter({openOwnPage, recordEffect, config, operato
       socket.on('close', () => record.closed = true);
       socket.on('socketerror', () => record.errors++);
     });
+    await actor.page.evaluate(installNativeLifetime);
     actors.push(actor);
     return actor;
   };
   const logout = async actor => {
     if (!actor?.client) fail('ACCOUNT_LOGOUT_IDENTITY_UNCONFIRMED');
+    await actor.page.evaluate(() => globalThis.__lab53NativeLifetime.beginLogout());
     const result = await logoutOwnPage(actor.page, actor.config, actor.client, diagnostics);
+    actor.logoutReceipt = result;
     actor.loggedOut = true;
-    fact('logout-disconnect-receipt', {...result, user_hash: actor.client.user_hash});
+    fact('logout-disconnect-receipt', {...result, user_hash: actor.client.user_hash, role: actor.role, effect: actor.identity?.effect});
     return result;
+  };
+  const identify = async actor => {
+    await nativePositive(actor.page);
+    const childBefore = await capture(actor);
+    const beforeTime = new Date().toISOString();
+    fact('causal-connection-start', {client: childBefore, operation_id: effectReceipt.attempt_id, source_sha: effectReceipt.source_sha});
+    const connectionReceipt = diagnostics.sha256;
+    const envelope = await captureHarness.during(actor.token);
+    diagnostics.remaining();
+    const childAfter = await capture(actor);
+    const native = await nativeSnapshot(actor.page);
+    const binding = envelope.binding;
+    if (binding.issue_id !== config.issue_id || binding.role !== actor.role
+      || binding.operation_id !== effectReceipt.attempt_id || binding.source_sha !== effectReceipt.source_sha
+      || binding.user_hash !== childAfter.user_hash || binding.stand !== config.loginom.url)
+      fail('CAUSAL_IDENTITY_BINDING_UNCONFIRMED');
+    const common = Object.fromEntries(['issue_id', 'operation_id', 'source_sha', 'nonce', 'config_sha256', 'role', 'user_hash']
+      .map(key => [key, binding[key]]));
+    const continuity = {transport_count: actor.sockets.length,
+      disconnects: actor.sockets.filter(socket => socket.closed || socket.errors).length,
+      reconnects: native.reconnect_count, native_lifetime: native, guard_audit: envelope.guard_audit,
+      account_lock: binding.account_lock, config_sha256: binding.config_sha256};
+    fact('causal-continuity', continuity); continuity.receipt_sha256 = diagnostics.sha256;
+    const proof = verifyCausalCapture({...envelope,
+      childBefore: {...common, ...childBefore, role: actor.role, observed_at: beforeTime, connection_receipt_sha256: connectionReceipt},
+      childAfter: {...common, ...childAfter, role: actor.role, observed_at: new Date().toISOString(), connection_receipt_sha256: connectionReceipt, continuity}});
+    fact('causal-identity', proof); actor.identity = proof;
+    return {...childAfter, session_id: proof.effect.session_id, create_time: proof.effect.create_time,
+      own_session_positive: proof.own_session_positive, observer_positive: proof.observer_positive,
+      own_session_count: proof.own_session_count, causal_proof_sha256: proof.proof_sha256};
   };
   return {
     recordEffect: async selected => {
@@ -187,6 +225,7 @@ export function makeAccountUIAdapter({openOwnPage, recordEffect, config, operato
         await loginOwnPage(actor.page, adminConfig, diagnostics);
         await capture(actor);
         if (actor.client.rights.chkAdmin !== true) fail('PROVISION_ADMIN_IDENTITY_UNCONFIRMED');
+        await identify(actor); // Numeric/causal own admin proof BEFORE Users/provisioning.
         await navigate(actor.page, 'Пользователи', diagnostics);
         const rowSelector = suffix('UserListForm;cntTile;ListView;headercontainer;title_' + config.loginom.username);
         const rows = actor.page.locator(rowSelector);
@@ -239,60 +278,21 @@ export function makeAccountUIAdapter({openOwnPage, recordEffect, config, operato
       await loginOwnPage(roleActor.page, config, diagnostics);
       await capture(roleActor);
     },
-    identity: async () => {
-      const childBefore = await capture(roleActor);
-      if (!captureCausalIdentity) fail('ACCOUNT_NUMERIC_IDENTITY_NOT_EXPOSED');
-      const guard = guardsEnvelope?.guards.find(guard => guard.path.endsWith('/' + config.loginom.username + '.lock'));
-      const lock = verifyHeldAccountGuard(guard, config.loginom.username);
-      const configHash = hash(readFileSync(configFile));
-      const original = await roleActor.page.evaluateHandle(() => {
-        const connection = bg.app.Application.FInstance.FServerConnection;
-        return {connection, remote: connection.RemoteSession, connector: connection.ServerContainer.FServerConnector,
-          transport: connection.ServerContainer.FServerConnector.$GT()};
-      });
-      try {
-        const beforeTime = new Date().toISOString();
-        fact('causal-connection-start', {client: childBefore, config_sha256: configHash,
-          operation_id: effectReceipt.attempt_id, source_sha: effectReceipt.source_sha});
-        const connectionReceipt = diagnostics.sha256;
-        const envelope = await captureCausalIdentity({config, client: childBefore, lock,
-          operation_id: effectReceipt.attempt_id, source_sha: effectReceipt.source_sha,
-          deadline: diagnostics.deadline});
-        diagnostics.remaining();
-        const childAfter = await capture(roleActor);
-        const same = await roleActor.page.evaluate(original => {
-          const con = bg.app.Application.FInstance.FServerConnection;
-          return con === original.connection && con.RemoteSession === original.remote && con.Connected
-            && con.ServerContainer?.FServerConnector === original.connector && original.connector.$GT() === original.transport;
-        }, original);
-        const afterLock = verifyHeldAccountGuard(guard, config.loginom.username);
-        if (!same || childBefore.guid_hash !== childAfter.guid_hash || hash(readFileSync(configFile)) !== configHash
-          || JSON.stringify(lock) !== JSON.stringify(afterLock)) fail('CAUSAL_CHILD_CHANGED');
-        const binding = envelope.binding;
-        if (binding.issue_id !== config.issue_id || binding.role !== config.role || binding.config_sha256 !== configHash
-          || binding.operation_id !== effectReceipt.attempt_id || binding.source_sha !== effectReceipt.source_sha
-          || binding.user_hash !== childAfter.user_hash || binding.stand !== config.loginom.url
-          || JSON.stringify(binding.account_lock) !== JSON.stringify(lock)) fail('CAUSAL_IDENTITY_BINDING_UNCONFIRMED');
-        const common = {issue_id: binding.issue_id, operation_id: binding.operation_id, source_sha: binding.source_sha,
-          nonce: binding.nonce, config_sha256: configHash, role: config.role, user_hash: childAfter.user_hash};
-        const continuity = {transport_count: roleActor.sockets.length, disconnects: roleActor.sockets.filter(socket => socket.closed || socket.errors).length,
-          reconnects: Math.max(0, roleActor.sockets.length - 1), guard_release_count: 0, account_lock: lock, config_sha256: configHash};
-        fact('causal-continuity', continuity); continuity.receipt_sha256 = diagnostics.sha256;
-        const proof = verifyCausalCapture({...envelope,
-          childBefore: {...common, ...childBefore, role: config.role, observed_at: beforeTime, connection_receipt_sha256: connectionReceipt},
-          childAfter: {...common, ...childAfter, role: config.role, observed_at: new Date().toISOString(), connection_receipt_sha256: connectionReceipt, continuity}});
-        fact('causal-identity', proof);
-        return {...childAfter, session_id: proof.effect.session_id, create_time: proof.effect.create_time,
-          own_session_positive: proof.own_session_positive, observer_positive: proof.observer_positive,
-          own_session_count: proof.own_session_count, causal_proof_sha256: proof.proof_sha256};
-      } finally {await original.dispose();}
-    },
+    identity: async () => identify(roleActor),
     rights: async () => {
       const current = await capture(roleActor);
       if (!policy || Object.entries(current.rights).some(([name, value]) => policy[name] !== value)) fail('ACCOUNT_RIGHTS_UNCONFIRMED');
       return {...policy, effective: true};
     },
     logout: async () => logout(roleActor),
+    receipts: () => {
+      if (actors.length !== 2 || actors.some(actor => !actor.identity || !actor.loggedOut
+        || actor.logoutReceipt?.ui_logout_invoked !== true || actor.logoutReceipt.transport_disconnected !== true))
+        fail('ALL_EFFECTS_LOGOUT_UNCONFIRMED');
+      return actors.map(actor => ({role: actor.role, effect: actor.identity.effect,
+        observer: actor.identity.observer_positive, causal_proof_sha256: actor.identity.proof_sha256,
+        logout: actor.logoutReceipt}));
+    },
     close: async () => {
       for (const actor of actors) await actor.page.close();
       // Closing an owned page never claims logout or independent server absence.

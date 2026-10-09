@@ -2,6 +2,7 @@ import fcntl
 import ctypes
 import importlib.util
 import json
+import hashlib
 import os
 from pathlib import Path
 import signal
@@ -10,6 +11,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from uuid import uuid4
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
@@ -141,6 +143,179 @@ if mode!='normal':
             finally: os.close(fd)
 
     def test_four_fds_and_flocks_survive_exec(self): self.run_child('normal')
+
+    def test_kernel_barrier_blocks_unlock_relock_even_after_fork_and_sets_id(self):
+        with self.guard() as context:
+            guards = [context['pair_guard'], *context['guards'].values()]
+            code = '''import os,json,fcntl,errno
+from pathlib import Path
+guards=json.loads(Path(os.environ['LOGINOM_ACCOUNTS_GUARDS_FILE']).read_text())['guards']
+pid=os.fork()
+if pid==0:
+ os.setsid()
+ for guard in guards:
+  for fd in [guard['fd'],os.dup(guard['fd'])]:
+   for operation in [fcntl.LOCK_UN,fcntl.LOCK_EX|fcntl.LOCK_NB]:
+    try:fcntl.flock(fd,operation);raise AssertionError('barrier bypass')
+    except PermissionError as e:assert e.errno==errno.EPERM
+ os._exit(0)
+assert os.waitpid(pid,0)[1]==0
+'''
+            self.assertEqual(provision.run_foreground([sys.executable, '-c', code], guards,
+                context['evidence_dir'] / 'barrier', timeout=5, guard_barrier=True), 0)
+            for guard in guards:
+                fd = os.open(guard['path'], os.O_RDWR)
+                try:
+                    with self.assertRaises(BlockingIOError): fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                finally: os.close(fd)
+            proof = read_private(context['evidence_dir'] / 'barrier' / 'flock-barrier.json')
+            self.assertEqual(proof['flock_policy'], 'deny-all-EPERM')
+            cleanup = read_private(context['evidence_dir'] / 'barrier' / 'supervisor-result.json')
+            self.assert_absent(cleanup['processes'])
+            if os.environ.get('LAB53_PROCESS_RECEIPT_DIR'):
+                write_private(Path(os.environ['LAB53_PROCESS_RECEIPT_DIR']) / 'barrier.json', cleanup)
+
+    def run_linked_harness(self, mode):
+        dependencies_file = Path.home() / '.config/loginom-multica/operator.json'
+        dependencies = read_private(dependencies_file)
+        write_private(self.operator, {**read_private(self.operator), 'admin_user': 'admin', 'admin_password': 'synthetic', 'url': 'about:blank'})
+        self.previous = {name: [] for name in ['admin', *[provision.planned_username(self.issue, role) for role in ['worker', 'reviewer']]]}
+        with self.guard() as context:
+            configs = provision.allocate(self.issue, self.operator, self.cards, held_pair=context['pair_guard'])
+            snapshots = [private_snapshot(self.operator), *[private_snapshot(path) for path in configs]]
+            attempt = str(uuid4()); source_sha = 'a' * 40
+            version = SCRIPTS.parent / 'VERSION.json'
+            source = {'sha': source_sha, 'tree': 'b' * 40, 'manifest_sha256': hashlib.sha256(version.read_bytes()).hexdigest()}
+            for role, name in context['role_names'].items():
+                context['guards'][name]['configs'] = snapshots
+                begin_account_effect(context['guards'][name], self.issue, role, attempt, source_sha)
+            expected = {'guid_hash': hashlib.sha256(b'owner-guid').hexdigest(), 'user_hash': hashlib.sha256(b'admin').hexdigest(),
+                'session_id': 90, 'create_time': '2026-10-09T00:00:00.000Z', 'tab_binding_sha256': hashlib.sha256(b'authorized-tab').hexdigest(), 'stand': 'about:blank'}
+            operation = {'issue_id': self.issue, 'operation_id': attempt, 'source': source, 'stand': 'about:blank', 'expected_observer': expected}
+            operation_file = context['evidence_dir'] / 'operation.json'; write_private(operation_file, operation)
+            audit = {'schema': 'parent-held-audited-harness-v1', 'source_sha': source_sha,
+                'manifest_sha256': source['manifest_sha256'], 'entrypoint': 'provision-account.mjs', 'parent': process_identity(os.getpid())}
+            responder = subprocess.Popen([sys.executable, SCRIPTS.parent / 'tests/parent-fixture.py', context['evidence_dir'], mode])
+            responder_record = process_identity(responder.pid)
+            old = os.environ.get('LAB53_FIXTURE_DEPENDENCIES'); os.environ['LAB53_FIXTURE_DEPENDENCIES'] = str(dependencies_file)
+            guards = [context['pair_guard'], *context['guards'].values()]; directory = context['evidence_dir'] / 'linked'
+            try:
+                command = [dependencies['node'], SCRIPTS.parent / 'tests/linked-harness.mjs', self.operator, operation_file, *configs, directory, mode]
+                result = provision.run_foreground(command, guards, directory, timeout=25, stop_timeout=1,
+                    guard_barrier=True, harness_audit=audit, operation_binding={'issue_id': self.issue, 'operation_id': attempt, 'source_sha': source_sha})
+                if os.environ.get('LAB53_PROCESS_RECEIPT_DIR'):
+                    saved = read_private(directory / 'supervisor-result.json')
+                    extra = read_private(directory / 'fixture-browser.json').get('observed_processes', []) if (directory / 'fixture-browser.json').exists() else []
+                    write_private(Path(os.environ['LAB53_PROCESS_RECEIPT_DIR']) / ('linked-start-' + mode + '.json'),
+                        {'processes': saved['processes'] + extra + [responder_record]})
+                self.assertEqual(result, 0 if mode in ['normal', 'readback', 'ready-write-failure', 'archive-stale'] else 1,
+                    (directory / 'stderr.log').read_text()[-3500:])
+                if mode == 'identity': self.assertIn('FINAL_SERVER_READBACK_INCOMPLETE', (directory / 'stderr.log').read_text())
+                if mode == 'rights': self.assertIn('ACCOUNT_RIGHTS_UNCONFIRMED', (directory / 'stderr.log').read_text())
+                if mode == 'logout': self.assertIn('waitForFunction', (directory / 'stderr.log').read_text())
+                cleanup = next(read_private(path) for path in directory.glob('event-*.json') if read_private(path).get('phase') == 'process-cleanup')
+                self.assert_absent(cleanup['processes'])
+                browser = read_private(directory / 'fixture-browser.json')
+                self.assertEqual(browser['network_requests'], 0); self.assertTrue(browser['sandbox'])
+                self.assert_absent(browser['observed_processes'])
+                if mode in ['normal', 'readback', 'ready-write-failure', 'archive-stale']:
+                    completion = read_private(directory / 'ui-completion.json'); receipts = completion['receipts']
+                    self.assertEqual([item['role'] for item in receipts], ['admin', 'worker', 'admin', 'reviewer'])
+                    self.assertTrue(all(item['logout']['transport_disconnected'] for item in receipts))
+                    # Actual completed UI subtree drives production final request
+                    # and one-use validator, after all inherited own FDs exit.
+                    effects = [item['effect'] for item in receipts]
+                    logout_file = directory / 'logout.json'; write_private(logout_file, {'issue_id': self.issue, 'operation_id': attempt,
+                        'source_sha': source_sha, 'effects': effects, 'receipts': receipts,
+                        'all_ui_logout_invoked': True, 'all_transports_disconnected': True})
+                    cleanup_file = next(path for path in directory.glob('event-*.json') if read_private(path).get('phase') == 'process-cleanup')
+                    final = context['evidence_dir'] / 'final'; final.mkdir(mode=0o700)
+                    inputs = {'directory': str(final), 'issueId': self.issue, 'operationId': attempt, 'source': source, 'stand': 'about:blank',
+                        'configs': list(map(str, [self.operator, *configs])), 'effects': effects, 'cleanupFile': str(cleanup_file),
+                        'logoutFile': str(logout_file), 'expectedObserver': expected}
+                    input_file = final / 'input.json'; write_private(input_file, inputs)
+                    collector = [dependencies['node'], SCRIPTS / 'finalize-preparation.mjs']
+                    self.assertEqual(provision.run_foreground([*collector, 'request', input_file], [], final / 'request', timeout=5), 0)
+                    response = final / 'parent-response.json'; deadline = time.monotonic() + 3
+                    while not response.exists() and time.monotonic() < deadline: time.sleep(.01)
+                    self.assertTrue(response.exists())
+                    verify_file = final / 'verify.json'; write_private(verify_file, {'directory': str(final), 'requestFile': str(final / 'parent-request.json'),
+                        'responseFile': str(response), 'expected': {'issue_id': self.issue, 'operation_id': attempt, 'source_sha': source_sha,
+                            'source_tree': source['tree'], 'manifest_sha256': source['manifest_sha256'], 'config_paths': inputs['configs'],
+                            'cleanup_file': str(cleanup_file), 'logout_file': str(logout_file), 'expected_observer': expected}})
+                    self.assertEqual(provision.run_foreground([*collector, 'verify', verify_file], [], final / 'verify', timeout=5),
+                        0 if mode != 'readback' else 1)
+                    self.assertEqual((final / 'final-proof.json').exists(), mode != 'readback')
+                    if mode != 'readback':
+                        spec = importlib.util.spec_from_file_location('fixture_archive', SCRIPTS / 'owner-archive.py')
+                        archive = importlib.util.module_from_spec(spec); spec.loader.exec_module(archive)
+                        proof_file = final / 'final-proof.json'
+                        all_markers = {}; marker_bytes = {}
+                        context['operator_path'] = self.operator
+                        original_configs = {path: read_private(path) for path in configs}
+                        for name, guard in context['guards'].items():
+                            guard['role'] = next(role for role, username in context['role_names'].items() if username == name)
+                            markers = []; all_markers[name] = markers
+                            for path in marker_paths(guard['path']):
+                                if path.exists():
+                                    info = path.stat(); markers.append({'path': str(path), 'device': info.st_dev, 'inode': info.st_ino,
+                                        'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
+                            broken = [dict(item, sha256='0' * 64) for item in markers]
+                            with self.assertRaisesRegex(RuntimeError, 'ARCHIVE_MARKER_CHANGED'):
+                                archive.archive_owned(guard, broken, snapshots, operation, verify_file, proof_file, [], self.root / ('rejected-' + name))
+                            marker_bytes.update({item['path']: Path(item['path']).read_bytes() for item in markers})
+                        if mode == 'archive-stale':
+                            os.utime(next(iter(marker_bytes)))
+                            with self.assertRaisesRegex(RuntimeError, 'ARCHIVE_FINAL_PROOF_STALE'):
+                                provision.finish_qualified_pair(context, configs, operation, verify_file, proof_file, all_markers, cleanup['processes'])
+                            for path, original in original_configs.items(): self.assertEqual(read_private(path), original)
+                            self.assertTrue(all(Path(path).exists() for path in marker_bytes))
+                        elif mode == 'ready-write-failure':
+                            calls = 0; original_write = provision.write_private
+                            def fail_second_ready(path, data):
+                                nonlocal calls
+                                if path in configs and data.get('account_state') == 'ready':
+                                    calls += 1
+                                    if calls == 2: raise OSError('synthetic ready write failure')
+                                return original_write(path, data)
+                            with patch.object(provision, 'write_private', fail_second_ready):
+                                with self.assertRaisesRegex(OSError, 'synthetic ready write failure'):
+                                    provision.finish_qualified_pair(context, configs, operation, verify_file, proof_file, all_markers, cleanup['processes'])
+                            for path, original in original_configs.items(): self.assertEqual(read_private(path), original)
+                            for guard in context['guards'].values():
+                                self.assertEqual(read_private(Path(guard['path']).with_suffix('.active.json'))['state'], 'UNKNOWN')
+                        else:
+                            qualified = provision.finish_qualified_pair(context, configs, operation, verify_file, proof_file, all_markers, cleanup['processes'])
+                            self.assertTrue(qualified['ready']); self.assertEqual(qualified['status'], 'PAIR_QUALIFIED')
+                            for path, original in original_configs.items():
+                                self.assertEqual(read_private(path), {**original, 'account_state': 'ready'})
+                            self.assertFalse(any(Path(path).exists() for path in marker_bytes))
+                        for guard in context['guards'].values():
+                            history = context['evidence_dir'] / ('history-' + guard['role'])
+                            if mode != 'archive-stale':
+                                self.assertEqual(len(list(history.iterdir())), 1)
+                                self.assertIn(next(history.iterdir()).read_bytes(), marker_bytes.values())
+                            self.assertTrue(Path(guard['path']).exists())
+                if os.environ.get('LAB53_PROCESS_RECEIPT_DIR'):
+                    write_private(Path(os.environ['LAB53_PROCESS_RECEIPT_DIR']) / ('linked-' + mode + '.json'),
+                        {'processes': cleanup['processes'] + browser['observed_processes'] + [responder_record]})
+            finally:
+                (context['evidence_dir'] / 'fixture-stop').touch()
+                responder.wait(timeout=3); self.assert_absent([responder_record])
+                if old is None: os.environ.pop('LAB53_FIXTURE_DEPENDENCIES', None)
+                else: os.environ['LAB53_FIXTURE_DEPENDENCIES'] = old
+        for guard in guards:
+            fd = os.open(guard['path'], os.O_RDWR)
+            try: fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            finally: os.close(fd)
+
+    def test_full_fixed_harness_admin_capture_roles_all_logout_process_and_final_response(self): self.run_linked_harness('normal')
+    def test_fixed_harness_incomplete_identity_stays_unknown(self): self.run_linked_harness('identity')
+    def test_fixed_harness_incomplete_rights_stays_unknown(self): self.run_linked_harness('rights')
+    def test_fixed_harness_incomplete_logout_stays_unknown(self): self.run_linked_harness('logout')
+    def test_fixed_harness_incomplete_final_readback_stays_unknown(self): self.run_linked_harness('readback')
+    def test_ready_write_failure_preserves_history_and_blocks_partial_pair(self): self.run_linked_harness('ready-write-failure')
+    def test_recreated_marker_cannot_reuse_an_earlier_same_operation_proof(self): self.run_linked_harness('archive-stale')
     def test_timeout_cleans_exact_children_without_erasing_unknown(self): self.run_child('timeout')
     def test_cancel_cleans_exact_children_without_erasing_unknown(self): self.run_child('cancel')
     def test_success_with_orphan_cleans_but_does_not_accept(self): self.run_child('orphan')

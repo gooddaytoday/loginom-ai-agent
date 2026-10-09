@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """One foreground operation's isolated Linux descendant owner, never a daemon."""
 import ctypes
+import importlib.util
 import json
+import hashlib
 import os
 from pathlib import Path
 import signal
@@ -168,12 +170,23 @@ def main():
     tree = Descendants(directory)
     failure = None
     cleanup = 'UNKNOWN'
+    barrier = None
     try:
         enable_subreaper(parent_pid)
         if os.read(start_fd, 1) != b'1' or cancelled:
             raise RuntimeError('ACCOUNT_PROVISION_CANCELLED')
         os.close(start_fd)
         start_fd = None
+        if os.environ.get('LOGINOM_ACCOUNTS_FLOCK_BARRIER') == 'required':
+            spec = importlib.util.spec_from_file_location('account_flock_barrier', Path(__file__).with_name('flock-barrier.py'))
+            module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+            barrier = module.install()
+            guards = json.loads(Path(os.environ['LOGINOM_ACCOUNTS_GUARDS_FILE']).read_text())
+            proof = {'phase': 'flock-barrier', **barrier, 'supervisor': tree.root, 'guards': guards['guards'],
+                'command': command, 'command_sha256': hashlib.sha256(json.dumps(command, separators=(',', ':')).encode()).hexdigest()}
+            fd = os.open(directory / 'flock-barrier.json', os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, 'w') as stream:
+                json.dump(proof, stream); stream.write('\n'); stream.flush(); os.fsync(stream.fileno())
         read_fd, write_fd = os.pipe()
         try:
             pid = os.fork()
@@ -227,7 +240,7 @@ def main():
         if cleanup != 'PASS': failure = 'ACCOUNT_PROVISION_PROCESS_STOP_UNCONFIRMED'
         result = {'schema': 'account-process-supervisor-v1', 'state': 'UNKNOWN', 'subreaper': tree.root,
             'processes': list(tree.records.values()), 'process_cleanup': cleanup, 'failure': failure,
-            'returncode': tree.returncode, 'server_absence': 'NOT_PROVED'}
+            'returncode': tree.returncode, 'server_absence': 'NOT_PROVED', 'flock_barrier': barrier}
         append_evidence(directory, {'phase': 'supervisor-result', **result})
         fd = os.open(directory / 'supervisor-result.json', os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, 'w') as stream:

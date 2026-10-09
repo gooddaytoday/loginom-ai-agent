@@ -1,6 +1,6 @@
 # Finite readback proposal and current boundary
 
-Status: **source components implemented / lifecycle incomplete / no live activation**. The parent
+Status: **bounded source harness implemented / runtime NOT_ACCEPTED / no live activation**. The parent
 attached to the already open owner Chrome Admin tab on Mac and performed a
 complete calibrated Dispatcher refresh without a new browser or Loginom login.
 The existing owner tab/session is preserved. LAB53 does not search mas for a
@@ -22,7 +22,7 @@ open another login tab or create an observer session. Its pre-existing ownership
 and session identity are recorded separately from all task-created effects.
 The parent can perform a fresh readback for a future operation through the
 ordinary supplement/handoff in this card, using native CUA. No callable mas/CDP
-endpoint exists. Private source-only request/response components are described
+endpoint exists. The private bounded before/during/post request/response harness is described
 in `parent-readback-plan.md`; they are not runtime-qualified or a gate bypass.
 The old3123 receipt has been superseded for historical reconciliation by
 shared-oauth `fafacd15848ea5ac1943deae76380c75fe368e6a`,

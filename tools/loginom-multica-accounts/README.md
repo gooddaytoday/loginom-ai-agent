@@ -56,25 +56,48 @@ cleanup does not extend the original deadline. A successful UI component returns
 fresh complete rows/counts/packages, observer calibration and exact own effects.
 It is a component validator, not live authorization.
 
-The production UI adapter now implements source-backed owned Login/Users/
-Logout and original-connector disposal. Numeric nonadmin identity remains
-`ACCOUNT_NUMERIC_IDENTITY_NOT_EXPOSED`; the complete lifecycle is unqualified.
-The private parent request/response reader and loaded Dispatcher collector are
-implemented as offline components. They use the existing authorized Mac native
-CUA handoff, with no new callable endpoint or observer. The production path
-still stops before final readback and has no ready/archive transition. See
-`parent-readback-plan.md` for exact formats, ordering and the unresolved numeric
-identity question. The old login/probe/create body is preserved verbatim in baseline;
-its early `saveState('ready')` is no longer present in the candidate. No candidate
-code writes ready, archives active markers or admits live use from partial proof.
-Live UI integration, fresh independent server readback, exact process/FD closure
-and runtime review remain required. Removing a hard stop is not deployment.
+The bounded production implementation is present behind the closed gates.
+`preparation-runtime.mjs` uses a fixed private before/during capture provider,
+never an arbitrary callback. Admin positive/causal capture occurs before Users
+or provisioning. Both admin effects and the worker/reviewer effects contribute
+logout receipts; the parent coordinator retains all four guards through exact
+owned process cleanup and a new final readback. `finalize-preparation.mjs` is a
+read-only foreground collector without account FDs, browser or Loginom calls.
+`owner-archive.py` verifies the consumed proof and exact canonical marker/config/
+permanent-lock/writer identity before preserving original marker bytes in history.
+Only the fully proved pair transition writes `account_state=ready`; partial UI,
+process, logout or server facts cannot reach it. A ready-write failure retains
+history and restores original values under UNKNOWN markers. Unbound historical
+legacy markers always block; they are not repaired or archived by this route.
 
+The child inherits a kernel seccomp barrier installed in its isolated supervisor
+which forbids all flock syscalls, including unlock/relock on duplicated FDs.
+The parent's held OFDs remain outside that barrier. The capture provider checks
+actual lineage, source/file hashes, command, barrier program and kernel FD locks.
+Native instrumentation installed before own Login observes connection/container/
+connector fields, calls and error callbacks, including saved vendor Reconnect;
+WebSocket count is only supplementary transport evidence. Missing source shape
+or incomplete lifetime provenance is UNKNOWN. The production page also requires
+exact loaded vendor response bytes before Login; changed, bundled or unavailable
+bytes fail closed pending explicit source/runtime qualification.
+
+The parent uses its existing Mac Admin tab through ordinary private handoff;
+there is no new endpoint, queue, observer or shared Host/Agent contract. Each
+phase has a new operation-bound nonce and pins the authorized tab/observer tuple.
+The complete loaded Dispatcher collector uses the actual Ext form/controller/
+store path without requiring data-tid. All client, shared/pool and package rows
+are preserved; virtual rows have no invented user/GUID/numeric ID. Unqualified
+mstBackup or unknown shapes reject the full snapshot. See
+`parent-readback-plan.md` for formats, exact owner baseline and qualification.
+
+This source implementation and its offline fixtures are not runtime acceptance.
+Both public gates, the installed tool, real configs/markers and historical
+attempts remain unchanged. No source fixture receipt enables live operation.
 `--issue`, `--operator`, `--directory`, `--stage stage0` and persisted pair
 credentials retain their meanings. Provider/full mode is rejected.
 Non-allocation lifecycle requires a new absolute private `--evidence-dir`, an
-explicit private `--previous-processes` per-account mapping and exact
-`--source-sha`. These inputs cannot bypass either public gate. The Node child
+explicit private `--previous-processes` per-account mapping, exact
+`--source-sha`, new `--operation-id` and private `--parent-binding-file`. These inputs cannot bypass either public gate. The Node child
 also receives both pair config paths, evidence-dir and the inherited guards
 envelope. All inputs are still behind the unconditional public hard stop.
 `--allocate-only` continues to persist a planned pair without Loginom calls;
@@ -93,7 +116,8 @@ Run `tests/account-ui.test.mjs` with `--test` using the pinned Node executable
 from the private operator config. The tests read only its Node/Chromium/
 Playwright dependency paths. Chromium runs with sandbox and default certificate
 verification; network requests are aborted and cause failure. Fixtures are
-synthetic layouts with observed data-tids, not recorded private DOM. Optional
+synthetic layouts, including an Ext Dispatcher without data-tids and complete
+shared/pool rows. They contain no private recorded DOM. Optional
 `LAB53_OFFLINE_RECEIPT` writes exact owned browser PID/start_ticks and absence
 after shutdown to a new private file. Python tests use actual flock and inherited
 child descriptors, plus isolated synthetic configs and markers. Detached

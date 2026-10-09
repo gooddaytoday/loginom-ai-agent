@@ -141,13 +141,19 @@ export function verifyCalibratedInventory(readback, after) {
     || observer?.connected !== true || observer.mst_self_count !== 1 || !isHash(observer.guid_hash)
     || !isHash(observer.user_hash) || !Number.isSafeInteger(observer.session_id) || !isTime(observer.create_time)
     || readback.calibration?.observer_guid_hash !== observer.guid_hash
+    || !isHash(observer.tab_binding_sha256) || readback.calibration?.tab_binding_sha256 !== observer.tab_binding_sha256
     || !readback.stand || readback.calibration?.stand !== readback.stand
-    || new Set(rows.map(row => row.session_id)).size !== rows.length
-    || rows.some(row => !Number.isSafeInteger(row.session_id) || row.session_id <= 0 || !isTime(row.create_time)
-      || !isHash(row.user_hash) || (row.guid_hash !== null && !isHash(row.guid_hash))
-      || typeof row.type !== 'string' || !Array.isArray(row.packages))) fail('FINAL_SERVER_READBACK_INCOMPLETE');
+    || new Set(rows.filter(row => row.kind === 'client').map(row => row.session_id)).size !== rows.filter(row => row.kind === 'client').length
+    || rows.some(row => !isHash(row.name_hash) || !Number.isSafeInteger(row.row_index) || row.row_index < 0
+      || !Array.isArray(row.packages) || (row.kind === 'client'
+        ? (!['mstClient', 'mstSelf'].includes(row.type) || !Number.isSafeInteger(row.session_id) || row.session_id <= 0
+          || !isTime(row.create_time) || !isHash(row.user_hash) || (row.guid_hash !== null && !isHash(row.guid_hash)))
+        : (row.kind !== 'virtual' || !['mstShared', 'mstPool'].includes(row.type) || row.session_id !== null
+          || row.user_hash !== null || row.guid_hash !== null || !(row.create_time === null || isTime(row.create_time)))))
+    || new Set(rows.map(row => row.row_index)).size !== rows.length
+    || rows.some(row => typeof row.pending_disconnect !== 'boolean')) fail('FINAL_SERVER_READBACK_INCOMPLETE');
   const self = rows.filter(row => row.type === 'mstSelf');
-  if (self.length !== 1 || self[0].guid_hash !== observer.guid_hash || self[0].session_id !== observer.session_id
+  if (self.length !== 1 || self[0].pending_disconnect !== false || self[0].guid_hash !== observer.guid_hash || self[0].session_id !== observer.session_id
     || self[0].create_time !== observer.create_time || self[0].user_hash !== observer.user_hash) fail('FINAL_SERVER_CALIBRATION_UNCONFIRMED');
 }
 
@@ -160,6 +166,10 @@ export function verifyFinalReadback(readback, effects, after) {
       || !isTime(effect.create_time) || effect.stand !== readback.stand || effect.guid_hash === observer.guid_hash) fail('FINAL_SERVER_EFFECT_UNBOUND');
     if (rows.some(row => row.guid_hash === effect.guid_hash
       || (row.session_id === effect.session_id && row.create_time === effect.create_time))) fail('OWN_SERVER_EFFECT_PRESENT');
+    // No additional login in a target bucket is accounted for by the bounded
+    // capture. Only the exact preserved owner self may remain under admin.
+    if (rows.some(row => row.user_hash === effect.user_hash && row.type !== 'mstSelf'))
+      fail('FINAL_SERVER_TARGET_BUCKET_UNKNOWN');
   }
   return {status: 'SERVER_COMPONENT_CHECKED', ready: false};
 }

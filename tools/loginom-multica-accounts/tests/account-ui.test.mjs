@@ -6,12 +6,16 @@ import {homedir, tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
+import {EventEmitter} from 'node:events';
 import {Diagnostics, navigate, refresh, errorDetails} from '../scripts/account-ui.mjs';
 import {requireFiniteCleanup, verifyPairBindings} from '../scripts/qualify-accounts.mjs';
 import {runAccountLifecycle, verifyFinalReadback, verifyHistoricalAccountBucket, readFinalServerInventory, accountPolicy} from '../scripts/account-lifecycle.mjs';
 import {loginOwnPage, logoutOwnPage, readOwnClient, makeAccountUIAdapter} from '../scripts/account-session-ui.mjs';
 import {createParentRequest, buildParentResponse, consumeParentResponse, collectLoadedDispatcher} from '../scripts/parent-readback.mjs';
-import {verifyCausalCapture} from '../scripts/account-identity.mjs';
+import {verifyCausalCapture, observerTuple} from '../scripts/account-identity.mjs';
+import {installNativeLifetime, nativePositive, nativeSnapshot} from '../scripts/native-lifetime.mjs';
+import {trackVendorSources, vendorSources} from '../scripts/vendor-provenance.mjs';
+import {writeBoundParentResponse} from '../scripts/parent-bridge.mjs';
 
 const operator = JSON.parse(readFileSync(join(homedir(), '.config/loginom-multica/operator.json'), 'utf8'));
 const {chromium} = await import(operator.playwright_module);
@@ -22,6 +26,23 @@ const temporary = mkdtempSync(join(tmpdir(), 'lab53-offline-'));
 let browser;
 const requests = [];
 const ownedProcesses = new Map();
+
+test('loaded native source requires every exact retained vendor response byte', async () => {
+  const retained = '/home/user/multica_workspaces/lab-6462f220cf3b/lab-47-fac8fe178ede/workdir/evidence-private/root-protocol-c410229c0bea';
+  const filenames = ['bg_app_Application.js', 'bg_app_ServerConnection.js', 'bg_ts_CustomClient.js', 'bg_js_bg.model.js', 'bg_js_bg.model.rpc.js'];
+  for (const mode of ['complete', 'missing', 'changed']) {
+    const page = new EventEmitter(), verify = trackVendorSources(page);
+    for (const [index, file] of filenames.entries()) {
+      if (mode === 'missing' && index === 0) continue;
+      const original = readFileSync(join(retained, file));
+      const bytes = mode === 'changed' && index === 0 ? Buffer.concat([original, Buffer.from('//changed')]) : original;
+      page.emit('response', {headers: () => ({'content-type': 'application/javascript'}),
+        url: () => 'https://fixture.invalid/' + file, status: () => 200, body: async () => bytes});
+    }
+    if (mode === 'complete') assert.deepEqual((await verify()).files, vendorSources);
+    else await assert.rejects(verify, /NATIVE_VENDOR_BYTES_NOT_QUALIFIED/);
+  }
+});
 async function recordProcesses() {
   const session = await browser.newBrowserCDPSession();
   try {
@@ -388,13 +409,13 @@ test('operator/pair mismatch blocks before even recording an effect', () => with
 
 function syntheticReadback() {
   const observer = {connected: true, mst_self_count: 1, guid_hash: syntheticHash('observer'), user_hash: syntheticHash('admin'),
-    session_id: 9, create_time: '2026-10-09T00:00:00Z'};
+    session_id: 9, create_time: '2026-10-09T00:00:00Z', tab_binding_sha256: syntheticHash('tab')};
   const effect = {guid_hash: syntheticHash('owned'), user_hash: syntheticHash('worker'), session_id: 10,
     create_time: '2026-10-09T00:00:00Z', stand: 'https://fixture.invalid'};
   return {effect, readback: {source: 'existing-authorized-admin', stand: effect.stand,
     loaded: true, refresh_complete: true, packages_complete: true, refreshed_at: '2026-10-09T00:01:00Z',
-    manager_count: 1, store_count: 1, observer, calibration: {observer_guid_hash: observer.guid_hash, stand: effect.stand},
-    rows: [{...observer, type: 'mstSelf', packages: []}]}};
+    manager_count: 1, store_count: 1, observer, calibration: {observer_guid_hash: observer.guid_hash, stand: effect.stand, tab_binding_sha256: observer.tab_binding_sha256},
+    rows: [{...observer, kind: 'client', row_index: 0, name_hash: syntheticHash('admin:9'), pending_disconnect: false, type: 'mstSelf', packages: []}]}};
 }
 test('complete calibrated server component remains insufficient for ready', () => {
   const {readback, effect} = syntheticReadback();
@@ -413,11 +434,18 @@ test('stale final inventory cannot authorize the next operation', () => {
 });
 test('present exact owned server effect blocks; no foreign session is closed', () => {
   const {readback, effect} = syntheticReadback();
-  readback.rows.push({...effect, type: 'mstDisconnected', packages: []});
+  readback.rows.push({...effect, kind: 'client', row_index: 1, name_hash: syntheticHash('worker:10'), type: 'mstClient', pending_disconnect: true, packages: []});
   readback.manager_count = readback.store_count = 2;
   const before = JSON.stringify(readback);
   assert.throws(() => verifyFinalReadback(readback, [effect], '2026-10-09T00:00:30Z'), {code: 'OWN_SERVER_EFFECT_PRESENT'});
   assert.equal(JSON.stringify(readback), before);
+});
+test('an unaccounted target login blocks final absence even after the captured effect leaves', () => {
+  const {readback, effect} = syntheticReadback();
+  readback.rows.push({...effect, session_id: 999, guid_hash: null, kind: 'client', row_index: 1,
+    name_hash: syntheticHash('worker:999'), type: 'mstClient', pending_disconnect: false, packages: []});
+  readback.manager_count = readback.store_count = 2;
+  assert.throws(() => verifyFinalReadback(readback, [effect], '2026-10-09T00:00:30Z'), {code: 'FINAL_SERVER_TARGET_BUCKET_UNKNOWN'});
 });
 test('uncalibrated observer and unbound effects block final server proof', () => {
   const {readback, effect} = syntheticReadback();
@@ -483,45 +511,14 @@ test('native client getter error preserves private native details', () => withPa
   await assert.rejects(readOwnClient(page, ownConfig), error => error.code === 'ACCOUNT_CLIENT_READ_FAILED'
     && error.browser_error.get_message === 'native-message' && error.browser_error.get_stack === 'native-stack');
 }));
-for (const existing of [false, true]) {
-  test(`production provision adapter reopens exact policy; existing=${existing}`, () => withPage([], async (page, diagnostics) => {
-    await installAccounts(page, {existing});
-    const adapter = makeAccountUIAdapter({config: ownConfig, operator: {admin_user: 'admin', admin_password: 'synthetic'},
-      diagnostics, recordEffect: async () => ({state: 'UNKNOWN', issue_id: ownConfig.issue_id}),
-      openOwnPage: async () => page});
-    await assert.rejects(adapter.provision(), {code: 'ACCOUNT_EFFECT_UNRECORDED'});
-    await adapter.recordEffect(ownConfig);
-    await adapter.provision();
-    const actions = await page.evaluate(() => window.actions);
-    assert.equal(actions.includes('apply'), !existing);
-    assert.ok(actions.indexOf('reopen') < actions.indexOf('logout'));
-    const facts = JSON.parse(readFileSync(diagnostics.path)).events;
-    assert.ok(facts.some(event => event.action === 'connection-receipt' && event.value.guid_hash));
-    assert.ok(facts.some(event => event.action === 'reopened-policy' && event.value.policy.chkRunner === false));
-  }));
-}
-test('nonadmin numeric identity gap cannot become ready; source adapter still logs out its owned client', () => withPage([], async (page, diagnostics) => {
+test('production adapter rejects any unknown capture provider before a login or provisioning', () => withPage([], async (page, diagnostics) => {
   await installAccounts(page);
-  const adapter = makeAccountUIAdapter({config: ownConfig, operator: {}, diagnostics,
-    recordEffect: async () => ({state: 'UNKNOWN', issue_id: ownConfig.issue_id}), openOwnPage: async () => page});
-  await adapter.recordEffect(ownConfig); await adapter.login();
-  await assert.rejects(adapter.identity(), {code: 'ACCOUNT_NUMERIC_IDENTITY_NOT_EXPOSED'});
-  assert.equal((await adapter.logout()).transport_disconnected, true);
-}));
-test('linked production UI lifecycle remains UNKNOWN without qualified parent capture and disposes both own transports', () => withPage([], async (page, diagnostics) => {
-  const operatorFile = '/private/offline-operator.json';
-  const op = {admin_user: 'admin', admin_password: 'synthetic', url: 'about:blank', agents: {worker: 'w', reviewer: 'r'}, workspace_id: 'fixture'};
-  const configs = ['worker', 'reviewer'].map(role => ({...ownConfig, role, stage: 'stage0', agent_id: op.agents[role],
-    workspace_id: 'fixture', operator_file: operatorFile, loginom: {...ownConfig.loginom, username: role}}));
-  const pages = [];
-  const adapter = makeAccountUIAdapter({config: configs[0], operator: op, diagnostics,
-    recordEffect: async () => ({state: 'UNKNOWN', issue_id: ownConfig.issue_id}),
-    openOwnPage: async () => {const owned = await page.context().newPage(); pages.push(owned); await installAccounts(owned); return owned;}});
-  await assert.rejects(runAccountLifecycle({config: configs[0], configs, operator: op, operatorFile, diagnostics, adapter}),
-    {code: 'ACCOUNT_NUMERIC_IDENTITY_NOT_EXPOSED'});
-  assert.equal(pages.length, 2);
-  for (const owned of pages) assert.ok((await owned.evaluate(() => actions)).includes('logout'));
-  await adapter.close();
+  const adapter = makeAccountUIAdapter({config: ownConfig, operator: {admin_user: 'admin', admin_password: 'synthetic'},
+    diagnostics, recordEffect: async () => ({state: 'UNKNOWN', issue_id: ownConfig.issue_id}),
+    captureHarness: {before: async () => ({}), during: async () => ({})}, openOwnPage: async () => page});
+  await adapter.recordEffect(ownConfig);
+  await assert.rejects(adapter.provision(), {code: 'CAPTURE_FIXED_HARNESS_REQUIRED'});
+  assert.deepEqual(await page.evaluate(() => window.actions), []);
 }));
 test('lifecycle keeps own-session positive separate from observer mstSelf', () => withPage([{}], async (page, diagnostics) => {
   const fixture = await lifecycleCase(page, diagnostics, {observer: {mst_self_count: 2}});
@@ -549,11 +546,15 @@ function parentOperation() {
   const bound = {issue_id: ownConfig.issue_id, operation_id: operationId, source_sha: source.sha};
   writeFileSync(cleanupFile, JSON.stringify({...bound, phase: 'process-cleanup', process_cleanup: 'PASS', failure: null,
     returncode: 0, processes: [JSON.parse(child.stdout)]}), {mode: 0o600});
-  writeFileSync(logoutFile, JSON.stringify({...bound, effects, all_ui_logout_invoked: true, all_transports_disconnected: true}), {mode: 0o600});
-  const inputs = {directory, issueId: ownConfig.issue_id, operationId, source, stand: 'about:blank', configs, effects, cleanupFile, logoutFile};
+  const expectedObserver = {guid_hash: syntheticHash('ABCDEF00-1234-1234-1234-123456789ABC'), user_hash: syntheticHash('admin'), session_id: 90, create_time: '2026-10-09T00:00:00.000Z', tab_binding_sha256: syntheticHash('tab'), stand: 'about:blank'};
+  writeFileSync(logoutFile, JSON.stringify({...bound, effects, receipts: effects.map(effect => ({effect,
+    observer: {...expectedObserver, connected: true, mst_self_count: 1}, causal_proof_sha256: syntheticHash('fixture-causal-proof'),
+    logout: {guid_hash: effect.guid_hash, ui_logout_invoked: true, transport_disconnected: true}})),
+    all_ui_logout_invoked: true, all_transports_disconnected: true}), {mode: 0o600});
+  const inputs = {expectedObserver, directory, issueId: ownConfig.issue_id, operationId, source, stand: 'about:blank', configs, effects, cleanupFile, logoutFile};
   const request = createParentRequest(inputs);
   const expected = {...bound, source_tree: source.tree, manifest_sha256: source.manifest_sha256,
-    config_paths: configs, cleanup_file: cleanupFile, logout_file: logoutFile};
+    config_paths: configs, cleanup_file: cleanupFile, logout_file: logoutFile, expected_observer: expectedObserver};
   return {directory, request, inputs, expected};
 }
 async function parentResponse(page, operation) {
@@ -562,7 +563,7 @@ async function parentResponse(page, operation) {
   await page.evaluate(() => installDispatcher());
   const refresh = {action: 'native-Refresh', started_at: new Date().toISOString(), completed_at: new Date().toISOString(), receipt_sha256: syntheticHash('fixture-refresh')};
   const raw = await page.evaluate(collectLoadedDispatcher);
-  const response = buildParentResponse(operation.request, raw, refresh);
+  const response = buildParentResponse(operation.request, raw, refresh, operation.request.expected_observer.tab_binding_sha256);
   const responseFile = join(operation.directory, 'response.json');
   writeFileSync(responseFile, JSON.stringify(response), {mode: 0o600});
   return {response, responseFile};
@@ -585,6 +586,12 @@ for (const [label, mutate] of [
   ['missing full store', x => x.readback.store_count = 1],
   ['wrong target', x => x.effects_sha256 = '0'.repeat(64)],
   ['new observer login', x => x.new_browser_or_login = true],
+  ['another calibrated observer', x => {
+    const own = x.readback.rows.find(row => row.type === 'mstSelf');
+    Object.assign(own, {guid_hash: syntheticHash('replacement'), session_id: 900, create_time: '2026-10-09T00:00:01.000Z'});
+    Object.assign(x.readback.observer, own); x.readback.calibration.observer_guid_hash = own.guid_hash;
+  }],
+  ['another authorized tab', x => x.readback.observer.tab_binding_sha256 = syntheticHash('another-tab')],
 ]) {
   test(`parent response rejects ${label}`, () => withPage([], async page => {
     const operation = parentOperation(), {response, responseFile} = await parentResponse(page, operation);
@@ -606,7 +613,7 @@ test('changed config and live exact process independently prevent parent consump
 }));
 for (const option of ['duplicate', 'changing']) {
   test(`loaded collector rejects ${option} remote inventory`, () => withPage([], async (page, diagnostics) => {
-    await installAccounts(page); await loginOwnPage(page, ownConfig, diagnostics);
+    await installAccounts(page); await loginOwnPage(page, {...ownConfig, loginom: {...ownConfig.loginom, username: 'admin'}}, diagnostics);
     await page.evaluate(option => installDispatcher({[option]: true}), option);
     await assert.rejects(page.evaluate(collectLoadedDispatcher), /PARENT_INVENTORY_(INCOMPLETE|CHANGED)/);
   }));
@@ -623,32 +630,56 @@ test('historical owner-self bucket component preserves old gaps and never replac
     {code: 'HISTORICAL_GUID_ALGORITHM_NOT_ESTABLISHED'});
   assert.throws(() => verifyFinalReadback(readback, [{...effect, session_id: undefined}], '2026-10-09T00:00:30Z'),
     {code: 'FINAL_SERVER_EFFECT_UNBOUND'});
-  readback.rows.push({...readback.rows[0], session_id: 22, type: 'mstClient', guid_hash: null});
+  readback.rows.push({...readback.rows[0], row_index: 1, session_id: 22, type: 'mstClient', guid_hash: null});
   readback.manager_count = readback.store_count = 2;
   assert.throws(() => verifyHistoricalAccountBucket(readback, old, '2026-10-09T00:00:30Z'), {code: 'HISTORICAL_ACCOUNT_BUCKET_UNKNOWN'});
 });
+
+test('the parent file bridge binds the authorized phase and refuses a substituted operation', () => withPage([], async (page) => {
+  const operation = parentOperation(); await parentResponse(page, operation);
+  const raw = await page.evaluate(collectLoadedDispatcher), stamp = new Date().toISOString(); raw.observed_at = stamp;
+  const paths = ['request.json', 'raw.json', 'refresh.json', 'authorization.json'].map(name => join(operation.directory, name));
+  const values = [operation.request, raw, {action: 'native-Refresh', started_at: stamp, completed_at: stamp,
+    receipt_sha256: syntheticHash('fresh-fixture-refresh')}, {issue_id: operation.request.issue_id,
+    operation_id: operation.request.operation_id, source: operation.request.source, expected_observer: operation.request.expected_observer}];
+  values.forEach((value, i) => writeFileSync(paths[i], JSON.stringify(value), {mode: 0o600}));
+  const outputFile = join(operation.directory, 'bridge-response.json');
+  const result = spawnSync(operator.node, [fileURLToPath(new URL('../scripts/parent-bridge.mjs', import.meta.url)), ...paths, outputFile], {encoding: 'utf8'});
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(readFileSync(outputFile)).nonce, operation.request.nonce);
+  values[3].operation_id = '11111111-2222-3333-4444-555555555555';
+  writeFileSync(paths[3], JSON.stringify(values[3]));
+  assert.throws(() => writeBoundParentResponse({requestFile: paths[0], rawFile: paths[1], refreshFile: paths[2], authorizationFile: paths[3],
+    outputFile: join(operation.directory, 'rejected-response.json')}), /PARENT_AUTHORIZATION_CHANGED/);
+}));
 
 function causalCase() {
   const {readback} = syntheticReadback();
   const binding = {schema: 'lab53-causal-binding-v1', issue_id: ownConfig.issue_id,
     operation_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', nonce: syntheticHash('causal-nonce'), source_sha: 'a'.repeat(40),
     config_sha256: syntheticHash('config'), user_hash: syntheticHash('worker'), role: 'worker', stand: readback.stand,
-    after: '2026-10-09T00:00:30Z', account_lock: {device: 1, inode: 2}};
+    after: '2026-10-09T00:00:30Z', account_lock: {device: 1, inode: 2}, expected_observer: observerTuple(readback.observer, readback.stand)};
   const common = {issue_id: binding.issue_id, operation_id: binding.operation_id, source_sha: binding.source_sha,
     nonce: binding.nonce, config_sha256: binding.config_sha256, user_hash: binding.user_hash, role: binding.role};
   const before = {...common, phase: 'before-operation', readback};
   const during = {...common, phase: 'while-connected', readback: structuredClone(readback)};
   during.readback.refreshed_at = '2026-10-09T00:03:00Z';
-  during.readback.rows.push({user_hash: binding.user_hash, session_id: 42, create_time: '2026-10-09T00:02:00Z',
+  during.readback.rows.push({kind: 'client', row_index: 1, name_hash: syntheticHash('worker:42'), user_hash: binding.user_hash, session_id: 42, create_time: '2026-10-09T00:02:00Z',
     guid_hash: null, type: 'mstClient', packages: [], pending_disconnect: false});
   during.readback.manager_count = during.readback.store_count = 2;
   const childBefore = {...common, connected: true, stand: binding.stand, guid_hash: syntheticHash('own-child'),
     observed_at: '2026-10-09T00:02:00Z', connection_receipt_sha256: syntheticHash('own-connection')};
   const childAfter = {...childBefore, observed_at: '2026-10-09T00:04:00Z', continuity: {
     receipt_sha256: syntheticHash('synthetic-continuity-fixture'), transport_count: 1, disconnects: 0, reconnects: 0,
-    guard_release_count: 0, account_lock: binding.account_lock, config_sha256: binding.config_sha256}};
+    native_lifetime: {connected: true, disposed: false, do_connect_count: 1, connect_to_server_count: 1, reconnect_count: 0,
+      events: [{kind: 'call', name: 'DoConnect'}, {kind: 'call', name: 'ConnectToServer'}]},
+    guard_audit: {schema: 'parent-held-audited-harness-v1', source_sha: binding.source_sha, entrypoint: 'provision-account.mjs', receipt_sha256: syntheticHash('audit'), manifest_sha256: syntheticHash('manifest'), parent: {pid: 1, start_ticks: '1'}}, account_lock: binding.account_lock, config_sha256: binding.config_sha256}};
   return {binding, before, during, childBefore, childAfter};
 }
+test('matching native counters without observed native events cannot qualify continuity', () => {
+  const options = causalCase(); options.childAfter.continuity.native_lifetime.events = [];
+  assert.throws(() => verifyCausalCapture(options), {code: 'CAUSAL_CONTINUITY_UNCONFIRMED'});
+});
 test('causal component returns exact child effect without borrowing parent mstSelf or live qualification', () => {
   const options = causalCase(), result = verifyCausalCapture(options);
   assert.equal(result.effect.session_id, 42);
@@ -661,7 +692,7 @@ for (const [label, change] of [
   ['old bucket', x => {x.before.readback.rows.push(x.during.readback.rows[1]); x.before.readback.manager_count++; x.before.readback.store_count++;}],
   ['reconnect', x => x.childAfter.continuity.reconnects++],
   ['missing continuity', x => delete x.childAfter.continuity],
-  ['guard release', x => x.childAfter.continuity.guard_release_count++],
+  ['missing guard barrier audit', x => delete x.childAfter.continuity.guard_audit],
   ['changed child GUID', x => x.childAfter.guid_hash = syntheticHash('replaced-child')],
   ['wrong role', x => x.childAfter.role = 'reviewer'],
   ['wrong operation', x => x.during.operation_id = 'bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee'],
@@ -671,3 +702,107 @@ for (const [label, change] of [
 ]) test(`causal component rejects ${label}`, () => {
   const options = causalCase(); change(options); assert.throws(() => verifyCausalCapture(options));
 });
+
+test('common admin admits only its exact calibrated owner baseline and one NEW child', () => {
+  const options = causalCase();
+  options.binding.role = 'admin'; options.binding.user_hash = options.before.readback.observer.user_hash;
+  options.binding.owner_baseline = {...options.binding.expected_observer};
+  for (const value of [options.before, options.during, options.childBefore, options.childAfter]) {
+    value.role = 'admin'; value.user_hash = options.binding.user_hash;
+  }
+  options.during.readback.rows[1].user_hash = options.binding.user_hash;
+  const result = verifyCausalCapture(options);
+  assert.equal(result.effect.session_id, 42); assert.equal(result.parent_is_child, false);
+  const invalid = structuredClone(options); invalid.binding.owner_baseline.session_id++;
+  assert.throws(() => verifyCausalCapture(invalid), {code: 'CAUSAL_OWNER_BASELINE_UNCONFIRMED'});
+  const role = structuredClone(options); role.binding.role = 'worker';
+  assert.throws(() => verifyCausalCapture(role));
+});
+test('full before inventory forbids reuse of another users ID/CreateTime tuple', () => {
+  const options = causalCase();
+  options.before.readback.rows.push({...options.during.readback.rows[1], user_hash: syntheticHash('foreign')});
+  options.before.readback.manager_count = options.before.readback.store_count = 2;
+  assert.throws(() => verifyCausalCapture(options), {code: 'CAUSAL_NEW_CHILD_UNCONFIRMED'});
+});
+test('nontestable real-shaped Dispatcher retains virtual shared/pool rows and packages without invented identities', () => withPage([], async (page, diagnostics) => {
+  const operation = parentOperation(); await installAccounts(page);
+  await loginOwnPage(page, {...ownConfig, loginom: {...ownConfig.loginom, username: 'admin'}}, diagnostics);
+  await page.evaluate(() => installDispatcher({virtual: true, noTid: true}));
+  assert.equal(await page.locator('[data-tid$="SessionsManagerForm;trpSessions"]').count(), 0);
+  const raw = await page.evaluate(collectLoadedDispatcher);
+  assert.equal(raw.rows.length, 4);
+  const stamp = new Date().toISOString(); raw.observed_at = stamp;
+  const response = buildParentResponse(operation.request, raw, {action: 'native-Refresh', started_at: stamp,
+    completed_at: stamp, receipt_sha256: syntheticHash('refresh')}, operation.request.expected_observer.tab_binding_sha256);
+  assert.equal(response.readback.manager_count, 4); assert.equal(response.readback.store_count, 4);
+  const virtual = response.readback.rows.filter(row => row.kind === 'virtual');
+  assert.equal(virtual.length, 2);
+  for (const row of virtual) {
+    assert.equal(row.user_hash, null); assert.equal(row.session_id, null); assert.equal(row.guid_hash, null);
+    assert.ok(row.name_hash); assert.equal(row.packages.length, 1);
+  }
+  assert.equal(verifyFinalReadback(response.readback, operation.request.effects, operation.request.after).ready, false);
+  response.readback.rows[1].session_id = null;
+  assert.throws(() => verifyFinalReadback(response.readback, operation.request.effects, operation.request.after));
+}));
+test('unknown backup semantics block full inventory instead of dropping the row', () => withPage([], async (page, diagnostics) => {
+  const operation = parentOperation(); await installAccounts(page);
+  await loginOwnPage(page, {...ownConfig, loginom: {...ownConfig.loginom, username: 'admin'}}, diagnostics);
+  await page.evaluate(() => installDispatcher({backup: true}));
+  const raw = await page.evaluate(collectLoadedDispatcher), stamp = new Date().toISOString(); raw.observed_at = stamp;
+  assert.equal(raw.rows.length, 2);
+  assert.throws(() => buildParentResponse(operation.request, raw, {action: 'native-Refresh', started_at: stamp,
+    completed_at: stamp, receipt_sha256: syntheticHash('refresh')}, operation.request.expected_observer.tab_binding_sha256),
+    {code: 'PARENT_BACKUP_SEMANTICS_UNQUALIFIED'});
+}));
+for (const mode of ['controller', 'store', 'mask']) {
+  test(`loaded collector refuses ${mode} changes during its full traversal`, () => withPage([], async (page, diagnostics) => {
+    await installAccounts(page); await loginOwnPage(page, {...ownConfig, loginom: {...ownConfig.loginom, username: 'admin'}}, diagnostics);
+    await page.evaluate(mode => {
+      installDispatcher({noTid: true});
+      const view = Ext.ComponentManager.getAll()[0], controller = view.Controller;
+      const manager = controller.FSessionManager, original = manager.SessionInfo.bind(manager);
+      manager.SessionInfo = async index => {
+        const info = await original(index);
+        if (mode === 'controller') view.Controller = {};
+        if (mode === 'store') controller.FSessionsStore = {};
+        if (mode === 'mask') document.body.insertAdjacentHTML('beforeend', '<div class="bg-mask-message" style="width:20px;height:20px">loading</div>');
+        return info;
+      };
+    }, mode);
+    await assert.rejects(page.evaluate(collectLoadedDispatcher), /PARENT_INVENTORY_CHANGED/);
+  }));
+}
+for (const mode of ['transport-error', 'state-write', 'connector-replacement', 'callback-replacement']) {
+  test(`native lifetime rejects ${mode} while wrapper references persist`, () => withPage([], async (page, diagnostics) => {
+    await installAccounts(page); await page.evaluate(installNativeLifetime); await loginOwnPage(page, ownConfig, diagnostics);
+    await nativePositive(page);
+    await page.evaluate(mode => {
+      const con = bg.app.Application.FInstance.FServerConnection;
+      if (mode === 'transport-error') con.FServerContainer.OnTransportError(Error('synthetic-native-error'));
+      if (mode === 'state-write') con.FConnected = true;
+      if (mode === 'connector-replacement') con.FServerContainer.FServerConnector = con.FServerContainer.FServerConnector;
+      if (mode === 'callback-replacement') con.FServerContainer.OnTransportError = () => {};
+    }, mode);
+    await assert.rejects(nativeSnapshot(page), /NATIVE_LIFETIME_UNKNOWN/);
+  }));
+}
+test('saved retained vendor Reconnect cannot bypass native lifetime observation', () => withPage([], async (page, diagnostics) => {
+  await installAccounts(page);
+  const raw = readFileSync('/home/user/multica_workspaces/lab-6462f220cf3b/lab-47-fac8fe178ede/workdir/evidence-private/root-protocol-c410229c0bea/bg_app_ServerConnection.js', 'utf8');
+  assert.equal(syntheticHash(raw), '4c8203aa04050c45f55f2dfec76ef65d93b056a9cbe092419a9bbea821e0c5a6');
+  const code = raw.slice(raw.indexOf('ServerConnection.prototype.Reconnect ='), raw.indexOf('ServerConnection.prototype.PrepareSession ='));
+  await page.evaluate(code => {
+    window.__awaiter = (self, args, _, generator) => new Promise((resolve, reject) => {
+      const iterator = generator.apply(self, args ?? []);
+      const step = value => {if (value.done) resolve(value.value); else Promise.resolve(value.value).then(
+        result => step(iterator.next(result)), error => {try {step(iterator.throw(error));} catch (failure) {reject(failure);}});};
+      try {step(iterator.next());} catch (error) {reject(error);}
+    });
+    Function('ServerConnection', code)(bg.app.ServerConnection);
+    window.savedVendorReconnect = bg.app.ServerConnection.prototype.Reconnect;
+  }, code);
+  await page.evaluate(installNativeLifetime); await loginOwnPage(page, ownConfig, diagnostics); await nativePositive(page);
+  await assert.rejects(page.evaluate(() => savedVendorReconnect.call(bg.app.Application.FInstance.FServerConnection)), /NATIVE_RECONNECT_FORBIDDEN/);
+  await assert.rejects(nativeSnapshot(page), /NATIVE_LIFETIME_UNKNOWN/);
+}));
