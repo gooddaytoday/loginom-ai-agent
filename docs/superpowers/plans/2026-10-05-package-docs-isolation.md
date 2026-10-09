@@ -1113,7 +1113,10 @@ Core имеет разметку осей, но без CSV oracle. По доку
   history4531/16301844bytes+diag3/4666374bytes full roundtrip. Node label
   REQUEST_REJECTED/NOT_APPLIED1 сохранён, trace/result counters match.
   Progress11 SHAe5e85ebe77…/metrics7b2ffa3dfe…; sales-by-category#1 running,
-  closed11/45/PASS8/FAIL3, candidate/cold/compare0/retries0.
+  Двенадцатый closed sales#1 PASS100/structure/warm/6 stages/remaining0×2;
+  history4507/15561728bytes+diag3/4000100bytes full roundtrip, errors0.
+  Progress12 SHA33fb9504d7…/metrics936a788901…; slow-supplier-deliveries#1 running,
+  closed12/45/PASS9/FAIL3, candidate/cold/compare0/retries0.
   Частичный v7 не подставлять
   как полный baseline и не повторять выборочно только неуспешные попытки.
   После обеих новых smoke сторон необходим полный набор90; перед приёмкой

@@ -669,6 +669,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | monthly-demand | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4604 / 16230213 | 3 / 4358291 |
 | nps-segments-by-tier | 1 | PASS100 | Есть / PASS | 23 / 22 / 18 | 4605 / 16613250 | 3 / 4745354 |
 | risky-approved-claims | 1 | PASS100 | Есть / PASS | 20 / 21 / 17 | 4531 / 16301844 | 3 / 4666374 |
+| sales-by-category | 1 | PASS100 | Есть / PASS | 16 / 17 / 13 | 4507 / 15561728 | 3 / 4000100 |
 
 Последний private snapshot `formal-v9-progress-9-20261009.json` SHA256
 `bd3dfd6fadbe73a2f9bff01ee31681692d1fb6da52d92f348a5351bfaba04702`:
@@ -810,3 +811,18 @@ metrics11 SHA256
 повторно проверены по SHA; common020c08059… и PID676156/UID/birth/exe/inode
 неизменны. Closed11/45:8 PASS100/3 no_artifact FAIL0, sales-by-category#1
 running. Candidate/cold/compare не начаты; полный90 не принят.
+
+Двенадцатый closed formal v9 `sales-by-category#1` PASS100:
+structure/warm oracle PASS, все6 cleanup stages/processes confirmed,
+error null/remaining0×2. History4507/15561728bytes и diagnostics3/4000100bytes
+сохранены с full roundtrip. Trace/result counters match:16 finishes/17 tools/
+13 Loginom/skill0/prepare1/errors0. Formal cold ещё pending.
+
+Private progress12 SHA256
+`33fb9504d79c22d2647ef10e3f34b1d8358b1071a13c75c416ff15b610cfa576`,
+metrics12 SHA256
+`936a78890131f8f6a9f3addeef0307e1e3057ed63224051c08d3ca685a019da0`.
+Все12 closed results/cleanup/process-cleanup и архивы, предыдущие11 traces
+повторно проверены по SHA; common020c08059… и PID676156/UID/birth/exe/inode
+неизменны. Closed12/45:9 PASS100/3 no_artifact FAIL0, slow-supplier-deliveries#1
+running. Candidate/cold/compare не начаты, retries0; полный90 не принят.
