@@ -19,6 +19,7 @@ const metadata = Schema.Struct({
   sourceTreeSha256: Schema.String,
   sourceDirty: Schema.Boolean,
   dependencies: Schema.Record(Schema.String, Schema.String),
+  capabilities: Schema.optional(Schema.Array(Schema.String)),
 })
 const manifest = Schema.Struct({
   format: Schema.Literal("loginom-cli-artifact-v1"),

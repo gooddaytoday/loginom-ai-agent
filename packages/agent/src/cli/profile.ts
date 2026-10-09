@@ -81,6 +81,8 @@ export async function acquireProfile(root: string, channel: keyof typeof Product
 
 export function profileEnvironment(paths: ReturnType<typeof profilePaths>, env: NodeJS.ProcessEnv) {
   const result = { ...env }
+  if (result.LOGINOM_AI_AGENT_SHARED_AUTH_DIR && result.LOGINOM_AI_AGENT_AUTH_CONTENT)
+    throw new Error("SHARED_AUTH_CONTENT_CONFLICT")
   // Inherited Desktop/sidecar settings must not redirect CLI writes or supply its auth.
   delete result.LOGINOM_AI_AGENT_AUTH_CONTENT
   delete result.LOGINOM_AI_AGENT_CONFIG
@@ -90,6 +92,9 @@ export function profileEnvironment(paths: ReturnType<typeof profilePaths>, env: 
     LOGINOM_AI_AGENT_CLI_ROOT: paths.root,
     LOGINOM_AI_AGENT_CONFIG_DIR: paths.config,
     LOGINOM_AI_AGENT_DB: path.join(paths.data, Product.database),
+    // gsettings/dconf can write cache even when only reading the system proxy.
+    // Retain XDG_CONFIG_HOME for OS settings, but isolate writable Linux paths.
+    ...(process.platform === "linux" ? { XDG_CACHE_HOME: paths.cache, XDG_RUNTIME_DIR: paths.tmp } : {}),
     TMPDIR: paths.tmp,
     TMP: paths.tmp,
     TEMP: paths.tmp,

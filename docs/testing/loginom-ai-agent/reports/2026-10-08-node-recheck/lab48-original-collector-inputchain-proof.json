@@ -1,0 +1,264 @@
+{
+  "schema": "lab48-original-native-input-collector-provenance-v1",
+  "observed_at_utc": "2026-10-09T08:24:47.088978+00:00",
+  "scope": "read-only Multica GET original task-runs/messages; exact structured collector creation input, matching tool ack, recorded supervisor invocation and original readback; no execution now",
+  "issue_id": "01a11d36-2811-71ba-a493-0e397e3e60f2",
+  "task_id": "01a11dfa-b0ef-71dc-8e40-cd98fbef9dcb",
+  "attempt_uuid": "8d6f150f-37e4-4680-a903-66009afc0144",
+  "checkout_source_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+  "api_message_count": 148,
+  "raw_source_credentials_saved": false,
+  "canonical_input_encoding": "sorted keys, compact separators, ensure_ascii=false, UTF-8; not HTTP wire bytes",
+  "collector": {
+    "file": "qualification.mjs",
+    "creation": {
+      "seq": 73,
+      "type": "tool_use",
+      "tool": "patch_apply",
+      "call_id": "88c10887-48ec-4076-bc7e-d380bb93c880",
+      "created_at": "2026-10-09T00:14:01.220981Z",
+      "canonical_structured_input_sha256": "f2d512a1bfb042fff02293120e78b7ef77c4a9d4109727c9a85551b7bd3dc4bb"
+    },
+    "successful_ack": {
+      "seq": 74,
+      "type": "tool_result",
+      "tool": "patch_apply",
+      "call_id": "88c10887-48ec-4076-bc7e-d380bb93c880",
+      "created_at": "2026-10-09T00:14:01.227982Z",
+      "output_truncated": false,
+      "output_text_sha256": "5542039eb39de1324d5a0945d170fb8831fb9027c246f1882f92a059e3eedd15"
+    },
+    "call_id_matches": true,
+    "created_source_utf8_bytes": 12116,
+    "created_source_lines": 96,
+    "ends_lf": true,
+    "created_source_sha256": "331b4596ea86f7ac397dc08a179d721991bc83e1abc88075d4b48b388f47f2c6",
+    "retained_source_sha256": "331b4596ea86f7ac397dc08a179d721991bc83e1abc88075d4b48b388f47f2c6",
+    "retained_source_match": true,
+    "flow": {
+      "4": "import crypto from 'node:crypto'",
+      "7": "const hash=s=>crypto.createHash('sha256').update(s).digest('hex');",
+      "12": "guid:String(await c.RemoteSession.get_Guid())",
+      "15": "guid_sha256:hash(raw.guid)",
+      "27": "guid:String(await c.RemoteSession.get_Guid())",
+      "31": "hash(raw.guid) compared to early admin connection guid_sha256",
+      "33": "guid_sha256:hash(raw.guid)"
+    },
+    "normalization": "none; Node crypto default UTF-8 string input"
+  },
+  "supervisor": {
+    "file": "supervise.py",
+    "creation": {
+      "seq": 75,
+      "type": "tool_use",
+      "tool": "patch_apply",
+      "call_id": "7bfccda1-be73-4459-99d3-2d0a1dcbc99d",
+      "created_at": "2026-10-09T00:14:58.243766Z",
+      "canonical_structured_input_sha256": "58c8eb4d42b69cc544a6e89e2e441f0c418709855a3edff23852963361ba7a89"
+    },
+    "successful_ack": {
+      "seq": 76,
+      "type": "tool_result",
+      "tool": "patch_apply",
+      "call_id": "7bfccda1-be73-4459-99d3-2d0a1dcbc99d",
+      "created_at": "2026-10-09T00:14:58.248271Z",
+      "output_truncated": false,
+      "output_text_sha256": "5542039eb39de1324d5a0945d170fb8831fb9027c246f1882f92a059e3eedd15"
+    },
+    "created_source_sha256": "4b532742edbf012363ac43f99db022ca8de3a1b92cdfb9f946659d9a78b10ca4",
+    "created_source_utf8_bytes": 8410,
+    "popen_line": 68,
+    "popen_expression": "subprocess.Popen([op['node'],str(root/'qualification.mjs')],env=env,pass_fds=tuple(fds),stdout=stdout,stderr=stderr,start_new_session=True)",
+    "no_qualification_content_writes_in_supervisor": true
+  },
+  "execution_chain": [
+    {
+      "seq": 77,
+      "type": "tool_use",
+      "tool": "exec_command",
+      "call_id": "e0a0822a-cdcb-49e0-81e4-e2c907c2edd0",
+      "created_at": "2026-10-09T00:14:58.277389Z",
+      "canonical_structured_input_sha256": "c4cb63747f58f18c12f20c481845c47b45d9a09f6fa84eb510a7065361f9f64a"
+    },
+    {
+      "seq": 78,
+      "type": "tool_result",
+      "tool": "exec_command",
+      "call_id": "e0a0822a-cdcb-49e0-81e4-e2c907c2edd0",
+      "created_at": "2026-10-09T00:14:58.279116Z",
+      "output_truncated": false
+    },
+    {
+      "seq": 79,
+      "type": "tool_use",
+      "tool": "exec_command",
+      "call_id": "d0898733-b317-4884-8d88-f7fb9a99155e",
+      "created_at": "2026-10-09T00:14:58.440356Z",
+      "canonical_structured_input_sha256": "31bed267659bd1681410f936b98cdc15dad3d51406bf80ddedc7bdf663724a65"
+    },
+    {
+      "seq": 80,
+      "type": "tool_use",
+      "tool": "exec_command",
+      "call_id": "95fe12fd-e23d-485a-b12c-93703cdee9e7",
+      "created_at": "2026-10-09T00:15:10.511304Z",
+      "canonical_structured_input_sha256": "4e6c0d67ea5a491621ecbeac7c3ccf751f08c5a3c0e5f8df7770411a80e58fd3"
+    },
+    {
+      "seq": 81,
+      "type": "tool_result",
+      "tool": "exec_command",
+      "call_id": "95fe12fd-e23d-485a-b12c-93703cdee9e7",
+      "created_at": "2026-10-09T00:15:10.513187Z",
+      "output_truncated": false,
+      "output_text_sha256": "590e8e68c731e2b0a1a0537e89d32b2dc78906af69b7956531984f56029d35c2"
+    },
+    {
+      "seq": 82,
+      "type": "tool_use",
+      "tool": "exec_command",
+      "call_id": "a3c35a7b-e091-452c-97c7-3325946ac60c",
+      "created_at": "2026-10-09T00:15:15.823782Z",
+      "canonical_structured_input_sha256": "8a14964bacae09bad088047577e866eb58de72a65a22f05025c10311756dd8c5"
+    },
+    {
+      "seq": 83,
+      "type": "tool_result",
+      "tool": "exec_command",
+      "call_id": "a3c35a7b-e091-452c-97c7-3325946ac60c",
+      "created_at": "2026-10-09T00:15:15.825146Z",
+      "output_truncated": false,
+      "output_text_sha256": "ad25434fbe446e1adfd6f7d91a0a40e282bec688c3f607b648337f1ef5ad8b71"
+    },
+    {
+      "seq": 84,
+      "type": "tool_use",
+      "tool": "exec_command",
+      "call_id": "1b8188fd-096d-4251-a339-389e2b4c1588",
+      "created_at": "2026-10-09T00:15:15.862836Z",
+      "canonical_structured_input_sha256": "46fc2475f7bf0d41564d4abfcf902c2e54c1209b0c3bbe36258e8353f4347d48"
+    },
+    {
+      "seq": 85,
+      "type": "tool_result",
+      "tool": "exec_command",
+      "call_id": "1b8188fd-096d-4251-a339-389e2b4c1588",
+      "created_at": "2026-10-09T00:15:15.864491Z",
+      "output_truncated": false,
+      "output_text_sha256": "76743a69eb298e1b0cb8aa42c782c8ece5a6dc1ee8a635496c8aa85d1521760a"
+    },
+    {
+      "seq": 86,
+      "type": "tool_use",
+      "tool": "exec_command",
+      "call_id": "8f9384e1-5534-4d69-9f1d-84d66d319489",
+      "created_at": "2026-10-09T00:15:15.90295Z",
+      "canonical_structured_input_sha256": "b37a42d65a9b14d30157206fff98b413b2943e367684d590b98a64a1835e4cb0"
+    },
+    {
+      "seq": 87,
+      "type": "tool_result",
+      "tool": "exec_command",
+      "call_id": "8f9384e1-5534-4d69-9f1d-84d66d319489",
+      "created_at": "2026-10-09T00:15:15.906852Z",
+      "output_truncated": true,
+      "output_text_sha256": "4660d4aa1a1435f36c510c63b25b93deafc380b8d24f4822c3c1dda8a3b1ccfd"
+    },
+    {
+      "seq": 88,
+      "type": "tool_result",
+      "tool": "exec_command",
+      "call_id": "d0898733-b317-4884-8d88-f7fb9a99155e",
+      "created_at": "2026-10-09T00:15:23.38648Z",
+      "output_truncated": false,
+      "output_text_sha256": "10ea71aa475f9d98611f29fb9e12bfd76924fb3b403edb17c5ecb72c81799085"
+    },
+    {
+      "seq": 89,
+      "type": "tool_use",
+      "tool": "exec_command",
+      "call_id": "21c95f2a-31a4-4dca-a10e-ab1d9354298b",
+      "created_at": "2026-10-09T00:15:26.714364Z",
+      "canonical_structured_input_sha256": "4cc845aaeec6179602a55794545e60dcdd4125375f54b81be6627f2a0fb88d9c"
+    },
+    {
+      "seq": 90,
+      "type": "tool_result",
+      "tool": "exec_command",
+      "call_id": "21c95f2a-31a4-4dca-a10e-ab1d9354298b",
+      "created_at": "2026-10-09T00:15:26.715668Z",
+      "output_truncated": false,
+      "output_text_sha256": "ebbf719dcace70b6db5b3193a1d20e91efdb6884c70eea39858133168f082467"
+    }
+  ],
+  "interval": {
+    "collector_creation_to_launch_other_tool_inputs": [
+      75,
+      77
+    ],
+    "collector_launch_to_result_other_tool_inputs": [
+      80,
+      82,
+      84,
+      86
+    ],
+    "all_recorded_other_commands_are_read_only_except_chmod": true,
+    "observed_collector_content_overwrites_before_run_completion": 0
+  },
+  "original_result": {
+    "supervisor_summary": {
+      "failure": null,
+      "qualification_summary": {
+        "status": "FAIL",
+        "failure": {
+          "code": "TimeoutError"
+        },
+        "pair_ready": false,
+        "admin_native_logout": false,
+        "own_admin_session": null
+      },
+      "own_pid_count": 11,
+      "exact_process_absence": true,
+      "lock_release": [
+        {
+          "role": "root_admin",
+          "released": true,
+          "inode": 2396017
+        },
+        {
+          "role": "worker",
+          "released": true,
+          "inode": 2398073
+        },
+        {
+          "role": "reviewer",
+          "released": true,
+          "inode": 2398074
+        }
+      ],
+      "marker_final_phase": "own_cleanup_requires_reconciliation"
+    },
+    "readback_file": "qualification-private.json",
+    "readback_seq": 90,
+    "readback_capture": {
+      "label": "admin",
+      "connected": true,
+      "packages": 0,
+      "guid_sha256": "94134f2a6cf93cc7bb8f8561d2dd0de6051a2631c121cda1e3962f3f8fca01f1",
+      "admin": true,
+      "designer": false,
+      "viewer": false,
+      "captured_at": "2026-10-09T00:15:02.265Z"
+    },
+    "readback_native_result": "FAIL/TimeoutError",
+    "readback_matches_retained_guid_digest": true
+  },
+  "independent_second_reader": "finite_local_route re-fetched original API; exact collector source bytes/hash, matching ack, Popen flow and absence of recorded source writes corroborated",
+  "claim": "Causal original-command provenance for exact-string GUID hashing substantially stronger than post-run retained file; this is a separately preserved new proof, not retroactive acceptance.",
+  "limits": [
+    "No physical on-disk pre-execution SHA receipt existed; cannot create that historical receipt now.",
+    "No audit of unrecorded external filesystem writes or process-memory bytes.",
+    "Old numeric SessionID/CreateTime absent; navigation TimeoutError cause NOT_ESTABLISHED.",
+    "No current server absence/marker reconciliation/node/model/runtime acceptance certified here."
+  ]
+}

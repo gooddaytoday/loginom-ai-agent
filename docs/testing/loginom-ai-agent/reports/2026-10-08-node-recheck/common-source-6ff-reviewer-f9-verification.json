@@ -1,0 +1,749 @@
+{
+  "schema": "lab53-source6ffea-reviewer-f9-independent-verification-v1",
+  "observed_at": "2026-10-09T11:01:12.437431+00:00",
+  "source": {
+    "sha": "6ffea08a383d3122601f60a40f4ee7be0905024e",
+    "tree": "5e41959f44bfe480d72784dfd70589a7ea978e90",
+    "current_pr_head": "6ffea08a383d3122601f60a40f4ee7be0905024e",
+    "current_pr_head_matches": true,
+    "pr_draft": true,
+    "pr_state": "OPEN",
+    "pr_base": "shared-oauth",
+    "reviewer_clean_checkout_claim": true,
+    "reviewer_checkout_readback_by_this_verifier": false
+  },
+  "artifacts": [
+    {
+      "id": "01a1204e-e0a5-779c-ac32-ec7e4237fecb",
+      "filename": "source-review.md",
+      "bytes": 8142,
+      "api_size_bytes": 8142,
+      "api_size_match": true,
+      "sha256": "42da423f34872e45f2e17e80fec8f6ca5858a88339b6c5c29ccfa58f348bc78c",
+      "comment_id": "01a1204e-ea20-7eec-b984-806084d88dff"
+    },
+    {
+      "id": "01a1204e-e309-7aab-a1a3-51b9e708c045",
+      "filename": "source-review-report.json",
+      "bytes": 7954,
+      "api_size_bytes": 7954,
+      "api_size_match": true,
+      "sha256": "827b4f6e760552624b3dcdb78010ff1c6b855173807f93d1db694c050ebce262",
+      "comment_id": "01a1204e-ea20-7eec-b984-806084d88dff"
+    },
+    {
+      "id": "01a1204e-e546-760a-a2ea-0944a21f52ae",
+      "filename": "source-review-manifest.json",
+      "bytes": 7885,
+      "api_size_bytes": 7885,
+      "api_size_match": true,
+      "sha256": "2ca90174a0c708b9326dfc76ce42c2659279d1c97a397066b028b0f9104550de",
+      "comment_id": "01a1204e-ea20-7eec-b984-806084d88dff"
+    }
+  ],
+  "artifact_manifest_bindings": [
+    {
+      "file": "source-review.md",
+      "bytes_match": true,
+      "sha256_match": true
+    },
+    {
+      "file": "source-review-report.json",
+      "bytes_match": true,
+      "sha256_match": true
+    }
+  ],
+  "version": {
+    "version": "lab53-source-only-v7",
+    "status": "SOURCE_ONLY_LIVE_BLOCKED",
+    "bytes": 4530,
+    "sha256": "0d921417dea72a90ca3dda15d7ba030da29a22fe02a0c368c74544f5f4749314",
+    "binding_count": 37,
+    "hash_matches": 37
+  },
+  "version_file_bindings": [
+    {
+      "path": "tools/loginom-multica-accounts/.gitignore",
+      "sha256": "862263fa1f46c20f0d1e4dac5ffcc75abd55c08211b2c3864c5f8764b9d87793",
+      "expected_sha256": "862263fa1f46c20f0d1e4dac5ffcc75abd55c08211b2c3864c5f8764b9d87793",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/README.md",
+      "sha256": "c964aa32976b124b1170efbce35065c2a6eefaf5c5e47be084a9c61b783e4677",
+      "expected_sha256": "c964aa32976b124b1170efbce35065c2a6eefaf5c5e47be084a9c61b783e4677",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/finite-cleanup.md",
+      "sha256": "4629897ffea0d1b04b5525096d58be17c5ad9139562028ad509924ed8da15b06",
+      "expected_sha256": "4629897ffea0d1b04b5525096d58be17c5ad9139562028ad509924ed8da15b06",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/fixtures/accounts.html",
+      "sha256": "35bc98bfbc75af54b20190766f9cd6b4da27632220076dfc261d2d21872d8963",
+      "expected_sha256": "35bc98bfbc75af54b20190766f9cd6b4da27632220076dfc261d2d21872d8963",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/fixtures/lifecycle.html",
+      "sha256": "1c348c66325ef6f4998f308ad7dc2dbf02b90003ddf9a1406db26514412133eb",
+      "expected_sha256": "1c348c66325ef6f4998f308ad7dc2dbf02b90003ddf9a1406db26514412133eb",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/fixtures/navigation.html",
+      "sha256": "b3bde2f068797b70e7c7975a31f1d64a03ac2686c6943abf2462ee5e5a0b4733",
+      "expected_sha256": "b3bde2f068797b70e7c7975a31f1d64a03ac2686c6943abf2462ee5e5a0b4733",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/parent-readback-plan.md",
+      "sha256": "ec672c3793904f71385315447918742f13cb8dfd25504b6aadebbc1ac9824f7b",
+      "expected_sha256": "ec672c3793904f71385315447918742f13cb8dfd25504b6aadebbc1ac9824f7b",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/account-identity.mjs",
+      "sha256": "0af649e990ea23a9c00b84493f82e216708d1b51ff1b6960cef749bcf88b6b7a",
+      "expected_sha256": "0af649e990ea23a9c00b84493f82e216708d1b51ff1b6960cef749bcf88b6b7a",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/account-lifecycle.mjs",
+      "sha256": "068c88503168347b20b46f7af0d7098c8ddd4508de75f92547d62b647b27579b",
+      "expected_sha256": "068c88503168347b20b46f7af0d7098c8ddd4508de75f92547d62b647b27579b",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/account-session-ui.mjs",
+      "sha256": "3f1b20e9cfc6c26799c23bf12faeb2d3db47873a2e2b8d834b602256738b4349",
+      "expected_sha256": "3f1b20e9cfc6c26799c23bf12faeb2d3db47873a2e2b8d834b602256738b4349",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/account-ui.mjs",
+      "sha256": "66673585250673fb9b6af04e7e4cbdc8c716e341bba39ba597dbc65abc585fe6",
+      "expected_sha256": "66673585250673fb9b6af04e7e4cbdc8c716e341bba39ba597dbc65abc585fe6",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/capture-harness.mjs",
+      "sha256": "341a586d0566fc27ea51509dd3a1641da7cd294cf71c91370665c02dc2d81db2",
+      "expected_sha256": "341a586d0566fc27ea51509dd3a1641da7cd294cf71c91370665c02dc2d81db2",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/common.py",
+      "sha256": "ceb400d2c1b5617cfa7598f75419a569e3b3cc52d13c6533dd7436fa39396743",
+      "expected_sha256": "ceb400d2c1b5617cfa7598f75419a569e3b3cc52d13c6533dd7436fa39396743",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/finalize-preparation.mjs",
+      "sha256": "0275887cfb2425dfed1f7e69105088b589646d5804d2bcede221bb786e5cad5e",
+      "expected_sha256": "0275887cfb2425dfed1f7e69105088b589646d5804d2bcede221bb786e5cad5e",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/flock-barrier.py",
+      "sha256": "c2ae2cb5cb7de931683d3bd3b875679125b55ec73872fa995b6ff0d4d2f72f2a",
+      "expected_sha256": "c2ae2cb5cb7de931683d3bd3b875679125b55ec73872fa995b6ff0d4d2f72f2a",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/historical-readback.mjs",
+      "sha256": "a606ae043df834e4f9e02e44ad79d566e12a76c0110cbf14f99af09ba4f73b64",
+      "expected_sha256": "a606ae043df834e4f9e02e44ad79d566e12a76c0110cbf14f99af09ba4f73b64",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/native-lifetime.mjs",
+      "sha256": "3e27dfd313e5a5ce05fcfd67c623beb57d937ab98164aed943fbbb105e3f7cd6",
+      "expected_sha256": "3e27dfd313e5a5ce05fcfd67c623beb57d937ab98164aed943fbbb105e3f7cd6",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/own-fd-inventory.py",
+      "sha256": "2dcb99d5367220aa71e9aba34295fdaf24298008f543efdd84c0f59f313f05e4",
+      "expected_sha256": "2dcb99d5367220aa71e9aba34295fdaf24298008f543efdd84c0f59f313f05e4",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/owner-archive.py",
+      "sha256": "84e35e4047ef85db58f29d3d4b26a90587629d4ed087b0da303add55db77037a",
+      "expected_sha256": "84e35e4047ef85db58f29d3d4b26a90587629d4ed087b0da303add55db77037a",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/owner-reconcile.py",
+      "sha256": "b2ccb4434f21627e3d6adf4062a15dabb34d56f9cefab422fa083151105ecbbb",
+      "expected_sha256": "b2ccb4434f21627e3d6adf4062a15dabb34d56f9cefab422fa083151105ecbbb",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/parent-bridge.mjs",
+      "sha256": "01cd73cd869fff4c617ca9c56c533873794bba0b4acb91dcadb0ae4947d0126b",
+      "expected_sha256": "01cd73cd869fff4c617ca9c56c533873794bba0b4acb91dcadb0ae4947d0126b",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/parent-readback.mjs",
+      "sha256": "0e7e8b05bdddd28ade15b5bf0b0bcc542a117d6bc5a8a72c70bdf70d7afb9e1c",
+      "expected_sha256": "0e7e8b05bdddd28ade15b5bf0b0bcc542a117d6bc5a8a72c70bdf70d7afb9e1c",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/preparation-runtime.mjs",
+      "sha256": "9e4b35175adfe491bddbad7d9662cd7fe67aa08b807f6bdcdcb5da5dae4f382c",
+      "expected_sha256": "9e4b35175adfe491bddbad7d9662cd7fe67aa08b807f6bdcdcb5da5dae4f382c",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/process-supervisor.py",
+      "sha256": "46f4b8b999438eddac67ca985fa9bd45c5812b70911327846ed6413e60ed66a8",
+      "expected_sha256": "46f4b8b999438eddac67ca985fa9bd45c5812b70911327846ed6413e60ed66a8",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/provision-account.mjs",
+      "sha256": "e68e0515129bfb9ebe15c633ca13d9170adff92069a6082158a48aacfb512f8c",
+      "expected_sha256": "e68e0515129bfb9ebe15c633ca13d9170adff92069a6082158a48aacfb512f8c",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/provision-accounts.py",
+      "sha256": "d26304ffe0b3d29263cfdc9573b54f8b0279ebd81b8cefcbe7e49be7b8af61d0",
+      "expected_sha256": "d26304ffe0b3d29263cfdc9573b54f8b0279ebd81b8cefcbe7e49be7b8af61d0",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/qualification-coordinator.py",
+      "sha256": "ad16a34483175344936e903cd0a15bb10c27c52878ee487a4ced6180435b5878",
+      "expected_sha256": "ad16a34483175344936e903cd0a15bb10c27c52878ee487a4ced6180435b5878",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/qualify-accounts.mjs",
+      "sha256": "87f2e1bf3edbdf2678901b7d7d3407a9f7864e26eac549ab488cc4daa09db2c3",
+      "expected_sha256": "87f2e1bf3edbdf2678901b7d7d3407a9f7864e26eac549ab488cc4daa09db2c3",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/qualify-preparation.mjs",
+      "sha256": "da81248324a52b0f29615db75fe1aede2a2f8f476016d22a8e74dc711e580cb5",
+      "expected_sha256": "da81248324a52b0f29615db75fe1aede2a2f8f476016d22a8e74dc711e580cb5",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/vendor-provenance.mjs",
+      "sha256": "7111f61f2f720f7634b473528ab31d5446e1b0d710efd37ba96c35cbef3d5f00",
+      "expected_sha256": "7111f61f2f720f7634b473528ab31d5446e1b0d710efd37ba96c35cbef3d5f00",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/account-ui.test.mjs",
+      "sha256": "6f988b1bc00634b8caf2f6a2dce0133ade73bd877960e7677e512e22e5cf0c52",
+      "expected_sha256": "6f988b1bc00634b8caf2f6a2dce0133ade73bd877960e7677e512e22e5cf0c52",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/linked-harness.mjs",
+      "sha256": "2b28e6b005c4206331ea9cdf9b8e250485cf1d1492ab865be27f3be216502499",
+      "expected_sha256": "2b28e6b005c4206331ea9cdf9b8e250485cf1d1492ab865be27f3be216502499",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/parent-fixture.py",
+      "sha256": "8efa606547195e5623cb80bd6a6d24c6c641dedddc65526e6498ce529b5107ea",
+      "expected_sha256": "8efa606547195e5623cb80bd6a6d24c6c641dedddc65526e6498ce529b5107ea",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/test_accounts.py",
+      "sha256": "971ef937be5a4193293b5e3ff7defd6e58fe78c668b4701f3df56b404e4727ad",
+      "expected_sha256": "971ef937be5a4193293b5e3ff7defd6e58fe78c668b4701f3df56b404e4727ad",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/test_lifecycle.py",
+      "sha256": "0e44aafa8bc455f6cf80c15aa89d00ffad0892205328bdf6724c4862c04fdb96",
+      "expected_sha256": "0e44aafa8bc455f6cf80c15aa89d00ffad0892205328bdf6724c4862c04fdb96",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/test_manifest.py",
+      "sha256": "f94c4063c53238b65e7512ce2fb1da45147410d8b501d39cac986dc8f6b8ba7f",
+      "expected_sha256": "f94c4063c53238b65e7512ce2fb1da45147410d8b501d39cac986dc8f6b8ba7f",
+      "match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/test_qualification.py",
+      "sha256": "7d1f9f8ecb2dd6f1da514e9aacdacff1585f5b30fda2ebaa54e144134e83eaee",
+      "expected_sha256": "7d1f9f8ecb2dd6f1da514e9aacdacff1585f5b30fda2ebaa54e144134e83eaee",
+      "match": true
+    }
+  ],
+  "manifest_candidate_bindings": [
+    {
+      "path": "tools/loginom-multica-accounts/parent-readback-plan.md",
+      "bytes": 17164,
+      "sha256": "ec672c3793904f71385315447918742f13cb8dfd25504b6aadebbc1ac9824f7b",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/VERSION.json",
+      "bytes": 4530,
+      "sha256": "0d921417dea72a90ca3dda15d7ba030da29a22fe02a0c368c74544f5f4749314",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/.gitignore",
+      "bytes": 19,
+      "sha256": "862263fa1f46c20f0d1e4dac5ffcc75abd55c08211b2c3864c5f8764b9d87793",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/finite-cleanup.md",
+      "bytes": 6757,
+      "sha256": "4629897ffea0d1b04b5525096d58be17c5ad9139562028ad509924ed8da15b06",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/README.md",
+      "bytes": 9930,
+      "sha256": "c964aa32976b124b1170efbce35065c2a6eefaf5c5e47be084a9c61b783e4677",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/fixtures/lifecycle.html",
+      "bytes": 505,
+      "sha256": "1c348c66325ef6f4998f308ad7dc2dbf02b90003ddf9a1406db26514412133eb",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/fixtures/accounts.html",
+      "bytes": 9842,
+      "sha256": "35bc98bfbc75af54b20190766f9cd6b4da27632220076dfc261d2d21872d8963",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/fixtures/navigation.html",
+      "bytes": 2101,
+      "sha256": "b3bde2f068797b70e7c7975a31f1d64a03ac2686c6943abf2462ee5e5a0b4733",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/parent-readback.mjs",
+      "bytes": 21906,
+      "sha256": "0e7e8b05bdddd28ade15b5bf0b0bcc542a117d6bc5a8a72c70bdf70d7afb9e1c",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/finalize-preparation.mjs",
+      "bytes": 1461,
+      "sha256": "0275887cfb2425dfed1f7e69105088b589646d5804d2bcede221bb786e5cad5e",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/account-session-ui.mjs",
+      "bytes": 18733,
+      "sha256": "3f1b20e9cfc6c26799c23bf12faeb2d3db47873a2e2b8d834b602256738b4349",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/account-identity.mjs",
+      "bytes": 8907,
+      "sha256": "0af649e990ea23a9c00b84493f82e216708d1b51ff1b6960cef749bcf88b6b7a",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/account-lifecycle.mjs",
+      "bytes": 13243,
+      "sha256": "068c88503168347b20b46f7af0d7098c8ddd4508de75f92547d62b647b27579b",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/native-lifetime.mjs",
+      "bytes": 7567,
+      "sha256": "3e27dfd313e5a5ce05fcfd67c623beb57d937ab98164aed943fbbb105e3f7cd6",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/parent-bridge.mjs",
+      "bytes": 1763,
+      "sha256": "01cd73cd869fff4c617ca9c56c533873794bba0b4acb91dcadb0ae4947d0126b",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/qualification-coordinator.py",
+      "bytes": 1976,
+      "sha256": "ad16a34483175344936e903cd0a15bb10c27c52878ee487a4ced6180435b5878",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/common.py",
+      "bytes": 12344,
+      "sha256": "ceb400d2c1b5617cfa7598f75419a569e3b3cc52d13c6533dd7436fa39396743",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/own-fd-inventory.py",
+      "bytes": 3452,
+      "sha256": "2dcb99d5367220aa71e9aba34295fdaf24298008f543efdd84c0f59f313f05e4",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/historical-readback.mjs",
+      "bytes": 2481,
+      "sha256": "a606ae043df834e4f9e02e44ad79d566e12a76c0110cbf14f99af09ba4f73b64",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/account-ui.mjs",
+      "bytes": 11429,
+      "sha256": "66673585250673fb9b6af04e7e4cbdc8c716e341bba39ba597dbc65abc585fe6",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/provision-account.mjs",
+      "bytes": 968,
+      "sha256": "e68e0515129bfb9ebe15c633ca13d9170adff92069a6082158a48aacfb512f8c",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/owner-archive.py",
+      "bytes": 8231,
+      "sha256": "84e35e4047ef85db58f29d3d4b26a90587629d4ed087b0da303add55db77037a",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/vendor-provenance.mjs",
+      "bytes": 1805,
+      "sha256": "7111f61f2f720f7634b473528ab31d5446e1b0d710efd37ba96c35cbef3d5f00",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/process-supervisor.py",
+      "bytes": 11230,
+      "sha256": "46f4b8b999438eddac67ca985fa9bd45c5812b70911327846ed6413e60ed66a8",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/qualify-accounts.mjs",
+      "bytes": 1179,
+      "sha256": "87f2e1bf3edbdf2678901b7d7d3407a9f7864e26eac549ab488cc4daa09db2c3",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/capture-harness.mjs",
+      "bytes": 9716,
+      "sha256": "341a586d0566fc27ea51509dd3a1641da7cd294cf71c91370665c02dc2d81db2",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/owner-reconcile.py",
+      "bytes": 17018,
+      "sha256": "b2ccb4434f21627e3d6adf4062a15dabb34d56f9cefab422fa083151105ecbbb",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/qualify-preparation.mjs",
+      "bytes": 3163,
+      "sha256": "da81248324a52b0f29615db75fe1aede2a2f8f476016d22a8e74dc711e580cb5",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/flock-barrier.py",
+      "bytes": 1757,
+      "sha256": "c2ae2cb5cb7de931683d3bd3b875679125b55ec73872fa995b6ff0d4d2f72f2a",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/provision-accounts.py",
+      "bytes": 29058,
+      "sha256": "d26304ffe0b3d29263cfdc9573b54f8b0279ebd81b8cefcbe7e49be7b8af61d0",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/scripts/preparation-runtime.mjs",
+      "bytes": 4344,
+      "sha256": "9e4b35175adfe491bddbad7d9662cd7fe67aa08b807f6bdcdcb5da5dae4f382c",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/test_accounts.py",
+      "bytes": 8221,
+      "sha256": "971ef937be5a4193293b5e3ff7defd6e58fe78c668b4701f3df56b404e4727ad",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/parent-fixture.py",
+      "bytes": 4140,
+      "sha256": "8efa606547195e5623cb80bd6a6d24c6c641dedddc65526e6498ce529b5107ea",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/test_qualification.py",
+      "bytes": 15715,
+      "sha256": "7d1f9f8ecb2dd6f1da514e9aacdacff1585f5b30fda2ebaa54e144134e83eaee",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/test_lifecycle.py",
+      "bytes": 37418,
+      "sha256": "0e44aafa8bc455f6cf80c15aa89d00ffad0892205328bdf6724c4862c04fdb96",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/account-ui.test.mjs",
+      "bytes": 57823,
+      "sha256": "6f988b1bc00634b8caf2f6a2dce0133ade73bd877960e7677e512e22e5cf0c52",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/linked-harness.mjs",
+      "bytes": 4467,
+      "sha256": "2b28e6b005c4206331ea9cdf9b8e250485cf1d1492ab865be27f3be216502499",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/tests/test_manifest.py",
+      "bytes": 1569,
+      "sha256": "f94c4063c53238b65e7512ce2fb1da45147410d8b501d39cac986dc8f6b8ba7f",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/VERSION.json",
+      "bytes": 1223,
+      "sha256": "848f7f7162a67f4ca51c3c6ad5e4292d07761cbc433d6181b58fd507cceb5d74",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/SOURCE_SNAPSHOT.json",
+      "bytes": 1115,
+      "sha256": "d0bc1f6af0dc80840ba80ef7f0cd94d103b5d5268f11e8666532426b8522ea9d",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/README.md",
+      "bytes": 1591,
+      "sha256": "76743a69eb298e1b0cb8aa42c782c8ece5a6dc1ee8a635496c8aa85d1521760a",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/scripts/common.py",
+      "bytes": 4359,
+      "sha256": "2f5ebbf82fa470fbe77e5c68aae5daa96f5476d82f80ee9854985db7fb1625e3",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/scripts/provision-account.mjs",
+      "bytes": 6961,
+      "sha256": "d45d8b5dd11d1071e54699f54c9dfe9fe1a630923466aec80203b98014932169",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/scripts/provision-accounts.py",
+      "bytes": 9614,
+      "sha256": "7ad2c05579a1e64a95c296ab884a5002de3e8dc2efcaa5041891a57e9a3941fc",
+      "manifest_match": true
+    }
+  ],
+  "manifest_retained_baseline_bindings": [
+    {
+      "path": "tools/loginom-multica-accounts/baseline/VERSION.json",
+      "bytes": 1223,
+      "sha256": "848f7f7162a67f4ca51c3c6ad5e4292d07761cbc433d6181b58fd507cceb5d74",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/SOURCE_SNAPSHOT.json",
+      "bytes": 1115,
+      "sha256": "d0bc1f6af0dc80840ba80ef7f0cd94d103b5d5268f11e8666532426b8522ea9d",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/README.md",
+      "bytes": 1591,
+      "sha256": "76743a69eb298e1b0cb8aa42c782c8ece5a6dc1ee8a635496c8aa85d1521760a",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/scripts/common.py",
+      "bytes": 4359,
+      "sha256": "2f5ebbf82fa470fbe77e5c68aae5daa96f5476d82f80ee9854985db7fb1625e3",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/scripts/provision-account.mjs",
+      "bytes": 6961,
+      "sha256": "d45d8b5dd11d1071e54699f54c9dfe9fe1a630923466aec80203b98014932169",
+      "manifest_match": true
+    },
+    {
+      "path": "tools/loginom-multica-accounts/baseline/scripts/provision-accounts.py",
+      "bytes": 9614,
+      "sha256": "7ad2c05579a1e64a95c296ab884a5002de3e8dc2efcaa5041891a57e9a3941fc",
+      "manifest_match": true
+    }
+  ],
+  "native_task_readback": {
+    "reviewer": {
+      "id": "01a12040-2de6-78d4-b223-90145c7f17e4",
+      "agent_id": "027d102c-5d25-402c-a8fb-58a3e810013c",
+      "status": "completed",
+      "created_at": "2026-10-09T13:40:39+03:00",
+      "started_at": "2026-10-09T13:40:40+03:00",
+      "completed_at": "2026-10-09T13:57:38+03:00",
+      "error": null
+    },
+    "one_worker_handoff": {
+      "id": "01a1204e-ea84-74c4-b38a-282616b57e6e",
+      "agent_id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+      "status": "running",
+      "created_at": "2026-10-09T13:56:45+03:00",
+      "started_at": "2026-10-09T13:56:46+03:00",
+      "completed_at": null,
+      "error": null
+    },
+    "reviewer_final_comment_id": "01a1204e-ea20-7eec-b984-806084d88dff",
+    "attachment_comment_ids": [
+      "01a1204e-ea20-7eec-b984-806084d88dff"
+    ]
+  },
+  "reviewer_report_claims_not_replayed": {
+    "status": "REQUEST_CHANGES",
+    "checkout_clean": true,
+    "findings": [
+      {
+        "id": "F9",
+        "priority": "P2",
+        "source": "scripts/own-fd-inventory.py:33",
+        "validator": "scripts/owner-reconcile.py:110",
+        "test_gap": "tests/test_qualification.py:201",
+        "problem": "Path.iterdir closes its own FD enumeration handle before stat, causing self FileNotFoundError and strict incomplete census",
+        "reproduced_runs": 2,
+        "samples_per_run": 2,
+        "positive_control_observed": true,
+        "same_visible_pids": true,
+        "collector_exit": 0,
+        "strict_validator": "HISTORICAL_FD_CENSUS_INCOMPLETE",
+        "errors_filtered": false,
+        "source_patch": false,
+        "python_version": "3.14.4",
+        "minimal_fix": "Hold os.scandir open through every stat; require an actual complete collector-to-strict-validator positive PASS regression; preserve all denial/race/error rejection",
+        "server_harm_claim": false
+      }
+    ],
+    "prior_findings": {
+      "F4": "CLOSED_SOURCE_OFFLINE_RUNTIME_NOT_PROVED",
+      "F5": "CLOSED_SOURCE_OFFLINE_RUNTIME_NOT_PROVED",
+      "F6": "CLOSED_SOURCE_OFFLINE_RUNTIME_NOT_PROVED",
+      "F7": "CLOSED_SOURCE_OFFLINE_RUNTIME_NOT_PROVED",
+      "F8": "CLOSED_SOURCE_OFFLINE_RUNTIME_NOT_PROVED"
+    },
+    "reviewed_delta": {
+      "from_sha": "201a9371889947638ba6215f514a48de3da9b47b",
+      "files": 30,
+      "scope": "tools/loginom-multica-accounts/",
+      "full_source_diff_reviewed": true
+    },
+    "tests": {
+      "python": {
+        "passed": 44,
+        "failed": 0
+      },
+      "chromium": {
+        "passed": 95,
+        "failed": 0
+      },
+      "total_passed": 139,
+      "sandbox": true,
+      "network_requests": 0,
+      "fixed_production_entry": "REACHED_ADMIN_BEFORE_REQUEST_NO_BROWSER_LOGIN_THEN_CANCELLED",
+      "fd_census_additional_probe": "CONFIRMED_FAILURE_2_OF_2",
+      "scandir_cause_diagnostic": "OWN_FD_ONLY_NO_COMPLETE_CENSUS_PASS",
+      "bounded_live_qualification": "NOT_RUN"
+    },
+    "bindings": {
+      "worker_api_attachments_downloaded": 3,
+      "manifest_artifacts": 2,
+      "candidate_files": 44,
+      "version_files": 37,
+      "retained_snapshot_files": 5,
+      "installed_scripts": 3,
+      "retained_baseline_exact_unchanged_files": 6,
+      "all_match": true,
+      "version_sha256": "0d921417dea72a90ca3dda15d7ba030da29a22fe02a0c368c74544f5f4749314"
+    },
+    "cleanup": {
+      "exact_observed_own_records": 465,
+      "absent_nonlive": true,
+      "scope": "observed own local fixtures, suites and collectors; not a full census or server proof",
+      "observed_at": "2026-10-09T10:52:40.892602+00:00",
+      "foreground_collectors": "ENDED",
+      "server_absence": "NOT_PROVED_NO_LOGINOM_ACTIONS",
+      "privileged_global_fd_census": "NOT_CLAIMED"
+    },
+    "native": {
+      "own_task_id": "01a12040-2de6-78d4-b223-90145c7f17e4",
+      "task_error": null,
+      "provider_errors_retries": "NOT_EXPOSED_BY_API",
+      "cli_model_runs": 0,
+      "central_instructions_sha256": "8d7a2fb19518fac1e1a8522cdccbfb1158b90c09ae71e411159e397d37ff2c32",
+      "cpu_ram_load_disk_receipts": "PRIVATE",
+      "model_runtime_caps": "UNCHANGED"
+    },
+    "history": {
+      "LAB45": "NOT_RECONCILED",
+      "LAB48": "NOT_RECONCILED",
+      "observer3119": "LOCAL_MARKER_RECONCILIATION_PENDING",
+      "Root47_PASS": "NOT_TRANSFERRED",
+      "LAB48_original_chain_formula": "REVIEWED_SEPARATELY_PREVIOUS_REVIEW",
+      "LAB45_new_original_chain_audit": "OWNER_PROVIDED_NOT_INDEPENDENTLY_RERUN_THIS_TURN",
+      "executed_bytes_physical_preexec_numeric_create_time_old_cause_gaps": "PRESERVED",
+      "old_receipts_3123_3128": "HISTORICAL_ONLY_NOT_FUTURE_OPERATION_PROOF"
+    },
+    "parent_collector_preflight": {
+      "scope": "OWNER_PROVIDED_ACTUAL_READONLY_EXISTING_MAC_COLLECTOR",
+      "reported_counts": [
+        8,
+        8,
+        8
+      ],
+      "new_operation_nonce": false,
+      "post_operation_proof": false
+    },
+    "issue_status": "blocked",
+    "live_acceptance": "NOT_ACCEPTED",
+    "ordinary_public_gates": "BOTH_UNCONDITIONAL_RETAINED",
+    "node_runs": 0,
+    "real_loginom_observer_server_config_marker_history_actions": 0,
+    "model_build_install_merge_release_schedules_contract_changes": 0,
+    "new_approval_gate": false,
+    "routing": "ONE_WORKER_HANDOFF_SUPPRESS_GENERATOR_AND_REVIEWER"
+  },
+  "independently_verified": [
+    "authenticated artifact bytes and API sizes",
+    "manifest source/tree and both deliverable bindings",
+    "exact Git commit tree and VERSION37 digests",
+    "manifest candidate and retained baseline bytes/digests",
+    "actual API Reviewer terminal metadata and same-card one Worker handoff"
+  ],
+  "limitations": [
+    "No test replay or new FD census by this verifier.",
+    "Native Reviewer report independently reran 139 tests and two F9 probes; this verifier confirmed artifact authenticity/bindings, not execution itself.",
+    "465 observed own-record absence is the report claim at its timestamp, not a machine-wide census/server proof.",
+    "API completed/error=null does not establish process or session absence.",
+    "Existing Mac collector remains preflight; no nonce-bound operation or live/node/model acceptance transferred.",
+    "Installed/source deployment, Loginom actions and provider retries not independently verified here."
+  ],
+  "mutations": {
+    "repository_files": 0,
+    "multica_api": 0,
+    "loginom_ui": 0,
+    "ssh": 0
+  }
+}

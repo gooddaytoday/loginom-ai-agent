@@ -1,0 +1,32 @@
+{
+  "observed_at": "2026-10-09T15:28:06.185388+00:00",
+  "scope": "configuration readback only; real concurrent node processing NOT_RUN",
+  "roles": [
+    {
+      "id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+      "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+      "max_concurrent_tasks": 8,
+      "instructions_sha256": "35da8ec9f2a7e04d054898eb4b1c596e748e13c24d962b01e017f99b20e3e2f2"
+    },
+    {
+      "id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+      "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+      "max_concurrent_tasks": 8,
+      "instructions_sha256": "5bd794574c023e44817b6b3b195d2eecfcb0341e62254c11df1a2fc72e118f13"
+    },
+    {
+      "id": "027d102c-5d25-402c-a8fb-58a3e810013c",
+      "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+      "max_concurrent_tasks": 8,
+      "instructions_sha256": "1570ceef87c260e2efc5531208c7dec2e79b6d8a552fa6ae013ea7846125b9a5"
+    }
+  ],
+  "squad_id": "8ff41bd5-f794-4b5b-a063-026f3874628e",
+  "squad_instructions_sha256": "5c16fd3060ce09331cbef14538dcbd6802e04397734c4db7d5f9bcf4bbe34910",
+  "central_cli_model_paragraph_unchanged": true,
+  "historical_holds_superseded": true,
+  "daemon_observed_argv": {
+    "max_concurrent_tasks": 12,
+    "ws_claim_poll_interval": "3m0s"
+  }
+}

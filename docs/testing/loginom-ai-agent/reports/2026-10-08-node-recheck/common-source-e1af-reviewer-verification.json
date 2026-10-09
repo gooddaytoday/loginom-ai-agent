@@ -1,0 +1,174 @@
+{
+  "schema": "lab53-source-e1af-reviewer-public-verification-v1",
+  "observed_at": "2026-10-09T12:57:30.245112+00:00",
+  "scope": "SOURCE_ONLY_EXACT_SHA_NO_RUNTIME_QUALIFICATION",
+  "source": {
+    "sha": "e1af46079cf5f16208384740eebf580332193a24",
+    "tree": "41d69aa2317efa007754b1e7d20ce57571e6a1be",
+    "VERSION_sha256": "2f514da464c5db553a8ab34f8ee1b3dd2fddc4828999f1092724262362fbfa64"
+  },
+  "result": "REVIEWER_API_ARTIFACT_SOURCE_IDENTITY_MATCH_ONLY",
+  "Reviewer_status_reported": "SOURCE_ONLY_PASS",
+  "private_reviewer_verification_receipt": {
+    "bytes": 5717,
+    "sha256": "35886a069e890d375ff8b82b2a5fa1c66429778255c545f74edbb090ec48e703",
+    "contents": "PRIVATE_NOT_PUBLISHED"
+  },
+  "private_worker_verification_receipt": {
+    "bytes": 6648,
+    "sha256": "c245712aa1e2ca373ce34301f07062a013ccca04bedb48ba61c3cd945726305a",
+    "contents": "PRIVATE_NOT_PUBLISHED"
+  },
+  "official_GET_downloads": [
+    {
+      "id": "01a120b5-3907-7154-a652-747c0a3ce555",
+      "name": "source-review.md",
+      "bytes": 8432,
+      "expected_bytes": 8432,
+      "size_match": true,
+      "sha256": "a2b82b18d4048aec028120578a78b2d8c167b84c152cba606708c9d0369921e3",
+      "issue_matches": true
+    },
+    {
+      "id": "01a120b5-3c66-7095-8f12-76f75810ebd3",
+      "name": "source-review-report.json",
+      "bytes": 10748,
+      "expected_bytes": 10748,
+      "size_match": true,
+      "sha256": "b0f25bd51c96e4f1c90fd9a025233d1a49707bb25224be6ffd7d09f531768142",
+      "issue_matches": true
+    },
+    {
+      "id": "01a120b5-3ed8-71b1-a0b9-868927fcf921",
+      "name": "source-review-manifest.json",
+      "bytes": 8018,
+      "expected_bytes": 8018,
+      "size_match": true,
+      "sha256": "ac9142f409790cd695a6d6f4d708306c09828e9221169f2ab3a5a231d1af0314",
+      "issue_matches": true
+    }
+  ],
+  "manifest_verification": {
+    "exact_two_artifacts": true,
+    "files": [
+      {
+        "name": "source-review.md",
+        "bytes": 8432,
+        "sha256": "a2b82b18d4048aec028120578a78b2d8c167b84c152cba606708c9d0369921e3",
+        "manifest_match": true
+      },
+      {
+        "name": "source-review-report.json",
+        "bytes": 10748,
+        "sha256": "b0f25bd51c96e4f1c90fd9a025233d1a49707bb25224be6ffd7d09f531768142",
+        "manifest_match": true
+      }
+    ],
+    "source_sha_match": true,
+    "source_tree_match": true,
+    "VERSION_match": true,
+    "candidate_path_scope": "Manifest paths are relative to tools/loginom-multica-accounts; explicit prefix used for Git/report mapping",
+    "candidate_file_count": 51,
+    "candidate_hash_or_size_mismatches": [],
+    "candidate_map_equals_verified_Worker_map": true
+  },
+  "independent_Worker_source_export_verification": {
+    "sha256": "a926b270f68f6f96299730b94de8dee133081adfb487a6b72a283fbb84c75339",
+    "git_export_report_exact_file_matches": 51,
+    "VERSION_declared_file_matches": 44,
+    "VERSION_digest_matches": true,
+    "baseline_SOURCE_SNAPSHOT_matches": 5,
+    "baseline_scripts_VERSION_matches": 3,
+    "missing_extra_hash_mismatches": 0
+  },
+  "draft_PR_readback": {
+    "number": 44,
+    "url": "https://github.com/gooddaytoday/loginom-ai-agent/pull/44",
+    "state": "OPEN",
+    "draft": true,
+    "head_branch": "common-preparation",
+    "base_branch": "shared-oauth",
+    "official_gh_head_matches_candidate": true
+  },
+  "native_task_readback": {
+    "id": "01a120aa-373e-7041-bdb8-03623f802b52",
+    "status": "completed",
+    "started_at": "2026-10-09T15:36:29+03:00",
+    "completed_at": "2026-10-09T15:49:21+03:00",
+    "error": null,
+    "initial_delivered_comment_ids": [
+      "01a120aa-36f3-716f-9494-9175116f3251"
+    ],
+    "supplement_delivery": "NOT_PROVEN_BY_INITIAL_DELIVERED_IDS"
+  },
+  "atomic_publication_finding": {
+    "root_comment_id": "01a120ad-42e6-79d8-a539-68e13c0e849d",
+    "root_comment_created_at": "2026-10-09T15:39:48+03:00",
+    "root_comment_body_sha256": "2ecc2c9d5b2c1b410bb6d1cfd6fa63440b58dbbf6d350934a05ce66d5837c9a9",
+    "disposition": "NOT_DOCUMENTED_OR_ACKNOWLEDGED_IN_EXPOSED_REVIEW_EVIDENCE",
+    "Reviewer_MD_atomic_terms": 0,
+    "Reviewer_JSON_findings": [],
+    "all_exposed_native_message_fields_inspected": true,
+    "native_messages": 58,
+    "native_atomic_related_matches": 0,
+    "native_message_receipt_sha256": "4063c75eae293f34fa799ae297c2fdb1b08a0a3f995643ddc4836e6920ac782d",
+    "GET_comment_supplement_receipt": "NOT_EXPOSED",
+    "source_still_direct_final_response_publication": {
+      "doc_parent_response": "retired-worker-archival.md:69-72",
+      "doc_fd_response": "retired-worker-archival.md:87-89",
+      "exists_then_read": "scripts/owner-retired-worker.py:168-175,185-186",
+      "bridge_output": "scripts/parent-bridge.mjs:17 -> scripts/parent-readback.mjs:25-31"
+    },
+    "safe_same_SHA_operational_route": [
+      "Use fresh private staged output names, never create expected final response while writing or collector runs.",
+      "Run unchanged bridge with staged outputFile; run privileged collector with stdout captured/staged away from expected fd-response.",
+      "After exit0, parse closed JSON and verify request/source/nonce bindings, private UID1000/mode0600 and complete file hash; keep diagnostics and failed stages immutable.",
+      "Publish completed response atomically into exact awaited filename on the same filesystem, before existing finite deadline. Do not weaken validators, fabricate proofs or change candidate bytes."
+    ],
+    "SOURCE_ONLY_PASS_does_not_close_this_operational_finding": true
+  },
+  "reported_checks_not_reexecuted": {
+    "tests": {
+      "python": 50,
+      "offline_chromium": 96,
+      "total": 146
+    },
+    "installed_scripts": 3,
+    "cleanup": "Reviewer-reported own local only; not fresh independent runtime census"
+  },
+  "Worker_report_claims_not_reexecuted": {
+    "tests": {
+      "python": 50,
+      "chromium": 96,
+      "total": 146,
+      "sandbox": true,
+      "network_requests": 0
+    },
+    "own_exact_host_records_absent_nonlive": 422,
+    "installed_scripts_matches": 3,
+    "private_receipt_hashes": "Report metadata only; private files and runtime not independently read in this task"
+  },
+  "limits": {
+    "source_only": true,
+    "bounded_runtime": "NOT_RUN",
+    "live_acceptance": "NOT_ACCEPTED",
+    "history": {
+      "old_UNKNOWN_AMBIGUOUS_and_missing_ticks_Host_browser_parent_execution_old_cause": "PRESERVED",
+      "different_profile_representations": "NOT_DECLARED_BOUND",
+      "historical_node_PASS": "NOT_GRANTED",
+      "observer3119": "LOCAL_MARKER_PENDING",
+      "Root47_PASS_and_old_receipts": "NOT_TRANSFERRED"
+    },
+    "no_PASS_transfer": true,
+    "no_runtime_qualification_in_this_receipt": true
+  },
+  "actions_by_independent_verifier": {
+    "API_mutations": 0,
+    "SSH": 0,
+    "UI_Loginom": 0,
+    "helper_or_test_execution": 0,
+    "source_or_docs_changes": 0,
+    "merge_release": 0
+  },
+  "later_operation_boundary": "The separate current retired-worker operation used a root-recorded unchanged-reader staging/atomic caller. It does not document or close the missing Native Reviewer disposition of the documentation finding, establish pair readiness, or transfer node/model PASS."
+}

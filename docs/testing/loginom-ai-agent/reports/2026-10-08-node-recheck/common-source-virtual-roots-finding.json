@@ -1,0 +1,70 @@
+{
+  "schema": "lab53-virtual-dispatcher-roots-source-finding-v1",
+  "observed_at_utc": "2026-10-09T08:55:32.171700+00:00",
+  "source_sha": "201a9371889947638ba6215f514a48de3da9b47b",
+  "scope": "read-only exact source and already-saved normalized Mac inventory; no UI/API/source mutations or runtime tests",
+  "finding": "Complete real Dispatcher inventory contains mstShared/mstPool roots with labels lacking username:positiveID; current builder and lifecycle reject them as if all roots were user sessions",
+  "files": [
+    {
+      "file": "/tmp/loginom-pr44-readonly-review/identity-head/tools/loginom-multica-accounts/scripts/parent-readback.mjs",
+      "sha256": "0fc44bf276283c88d2aaadb337a05d566d22db2b50d8704577de0e9cfc1e74d7",
+      "lines": [
+        225,
+        227,
+        228,
+        229,
+        230,
+        237
+      ]
+    },
+    {
+      "file": "/tmp/loginom-pr44-readonly-review/identity-head/tools/loginom-multica-accounts/scripts/account-lifecycle.mjs",
+      "sha256": "3734db4d22ce6d768a3d2a2483147178c87c5653c8990cbf569879984bddfc2d",
+      "lines": [
+        145,
+        146,
+        147,
+        148
+      ]
+    }
+  ],
+  "retained_inventory_sha256": "6628b56d1d950d5fd156a8afb4487ee0c0f1e64807e1e498158d3028d1dda946",
+  "retained_inventory_row_count": 8,
+  "virtual_label_hash_matches": [
+    {
+      "type": 2,
+      "public_label": "Общие пакеты",
+      "inventory_index": 6,
+      "name_hash_match": true
+    },
+    {
+      "type": 3,
+      "public_label": "Пул пакетов",
+      "inventory_index": 7,
+      "name_hash_match": true
+    }
+  ],
+  "vendor_semantics": {
+    "file": "/tmp/loginom-lab47-client-identity-source/SessionsManagerForm.js",
+    "sha256": "e70ccf4d0cf4e37b87c149c08bc3a46c5ce50901a5c996e0e9ef80a2bbeb0e0a",
+    "lines": [
+      51,
+      54
+    ],
+    "fact": "IsUserSession excludes mstShared and mstPool"
+  },
+  "minimal_internal_fix": [
+    "Classify by actual enum type before username:positiveID parsing. Retain recognized virtual roots, their hashed label, exact CreateTime, pending flag and every package.",
+    "Virtual rows have no invented user/session/GUID ownership; use null identities distinct from actual session rows.",
+    "Validate positive unique numeric IDs and user hashes only for actual session rows. Preserve total rows/store/manager counts, package traversal and inventory hash.",
+    "Virtual roots cannot be observer or an owned effect; exact self, account buckets and new-effect ID/CreateTime/GUID checks remain strict.",
+    "Update internal parent normalization and lifecycle validation consistently; do not drop virtual roots to evade the error."
+  ],
+  "validation_needed_after_actual_fix": [
+    "Complete mixed inventory with 5 client sessions+1 self+shared+pool and exact counts/packages; include virtual package contents where present.",
+    "Malformed real session identity still fails; duplicate real numeric ID, partial inventory and mismatched self still fail.",
+    "Independent native source review at new clean SHA followed by fresh existing-owner readback; no acceptance transfer from source checks."
+  ],
+  "not_a_public_contract_change": "Accounts-helper private schema correction only; Host/Agent/Multica contracts and node/model acceptance criteria unchanged",
+  "acceptance_claims": 0
+}

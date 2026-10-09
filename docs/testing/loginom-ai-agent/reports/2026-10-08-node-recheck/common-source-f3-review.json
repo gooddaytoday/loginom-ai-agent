@@ -1,0 +1,58 @@
+{
+  "schema": "lab53-parent-source-review-v1",
+  "observed_at": "2026-10-09T07:18:44.426990+00:00",
+  "source_sha": "6a97eb3cd264059dc95f3de9302e494683921f67",
+  "git_tree": "1d391b6b22f299dce21d33f5a706502f3a899b89",
+  "result": "SOURCE_ONLY_PASS_F3_CLOSED",
+  "full_LAB53_live": "NOT_ACCEPTED",
+  "node_model_acceptance": "NOT_RUN",
+  "native_reviewer_task": "01a11f6c-693a-70ee-9e76-ae2c5e602d2c",
+  "native_reviewer_completed_at": "2026-10-09T10:05:27+03:00",
+  "independent_validation": {
+    "suite": 68,
+    "additional_cases": 4,
+    "result": "PASS",
+    "source_only": true
+  },
+  "parent_verification": {
+    "attachment_api_bytes_and_sha_match": true,
+    "manifest_artifacts_bytes_sha_match": true,
+    "tree_match": true,
+    "candidate_files": 23,
+    "VERSION_bindings": 16,
+    "attachments": [
+      {
+        "id": "01a11f7a-32f7-7251-9e0d-66b3a88d2b67",
+        "filename": "reviewer-f3-source.md",
+        "bytes": 7679,
+        "sha256": "defe1bb9765b2df674bef1953bdaf2e0340112bd8566dc8bffc319a3b307e75d",
+        "api_bytes_match": true
+      },
+      {
+        "id": "01a11f7a-33be-794a-bd1f-73aaaa0a9108",
+        "filename": "reviewer-f3-source-report.json",
+        "bytes": 14343,
+        "sha256": "c4e5d200a24c21411366dc2ef87d07e536bc3f040e831b4ebb42719014848986",
+        "api_bytes_match": true
+      },
+      {
+        "id": "01a11f7a-3491-7811-b255-118258aa44de",
+        "filename": "reviewer-f3-source-manifest.json",
+        "bytes": 646,
+        "sha256": "d9b909786170803e9eeca130c89e908db4b3fe217a280cc95f6e409a76ad654c",
+        "api_bytes_match": true
+      }
+    ]
+  },
+  "boundaries": {
+    "gates": "both unconditional retained",
+    "UI_lifecycle_adapter": "NOT_QUALIFIED",
+    "final_server_readback_adapter": "NOT_IMPLEMENTED",
+    "ready": false,
+    "cleanup": "listed exact local records only; not server absence/census",
+    "historical_45_48": "NOT_RECONCILED; numeric IDs and executed-byte gaps unchanged",
+    "old_results_reused": false,
+    "merge_release_install": false
+  },
+  "next": "Existing native Worker01a11f7d-3749-7db4-a313-e32e0e2c084e implements adapters in same LAB53/PR44, then independent source and live qualification."
+}

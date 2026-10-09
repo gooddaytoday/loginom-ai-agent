@@ -29,7 +29,7 @@ Component ID: `component.integration.SoapRequest`, slug `integration-soaprequest
 | Исходный SHA | вершина ветки задания; Генератор фиксирует в карточке |
 | Runtime type и режим | `integration.soap_request` / `operation` — предложение до конца этапа 0 |
 | Стенд и аккаунты | из конфигов ролей; пара worker/reviewer, один стенд |
-| Модель приёмки | из конфигурации обвязки; предел модельного прогона 7200 с |
+| Настройки CLI-приёмки | из действующих инструкций сквада Multica; предел модельного прогона 7200 с |
 | Внешняя среда | Loginom Standard/Enterprise/Cloud; контролируемый WSDL1.1/SOAP1.1 и SOAP1.2 сервис Sum с ledger, fault/delay/malformed endpoints; тестовые TLS/auth профили и резервный WSDL. |
 
 Стоп-условия — Blocked с конкретным вопросом Генератору:

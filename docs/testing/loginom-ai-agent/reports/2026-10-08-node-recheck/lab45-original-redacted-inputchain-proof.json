@@ -1,0 +1,341 @@
+{
+  "schema": "lab45-original-native-api-redacted-input-collector-provenance-v1",
+  "observed_at_utc": "2026-10-09T10:24:32.163332+00:00",
+  "scope": "read-only Multica GET original task/messages and local previously verified sanitized receipts; semantic hash algorithm and original command chain, not executed-byte provenance or acceptance",
+  "issue_id": "01a11d36-053e-78da-b06c-e313de5319e3",
+  "task_id": "01a11dfa-b109-7e53-95ae-565261a747a6",
+  "attempt_uuid": "6d13d38b-9d1f-4084-ade1-1cffcb844658",
+  "api_message_count": 159,
+  "canonical_api_input_encoding": "sorted keys, compact separators, ensure_ascii=false, UTF-8; not HTTP wire bytes; input may contain service redaction",
+  "original_task": {
+    "status": "completed",
+    "started_at": "2026-10-09T03:08:10+03:00",
+    "completed_at": "2026-10-09T03:26:13+03:00",
+    "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+    "error": null
+  },
+  "source_sha_from_previously_verified_public_checkpoint": "a00b0203026f7719f10403bfc4fa02810aa8502e",
+  "collector": {
+    "file": "ui.mjs",
+    "source_representation": "api-redacted-original-input",
+    "redaction_count": 1,
+    "redacted_line": 18,
+    "creation": {
+      "seq": 81,
+      "type": "tool_use",
+      "tool": "patch_apply",
+      "call_id": "71d2ac66-9398-423d-af4a-b880cb5ce07d",
+      "created_at": "2026-10-09T00:16:46.990952Z",
+      "canonical_api_structured_input_sha256": "a3fc87beb937933d20db32d5aae8c2cbff9214c7c3988197032f009dbb1cd3fa",
+      "input_redaction_tokens": 1
+    },
+    "successful_ack": {
+      "seq": 82,
+      "type": "tool_result",
+      "tool": "patch_apply",
+      "call_id": "71d2ac66-9398-423d-af4a-b880cb5ce07d",
+      "created_at": "2026-10-09T00:16:46.996447Z",
+      "output_text_sha256": "5dabdf4d2066a1f13de6d87ddc26b39e73b70a0588db79cff81c005d841dc591",
+      "output_truncated": false
+    },
+    "call_id_match": true,
+    "api_redacted_source_utf8_bytes": 4033,
+    "api_redacted_source_lines": 42,
+    "ends_lf": true,
+    "api_redacted_source_sha256": "a80488e8b7cd6ab623afcfe6a9f1a95a053e5f1f05f7975dd65b55acad18b8da",
+    "original_unredacted_created_source_sha256": "NOT_CAPTURED",
+    "physical_preexec_source_sha256": "NOT_CAPTURED",
+    "physical_executed_source_sha256": "NOT_ESTABLISHED",
+    "visible_semantic_expressions": {
+      "3": "import crypto from 'node:crypto';",
+      "5": "export const hash=v=>crypto.createHash('sha256').update(v).digest('hex');",
+      "8": "fs.writeFileSync(fd,JSON.stringify(data,null,2)+'\\n');fs.fsyncSync(fd)",
+      "10": "return hash(fs.readFileSync(p));",
+      "17": "if(!await identity(page,username))throw Error('OWN_IDENTITY_REQUIRED');",
+      "18_visible_fragments": [
+        "const c=bg.app.Application.FInstance.FServerConnection",
+        "globalThis.__ownCapturedConnection=c",
+        "const r=c.RemoteSession",
+        "guid:String(await r.get_Guid())"
+      ],
+      "19": "const file=label+'-key.private.json',sha=save(file,secret);",
+      "20": "JSON.parse(fs.readFileSync(path.join(root,file),'utf8')) compared with secret",
+      "21": "guid_sha256:hash(secret.guid),key_file_sha256:sha,key_file:file,identity_verified:true,package_count:0"
+    },
+    "algorithm": "Node crypto SHA-256 of exact String result from get_Guid(); visible expression has no trim, case change, brace removal or normalization; string update defaults to UTF-8",
+    "redaction_limit": "The assignment prefix at line18 is replaced by the API with [REDACTED CREDENTIAL]. Its original bytes are not visible; variable secret is referenced by visible subsequent lines."
+  },
+  "supervisor": {
+    "file": "run-preparation.py",
+    "source_representation": "original-api-input-with-no-redaction-tokens",
+    "creation": {
+      "seq": 81,
+      "type": "tool_use",
+      "tool": "patch_apply",
+      "call_id": "71d2ac66-9398-423d-af4a-b880cb5ce07d",
+      "created_at": "2026-10-09T00:16:46.990952Z",
+      "canonical_api_structured_input_sha256": "a3fc87beb937933d20db32d5aae8c2cbff9214c7c3988197032f009dbb1cd3fa",
+      "input_redaction_tokens": 1
+    },
+    "successful_ack": {
+      "seq": 82,
+      "type": "tool_result",
+      "tool": "patch_apply",
+      "call_id": "71d2ac66-9398-423d-af4a-b880cb5ce07d",
+      "created_at": "2026-10-09T00:16:46.996447Z",
+      "output_text_sha256": "5dabdf4d2066a1f13de6d87ddc26b39e73b70a0588db79cff81c005d841dc591",
+      "output_truncated": false
+    },
+    "visible_created_content_sha256": "145c89064d04aa03fb7ffb4c5d5110ec823a16e81c8912e5d24651c0bf590d05",
+    "visible_created_content_utf8_bytes": 4236,
+    "popen_line": 45,
+    "popen_expression": "subprocess.Popen([op['node'],str(base/'prepare.mjs')],env=env,pass_fds=tuple(locks),stdout=out,stderr=err)",
+    "physical_preexec_source_sha256": "NOT_CAPTURED"
+  },
+  "entrypoint": {
+    "file": "prepare.mjs",
+    "source_representation": "api-redacted-original-input",
+    "redaction_count": 1,
+    "creation": {
+      "seq": 85,
+      "type": "tool_use",
+      "tool": "patch_apply",
+      "call_id": "1ef0c150-2534-4c70-8e1a-0c58adcc6204",
+      "created_at": "2026-10-09T00:18:33.767043Z",
+      "canonical_api_structured_input_sha256": "29fa0719923001c28c65ba70ad5d708bc5c312a84c268e4cec3973d2f614d4aa",
+      "input_redaction_tokens": 1
+    },
+    "successful_ack": {
+      "seq": 86,
+      "type": "tool_result",
+      "tool": "patch_apply",
+      "call_id": "1ef0c150-2534-4c70-8e1a-0c58adcc6204",
+      "created_at": "2026-10-09T00:18:33.773861Z",
+      "output_text_sha256": "5542039eb39de1324d5a0945d170fb8831fb9027c246f1882f92a059e3eedd15",
+      "output_truncated": false
+    },
+    "call_id_match": true,
+    "api_redacted_source_sha256": "e31669eb26cbfa642fcd37f024b8ced0b88b703642b58e3001b45cfa00a35d55",
+    "api_redacted_source_utf8_bytes": 13561,
+    "import_line": 5,
+    "visible_import_expression": "import {root,save,hash,tid,suffix,ready,identity,capture,logout,processProof,remaining} from './ui.mjs';",
+    "capture_line": 76,
+    "visible_capture_expression": "rootEntry={label:'own-root-admin',...await capture(page,op.admin_user,'admin-early')};report.sessions.push(rootEntry);checkpoint();",
+    "physical_preexec_source_sha256": "NOT_CAPTURED"
+  },
+  "execution_chain": [
+    {
+      "seq": 81,
+      "type": "tool_use",
+      "tool": "patch_apply",
+      "call_id": "71d2ac66-9398-423d-af4a-b880cb5ce07d",
+      "created_at": "2026-10-09T00:16:46.990952Z",
+      "canonical_api_structured_input_sha256": "a3fc87beb937933d20db32d5aae8c2cbff9214c7c3988197032f009dbb1cd3fa",
+      "input_redaction_tokens": 1
+    },
+    {
+      "seq": 82,
+      "type": "tool_result",
+      "tool": "patch_apply",
+      "call_id": "71d2ac66-9398-423d-af4a-b880cb5ce07d",
+      "created_at": "2026-10-09T00:16:46.996447Z",
+      "output_text_sha256": "5dabdf4d2066a1f13de6d87ddc26b39e73b70a0588db79cff81c005d841dc591",
+      "output_truncated": false
+    },
+    {
+      "seq": 85,
+      "type": "tool_use",
+      "tool": "patch_apply",
+      "call_id": "1ef0c150-2534-4c70-8e1a-0c58adcc6204",
+      "created_at": "2026-10-09T00:18:33.767043Z",
+      "canonical_api_structured_input_sha256": "29fa0719923001c28c65ba70ad5d708bc5c312a84c268e4cec3973d2f614d4aa",
+      "input_redaction_tokens": 1
+    },
+    {
+      "seq": 86,
+      "type": "tool_result",
+      "tool": "patch_apply",
+      "call_id": "1ef0c150-2534-4c70-8e1a-0c58adcc6204",
+      "created_at": "2026-10-09T00:18:33.773861Z",
+      "output_text_sha256": "5542039eb39de1324d5a0945d170fb8831fb9027c246f1882f92a059e3eedd15",
+      "output_truncated": false
+    },
+    {
+      "seq": 87,
+      "type": "tool_use",
+      "tool": "exec_command",
+      "call_id": "cab23ec4-407c-46aa-b369-7c09bcd88425",
+      "created_at": "2026-10-09T00:18:33.921704Z",
+      "canonical_api_structured_input_sha256": "6d6db6309f6a4cf1c04b64fe454c51776ed523aea107765db25c41faddb84c29",
+      "input_redaction_tokens": 0
+    },
+    {
+      "seq": 88,
+      "type": "tool_use",
+      "tool": "exec_command",
+      "call_id": "1ccfa3e9-a99e-48e5-95f3-db54f014daa6",
+      "created_at": "2026-10-09T00:18:42.28147Z",
+      "canonical_api_structured_input_sha256": "516c187e419638a206b1826727727e9a8e01800866399bc9a7e7474f87045567",
+      "input_redaction_tokens": 0
+    },
+    {
+      "seq": 89,
+      "type": "tool_result",
+      "tool": "exec_command",
+      "call_id": "1ccfa3e9-a99e-48e5-95f3-db54f014daa6",
+      "created_at": "2026-10-09T00:18:42.28302Z",
+      "output_text_sha256": "545536f777f3e8c0d6320a241d6b363ced86aff7c42ee54c12ed931a7e1faafe",
+      "output_truncated": false
+    },
+    {
+      "seq": 90,
+      "type": "tool_use",
+      "tool": "exec_command",
+      "call_id": "d6b272fe-d94d-436a-9390-15c4d11a24b4",
+      "created_at": "2026-10-09T00:18:52.704523Z",
+      "canonical_api_structured_input_sha256": "c84e8cc30cd461b4a535387773ca4364370c37abe99ff7cb60a928666d41dc9e",
+      "input_redaction_tokens": 0
+    },
+    {
+      "seq": 91,
+      "type": "tool_result",
+      "tool": "exec_command",
+      "call_id": "d6b272fe-d94d-436a-9390-15c4d11a24b4",
+      "created_at": "2026-10-09T00:18:52.705879Z",
+      "output_text_sha256": "9836f26d26255cf80166818107b3965316b478bedc8c40f7082473002796c9b8",
+      "output_truncated": false
+    },
+    {
+      "seq": 92,
+      "type": "tool_use",
+      "tool": "exec_command",
+      "call_id": "2f043809-ec12-4bed-b4eb-010cd0233e9a",
+      "created_at": "2026-10-09T00:18:52.775973Z",
+      "canonical_api_structured_input_sha256": "130e2823baa184466716ddc10f1c5455b150667592be1651809c34cf49b7f440",
+      "input_redaction_tokens": 0
+    },
+    {
+      "seq": 93,
+      "type": "tool_result",
+      "tool": "exec_command",
+      "call_id": "2f043809-ec12-4bed-b4eb-010cd0233e9a",
+      "created_at": "2026-10-09T00:18:52.777349Z"
+    },
+    {
+      "seq": 96,
+      "type": "tool_result",
+      "tool": "exec_command",
+      "call_id": "cab23ec4-407c-46aa-b369-7c09bcd88425",
+      "created_at": "2026-10-09T00:18:57.753308Z",
+      "output_text_sha256": "d2bcb428bcb0e2f5f9d0275f0696b4805c08e148ec291630e9a9cf8e0785e63e",
+      "output_truncated": false
+    }
+  ],
+  "launch": {
+    "seq": 87,
+    "command": "python3 evidence-private/generator-resume-6d13d38b-9d1f-4084-ade1-1cffcb844658/run-preparation.py",
+    "result_seq": 96,
+    "call_id_match": true
+  },
+  "interval": {
+    "other_tool_inputs_after_collector_creation_before_launch": [
+      85
+    ],
+    "other_tool_inputs_between_launch_and_result": [
+      88,
+      90,
+      92
+    ],
+    "between_launch_and_result_operations": [
+      "read preparation.json",
+      "read preparation.json",
+      "git status --porcelain"
+    ],
+    "observed_ui_mjs_content_overwrites_until_original_result": 0,
+    "unrecorded_external_writes": "NOT_ASSESSED"
+  },
+  "original_captured_receipt": {
+    "first_readback": {
+      "seq": 89,
+      "type": "tool_result",
+      "tool": "exec_command",
+      "call_id": "1ccfa3e9-a99e-48e5-95f3-db54f014daa6",
+      "created_at": "2026-10-09T00:18:42.28302Z",
+      "output_text_sha256": "545536f777f3e8c0d6320a241d6b363ced86aff7c42ee54c12ed931a7e1faafe",
+      "output_truncated": false
+    },
+    "confirming_readback": {
+      "seq": 91,
+      "type": "tool_result",
+      "tool": "exec_command",
+      "call_id": "d6b272fe-d94d-436a-9390-15c4d11a24b4",
+      "created_at": "2026-10-09T00:18:52.705879Z",
+      "output_text_sha256": "9836f26d26255cf80166818107b3965316b478bedc8c40f7082473002796c9b8",
+      "output_truncated": false
+    },
+    "equal_session_values": true,
+    "captured_at": "2026-10-09T00:18:37.148Z",
+    "label": "own-root-admin",
+    "guid_sha256": "d80d0bf67bd9205cb8434d21e0084fdab9ebcd1c7006932cd072db9ac531824b",
+    "key_file": "admin-early-key.private.json",
+    "key_file_sha256": "3f1ae9b00221a11860707779ea7fca9b2faac65f33720ca1b56a5ef3cacaaf71",
+    "identity_verified": true,
+    "package_count": 0,
+    "numeric_session_id": "NOT_CAPTURED",
+    "CreateTime": "NOT_CAPTURED"
+  },
+  "original_supervisor_result": {
+    "issue_id": "01a11d36-053e-78da-b06c-e313de5319e3",
+    "attempt_uuid": "6d13d38b-9d1f-4084-ade1-1cffcb844658",
+    "started_at": "2026-10-09T00:18:33Z",
+    "pid": 220867,
+    "node_pid": 220868,
+    "exit_code": 0,
+    "result": "BLOCKED",
+    "root_server_absence": false,
+    "locks_released": true,
+    "own_marker_retained": true
+  },
+  "previously_verified_public_checkpoint_comparison": {
+    "path": "/tmp/loginom-lab45-resume-generator-checkpoint.json",
+    "sha256": "ea1e25f3b96221c7aa5419f83fa366cbfa8b10bf5e0bf85de5877fab7ea0ab10",
+    "original_task_attempt_issue_match": true,
+    "guid_key_receipt_fields_match": true,
+    "public_session_at": "2026-10-09T00:18:57.647Z",
+    "public_at_limit": "rootEntry at was later assigned logout timestamp; use seq89 captured_at for original capture time",
+    "new_attachment_download_performed": false
+  },
+  "retained_reconstruction_reference": {
+    "receipt_path": "/tmp/loginom-common53-retained-collector-readonly/retained-guid-collector-algorithms.json",
+    "receipt_sha256": "9ba063ef11ba7208331e3a422137237399ed4c9b9bb332b0465e5bd9828a32dd",
+    "reported_reference_file_sha256": "e5a0f802a63ea0f9c0b6c74b6f39c7c49df403f3e9561c17cc5e80b197d969d4",
+    "reported_raw_guid_utf8_rehash": "MATCH",
+    "reported_key_file_sha256": "3f1ae9b00221a11860707779ea7fca9b2faac65f33720ca1b56a5ef3cacaaf71",
+    "raw_guid_key_independently_reread_this_task": false,
+    "reference_bytes_are_not_original_executed_bytes": true,
+    "diagnostic_redaction_substitution": {
+      "literal_substitution": "[REDACTED CREDENTIAL] -> secret=await",
+      "local_nonexecuted_transformation_sha256": "e5a0f802a63ea0f9c0b6c74b6f39c7c49df403f3e9561c17cc5e80b197d969d4",
+      "matches_reported_reference_sha256": true,
+      "original_bytes_proven": false,
+      "purpose": "Shows redacted API representation and reference reconstruction are compatible; does not establish original bytes or a mismatch."
+    }
+  },
+  "acceptance": {
+    "historical_cleanup": "UNKNOWN_UNCHANGED",
+    "historical_timeout_underlying_cause": "NOT_ESTABLISHED_UNCHANGED",
+    "historical_numeric_identity": "NOT_CAPTURED_UNCHANGED",
+    "node_model_acceptance": false,
+    "server_current_absence": false,
+    "execution_now": false
+  },
+  "actions": {
+    "Multica_GET_only": true,
+    "SSH": false,
+    "browser": false,
+    "Loginom_login": false,
+    "API_mutations": false,
+    "git_mutations": false,
+    "raw_guid_credentials_transcript_saved": false
+  }
+}

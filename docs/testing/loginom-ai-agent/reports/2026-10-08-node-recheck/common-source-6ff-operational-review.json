@@ -1,0 +1,104 @@
+{
+  "schema": "lab53-operational-source-review-v1",
+  "observed_at": "2026-10-09T10:50:51.188376+00:00",
+  "source_sha": "6ffea08a383d3122601f60a40f4ee7be0905024e",
+  "source_tree": "5e41959f44bfe480d72784dfd70589a7ea978e90",
+  "version_sha256": "0d921417dea72a90ca3dda15d7ba030da29a22fe02a0c368c74544f5f4749314",
+  "manifest_files_total": 37,
+  "manifest_files_matching": 37,
+  "scope": "READ_ONLY_SOURCE_AND_EXISTING_SANITISED_PROOFS",
+  "live_tests_run": false,
+  "helper_execution_run": false,
+  "api_writes": 0,
+  "ssh_actions": 0,
+  "ui_actions": 0,
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "P2",
+      "status": "SOURCE_CONFIRMED_RUNTIME_NOT_RUN",
+      "file": "scripts/own-fd-inventory.py",
+      "lines": [
+        30,
+        37
+      ],
+      "cause": "Path.iterdir closes directory enumerator before yielding own /proc/PID/fd paths; the enumerator FD visible in its own listing vanishes before stat and is recorded as an error.",
+      "consumer": "scripts/owner-reconcile.py:110 requires an error-free census and rejects HISTORICAL_FD_CENSUS_INCOMPLETE.",
+      "test_boundary": "tests/test_qualification.py:215-219 considers correct rejection of census errors a passing test; 139 offline/source-only checks do not establish a successful archival route.",
+      "minimal_fix": "Keep os.scandir fd-directory iterator context open and stat each entry inside that immediate loop; preserve all true errors/races as UNKNOWN."
+    }
+  ],
+  "qualification": {
+    "entry": "python3 /ABS/ACCOUNT_HELPER/scripts/qualification-coordinator.py --issue ISSUE_UUID --operator /PRIVATE/operator.json --directory /PRIVATE/cards --previous-processes /PRIVATE/previous.json --evidence-dir /PRIVATE/new-operation --source-sha CLEAN_SHA --operation-id NEW_UUID --parent-binding-file /PRIVATE/authorization.json",
+    "entry_reachable_source": true,
+    "prerequisites": [
+      "Native independent source review of the eventual exact published SHA",
+      "Dedicated clean Git checkout at that SHA, exact tree and VERSION file digests",
+      "Existing operator, worker and reviewer config bindings, new private operation and authorization with current exact existing owner observer/tab binding",
+      "Explicit exact previous-process mapping for all three accounts",
+      "Legacy active markers reconciled separately before preparation",
+      "Existing foreground parent SSH/SFTP and existing owner Mac CUA ready to service private requests"
+    ],
+    "phase_requests": [
+      "worker/capture-1-before-operation",
+      "worker/capture-2-while-connected",
+      "worker/capture-3-before-operation",
+      "worker/capture-4-while-connected",
+      "reviewer/capture-1-before-operation",
+      "reviewer/capture-2-while-connected",
+      "reviewer/capture-3-before-operation",
+      "reviewer/capture-4-while-connected",
+      "final/parent-request"
+    ],
+    "parent_bridge": "NODE /ABS/ACCOUNT_HELPER/scripts/parent-bridge.mjs REQUEST.json RAW.json REFRESH.json AUTHORIZATION.json RESPONSE.json",
+    "bridge_rules": [
+      "Use existing same owner tab and a new standard Refresh after request.after",
+      "Actual collectLoadedDispatcher source, complete rows/packages/observer",
+      "Bind source/config/nonce/phase/action receipt; response prefix and private ownership preserved",
+      "Return via existing SSH/SFTP, no endpoint/new observer/queue/timer",
+      "Node child uses one total 300s budget for its four phase bridges plus its UI lifecycle",
+      "Final parent response wait is a separate 300s; final request and verify collectors each 10s",
+      "Timeout/unknown effects remain immutable and do not earn pair readiness"
+    ]
+  },
+  "legacy": {
+    "entry": "python3 /ABS/ACCOUNT_HELPER/scripts/owner-reconcile.py --authorization /PRIVATE/historical-owner-binding.json --evidence-dir /PRIVATE/new-historical-operation --source-sha CLEAN_SHA",
+    "blocked_by": "F1 until the eventual reviewed exact source fix",
+    "grant_schema": "lab53-historical-owner-binding-v1",
+    "receipt_schema": "lab53-retained-guid-collector-v1",
+    "bindings": "LAB53/new UUID/source/observer; 7 configs,5 locks,2 exact original markers;59 original unique process tuples",
+    "lab45_proof": {
+      "path": "/tmp/loginom-lab45-original-redacted-inputchain-proof.json",
+      "sha256": "9ee1f5ee7c82df1c91a40db364236dd9c83f868008e9b03389e90947f1cda3e4",
+      "source_role": "api-redacted-source-representation"
+    },
+    "lab48_proof": {
+      "path": "/tmp/loginom-lab48-original-collector-inputchain-proof.json",
+      "sha256": "81a55495f81aa72f4f11d1d09963f215cb6998fea5426db8f82636d815496bc9",
+      "source_role": "retained-created-source"
+    },
+    "algorithm": "sha256-utf8-exact-guid-string",
+    "executed_source_sha256": null,
+    "history_preservation": [
+      "physical-preexec-not-captured",
+      "LAB45 redacted/unavailable unredacted executed bytes",
+      "original missing numeric ID/CreateTime/start/helper/cause gaps remain UNKNOWN",
+      "No historical PASS or old SessionID closure inferred"
+    ],
+    "current_route": [
+      "Hold original permanent admin OFD flock",
+      "Recheck14 targets and59 exact process tuples; bind original audited command-chain algorithm receipts",
+      "Fresh nonce-bound existing owner Mac complete sole-owner bucket proof, distinct comparable GUID",
+      "Privileged read-only own-fd-inventory response after collector exit, same held flock; zero incomplete census/errors/races and exact controls/holders/kernel locks",
+      "Recheck hashes/processes/source/authorization/provenance/OFD/freshness",
+      "Durably hardlink both original markers before unlink; same failure/receipt rollback boundary; UNKNOWN_PRESERVED"
+    ]
+  },
+  "same_sha_activation": {
+    "usable_entry": "The same reviewed clean checkout and fixed qualification-coordinator entry; do not edit ordinary gates after acceptance.",
+    "installation_constraint": "A source archive copied without Git metadata cannot pass clean_candidate (git rev-parse HEAD at provision-accounts.py:144). Pin a dedicated clean exact-SHA Git checkout as the helper launch path.",
+    "central_handoff": "After finite actual qualification and independent review bind accepted common-helper SHA/tree/VERSION/receipts and the fixed entry centrally; existing 8 cards reuse their plans and exact own node SHAs.",
+    "ordinary_entry": "provision-accounts.py remains unconditionally BLOCKED_FINITE_SERVER_CLEANUP; copying accepted files does not activate that old caller.",
+    "boundary": "No release/merge; common preparation proof is separate from full independent CLI node model acceptance and cold reopen."
+  }
+}

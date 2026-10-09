@@ -30,6 +30,7 @@ for (const [initial, password, expected] of [
       const fills = [],
         clicks = []
       let visible = false
+      let passwordFocused = false
       const account = "User"
       const locator = (selector) => ({
         locator(child) {
@@ -40,12 +41,14 @@ for (const [initial, password, expected] of [
           return initial
         },
         async fill(value) {
-          if (selector.includes("edtPassword") && initial === "" && password === "") throw Error("FIELD_READONLY")
+          if (selector.includes("edtPassword") && (!passwordFocused || (initial === "" && password === "")))
+            throw Error("FIELD_READONLY")
           fills.push([selector, value])
         },
         async click() {
           clicks.push(selector)
-          visible = true
+          if (selector.includes("edtPassword")) passwordFocused = true
+          if (selector.includes("btnLogin")) visible = true
         },
         async isVisible() {
           return visible
@@ -77,7 +80,7 @@ for (const [initial, password, expected] of [
         fills.map((row) => row[1]),
         [account, ...expected],
       )
-      assert.equal(clicks.length, 1)
+      assert.deepEqual(clicks, ['[data-tid="LoginForm;Login;edtPassword"]', '[data-tid="LoginForm;Login;btnLogin"]'])
       await assert.rejects(
         loginPage(page, { url: "http://example.test/app/", username: "Other", password: "secret" }),
         /LOGINOM_ACCOUNT_MISMATCH/,

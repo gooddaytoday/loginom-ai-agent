@@ -1,0 +1,49 @@
+{
+  "schema": "loginom-existing-admin-mac-readback-v1",
+  "observed_at": "2026-10-09T09:00:06.278Z",
+  "access": "existing-owner-Mac-Admin-native-CUA",
+  "stand": "https://app.loginom.ai/app/",
+  "native_refresh": {
+    "started_at": "2026-10-09T08:58:14.145Z",
+    "completed_at": "2026-10-09T08:58:20.059Z",
+    "action": "native-Refresh"
+  },
+  "inventory": {
+    "manager_count_before": 8,
+    "manager_count_after": 8,
+    "store_roots": 8,
+    "packages": 2,
+    "total_nodes": 10,
+    "complete_getter_store_package_equality": true,
+    "visible_masks": 0,
+    "component": "ext-comp-1548",
+    "sha256": "0ad7f4c4122ffdb38e6c0bbfcc56672356567226f623251c13682aa585da4dce",
+    "bytes": 1857,
+    "browser_digest_matches_local_transcription": true,
+    "virtual_rows_preserved": 2
+  },
+  "observer": {
+    "session_id": 3128,
+    "guid_hash": "8d9e536e57f281f3d831d169e7fd5b3d24e9f56c74161cf598fae598ef2f7a92",
+    "user_hash": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+    "create_time_ms": 1791519297984,
+    "connected": true,
+    "same_client_session": true,
+    "closable": false,
+    "matches_prior_3128": true
+  },
+  "operator_bucket_count": 1,
+  "prior_observer3119_present": false,
+  "prior_owner3123_present": false,
+  "new_login_or_observer_created": false,
+  "close_or_stop_actions": 0,
+  "own_devtools_closed": true,
+  "owner_tab_preserved": true,
+  "limits": [
+    "Current complete account bucket observation; historical unknown numericID/CreateTime/cause not retrofilled.",
+    "Not source201a candidate qualification or a future post-operation readback.",
+    "No parent nonce/operation binding for a new harness.",
+    "Exact old config/flock/process/FD/marker reconciliation remains separate.",
+    "Other client sessions were not attributed, changed or closed."
+  ]
+}

@@ -1,9 +1,12 @@
 import type { Hooks, PluginInput } from "@loginom-ai-agent/plugin"
 import { InstallationVersion } from "@loginom-ai-agent/core/installation/version"
 import { OAUTH_DUMMY_KEY } from "../../auth"
+import { SharedAuth } from "../../auth/shared"
+import { standaloneCancellation } from "../../cli/standalone-cancellation"
 import os from "os"
 import { setTimeout as sleep } from "node:timers/promises"
 import { createServer } from "http"
+import { debuglog } from "node:util"
 import { OpenAIWebSocketPool } from "./ws-pool"
 import { OauthCallbackPage } from "@loginom-ai-agent/core/oauth/page"
 
@@ -14,6 +17,8 @@ const OAUTH_PORT = 1455
 const OAUTH_POLLING_SAFETY_MARGIN_MS = 3000
 const ALLOWED_MODELS = new Set(["gpt-5.5", "gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini"])
 const DISALLOWED_MODELS = new Set(["gpt-5.5-pro"])
+// Opt-in stage markers contain no credentials, request bodies, or response payloads.
+const diagnostic = debuglog("loginom-codex")
 
 interface PkceCodes {
   verifier: string
@@ -148,7 +153,7 @@ async function exchangeCodeForTokens(code: string, redirectUri: string, pkce: Pk
   return response.json()
 }
 
-async function refreshAccessToken(refreshToken: string, issuer = ISSUER): Promise<TokenResponse> {
+async function refreshAccessToken(refreshToken: string, issuer = ISSUER, shared = false): Promise<TokenResponse> {
   const response = await fetch(`${issuer}/oauth/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -157,11 +162,18 @@ async function refreshAccessToken(refreshToken: string, issuer = ISSUER): Promis
       refresh_token: refreshToken,
       client_id: CLIENT_ID,
     }).toString(),
+    ...(shared && { signal: AbortSignal.timeout(30_000) }),
   })
   if (!response.ok) {
+    if (shared) throw new Error(`SHARED_AUTH_REFRESH_FAILED_HTTP_${response.status}`)
     throw await oauthResponseError(response, "Token refresh failed")
   }
-  return response.json()
+  if (!shared) return response.json()
+  try {
+    return await response.json()
+  } catch {
+    throw new Error("SHARED_AUTH_REFRESH_RESPONSE_INVALID")
+  }
 }
 
 // Kept as a named export for plugin.codex tests; delegates to the shared branded page.
@@ -344,7 +356,9 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
     auth: {
       provider: "openai",
       async loader(getAuth) {
-        const auth = await getAuth()
+        const shared = SharedAuth.directory()
+        const selected = shared ? await SharedAuth.snapshot(shared, "openai", standaloneCancellation()) : undefined
+        const auth = selected?.auth ?? (await getAuth())
         const websocketFetch = options.experimentalWebSockets
           ? OpenAIWebSocketPool.createWebSocketFetch({ httpFetch: fetch })
           : undefined
@@ -376,13 +390,43 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
               }
             }
 
-            const currentAuth = await getAuth()
+            const signal = AbortSignal.any(
+              [
+                init?.signal,
+                requestInput instanceof Request ? requestInput.signal : undefined,
+                standaloneCancellation(),
+              ].filter((value): value is AbortSignal => !!value),
+            )
+            signal.throwIfAborted()
+            diagnostic("auth.begin")
+            const currentAuth = {
+              ...(shared
+                ? await SharedAuth.refresh(
+                    shared,
+                    "openai",
+                    async (latest) => {
+                      const tokens = await refreshAccessToken(latest.refresh, issuer, true)
+                      const accountId = extractAccountId(tokens) || latest.accountId
+                      return {
+                        type: "oauth",
+                        refresh: tokens.refresh_token,
+                        access: tokens.access_token,
+                        expires: Date.now() + (tokens.expires_in ?? 3600) * 1000,
+                        ...(accountId && { accountId }),
+                      }
+                    },
+                    signal,
+                    selected!.session,
+                  )
+                : await getAuth()),
+            }
+            signal.throwIfAborted()
+            diagnostic("auth.ready")
             if (currentAuth.type !== "oauth")
               return websocketFetch ? websocketFetch(requestInput, init) : fetch(requestInput, init)
-
             const authWithAccount = currentAuth as typeof currentAuth & { accountId?: string }
 
-            if (!currentAuth.access || currentAuth.expires < Date.now()) {
+            if (!shared && (!currentAuth.access || currentAuth.expires < Date.now())) {
               if (!refreshPromise) {
                 refreshPromise = refreshAccessToken(currentAuth.refresh, issuer)
                   .then(async (tokens) => {
@@ -442,13 +486,62 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
               if (residency) headers.set("x-openai-internal-codex-residency", residency)
             }
 
+            signal.throwIfAborted()
             const requestInit = {
               ...init,
               body: init?.body,
               headers,
+              ...(shared && { signal }),
             }
-            if (websocketFetch && parsed.pathname.endsWith("/responses")) return websocketFetch(url, requestInit)
-            return fetch(url, OpenAIWebSocketPool.withoutInternalHeaders(requestInit))
+            if (websocketFetch && parsed.pathname.endsWith("/responses")) {
+              diagnostic("dispatch.websocket")
+              return websocketFetch(url, requestInit)
+            }
+            if (
+              process.env.NODE_DEBUG?.toLowerCase()
+                .split(/[,\s]+/)
+                .includes("loginom-codex")
+            ) {
+              const { Option, Schema } = await import("effect")
+              const body =
+                typeof requestInit.body === "string"
+                  ? Option.getOrUndefined(Schema.decodeUnknownOption(Schema.UnknownFromJsonString)(requestInit.body))
+                  : undefined
+              const value = body && typeof body === "object" ? body : undefined
+              const reasoning =
+                value && "reasoning" in value && value.reasoning && typeof value.reasoning === "object"
+                  ? value.reasoning
+                  : undefined
+              const effort = reasoning && "effort" in reasoning ? reasoning.effort : undefined
+              diagnostic(
+                "request.options gpt56Model=%s stream=%s store=%s reasoning=%s contentLength=%s",
+                !!value && "model" in value && value.model === "gpt-5.6-sol",
+                !!value && "stream" in value && value.stream === true,
+                !!value && "store" in value && value.store === true,
+                typeof effort === "string" && ["none", "minimal", "low", "medium", "high", "xhigh"].includes(effort)
+                  ? effort
+                  : "other",
+                headers.has("content-length"),
+              )
+              diagnostic(
+                "request.shape codexTarget=%s post=%s inputCount=%d toolCount=%d instructionsBytes=%d",
+                url.origin === "https://chatgpt.com" && url.pathname === "/backend-api/codex/responses",
+                requestInit.method === "POST",
+                value && "input" in value && Array.isArray(value.input) ? value.input.length : 0,
+                value && "tools" in value && Array.isArray(value.tools) ? value.tools.length : 0,
+                value && "instructions" in value && typeof value.instructions === "string"
+                  ? Buffer.byteLength(value.instructions)
+                  : 0,
+              )
+            }
+            diagnostic(
+              "dispatch.http bodyBytes=%d",
+              typeof requestInit.body === "string" ? Buffer.byteLength(requestInit.body) : 0,
+            )
+            return fetch(url, OpenAIWebSocketPool.withoutInternalHeaders(requestInit)).then((response) => {
+              diagnostic("response.headers status=%d", response.status)
+              return response
+            })
           },
         }
       },

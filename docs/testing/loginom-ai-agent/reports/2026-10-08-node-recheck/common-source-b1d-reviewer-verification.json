@@ -1,0 +1,215 @@
+{
+  "schema": "lab53-source-b1d-reviewer-public-verification-v1",
+  "observed_at": "2026-10-09T11:27:22.889385+00:00",
+  "scope": "SOURCE_ONLY_EXACT_SHA",
+  "private_verification_receipt": {
+    "bytes": 28524,
+    "sha256": "4fa14b68935ee70e855cc35d754e1a94b8d10ee46239bcf2da66e5c20b3e1d4e",
+    "contents": "PRIVATE_NOT_PUBLISHED"
+  },
+  "source": {
+    "sha": "b1d002933bc7aec3eec8ebfdd009c905025bb7a3",
+    "tree": "cf2b733c40f1626a941dc5cb4b9d8f505952786c",
+    "current_pr_head": "b1d002933bc7aec3eec8ebfdd009c905025bb7a3",
+    "current_pr_head_matches": true,
+    "pr_state": "OPEN",
+    "pr_draft": true,
+    "pr_base": "shared-oauth",
+    "reviewer_clean_checkout_claim": true,
+    "reviewer_checkout_readback_by_this_verifier": false
+  },
+  "artifacts": [
+    {
+      "id": "01a12063-b6c9-7ec8-a317-66b8c4e99e03",
+      "filename": "source-review.md",
+      "bytes": 7149,
+      "api_size_bytes": 7149,
+      "api_size_match": true,
+      "sha256": "871715045ac800d296852b36a8f5f60b6b4752cab42d66425d4c65d769013d0e",
+      "comment_id": "01a12063-c11f-761d-880b-06c8d7331586"
+    },
+    {
+      "id": "01a12063-b933-7a3d-bd9e-324f0c1376ec",
+      "filename": "source-review-report.json",
+      "bytes": 8852,
+      "api_size_bytes": 8852,
+      "api_size_match": true,
+      "sha256": "dd067f2066f8431e3463367c29a83d5a74306da3f2add4a7bd8948a5f772ad8b",
+      "comment_id": "01a12063-c11f-761d-880b-06c8d7331586"
+    },
+    {
+      "id": "01a12063-bbc6-7780-92bf-317b9214feb0",
+      "filename": "source-review-manifest.json",
+      "bytes": 7108,
+      "api_size_bytes": 7108,
+      "api_size_match": true,
+      "sha256": "1c766f7ab32eb84a24058016dc289c950cf874f12f5f3749a91bfce13c5bb551",
+      "comment_id": "01a12063-c11f-761d-880b-06c8d7331586"
+    }
+  ],
+  "artifact_manifest_bindings": [
+    {
+      "file": "source-review.md",
+      "bytes_match": true,
+      "sha256_match": true
+    },
+    {
+      "file": "source-review-report.json",
+      "bytes_match": true,
+      "sha256_match": true
+    }
+  ],
+  "version": {
+    "version": "lab53-source-only-v8",
+    "status": "SOURCE_ONLY_LIVE_BLOCKED",
+    "bytes": 4632,
+    "sha256": "7794acd26f21ce4dbba42268875b9ee2f20b14cc7edbfddc56476c645b37680f",
+    "binding_count": 38,
+    "hash_matches": 38
+  },
+  "published_file_bindings": {
+    "VERSION": {
+      "count": 38,
+      "matches": 38
+    },
+    "candidate": {
+      "count": 45,
+      "hash_matches": 45,
+      "complete_tree_coverage": true
+    },
+    "baseline_snapshot": {
+      "count": 5,
+      "matches": 5
+    },
+    "baseline_boundary": "This final manifest has no separate retained_baseline map; its complete 45-file candidate map includes all 6 baseline files. The 5 declared baseline snapshot files were also independently checked against SOURCE_SNAPSHOT.json."
+  },
+  "native_task_readback": {
+    "reviewer": {
+      "id": "01a1205c-87ee-75a0-9797-0071683e2536",
+      "agent_id": "027d102c-5d25-402c-a8fb-58a3e810013c",
+      "status": "completed",
+      "created_at": "2026-10-09T14:11:37+03:00",
+      "started_at": "2026-10-09T14:11:38+03:00",
+      "completed_at": "2026-10-09T14:20:25+03:00",
+      "error": null
+    },
+    "final_comments": [
+      {
+        "id": "01a12063-c11f-761d-880b-06c8d7331586",
+        "created_at": "2026-10-09T14:19:30+03:00",
+        "contains_exact_source_sha": true,
+        "contains_source_only_pass": true
+      }
+    ],
+    "attachment_comment_ids": [
+      "01a12063-c11f-761d-880b-06c8d7331586"
+    ]
+  },
+  "reviewer_report_claims_not_replayed": {
+    "status": "SOURCE_ONLY_PASS",
+    "checkout_clean": true,
+    "findings": [],
+    "tests": {
+      "python": {
+        "passed": 45,
+        "failed": 0
+      },
+      "offline_chromium": {
+        "passed": 95,
+        "failed": 0
+      },
+      "total_passed": 140,
+      "sandbox": true,
+      "network_requests": 0,
+      "additional_original_host_probe": "PASS_SELF_RACE_CLOSED_HOST_CENSUS_REMAINS_UNKNOWN",
+      "fixed_production_entry": "REACHED_ADMIN_BEFORE_REQUEST_BEFORE_BROWSER_LOGIN_THEN_CANCELLED",
+      "F4_F8_native_capture_cleanup_ready_archive_regressions": "PASS_SOURCE_OFFLINE"
+    },
+    "cleanup": {
+      "exact_own_observed_host_records": 469,
+      "absent_nonlive": true,
+      "observed_at": "2026-10-09T11:16:18.896698+00:00",
+      "namespace_local_identities_excluded": true,
+      "scope": "observed own host fixtures, suites, wrappers and collectors; not a full census or server proof",
+      "foreground_suites_collectors": "ENDED",
+      "server_absence": "NOT_PROVED"
+    },
+    "F9": {
+      "status": "CLOSED_SOURCE_OFFLINE",
+      "implementation": "held os.scandir through every entry.stat; strict validator unchanged",
+      "actual_executable_positive": "PASS",
+      "positive_scope": "isolated-user-pid-mount-namespace",
+      "before_visible_pids": [
+        1,
+        2
+      ],
+      "after_visible_pids": [
+        1,
+        2
+      ],
+      "errors_before_after": [
+        0,
+        0
+      ],
+      "real_guardian_flock_control": true,
+      "real_extra_holder": "HISTORICAL_FD_HOLDER_PRESENT",
+      "negative_cases": [
+        {
+          "case": "PermissionError",
+          "code": "HISTORICAL_FD_CENSUS_INCOMPLETE"
+        },
+        {
+          "case": "FileNotFoundError",
+          "code": "HISTORICAL_FD_CENSUS_INCOMPLETE"
+        },
+        {
+          "case": "OSError",
+          "code": "HISTORICAL_FD_CENSUS_INCOMPLETE"
+        },
+        {
+          "case": "holder",
+          "code": "HISTORICAL_FD_HOLDER_PRESENT"
+        },
+        {
+          "case": "inventory",
+          "code": "HISTORICAL_FD_CENSUS_CHANGED"
+        },
+        {
+          "case": "nonce",
+          "code": "HISTORICAL_FD_BINDING_UNKNOWN"
+        }
+      ],
+      "no_skip_waiver_filtering_source_proc_override": true,
+      "host_original_probe_self_errors_before_after": [
+        0,
+        0
+      ],
+      "actual_unprivileged_host_validator": "HISTORICAL_FD_CENSUS_INCOMPLETE",
+      "host_errors_filtered": false,
+      "host_census_absence_claim": false
+    }
+  },
+  "independently_verified": [
+    "authenticated attachment bytes and API sizes",
+    "manifest source/tree and both deliverable byte/digest bindings",
+    "exact commit tree and VERSION declared file bytes/digests",
+    "complete 45-file manifest candidate (including all 6 baseline files), plus 5 baseline snapshot byte/digest bindings",
+    "actual API Reviewer terminal status/error and linked final source-only result comment"
+  ],
+  "limitations": [
+    "Source-only acceptance at exact b1d0029; no transfer to another SHA/build/model.",
+    "No suite, namespace, extra-holder, FD or cleanup replay by this verifier.",
+    "Native Reviewer test/fixture/cleanup statements are authenticated report claims rather than this verifier runtime observations.",
+    "Namespace positive strict-validator proof does not establish complete privileged host census or server absence.",
+    "API completed/error=null does not establish process or session absence.",
+    "Existing Mac collector is preflight; fresh nonce-bound held-flock/legacy reconciliation and full live qualification remain separate.",
+    "Loginom/model/node acceptance, install/merge/release are not established by this result."
+  ],
+  "chronology_boundary": "The source verifier observed this result before the separate current legacy reconciliation. Its source-only claims are not promoted by the later operation.",
+  "mutations_by_independent_verifier": {
+    "repository_files": 0,
+    "multica_api": 0,
+    "loginom_ui": 0,
+    "ssh": 0
+  }
+}

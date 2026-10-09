@@ -1,0 +1,161 @@
+{
+  "schema": "lab53-root-independent-reviewer-final-artifacts-verification-v1",
+  "verified_at_utc": "2026-10-09T08:54:57.470678+00:00",
+  "issue_id": "01a11e17-b869-7550-8450-35e5e17119d4",
+  "reviewer_task": {
+    "id": "01a11fb7-b1c3-78fc-a81c-003a784e890b",
+    "status": "completed",
+    "started_at": "2026-10-09T11:11:35+03:00",
+    "completed_at": "2026-10-09T11:45:03+03:00",
+    "error": null,
+    "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517"
+  },
+  "reviewed_source_sha": "201a9371889947638ba6215f514a48de3da9b47b",
+  "reviewed_tree": "dd8355597fe570c00eac06faf6f3c7d6c98288bd",
+  "attachments": [
+    {
+      "id": "01a11fd0-51d8-70fd-8d25-cdbc51784f94",
+      "file": "source-review.md",
+      "api_bytes": 9390,
+      "bytes": 9390,
+      "sha256": "eb8e1f7b7f9c90bc6dcf3dc12efbc7426a79555a1f8fcc2e293f40a8e10d2874",
+      "api_bytes_match": true
+    },
+    {
+      "id": "01a11fd0-5469-76d4-83af-3a3d53c3d41f",
+      "file": "source-review-report.json",
+      "api_bytes": 5598,
+      "bytes": 5598,
+      "sha256": "d449637bcc7e441fb856e0608986a67f3cea4d351da406510908164ccb7f33f9",
+      "api_bytes_match": true
+    },
+    {
+      "id": "01a11fd0-56d3-7e48-819f-f1c894b57594",
+      "file": "source-review-manifest.json",
+      "api_bytes": 516,
+      "bytes": 516,
+      "sha256": "368d4c5d7bfd126ae8cf9b920d2d8acbf99261509b2ed678e90ce6b51b0201e7",
+      "api_bytes_match": true
+    },
+    {
+      "id": "01a11fd4-9940-79ec-b2bc-54840001b13f",
+      "file": "source-review-final-addendum.md",
+      "api_bytes": 3882,
+      "bytes": 3882,
+      "sha256": "30bef5fc71e10cc2d57cfac38e8a5639498420232a33d9ea665bf54dc721bb1c",
+      "api_bytes_match": true
+    },
+    {
+      "id": "01a11fd4-9b92-74cb-b24e-b4ea0a2264ec",
+      "file": "source-review-final-report.json",
+      "api_bytes": 6884,
+      "bytes": 6884,
+      "sha256": "d57b0e128af58f9f4dcb5c729968aed2ee9778a2bd9bf6a278f8980b448e4562",
+      "api_bytes_match": true
+    },
+    {
+      "id": "01a11fd4-9e05-74fd-a959-a9ff586e5c97",
+      "file": "source-review-final-manifest.json",
+      "api_bytes": 1049,
+      "bytes": 1049,
+      "sha256": "31d0b79b74fea8bfdc505f868760387d4da7610b12a5977f026ccbbd2056fb1e",
+      "api_bytes_match": true
+    }
+  ],
+  "verification": {
+    "api_bytes_matches": true,
+    "final_manifest_bindings": [
+      {
+        "file": "source-review.md",
+        "final_manifest_match": true
+      },
+      {
+        "file": "source-review-report.json",
+        "final_manifest_match": true
+      },
+      {
+        "file": "source-review-manifest.json",
+        "final_manifest_match": true
+      },
+      {
+        "file": "source-review-final-addendum.md",
+        "final_manifest_match": true
+      },
+      {
+        "file": "source-review-final-report.json",
+        "final_manifest_match": true
+      }
+    ],
+    "all_final_manifest_hashes_match": true,
+    "initial_manifest_bindings": [
+      {
+        "file": "source-review.md",
+        "initial_manifest_match": true
+      },
+      {
+        "file": "source-review-report.json",
+        "initial_manifest_match": true
+      }
+    ],
+    "all_initial_manifest_hashes_match": true,
+    "final_source_binding": true,
+    "exact_git_tree_match": true,
+    "terminal_task_match": true
+  },
+  "reported_result": {
+    "source_only": "REQUEST_CHANGES",
+    "findings": [
+      "F4/P2 approved same-account admin baseline rejected",
+      "F5/P2 fabricated continuity counters: actual FLOCK gap and native Reconnect accepted",
+      "F6/P2 expected observer tuple omitted from final request",
+      "F7/P2 NEW tuple not checked against complete before inventory",
+      "F8/P2 required testable Dispatcher data-tid absent from existing authorized owner Mac tab"
+    ],
+    "live": "NOT_ACCEPTED",
+    "issue_status": "blocked",
+    "node_runs": "NOT_RUN",
+    "ready": false,
+    "source_components_do_not_complete_LAB53": true
+  },
+  "native_reviewer_evidence_claims": {
+    "independent_suites": {
+      "python_pass": 26,
+      "chromium_pass": 79,
+      "total_pass": 105,
+      "chromium_sandbox": true,
+      "network_requests": 0
+    },
+    "independent_probes": 8,
+    "observed_exact_own_process_records": 241,
+    "fresh_own_records_absent_or_nonlive": true,
+    "foreground_collectors_completed": true,
+    "complete_process_census": false,
+    "local_cleanup_is_server_absence": false
+  },
+  "independently_verified_here": "API metadata versus actual downloaded bytes; both manifest chains; exact report/source/tree binding; terminal task metadata. Only this sanitized receipt persisted; downloaded artifacts remained in RAM.",
+  "not_replayed_here": [
+    "offline suites/probes",
+    "private process PID/start_ticks readback",
+    "installed CLI/runtime identity",
+    "live Loginom UI/server lifecycle",
+    "model/node acceptance"
+  ],
+  "historical_boundaries": {
+    "LAB45_LAB48": "NOT_RECONCILED",
+    "LAB45_executed_helper_gap": "RETAINED",
+    "observer3119_local_marker_reconciliation": "PENDING",
+    "Root47_PASS_transferred": false,
+    "historical3123_3128_future_operation_proof": false,
+    "new_real_Loginom_operations": 0,
+    "real_config_marker_history_server_mutations": 0,
+    "CLI_model_provider_build_install_node_runs": 0,
+    "native_task_error": null,
+    "native_provider_errors_retries": "NOT_EXPOSED_BY_THIS_API",
+    "new_shared_contracts_pools_queues_cards_schedules_merge_release": 0
+  },
+  "original_artifacts_retained_in_multica": true,
+  "original_artifacts_overwritten": false,
+  "no_api_mutations_or_loginom_actions": true,
+  "no_credentials_headers_raw_logs_or_full_reports_saved": true,
+  "download_policy": "authenticated same origin; authorization/workspace/cookies stripped on cross-origin redirect; HTTPS downgrade refused; max1MiB"
+}

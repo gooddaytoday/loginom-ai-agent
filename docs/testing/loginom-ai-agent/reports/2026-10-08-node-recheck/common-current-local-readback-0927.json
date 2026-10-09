@@ -1,0 +1,132 @@
+{
+  "schema": "loginom-common53-current-local-reconciliation-readback-v1",
+  "observed_at": "2026-10-09T09:27:19.938978+00:00",
+  "access": "mas-SSH-readonly-root-proc-census",
+  "collector_source_sha256": "b490612fd306e481930164da0b834444280dfa2cc915a98d1ac8797b3f9b01e0",
+  "private_output_sha256": "0c8d4c18f8dd205d8d5c50caa651ace284bc6e3a8f8c29fdb2e344f9f777c423",
+  "private_output_bytes": 42482,
+  "historical_processes": {
+    "known_unique_pid_start_ticks": 59,
+    "known_unique_absent_before_after": 59,
+    "source_retained_private_sha256": "417a7ef847626440dd19b4ddd5a42173222e086df0ab3c30975f88f15f293ac5",
+    "tuple_extraction_sha256": "6d4cc49d96461ae1cae1fbbdc9818e1b8819d1abf5cdae21c32c8a9bac81cd32",
+    "additional_four_owner_issue": "LAB47",
+    "marker45_pid_absent": true,
+    "marker45_historical_start_ticks": "NOT_CAPTURED"
+  },
+  "fd_census": {
+    "process_fd_directories_scanned": 240,
+    "complete_readable_census_without_races": true,
+    "bounded_timeout": false,
+    "vanished_entries": 0,
+    "positive_control_found": true,
+    "positive_control_after": {
+      "fd": 3,
+      "fd_stat_matches_fstat": true,
+      "fstat_dev_inode": [
+        25,
+        878363
+      ],
+      "pid": 272600,
+      "same_proc_stat_identity_as_initial_control": true
+    }
+  },
+  "fd_census_permission_denials": 0,
+  "fd_census_unclassified_os_errors": 0,
+  "target_fd_holders": 0,
+  "target_proc_locks": 0,
+  "global_operator": {
+    "sha256": "e82bfa87a866b04643a27cb6d8fa731f5edc4294505e3c75db617a994abdee05",
+    "user_hash": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+    "historical_config_hash_matches": true,
+    "historical_user_hash_matches": true,
+    "stable_across_scan": true,
+    "matches_mac_0900_user_hash": true
+  },
+  "targets": {
+    "configs": 7,
+    "locks": 5,
+    "markers": 2,
+    "changed_or_unknown": []
+  },
+  "markers": [
+    {
+      "alias": "LAB45.historical-root-marker",
+      "sha256": "9595e0bb0d748a5e04a67c62f97c3e59b0c5ce839500eeb56716e1ec77630a90",
+      "historical_sha256_match": true,
+      "issue_match": true,
+      "attempt_match": true,
+      "ownership_fields": {
+        "attempt_uuid": "6d13d38b-9d1f-4084-ade1-1cffcb844658",
+        "issue_id": "01a11d36-053e-78da-b06c-e313de5319e3",
+        "json_object": true,
+        "key_names": [
+          "attempt_uuid",
+          "evidence_dir",
+          "finished",
+          "issue_id",
+          "phase",
+          "pid",
+          "sessions",
+          "task_id"
+        ],
+        "phase": "own_cleanup_reconciliation_required",
+        "pid": 220867,
+        "task_id": "01a11dfa-b109-7e53-95ae-565261a747a6"
+      }
+    },
+    {
+      "alias": "LAB48.historical-root-marker",
+      "sha256": "74f25f19294cc007923e4deb04763a9203fea294d93177d68d4e5a2f548d425e",
+      "historical_sha256_match": true,
+      "issue_match": true,
+      "attempt_match": true,
+      "ownership_fields": {
+        "attempt_uuid": "8d6f150f-37e4-4680-a903-66009afc0144",
+        "issue_id": "01a11d36-2811-71ba-a493-0e397e3e60f2",
+        "json_object": true,
+        "key_names": [
+          "attempt_uuid",
+          "cleanup_effect",
+          "created_at",
+          "current_create_time",
+          "current_session_id",
+          "ended_at",
+          "evidence",
+          "exact_process_absence",
+          "issue_id",
+          "logout_ui_ack_and_connection_disposed",
+          "native_logout",
+          "own_connection_guid_sha256",
+          "phase",
+          "pid",
+          "server_absence",
+          "session",
+          "start_ticks"
+        ],
+        "native_logout": true,
+        "phase": "own_cleanup_requires_reconciliation",
+        "pid": 219310,
+        "server_absence": "NOT_CONFIRMED",
+        "start_ticks": "12096555"
+      }
+    }
+  ],
+  "root_permanent_lock_inode": 2396017,
+  "parent_transport_closed": true,
+  "actions": {
+    "file_mutations": 0,
+    "locks_acquired": 0,
+    "loginom_requests": 0,
+    "read_only": true,
+    "signals": 0
+  },
+  "result": "CURRENT_LOCAL_READBACK_CONFIRMED_ARCHIVE_PENDING",
+  "limits": [
+    "This is a bounded complete visible-proc FD census, not a continuous future absence guarantee.",
+    "No permanent account flock was acquired; atomic revalidation under that flock remains pending.",
+    "Mac09:00 current complete server readback is separate; fresh binding under held flock is still required.",
+    "Raw old markers, unknown numericID/CreateTime, pre-exec byte gap and TimeoutError cause remain immutable.",
+    "No Loginom login, logout, server close, marker archive, helper install or node/model acceptance was performed."
+  ]
+}

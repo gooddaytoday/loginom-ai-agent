@@ -1,0 +1,280 @@
+{
+  "kind": "multica_node_recheck_dispatch",
+  "observed_at": "2026-10-08T20:40:31.320264+00:00",
+  "source_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+  "source_branch": "shared-oauth",
+  "common_base_sha": "f9bf332cc491baa784e6e04fdfda7c0f09151cb7",
+  "current_loginom_sha_not_in_source": "0ca9e75bc7bb6897f46ac1ddc880b9758e993dc9",
+  "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+  "squad_id": "8ff41bd5-f794-4b5b-a063-026f3874628e",
+  "role_caps": [
+    1,
+    8,
+    8
+  ],
+  "daemon_cap": 12,
+  "configured_internal_cli": {
+    "model": "openai/gpt-6-luna",
+    "variant": "high",
+    "source": "squad instructions API readback",
+    "instructions_sha256": "3ebc984270238d6d1769ace7e0b260cf6c81dea5df48c46b275d0d82e802b9e6",
+    "actual_node_model_runs": []
+  },
+  "cards": [
+    {
+      "id": "01a11d36-053e-78da-b06c-e313de5319e3",
+      "identifier": "LAB-45",
+      "slug": "calculator",
+      "name": "Калькулятор",
+      "branch": "recheck-calculator",
+      "scope": "Зависимые выражения Loginom, replace, scalar-типы, input/output mapping и сохранность незапрошенных свойств.",
+      "initial_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+      "generator_task_id": "01a11d37-c86d-7241-8ad3-196348de401d",
+      "issue_status": "in_progress",
+      "tasks": [
+        {
+          "id": "01a11d37-c86d-7241-8ad3-196348de401d",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "running",
+          "started_at": "2026-10-08T23:32:40+03:00",
+          "work_dir": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-45-196348de401d/workdir"
+        }
+      ]
+    },
+    {
+      "id": "01a11d36-10b0-702f-930d-e91315129205",
+      "identifier": "LAB-46",
+      "slug": "field-parameters",
+      "name": "Параметры полей",
+      "branch": "recheck-fields",
+      "scope": "Scalar-конверсии, technical identity, имена/метки, usage/data_kind, исключение и порядок полей.",
+      "initial_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+      "generator_task_id": "01a11d3a-79e8-7692-bf5a-619a7f194c64",
+      "issue_status": "todo",
+      "tasks": [
+        {
+          "id": "01a11d3a-79e8-7692-bf5a-619a7f194c64",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "queued",
+          "started_at": null,
+          "work_dir": null
+        }
+      ]
+    },
+    {
+      "id": "01a11d36-1c50-7c05-bb73-d72ffd159b1b",
+      "identifier": "LAB-47",
+      "slug": "row-filter",
+      "name": "Фильтр строк",
+      "branch": "recheck-filter",
+      "scope": "AND/OR scalar-условия, NULL/empty, изменение existing; оба выхода и полнота разделения. Cold-check порта 0 плюс самостоятельный независимый аудит порта 1 после cold reopen; W1 не внедрять без решения владельца.",
+      "initial_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+      "generator_task_id": "01a11d3a-8606-7496-b636-6545844a9063",
+      "issue_status": "todo",
+      "tasks": [
+        {
+          "id": "01a11d3a-8606-7496-b636-6545844a9063",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "queued",
+          "started_at": null,
+          "work_dir": null
+        }
+      ]
+    },
+    {
+      "id": "01a11d36-2811-71ba-a493-0e397e3e60f2",
+      "identifier": "LAB-48",
+      "slug": "grouping",
+      "name": "Группировка",
+      "branch": "recheck-grouping",
+      "scope": "Упорядоченные ключи, sum/count/avg/min/max, all-null и empty, изменение мер и mapping.",
+      "initial_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+      "generator_task_id": "01a11d3a-91ff-7403-891c-9f4e2724bc58",
+      "issue_status": "todo",
+      "tasks": [
+        {
+          "id": "01a11d3a-91ff-7403-891c-9f4e2724bc58",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "queued",
+          "started_at": null,
+          "work_dir": null
+        }
+      ]
+    },
+    {
+      "id": "01a11d36-33ae-732e-b618-5618ed5301cd",
+      "identifier": "LAB-49",
+      "slug": "sorting",
+      "name": "Сортировка",
+      "branch": "recheck-sorting",
+      "scope": "ASC/DESC составные ключи, string flags/локаль, сохранность кратности; отдельный независимый аудит порядка после cold reopen, общий unordered cold-check недостаточен.",
+      "initial_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+      "generator_task_id": "01a11d3a-9db4-7946-a691-4acb08b7847e",
+      "issue_status": "todo",
+      "tasks": [
+        {
+          "id": "01a11d3a-9db4-7946-a691-4acb08b7847e",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "queued",
+          "started_at": null,
+          "work_dir": null
+        }
+      ]
+    },
+    {
+      "id": "01a11d36-3f2a-7df1-bd81-d5401bdcdd16",
+      "identifier": "LAB-50",
+      "slug": "join",
+      "name": "Слияние",
+      "branch": "recheck-join",
+      "scope": "Два входа, inner/left, типизированные составные ключи, регистр, right-key inclusion, повторные совпадения, NULL/empty и обе связи после reopen.",
+      "initial_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+      "generator_task_id": "01a11d3a-a926-7cff-a9a3-d63d79f60769",
+      "issue_status": "todo",
+      "tasks": [
+        {
+          "id": "01a11d3a-a926-7cff-a9a3-d63d79f60769",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "queued",
+          "started_at": null,
+          "work_dir": null
+        }
+      ]
+    },
+    {
+      "id": "01a11d36-4ace-7dd4-a0d4-498195f7d2e9",
+      "identifier": "LAB-51",
+      "slug": "union",
+      "name": "Объединение",
+      "branch": "recheck-union",
+      "scope": "Append-all, полная карта всех полей, dynamic inputs и префиксы, дубли/NULL/empty; матрица подплана. Исторические 8 входов не доказывают предел 15.",
+      "initial_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+      "generator_task_id": "01a11d3a-b4e9-74a0-ba5c-1196ac112c0e",
+      "issue_status": "todo",
+      "tasks": [
+        {
+          "id": "01a11d3a-b4e9-74a0-ba5c-1196ac112c0e",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "queued",
+          "started_at": null,
+          "work_dir": null
+        }
+      ]
+    },
+    {
+      "id": "01a11d36-5670-7786-bfe1-e9a4a4462e6e",
+      "identifier": "LAB-52",
+      "slug": "replacement",
+      "name": "Замена",
+      "branch": "recheck-replacement",
+      "scope": "Внутренняя exact-таблица string/integer/real, add/replace, other keep/null/value, фактический _Replaced, Int64 и partial/persistence; сохранить исторические FAIL.",
+      "initial_sha": "4e626d547258e9ae7c0b7937cd672781dde0667e",
+      "generator_task_id": "01a11d3a-c0d0-75c8-b362-942aec7a3f52",
+      "issue_status": "todo",
+      "tasks": [
+        {
+          "id": "01a11d3a-c0d0-75c8-b362-942aec7a3f52",
+          "agent_id": "d061f723-dbc6-4db7-bd22-d79b8068cb8a",
+          "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+          "status": "queued",
+          "started_at": null,
+          "work_dir": null
+        }
+      ]
+    }
+  ],
+  "installed_preflight": {
+    "comment_id": "01a11d3d-c146-7a2f-a026-070caeac7f51",
+    "attachment_id": "01a11d3d-bf9b-7706-93dd-e4f33f7988d1",
+    "downloaded_sha256": "ceebd7c7bc0edcebe6473bb1ccf1960308948729800296344ec9ecb6212e83d3",
+    "downloaded_size_bytes": 3382,
+    "metadata": {
+      "version": "0.0.0-dev-202610081651",
+      "channel": "dev",
+      "platform": "linux",
+      "arch": "x64",
+      "sourceCommit": "597592f5d53f86beb69ffe318af2d4db52c5f416",
+      "sourceTreeSha256": "9fafa5778304cdac6bff0862b9f796f3a3b152a8a1c06ade14912b65c27010ba",
+      "sourceDirty": false,
+      "capabilities": [
+        "shared-oauth-v1"
+      ],
+      "dependencies": {
+        "bun": "1.3.14",
+        "node": "24.19.0",
+        "playwright": "1.63.0-alpha-2026-08-31",
+        "playwrightMcp": "0.0.80",
+        "chromium": "1243"
+      }
+    },
+    "executable_version": "0.0.0-dev-202610081651",
+    "executable_capabilities": {
+      "capabilities": [
+        "shared-oauth-v1"
+      ]
+    },
+    "manifest_sha256": "1d518db83c2e3ae625fc93b707edaaeb837a6f2cfcc99a1ed0824093f9b70768",
+    "launcher_sha256": "20305a8d848f785c2120d03c56e3fc77129d0156d7319a9f43beca3bc0b70d03",
+    "files_verified": 5678,
+    "resource_snapshot": {
+      "logical_cpus": 12,
+      "load": [
+        0.14892578125,
+        0.04443359375,
+        0.01318359375
+      ],
+      "memory": {
+        "MemTotal": "31604384 kB",
+        "MemAvailable": "30172148 kB",
+        "SwapTotal": "8388604 kB"
+      },
+      "disk_free_bytes": 419266428928,
+      "cpu_ticks": "cpu  497473 529 310508 128549269 39635 0 8315 0 0 0",
+      "own_pid": 165489,
+      "parent_pid": 164630
+    },
+    "verification": "exact597 inventory contract, lstat mode & 07777, link text, sha256, full inventory equality; verifier source unchanged at docs-only4e",
+    "initial_diagnostic": "stat-followed symlinks; invalid mode comparison retained in preflight-integrity.json",
+    "model_runs": 0,
+    "status": "PASS"
+  },
+  "node_acceptance": "NOT_RUN",
+  "load_12": "NOT_RUN",
+  "protected_cards": {
+    "LAB-29": "backlog",
+    "LAB-30": "backlog"
+  },
+  "eval_changed": false,
+  "merge": "NOT_RUN",
+  "release": "NOT_RUN",
+  "first_handoff_observed_at": "2026-10-08T20:47:50.526809+00:00",
+  "first_handoff": {
+    "issue": "LAB-45",
+    "comment_id": "01a11d44-b8c9-76ea-b676-51d8c3686284",
+    "worker_task": {
+      "id": "01a11d44-b8f8-7b36-a6b3-93fbb28a1cf2",
+      "agent_id": "c25d6205-7c17-4672-a177-7e8ee9af9358",
+      "runtime_id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+      "status": "running",
+      "started_at": "2026-10-08T23:46:46+03:00",
+      "work_dir": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-45-93fbb28a1cf2/workdir"
+    },
+    "account_qualification": "Generator reports both ready/identity/permissions/logout/process and calibrated server absence PASS",
+    "model_node_acceptance": "NOT_RUN"
+  },
+  "observation_reports": [
+    {
+      "path": "catalogue-refresh.json",
+      "event": "stale bundled catalogue recovered via stock refresh; same-card native continuation",
+      "latest_card_snapshot_path": "catalogue-refresh.json#/current_snapshot",
+      "acceptance": "NOT_RUN"
+    }
+  ]
+}

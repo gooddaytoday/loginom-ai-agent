@@ -2,21 +2,35 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { Product, productChannel } from "@loginom-ai-agent/product"
 import { cliProfile } from "@loginom-ai-agent/product/cli-profile"
+import { cliCapabilities } from "@loginom-ai-agent/product/cli-capabilities"
 import { InstallationChannel, InstallationVersion } from "@loginom-ai-agent/core/installation/version"
 import { withStandaloneCancellation } from "./standalone-cancellation"
 import { acquireProfile, profileEnvironment } from "./profile"
+
+declare const LOGINOM_AI_AGENT_LIBC: string | undefined
+
+const capabilities = () =>
+  cliCapabilities(
+    process.platform,
+    process.arch,
+    typeof LOGINOM_AI_AGENT_LIBC === "string" ? LOGINOM_AI_AGENT_LIBC : undefined,
+  )
 
 export async function standalone(
   args: string[],
   execute: (args: string[], paths: ReturnType<typeof cliProfile>) => Promise<void>,
 ) {
   const options = args.slice(0, args.indexOf("--") < 0 ? args.length : args.indexOf("--"))
+  if (args.length === 1 && args[0] === "--capabilities") {
+    process.stdout.write(JSON.stringify({ capabilities: capabilities() }) + "\n")
+    return
+  }
   if (options.includes("--help") || options.includes("-h")) {
     process.stdout.write(
       `${Product.name} CLI\n\nUsage: ${Product.cliExecutable} [options] [command]\n\n` +
         "Commands: run, providers (auth), models, loginom setup/check/status/cancel-pending/recover\n" +
         "Without a command: interactive TUI\n\n" +
-        "Options: --headless, --no-headless, --help, --version\n" +
+        "Options: --headless, --no-headless, --help, --version, --capabilities\n" +
         "Management: --format json; setup --stdin-json; recover --acknowledge [id...]\n" +
         "Profile: LOGINOM_AI_AGENT_CLI_PROFILE (absolute path)\n",
     )
@@ -42,6 +56,14 @@ async function executeProfile(
   const channel = productChannel(
     process.env.LOGINOM_AI_AGENT_CHANNEL ?? (InstallationChannel === "local" ? "dev" : InstallationChannel),
   )
+  if (process.env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR && process.env.LOGINOM_AI_AGENT_AUTH_CONTENT)
+    throw new Error("SHARED_AUTH_CONTENT_CONFLICT")
+  if (process.env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR && !capabilities().includes("shared-oauth-v1"))
+    throw new Error("SHARED_AUTH_PLATFORM_UNSUPPORTED")
+  if (process.env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR) {
+    const { standaloneBundle } = await import("./standalone-bundle")
+    await standaloneBundle(capabilities())
+  }
   const profile = await acquireProfile(
     cliProfile({
       channel,

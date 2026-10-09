@@ -2,6 +2,8 @@
 
 ## Standalone CLI implementation
 
+- Shared OAuth is standalone-only and opt-in via `LOGINOM_AI_AGENT_SHARED_AUTH_DIR`; see [contract](../../docs/testing/loginom-ai-agent/shared-oauth.md). All participants use one private directory and the permanent OS `auth.json.lock`. Keep refresh read/recheck/exchange/save in one transaction, release before model dispatch, preserve the uncertainty marker after an ambiguous exchange, and never copy the shared token into independent writable profiles. Ordinary Desktop and per-profile auth remain unchanged.
+
 - `src/standalone.ts` is the new early CLI entry; `src/cli/standalone.ts` selects and guards the profile before importing backend code. Do not route the standalone binary directly through the legacy eager `src/index.ts`.
 - `LOGINOM_AI_AGENT_CLI_PROFILE` selects an absolute profile; only the bootstrap sets internal `LOGINOM_AI_AGENT_CLI_ROOT` for Global and worker inheritance. Clear inherited Desktop auth/config/DB overrides before backend imports. Keep project config discovery, but omit the implicit home `.loginom-ai-agent` global fallback.
 - Hold `.writer` until backend and private host cleanup completes. Never steal a guard based on age/PID, and leave it after unconfirmed cleanup. `loginom recover` must not remove it.

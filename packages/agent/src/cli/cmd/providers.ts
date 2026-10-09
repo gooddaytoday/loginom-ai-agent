@@ -28,7 +28,7 @@ const promptValue = <Value>(value: Option.Option<Value>) => {
 
 const put = Effect.fn("Cli.providers.put")(function* (key: string, info: Auth.Info) {
   const auth = yield* Auth.Service
-  yield* Effect.orDie(auth.set(key, info))
+  yield* Effect.orDie(info.type === "oauth" ? Auth.verifiedLogin(key, info) : auth.set(key, info))
 })
 
 const cliTry = <Value>(message: string, fn: (signal: AbortSignal) => PromiseLike<Value>) =>

@@ -1,0 +1,30 @@
+{
+  "schema": "lab53-resource-snapshot-v1",
+  "at": "2026-10-09T07:30:49.797557+00:00",
+  "read_only_ssh": true,
+  "ssh_closed_normally": true,
+  "cpu_count": 12,
+  "load": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "mem_available_kB": 30140616,
+  "swap_free_kB": 8385832,
+  "disk_free_bytes": 408538505216,
+  "daemon": {
+    "id": "01a116e7-cc72-796d-8f8a-e4e8c9f33d9e",
+    "pid": 212379,
+    "cli_version": "0.6.1",
+    "active_task_count": 1,
+    "running_task_count": 1,
+    "resource_wait_task_count": 0,
+    "pending_terminal_report_count": 0,
+    "failed_terminal_report_count": 0
+  },
+  "boundaries": {
+    "node_model_acceptance": 0,
+    "load12_acceptance": "NOT_RUN",
+    "provider_error_retry_counters": "NOT_EXPOSED by task/status API; no zero claim"
+  }
+}

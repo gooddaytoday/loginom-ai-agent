@@ -1,0 +1,632 @@
+{
+  "schema": "lab53-source-e1af-current-retired-public-verification-v1",
+  "operation_id": "4795739a-aa25-4b37-8b36-8affc70ef01c",
+  "source": {
+    "sha": "e1af46079cf5f16208384740eebf580332193a24",
+    "tree": "41d69aa2317efa007754b1e7d20ce57571e6a1be",
+    "manifest_sha256": "2f514da464c5db553a8ab34f8ee1b3dd2fddc4828999f1092724262362fbfa64"
+  },
+  "scope": "CURRENT_RETIRED_WORKER_PROOF_ONLY_NOT_PAIR_READINESS",
+  "recorded_root_operation": {
+    "launch_started_at": "2026-10-09T12:57:02.714312+00:00",
+    "exit": 0,
+    "completed_at": "2026-10-09T13:00:07.848361+00:00",
+    "error_code": null,
+    "stdout_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "private_root_operation_receipt": {
+    "bytes": 1735,
+    "sha256": "499930b4a1ce0864e2464e6477e1c3bd630ce30014422d393347617f864b90d3",
+    "contents": "PRIVATE_NOT_PUBLISHED"
+  },
+  "recorded_current_proof": {
+    "current_proof": "CURRENT_RETIRED_WORKER_PROOF_ONLY",
+    "ready": false,
+    "history_facts_modified": false,
+    "history_state": "UNKNOWN_PRESERVED",
+    "historical_status": "retired_cleanup_confirmed",
+    "historical_start_ticks": "NOT_CAPTURED",
+    "server_receipt_sha256": "ac1765c89ae630173b36d09829feeaaf272e27f9b6c714492db575eeb4311383",
+    "fd_receipt_sha256": "01f890b34b9b4001d114d04b8440c2641d0da92d0a0395bb9d90d2d4dbea525a"
+  },
+  "known_exact_records": [
+    {
+      "pid": 177762,
+      "start_ticks": "10984526"
+    },
+    {
+      "pid": 196500,
+      "start_ticks": "11115648"
+    },
+    {
+      "pid": 196596,
+      "start_ticks": "11115663"
+    },
+    {
+      "pid": 196597,
+      "start_ticks": "11115663"
+    },
+    {
+      "pid": 196587,
+      "start_ticks": "11115661"
+    },
+    {
+      "pid": 196533,
+      "start_ticks": "11115655"
+    },
+    {
+      "pid": 196535,
+      "start_ticks": "11115655"
+    },
+    {
+      "pid": 196557,
+      "start_ticks": "11115656"
+    },
+    {
+      "pid": 185230,
+      "start_ticks": "11027498"
+    },
+    {
+      "pid": 185326,
+      "start_ticks": "11027512"
+    },
+    {
+      "pid": 185327,
+      "start_ticks": "11027512"
+    },
+    {
+      "pid": 185317,
+      "start_ticks": "11027510"
+    },
+    {
+      "pid": 185263,
+      "start_ticks": "11027504"
+    },
+    {
+      "pid": 185265,
+      "start_ticks": "11027504"
+    },
+    {
+      "pid": 185286,
+      "start_ticks": "11027506"
+    }
+  ],
+  "partial_numeric_pids_without_historical_ticks": [
+    176775,
+    178035
+  ],
+  "recorded_parent_readback": {
+    "refreshed_at": "2026-10-09T12:58:26.939Z",
+    "manager_count": 8,
+    "store_count": 8,
+    "rows": 8,
+    "packages": 3,
+    "inventory_sha256": "969aaf5b08950a952a5efdf06f4b8855b3c5b554f65378b95a8592de8843f8df",
+    "observer": {
+      "user_hash": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+      "guid_hash": "8d9e536e57f281f3d831d169e7fd5b3d24e9f56c74161cf598fae598ef2f7a92",
+      "session_id": 3128,
+      "create_time": "2026-10-09T04:14:57.984Z",
+      "connected": true,
+      "tab_binding_sha256": "396acaf68826b792bfca1420597aac34e13a0c7c0af364682cfaa46e68399f04"
+    },
+    "owner_session_preserved": true,
+    "new_browser_or_login": false,
+    "close_actions": 0
+  },
+  "recorded_root_post_readback": {
+    "operation_id": "4795739a-aa25-4b37-8b36-8affc70ef01c",
+    "source": {
+      "sha": "e1af46079cf5f16208384740eebf580332193a24",
+      "tree": "41d69aa2317efa007754b1e7d20ce57571e6a1be",
+      "manifest_sha256": "2f514da464c5db553a8ab34f8ee1b3dd2fddc4828999f1092724262362fbfa64"
+    },
+    "observed_at": "2026-10-09T13:02:45.278149+00:00",
+    "configs7_unchanged": true,
+    "locks5_unchanged": true,
+    "stock_original_unchanged": true,
+    "canonical_worker_marker_absent": true,
+    "both_role_marker_spellings_absent": true,
+    "archive_same_original_device_inode": true,
+    "archive_sha256": "a7513042bdf7319d61c02611faa4e92563441f3263e5a227457584a8c2ca466b",
+    "archive_bytes": 612,
+    "historical_status": "retired_cleanup_confirmed",
+    "historical_unknown_preserved": true,
+    "ready": false,
+    "current_proof": "CURRENT_RETIRED_WORKER_PROOF_ONLY",
+    "known_exact_records_count": 15,
+    "known_exact_records_current_absent": true,
+    "partial_numeric_pids_current_absent": true,
+    "partial_count": 2,
+    "guardian_current_absent": true,
+    "both_fd_controls_current_absent": true,
+    "source_clean": true,
+    "targets_bound": 15,
+    "privileged_census_pids": [
+      246,
+      246
+    ],
+    "privileged_census_errors": [
+      0,
+      0
+    ],
+    "parent_response_sha256": "3abbfb9d1f85452ec79db5bbcb9803b91f4f190f5f136fdb9524f0d65e484f80",
+    "fd_response_sha256": "01f890b34b9b4001d114d04b8440c2641d0da92d0a0395bb9d90d2d4dbea525a",
+    "receipt_sha256": "81643f5a91656ee8d1907d2a09808c36103d52e148ef90be35fcd28c3d9e7222"
+  },
+  "guardian_identity_at_recorded_census": {
+    "pid": 331068,
+    "start_ticks": "16669024"
+  },
+  "privileged_fd_metadata": {
+    "observed_at": "2026-10-09T13:00:07.669835+00:00",
+    "request_sha256": "cbdbdfd840d75dc428d6519a9d9e19ac034b65d3f18ebf81650cdf803cf08292",
+    "collector_source_sha256": "23ae7105d89a685c2fd76afb02d108b8038b902c230d83b4a42366602572498f",
+    "pid_inventory_counts_root_post_reported": [
+      246,
+      246
+    ],
+    "errors_root_post_reported": [
+      0,
+      0
+    ],
+    "targets_bound_root_post_reported": 15,
+    "recorded_control_identities": [
+      {
+        "pid": 331399,
+        "start_ticks": "16687489"
+      },
+      {
+        "pid": 331399,
+        "start_ticks": "16687489"
+      }
+    ]
+  },
+  "atomic_publication": {
+    "root_prelaunch_record": {
+      "comment_id": "01a120bc-9117-7b43-886f-63781c1bdcf0",
+      "operation_id": "4795739a-aa25-4b37-8b36-8affc70ef01c",
+      "source_sha": "e1af46079cf5f16208384740eebf580332193a24",
+      "reader_unchanged": true,
+      "staging_complete_before_atomic_publication": true,
+      "note": "SOURCE_ONLY_PASS excludes unaddressed documentation finding"
+    },
+    "private_root_prelaunch_receipt": {
+      "bytes": 331,
+      "sha256": "f90e2e3713c9048d889fbe051f4e5608501e3ce778e6071ba0504c163a8d5150",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    "closed_parent_pending_final_bytes_equal": true,
+    "closed_fd_pending_final_bytes_equal": true,
+    "root_parent_publication": {
+      "status": "COMPLETE_PARENT_ATOMIC_PUBLISHED",
+      "parent_response_sha256": "3abbfb9d1f85452ec79db5bbcb9803b91f4f190f5f136fdb9524f0d65e484f80",
+      "parent_response_bytes": 7132,
+      "uid": 1000,
+      "mode": "0o600",
+      "same_inode": true,
+      "fd_request_ready": true
+    },
+    "root_parent_publication_receipt": {
+      "bytes": 248,
+      "sha256": "490a67d67d9767afeab3331a2a0e25c400b2ed62bee4f681bf366cfe3323cf67",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    "root_fd_publication": {
+      "status": "STRICT_FD_VALIDATED_ATOMIC_PUBLISHED",
+      "fd_response_bytes": 14637,
+      "fd_response_sha256": "01f890b34b9b4001d114d04b8440c2641d0da92d0a0395bb9d90d2d4dbea525a",
+      "uid": 1000,
+      "mode": "0o600",
+      "same_inode": true,
+      "pids_before": 246,
+      "pids_after": 246,
+      "errors_before": 0,
+      "errors_after": 0,
+      "holders_before": 3,
+      "holders_after": 3,
+      "controls_observed": true,
+      "controls_current_absent": true,
+      "observed_at": "2026-10-09T13:00:07.669835+00:00"
+    },
+    "root_fd_publication_receipt": {
+      "bytes": 449,
+      "sha256": "cf5bd0e72593dbfad064f4b1574f9ed777c8c758c111bf03ec60b263084060a5",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    "boundary": "Recorded unchanged-reader operational caller, not source modification or independent Native Reviewer disposition of the atomic documentation finding."
+  },
+  "original_marker": {
+    "bytes": 612,
+    "sha256": "a7513042bdf7319d61c02611faa4e92563441f3263e5a227457584a8c2ca466b",
+    "original_device_root_observed": 64512,
+    "original_inode_root_observed": 2396042,
+    "archived_same_original_device_inode_root_reported": true,
+    "local_original_bytes_verified": true
+  },
+  "local_artifact_digest_bindings": [
+    {
+      "artifact_label": "authorization.json",
+      "bytes": 4665,
+      "sha256": "74f9464a4dc22858136ce4f6df63ca120ff80374df6b49330ad202bbf760a17c",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "download-manifest.json",
+      "bytes": 18894,
+      "sha256": "88e30642cc97e76428438f0e49e479116a6e890865f5d76b90e16eed9e979dbe",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "expected-observer.json",
+      "bytes": 370,
+      "sha256": "c12d527b3cee5bfc408d79443fa2a72ce33c88ed3d09ce4911aa39c683e0eab5",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "native-refresh-action.json",
+      "bytes": 993,
+      "sha256": "1c1fe34e7b772e7c108fa411473585a668e0b27f00abcb077427cfa0501cecb8",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/current-retired-worker-reconciled.json",
+      "bytes": 4477,
+      "sha256": "81643f5a91656ee8d1907d2a09808c36103d52e148ef90be35fcd28c3d9e7222",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/fd-request.json",
+      "bytes": 5273,
+      "sha256": "ffdb88e32ccab39b56daab548e50f2bb7f16a0a2e2fcb95c0441fff9309202f5",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/fd-response.json",
+      "bytes": 14637,
+      "sha256": "01f890b34b9b4001d114d04b8440c2641d0da92d0a0395bb9d90d2d4dbea525a",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/fd-response.pending.json",
+      "bytes": 14637,
+      "sha256": "01f890b34b9b4001d114d04b8440c2641d0da92d0a0395bb9d90d2d4dbea525a",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "immutable-original-LAB45-worker-marker",
+      "bytes": 612,
+      "sha256": "a7513042bdf7319d61c02611faa4e92563441f3263e5a227457584a8c2ca466b",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/input.json",
+      "bytes": 5581,
+      "sha256": "52b8fba59bde14195ac62c7eae526a9e6d64be3db55f42f5007550a5a40bbdc7",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/parent-request.json",
+      "bytes": 5410,
+      "sha256": "f1f19374a6ae37f27ca7c9953478856234748962ea5d904f1f611965c398248b",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/parent-response.json",
+      "bytes": 7132,
+      "sha256": "3abbfb9d1f85452ec79db5bbcb9803b91f4f190f5f136fdb9524f0d65e484f80",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/parent-response.pending.json",
+      "bytes": 7132,
+      "sha256": "3abbfb9d1f85452ec79db5bbcb9803b91f4f190f5f136fdb9524f0d65e484f80",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/request/event-029fb693-c3c7-4587-9043-7d2bd8788223.json",
+      "bytes": 278,
+      "sha256": "b0fea0c422e661fa4c783701009787c16c534ac0820f9576868d184a05dcda08",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/request/event-1f19fcac-4197-453f-a9ce-360a013f7b8e.json",
+      "bytes": 347,
+      "sha256": "24759f3e307d9693bf8f90d660c8c1e4ae72cb948f67156d914a3901575a2ec7",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/request/event-3fd2a021-a607-49b0-ad94-5563142ad997.json",
+      "bytes": 656,
+      "sha256": "8991fea1c886698c3106c2253edeb029d5bf4855a40967dbb9a669e07c5d320f",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/request/event-559b3885-0cdb-460a-89d8-f97c14bce3b0.json",
+      "bytes": 582,
+      "sha256": "c5e671f262ca62462831f4bcd7e1361e019206b3e406b0caa9cc5253eccec358",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/request/event-6209625c-6658-47d3-bdb0-8ac4b194f490.json",
+      "bytes": 351,
+      "sha256": "faff9c8d2669e59e4c39dcbe1941e757e2bd65fd1317a66ad72b70816f7afd1f",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/request/event-e426a13f-b045-4555-b76b-1ddd0b6c9f2c.json",
+      "bytes": 62,
+      "sha256": "b6f175cb8288ea25755546abd44600c0f7f5a437ce58fe9d413231beb61f1ca9",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/request/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/request/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/request/supervisor-result.json",
+      "bytes": 624,
+      "sha256": "6c3162c12c817cb38471d9235c345ebc8a7241862181a0b9bf5214bc2bf1ab68",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/retired-consumed-536a3bd10aad6e283a419480a0137c0c67002f99566993f96d6beacd28baf4df.json",
+      "bytes": 6753,
+      "sha256": "ac1765c89ae630173b36d09829feeaaf272e27f9b6c714492db575eeb4311383",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/verify/event-0a4bb2f3-0d1c-46ad-8648-618a0991ec60.json",
+      "bytes": 350,
+      "sha256": "b20fa5a601c8b5cc594ebb03a784b6227fd72fba719f1cecbf8bb4e7a5f52f32",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/verify/event-570f63a8-3ddc-4c21-837a-24706859fcff.json",
+      "bytes": 656,
+      "sha256": "41bc0ee6af53faa4a7fa3dd613c15b7033d60094be0eb8c3930521ef5ca7d28d",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/verify/event-6c77ed9f-cd4c-40ff-8ef0-6e2ec858d957.json",
+      "bytes": 278,
+      "sha256": "fc79b7d43988fcfbe2aeee592e7a1042ffa740355826394b61d0016f6ca92181",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/verify/event-7d020be2-3dff-4681-a3ed-da896e473d1c.json",
+      "bytes": 347,
+      "sha256": "a4c3749e8e7d7db3572e7ce8457ffa049729fb692855c1d91717103adcaf1d1f",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/verify/event-8dbe41be-114a-4df3-a636-55f2d6d7a041.json",
+      "bytes": 62,
+      "sha256": "b6f175cb8288ea25755546abd44600c0f7f5a437ce58fe9d413231beb61f1ca9",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/verify/event-d1257750-7d8b-4b20-a205-a83212b6036a.json",
+      "bytes": 582,
+      "sha256": "db7dc4a22846717d5b242443290f1ffe68ce0c8b64bb0c197327c2320da8acf1",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/verify/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/verify/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "operation/verify/supervisor-result.json",
+      "bytes": 624,
+      "sha256": "63bf90127d4e12c5b56eafc15d42ba54aa3bc5e38fb128498bf3fb29c73c2249",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "original-marker-cleanup.json",
+      "bytes": 3341,
+      "sha256": "a977c4fedc7d65e9bfa6b9e5e0e144e3de515ba66fa040bb273bbb7615c1ac87",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "original-stock-receipt.json",
+      "bytes": 52385,
+      "sha256": "278a58bd91a0d9b3ff6c7d0fc74d5cfc271cce3a93c08c40fe19fd5fe2e902c5",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "previous-readback-diagnostic.json",
+      "bytes": 267,
+      "sha256": "b8df76c4b26d45683c1f6cfde8e3c0836ea0568b582b2293572f362ba7dda4fb",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "private-native-collector-RAW",
+      "bytes": 2002,
+      "sha256": "dfc1b19adc6e824f50d610f7e5f6883a7ee9feba62f4ac14f708f19be0c91f72",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "refresh.json",
+      "bytes": 211,
+      "sha256": "516b1affe027697d19453dc4c63fd45cb25c3e2565c01a05000f891ca4aae2cd",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "root-current-readback.json",
+      "bytes": 1792,
+      "sha256": "3610822f83a1d1f9d3f0d2d199b6b4ba7ef9a3d218918e5706a79365bc15ac69",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "root-current-readback.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    {
+      "artifact_label": "root-current-readback.stdout",
+      "bytes": 1674,
+      "sha256": "afea9bef60a95e2c54e6af11c11c6ed68b74dd0e0c224bd437e348cc59794996",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    }
+  ],
+  "independent_pure_source_artifact_review": {
+    "status": "COMPLETED_LOCAL_BYTES_AND_PURE_PREDICATES_ONLY",
+    "private_verification_receipt": {
+      "bytes": 5697,
+      "sha256": "314c08d2c84229692642c8690f0b2ad3b2a21661950a508557b36d176cfd4600",
+      "contents": "PRIVATE_NOT_PUBLISHED"
+    },
+    "observed_at": "2026-10-09T13:13:28.847602+00:00",
+    "result": "RETAINED_CURRENT_RETIRED_PROOF_BYTES_AND_LOCAL_PREDICATES_MATCH",
+    "proof_kind": "CURRENT_RETIRED_WORKER_PROOF_ONLY",
+    "ready": false,
+    "history": {
+      "history_facts_modified": false,
+      "history_state": "UNKNOWN_PRESERVED",
+      "historical_status": "retired_cleanup_confirmed",
+      "historical_start_ticks": "NOT_CAPTURED",
+      "old_executed_bytes_numericID_CreateTime_missing_ticks_cause": "UNKNOWN_PRESERVED_NOT_REPAIRED"
+    },
+    "download_manifest": {
+      "sha256": "88e30642cc97e76428438f0e49e479116a6e890865f5d76b90e16eed9e979dbe",
+      "expected_sha256_match": true,
+      "declared_file_count": 36,
+      "matched_file_count": 36,
+      "mismatches": 0
+    },
+    "originals": {
+      "retained_marker_bytes": 612,
+      "retained_marker_sha256": "a7513042bdf7319d61c02611faa4e92563441f3263e5a227457584a8c2ca466b",
+      "stock_bytes": 52385,
+      "stock_sha256": "278a58bd91a0d9b3ff6c7d0fc74d5cfc271cce3a93c08c40fe19fd5fe2e902c5",
+      "cleanup_sha256": "a977c4fedc7d65e9bfa6b9e5e0e144e3de515ba66fa040bb273bbb7615c1ac87",
+      "original15_exact_plus2_partial_pure_origin_function_match": true
+    },
+    "actual_source_pure_functions": {
+      "sha256": "1ca4f403f9203f5b50863194d2f054ff82efeb6058a4e791ec8daf12e5f808a2",
+      "functions_called": [
+        "buildParentResponse",
+        "verifyParentEnvelope",
+        "verifyCalibratedInventory",
+        "verifyEmptyPair",
+        "origin_records"
+      ],
+      "grant_source_issue_pair_configs_operator_targets_expected_owner_bindings_match": true,
+      "deterministic_rebuilt_parent_response_matches": true,
+      "worker_and_reviewer_empty": true,
+      "positive_owner_connected_3128": true,
+      "inventory_rows": 8,
+      "virtual_rows": 2,
+      "package_entries": 3,
+      "consumed_file_bindings_match": true
+    },
+    "recorded_Linux_FD_predicates": {
+      "sha256": "bcf2f233e1ff551b3d3023e2682f10193ee3af2a6afeb930fb5d88d303d056e0",
+      "scope": "Actual imported origin_records only, and local predicates on retained Linux census records with explicit Linux dev_t decoding; no /proc/lock/FD syscall or full validate_pair_fd/current_absence replay. Runtime inode/absence/completeness and root process/control disappearance remain root recorded assertions.",
+      "request_source_privileged_namespace_uid0_match": true,
+      "before_after_entire_PID_list_equal": true,
+      "two_distinct_role_guards": true,
+      "before_after_PID_counts": [
+        246,
+        246
+      ],
+      "before_after_error_counts": [
+        0,
+        0
+      ],
+      "both_samples_target_guard_control_lock_predicates_match": true,
+      "freshness_asof_recorded_postcheck_only": {
+        "observed_at": "2026-10-09T13:02:45.278149+00:00",
+        "FD_age_seconds": 157.608314,
+        "server_age_seconds": 258.339149,
+        "both_within_source300s_window_at_postcheck": true,
+        "current_now_freshness_not_claimed": true
+      }
+    },
+    "root_remote_recorded_assertions_not_reobserved_locally": {
+      "observed_at": "2026-10-09T13:02:45.278149+00:00",
+      "configs7_unchanged": true,
+      "locks5_unchanged": true,
+      "stock_original_unchanged": true,
+      "canonical_worker_marker_absent": true,
+      "both_role_marker_spellings_absent": true,
+      "archive_same_original_device_inode": true,
+      "archive_sha256": "a7513042bdf7319d61c02611faa4e92563441f3263e5a227457584a8c2ca466b",
+      "archive_bytes": 612,
+      "known_exact_records_count": 15,
+      "known_exact_records_current_absent": true,
+      "partial_numeric_pids_current_absent": true,
+      "partial_count": 2,
+      "guardian_current_absent": true,
+      "guardian": {
+        "pid": 331068,
+        "start_ticks": "16669024",
+        "state": "R"
+      },
+      "both_fd_controls_current_absent": true,
+      "source_clean": true,
+      "targets_bound": 15
+    },
+    "response_publication": {
+      "parent_and_fd_closed_staging_bytes_match_final": true,
+      "atomic_fsync_publication": "Root explicit operational caller comment01a120bc before launch; syscalls not independently reobserved locally",
+      "unsafe_source_docs": "Separate next source correction; no source mutation in this operation"
+    },
+    "preserved_diagnostic": {
+      "previous_wrong_archive_basename_postcheck": "Retained separately; corrected exact source basename; no helper/operation replay; not labelled runtime operation failure"
+    },
+    "cross_check_receipt": {
+      "sha256": "83aea81d54645bf8cb1efc5575c35a612b552aae2371681b4721052a70662602"
+    },
+    "limitations": [
+      "Local immutable bytes and pure predicates are independently checked; remote inode/absence/actual census completeness and control-process disappearance remain recorded root observations.",
+      "No /proc, flock, signalling, archive, nonce consumption, browser or Loginom operation performed by this verification.",
+      "No current freshness claim for old receipts; recorded source windows evaluated as of postreadback13:02:45Z only.",
+      "CURRENT_RETIRED_WORKER_PROOF_ONLY,readyfalse does not qualify a pair, install, internal CLI model, node scenario, cold reopen or parallel-eight workload."
+    ],
+    "actions": {
+      "SSH": 0,
+      "UI_Loginom": 0,
+      "helper_action_or_test_replay": 0,
+      "API_writes": 0,
+      "source_or_config_or_marker_changes": 0
+    }
+  },
+  "limits": [
+    "Local immutable bytes and pure-source predicates were independently checked against retained e1af operation evidence. Actual remote inode/absence/census completeness, process/control disappearance and publication syscalls remain recorded root observations; the verifier performed no new SSH/UI/census.",
+    "The privileged census and server readback belong to this recorded operation; publication does not constitute a fresh whole-host absence claim.",
+    "No new Loginom login or production account creation, CLI model/node acceptance or cold reopen was performed by this retired-worker operation.",
+    "Original historical missing ticks, differing profile representations, Host/browser/executed-byte bindings and causes remain UNKNOWN; partial numeric absence does not supply historical exact PID proof.",
+    "ready=false and CURRENT_RETIRED_WORKER_PROOF_ONLY are preserved; no PASS transfer or weakening of public gates.",
+    "The saved initial post-readback diagnostic has a wrong suffix; the corrected source-basename readback did not replay this operation."
+  ],
+  "projection_actions": {
+    "repository_evidence_only": true,
+    "SSH": 0,
+    "Loginom_UI": 0,
+    "Multica_API_mutations": 0,
+    "source_changes": 0,
+    "tests_or_helpers_reexecuted": 0,
+    "merge_release": 0
+  }
+}

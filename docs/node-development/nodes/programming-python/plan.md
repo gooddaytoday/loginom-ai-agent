@@ -29,7 +29,7 @@ Component ID: `component.programming.Python`, slug `programming-python`. Runtime
 | Исходный SHA | вершина ветки задания; Генератор фиксирует в карточке |
 | Runtime type и режим | `programming.python` / `external_process` — предложение до конца этапа 0 |
 | Стенд и аккаунты | из конфигов ролей; пара worker/reviewer, один стенд |
-| Модель приёмки | из конфигурации обвязки; предел модельного прогона 7200 с |
+| Настройки CLI-приёмки | из действующих инструкций сквада Multica; предел модельного прогона 7200 с |
 | Внешняя среда | Установленный и разрешённый администратором Python той же разрядности, что сервер Loginom; на Linux отдельный процесс, версия/путь закрепляются на этапе 0. Этап 2 — pinned pandas/numpy; этап 3 — Windows in-process и Linux venv/Docker/Podman fixtures. |
 
 Стоп-условия — Blocked с конкретным вопросом Генератору:

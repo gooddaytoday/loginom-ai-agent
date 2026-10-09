@@ -1,0 +1,69 @@
+{
+  "schema": "lab53-existing-admin-readback-v1",
+  "issue_id": "01a11e17-b869-7550-8450-35e5e17119d4",
+  "observed_at": "2026-10-09T05:40:27.376Z",
+  "status": "CALIBRATED_SERVER_INVENTORY_ONLY",
+  "stand": "https://app.loginom.ai/app/",
+  "access": {
+    "owner_directive": "используй браузер на этом mac",
+    "surface": "existing owner Chrome tab via native CUA",
+    "parent_new_browser_or_login": false,
+    "owner_session_preserved": true
+  },
+  "observer": {
+    "session_name": "admin:3123",
+    "session_type": "mstSelf",
+    "unique_self_count": 1,
+    "guid_sha256": "3abc251c82058acd70a6810d8f0ecac8f5a5ec08cbf535684dd3b8474030f2d1",
+    "username_sha256": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+    "model_create_time_ms": 1791512763071,
+    "model_create_time_semantics": "exact getter/store epoch equality; not wall-clock age proof",
+    "getter_store_create_time_equal": true,
+    "manager_remote_same_client_session": true,
+    "connected": true,
+    "standard_is_closable": false
+  },
+  "inventory": {
+    "standard_dispatcher_refresh_performed": true,
+    "visible_masks": 0,
+    "server_count_before": 8,
+    "server_count_after": 8,
+    "store_roots": 8,
+    "total_store_nodes": 10,
+    "full_session_name_type_info_proxy_equal": true,
+    "all_package_counts_match_children": true,
+    "packages_checked": 2,
+    "all_package_info_proxy_equal": true,
+    "canonical_normalized_private_inventory_sha256": "ac94600a6b9fd26412b5b5549293a7b9fd202a8165efd5ee06822f18774bfea8",
+    "encoding": "UTF-8 JSON.stringify ordered array, no trailing newline",
+    "local_normalized_transcription_sha_matches_browser_digest": true,
+    "admin_rows": 1,
+    "only_admin_row_is_current_positive_self": true,
+    "foreign_sessions_touched": false
+  },
+  "targets": {
+    "observer3119": {
+      "current_server_absence": "PASS_CALIBRATED_COMPLETE_INVENTORY",
+      "historical_attempt_or_local_marker_reconciliation": "PENDING_OWNER_EXACT_PROCESS_FD_CHECKS"
+    },
+    "LAB45_LAB48": {
+      "server_bucket_account_binding": "PENDING_COMPARE_PRIVATE_OPERATOR_USERNAME_HASH",
+      "numeric_session_ids_historical": "NOT_CAPTURED",
+      "current_markers": "RETAINED",
+      "result": "NOT_RECONCILED"
+    }
+  },
+  "boundaries": {
+    "candidate_source_sha": "9e2ccc724a3b8616f2f878dc7719cd10bb957a94",
+    "candidate_live_execution": false,
+    "installed_accounts_tool_changed": false,
+    "source_gates": "remain unconditional",
+    "source_lifecycle_handoff_comment": "01a11f28-aeda-7753-91e6-74a0973abbbd",
+    "native_worker_task": "01a11f28-af02-7bb6-aa63-d80bb075b9cf",
+    "node_acceptance": "NOT_RUN",
+    "new_preparation_cleanup": "requires new post-operation readback; this historical receipt cannot be reused",
+    "close_or_stop_actions": 0,
+    "markers_or_configs_changed": false,
+    "schedules_merge_release": false
+  }
+}

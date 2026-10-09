@@ -1,0 +1,25 @@
+{
+  "source_sha": "0955f8899cb0d94148634f05446ebf2379b869df",
+  "observed_at": "2026-10-09T09:54:42.435Z",
+  "access": "existing-owner-Mac-Admin-native-CUA",
+  "stand": "https://app.loginom.ai/app/",
+  "unique_visible": 1,
+  "controller_instance": true,
+  "tree_visible": true,
+  "tree_store_equal": true,
+  "root_loaded": true,
+  "current_user_helper_admin": true,
+  "current_user_rpc_name_equal": true,
+  "current_user_rpc_admin": true,
+  "connected": true,
+  "manager_count": 8,
+  "own_console_closed": true,
+  "owner_tab_preserved": true,
+  "new_browser_or_login": false,
+  "limitations": [
+    "shape probe only, not exact complete collector execution",
+    "no standard Refresh in this probe",
+    "no operation UUID/nonce/final absence proof",
+    "qualification NOT_RUN; public gates closed"
+  ]
+}

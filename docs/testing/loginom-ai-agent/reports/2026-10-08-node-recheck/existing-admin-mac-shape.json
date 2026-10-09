@@ -1,0 +1,39 @@
+{
+  "schema": "lab53-existing-owner-mac-loaded-shape-v1",
+  "recorded_at_utc": "2026-10-09T08:41:43.922048+00:00",
+  "source_candidate_examined": "201a9371889947638ba6215f514a48de3da9b47b",
+  "existing_stand": "https://app.loginom.ai/app/",
+  "browser": "existing owner Chrome Mac",
+  "parent_new_browser_or_login": false,
+  "reload_close_stop_actions": 0,
+  "enum_readonly_result": {
+    "mstSelf_static": 1,
+    "mstSelf_prototype": 1,
+    "connection_Connected": true
+  },
+  "tid_selector_result": {
+    "selector": "[data-tid$=\"SessionsManagerForm;trpSessions\"]",
+    "count": 0,
+    "controller": false,
+    "store": false
+  },
+  "loaded_components_result": [
+    {
+      "id": "ext-comp-1548",
+      "class": "bg.admin.view.SessionsManagerForm",
+      "controller": true,
+      "store": true,
+      "roots": 12,
+      "visible": true,
+      "rootLoaded": true
+    }
+  ],
+  "scope": "read-only current loaded browser objects; no fresh remote count/package comparison in this diagnostic",
+  "server_cleanup": "NOT_CERTIFIED",
+  "future_operation_proof": false,
+  "limitations": [
+    "Native CUA prompt keyboard focus required physical screenshot pixel click; coordinate half-scaling did not focus editor.",
+    "Two prior console expressions failed syntax parsing; neither produced Loginom calls or accepted evidence.",
+    "Actual observed results were read back from console; component count and loaded flag alone do not certify full inventory."
+  ]
+}
