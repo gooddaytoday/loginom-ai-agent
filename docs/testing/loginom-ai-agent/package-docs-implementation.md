@@ -4464,6 +4464,7 @@ unchanged/settingsReapplied=false/logout/remaining0; кейс/общая мат�
 - S1–S6 PASS на реальной основной модели: CLI/default/Help/no-file, native Desktop PDF2pages и CLI DOCX2pages; факты/все страницы/вход unchanged/browser0/remaining0 проверены. Произвольное имя DOCX не поддерживается и не критерий S5.
 - ABC pre-model refusals2 с model attempts0 сохранены; S4 ports closed/helper1440162/1440164 absent, прежняя failed cleanup не переписана. Revision4 только новый admission3 path, все live checks строго serial.
 - Остальные fixed8 запущены serial controller/session89353, текущая articles-by-author; fresh profile/results per task, никаких live параллельно. Следующий шаг: итог8/review/campaign cold, S7/S8/native lifecycle.
+- Private helpers подготовлены, НЕ запущены: skills-short-desktop-observer-20261009.py (S7 actual inspector/CDP), routing S7/S8 payload с exact own packageContainer, skills-short-modify-cancel-20261009.ts (после S8 PASS; small calculator + обычный SIGINT активного provider-turn, не node stop/recovery matrix). Syntax checks PASS; pending-lifecycle-adapters.json содержит hashes.
 
 ### 2026-10-09 — ACTIVE, v9 terminal143; closed34/45, PASS25/FAIL9; cohort#3 INCOMPLETE
 
