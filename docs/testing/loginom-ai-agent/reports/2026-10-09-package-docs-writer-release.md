@@ -675,6 +675,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | low-liquidity-companies | 1 | FAIL0/no_artifact | Нет / не выполнялись | 23 / 23 / 21 | 4487 / 15707741 | 3 / 4075869 |
 | low-liquidity-companies | 2 | FAIL0/no_artifact | Нет / не выполнялись | 24 / 23 / 21 | 4487 / 15712963 | 3 / 4062618 |
 | monthly-demand | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4604 / 16230213 | 3 / 4358291 |
+| monthly-demand | 2 | PASS100 | Есть / PASS | 21 / 21 / 17 | 4605 / 16339085 | 3 / 4482084 |
 | nps-segments-by-tier | 1 | PASS100 | Есть / PASS | 23 / 22 / 18 | 4605 / 16613250 | 3 / 4745354 |
 | risky-approved-claims | 1 | PASS100 | Есть / PASS | 20 / 21 / 17 | 4531 / 16301844 | 3 / 4666374 |
 | sales-by-category | 1 | PASS100 | Есть / PASS | 16 / 17 / 13 | 4507 / 15561728 | 3 / 4000100 |
@@ -1082,4 +1083,21 @@ metrics23 SHA256
 проверены; reviews17/cold index15/batch8 receipt/readback SHA совпали.
 Common020c08059… и controller identity совпали. Closed23/45:17 PASS100/
 6 no_artifact FAIL0, monthly#2 running; candidate/cold/compare0/retries0.
+Полный90 не принят.
+
+Двадцать четвёртый closed formal v9 `monthly-demand#2` PASS100:
+structure/warm oracle PASS; cleanup6 stages/processes confirmed,
+error null/remaining0×2. History4605/16339085bytes и diagnostics3/4482084bytes
+full roundtrip. Trace/result counters match:21 finishes/21 tools/17 Loginom/
+skill0/prepare1/errors0. Process persistence до финальных result/cleanup
+не принималась за полное завершение попытки.
+
+Private progress24 SHA256
+`73f418ef2e3aa993ff055519685566c86154f5e7f971d34a9a549d4300466b05`,
+metrics24 SHA256
+`2fd2efbcc05dc33595360104df7df93814d0dd9cc83db670ee8448dfe69eba9c`.
+Все24 results/cleanup/process-cleanup/архивы и предыдущие23 trace SHA
+проверены; reviews18/cold index15/batch8 receipt/readback SHA совпали.
+Common020c08059… и controller identity совпали. Closed24/45:18 PASS100/
+6 no_artifact FAIL0, NPS#2 running; candidate/cold/compare0/retries0.
 Полный90 не принят.
