@@ -9,10 +9,11 @@ import type { BaselineCleanupExecution, EvalProductPins, NodeOpsConfig, NodeStan
 import type { ProcessCleanup } from "./process-supervisor"
 import { dockSkillRevision } from "./preflight"
 import { compareCsv, parseCsv } from "./oracle"
+import type { OperationalEquivalence } from "./baseline-comparison"
 import type { AgentRun } from "./cli"
 
 export type BaselinePins = {
-  mode: "live" | "fixture"; harnessSha: string; corpusSha: string; cliVersion: string; cliSource: string
+  evaluatorSha256?: string; mode: "live" | "fixture"; harnessSha: string; corpusSha: string; cliVersion: string; cliSource: string
   cliManifestSha256: string; binarySha256: string; model: string; variant: string; judgeModel: string; judgeReasoning: string
   threshold: number; timeoutMs: number; judgeTimeoutMs: number; promptSha256: string; schemaSha256: string
   opsConfigSha256: string; isolationSha256: string; endpoint: string; containerId: string; imageDigest: string; dockRevision: string
@@ -23,7 +24,7 @@ export type BaselineRole = "evalbaseline" | "evalrunner"
 export type BaselineReference = { id: string; seriesDir: string; manifestSha256: string; archiveSha256: string; issue: string; decision: string; acceptedAt: string }
 export type BaselineChange = "cli" | "model" | "reasoning"
 export type BaselineManifest = { version: 1 | 2; id: string; kind: "baseline" | "smoke"; createdAt: string; pins: BaselinePins
-  executorRole?: BaselineRole; product?: EvalProductPins; baseline?: BaselineReference; declaredChanges?: BaselineChange[]
+  operationalEquivalence?: OperationalEquivalence; executorRole?: BaselineRole; product?: EvalProductPins; baseline?: BaselineReference; declaredChanges?: BaselineChange[]
   infraRetries: 0 | 1
   cases: BaselineCase[]; jobs: { key: string; caseKey: string; attempt: number }[]
   acceptedNodeSmokeNoArtifact?: string
@@ -132,7 +133,8 @@ export async function captureBaselinePins(config: NodeOpsConfig, env: Record<str
     apparmor: await Promise.all((role.apparmorProfiles ?? ["loginom-evals-bwrap", "loginom-evals-chromium", `loginom-${executorRole}-chromium`]).map(async name => baselineHash(await Bun.file(`/etc/apparmor.d/${name}`).bytes()))),
     connection: Object.fromEntries(["LOGINOM_USERNAME", "LOGINOM_PASSWORD", "LOGINOM_DOCK_API_KEY", "LOGINOM_DOCK_BASE_URL", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"].map(key => [key, env[key] ?? ""])) }
   const revision = await dockSkillRevision({ apiKey: env.LOGINOM_DOCK_API_KEY ?? "", baseUrl: env.LOGINOM_DOCK_BASE_URL ?? "https://loginom.duckdns.org" })
-  return { mode: "live", harnessSha: sha, corpusSha, cliVersion: installed.metadata.version, cliSource: installed.metadata.sourceCommit,
+  const { evaluatorFingerprint } = await import("./evaluator-replay")
+  return { ...(executorRole === "evalrunner" ? { evaluatorSha256: await evaluatorFingerprint(role.checkout) } : {}), mode: "live", harnessSha: sha, corpusSha, cliVersion: installed.metadata.version, cliSource: installed.metadata.sourceCommit,
     cliManifestSha256: installed.manifestSha256, binarySha256: installed.binarySha256, model: product?.model ?? "openai/gpt-6.1-sol", variant: product?.variant ?? "medium",
     judgeModel: "gpt-6-astra", judgeReasoning: "high", threshold: 70, timeoutMs: 1_800_000, judgeTimeoutMs: 300_000,
     promptSha256: baselineHash(await Bun.file(path.join(role.checkout, "evals/src/judge-prompt.md")).bytes()),
@@ -142,7 +144,7 @@ export async function captureBaselinePins(config: NodeOpsConfig, env: Record<str
 }
 
 export async function prepareBaseline(directory: string, options: { checkout: string; pins: BaselinePins; smoke?: boolean; smokeCase?: string; config?: NodeOpsConfig;
-  executorRole?: BaselineRole; product?: EvalProductPins; baseline?: BaselineReference; declaredChanges?: BaselineChange[]; acceptedNodeSmokeNoArtifact?: string }) {
+  executorRole?: BaselineRole; product?: EvalProductPins; baseline?: BaselineReference; declaredChanges?: BaselineChange[]; operationalEquivalence?: OperationalEquivalence; acceptedNodeSmokeNoArtifact?: string }) {
   const executorRole = options.executorRole ?? "evalbaseline"
   if (executorRole === "evalrunner" && options.acceptedNodeSmokeNoArtifact !== undefined) throw new BaselineFailure("LEGACY_ACCEPTANCE_REFUSED")
   validatePins(options.pins, executorRole, options.product)
@@ -182,7 +184,7 @@ export async function prepareBaseline(directory: string, options: { checkout: st
   if (previous && (cases.length !== 48 || JSON.stringify(cases) !== JSON.stringify(previous.manifest.cases)))
     throw new BaselineFailure("BASELINE_CORPUS_CHANGED")
   const manifest: BaselineManifest = { version: executorRole === "evalrunner" ? 2 : 1, id: crypto.randomUUID(), kind: options.smoke ? "smoke" : "baseline",
-    ...(executorRole === "evalrunner" ? { executorRole, product: options.product, baseline: options.baseline, declaredChanges: options.declaredChanges ?? [] } : {}),
+    ...(executorRole === "evalrunner" ? { executorRole, product: options.product, baseline: options.baseline, declaredChanges: options.declaredChanges ?? [], ...(options.operationalEquivalence ? { operationalEquivalence: options.operationalEquivalence } : {}) } : {}),
     createdAt: new Date().toISOString(), pins: options.pins, cases, infraRetries: options.smoke ? 0 : 1,
     ...(options.acceptedNodeSmokeNoArtifact ? { acceptedNodeSmokeNoArtifact: options.acceptedNodeSmokeNoArtifact } : {}),
     ...(selected === "regular:calc-data-double" ? { smokeOracle: await freezeSmokeOracle(options.checkout, cases[0]!) } : {}),
@@ -566,7 +568,8 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
   try {
     const command = argv[0]
     if (argv.includes("--help")) return { code: 0, status: "HELP", help: "run-baseline.ts prepare|start|resume|check|smoke|recover-measurement|resolve-cleanup|abandon --series DIR [smoke: --case calc-data-double|crosstable-fixed-sum] [prepare: --accept-node-smoke-no-artifact MANIFEST_UUID] [recover-measurement: --job KEY --kind infrastructure|judge --evidence PRIVATE_JSON] [resolve-cleanup: --evidence RECOVERY_COMPLETION_JSON] [abandon: --reason REASON --evidence RELEASE_JSON] [--config PRIVATE --issue ID --task ID] [check: --compare SERIES --export] [resume/resolve-cleanup: --recover-executor after inspection]" }
-    const values = parseArgs({ args: argv.slice(1), strict: true, options: { role: { type: "string" }, changes: { type: "string" }, series: { type: "string" }, case: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, job: { type: "string" }, kind: { type: "string" }, reason: { type: "string" }, evidence: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" }, "accept-node-smoke-no-artifact": { type: "string" } } }).values
+    const values = parseArgs({ args: argv.slice(1), strict: true, options: { role: { type: "string" }, changes: { type: "string" }, conditions: { type: "string" }, series: { type: "string" }, case: { type: "string" }, config: { type: "string" }, issue: { type: "string" }, task: { type: "string" }, compare: { type: "string" }, limit: { type: "string" }, job: { type: "string" }, kind: { type: "string" }, reason: { type: "string" }, evidence: { type: "string" }, export: { type: "boolean" }, "recover-executor": { type: "boolean" }, "accept-node-smoke-no-artifact": { type: "string" } } }).values
+    if (values.conditions !== undefined && (command !== "prepare" || values.role !== "evalrunner")) throw new BaselineFailure("CONDITIONS_ONLY_FOR_PREPARE")
     if (values.changes !== undefined && values.role !== "evalrunner") throw new BaselineFailure("CHANGES_REQUIRE_EVALRUNNER")
     if (values.changes !== undefined && command !== "prepare") throw new BaselineFailure("CHANGES_ONLY_FOR_PREPARE")
     if (values.role !== undefined && !["prepare", "smoke"].includes(command ?? "")) throw new BaselineFailure("ROLE_ONLY_FOR_PREPARE")
@@ -610,7 +613,11 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
     if (command === "check") {
       const report = await checkBaseline(directory)
       const reportDir = await writeBaselineReport(directory, report)
-      if (values.compare) await writeBaselineComparison(reportDir, await checkBaseline(values.compare), report)
+      if (report.manifest.baseline) {
+        if (values.compare && values.compare !== report.manifest.baseline.seriesDir) throw new BaselineFailure("BASELINE_REFERENCE_CHANGED")
+        const { verifyBaselineReference } = await import("./baseline-registry")
+        await writeBaselineComparison(reportDir, await verifyBaselineReference(report.manifest.baseline), report)
+      } else if (values.compare) await writeBaselineComparison(reportDir, await checkBaseline(values.compare), report)
       return { code: 0, status: report.status, ...report.coverage, reportDir,
         ...(values.export ? await exportBaselineReport(directory, reportDir, report, env) : {}) }
     }
@@ -651,7 +658,7 @@ export async function runBaseline(argv: string[], env: Record<string, string | u
     const pins = await captureBaselinePins(config, env, executorRole, product)
     if (command === "prepare" || command === "smoke") {
       const manifest = await prepareBaseline(directory, { checkout: role.checkout, pins, smoke: command === "smoke", smokeCase: values.case, config,
-        executorRole, product, baseline: command === "prepare" ? reference : undefined, declaredChanges: values.changes ? values.changes.split(",") as BaselineChange[] : [], acceptedNodeSmokeNoArtifact: values["accept-node-smoke-no-artifact"] })
+        executorRole, product, operationalEquivalence: values.conditions ? await readPrivateBaselineJson(values.conditions) as OperationalEquivalence : undefined, baseline: command === "prepare" ? reference : undefined, declaredChanges: values.changes ? values.changes.split(",") as BaselineChange[] : [], acceptedNodeSmokeNoArtifact: values["accept-node-smoke-no-artifact"] })
       if (command === "prepare") return { code: 0, status: "PREPARED", id: manifest.id, expected: manifest.jobs.length, cases: manifest.cases.length }
     }
     return await executeLiveBaseline(directory, config, env, pins, { issue: typeof values.issue === "string" ? values.issue : undefined,
@@ -1078,15 +1085,17 @@ async function writeBaselineReport(directory: string, report: Awaited<ReturnType
 // combining its logical attempts; a synthetic corpus-wide rubric would invalidate it.
 async function writeBaselineComparison(out: string, before: Awaited<ReturnType<typeof checkBaseline>>, after: Awaited<ReturnType<typeof checkBaseline>>) {
   const { compare } = await import("./compare")
-  const environment = before.manifest.pins.isolationSha256 === after.manifest.pins.isolationSha256
-    ? "Пины изоляции совпадают." : "Пины изоляции различаются: контролируемое сравнение качества не подтверждено."
+  const { compareBaselineConditions } = await import("./baseline-comparison")
+  const conditions = await compareBaselineConditions(before, after)
+  await writeFile(path.join(out, "comparison.json"), JSON.stringify(conditions, null, 2), { flag: "wx", mode: 0o600 })
+  const environment = `${conditions.status}: ${conditions.reasons.join(", ") || "все обязательные условия подтверждены"}. ${conditions.interpretation}`
   for (const collection of ["regular", "analytic"] as const) {
     const keys = [...new Set([...before.manifest.cases, ...after.manifest.cases].filter(item => item.collection === collection).map(item => item.key))]
     const sections: string[] = []
     for (const key of keys) {
       const a = await baselineCaseSummary(before, key)
       const b = await baselineCaseSummary(after, key)
-      sections.push(a && b ? compare(a, b) : `${key}: нет сохранённых результатов в одной из серий; сравнение недоступно.`)
+      sections.push(conditions.status === "INCOMPARABLE" ? `${key}: INCOMPARABLE; метрики серий доступны отдельно.` : a && b ? compare(a, b, { experiment: conditions.experiment }) : `${key}: нет сохранённых результатов в одной из серий; сравнение недоступно.`)
     }
     await writeFile(path.join(out, `compare-${collection}.md`), [`# ${collection}: ${before.id} → ${after.id}`, environment,
       "Сравнения штатного harness представлены по кейсам; их повторения сохраняют исходные rubric/evaluation hashes.", ...sections].join("\n\n"), { flag: "wx", mode: 0o600 })
@@ -1124,7 +1133,7 @@ async function exportBaselineReport(directory: string, reportDir: string, report
   }
   const selected: { source: string; target: string }[] = [
     { source: path.join(directory, "manifest.json"), target: "manifest.json" },
-    ...(await readdir(reportDir)).filter(name => ["baseline.json", "report.md", "compare-regular.md", "compare-analytic.md", "compare-node.json"].includes(name))
+    ...(await readdir(reportDir)).filter(name => ["baseline.json", "report.md", "comparison.json", "compare-regular.md", "compare-analytic.md", "compare-node.json"].includes(name))
       .map(name => ({ source: path.join(reportDir, name), target: name })),
   ]
   for (const execution of report.executions) {

@@ -1,14 +1,18 @@
+import { mkdir } from "node:fs/promises"
 import path from "node:path"
 import { baselineFixturePins } from "../../fixtures/baseline"
-import { baselineHash, beginBaselineMeasurement, prepareBaseline, recordBaselineMeasurement, runBaseline, sealBaselineRelease } from "../../src/baseline"
+import { type BaselinePins, type BaselineReference, baselineHash, beginBaselineMeasurement, prepareBaseline, recordBaselineMeasurement, runBaseline, sealBaselineRelease } from "../../src/baseline"
+import type { EvalProductPins } from "../../src/node-eval-ops"
 import { repoRoot } from "../../src/config"
 import { comparisonSummary } from "./compare-summary"
 
-export async function completedBaselineFixture(directory: string) {
+export async function completedBaselineFixture(directory: string, options: { pins?: BaselinePins; executorRole?: "evalrunner"; product?: EvalProductPins; baseline?: BaselineReference; declaredChanges?: ("cli" | "model" | "reasoning")[] } = {}) {
+  await mkdir(directory, { recursive: true, mode: 0o700 })
+  const pins = options.pins ?? baselineFixturePins
   const series = path.join(directory, "series")
-  const manifest = await prepareBaseline(series, { checkout: repoRoot, pins: baselineFixturePins })
+  const manifest = await prepareBaseline(series, { checkout: repoRoot, ...options, pins })
   for (const job of manifest.jobs) {
-    const admitted = await beginBaselineMeasurement(series, job.key, { checkout: repoRoot, pins: baselineFixturePins })
+    const admitted = await beginBaselineMeasurement(series, job.key, { checkout: repoRoot, pins })
     const id = admitted.case.id
     const run = path.join(admitted.resultsDir, "fixture")
     const summary = comparisonSummary([{ successes: 0, attempts: 1 }], 1)
@@ -17,7 +21,7 @@ export async function completedBaselineFixture(directory: string) {
     summary.tasks[0]!.id = id
     summary.tasks[0]!.attempts[0]!.task_id = id
     summary.tasks[0]!.attempts[0]!.environment_cleanup = { status: "confirmed", evidence: null, error: null }
-    summary.agent = { ...summary.agent, model: baselineFixturePins.model, variant: baselineFixturePins.variant }
+    summary.agent = { ...summary.agent, model: pins.model, variant: pins.variant }
     summary.config.infra_retries = 1
     summary.config.task_timeout_ms = { [id]: summary.config.timeout_ms }
     await Bun.write(path.join(run, "summary.json"), JSON.stringify(summary))
