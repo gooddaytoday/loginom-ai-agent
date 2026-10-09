@@ -671,6 +671,7 @@ Cold formal ещё не выполнялся; candidate formal и compare не �
 | customer-activity-segments | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4608 / 17448322 | 3 / 5497845 |
 | customer-activity-segments | 2 | PASS100 | Есть / PASS | 21 / 21 / 17 | 4604 / 16817553 | 3 / 4888921 |
 | first-last-touch | 1 | FAIL0/no_artifact | Нет / не выполнялись | 26 / 25 / 23 | 4585 / 15440708 | 3 / 3550529 |
+| first-last-touch | 2 | FAIL0/no_artifact | Нет / не выполнялись | 24 / 24 / 22 | 4585 / 15423157 | 3 / 3531856 |
 | low-liquidity-companies | 1 | FAIL0/no_artifact | Нет / не выполнялись | 23 / 23 / 21 | 4487 / 15707741 | 3 / 4075869 |
 | monthly-demand | 1 | PASS100 | Есть / PASS | 21 / 20 / 16 | 4604 / 16230213 | 3 / 4358291 |
 | nps-segments-by-tier | 1 | PASS100 | Есть / PASS | 23 / 22 / 18 | 4605 / 16613250 | 3 / 4745354 |
@@ -1023,4 +1024,31 @@ metrics21 SHA256
 и cold index15 повторно проверены по SHA; batch8 receipt/readback SHA
 совпали, common020c08059… и PID676156/UID/birth/exe/inode неизменны.
 Closed21/45:17 PASS100/4 no_artifact FAIL0, first-last#2 running;
+candidate/cold/compare0/retries0. Полный90 не принят.
+
+Двадцать второй closed formal v9 `first-last-touch#2` no_artifact FAIL0:
+package_not_created, CLI exit0, timeout/interrupted=false, judge_attempts0.
+LGP отсутствует, structure/warm/cold не выполнялись. Input_mapping
+AMBIGUOUS/NODE_APPLY_STOPPED: calculator Done readiness не подтверждена.
+Resume отказал с REQUEST_REJECTED; cancel сохраняет AMBIGUOUS. Два
+operation_recover error — plain text2279bytes, SHA256
+`b2aeaa26ef864fe05ac8d929d388756111c5a766f88de0752d514e807fb4006c`: в тексте
+наблюдаются REQUEST_REJECTED/AMBIGUOUS/NODE_APPLY_STOPPED; structured
+semantics не выведены из plain text. Native cause и semantic recovery UNKNOWN.
+
+Все6 cleanup stages/processes confirmed/error null/remaining0×2.
+History4585/15423157bytes и diagnostics3/3531856bytes full roundtrip.
+Trace/result counters match:24 finishes/24 tools/22 Loginom/skill0/prepare1/
+errors5. Отказ сохранён без исключения или ручного повторного запуска.
+
+Private progress22 SHA256
+`dd71ba33d7e9c1b70286b2e7356caa72c7cb88b501653e8c3368cb874112a2b8`,
+metrics22 SHA256
+`e40cdb4f36b92f1626ebc28550112ab2c5595faf141298d593a3cb4e7aa5fdec`.
+Все22 results/cleanup/process-cleanup/архивы и предыдущие21 trace SHA
+проверены. Optional eventsSha256 отсутствовал у старых progress rows:
+первый read-only snapshot helper отказал KeyError до записи; все21 trace SHA
+проверены через metrics21. Исполняемый harness, продукт и retries неизменны.
+Cold index15 SHA совпал; common020c08059… и controller identity совпали.
+Closed22/45:17 PASS100/5 no_artifact FAIL0, low-liquidity#2 running;
 candidate/cold/compare0/retries0. Полный90 не принят.
