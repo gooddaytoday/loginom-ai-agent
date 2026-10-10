@@ -76,7 +76,7 @@ test("saved-connection readiness can finish after the former 30s startup deadlin
   expect(await host.exited).toEqual({ code: 0, signal: null })
 }, 40_000)
 
-test.each(["ack-without-exit", "disconnect-without-exit", "bad-ack"])(
+test.each(["ack-without-exit", "disconnect-without-exit"])(
   "host shutdown is bounded and never accepts incomplete cleanup: %s",
   async (mode) => {
     const entry = join(fixture.directory, mode + ".mjs")
@@ -108,3 +108,21 @@ test.each(["ack-without-exit", "disconnect-without-exit", "bad-ack"])(
   },
   10000,
 )
+
+
+test("refused close preserves the same Node owner beyond 5000ms, then accepts guarded completion", async () => {
+  const entry = join(fixture.directory, "refused-owner.mjs")
+  await writeFile(entry, `let settled=false; process.on('message', m => {
+    if(m.method==='start') process.send({id:m.id,result:{protocol:1,ready:true,pid:process.pid}});
+    if(m.method==='inspect') {settled=true;process.send({id:m.id,result:{original:true}});}
+    if(m.method==='close') process.send({id:m.id,result:{closed:settled}},()=>{if(settled)process.disconnect()});
+  });`)
+  const host=await launchNodeHost({node:fixture.node,entry,root:fixture.directory,resources:fixture.directory,headless:true})
+  try {
+    await expect(host.close()).rejects.toThrow("LOGINOM_HOST_CLEANUP_FAILED")
+    await Bun.sleep(5100)
+    expect(host.alive).toBe(true)
+    expect(await host.request("inspect",{})).toEqual({original:true})
+  } finally { await host.request("inspect",{}); await host.close() }
+  expect(await host.exited).toEqual({code:0,signal:null})
+},10000)

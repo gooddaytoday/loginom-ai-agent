@@ -101,12 +101,12 @@ export async function createLoginomHost(options: {
               throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
           },
           async close() {
-            generations.delete(connection.generation)
             const results = await Promise.allSettled(
               [...generation.children.values()].map(async (child) => (await child).close()),
             )
             if (results.some((result) => result.status === "rejected"))
               throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+            generations.delete(connection.generation)
           },
         }
       },

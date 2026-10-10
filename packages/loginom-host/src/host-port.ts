@@ -207,13 +207,15 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
   })
   function stop() {
     if (state.stopping) return state.stopping
-    state.closed = true
-    runs.forEach((run) => {
-      run.released = true
-    })
     // In-flight operations retain their leases until their finally handlers run.
     state.stopping = Promise.all([...pending]).then(async () => {
+      if (service.journal.pending().length) throw new Error("LOGINOM_RECOVERY_REQUIRED")
       for (const [id, run] of runs) await release(id, run)
+      state.closed = true
+    })
+    const attempt = state.stopping
+    void attempt.catch(() => {
+      if (state.stopping === attempt) state.stopping = undefined
     })
     return state.stopping
   }

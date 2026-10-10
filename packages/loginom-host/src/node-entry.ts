@@ -46,7 +46,7 @@ process.on("disconnect", () => {
 })
 process.on("SIGTERM", () => {
   void stop()
-    .finally(() => {
+    .then(() => {
       if (process.connected) process.disconnect()
     })
     .catch(() => {
@@ -110,7 +110,7 @@ async function dispatch(message: unknown) {
       void closing.then(
         () => reply({ id: message.id, result: { closed: true } }, true),
         () => {
-          reply({ id: message.id, error: "LOGINOM_HOST_CLEANUP_FAILED" }, true)
+          reply({ id: message.id, error: "LOGINOM_HOST_CLEANUP_FAILED" })
         },
       )
       return
@@ -155,17 +155,21 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
 
 function stop() {
   if (state.stopping) return state.stopping
-  state.closed = true
-  events.emit("close")
   state.stopping = (async () => {
     await state.starting
     const cancellation = Promise.allSettled([state.host?.interruptAll()])
     await Promise.all([...operations])
-    await state.port?.close()
     const results = await Promise.allSettled([state.host?.close()])
     if ([...(await cancellation), ...results].some((result) => result.status === "rejected"))
       throw new Error("LOGINOM_HOST_CLEANUP_FAILED")
+    await state.port?.close()
+    state.closed = true
+    events.emit("close")
   })()
+  const attempt = state.stopping
+  void attempt.catch(() => {
+    if (state.stopping === attempt) state.stopping = undefined
+  })
   return state.stopping
 }
 
