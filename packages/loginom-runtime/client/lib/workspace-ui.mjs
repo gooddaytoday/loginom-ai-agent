@@ -3780,9 +3780,15 @@ function readRenderedInputMapping(observation) {
                 &&beforeNode.pending_wizard_node.label===owner?.node?.label
               :labels.length===1&&normalizeLabel(labels[0].label)!==''
                 &&normalizeLabel(labels[0].label)===normalizeLabel(owner?.node?.label));
+          // Only the prepared native binding can authorize a saved-package
+          // rekey; the raw owner path or displayed label cannot do so.
+          const rebound=afterNode?.navigation_rebinding;
+          const ownerPath=owner?.path?.slice(0,-2).map(({tid,label})=>({tid,label}));
+          const openingPathMatches=same(ownerPath,opening.workflow_path)
+            ||guidOwnerMatches&&same(rebound?.prepared_path,opening.workflow_path)&&same(rebound?.observed_path,ownerPath);
           if(!deactivationPending && (!contextMatches(observed) || observed.ui.masks.length || observed.wizard?.status!=='observed'
             || owner?.status!=='observed' || !guidOwnerMatches&&owner.node.tid!==opening.workflow_path.at(-1)?.tid+'>'+opening.node.node_label
-            || !same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path)))
+            || !openingPathMatches))
             fail('WIZARD_OPEN_NOT_CONFIRMED','The intended node wizard was not confirmed after one click; inspect the current view before retry');
           if(!deactivationPending)record('wizard_open_verified',{node:opening.node,workflow_path:opening.workflow_path,wizard_root_ref:observed.wizard.root_ref,
             owner_node:owner.node,settings_applied:false});
