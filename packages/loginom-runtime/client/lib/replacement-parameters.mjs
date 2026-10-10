@@ -7,7 +7,7 @@ export function validateReplacementValue(v,type){
  if(type==='string')need(typeof v.value==='string'&&v.value.length<=2048&&!/[\x00\r\n]/.test(v.value),'Invalid replacement string');
  else if(type==='real')need(typeof v.value==='number'&&Number.isFinite(v.value),'Finite real replacement required');
  else if(type==='integer'){
-  need(typeof v.value==='number'&&Number.isSafeInteger(v.value)||typeof v.value==='string'&&/^-?(0|[1-9]\d*)$/.test(v.value),'Exact integer replacement required');
+  need(typeof v.value==='number'&&Number.isSafeInteger(v.value)||typeof v.value==='string'&&/^-?(0|[1-9]\d*)$/.test(v.value),'Exact integer replacement required; use a decimal string for Int64 values outside the safe JavaScript integer range');
   const n=BigInt(v.value);need(n>=-9223372036854775808n&&n<=9223372036854775807n,'Replacement integer outside Int64');
  }else need(false,'Unsupported replacement type');
 }
@@ -23,11 +23,12 @@ export function validateReplacementParameters(p,mode,r){
  if(p.rules!==undefined){
   need(Array.isArray(p.rules)&&p.rules.length>0&&p.rules.length<=128,'Nonempty replacement rules required');
   const fields=new Set();
-  for(const rule of p.rules){
+  for(const [index,rule] of p.rules.entries()){
    need(keys(rule,['field','type','pairs','other','case_sensitive','precision'])&&keys(rule.field,['kind','name'])&&rule.field.kind==='input_field'&&name(rule.field.name),'Invalid replacement field');
    need(!fields.has(rule.field.name.toLowerCase()),'Duplicate replacement field');fields.add(rule.field.name.toLowerCase());
    need(['string','integer','real'].includes(rule.type),'Replacement type unsupported');
-   need(rule.type==='string'?typeof rule.case_sensitive==='boolean'&&rule.precision===undefined:rule.precision===0&&rule.case_sensitive===undefined,'String case flag or numeric precision zero required');
+   need(rule.type==='string'?typeof rule.case_sensitive==='boolean'&&rule.precision===undefined:rule.precision===0&&rule.case_sensitive===undefined,
+    'Invalid parameters.rules.'+index+': '+rule.field.name+' ('+rule.type+') '+(rule.type==='string'?'requires case_sensitive=true or false and forbids precision':'requires precision zero (precision=0) and forbids case_sensitive'));
    need(Array.isArray(rule.pairs)&&rule.pairs.length<=256,'Replacement table exceeds supported bound');
    const seen=new Set();
    for(const pair of rule.pairs){
