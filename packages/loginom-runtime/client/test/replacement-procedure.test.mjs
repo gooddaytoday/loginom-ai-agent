@@ -1,5 +1,12 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {revealReplacementAdd} from '../lib/replacement-procedure.mjs';
+import {revealReplacementAdd,replacementRealEditorText,assertReplacementEditorPair} from '../lib/replacement-procedure.mjs';
+test('real values follow the observed native decimal separator without scaling or rounding',()=>{
+ for(const [separator,pair,remaining] of [['.','9.125','-5.25'],[',','9,125','-5,25']]){
+  assert.equal(replacementRealEditorText(9.125,separator),pair);
+  assert.equal(replacementRealEditorText(-5.25,separator),remaining);
+ }
+ for(const separator of [undefined,null,';', ''])assert.throws(()=>replacementRealEditorText(1.25,separator),/Observed.*separator/);
+});
 const state=(top,visible=false)=>({wizard:{root_tid:'w'},node_replacement:{selected:'Category',editor_open:false},ui:{elements:[{ref:'row',replacement_field:{role:'pair',field_key:'Category'},scroll:{ref:'grid',top},allowed_actions:['scroll']},...(visible?[{tid:'w;ReplaceColumnsWizard;grdReplaceItems;tbl;GroupHeader;0;AddButton',allowed_actions:['click']}]:[])]}});
 test('long replacement table reveals Add through its bound pair grid',async()=>{const before=state(435),middle=state(35),after=state(0,true),states=[before,middle,after],actions=[];const channel={perform:async p=>actions.push(p.resolve())};assert.equal(await revealReplacementAdd(channel,async()=>states.shift(),()=>true),after);assert.deepEqual(actions,[{verb:'scroll',ref:'row',delta_y:-400},{verb:'scroll',ref:'row',delta_y:-400}]);});
 test('visible Add does not scroll and failed or foreign scroll cannot proceed',async()=>{let calls=0;await revealReplacementAdd({perform:async()=>calls++},async()=>state(0,true),()=>true);assert.equal(calls,0);for(const change of [s=>s,s=>{s.node_replacement.selected='Other';return s;},s=>{s.ui.elements[0].scroll.ref='foreign';return s;}]){const states=[state(35),change(state(35))];await assert.rejects(()=>revealReplacementAdd({perform:async()=>{}},async()=>states.shift(),()=>true),/did not move/);}});
@@ -28,4 +35,13 @@ test('both colliding partial requests are cancelled before rule or policy change
   assert.deepEqual(actions.map(a=>a.ref),modeOnly?['btnClose']:['btnNext',form+';rbTable;DisplayEl','btnPrev',...(variant==='changed-label'?[]:['btnClose'])]);
   assert.equal(native.pairs[0].from.value,'old');assert.equal(native.input_fields.find(f=>f.name===selected).mode,'manual');
  }
+});
+
+test('commit requires native editor NULL, empty, Null and null on both sides',()=>{
+ const v=value=>({type:'string',value});
+ for(const from of [null,'','Null','null'])for(const to of [null,'','Null','null']){
+  const pair={from:v(from),to:v(to)};assert.doesNotThrow(()=>assertReplacementEditorPair(pair,pair));
+  for(const side of ['from','to'])for(const wrong of [null,'','Null','null'].filter(x=>x!==pair[side].value))assert.throws(()=>assertReplacementEditorPair({...pair,[side]:v(wrong)},pair),/native editor value differs/);
+ }
+ assert.throws(()=>assertReplacementEditorPair(null,{from:v(null),to:v('Missing')}),/native editor value differs/);
 });
