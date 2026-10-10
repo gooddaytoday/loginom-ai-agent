@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {revealReplacementAdd,replacementRealEditorText} from '../lib/replacement-procedure.mjs';
+import {revealReplacementAdd,replacementRealEditorText,assertReplacementEditorPair} from '../lib/replacement-procedure.mjs';
 test('real values follow the observed native decimal separator without scaling or rounding',()=>{
  for(const [separator,pair,remaining] of [['.','9.125','-5.25'],[',','9,125','-5,25']]){
   assert.equal(replacementRealEditorText(9.125,separator),pair);
@@ -35,4 +35,13 @@ test('both colliding partial requests are cancelled before rule or policy change
   assert.deepEqual(actions.map(a=>a.ref),modeOnly?['btnClose']:['btnNext',form+';rbTable;DisplayEl','btnPrev',...(variant==='changed-label'?[]:['btnClose'])]);
   assert.equal(native.pairs[0].from.value,'old');assert.equal(native.input_fields.find(f=>f.name===selected).mode,'manual');
  }
+});
+
+test('commit requires native editor NULL, empty, Null and null on both sides',()=>{
+ const v=value=>({type:'string',value});
+ for(const from of [null,'','Null','null'])for(const to of [null,'','Null','null']){
+  const pair={from:v(from),to:v(to)};assert.doesNotThrow(()=>assertReplacementEditorPair(pair,pair));
+  for(const side of ['from','to'])for(const wrong of [null,'','Null','null'].filter(x=>x!==pair[side].value))assert.throws(()=>assertReplacementEditorPair({...pair,[side]:v(wrong)},pair),/native editor value differs/);
+ }
+ assert.throws(()=>assertReplacementEditorPair(null,{from:v(null),to:v('Missing')}),/native editor value differs/);
 });
