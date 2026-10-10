@@ -467,7 +467,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       lastPreparedStep = structuredClone(persisted);
       signal?.throwIfAborted();
       if (now() >= operation.deadline) throw new Error('Node procedure deadline elapsed before mutation');
-      const openingWait=preparedNodeContext&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(action.verb)
+      // BrowseFilter construction can outlast the primitive's 15s deadline.
+      // Only its exact active native Table may borrow the original node budget.
+      const tableFilterOpening=action.verb==='click'&&before.node_outputs?.verified===true
+        &&before.node_outputs.surface==='views'&&before.prepared_node_context?.surface==='views'
+        &&before.node_outputs.tables.filter(t=>t.active&&t.view_guid&&t.port_guid
+          &&before.ui.elements.some(e=>e.ref===action.ref&&e.tid===t.table_tid+';btnDataGridFilter')).length===1;
+      const openingWait=preparedNodeContext&&(['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(action.verb)||tableFilterOpening)
         ?Math.min(45000,Math.max(1,Math.floor(operation.deadline-now()))):null;
       const settlementWait=preparedNodeContext&&['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(action.verb)
         ?Math.max(1,Math.floor(operation.deadline-now())):null;

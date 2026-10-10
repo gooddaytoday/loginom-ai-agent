@@ -4048,13 +4048,17 @@ function readRenderedInputMapping(observation) {
 
 export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
+  const tableFilterOpening=options.action?.verb==='click'&&options.snapshot?.node_outputs?.verified===true
+    &&options.snapshot.node_outputs.surface==='views'&&options.snapshot.prepared_node_context?.surface==='views'
+    &&options.snapshot.node_outputs.tables.filter(t=>t.active&&t.view_guid&&t.port_guid
+      &&options.snapshot.ui.elements.some(e=>e.ref===options.action.ref&&e.tid===t.table_tid+';btnDataGridFilter')).length===1;
   if(options.settlement_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
     ||!['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
     ||options.opening_timeout_ms!==undefined||!Number.isInteger(options.settlement_timeout_ms)
     ||options.settlement_timeout_ms<1||options.settlement_timeout_ms>1800000))
     throw Error('Mask settlement requires a bound completion action and the remaining node deadline');
   if(options.opening_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
-    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(options.action?.verb)
+    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(options.action?.verb)&&!tableFilterOpening
     ||!Number.isInteger(options.opening_timeout_ms)||options.opening_timeout_ms<1||options.opening_timeout_ms>45000))
     throw Error('Extended opening wait requires a bound node wizard and at most 45000 ms');
   if(options.mode==='act'&&['begin_wizard','confirm_wizard_deactivation','cancel_process'].includes(options.action?.verb)
