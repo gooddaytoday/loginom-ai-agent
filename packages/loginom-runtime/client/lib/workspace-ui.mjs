@@ -2405,6 +2405,18 @@ function readRenderedInputMapping(observation) {
         link:{owner,key,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),selected:d.FSelectedLinks[key]===pair}}]);
       if(selected.length===1){const [key,pair]=selected[0],item=d.FDrawLinkItems?.[key],buttons=item?.DrawDeleteButton;
         requireLink(item?.LinkID===key&&Array.isArray(buttons)&&buttons.length===2&&new Set(buttons).size===2,'output_link_remove_items');
+        // A sprite object alone does not own its DOM alias. Prove the complete
+        // current draw inventory, including hidden controls of other links.
+        const drawItems=Object.entries(d.FDrawLinkItems??{}),pairKeys=new Set(pairs.map(([pairKey])=>pairKey)),allButtons=[];
+        requireLink(drawItems.length===pairs.length&&drawItems.every(([drawKey,drawItem])=>{
+          if(!pairKeys.has(drawKey)||drawItem?.LinkID!==drawKey||!Array.isArray(drawItem.DrawDeleteButton)
+            ||drawItem.DrawDeleteButton.length>2)return false;
+          allButtons.push(...drawItem.DrawDeleteButton);return true;
+        }),'output_link_remove_inventory');
+        requireLink(allButtons.every(sprite=>sprite?.element?.dom instanceof Element
+            &&form.contains(sprite.element.dom)&&seenElements.has(sprite.element.dom))
+          &&new Set(allButtons).size===allButtons.length
+          &&new Set(allButtons.map(sprite=>sprite.element.dom)).size===allButtons.length,'output_link_remove_aliases');
         for(const sprite of buttons){const element=sprite?.element?.dom;
           requireLink(sprite.type==='path'&&sprite.attr?.hidden===false&&sprite.attr.globalAlpha===1&&element?.tagName?.toLowerCase()==='g'
             &&form.contains(element)&&visible(element)&&seenElements.has(element)&&element.children.length===1

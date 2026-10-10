@@ -104,6 +104,23 @@ async function hydrate(page,capture,mode){
    const page=await context.newPage();await hydrate(page,after);const before=await observe(page),a=action(before);await mutate(page,variant);const result=await execute(page,{mode:'observe',root_ref:before.wizard.root_ref});if(result.status==='SUCCEEDED'){assert.equal(linked(result.output).length,0);assert.throws(()=>validateUiAction(a,result.output));}
    let dispatched=0;const down=page.mouse.down.bind(page.mouse);page.mouse.down=async(...args)=>{dispatched++;return down(...args);};const outcome=await execute(page,{mode:'act',snapshot:before,action:a});assert.equal(outcome.status,'NOT_APPLIED');assert.equal(dispatched,0);await page.close();
   });
+  for(const variant of ['duplicate_delete_dom','delete_sprites_shared_by_links','delete_dom_shared_by_links','missing_draw_item','foreign_draw_item','foreign_draw_key','missing_delete_alias'])await t.test(variant+' denies fresh and retained removal before dispatch',async()=>{
+   const page=await context.newPage();await hydrate(page,after);const before=await observe(page),remove=linked(before).find(e=>metadata(e).role==='output_relation_remove'&&e.allowed_actions.includes('click'));
+   assert.ok(remove);const request={verb:'click',ref:remove.ref};validateUiAction(request,before);
+   await page.evaluate(variant=>{
+    const {draw}=globalThis.__nativeFixture,key=Object.keys(draw.FSelectedLinks)[0],other=Object.keys(draw.FLinks).find(k=>k!==key),buttons=draw.FDrawLinkItems[key].DrawDeleteButton;
+    if(variant==='duplicate_delete_dom')buttons[0].element.dom=buttons[1].element.dom;
+    else if(variant==='delete_sprites_shared_by_links')draw.FDrawLinkItems[other].DrawDeleteButton=buttons;
+    else if(variant==='delete_dom_shared_by_links')draw.FDrawLinkItems[other].DrawDeleteButton=buttons.map(b=>({...b,element:{dom:b.element.dom}}));
+    else if(variant==='missing_draw_item')delete draw.FDrawLinkItems[other];
+    else if(variant==='foreign_draw_item')draw.FDrawLinkItems[other].LinkID=key;
+    else if(variant==='foreign_draw_key'){draw.FDrawLinkItems.constructor={...draw.FDrawLinkItems[other],LinkID:'constructor'};delete draw.FDrawLinkItems[other];}
+    else buttons[0].element.dom=null;
+   },variant);
+   const fresh=await observe(page);assert.ok(!linked(fresh).some(e=>metadata(e).role==='output_relation_remove'&&e.allowed_actions.includes('click')));assert.throws(()=>validateUiAction(request,fresh));
+   let count=0;const click=page.mouse.click.bind(page.mouse);page.mouse.click=async(...args)=>{count++;return click(...args);};
+   const retained=await execute(page,{mode:'act',snapshot:before,action:request});assert.equal(retained.status,'NOT_APPLIED');assert.equal(count,0);await page.close();
+  });
   for(const variant of ['stale_definition','stale_selection'])await t.test(variant+' rejects retained stale references before dispatch',async()=>{
    const page=await context.newPage();await hydrate(page,after);const before=await observe(page),a=action(before);await mutate(page,variant);let dispatched=0;page.mouse.down=async()=>{dispatched++;};const outcome=await execute(page,{mode:'act',snapshot:before,action:a});assert.equal(outcome.status,'NOT_APPLIED');assert.equal(dispatched,0);await page.close();
   });
