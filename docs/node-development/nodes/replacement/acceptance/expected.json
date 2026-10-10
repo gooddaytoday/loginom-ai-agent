@@ -233,12 +233,52 @@
     {
       "name": "input.csv",
       "bytes": 124,
-      "sha256": "0e0151318f8307267dc1ed61b396c869303331dc8f1831cac8b7b5a73d2e2e4b"
+      "sha256": "0e0151318f8307267dc1ed61b396c869303331dc8f1831cac8b7b5a73d2e2e4b",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer"
+        },
+        {
+          "name": "Category",
+          "type": "string"
+        },
+        {
+          "name": "Code",
+          "type": "integer"
+        },
+        {
+          "name": "Amount",
+          "type": "real"
+        },
+        {
+          "name": "Keep",
+          "type": "string"
+        }
+      ]
     },
     {
       "name": "partial-input.csv",
       "bytes": 67,
-      "sha256": "e195cdcbcc187601a822f31e26fc7d55f9507c66c51cb9e9d799d785649a1123"
+      "sha256": "e195cdcbcc187601a822f31e26fc7d55f9507c66c51cb9e9d799d785649a1123",
+      "columns": [
+        {
+          "name": "A",
+          "type": "string"
+        },
+        {
+          "name": "A_Replace",
+          "type": "string"
+        },
+        {
+          "name": "B",
+          "type": "string"
+        },
+        {
+          "name": "C",
+          "type": "string"
+        }
+      ]
     }
   ]
 }

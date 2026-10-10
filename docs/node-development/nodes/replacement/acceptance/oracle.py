@@ -37,7 +37,8 @@ def expected():
     preserved = output("Preserved", names, ["string", "string", "string", "string", "boolean", "string", "string", "boolean"], partial)
     # A_Replace is an original column and retains its original label.
     preserved["columns"][1]["label"] = "A_Replace"
-    return {"package_path": "{{PACKAGE_PATH}}", "nodes": [{"type": "imports.text", "label": "Main"}, {"type": "imports.text", "label": "Partial"}, {"type": "transform.replace_columns", "label": "Typed"}, {"type": "transform.replace_columns", "label": "Preserved"}], "outputs": [typed, preserved], "static_sources": [{"name": n, "bytes": (ROOT / "data" / n).stat().st_size, "sha256": hashlib.sha256((ROOT / "data" / n).read_bytes()).hexdigest()} for n in ["input.csv", "partial-input.csv"]]}
+    source_types = {"input.csv": types, "partial-input.csv": {n: "string" for n in ["A", "A_Replace", "B", "C"]}}
+    return {"package_path": "{{PACKAGE_PATH}}", "nodes": [{"type": "imports.text", "label": "Main"}, {"type": "imports.text", "label": "Partial"}, {"type": "transform.replace_columns", "label": "Typed"}, {"type": "transform.replace_columns", "label": "Preserved"}], "outputs": [typed, preserved], "static_sources": [{"name": n, "bytes": (ROOT / "data" / n).stat().st_size, "sha256": hashlib.sha256((ROOT / "data" / n).read_bytes()).hexdigest(), "columns": [{"name": name, "type": kind} for name, kind in source_types[n].items()]} for n in ["input.csv", "partial-input.csv"]]}
 
 if __name__ == "__main__":
     print(json.dumps(expected(), ensure_ascii=False, indent=2))
