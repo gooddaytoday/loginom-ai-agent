@@ -43,6 +43,22 @@ class ChronologyTests(unittest.TestCase):
     def test_label_repair_then_fresh_exact_execution(self):
         self.assertTrue(self.matches([self.call({'output_mode': 'add'}), self.call(mappings=[{'direction': 'output', 'port': 0, 'fields': [{'source': {'kind': 'configured_field', 'name': 'B_Replace'}, 'label': 'B Замена'}]}], exact=True)]))
 
+        layout = [{'direction': 'output', 'port': 0, 'fields': [{'source': {'kind': 'configured_field', 'name': 'B_Replace'}}]}]
+        self.assertTrue(self.matches([self.call({'output_mode': 'add'}, mappings=layout, exact=True)]))
+
+    def test_initial_input_mapping(self):
+        initial = self.call({'output_mode': 'add'}, mappings=[{'direction': 'input', 'port': 0, 'fields': []}])
+        self.assertFalse(self.matches([initial, self.call(exact=True)]))
+        initial['result']['exact'] = True
+        self.assertFalse(self.matches([initial]))
+
+    def test_initial_nonempty_inputs(self):
+        initial = self.call({'output_mode': 'add'})
+        initial['input']['inputs'] = [{'source': {'node_id': 'source'}, 'output': 0, 'input': 0}]
+        self.assertFalse(self.matches([initial, self.call(exact=True)]))
+        initial['result']['exact'] = True
+        self.assertFalse(self.matches([initial]))
+
     def test_changed_rules_mode_failed_apply_and_earlier_output_rejected(self):
         for calls in [
             [self.call(exact=True), self.call({'output_mode': 'add'})],

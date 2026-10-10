@@ -39,12 +39,14 @@ def unwrap(value):
 
 
 def label_only_mappings(mappings):
+    if mappings is None:
+        return True
     return isinstance(mappings, list) and all(
         isinstance(m, dict) and set(m) <= {'direction', 'port', 'autosync', 'fields'}
         and m.get('direction') == 'output' and m.get('port') == 0
         and isinstance(m.get('fields'), list) and all(
             isinstance(f, dict) and set(f) <= {'source', 'label'}
-            and isinstance(f.get('label'), str) and isinstance(f.get('source'), dict)
+            and ('label' not in f or isinstance(f['label'], str)) and isinstance(f.get('source'), dict)
             and set(f['source']) == {'kind', 'name'}
             and f['source']['kind'] == 'configured_field'
             for f in m['fields']) for m in mappings)
@@ -60,7 +62,7 @@ def mode_sequence_matches(calls, mode, reply, values, want):
         if call['input'].get('parameters') != {'output_mode': mode}:
             continue
         for current in calls[index:]:
-            if current is not call and (current['input'].get('parameters') or current['input'].get('inputs') or not label_only_mappings(current['input'].get('mappings', []))):
+            if (current is not call and current['input'].get('parameters')) or current['input'].get('inputs') or not label_only_mappings(current['input'].get('mappings', [])):
                 break
             result = reply(current)
             if result.get('status') != 'SUCCEEDED' or result.get('cleanup_complete') is not True:
