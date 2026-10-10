@@ -314,9 +314,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       charge();for (const element of guards)if(addressedImportField(element))include(element);
       // Ext renders Table modals in a portal outside the owning BrowseView.
       // Include exact view roots as global identity guards, never their trees.
-      const tableOwners=document.querySelectorAll('[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid*=";ViewsForm;BrowseView-"]');
+      const tableOwners=document.querySelectorAll('[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid*=";ViewsForm;BrowseView-"],[data-tid*=";ViewsForm;cntPorts;"],[data-tid*=";ViewsForm;ViewerCard"]');
       charge();for (const element of tableOwners) {
-        charge();if(/^MF;TF(?:-\d+)?;ViewsForm;BrowseView(?:-[1-9][0-9]*)?$/.test(element.getAttribute('data-tid')??''))include(element);
+        charge();if(/^MF;TF(?:-\d+)?;ViewsForm(?:;BrowseView(?:-[1-9][0-9]*)?|;cntPorts;[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|;ViewerCard(?:-[0-9]+)?)?$/.test(element.getAttribute('data-tid')??''))include(element);
       }
     }
     if(!requestedRoot && !discoverRoots && omittedRegions.has('preview_data_cells')) {
@@ -2509,6 +2509,8 @@ function readRenderedInputMapping(observation) {
       // Preserve a real uniquely labelled node whose actual name is Vertex.
       .filter(element=>!ownedGraph(element) || getTid(element)!==graphPrefix+'Vertex' || graphNodeOf(element))
       .filter(element=>!element.closest('[data-tid="mnContextMenu"]') || processMenuControls.has(state.ids.get(element))).filter(element=>!selectedRoot || selectedRoot===element || selectedRoot.contains(element)
+        ||preparedNodeId&&['NavigationPanel','NavPanel'].some(name=>getTid(selectedRoot)===definitionPrefix+';NavigationBar;'+name)
+          &&['NavigationPanel','NavPanel'].flatMap(name=>tids.get(definitionPrefix+';NavigationBar;'+name)??[]).filter(e=>visible(e)&&!sensitive(e)).length===1&&viewerControls.has(state.ids.get(element))
         ||preparedNodeId&&getTid(selectedRoot)===definitionPrefix+';ModelForm;cmpDiagram'&&getTid(element)===definitionPrefix+';ModelForm;btnToggleActivateCurrent')
       .sort((left, right) => controlPriority(left) - controlPriority(right));
     const checkStateOf = element => {
