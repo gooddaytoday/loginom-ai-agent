@@ -41,14 +41,17 @@ export async function replayEvaluatorEvidence(checkout: string, sources: { regul
   const oracle = await checkOracle(task, path.join(out, "artifact"))
   if (!scored.ok || scored.score !== attempt.score || (scored.pass && oracle.passed !== false) !== attempt.pass ||
     (attempt.oracle_pass ?? null) !== oracle.passed) throw new BaselineFailure("REGULAR_REPLAY_FAILED")
-  const node = await validateNodeRun(sources.nodeRun, ["crosstable-fixed-sum"], path.join(checkout, "evals/tasks/node-evals"))
-  if (node.code !== 0) throw new BaselineFailure("NODE_REPLAY_FAILED")
-  if (JSON.stringify(before) !== JSON.stringify(await replaySourceHashes(sources))) throw new BaselineFailure("REPLAY_SOURCE_CHANGED")
   const nodeSummary = await Bun.file(path.join(sources.nodeRun, "summary.json")).json() as RunSummary
+  const node = await validateNodeRun(sources.nodeRun, nodeSummary.task_ids, path.join(checkout, "evals/tasks/node-evals"))
+  const selected = node.attempts.filter(attempt => attempt.task_id === "crosstable-fixed-sum")
+  if (node.code === 2 || selected.length !== 1 || selected[0]?.status !== "completed" || selected[0].verdict !== "PASS")
+    throw new BaselineFailure("NODE_REPLAY_FAILED")
+  if (JSON.stringify(before) !== JSON.stringify(await replaySourceHashes(sources))) throw new BaselineFailure("REPLAY_SOURCE_CHANGED")
   return { version: 1 as const, status: "VERIFIED" as const, modelCalls: 0 as const, threshold, sources, files: before,
     evaluatorSha256: await evaluatorFingerprint(checkout),
     mode: [regularSummary, nodeSummary].every(summary => summary.agent?.cli_mode === "binary" && summary.harness?.dirty === false) ? "live" : "fixture",
-    regular: { score: scored.score, pass: scored.pass && oracle.passed !== false, oracle: oracle.passed }, node: { code: node.code, verdict: node.verdict } }
+    regular: { score: scored.score, pass: scored.pass && oracle.passed !== false, oracle: oracle.passed },
+    node: { code: 0, verdict: "PASS", run: node } }
 }
 
 export async function verifyEvaluatorReplay(file: string, checkout: string, threshold: number) {

@@ -17,6 +17,22 @@ test("offline replay uses saved verdict and full node evidence, makes no model c
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+test("offline replay verifies a positive fixed-sum case within a complete multi-case run without hiding cleanup errors", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "eval-replay-suite-"))
+  try {
+    const sources = await replayFixture(directory)
+    const summary = await Bun.file(path.join(sources.nodeRun, "summary.json")).json()
+    summary.task_ids.push("crosstable-reconfigure")
+    summary.tasks.push({ id: "crosstable-reconfigure", attempts: [{ attempt: 1, status: "no_artifact", environment_cleanup: { status: "confirmed" } }] })
+    await Bun.write(path.join(sources.nodeRun, "summary.json"), JSON.stringify(summary))
+    const cleanup = path.join(sources.nodeRun, "crosstable-reconfigure/1/cleanup.json")
+    await Bun.write(cleanup, await Bun.file(path.join(sources.nodeRun, "crosstable-fixed-sum/1/cleanup.json")).bytes())
+    expect(await replayEvaluatorEvidence(repoRoot, sources, 70)).toMatchObject({ status: "VERIFIED", node: { code: 0, verdict: "PASS", run: { code: 1, verdict: "FAIL" } } })
+    await Bun.write(cleanup, JSON.stringify({ result: { status: "unconfirmed" } }))
+    await expect(replayEvaluatorEvidence(repoRoot, sources, 70)).rejects.toThrow("NODE_REPLAY_FAILED")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test("scorer fingerprint includes the Python XML inspector at the exact recorded revision", async () => {
   const { cp } = await import("node:fs/promises")
   const { evaluatorFingerprint } = await import("../src/evaluator-replay")
