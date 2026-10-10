@@ -27,5 +27,9 @@ export function validateStartInput(input) {
       cleanup.split("/").some((segment) => segment === "." || segment === ".."))
   )
     throw Error("LOGINOM_START_INVALID")
-  return { acceptanceCleanupPackage: cleanup }
+  const account = input.ownedPackageCleanupAccount ?? null
+  if (account !== null && (typeof account !== "string" || !account || account.length > 200
+      || /[\/\\\x00-\x1f\x7f]/.test(account) || account === "." || account === ".."
+      || account !== input.connection?.username || input.validation === true)) throw Error("LOGINOM_START_INVALID")
+  return { acceptanceCleanupPackage: cleanup, ...(account !== null ? { ownedPackageCleanupAccount: account } : {}) }
 }

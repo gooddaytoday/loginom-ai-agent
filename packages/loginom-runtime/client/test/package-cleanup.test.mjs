@@ -16,7 +16,7 @@ function fixture(overrides = {}) {
     Package:{}, HasRunningNodes:() => state.running};
   const m = {PackageNodes:{get Count(){return state.count;}, Items:() => node}, HasRunningNodes:() => state.running,
     FServerConnection:{get UserName(){return state.account;}, Connected:true, Session:{IsPackageModified:async () => {
-      events.push('modified-read'); if (state.racePath) state.path = state.racePath; if(state.raceReadOnly!==undefined)state.readonly=state.raceReadOnly; return state.modified;
+      events.push('modified-read'); if(state.raceRunning)state.running=true; if (state.racePath) state.path = state.racePath; if(state.raceReadOnly!==undefined)state.readonly=state.raceReadOnly; return state.modified;
     }}}, async ClosePackage(target, suppressEvents, processAfterCall) {
       events.push('close'); assert.equal(target,node); assert.equal(suppressEvents,false); assert.equal(processAfterCall,true);
       if (state.closePrompt || state.modified) { state.dialog=true; return new Promise(resolve => {
@@ -60,10 +60,10 @@ test('saved owned package closes with native guards, tabs disappear, then logout
 });
 
 for (const [change,reason] of [
-  [{modified:true},'UNSAVED_CHANGES'], [{running:true},'RUNNING_NODES'],
+  [{modified:true},'UNSAVED_CHANGES'], [{modified:null},'UNSAVED_CHANGES'], [{modified:undefined},'UNSAVED_CHANGES'], [{running:true},'RUNNING_NODES'],
   [{account:'another-user'},'ACCOUNT_CHANGED'], [{path:'/other/result.lgp'},'PACKAGE_IDENTITY_CHANGED'],
-  [{readonly:true},'PACKAGE_IDENTITY_CHANGED'], [{count:2},'PACKAGE_INVENTORY_CHANGED'],
-  [{dialog:true},'DIALOG_OR_OPERATION_OPEN'], [{racePath:'/changed/result.lgp'},'PACKAGE_CHANGED_DURING_CHECK'],
+  [{readonly:true},'PACKAGE_IDENTITY_CHANGED'], [{count:2},'PACKAGE_INVENTORY_CHANGED'], [{count:0},'PACKAGE_INVENTORY_CHANGED'],
+  [{dialog:true},'DIALOG_OR_OPERATION_OPEN'], [{raceRunning:true},'PACKAGE_CHANGED_DURING_CHECK'], [{racePath:'/changed/result.lgp'},'PACKAGE_CHANGED_DURING_CHECK'],
 ]) test('refuses before closing: '+reason, async () => {
   const f=fixture(change),result=await f.run();
   assert.equal(result.status,'BLOCKED');assert.equal(result.reason,reason);

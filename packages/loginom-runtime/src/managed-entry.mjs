@@ -38,7 +38,10 @@ function close() {
     await Promise.allSettled([...requests])
     const results = []
     for (const handle of [state.client, state.bridge, state.browserServer, state.browser]) {
-      results.push(...(await Promise.allSettled([Promise.resolve().then(() => handle?.close())])))
+      const settled = await Promise.allSettled([Promise.resolve().then(() => handle?.close())])
+      results.push(...settled)
+      if (handle && handle === state.bridge && settled[0].status === "fulfilled" && settled[0].value?.browser_transport_closed !== true)
+        results.push({ status: "rejected", reason: Error("LOGINOM_RUNTIME_CLEANUP_FAILED") })
     }
     if (state.browserProfile)
       results.push(...(await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])))
@@ -71,7 +74,7 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage } = validateStartInput(input)
+      const { acceptanceCleanupPackage, ownedPackageCleanupAccount } = validateStartInput(input)
       const resources = await verifyResources(input.resources)
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
       const directory = join(
@@ -120,6 +123,7 @@ async function handle(message) {
         // Acceptance-only shutdown cleanup; the bridge binds it to the observed
         // prepared account, so no replay login account is needed here.
         acceptanceCleanupPackage,
+        ownedPackageCleanupAccount,
         storageDirectories: {
           inputs: `/${input.connection.username}`,
           exports: `/${input.connection.username}`,
