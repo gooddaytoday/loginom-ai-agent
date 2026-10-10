@@ -144,6 +144,8 @@ def verify_ports(case, ports, binding):
                 value, kind = cell.get('value'), c['type']
                 if cell.get('type') != kind or type(cell.get('is_null')) is not bool:
                     raise ValueError('cell_type')
+                if kind == 'datetime' and cell.get('timezone') != 'unspecified':
+                    raise ValueError('datetime_timezone')
                 if cell['is_null']:
                     if value is not None or cell.get('precision') != 'exact_null':
                         raise ValueError('null_cell')
@@ -158,7 +160,7 @@ def verify_ports(case, ports, binding):
                     if type(value) is not bool or cell.get('precision') != 'exact_boolean':
                         raise ValueError('boolean_precision')
                 elif kind == 'datetime':
-                    if (type(value) is not str or cell.get('precision') != 'millisecond' or cell.get('timezone') != 'unspecified'
+                    if (type(value) is not str or cell.get('precision') != 'millisecond'
                             or re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?', value) is None):
                         raise ValueError('datetime_precision')
                     # Validate lexical precision before parsing: fromisoformat

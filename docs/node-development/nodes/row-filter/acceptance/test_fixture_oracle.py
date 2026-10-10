@@ -160,6 +160,19 @@ class OracleTests(unittest.TestCase):
     def test_generated_expectations_are_reproducible(self):
         self.assertEqual(json.loads((ROOT/'fixture-expected.json').read_text()), self.bundle)
 
+    def test_null_datetime_requires_unspecified_timezone(self):
+        case = next(c for c in self.bundle['golden_cases'] if c['name'] == 'all_records')
+        for timezone in (None, 'UTC'):
+            ports, binding = receipt(case)
+            cell = next(row[3] for p in ports for row in p['sample'] if row[0]['value'] == '5')
+            self.assertTrue(cell['is_null'])
+            if timezone is None:
+                del cell['timezone']
+            else:
+                cell['timezone'] = timezone
+            with self.subTest(timezone=timezone), self.assertRaisesRegex(ValueError, 'datetime_timezone'):
+                verify_ports(case, ports, binding)
+
     def test_datetime_fraction_cannot_be_truncated(self):
         case = next(c for c in self.bundle['golden_cases'] if c['name'] == 'all_records')
         for fraction in ('000900', '0000009', '0000'):
