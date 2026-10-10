@@ -87,7 +87,7 @@ test.each(["ack-without-exit", "disconnect-without-exit"])(
       process.on('message', m => {
         if (m.method === 'start') process.send({id:m.id,result:{protocol:1,ready:true,pid:process.pid}});
         if (m.method !== 'close') return;
-        if (${JSON.stringify(mode)} === 'disconnect-without-exit') { process.disconnect(); return; }
+        if (${JSON.stringify(mode)} === 'disconnect-without-exit') { process.disconnect(); setTimeout(() => process.exit(1), 100); return; }
         process.send({id:m.id,result:{closed:${mode !== "bad-ack"}}});
       });
     `,
@@ -99,10 +99,10 @@ test.each(["ack-without-exit", "disconnect-without-exit"])(
       resources: fixture.directory,
       headless: true,
     })
-    await expect(host.close()).rejects.toThrow("LOGINOM_HOST_CLEANUP_FAILED")
-    await expect(host.close()).rejects.toThrow("LOGINOM_HOST_CLEANUP_FAILED")
-    expect(host.alive).toBe(false)
+    await expect(host.close()).rejects.toThrow(mode === "disconnect-without-exit" ? "LOGINOM_HOST_CLOSED" : "LOGINOM_HOST_CLEANUP_FAILED")
+    await expect(host.close()).rejects.toThrow("LOGINOM_HOST_CLOSED")
     const outcome = await host.exited
+    expect(host.alive).toBe(false)
     expect(outcome.code !== 0 || outcome.signal !== null).toBe(true)
     await expect(host.request("connection.status", {})).rejects.toThrow("LOGINOM_HOST_CLOSED")
   },
