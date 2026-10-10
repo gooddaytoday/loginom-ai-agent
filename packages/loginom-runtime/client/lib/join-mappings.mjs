@@ -55,6 +55,23 @@ export async function configureJoinInputs(channel,mappings,ctx,request,finishWiz
  }
  return {verified:true,cleanup_complete:true,effect_possible:true,ports:results.sort((a,b)=>a.port-b.port),source_identity_verified:true};
 }
+export function defaultJoinOutputRecords(configuration,native){
+ const owner=native?.node_context,port=owner?.output_port;
+ need(configuration?.verified===true&&configuration.inventory_complete===true&&owner?.verified===true&&owner.surface==='wizard'
+  &&['document_id','workflow_id','node_id'].every(k=>typeof owner[k]==='string'&&owner[k].length>0&&owner[k]===configuration.node_context?.[k])
+  &&typeof owner.tid==='string'&&owner.tid.length>0&&port?.direction==='output'&&port.port===0
+  &&Number.isInteger(port.native_index)&&port.native_index>=0&&typeof port.port_guid==='string'&&port.port_guid.length>0
+  &&typeof port.opening_operation_id==='string'&&port.opening_operation_id.length>0,'Default Join output owner differs');
+ const fields=joinOutputFields(configuration);
+ const resolved=resolveConfiguredOutputMapping({direction:'output',port:0,fields:fields.map(f=>({source:{kind:'configured_field',name:f.name}}))},fields,native);
+ need(native.target_fields.length===fields.length,'Default Join output has extra targets');
+ need(resolved.fields.every((f,i)=>!f.current.excluded&&f.current.exclusion_source===null
+  &&f.current.name===fields[i].name&&f.current.label===fields[i].label&&f.current.type===fields[i].type
+  &&JSON.stringify(f.current.source)===JSON.stringify(f.source)), 'Default Join output source binding or definition differs');
+ const ids=resolved.fields.map(f=>f.current.record_id);
+ need(ids.every(id=>typeof id==='string'&&id.length>0)&&new Set(ids).size===ids.length,'Default Join output records ambiguous');
+ return ids;
+}
 export async function configureJoinOutput(channel,configuration,parameters,mapping={}){
  const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
  const sources=joinOutputFields(configuration),requested={direction:'output',port:0,...mapping},changes=[];
@@ -62,6 +79,13 @@ export async function configureJoinOutput(channel,configuration,parameters,mappi
  s=await ensureGroupingOutputSources(channel,s,{verify:(before,after)=>verifyJoinSourceFetch(before,after,sources)});
  s=await ensureJoinOutputComplete(channel,s);
  resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
+ if(configuration.default_output_order===true){
+  need(Object.keys(mapping).length===0,'Default Join order requires an empty output mapping');
+  const ids=defaultJoinOutputRecords(configuration,s.node_mapping);
+  const reordered=await reorderOutputFields(channel,ids);changes.push(reordered);
+  s=await channel.observe({condition:'default join output order readback',readMappings:true,ready});
+  need(JSON.stringify(defaultJoinOutputRecords(configuration,s.node_mapping))===JSON.stringify(s.node_mapping.target_fields.map(f=>f.record_id)), 'Default Join output order differs');
+ }
  if(requested.fields){
   changes.push(await configureOutputFields(channel,requested,sources));
   s=await channel.observe({condition:'join output fields configured',readMappings:true,ready});
