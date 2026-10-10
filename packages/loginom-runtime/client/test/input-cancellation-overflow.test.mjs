@@ -75,13 +75,19 @@ async function hydrate(page,capture,mode){
     await assert.rejects(closePreparedWizard(channel),/lost reply/);assert.equal(calls,lossAt);}
    await page.close();
   });
-  for(const mode of ['missing_ledger','duplicate_ledger','foreign_node','foreign_document','foreign_port','foreign_index','foreign_socket','foreign_root','stale_data','foreign_parent','foreign_workflow','foreign_opening','duplicate_root','duplicate_dialog','duplicate_yes','duplicate_no','foreign_yes_binding','foreign_port_breadcrumb','stale_wizard_breadcrumb','missing_port_breadcrumb'])await t.test(mode,async()=>{
-   const page=await context.newPage();await hydrate(page,after,mode);
+  for(const file of ['native-after-1280.json','native-after-1440.json','native-after-1280-restored.json'])
+  for(const mode of ['missing_ledger','duplicate_ledger','foreign_node','foreign_document','foreign_port','foreign_index','foreign_socket','foreign_root','stale_data','foreign_parent','foreign_workflow','foreign_opening','duplicate_root','duplicate_dialog','duplicate_yes','duplicate_no','foreign_yes_binding','foreign_port_breadcrumb','stale_wizard_breadcrumb','missing_port_breadcrumb'])await t.test(file+':'+mode,async()=>{
+   const capture=fixture[file],page=await context.newPage();await page.setViewportSize(capture.viewport);await hydrate(page,capture,mode);
    const initial=await execute(page,{mode:'observe'});
    if(initial.status==='SUCCEEDED'){
     const ref=initial.output.ui.dialogs[0]?.ref;
     const portal=ref?await execute(page,{mode:'observe',root_ref:ref}):initial;
-    if(portal.status==='SUCCEEDED')assert.ok(!portal.output.ui.elements.some(e=>e.allowed_actions.includes('confirm_wizard_close')),mode);
+    if(portal.status==='SUCCEEDED'){
+     const state=portal.output,yes=state.ui.elements.find(e=>e.tid==='msgbox;tlb;yes');
+     assert.ok(!state.ui.elements.some(e=>e.allowed_actions.includes('confirm_wizard_close')),mode);
+     if(yes)assert.throws(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},state));
+     if(state.prepared_node_context?.verified&&state.wizard?.status==='observed')assert.equal(boundWizardCloseConfirmation(state,wizardCloseBinding(state)),false);
+    }
    }
    await page.close();
   });
