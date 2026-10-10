@@ -15,6 +15,7 @@ const save=(n,v)=>writeFile(join(out,n+'.json'),JSON.stringify(v,null,2));const 
 // External observer wraps public Playwright calls without changing candidate code.
 const {createRequire}=await import('node:module');const req=createRequire(join(root,'runtime/client/package.json'));const {chromium}=req('playwright-core');
 const secrets=[config.workflow_profile.password,config.api_key].filter(Boolean),redact=v=>secrets.reduce((t,s)=>t.split(s).join('[REDACTED]'),String(v));
+const redactValues=value=>typeof value==='string'?redact(value):Array.isArray(value)?value.map(redactValues):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,item])=>[key,redactValues(item)])):value;
 const observe=(stage,data={})=>{appendFile(join(out,'login-observer.jsonl'),JSON.stringify({at:new Date().toISOString(),stage,...data})+'\n').catch(()=>{});};
 const originalLaunch=chromium.launchPersistentContext.bind(chromium);
 chromium.launchPersistentContext=async(...args)=>{observe('launch-start');try{const ctx=await originalLaunch(...args);observe('launch-success');
@@ -37,7 +38,7 @@ const snapshot=async label=>{
   const grid=cmp('grdReplaceItems'),input=cmp('grdDataList');result.selected=input?.getSelectionModel?.().getSelection?.().map(r=>({id:r.internalId,name:r.data.Name,type:r.data.DataType}));result.pairs=[];
   for(const r of grid?.getStore?.().getData?.().items??[]){const d=r.data,p={id:r.internalId,index:d.Index,collection:d.CollectionID,cache:{from:d.ValueRender,to:d.ReplaceRender}};if(d.DataValue&&d.ReplaceBy)try{const read=async v=>({DataType:await v.DataType,IsNull:await v.IsNull,Value:await v.Value});p.native={from:await read(d.DataValue),to:await read(d.ReplaceBy)};}catch(e){p.error=String(e.message);}result.pairs.push(p);}
   result.editor={from:cmp('ReplaceEditor')?.Controller?.getValue?.(),to:cmp('ReplaceEditor-1')?.Controller?.getValue?.(),record:grid?.findPlugin?.('rowediting')?.context?.record?.internalId};return result;
- });const safe=JSON.parse(redact(JSON.stringify(value)));await save('trace-'+(++trace),{label,at:new Date().toISOString(),value:safe});return safe;
+ });const safe=redactValues(value);await save('trace-'+(++trace),{label,at:new Date().toISOString(),value:safe});return safe;
 };
 const record=async event=>{const r=await journal(event);if(['node_step_prepared','node_step_completed'].includes(event.phase)&&event.action_key!=='package.save_checkpoint')try{await snapshot(event.phase+':'+JSON.stringify(event.action??event.condition??event.internal_operation_id));}catch(e){await save('trace-error-'+(++trace),{message:redact(e?.message??String(e))});}return r;};
 const actions=JSON.parse(await readFile(join(root,'runtime/executor/catalog/actions.json'))).actions,selectors=JSON.parse(await readFile(join(root,'runtime/executor/catalog/selectors.json'))).selectors;

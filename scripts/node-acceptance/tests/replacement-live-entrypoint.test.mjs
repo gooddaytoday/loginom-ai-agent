@@ -9,16 +9,26 @@ import {tmpdir} from 'node:os';
 
 // All candidate modules and Playwright objects below are private offline mocks.
 // No credentials, browser, network connection or package operation is used.
-const base=await mkdtemp(join(tmpdir(),'replacement-entrypoint-')),results=[];
+const base=await mkdtemp(join(tmpdir(),'replacement-native-entrypoint-')),results=[];
 const originalStdin=Object.getOwnPropertyDescriptor(process,'stdin'),originalLog=console.log,oldMask=process.umask();
 async function runCase(mode){
  const directory=join(base,mode),root=join(directory,'candidate'),out=join(directory,'evidence');
  const write=async(path,text)=>{await mkdir(join(root,path,'..'),{recursive:true});await writeFile(join(root,path),text);};
- const password='SYNTHETIC_PASSWORD_123',failure=Error('setup original '+password),logs=[];
+ const password=mode==='native-escaped-secret'?'SYNTHETIC_"PASSWORD_\\123':'SYNTHETIC_PASSWORD_123',failure=Error('setup original '+password),logs=[];
  const state={mode,failure,closed:0,launched:0,record:null};
  const page={on(){},locator(){return Object.create({waitFor(){},click(){},fill(){},inputValue(){},isVisible(){}});},async evaluate(fn){
   if(mode==='ready-inventory-rejection')throw failure;
-  if(String(fn).includes('ReplaceColumnsWizard')){if(mode==='native-error-redaction')return {pairs:[{error:'native getter '+password}]};throw Error('native trace '+password);}
+  if(String(fn).includes('ReplaceColumnsWizard')){
+   if(!mode.startsWith('native-'))throw Error('native trace '+password);
+   const root={checkVisibility:()=>true,getAttribute:()=>';ReplaceColumnsWizard',contains:()=>true};
+   const cmp=name=>({id:name});const row={internalId:'original-row',data:{Index:0,CollectionID:'original-collection',ValueRender:'cache',ReplaceRender:'Missing',DataValue:{get DataType(){throw Error('native getter '+password);}},ReplaceBy:{DataType:'string',IsNull:false,Value:'Missing'}}};
+   const grid={getStore:()=>({getData:()=>({items:[row]})}),findPlugin:()=>({context:{record:row}})};
+   const bindings={bg:globalThis.bg,document:globalThis.document,Ext:globalThis.Ext};
+   globalThis.bg={app:{Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:'review-unit-worker'},PackageNodes:{Count:0}}}}}}};
+   globalThis.document={querySelectorAll:selector=>selector.includes('$=')?[root]:['grdReplaceItems','grdDataList','ReplaceEditor-1','ReplaceEditor'].filter(name=>selector.endsWith(name+'"]')).map(cmp)};
+   globalThis.Ext={getCmp:id=>id==='grdReplaceItems'?grid:id==='grdDataList'?{getSelectionModel:()=>({getSelection:()=>[]})}:null};
+   try{return await fn();}finally{for(const key of Object.keys(bindings)){if(bindings[key]===undefined)delete globalThis[key];else globalThis[key]=bindings[key];}}
+  }
   return {account:'review-unit-worker',build:'7.4.2',packages:[]};
  }};
  const context={pages:()=>[page],on(){},async close(){state.closed++;}};
@@ -46,23 +56,28 @@ async function runCase(mode){
   assert.equal(state.launched,1);assert.equal(state.closed,0);assert.equal(result,owner);assert.equal(owner.context,context);assert.equal(owner.page,page);
   if(mode==='setup-rejection'||mode==='ready-inventory-rejection'){
    assert.equal(owner.error,failure);
-   assert.equal(typeof owner.execute,'function');assert.equal(typeof owner.recover,'function');assert.equal(await owner.execute('async page=>page'),page);await assert.rejects(owner.recover(),/IDENTITY_UNCONFIRMED/);assert.equal(owner.error,failure);
-   if(mode==='ready-inventory-rejection'){assert.ok(state.runtime);assert.equal(owner.runtime,state.runtime);}
+   assert.equal(typeof owner.execute,'function');assert.equal(typeof owner.recover,'function');assert.equal(await owner.execute('async page=>page'),page);
+   await assert.rejects(owner.recover(),/IDENTITY_UNCONFIRMED/);assert.equal(owner.error,failure);assert.equal(state.closed,0);
+   if(mode==='ready-inventory-rejection'){assert.ok(state.runtime);assert.equal(owner.runtime,state.runtime);state.runtime.hasUnsettledWork=()=>true;await assert.rejects(owner.recover(),/PENDING_OPERATION_PRESERVED/);assert.equal(state.closed,0);}
    results.push({probe:mode,original_error_preserved:owner.error===failure,context_preserved:owner.context===context,page_preserved:owner.page===page,runtime_was_created:!!state.runtime,runtime_available:!!owner.runtime,execute_available:typeof owner.execute==='function',guarded_recovery_available:typeof owner.recover==='function',expected_execute_available:true,expected_guarded_recovery_available:true,browser_exit_calls:state.closed});
   }else{
    assert.equal(owner.error.message,'DIAGNOSTIC_STDIN_EOF_BEFORE_CLEANUP');assert.equal(typeof owner.execute,'function');
    await owner.runtime.emitTrace();
-   const files=(await readdir(out)).filter(x=>x.startsWith(mode==='native-error-redaction'?'trace-':'trace-error-'));
-   assert.equal(files.length,1);const evidence=await readFile(join(out,files[0]),'utf8');assert.equal(evidence.includes(password),false);assert.ok(evidence.includes('[REDACTED]'));
-   results.push({probe:mode,eof_refused:true,context_preserved:true,source_execute_available:true,guarded_recovery_available:typeof owner.recover==='function',evidence_file:files[0],synthetic_password_persisted:evidence.includes(password),expected_synthetic_password_persisted:false,browser_exit_calls:state.closed});
+   const files=(await readdir(out)).filter(x=>x.startsWith(mode.startsWith('native-')?'trace-':'trace-error-'));
+   assert.equal(files.length,1);const evidence=await readFile(join(out,files[0]),'utf8'),decoded=JSON.parse(evidence);
+   const containsSecret=value=>typeof value==='string'?value.includes(password):value&&typeof value==='object'?Object.values(value).some(containsSecret):false;
+   const leaked=containsSecret(decoded);assert.equal(leaked,false);
+   assert.ok(evidence.includes('[REDACTED]'));
+   if(mode.startsWith('native-'))assert.equal(decoded.value.pairs[0].id,'original-row');
+   results.push({probe:mode,eof_refused:true,context_preserved:true,source_execute_available:true,guarded_recovery_available:typeof owner.recover==='function',evidence_file:files[0],synthetic_password_persisted:leaked,expected_synthetic_password_persisted:false,browser_exit_calls:state.closed});
   }
  }finally{input.destroy();Object.defineProperty(process,'stdin',originalStdin);console.log=originalLog;process.umask(oldMask);}
 }
-test('entrypoint preserves setup handles and redacts both trace paths offline',async()=>{try{
+test('real entrypoint callback redacts decoded native getter errors including escaped secrets',async()=>{try{
  const guardOwner={};const guard=await runLive398([],guardOwner);
  assert.equal(guard,guardOwner);assert.equal(guard.failed,true);assert.equal(guard.error.message,'DIAGNOSTIC_INTERACTIVE_STDIN_REQUIRED_BEFORE_LOGIN');assert.equal(guard.context,undefined);
  results.push({probe:'non-PTY guard',refused_before_login:true});
- await runCase('setup-rejection');await runCase('ready-inventory-rejection');await runCase('trace-redaction');
+ await runCase('setup-rejection');await runCase('ready-inventory-rejection');await runCase('trace-redaction');await runCase('native-error-redaction');await runCase('native-escaped-secret');
 }
 finally{Object.defineProperty(process,'stdin',originalStdin);console.log=originalLog;process.umask(oldMask);delete globalThis.__replacementProbe;await rm(base,{recursive:true,force:true});}
 });
