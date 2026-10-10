@@ -45,11 +45,10 @@ test('Union does not click or scroll from a clipped quarter-point cell whose cen
  await revealUnionField(channel,structuredClone(s),2,'A','field');assert.equal(gestures,1);
 });
 
- test('Union clears literal prefix values while leaving prefix use disabled',async()=>{
+ test('Union refuses disabled prefix edits that cached readback cannot prove persisted',async()=>{
  const f=fixture();f.c.mappings[0]={port:1,pairs:[{main:'A',source:'Right'}],unmatched:['Wrong']};
  const wanted={...p,prefixes:{enabled:false,name:'',label:''}};
- const r=await configureUnion(f.channel,wanted,{request:{finish:'done'}});
- assert.deepEqual(r.configuration.prefixes,wanted.prefixes);
- assert.deepEqual(f.actions.map(a=>a.verb),['set_checked','fill','press','fill','press','set_checked']);
- assert.equal(f.actions[0].checked,true);assert.equal(f.actions.at(-1).checked,false);
+ await assert.rejects(configureUnion(f.channel,wanted,{request:{finish:'done'}}),/disabled prefix values differ/);
+ assert.equal(f.actions.length,0);
+ assert.deepEqual(f.c.prefixes,p.prefixes);
 });

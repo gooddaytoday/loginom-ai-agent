@@ -61,6 +61,11 @@ export async function configureUnion(channel,p,{request}){
  const click=async(tid,condition)=>{const old=s.node_union;await channel.perform({condition,initialObservation:s,ready:unionReady,identity:()=>semantic(old),resolve:s=>({verb:'click',ref:control(s,tid,'click').ref})});};
  const base=s.wizard.root_tid+';UnionDataWizard;';
  const editPrefixes=['name','label'].some(key=>s.node_union.prefixes[key]!==p.prefixes[key]);
+ // Loginom applies property editors only while enabled. Disabling them before
+ // Next leaves the engine's previous strings intact, even after a committed
+ // textbox readback. An enabled empty name is rejected by native validation;
+ // do not manufacture success from those cached strings or bypass that guard.
+ need(p.prefixes.enabled||!editPrefixes,'Union disabled prefix values differ from native settings; persistence cannot be verified');
  const editablePrefixUse=p.prefixes.enabled||editPrefixes;
  if(s.node_union.prefixes.enabled!==editablePrefixUse){
   const before=s.node_union;

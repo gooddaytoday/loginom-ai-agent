@@ -1,5 +1,32 @@
 """Union auditor independent of the JS handler and its projected readback."""
 from node_procedure_evidence import verify_internal_sequence
+import xml.etree.ElementTree as ET
+
+def verify_union_persisted_prefixes(xml, node_id, expected):
+    """Check the saved engine, never substitute cached wizard values or defaults."""
+    failures=[]; actual={}; missing=[]
+    try:
+        root=ET.fromstring(xml)
+        nodes=[n for n in root.findall('.//WorkFlow/Nodes/Item') if n.get('Guid')==node_id]
+        if len(nodes)!=1:raise ValueError('union_saved_node_identity')
+        engines=nodes[0].findall('./Component/Engine')
+        if len(engines)!=1 or engines[0].get('{http://www.w3.org/2001/XMLSchema-instance}type')!='TBGUnionDataEngine':
+            raise ValueError('union_saved_engine_identity')
+        engine=engines[0]
+        for key,attribute in [('enabled','UsePrefixes'),('name','NamePrefix'),('label','DisplayNamePrefix')]:
+            value=engine.get(attribute)
+            if value is None:
+                missing.append(key)
+                continue
+            if key=='enabled':
+                if value not in ('true','false'):raise ValueError('union_saved_prefix_flag')
+                value=value=='true'
+            actual[key]=value
+            if value!=expected[key]:failures.append('union_saved_prefix_'+key)
+        if missing:failures.append('union_saved_prefix_defaults_unverified')
+    except (ET.ParseError,KeyError,TypeError,ValueError) as e:failures.append(str(e))
+    return dict(passed=not failures,failures=sorted(set(failures)),scope='union_saved_xml_prefixes',
+                node_id=node_id,explicit_values=actual,unverified_defaults=missing)
 
 def verify_union_configuration(events,request):
     failures=[]
