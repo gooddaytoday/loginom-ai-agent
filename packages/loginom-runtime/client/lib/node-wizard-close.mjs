@@ -32,7 +32,13 @@ export function boundWizardCloseConfirmation(state,binding,requireControls=true)
  if(!requireControls)return true;
  return ['yes','no'].every(name=>ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name
   &&e.signature?.dialog_ref===dialog.ref&&e.label===(name==='yes'?'Да':'Нет')
-  &&e.allowed_actions?.includes('click')).length===1);
+  &&e.allowed_actions?.includes('click')
+  &&(name!=='yes'||!binding.owner?.input_port||e.allowed_actions.includes('confirm_wizard_close')
+    &&e.wizard_close_confirmation?.root_ref===binding.root_ref
+    &&e.wizard_close_confirmation.root_tid===binding.root_tid
+    &&e.wizard_close_confirmation.stage===binding.stage
+    &&e.wizard_close_confirmation.dialog_ref===dialog.ref
+    &&same(e.wizard_close_confirmation.input_port,binding.owner.input_port))).length===1);
 }
 
 export function cancelledWizardReady(state,binding) {

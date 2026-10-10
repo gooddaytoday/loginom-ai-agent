@@ -2646,6 +2646,54 @@ function readRenderedInputMapping(observation) {
       if(!dom||!d.FmxGraph.container.contains(dom)||getTid(dom)!==workflow.prefix+';Graph;'+getTid(dom)?.split(';Graph;')[1])return null;
       return {node_id:preparedNodeId,node_ref:refOf(dom),mode:execute?'execute':'deactivate',source:'native_selected_graph_node'};
     };
+    // Cancellation may own an overflowed port without making mapping or
+    // navigation ready. Bind hidden captions to the current native opening.
+    const inputCancellationOwner=(()=>{
+      if(wizard.status!=='observed'||wizard.stage!=='input_mapping'||preparedInputPort?.direction!=='input')return null;
+      const p=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
+      const card=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
+      const model=card?.Controller?.FController,w=card?.Controller?.Node?.data?.node;
+      const port=w?.ParentNode,group=port?.ParentNode,node=group?.ParentNode,flow=node?.ParentNode;
+      const openings=[...(p?.inputPortOpenReceipts?.values()??[])].filter(o=>o.phase==='verified'&&o.wizard===model);
+      const o=openings[0],roots=tids.get(wizard.root_tid)??[];
+      if(p?.document!==document||!p.id||openings.length!==1||o.document_id!==p.id
+        ||![...(p.receipts?.values()??[])].some(r=>r.phase==='verified'&&r.workflowId===o.workflow_id&&r.nodeTargetWorkflowNode===flow&&r.packageNode===o.packageNode)
+        ||o.node_id!==preparedNodeId||node?.FGuid!==preparedNodeId
+        ||o.direction!=='input'||o.portIndex!==preparedInputPort.port||o.nativeIndex!==preparedInputPort.native_index
+        ||o.portGuid!==preparedInputPort.port_guid||o.operation_id!==preparedInputPort.opening_operation_id
+        ||p.inputPortOpenReceipts.get(o.operation_id)!==o
+        ||!app?.WizardTreeNode||!(w instanceof app.WizardTreeNode)
+        ||!app.ModelPortTreeNode||!(port instanceof app.ModelPortTreeNode)
+        ||!app.ModelInputPortsTreeNode||!(group instanceof app.ModelInputPortsTreeNode)
+        ||o.nodeTree!==node||o.portTree!==port||o.workflow!==flow||o.packageNode!==flow?.ParentNode?.ParentNode
+        ||o.node?.FGuid!==o.node_id||o.node?.data!==o.nodeData||o.nodeData!==node?.FModelNode
+        ||o.port?.data!==o.portData||o.portData!==port?.FModelNodePort||o.port?.parent!==o.node
+        ||o.port?.FGuid!==o.portGuid||port?.FIndex!==o.nativeIndex
+        ||o.port.FPortIndex!==undefined&&o.port.FPortIndex!==o.nativeIndex
+        ||!o.enginePort||model?.FModelSocket!==o.enginePort||model.FModelNode
+        ||roots.length!==1||model.FView?.el?.dom!==roots[0])return null;
+      const panels=tids.get(workflow.prefix+';NavigationBar;NavigationPanel')??[];
+      if(panels.length!==1||!visible(panels[0]))return null;
+      if(['yes','no'].some(name=>{const buttons=tids.get('msgbox;tlb;'+name)??[];
+        return buttons.length!==1||globalThis.Ext?.getCmp(buttons[0].id)?.el?.dom!==buttons[0];}))return null;
+      const panel=panels[0],prefix=workflow.prefix+';cnrNaviMode;b.s_';
+      const crumbs=all.filter(e=>panel.contains(e)&&(getTid(e)??'').startsWith(prefix));
+      if(crumbs.length!==9||crumbs.some(e=>sensitive(e)))return null;
+      const native=[flow,node,group,port,w];
+      if(native.some((n,i)=>{const e=crumbs[i+4],cmp=globalThis.Ext?.getCmp(e.id);
+        return !n||cmp?.el?.dom!==e||cmp?._node?.data?.node!==n;}))return null;
+      if(crumbs.slice(0,7).some(e=>!visible(e)))return null;
+      const items=crumbs.map((e,i)=>({ref:refOf(e),tid:getTid(e),label:i>=7?e.textContent.trim():textOf(e,true)}));
+      const format=s=>s.replace(/\s/g,'_').replace(/,/g,'');
+      if(new Set(items.map(i=>i.tid)).size!==9||items.some((i,n)=>n>0&&!i.label||i.label.length>=240||i.tid.length>2048)
+        ||items.reduce((n,i)=>n+i.tid.length+i.label.length,0)>4096
+        ||items.some((i,n)=>i.tid.slice(prefix.length).split('>').length!==n+1||n&&!i.tid.startsWith(items[n-1].tid+'>'))
+        ||items[0].tid!==prefix+'Сервер'||items[1].label!=='Пакеты'||items[6].label!=='Входные порты'
+        ||items[6].tid!==items[5].tid+'>Входные_порты'||items[7].tid!==items[6].tid+'>'+format(items[7].label)
+        ||items[8].label!=='Настройка'||items[8].tid!==items[7].tid+'>Настройка')return null;
+      return {status:'observed',direction:'input',panel_ref:refOf(panel),node:items[5],node_path:items.slice(0,6),
+        port_display_label:items[7].label,port_ref:items[7].ref,port_path:items.slice(0,8),path:items};
+    })();
     const elements = controls.slice(0, 240).map(element => {
       const identity = identityOf(element), tag = element.tagName.toLowerCase(), tid = getTid(element);
       const editable = element.matches('textarea,input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),[contenteditable="true"]') && !element.readOnly;
@@ -2699,8 +2747,8 @@ function readRenderedInputMapping(observation) {
             &&wizard.output_columns.page.returned===wizard.output_columns.fields?.length)
         && wizard.output_columns.auto_sync?.status==='observed';
       const inputCloseOwner=preparedInputPort?.direction==='input'&&Number.isInteger(preparedInputPort.port)&&preparedInputPort.port>=0&&preparedInputPort.port<100
-        &&wizard.stage==='input_mapping'&&wizard.input_port_context?.status==='observed'
-        ? wizard.input_port_context:null;
+        &&wizard.stage==='input_mapping'
+        ? (wizard.input_port_context?.status==='observed'?wizard.input_port_context:inputCancellationOwner):null;
       const outputCloseOwner=preparedOutputPort?.direction==='output'&&Number.isInteger(preparedOutputPort.port)&&preparedOutputPort.port>=0&&preparedOutputPort.port<100
         &&wizard.stage==='output_mapping'&&wizard.port_context?.status==='observed'&&wizard.port_context.kind==='output_data'
         &&wizard.port_context.node?.ref&&wizard.port_context.port?.ref ? wizard.port_context:null;

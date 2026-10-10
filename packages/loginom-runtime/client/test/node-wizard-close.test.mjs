@@ -48,7 +48,9 @@ test('the deactivation prompt is not a wizard cancellation even when native butt
 test('native input-port Close binds the port and rejects foreign confirmations',()=>{
  const {state}=fixture();state.wizard.stage='input_mapping';state.wizard.owner_context={status:'unobserved'};
  state.prepared_node_context.input_port={direction:'input',port:0,native_index:0,port_guid:'port0',opening_operation_id:'open0'};
- const binding=wizardCloseBinding(state);assert.equal(boundWizardCloseConfirmation(state,binding),true);
+ const binding=wizardCloseBinding(state);
+ if(binding.owner.input_port){const yes=state.ui.elements[0];yes.allowed_actions.push('confirm_wizard_close');yes.wizard_close_confirmation={root_ref:binding.root_ref,root_tid:binding.root_tid,stage:binding.stage,dialog_ref:'dialog',input_port:structuredClone(binding.owner.input_port)};}
+ assert.equal(boundWizardCloseConfirmation(state,binding),true);
  for(const change of [s=>delete s.prepared_node_context.input_port,s=>s.prepared_node_context.input_port.port=1,
   s=>s.prepared_node_context.input_port.port_guid='foreign',s=>s.prepared_node_context.input_port.opening_operation_id='foreign',
   s=>s.prepared_node_context.node_id='foreign',s=>s.wizard.stage='done',s=>s.ui.dialogs[0].text='Удалить узел?']){
@@ -62,7 +64,9 @@ test('native input-port Close binds the port and rejects foreign confirmations',
 test('second input cancellation binds its own opening receipt',()=>{
  const {state}=fixture();state.wizard.stage='input_mapping';state.wizard.owner_context={status:'unobserved'};
  state.prepared_node_context.input_port={direction:'input',port:1,native_index:1,port_guid:'right',opening_operation_id:'right-open'};
- const binding=wizardCloseBinding(state);assert.equal(boundWizardCloseConfirmation(state,binding),true);
+ const binding=wizardCloseBinding(state);
+ if(binding.owner.input_port){const yes=state.ui.elements[0];yes.allowed_actions.push('confirm_wizard_close');yes.wizard_close_confirmation={root_ref:binding.root_ref,root_tid:binding.root_tid,stage:binding.stage,dialog_ref:'dialog',input_port:structuredClone(binding.owner.input_port)};}
+ assert.equal(boundWizardCloseConfirmation(state,binding),true);
  state.prepared_node_context.input_port.port=0;assert.equal(boundWizardCloseConfirmation(state,binding),false);
 });
 
@@ -70,7 +74,9 @@ test('output-port cancellation binds both the native opening receipt and observe
  const {state}=fixture();state.wizard.stage='output_mapping';state.wizard.owner_context={status:'unobserved'};
  state.prepared_node_context.output_port={direction:'output',port:0,native_index:0,port_guid:'out0',opening_operation_id:'open-output'};
  state.wizard.port_context={status:'observed',kind:'output_data',node:{ref:'node-ref'},port:{ref:'port-ref'},path:[]};
- const binding=wizardCloseBinding(state);assert.equal(boundWizardCloseConfirmation(state,binding),true);
+ const binding=wizardCloseBinding(state);
+ if(binding.owner.input_port){const yes=state.ui.elements[0];yes.allowed_actions.push('confirm_wizard_close');yes.wizard_close_confirmation={root_ref:binding.root_ref,root_tid:binding.root_tid,stage:binding.stage,dialog_ref:'dialog',input_port:structuredClone(binding.owner.input_port)};}
+ assert.equal(boundWizardCloseConfirmation(state,binding),true);
  for(const change of [s=>delete s.prepared_node_context.output_port,s=>s.prepared_node_context.output_port.port_guid='foreign',
   s=>s.prepared_node_context.output_port.native_index=1,s=>s.prepared_node_context.output_port.direction='input',
   s=>s.prepared_node_context.output_port.opening_operation_id='other',s=>s.wizard.port_context.port.ref='other',
@@ -81,4 +87,12 @@ test('output-port cancellation binds both the native opening receipt and observe
   s=>s.prepared_node_context.output_port.port_guid='',s=>s.wizard.port_context.kind='input_data',s=>delete s.wizard.port_context.node.ref]) {
   const altered=structuredClone(state);change(altered);assert.throws(()=>wizardCloseBinding(altered),/prepared wizard/);
  }
+});
+
+test('input cancellation readiness requires the typed confirmation for this opening',()=>{
+ const {state}=fixture();state.wizard.stage='input_mapping';state.prepared_node_context.input_port={direction:'input',port:0,native_index:0,port_guid:'port0',opening_operation_id:'open0'};
+ const binding=wizardCloseBinding(state);assert.equal(boundWizardCloseConfirmation(state,binding),false);
+ const yes=state.ui.elements[0];yes.allowed_actions.push('confirm_wizard_close');yes.wizard_close_confirmation={root_ref:binding.root_ref,root_tid:binding.root_tid,stage:binding.stage,dialog_ref:'dialog',input_port:structuredClone(binding.owner.input_port)};
+ assert.equal(boundWizardCloseConfirmation(state,binding),true);
+ for(const alter of [e=>e.allowed_actions=['click'],e=>e.wizard_close_confirmation.root_ref='other',e=>e.wizard_close_confirmation.root_tid='other',e=>e.wizard_close_confirmation.stage='done',e=>e.wizard_close_confirmation.dialog_ref='other',e=>e.wizard_close_confirmation.input_port.opening_operation_id='other',e=>e.wizard_close_confirmation.input_port.port_guid='other']){const s=structuredClone(state);alter(s.ui.elements[0]);assert.equal(boundWizardCloseConfirmation(s,binding),false);}
 });
