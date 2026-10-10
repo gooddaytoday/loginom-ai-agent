@@ -13,6 +13,7 @@ sys.path.insert(0, str(REPO / 'packages/loginom-runtime/tools/loginom-acceptance
 from row_filter_oracle import load_rows, partition, assert_partition
 from filter_goal_contract import INITIAL_GROUPS, FINAL_GROUPS, COLUMNS
 from row_filter_matrix import cases
+from fixture_oracle import expectations as fixture_expectations
 
 
 def expectations(package_path):
@@ -56,6 +57,7 @@ if __name__ == '__main__':
     cold, audit = expectations(args.package_path)
     for name, body in [('expected.json', cold), ('partition-expected.json', audit)]:
         (args.output / name).write_text(json.dumps(body, ensure_ascii=False, indent=2) + '\n')
+    (args.output / 'fixture-expected.json').write_text(json.dumps(fixture_expectations(), ensure_ascii=False, indent=2) + '\n')
     print(json.dumps({'phases': {k: [len(p['rows']) for p in v['ports']]
                                for k, v in audit['phases'].items()},
                       'matrix_cases': len(audit['matrix']['cases'])}))

@@ -1,0 +1,21 @@
+{
+  "path": "fixtures/and-or.csv",
+  "bytes": 66,
+  "sha256": "284befe17608702cbc1055aa66df335a7454fee70bc7517a36f47a9773238366",
+  "encoding": "UTF-8",
+  "delimiter": ";",
+  "text_qualifier": "\"",
+  "null_marker": "NULL",
+  "columns": [
+    "RowID",
+    "Age",
+    "Income"
+  ],
+  "types": [
+    "integer",
+    "integer",
+    "integer"
+  ],
+  "rows": 6,
+  "origin": "explicit §3 fixture, constructed from plan values; no historical live claim"
+}

@@ -1,0 +1,21 @@
+{
+  "path": "fixtures/strings.csv",
+  "bytes": 71,
+  "sha256": "98f4e9923f44e4fca7eb947dfacb24b42b89830a7c33086bf7f7061a2b0b97ec",
+  "encoding": "UTF-8",
+  "delimiter": ";",
+  "text_qualifier": "\"",
+  "null_marker": "NULL",
+  "columns": [
+    "RowID",
+    "Text",
+    "Value"
+  ],
+  "types": [
+    "integer",
+    "string",
+    "integer"
+  ],
+  "rows": 6,
+  "origin": "explicit §3 fixture, constructed from plan values; no historical live claim"
+}

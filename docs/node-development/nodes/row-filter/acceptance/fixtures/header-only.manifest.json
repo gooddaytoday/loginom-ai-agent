@@ -1,0 +1,25 @@
+{
+  "path": "fixtures/header-only.csv",
+  "bytes": 25,
+  "sha256": "9169cabf02314b487c7879475fbd2caa6c770f5b3f720a5a8a74c614811ca2e0",
+  "encoding": "UTF-8",
+  "delimiter": ";",
+  "text_qualifier": "\"",
+  "null_marker": "NULL",
+  "columns": [
+    "Id",
+    "Amount",
+    "Flag",
+    "When",
+    "Text"
+  ],
+  "types": [
+    "integer",
+    "real",
+    "boolean",
+    "datetime",
+    "string"
+  ],
+  "rows": 0,
+  "origin": "explicit §3 fixture, constructed from plan values; no historical live claim"
+}
