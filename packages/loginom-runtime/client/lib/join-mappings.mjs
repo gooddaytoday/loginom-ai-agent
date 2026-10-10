@@ -1,4 +1,4 @@
-import {ensureJoinOutputComplete} from './join-output-sync.mjs';
+import {ensureJoinOutputComplete,verifyJoinSourceFetch} from './join-output-sync.mjs';
 import {resolveConfiguredOutputMapping,configureOutputFields,reorderOutputFields,configureOutputAutosync} from './port-mapping-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
@@ -59,7 +59,7 @@ export async function configureJoinOutput(channel,configuration,parameters,mappi
  const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
  const sources=joinOutputFields(configuration),requested={direction:'output',port:0,...mapping},changes=[];
  let s=await channel.observe({condition:'join output inventory',readMappings:true,ready});
- s=await ensureGroupingOutputSources(channel,s);
+ s=await ensureGroupingOutputSources(channel,s,{verify:(before,after)=>verifyJoinSourceFetch(before,after,sources)});
  s=await ensureJoinOutputComplete(channel,s);
  resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
  if(requested.fields){
