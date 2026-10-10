@@ -2385,7 +2385,8 @@ function readRenderedInputMapping(observation) {
       });
       const [sources,targets]=inventories,g=controller.Items?.LinkGrid,d=g?.FLinkDrawContainer;
       requireLink(sources.length===targets.length&&d?.FTables?.length===2&&d.FTables.every((v,i)=>v.getView?.()===views[i]&&v.getStore?.()===stores[i]),'output_link_native_tables');
-      const pairs=Object.entries(d.FLinks??{}),selected=Object.entries(d.FSelectedLinks??{});
+      requireLink(d.FSelectedLinks&&typeof d.FSelectedLinks==='object'&&!Array.isArray(d.FSelectedLinks),'output_link_selection_inventory');
+      const pairs=Object.entries(d.FLinks??{}),selected=Object.entries(d.FSelectedLinks);
       const boundSources=new Set(pairs.map(([,pair])=>pair?.[0])),boundTargets=new Set(pairs.map(([,pair])=>pair?.[1]));
       const unboundSources=sources.filter(record=>!boundSources.has(record)),unboundTargets=targets.filter(record=>!boundTargets.has(record));
       // A null endpoint is not a relation. Reconnect stages only one completely
@@ -2398,10 +2399,18 @@ function readRenderedInputMapping(observation) {
         &&selected.every(([key,pair])=>d.FLinks[key]===pair),'output_link_pairs');
       // A sprite object alone does not own its DOM alias. Prove the complete
       // current draw inventory, including hidden controls of other links.
-      const drawItems=Object.entries(d.FDrawLinkItems??{}),pairKeys=new Set(pairs.map(([pairKey])=>pairKey)),allButtons=[];
+      const drawItems=Object.entries(d.FDrawLinkItems??{}),pairKeys=new Set(pairs.map(([pairKey])=>pairKey)),allButtons=[],buttonsByItem=new Map();
       requireLink(drawItems.length===pairs.length&&drawItems.every(([drawKey,drawItem])=>{
-        if(!pairKeys.has(drawKey)||drawItem?.LinkID!==drawKey||!Array.isArray(drawItem.DrawDeleteButton)
-          ||drawItem.DrawDeleteButton.length>2)return false;
+        if(!pairKeys.has(drawKey)||drawItem?.LinkID!==drawKey)return false;
+        if(!Object.hasOwn(drawItem,'DrawDeleteButton')){
+          // Only a proven unselected item may have no removal control. An
+          // inherited control, missing selection inventory, or explicit
+          // undefined/null is not the measured absent-property state.
+          if(selected.some(([key])=>key===drawKey)||'DrawDeleteButton' in drawItem)return false;
+          buttonsByItem.set(drawItem,[]);return true;
+        }
+        if(!Array.isArray(drawItem.DrawDeleteButton)||drawItem.DrawDeleteButton.length>2)return false;
+        buttonsByItem.set(drawItem,drawItem.DrawDeleteButton);
         allButtons.push(...drawItem.DrawDeleteButton);return true;
       }),'output_link_remove_inventory');
       requireLink(allButtons.every(sprite=>sprite?.element?.dom instanceof Element
@@ -2429,7 +2438,8 @@ function readRenderedInputMapping(observation) {
             source_display_name:record.data.SourceDisplayName??null,source_data_type:record.data.SourceDataType??null}))),
           pairs:pairs.map(([pairKey,endpoints])=>({key:pairKey,records:endpoints.map(refOf)})),
           draw:drawItems.map(([drawKey,drawItem])=>({key:drawKey,native_ref:refOf(drawItem),
-            buttons:drawItem.DrawDeleteButton.map(sprite=>({native_ref:refOf(sprite),dom_ref:refOf(sprite.element.dom)}))}))};
+            delete_buttons_present:Object.hasOwn(drawItem,'DrawDeleteButton'),
+            buttons:buttonsByItem.get(drawItem).map(sprite=>({native_ref:refOf(sprite),dom_ref:refOf(sprite.element.dom)}))}))};
         for(const i of [0,1])staged.push([cells[i][inventories[i].indexOf(pair[i])],{
           role:i===0?'output_source':'output_target',field_key:pair[i].data.Name,record_id:String(pair[i].internalId),grid_ref:refOf(grids[i][0]),wizard_root_ref:wizard.root_ref,
           link:{owner,key,state:'unbound',inventory,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),
