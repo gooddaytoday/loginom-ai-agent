@@ -1,0 +1,37 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Offline Loginom navigation variants</title>
+<button data-tid="MF;cntMain;tlbMainToolbar;btnNavigator">Navigator</button>
+<button data-tid="MF;TF;SessionsManagerForm;btnRefresh">Refresh</button>
+<div id="trees"></div>
+<script>
+// Synthetic layout using the observed data-tid strings. No Loginom transport,
+// credentials, raw DOM, GUIDs or reconnect keys are included in this fixture.
+window.clicks = [];
+window.records = new Map();
+window.Ext = {getCmp: id => ({getRecord: () => window.records.get(id)})};
+window.addTree = ({prefix = 'MF;', target = 'Пользователи', ready = true,
+                  expanded = true, collapsed = false, missing = false} = {}) => {
+  const tree = document.createElement('div');
+  tree.id = 'tree-' + window.records.size;
+  tree.className = 'x-tree-view';
+  tree.hidden = collapsed;
+  tree.innerHTML = `<table><tbody>
+    <tr><td><button class="x-tree-expander">Expand</button><span data-tid="${prefix}MapTreeForm;colNavigation_Сервер>Администрирование;TreeText">Администрирование</span></td></tr>
+    ${missing ? '' : `<tr ${expanded ? '' : 'hidden'}><td><span data-tid="${prefix}MapTreeForm;colNavigation_Сервер>Администрирование>${target};TreeText">${target}</span></td></tr>`}
+    </tbody></table>`;
+  window.records.set(tree.id, ready ? {isExpanded: () => expanded} : null);
+  document.querySelector('#trees').append(tree);
+  tree.querySelector('.x-tree-expander').onclick = () => {
+    window.clicks.push('expand:' + prefix);
+    expanded = true;
+    tree.querySelectorAll('tr').forEach(row => row.hidden = false);
+  };
+  tree.querySelectorAll('[data-tid]').forEach(element => element.onclick = () => window.clicks.push(element.dataset.tid));
+};
+document.querySelector('[data-tid$="btnNavigator"]').onclick = () => {
+  window.clicks.push('navigator');
+  document.querySelectorAll('.x-tree-view').forEach(tree => tree.hidden = false);
+};
+document.querySelector('[data-tid$="btnRefresh"]').onclick = () => window.clicks.push('refresh');
+</script>
