@@ -2386,10 +2386,28 @@ function readRenderedInputMapping(observation) {
       const [sources,targets]=inventories,g=controller.Items?.LinkGrid,d=g?.FLinkDrawContainer;
       requireLink(sources.length===targets.length&&d?.FTables?.length===2&&d.FTables.every((v,i)=>v.getView?.()===views[i]&&v.getStore?.()===stores[i]),'output_link_native_tables');
       const pairs=Object.entries(d.FLinks??{}),selected=Object.entries(d.FSelectedLinks??{});
-      requireLink(pairs.length===targets.length&&pairs.every(([key,pair])=>Array.isArray(pair)&&pair.length===2&&sources.includes(pair[0])&&targets.includes(pair[1])
+      const boundSources=new Set(pairs.map(([,pair])=>pair?.[0])),boundTargets=new Set(pairs.map(([,pair])=>pair?.[1]));
+      const unboundSources=sources.filter(record=>!boundSources.has(record)),unboundTargets=targets.filter(record=>!boundTargets.has(record));
+      // A null endpoint is not a relation. Reconnect stages only one completely
+      // observed vacant pair, beside five unchanged reciprocal native pairs.
+      const reconnect=sources.length===6&&pairs.length===5&&unboundSources.length===1&&unboundTargets.length===1
+        &&unboundSources[0].data.ConnectedRecord===null&&unboundTargets[0].data.ConnectedRecord===null;
+      requireLink((pairs.length===targets.length||reconnect)&&pairs.every(([key,pair])=>Array.isArray(pair)&&pair.length===2&&sources.includes(pair[0])&&targets.includes(pair[1])
         &&key===String(pair[0].internalId)+'_'+String(pair[1].internalId)&&pair[0].data.ConnectedRecord===pair[1]&&pair[1].data.ConnectedRecord===pair[0])
-        &&new Set(pairs.map(([,x])=>x[0])).size===sources.length&&new Set(pairs.map(([,x])=>x[1])).size===targets.length
+        &&boundSources.size===pairs.length&&boundTargets.size===pairs.length
         &&selected.every(([key,pair])=>d.FLinks[key]===pair),'output_link_pairs');
+      // A sprite object alone does not own its DOM alias. Prove the complete
+      // current draw inventory, including hidden controls of other links.
+      const drawItems=Object.entries(d.FDrawLinkItems??{}),pairKeys=new Set(pairs.map(([pairKey])=>pairKey)),allButtons=[];
+      requireLink(drawItems.length===pairs.length&&drawItems.every(([drawKey,drawItem])=>{
+        if(!pairKeys.has(drawKey)||drawItem?.LinkID!==drawKey||!Array.isArray(drawItem.DrawDeleteButton)
+          ||drawItem.DrawDeleteButton.length>2)return false;
+        allButtons.push(...drawItem.DrawDeleteButton);return true;
+      }),'output_link_remove_inventory');
+      requireLink(allButtons.every(sprite=>sprite?.element?.dom instanceof Element
+          &&form.contains(sprite.element.dom)&&seenElements.has(sprite.element.dom))
+        &&new Set(allButtons).size===allButtons.length
+        &&new Set(allButtons.map(sprite=>sprite.element.dom)).size===allButtons.length,'output_link_remove_aliases');
       const cells=inventories.map((records,i)=>records.map(record=>{
         const rows=[...grids[i][0].querySelectorAll('table.x-grid-item')].filter(e=>e.getAttribute('data-recordid')===String(record.internalId));
         requireLink(rows.length===1&&rows[0].getAttribute('data-boundview')===grids[i][0].id&&rows[0].getAttribute('data-recordindex')===String(records.indexOf(record)),'output_link_row');
@@ -2400,23 +2418,25 @@ function readRenderedInputMapping(observation) {
       const owner={document_id:r.document_id,workflow_id:r.workflow_id,node_id:r.node_id,port:preparedOutputPort,root_ref:wizard.root_ref};
       const definition=x=>({...Object.fromEntries(['ID','Index','Name','DisplayName','DataType','DataKind','UsageType','OriginType','IsDerived','Required','Broken','GroupField'].map(k=>[k,x.data[k]??null])),dirty:x.dirty??null});
       const staged=[];
-      for(const [key,pair] of pairs)for(const i of [0,1])staged.push([cells[i][inventories[i].indexOf(pair[i])],{
+      for(const [key,pair] of reconnect?[]:pairs)for(const i of [0,1])staged.push([cells[i][inventories[i].indexOf(pair[i])],{
         role:i===0?'output_source':'output_target',field_key:pair[i].data.Name,record_id:String(pair[i].internalId),grid_ref:refOf(grids[i][0]),wizard_root_ref:wizard.root_ref,
         link:{owner,key,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),selected:d.FSelectedLinks[key]===pair}}]);
-      if(selected.length===1){const [key,pair]=selected[0],item=d.FDrawLinkItems?.[key],buttons=item?.DrawDeleteButton;
+      if(reconnect){const pair=[unboundSources[0],unboundTargets[0]],key=String(pair[0].internalId)+'_'+String(pair[1].internalId);
+        requireLink(!Object.hasOwn(d.FLinks,key)&&!Object.hasOwn(d.FSelectedLinks,key)&&!Object.hasOwn(d.FDrawLinkItems,key),'output_link_unbound_alias');
+        const inventory={controller_ref:refOf(controller),stores:stores.map(refOf),
+          records:inventories.map(records=>records.map(record=>({native_ref:refOf(record),record_id:String(record.internalId),definition:definition(record),
+            connected_record:record.data.ConnectedRecord===null?null:refOf(record.data.ConnectedRecord),
+            source_display_name:record.data.SourceDisplayName??null,source_data_type:record.data.SourceDataType??null}))),
+          pairs:pairs.map(([pairKey,endpoints])=>({key:pairKey,records:endpoints.map(refOf)})),
+          draw:drawItems.map(([drawKey,drawItem])=>({key:drawKey,native_ref:refOf(drawItem),
+            buttons:drawItem.DrawDeleteButton.map(sprite=>({native_ref:refOf(sprite),dom_ref:refOf(sprite.element.dom)}))}))};
+        for(const i of [0,1])staged.push([cells[i][inventories[i].indexOf(pair[i])],{
+          role:i===0?'output_source':'output_target',field_key:pair[i].data.Name,record_id:String(pair[i].internalId),grid_ref:refOf(grids[i][0]),wizard_root_ref:wizard.root_ref,
+          link:{owner,key,state:'unbound',inventory,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),
+            source_display_name:pair[1].data.SourceDisplayName??null,source_data_type:pair[1].data.SourceDataType??null,selected:false}}]);
+      }
+      if(selected.length===1&&!reconnect){const [key,pair]=selected[0],item=d.FDrawLinkItems?.[key],buttons=item?.DrawDeleteButton;
         requireLink(item?.LinkID===key&&Array.isArray(buttons)&&buttons.length===2&&new Set(buttons).size===2,'output_link_remove_items');
-        // A sprite object alone does not own its DOM alias. Prove the complete
-        // current draw inventory, including hidden controls of other links.
-        const drawItems=Object.entries(d.FDrawLinkItems??{}),pairKeys=new Set(pairs.map(([pairKey])=>pairKey)),allButtons=[];
-        requireLink(drawItems.length===pairs.length&&drawItems.every(([drawKey,drawItem])=>{
-          if(!pairKeys.has(drawKey)||drawItem?.LinkID!==drawKey||!Array.isArray(drawItem.DrawDeleteButton)
-            ||drawItem.DrawDeleteButton.length>2)return false;
-          allButtons.push(...drawItem.DrawDeleteButton);return true;
-        }),'output_link_remove_inventory');
-        requireLink(allButtons.every(sprite=>sprite?.element?.dom instanceof Element
-            &&form.contains(sprite.element.dom)&&seenElements.has(sprite.element.dom))
-          &&new Set(allButtons).size===allButtons.length
-          &&new Set(allButtons.map(sprite=>sprite.element.dom)).size===allButtons.length,'output_link_remove_aliases');
         for(const sprite of buttons){const element=sprite?.element?.dom;
           requireLink(sprite.type==='path'&&sprite.attr?.hidden===false&&sprite.attr.globalAlpha===1&&element?.tagName?.toLowerCase()==='g'
             &&form.contains(element)&&visible(element)&&seenElements.has(element)&&element.children.length===1

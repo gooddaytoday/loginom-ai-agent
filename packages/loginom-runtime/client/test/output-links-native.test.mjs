@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import fixture from './fixtures/output-links-native.mjs';
 import {makeWorkspaceUiCode,validateUiAction} from '../lib/workspace-ui.mjs';
+import {closePreparedWizard,wizardCloseBinding,cancelledWizardReady} from '../lib/node-wizard-close.mjs';
 const after=fixture['native-selected-complete.json'],prepared=fixture['source-open.json'];
 const binding={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node:{document_id:prepared.document_id,workflow_id:prepared.workflow_ref.workflow_id,node_id:after.ledger[0].node_id}};
 const executablePath=process.env.LOGINOM_FIXTURE_BROWSER;
@@ -123,6 +124,68 @@ async function hydrate(page,capture,mode){
   });
   for(const variant of ['stale_definition','stale_selection'])await t.test(variant+' rejects retained stale references before dispatch',async()=>{
    const page=await context.newPage();await hydrate(page,after);const before=await observe(page),a=action(before);await mutate(page,variant);let dispatched=0;page.mouse.down=async()=>{dispatched++;};const outcome=await execute(page,{mode:'act',snapshot:before,action:a});assert.equal(outcome.status,'NOT_APPLIED');assert.equal(dispatched,0);await page.close();
+  });
+  // Counterfactual states only: SetSource(null) settlement has not been
+  // measured. Alter native records/draw aliases, never observer output/actions.
+  const unbind=async(page,key='184_190',clearLabels=false)=>page.evaluate(({key,clearLabels})=>{
+   const {draw}=globalThis.__nativeFixture,pair=draw.FLinks[key];
+   pair[0].data.ConnectedRecord=null;pair[1].data.ConnectedRecord=null;
+   if(clearLabels){pair[1].data.SourceDisplayName=null;pair[1].data.SourceDataType=null;}
+   delete draw.FLinks[key];delete draw.FSelectedLinks[key];delete draw.FDrawLinkItems[key];
+  },{key,clearLabels});
+  for(const clearLabels of [false,true])await t.test('one synthetic unbound pair stages a fresh guarded reconnect; labels cleared='+clearLabels,async()=>{
+   const page=await context.newPage();await hydrate(page,after);const original=await observe(page),retained=action(original);await unbind(page,'184_190',clearLabels);
+   const fresh=await observe(page);assert.equal(pairs(fresh).length,1);assert.equal(linked(fresh).length,2);assert.equal(metadata(pairs(fresh)[0]).link.state,'unbound');
+   assert.ok(!fresh.ui.elements.some(e=>e.allowed_actions.some(v=>['finish_wizard','execute_wizard'].includes(v))));
+   const request=action(fresh);validateUiAction(request,fresh);let count=0;const down=page.mouse.down.bind(page.mouse);page.mouse.down=async(...args)=>{count++;return down(...args);};
+   const stale=await execute(page,{mode:'act',snapshot:original,action:retained});assert.equal(stale.status,'NOT_APPLIED');assert.equal(count,0);
+   const result=await execute(page,{mode:'act',snapshot:fresh,action:request});assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));assert.equal(count,1);await page.close();
+  });
+  for(const variant of ['foreign_opening','missing_ledger','duplicate_opening','foreign_port','foreign_index','foreign_node','foreign_workflow','foreign_tree_port','foreign_engine','foreign_controller','foreign_root','foreign_ext','foreign_store','missing_record','duplicate_record','pending_store','duplicate_row','wrong_row_ref','foreign_connected','foreign_pair','duplicate_pair'])await t.test('unbound '+variant+' rejects fresh and retained reconnect before dispatch',async()=>{
+   const page=await context.newPage();await hydrate(page,after);await unbind(page);const before=await observe(page),request=action(before);await mutate(page,variant);
+   const fresh=await execute(page,{mode:'observe',root_ref:before.wizard.root_ref});if(fresh.status==='SUCCEEDED'){assert.equal(linked(fresh.output).length,0);assert.throws(()=>validateUiAction(request,fresh.output));}else assert.equal(fresh.status,'NOT_APPLIED');let count=0;page.mouse.down=async()=>{count++;};
+   const result=await execute(page,{mode:'act',snapshot:before,action:request});assert.equal(result.status,'NOT_APPLIED');assert.equal(count,0);await page.close();
+  });
+  for(const variant of ['second_unbound','undefined_connection','foreign_connection','stale_definition','missing_draw','duplicate_draw_alias','stale_bound_ref'])await t.test('unbound '+variant+' fails before dispatch',async()=>{
+   const page=await context.newPage();await hydrate(page,after);await unbind(page);const before=await observe(page),request=action(before);
+   if(variant==='second_unbound')await unbind(page,'185_191');else await page.evaluate(variant=>{
+    const {draw,get,grids}=globalThis.__nativeFixture,target=get(grids[1].records.find(x=>String(x.internalId)==='190').object);
+    if(variant==='undefined_connection')target.data.ConnectedRecord=undefined;
+    else if(variant==='foreign_connection')target.data.ConnectedRecord={};
+    else if(variant==='stale_definition')target.data.OriginType=1;
+    else if(variant==='missing_draw')delete draw.FDrawLinkItems[Object.keys(draw.FDrawLinkItems)[0]];
+    else if(variant==='duplicate_draw_alias'){const keys=Object.keys(draw.FDrawLinkItems),dom=get(grids[0].element);draw.FDrawLinkItems[keys[0]].DrawDeleteButton=[{element:{dom}}];draw.FDrawLinkItems[keys[1]].DrawDeleteButton=[{element:{dom}}];}
+    else {const pair=Object.values(draw.FLinks)[0];pair[0].data.Index=99;}
+   },variant);
+   let count=0;page.mouse.down=async()=>{count++;};const result=await execute(page,{mode:'act',snapshot:before,action:request});assert.equal(result.status,'NOT_APPLIED');assert.equal(count,0);await page.close();
+  });
+  for(const variant of ['retained_id','retained_definition','retained_native_record','retained_draw_alias','retained_source_label','target_pending'])await t.test('unbound '+variant+' invalidates the whole inventory before dispatch',async()=>{
+   const page=await context.newPage();await hydrate(page,after);await unbind(page);const before=await observe(page),request=action(before);
+   await page.evaluate(variant=>{
+    const {get,grids,draw}=globalThis.__nativeFixture,records=grids[0].records.map(x=>get(x.object)),record=records[1];
+    if(variant==='retained_id')record.data.ID=100;
+    else if(variant==='retained_definition')record.data.DataKind=1;
+    else if(variant==='retained_source_label')Object.values(draw.FLinks)[0][1].data.SourceDisplayName='changed';
+    else if(variant==='target_pending')get(grids[1].store).getProxy=()=>({pendingOperations:{pending:{}}});
+    else if(variant==='retained_draw_alias'){const key=Object.keys(draw.FDrawLinkItems)[0];draw.FDrawLinkItems[key]={...draw.FDrawLinkItems[key]};}
+    else {const replacement={...record,data:{...record.data}};records[1]=replacement;const pair=Object.values(draw.FLinks).find(pair=>pair[0]===record);pair[0]=replacement;pair[1].data.ConnectedRecord=replacement;get(grids[0].store).getData=()=>({items:records,getSource:()=>({items:records})});}
+   },variant);
+   let count=0;page.mouse.down=async()=>{count++;};const result=await execute(page,{mode:'act',snapshot:before,action:request});assert.equal(result.status,'NOT_APPLIED');assert.equal(count,0);await page.close();
+  });
+  await t.test('unbound obscured Close fallback cannot claim dispatch or discarded draft',async()=>{
+   const page=await context.newPage();await hydrate(page,after);await unbind(page);const before=await observe(page),binding=wizardCloseBinding(before);
+   assert.equal(cancelledWizardReady(before,binding),false);let count=0;page.mouse.click=async()=>{count++;};
+   const channel={observe:async options=>{const state=await observe(page);if(!options.ready(state))throw Error('discard not observed');return state;},perform:async options=>{
+    const state=await observe(page);assert.ok(options.ready(state));const request=options.resolve(state);validateUiAction(request,state);
+    const result=await execute(page,{mode:'act',snapshot:state,action:request});assert.equal(result.status,'NOT_APPLIED');assert.equal(result.error.code,'UI_REFERENCE_OBSCURED');throw Error('Close has no verified interaction point');
+   }};
+   // The inert captured layout does not establish a clickable Close point or
+   // a post-unlink cancellation callback. Do not inject a success context.
+   await assert.rejects(closePreparedWizard(channel),/Close has no verified interaction point/);assert.equal(count,0);assert.equal(cancelledWizardReady(await observe(page),binding),false);await page.close();
+  });
+  await t.test('unbound lost drag reply remains ambiguous without replay',async()=>{
+   const page=await context.newPage();await hydrate(page,after);await unbind(page);const fresh=await observe(page);let count=0;const down=page.mouse.down.bind(page.mouse);page.mouse.down=async(...args)=>{count++;await down(...args);throw Error('lost reconnect reply');};
+   const result=await execute(page,{mode:'act',snapshot:fresh,action:action(fresh)});assert.equal(result.status,'AMBIGUOUS');assert.equal(count,1);await page.close();
   });
   await t.test('real guarded drag checks native references and dispatches once',async()=>{
    const page=await context.newPage();await hydrate(page,after);const s=await observe(page);let downCount=0,upCount=0;const down=page.mouse.down.bind(page.mouse),up=page.mouse.up.bind(page.mouse);page.mouse.down=async(...args)=>{downCount++;return down(...args);};page.mouse.up=async(...args)=>{upCount++;return up(...args);};const outcome=await execute(page,{mode:'act',snapshot:s,action:action(s)});assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome.error));assert.equal(downCount,1);assert.equal(upCount,1);await page.close();
