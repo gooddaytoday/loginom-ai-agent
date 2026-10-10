@@ -83,7 +83,7 @@ return await runReplacementDiagnostic({context,page,execute,runtime,directory:jo
    }else if(q.command==='cleanup'){need(!runtime.hasUnsettledWork(),'DIAGNOSTIC_PENDING_OPERATION_PRESERVED');lines.close();return {cleanup_requested:true};
    }else throw Error('UNKNOWN_COMMAND');
    await save('command-'+(++step)+'-'+q.command,r);if(prepared?.status==='READY'&&prepared.package_ref?.path===packagePath)await bindPrepared(prepared);if(r?.status==='AMBIGUOUS')throw Error('DIAGNOSTIC_OPERATION_AMBIGUOUS',{cause:r});console.log(JSON.stringify({command:q.command,result:r}));
-  }catch(e){try{await save('failure-'+(++step),{command:q.command,error:e?.message??'DIAGNOSTIC_REJECTION',at:new Date().toISOString()});}catch{}console.log(JSON.stringify({command:q.command,error:e?.message??'DIAGNOSTIC_REJECTION'}));throw e;}
+  }catch(e){try{await save('failure-'+(++step),{command:q.command,error:redact(e?.message??'DIAGNOSTIC_REJECTION'),at:new Date().toISOString()});}catch{}console.log(JSON.stringify({command:q.command,error:redact(e?.message??'DIAGNOSTIC_REJECTION')}));throw e;}
  }
  }finally{lines.close();}
  throw Error('DIAGNOSTIC_STDIN_EOF_BEFORE_CLEANUP');
