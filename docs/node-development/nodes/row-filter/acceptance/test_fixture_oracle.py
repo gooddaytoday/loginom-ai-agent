@@ -160,6 +160,40 @@ class OracleTests(unittest.TestCase):
     def test_generated_expectations_are_reproducible(self):
         self.assertEqual(json.loads((ROOT/'fixture-expected.json').read_text()), self.bundle)
 
+    def test_datetime_fraction_cannot_be_truncated(self):
+        case = next(c for c in self.bundle['golden_cases'] if c['name'] == 'all_records')
+        for fraction in ('000900', '0000009', '0000'):
+            ports, binding = receipt(case)
+            cell = ports[0]['sample'][0][3]
+            cell['value'] = cell['value'].split('.')[0] + '.' + fraction
+            with self.subTest(fraction=fraction), self.assertRaisesRegex(ValueError, 'datetime_precision'):
+                verify_ports(case, ports, binding)
+
+    def test_every_required_cell_field_is_present_even_for_null(self):
+        case = next(c for c in self.bundle['golden_cases'] if c['name'] == 'all_records')
+        for null in (True, False):
+            for key in ('value', 'type', 'is_null', 'precision'):
+                ports, binding = receipt(case)
+                cell = next(cell for p in ports for row in p['sample'] for cell in row
+                            if cell['type'] == 'datetime' and cell['is_null'] == null)
+                del cell[key]
+                with self.subTest(null=null, missing=key), self.assertRaisesRegex(ValueError, 'required_cell_fields'):
+                    verify_ports(case, ports, binding)
+
+    def test_string_precision_is_required_for_empty_and_nonempty(self):
+        case = next(c for c in self.bundle['cases'] if c['name'] == 'text_not_null')
+        for empty in (True, False):
+            for precision in (None, 'rounded', 'display_text'):
+                ports, binding = receipt(case)
+                cell = next(cell for p in ports for row in p['sample'] for cell in row
+                            if cell['type'] == 'string' and not cell['is_null'] and (cell['value'] == '') == empty)
+                if precision is None:
+                    del cell['precision']
+                else:
+                    cell['precision'] = precision
+                with self.subTest(empty=empty, precision=precision), self.assertRaises(ValueError):
+                    verify_ports(case, ports, binding)
+
 
 if __name__ == '__main__':
     unittest.main()

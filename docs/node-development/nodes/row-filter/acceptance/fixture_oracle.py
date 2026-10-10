@@ -7,6 +7,7 @@ This module checks consistency; it does not attest browser execution itself.
 import csv
 import hashlib
 import json
+import re
 import sys
 from collections import Counter
 from datetime import datetime
@@ -138,6 +139,8 @@ def verify_ports(case, ports, binding):
                 raise ValueError('cell_count')
             row = {}
             for c, cell in zip(columns, cells, strict=True):
+                if not isinstance(cell, dict) or not {'type', 'value', 'is_null', 'precision'} <= cell.keys():
+                    raise ValueError('required_cell_fields')
                 value, kind = cell.get('value'), c['type']
                 if cell.get('type') != kind or type(cell.get('is_null')) is not bool:
                     raise ValueError('cell_type')
@@ -155,11 +158,15 @@ def verify_ports(case, ports, binding):
                     if type(value) is not bool or cell.get('precision') != 'exact_boolean':
                         raise ValueError('boolean_precision')
                 elif kind == 'datetime':
-                    if type(value) is not str or cell.get('precision') != 'millisecond' or cell.get('timezone') != 'unspecified':
+                    if (type(value) is not str or cell.get('precision') != 'millisecond' or cell.get('timezone') != 'unspecified'
+                            or re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?', value) is None):
                         raise ValueError('datetime_precision')
+                    # Validate lexical precision before parsing: fromisoformat
+                    # itself truncates fractions longer than six digits.
                     value = datetime.fromisoformat(value).isoformat(timespec='milliseconds')
-                elif kind == 'string' and type(value) is not str:
-                    raise ValueError('string_value')
+                elif kind == 'string':
+                    if type(value) is not str or cell['precision'] != 'exact_string':
+                        raise ValueError('string_precision')
                 row[c['name']] = value
             actual[port['port']].append(row)
     for expected in case['expected_ports']:

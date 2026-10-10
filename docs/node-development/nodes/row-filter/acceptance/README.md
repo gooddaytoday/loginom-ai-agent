@@ -55,7 +55,16 @@ PYTHONDONTWRITEBYTECODE=1 python3 audit.py --case age_income --actual actual-por
 Клетка содержит `type`, `value`, `is_null`, `precision`; datetime также `timezone`.
 Целые передаются точными десятичными строками. Форматы precision совпадают с
 прежним независимым контрактом: exact_null, exact_integer, 17_significant_digits,
-exact_boolean, millisecond. Порядок строк несущественен; кратность дубликатов существенна.
+exact_boolean, millisecond, exact_string. Все клетки, включая NULL, обязательно
+содержат type/value/is_null/precision; явный `value:null` не равен отсутствию поля.
+Непустые и пустые строки требуют `precision:exact_string`. `display_text`, rounded
+и отсутствие precision не удовлетворяют этому локальному контракту. Нативный
+display_text нельзя автоматически переименовывать в exact_string: полноту исходного
+текста необходимо независимо проверить. Datetime допускает только локальный ISO
+со секундами и необязательной дробью из 1–3 знаков; timezone и более точная дробь
+отвергаются до парсинга, без усечения значений. Это контракт проверки квитанции,
+не подтверждение семантики или точности стенда.
+Порядок строк несущественен; кратность дубликатов существенна.
 
 Binding содержит отдельно проверенные `document_id`, `workflow_id`, `node_id`,
 `execution_id`, `source_sha256`, `port_guids` с ключами `"0"`, `"1"`. Его получают
