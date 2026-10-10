@@ -184,7 +184,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if (dom.length >= maxElements) { const error=new Error('Selected region or global guards exceed the scan budget');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error; }
       seenElements.add(element);dom.push(element);
     };
-    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
+    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"],[data-tid$="NavigationBar;NavPanel"]';
     // E2E utils/selectors.Format: whitespace -> underscore, comma removed.
     // This finds candidates, not filesystem identity or absence. CSS hex escapes
     // keep arbitrary filename characters data rather than selector syntax.
@@ -265,7 +265,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const wizardButtons=['btnPrev','btnNext','btnDone','btnExecute','btnClose','btnError'];
     // Breadcrumb labels are fixed global context even for a narrow file row;
     // including buttons without their labels loses the observed directory.
-    const wizardSelectors=[...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
+    const wizardSelectors=[...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid$=";NavigationBar;NavPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
       ...Object.values(wizardMarkers).flat().map(suffix=>'[data-tid$=";WizrdMCF'+suffix+'"]'),
       ...Object.entries({ExportTextFileParamsWizard:['edtFileName','edtTextQualifier','edtDecimalSeparator','edtDateSeparator','edtTimeSeparator','edtValueTrue','edtValueFalse','edtValueNull','edtDateFormat','edtTimeFormat'],ExportTextFilePreviewWizard:['edtDelimiterChar','edtCodePage','edtWriteBOM','edtLineEnding','edtCaptionType']}).flatMap(([card,fields])=>fields.flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
@@ -314,9 +314,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       charge();for (const element of guards)if(addressedImportField(element))include(element);
       // Ext renders Table modals in a portal outside the owning BrowseView.
       // Include exact view roots as global identity guards, never their trees.
-      const tableOwners=document.querySelectorAll('[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid*=";ViewsForm;BrowseView-"]');
+      const tableOwners=document.querySelectorAll('[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid*=";ViewsForm;BrowseView-"],[data-tid*=";ViewsForm;cntPorts;"],[data-tid*=";ViewsForm;ViewerCard"]');
       charge();for (const element of tableOwners) {
-        charge();if(/^MF;TF(?:-\d+)?;ViewsForm;BrowseView(?:-[1-9][0-9]*)?$/.test(element.getAttribute('data-tid')??''))include(element);
+        charge();if(/^MF;TF(?:-\d+)?;ViewsForm(?:;BrowseView(?:-[1-9][0-9]*)?|;cntPorts;[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|;ViewerCard(?:-[0-9]+)?)?$/.test(element.getAttribute('data-tid')??''))include(element);
       }
     }
     if(!requestedRoot && !discoverRoots && omittedRegions.has('preview_data_cells')) {
@@ -529,7 +529,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // E2E navigation.GetCurrentTabPath: inspect the current tab's visible
       // breadcrumb buttons, not document.title. This is observed context only;
       // proving which graph click opened the wizard requires an action receipt.
-      const panels=(tids.get(workflow.prefix+';NavigationBar;NavigationPanel')??[]).filter(e=>visible(e) && !sensitive(e));
+      // Native 7.4.2 shortnames uses NavPanel; keep the legacy exact name.
+      // Both candidates still belong to this tab and must resolve uniquely.
+      const panels=['NavPanel','NavigationPanel'].flatMap(name=>tids.get(workflow.prefix+';NavigationBar;'+name)??[])
+        .filter(e=>visible(e) && !sensitive(e));
       let ownerContext={status:panels.length>1?'ambiguous':'unobserved',opening_verified:false};
       let portContext={status:panels.length>1?'ambiguous':'unobserved',opening_verified:false};
       if(panels.length===1) {
@@ -561,7 +564,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             vendor_icon:e.querySelectorAll('[class*="bg-vendor-icon-"]').length===1}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const chain=items.every((item,index)=>item.tid.length<=2048 && item.label.length<240
-            && (!index || item.tid.startsWith(items[index-1].tid+'>')));
+            && (!index || item.tid.startsWith(items[index-1].tid+'>')
+              && !item.tid.slice(items[index-1].tid.length+1).includes('>')));
           if(unique&&chain&&Array.isArray(preparedWorkflowPath)&&preparedWorkflowPath.length>0
             &&items.length>=preparedWorkflowPath.length&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096
             &&preparedWorkflowPath.every((c,i)=>c.tid===items[i].tid&&c.label===items[i].label)
@@ -2505,6 +2509,8 @@ function readRenderedInputMapping(observation) {
       // Preserve a real uniquely labelled node whose actual name is Vertex.
       .filter(element=>!ownedGraph(element) || getTid(element)!==graphPrefix+'Vertex' || graphNodeOf(element))
       .filter(element=>!element.closest('[data-tid="mnContextMenu"]') || processMenuControls.has(state.ids.get(element))).filter(element=>!selectedRoot || selectedRoot===element || selectedRoot.contains(element)
+        ||preparedNodeId&&['NavigationPanel','NavPanel'].some(name=>getTid(selectedRoot)===definitionPrefix+';NavigationBar;'+name)
+          &&['NavigationPanel','NavPanel'].flatMap(name=>tids.get(definitionPrefix+';NavigationBar;'+name)??[]).filter(e=>visible(e)&&!sensitive(e)).length===1&&viewerControls.has(state.ids.get(element))
         ||preparedNodeId&&getTid(selectedRoot)===definitionPrefix+';ModelForm;cmpDiagram'&&getTid(element)===definitionPrefix+';ModelForm;btnToggleActivateCurrent')
       .sort((left, right) => controlPriority(left) - controlPriority(right));
     const checkStateOf = element => {
@@ -3780,9 +3786,15 @@ function readRenderedInputMapping(observation) {
                 &&beforeNode.pending_wizard_node.label===owner?.node?.label
               :labels.length===1&&normalizeLabel(labels[0].label)!==''
                 &&normalizeLabel(labels[0].label)===normalizeLabel(owner?.node?.label));
+          // Only the prepared native binding can authorize a saved-package
+          // rekey; the raw owner path or displayed label cannot do so.
+          const rebound=afterNode?.navigation_rebinding;
+          const ownerPath=owner?.path?.slice(0,-2).map(({tid,label})=>({tid,label}));
+          const openingPathMatches=same(ownerPath,opening.workflow_path)
+            ||guidOwnerMatches&&same(rebound?.prepared_path,opening.workflow_path)&&same(rebound?.observed_path,ownerPath);
           if(!deactivationPending && (!contextMatches(observed) || observed.ui.masks.length || observed.wizard?.status!=='observed'
             || owner?.status!=='observed' || !guidOwnerMatches&&owner.node.tid!==opening.workflow_path.at(-1)?.tid+'>'+opening.node.node_label
-            || !same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path)))
+            || !openingPathMatches))
             fail('WIZARD_OPEN_NOT_CONFIRMED','The intended node wizard was not confirmed after one click; inspect the current view before retry');
           if(!deactivationPending)record('wizard_open_verified',{node:opening.node,workflow_path:opening.workflow_path,wizard_root_ref:observed.wizard.root_ref,
             owner_node:owner.node,settings_applied:false});
@@ -4041,13 +4053,17 @@ function readRenderedInputMapping(observation) {
 
 export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
+  const tableFilterOpening=options.action?.verb==='click'&&options.snapshot?.node_outputs?.verified===true
+    &&options.snapshot.node_outputs.surface==='views'&&options.snapshot.prepared_node_context?.surface==='views'
+    &&options.snapshot.node_outputs.tables.filter(t=>t.active&&t.view_guid&&t.port_guid
+      &&options.snapshot.ui.elements.some(e=>e.ref===options.action.ref&&e.tid===t.table_tid+';btnDataGridFilter')).length===1;
   if(options.settlement_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
     ||!['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
     ||options.opening_timeout_ms!==undefined||!Number.isInteger(options.settlement_timeout_ms)
     ||options.settlement_timeout_ms<1||options.settlement_timeout_ms>1800000))
     throw Error('Mask settlement requires a bound completion action and the remaining node deadline');
   if(options.opening_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
-    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(options.action?.verb)
+    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(options.action?.verb)&&!tableFilterOpening
     ||!Number.isInteger(options.opening_timeout_ms)||options.opening_timeout_ms<1||options.opening_timeout_ms>45000))
     throw Error('Extended opening wait requires a bound node wizard and at most 45000 ms');
   if(options.mode==='act'&&['begin_wizard','confirm_wizard_deactivation','cancel_process'].includes(options.action?.verb)
