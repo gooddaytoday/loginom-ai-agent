@@ -23,7 +23,7 @@ async function fixture(run) {
  await module('client/lib/execution-journal.mjs',`export function createExecutionJournal(){return ()=>{}}`)
  state.prepare=p=>{state.session=p.sessionId;state.packages=1;return {status:'READY',document_id:'original-document',package_ref:{path:p.packagePath},workflow_ref:{tab_tid:'original-tab'}}}
  state.cleanup=p=>{state.cleanupCalls++;if(state.refuse)return {status:'NOT_APPLIED',reason:'ACCOUNT_CHANGED'};events.push('close/logout');return {status:'SUCCEEDED',package_closed:true,logged_out:true,session_id:p.sessionId,document_id:p.documentId,account:p.account,package_path:p.packagePath}}
- state.runtime={deliverArtifact:async()=>({outcome:{status:'SUCCEEDED'}}),runNodeApply:async()=>{state.importCalls++;if(state.throwImport)throw state.error;return {status:'SUCCEEDED'}},run:async(action,input)=>{state.saveCalls.push(input);events.push(input.path.includes('final')?'final save':'bootstrap save');if(input.path.includes('final')&&state.failSave)return {status:'NOT_APPLIED',effect_possible:true};return {status:'SUCCEEDED',output:{save_completed:true}}}}
+ state.runtime={hasUnsettledWork:()=>Boolean(state.unsettled),deliverArtifact:async()=>({outcome:{status:'SUCCEEDED'}}),runNodeApply:async()=>{state.importCalls++;if(state.throwImport)throw state.error;return {status:'SUCCEEDED'}},run:async(action,input)=>{state.saveCalls.push(input);events.push(input.path.includes('final')?'final save':'bootstrap save');if(input.path.includes('final')&&state.failSave)return {status:'NOT_APPLIED',effect_possible:true};return {status:'SUCCEEDED',output:{save_completed:true}}}}
  await module('executor/catalog/actions.json','')
  await writeFile(join(root,'runtime/executor/catalog/actions.json'),JSON.stringify({actions:[{action_key:'package.save_checkpoint',effect:{}}]}))
  await writeFile(join(root,'runtime/executor/catalog/selectors.json'),JSON.stringify({selectors:[]}))
@@ -54,3 +54,31 @@ test('unknown final-save effect retains handles without retry or automatic clean
  assert.equal(owner.finalSave.effect_possible,true);assert.equal(s.closed,false);assert.equal(s.cleanupCalls,1);assert.equal(s.saveCalls.length,2)
 }))
 test('owner must exist before any browser launch',async()=>assert.rejects(runBrowseLive([],null),/FOREGROUND_OWNER_REQUIRED/))
+
+for (const phase of ['import','final-save']) test('recovery refuses retained unsettled runtime: '+phase,()=>fixture(async(s,args)=>{
+ const original=s.runtime
+ s.runtime=Object.freeze({...original,
+  runNodeApply:async(...a)=>{if(phase==='import'){s.unsettled=true;throw Error('import unsettled')}return original.runNodeApply(...a)},
+  run:async(...a)=>{if(phase==='final-save'&&a[1].path.includes('final')){s.unsettled=true;return {status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false}}return original.run(...a)}
+ })
+ const owner=await runBrowseLive(args,{}),error=owner.error,execute=owner.execute,calls=s.cleanupCalls
+ assert.equal(owner.failed,true)
+ await assert.rejects(owner.recover(),/DIAGNOSTIC_RUNTIME_UNSETTLED/)
+ assert.equal(s.cleanupCalls,calls);assert.equal(s.closed,false);assert.equal(owner.closed,false)
+ assert.equal(owner.error,error);assert.equal(owner.runtime,s.runtime);assert.equal(owner.page,s.page);assert.equal(owner.context,s.context);assert.equal(owner.execute,execute)
+ // Simulate the retained runtime's ordinary resolution, never reset caller pending.
+ s.unsettled=false
+ await owner.recover();assert.equal(s.closed,true);assert.equal(s.cleanupCalls,calls+1);assert.equal(owner.error,error)
+}))
+
+test('recovery refuses replaced runtime without changing original error',()=>fixture(async(s,args)=>{
+ s.throwImport=true;s.error=Error('original');const owner=await runBrowseLive(args,{})
+ owner.runtime={hasUnsettledWork:()=>false}
+ await assert.rejects(owner.recover(),/DIAGNOSTIC_RUNTIME_UNVERIFIED/)
+ assert.equal(owner.error,s.error);assert.equal(s.cleanupCalls,1);assert.equal(s.closed,false)
+}))
+test('successful save cannot authorize cleanup while runtime remains unsettled',()=>fixture(async(s,args)=>{
+ const run=s.runtime.run;s.runtime.run=async(...a)=>{const result=await run(...a);if(a[1].path.includes('final'))s.unsettled=true;return result}
+ const owner=await runBrowseLive(args,{})
+ assert.match(owner.error.message,/DIAGNOSTIC_RUNTIME_UNSETTLED/);assert.equal(s.cleanupCalls,1);assert.equal(s.closed,false)
+}))
