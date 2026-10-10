@@ -30,5 +30,13 @@
     "encoding": "UTF-8",
     "delimiter": ";",
     "null_marker": "NULL"
+  },
+  {
+    "file": "wide.csv",
+    "bytes": 490,
+    "sha256": "432af2fcd4e42d86501330d760276b52192431f4d50d23f2a75828931a42a8a9",
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "null_marker": "NULL"
   }
 ]

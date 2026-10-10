@@ -17,7 +17,8 @@ export function validateUnionParameters(p,mode,r){
  }
  const count=p.tables.length+1;
  need(r.inputs.every(i=>i.input<count),'Union input is outside declared tables');
- need(r.target.kind==='existing'||r.inputs.length===count&&Array.from({length:count},(_,i)=>i).every(i=>r.inputs.some(p=>p.input===i)),'New union requires every input source');
+ need(r.target.kind==='existing'||r.inputs.length===count&&Array.from({length:count},(_,i)=>i).every(i=>r.inputs.some(p=>p.input===i)),
+  `New union requires ${count} input sources at ports 0..${count-1}; parameters.tables lists only joined ports 1..${count-1}, never the main table at port 0`);
  need(r.read.ports.every(p=>p===0)&& (r.finish!=='execute'||r.read.ports.length===1),'Union execution requires output0');
  need(r.mappings.every(m=>(m.direction==='input'?m.port<count:m.port===0)
   &&(m.fields??m.changes??[]).every(f=>f.source?.kind==='configured_field'&&(m.direction==='output'||f.excluded!==true))),'Invalid union port mapping');
