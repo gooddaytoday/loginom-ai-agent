@@ -1,0 +1,34 @@
+[
+  {
+    "file": "main.csv",
+    "bytes": 51,
+    "sha256": "3ee49d5ef8d061d149cc9b040167bc4519a542e39ff5947a28664a25ef582943",
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "null_marker": "NULL"
+  },
+  {
+    "file": "second.csv",
+    "bytes": 35,
+    "sha256": "283537adf032ae4bcd0fe8d8b314be8a5246c00bd00733b30cee6b0e6067fc33",
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "null_marker": "NULL"
+  },
+  {
+    "file": "third.csv",
+    "bytes": 55,
+    "sha256": "b77641ddfe84a4e7ad5860870435a7ae0a2b77cb9d76660ee4424c2b6095bbcf",
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "null_marker": "NULL"
+  },
+  {
+    "file": "empty.csv",
+    "bytes": 17,
+    "sha256": "7829cc54e74b6212d6f9e89b830b5fb9c310a9c938dbccba41d12ffe40fb4b05",
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "null_marker": "NULL"
+  }
+]
