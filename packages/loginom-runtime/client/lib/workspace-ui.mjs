@@ -2333,6 +2333,91 @@ function readRenderedInputMapping(observation) {
           dateTimeCells.set(refOf(cells[0]),{role:'output_source',field_key:d.Name,record_id:String(r.internalId),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
       }
     }
+    // Output Links refs require the current opening and complete cached native
+    // record/Ext/DOM aliases. They do not authorize a hidden toolbar control.
+    if(!discoverRoots&&wizard.stage==='output_mapping'&&preparedOutputPort?.direction==='output')try{
+      const p=globalThis.__loginomDockPreparationV1,card=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab();
+      const model=card?.Controller?.FController,entries=[...(p?.outputPortOpenReceipts?.entries()??[])];
+      const matched=entries.filter(([key,r])=>key===preparedOutputPort.opening_operation_id&&r.operation_id===key&&r.phase==='verified'
+        &&r.document_id===p.id&&r.node_id===preparedNodeId&&r.wizard===model);
+      const requireLink=(v,m)=>{if(!v)throw Error(m);};
+      requireLink(p?.document===document&&matched.length===1,'output_link_opening');
+      const r=matched[0][1],root=(tids.get(wizard.root_tid)??[]),base=wizard.root_tid+';DerivedDataSourceOutputSocketWizard;';
+      requireLink(entries.filter(([,x])=>x.phase==='verified'&&x.wizard===model).length===1&&r.direction==='output'
+        &&r.portIndex===preparedOutputPort.port&&r.nativeIndex===preparedOutputPort.native_index&&r.portGuid===preparedOutputPort.port_guid
+        &&r.enginePort===model.FModelEnginePort&&r.port?.data===r.portData&&r.node?.data===r.nodeData&&r.port.parent===r.node
+        &&[...(p.receipts?.values()??[])].filter(x=>x.phase==='verified'&&x.workflowId===r.workflow_id
+          &&x.nodeTargetWorkflowNode===r.workflow&&x.packageNode===r.packageNode).length===1
+        &&r.port.FGuid===r.portGuid&&r.node.FGuid===r.node_id&&r.portTree?.FIndex===r.nativeIndex
+        &&card.Controller?.Node?.data?.node?.ParentNode===r.portTree&&r.portTree.FModelNodePort===r.portData
+        &&r.portTree.ParentNode?.constructor?.name==='ModelOutputPortsTreeNode'&&r.portTree.ParentNode.ParentNode===r.nodeTree
+        &&r.nodeTree?.FGuid===r.node_id&&r.nodeTree.FModelNode===r.nodeData&&r.nodeTree.ParentNode===r.workflow
+        &&root.length===1&&model.FView?.el?.dom===root[0]&&!dialogs.length&&!select('.x-mask,.bg-mask-message,.x-mask-msg').some(visible),'output_link_owner');
+      const forms=(tids.get(base.slice(0,-1))??[]).filter(e=>root[0].contains(e)&&visible(e));
+      requireLink(forms.length===1,'output_link_form');
+      const form=forms[0],cmp=globalThis.Ext?.getCmp?.(form.id),controller=cmp?.['@@TestCmpController'];
+      const items=model.FWizardItems?.FItems;
+      requireLink(cmp?.el?.dom===form&&Array.isArray(items)&&items.filter(x=>x.Wizard===controller).length===1
+        &&controller?.constructor?.name==='DerivedDataSourceOutputSocketWizard','output_link_controller');
+      const exact=tail=>(tids.get(base+tail)??[]).filter(e=>form.contains(e));
+      const modes=['rbLinks','rbTable'].map(t=>exact(t));
+      requireLink(modes.every(es=>es.length===1)&&modes[0][0].classList.contains('x-form-cb-checked')
+        &&!modes[1][0].classList.contains('x-form-cb-checked'),'output_link_mode');
+      for(const [i,es] of modes.entries()){const c=Ext.getCmp(es[0].id);requireLink(c?.el?.dom===es[0]&&c.getValue?.()===(i===0),'output_link_radio');}
+      const grids=['grdSourceColumns;tbl','grdTargetColumns;tbl'].map(t=>exact(t));
+      requireLink(grids.every(es=>es.length===1&&visible(es[0])),'output_link_grids');
+      const views=grids.map(es=>Ext.getCmp(es[0].id)),stores=views.map(v=>v?.getStore?.());
+      requireLink(views.every((v,i)=>v?.el?.dom===grids[i][0])&&stores[0]!==stores[1]
+        &&controller.FSourceStore===stores[0]&&controller.FTargetStore===stores[1],'output_link_stores');
+      const inventories=stores.map(s=>{
+        const data=s?.getData?.(),records=data?.items,full=data?.getSource?.()?.items;
+        requireLink(s?.$className==='Ext.data.Store'&&!s.isBufferedStore&&!s.isLoading?.()&&s.currentPage===1
+          &&s.getRemoteFilter?.()===false&&s.getRemoteSort?.()===false&&Array.isArray(records)&&records.length>0&&records.length<=200
+          &&s.getCount?.()===records.length&&s.getTotalCount?.()===records.length&&Array.isArray(full)&&full.length===records.length
+          &&new Set(full).size===records.length&&full.every(x=>records.includes(x))
+          &&s.getProxy?.()?.pendingOperations&&Object.keys(s.getProxy().pendingOperations).length===0,'output_link_inventory');
+        requireLink(['internalId'].every(k=>new Set(records.map(x=>String(x[k]))).size===records.length)
+          &&new Set(records.map(x=>x.data?.ID)).size===records.length&&new Set(records.map(x=>x.data?.Name)).size===records.length
+          &&records.every((x,i)=>x.isModel&&String(x.internalId)&&Number.isSafeInteger(x.data?.ID)&&x.data.ID>=0&&x.data.Index===i
+            &&typeof x.data.Name==='string'&&x.data.Name&&typeof x.data.DisplayName==='string'&&x.data.DisplayName
+            &&[1,2,3,4,5,6].includes(x.data.DataType)&&x.data.Broken===false&&x.data.Required===false&&x.data.GroupField===''),'output_link_records');
+        return records;
+      });
+      const [sources,targets]=inventories,g=controller.Items?.LinkGrid,d=g?.FLinkDrawContainer;
+      requireLink(sources.length===targets.length&&d?.FTables?.length===2&&d.FTables.every((v,i)=>v.getView?.()===views[i]&&v.getStore?.()===stores[i]),'output_link_native_tables');
+      const pairs=Object.entries(d.FLinks??{}),selected=Object.entries(d.FSelectedLinks??{});
+      requireLink(pairs.length===targets.length&&pairs.every(([key,pair])=>Array.isArray(pair)&&pair.length===2&&sources.includes(pair[0])&&targets.includes(pair[1])
+        &&key===String(pair[0].internalId)+'_'+String(pair[1].internalId)&&pair[0].data.ConnectedRecord===pair[1]&&pair[1].data.ConnectedRecord===pair[0])
+        &&new Set(pairs.map(([,x])=>x[0])).size===sources.length&&new Set(pairs.map(([,x])=>x[1])).size===targets.length
+        &&selected.every(([key,pair])=>d.FLinks[key]===pair),'output_link_pairs');
+      const cells=inventories.map((records,i)=>records.map(record=>{
+        const rows=[...grids[i][0].querySelectorAll('table.x-grid-item')].filter(e=>e.getAttribute('data-recordid')===String(record.internalId));
+        requireLink(rows.length===1&&rows[0].getAttribute('data-boundview')===grids[i][0].id&&rows[0].getAttribute('data-recordindex')===String(records.indexOf(record)),'output_link_row');
+        const tid=base+(i===0?'colSourceName_':'colDisplayName_')+record.data.Name;
+        const es=(tids.get(tid)??[]).filter(e=>rows[0].contains(e));
+        requireLink(es.length===1&&visible(es[0])&&es[0].textContent.trim()===record.data.DisplayName,'output_link_cell');return es[0];
+      }));
+      const owner={document_id:r.document_id,workflow_id:r.workflow_id,node_id:r.node_id,port:preparedOutputPort,root_ref:wizard.root_ref};
+      const definition=x=>({...Object.fromEntries(['ID','Index','Name','DisplayName','DataType','DataKind','UsageType','OriginType','IsDerived','Required','Broken','GroupField'].map(k=>[k,x.data[k]??null])),dirty:x.dirty??null});
+      const staged=[];
+      for(const [key,pair] of pairs)for(const i of [0,1])staged.push([cells[i][inventories[i].indexOf(pair[i])],{
+        role:i===0?'output_source':'output_target',field_key:pair[i].data.Name,record_id:String(pair[i].internalId),grid_ref:refOf(grids[i][0]),wizard_root_ref:wizard.root_ref,
+        link:{owner,key,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),selected:d.FSelectedLinks[key]===pair}}]);
+      if(selected.length===1){const [key,pair]=selected[0],item=d.FDrawLinkItems?.[key],buttons=item?.DrawDeleteButton;
+        requireLink(item?.LinkID===key&&Array.isArray(buttons)&&buttons.length===2&&new Set(buttons).size===2,'output_link_remove_items');
+        for(const sprite of buttons){const element=sprite?.element?.dom;
+          requireLink(sprite.type==='path'&&sprite.attr?.hidden===false&&sprite.attr.globalAlpha===1&&element?.tagName?.toLowerCase()==='g'
+            &&form.contains(element)&&visible(element)&&seenElements.has(element)&&element.children.length===1
+            &&element.children[0].tagName.toLowerCase()==='path','output_link_remove_dom');
+          staged.push([element,{role:'output_relation_remove',record_id:String(pair[1].internalId),wizard_root_ref:wizard.root_ref,
+            link:{owner,key,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),selected:true}}]);
+        }
+      }
+      for(const [element,metadata] of staged){
+        dateTimeCells.set(refOf(element),metadata);
+        if(metadata.role==='output_relation_remove'&&!candidates.includes(element))candidates.push(element);
+      }
+    }catch(error){if(error?.code==='UI_SCAN_LIMIT')throw error;}
     // The constant trigger is a role-less Ext div. Bind it to the active
     // method editor and its exact cached field before exposing a gesture.
     if(!discoverRoots&&wizard.stage==='missing_values'){
@@ -2850,7 +2935,7 @@ function readRenderedInputMapping(observation) {
         enabled: isEnabled, visible: true, interaction, bounding_box: boxOf(element),
         // A bounded prefix is not a sufficient value precondition. A dedicated
         // large-field driver must establish its own complete read/write contract.
-        allowed_actions: crossTableField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && interaction.state==='point_observed'?[...(scroll?.ref===refOf(element)?['scroll']:[]),...(horizontalScroll?.ref===refOf(element)?['scroll_horizontal']:[])]:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
+        allowed_actions: crossTableField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(dateTimeCell.link&&dateTimeCell.role!=='output_relation_remove'?['drag']:[]),...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && interaction.state==='point_observed'?[...(scroll?.ref===refOf(element)?['scroll']:[]),...(horizontalScroll?.ref===refOf(element)?['scroll_horizontal']:[])]:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
     });
     scanStage='data_views';
     const nodes = labels.slice(0, 200).map(label => {
