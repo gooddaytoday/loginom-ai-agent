@@ -17,9 +17,45 @@ export async function activatePreparedWorkflow(page, task) {
     if([...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].some(visible))throw Error('Workflow activation blocked');
     const crumbs=[...document.querySelectorAll('[data-tid^='+JSON.stringify(request.workflow_ref.prefix+';cnrNaviMode;b.s_')+']')]
       .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
-    const expected=request.workflow_ref.navigation_path;
-    if(crumbs.length!==expected.length||crumbs.some((c,i)=>c.tid!==expected[i].tid||c.label!==expected[i].label))
-      throw Error('Prepared workflow navigation changed');
+    // A save can rekey Package1 only when the original rendered/native path
+    // was bound before the transition. Labels alone never establish ownership.
+    const verifyNavigation = (wf, receipt, observed, capture=false) => {
+      const expected=wf.navigation_path, samePath=(a,b)=>Array.isArray(a)&&a.length===b.length
+        &&a.every((c,i)=>c.tid===b[i].tid&&c.label===b[i].label);
+      if(!Array.isArray(expected)||!expected.length||expected.length>32||observed.length!==expected.length
+        ||new Set(observed.map(c=>c.tid)).size!==observed.length)return null;
+      const peers=[...globalThis.__loginomDockPreparationV1.receipts.values()].filter(v=>v.phase==='verified'&&v.workflowId===wf.workflow_id);
+      if(peers.some(v=>v.tab!==receipt.tab||v.packageNode!==receipt.packageNode
+        ||v.nodeTargetWorkflowNode&&receipt.nodeTargetWorkflowNode&&v.nodeTargetWorkflowNode!==receipt.nodeTargetWorkflowNode)
+        ||receipt.crumbs&&!samePath(receipt.crumbs,expected))return null;
+      const native=observed.map(c=>{const es=exact(c.tid),e=es.length===1&&es[0],cmp=e&&globalThis.Ext?.getCmp?.(e.id);
+        return cmp?.el?.dom===e?cmp?._node?.data?.node:null;});
+      const main=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
+      const account=main?.FMapTree?.FServerConnection?.UserName;
+      const packagePath=receipt.packageNode?.PackageFileName;
+      const baseline=receipt.nodeNavigationBinding;
+      if(baseline) {
+        if(!samePath(expected,baseline.path)||baseline.tab!==receipt.tab||baseline.packageNode!==receipt.packageNode
+          ||baseline.workflow!==receipt.nodeTargetWorkflowNode||baseline.account!==account||baseline.connection!==main?.FMapTree?.FServerConnection||baseline.packagePath!==packagePath
+          ||native.length!==baseline.native.length||native.some((n,i)=>!n||n!==baseline.native[i]||n.FGuid!==baseline.guids[i]||i>0&&n.ParentNode!==native[i-1]))return null;
+      }
+      if(samePath(expected,observed)) {
+        if(capture&&!baseline&&samePath(receipt.crumbs,expected)&&typeof account==='string'&&account
+          &&typeof packagePath==='string'&&packagePath&&native.every((n,i)=>n&&(!i||n.ParentNode===native[i-1]))
+          &&native.filter(n=>n===receipt.packageNode).length===1&&native.at(-1)===receipt.nodeTargetWorkflowNode)
+          receipt.nodeNavigationBinding={path:expected.map(c=>({...c})),native,guids:native.map(n=>n.FGuid),tab:receipt.tab,packageNode:receipt.packageNode,
+            workflow:receipt.nodeTargetWorkflowNode,account,connection:main.FMapTree.FServerConnection,packagePath};
+        return {verified:true};
+      }
+      if(!baseline)return null;
+      const index=native.indexOf(receipt.packageNode),old=expected[index],current=observed[index];
+      if(index<1||!old||current.label!==old.label||receipt.packageNode.PackageName!==old.label
+        ||current.tid!==expected[index-1].tid+'>'+receipt.packageNode.PackageName)return null;
+      if(observed.some((c,i)=>c.label!==expected[i].label||c.tid!==(i<index?expected[i].tid:
+        i===index?current.tid:expected[i].tid.startsWith(old.tid+'>')?current.tid+expected[i].tid.slice(old.tid.length):null)))return null;
+      return {verified:true,rebinding:{prepared_path:expected.map(c=>({...c})),observed_path:observed.map(c=>({...c}))}};
+    };
+    if(!verifyNavigation(request.workflow_ref,r,crumbs,true))throw Error('Prepared workflow navigation changed');
     return {document_id:p.id,workflow_ref:request.workflow_ref,tab_tid:request.workflow_ref.tab_tid,
       active:r.tab.classList.contains('x-tab-active')};
   },task);

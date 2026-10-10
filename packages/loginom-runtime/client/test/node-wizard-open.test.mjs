@@ -66,3 +66,21 @@ test('duplicate deactivation breadcrumb requires native pending owner binding, n
   assert.equal(boundWizardDeactivationConfirmation(bad,binding),false,fault);
  }
 });
+
+ test('deactivation accepts the same verified rebinding and preserves pending/dialog guards',()=>{
+ const {state,binding}=fixture();
+ const prepared=structuredClone(binding.opening.workflow_path),observed=[{tid:'saved-flow',label:'Scenario'}];
+ state.wizard_pending_owner.path=[...observed,{tid:'saved-flow>Import',label:'Import'},{tid:'saved-flow>Import>Settings',label:'Settings'}];
+ state.wizard_pending_owner.node={tid:'saved-flow>Import',label:'Import'};
+ state.prepared_node_context.pending_wizard_node={tid:'saved-flow>Import',label:'Import'};
+ state.prepared_node_context.navigation_rebinding={prepared_path:prepared,observed_path:observed};
+ assert.equal(boundWizardDeactivationConfirmation(state,binding),true);
+ for(const change of [s=>delete s.prepared_node_context.navigation_rebinding,s=>s.prepared_node_context.navigation_rebinding.prepared_path=[],s=>s.prepared_node_context.navigation_rebinding.observed_path=[],s=>s.prepared_node_context.pending_wizard_node.tid='foreign',s=>s.prepared_node_context.node_id='foreign',s=>s.ui.dialogs[0].text='foreign']){
+ const bad=structuredClone(state);change(bad);assert.equal(boundWizardDeactivationConfirmation(bad,binding),false);
+ }
+ });
+ test('lost opening reply never causes a second gesture',async()=>{
+ const {state}=fixture();state.ui.elements=[{ref:'settings',tid:state.prepared_node_context.tid+';Setting',allowed_actions:['begin_wizard'],wizard_open:{node:{node_label:'Import'},workflow_path:[{tid:'flow',label:'Scenario'}]}}];
+ let gestures=0;const channel={observe:async()=>state,perform:async()=>{gestures++;throw Error('unknown reply');}};
+ await assert.rejects(openPreparedWizard(channel),/unknown reply/);assert.equal(gestures,1);
+ });

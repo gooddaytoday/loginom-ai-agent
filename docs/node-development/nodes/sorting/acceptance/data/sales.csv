@@ -1,0 +1,11 @@
+Id,Product,Region,Quantity,UnitPrice
+1,Alpha,North,3,12.50
+2,Beta,South,2,20.25
+3,Gamma,East,4,7.125
+4,Alpha,South,-1,12.50
+5,Beta,North,0,20.25
+6,Gamma,North,2,7.125
+7,Delta,East,3,10.00
+8,Delta,West,1,10.00
+9,Alpha,West,2,12.50
+10,Beta,East,1,9.50
