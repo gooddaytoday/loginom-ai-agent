@@ -213,7 +213,7 @@ async function handle(message) {
     }
   } catch (error) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
-    send({ id: message.id, error: code }, message.operation === "close")
+    send({ id: message.id, error: code })
     if (message.operation === "start") {
       // Clean up immediately, but keep IPC until the owner requests an acknowledged close.
       // close() retains a rejection so that the later close request reports cleanup failure.

@@ -96,5 +96,13 @@ for(const scenario of ['success','unprepared','no-save','native-blocked','busy',
       assert.equal(f.events.includes('package-cleanup'),scenario==='native-blocked');
     }
     assert.equal(f.events.filter(e=>e==='package-cleanup').length,['success','native-blocked','dirty-after-save','state-unavailable'].includes(scenario)?1:0);
+    if(['native-blocked','busy'].includes(scenario)) {
+      const retained=await client.callTool({name:'dock_diagnostics',arguments:{}});
+      assert.notEqual(retained.isError,true,JSON.stringify(retained));
+      f.busy=false;f.scenario='success';
+      const recovered=await bridge.close();assert.equal(recovered.browser_transport_closed,true);
+      assert.ok(f.events.includes('browser-close'));
+    }
+
   }finally{await client?.close();await bridge?.close();await rm(directory,{recursive:true,force:true});}
 });

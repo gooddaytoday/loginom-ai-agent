@@ -481,7 +481,10 @@ export async function createBridge(config, session, { browserTransport: managedB
         // releases kernel locks and is not cross-process recovery evidence.
         return { browser_transport_closed: browserTransportClosed,
           browser_process_terminated: browserProcessTerminated, clipboard_leases_retained: heldLeases.size };
-      })();
+      })().then(result => {
+        if (result?.browser_transport_closed !== true) { closing = undefined; shutdownStarted = false; }
+        return result;
+      }, error => { closing = undefined; shutdownStarted = false; throw error; });
       return closing;
     } };
   } catch (error) {

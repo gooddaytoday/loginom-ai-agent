@@ -16,3 +16,17 @@ for(const [name,receipt] of [['unsettled',{browser_transport_closed:false}],['id
 test('settled shutdown requires explicit receipt',async()=>{const f=fixture({browser_transport_closed:true});await f.close();assert.equal(f.page.closed,true)});
 test('startup without browser requires no bridge',async()=>{const f=fixture(undefined,{startup:true});await f.close();assert.equal(f.page.closed,false);assert.deepEqual(f.events,['abort','client'])});
 test('created browser without bridge is retained',async()=>{const f=fixture(undefined,{missingBridge:true});await assert.rejects(f.close());assert.equal(f.page.closed,false);assert.deepEqual(f.events,[])});
+
+test('existing IPC owner inspects exact actual pending runtime then closes',async()=>{
+ const {Page,runtime,nodeParameters}=await import('../client/test/support/executor-fixture.mjs');const page=new Page();page.failDrag=true;const actual=runtime(page);const outcome=await actual.run('node.add',nodeParameters);assert.equal(outcome.status,'AMBIGUOUS');assert.equal(actual.hasUnsettledWork(),true);const drops=page.drops;
+ const events=[],messages=[],listeners={},state={client:{close:async()=>{},callTool:async input=>actual.inspect(input.arguments)},bridge:{hasUnsettledWork:actual.hasUnsettledWork,hasActiveWork:actual.hasActiveWork,close:async()=>({browser_transport_closed:!actual.hasUnsettledWork()})},browser:{page,close:async()=>events.push('browser-close')}};
+ const process={connected:true,on:(name,fn)=>listeners[name]=fn,exit:code=>events.push('exit:'+code),send:(m,cb)=>{messages.push(m);cb()},disconnect:()=>{process.connected=false;events.push('disconnect')}};
+ const send=source.slice(source.indexOf('const send ='),source.indexOf('function close()'));
+ const close=source.slice(source.indexOf('function close()'),source.indexOf('process.on("message"'));
+ const handle=source.slice(source.indexOf('async function handle(message)'));
+ const api=vm.runInNewContext(send+close+handle+';({handle})',{state,requests:new Set(),process,Promise,Error,AbortController,setImmediate});
+ await api.handle({id:'refusal',operation:'close'});assert.equal(process.connected,true);assert.deepEqual(events,[]);assert.equal(state.browser.page,page);assert.equal(actual.hasUnsettledWork(),true);
+ await api.handle({id:'original-inspect',operation:'call',input:{name:'dock_operation_inspect',arguments:{operation_id:outcome.operation_id}}});
+ assert.ok(messages.find(m=>m.id==='original-inspect')?.result);assert.equal(state.browser.page,page);assert.equal(actual.hasUnsettledWork(),false);assert.equal(page.drops,drops);
+ await api.handle({id:'settled-close',operation:'close'});assert.deepEqual(events,['browser-close','disconnect']);assert.equal(page.drops,drops);
+});
