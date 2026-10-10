@@ -3893,8 +3893,8 @@ function readRenderedInputMapping(observation) {
             kind.enabled=!discrete;
             if(discrete){kind.value='Дискретный';kind.value_length_utf16=kind.value.length;}
             // Loginom 7.4.2 promotes an undefined kind when converting a
-            // string to real. Preserve explicit kinds and every other field.
-            if(choice.label==='Вещественный'
+            // string to real or datetime. Preserve explicit kinds and every other field.
+            if(['Вещественный','Дата/Время'].includes(choice.label)
               &&current.wizard.reform_parameters.fields.type_label.value==='Строковый'
               &&kind.value==='Неопределенное') {
               kind.value='Непрерывный';kind.value_length_utf16=kind.value.length;
