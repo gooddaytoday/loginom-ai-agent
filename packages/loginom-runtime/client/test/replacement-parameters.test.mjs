@@ -5,6 +5,15 @@ const value=(value,type='string')=>({type,value});
 const params=()=>({output_mode:'add',rules:[{field:{kind:'input_field',name:'Category'},type:'string',case_sensitive:true,pairs:[{from:value(null),to:value('Missing')},{from:value(''),to:value('Empty')},{from:value('null'),to:value('Literal')}],other:{mode:'keep'}}]});
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0]},mappings:[],finish:'execute'};
 test('Null, empty string and literal null remain three distinct keys',()=>assert.equal(validateReplacementParameters(params(),'exact',request).rules[0].pairs.length,3));
+test('incompatible comparison flags identify the rule and required correction',()=>{
+ const p=params();p.rules[0].precision=0;
+ assert.throws(()=>validateReplacementParameters(p,'exact',request),/parameters.rules.0: Category \(string\).*forbids precision/);
+ p.rules[0]={field:{kind:'input_field',name:'Code'},type:'integer',precision:0,case_sensitive:true,pairs:[],other:{mode:'keep'}};
+ assert.throws(()=>validateReplacementParameters(p,'exact',request),/parameters.rules.0: Code \(integer\).*precision=0.*forbids case_sensitive/);
+ delete p.rules[0].case_sensitive;
+ assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));
+ assert.throws(()=>validateReplacementValue(value(9223372036854775807,'integer'),'integer'),/use a decimal string/);
+});
 test('case folding rejects conflicting keys before mutation',()=>{const p=params();p.rules[0].case_sensitive=false;p.rules[0].pairs=[{from:value('North'),to:value('A')},{from:value('north'),to:value('B')}];assert.throws(()=>validateReplacementParameters(p,'exact',request),/Duplicate replacement key/);p.rules[0].case_sensitive=true;assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));});
 test('integers retain Int64 boundaries and reject rounded JS numbers',()=>{for(const n of ['9223372036854775807','-9223372036854775808'])assert.doesNotThrow(()=>validateReplacementValue(value(n,'integer'),'integer'));for(const n of [9223372036854775807,'9223372036854775808','-9223372036854775809'])assert.throws(()=>validateReplacementValue(value(n,'integer'),'integer'));});
 test('generated names cannot collide with retained source fields',()=>{const p=params(),f=[{name:'Category',type:'string'},{name:'Category_Replace',type:'string'}];assert.throws(()=>resolveReplacementParameters(p,f),/collision/);p.output_mode='replace';assert.doesNotThrow(()=>resolveReplacementParameters(p,f));});
