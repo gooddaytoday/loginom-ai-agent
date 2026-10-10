@@ -31,11 +31,20 @@ const runtimeConfig={targetOrigin:new URL(config.loginom_url).origin,targetBuild
 const artifactStore=await createArtifactStore({directory:join(out,'artifacts'),sessionId});
 const runtime=createActionRuntime({pinned:{actions:new Map(actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.map(s=>[s.symbol,s])),pins:{}},execute,onRecord:record,...runtimeConfig,artifactStore,allowCandidate:true,...createCandidateNodeSupport(runtimeConfig)});
 owner.runtime=runtime;
+// Cleanup must not invalidate a retained operation with an unknown effect.
+const requireSettledRuntime=async()=>{
+ if(owner.runtime!==runtime || typeof runtime.hasUnsettledWork!=='function')throw Error('DIAGNOSTIC_RUNTIME_UNVERIFIED');
+ if(runtime.hasUnsettledWork()){
+  await persist('cleanup-refused-unsettled',{reason:'DIAGNOSTIC_RUNTIME_UNSETTLED',sessionId,cleanup_attempted:false});
+  throw Error('DIAGNOSTIC_RUNTIME_UNSETTLED');
+ }
+};
 const packagePath=storage+'/matrix-'+sessionId+'.lgp';
 const identity={sessionId,account,packagePath,loginomUrl:config.loginom_url,loginomBuild:'7.4.2',diagnosticDiscard:false};
 owner.identity=identity;
 owner.recover=async()=>{
  if(owner.closed)throw Error('DIAGNOSTIC_CONTEXT_ALREADY_CLOSED');
+ await requireSettledRuntime();
  const value=await withDiagnosticSession({context,page,execute,directory:join(out,'recovery'),identity:owner.identity,makeCleanupCode:makePackageCleanupCode},async({bindPrepared})=>bindPrepared(owner.prepared));
  owner.closed=true;return value;
 };
@@ -46,6 +55,7 @@ const need=(v,m)=>{if(!v)throw Error(m)};
  owner.prepared=prepared;need(prepared.status==='READY','MATRIX_DRAFT_FAILED');
  const saved=await runtime.run('package.save_checkpoint',{path:packagePath,conflict_policy:'fail'},{operationId:'matrix-bootstrap'});await persist('bootstrap',saved);
  need(saved.status==='SUCCEEDED'&&saved.output.save_completed,'MATRIX_BOOTSTRAP_FAILED');
+ await requireSettledRuntime();
  const bootstrapCleanup=await execute(makePackageCleanupCode({...identity,diagnosticDiscard:false,documentId:prepared.document_id,tabTid:prepared.workflow_ref.tab_tid}));await persist('bootstrap-cleanup',bootstrapCleanup);need(bootstrapCleanup.package_closed&&bootstrapCleanup.logged_out,'MATRIX_BOOTSTRAP_CLEANUP_FAILED');
  const {loginPage}=await load('src/connection-check.mjs');await loginPage(page,{url:config.loginom_url,username:account,password:config.workflow_profile.password});
  prepared=await execute(makeWorkspacePrepareCode({loginomUrl:page.url(),compatibility:{loginom_build:'7.4.2',platform:'linux',browser:'chromium'},sessionId,operationId:'matrix-open-saved',intent:'open_package',packagePath}));
@@ -65,6 +75,7 @@ const need=(v,m)=>{if(!v)throw Error(m)};
  owner.identity={...identity,packagePath:finalPath};
  owner.prepared=await execute(makeWorkspacePrepareCode({loginomUrl:page.url(),compatibility:{loginom_build:'7.4.2',platform:'linux',browser:'chromium'},sessionId,operationId:'matrix-final-prepare',intent:'open_package',packagePath:finalPath}));
  await persist('result',{status:'IMPORT_COMPLETED',scope:'original import-read bound Table Filter',source_sha:'5430915edcfdc91f215a53852360e596ba38fbd0',operation:imported});
+ await requireSettledRuntime();
  await withDiagnosticSession({context,execute,directory:out,identity:owner.identity,makeCleanupCode:makePackageCleanupCode},async({bindPrepared})=>bindPrepared(owner.prepared));
  owner.closed=true;
 
