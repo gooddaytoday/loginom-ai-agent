@@ -1,0 +1,205 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.join_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.join_data",
+      "output_node_label": "Операции с деталями",
+      "columns": [
+        {
+          "name": "LKey",
+          "label": "LKey",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Part",
+          "label": "Part",
+          "type": "integer",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "LValue",
+          "label": "LValue",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "RKey",
+          "label": "RKey",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "PartR",
+          "label": "PartR",
+          "type": "integer",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "RValue",
+          "label": "RValue",
+          "type": "string",
+          "data_kind": "Дискретный"
+        }
+      ],
+      "rows": [
+        {
+          "LKey": "A",
+          "Part": 1,
+          "LValue": "left1",
+          "RKey": "A",
+          "PartR": 1,
+          "RValue": "right1"
+        },
+        {
+          "LKey": "A",
+          "Part": 1,
+          "LValue": "left1",
+          "RKey": "A",
+          "PartR": 1,
+          "RValue": "right2"
+        },
+        {
+          "LKey": "A",
+          "Part": 1,
+          "LValue": "left2",
+          "RKey": "A",
+          "PartR": 1,
+          "RValue": "right1"
+        },
+        {
+          "LKey": "A",
+          "Part": 1,
+          "LValue": "left2",
+          "RKey": "A",
+          "PartR": 1,
+          "RValue": "right2"
+        },
+        {
+          "LKey": null,
+          "Part": 1,
+          "LValue": "nullleft",
+          "RKey": null,
+          "PartR": 1,
+          "RValue": "nullright"
+        },
+        {
+          "LKey": "A",
+          "Part": 2,
+          "LValue": "part2",
+          "RKey": "A",
+          "PartR": 2,
+          "RValue": "part2right"
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.join_data",
+      "output_node_label": "Все операции",
+      "columns": [
+        {
+          "name": "LKey",
+          "label": "LKey",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "Part",
+          "label": "Part",
+          "type": "integer",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "LValue",
+          "label": "LValue",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "RKey",
+          "label": "RKey",
+          "type": "string",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "PartR",
+          "label": "PartR",
+          "type": "integer",
+          "data_kind": "Дискретный"
+        },
+        {
+          "name": "RValue",
+          "label": "RValue",
+          "type": "string",
+          "data_kind": "Дискретный"
+        }
+      ],
+      "rows": [
+        {
+          "LKey": "A",
+          "Part": 1,
+          "LValue": "left1",
+          "RKey": "A",
+          "PartR": 1,
+          "RValue": "right1"
+        },
+        {
+          "LKey": "A",
+          "Part": 1,
+          "LValue": "left1",
+          "RKey": "A",
+          "PartR": 1,
+          "RValue": "right2"
+        },
+        {
+          "LKey": "A",
+          "Part": 1,
+          "LValue": "left2",
+          "RKey": "A",
+          "PartR": 1,
+          "RValue": "right1"
+        },
+        {
+          "LKey": "A",
+          "Part": 1,
+          "LValue": "left2",
+          "RKey": "A",
+          "PartR": 1,
+          "RValue": "right2"
+        },
+        {
+          "LKey": "B",
+          "Part": 1,
+          "LValue": "unmatched",
+          "RKey": null,
+          "PartR": null,
+          "RValue": null
+        },
+        {
+          "LKey": null,
+          "Part": 1,
+          "LValue": "nullleft",
+          "RKey": null,
+          "PartR": 1,
+          "RValue": "nullright"
+        },
+        {
+          "LKey": "A",
+          "Part": 2,
+          "LValue": "part2",
+          "RKey": "A",
+          "PartR": 2,
+          "RValue": "part2right"
+        }
+      ]
+    }
+  ]
+}
