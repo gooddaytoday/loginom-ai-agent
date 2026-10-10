@@ -1,0 +1,24 @@
+{
+  "source_commit": "314de3573e08a3dd6d188dc2900b5db2f2f56a54",
+  "files": [
+    {
+      "path": "data/cleanup.csv",
+      "bytes": 248,
+      "sha256": "c1204e8bb03a0a686ec291de1fa5d532f19830589d4040e695f2f17e186f2a2e"
+    },
+    {
+      "path": "fixtures/scalar-matrix.csv",
+      "bytes": 2200,
+      "sha256": "351c5a12660a1a016a565a0e909e680a5b00eae9abecae10d0310b86bcf69334"
+    },
+    {
+      "path": "fixtures/scalar-matrix.json",
+      "bytes": 65999,
+      "sha256": "805211c2c3f84248b061ee5a3c791e0ee34d00ec4cacaa52349ac738eef2b007"
+    }
+  ],
+  "encoding": "UTF-8",
+  "delimiter": ";",
+  "null_marker": "NULL",
+  "matrix_status": "historical_exploratory_not_reverified"
+}
