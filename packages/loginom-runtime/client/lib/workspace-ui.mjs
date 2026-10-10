@@ -3892,6 +3892,13 @@ function readRenderedInputMapping(observation) {
             const discrete=['Строковый','Логический'].includes(choice.label);
             kind.enabled=!discrete;
             if(discrete){kind.value='Дискретный';kind.value_length_utf16=kind.value.length;}
+            // Loginom 7.4.2 promotes an undefined kind when converting a
+            // string to real. Preserve explicit kinds and every other field.
+            if(choice.label==='Вещественный'
+              &&current.wizard.reform_parameters.fields.type_label.value==='Строковый'
+              &&kind.value==='Неопределенное') {
+              kind.value='Непрерывный';kind.value_length_utf16=kind.value.length;
+            }
           }
           if(!observed.authenticated || observed.origin!==current.origin || observed.loginom_build!==current.loginom_build
             || !same(observed.workflow_ref,current.workflow_ref) || !same(observed.package_identity,current.package_identity)

@@ -2520,7 +2520,7 @@ test('field parameters read row types caching and exclusion separately from port
 });
 
 test('reform editor reads seven native parameters including disabled cache and owner checkbox state',async()=>{
-  for(const mode of ['global','global_duplicate','global_impostor','global_foreign_wizard','valid','checked','missing_display','duplicate_display','duplicate_form','long_name','combo','combo_enable_kind','combo_wrong_kind','combo_excluded','combo_cache','combo_busy','combo_lost']) {
+  for(const mode of ['global','global_duplicate','global_impostor','global_foreign_wizard','valid','checked','missing_display','duplicate_display','duplicate_form','long_name','combo','combo_enable_kind','combo_undefined_to_continuous','combo_undefined_wrong_kind','combo_undefined_changed_name','combo_wrong_kind','combo_excluded','combo_cache','combo_busy','combo_lost']) {
     const page=new Page(),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1)),stem=base+'ReformColumnsWizard;';
     page.add('div',stem+'grdTargetColumns;tbl','',undefined,form);
     const row=page.add('table',null,'',undefined,form);row.attrs.class='x-grid-item-selected';
@@ -2541,6 +2541,7 @@ test('reform editor reads seven native parameters including disabled cache and o
     if(mode==='duplicate_display')page.add('span',root+'cntMain;chbExcluded;DisplayEl','',undefined,owner).attrs.class='x-form-checkbox';
     if(mode==='duplicate_form' || mode==='global_duplicate')page.add('div',base+'EditReformColumnDefForm');
     if(mode==='combo_enable_kind'){inputs.cbxDataType.value='Строковый';inputs.cbxDataKind.disabled=true;}
+    if(mode.startsWith('combo_undefined')){inputs.cbxDataType.value='Строковый';inputs.cbxDataKind.value='Неопределенное';inputs.cbxDataKind.disabled=true;}
     if(mode.startsWith('combo')) {
       const list=page.add('div',root+'cbxDataType;boundlist','',{x:600,y:300,width:140,height:40});
       page.add('div',root+'cbxDataType;boundlist;Вещественный','Вещественный',{x:605,y:305,width:130,height:25},list);
@@ -2549,16 +2550,19 @@ test('reform editor reads seven native parameters including disabled cache and o
       const full=await page.observe(),first=full.ui.elements.find(e=>e.wizard_combo?.kind==='option');assert.ok(first);
       const read=await page.execute({mode:'observe',root_ref:first.wizard_combo.list_ref});
       const option=read.output.ui.elements.find(e=>e.wizard_combo?.kind==='option');assert.ok(option);
+      if(mode.startsWith('combo_undefined')){assert.equal(read.output.wizard.reform_parameters.fields.type_label.value,'Строковый');assert.equal(read.output.wizard.reform_parameters.fields.data_kind.value,'Неопределенное');}
       const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);list.remove();
         inputs.cbxDataType.value='Вещественный';
         if(mode==='combo_enable_kind')inputs.cbxDataKind.disabled=false;
+        if(mode.startsWith('combo_undefined')){inputs.cbxDataKind.disabled=false;inputs.cbxDataKind.value=mode==='combo_undefined_wrong_kind'?'Дискретный':'Непрерывный';}
+        if(mode==='combo_undefined_changed_name')inputs.edtName.value='Foreign';
         if(mode==='combo_wrong_kind')inputs.cbxDataKind.value='Дискретный';
         if(mode==='combo_excluded')owner.attrs.class='x-form-cb-checked';
         if(mode==='combo_cache')inputs['cntMain;cbxCachingMethod'].value='При активации';
         if(mode==='combo_lost')throw new Error('lost reply');
       };
       const result=await page.act({verb:'select_wizard_option',ref:option.ref},read.output);
-      assert.equal(result.status,['combo','combo_enable_kind'].includes(mode)?'SUCCEEDED':mode==='combo_busy'?'NOT_APPLIED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+      assert.equal(result.status,['combo','combo_enable_kind','combo_undefined_to_continuous'].includes(mode)?'SUCCEEDED':mode==='combo_busy'?'NOT_APPLIED':'AMBIGUOUS',mode+JSON.stringify(result.error));
       assert.equal(page.events.filter(e=>e==='click').length,mode==='combo_busy'?0:1);continue;
     }
     const full=await page.observe(),params=full.wizard.reform_parameters;
