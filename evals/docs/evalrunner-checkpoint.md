@@ -1,20 +1,20 @@
 # EvalRunner — checkpoint 2026-10-10
-- Worktree: /home/kiselev/.codex/worktrees/eval-runner/loginom-ai-agent; branch eval-runner; исходная база 74cfb803f0488da60db6ab09dfc0ea2042572cf5.
-- Код: 8379d835a; инструкции/runbook/settings/template: 50cd54cc6. Все изменения внутри evals; основной/baseline worktree не менялись.
-- Этап A: config v3 / manifest v2 / роль evalrunner / общий lease / immutable product+baseline / CAS registry / comparison+offline replay реализованы локально.
-- v1/v2 и manifest v1 читаются без миграции; raw evidence не переписывается. CLI artifact сохраняет полный hash/mode/symlink/file-set контроль.
-- Smoke admissions отдельны от EvalBaseline: два 1×1, без infra retry; terminal product FAIL/no_artifact допускается только при replay+cleanup+release.
-- Full: 48×3 последовательно; measurement retry ради PASS запрещён; UNKNOWN/infra/failed cleanup блокируют; judge recovery без нового продукта.
-- Comparator strict по умолчанию; declared model/reasoning opt-in; прочие необъяснённые условия INCOMPARABLE; метрики и node PASS n/3 отдельно.
-- Scorer fingerprint 22 файлов совпал с LAB-55 helper ee7861513be1c4309fdf1678ccae78ad89522973: cb0971d04fa3cfd53cdcff38acebce9faee7ec7aa3de818d32b2410fc38a0f16.
-- Проверки: первый полный bun test 570 PASS / 9 SKIP / 0 FAIL; финальные fixture/offline 91 PASS + role 1 PASS; bun typecheck PASS.
-- Повторный полный bun test на 50cd54cc6 остановлен SIGTERM143: local docker create/run зависают до ID. Daemon/чужие контейнеры не менялись; полный повтор не пройден.
-- Private config draft + readonly v2 + hashes: evals/.bundle/evalrunner-preparation/; не активированы, readinessIssue ещё не задан.
-- LAB-55 read-only 2026-10-10 09:10 UTC: in_progress, journal recorded 123/144, running 1, pending 20, release отсутствует, stand.lease существует. Manifest SHA неизменен. Gate B не выполнен.
-- Этап B ОТЛОЖЕН ДО ЗАВЕРШЕНИЯ LAB-55: регистрация первого baseline, серверные поставка/config/helper/AppArmor/профиль/MCP, создание агента без squad, live-приёмка.
-- Multica агент/карточки/расписания не создавались; LAB-55 карточка, монитор, leases, journal, manifest и результаты не изменялись этими работами.
-- Инструкции: evals/docs/evalrunner/agent.md; настройки: agent-settings.json; этап B/команды: runbook.md; карточка: task-template.md.
-- Локальная immutable поставка + Git bundle: evals/.bundle/evalrunner-delivery/<source SHA>/delivery-receipt.json; file-set/hash/mode/tar/bundle verify. Активация отложена. Следующий шаг A: восстановить local Docker без вмешательства в чужую работу и повторить полный bun test.
-- Следующий шаг B: свежие 144+judgements+cleanup/history+valid release+download/hash receipts И FREE без active/queued/processes/harness leases/recovery; статус/idle/PID недостаточны.
-- Codex heartbeat evalrunner-lab-55 каждые 6 h; тик 12:10 МСК 2026-10-10 выполнен только чтением, следующий около 18:10 МСК. После полного gate создать Goal и автономно закончить B.
-- После доказанной готовности агента завершить Goal и удалить только этот heartbeat; private state /home/kiselev/.local/share/loginom-evalrunner-control/loop-state.json. Исходный монитор LAB-55 не менять.
+- Worktree /home/kiselev/.codex/worktrees/eval-runner/loginom-ai-agent; branch eval-runner; base 74cfb803f. Все изменения внутри evals; чужие worktree сохранены.
+- Активная immutable поставка/own server checkout: 6f5b40f8722cd253cc4459d4c71dc42ce1362a63; manifest SHA256 904c675afbcc12f37649b3e948cca82d6eb6eb551da8d9f2c6d86ece03fcb510; 751 файла verified.
+- Локально final bun test 572 PASS/9 SKIP/0 FAIL (560.24s), targeted 123 PASS, bun typecheck PASS; 9 SKIP закрыты на server fixtures (50 PASS + 2 PASS после PATH).
+- LAB-55 gate VERIFIED 2026-10-10: 144 measured/48 cases, mandatory verdicts, cleanup, 144 distinct private history archives, owner-bound release, verified downloaded archive.
+- Baseline f8c70eb0-88b6-457d-99a0-cd4ccb44d0b9; manifest SHA256 48b60d07dc71b3b6b528297a04cfd395fe9299507600acc2058e91031096d689; archive SHA256 f3914febcb32f7c1cb087700215a7aa6be2ae42f38c0dd099e41cdfe46b8e932.
+- Release находится в journal.release.receiptPath /operations/completed/3b6b8548-daae-4171-9403-735f9d5ef72a/release.json; series/release.json не является gate.
+- Первый baseline принят CAS expected-current none; registry R/operations/accepted-baselines/registry.json, решение — согласованный план/автоматическое продолжение владельца.
+- Stage B: common config v3/helper переключены при FREE/all runtime queues empty; system loginom-evals-multica.service перезапущен контролируемо, active.
+- Backup R/operations/evalrunner-activation-20261010; прежний helper baseline-v2-ee7861513/config/AppArmor сохранены; старые roles/модели/MCP/squads не изменены, entrypoints обновлены.
+- LAB-55 manifest/journal hashes до/после совпали; journal SHA256 0a71d61e4d8e190c8675dff1db8e124314d086bdc6e9fe9d71ac8484ffc88318; evidence не менялись.
+- Own R/roles/evalrunner eval-profile/judge-home/agent-work/work/results/history приватны; baseline credentials перенесены без истории. CLI exact 0.1.17/fc3d97db, product openai/gpt-6.1-sol/medium.
+- Old/current isolation SHA f52465c4f3592531a70e24bfdcb3fbf4dd5acfb55cae221f61fa30355246d8de совпал; меняются only role/paths/operational harness/config, proof в own work.
+- Реальный replay VERIFIED/live/modelCalls0; evaluator cb0971d04fa3cfd53cdcff38acebce9faee7ec7aa3de818d32b2410fc38a0f16 совпал; multi-case positive fixed-sum проверен с сохранением других FAIL.
+- Own live bwrap boundary VERIFIED: profile writable, input readable, 8 sensitive roots скрыты; OpenViking health/search actor и automatic Git Peer github.com-gooddaytoday-loginom-ai-agent проверены.
+- EvalRunner 5218b92b-71e0-4197-8225-4c30521a3467 создан; runtime a5fa993f-2903-4997-a832-955ffbb1203c, gpt-6.1-sol/xhigh, concurrency1, workspace; readback/hash/MCP/no squads VERIFIED.
+- LAB-74 UUID 01a1266e-c87f-76ad-869c-655e2534c10f назначена EvalRunner для двух отдельных 1×1 smoke, no infra retry, baseline параметры; readiness ещё НЕ подтверждена.
+- Следующий шаг: наблюдать один native run LAB-74 до terminal; проверить actual model/reasoning, distinct archives, cleanup/releases, downloaded curated archives и полный аудит. Product FAIL/no_artifact не повторять, UNKNOWN/infra блокируют.
+- Full comparative 48×3 только отдельной назначенной карточкой; latest/quality retries/унаследованное исключение LAB-55/расписания запрещены.
+- Goal ACTIVE; loop evalrunner-lab-55 ACTIVE каждые6h. Завершить Goal/удалить только этот heartbeat после полной готовности; private state /home/kiselev/.local/share/loginom-evalrunner-control/loop-state.json.
