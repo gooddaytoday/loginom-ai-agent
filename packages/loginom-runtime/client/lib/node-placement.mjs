@@ -56,11 +56,17 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
    &&bounds.x+bounds.width<Math.min(v.x+v.width,v.viewportWidth)-8&&bounds.y+bounds.height<Math.min(v.y+v.height,v.viewportHeight)-8;
  };
  let view=await root.evaluate(readViewport,nodeId),point=project(view,position),opened=false,steps=0,error,zoom;
+ // A rejected dispatch may have already changed the UI. Keep that uncertainty
+ // even if the owned menu subsequently closes; never repeat an unknown toggle.
+ const gesture=async dispatch=>{
+  try{return await dispatch();}
+  catch(e){e.placement_navigation_unverified=true;throw e;}
+ };
  const toggle=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;btnShowOutline')+']');
  const toggleOutline=async()=>{
   await guard();remaining();
   if(await toggle.count()!==1)throw Error('Canvas outline control unavailable');
-  if(await toggle.isVisible()){await toggle.click({timeout:remaining()});return;}
+  if(await toggle.isVisible()){await gesture(()=>toggle.click({timeout:remaining()}));return;}
   // The exact button can be hidden by the native toolbar overflow layout.
   // Bind its menu to that toolbar; never search a global menu by caption.
   const toolbarTid=prefix+';ModelForm;tlbModel',triggerTid=toolbarTid+';b',menuTid=triggerTid+';mn';
@@ -82,7 +88,8 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
   let menuOpened=false;
   try{
    for(let attempt=0;attempt<2;attempt++){
-    await guard();await trigger.press('ArrowDown',{timeout:remaining()});menuOpened=true;
+    await guard();remaining();menuOpened=true;
+    await gesture(()=>trigger.press('ArrowDown',{timeout:remaining()}));
     try{await menu.waitFor({state:'visible',timeout:Math.min(1000,remaining())});break;}
     catch(e){
      // Native keyboard focus can consume the first open after canvas zoom.
@@ -103,7 +110,7 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
      &&typeof c.checked==='boolean'&&c.checked===button.pressed;
    },{toolbarTid,toggleTid:prefix+';ModelForm;btnShowOutline',menuTid});
    if(!owned)throw Error('Owned outline overflow item identity unavailable');
-   await guard();await item.click({timeout:remaining()});
+   await guard();remaining();await gesture(()=>item.click({timeout:remaining()}));
   }finally{
    if(menuOpened){
     try{
@@ -129,7 +136,7 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
    if(await zoom.count()!==1||!await zoom.isVisible()||await zoom.getAttribute('data-qtip')!=='Уменьшить масштаб')throw Error('Exact canvas zoom-out control unavailable');
    while(!within(view,point)&&steps<12){
     await guard();remaining();const old=view.scale;
-    await zoom.click({timeout:remaining()});steps++;
+    await gesture(()=>zoom.click({timeout:remaining()}));steps++;
     const end=Math.min(Date.now()+1500,Date.now()+remaining());
     do {view=await root.evaluate(readViewport,nodeId);if(view.scale!==old)break;await page.waitForTimeout(Math.min(50,Math.max(0,end-Date.now())));}while(Date.now()<end);
     await guard();

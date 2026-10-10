@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
-import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
+import {createNodeTargetBrowserAdapter,mutateGraph} from '../lib/node-target-browser.mjs';
 import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
 import {nodePlacementPoint,nodePlacementPosition,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from '../lib/node-placement.mjs';
 
@@ -178,4 +178,45 @@ test('native focus-only open may retry only with the same unchanged toggle',asyn
  const changed=overflowFixture({changedOnOpen:true});
  await assert.rejects(revealNodePlacement(changed.args),e=>e.placement_navigation_unverified===true);
  assert.equal(changed.state().clicks,0);
+});
+
+// Lost replies are injected after the native fixture gesture, and classified
+// by the real mutation wrapper. No creation gesture may follow an unknown UI.
+for(const fault of ['overflow-open','overflow-toggle','visible-toggle','zoom','overflow-close','menu-cleanup'])test('lost navigation reply preserves mutation uncertainty: '+fault,async()=>{
+ const f=fault==='visible-toggle'?fixture():overflowFixture({selfHide:fault!=='menu-cleanup'});
+ const base=f.args.page.locator;let toggles=0,opens=0,creates=0;
+ const failAfter=async(fn,args)=>{await fn(...args);throw Error('Lost reply after '+fault);};
+ f.args.page.locator=selector=>{
+  if(selector==='[data-tid="MF;TF;ModelForm;cmpDiagram"]')return f.args.root;
+  if(!selector.includes('ModelForm')){creates++;throw Error('Unexpected creation locator');}
+  const original=base(selector);
+  if(selector.includes('btnShowOutline')&&fault==='visible-toggle')return {...original,click:async(...args)=>{toggles++;await failAfter(original.click,args);}};
+  if(selector==='[data-tid="MF;TF;ModelForm;tlbModel"]')return {...original,locator:child=>{
+   const trigger=original.locator(child);
+   return {...trigger,press:async(...args)=>{opens++;if(fault==='overflow-open')await failAfter(trigger.press,args);else await trigger.press(...args);}};
+  }};
+  if(selector==='[data-tid="MF;TF;ModelForm;tlbModel;b;mn"]')return {...original,
+   press:async(...args)=>{if(fault==='menu-cleanup')await failAfter(original.press,args);else await original.press(...args);},
+   locator:child=>{const children=original.locator(child);return {...children,filter:options=>{
+    const item=children.filter(options);return {...item,click:async(...args)=>{
+     toggles++;if(fault==='overflow-toggle'||fault==='overflow-close'&&toggles===2)await failAfter(item.click,args);else await item.click(...args);
+    }};
+   }};}
+  };
+  if(selector==='[data-tid="MF;TF;ModelForm;cntDiagram"]'&&fault==='zoom')return {...original,locator:child=>{
+   const control=original.locator(child);return {...control,click:async(...args)=>failAfter(control.click,args)};
+  }};
+  return original;
+ };
+ f.args.page.evaluate=async()=>true;
+ const graph={interaction_ready:true,dom_epoch:1,document_id:'doc',nodes:[],links:[]};
+ const task={deadline:Date.now()+10000,request:{document_id:'doc',workflow_ref:{prefix:'MF;TF',workflow_id:'wf'}},effect:{id:'lost-navigation',kind:'create',parameters:{type:'transform.join_data',position:f.args.position},before:graph},types:{'transform.join_data':{title:'Join',palette_group:'Transforms'}}};
+ const outcome=await mutateGraph(f.args.page,task,async()=>graph,()=>{},f.args.readViewport,nodePlacementPoint,revealNodePlacement,samePlacementGraph);
+ assert.equal(outcome.status,'AMBIGUOUS');assert.equal(outcome.effect_possible,true);assert.equal(outcome.cleanup_complete,false);
+ assert.equal(creates,0);assert.deepEqual(graph.nodes,[]);
+ if(['overflow-open','overflow-toggle','visible-toggle','menu-cleanup'].includes(fault))assert.equal(f.state().clicks,0);
+ if(fault==='overflow-open'){assert.equal(opens,1);assert.equal(toggles,0);assert.equal(f.overflowState().menuOpen,false);}
+ if(fault==='overflow-toggle'){assert.equal(toggles,1);assert.equal(opens,1);assert.equal(f.state().open,true);}
+ if(fault==='visible-toggle'){assert.equal(toggles,1);assert.equal(f.state().open,true);}
+ if(fault==='overflow-close'){assert.equal(toggles,2);assert.equal(opens,2);}
 });
