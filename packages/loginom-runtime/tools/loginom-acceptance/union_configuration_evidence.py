@@ -19,7 +19,7 @@ def verify_union_configuration(events,request):
         p=request['parameters'];count=len(p['tables'])+1
         if len(after['input_fields'])!=count or len(after['mappings'])!=count-1:raise ValueError('union_input_count')
         if after['prefixes']['enabled']!=p['prefixes']['enabled']:failures.append('union_prefix_flag')
-        if p['prefixes']['enabled'] and after['prefixes']!=p['prefixes']:failures.append('union_prefix_values')
+        if after['prefixes']!=p['prefixes']:failures.append('union_prefix_values')
         tables=[]
         for port,m in enumerate(after['mappings'],1):
             if m['port']!=port:raise ValueError('union_ordered_port')

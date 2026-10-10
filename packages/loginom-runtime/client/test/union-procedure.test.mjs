@@ -44,3 +44,12 @@ test('Union does not click or scroll from a clipped quarter-point cell whose cen
  const channel={perform:async({resolve})=>{assert.deepEqual(resolve(s),{verb:'scroll_horizontal',ref:'middle',delta_x:-400});partial.interaction=hit.interaction;for(const e of s.ui.elements)e.horizontal_scroll.left=81;gestures++;},observe:async({ready})=>{assert.ok(ready(s));return structuredClone(s);}};
  await revealUnionField(channel,structuredClone(s),2,'A','field');assert.equal(gestures,1);
 });
+
+ test('Union clears literal prefix values while leaving prefix use disabled',async()=>{
+ const f=fixture();f.c.mappings[0]={port:1,pairs:[{main:'A',source:'Right'}],unmatched:['Wrong']};
+ const wanted={...p,prefixes:{enabled:false,name:'',label:''}};
+ const r=await configureUnion(f.channel,wanted,{request:{finish:'done'}});
+ assert.deepEqual(r.configuration.prefixes,wanted.prefixes);
+ assert.deepEqual(f.actions.map(a=>a.verb),['set_checked','fill','press','fill','press','set_checked']);
+ assert.equal(f.actions[0].checked,true);assert.equal(f.actions.at(-1).checked,false);
+});

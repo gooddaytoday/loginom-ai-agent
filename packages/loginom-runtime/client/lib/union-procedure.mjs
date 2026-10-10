@@ -60,13 +60,15 @@ export async function configureUnion(channel,p,{request}){
  const wanted=resolveUnionTables(p,s.node_union.input_fields),changes=[];
  const click=async(tid,condition)=>{const old=s.node_union;await channel.perform({condition,initialObservation:s,ready:unionReady,identity:()=>semantic(old),resolve:s=>({verb:'click',ref:control(s,tid,'click').ref})});};
  const base=s.wizard.root_tid+';UnionDataWizard;';
- if(s.node_union.prefixes.enabled!==p.prefixes.enabled){
+ const editPrefixes=['name','label'].some(key=>s.node_union.prefixes[key]!==p.prefixes[key]);
+ const editablePrefixUse=p.prefixes.enabled||editPrefixes;
+ if(s.node_union.prefixes.enabled!==editablePrefixUse){
   const before=s.node_union;
   await channel.perform({condition:'set union prefix use',initialObservation:s,ready:unionReady,identity:()=>semantic(before),
-   resolve:s=>({verb:'set_checked',ref:control(s,base+'cntUsePrefixes;cnt;chb;InputEl','set_checked').ref,checked:p.prefixes.enabled})});
-  s=await channel.observe({condition:'union prefix flag applied',readUnion:true,ready:s=>unionReady(s)&&s.node_union.prefixes.enabled===p.prefixes.enabled});changes.push('prefix_use');
+   resolve:s=>({verb:'set_checked',ref:control(s,base+'cntUsePrefixes;cnt;chb;InputEl','set_checked').ref,checked:editablePrefixUse})});
+  s=await channel.observe({condition:'union prefix flag applied',readUnion:true,ready:s=>unionReady(s)&&s.node_union.prefixes.enabled===editablePrefixUse});changes.push('prefix_use');
  }
- if(p.prefixes.enabled)for(const [key,tid] of [['name','pedNamePrefix'],['label','pedDisplayNamePrefix']]){
+ for(const [key,tid] of [['name','pedNamePrefix'],['label','pedDisplayNamePrefix']]){
   if(s.node_union.prefixes[key]===p.prefixes[key])continue;
   const old=s.node_union;
   const inputs=s.ui.elements.filter(e=>e.allowed_actions.includes('fill')&&e.signature?.tag==='input'&&e.identity?.anchor_tid===base+tid+';ValueControl');
@@ -76,6 +78,12 @@ export async function configureUnion(channel,p,{request}){
   await channel.perform({condition:'commit union prefix '+key,initialObservation:s,ready:s=>s.wizard?.stage==='union',identity:()=>old.node_context,resolve:s=>{const inputs=s.ui.elements.filter(e=>e.allowed_actions.includes('press')&&e.signature?.tag==='input'&&e.identity?.anchor_tid===base+tid+';ValueControl');need(inputs.length===1,'Union prefix commit control unavailable');return {verb:'press',ref:inputs[0].ref,key:'Tab'};}});
   s=await channel.observe({condition:'union prefix value applied',readUnion:true,ready:s=>unionReady(s)&&s.node_union.prefixes[key]===p.prefixes[key]});changes.push('prefix_'+key);
  }
+ if(s.node_union.prefixes.enabled!==p.prefixes.enabled){
+  const before=s.node_union;
+  await channel.perform({condition:'restore requested union prefix use',initialObservation:s,ready:unionReady,identity:()=>semantic(before),resolve:s=>({verb:'set_checked',ref:control(s,base+'cntUsePrefixes;cnt;chb;InputEl','set_checked').ref,checked:p.prefixes.enabled})});
+  s=await channel.observe({condition:'requested union prefix flag applied',readUnion:true,ready:s=>unionReady(s)&&s.node_union.prefixes.enabled===p.prefixes.enabled});changes.push('prefix_use');
+ }
+ need(same(s.node_union.prefixes,p.prefixes),'Union final prefix values differ');
  // Remove obsolete pairs individually; retaining correct pairs prevents the
  // automatic first-compatible-field selection from changing unrelated rows.
  for(const table of wanted){
