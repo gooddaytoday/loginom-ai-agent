@@ -96,7 +96,17 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
         return
       }
       if (ending === "release") await client.request("release", { run: "one" })
-      if (ending === "close") await expect(port.close()).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
+      if (ending === "close") {
+        await expect(port.close()).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
+        expect(host.journal.pending()).toEqual([])
+        expect((await recoveryStore(join(root, "recovery"), { strict: true })).pending()).toHaveLength(2)
+        await expect(client.request("acquire", { run: "next", session: "chat" })).rejects.toThrow("LOGINOM_CALL_BUSY")
+        expect(await call("finish")).toEqual({ action: "finish" })
+        expect(host.journal.pending()).toEqual([])
+        expect(await readdir(join(root, "recovery"))).toEqual([])
+        await client.request("release", { run: "one" })
+        return
+      }
       if (ending === "uncertain") {
         expect(await call("uncertain")).toEqual({ action: "uncertain" })
         await expect(call("finish")).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
@@ -119,7 +129,7 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
       // only has to close runtimes that are still alive.
       if (ending === "disconnect") await expect(host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
       if (ending !== "disconnect") await host.close()
-      if (ending !== "finish") {
+      if (ending !== "finish" && ending !== "close") {
         const calls = await readFile(join(directory, "calls.jsonl"), "utf8")
         expect(
           calls

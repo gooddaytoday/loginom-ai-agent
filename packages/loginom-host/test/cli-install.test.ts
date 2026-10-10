@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { cp, mkdir, mkdtemp, readFile, readlink, rename, rm, symlink, writeFile } from "node:fs/promises"
+import { chmod, cp, mkdir, mkdtemp, readFile, readlink, rename, rm, symlink, writeFile } from "node:fs/promises"
 import { join, dirname } from "node:path"
 import { tmpdir } from "node:os"
 import { installCli, uninstallCli } from "../src/cli-install"
@@ -22,7 +22,11 @@ test.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
         await mkdir(dirname(join(artifact, file)), { recursive: true })
         await writeFile(join(artifact, file), file)
       }
-      await cp("/bin/sleep", join(artifact, "bin/loginom-ai-agent-cli"))
+      await rm(join(artifact, "resources/loginom/bin/node"))
+      await cp(process.env.LOGINOM_AI_AGENT_TEST_NODE ?? process.execPath, join(artifact, "resources/loginom/bin/node"), { dereference: true })
+      await chmod(join(artifact, "resources/loginom/bin/node"), 0o755)
+      await writeFile(join(artifact, "bin/loginom-ai-agent-cli"), "#!/bin/sh\nresolved=$(readlink \"$0\")\n[ -n \"$resolved\" ] || resolved=\"$0\"\nexec \"$(dirname \"$resolved\")/../resources/loginom/bin/node\" -e 'process.stdout.write(\"ready\\n\"); setTimeout(() => {}, 30000)'\n")
+      await chmod(join(artifact, "bin/loginom-ai-agent-cli"), 0o755)
       await symlink("loginom-ai-agent-cli", join(artifact, "bin/alias"))
       await writeCliManifest(artifact, {
         version: "test",
@@ -57,8 +61,13 @@ test.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
       const installed = await installCli(artifact, home)
       expect(await readlink(launcher)).toBe(join(installed.destination, "bin/loginom-ai-agent-cli"))
       expect(await readlink(join(installed.destination, "bin/alias"))).toBe("loginom-ai-agent-cli")
-      const child = Bun.spawn([launcher, "30"], { stdout: "ignore", stderr: "ignore" })
+      const child = Bun.spawn([launcher, "30"], { stdout: "pipe", stderr: "pipe" })
       try {
+        const reader = child.stdout.getReader()
+        const ready = await reader.read()
+        reader.releaseLock()
+        if (ready.done) throw new Error("Fixture startup failed: " + await new Response(child.stderr).text())
+        expect(new TextDecoder().decode(ready.value)).toBe("ready\n")
         await expect(uninstallCli(home)).rejects.toThrow("CLI_INSTALL_BUSY")
       } finally {
         child.kill()

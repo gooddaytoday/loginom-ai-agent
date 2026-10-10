@@ -147,13 +147,10 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
       error instanceof Error && error.message === "CLI_ARGUMENT_INVALID" ? 2 : 1,
     )
   } finally {
-    try {
-      await cleanup.dispose?.()
-    } finally {
-      cleanup.detach?.()
-      LoginomHost.disconnect()
-      await host.close()
-      if (signal?.aborted && process.exitCode !== 130 && process.exitCode !== 4) failure("CLI_CANCELLED", 130)
-    }
+    await host.close()
+    await cleanup.dispose?.()
+    cleanup.detach?.()
+    LoginomHost.disconnect()
+    if (signal?.aborted && process.exitCode !== 130 && process.exitCode !== 4) failure("CLI_CANCELLED", 130)
   }
 }
