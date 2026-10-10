@@ -14,8 +14,19 @@ function fixture(){
  const values={cbxReplaceOther:0,chkCaseSensitivity:true,edPrecision:0,edtReplaceOther:'x'};
  for(const k of Object.keys(values)){const e=element(base+k,root);components[e.id]={el:{dom:e},getValue:()=>values[k]};}
  const masks=[];const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?all.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):q.startsWith('.x-mask')?masks:[]}};
- return {root,fields,pairs,input,table,inputProxy,pairProxy,selected,values,masks,read:()=>vm.runInNewContext('('+readReplacementBrowser.toString()+')("MF;TF")',context)};
+ const addControl=(name,properties)=>{const e=element(base+name,root);components[e.id]={el:{dom:e},...properties};};
+ return {root,fields,pairs,input,table,inputProxy,pairProxy,selected,values,masks,addControl,read:()=>vm.runInNewContext('('+readReplacementBrowser.toString()+')("MF;TF")',context)};
 }
+test('real editor separators come from the exact owned local controls',()=>{
+ const f=fixture();f.fields[0].data.DataType=3;
+ f.pairs.splice(0,f.pairs.length,{isModel:true,internalId:'p',data:{Index:0,CollectionID:0,DataValueType:3,ReplaceByType:3,ValueRender:1.25,ReplaceRender:9.125}});
+ f.addControl('ReplaceEditor;fldVariant;ValueContainer;num',{decimalSeparator:'.'});
+ f.addControl('ReplaceEditor-1;fldVariant;ValueContainer;num',{decimalSeparator:','});
+ f.addControl('edtReplaceOtherFloat',{decimalSeparator:'.'});
+ assert.deepEqual(JSON.parse(JSON.stringify(f.read().real_decimal_separators)),{from:'.',to:',',other:'.'});
+ const absent=fixture();absent.fields[0].data.DataType=3;absent.pairs.splice(0,absent.pairs.length);
+ assert.deepEqual(JSON.parse(JSON.stringify(absent.read().real_decimal_separators)),{from:null,to:null,other:null});
+});
 test('cached rules retain Null, empty and literal null without invoking remote getters',()=>{const r=fixture().read();assert.equal(r.verified,true);assert.deepEqual(Array.from(r.pairs,p=>p.from.value),[null,'','null']);assert.equal(r.pairs.length,3);assert.equal(r.input_fields[1].name,'Other');});
 test('exact Int64 native BigInt is serialized as a decimal string',()=>{const f=fixture();f.fields[0].data.DataType=4;f.pairs.splice(0,f.pairs.length,{isModel:true,internalId:'p',data:{Index:0,CollectionID:0,DataValueType:4,ReplaceByType:4,ValueRender:1,ReplaceRender:9223372036854775807n}});assert.equal(f.read().pairs[0].to.value,'9223372036854775807');});
 test('reader refuses loading, pending responses, foreign selection and unsupported rules',()=>{
