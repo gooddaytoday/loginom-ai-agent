@@ -14,6 +14,7 @@ function fixture(){
  for(const [k,s] of [['grdDataList',input],['grdReplaceItems',table]]){const e=element(base+k,root);components[e.id]={el:{dom:e},getStore:()=>s,getSelectionModel:()=>({getSelection:()=>selected})};}
  const values={cbxReplaceOther:0,chkCaseSensitivity:true,edPrecision:0,edtReplaceOther:'x'};
  for(const k of Object.keys(values)){const e=element(base+k,root);components[e.id]={el:{dom:e},getValue:()=>values[k]};}
+ const tableGrid=Object.values(components).find(c=>c.getStore?.()===table);tableGrid.findPlugin=()=>({context:{record:pairs[0]}});
  const masks=[];const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?all.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):q.startsWith('.x-mask')?masks:[]}};
  const addControl=(name,properties)=>{const e=element(base+name,root);components[e.id]={el:{dom:e},...properties};};
  return {root,fields,pairs,input,table,inputProxy,pairProxy,selected,values,masks,addControl,read:()=>vm.runInNewContext('('+readReplacementBrowser.toString()+')("MF;TF")',context)};
@@ -49,4 +50,9 @@ test('remaining policies keep, null and value survive native pair verification',
 test('editor proof uses native controllers rather than displayed NULL markers',async()=>{
  for(const value of [null,'','Null','null']){const f=fixture();f.addControl('ReplaceEditor',{Controller:{getValue:()=>value}});f.addControl('ReplaceEditor-1',{Controller:{getValue:()=>value}});const r=await f.read();assert.equal(r.verified,true);assert.equal(r.editor_values.from.value,value);assert.equal(r.editor_values.to.value,value);}
  const f=fixture();f.addControl('ReplaceEditor',{getValue:()=>null});f.addControl('ReplaceEditor-1',{getValue:()=>null});assert.equal((await f.read()).verified,false);
+});
+
+test('native await cannot replace either bound proxy or change input inventory/metadata',async()=>{
+ for(const side of ['DataValue','ReplaceBy']){const f=fixture();if(side==='ReplaceBy')f.pairs[0].data.ReplaceRender=null;f.pairs[0].data[side]={DataType:5,IsNull:true,Value:Promise.resolve().then(()=>{f.pairs[0].data[side]={DataType:5,IsNull:false,Value:'Null'};return null;})};assert.equal((await f.read()).verified,false);}
+ for(const change of [f=>f.fields.push({isModel:true,internalId:'new',data:{Name:'Added',DisplayName:'Added',DataType:5,ReplaceMode:0}}),f=>f.fields[0].data.DisplayName='changed',f=>f.fields[0].data.DataType=4,f=>f.fields[0].data.ReplaceMode=0,f=>f.fields[0].data={...f.fields[0].data},f=>f.pairs[0].data.Index=42,f=>f.pairs[0].data.DataValueType=4,f=>f.pairs[0].data={...f.pairs[0].data},f=>f.pairs.push({...f.pairs[0],internalId:'new'})]){const f=fixture();f.pairs[0].data.DataValue={DataType:5,IsNull:true,Value:Promise.resolve().then(()=>{change(f);return null;})};assert.equal((await f.read()).verified,false);}
 });

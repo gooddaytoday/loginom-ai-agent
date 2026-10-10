@@ -43,10 +43,24 @@ export async function readReplacementBrowser(prefix){
   }
   return null;
  };
+ if(rows.some(r=>!r?.isModel||!r.data))return fail('replacement_table_record');
+ const inputGrid=grid,tableGrid=cmp('grdReplaceItems'),inputStore=grid.getStore(),tableStore=tableGrid.getStore();
+ const inputProxy=inputStore.getProxy(),tableProxy=tableStore.getProxy();
+ const snapshot=(r,keys)=>({record:r,data:r.data,id:r.internalId,model:r.isModel,values:keys.map(k=>r.data[k])});
+ const inputKeys=['Name','DisplayName','DataType','ReplaceMode','Index','ReplaceTable'];
+ const rowKeys=['Index','CollectionID','DataValueType','ReplaceByType','DataValue','ReplaceBy'];
+ const inputs=rs.map(r=>snapshot(r,inputKeys)),boundRows=rows.map(r=>({...snapshot(r,rowKeys),from:JSON.stringify(typed(r.data.ValueRender,field.type)),to:JSON.stringify(typed(r.data.ReplaceRender,field.type))}));
+ const unchanged=(captured,current,keys)=>Array.isArray(current)&&current.length===captured.length&&captured.every((b,i)=>current[i]===b.record&&b.record.data===b.data&&b.record.internalId===b.id&&b.record.isModel===b.model&&keys.every((k,j)=>b.data[k]===b.values[j]));
+ const stable=()=>{
+  const currentInputs=records(inputGrid,'bg.ext.CollectionProxy',1000),currentRows=records(tableGrid,'bg.ext.CollectionListProxy',512),selection=inputGrid.getSelectionModel?.().getSelection?.();
+  return roots[0].checkVisibility({checkVisibilityCSS:true})&&cmp('grdDataList')===inputGrid&&cmp('grdReplaceItems')===tableGrid&&inputGrid.getStore()===inputStore&&tableGrid.getStore()===tableStore&&inputStore.getProxy()===inputProxy&&tableStore.getProxy()===tableProxy&&selection?.length===1&&selection[0]===selectedRecord&&unchanged(inputs,currentInputs,inputKeys)&&unchanged(boundRows,currentRows,rowKeys)&&boundRows.every(b=>b.from===JSON.stringify(typed(b.data.ValueRender,field.type))&&b.to===JSON.stringify(typed(b.data.ReplaceRender,field.type)));
+ };
  const pairs=[],seen=new Set();for(const r of rows){const d=r?.data,id=String(r?.internalId??'');
   if(!r?.isModel||!id||seen.has(id)||![0,1].includes(d?.CollectionID))return fail('replacement_table_record');seen.add(id);
   if(!Object.hasOwn(d,'DataValueType')&&!Object.hasOwn(d,'ReplaceByType'))continue; // Empty group placeholder.
   if(d.CollectionID!==0||types[d.DataValueType]!==field.type||types[d.ReplaceByType]!==field.type)return fail('replacement_unsupported_rule');
+  if(!stable())return fail('replacement_native_inventory_changed');
+  const binding=boundRows[rows.indexOf(r)],fromProxy=binding.values[4],toProxy=binding.values[5];
   let from,to;
   try{
    const read=async proxy=>{
@@ -55,8 +69,9 @@ export async function readReplacementBrowser(prefix){
     if(types[type]!==field.type||typeof isNull!=='boolean'||isNull!==(value===null))return null;
     return typed(value,field.type);
    };
-   [from,to]=await Promise.all([read(d.DataValue),read(d.ReplaceBy)]);
+   [from,to]=await Promise.all([read(fromProxy),read(toProxy)]);
   }catch{return fail('replacement_native_value');}
+  if(!stable())return fail('replacement_native_inventory_changed');
   if(JSON.stringify(from)!==JSON.stringify(typed(d.ValueRender,field.type))||JSON.stringify(to)!==JSON.stringify(typed(d.ReplaceRender,field.type)))return fail('replacement_native_cache_mismatch');
   if(!from||!to||!Number.isSafeInteger(d.Index)||d.Index<0||pairs.some(p=>p.index===d.Index))return fail('replacement_typed_value');
   pairs.push({record_id:id,index:d.Index,from,to});
@@ -67,19 +82,22 @@ export async function readReplacementBrowser(prefix){
  const other={mode:['keep','null','value'][mode]};
  if(mode===2){const c=cmp(field.type==='string'?'edtReplaceOther':field.type==='real'?'edtReplaceOtherFloat':'edtReplaceOtherInt'),v=c?.getValue?.();other.value=typed(v,field.type);if(!other.value)return fail('replacement_other_value');}
  const editors=exact(base+'ReplaceEditor').filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
- let editor_values=null;
+ let editor_values=null,editor_record_id=null;
  if(editors.length){
+  const record=tableGrid.findPlugin?.('rowediting')?.context?.record;
+  if(!rows.includes(record))return fail('replacement_editor_binding');
+  editor_record_id=String(record.internalId);
   const from=cmp('ReplaceEditor'),to=cmp('ReplaceEditor-1');
   try{editor_values={from:typed(from?.Controller?.getValue?.(),field.type),to:typed(to?.Controller?.getValue?.(),field.type)};}catch{return fail('replacement_editor_value');}
   if(!editor_values.from||!editor_values.to)return fail('replacement_editor_value');
  }
  // Awaited native reads must still belong to the exact inventory and selection.
- if(!roots[0].checkVisibility({checkVisibilityCSS:true})||cmp('grdDataList')!==grid||grid.getSelectionModel?.().getSelection?.().length!==1||grid.getSelectionModel?.().getSelection?.()[0]!==selectedRecord||records(cmp('grdReplaceItems'),'bg.ext.CollectionListProxy',512)?.some((r,i)=>r!==rows[i])||records(cmp('grdReplaceItems'),'bg.ext.CollectionListProxy',512)?.length!==rows.length)return fail('replacement_native_inventory_changed');
+ if(!stable())return fail('replacement_native_inventory_changed');
  const separator=suffix=>{const c=cmp(suffix);return ['.',','].includes(c?.decimalSeparator)?c.decimalSeparator:null;};
  const real_decimal_separators=field.type==='real'?{
   from:separator('ReplaceEditor;fldVariant;ValueContainer;num'),
   to:separator('ReplaceEditor-1;fldVariant;ValueContainer;num'),
   other:separator('edtReplaceOtherFloat'),
  }:null;
- return {verified:true,inventory_complete:true,state_source:'native_replacement_values',input_fields:fields,selected:field.name,pairs,other,case_sensitive:caseSensitive,precision,editor_open:editors.length>0,editor_values,real_decimal_separators,settings_applied:false};
+ return {verified:true,inventory_complete:true,state_source:'native_replacement_values',input_fields:fields,selected:field.name,pairs,other,case_sensitive:caseSensitive,precision,editor_open:editors.length>0,editor_values,editor_record_id,real_decimal_separators,settings_applied:false};
 }

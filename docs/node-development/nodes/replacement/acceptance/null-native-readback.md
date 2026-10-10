@@ -29,3 +29,15 @@ disagreement, native read failure, identity changes, editor-controller proof,
 remaining keep/null/value policies, and the existing Int64/Real/add/replace
 checks. Review this local verification fix independently; diagnose successful
 NULL mutation and saved-package proof only after resource recovery.
+
+Review follow-up (parent fd6f0933ebebda06dadca47c4d3a53855234550d):
+The actual configureReplacement commit resolver validates editor values, native
+row ID, input ID/type, node owner and the Update control binding on every
+resolution, including production UI_EPOCH_CHANGED recovery. Integration tests
+use createNodeProcedure with a durably recorded NOT_APPLIED receipt, and require
+zero Update gestures after value/binding changes; unchanged recovery still works.
+The reader snapshots both inventories, records/data objects, IDs/metadata,
+render values, stores/proxies and both native value bindings, then compares them
+before and after awaited native reads and before returning a verified result.
+Native proxy replacement or input inventory growth during await now refuses.
+These are offline verification repairs only; the live limitation above remains.
