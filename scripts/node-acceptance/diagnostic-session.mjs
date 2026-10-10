@@ -27,7 +27,7 @@ export async function withDiagnosticSession({ context, execute, directory, ident
       return prepared
     } })
   } catch (error) { failure = error }
-  if (bound) {
+  if (bound && !failure) {
     try {
       receipt = await execute(makeCleanupCode({ ...identity, sessionId, account, packagePath, loginomUrl, loginomBuild,
         documentId: prepared.document_id, tabTid: prepared.workflow_ref.tab_tid }))

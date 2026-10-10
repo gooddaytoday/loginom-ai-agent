@@ -39,10 +39,10 @@ for (const scenario of ['success', 'exception', 'cleanup failure', 'wrong receip
       if (scenario === 'success') assert.equal(await run(), 'done')
       else await assert.rejects(run, scenario === 'exception' ? /original-error/ : scenario === 'prepare failure' ? /prepare-failed/ : scenario === 'missing build' ? /Exact isolated cleanup identity required/ : scenario === 'persistence failure' ? /ENOENT/ : /CLEANUP_UNCONFIRMED/)
       assert.equal(closed, scenario === 'success')
-      assert.equal(cleanupCalls, ['prepare failure', 'missing build'].includes(scenario) ? 0 : 1)
+      assert.equal(cleanupCalls, ['prepare failure', 'missing build', 'exception'].includes(scenario) ? 0 : 1)
       if (scenario === 'persistence failure') return
       const cleanup = JSON.parse(await readFile(join(directory, 'cleanup.json')))
-      assert.equal(cleanup.confirmed, scenario === 'success' || scenario === 'exception')
+      assert.equal(cleanup.confirmed, scenario === 'success')
       assert.doesNotMatch(JSON.stringify(cleanup), /secret-bearing-error/)
     } finally { await rm(directory, { recursive: true, force: true }) }
   })
@@ -54,7 +54,7 @@ for (const scenario of ['success', 'exception', 'cleanup failure', 'wrong receip
  });
  test('an original error survives cleanup and persistence failures with context retained',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'diagnostic-errors-'));const original=Error('original');let closed=false;
- try{await assert.rejects(withDiagnosticSession({directory,identity,makeCleanupCode:makePackageCleanupCode,execute:async()=>{await rm(directory,{recursive:true,force:true});throw Error('cleanup');},context:{close:async()=>{closed=true;}}},async({bindPrepared})=>{await bindPrepared(prepared);throw original;}),e=>e===original);assert.equal(closed,false);}finally{await rm(directory,{recursive:true,force:true});}
+ try{await assert.rejects(withDiagnosticSession({directory,identity,makeCleanupCode:makePackageCleanupCode,execute:async()=>{await rm(directory,{recursive:true,force:true});throw Error('cleanup');},context:{close:async()=>{closed=true;}}},async({bindPrepared})=>{await bindPrepared(prepared);await rm(directory,{recursive:true,force:true});throw original;}),e=>e===original);assert.equal(closed,false);}finally{await rm(directory,{recursive:true,force:true});}
  });
 
 for(const field of ['session_id','document_id','account','package_path'])test('cleanup identity mismatch: '+field,async()=>{
