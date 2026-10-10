@@ -128,3 +128,54 @@ test('created node without verified rendered bounds cannot silently use a point'
  const f=fixture();f.args.nodeId='missing';
  await assert.rejects(revealNodePlacement(f.args),/footprint unavailable/);assert.equal(f.state().clicks,0);
 });
+
+// Native 7.4.2 toolbar/menu identities captured from the case diagnostic copy.
+function overflowFixture({foreignToolbar=false,foreignMenu=false,duplicate=false,selfHide=false,cleanupFailure=false,focusOnly=false,changedOnOpen=false}={}){
+ const f=fixture(),base=f.args.page.locator;let menuOpen=false,itemClicks=0,opens=0;
+ const toolbarTid='MF;TF;ModelForm;tlbModel',triggerTid=toolbarTid+';b',menuTid=triggerTid+';mn';
+ const attrs=(id,tid)=>({id,getAttribute:k=>k==='data-tid'?tid:k==='data-qtip'?'Показать карту сценария':null});
+ const toolbarEl=attrs('bar',toolbarTid),triggerEl=attrs('trigger',triggerTid),buttonEl=attrs('button','MF;TF;ModelForm;btnShowOutline');
+ toolbarEl.querySelector=()=>triggerEl;buttonEl.closest=()=>toolbarEl;
+ const bar={},button={ownerCt:foreignToolbar?{}:bar,getEl:()=>({dom:buttonEl}),get pressed(){return f.state().open;}},triggerComponent={ownerCt:bar};
+ const menuComponent={el:{dom:attrs('menu',menuTid)}};
+ bar.layout={overflowHandler:{$className:'Ext.layout.container.boxOverflow.Menu',menuTrigger:triggerComponent,menuItems:[button],menu:menuComponent}};
+ const itemEl=attrs('item',menuTid+';mn.ch-2'),itemComponent={ownerCt:foreignMenu?{}:menuComponent,text:'Показать карту сценария',disabled:false,get checked(){return f.state().open;}};
+ const components={bar,button,trigger:triggerComponent,item:itemComponent};
+ const evaluate=(el,fn,args)=>runInNewContext('('+fn.toString()+')(element,args)',{element:el,args,Ext:{getCmp:id=>components[id]},document:{querySelector:s=>s.includes('tlbModel')?toolbarEl:buttonEl}});
+ const trigger={count:async()=>1,isVisible:async()=>true,press:async key=>{assert.equal(key,'ArrowDown');opens++;menuOpen=!focusOnly||opens>1;if(changedOnOpen){menuOpen=false;await base('[data-tid="MF;TF;ModelForm;btnShowOutline"]').click();}}};
+ const toolbar={count:async()=>1,locator:s=>{assert.equal(s,'[data-tid="'+triggerTid+'"]');return trigger;}};
+ const toggle={...base('[data-tid="MF;TF;ModelForm;btnShowOutline"]'),isVisible:async()=>false,evaluate:async(fn,args)=>evaluate(buttonEl,fn,args)};
+ const item={count:async()=>duplicate?2:1,isVisible:async()=>menuOpen,evaluate:async(fn,args)=>evaluate(itemEl,fn,args),click:async()=>{itemClicks++;await toggle.click();if(selfHide)menuOpen=false;}};
+ const menu={count:async()=>1,isVisible:async()=>menuOpen,waitFor:async({state})=>assert.equal(menuOpen,state==='visible'),locator:()=>({filter:()=>item}),press:async key=>{assert.equal(key,'Escape');if(cleanupFailure)throw Error('Menu cleanup failed');menuOpen=false;}};
+ f.args.page.locator=s=>s==='[data-tid="'+toolbarTid+'"]'?toolbar:s==='[data-tid="'+menuTid+'"]'?menu:s.includes('btnShowOutline')?toggle:base(s);
+ return {...f,overflowState:()=>({menuOpen,itemClicks})};
+}
+for(const selfHide of [false,true])test('hidden owned outline toggles through its exact native overflow menu; cleanup '+selfHide,async()=>{
+ const f=overflowFixture({selfHide});const r=await revealNodePlacement(f.args);
+ assert.equal(r.fully_visible,true);assert.equal(f.state().open,false);
+ assert.deepEqual(f.overflowState(),{menuOpen:false,itemClicks:2});
+});
+test('foreign toolbar, foreign menu and ambiguous item refuse before zoom and clean only owned menus',async()=>{
+ for(const options of [{foreignToolbar:true},{foreignMenu:true},{duplicate:true}]){
+  const f=overflowFixture(options);await assert.rejects(revealNodePlacement(f.args),/overflow.*(identity|item)/);
+  assert.equal(f.state().clicks,0);assert.equal(f.state().open,false);
+  assert.deepEqual(f.overflowState(),{menuOpen:false,itemClicks:0});
+ }
+});
+test('overflow cleanup failure is never presented as verified navigation',async()=>{
+ const f=overflowFixture({cleanupFailure:true});
+ await assert.rejects(revealNodePlacement(f.args),e=>e.placement_navigation_unverified===true);
+ assert.equal(f.state().clicks,0);
+});
+test('strictly visible placement never opens a hidden outline overflow menu',async()=>{
+ const f=overflowFixture();f.args.position={x:104,y:200};
+ assert.equal((await revealNodePlacement(f.args)).fully_visible,true);
+ assert.deepEqual(f.overflowState(),{menuOpen:false,itemClicks:0});
+});
+test('native focus-only open may retry only with the same unchanged toggle',async()=>{
+ const f=overflowFixture({focusOnly:true});assert.equal((await revealNodePlacement(f.args)).fully_visible,true);
+ assert.equal(f.state().open,false);assert.equal(f.overflowState().menuOpen,false);
+ const changed=overflowFixture({changedOnOpen:true});
+ await assert.rejects(revealNodePlacement(changed.args),e=>e.placement_navigation_unverified===true);
+ assert.equal(changed.state().clicks,0);
+});
