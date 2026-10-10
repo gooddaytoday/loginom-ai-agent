@@ -7,3 +7,10 @@ const request=()=>({operation_id:'union-op',contract_revision:'1.0.0',document_i
 const handlers=createCandidateNodeSupport({}).nodeApplyHandlers;
 test('public Union contract admits three sources and the installed typed handler',()=>{const r=request();assert.doesNotThrow(()=>validateActionParameters(nodeApplyInputSchema,r));assert.doesNotThrow(()=>validateNodeApplyRequest(r,handlers));assert.equal(typeof handlers.get('transform.union_data').configurationReadback,'function');});
 test('public Union contract refuses foreign, missing, unordered and unsupported inputs',()=>{for(const change of [r=>r.inputs[2].source.workflow_id='foreign',r=>r.inputs.pop(),r=>r.parameters.tables.reverse(),r=>r.mode='distinct',r=>r.mappings[0].port=3]){const r=request();change(r);assert.throws(()=>{validateActionParameters(nodeApplyInputSchema,r);validateNodeApplyRequest(r,handlers);});}});
+test('two-input Union declares only the joined table and explains accidental main-table entries',()=>{
+ const r=request();r.inputs.pop();r.parameters.tables.pop();r.mappings=[];
+ r.parameters.prefixes={enabled:false,name:'',label:''};
+ assert.doesNotThrow(()=>validateNodeApplyRequest(r,handlers));
+ r.parameters.tables.push({port:2,fields:[{source:'Extra',main:null}]});
+ assert.throws(()=>validateNodeApplyRequest(r,handlers),/requires 3 input sources at ports 0\.\.2.*never the main table at port 0/);
+});

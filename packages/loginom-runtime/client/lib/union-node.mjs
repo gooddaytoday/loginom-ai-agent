@@ -8,6 +8,12 @@ import {preflightUnion} from './union-preflight.mjs';
 import {configureDerivedInlineMapping} from './grouping-inline-mapping.mjs';
 import {verifyJoinOutputSync} from './join-output-sync.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
+// Keep guidance local to Union: the main table belongs to inputs[0], not
+// parameters.tables. Descriptions do not change the shared request schema.
+const parameterSchema=structuredClone(unionParametersSchema);
+parameterSchema.description='Append all rows, preserving duplicates. inputs includes the main table at port 0 and joined tables at ports 1..N. parameters.tables describes ONLY joined tables; never include the main table there. Two total inputs require exactly one tables entry (port 1); three total inputs require exactly two entries (ports 1 and 2).';
+parameterSchema.properties.tables.description='Complete mappings for joined input ports 1..N ONLY, in order. Do not list the main table at input port 0. Each source field must have an explicit main field name or null to retain a separate output field.';
+parameterSchema.properties.prefixes.description='Always supply enabled, name and label. For no prefixes use {enabled:false,name:"",label:""}. When enabled is true, name must be a nonempty identifier; name and label are prepended only to unmatched joined fields.';
 export function validateUnionInlineSources(configuration,native){
  const expected=unionOutputFields(configuration);
  need(native?.verified&&native.inventory_complete&&native.source_identity_verified,'Union inline output not verified');
@@ -18,7 +24,7 @@ export function validateUnionInlineSources(configuration,native){
  return native.target_fields.filter(f=>!f.excluded&&f.source===null);
 }
 export function createUnionNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'transform.union_data',modes:['append_all'],revision:'union-v4-internal-1',readback:unionConfigurationReadback,parameterSchema:unionParametersSchema,
+ type:'transform.union_data',modes:['append_all'],revision:'union-v4-internal-2',readback:unionConfigurationReadback,parameterSchema,
  validate:validateUnionParameters,preflight:preflightUnion,configureInputs:configureUnionInputs,
  configurationObservation:{condition:'union configuration page',readUnion:true,ready:unionReady},
  async configure(channel,p,{request}){
