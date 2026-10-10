@@ -1,8 +1,8 @@
 import { mkdir, writeFile, rename } from 'node:fs/promises'
 import { join } from 'node:path'
 
-// The caller supplies the cleanup generator from the exact runtime being tested.
-// This helper does not weaken package identity/dirty/running-node guards.
+// The caller retains ownership of the original context on every refusal.
+// A profile or a replacement login cannot recover its in-memory native bindings.
 export async function withDiagnosticSession({ context, execute, directory, identity, makeCleanupCode }, run) {
   const { sessionId, account, packagePath, loginomUrl, loginomBuild } = identity
   const persist = async (name, value) => {
@@ -10,48 +10,38 @@ export async function withDiagnosticSession({ context, execute, directory, ident
     await writeFile(file + '.tmp', JSON.stringify(value, null, 2) + '\n', { mode: 0o600 })
     await rename(file + '.tmp', file)
   }
-  const state = { prepared: null, cleanup: null, failed: false }
+  let prepared, bound = false, failure, value, receipt = null, confirmed = false
   try {
-    // Validate before any diagnostic action, including the mandatory build.
     await mkdir(directory, { recursive: true, mode: 0o700 })
     makeCleanupCode({ ...identity, documentId: 'preflight', tabTid: 'preflight' })
     await persist('session.json', { sessionId, account, packagePath, loginomBuild, prepared: null })
-    return await run({
-      bindPrepared: async (prepared) => {
-        // Capture before returning control to diagnostic code that may throw.
-        state.prepared = prepared
-        await persist('session.json', { sessionId, account, packagePath, loginomBuild, prepared })
-        if (prepared?.status !== 'READY' || prepared.package_ref?.path !== packagePath)
-          throw Error('DIAGNOSTIC_PACKAGE_IDENTITY_UNCONFIRMED')
-        return prepared
-      },
-    })
-  } catch (error) {
-    state.failed = true
-    throw error
-  } finally {
-    let confirmed = false
+    value = await run({ bindPrepared: async candidate => {
+      bound = false
+      prepared = candidate
+      if (prepared?.status !== 'READY' || prepared.package_ref?.path !== packagePath
+          || typeof prepared.document_id !== 'string' || !prepared.document_id
+          || typeof prepared.workflow_ref?.tab_tid !== 'string' || !prepared.workflow_ref.tab_tid)
+        throw Error('DIAGNOSTIC_PACKAGE_IDENTITY_UNCONFIRMED')
+      await persist('session.json', { sessionId, account, packagePath, loginomBuild, prepared })
+      bound = true
+      return prepared
+    } })
+  } catch (error) { failure = error }
+  if (bound) {
     try {
-      const prepared = state.prepared
-      if (prepared?.status === 'READY' && prepared.package_ref?.path === packagePath) {
-        state.cleanup = await execute(makeCleanupCode({
-          ...identity, sessionId, account, packagePath, loginomUrl, loginomBuild,
-          documentId: prepared.document_id, tabTid: prepared.workflow_ref.tab_tid,
-        }))
-        const receipt = state.cleanup
-        confirmed = receipt?.status === 'SUCCEEDED' && receipt.package_closed === true && receipt.logged_out === true
-          && receipt.session_id === sessionId && receipt.document_id === prepared.document_id
-          && receipt.account === account && receipt.package_path === packagePath
-      }
-    } catch {
-      // Keep raw errors out of durable reports: they can contain credentials.
-    } finally {
-      try {
-        await persist('cleanup.json', { confirmed, receipt: state.cleanup })
-      } finally {
-        await context.close()
-      }
-    }
-    if (!confirmed && !state.failed) throw Error('DIAGNOSTIC_CLEANUP_UNCONFIRMED')
+      receipt = await execute(makeCleanupCode({ ...identity, sessionId, account, packagePath, loginomUrl, loginomBuild,
+        documentId: prepared.document_id, tabTid: prepared.workflow_ref.tab_tid }))
+      confirmed = receipt?.status === 'SUCCEEDED' && receipt.package_closed === true && receipt.logged_out === true
+        && receipt.session_id === sessionId && receipt.document_id === prepared.document_id
+        && receipt.account === account && receipt.package_path === packagePath
+    } catch (error) { failure ??= Error('DIAGNOSTIC_CLEANUP_UNCONFIRMED', { cause: error }) }
   }
+  try {
+    // Evidence must be durable before browser exit; raw errors may contain credentials.
+    await persist('cleanup.json', { confirmed, receipt, browser_retained: !confirmed || !!failure })
+  } catch (error) { failure ??= error }
+  if (!confirmed) failure ??= Error('DIAGNOSTIC_CLEANUP_UNCONFIRMED')
+  if (failure) throw failure
+  await context.close()
+  return value
 }

@@ -26,9 +26,10 @@ const {NODE_TYPES}=await load('client/lib/node-contracts.mjs');
 const sessionId=randomUUID(),origin=new URL(config.url).origin;
 await mkdir(directory,{recursive:true,mode:0o700});
 const record=createExecutionJournal({directory,metadata:{sessionId,clientRevision:resources.manifestHash,actionManifestDigest:resources.manifest.actionManifestSha256},knownSecrets:[config.api_key,config.password]});
-const {context}=await loginBrowser({browserPath:resources.browserPath,profile:join(directory,'browser'),candidate:{url:config.url,username:config.username,password:config.password},headless:true,keepOpen:true});
-const execute=code=>new Function('page',`return (${code})(page)`)(context.pages()[0]);
+export const {context}=await loginBrowser({browserPath:resources.browserPath,profile:join(directory,'browser'),candidate:{url:config.url,username:config.username,password:config.password},headless:true,keepOpen:true});
+export const execute=code=>new Function('page',`return (${code})(page)`)(context.pages()[0]);
 const need=(v,m)=>{if(!v)throw Error(m)};
+export let diagnosticFailure;
 await withDiagnosticSession({context,execute,directory,identity:{sessionId,account:config.username,packagePath,loginomUrl:config.url,loginomBuild:'7.4.2',diagnosticDiscard:true},makeCleanupCode:makePackageCleanupCode},async({bindPrepared})=>{
  const prepared=await bindPrepared(await execute(makeWorkspacePrepareCode({loginomUrl:config.url,compatibility:{loginom_build:'7.4.2',platform:'linux',browser:'chromium'},sessionId,operationId:'settings-open',intent:'open_package',packagePath})));
  const adapter=createNodeTargetBrowserAdapter({execute,origin,build:'7.4.2'});
@@ -64,4 +65,10 @@ await withDiagnosticSession({context,execute,directory,identity:{sessionId,accou
   }finally{const closed=await closePreparedWizard(channel);need(closed.verified&&closed.settings_applied===false,'WIZARD_CANCEL');}
  }
  await writeFile(join(directory,'result.json'),JSON.stringify({status:'PASS',path:packagePath,settings_reapplied:false,configurations},null,2)+'\n');
+ }).catch(async error=>{
+ diagnosticFailure=error;
+ process.exitCode=1;
+ // The existing interactive owner can still use the exported original context.
+ // Do not turn a retained-context refusal into an uncaught process exit.
+ await writeFile(join(directory,'recovery-required.json'),JSON.stringify({context_retained:true,sessionId,packagePath,process_exit_safe:false})+'\n').catch(()=>undefined);
 });
