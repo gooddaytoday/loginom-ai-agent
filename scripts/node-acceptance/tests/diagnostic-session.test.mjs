@@ -65,3 +65,32 @@ for(const field of ['session_id','document_id','account','package_path'])test('c
  const directory=await mkdtemp(join(tmpdir(),'diagnostic-bind-'));let closed=false,calls=0;
  try{await assert.rejects(withDiagnosticSession({directory,identity,makeCleanupCode:makePackageCleanupCode,execute:async()=>{calls++;return receipt;},context:{close:async()=>{closed=true;}}},async({bindPrepared})=>{await rm(directory,{recursive:true,force:true});await bindPrepared(prepared);}),/ENOENT/);assert.equal(calls,0);assert.equal(closed,false);}finally{await rm(directory,{recursive:true,force:true});}
  });
+
+for (const rejectedValue of [null, undefined, false, 0, '']) {
+ for (const persistenceFails of [false, true]) test(`scenario rejection ${String(rejectedValue)}; persistence failure ${persistenceFails}`, async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'diagnostic-falsy-'))
+  let closed = false, cleanupCalls = 0, rejected = false, actual
+  try {
+   try {
+    await withDiagnosticSession({ directory, identity, makeCleanupCode: makePackageCleanupCode,
+     context: { close: async () => { closed = true } },
+     execute: async () => { cleanupCalls++; return receipt },
+    }, async ({ bindPrepared }) => {
+     await bindPrepared(prepared)
+     if (persistenceFails) await rm(directory, { recursive: true, force: true })
+     throw rejectedValue
+    })
+   } catch (value) { rejected = true; actual = value }
+   assert.equal(rejected, true)
+   assert.equal(Object.is(actual, rejectedValue), true)
+   assert.equal(cleanupCalls, 0)
+   assert.equal(closed, false)
+   if (!persistenceFails) {
+    const evidence = JSON.parse(await readFile(join(directory, 'cleanup.json')))
+    assert.equal(evidence.confirmed, false)
+    assert.equal(evidence.browser_retained, true)
+    assert.equal(evidence.receipt, null)
+   }
+  } finally { await rm(directory, { recursive: true, force: true }) }
+ })
+}
