@@ -1,4 +1,4 @@
-import {runReplacementDiagnostic} from './replacement-live-owner.mjs';
+import {runReplacementDiagnostic,retainReplacementOwner} from './replacement-live-owner.mjs';
 import {readFile,writeFile,mkdir,appendFile} from 'node:fs/promises';
 import {resolve,join} from 'node:path';import {pathToFileURL} from 'node:url';import {randomUUID,createHash} from 'node:crypto';import {createInterface} from 'node:readline';
 export async function runLive398(args, owner) {
@@ -26,6 +26,8 @@ console.log(JSON.stringify({diagnostic_out:out}));
 const {context}=await loginBrowser({browserPath:resources.browserPath,profile:join(out,'browser'),candidate:{url:config.loginom_url,username:account,password:config.workflow_profile.password},headless:true,keepOpen:true}).catch(async e=>{await save('login-failure',{error:redact(e.message),at:new Date().toISOString(),profile:join(out,'browser'),runtime_created:false});throw e;});const page=context.pages()[0];
 Object.assign(owner,{page,context});
 const execute=code=>new Function('page',`return (${code})(page)`)(page);
+const lifecycle={context,page,execute,directory:join(out,'lifecycle'),identity:{sessionId:sid,account,packagePath,loginomUrl:config.loginom_url,loginomBuild:'7.4.2'},makeCleanupCode:makePackageCleanupCode};
+delete owner.context;retainReplacementOwner(lifecycle,owner);
 const journal=createExecutionJournal({directory:out,metadata:{sessionId:sid},knownSecrets:[config.api_key,config.workflow_profile.password].filter(Boolean)});let trace=0;
 const snapshot=async label=>{
  const value=await page.evaluate(async()=>{
@@ -35,20 +37,20 @@ const snapshot=async label=>{
   const grid=cmp('grdReplaceItems'),input=cmp('grdDataList');result.selected=input?.getSelectionModel?.().getSelection?.().map(r=>({id:r.internalId,name:r.data.Name,type:r.data.DataType}));result.pairs=[];
   for(const r of grid?.getStore?.().getData?.().items??[]){const d=r.data,p={id:r.internalId,index:d.Index,collection:d.CollectionID,cache:{from:d.ValueRender,to:d.ReplaceRender}};if(d.DataValue&&d.ReplaceBy)try{const read=async v=>({DataType:await v.DataType,IsNull:await v.IsNull,Value:await v.Value});p.native={from:await read(d.DataValue),to:await read(d.ReplaceBy)};}catch(e){p.error=String(e.message);}result.pairs.push(p);}
   result.editor={from:cmp('ReplaceEditor')?.Controller?.getValue?.(),to:cmp('ReplaceEditor-1')?.Controller?.getValue?.(),record:grid?.findPlugin?.('rowediting')?.context?.record?.internalId};return result;
- });await save('trace-'+(++trace),{label,at:new Date().toISOString(),value});return value;
+ });const safe=JSON.parse(redact(JSON.stringify(value)));await save('trace-'+(++trace),{label,at:new Date().toISOString(),value:safe});return safe;
 };
-const record=async event=>{const r=await journal(event);if(['node_step_prepared','node_step_completed'].includes(event.phase)&&event.action_key!=='package.save_checkpoint')try{await snapshot(event.phase+':'+JSON.stringify(event.action??event.condition??event.internal_operation_id));}catch(e){await save('trace-error-'+(++trace),{message:e.message});}return r;};
+const record=async event=>{const r=await journal(event);if(['node_step_prepared','node_step_completed'].includes(event.phase)&&event.action_key!=='package.save_checkpoint')try{await snapshot(event.phase+':'+JSON.stringify(event.action??event.condition??event.internal_operation_id));}catch(e){await save('trace-error-'+(++trace),{message:redact(e?.message??String(e))});}return r;};
 const actions=JSON.parse(await readFile(join(root,'runtime/executor/catalog/actions.json'))).actions,selectors=JSON.parse(await readFile(join(root,'runtime/executor/catalog/selectors.json'))).selectors;
 for(const k of ['package.save_checkpoint','package.save_as'])actions.find(a=>a.action_key===k).effect.allowed_roots=[storage];
 const artifactStore=await createArtifactStore({directory:join(out,'artifacts'),sessionId:sid}),rc={targetOrigin:new URL(config.loginom_url).origin,targetBuild:'7.4.2'};
 const runtime=createActionRuntime({pinned:{actions:new Map(actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.map(s=>[s.symbol,s])),pins:{}},execute,onRecord:record,artifactStore,allowCandidate:true,...rc,...createCandidateNodeSupport(rc)});
+owner.runtime=runtime;lifecycle.runtime=runtime;
 let prepared,artifact,source,result,absent=false,step=0;
 const inventory=()=>page.evaluate(async()=>{const m=bg.app.Application.FInstance.FMainForm.FMapTree;return {account:m.FServerConnection.UserName,build:bg.app.Version,packages:await Promise.all(Array.from({length:m.PackageNodes.Count},async(_,i)=>{const n=m.PackageNodes.Items(i);return {path:n.PackageFileName,read_only:n.ReadOnly,running:n.HasRunningNodes(),modified:await m.FServerConnection.Session.IsPackageModified(n.Package)};}))};});
 await save('identity',{session:sid,packagePath,historical_replacement_sha:'398109d58ccd6e01032b3a72416c79ece8d889b2',resources_manifest:resources.manifestHash,at:new Date().toISOString()});
 console.log(JSON.stringify({ready:true,out,name,packagePath,inventory:await inventory(),unsettled:runtime.hasUnsettledWork()}));
 const base=()=>({contract_revision:'1.0.0',document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,inputs:[],mappings:[],finish:'execute',read:{ports:[0],sample_rows:100,require_exact_numbers:true},budgets:{configure_ms:120000,execute_ms:120000,total_ms:300000}});
-delete owner.context;
-return await runReplacementDiagnostic({context,page,execute,runtime,directory:join(out,'lifecycle'),identity:{sessionId:sid,account,packagePath,loginomUrl:config.loginom_url,loginomBuild:'7.4.2'},makeCleanupCode:makePackageCleanupCode},owner,async({bindPrepared})=>{
+return await runReplacementDiagnostic(lifecycle,owner,async({bindPrepared})=>{
  const lines=createInterface({input:process.stdin});try{for await(const line of lines){
   let q;try{q=JSON.parse(line);}catch{continue;}let r;
   try{
