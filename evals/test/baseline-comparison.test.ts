@@ -16,18 +16,27 @@ test("full model experiment compares fixed conditions and rejects unexplained en
     const before = await completedBaselineFixture(path.join(directory, "before"), { pins })
     const reference = await acceptBaseline(path.join(directory, "registry.json"), before.series, { issue: "LAB-55", decision: "owner fixture acceptance", expectedCurrent: null, archive: before.archive, archiveSha256: before.archiveSha256 })
     const candidate = { ...pins, model: "openai/other", variant: "high" }
+    const operationalEquivalence = { version: 1 as const, baselineId: reference.id, previousIsolationSha256: pins.isolationSha256,
+      currentIsolationSha256: candidate.isolationSha256, previousOpsConfigSha256: pins.opsConfigSha256, currentOpsConfigSha256: candidate.opsConfigSha256,
+      previousHarnessSha: pins.harnessSha, currentHarnessSha: candidate.harnessSha,
+      evaluatorSha256: await (await import("../src/evaluator-replay")).evaluatorFingerprint(repoRoot, pins.harnessSha),
+      decision: "Operator audited EvalRunner stop-on-infra policy; previous retry budget was never consumed", changes: ["role", "operational-harness"] as ("role" | "operational-harness")[] }
     const after = await completedBaselineFixture(path.join(directory, "after"), { pins: candidate, executorRole: "evalrunner", baseline: reference,
-      product: { version: candidate.cliVersion, source: candidate.cliSource, manifestSha256: candidate.cliManifestSha256, binarySha256: candidate.binarySha256, model: candidate.model, variant: candidate.variant }, declaredChanges: ["model", "reasoning"] })
+      product: { version: candidate.cliVersion, source: candidate.cliSource, manifestSha256: candidate.cliManifestSha256, binarySha256: candidate.binarySha256, model: candidate.model, variant: candidate.variant }, declaredChanges: ["model", "reasoning"], operationalEquivalence })
     const a = await checkBaseline(before.series)
     const b = await checkBaseline(after.series)
+    expect(b.manifest.infraRetries).toBe(0)
+    expect((await compareBaselineConditions(a, { ...b, manifest: { ...b.manifest, operationalEquivalence: undefined } })).reasons).toContain("infra_retry_policy")
     expect(await compareBaselineConditions(a, b)).toMatchObject({ status: "COMPARABLE", experiment: ["model", "reasoning"] })
+    const retried = { ...a, executions: [{ ...a.executions[0]!, result: { ...a.executions[0]!.result, infra_retry: { initial: a.executions[0]!.result } } }, ...a.executions.slice(1)] }
+    expect((await compareBaselineConditions(retried, b)).reasons).toContain("infra_retry_policy")
     const changed = { ...b, manifest: { ...b.manifest, pins: { ...b.manifest.pins, isolationSha256: "0".repeat(64) } } }
-    expect(await compareBaselineConditions(a, changed)).toMatchObject({ status: "INCOMPARABLE", reasons: ["isolationSha256"] })
+    expect(await compareBaselineConditions(a, changed)).toMatchObject({ status: "INCOMPARABLE", reasons: ["isolationSha256", "infra_retry_policy"] })
     changed.manifest.operationalEquivalence = { version: 1, baselineId: a.id, previousIsolationSha256: a.manifest.pins.isolationSha256,
       currentIsolationSha256: changed.manifest.pins.isolationSha256, previousOpsConfigSha256: a.manifest.pins.opsConfigSha256,
       currentOpsConfigSha256: changed.manifest.pins.opsConfigSha256, previousHarnessSha: a.manifest.pins.harnessSha,
       currentHarnessSha: changed.manifest.pins.harnessSha, evaluatorSha256: (await (await import("../src/evaluator-replay")).evaluatorFingerprint(repoRoot, a.manifest.pins.harnessSha)),
-      decision: "operator verified equivalent isolation after role/path migration", changes: ["role", "paths"] }
+      decision: "operator verified equivalent isolation after role/path migration and unused historical retry budget", changes: ["role", "paths", "operational-harness"] }
     expect((await compareBaselineConditions(a, changed)).status).toBe("COMPARABLE")
     changed.manifest.operationalEquivalence.baselineId = "foreign"
     expect((await compareBaselineConditions(a, changed)).status).toBe("INCOMPARABLE")

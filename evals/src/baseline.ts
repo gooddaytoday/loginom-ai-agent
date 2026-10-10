@@ -185,7 +185,7 @@ export async function prepareBaseline(directory: string, options: { checkout: st
     throw new BaselineFailure("BASELINE_CORPUS_CHANGED")
   const manifest: BaselineManifest = { version: executorRole === "evalrunner" ? 2 : 1, id: crypto.randomUUID(), kind: options.smoke ? "smoke" : "baseline",
     ...(executorRole === "evalrunner" ? { executorRole, product: options.product, baseline: options.baseline, declaredChanges: options.declaredChanges ?? [], ...(options.operationalEquivalence ? { operationalEquivalence: options.operationalEquivalence } : {}) } : {}),
-    createdAt: new Date().toISOString(), pins: options.pins, cases, infraRetries: options.smoke ? 0 : 1,
+    createdAt: new Date().toISOString(), pins: options.pins, cases, infraRetries: options.smoke || executorRole === "evalrunner" ? 0 : 1,
     ...(options.acceptedNodeSmokeNoArtifact ? { acceptedNodeSmokeNoArtifact: options.acceptedNodeSmokeNoArtifact } : {}),
     ...(selected === "regular:calc-data-double" ? { smokeOracle: await freezeSmokeOracle(options.checkout, cases[0]!) } : {}),
     jobs: (options.smoke ? [1] : [1, 2, 3]).flatMap(attempt => cases.map(item => ({ key: `${item.collection}-${item.id}-${attempt}`, caseKey: item.key, attempt }))) }
@@ -203,6 +203,7 @@ export async function prepareBaseline(directory: string, options: { checkout: st
 export async function beginBaselineMeasurement(directory: string, key: string, current: { checkout: string; pins: BaselinePins }) {
   return mutateBaseline(directory, async (manifest, journal) => {
     if (journal.release) throw new BaselineFailure("SERIES_RELEASED")
+    if (baselineRole(manifest) === "evalrunner" && manifest.infraRetries !== 0) throw new BaselineFailure("INFRA_RETRY_POLICY_REFUSED")
     if (JSON.stringify(manifest.pins) !== JSON.stringify(current.pins) || journal.checkout !== current.checkout) throw new BaselineFailure("PINS_CHANGED")
     if (manifest.baseline) {
       const { verifyBaselineReference } = await import("./baseline-registry")
@@ -258,7 +259,7 @@ export async function admitBaselineSmoke(directory: string, config: NodeOpsConfi
 }
 
 /** Readiness comes from both immutable smoke reports and their distinct verified releases. */
-export async function checkBaselineReadiness(config: NodeOpsConfig, pins?: BaselinePins, acceptedNodeSmokeNoArtifact?: string, executorRole: BaselineRole = "evalbaseline") {
+export async function checkBaselineReadiness(config: NodeOpsConfig, pins?: BaselinePins, acceptedNodeSmokeNoArtifact?: string, executorRole: BaselineRole = "evalbaseline", operationalEquivalence?: OperationalEquivalence) {
   if (executorRole === "evalrunner" && acceptedNodeSmokeNoArtifact) throw new BaselineFailure("LEGACY_ACCEPTANCE_REFUSED")
   const role = config.roles[executorRole]
   const root = await readinessRoot(config, false, executorRole)
@@ -275,8 +276,9 @@ export async function checkBaselineReadiness(config: NodeOpsConfig, pins?: Basel
       saved.baselineId !== manifest.id || saved.manifestSha256 !== journal.manifestSha256 || manifest.kind !== "smoke" || manifest.cases.length !== 1 ||
       baselineRole(manifest) !== executorRole || manifest.cases[0]!.key !== caseKey || !saved.seriesDir.startsWith(role!.resultsRoot + path.sep) ||
       baselineHash(JSON.stringify(config)) !== manifest.pins.opsConfigSha256) throw new BaselineFailure("READINESS_EVIDENCE_CHANGED")
-    // The accepted smoke predates the operational supplement; all measurement pins still match.
-    if (pins && JSON.stringify(acceptedNodeSmokeNoArtifact ? { ...pins, harnessSha: manifest.pins.harnessSha } : pins) !== JSON.stringify(manifest.pins))
+    // Legacy acceptance and an audited operational migration never waive measurement pins.
+    if (pins && JSON.stringify(acceptedNodeSmokeNoArtifact ? { ...pins, harnessSha: manifest.pins.harnessSha } : pins) !== JSON.stringify(manifest.pins) &&
+      !(executorRole === "evalrunner" && await smokeHarnessEquivalent(role!.checkout, role!.readinessIssue!, manifest.pins, journal.manifestSha256, pins, operationalEquivalence)))
       throw new BaselineFailure("READINESS_PINS_CHANGED")
     const report = await checkBaseline(saved.seriesDir)
     checks.push({ caseKey, admitted: true, complete: manifest.pins.mode === "live" && (executorRole === "evalbaseline" ? report.status === "complete" :
@@ -300,6 +302,17 @@ export async function checkBaselineReadiness(config: NodeOpsConfig, pins?: Basel
   })()
   return { issue: role!.readinessIssue, expected: 2, admitted: admitted.length,
     complete: checks.filter(check => check.complete).length, ready: checks.every(check => check.complete) && replay, replay, accepted, checks }
+}
+
+async function smokeHarnessEquivalent(checkout: string, issue: string, previous: BaselinePins, manifestSha256: string, current: BaselinePins, proof?: OperationalEquivalence) {
+  if (!proof || proof.version !== 1 || !proof.baselineId || !proof.decision?.trim() || !proof.changes?.includes("operational-harness") ||
+    proof.currentHarnessSha !== current.harnessSha || proof.currentOpsConfigSha256 !== current.opsConfigSha256 || proof.currentIsolationSha256 !== current.isolationSha256 ||
+    proof.evaluatorSha256 !== current.evaluatorSha256 || proof.readiness?.issue !== issue || proof.readiness.previousHarnessSha !== previous.harnessSha ||
+    proof.readiness.manifestSha256.length !== 2 || new Set(proof.readiness.manifestSha256).size !== 2 || !proof.readiness.manifestSha256.includes(manifestSha256) ||
+    JSON.stringify({ ...current, harnessSha: previous.harnessSha }) !== JSON.stringify(previous)) return false
+  const { evaluatorFingerprint } = await import("./evaluator-replay")
+  const scoring = await Promise.all([evaluatorFingerprint(checkout, previous.harnessSha), evaluatorFingerprint(checkout, current.harnessSha)])
+  return scoring.every(fingerprint => fingerprint === proof.evaluatorSha256)
 }
 
 async function readinessRoot(config: NodeOpsConfig, create: boolean, executorRole: BaselineRole) {
@@ -673,10 +686,12 @@ async function executeLiveBaseline(directory: string, config: NodeOpsConfig, env
   options: { issue?: string; task?: string; resume: boolean; recoverExecutor: boolean }) {
   const { acquireNodeStand, assertNodeStandOwner, preflightNodeStand, verifyBaselineStand, runNodeEvalOps } = await import("./node-eval-ops")
   const { manifest, journal } = await readBaseline(directory)
+  if (baselineRole(manifest) === "evalrunner" && manifest.infraRetries !== 0) throw new BaselineFailure("INFRA_RETRY_POLICY_REFUSED")
   if (JSON.stringify(pins) !== JSON.stringify(manifest.pins)) throw new BaselineFailure("PINS_CHANGED")
   if (!options.resume && journal.jobs.some(job => job.state !== "pending")) throw new BaselineFailure("USE_RESUME")
   if (journal.release) return { code: 0, ...await writeCheckResult(directory) }
-  const readiness = await checkBaselineReadiness(config, pins, manifest.acceptedNodeSmokeNoArtifact, baselineRole(manifest))
+  if (manifest.operationalEquivalence && manifest.operationalEquivalence.baselineId !== manifest.baseline?.id) throw new BaselineFailure("BASELINE_REFERENCE_CHANGED")
+  const readiness = await checkBaselineReadiness(config, pins, manifest.acceptedNodeSmokeNoArtifact, baselineRole(manifest), manifest.operationalEquivalence)
   if (manifest.kind === "baseline" && !readiness.ready && !readiness.accepted) throw new BaselineFailure("BASELINE_READINESS_INCOMPLETE")
   if (manifest.kind === "smoke") {
     const previous = readiness.checks.find(check => check.caseKey === manifest.cases[0]!.key)
@@ -1213,7 +1228,8 @@ async function readBaseline(directory: string) {
   const manifest = JSON.parse(raw) as BaselineManifest
   const journal = await Bun.file(path.join(directory, "journal.json")).json() as BaselineJournal
   if (![1, 2].includes(manifest.version) || manifest.version === 1 && manifest.executorRole !== undefined ||
-    manifest.version === 2 && manifest.executorRole !== "evalrunner" || manifest.infraRetries !== (manifest.kind === "smoke" ? 0 : 1) || journal.version !== 1 || journal.manifestSha256 !== baselineHash(raw) ||
+    manifest.version === 2 && manifest.executorRole !== "evalrunner" || ![0, 1].includes(manifest.infraRetries) ||
+    manifest.kind === "smoke" && manifest.infraRetries !== 0 || manifest.version === 1 && manifest.kind === "baseline" && manifest.infraRetries !== 1 || journal.version !== 1 || journal.manifestSha256 !== baselineHash(raw) ||
     JSON.stringify(journal.jobs.map(job => job.key)) !== JSON.stringify(manifest.jobs.map(job => job.key))) throw new BaselineFailure("MANIFEST_CHANGED")
   validatePins(manifest.pins, baselineRole(manifest), manifest.product)
   if (manifest.version === 2 && (manifest.acceptedNodeSmokeNoArtifact !== undefined || manifest.kind === "baseline" && !manifest.baseline ||

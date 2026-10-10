@@ -142,6 +142,14 @@ corpus/rubric/oracle/лимитов; scoring files читаются на exact G
 Agent не синтезирует такое решение. Без подходящего proof разница изоляции/config/harness
 даёт INCOMPARABLE. Файл встраивается в immutable manifest, дальнейшее редактирование не влияет.
 
+После изменения только operational harness уже измеренные smoke не повторяются.
+Оператор может добавить в proof readiness: {issue, previousHarnessSha, manifestSha256},
+закрепив ровно два исходных manifest SHA256. Executor принимает этот cohort только при
+совпадении всех measurement pins кроме harnessSha и exact-Git fingerprint обоих scorer.
+Изменение модели, CLI, критериев, изоляции или config требует нового допуска;
+пустое решение, чужой cohort или изменённый scorer блокируют reuse. Для текущей поставки
+путь проверенного proof берётся из runtime.md и передаётся prepare через --conditions.
+
 Comparison.json содержит coverage, метрики/переходы каждого кейса и отдельные node PASS n/3,
 затраты/infra/recovery. Сопоставление номеров попыток — описание, не парный эксперимент.
 regular/analytic compare сохраняет evaluation lineage и явный model/reasoning opt-in.
@@ -152,6 +160,10 @@ INCOMPARABLE сохраняет результаты серии и причин�
 ## Ошибки, доставка и откат
 
 Product FAIL/timeout/no_artifact окончателен и не препятствует 144 измерениям.
+EvalRunner фиксирует infraRetries=0 и в smoke, и в полной серии. Старые manifest v2
+с infraRetries=1 читаются без переписывания, но новый dispatch для них запрещён.
+Разница с историческим baseline budget=1 отражается отдельно: только операторский
+аудит operational-harness и отсутствие использованных infra retries допускают сравнение.
 UNKNOWN/infra/judge error/failed cleanup останавливает executor. Recovery — только штатные
 owner/process/history/storage gates и фиксированный operator admission, как в baseline-runtime.md.
 Judge recovery использует прежний артефакт. Не применять исключение LAB-55 к EvalRunner.

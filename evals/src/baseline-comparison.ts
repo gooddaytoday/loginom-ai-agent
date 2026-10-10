@@ -7,6 +7,7 @@ export type OperationalEquivalence = {
   version: 1; baselineId: string; previousIsolationSha256: string; currentIsolationSha256: string
   previousOpsConfigSha256: string; currentOpsConfigSha256: string; previousHarnessSha: string; currentHarnessSha: string
   evaluatorSha256: string; decision: string; changes: ("role" | "paths" | "operational-harness")[]
+  readiness?: { issue: string; previousHarnessSha: string; manifestSha256: string[] }
 }
 
 type Report = Awaited<ReturnType<typeof checkBaseline>>
@@ -41,6 +42,10 @@ export async function compareBaselineConditions(before: Report, after: Report) {
   if (a.isolationSha256 !== b.isolationSha256 && !explained) reasons.push("isolationSha256")
   if (a.opsConfigSha256 !== b.opsConfigSha256 && !explained) reasons.push("opsConfigSha256")
   if (a.harnessSha !== b.harnessSha && !explained) reasons.push("operational_harness")
+  const retryConsumed = [...before.executions, ...after.executions].some(execution => Boolean(execution.result?.infra_retry))
+  const retryExplained = Boolean(explained && proof?.changes.includes("operational-harness") && baselineRole(before.manifest) === "evalbaseline" &&
+    baselineRole(after.manifest) === "evalrunner" && before.manifest.infraRetries === 1 && after.manifest.infraRetries === 0 && !retryConsumed)
+  if (before.manifest.infraRetries !== after.manifest.infraRetries && !retryExplained) reasons.push("infra_retry_policy")
   const experiment = declared.filter((change): change is "model" | "reasoning" => change === "model" || change === "reasoning")
   for (const item of after.manifest.cases.filter(item => item.collection !== "node")) {
     const a = await baselineCaseSummary(before, item.key)
@@ -54,6 +59,7 @@ export async function compareBaselineConditions(before: Report, after: Report) {
   return { status: reasons.length ? "INCOMPARABLE" as const : "COMPARABLE" as const, before: before.id, after: after.id, reasons,
     declaredChanges: declared, experiment,
     operational: { previousRole: baselineRole(before.manifest), currentRole: baselineRole(after.manifest), explained: Boolean(explained), proof: proof ?? null },
+    retryPolicy: { previous: before.manifest.infraRetries, current: after.manifest.infraRetries, explained: retryExplained, consumed: retryConsumed },
     evaluator: { previous: first ?? null, current: second ?? null },
     interpretation: "Вывод относится к совокупности объявленных изменений; три попытки не доказывают статистическую значимость. Analytic structure: unavailable." }
 }

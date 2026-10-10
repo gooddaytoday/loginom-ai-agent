@@ -14,7 +14,7 @@
 - Реальный replay VERIFIED/live/modelCalls0; evaluator cb0971d04fa3cfd53cdcff38acebce9faee7ec7aa3de818d32b2410fc38a0f16 совпал; multi-case positive fixed-sum проверен с сохранением других FAIL.
 - Own live bwrap boundary VERIFIED: profile writable, input readable, 8 sensitive roots скрыты; OpenViking health/search actor и automatic Git Peer github.com-gooddaytoday-loginom-ai-agent проверены.
 - EvalRunner 5218b92b-71e0-4197-8225-4c30521a3467 создан; runtime a5fa993f-2903-4997-a832-955ffbb1203c, gpt-6.1-sol/xhigh, concurrency1, workspace; readback/hash/MCP/no squads VERIFIED.
-- LAB-74 UUID 01a1266e-c87f-76ad-869c-655e2534c10f назначена EvalRunner для двух отдельных 1×1 smoke, no infra retry, baseline параметры; readiness ещё НЕ подтверждена.
-- Следующий шаг: наблюдать один native run LAB-74 до terminal; проверить actual model/reasoning, distinct archives, cleanup/releases, downloaded curated archives и полный аудит. Product FAIL/no_artifact не повторять, UNKNOWN/infra блокируют.
+- LAB-74 UUID 01a1266e-c87f-76ad-869c-655e2534c10f назначена EvalRunner для двух отдельных 1×1 smoke, no infra retry, baseline параметры; оба завершены: calc PASS/100, node code FAIL; cleanup/releases VERIFIED, native run completed, in_review.
+- Следующий шаг: завершить TDD strict infraRetries=0 для full EvalRunner, audited reuse исходных smoke при operational-only миграции, затем immutable activation при FREE и аудит скачанных архивов/actual model. Goal ещё НЕ ready.
 - Full comparative 48×3 только отдельной назначенной карточкой; latest/quality retries/унаследованное исключение LAB-55/расписания запрещены.
 - Goal ACTIVE; loop evalrunner-lab-55 ACTIVE каждые6h. Завершить Goal/удалить только этот heartbeat после полной готовности; private state /home/kiselev/.local/share/loginom-evalrunner-control/loop-state.json.

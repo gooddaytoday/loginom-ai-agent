@@ -10,6 +10,42 @@ import { validateNodeRun } from "../src/node-evals"
 import { replayFixture } from "./helpers/evaluator-replay"
 import { replayEvaluatorEvidence } from "../src/evaluator-replay"
 import { baselineFixturePins } from "../fixtures/baseline"
+import { completedBaselineFixture } from "./helpers/baseline-series"
+import { acceptBaseline } from "../src/baseline-registry"
+
+test("full EvalRunner stops at the first infrastructure error without automatic redispatch", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evalrunner-infra-stop-"))
+  const server = Bun.serve({ port: 0, fetch: () => Response.json({ status: "ok", result: { revision: "fixture" } }) })
+  try {
+    const checkout = path.join(directory, "checkout")
+    await cp(path.join(evalsRoot, "tasks"), path.join(checkout, "evals/tasks"), { recursive: true })
+    for (const part of ["src", "script"]) await symlink(path.join(evalsRoot, part), path.join(checkout, "evals", part))
+    const caseDir = path.join(checkout, "evals/tasks/calc-data-double")
+    const task = await Bun.file(path.join(caseDir, "task.json")).json()
+    await Bun.write(path.join(caseDir, "data/fake-infra-retry.json"), "{}")
+    await Bun.write(path.join(caseDir, "task.json"), JSON.stringify({ ...task, inputs: [...task.inputs, "data/fake-infra-retry.json"] }))
+    const previous = await completedBaselineFixture(path.join(directory, "previous"), { checkout })
+    const baseline = await acceptBaseline(path.join(directory, "registry.json"), previous.series, { issue: "LAB-55", decision: "fixture owner", expectedCurrent: null, archive: previous.archive, archiveSha256: previous.archiveSha256 })
+    const series = path.join(directory, "candidate")
+    await prepareBaseline(series, { checkout, pins: baselineFixturePins, executorRole: "evalrunner", baseline,
+      product: { version: baselineFixturePins.cliVersion, source: baselineFixturePins.cliSource, manifestSha256: baselineFixturePins.cliManifestSha256,
+        binarySha256: baselineFixturePins.binarySha256, model: baselineFixturePins.model, variant: baselineFixturePins.variant } })
+    const env = { PATH: Bun.env.PATH, EVAL_BASELINE_FIXTURE: "1", EVAL_CLI_MODE: "fake", EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_AGENT_VARIANT: "medium",
+      EVAL_PROFILE_DIR: path.join(directory, "profile"), EVAL_WORKSPACE_ROOT: path.join(directory, "work"),
+      EVAL_ARTIFACT_SOURCE: `dir:${path.join(evalsRoot, "fixtures/storage")}`, LOGINOM_DOCK_API_KEY: "fixture",
+      LOGINOM_URL: `http://127.0.0.1:${server.port}`, LOGINOM_DOCK_BASE_URL: `http://127.0.0.1:${server.port}`,
+      EVAL_AGENT_PROVIDER_ID: "openai", EVAL_AGENT_PROVIDER_BASE_URL: "http://fixture", EVAL_AGENT_PROVIDER_API_KEY: "fixture", EVAL_AGENT_PROVIDER_MODEL_ID: "model",
+      EVAL_JUDGE_COMMAND: `${Bun.which("bun")} ${path.join(evalsRoot, "fixtures/fake-codex.ts")}`, JUDGE_MODEL: "gpt-6-astra", JUDGE_REASONING: "high" }
+    expect(await runBaseline(["start", "--series", series, "--limit", "1"], env)).toMatchObject({ code: 2, status: "AWAITING_RECOVERY" })
+    const report = await checkBaseline(series)
+    expect(report.coverage).toMatchObject({ recorded: 1, measured: 0, pending: 143, unknown: 0 })
+    const summary = await Bun.file(path.join(report.rows[0]!.runDir!, "summary.json")).json()
+    expect(summary.config.infra_retries).toBe(0)
+    expect(summary.tasks[0].attempts[0]).toMatchObject({ status: "infra_error" })
+    expect(summary.tasks[0].attempts[0].infra_retry).toBeUndefined()
+    expect(await Bun.file(path.join(directory, "work", summary.run_id, "calc-data-double/1/fake-launches.json")).json()).toBe(1)
+  } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
+}, 60_000)
 
 test("EvalRunner smoke freezes its own role and candidate while legacy pins remain strict", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "evalrunner-manifest-"))
@@ -151,9 +187,15 @@ test("concurrent smoke admissions cannot reserve two series for the same case", 
   } finally { await fixture.close() }
 })
 
-async function completedReadinessFixture(nodeStatus = "no_artifact", releaseNode = true, executorRole: "evalbaseline" | "evalrunner" = "evalbaseline", replay = false) {
+async function completedReadinessFixture(nodeStatus = "no_artifact", releaseNode = true, executorRole: "evalbaseline" | "evalrunner" = "evalbaseline", replay = false, revisioned = false) {
   const fixture = await readinessFixture(executorRole, replay)
-  const pins = { ...fixture.pins, mode: "live" as const }
+  if (revisioned) {
+    await Bun.$`git -C ${fixture.checkout} init`.quiet()
+    await Bun.$`git -C ${fixture.checkout} add evals`.quiet()
+    await Bun.$`git -C ${fixture.checkout} -c user.name=Fixture -c user.email=fixture@example.invalid commit -m fixture`.quiet()
+  }
+  const pins = { ...fixture.pins, mode: "live" as const, ...(revisioned ? { harnessSha: (await Bun.$`git -C ${fixture.checkout} rev-parse HEAD`.quiet()).text().trim(),
+    evaluatorSha256: await (await import("../src/evaluator-replay")).evaluatorFingerprint(fixture.checkout) } : {}) }
   const lease = await acquireNodeStand(fixture.config, { issue: "LAB-32", task: "fixture-smokes", role: executorRole, phase: "eval", sha: pins.harnessSha })
   const series: string[] = []
   const manifests = []
@@ -620,4 +662,30 @@ test("EvalRunner readiness requires real replay and refuses unknown, infrastruct
       expect(await checkBaselineReadiness(fixture.config, fixture.pins, undefined, "evalrunner")).toMatchObject({ replay: true, ready: outcome === "no_artifact" })
     } finally { await fixture.close() }
   }
+})
+
+test("operational migration reuses only an explicitly audited immutable smoke cohort with identical scoring and measurement pins", async () => {
+  const fixture = await completedReadinessFixture("no_artifact", true, "evalrunner", true, true)
+  try {
+    await Bun.write(path.join(fixture.checkout, "operational-migration.txt"), "stop on infrastructure error")
+    await Bun.$`git -C ${fixture.checkout} add operational-migration.txt`.quiet()
+    await Bun.$`git -C ${fixture.checkout} -c user.name=Fixture -c user.email=fixture@example.invalid commit -m migration`.quiet()
+    const pins = { ...fixture.pins, harnessSha: (await Bun.$`git -C ${fixture.checkout} rev-parse HEAD`.quiet()).text().trim() }
+    const proof = { version: 1 as const, baselineId: "accepted-fixture", previousIsolationSha256: pins.isolationSha256, currentIsolationSha256: pins.isolationSha256,
+      previousOpsConfigSha256: pins.opsConfigSha256, currentOpsConfigSha256: pins.opsConfigSha256, previousHarnessSha: fixture.pins.harnessSha, currentHarnessSha: pins.harnessSha,
+      evaluatorSha256: pins.evaluatorSha256!, decision: "Operator verified scoring and smoke execution are unchanged", changes: ["operational-harness"] as ("operational-harness")[],
+      readiness: { issue: fixture.config.roles.evalrunner!.readinessIssue!, previousHarnessSha: fixture.pins.harnessSha,
+        manifestSha256: await Promise.all(fixture.series.map(async series => baselineHash(await Bun.file(path.join(series, "manifest.json")).bytes()))) } }
+    await expect(checkBaselineReadiness(fixture.config, pins, undefined, "evalrunner")).rejects.toThrow("READINESS_PINS_CHANGED")
+    expect(await checkBaselineReadiness(fixture.config, pins, undefined, "evalrunner", proof)).toMatchObject({ ready: true, complete: 2, replay: true })
+    for (const changed of [{ ...proof, decision: "" }, { ...proof, evaluatorSha256: "0".repeat(64) },
+      { ...proof, readiness: { ...proof.readiness, manifestSha256: ["0".repeat(64), "1".repeat(64)] } }])
+      await expect(checkBaselineReadiness(fixture.config, pins, undefined, "evalrunner", changed)).rejects.toThrow("READINESS_PINS_CHANGED")
+    await expect(checkBaselineReadiness(fixture.config, { ...pins, variant: "high" }, undefined, "evalrunner", proof)).rejects.toThrow("READINESS_PINS_CHANGED")
+    await Bun.write(path.join(fixture.checkout, "evals/src/oracle.ts"), "export const changed = true")
+    await Bun.$`git -C ${fixture.checkout} add evals/src/oracle.ts`.quiet()
+    await Bun.$`git -C ${fixture.checkout} -c user.name=Fixture -c user.email=fixture@example.invalid commit -m changed-scorer`.quiet()
+    const changedPins = { ...pins, harnessSha: (await Bun.$`git -C ${fixture.checkout} rev-parse HEAD`.quiet()).text().trim() }
+    await expect(checkBaselineReadiness(fixture.config, changedPins, undefined, "evalrunner", { ...proof, currentHarnessSha: changedPins.harnessSha })).rejects.toThrow("READINESS_PINS_CHANGED")
+  } finally { await fixture.close() }
 })
