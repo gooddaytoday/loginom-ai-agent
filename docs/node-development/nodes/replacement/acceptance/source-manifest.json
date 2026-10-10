@@ -1,0 +1,29 @@
+{
+  "source": "packages/loginom-runtime/tools/loginom-acceptance/fixtures/replacement",
+  "files": [
+    {
+      "path": "data/empty.csv",
+      "bytes": 29,
+      "sha256": "4df9ac77b4092d75e010a5b4e430023549fd2428d76110382cb73fbaf8377cf3",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "null_marker": "NULL"
+    },
+    {
+      "path": "data/input.csv",
+      "bytes": 124,
+      "sha256": "0e0151318f8307267dc1ed61b396c869303331dc8f1831cac8b7b5a73d2e2e4b",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "null_marker": "NULL"
+    },
+    {
+      "path": "data/partial-input.csv",
+      "bytes": 67,
+      "sha256": "e195cdcbcc187601a822f31e26fc7d55f9507c66c51cb9e9d799d785649a1123",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "null_marker": "NULL"
+    }
+  ]
+}

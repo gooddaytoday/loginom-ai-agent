@@ -1,0 +1,244 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Main"
+    },
+    {
+      "type": "imports.text",
+      "label": "Partial"
+    },
+    {
+      "type": "transform.replace_columns",
+      "label": "Typed"
+    },
+    {
+      "type": "transform.replace_columns",
+      "label": "Preserved"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.replace_columns",
+      "output_node_label": "Typed",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "integer"
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string"
+        },
+        {
+          "name": "Category_Replace",
+          "label": "Category Замена",
+          "type": "string"
+        },
+        {
+          "name": "Category_Replaced",
+          "label": "Category Заменен",
+          "type": "boolean"
+        },
+        {
+          "name": "Code",
+          "label": "Code",
+          "type": "integer"
+        },
+        {
+          "name": "Code_Replace",
+          "label": "Code Замена",
+          "type": "integer"
+        },
+        {
+          "name": "Code_Replaced",
+          "label": "Code Заменен",
+          "type": "boolean"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real"
+        },
+        {
+          "name": "Amount_Replace",
+          "label": "Amount Замена",
+          "type": "real"
+        },
+        {
+          "name": "Amount_Replaced",
+          "label": "Amount Заменен",
+          "type": "boolean"
+        },
+        {
+          "name": "Keep",
+          "label": "Keep",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Category": "North",
+          "Code": 1,
+          "Amount": 1.25,
+          "Keep": "A",
+          "Category_Replace": "N",
+          "Category_Replaced": true,
+          "Code_Replace": "9223372036854775807",
+          "Code_Replaced": true,
+          "Amount_Replace": 9.125,
+          "Amount_Replaced": true
+        },
+        {
+          "Id": 2,
+          "Category": "north",
+          "Code": 2,
+          "Amount": 1.2501,
+          "Keep": "B",
+          "Category_Replace": null,
+          "Category_Replaced": true,
+          "Code_Replace": 2,
+          "Code_Replaced": false,
+          "Amount_Replace": -5.25,
+          "Amount_Replaced": true
+        },
+        {
+          "Id": 3,
+          "Category": null,
+          "Code": 3,
+          "Amount": 2.5,
+          "Keep": "C",
+          "Category_Replace": "Missing",
+          "Category_Replaced": true,
+          "Code_Replace": 3,
+          "Code_Replaced": false,
+          "Amount_Replace": -5.25,
+          "Amount_Replaced": true
+        },
+        {
+          "Id": 4,
+          "Category": "",
+          "Code": 4,
+          "Amount": 0.0,
+          "Keep": "D",
+          "Category_Replace": "Empty",
+          "Category_Replaced": true,
+          "Code_Replace": 4,
+          "Code_Replaced": false,
+          "Amount_Replace": -5.25,
+          "Amount_Replaced": true
+        },
+        {
+          "Id": 5,
+          "Category": "null",
+          "Code": 5,
+          "Amount": -1.5,
+          "Keep": "E",
+          "Category_Replace": "Literal",
+          "Category_Replaced": true,
+          "Code_Replace": 5,
+          "Code_Replaced": false,
+          "Amount_Replace": -5.25,
+          "Amount_Replaced": true
+        },
+        {
+          "Id": 6,
+          "Category": "Other",
+          "Code": 6,
+          "Amount": 3.75,
+          "Keep": "F",
+          "Category_Replace": null,
+          "Category_Replaced": true,
+          "Code_Replace": 6,
+          "Code_Replaced": false,
+          "Amount_Replace": -5.25,
+          "Amount_Replaced": true
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.replace_columns",
+      "output_node_label": "Preserved",
+      "columns": [
+        {
+          "name": "A",
+          "label": "A",
+          "type": "string"
+        },
+        {
+          "name": "A_Replace",
+          "label": "A_Replace",
+          "type": "string"
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "type": "string"
+        },
+        {
+          "name": "B_Replace",
+          "label": "B Замена",
+          "type": "string"
+        },
+        {
+          "name": "B_Replaced",
+          "label": "B Заменен",
+          "type": "boolean"
+        },
+        {
+          "name": "C",
+          "label": "C",
+          "type": "string"
+        },
+        {
+          "name": "C_Replace",
+          "label": "C Замена",
+          "type": "string"
+        },
+        {
+          "name": "C_Replaced",
+          "label": "C Заменен",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        {
+          "A": "north",
+          "A_Replace": "retained",
+          "B": "old",
+          "C": "stay",
+          "B_Replace": "New",
+          "B_Replaced": true,
+          "C_Replace": "Stayed",
+          "C_Replaced": true
+        },
+        {
+          "A": "other",
+          "A_Replace": "untouched",
+          "B": "other",
+          "C": "stay",
+          "B_Replace": "other",
+          "B_Replaced": false,
+          "C_Replace": "Stayed",
+          "C_Replaced": true
+        }
+      ]
+    }
+  ],
+  "static_sources": [
+    {
+      "name": "input.csv",
+      "bytes": 124,
+      "sha256": "0e0151318f8307267dc1ed61b396c869303331dc8f1831cac8b7b5a73d2e2e4b"
+    },
+    {
+      "name": "partial-input.csv",
+      "bytes": 67,
+      "sha256": "e195cdcbcc187601a822f31e26fc7d55f9507c66c51cb9e9d799d785649a1123"
+    }
+  ]
+}

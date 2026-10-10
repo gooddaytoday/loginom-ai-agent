@@ -1,0 +1,5 @@
+{"output_mode":"add","rules":[
+ {"field":{"kind":"input_field","name":"Category"},"type":"string","case_sensitive":true,"pairs":[{"from":{"type":"string","value":"North"},"to":{"type":"string","value":"N"}},{"from":{"type":"string","value":null},"to":{"type":"string","value":"Missing"}},{"from":{"type":"string","value":""},"to":{"type":"string","value":"Empty"}},{"from":{"type":"string","value":"null"},"to":{"type":"string","value":"Literal"}}],"other":{"mode":"null"}},
+ {"field":{"kind":"input_field","name":"Code"},"type":"integer","precision":0,"pairs":[{"from":{"type":"integer","value":1},"to":{"type":"integer","value":"9223372036854775807"}}],"other":{"mode":"keep"}},
+ {"field":{"kind":"input_field","name":"Amount"},"type":"real","precision":0,"pairs":[{"from":{"type":"real","value":1.25},"to":{"type":"real","value":9.125}}],"other":{"mode":"value","value":{"type":"real","value":-5.25}}}
+]}
