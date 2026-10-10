@@ -1,0 +1,152 @@
+[
+  {
+    "path": "data/five-aggregates.csv",
+    "bytes": 54,
+    "sha256": "0eb72dab71f6eeacf7dd33af6961a19636d5876f599f450b13013dc95cb4223d",
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "text_qualifier": "\"",
+    "null_marker": "\\N",
+    "columns": [
+      {
+        "name": "Region",
+        "label": "Region",
+        "type": "string"
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": "real"
+      },
+      {
+        "name": "RowID",
+        "label": "RowID",
+        "type": "integer"
+      }
+    ],
+    "rows": 5
+  },
+  {
+    "path": "data/grouping.csv",
+    "bytes": 150,
+    "sha256": "579c1df3f406bc4b6839ea9d587736d120092128404ba68f2619b2e9a720e27c",
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "text_qualifier": "\"",
+    "null_marker": "\\N",
+    "columns": [
+      {
+        "name": "Group",
+        "label": "Group",
+        "type": "string"
+      },
+      {
+        "name": "Segment",
+        "label": "Segment",
+        "type": "string"
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": "real"
+      },
+      {
+        "name": "Other",
+        "label": "Other",
+        "type": "integer"
+      },
+      {
+        "name": "Text",
+        "label": "Text",
+        "type": "string"
+      }
+    ],
+    "rows": 8
+  },
+  {
+    "path": "data/header-only.csv",
+    "bytes": 19,
+    "sha256": "23b7b89b2280d178cff1730aee67a53767009b647926fdc33168e920652c6acb",
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "text_qualifier": "\"",
+    "null_marker": "\\N",
+    "columns": [
+      {
+        "name": "Region",
+        "label": "Region",
+        "type": "string"
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": "real"
+      },
+      {
+        "name": "Text",
+        "label": "Text",
+        "type": "string"
+      }
+    ],
+    "rows": 0
+  },
+  {
+    "path": "data/multiple-keys.csv",
+    "bytes": 66,
+    "sha256": "73564bcf097a6b00def3b5fc12fd24fbfae5cf182aa2c96b7d591a2296f11570",
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "text_qualifier": "\"",
+    "null_marker": "\\N",
+    "columns": [
+      {
+        "name": "Region",
+        "label": "Region",
+        "type": "string"
+      },
+      {
+        "name": "Product",
+        "label": "Product",
+        "type": "string"
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": "real"
+      },
+      {
+        "name": "Quantity",
+        "label": "Quantity",
+        "type": "integer"
+      }
+    ],
+    "rows": 4
+  },
+  {
+    "path": "data/null-empty.csv",
+    "bytes": 33,
+    "sha256": "13ecd022518c5da83b23b5e50777d866808aa8bf7df81c31ee539e007cff1147",
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "text_qualifier": "\"",
+    "null_marker": "\\N",
+    "columns": [
+      {
+        "name": "Region",
+        "label": "Region",
+        "type": "string"
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": "real"
+      },
+      {
+        "name": "Text",
+        "label": "Text",
+        "type": "string"
+      }
+    ],
+    "rows": 2
+  }
+]

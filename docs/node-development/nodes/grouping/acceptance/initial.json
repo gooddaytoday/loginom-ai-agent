@@ -1,0 +1,74 @@
+{
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_node_label": "Итоги",
+      "columns": [
+        {
+          "name": "Group",
+          "label": "Group",
+          "type": "string"
+        },
+        {
+          "name": "Total",
+          "label": "Сумма",
+          "type": "real"
+        },
+        {
+          "name": "Rows",
+          "label": "Строки",
+          "type": "integer"
+        },
+        {
+          "name": "Average",
+          "label": "Среднее",
+          "type": "real"
+        },
+        {
+          "name": "Minimum",
+          "label": "Минимум",
+          "type": "real"
+        },
+        {
+          "name": "Maximum",
+          "label": "Максимум",
+          "type": "real"
+        },
+        {
+          "name": "TextRows",
+          "label": "Количество строк",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Group": "A",
+          "Total": -1.25,
+          "Rows": 4,
+          "Average": -0.625,
+          "Minimum": -2.5,
+          "Maximum": 1.25,
+          "TextRows": 4
+        },
+        {
+          "Group": "B",
+          "Total": 0.123456789012345,
+          "Rows": 2,
+          "Average": 0.0617283945061725,
+          "Minimum": 0.0,
+          "Maximum": 0.123456789012345,
+          "TextRows": 2
+        },
+        {
+          "Group": "C",
+          "Total": null,
+          "Rows": 2,
+          "Average": null,
+          "Minimum": null,
+          "Maximum": null,
+          "TextRows": 2
+        }
+      ]
+    }
+  ]
+}
