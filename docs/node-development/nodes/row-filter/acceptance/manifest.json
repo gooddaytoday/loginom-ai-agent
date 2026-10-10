@@ -1,0 +1,28 @@
+{
+  "source_commit": "314de3573e08a3dd6d188dc2900b5db2f2f56a54",
+  "fixtures": [
+    {
+      "path": "data/golden.csv",
+      "bytes": 413,
+      "sha256": "7ac857baaecd48b1e03f2cff470140ae7526a3e289016a209c7d41a706a2e0bb",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "null_marker": "NULL",
+      "columns": [
+        "Id",
+        "Amount",
+        "Flag",
+        "When",
+        "Text"
+      ],
+      "types": [
+        "integer",
+        "real",
+        "boolean",
+        "datetime",
+        "string"
+      ],
+      "rows": 10
+    }
+  ]
+}

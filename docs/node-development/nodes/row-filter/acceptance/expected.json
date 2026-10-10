@@ -1,0 +1,81 @@
+{
+  "package_path": "/LAB68-row-filter/worker-20261010-01.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.filter_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_node_label": "Отбор",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "integer"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real"
+        },
+        {
+          "name": "Flag",
+          "label": "Flag",
+          "type": "boolean"
+        },
+        {
+          "name": "When",
+          "label": "When",
+          "type": "datetime"
+        },
+        {
+          "name": "Text",
+          "label": "Text",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 3,
+          "Amount": 1.23456,
+          "Flag": true,
+          "When": "2024-01-01T00:00:03.000",
+          "Text": "Beta"
+        },
+        {
+          "Id": 6,
+          "Amount": 8.76543,
+          "Flag": true,
+          "When": "2024-01-02T12:30:01.000",
+          "Text": "A,b"
+        },
+        {
+          "Id": 6,
+          "Amount": 8.76543,
+          "Flag": true,
+          "When": "2024-01-02T12:30:01.000",
+          "Text": "A,b"
+        },
+        {
+          "Id": 7,
+          "Amount": 10.00001,
+          "Flag": false,
+          "When": "2024-01-02T12:30:02.000",
+          "Text": "preTail"
+        },
+        {
+          "Id": 8,
+          "Amount": -1e-05,
+          "Flag": true,
+          "When": "2024-01-02T12:30:03.000",
+          "Text": "preTAIL"
+        }
+      ]
+    }
+  ]
+}
