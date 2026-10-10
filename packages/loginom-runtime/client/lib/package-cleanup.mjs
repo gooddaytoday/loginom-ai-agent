@@ -62,7 +62,9 @@ async function closeOwnedPackage(page, options) {
       // Recheck identity after the server read. The native BeforeClose handler
       // repeats lock/dirty checks and may show a prompt. Normal shutdown never
       // answers it; independent QA can explicitly discard its temporary views.
-      if (m.PackageNodes.Count !== 1 || m.PackageNodes.Items(0) !== node || normalized(node.PackageFileName) !== o.packagePath
+      if (globalThis.__loginomDockPreparationV1 !== prep || prep.document !== document || prep.id !== o.documentId
+          || !m.FServerConnection.Connected || m.HasRunningNodes() !== false
+          || m.PackageNodes.Count !== 1 || m.PackageNodes.Items(0) !== node || normalized(node.PackageFileName) !== o.packagePath
           || node.ReadOnly !== o.diagnosticReadOnly || m.FServerConnection.UserName !== o.account || node.HasRunningNodes() !== false) return {reason:'PACKAGE_CHANGED_DURING_CHECK'};
       const state = globalThis.__loginomDockCleanupV1 = {identity, document, done:false, closed:false};
       Promise.resolve().then(() => m.ClosePackage(node, false, true)).then(value => {

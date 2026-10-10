@@ -16,7 +16,7 @@ test("private process transport preserves spaces and Unicode, rejects wrong gene
       `
 process.on('message', message => {
  if (message.operation === 'start') {
-  const valid = !process.argv.join(' ').includes('private-key') && !Object.values(process.env).includes('private-key') && message.input.connection.apiKey === 'private-key' && !message.input.environment && !process.env.OPENAI_API_KEY;
+  const valid = !process.argv.join(' ').includes('private-key') && !Object.values(process.env).includes('private-key') && message.input.connection.apiKey === 'private-key' && !message.input.environment && !process.env.OPENAI_API_KEY && message.input.ownedPackageCleanupAccount === message.input.connection.username && !message.input.acceptanceCleanupPackage;
   process.send({id:message.id, result:{protocol:1,generation:valid?message.input.generation:-1,chat:message.input.chat,ready:true}});
  }
  if (message.operation === 'close') { process.send({id:message.id,result:{closed:true}},()=>process.disconnect()); }

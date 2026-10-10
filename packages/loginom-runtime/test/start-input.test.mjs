@@ -41,3 +41,10 @@ for (const [label, patch] of [
   test("managed start rejects invalid " + label, () => {
     assert.throws(() => validateStartInput({ ...base, ...patch }), /^Error: LOGINOM_START_INVALID$/)
   })
+
+ test("managed product cleanup account is bound to the private connection",()=>{
+  const launch={...base,connection:{username:"owned"},ownedPackageCleanupAccount:"owned"};
+  assert.equal(validateStartInput(launch).ownedPackageCleanupAccount,"owned");
+  for(const patch of [{ownedPackageCleanupAccount:"other"},{ownedPackageCleanupAccount:"../owned"},{validation:true}])
+    assert.throws(()=>validateStartInput({...launch,...patch}),/^Error: LOGINOM_START_INVALID$/);
+ });

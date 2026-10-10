@@ -1,0 +1,45 @@
+{
+  "contextController": "ModelForm",
+  "crumbs": [
+    {
+      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+      "label": "",
+      "nativeClass": "MapTreeNode",
+      "package": false,
+      "workflow": false,
+      "componentBound": true
+    },
+    {
+      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+      "label": "Пакеты",
+      "nativeClass": "PackagesTreeParentNode",
+      "package": false,
+      "workflow": false,
+      "componentBound": true
+    },
+    {
+      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+      "label": "navigation_diagnostic_a7b64010_ade3_4234_9f01_5efbc8d4dee5",
+      "nativeClass": "PackageTreeNode",
+      "package": true,
+      "workflow": false,
+      "componentBound": true
+    },
+    {
+      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+      "label": "Модуль1",
+      "nativeClass": "ModelUnitItemTreeNode",
+      "package": false,
+      "workflow": false,
+      "componentBound": true
+    },
+    {
+      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+      "label": "Сценарий",
+      "nativeClass": "WorkFlowTreeNode",
+      "package": false,
+      "workflow": true,
+      "componentBound": true
+    }
+  ]
+}

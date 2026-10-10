@@ -171,7 +171,7 @@ export async function supervise(input: Launch) {
   // documented budget with the ordinary 120-second runtime handshake.
   const ready = await request(
     "start",
-    { ...input, environment: undefined, protocol: 1 },
+    { ...input, environment: undefined, protocol: 1, ownedPackageCleanupAccount: input.validation ? null : input.connection.username },
     input.validation ? 210_000 : 120_000,
   ).catch(
     async (error: Error) => {
