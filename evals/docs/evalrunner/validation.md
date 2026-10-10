@@ -4,7 +4,39 @@
 Все команды выполнялись из отдельного worktree, в `evals/`. Живые модели и судья
 не вызывались. Серверные конфигурация, профили, службы и LAB-55 не изменялись.
 
-## Подтверждённые результаты
+## Приёмка 2026-10-10 (stage B)
+
+Gate LAB-55 подтверждён собственным аудитом: 144 измерения/48 кейсов, обязательные
+оценки, cleanup, 144 distinct private history, owner-bound release и свежий download
+доставленного архива с проверкой полного manifest/хэшей. Status/idle/PID не заменяли gate.
+Первый baseline принят по согласованному решению владельца, CAS `expected-current none`.
+
+Финальная immutable поставка `6f5b40f8722cd253cc4459d4c71dc42ce1362a63`: 751 файл,
+manifest SHA256 `904c675afbcc12f37649b3e948cca82d6eb6eb551da8d9f2c6d86ece03fcb510`.
+TDD replay: RED на полном многокейсовом source, GREEN после проверки всего run и
+отдельного positive fixed-sum; product FAIL другого кейса остаётся в proof. Cleanup
+error любого кейса блокирует replay. Исходные evidence не редактируются.
+
+| Проверка | Фактический результат | Граница |
+| --- | --- | --- |
+| Финальный полный `bun test` | 572 PASS / 9 SKIP / 0 FAIL, 560.24 s | Локальные fixture/offline, без живых моделей |
+| Целевые 8 suite после TDD | 123 PASS / 0 FAIL, 68.69 s | Baseline, registry, comparison, replay, recovery, comparators |
+| Финальный `bun typecheck` | PASS | Из `evals/` |
+| 9 локальных SKIP | Закрыты отдельно на свободном сервере | В первом целевом серверном запуске 50 PASS/2 FAIL; два отказа из-за отсутствующего `bun` в PATH вызова; повтор только этих двух с правильным PATH — 2 PASS/0 FAIL; критерии/skip guards не менялись |
+| Настоящий offline replay | VERIFIED / live / modelCalls=0 | Закрытые binary calc и positive fixed-sum Rich evidence; hashes до/после совпали |
+| Scorer fingerprint | 22 файла, совпадает с LAB-55 | `cb0971d04fa3cfd53cdcff38acebce9faee7ec7aa3de818d32b2410fc38a0f16` |
+| Old/current pins | CLI/corpus/judge/limits/Dock/container/isolation неизменны | Разница только operational harness/config/role/paths, сохранён operator proof |
+| Live own profile boundary | VERIFIED, modelCalls=0 | Реальная bwrap с установленным CLI/own profile/current input; 8 sensitive roots скрыты, профиль writable |
+| Серверная поставка | Hash/file-set/mode/Git verify PASS; own checkout clean | Старые checkout/roles сохранены, private backups config/helper/AppArmor; controlled stop/start только при FREE/пустых очередях |
+| LAB-55 compatibility и evidence | Complete 144 читается новым helper; manifest/journal hashes совпали | Raw results, оценки, leases, card/comments/monitor не менялись |
+| Агент EvalRunner | Создан, readback PASS, 2 squad проверены: memberships=[] | Codex(eval-tests), gpt-6.1-sol/xhigh, concurrency1, workspace invocation; own MCP cwd/automatic Git Peer |
+| Реальный server MCP | health и actor search успешны | Peer `github.com-gooddaytoday-loginom-ai-agent`; profile-independent own checkout |
+| Два отдельных live smoke и доставка | **Выполняются, НЕ подтверждены** | Назначенная LAB-74; 1×1 каждый, no infra retry, product medium; полная 48×3 не запускается |
+
+Goal ACTIVE; heartbeat `evalrunner-lab-55` остаётся ACTIVE до полного аудита готовности.
+Более ранние результаты и ограничения ниже являются историей этапа A.
+
+## Подтверждённые результаты этапа A
 
 | Проверка | Результат | Граница результата |
 | --- | --- | --- |
