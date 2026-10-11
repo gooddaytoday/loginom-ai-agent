@@ -4,6 +4,8 @@ const need=(v,m)=>{if(!v)throw Error('PRESERVATION_COLD_PIN:'+m);};
 const fixture='fixtures/preservation/rowid-ab-c.csv';
 const sha='5f1b19c2d28d1548bdc287fff6e61fbaee72147753379a2aaa5e38d56dca72a3';
 const format={delimiter:';',decimal_separator:'.',null_marker:'NULL',text_qualifier:'"'};
+// Independent literal import contract, before Reform rename/exclusion; never output-derived.
+const columns=[{"name":"RowID","label":"RowID","type":"integer"},{"name":"A","label":"Same","type":"string"},{"name":"B","label":"Same","type":"integer"},{"name":"C","label":"Unused","type":"boolean"},{"name":"Extra","label":"Unrequested","type":"string"}];
 export function verifyPreservationColdPin({expected,bindings,bytes}){
  need(bindings&&typeof bindings.account==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(bindings.account),'explicit account required');
  const prefix='/'+bindings.account+'/';
@@ -20,6 +22,7 @@ export function verifyPreservationColdPin({expected,bindings,bytes}){
  need(p.bytes===167&&p.sha256===sha,'assigned bytes/SHA differ');
  need(p.format&&Object.keys(p.format).sort().join(',')===Object.keys(format).sort().join(',')
   &&Object.keys(format).every(k=>p.format[k]===format[k]),'complete canonical format required');
+ need(JSON.stringify(p.columns)===JSON.stringify(columns),'complete literal import schema required');
  verifyStaticSourceFixture({bytes,allowed:[p],format});
  return {pin_ready:true,native_source_verified:false,source_path:p.source_path,package_path:bindings.package_path};
 }

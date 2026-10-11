@@ -1,5 +1,7 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
+import test from 'node:test';import assert from 'node:assert/strict';import {readFile,writeFile,mkdtemp,rm} from 'node:fs/promises';
 import {verifyPreservationColdPin} from '../../../../docs/node-development/nodes/field-parameters/acceptance/preservation-cold-preflight.mjs';
+import {tmpdir} from 'node:os';import {join} from 'node:path';
+import {verifyStaticSourceBytes} from '../../../../scripts/node-acceptance/static-source-proof.mjs';
 import {parseExpectedOutputs} from '../../../../scripts/node-acceptance/expected-outputs.mjs';
 const base=new URL('../../../../docs/node-development/nodes/field-parameters/acceptance/',import.meta.url);
 const template=JSON.parse(await readFile(new URL('fixtures/preservation/cold-source-template.json',base),'utf8'));
@@ -37,4 +39,49 @@ test('existing expected parser accepts template shape even without static_source
  delete v.expected.static_sources;
  assert.equal(parseExpectedOutputs(v.expected).outputs[0].rows.length,5);
  assert.throws(()=>verifyPreservationColdPin(v),/static source required/);
+});
+
+// Independent source literal, distinct from four-column Reform expected output.
+const importColumns=[
+ {name:'RowID',label:'RowID',type:'integer'},
+ {name:'A',label:'Same',type:'string'},
+ {name:'B',label:'Same',type:'integer'},
+ {name:'C',label:'Unused',type:'boolean'},
+ {name:'Extra',label:'Unrequested',type:'string'},
+];
+for(const [name,mutate] of Object.entries({
+ missing:v=>delete v.expected.static_sources[0].columns,
+ partial:v=>v.expected.static_sources[0].columns.splice(3,1),
+ order:v=>v.expected.static_sources[0].columns.reverse(),
+ renamed:v=>v.expected.static_sources[0].columns[2].name='RenamedB',
+ type:v=>v.expected.static_sources[0].columns[3].type='string',
+ label:v=>v.expected.static_sources[0].columns[4].label='Changed',
+ outputSchema:v=>v.expected.static_sources[0].columns=structuredClone(v.expected.outputs[0].columns),
+}))test('local preservation pin refuses import schema '+name,()=>{
+ const v=valid();mutate(v);assert.throws(()=>verifyPreservationColdPin(v),/complete literal import schema required/);
+});
+test('full literal source pin composes with unchanged cold helper using labelled storage/download doubles',async()=>{
+ const v=valid();assert.equal(verifyPreservationColdPin(v).pin_ready,true);
+ assert.deepEqual(v.expected.static_sources[0].columns,importColumns);
+ assert.equal(v.expected.outputs[0].columns.length,4);
+ const output=await mkdtemp(join(tmpdir(),'preservation-source-proof-'));
+ const calls={storage:0,download:0,gestures:0};
+ const snapshot={observation_id:'offline-obs',dom_epoch:{document:'offline-doc'},workflow_ref:{prefix:'MF'},
+  file_storage:{status:'observed',directory:'/offline_operator'},ui:{elements:[
+   {tid:'MF;FileStorageForm;root'},{tid:'MF;NavigationBar;NavigationPanel'},
+   {label:'rowid-ab-c.csv',ref:{},storage_entry:{kind:'file',bytes_source:'native_file_store',bytes:167}}]}};
+ const runtime={observe:async()=>{calls.storage++;return {status:'SUCCEEDED',output:snapshot};},
+  uiAct:async()=>{calls.gestures++;throw Error('offline fixture forbids gestures');}};
+ const load=async()=>({findNativeStorageRow:async()=>snapshot,makeArtifactDownloadCode:options=>options});
+ const execute=async options=>{calls.download++;await writeFile(options.download_path,v.bytes);
+  return {status:'SUCCEEDED',cleanup_complete:true,output:{download_completed:true}};};
+ const sources={imports:[{configuration:{source:{source_path:v.bindings.source_path},format:v.expected.static_sources[0].format,output_mapping:{fields:structuredClone(importColumns)}}}]};
+ try{
+  const proofs=await verifyStaticSourceBytes({load,runtime,execute,sources,allowed:v.expected.static_sources,
+   account:v.bindings.account,origin:'https://offline.invalid',output});
+  const proof=proofs.get(v.bindings.source_path);assert.equal(proof.bytes,167);assert.equal(proof.sha256,'5f1b19c2d28d1548bdc287fff6e61fbaee72147753379a2aaa5e38d56dca72a3');
+  assert.equal(proof.bytes_verified,true);assert.equal(proof.download_completion_verified,true);
+  assert.equal(calls.download,1);assert.equal(calls.gestures,0);
+  // Driver-issued provenance is synthetic, not independent native proof.
+ }finally{await rm(output,{recursive:true,force:true});}
 });

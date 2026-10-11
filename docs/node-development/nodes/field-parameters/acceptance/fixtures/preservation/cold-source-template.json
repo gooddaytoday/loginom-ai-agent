@@ -15,7 +15,34 @@
       "encoding": "UTF-8",
       "provenance": "authored_fixture_bytes_contract",
       "source_path": "{{SOURCE_PATH}}",
-      "required_receipt_provenance": "independent_server_file_download"
+      "required_receipt_provenance": "independent_server_file_download",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "A",
+          "label": "Same",
+          "type": "string"
+        },
+        {
+          "name": "B",
+          "label": "Same",
+          "type": "integer"
+        },
+        {
+          "name": "C",
+          "label": "Unused",
+          "type": "boolean"
+        },
+        {
+          "name": "Extra",
+          "label": "Unrequested",
+          "type": "string"
+        }
+      ]
     }
   ],
   "nodes": [

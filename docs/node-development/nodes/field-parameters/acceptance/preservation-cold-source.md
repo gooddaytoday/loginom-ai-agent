@@ -14,9 +14,9 @@ Operator binds explicit account/package_path/source_path/fixture_path before a f
 
 Existing contracts:
 cold-check.mjs:111 uses if(expected.static_sources). Missing section skips fresh source proof; existing parseExpectedOutputs accepts the value/schema template with or without it. Do not describe the public checker as rejecting missing static_sources.
-With the pin, existing verifyStaticSourceFixture verifies exact bytes/one fixture/canonical parser; observeStaticSources/verifyStaticSourceBytes later require independently downloaded bytes, provenance, exact owned account/source path and settings pass. This offline task does not execute those native helpers.
+With the pin, existing verifyStaticSourceFixture verifies exact bytes/one fixture/canonical parser; observeStaticSources/verifyStaticSourceBytes later require independently downloaded bytes, provenance, exact owned account/source path and settings pass. An addressed offline composition exercises the unchanged verifyStaticSourceBytes helper with explicitly synthetic storage/download drivers; it does not establish native proof.
 New local guard rejects absent/empty/partial/duplicate source specs, wrong bytes/size/SHA/format/encoding/fixture/UI-output provenance/receipt provenance and foreign/unresolved paths.
-20 addressed tests include explicit full-pin acceptance and existing-parser absence behavior; old accepted suites not repeated.
+28 addressed tests include full literal five-column import schema refusals and unchanged-helper offline composition, plus explicit full-pin acceptance and existing-parser absence behavior; old accepted suites not repeated.
 
 FP applicability on product eec075d5b:
 | Condition | Confirmed/offline | Still NOT_VERIFIED |
@@ -32,3 +32,5 @@ FP applicability on product eec075d5b:
 | Persistence/cleanup | standard save/dirty/close/logout and cold receipt criteria unchanged | exact save/source proof, original Page cleanup before shutdown/release, artifact/copy hashes and reopen without reapplying settings |
 
 No new native/live/model/replay/save/reopen/cleanup authorization. Public checker/host/runtime and foreign helpers unchanged. Pending/unknown-effect/accounts/branches/resources preserved; full node/wide/empty/scalar/cold acceptance remains open.
+
+Correction: static_sources[0].columns pins the independent original RowID/A/B/C/Extra name/label/type/order contract, separate from Reform output RowID/A/RenamedB/Extra. Local preflight rejects missing/partial/reordered/renamed/type/label/output schemas before transport. Fixture CSV, expected output and manifest remain unchanged. Product eec075d5b is reused; cleanup receiving de93e239c is separately under review.
