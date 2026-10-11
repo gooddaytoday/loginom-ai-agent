@@ -124,6 +124,11 @@ export async function createBridge(config, session, { browserTransport: managedB
   const browserGate = createSerialGate();
   const heldLeases = new Set();
   const savedPackages = new Map();
+  // Managed model runs derive teardown authority from guarded preparation and a
+  // settled save on this bridge, never from a caller-supplied cleanup path.
+  const managedCleanup = userProfile && config.mode === 'executor-replay';
+  let managedSave, cleanupRefused = false;
+  let confirmedCleanup, cleanupReceiptWritten = false;
   let closing, shutdownStarted = false;
   const skill = createSkillLoader({ directory: session.directory, transport: skillTransport(config) });
   let clipboardUncertain = false;
@@ -191,6 +196,9 @@ export async function createBridge(config, session, { browserTransport: managedB
       if (shutdownStarted) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
       const owner = catalog.routes.get(request.params.name);
       if (!owner) throw new McpError(ErrorCode.InvalidParams, 'Unknown Dock tool');
+      if (cleanupRefused && owner !== 'remote' && !['dock_diagnostics','dock_workspace_observe',
+        'dock_operation_inspect','dock_node_status','dock_node_wait','tool_search','tool_describe'].includes(request.params.name))
+        throw new McpError(ErrorCode.InvalidRequest, 'Package cleanup is unconfirmed; only read-only diagnosis is allowed');
       if (request.params.name === 'dock_diagnostics') {
         let archive = null;
         try { archive = JSON.parse(await readFile(join(session.directory, 'archive.json'), 'utf8')); } catch {}
@@ -345,6 +353,14 @@ export async function createBridge(config, session, { browserTransport: managedB
             await logResult(request.params.name,outcome);
             if (outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
                 && outcome.output?.package_ref?.path) savedPackages.set(outcome.output.package_ref.path, outcome.operation_id);
+            if (managedCleanup && outcome.status === 'SUCCEEDED' && outcome.cleanup_complete === true
+                && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key) && outcome.output?.package_ref?.path) {
+              const prepared=session.metadata.workspacePreparation?.state;
+              managedSave={operationId:outcome.operation_id, sessionId:session.metadata.sessionId,
+                documentId:prepared?.document_id, tabTid:prepared?.workflow_ref?.tab_tid,
+                account:prepared?.loginom_account, packagePath:outcome.output.package_ref.path,
+                loginomUrl:config.loginomUrl, loginomBuild:session.metadata.targetIdentity?.loginom_build};
+            }
             if (userProfile && outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key))
               for (const continuation of outcome.output?.workflow_continuations ?? []) userWorkflows.remember(continuation);
             const reply = actionReply(userProfile?compactActionResult(outcome):outcome, { observe: request.params.name === 'dock_workspace_observe', userProfile });
@@ -429,19 +445,29 @@ export async function createBridge(config, session, { browserTransport: managedB
       }
     });
     return { server, catalog, hasActiveWork: () => !clipboardUncertain && !!actionRuntime?.hasActiveWork(),
-      hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0, close() {
+      hasUnsettledWork: () => cleanupRefused || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
       closing ??= (async () => {
-        if (config.acceptanceCleanupPackage) {
+        if (config.acceptanceCleanupPackage || managedCleanup) {
+          if (managedCleanup) cleanupRefused=true;
           let cleanup;
           const prepared = session.metadata.workspacePreparation;
-          if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
+          if (confirmedCleanup) cleanup=confirmedCleanup;
+          else if (managedCleanup && (clipboardUncertain || heldLeases.size || actionRuntime?.hasUnsettledWork?.()))
+            cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'};
+          else if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
           else {
             try {
               // Refuse unsettled background node jobs before waiting on the
               // browser gate. Shutdown never cancels them to force a close.
               actionRuntime.assertPreparationAllowed();
-              if (session.metadata.workspaceReady !== true || !savedPackages.has(config.acceptanceCleanupPackage)) {
+              const path=config.acceptanceCleanupPackage ?? managedSave?.packagePath;
+              if (session.metadata.workspaceReady !== true || !savedPackages.has(path)
+                  || (managedCleanup && (!managedSave || managedSave.sessionId!==session.metadata.sessionId
+                    || managedSave.documentId!==prepared.state.document_id
+                    || managedSave.tabTid!==prepared.state.workflow_ref.tab_tid
+                    || managedSave.account!==prepared.state.loginom_account
+                    || managedSave.packagePath!==path || managedSave.loginomBuild!==session.metadata.targetIdentity.loginom_build))) {
                 cleanup = {status:'BLOCKED', reason:'CONFIRMED_SAVE_REQUIRED'};
               } else cleanup = await browserGate(async () => {
                 actionRuntime.assertPreparationAllowed();
@@ -450,18 +476,35 @@ export async function createBridge(config, session, { browserTransport: managedB
                   // Managed runtimes have no replay login account; the cleanup
                   // binds to the account observed at workspace preparation.
                   tabTid:prepared.state.workflow_ref.tab_tid, account:prepared.state.loginom_account??config.replayLoginUser,
-                  packagePath:config.acceptanceCleanupPackage, loginomUrl:config.loginomUrl,
+                  packagePath:path, loginomUrl:config.loginomUrl,
                   loginomBuild:session.metadata.targetIdentity.loginom_build,
                 };
-                const response = await browser.callTool({name:'browser_run_code_unsafe', arguments:{code:makePackageCleanupCode(cleanupOptions)}}, undefined, {timeout:30000});
+                // Keep the shared helper unchanged. Add the current native tab
+                // guard inside its existing evaluate, immediately before ClosePackage.
+                const anchor='const state = globalThis.__loginomDockCleanupV1 =';
+                const original=makePackageCleanupCode(cleanupOptions);
+                if (!original.includes(anchor)) throw Error('Cleanup guard insertion unavailable');
+                const code=original.replace(anchor, `
+                  const tabs=[...document.querySelectorAll('[data-tid]')].filter(el=>el.getAttribute('data-tid')===o.tabTid);
+                  if(tabs.length!==1 || !visible(tabs[0])) return {reason:'CURRENT_TAB_CHANGED'};
+                  ${anchor}`);
+                const response = await browser.callTool({name:'browser_run_code_unsafe', arguments:{code}}, undefined, {timeout:30000});
                 return parsePackageCleanupResult(response, cleanupOptions);
               });
             } catch { cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'}; }
           }
           cleanup = {...cleanup, session_id:session.metadata.sessionId,
-            save_operation_id:savedPackages.get(config.acceptanceCleanupPackage) ?? null};
-          await writeFile(join(session.directory,'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
+            save_operation_id:savedPackages.get(config.acceptanceCleanupPackage ?? managedSave?.packagePath) ?? null};
+          if (managedCleanup && !['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) cleanupRefused=true;
+          // Preserve the verified native result across persistence failures on
+          // this same foreground owner. No cache is minted for unknown responses.
+          if (cleanup.status==='SUCCEEDED' && !confirmedCleanup) confirmedCleanup=Object.freeze(cleanup);
+          if (!confirmedCleanup || !cleanupReceiptWritten) {
+            await writeFile(join(session.directory,'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
+            if (confirmedCleanup) cleanupReceiptWritten=true;
+          }
           await recordExecution({event:'isolated_package_cleanup', cleanup});
+          if (managedCleanup && ['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) cleanupRefused=false;
           if (!['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) return {
             browser_transport_closed:false, browser_process_terminated:false, clipboard_leases_retained:heldLeases.size,
             package_cleanup:cleanup,
@@ -481,7 +524,10 @@ export async function createBridge(config, session, { browserTransport: managedB
         // releases kernel locks and is not cross-process recovery evidence.
         return { browser_transport_closed: browserTransportClosed,
           browser_process_terminated: browserProcessTerminated, clipboard_leases_retained: heldLeases.size };
-      })();
+      })().then(result => {
+        if (result?.browser_transport_closed !== true) { if(managedCleanup)cleanupRefused=true; closing = undefined; shutdownStarted = false; }
+        return result;
+      }, error => { if(managedCleanup)cleanupRefused=true; closing = undefined; shutdownStarted = false; throw error; });
       return closing;
     } };
   } catch (error) {

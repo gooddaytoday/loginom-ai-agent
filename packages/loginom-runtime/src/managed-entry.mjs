@@ -33,23 +33,29 @@ const send = (message, disconnect = false) => {
 }
 function close() {
   if (state.closing) return state.closing
-  state.controller?.abort()
   state.closing = (async () => {
     await Promise.allSettled([...requests])
+    if (state.browser && !state.bridge) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    if (state.bridge) {
+      const receipt = await state.bridge.close()
+      if (receipt?.browser_transport_closed !== true) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    }
+    state.controller?.abort()
     const results = []
-    for (const handle of [state.client, state.bridge, state.browserServer, state.browser]) {
+    for (const handle of [state.client, state.browserServer, state.browser]) {
       results.push(...(await Promise.allSettled([Promise.resolve().then(() => handle?.close())])))
     }
     if (state.browserProfile)
       results.push(...(await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])))
     if (results.some((result) => result.status === "rejected")) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
   })()
+  state.closing.catch(error => { state.closeFailure = error; state.closing = undefined })
   return state.closing
 }
 const stop = () => {
   void close().then(
     () => process.exit(0),
-    () => process.exit(1),
+    error => { state.closeFailure = error },
   )
 }
 process.on("disconnect", stop)
@@ -207,7 +213,7 @@ async function handle(message) {
     }
   } catch (error) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
-    send({ id: message.id, error: code }, message.operation === "close")
+    send({ id: message.id, error: code })
     if (message.operation === "start") {
       // Clean up immediately, but keep IPC until the owner requests an acknowledged close.
       // close() retains a rejection so that the later close request reports cleanup failure.

@@ -27,18 +27,18 @@ await standalone(process.argv.slice(2), async (args, paths) => {
     process.exitCode = 2
   }
 })
-  .catch((error: unknown) => {
-    const code =
-      error instanceof Error && /^(PROFILE|LOGINOM)_[A-Z_]+$/.test(error.message) ? error.message : "CLI_START_FAILED"
-    process.stderr.write(`${code}\n`)
-    process.exitCode = code === "PROFILE_BUSY" ? 3 : 1
-  })
   .then(async () => {
-    // Failed cleanup retains the profile guard; both outcomes still need a bounded CLI exit.
+    // Only a resolved owner cleanup permits transport/process exit.
     // Provider libraries may retain process-global handles after a finished request.
     await Promise.all([
       new Promise<void>((resolve) => process.stdout.write("", () => resolve())),
       new Promise<void>((resolve) => process.stderr.write("", () => resolve())),
     ])
     process.exit(process.exitCode ?? 0)
+  })
+  .catch((error: unknown) => {
+    const code =
+      error instanceof Error && /^(PROFILE|LOGINOM)_[A-Z_]+$/.test(error.message) ? error.message : "CLI_START_FAILED"
+    process.stderr.write(`${code}\n`)
+    process.exitCode = code === "PROFILE_BUSY" ? 3 : 1
   })

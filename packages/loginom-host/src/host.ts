@@ -15,6 +15,8 @@ export async function createLoginomHost(options: {
   environment?: NodeJS.ProcessEnv
   headless?: boolean
   strictRecovery?: boolean
+  // Acceptance-only forwarding of the existing managed shutdown binding.
+  acceptanceCleanupPackage?: string
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
@@ -65,6 +67,7 @@ export async function createLoginomHost(options: {
       endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
       actionManifestUri: manifest.actionManifestUri,
       actionManifestSha256: manifest.actionManifestSha256,
+      acceptanceCleanupPackage: options.acceptanceCleanupPackage,
     })
   }
   const service = await connectionService(
@@ -101,12 +104,12 @@ export async function createLoginomHost(options: {
               throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
           },
           async close() {
-            generations.delete(connection.generation)
             const results = await Promise.allSettled(
               [...generation.children.values()].map(async (child) => (await child).close()),
             )
             if (results.some((result) => result.status === "rejected"))
               throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+            generations.delete(connection.generation)
           },
         }
       },
