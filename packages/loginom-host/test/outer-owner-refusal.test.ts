@@ -24,7 +24,7 @@ test('generation removal follows confirmed child close',async()=>{
  const s=await readFile(new URL('host.ts',base),'utf8')
  const begin=s.indexOf('async close() {',s.indexOf('async prepare(connection)'))
  const chunk=s.slice(begin,s.indexOf('\n          },',begin)).replace('async close() {','async function close() {')+'\n}'
- const owner={},generations=new Map([[1,owner]]),generation={children:new Map([['own',Promise.resolve({close:async()=>{throw Error('refused')}})]])},connection={generation:1}
+ const owner={},generations=new Map([[1,owner]]),generation={children:new Map<string,Promise<{close():Promise<void>}>>([['own',Promise.resolve({close:async()=>{throw Error('refused')}})]])},connection={generation:1}
  const close=vm.runInNewContext(chunk+';close',{generations,generation,connection,Promise,Error})
  await expect(close()).rejects.toThrow('LOGINOM_RUNTIME_CLEANUP_FAILED');expect(generations.get(1)).toBe(owner)
  generation.children.set('own',Promise.resolve({close:async()=>{}}));await close();expect(generations.has(1)).toBe(false)
@@ -32,7 +32,7 @@ test('generation removal follows confirmed child close',async()=>{
 test('actual port refuses pending shutdown without releasing old run; same client resumes',async()=>{
  const listeners=new Map(),replies:any[]=[],page={},runtime={page},pending:string[]=[];let released=0,inspect=0
  const service:any={recoveries:new Map(),journal:{pending:()=>pending,settle:async()=>{},admit:async()=>({id:'op'})},acquire:()=>({generation:1,release:()=>released++}),retireRuntime:async()=>{},resetRestarts:()=>{},runtime:async()=>({request:async()=>{inspect++;return runtime.page}})}
- const port=loginomHostPort({on:(n,f)=>listeners.set(n,f),postMessage:v=>replies.push(v),start:()=>{}},service)
+ const port=loginomHostPort({on:(n:string,f:(event:any)=>void)=>listeners.set(n,f),postMessage:(v:any)=>replies.push(v),start:()=>{}},service)
  const send=async(data:any)=>{listeners.get('message')({data});await Bun.sleep(5);return replies.at(-1)}
  await send({id:'acquire',method:'acquire',input:{run:'own',session:'own'}})
  pending.push('op');await expect(port.close()).rejects.toThrow('LOGINOM_RECOVERY_REQUIRED');expect(released).toBe(0)

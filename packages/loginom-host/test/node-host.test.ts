@@ -88,7 +88,7 @@ test.each(["ack-without-exit", "disconnect-without-exit"])(
         if (m.method === 'start') process.send({id:m.id,result:{protocol:1,ready:true,pid:process.pid}});
         if (m.method !== 'close') return;
         if (${JSON.stringify(mode)} === 'disconnect-without-exit') { process.disconnect(); setTimeout(() => process.exit(1), 100); return; }
-        process.send({id:m.id,result:{closed:${mode !== "bad-ack"}}});
+        process.send({id:m.id,result:{closed:${String(mode) !== "bad-ack"}}});
       });
     `,
     )

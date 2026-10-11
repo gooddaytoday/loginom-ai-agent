@@ -136,7 +136,7 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
             .trim()
             .split("\n")
             .map((line) => JSON.parse(line).action),
-        ).toEqual(ending === "release" || ending === "close" ? ["start", "wait"] : ["start", "wait", ending])
+        ).toEqual(ending === "release" || String(ending) === "close" ? ["start", "wait"] : ["start", "wait", ending])
         const pending = (await recoveryStore(join(root, "recovery"), { strict: true })).pending().sort()
         const reopened = await createLoginomHost({
           root,

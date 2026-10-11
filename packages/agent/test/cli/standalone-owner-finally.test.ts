@@ -7,10 +7,10 @@ const start=source.indexOf('  } finally {',source.indexOf('    const final ='))
 const body=source.slice(start+'  } finally {'.length,source.lastIndexOf('\n  }\n}'))
 for(const value of [Error('original refusal'),null,undefined,false,0,''])test('real caller finally retains same adapter/rejection: '+String(value),async()=>{
  let listener:any;const page={original:true},events:string[]=[]
- LoginomHost.connect({on:(_,f)=>listener=f,start(){},postMessage(m:any){queueMicrotask(()=>listener({data:{id:m.id,result:m.method==='acquire'?{generation:1}:page}}))}})
+ LoginomHost.connect({on:(_:string,f:(event:any)=>void)=>listener=f,start(){},postMessage(m:any){queueMicrotask(()=>listener({data:{id:m.id,result:m.method==='acquire'?{generation:1}:page}}))}})
  const retained={deferRelease:true,leases:new Set<any>()}
  LoginomHost.disconnect()
- LoginomHost.connect({on:(_,f)=>listener=f,start(){},postMessage(m:any){queueMicrotask(()=>listener({data:{id:m.id,result:m.method==='acquire'?{generation:1}:page}}))}},retained)
+ LoginomHost.connect({on:(_:string,f:(event:any)=>void)=>listener=f,start(){},postMessage(m:any){queueMicrotask(()=>listener({data:{id:m.id,result:m.method==='acquire'?{generation:1}:page}}))}},retained)
  const owner=await LoginomHost.acquire('old');await owner!.release()
  const finish=vm.runInNewContext('async function finish(){try{}finally{'+body+'}};finish',{owner:retained,host:{close:async()=>{events.push('close');throw value}},cleanup:{dispose:async()=>events.push('dispose'),detach:()=>events.push('detach')},LoginomHost,signal:undefined,process:{exitCode:undefined},failure:()=>events.push('failure')})
  let caught=false,rejected;try{await finish()}catch(e){caught=true;rejected=e}

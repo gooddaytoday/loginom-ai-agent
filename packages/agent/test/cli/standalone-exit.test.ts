@@ -7,9 +7,9 @@ const tail=source.slice(source.indexOf('\n  .',source.indexOf('\n})'))).replace(
 for(const original of [Error('LOGINOM_RECOVERY_REQUIRED'),null,undefined,false,0,''])test('product exit preserves refusal '+String(original),async()=>{
  let listener:any,exitCalls=0,seen:any,observed=false,closed=0
  const page={original:true,generation:1}
- LoginomHost.connect({on:(_,f)=>listener=f,start(){},postMessage(m:any){queueMicrotask(()=>listener({data:{id:m.id,result:m.method==='acquire'?{generation:1}:page}}))},close(){closed++}})
+ LoginomHost.connect({on:(_:string,f:(event:any)=>void)=>listener=f,start(){},postMessage(m:any){queueMicrotask(()=>listener({data:{id:m.id,result:m.method==='acquire'?{generation:1}:page}}))},close(){closed++}})
  const owner=await LoginomHost.acquire('original-client')
- class ObservedPromise extends Promise<any>{catch(fn:any){return super.catch((e)=>{observed=true;seen=e;return fn(e)})}}
+ class ObservedPromise extends Promise<any>{override catch(fn:any){return super.catch((e)=>{observed=true;seen=e;return fn(e)})}}
  const stream={write(_s:any,done?:()=>void){done?.();return true}}
  const process={stdout:stream,stderr:stream,exitCode:undefined,exit(){exitCalls++}}
  await vm.runInNewContext('Promise.reject(original)'+tail,{Promise:ObservedPromise,original,process,Error})
