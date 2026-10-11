@@ -20,7 +20,7 @@ const state: {
   stopping?: Promise<void>
   closed: boolean
   root?: string
-  shutdown?: { stages: object[] }
+  shutdown?: { stages: object[], primaryFailure?:unknown, persistenceFailure?:unknown }
   closeFailure?: unknown
 } = { closed: false }
 const port: HostPort = {
@@ -213,9 +213,10 @@ function stop() {
     } catch(error) {
       const rejection=primary?.error??error
       state.closeFailure=rejection
-      if(primary) state.shutdown.primaryFailure={stage:primary.stage,rejection:closeRejection(rejection)}
-      if(primary && error!==rejection) state.shutdown.persistenceFailure=closeRejection(error)
-      try { await recordClose("refused",{rejection:closeRejection(rejection)}) } catch(persistenceFailure) { state.shutdown.persistenceFailure=closeRejection(persistenceFailure) }
+      const shutdown=state.shutdown??={stages:[]}
+      if(primary) shutdown.primaryFailure={stage:primary.stage,rejection:closeRejection(rejection)}
+      if(primary && error!==rejection) shutdown.persistenceFailure=closeRejection(error)
+      try { await recordClose("refused",{rejection:closeRejection(rejection)}) } catch(persistenceFailure) { shutdown.persistenceFailure=closeRejection(persistenceFailure) }
       throw rejection
     }
   })()
