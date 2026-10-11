@@ -123,3 +123,66 @@ test('confirmed native/context results survive final receipt failure without rep
   assert.equal((await f.owner.close()).cleanup_complete,true);assert.equal(f.logout(),1);assert.equal(f.contextClose(),1);
  }finally{await rm(root,{recursive:true,force:true})}
 });
+
+function serial(value) {
+ return value instanceof Error ? {kind:'Error',name:value.name,message:value.message,
+  ...('cause' in value?{cause:serial(value.cause)}:{})} :
+  {kind:'value',value:value===undefined?null:value,is_undefined:value===undefined};
+}
+function contains(tree, wanted) {
+ if(tree && typeof tree==='object') {
+  if(JSON.stringify(tree)===JSON.stringify(wanted)) return true;
+  return Object.values(tree).some(value=>contains(value,wanted));
+ }
+ return false;
+}
+for(const [label,native] of [['Error',Error('independent native refusal')],['undefined',undefined],['null',null],['false',false],['zero',0],['empty','']])
+ for(const blocked of [false,true]) test('independent linked authentication/native refusal survives managed retry: '+label+' writeBlocked='+blocked,async()=>{
+  const root=await mkdtemp(join(tmpdir(),'review-startup-linked-'));
+  const authentication=Error('independent authentication refusal');
+  const f=fixture(root,'identity',authentication);
+  const locator=f.page.locator.bind(f.page);
+  let nativeCalls=0;
+  f.page.locator=selector=>{
+   const handle=locator(selector);
+   if(selector.includes('btnLogOut'))handle.click=async()=>{
+    nativeCalls++;
+    if(blocked) {
+     await rename(join(root,'startup-cleanup.json'),join(root,'before-native-refusal.json'));
+     await mkdir(join(root,'startup-cleanup.json'));
+    }
+    throw native;
+   };
+   return handle;
+  };
+  let caller;
+  try{await f.functions.checkConnection(f.options)}catch(error){caller=error}
+  assert.equal(caller.cause,authentication);
+  assert.equal(f.owner.primaryFailure,authentication);
+  const before=structuredClone(f.owner.evidence);
+  assert.ok(contains(before,serial(native)),'first native rejection must be present');
+  if(blocked)await rename(join(root,'startup-cleanup.json'),join(root,'failed-evidence-write'));
+  const state={startupOwner:f.owner,browser:f.context,session:{directory:root}};
+  const close=vm.runInNewContext(managedCode+';({close})',{state,requests:new Set(),writeFile,join,rm,Promise,Error}).close;
+  let managedFailure;
+  try{await close()}catch(error){managedFailure=error}
+  assert.ok(managedFailure instanceof Error);
+  assert.equal(managedFailure.cause,native);
+  assert.equal(f.owner.cleanupFailure,native);
+  assert.equal(f.owner.nativeFailure.value,native);
+  assert.equal(f.owner.nativeFailure.stage,'native_logout');
+  assert.deepEqual(structuredClone(f.owner.evidence.native_failure),before.native_failure);
+  assert.equal(state.shutdown.stages.some(stage=>stage.status==='allowed'),false);
+  assert.equal(nativeCalls,1,'unknown native effect must never be replayed');
+  assert.equal(f.contextClose(),0,'context must remain retained');
+  assert.equal(state.browser,f.context,'original context remains with foreground owner');
+  assert.equal(f.owner.primaryFailure,authentication);
+  const durable=JSON.parse(await readFile(join(root,'startup-cleanup.json'),'utf8'));
+  assert.equal(durable.cleanup_complete,false);
+  const evidence={label,writeBlocked:blocked,fixture:true,production:process.env.STARTUP_SOURCE,
+   before,after:durable,caller:serial(caller),managed:serial(managedFailure),nativeCalls,contextCalls:f.contextClose()};
+  if(process.env.REVIEW_RESULTS)await writeFile(join(process.env.REVIEW_RESULTS,label+'-'+blocked+'.json'),JSON.stringify(evidence,null,2)+'\n');
+  try {
+   assert.ok(contains(durable,serial(native)), 'durable retry must retain original native rejection separately from authentication/unknown/persistence failures');
+  } finally {await rm(root,{recursive:true,force:true})}
+ });

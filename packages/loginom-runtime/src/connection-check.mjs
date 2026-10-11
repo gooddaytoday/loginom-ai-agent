@@ -97,11 +97,12 @@ function startupOwner(owner, profile, candidate) {
     if(owner.closed) return owner.receipt
     if(owner.closing) return owner.closing
     owner.closing=(async()=>{
+      let nativeStage
       try {
         if(owner.launchAttempted && !owner.context) throw Error('LOGINOM_STARTUP_LAUNCH_UNKNOWN')
         if(owner.context && (owner.context.pages().length!==1||owner.context.pages()[0]!==owner.page)) throw Error('LOGINOM_STARTUP_PAGE_CHANGED')
         if(owner.context && !owner.nativeConfirmed) {
-          if(owner.nativeAttempted) throw Error('LOGINOM_STARTUP_CLEANUP_UNKNOWN')
+          if(owner.nativeAttempted) throw new Error('LOGINOM_STARTUP_CLEANUP_UNKNOWN',{cause:owner.nativeFailure?.value})
           if(!owner.page) throw Error('LOGINOM_STARTUP_PAGE_UNKNOWN')
           const observed=await owner.page.evaluate(o=>{
             const own=globalThis.__loginomStartupV1,app=globalThis.bg?.app,m=app?.Application?.FInstance?.FMainForm?.FMapTree;
@@ -118,16 +119,21 @@ function startupOwner(owner, profile, candidate) {
           },{id:owner.id,account:owner.account,origin:owner.origin,navigationStarted:owner.navigationStarted===true,loginSubmitted:owner.loginSubmitted===true})
           if(observed.authenticated) {
             owner.nativeAttempted=true
+            nativeStage='native_menu_open'
             const at=tid=>owner.page.locator('[data-tid='+JSON.stringify(tid)+']')
             await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:8000})
+            nativeStage='native_account_check'
             if((await at('MF;AppMenuForm;p.h;p.t').innerText()).trim()!==owner.account) throw Error('LOGINOM_STARTUP_ACCOUNT_CHANGED')
+            nativeStage='native_identity_check'
             const same=await owner.page.evaluate(o=>{
               const own=globalThis.__loginomStartupV1,app=globalThis.bg?.app,m=app?.Application?.FInstance?.FMainForm?.FMapTree;
               return own?.document===document&&own.id===o.id&&own.account===o.account&&location.origin===o.origin&&app?.Version==='7.4.2'
                 &&m.FServerConnection.UserName===o.account&&m.FServerConnection.Connected===true&&m.PackageNodes?.Count===0&&m.HasRunningNodes()===false
             },{id:owner.id,account:owner.account,origin:owner.origin})
             if(!same) throw Error('LOGINOM_STARTUP_IDENTITY_CHANGED')
+            nativeStage='native_logout'
             await at('MF;AppMenuForm;btnLogOut').click({timeout:8000})
+            nativeStage='native_logout_confirmation'
             await at('LoginForm;Login;edtUsername').locator('input').waitFor({state:'visible',timeout:8000})
             if(await at('MF;cntMain;tlbMainToolbar;btnAvatar').isVisible()) throw Error('LOGINOM_STARTUP_LOGOUT_UNKNOWN')
             owner.nativeConfirmed={logged_out:true,unauthenticated:false}
@@ -154,10 +160,18 @@ function startupOwner(owner, profile, candidate) {
         owner.receipt={owner_id:owner.id,account:owner.account,cleanup_complete:true,...owner.evidence.native,context_closed:true}
         return owner.receipt
       } catch(error) {
-        owner.cleanupFailure=error
+        // A refused native gesture is never replayed. Keep its first exact
+        // value independently of authentication, retry and persistence errors.
+        if(nativeStage && !owner.nativeConfirmed && !owner.nativeFailure) {
+          owner.nativeFailure={stage:nativeStage,value:error}
+          owner.evidence.native_failure={stage:nativeStage,rejection:startupRejection(error)}
+          owner.evidence.stages.push({stage:nativeStage,status:'rejected',rejection:startupRejection(error)})
+        }
+        owner.cleanupFailure=owner.nativeFailure?owner.nativeFailure.value:error
         owner.evidence.cleanup_complete=false
         owner.evidence.effect_possible=owner.nativeAttempted===true||owner.loginSubmitted===true||(owner.launchAttempted===true&&!owner.context)
-        owner.evidence.cleanup_rejection=startupRejection(error)
+        owner.evidence.cleanup_rejection=startupRejection(owner.cleanupFailure)
+        owner.evidence.cleanup_attempt_rejection=startupRejection(error)
         try { await startupEvidence(owner) } catch(persistenceFailure) {owner.evidence.persistence_failure=startupRejection(persistenceFailure)}
         throw error
       }
@@ -209,7 +223,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     owner.primaryFailure=error
     owner.evidence.primary_rejection=startupRejection(error)
     try {await startupEvidence(owner)} catch(persistenceFailure) {owner.evidence.persistence_failure=startupRejection(persistenceFailure)}
-    try {await owner.close()} catch(cleanupFailure) {owner.cleanupFailure=cleanupFailure}
+    try {await owner.close()} catch(cleanupFailure) {owner.cleanupFailure=owner.nativeFailure?owner.nativeFailure.value:cleanupFailure}
     // Preserve generic/falsy originals as cause, with the same foreground owner.
     const code=['LOGINOM_ACCOUNT_MISMATCH','LOGINOM_LOGIN_REJECTED'].includes(error?.message)?error.message:owner.context?'LOGINOM_LOGIN_UNAVAILABLE':'LOGINOM_BROWSER_START_FAILED'
     const failure=new Error(code,{cause:error})
@@ -224,7 +238,7 @@ export async function checkConnection(options) {
   try {await checkKnowledge(options.endpoint,options.candidate.apiKey,owner)}
   catch(error){
     owner.primaryFailure=error;owner.evidence.primary_rejection=startupRejection(error)
-    try {await owner.close()} catch(cleanupFailure){owner.cleanupFailure=cleanupFailure}
+    try {await owner.close()} catch(cleanupFailure){owner.cleanupFailure=owner.nativeFailure?owner.nativeFailure.value:cleanupFailure}
     const failure=error instanceof Error?error:new Error('LOGINOM_KNOWLEDGE_UNAVAILABLE',{cause:error})
     failure.startupOwner=owner;throw failure
   }
