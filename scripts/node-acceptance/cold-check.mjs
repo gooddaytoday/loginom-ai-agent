@@ -1,39 +1,24 @@
 import {parseExpectedOutputs,matchExpectedOutputs} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
-import { readFile, mkdir, writeFile } from "node:fs/promises"
+import { readFile, mkdir, writeFile, open } from "node:fs/promises"
 import { join, resolve } from "node:path"
-import { pathToFileURL } from "node:url"
+import { pathToFileURL, fileURLToPath } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
 import {coldNativeEligible} from './cold-reader-policy.mjs'
 
-// Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
-// захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
-process.umask(0o077)
-const args = parseArgs({
-  options: {
-    config: { type: "string" },
-    resources: { type: "string" },
-    saved: { type: "string" },
-    expected: { type: "string" },
-    output: { type: "string" },
-  },
-  strict: true,
-}).values
-if (!args.config || !args.resources || !args.saved || !args.expected || !args.output)
-  throw Error("Required: --config --resources --saved --expected --output")
-
+import {withDiagnosticSession} from './diagnostic-session.mjs'
+// Foreground owners retain the original handles through every rejection.
+export async function runColdCheck(args, owner, foreground = {}) {
+ if (!owner || owner.context) throw Error('FOREGROUND_OWNER_REQUIRED')
+ process.umask(0o077)
+ try {
 const root = resolve(args.resources)
-const load = (name) => import(pathToFileURL(join(root, "runtime", name)).href)
-const { verifyResources } = await load("src/resources.mjs")
-const resources = await verifyResources(root)
-const compatibilityPlatform = resources.manifest.target?.startsWith("win32-")
-  ? "windows"
-  : resources.manifest.target?.startsWith("darwin-")
-    ? "macos"
-    : "linux"
-const { loginBrowser } = await load("src/connection-check.mjs")
+const load = foreground.load ?? (name => import(pathToFileURL(join(root,'runtime',name)).href))
+const {verifyResources}=await load('src/resources.mjs')
+const resources=await verifyResources(root)
+const compatibilityPlatform=resources.manifest.target?.startsWith('win32-')?'windows':resources.manifest.target?.startsWith('darwin-')?'macos':'linux'
 const { makeWorkspacePrepareCode } = await load("client/lib/workspace.mjs")
 const { createNodeTargetBrowserAdapter } = await load("client/lib/node-target-browser.mjs")
 const { createNodeProcedure } = await load("client/lib/node-procedure.mjs")
@@ -46,57 +31,105 @@ const { openNewOutputTable, configureTablePrecision, prepareTableRead, returnFro
 const { readTableOutputPages } = await load("client/lib/table-output-pages.mjs")
 const { decodeTableOutput } = await load("client/lib/table-output-values.mjs")
 
-const config = JSON.parse(await readFile(args.config, "utf8"))
-const loginPassword = config.workflow_profile?.password ?? ""
-if (config.workflow_profile?.passwordless_login === true && loginPassword !== "") throw Error("TEST_PASSWORD_UNAVAILABLE")
-if (config.workflow_profile?.passwordless_login !== true && loginPassword === "") throw Error("TEST_PASSWORD_UNAVAILABLE")
-const expected = JSON.parse(await readFile(args.expected, "utf8"))
+const config=JSON.parse(await readFile(args.config,'utf8'))
+const loginPassword=config.workflow_profile?.password??''
+if(config.workflow_profile?.passwordless_login===true&&loginPassword!=='' || config.workflow_profile?.passwordless_login!==true&&loginPassword==='')throw Error('TEST_PASSWORD_UNAVAILABLE')
+const expected=JSON.parse(await readFile(args.expected,'utf8'))
 const {multiple,outputs:expectedOutputs}=parseExpectedOutputs(expected)
-
-const saved = await loadSaved(args.saved)
-if (saved.path !== expected.package_path) throw Error("PACKAGE_PATH_MISMATCH")
-
-await mkdir(args.output, { recursive: true, mode: 0o700 })
-const session = randomUUID()
-const metadata = {
-  sessionId: session,
-  clientRevision: resources.manifestHash,
-  actionManifestDigest: resources.manifest.actionManifestSha256,
+const saved=await loadSaved(args.saved)
+if(saved.path!==expected.package_path)throw Error('PACKAGE_PATH_MISMATCH')
+await mkdir(args.output,{recursive:true,mode:0o700})
+const session=foreground.sessionId??randomUUID(),account=config.workflow_profile.loginom_user
+const identity=Object.freeze({sessionId:session,account,packagePath:saved.path,personalDirectory:'/'+account,loginomUrl:config.loginom_url,loginomBuild:'7.4.2',diagnosticDiscard:false})
+const record=createExecutionJournal({directory:args.output,metadata:{sessionId:session,clientRevision:resources.manifestHash,actionManifestDigest:resources.manifest.actionManifestSha256},knownSecrets:[config.api_key,loginPassword].filter(Boolean)})
+let context=foreground.context,page=foreground.page
+if(!context){
+ const {createRequire}=await import('node:module'),{chromium}=createRequire(pathToFileURL(join(root,'runtime/client/package.json')))('playwright-core')
+ const {loginPage,browserEnvironment,browserLoggingArguments}=await load('src/connection-check.mjs')
+ const {browserLaunch}=await load('client/lib/browser-launch.mjs'),{browserDownloadScript}=await load('client/lib/browser-downloads.mjs')
+ const profile=join(args.output,'browser'),launch=browserLaunch(process.env.LOGINOM_AI_AGENT_TEST_HEADLESS!=='0')
+ context=await chromium.launchPersistentContext(profile,{executablePath:resources.browserPath,headless:process.env.LOGINOM_AI_AGENT_TEST_HEADLESS!=='0',chromiumSandbox:true,env:browserEnvironment(profile),args:['--no-proxy-server',...browserLoggingArguments(profile),...launch.args],viewport:launch.viewport})
+ page=context.pages()[0]??await context.newPage()
+ Object.assign(owner,{context,page,failed:false,closed:false})
+ await context.addInitScript({content:browserDownloadScript(config.loginom_url)})
+ await loginPage(page,{url:config.loginom_url,username:account,password:loginPassword})
 }
-const record = createExecutionJournal({
-  directory: args.output,
-  metadata,
-  knownSecrets: [config.api_key, loginPassword].filter(Boolean),
-})
-const { context } = await loginBrowser({
-  browserPath: resources.browserPath,
-  profile: join(args.output, "browser"),
-  candidate: { url: config.loginom_url, username: config.workflow_profile.loginom_user, password: loginPassword },
-  headless: process.env.LOGINOM_AI_AGENT_TEST_HEADLESS !== "0",
-  keepOpen: true,
-})
-const page = context.pages()[0]
-const execute = (code) => new Function("page", `return (${code})(page)`)(page)
-const state = { prepared: undefined, closed: false, cleanupAttempted: false }
-try {
-  let prepared = await execute(
-    makeWorkspacePrepareCode({
-      loginomUrl: page.url(),
-      compatibility: { loginom_build: "7.4.2", platform: compatibilityPlatform, browser: "chromium" },
-      sessionId: session,
-      operationId: "cold-open",
-      intent: "open_package",
-      packagePath: saved.path,
-    }),
-  )
-  state.prepared = prepared
-  if (
-    prepared.status !== "READY" ||
-    prepared.package_ref.path !== saved.path ||
-    prepared.workflow_ref.navigation_path.some((item) => item.label.endsWith("(только чтение)"))
-  )
-    throw Error("COLD_PACKAGE_NOT_WRITABLE")
-
+const transport=foreground.execute??(code=>new Function('page',`return (${code})(page)`)(page))
+let unknownEffect=false
+const execute=async code=>{
+ try{const receipt=await transport(code);if(receipt?.status==='AMBIGUOUS'||receipt?.outcome?.status==='AMBIGUOUS'||receipt?.status!=='SUCCEEDED'&&receipt?.effect_possible===true&&receipt?.cleanup_complete===false){unknownEffect=true;owner.unknownEffect=true}return receipt}
+ catch(error){unknownEffect=true;owner.unknownEffect=true;throw error}
+}
+Object.assign(owner,{context,page,execute,identity:{...identity},failed:false,closed:false,unknownEffect:false})
+const {createActionRuntime}=await load('client/lib/executor.mjs')
+const catalog=JSON.parse(await readFile(join(root,'runtime/executor/catalog/actions.json'),'utf8')),selectors=JSON.parse(await readFile(join(root,'runtime/executor/catalog/selectors.json'),'utf8'))
+catalog.actions.find(a=>a.action_key==='package.save_checkpoint').effect.allowed_roots=[identity.personalDirectory]
+const runtime=foreground.runtime??createActionRuntime({pinned:{actions:new Map(catalog.actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.selectors.map(s=>[s.symbol,s])),pins:{}},execute,onRecord:record,targetOrigin:new URL(config.loginom_url).origin,targetBuild:'7.4.2',allowCandidate:true})
+owner.runtime=runtime
+const settled=()=>{
+ if(owner.runtime!==runtime||typeof runtime.hasUnsettledWork!=='function')throw Error('DIAGNOSTIC_RUNTIME_UNVERIFIED')
+ if(runtime.hasUnsettledWork()||unknownEffect)throw Error('DIAGNOSTIC_RUNTIME_UNSETTLED')
+ if(owner.context!==context||owner.page!==page||owner.execute!==execute||owner.closed)throw Error('DIAGNOSTIC_OWNER_CHANGED')
+}
+let prepared,verifiedPrepared,binding,nativeHandle
+const requireBinding=()=>{
+ if(!binding||owner.prepared!==verifiedPrepared||owner.prepared.status!=='READY'||owner.prepared.document_id!==binding.documentId||owner.prepared.workflow_ref?.tab_tid!==binding.tabTid||owner.prepared.package_ref?.path!==binding.path||owner.identity.packagePath!==binding.path||owner.identity.account!==identity.account||owner.identity.sessionId!==identity.sessionId)throw Error('DIAGNOSTIC_PACKAGE_IDENTITY_UNCONFIRMED')
+}
+const observe=foreground.observeIdentity??(()=>page.evaluate(({b,o})=>{
+ const app=globalThis.bg?.app,m=app?.Application?.FInstance?.FMainForm?.FMapTree,p=globalThis.__loginomDockPreparationV1,n=m?.PackageNodes?.Count===1?m.PackageNodes.Items(0):null
+ const tabs=document.querySelectorAll('[data-tid='+JSON.stringify(o.tabTid)+']')
+ const path=n?.PackageFileName?'/'+n.PackageFileName.replaceAll('\\','/').replace(/^\/+/, ''):null
+ return Promise.resolve(n?m.FServerConnection.Session.IsPackageModified(n.Package):null).then(modified=>({account:m?.FServerConnection?.UserName,sessionId:o.sessionId,documentId:p?.id,tabTid:tabs.length===1&&tabs[0]===b.tab&&tabs[0].classList.contains('x-tab-active')?o.tabTid:null,path,modified,running:n?n.HasRunningNodes()||m.HasRunningNodes():null,readOnly:n?.ReadOnly,owned:p===b.prep&&p.document===document&&n===b.node&&n?.Package===b.package&&m?.FServerConnection===b.connection&&m.FServerConnection.Connected===true,personalDirectory:o.personalDirectory}))
+},{b:nativeHandle,o:{...identity,tabTid:binding.tabTid}}))
+const requireState=state=>{requireBinding();if(state.account!==identity.account||state.sessionId!==identity.sessionId||state.documentId!==binding.documentId||state.tabTid!==binding.tabTid||state.path!==binding.path||state.owned!==true||state.running!==false||state.readOnly!==false)throw Error('DIAGNOSTIC_RECOVERY_IDENTITY_UNCONFIRMED')}
+const durable=async(name,value)=>{
+ const f=await open(join(args.output,name),'w',0o600);try{await f.writeFile(JSON.stringify(value,null,2)+'\n');await f.sync()}finally{await f.close()}
+ const dir=await open(args.output,'r');try{await dir.sync()}finally{await dir.close()}
+}
+let coldResult,recovering=false
+owner.recover=async()=>{
+ if(recovering)throw Error('DIAGNOSTIC_RECOVERY_RUNNING')
+ recovering=true
+ try{
+ settled();requireBinding();const state=await observe();requireState(state);settled()
+ if(state.modified!==false){
+  if(state.modified!==true)throw Error('DIAGNOSTIC_DIRTY_UNCONFIRMED')
+  if(state.personalDirectory!==identity.personalDirectory||!/^[^/\\\x00-\x1f]+$/.test(account)||['.','..'].includes(account))throw Error('DIAGNOSTIC_PERSONAL_PATH_UNCONFIRMED')
+  const path=identity.personalDirectory+'/'+randomUUID()+'.lgp'
+  settled();requireBinding()
+  const savedCopy=await runtime.run('package.save_checkpoint',{path,conflict_policy:'fail'},{operationId:'cold-preserve-'+randomUUID()})
+  owner.preservation=savedCopy
+  if(savedCopy?.status!=='SUCCEEDED'||savedCopy.output?.save_completed!==true||savedCopy.output.package_ref?.path!==path)throw Error('DIAGNOSTIC_SAVE_UNCONFIRMED')
+  settled();requireBinding()
+  owner.identity={...identity,packagePath:path};owner.prepared={...verifiedPrepared,package_ref:savedCopy.output.package_ref};verifiedPrepared=owner.prepared;binding={...binding,path}
+  await durable('preservation.json',savedCopy)
+  const after=await observe();requireState(after);if(after.modified!==false)throw Error('DIAGNOSTIC_SAVE_DIRTY')
+ }
+ settled();requireBinding()
+ const cleanupExecute=async code=>{
+  settled();requireBinding();const receipt=await execute(code);owner.cleanup=receipt
+  const confirmed=receipt?.status==='SUCCEEDED'&&receipt.package_closed===true&&receipt.logged_out===true&&receipt.unsaved_changes_discarded===false&&receipt.session_id===identity.sessionId&&receipt.document_id===binding.documentId&&receipt.account===identity.account&&receipt.package_path===binding.path
+  const noEffect=receipt?.status==='BLOCKED'&&receipt.package_closed===false&&receipt.logged_out===false&&['ACCOUNT_CHANGED','DOCUMENT_IDENTITY_CHANGED','CONNECTION_DISCONNECTED','DIALOG_OR_OPERATION_OPEN','PACKAGE_INVENTORY_CHANGED','PACKAGE_IDENTITY_CHANGED','RUNNING_NODES','UNSAVED_CHANGES','PACKAGE_CHANGED_DURING_CHECK'].includes(receipt.reason)
+  if(!confirmed&&!noEffect){unknownEffect=true;owner.unknownEffect=true}
+  if(receipt?.status==='SUCCEEDED'&&receipt.package_closed===true&&receipt.logged_out===true&&receipt.unsaved_changes_discarded===false&&receipt.session_id===identity.sessionId&&receipt.document_id===binding.documentId&&receipt.account===identity.account&&receipt.package_path===binding.path){
+   await durable('package-cleanup.json',receipt)
+   if(!owner.failed&&coldResult)await durable('result.json',{...coldResult,cleanup:{package_closed:true,logged_out:true},preservation:owner.preservation??null})
+  }
+  if(receipt?.status==='SUCCEEDED'&&receipt.unsaved_changes_discarded!==false)throw Error('DIAGNOSTIC_DISCARD_UNCONFIRMED')
+  return receipt
+ }
+ await withDiagnosticSession({context,execute:cleanupExecute,directory:args.output,identity:{...identity,packagePath:binding.path},makeCleanupCode:foreground.makeCleanupCode??makePackageCleanupCode},async({bindPrepared})=>bindPrepared(owner.prepared))
+ owner.closed=true;return owner
+ }finally{recovering=false}
+}
+prepared=await execute(makeWorkspacePrepareCode({loginomUrl:config.loginom_url,compatibility:{loginom_build:'7.4.2',platform:compatibilityPlatform,browser:'chromium'},sessionId:session,operationId:'cold-open',intent:'open_package',packagePath:saved.path}))
+owner.preparedCandidate=prepared
+if(prepared?.status!=='READY'||prepared.package_ref?.path!==saved.path||!prepared.document_id||!prepared.workflow_ref?.tab_tid||prepared.workflow_ref.navigation_path.some(item=>item.label.endsWith('(только чтение)')))throw Error('COLD_PACKAGE_NOT_WRITABLE')
+verifiedPrepared=structuredClone(prepared);owner.prepared=verifiedPrepared;binding={documentId:prepared.document_id,tabTid:prepared.workflow_ref.tab_tid,path:saved.path}
+if(!foreground.observeIdentity)nativeHandle=await page.evaluateHandle(tabTid=>{const p=globalThis.__loginomDockPreparationV1,m=bg.app.Application.FInstance.FMainForm.FMapTree,n=m.PackageNodes.Count===1?m.PackageNodes.Items(0):null,tabs=document.querySelectorAll('[data-tid='+JSON.stringify(tabTid)+']');return {prep:p,node:n,package:n?.Package,connection:m.FServerConnection,tab:tabs.length===1?tabs[0]:null}},binding.tabTid)
+requireState(await observe());settled()
+if(foreground.scenario){await foreground.scenario({owner,prepared,execute,runtime});coldResult={status:'PASS',phase:'diagnostic_cold_caller',path:saved.path,settingsReapplied:false}}
+else{
   const origin = new URL(config.loginom_url).origin
   const adapter = createNodeTargetBrowserAdapter({ execute, origin, build: "7.4.2" })
   let graph = await adapter.observe(
@@ -123,10 +156,6 @@ try {
     if(result.status!=='SUCCEEDED'||result.verified!==true||result.graph_unchanged!==true||result.fully_visible!==true||result.settings_applied!==false)
      throw Error('COLD_SOURCE_REVEAL_UNCONFIRMED');
    };
-   const {createActionRuntime}=await load('client/lib/executor.mjs');
-   const catalog=JSON.parse(await readFile(join(root,'runtime/executor/catalog/actions.json'),'utf8'));
-   const selectors=JSON.parse(await readFile(join(root,'runtime/executor/catalog/selectors.json'),'utf8'));
-   const runtime=createActionRuntime({pinned:{actions:new Map(catalog.actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.selectors.map(s=>[s.symbol,s])),pins:{}},execute,onRecord:record,targetOrigin:origin,targetBuild:'7.4.2',allowCandidate:true});
    const account=config.workflow_profile.loginom_user;
    const before=await observeStaticSources({load,graph:{...graph,nodes:graph.nodes.filter(n=>n.type==='imports.text')},channelFor,account,revealSource});
    const verified=await verifyStaticSourceBytes({load,runtime,execute,sources:before,allowed:expected.static_sources,account,origin,output:args.output});
@@ -232,9 +261,8 @@ try {
     requireExactNumbers: true,
   })
   // This reader created this temporary visualizer with openNewOutputTable.
-  // Its formats are never saved: the verified owned-package cleanup below
-  // discards every temporary view. Rewriting every field's original format
-  // here duplicated the expensive precision protocol and timed out wide reports.
+  // Recovery preserves temporary views only in a new private copy; the source
+  // package is never overwritten. Exact decoding remains independent of cleanup.
   // Exact mask application/readback and value decoding remain mandatory.
   await returnFromOutputTable(channel, opened.table)
   }
@@ -248,77 +276,29 @@ try {
   }
   const correspondence=matchExpectedOutputs(actual,expectedOutputs);
 
-  // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.
-  // Cleanup проверяет точное владение пакетом/аккаунтом перед discard.
-  state.cleanupAttempted=true;
-  const cleanup = await execute(
-    makePackageCleanupCode({
-      sessionId: session,
-      documentId: prepared.document_id,
-      account: config.workflow_profile.loginom_user,
-      packagePath: saved.path,
-      loginomUrl: config.loginom_url,
-      loginomBuild: "7.4.2",
-      tabTid: prepared.workflow_ref.tab_tid,
-      diagnosticDiscard: true,
-    }),
-  )
-  await writeFile(join(args.output, "cleanup.json"), JSON.stringify(cleanup, null, 2) + "\n")
-  state.cleanup=cleanup
-  if (cleanup.status !== "SUCCEEDED" || !cleanup.package_closed || !cleanup.logged_out)
-    throw Error("COLD_CLEANUP_UNCONFIRMED")
-  state.closed = true
+coldResult={status:'PASS',phase:'independent_cold_reopen_readback',path:saved.path,...(multiple?{outputs:actual.map(a=>({node:a.node,execution:a.execution,output:{ports:[a.data]}})),correspondence}:{node:actual[0].node,execution:actual[0].execution,output:{ports:[actual[0].data]}}),settingsReapplied:false}
+const text=JSON.stringify(coldResult);if([config.api_key,loginPassword].filter(Boolean).some(secret=>text.includes(secret)))throw Error('SECRET_IN_RESULT')
+await durable('actual-readback.json',coldResult)
+}
+owner.result=coldResult
+await owner.recover()
+ }catch(error){
+  owner.failed=true;owner.error=error
+  let message=String(error?.message??error)
+  try{const config=JSON.parse(await readFile(args.config,'utf8'));for(const secret of [config.api_key,config.workflow_profile?.password].filter(Boolean))message=message.split(secret).join('[REDACTED]')
+   await writeFile(join(args.output,'result.json'),JSON.stringify({status:'FAIL',phase:'independent_cold_reopen_readback',error:message,settingsReapplied:false,cleanup:{package_closed:owner.cleanup?.package_closed===true,logged_out:owner.cleanup?.logged_out===true}})+'\n',{mode:0o600})
+  }catch(evidenceError){owner.evidenceError=evidenceError}
+ }
+ return owner
+}
 
-  const result = {
-    status: "PASS",
-    phase: "independent_cold_reopen_readback",
-    path: saved.path,
-    ...(multiple?{outputs:actual.map(a=>({node:a.node,execution:a.execution,output:{ports:[a.data]}})),correspondence}
-      :{node:actual[0].node,execution:actual[0].execution,output:{ports:[actual[0].data]}}),
-    settingsReapplied: false,
-    cleanup: {
-      package_closed: cleanup.package_closed === true,
-      logged_out: cleanup.logged_out === true,
-    },
-  }
-  const body = JSON.stringify(result, null, 2)
-  if (body.includes(config.api_key) || (loginPassword && body.includes(loginPassword))) throw Error("SECRET_IN_RESULT")
-  await writeFile(join(args.output, "result.json"), body + "\n")
-  console.log(
-    JSON.stringify({
-      status: result.status,
-      phase: result.phase,
-      path: saved.path,
-      settingsReapplied: false,
-      cleanup: result.cleanup,
-    }),
-  )
-} catch(error) {
-  state.failure=String(error?.message??error)
-  for(const secret of [config.api_key,loginPassword].filter(Boolean))state.failure=state.failure.split(secret).join('[REDACTED]')
-  throw error
-} finally {
-  if (!state.closed && !state.cleanupAttempted && state.prepared?.status === "READY" && state.prepared.package_ref?.path === saved.path) {
-    await execute(
-      makePackageCleanupCode({
-        sessionId: session,
-        documentId: state.prepared.document_id,
-        account: config.workflow_profile.loginom_user,
-        packagePath: saved.path,
-        loginomUrl: config.loginom_url,
-        loginomBuild: "7.4.2",
-        tabTid: state.prepared.workflow_ref.tab_tid,
-        diagnosticDiscard: true,
-      }),
-    )
-      .then((result) => {state.cleanup=result;return writeFile(join(args.output, "cleanup.json"), JSON.stringify(result, null, 2) + "\n")})
-      .catch(() => console.error("COLD_PACKAGE_CLEANUP_UNCONFIRMED"))
-  }
-  if(state.failure)await writeFile(join(args.output,'result.json'),JSON.stringify({status:'FAIL',
-   phase:'independent_cold_reopen_readback',path:saved.path,settingsReapplied:false,error:state.failure,
-   cleanup:{package_closed:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.package_closed===true,
-    logged_out:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.logged_out===true}},null,2)+'\n')
-  await context.close()
+export const coldOwner={}
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+ const args=parseArgs({options:{config:{type:'string'},resources:{type:'string'},saved:{type:'string'},expected:{type:'string'},output:{type:'string'}},strict:true}).values
+ if(!args.config||!args.resources||!args.saved||!args.expected||!args.output)throw Error('Required: --config --resources --saved --expected --output')
+ await runColdCheck(args,coldOwner)
+ if(coldOwner.failed){process.exitCode=1;console.error('COLD_CHECK_FAILED; original foreground owner retained for guarded recovery')}
+ else console.log(JSON.stringify({status:'PASS',phase:'independent_cold_reopen_readback',path:coldOwner.result.path,settingsReapplied:false,cleanup:{package_closed:true,logged_out:true}}))
 }
 
 async function loadSaved(value) {
