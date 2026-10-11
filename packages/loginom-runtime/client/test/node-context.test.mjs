@@ -140,6 +140,19 @@ function checkpointFixture(){
  return {page,binding,record,preparation,packageNode,moduleNode,workflowNode,nodeTree,controller,components,context,open,setCrumbs,wizardRoot,tab,
  duplicate:()=>surface.push(crumbs[2]),missingSurface:()=>surface=[tab],crumb:i=>crumbs[i]};
 }
+for(const surface of ['graph','canonical wizard'])for(const conflict of [false,true])
+ test('peer receipt '+(conflict?'authority conflict':'same native owner')+' on '+surface,async()=>{
+  const f=checkpointFixture();if(surface==='canonical wizard')f.open();
+  const peer={...f.record,nodeTargetWorkflowNode:conflict
+    ?Object.assign(Object.create(Object.getPrototypeOf(f.workflowNode)),f.workflowNode):f.workflowNode};
+  f.preparation.receipts.set('second-verified-receipt',peer);
+  const binding=JSON.stringify(f.binding),receipt=JSON.stringify(f.record.request),alias=f.record.nodeNavigationPath;
+  const result=await readPreparedNodeContext(f.page,f.binding);
+  assert.equal(result.verified,!conflict);
+  if(conflict){assert.equal(result.reason,'navigation');assert.equal(f.record.nodeNavigationPath,alias);
+    assert.equal(f.record.nodeNavigationBinding,undefined);}
+  assert.equal(JSON.stringify(f.binding),binding);assert.equal(JSON.stringify(f.record.request),receipt);
+ });
 test('SaveCheckpoint canonical preparation: old graph keys then native-bound wizard keys',async()=>{
  const f=checkpointFixture();assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,true);assert.equal(f.record.nodeNavigationPath,undefined);
  f.open();const r=await readPreparedNodeContext(f.page,f.binding);

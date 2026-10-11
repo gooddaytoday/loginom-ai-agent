@@ -43,14 +43,17 @@ export async function readPreparedNodeContext(page, binding) {
     }
     // A save can rekey Package1 only when the original rendered/native path
     // was bound before the transition. Labels alone never establish ownership.
+    const hasReceiptAuthority = (wf, receipt) => {
+      const peers=[...p.receipts.values()].filter(v=>v.phase==='verified'&&v.workflowId===wf.workflow_id);
+      return !peers.some(v=>v.tab!==receipt.tab||v.packageNode!==receipt.packageNode
+        ||v.nodeTargetWorkflowNode&&receipt.nodeTargetWorkflowNode&&v.nodeTargetWorkflowNode!==receipt.nodeTargetWorkflowNode);
+    };
     const verifyNavigation = (wf, receipt, observed, capture=false) => {
       const expected=wf.navigation_path, samePath=(a,b)=>Array.isArray(a)&&a.length===b.length
         &&a.every((c,i)=>c.tid===b[i].tid&&c.label===b[i].label);
       if(!Array.isArray(expected)||!expected.length||expected.length>32||observed.length!==expected.length
         ||new Set(observed.map(c=>c.tid)).size!==observed.length)return null;
-      const peers=[...globalThis.__loginomDockPreparationV1.receipts.values()].filter(v=>v.phase==='verified'&&v.workflowId===wf.workflow_id);
-      if(peers.some(v=>v.tab!==receipt.tab||v.packageNode!==receipt.packageNode
-        ||v.nodeTargetWorkflowNode&&receipt.nodeTargetWorkflowNode&&v.nodeTargetWorkflowNode!==receipt.nodeTargetWorkflowNode)
+      if(!hasReceiptAuthority(wf,receipt)
         ||receipt.crumbs&&!samePath(receipt.crumbs,expected))return null;
       const native=observed.map(c=>{const es=exact(c.tid),e=es.length===1&&es[0],cmp=e&&globalThis.Ext?.getCmp?.(e.id);
         return cmp?.el?.dom===e?cmp?._node?.data?.node:null;});
@@ -79,6 +82,9 @@ export async function readPreparedNodeContext(page, binding) {
         i===index?current.tid:expected[i].tid.startsWith(old.tid+'>')?current.tid+expected[i].tid.slice(old.tid.length):null)))return null;
       return {verified:true,rebinding:{prepared_path:expected.map(c=>({...c})),observed_path:observed.map(c=>({...c}))}};
     };
+    // A canonical path transition cannot turn conflicting verified receipts
+    // into authority, even before the first navigation binding is captured.
+    if(!hasReceiptAuthority(b.workflow_ref,r))return reject('navigation');
     let navigation=verifyNavigation(b.workflow_ref,r,crumbs.slice(0,b.workflow_ref.navigation_path.length));
     // Canonical open_package can precede capture; a captured binding must
     // still satisfy every existing account/connection/native rekey guard.
