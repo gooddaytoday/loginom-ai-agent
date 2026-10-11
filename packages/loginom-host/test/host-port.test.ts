@@ -128,7 +128,11 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
       // Disconnect or process death does not confirm cleanup. The retained
       // owner must refuse shutdown while its receipt remains unconfirmed.
       if (ending === "disconnect") await expect(host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
-      if (ending === "kill") await expect(host.close()).rejects.toThrow("LOGINOM_RUNTIME_DISCONNECTED")
+      if (ending === "kill") {
+        const refusal = await host.close().then(() => undefined, error => error)
+        expect(refusal?.message).toBe("LOGINOM_RUNTIME_CLEANUP_FAILED")
+        expect(refusal?.cause?.message).toBe("LOGINOM_RUNTIME_DISCONNECTED")
+      }
       if (ending !== "disconnect" && ending !== "kill") await host.close()
       if (ending !== "finish" && ending !== "close") {
         const calls = await readFile(join(directory, "calls.jsonl"), "utf8")
