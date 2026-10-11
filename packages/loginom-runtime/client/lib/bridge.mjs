@@ -546,6 +546,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       if (captureRejected && captureUnknown) return Promise.reject(captureRejection);
       if (captureInFlight) return captureInFlight.then(() => closeBridge());
       shutdownStarted = true;
+      let shutdownPrimary;
       closing ??= (async () => {
         shutdownStage='native_cleanup';
         let shutdownCleanup;
@@ -639,6 +640,8 @@ export async function createBridge(config, session, { browserTransport: managedB
         await server.close();
         shutdownStage='transport_close';
         const closed=await closeClients();
+        const rejectedStages=closed.flatMap((result,index)=>result.status==='rejected'?[{stage:index===0?'remote_close':'browser_transport_close',rejection:shutdownRejection(result.reason)}]:[]);
+        if(rejectedStages.length) shutdownPrimary={stage:'transport_close',rejections:rejectedStages,reason:closed.find(result=>result.status==='rejected').reason};
         if (closed[1].status === 'fulfilled') await awaitBrowserExit();
         const browserTransportClosed = closed[1].status === 'fulfilled' && browserTransportEnded;
         const cleanupComplete=browserTransportClosed&&closed.every(result=>result.status==='fulfilled');
@@ -648,7 +651,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           package_cleanup:shutdownCleanup??null,clipboard_leases_retained:heldLeases.size,
           stages:{remote_close:closed[0].status,browser_transport_close:closed[1].status,
             browser_transport_onclose:browserTransportEnded},
-          ...(closed[1].status==='rejected'?{rejection:shutdownRejection(closed[1].reason)}:{})};
+          ...(rejectedStages.length?{rejection:rejectedStages[0].rejection,rejections:rejectedStages}:{})};
         shutdownStage='durable_transport_receipt';
         await writeFile(join(session.directory,'shutdown-receipt.json'),JSON.stringify(shutdown,null,2)+'\n',{mode:0o600});
         await recordExecution({event:'bridge_shutdown',shutdown});
@@ -669,9 +672,10 @@ export async function createBridge(config, session, { browserTransport: managedB
       }, async error => {
         if(managedCleanup)cleanupRefused=true; closing = undefined; shutdownStarted = false;
         try { await writeFile(join(session.directory,'bridge-shutdown-failure.json'),
-          JSON.stringify({stage:shutdownStage,rejection:shutdownRejection(error)},null,2)+'\n',{mode:0o600}); }
+          JSON.stringify({stage:shutdownStage,rejection:shutdownPrimary?shutdownRejection(shutdownPrimary.reason):shutdownRejection(error),
+            ...(shutdownPrimary?{primary_phase:shutdownPrimary.stage,primary_rejection:shutdownRejection(shutdownPrimary.reason),rejections:shutdownPrimary.rejections,persistence_failure:shutdownRejection(error)}:{})},null,2)+'\n',{mode:0o600}); }
         catch { /* Preserve the primary refusal even if its diagnostic write also fails. */ }
-        throw error;
+        throw shutdownPrimary?new Error('LOGINOM_BRIDGE_CLEANUP_FAILED',{cause:shutdownPrimary.reason}):error;
       });
       return closing;
     }

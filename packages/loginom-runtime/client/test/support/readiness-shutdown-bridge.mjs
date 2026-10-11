@@ -20,7 +20,7 @@ const target={profile_id:'test',loginom_build:'7.4.2',platform:'macos',browser:'
 class ExternalClient {
  constructor(identity){if(identity.name==='loginom-dock-browser')return new RealClient(identity);this.f=current;}
  async connect(){}
- async close(){this.f.events.push('remote-close');}
+ async close(){this.f.events.push('remote-close');if(this.f.remoteRejected)throw this.f.remoteRejection;}
  async listTools(){return {tools:[{name:'read',inputSchema:{type:'object'}}]};}
 }
 mock.module('@modelcontextprotocol/sdk/client/index.js',{namedExports:{Client:ExternalClient}});
@@ -138,4 +138,55 @@ for(const scenario of ['ready','unconfigured','foreign-account','foreign-documen
     // Only our local InMemory fixture transports, never a production browser.
     a.close=originalClose;await originalClose();await browserServer.close();await rm(directory,{recursive:true,force:true});
   }
+ });
+
+
+// New combinations: a remote close failure with an otherwise confirmed
+// browser close, and a primary browser failure followed by receipt failure.
+// External services and Page are fixtures; bridge/SDK/gate/disk are actual.
+for(const scenario of ['remote-error','remote-zero','remote-false','remote-empty','remote-null','remote-undefined','transport-and-receipt-failure'])
+ test('independent primary shutdown evidence: '+scenario,async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'review-primary-shutdown-'));
+  const rejection=scenario==='remote-error'?Error('original remote close'):scenario==='remote-zero'?0:
+   scenario==='remote-false'?false:scenario==='remote-empty'?'':scenario==='remote-null'?null:undefined;
+  const f=current={events:[],unsettled:false,remoteRejected:scenario!=='transport-and-receipt-failure',remoteRejection:rejection,logout:0};
+  const m={FServerConnection:{Connected:true,UserName:'user'},PackageNodes:{Count:0},HasRunningNodes:()=>false};
+  const document={querySelectorAll:()=>[]};
+  const context=vm.createContext({document,location:{origin:'https://loginom.invalid'},
+   bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:m}}}}}});
+  context.__loginomDockReadinessV1={document,documentId:'original-document',sessionId:'original-session',account:'user',loginomBuild:'7.4.2'};
+  const page={evaluate:async(fn,arg)=>vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context),
+   locator(selector){const avatar=selector.includes('btnAvatar'),logout=selector.includes('btnLogOut');
+    return {locator(){return this},innerText:async()=>m.FServerConnection.UserName,
+     async click(){if(logout){f.logout++;m.FServerConnection.Connected=false}},async waitFor(){},
+     async isVisible(){return avatar&&m.FServerConnection.Connected}}}};
+  const browserServer=new Server({name:'fixture-browser',version:'1'},{capabilities:{tools:{}}});
+  browserServer.setRequestHandler(ListToolsRequestSchema,()=>({tools:[{name:'browser_run_code_unsafe',inputSchema:{type:'object'}}]}));
+  browserServer.setRequestHandler(CallToolRequestSchema,async request=>({content:[{type:'text',text:JSON.stringify(await vm.runInContext('('+request.params.arguments.code+')',context)(page))}]}));
+  const [a,b]=InMemoryTransport.createLinkedPair();await browserServer.connect(b);
+  const originalClose=a.close.bind(a);
+  a.close=async()=>{f.events.push('browser-close');if(scenario==='transport-and-receipt-failure')throw 0;await originalClose()};
+  const session={directory,browserRoot:'/fixture',async save(){},metadata:{client:'test',clientRevision:'a'.repeat(64),sessionId:'original-session'},artifactStore:{list:()=>[],async releaseUploads(){f.events.push('release')}}};
+  let bridge;
+  try{
+   bridge=await createBridge({mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',stateDir:directory,loginomUrl:'https://loginom.invalid/app',endpoint:'https://fixture.invalid/mcp'},session,
+    {browserTransport:a,authenticatedReadiness:{account:'user',documentId:'original-document',loginomBuild:'7.4.2'}});
+   if(scenario==='transport-and-receipt-failure')await mkdir(join(directory,'shutdown-receipt.json'));
+   let result,caught;try{result=await bridge.close()}catch(e){caught=e}
+   const read=async path=>{try{return JSON.parse(await readFile(join(directory,path),'utf8'))}catch{return null}};
+   const shutdown=await read('shutdown-receipt.json'),failure=await read('bridge-shutdown-failure.json');
+   const evidence={scenario,result:result??null,caught:caught?{message:caught.message,code:caught.code,cause:caught.cause}:null,shutdown,failure,events:f.events,nativeLogoutCalls:f.logout};
+   if(process.env.READINESS_RESULTS_DIR)await writeFile(join(process.env.READINESS_RESULTS_DIR,scenario+'.json'),JSON.stringify(evidence,null,2)+'\n');
+   assert.equal(f.events.includes('release'),false);
+   if(scenario==='transport-and-receipt-failure'){
+    // The separate persistence failure may be reported, but the primary 0
+    // rejection must remain explicitly identifiable, including its phase.
+    assert.deepEqual(failure?.primary_rejection??failure?.rejection,{kind:'value',value:0,is_undefined:false});
+   }else{
+    assert.equal(result.cleanup_complete,false);assert.equal(result.browser_transport_closed,true);
+    const expected=rejection instanceof Error?{kind:'Error',name:rejection.name,message:rejection.message}:
+     {kind:'value',value:rejection===undefined?null:rejection,is_undefined:rejection===undefined};
+    assert.deepEqual(shutdown?.rejection??shutdown?.primary_rejection,expected);
+   }
+  }finally{a.close=originalClose;await originalClose();await browserServer.close();await rm(directory,{recursive:true,force:true})}
  });

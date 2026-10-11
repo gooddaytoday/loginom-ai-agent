@@ -188,19 +188,22 @@ function stop() {
   state.stopping = (async () => {
     await state.starting
     await recordClose("interrupt",{status:"started"})
+    let primary: {stage:string,error:Error} | undefined
     try {
     const cancellation = await Promise.allSettled([Promise.resolve().then(()=>state.host?.interruptAll())])
     const interrupted=cancellation[0]
+    if(interrupted.status==="rejected") primary={stage:"interrupt",error:new Error("LOGINOM_HOST_CLEANUP_FAILED",{cause:interrupted.reason})}
     await recordClose("interrupt",{status:interrupted.status,
       ...(interrupted.status==="rejected"?{rejection:closeRejection(interrupted.reason)}:{})})
     await Promise.all([...operations])
     await recordClose("host_close",{status:"started"})
     const results = await Promise.allSettled([Promise.resolve().then(()=>state.host?.close())])
     const closed=results[0]
+    if(closed.status==="rejected" && !primary) primary={stage:"host_close",error:new Error("LOGINOM_HOST_CLEANUP_FAILED",{cause:closed.reason})}
     await recordClose("host_close",{status:closed.status,
       ...(closed.status==="rejected"?{rejection:closeRejection(closed.reason)}:{})})
     const refused=[...cancellation,...results].find(result=>result.status==="rejected")
-    if (refused) throw new Error("LOGINOM_HOST_CLEANUP_FAILED",{cause:refused.reason})
+    if (refused) throw primary?.error??new Error("LOGINOM_HOST_CLEANUP_FAILED",{cause:refused.reason})
     // Durable native/transport completion precedes the port's lease release.
     // "prepared" is not a claim that an outer acknowledgement was delivered.
     await recordClose("outer_acknowledgement",{status:"prepared"})
@@ -208,9 +211,12 @@ function stop() {
     state.closed = true
     events.emit("close")
     } catch(error) {
-      state.closeFailure=error
-      try { await recordClose("refused",{rejection:closeRejection(error)}) } catch { /* Original rejection retained by this owner. */ }
-      throw error
+      const rejection=primary?.error??error
+      state.closeFailure=rejection
+      if(primary) state.shutdown.primaryFailure={stage:primary.stage,rejection:closeRejection(rejection)}
+      if(primary && error!==rejection) state.shutdown.persistenceFailure=closeRejection(error)
+      try { await recordClose("refused",{rejection:closeRejection(rejection)}) } catch(persistenceFailure) { state.shutdown.persistenceFailure=closeRejection(persistenceFailure) }
+      throw rejection
     }
   })()
   const attempt = state.stopping

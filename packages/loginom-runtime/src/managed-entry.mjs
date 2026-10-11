@@ -47,6 +47,7 @@ function close() {
   if (state.closing) return state.closing
   state.closing = (async () => {
     await recordClose("drain",{status:"started"})
+    let primary
     try {
     await Promise.allSettled([...requests])
     if (state.authenticatedReadiness && !state.browser) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
@@ -55,7 +56,7 @@ function close() {
       await recordClose("bridge",{status:"started"})
       const receipt = await state.bridge.close()
       await recordClose("bridge",{status:"returned",receipt})
-      if (receipt?.browser_transport_closed !== true || receipt.cleanup_complete===false
+      if (receipt?.browser_transport_closed !== true || receipt.cleanup_complete!==true
           || (state.authenticatedReadiness && receipt.native_logout_confirmed !== true))
         throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", {cause:receipt})
     }
@@ -64,19 +65,23 @@ function close() {
     for (const [name,handle] of [["client",state.client],["browser_server",state.browserServer],["browser_context",state.browser]]) {
       const result=await Promise.allSettled([Promise.resolve().then(() => handle?.close())])
       results.push(...result)
+      if(result[0].status==="rejected" && !primary) primary={stage:name,error:new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:result[0].reason})}
       await recordClose(name,{status:result[0].status,
         ...(result[0].status==="rejected"?{rejection:closeRejection(result[0].reason)}:{})})
     }
     if (state.browserProfile)
       results.push(...(await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])))
     const refused=results.find(result=>result.status==="rejected")
-    if (refused) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:refused.reason})
+    if (refused) throw primary?.error??new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:refused.reason})
     await recordClose("outer_acknowledgement",{status:"allowed"})
     } catch(error) {
-      state.closeFailure=error
-      try { await recordClose("refused",{rejection:closeRejection(error)}) }
+      const rejection=primary?.error??error
+      state.closeFailure=rejection
+      if(primary) state.shutdown.primaryFailure={stage:primary.stage,rejection:closeRejection(rejection)}
+      if(primary && error!==rejection) state.shutdown.persistenceFailure=closeRejection(error)
+      try { await recordClose("refused",{rejection:closeRejection(rejection)}) }
       catch(persistenceFailure) { state.shutdown.persistenceFailure=closeRejection(persistenceFailure) }
-      throw error
+      throw rejection
     }
   })()
   state.closing.catch(error => { state.closeFailure = error; state.closing = undefined })

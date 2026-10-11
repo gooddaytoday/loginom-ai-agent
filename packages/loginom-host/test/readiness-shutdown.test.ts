@@ -54,7 +54,7 @@ for(const rejected of [Error('inner close rejected'),0,false,'',null,undefined])
 for(const scenario of ['ready','unconfigured','unconfirmed-logout','unknown-transport','browser-error','write-failure'])
  test('managed shutdown stage boundaries: '+scenario,async()=>{
  const root=await mkdtemp(join(tmpdir(),'managed-shutdown-boundary-')),events:string[]=[]
- const receipt={browser_transport_closed:scenario!=='unknown-transport',native_logout_confirmed:scenario!=='unconfirmed-logout'}
+ const receipt={cleanup_complete:true,browser_transport_closed:scenario!=='unknown-transport',native_logout_confirmed:scenario!=='unconfirmed-logout'}
  const state:any={session:{directory:root},...(scenario==='unconfigured'?{}:{authenticatedReadiness:{}}),
   bridge:{close:async()=>{events.push('bridge');return receipt}},controller:{abort:()=>events.push('abort')},
   client:{close:async()=>events.push('client')},browserServer:{close:async()=>events.push('server')},
@@ -115,5 +115,45 @@ test('outer durable receipt failure precedes release; same owner can retry',asyn
   await mkdir(join(root,'host-shutdown.json'));await expect(f.stop()).rejects.toThrow();expect(events).toEqual([])
   expect(state.closed).toBe(false);await rename(join(root,'host-shutdown.json'),join(root,'failed-write'))
   await f.stop();expect(events).toEqual(['interrupt','host_close','release']);expect(state.closed).toBe(true)
+ }finally{await rm(root,{recursive:true,force:true})}
+})
+
+// Regression cases from independent review: actual functions and filesystem failures.
+test('authenticated managed close refuses missing cleanup_complete',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'review-managed-incomplete-')),events:string[]=[]
+ const state:any={session:{directory:root},authenticatedReadiness:{account:'fixture'},
+  bridge:{close:async()=>({browser_transport_closed:true,native_logout_confirmed:true})},
+  client:{close:async()=>events.push('client-close')},browser:{close:async()=>events.push('context-close')}}
+ const f=vm.runInNewContext(managedCode+';({close})',{state,requests:new Set(),writeFile,join,rm,Promise,Error})
+ try{
+  let refused=false;try{await f.close()}catch{refused=true}
+  expect(refused).toBe(true);expect(events).toEqual([])
+ }finally{await rm(root,{recursive:true,force:true})}
+})
+
+for(const phase of ['interrupt','host_close'])test('outer '+phase+' rejection survives subsequent diagnostic write failure',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'review-outer-primary-')),events:string[]=[]
+ const diagnostic=join(root,'host-shutdown.json'),state:any=actual?.shutdownState??{}
+ async function reject(){await rename(diagnostic,diagnostic+'.prior');await mkdir(diagnostic);throw 0}
+ Object.assign(state,{root,closed:false,stopping:undefined,starting:undefined,shutdown:undefined,closeFailure:undefined,
+  host:{interruptAll:async()=>{events.push('interrupt');if(phase==='interrupt')await reject()},
+   close:async()=>{events.push('host_close');if(phase==='host_close')await reject()}},port:{close:async()=>events.push('release')}})
+ const f=actual?{stop:actual.shutdownStop}:vm.runInNewContext(code+';({stop})',{
+  state,operations:new Set(),events:{emit:(s:string)=>events.push(s)},writeFile,join,Promise,Error})
+ try{
+  let caught:any;try{await f.stop()}catch(e){caught=e}
+  expect(state.closed).toBe(false);expect(events).not.toContain('release')
+  expect(caught.message).toBe('LOGINOM_HOST_CLEANUP_FAILED');expect(caught.cause).toBe(0)
+ }finally{await rm(root,{recursive:true,force:true})}
+})
+
+test('managed context rejection survives its stage write failure',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'review-managed-primary-')),events:string[]=[],diagnostic=join(root,'managed-shutdown.json')
+ const state:any={session:{directory:root},authenticatedReadiness:{},bridge:{close:async()=>({browser_transport_closed:true,cleanup_complete:true,native_logout_confirmed:true})},
+  browser:{close:async()=>{events.push('context-close');await rename(diagnostic,diagnostic+'.prior');await mkdir(diagnostic);throw 0}}}
+ const f=vm.runInNewContext(managedCode+';({close})',{state,requests:new Set(),writeFile,join,rm,Promise,Error})
+ try{
+  let caught:any;try{await f.close()}catch(e){caught=e}
+  expect(caught.message).toBe('LOGINOM_RUNTIME_CLEANUP_FAILED');expect(caught.cause).toBe(0)
  }finally{await rm(root,{recursive:true,force:true})}
 })
