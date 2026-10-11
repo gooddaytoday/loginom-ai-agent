@@ -2079,6 +2079,7 @@ test('wizard cancellation confirms the original graph after one exact affirmativ
   page.add('span',null,mode==='wrong_question'?'Удалить пакет?':'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
   page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
   page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  bindSyntheticCloseDialog(page,dialog);
   const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.allowed_actions.includes('confirm_wizard_close'));
   if(mode==='wrong_question'){assert.equal(button,undefined);continue;}
   assert.ok(button);
@@ -4927,6 +4928,17 @@ test('graph observation retains automatic-label links and excludes their child d
  page.add('g',link+';Decoration','',{x:300,y:140,width:100,height:1});
  const s=await page.observe();assert.deepEqual(s.links.map(e=>e.tid??e),[link]);
 });
+// Synthetic close-only controls now model the native DOM/Ext ownership that
+// the measured confirmation fixture independently exercises in Chromium.
+function bindSyntheticCloseDialog(page,dialog){
+ const buttons=page.document.all().filter(e=>['msgbox;tlb;yes','msgbox;tlb;no'].includes(e.attrs['data-tid'])&&dialog.contains(e));
+ const toolbar=page.add('div','msgbox;tlb','',dialog.box,dialog);
+ for(const e of buttons){e.remove();toolbar.append(e);}
+ const native={$className:'Ext.window.MessageBox',hidden:false,disabled:false,el:{dom:dialog}};
+ const bar={hidden:false,disabled:false,el:{dom:toolbar},ownerCt:native};
+ const cmp=new Map();for(const [i,e] of [dialog,toolbar,...buttons].entries()){e.id='close-native-'+i;e.attrs.id=e.id;cmp.set(e.id,i===0?native:i===1?bar:{hidden:false,disabled:false,el:{dom:e},ownerCt:bar});}
+ page.context.Ext={getCmp:id=>cmp.get(id)};
+}
 test('output-port Close returns through the port breadcrumb path after exactly one confirmation',async()=>{
  for(const mode of ['valid','duplicate','foreign_guid','foreign_document','foreign_workflow','wrong_workflow','wrong_node','still_open','missing_context']) {
   const {page}=outputPortFinishFixture(mode);
@@ -4935,6 +4947,13 @@ test('output-port Close returns through the port breadcrumb path after exactly o
   page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
   page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
   page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  bindSyntheticCloseDialog(page,dialog);
+  const form=page.document.all().find(e=>e.attrs['data-tid']==='MF;TF-1;WizrdMCF'),enginePort={},nodeData={},portData={};
+  const nativeNode={FGuid:'node',data:nodeData},nativePort={FGuid:'out',data:portData,parent:nativeNode};
+  const model={FView:{el:{dom:form}},FModelEnginePort:enginePort};
+  const opening={phase:'verified',wizard:model,document_id:'doc',node_id:'node',direction:'output',portIndex:0,nativeIndex:0,portGuid:'out',operation_id:'open',node:nativeNode,nodeData,port:nativePort,portData,portTree:{FIndex:0},enginePort};
+  page.context.__loginomDockPreparationV1={document:page.document,id:'doc',outputPortOpenReceipts:new Map([['open',opening]])};
+  page.app.Application={FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model}})}}}}};
   const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
   const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
    {expected_build:build,expected_origin:origin,prepared_node_context:binding,...options},async()=>{const graph=page.document.all().some(e=>e.attrs['data-tid']==='MF;TF-1;ModelForm;cmpDiagram');return {verified:true,
