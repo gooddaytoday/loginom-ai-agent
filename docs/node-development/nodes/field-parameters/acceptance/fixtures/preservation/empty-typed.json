@@ -1,0 +1,163 @@
+{
+  "case": "empty-typed",
+  "scope": "offline independent fixture; not native observation",
+  "format": {
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "decimal_separator": ".",
+    "null_marker": "NULL",
+    "text_qualifier": "\""
+  },
+  "input_columns": [
+    {
+      "name": "Id",
+      "label": "Id",
+      "type": "integer",
+      "index": 0,
+      "data_kind": "Непрерывный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "Text",
+      "label": "Same",
+      "type": "string",
+      "index": 1,
+      "data_kind": "Дискретный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "R",
+      "label": "R",
+      "type": "real",
+      "index": 2,
+      "data_kind": "Непрерывный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "Flag",
+      "label": "Same",
+      "type": "boolean",
+      "index": 3,
+      "data_kind": "Дискретный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "When",
+      "label": "When",
+      "type": "datetime",
+      "index": 4,
+      "data_kind": "Непрерывный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    }
+  ],
+  "input_rows": [],
+  "changes": [
+    {
+      "field": {
+        "kind": "configured_field",
+        "name": "Text"
+      },
+      "label": "Текст"
+    }
+  ],
+  "expected_configuration": [
+    {
+      "name": "Id",
+      "label": "Id",
+      "type": "integer",
+      "index": 0,
+      "data_kind": "Непрерывный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "Text",
+      "label": "Текст",
+      "type": "string",
+      "index": 1,
+      "data_kind": "Дискретный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "R",
+      "label": "R",
+      "type": "real",
+      "index": 2,
+      "data_kind": "Непрерывный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "Flag",
+      "label": "Same",
+      "type": "boolean",
+      "index": 3,
+      "data_kind": "Дискретный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    },
+    {
+      "name": "When",
+      "label": "When",
+      "type": "datetime",
+      "index": 4,
+      "data_kind": "Непрерывный",
+      "usage_type": 0,
+      "caching_method": 2,
+      "excluded": false
+    }
+  ],
+  "expected": {
+    "columns": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": "integer"
+      },
+      {
+        "name": "Text",
+        "label": "Текст",
+        "type": "string"
+      },
+      {
+        "name": "R",
+        "label": "R",
+        "type": "real"
+      },
+      {
+        "name": "Flag",
+        "label": "Same",
+        "type": "boolean"
+      },
+      {
+        "name": "When",
+        "label": "When",
+        "type": "datetime"
+      }
+    ],
+    "rows": [],
+    "cardinality": 0
+  },
+  "value_sources": [
+    "Id",
+    "Text",
+    "R",
+    "Flag",
+    "When"
+  ]
+}
