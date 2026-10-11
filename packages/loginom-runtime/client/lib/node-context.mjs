@@ -41,7 +41,7 @@ export async function readPreparedNodeContext(page, binding) {
       if(crumbs.every((c,i)=>c.tid===b.workflow_ref.navigation_path[i].tid && c.label===b.workflow_ref.navigation_path[i].label))return pending();
       return reject('navigation');
     }
-    if(b.workflow_ref.navigation_path.some((c,i)=>c.tid!==crumbs[i].tid || c.label!==crumbs[i].label))return reject('navigation');
+    const navigationChanged=b.workflow_ref.navigation_path.some((c,i)=>c.tid!==crumbs[i].tid || c.label!==crumbs[i].label);
     const model=card?.Controller?.FController;
     let surface, tid, locked, outputPort, graphRoot, pendingWizardNode;
     if(app.ModelForm && model instanceof app.ModelForm) {
@@ -100,6 +100,33 @@ export async function readPreparedNodeContext(page, binding) {
     if(elements.length!==1)return reject('surface_ambiguous');
     if(elements[0].getBoundingClientRect().width<=0 || elements[0].getBoundingClientRect().height<=0
       || getComputedStyle(elements[0]).visibility==='hidden')return pending();
+    // SaveCheckpoint can leave graph breadcrumb keys from the unsaved name;
+    // opening the wizard rerenders them. Rebind only after ALL surface/native
+    // checks above, using the verified preparation and exact tree-object chain.
+    // Never infer ancestry from pathname, labels, GUIDs or matching DOM keys.
+    if(r.nodeNavigationPath&&JSON.stringify(r.nodeNavigationPath)!==JSON.stringify(crumbs.slice(0,b.workflow_ref.navigation_path.length)))return reject('navigation');
+    if(navigationChanged) {
+      const original=b.workflow_ref.navigation_path, current=crumbs.slice(0,original.length);
+      let request;try{request=JSON.parse(r.request);}catch{return reject('navigation');}
+      const path=packageNode.PackageFileName;
+      if(request.intent!=='open_package'||typeof path!=='string'||!path
+        ||'/'+path.replaceAll('\\','/').replace(/^\/+/, '')!==request.packagePath
+        ||JSON.stringify(r.crumbs)!==JSON.stringify(original)
+        ||current.some((c,i)=>c.label!==original[i].label))return reject('navigation');
+      const lineage=[],visited=new Set();
+      for(let n=workflowNode;n&&lineage.length<32&&!visited.has(n);n=n.ParentNode){
+        visited.add(n);lineage.unshift(n);if(n===packageNode)break;
+      }
+      const start=current.length-lineage.length;
+      if(lineage[0]!==packageNode||lineage.at(-1)!==workflowNode||start<2
+        ||current.slice(0,start).some((c,i)=>c.tid!==original[i].tid))return reject('navigation');
+      for(let i=0;i<lineage.length;i++) {
+        const elements=exact(current[start+i].tid),e=elements[0];
+        const component=elements.length===1&&e?.isConnected&&globalThis.Ext?.getCmp(e.id);
+        if(!component||component.el?.dom!==e||component._node?.data?.node!==lineage[i])return reject('navigation');
+      }
+      r.nodeNavigationPath=current; // Internal verified alias; original receipt stays immutable.
+    }
     return {verified:true,document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,surface,tid,
       ...(outputPort?{[outputPort.direction==='input'?'input_port':'output_port']:outputPort}:{}),
       ...(surface==='graph'?{locked,...(nodeTree&&crumbs.length===b.workflow_ref.navigation_path.length+1?{navigation_node:crumbs.at(-1)}:{}),
