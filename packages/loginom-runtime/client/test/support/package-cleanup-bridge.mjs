@@ -152,3 +152,18 @@ for(const scenario of ['managed-success','managed-no-save','managed-unsettled-sa
   await client?.close();await rm(directory,{recursive:true,force:true});
  }
 });
+
+test('guarded pending close retries only after the same owner operation settles',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'managed-guarded-retry-'));
+ const f=current={scenario:'managed-pending',events:[],busy:false,saves:0};
+ const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){assert.equal(JSON.parse(await readFile(join(directory,'package-cleanup.json'),'utf8')).status,'SUCCEEDED');f.events.push('release-uploads')}}};
+ let bridge,client;try{
+ bridge=await createBridge({mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,loginomUrl:'http://loginom.invalid/app',replayBootstrap:false,replayLoginUser:null},session);
+ client=new AgentClient({name:'test',version:'1'});const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+ assert.notEqual((await client.callTool({name:'dock_prepare',arguments:{}})).isError,true);
+ await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'own-save'}});
+ f.busy=true;const refused=await bridge.close();assert.equal(refused.browser_transport_closed,false);assert.equal(f.events.includes('package-cleanup'),false);assert.equal(f.events.includes('browser-close'),false);assert.equal(bridge.hasUnsettledWork(),true);
+ const saves=f.saves;await assert.rejects(client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'forbidden'}}),/only read-only diagnosis/);assert.equal(f.saves,saves);
+ f.busy=false;const result=await bridge.close();assert.equal(result.cleanup_complete,true);assert.equal(result.native_logout_confirmed,true);assert.equal(f.events.filter(x=>x==='package-cleanup').length,1);assert.equal(f.events.filter(x=>x==='browser-close').length,1);assert.strictEqual(await bridge.close(),result);
+ }finally{await client?.close();await rm(directory,{recursive:true,force:true})}
+});

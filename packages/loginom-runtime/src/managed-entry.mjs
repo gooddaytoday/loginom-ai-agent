@@ -103,7 +103,9 @@ process.on("disconnect", stop)
 process.on("SIGTERM", stop)
 process.on("message", (message) => {
   const request = handle(message)
-  requests.add(request)
+  // Close awaits the ordinary requests; tracking its own control handler would
+  // make that drain wait for itself (and for every concurrent Close handler).
+  if (message?.operation !== "close") requests.add(request)
   void request
     .finally(() => requests.delete(request))
     .catch(() => {
