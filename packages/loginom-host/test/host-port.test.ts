@@ -125,10 +125,11 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
       if (ending === "close") await port.close()
       else if (host.journal.pending().length) await expect(port.close()).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
       else await port.close()
-      // Disconnect leaves the runtime process owned. Exit drops it, so shutdown
-      // only has to close runtimes that are still alive.
+      // Disconnect or process death does not confirm cleanup. The retained
+      // owner must refuse shutdown while its receipt remains unconfirmed.
       if (ending === "disconnect") await expect(host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
-      if (ending !== "disconnect") await host.close()
+      if (ending === "kill") await expect(host.close()).rejects.toThrow("LOGINOM_RUNTIME_DISCONNECTED")
+      if (ending !== "disconnect" && ending !== "kill") await host.close()
       if (ending !== "finish" && ending !== "close") {
         const calls = await readFile(join(directory, "calls.jsonl"), "utf8")
         expect(
