@@ -1,6 +1,6 @@
 // Offline drivers only. Use the actual product's applyNode and fsync journal.
 // No browser, model, Loginom, or native observations are created by this file.
-import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {mkdir,readFile,writeFile,readdir} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
@@ -10,6 +10,7 @@ const lib=process.env.GROUPING_EVIDENCE_LIB
 const {applyNode}=await import(new URL('node-apply.mjs',lib));
 const {createExecutionJournal}=await import(new URL('execution-journal.mjs',lib));
 const directory=resolve(process.argv[2]);await mkdir(directory,{recursive:true});
+if((await readdir(directory)).length)throw Error('Offline double requires an empty output directory');
 const pins={session_id:'offline-double',runtime_revision:'offline-product',manifest_sha256:'offline-manifest',target:{loginom_build:'7.4.2',profile_id:'offline-double'}};
 const journal=createExecutionJournal({directory,metadata:{sessionId:pins.session_id,clientRevision:pins.runtime_revision,actionManifestDigest:pins.manifest_sha256,targetIdentity:pins.target}});
 const csv=await readFile(new URL('data/five-aggregates.csv',import.meta.url));
@@ -38,7 +39,8 @@ for(const r of [upstream,grouping]){
  finishGraph:async mode=>good({mode,settings_applied:true,node_context:{...node,verified:true},execution_started:true,execution_id}),waitExecution:async()=>good({status:'completed',execution_id}),readOutput:async()=>good({status:'complete',execution_id,evidence_ref:'double-read',ports:[port]})};
  if(!group)drivers.finish=drivers.finishGraph;
  const handler={revision:'1',modes:[r.mode],validate:()=>{},configure:async()=>good({configuration:{input_fields:inputSchema}}),...(group?{output_wizard:'separate'}:{})};
- const result=await applyNode({request:r,operation:{id:r.operation_id},handlers:new Map([[r.target.type,handler]]),drivers,record:journal});
+ // Deterministic procedure clock: fsync wall time is not a latency fixture.
+ const result=await applyNode({request:r,operation:{id:r.operation_id},handlers:new Map([[r.target.type,handler]]),drivers,record:journal,now:()=>1});
  if(result.status!=='SUCCEEDED')throw Error(JSON.stringify(result));
 }
 for(const [name,value] of Object.entries({'request.json':grouping,'pins.json':pins,'expected.json':expected}))await writeFile(resolve(directory,name),JSON.stringify(value,null,2));
