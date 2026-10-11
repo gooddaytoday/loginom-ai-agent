@@ -58,7 +58,7 @@ const {createBridge}=await import('../../lib/bridge.mjs');
 
 
 const scenarios=['success','no-binding','wrong-session','wrong-account','wrong-path','wrong-document','expired','pending','unknown','unsaved','cancel-missing','cancel-applied','identity-after','receipt-write','falsy-false','falsy-zero','falsy-empty','falsy-null','falsy-undefined'];
-for(const scenario of scenarios)test('private capture transaction: '+scenario,async()=>{
+for(const harnessName of ['calculator-grouped-before-done-v1','amount-import-type-v1'])for(const scenario of scenarios)test('private capture transaction: '+harnessName+' '+scenario,async()=>{
  const directory=await mkdtemp(join(tmpdir(),'capture-bridge-'));
  const f=current={scenario,events:[],busy:false,saves:0};
  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
@@ -66,7 +66,7 @@ for(const scenario of scenarios)test('private capture transaction: '+scenario,as
   artifactStore:{list:()=>[],async releaseUploads(){
    assert.equal(JSON.parse(await readFile(join(directory,'package-cleanup.json'),'utf8')).status,'SUCCEEDED');f.events.push('release-uploads');
   }}};
- const binding={revision:1,harness:'calculator-grouped-before-done-v1',owner:'actual-owner',run:'actual-run',lease:'actual-owner:actual-run',
+ const binding={revision:1,harness:harnessName,owner:'actual-owner',run:'actual-run',lease:'actual-owner:actual-run',
   generation:7,chat:'actual-chat',account:'test-2',packagePath:path,admission:'once',session:'own-session',expires:Date.now()+60000};
  if(scenario==='wrong-session')binding.session='foreign';if(scenario==='wrong-account')binding.account='foreign';
  if(scenario==='wrong-path')binding.packagePath='/foreign/pkg.lgp';if(scenario==='expired')binding.expires=0;

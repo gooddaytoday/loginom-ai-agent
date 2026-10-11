@@ -14,7 +14,7 @@ const { createLoginomHost, connectionStore, loginomHostPort } = await import(
 const portFunction = loginomHostPort ?? (await import('../src/host-port')).loginomHostPort
 const storeFunction = connectionStore ?? (await import('../src/connection/connection-store')).connectionStore
 
-for (const scenario of ['success', 'strict-success', 'strict-refusal', 'default-refusal', 'explicit-advisory-refusal']) test('actual host composition: '+scenario, async () => {
+for (const harness of ['calculator-grouped-before-done-v1','amount-import-type-v1'] as const) for (const scenario of ['success', 'strict-success', 'strict-refusal', 'default-refusal', 'explicit-advisory-refusal']) test('actual host composition: '+harness+' '+scenario, async () => {
   const root = await mkdtemp(join(tmpdir(), 'review-admission-host-'))
   const resources = join(root, 'fixture-resources'), profile = join(root, 'profile')
   let service: any
@@ -53,7 +53,7 @@ for (const scenario of ['success', 'strict-success', 'strict-refusal', 'default-
     await store.activate(7)
     service = await createLoginomHost({root:profile,resources,codec,environment:{},headless:true,
       ...(scenario.startsWith('strict-')?{strictRecovery:true}:scenario.startsWith('explicit-advisory')?{strictRecovery:false}:{}),
-      acceptanceCapture:{authorization:'a'.repeat(64),packagePath:'/user/result.lgp'}})
+      acceptanceCapture:{authorization:'a'.repeat(64),packagePath:'/user/result.lgp',...(harness==='amount-import-type-v1'?{harness}:{})}})
     await service.settled()
     const listeners = new Map(), waiting = new Map<string,(v:any)=>void>()
     const port = portFunction({on:(name:string,fn:any)=>listeners.set(name,fn),start(){},postMessage:(v:any)=>waiting.get(v.id)?.(v)}, service)
@@ -69,6 +69,7 @@ for (const scenario of ['success', 'strict-success', 'strict-refusal', 'default-
     expect(binding.generation).toBe(7)
     expect(binding.run).toBe('original-run')
     expect(binding.chat).toBe(createHash('sha256').update('original-chat').digest('hex'))
+    expect(binding.harness).toBe(harness)
     expect(binding.lease).toBe(binding.owner+':original-run')
     const admissionAtDispatch=starts.find((e:any)=>e.event==='capture-dispatched').entries
     expect(admissionAtDispatch).toHaveLength(1)
@@ -90,7 +91,7 @@ for (const scenario of ['success', 'strict-success', 'strict-refusal', 'default-
       const after = await readdir(join(profile,'recovery'))
       const evidence = {scenario,binding,admission_at_dispatch:admissionAtDispatch,captured:captured.result,journal_before_diagnosis:before,journal_after_diagnosis:after,
         pending:service.journal.pending(),same_owner_diagnosis:diag.result.sameBinding,live:false}
-      await writeFile(join(process.env.REVIEW_RESULTS_DIR!, scenario+'.json'),JSON.stringify(evidence,null,2)+'\n')
+      await writeFile(join(process.env.REVIEW_RESULTS_DIR!, harness+'-'+scenario+'.json'),JSON.stringify(evidence,null,2)+'\n')
       expect(after).toEqual(before)
       expect(before.filter((n:string)=>n.endsWith('.json'))).toHaveLength(1)
       expect(await readFile(join(profile,'recovery',before.find((n:string)=>n.endsWith('.json'))!),'utf8')).toBe(admissionBytes!)
@@ -103,7 +104,7 @@ for (const scenario of ['success', 'strict-success', 'strict-refusal', 'default-
       await service.close()
       service = await createLoginomHost({root:profile,resources,codec,environment:{},headless:true,
         strictRecovery:scenario.startsWith('strict-'),
-        acceptanceCapture:{authorization:'a'.repeat(64),packagePath:'/user/result.lgp'}})
+        acceptanceCapture:{authorization:'a'.repeat(64),packagePath:'/user/result.lgp',...(harness==='amount-import-type-v1'?{harness}:{})}})
       await service.settled()
       expect(service.journal.pending()).toEqual([admissionAtDispatch[0].id])
       expect(await readFile(join(profile,'recovery',before.find((n:string)=>n.endsWith('.json'))!),'utf8')).toBe(admissionBytes!)

@@ -20,7 +20,7 @@ export type Launch = {
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.
   acceptanceCleanupPackage?: string
-  acceptanceCapture?: { revision: 1; harness: "calculator-grouped-before-done-v1"; owner: string; run: string;
+  acceptanceCapture?: { revision: 1; harness: "calculator-grouped-before-done-v1" | "amount-import-type-v1"; owner: string; run: string;
     lease: string; generation: number; chat: string; account: string; packagePath: string; admission: string; expires: number }
 }
 

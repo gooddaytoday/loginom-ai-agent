@@ -123,12 +123,14 @@ async function handle(message) {
       let captureHarness
       if (acceptanceCapture) {
         // Fixed reviewed receiving resource, never a request-selected module.
-        const path = "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs"
+        const amount = acceptanceCapture.harness === "amount-import-type-v1"
+        const path = amount ? "runtime/src/acceptance/amount-import-type-v1.mjs"
+          : "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs"
         if (!resources.manifest.files.some(file => file.path === path && !file.link && !file.directory))
           throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
         const module = await import(pathToFileURL(join(input.resources, path)).href)
-        if (typeof module.captureCalculator !== "function") throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
-        captureHarness = module.captureCalculator
+        if (typeof (amount ? module.captureAmount : module.captureCalculator) !== "function") throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
+        captureHarness = amount ? module.captureAmount : module.captureCalculator
       }
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
       const directory = join(
