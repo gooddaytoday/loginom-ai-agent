@@ -56,3 +56,27 @@ test('cold unknown browser reply cannot be cleared via owner flag',()=>fixture(a
 test('cold cleanup evidence error refuses exit',()=>fixture(async x=>{x.foreground.scenario=async()=>{await mkdir(join(x.output,'cleanup.json'))};await runColdCheck(x.args,x.owner,x.foreground);assert.equal(x.owner.failed,true);assert.equal(x.s.exitCalls,0);assert.equal(x.owner.page,x.page);assert.equal(x.s.cleanupCalls,1)}))
 test('cold concurrent recovery admits only one cleanup',()=>fixture(async x=>{x.foreground.scenario=async()=>{throw Error('scenario')};await runColdCheck(x.args,x.owner,x.foreground);const first=x.owner.recover();await assert.rejects(x.owner.recover(),/RECOVERY_RUNNING/);await first;assert.equal(x.s.cleanupCalls,1);assert.equal(x.s.exitCalls,1);await assert.rejects(x.owner.recover(),/OWNER_CHANGED/)}))
 for(const receipt of [undefined,false,{status:'BLOCKED',reason:'NATIVE_CLOSE_UNCONFIRMED',package_closed:false,logged_out:false}])test('cold missing/uncertain cleanup receipt forbids replay '+JSON.stringify(receipt),()=>fixture(async x=>{const execute=x.foreground.execute;x.foreground.execute=async code=>JSON.parse(code).kind==='prepare'?execute(code):receipt;await runColdCheck(x.args,x.owner,x.foreground);assert.equal(x.owner.failed,true);assert.equal(x.s.exitCalls,0);await assert.rejects(x.owner.recover(),/RUNTIME_UNSETTLED/)}))
+async function assertEarlyRetention(x){
+ assert.equal(x.owner.failed,true)
+ assert.equal(x.owner.context,x.context);assert.equal(x.owner.page,x.page)
+ assert.equal(x.owner.execute,x.foreground.execute);assert.equal(x.owner.runtime,x.runtime)
+ assert.equal(x.owner.closed,false)
+ await assert.rejects(x.owner.recover(),/DIAGNOSTIC_PACKAGE_IDENTITY_UNCONFIRMED/)
+ assert.equal(x.s.saveCalls,0);assert.equal(x.s.cleanupCalls,0);assert.equal(x.s.exitCalls,0)
+ assert.equal(x.owner.prepared,undefined)
+}
+for(const stage of ['resources','config','expected','output'])test('cold early '+stage+' failure retains supplied foreground',()=>fixture(async x=>{
+ const original=Error('resource verification failed')
+ if(stage==='resources'){const load=x.foreground.load;x.foreground.load=async name=>name==='src/resources.mjs'?{verifyResources:async()=>{throw original}}:load(name)}
+ else if(stage==='output')await writeFile(x.args.output,'not a directory')
+ else x.args[stage]=join(x.output,'missing-'+stage+'.json')
+ await runColdCheck(x.args,x.owner,x.foreground)
+ if(stage==='resources')assert.equal(x.owner.error,original)
+ else assert.equal(x.owner.error.code,stage==='output'?'EEXIST':'ENOENT')
+ const error=x.owner.error;await assertEarlyRetention(x);assert.equal(x.owner.error,error)
+}))
+for(const error of [Error('early original'),null,undefined,false,0,''])test('cold early exact rejection '+String(error),()=>fixture(async x=>{
+ x.foreground.load=async()=>{throw error}
+ await runColdCheck(x.args,x.owner,x.foreground)
+ assert.equal(x.owner.error,error);await assertEarlyRetention(x);assert.equal(x.owner.error,error)
+}))

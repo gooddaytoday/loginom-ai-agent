@@ -12,6 +12,10 @@ import {withDiagnosticSession} from './diagnostic-session.mjs'
 // Foreground owners retain the original handles through every rejection.
 export async function runColdCheck(args, owner, foreground = {}) {
  if (!owner || owner.context) throw Error('FOREGROUND_OWNER_REQUIRED')
+ // Retain supplied handles before resource/config/evidence setup can reject.
+ // Recovery stays fail-closed until the original package binding is verified.
+ Object.assign(owner,{context:foreground.context,page:foreground.page,execute:foreground.execute,runtime:foreground.runtime,failed:false,closed:false,
+  recover:async()=>{throw Error('DIAGNOSTIC_PACKAGE_IDENTITY_UNCONFIRMED')}})
  process.umask(0o077)
  try {
 const root = resolve(args.resources)
