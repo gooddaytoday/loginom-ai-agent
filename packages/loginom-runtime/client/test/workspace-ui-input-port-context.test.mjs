@@ -8,7 +8,7 @@ import {makeWorkspaceUiCode} from '../lib/workspace-ui.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
 const read=n=>JSON.parse(fs.readFileSync(new URL('./fixtures/input-port-context/'+n,import.meta.url)));
 const proof=read('native-node-context.json'),geometry=read('navigation-geometry.json'),observed=read('mapping-observation.json').output;
-async function run(mode){
+async function run(mode,alter){
  const f=nativePage(),page=new NavigationPage(),binding=structuredClone(proof.binding),prefix=binding.workflow_ref.prefix;
  page.context.innerWidth=geometry.viewport.width;page.context.innerHeight=geometry.viewport.height;
  page.document.documentElement.box={x:0,y:0,width:1280,height:800};page.document.body.box=page.document.documentElement.box;
@@ -62,6 +62,7 @@ async function run(mode){
  if(mode==='duplicate_panel')page.add('div',prefix+';NavigationBar;NavigationPanel','',geometry.panels[0].box);
  if(mode==='bad_folder_caption')panel.children[6].ownText='Other';
  if(mode==='broken_chain')panel.children[6].attrs['data-tid']=prefix+';cnrNaviMode;b.s_Other';
+ if(alter)alter({page,panel});
  const native=await readPreparedNodeContext(page,binding);const receipt=await page.execute({mode:'observe'});
  const s=receipt.output,done=s?.ui?.elements.find(e=>e.tid===prefix+';WizrdMCF;btnDone');
  const actual={native,receipt_status:receipt.status,error:receipt.error,wizard:s?.wizard,done:done&&{enabled:done.enabled,interaction:done.interaction,allowed_actions:done.allowed_actions},events:page.events};
@@ -81,7 +82,28 @@ for(const mode of ['captured_hidden','folder_visible','all_visible',...rejectedN
  assert.equal(done.allowed_actions.includes('finish_wizard'),false);
  assert.equal(receipt.output.wizard.input_mapping.reason,'links_mode_unverified');
 });
-test('observer lost reply never repeats a gesture',async()=>{
- let calls=0;const read=async()=>{calls++;const result=await run('captured_hidden');assert.equal(result.events.length,0);throw Error('lost reply')};
- await assert.rejects(read(),/lost reply/);assert.equal(calls,1);
+for(const [name,box] of [
+ ['visible_folder_outside_panel',{x:1100,y:180,width:130,height:24}],
+ ['visible_folder_outside_viewport',{x:1800,y:41,width:130,height:24}],
+])test('native input-port structural breadcrumb: '+name,async()=>{
+ const result=await run('captured_hidden',({panel})=>{panel.children[6].box=box});
+ assert.equal(result.native.verified,true);assert.equal(result.receipt.status,'SUCCEEDED');
+ assert.notEqual(result.receipt.output.wizard.input_port_context.status,'observed');
+ assert.equal(result.events.length,0);
+});
+test('lost browser observation reply permits diagnostic reads without gestures',async()=>{
+ let reads=0;
+ const result=await run('captured_hidden',({page})=>{
+  const evaluate=page.evaluate;
+  page.evaluate=async(fn,arg)=>{
+   const value=await evaluate(fn,arg);
+   if(fn.toString().includes('const scanStarted')){reads++;throw Error('lost browser reply')}
+   return value;
+  };
+ });
+ assert.equal(reads,2);
+ assert.equal(result.receipt.status,'NOT_APPLIED');
+ assert.equal(result.receipt.error.code,'UI_BROWSER_CALL_FAILED');
+ assert.equal(result.receipt.effect_possible,false);
+ assert.equal(result.events.length,0);
 });
