@@ -39,6 +39,22 @@ export async function createLoginomHost(options: {
   type CaptureBinding = NonNullable<Parameters<typeof supervise>[0]["acceptanceCapture"]>
   const captures = new Map<string, CaptureBinding>()
   type Runtime = Awaited<ReturnType<typeof supervise>>
+  // Includes validation and failed-start children, even without a prepared
+  // service handle. Removal requires confirmed close/exit, never merely failure.
+  const owners = new Map<string, { child?: Runtime; settled: Promise<void>; failure?: { value: unknown } }>()
+  function guardOwners() {
+    const refused = [...owners.values()].find(owner => owner.failure)
+    if (refused) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: refused.failure!.value })
+  }
+  async function closeOwners() {
+    const results = await Promise.allSettled([...owners.entries()].map(async ([key, owner]) => {
+      await owner.settled
+      await owner.child?.close()
+      if (owners.get(key) === owner) owners.delete(key)
+    }))
+    const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected")
+    if (failures.length) throw new AggregateError(failures.map(result => result.reason), "LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: failures[0]!.reason })
+  }
   function retain(
     generation: { children: Map<string, Promise<Runtime>> },
     chat: string,
@@ -59,8 +75,12 @@ export async function createLoginomHost(options: {
     return tracked
   }
   async function launch(connection: ActiveConnection, chat: string, validation = false, acceptanceCapture?: CaptureBinding) {
+    guardOwners()
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
-    return supervise({
+    const key = `${validation ? "validation" : "runtime"}:${connection.generation}:${chat}`
+    const owner: { child?: Runtime; settled: Promise<void>; failure?: { value: unknown } } = { settled: Promise.resolve() }
+    owners.set(key, owner)
+    const launched = supervise({
       node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
       entry: join(resources, "runtime/src/managed-entry.mjs"),
       resources,
@@ -77,6 +97,12 @@ export async function createLoginomHost(options: {
       acceptanceCleanupPackage: options.acceptanceCleanupPackage,
       acceptanceCapture,
     })
+    owner.settled = launched.then(child => { owner.child = child }, error => {
+      owner.failure = { value: error }
+      owner.child = error?.runtime
+      if (!owner.child && owners.get(key) === owner) owners.delete(key)
+    })
+    return launched
   }
   const service = await connectionService(
     connectionStore(join(root, "connection"), options.codec),
@@ -86,13 +112,20 @@ export async function createLoginomHost(options: {
         try {
           const child = await launch(connection, chat, true)
           await child.close()
-        } finally {
           await rm(join(root, "validation", "generations", String(connection.generation), "chats", chat), {
             recursive: true,
             force: true,
           })
+          owners.delete(`validation:${connection.generation}:${chat}`)
+        } catch (error) {
+          const owner = owners.get(`validation:${connection.generation}:${chat}`)
+          if (owner) owner.failure = { value: error }
+          // Failed chat contains the original authentication/native/persistence
+          // evidence. Do not erase it, including after confirmed cleanup.
+          throw error
         }
       },
+      close: closeOwners,
       async prepare(connection) {
         const child = await launch(connection, "readiness")
         const generation = { connection, children: new Map<string, Promise<Runtime>>() }
@@ -129,11 +162,24 @@ export async function createLoginomHost(options: {
     ...service,
     api: {
       ...service.api,
+      async check(input: Parameters<typeof service.api.check>[0]) {
+        guardOwners()
+        return service.api.check(input)
+      },
+      async save(input: Parameters<typeof service.api.save>[0]) {
+        guardOwners()
+        return service.api.save(input)
+      },
       async acknowledgeRecovery(input: Parameters<typeof service.api.acknowledgeRecovery>[0]) {
+        guardOwners()
         const view = await service.api.acknowledgeRecovery(input)
         recoveries.clear()
         return view
       },
+    },
+    acquire(run: string) {
+      if ([...owners.values()].some(owner => owner.failure)) return
+      return service.acquire(run)
     },
     journal,
     recoveries,
