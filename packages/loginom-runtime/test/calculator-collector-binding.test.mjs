@@ -38,7 +38,7 @@ function pageDouble(scenario){
  const view=e=>({el:{dom:e},getStore:()=>{
   const items=records();return {$className:'Ext.data.Store',isBufferedStore:false,currentPage:1,loading:false,getCount:()=>items.length,getTotalCount:()=>items.length,isLoading:()=>false,getRemoteFilter:()=>scenario==='filter',getRemoteSort:()=>false,getData:()=>({items,getSource:()=>({items})}),getProxy:()=>({$className:'bg.ext.CollectionProxy',pendingOperations:{}})};
  }});
- state={events,open:false,edited:false,snapshot:()=>({prepared_node_context:{verified:true,surface:state.open?'wizard':'graph',document_id:'doc',workflow_id:'flow',node_id:scenario==='node'?'foreign':'node'},
+ state={events,open:false,edited:false,snapshot:()=>({prepared_node_context:{verified:true,surface:state.open?'wizard':'graph',document_id:'doc',workflow_id:'flow',node_id:scenario==='node'?'foreign':'node',tid:scenario==='node-root'?'foreign':'root'},
   wizard:state.open?{status:'observed',stage:'output_mapping',root_tid:'root',root_ref:'ref'}:{status:'absent'},
   node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',
    target_fields:[{name:'Region',record_id:state.edited?'after':'before',excluded:state.edited,
@@ -58,7 +58,7 @@ function pageDouble(scenario){
  }};
  return {events,browser,root,grids,page};
 }
-for(const scenario of ['success','document','node','root-ref','partial','filter','store'])test('actual collector to harness with labelled Page/Ext/executor doubles: '+scenario,async()=>{
+for(const scenario of ['success','document','node','node-root','root-ref','partial','filter','store'])test('actual collector to harness with labelled Page/Ext/executor doubles: '+scenario,async()=>{
  const {events,browser}=pageDouble(scenario),binding={revision:1,harness:'calculator-grouped-before-done-v1',owner:'owner',run:'run',lease:'owner:run',admission:'admission',chat:'chat',account:'account',session:'session',generation:1,expires:Date.now()+60000,packagePath:'/account/draft.lgp'};
  const identity={session_id:'session',document_id:'doc',account:'account',package_path:binding.packagePath,tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb',loginom_build:'7.4.2'};
  if(scenario==='lease')binding.lease='foreign';if(scenario==='run')binding.run='foreign';if(scenario==='session')binding.session='foreign';

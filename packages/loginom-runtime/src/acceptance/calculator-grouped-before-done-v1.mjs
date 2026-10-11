@@ -61,7 +61,8 @@ export async function captureCalculator({binding,identity,browser,record}) {
   const read=${readPreparedNodeContext.toString()},binding=${JSON.stringify(preparedNodeContext)};
   const before=await read(page,binding);
   if(before.verified!==true||before.surface!=='wizard'||before.document_id!==binding.document_id
-   ||before.node_id!==binding.node.node_id)throw Error('LOGINOM_CAPTURE_RAW_NODE');
+   ||before.node_id!==binding.node.node_id||before.workflow_id!==binding.workflow_ref.workflow_id
+   ||before.tid!==${JSON.stringify(state.wizard.root_tid)})throw Error('LOGINOM_CAPTURE_RAW_NODE');
   const value=await (${makeCalculatorCaptureCode({owner,root_tid:state.wizard.root_tid,root_ref:state.wizard.root_ref,limits:CAPTURE_LIMITS})})(page);
   const after=await read(page,binding);if(JSON.stringify(before)!==JSON.stringify(after))throw Error('LOGINOM_CAPTURE_RAW_NODE_CHANGED');
   return value;
