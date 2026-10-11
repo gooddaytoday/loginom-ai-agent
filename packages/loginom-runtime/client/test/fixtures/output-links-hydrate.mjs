@@ -1,13 +1,15 @@
 export async function hydrate(page,capture,mode,prepared,settlement){
- await page.goto(capture.origin+'/offline-output-links-fixture');
+ if(mode!=='transition')await page.goto(capture.origin+'/offline-output-links-fixture');
  await page.evaluate(({d,p,mode,settlement})=>{
-  const objects=new Map(),get=id=>{if(!id)return null;if(!objects.has(id))objects.set(id,{});return objects.get(id);};
-  const classes={};for(const t of d.tree_chain){classes[t.constructor]??=({[t.constructor]:class{}})[t.constructor];objects.set(t.object,new classes[t.constructor]());}
-  const WizardModelComponentForm=class WizardModelComponentForm{};objects.set(d.active.model,new WizardModelComponentForm());
-  const styles=new WeakMap();const oldStyle=globalThis.getComputedStyle;globalThis.getComputedStyle=e=>styles.has(e)?new Proxy(oldStyle(e),{get:(target,k)=>styles.get(e)[k]??target[k]}):oldStyle(e);
+  const prior=mode==='transition'?globalThis.__nativeFixture:null;
+  const objects=prior?.objects??new Map(),get=id=>{if(!id)return null;if(!objects.has(id))objects.set(id,{});return objects.get(id);};
+  const classes=prior?.classes??{};for(const t of d.tree_chain){classes[t.constructor]??=({[t.constructor]:class{}})[t.constructor];if(!objects.has(t.object))objects.set(t.object,new classes[t.constructor]());}
+  const WizardModelComponentForm=class WizardModelComponentForm{};if(!objects.has(d.active.model))objects.set(d.active.model,new WizardModelComponentForm());
+  const styles=prior?.styles??new WeakMap();const oldStyle=globalThis.getComputedStyle;if(!prior)globalThis.getComputedStyle=e=>styles.has(e)?new Proxy(oldStyle(e),{get:(target,k)=>styles.get(e)[k]??target[k]}):oldStyle(e);
   // Captured rectangles already include transforms. Use them as viewport CSS
   // geometry, removing transform containing blocks; browser hit testing stays real.
-  for(const n of d.dom.nodes){const e=(['svg','g','path'].includes(n.tag.toLowerCase())?document.createElementNS('http://www.w3.org/2000/svg',n.tag.toLowerCase()):document.createElement(n.tag));for(const [k,v] of Object.entries(n.attributes))e.setAttribute(k,v);if(n.text!==null)e.textContent=n.text;if('value'in n)e.value=n.value;e.style.position='fixed';e.style.left=n.box.x+'px';e.style.top=n.box.y+'px';e.style.width=n.box.width+'px';e.style.height=n.box.height+'px';e.style.boxSizing='border-box';e.style.transform='none';objects.set(n.object,e);styles.set(e,n.computed);e.getBoundingClientRect=()=>({...n.box,left:n.box.x,top:n.box.y,right:n.box.x+n.box.width,bottom:n.box.y+n.box.height});e.checkVisibility=()=>n.visible;e.getClientRects=()=>n.visible?[e.getBoundingClientRect()]:[];for(const [k,v] of Object.entries({scrollLeft:n.scroll.left,scrollTop:n.scroll.top,scrollWidth:n.scroll.width,scrollHeight:n.scroll.height,clientWidth:n.scroll.clientWidth,clientHeight:n.scroll.clientHeight}))Object.defineProperty(e,k,{value:v,configurable:true});}
+  if(prior){const retained=new Set(d.dom.nodes.map(n=>n.object));for(const id of prior.domObjects)if(!retained.has(id))get(id)?.remove?.();}
+  for(const n of d.dom.nodes){const e=(objects.get(n.object) instanceof Element?objects.get(n.object):(['svg','g','path'].includes(n.tag.toLowerCase())?document.createElementNS('http://www.w3.org/2000/svg',n.tag.toLowerCase()):document.createElement(n.tag)));for(const [k,v] of Object.entries(n.attributes))e.setAttribute(k,v);if(n.text!==null)e.textContent=n.text;if('value'in n)e.value=n.value;e.style.position='fixed';e.style.left=n.box.x+'px';e.style.top=n.box.y+'px';e.style.width=n.box.width+'px';e.style.height=n.box.height+'px';e.style.boxSizing='border-box';e.style.transform='none';objects.set(n.object,e);styles.set(e,n.computed);e.getBoundingClientRect=()=>({...n.box,left:n.box.x,top:n.box.y,right:n.box.x+n.box.width,bottom:n.box.y+n.box.height});e.checkVisibility=()=>n.visible;e.getClientRects=()=>n.visible?[e.getBoundingClientRect()]:[];for(const [k,v] of Object.entries({scrollLeft:n.scroll.left,scrollTop:n.scroll.top,scrollWidth:n.scroll.width,scrollHeight:n.scroll.height,clientWidth:n.scroll.clientWidth,clientHeight:n.scroll.clientHeight}))Object.defineProperty(e,k,{value:v,configurable:true});}
   for(const n of d.dom.nodes){const e=get(n.object),parent=get(n.parent);if(parent instanceof Element)parent.append(e);else document.body.append(e);}
   const originals=new Map();
   for(const scope of d.dom.scopes){const template=document.createElement('template');template.innerHTML=scope.html;const root=template.content.firstElementChild;originals.set(scope.object,root);}
@@ -40,10 +42,10 @@ export async function hydrate(page,capture,mode,prepared,settlement){
   // Workspace chrome is scaffolded from the measured preparation receipt.
   // Output owner objects/relationships and scoped DOM come exclusively
   // from the native capture; no observed context or allowed_actions is injected.
-  const tab=document.createElement('div');tab.setAttribute('data-tid',p.workflow_ref.tab_tid);tab.className='x-tab-active';tab.textContent='Сценарий';document.body.prepend(tab);
-  const avatar=document.createElement('button');avatar.setAttribute('data-tid','MF;cntMain;tlbMainToolbar;btnAvatar');document.body.prepend(avatar);
+  const tab=prior?document.querySelector('[data-tid='+JSON.stringify(p.workflow_ref.tab_tid)+']'):document.createElement('div');tab.setAttribute('data-tid',p.workflow_ref.tab_tid);tab.className='x-tab-active';tab.textContent='Сценарий';document.body.prepend(tab);
+  const avatar=prior?document.querySelector('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]'):document.createElement('button');avatar.setAttribute('data-tid','MF;cntMain;tlbMainToolbar;btnAvatar');document.body.prepend(avatar);
   const r=ledger[0];globalThis.__loginomDockPreparationV1={document,id:d.document_id,receipts:new Map([['fixture-preparation',{phase:'verified',workflowId:p.workflow_ref.workflow_id,tab,packageNode:r.packageNode,nodeTargetWorkflowNode:r.workflow}]]),outputPortOpenReceipts:new Map(ledger.map(r=>[r.key,r]))};
-  globalThis.__nativeFixture={get,ledger,model,c,draw,grids:d.grids,link:d.linkNative};
+  globalThis.__nativeFixture={objects,styles,classes,domObjects:d.dom.nodes.map(n=>n.object),get,ledger,model,c,draw,grids:d.grids,link:d.linkNative};
 
  },{d:capture,p:prepared,mode,settlement});
 }

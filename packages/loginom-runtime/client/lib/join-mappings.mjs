@@ -1,3 +1,4 @@
+import {materializeJoinDefaultOutput} from './join-output-materialize.mjs';
 import {ensureJoinOutputComplete,verifyJoinSourceFetch} from './join-output-sync.mjs';
 import {resolveConfiguredOutputMapping,configureOutputFields,reorderOutputFields,configureOutputAutosync} from './port-mapping-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
@@ -82,6 +83,7 @@ export async function configureJoinOutput(channel,configuration,parameters,mappi
  if(configuration.default_output_order===true){
   need(Object.keys(mapping).length===0,'Default Join order requires an empty output mapping');
   const ids=defaultJoinOutputRecords(configuration,s.node_mapping);
+  const materialized=await materializeJoinDefaultOutput(channel,s,ids);s=materialized.state;changes.push(materialized.receipt);
   const reordered=await reorderOutputFields(channel,ids);changes.push(reordered);
   s=await channel.observe({condition:'default join output order readback',readMappings:true,ready});
   need(JSON.stringify(defaultJoinOutputRecords(configuration,s.node_mapping))===JSON.stringify(s.node_mapping.target_fields.map(f=>f.record_id)), 'Default Join output order differs');

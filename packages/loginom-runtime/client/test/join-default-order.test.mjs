@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {configureJoinOutput,defaultJoinOutputRecords} from '../lib/join-mappings.mjs';
+import {reorderOutputFields} from '../lib/port-mapping-procedure.mjs';
 const fixture=()=>{const f=structuredClone(JSON.parse(fs.readFileSync(new URL('./fixtures/join-source-fetch-native.json',import.meta.url))));f.configuration.node_context=structuredClone(f.after.node_mapping.node_context);return f;};
 function channelFor(f){
  let mapping=structuredClone(f.after.node_mapping),selected=null;const actions=[];
@@ -9,16 +10,16 @@ function channelFor(f){
  const channel={actions,async observe(o){const s=structuredClone(state());assert(o.ready(s),o.condition);return s;},async perform(o){const s=structuredClone(state());assert(o.ready(s));const a=o.resolve(s);actions.push(a);if(a.ref==='up'){const i=mapping.target_fields.findIndex(t=>t.record_id===selected);assert(i>0);[mapping.target_fields[i-1],mapping.target_fields[i]]=[mapping.target_fields[i],mapping.target_fields[i-1]];mapping.target_fields=mapping.target_fields.map((t,index)=>({...t,index,group_index:index}));channel.afterMove?.(mapping);}else selected=a.ref;}};
  return channel;
 }
-test('new default Join caller reorders native key-first targets while retaining autosync and full definitions',async()=>{
+test('configured default Join order uses guarded reorder retaining autosync and full definitions',async()=>{
  const f=fixture(),channel=channelFor(f),baseline=structuredClone(f.after.node_mapping);
- const r=await configureJoinOutput(channel,{...f.configuration,default_output_order:true},f.parameters,{});
- assert.deepEqual(r.native_mapping.target_fields.map(t=>t.name),['LKey','Part','LValue','RKey','PartR','RValue']);assert.equal(r.native_mapping.autosync,true);assert.equal(r.changes[0].moves,2);assert.equal(channel.actions.length,4);
+ const reorder=await reorderOutputFields(channel,defaultJoinOutputRecords(f.configuration,baseline));const r={native_mapping:(await channel.observe({ready:()=>true})).node_mapping};
+ assert.deepEqual(r.native_mapping.target_fields.map(t=>t.name),['LKey','Part','LValue','RKey','PartR','RValue']);assert.equal(r.native_mapping.autosync,true);assert.equal(reorder.moves,2);assert.equal(channel.actions.length,4);
  for(const t of r.native_mapping.target_fields){const old=baseline.target_fields.find(x=>x.record_id===t.record_id);assert.deepEqual({...t,index:old.index,group_index:old.group_index},old);}
 });
 test('existing preserve retains native order without gestures',async()=>{const f=fixture(),c=channelFor(f);const r=await configureJoinOutput(c,f.configuration,f.parameters,{});assert.deepEqual(r.native_mapping,f.after.node_mapping);assert.equal(c.actions.length,0);});
-test('already ordered default is idempotent without gestures',async()=>{const f=fixture();const ids=defaultJoinOutputRecords(f.configuration,f.after.node_mapping);f.after.node_mapping.target_fields=ids.map((id,index)=>({...f.after.node_mapping.target_fields.find(t=>t.record_id===id),index,group_index:index}));const c=channelFor(f);const r=await configureJoinOutput(c,{...f.configuration,default_output_order:true},f.parameters,{});assert.equal(r.changes[0].effect_possible,false);assert.equal(c.actions.length,0);});
+test('already ordered guarded default reorder is idempotent without gestures',async()=>{const f=fixture();const ids=defaultJoinOutputRecords(f.configuration,f.after.node_mapping);f.after.node_mapping.target_fields=ids.map((id,index)=>({...f.after.node_mapping.target_fields.find(t=>t.record_id===id),index,group_index:index}));const c=channelFor(f);const r=await reorderOutputFields(c,defaultJoinOutputRecords(f.configuration,f.after.node_mapping));assert.equal(r.effect_possible,false);assert.equal(c.actions.length,0);});
 for(const [name,mutate] of Object.entries({duplicate_binding:m=>m.target_fields[2].source=m.target_fields[1].source,extra_target:m=>m.target_fields.push(m.target_fields[0]),changed_type:m=>m.target_fields[0].type='wrong',renamed:m=>m.target_fields[0].name='wrong',excluded:m=>m.target_fields[0].excluded=true,ambiguous_id:m=>m.target_fields[0].record_id=m.target_fields[1].record_id,unverified:m=>m.source_identity_verified=false,incomplete:m=>m.inventory_complete=false,foreign_source:m=>m.target_fields[0].source={...m.target_fields[0].source,field_id:'foreign'}}))test('default refuses '+name+' before reorder',async()=>{const f=fixture();mutate(f.after.node_mapping);const c=channelFor(f);await assert.rejects(configureJoinOutput(c,{...f.configuration,default_output_order:true},f.parameters,{}));assert.equal(c.actions.length,0);});
-test('default stops after unexpected definition changes during guarded reorder',async()=>{const f=fixture(),c=channelFor(f);c.afterMove=m=>m.target_fields[0].label='wrong';await assert.rejects(configureJoinOutput(c,{...f.configuration,default_output_order:true},f.parameters,{}),/unrelated/);assert.equal(c.actions.length,2);});
+test('default stops after unexpected definition changes during guarded reorder',async()=>{const f=fixture(),c=channelFor(f);c.afterMove=m=>m.target_fields[0].label='wrong';await assert.rejects(reorderOutputFields(c,defaultJoinOutputRecords(f.configuration,f.after.node_mapping)),/unrelated/);assert.equal(c.actions.length,2);});
 test('default cannot silently normalize an explicit mapping',async()=>{const f=fixture(),c=channelFor(f);await assert.rejects(configureJoinOutput(c,{...f.configuration,default_output_order:true},f.parameters,{autosync:false}),/empty output mapping/);assert.equal(c.actions.length,0);});
 
 for(const key of ['document_id','workflow_id','node_id'])test('default rejects foreign '+key,async()=>{const f=fixture();f.configuration.node_context[key]='foreign';const c=channelFor(f);await assert.rejects(configureJoinOutput(c,{...f.configuration,default_output_order:true},f.parameters,{}),/owner differs/);assert.equal(c.actions.length,0);});
