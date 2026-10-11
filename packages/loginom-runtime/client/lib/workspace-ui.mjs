@@ -4095,3 +4095,82 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) 
   if(snapshotArgument)return `async (page, snapshot) => (${workspaceUiCapability.toString()})(page, {...${JSON.stringify(task)},snapshot}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;
   return `async (page) => (${workspaceUiCapability.toString()})(page, ${JSON.stringify(task)}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;
 }
+
+// Internal Calculator-only diagnostic capture; not a public observer option.
+export function readCalculatorCaptureSurface({owner,root_tid,root_ref,limits}) {
+ const fail=m=>{throw Error('LOGINOM_CAPTURE_'+m);};
+ if(!limits||limits.bytes!==524288||limits.dom!==4096||limits.records!==1000||limits.string!==512)fail('LIMITS');
+ const p=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
+ if(p?.document!==document||p.id!==owner.document_id||app?.Version!==owner.loginom_build
+  ||app.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName!==owner.account)fail('RAW_IDENTITY');
+ const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
+ const tabs=exact(owner.tab_tid);
+ if(tabs.length!==1||!tabs[0].classList.contains('x-tab-active'))fail('RAW_TAB');
+ const roots=exact(root_tid);if(roots.length!==1)fail('RAW_ROOT');
+ const root=roots[0],ui=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+ if(ui?.document!==document||ui.refs?.get(root_ref)?.deref()!==root||!root.isConnected)fail('RAW_ROOT_REF');
+ const receipts=[...p.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===owner.workflow_id&&r.tab===tabs[0]);
+ if(!receipts.length||receipts.some(r=>r.packageNode!==receipts[0].packageNode))fail('RAW_WORKFLOW');
+ const ids=new WeakMap();let seq=0;
+ const id=o=>{if(!o||typeof o!=='object')return null;if(!ids.has(o))ids.set(o,++seq);return ids.get(o);};
+ const scalar=v=>{if(v===undefined)return {missing:true};if(v===null||typeof v==='boolean')return v;
+  if(typeof v==='number'){if(!Number.isFinite(v))fail('FINITE');return v;}
+  if(typeof v==='string'){if(new TextEncoder().encode(v).length>limits.string)fail('STRING_BOUND');return v;}return {object_id:id(v)};};
+ const own=(o,k)=>{const d=o&&Object.getOwnPropertyDescriptor(o,k);return !d?{missing:true}:!('value'in d)?{accessor_not_read:true}:scalar(d.value);};
+ const rect=e=>{const r=e.getBoundingClientRect();if(![r.x,r.y,r.width,r.height,e.clientWidth,e.clientHeight,e.scrollWidth,e.scrollHeight,e.scrollLeft,e.scrollTop].every(Number.isFinite))fail('GEOMETRY');return {x:r.x,y:r.y,width:r.width,height:r.height,
+  clientWidth:e.clientWidth,clientHeight:e.clientHeight,scrollWidth:e.scrollWidth,scrollHeight:e.scrollHeight,scrollLeft:e.scrollLeft,scrollTop:e.scrollTop};};
+ const dom=[],stack=[root];while(stack.length){
+  if(dom.length>=limits.dom)fail('DOM_BOUND');const e=stack.pop();
+  dom.push({id:id(e),parent_id:id(e.parentElement),tag:e.tagName,
+   attrs:Object.fromEntries(['id','data-tid','data-recordindex','data-recordid','data-boundview','class'].map(k=>[k,scalar(e.getAttribute(k))])),rect:rect(e)});
+  // Charge before allocating a child list; reject rather than truncate.
+  if(e.children.length+stack.length+dom.length>limits.dom)fail('DOM_BOUND');
+  for(let i=e.children.length-1;i>=0;i--)stack.push(e.children[i]);
+ }
+ const stores=['grdSourceColumns;tbl','grdTargetColumns;tbl'].map(suffix=>{
+  const candidates=root.querySelectorAll('[data-tid$='+JSON.stringify(';'+suffix)+']');
+  if(candidates.length!==1)fail('GRID');const element=candidates[0],view=globalThis.Ext?.getCmp?.(element.id);
+  if(view?.el?.dom!==element)fail('GRID_BINDING');
+  // These are the same cached UI accessors used by the native mapping reader.
+  const store=view.getStore?.(),data=store?.getData?.(),source=data?.getSource?.(),proxy=store?.getProxy?.();
+  if(!Array.isArray(data?.items)||data.items.length>limits.records||source&&(!Array.isArray(source.items)||source.items.length>limits.records))fail('CACHE_BOUND');
+  const records=data.items.map(r=>({object_id:id(r),internalId:own(r,'internalId'),data_id:id(r.data),
+   data:Object.fromEntries(['ID','Index','Name','DisplayName','DataType','GroupField','DataKind','Required','Broken','IsDerived','SourceDisplayName','SourceName','ConnectedRecord'].map(k=>[k,own(r.data,k)]))}));
+  const rendered=[...element.querySelectorAll('table.x-grid-item')];
+  if(rendered.length>limits.records)fail('ROW_BOUND');
+  const rows=rendered.map(e=>({element_id:id(e),parent_id:id(e.parentElement),record_index:scalar(e.getAttribute('data-recordindex')),record_id:scalar(e.getAttribute('data-recordid')),bound_view:scalar(e.getAttribute('data-boundview')),rect:rect(e)}));
+  const pending=proxy&&Object.getOwnPropertyDescriptor(proxy,'pendingOperations');
+  const pendingKeys=pending&&'value'in pending&&pending.value?Object.keys(pending.value):null;
+  if(pendingKeys&&pendingKeys.length>limits.records)fail('PENDING_BOUND');
+  return {element_id:id(element),view_id:id(view),store_id:id(store),data_id:id(data),source_id:id(source),proxy_id:id(proxy),
+   flags:Object.fromEntries(['$className','isBufferedStore','loading','currentPage','remoteFilter','remoteSort','totalCount'].map(k=>[k,own(store,k)])),
+   cached_reads:{count:scalar(store.getCount?.()),total:scalar(store.getTotalCount?.()),loading:scalar(store.isLoading?.()),
+    remoteFilter:scalar(store.getRemoteFilter?.()),remoteSort:scalar(store.getRemoteSort?.())},
+   proxy_class:own(proxy,'$className'),pendingKeys:pendingKeys?.map(scalar)??null,
+   source_membership:source?.items.map(id)??null,cache_membership:data.items.map(id),records,rows,geometry:rect(element)};
+ });
+ // These are diagnostic cache/row predicates, not the observer's ordinary
+ // coverage or addressed-definition decision. Missing facts stay unevaluated.
+ const window=stores.map(s=>{
+  const f=s.flags,c=s.cached_reads;
+  const available=typeof c.count==='number'&&typeof c.loading==='boolean'
+   &&typeof c.remoteFilter==='boolean'&&typeof c.remoteSort==='boolean'&&Array.isArray(s.source_membership)
+   &&Array.isArray(s.pendingKeys)&&typeof f.isBufferedStore==='boolean';
+  if(!available)return {evaluated:false,value:null,reason:'cached_flags_unavailable'};
+  const cache=f.$className==='Ext.data.Store'&&f.isBufferedStore===false&&c.loading===false
+   &&f.currentPage===1&&c.remoteFilter===false&&c.remoteSort===false&&s.pendingKeys.length===0
+   &&s.proxy_class==='bg.ext.CollectionProxy'&&c.count===s.records.length
+   &&s.source_membership.length===s.cache_membership.length
+   &&new Set(s.source_membership).size===s.source_membership.length
+   &&s.source_membership.every(id=>s.cache_membership.includes(id));
+  const rows=s.rows.length===s.records.length&&s.rows.every((r,i)=>
+   r.record_index===String(i)&&r.record_id===String(s.records[i].internalId)
+   &&r.bound_view===dom.find(e=>e.id===s.element_id)?.attrs.id);
+  return {evaluated:true,value:cache&&rows,cache_complete:cache,rows_complete:rows};
+ });
+ const result={owner,root_tid,root_ref,dom,stores,collector_revision:1,
+  predicates:{status:'partial',evaluated:false,cached_windows:window,
+   missing:['ordinary_coverage','addressed_complete','native_window','full_geometry_trace']}};
+ if(new TextEncoder().encode(JSON.stringify(result)).length>limits.bytes)fail('BYTE_BOUND');
+ return result;
+}
