@@ -5,7 +5,6 @@ import evidence from './fixtures/calculator-b073-navigation.json' with {type:'js
 import {makeWorkspacePrepareCode,prepareWorkspaceSession} from '../lib/workspace.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
 import {createTextImportNodeSupport} from '../lib/text-import-node.mjs';
-import {makeWorkspaceUiCode} from '../lib/workspace-ui.mjs';
 
 // OFFLINE ONLY. The navigation inputs are exact receipt 012/020 values.
 // SaveCheckpoint persistence, Page/Ext/native instances, workspace UI observer,
@@ -99,8 +98,8 @@ test('production canonical preparation retains original SaveCheckpoint receipt/r
  assert.equal(f.state.effect_possible,false);assert.equal(f.metadata.workspaceReady,true);assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,true);f.immutable();assert.equal(f.gestures.length,0);
 });
 
-test('existing import: accepted reader alias still encounters exact old-path check in production wizard opener',async()=>{
- const f=await fixture();await assert.rejects(f.driver.openWizard(f.ctx),/Opened wizard owner differs from the prepared node/);
+test('existing import: fresh reader alias passes both production opening consumers',async()=>{
+ const f=await fixture();assert.equal((await f.driver.openWizard(f.ctx)).verified,true);
  assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,true);
  assert.deepEqual(plain(f.record.nodeNavigationPath),opened.slice(0,-2).map(({tid,label})=>({tid,label})));
  assert.deepEqual(f.gestures.map(x=>x.verb),['click','begin_wizard']);
@@ -159,29 +158,4 @@ test('production preparation refuses replacing an unresolved effect-possible pre
  const before=clone(metadata);let calls=0;
  await assert.rejects(prepareWorkspaceSession({metadata,request:{operation_id:'new'},assertAllowed(){},prepare(){calls++;},save(){calls++;},record(){calls++;}}),/reconcile the existing request/);
  assert.equal(calls,0);assert.deepEqual(metadata,before);
-});
-
-// Addressed predicate probe of the exact serialized production block. The rest
-// of workspaceUiCapability is NOT executed: grant lifecycleContextMatches and
-// before/after native GUID identity to isolate the remaining path conjunct.
-// This is source/bundle predicate evidence, not a Page/executor/native gesture.
-for(const canonical of [false,true])test('serialized production opening predicate '+(canonical?'rejects canonical keys despite accepted authority':'accepts unchanged-key control'),async()=>{
- const f=await fixture({kind:'new',canonical});const current=await f.observe();f.open();const observed=await f.observe();
- assert.equal(observed.prepared_node_context.verified,true);
- current.ui.elements.find(e=>e.ref==='ui-settings').graph_node={part:'settings',node_label:'DiagInput'};
- current.ui.elements.find(e=>e.graph_node?.part==='label').graph_node.node_label='DiagInput';
- const code=makeWorkspaceUiCode({mode:'observe'});
- const start=code.indexOf("if(['open_wizard','begin_wizard','confirm_wizard_deactivation'].includes(task.action.verb)) {");
- const end=code.indexOf("if(['apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(task.action.verb)) {",start);
- assert.ok(start>0&&end>start,'fixed production block must be present');
- const events=[];
- const probe=vm.runInNewContext('(async()=>{'+code.slice(start,end)+'})()',{
-  task:{action:{verb:'open_wizard',ref:'ui-settings'},prepared_node_context:f.binding,snapshot:current},current,observed,
-  lifecycleContextMatches:()=>true,exactDeactivation:()=>false,same:(a,b)=>JSON.stringify(a)===JSON.stringify(b),
-  record:(event,detail)=>events.push({event,detail}),fail:(code,message)=>{const e=Error(message);e.code=code;throw e;},
-  timeout:()=>{throw Error('unexpected wait');},page:{waitForTimeout:()=>{throw Error('unexpected Page call');}},readOpeningUi:()=>{throw Error('unexpected reread');}
- });
- if(canonical){await assert.rejects(probe,e=>e.code==='WIZARD_OPEN_NOT_CONFIRMED');assert.deepEqual(events,[]);}
- else {await probe;assert.deepEqual(events.map(e=>e.event),['wizard_open_verified']);}
- assert.deepEqual(f.gestures,[]);f.immutable();
 });

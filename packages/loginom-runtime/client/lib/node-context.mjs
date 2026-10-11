@@ -105,6 +105,7 @@ export async function readPreparedNodeContext(page, binding) {
     // checks above, using the verified preparation and exact tree-object chain.
     // Never infer ancestry from pathname, labels, GUIDs or matching DOM keys.
     if(r.nodeNavigationPath&&JSON.stringify(r.nodeNavigationPath)!==JSON.stringify(crumbs.slice(0,b.workflow_ref.navigation_path.length)))return reject('navigation');
+    let navigationAlias;
     if(navigationChanged) {
       const original=b.workflow_ref.navigation_path, current=crumbs.slice(0,original.length);
       let request;try{request=JSON.parse(r.request);}catch{return reject('navigation');}
@@ -126,8 +127,10 @@ export async function readPreparedNodeContext(page, binding) {
         if(!component||component.el?.dom!==e||component._node?.data?.node!==lineage[i])return reject('navigation');
       }
       r.nodeNavigationPath=current; // Internal verified alias; original receipt stays immutable.
+      navigationAlias={original_path:original,path:current}; // Fresh authority, never a cached caller claim.
     }
     return {verified:true,document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,surface,tid,
+      ...(navigationAlias?{navigation_alias:navigationAlias}:{}),
       ...(outputPort?{[outputPort.direction==='input'?'input_port':'output_port']:outputPort}:{}),
       ...(surface==='graph'?{locked,...(nodeTree&&crumbs.length===b.workflow_ref.navigation_path.length+1?{navigation_node:crumbs.at(-1)}:{}),
         ...(pendingWizardNode?{pending_wizard_node:pendingWizardNode}:{})}:{} )};

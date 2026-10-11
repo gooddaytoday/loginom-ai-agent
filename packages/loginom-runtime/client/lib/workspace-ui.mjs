@@ -3412,6 +3412,10 @@ function readRenderedInputMapping(observation) {
         if (!current.authenticated) fail('LOGIN_REQUIRED', 'Loginom authentication is required before changing the workspace');
         if (!same(task.snapshot.dom_epoch, current.dom_epoch)) fail('UI_EPOCH_CHANGED', 'The document changed since this observation; observe again even if its visible state looks unchanged');
         if (!same(current.ui.dialogs.map(item => item.ref), task.snapshot.ui.dialogs.map(item => item.ref))) fail('UI_CONTEXT_CHANGED', 'The visible dialog changed; observe the workspace again');
+        // Only a fresh bound reader can supply this alias proof. Keep exact
+        // workflow equality for unbound/exact-key opening; caller receipts stay immutable.
+        const openingWorkflowMatches=(node,path,opening)=>same(path,opening)
+          ||node?.verified===true&&same(node.navigation_alias?.original_path,opening)&&same(node.navigation_alias?.path,path);
         if(task.action.verb==='confirm_wizard_deactivation') {
           const binding=task.snapshot.node_wizard_confirmation,n=current.prepared_node_context;
           if(binding?.kind!=='deactivation'||n?.verified!==true||n.surface!=='graph'||n.tid!==binding.graph_tid
@@ -3420,7 +3424,7 @@ function readRenderedInputMapping(observation) {
             ||!(current.wizard_pending_owner.node?.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
               ||typeof n.pending_wizard_node?.tid==='string'&&n.pending_wizard_node.tid===current.wizard_pending_owner.node?.tid
                 &&n.pending_wizard_node.label===current.wizard_pending_owner.node?.label)
-            ||!same(current.wizard_pending_owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path)
+            ||!openingWorkflowMatches(n,current.wizard_pending_owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path)
             ||current.ui.dialogs.length!==1||!Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'}).every(([name,label])=>
               current.ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name&&e.label===label
                 &&e.signature?.dialog_ref===current.ui.dialogs[0].ref&&e.allowed_actions.includes('click')).length===1))
@@ -3782,7 +3786,7 @@ function readRenderedInputMapping(observation) {
                 &&normalizeLabel(labels[0].label)===normalizeLabel(owner?.node?.label));
           if(!deactivationPending && (!contextMatches(observed) || observed.ui.masks.length || observed.wizard?.status!=='observed'
             || owner?.status!=='observed' || !guidOwnerMatches&&owner.node.tid!==opening.workflow_path.at(-1)?.tid+'>'+opening.node.node_label
-            || !same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path)))
+            || !openingWorkflowMatches(afterNode,owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path)))
             fail('WIZARD_OPEN_NOT_CONFIRMED','The intended node wizard was not confirmed after one click; inspect the current view before retry');
           if(!deactivationPending)record('wizard_open_verified',{node:opening.node,workflow_path:opening.workflow_path,wizard_root_ref:observed.wizard.root_ref,
             owner_node:owner.node,settings_applied:false});
