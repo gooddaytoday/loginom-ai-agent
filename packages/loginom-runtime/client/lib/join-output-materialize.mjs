@@ -81,5 +81,10 @@ export async function materializeJoinDefaultOutput(channel,initial,orderedIds){
  need(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===baseline.target_fields[i][k])), 'Join materialized rendered definition differs');
  state=await channel.observe({condition:'native Join mapping after complete rendered materialization',readMappings:true,ready:unchanged});
  return {state,receipt:{verified:true,effect_possible:receipts.length>0,cleanup_complete:true,persisted_content_verified:false,
-  materialized_fields:planned.filter(p=>p.implicit).map(p=>p.targetId),receipts,definition}};
+  materialized_fields:planned.filter(p=>p.implicit).map(p=>p.targetId),
+  // Full gesture observations already belong to node_step_completed in the
+  // durable journal. A phase receipt carries their identities and effects,
+  // rather than raw UI packets that the journal's redactor can transform.
+  receipts:receipts.map(r=>({status:r.status,action_key:r.action_key,action_revision:r.action_revision,
+   operation_id:r.operation_id,phase:r.phase,effect_possible:r.effect_possible})),definition}};
 }

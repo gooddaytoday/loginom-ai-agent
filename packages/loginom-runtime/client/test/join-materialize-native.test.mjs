@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createRequire} from 'node:module';
+import os from 'node:os';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {createExecutionJournal} from '../lib/execution-journal.mjs';
 import fixture from './fixtures/join-materialize-native.mjs';
 import {hydrate} from './fixtures/output-links-hydrate.mjs';
 import {makeWorkspaceUiCode,validateUiAction} from '../lib/workspace-ui.mjs';
@@ -39,7 +43,19 @@ for(const variant of ['full','partial','custom','foreign_controller','duplicate_
    if(v==='pending')c.FLinksUpdateMode=true;
   },variant);
   const invoke=async()=>{state=await channel.observe({readMappings:true});return configureJoinOutput(channel,{...config.configuration,node_context:state.node_mapping.node_context,default_output_order:true},config.parameters,{});};
-  if(['full','partial','custom','delayed_unlink','delayed_reconnect'].includes(variant)){const result=await invoke();assert.equal(result.verified,true);assert.equal(result.changes[0].materialized_fields.length,variant==='custom'?0:variant==='partial'?4:6);assert.equal(result.changes[0].persisted_content_verified,false);assert.deepEqual(result.native_mapping.target_fields.map(f=>f.name),config.configuration.input_fields.flat().map(f=>f.name));assert.equal(receipts.length,gestures);
+  if(['full','partial','custom','delayed_unlink','delayed_reconnect'].includes(variant)){const result=await invoke();assert.equal(result.verified,true);assert.equal(result.changes[0].materialized_fields.length,variant==='custom'?0:variant==='partial'?4:6);assert.equal(result.changes[0].persisted_content_verified,false);
+   if(variant==='full'){
+    const directory=fs.mkdtempSync(path.join(os.tmpdir(),'join-phase-ack-'));
+    const record=createExecutionJournal({directory,metadata:{sessionId:'join-phase-ack',clientRevision:'fixture',actionManifestDigest:'fixture'}});
+    const event={operation_id:'join-phase-ack',action_key:'node.apply',action_revision:'1.0.0',phase:'node_phase_completed',signature:'fixture',receipt:{phase:'output_mapping',receipt_id:'join-phase-ack:output_mapping',status:'verified',effect_possible:true,value:result}};
+    const saved=await record(event);
+    const stable=v=>Array.isArray(v)?v.map(stable):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,stable(v[k])])):v;
+    const hash=v=>createHash('sha256').update(JSON.stringify(stable(v))).digest('hex');
+    assert.equal(hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]]))),hash(event),'actual Join output receipt must survive the unchanged durable journal acknowledgement');
+    assert.equal(result.changes[0].receipts.length,12);
+    assert.ok(result.changes[0].receipts.every(r=>r.status==='SUCCEEDED'&&r.effect_possible===true));
+   }
+assert.deepEqual(result.native_mapping.target_fields.map(f=>f.name),config.configuration.input_fields.flat().map(f=>f.name));assert.equal(receipts.length,gestures);
    const final=await channel.observe({outputColumnPage:{offset:0,limit:8}}),es=final.ui.elements.filter(e=>e.wizard_finish?.mode==='output_port'&&e.allowed_actions.includes('finish_wizard'));assert.equal(es.length,1);validateUiAction({verb:'finish_wizard',ref:es[0].ref},final);
   }else{await assert.rejects(invoke());const expected=variant==='lost_selection'?1:variant==='lost_unlink'||variant==='changed_unbound_definition'||variant==='pending_after_unlink'||variant==='stale_reconnect_ref'||variant==='stale_unbound_label'||variant==='stale_unbound_type'?2:variant==='lost_reconnect'||variant==='changed_reconnected_origin'?3:0;assert.equal(dispatch,expected);assert.ok(receipts.every(r=>!r.trace?.some(t=>['finish_wizard','execute'].includes(t.verb))));if(variant.startsWith('lost_')){assert.equal(receipts.at(-1).status,'AMBIGUOUS');assert.equal(receipts.at(-1).effect_possible,true);}if(expected>=2)assert.ok(receipts.some(r=>r.effect_possible===true),'prior effects must remain possible');if(variant.startsWith('retained_')||variant==='epoch'){assert.equal(receipts.at(-1).status,'NOT_APPLIED');assert.equal(receipts.at(-1).effect_possible,false);}}
  }finally{await context.close();await browser.close();if(process.env.LOGINOM_MATERIALIZER_EVIDENCE){fs.mkdirSync(process.env.LOGINOM_MATERIALIZER_EVIDENCE,{recursive:true});fs.writeFileSync(process.env.LOGINOM_MATERIALIZER_EVIDENCE+'/'+variant+'.json',JSON.stringify({variant,dispatch,gestures,receipts,observations,browser_closed:true},null,2)+'\n');}}
