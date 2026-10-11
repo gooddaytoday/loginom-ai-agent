@@ -84,3 +84,14 @@ test('duplicate deactivation breadcrumb requires native pending owner binding, n
  let gestures=0;const channel={observe:async()=>state,perform:async()=>{gestures++;throw Error('unknown reply');}};
  await assert.rejects(openPreparedWizard(channel),/unknown reply/);assert.equal(gestures,1);
  });
+
+test('deactivation owner prefix accepts only the fresh prepared original-to-current alias proof',()=>{
+ const {state,binding}=fixture(),original=structuredClone(binding.opening.workflow_path),path=[{tid:'canonical',label:'Scenario'}];
+ state.wizard_pending_owner={status:'observed',node:{tid:'canonical>Import',label:'Import'},path:[...path,{tid:'canonical>Import',label:'Import'},{tid:'canonical>Import>Settings',label:'Settings'}]};
+ state.prepared_node_context.pending_wizard_node={tid:'canonical>Import',label:'Import'};
+ state.prepared_node_context.navigation_rebinding={prepared_path:original,observed_path:path};
+ assert.equal(boundWizardDeactivationConfirmation(state,binding),true);
+ for(const change of [s=>delete s.prepared_node_context.navigation_rebinding,s=>s.prepared_node_context.navigation_rebinding.prepared_path=[],s=>s.prepared_node_context.navigation_rebinding.observed_path=[],s=>s.prepared_node_context.verified=false,s=>s.prepared_node_context.node_id='foreign',s=>delete s.prepared_node_context.pending_wizard_node]){
+  const bad=structuredClone(state);change(bad);assert.equal(boundWizardDeactivationConfirmation(bad,binding),false);
+ }
+});
