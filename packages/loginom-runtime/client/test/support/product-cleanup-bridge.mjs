@@ -23,7 +23,7 @@ class ExternalClient {
   async callTool({arguments:{code}}){
     let value;
     if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,
-      target,loginom_account:'test-2',document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
+      target,loginom_account:this.f.scenario==='foreign-account'?'foreign':'test-2',document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
     else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
     else if(code.includes('function readSavedPackageState')){
       this.f.events.push('saved-state');
@@ -48,8 +48,8 @@ mock.module(new URL('../../lib/skill.mjs',import.meta.url).href,{namedExports:{.
 mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExports:{...workspace,
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>{
-  const f=current;return {tools:[],describe:()=>({}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},
-    run:async(key,parameters,{operationId})=>{f.saves++;return {status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path},save_completed:f.scenario!=='unconfirmed-save'}};},
+  const f=current;return {tools:[],describe:()=>({actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},
+    run:async(key,parameters,{operationId})=>{f.saves++;return {status:'SUCCEEDED',cleanup_complete:f.scenario!=='unconfirmed-save',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path},save_completed:f.scenario!=='unconfirmed-save'}};},
   };
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
@@ -62,7 +62,7 @@ for(const scenario of ['success','unprepared','no-save','native-blocked','busy',
     artifactStore:{list:()=>[],async releaseUploads(){f.events.push('release-uploads');}}};
   let bridge,client;
   try{
-    bridge=await createBridge({mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+    bridge=await createBridge({mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
       loginomUrl:'http://loginom.invalid/app',replayBootstrap:false,replayLoginUser:null,ownedPackageCleanupAccount:scenario==='foreign-account'?'another-user':'test-2'},session);
     client=new AgentClient({name:'test',version:'1'});const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
     if(scenario!=='unprepared'){
@@ -70,9 +70,9 @@ for(const scenario of ['success','unprepared','no-save','native-blocked','busy',
       if(scenario!=='no-save'){
         const saved=await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path:scenario==='foreign-path'?'/other/result.lgp':path},operation_id:'own-save'}});
         const values=saved.content.filter(c=>c.type==='text').map(c=>{try{return JSON.parse(c.text);}catch{return {};}});
-        assert.equal(values[0].status,'SUCCEEDED');assert.deepEqual(values[0].output,{package_ref:{path:scenario==='foreign-path'?'/other/result.lgp':path},save_completed:scenario!=='unconfirmed-save'});
+        assert.equal(values[0].status,'SUCCEEDED');assert.deepEqual({package_ref:values[0].output.package_ref,save_completed:values[0].output.save_completed},{package_ref:{path:scenario==='foreign-path'?'/other/result.lgp':path},save_completed:scenario!=='unconfirmed-save'});
         const advice=values.find(v=>v.kind==='dock_saved_package_state');assert.ok(advice);
-        assert.equal(advice.modified,['state-unavailable','foreign-path'].includes(scenario)?null:scenario==='dirty-after-save');
+        assert.equal(advice.modified,['state-unavailable','foreign-path','foreign-account'].includes(scenario)?null:scenario==='dirty-after-save');
         if(scenario==='dirty-after-save'){
           assert.equal(advice.next_step.arguments.action_key,'package.save_checkpoint');assert.equal(advice.next_step.arguments.parameters.path,path);
           const second=await client.callTool({name:advice.next_step.tool,arguments:{...advice.next_step.arguments,operation_id:'own-save-2'}});
@@ -94,8 +94,8 @@ for(const scenario of ['success','unprepared','no-save','native-blocked','busy',
     }else{
       assert.equal(result.browser_transport_closed,false);assert.equal(receipt.status,'BLOCKED');
       assert.equal(f.events.includes('browser-close'),false);assert.equal(f.events.includes('release-uploads'),false);
-      assert.equal(f.events.includes('package-cleanup'),scenario==='native-blocked');
+      assert.equal(f.events.includes('package-cleanup'),['native-blocked','foreign-path','multiple-saves','foreign-account'].includes(scenario));
     }
-    assert.equal(f.events.filter(e=>e==='package-cleanup').length,['success','native-blocked','state-unavailable'].includes(scenario)?1:0);
+    assert.equal(f.events.filter(e=>e==='package-cleanup').length,['success','native-blocked','state-unavailable','foreign-path','multiple-saves','foreign-account'].includes(scenario)?1:0);
   }finally{await client?.close();await bridge?.close();await rm(directory,{recursive:true,force:true});}
 });

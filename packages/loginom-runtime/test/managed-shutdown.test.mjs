@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import {readFile} from "node:fs/promises";
 const source=await readFile(new URL("../src/managed-entry.mjs",import.meta.url),"utf8");
-const body=source.slice(source.indexOf("function close() {"),source.indexOf("const stop ="));
-for(const [label,reply] of [["unstarted",undefined],["released",{browser_transport_closed:true}],["refused",{browser_transport_closed:false,package_cleanup:{status:"BLOCKED"}}]])
+const body=source.slice(source.indexOf("function closeRejection("),source.indexOf("const stop ="));
+for(const [label,reply] of [["unstarted",undefined],["released",{browser_transport_closed:true,cleanup_complete:true}],["refused",{browser_transport_closed:false,package_cleanup:{status:"BLOCKED"}}]])
  test("managed shutdown acknowledgement: "+label,async()=>{
   let calls=0;
   const state={bridge:reply?{close:async()=>{calls++;return reply;}}:undefined};

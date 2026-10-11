@@ -1,5 +1,7 @@
 import { EventEmitter } from "node:events"
 import { isAbsolute } from "node:path"
+import { join } from "node:path"
+import { writeFile } from "node:fs/promises"
 import { Option, Schema } from "effect"
 import { Loginom } from "@loginom-ai-agent/schema/loginom"
 import { createLoginomHost } from "./host"
@@ -17,6 +19,9 @@ const state: {
   port?: ReturnType<typeof loginomHostPort>
   stopping?: Promise<void>
   closed: boolean
+  root?: string
+  shutdown?: { stages: object[], primaryFailure?:unknown, persistenceFailure?:unknown }
+  closeFailure?: unknown
 } = { closed: false }
 const port: HostPort = {
   postMessage: (value) => reply(value),
@@ -46,7 +51,7 @@ process.on("disconnect", () => {
 })
 process.on("SIGTERM", () => {
   void stop()
-    .finally(() => {
+    .then(() => {
       if (process.connected) process.disconnect()
     })
     .catch(() => {
@@ -82,17 +87,33 @@ async function dispatch(message: unknown) {
         !isAbsolute(input.resources) ||
         !("headless" in input) ||
         typeof input.headless !== "boolean" ||
-        ("strictRecovery" in input && typeof input.strictRecovery !== "boolean")
+        ("strictRecovery" in input && typeof input.strictRecovery !== "boolean") ||
+        ("acceptanceCleanupPackage" in input && (typeof input.acceptanceCleanupPackage !== "string" ||
+          input.acceptanceCleanupPackage.length > 1024 ||
+          !/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/.test(input.acceptanceCleanupPackage) ||
+          input.acceptanceCleanupPackage.split("/").some(segment => segment === "." || segment === "..")))
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
+      const capture = "acceptanceCapture" in input ? input.acceptanceCapture : undefined
+      if (capture !== undefined && (!capture || typeof capture !== "object"
+          || !["authorization,packagePath", "authorization,harness,packagePath"].includes(Object.keys(capture).sort().join(","))
+          || ("harness" in capture && capture.harness !== "amount-import-type-v1")
+          || !("authorization" in capture) || typeof capture.authorization !== "string" || !/^[a-f0-9]{64}$/.test(capture.authorization)
+          || !("packagePath" in capture) || typeof capture.packagePath !== "string" || capture.packagePath.length > 1024
+          || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(capture.packagePath)
+          || capture.packagePath.split("/").some(x => x === "." || x === "..")))
+        throw Error("LOGINOM_HANDSHAKE_INVALID")
       const options = {
         root: input.root,
+        acceptanceCapture: capture as { authorization: string; packagePath: string; harness?: "amount-import-type-v1" } | undefined,
         resources: input.resources,
         headless: input.headless,
         strictRecovery: "strictRecovery" in input && input.strictRecovery === true,
+        acceptanceCleanupPackage: "acceptanceCleanupPackage" in input ? input.acceptanceCleanupPackage as string : undefined,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
       }
+      state.root=input.root
       state.starting = createLoginomHost(options).then(async (host) => {
         state.host = host
         state.port = loginomHostPort(port, host)
@@ -110,7 +131,7 @@ async function dispatch(message: unknown) {
       void closing.then(
         () => reply({ id: message.id, result: { closed: true } }, true),
         () => {
-          reply({ id: message.id, error: "LOGINOM_HOST_CLEANUP_FAILED" }, true)
+          reply({ id: message.id, error: "LOGINOM_HOST_CLEANUP_FAILED" })
         },
       )
       return
@@ -153,19 +174,58 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
   throw new Error("LOGINOM_METHOD_INVALID")
 }
 
+function closeRejection(value: unknown): unknown {
+  return value instanceof Error ? {kind:"Error",name:value.name,message:value.message,
+    ...("cause" in value?{cause:closeRejection(value.cause)}:{})} :
+    {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
+}
+async function recordClose(stage: string, detail: object) {
+  state.shutdown ??= {stages:[]}
+  state.shutdown.stages.push({stage,...detail})
+  if(state.root) await writeFile(join(state.root,"host-shutdown.json"),JSON.stringify(state.shutdown,null,2)+"\n",{mode:0o600})
+}
 function stop() {
   if (state.stopping) return state.stopping
-  state.closed = true
-  events.emit("close")
   state.stopping = (async () => {
     await state.starting
-    const cancellation = Promise.allSettled([state.host?.interruptAll()])
+    await recordClose("interrupt",{status:"started"})
+    let primary: {stage:string,error:Error} | undefined
+    try {
+    const cancellation = await Promise.allSettled([Promise.resolve().then(()=>state.host?.interruptAll())])
+    const interrupted=cancellation[0]
+    if(interrupted.status==="rejected") primary={stage:"interrupt",error:new Error("LOGINOM_HOST_CLEANUP_FAILED",{cause:interrupted.reason})}
+    await recordClose("interrupt",{status:interrupted.status,
+      ...(interrupted.status==="rejected"?{rejection:closeRejection(interrupted.reason)}:{})})
     await Promise.all([...operations])
+    await recordClose("host_close",{status:"started"})
+    const results = await Promise.allSettled([Promise.resolve().then(()=>state.host?.close())])
+    const closed=results[0]
+    if(closed.status==="rejected" && !primary) primary={stage:"host_close",error:new Error("LOGINOM_HOST_CLEANUP_FAILED",{cause:closed.reason})}
+    await recordClose("host_close",{status:closed.status,
+      ...(closed.status==="rejected"?{rejection:closeRejection(closed.reason)}:{})})
+    const refused=[...cancellation,...results].find(result=>result.status==="rejected")
+    if (refused) throw primary?.error??new Error("LOGINOM_HOST_CLEANUP_FAILED",{cause:refused.reason})
+    // Durable native/transport completion precedes the port's lease release.
+    // "prepared" is not a claim that an outer acknowledgement was delivered.
+    await recordClose("outer_acknowledgement",{status:"prepared"})
     await state.port?.close()
-    const results = await Promise.allSettled([state.host?.close()])
-    if ([...(await cancellation), ...results].some((result) => result.status === "rejected"))
-      throw new Error("LOGINOM_HOST_CLEANUP_FAILED")
+    state.closed = true
+    events.emit("close")
+    } catch(error) {
+      const rejection=primary?.error??error
+      state.closeFailure=rejection
+      const shutdown=state.shutdown??={stages:[]}
+      if(primary) shutdown.primaryFailure={stage:primary.stage,rejection:closeRejection(rejection)}
+      if(primary && error!==rejection) shutdown.persistenceFailure=closeRejection(error)
+      try { await recordClose("refused",{rejection:closeRejection(rejection)}) } catch(persistenceFailure) { shutdown.persistenceFailure=closeRejection(persistenceFailure) }
+      throw rejection
+    }
   })()
+  const attempt = state.stopping
+  void attempt.catch(error => {
+    state.closeFailure=error
+    if (state.stopping === attempt) state.stopping = undefined
+  })
   return state.stopping
 }
 
