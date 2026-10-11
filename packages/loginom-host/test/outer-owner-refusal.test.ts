@@ -9,7 +9,8 @@ for(const refusal of ['refusal','persistence','throw'])test('node-entry retains 
  const process:any={connected:true,send:(v:any,cb:any)=>{events.push(v.error??'reply');cb()},disconnect:()=>{process.connected=false;events.push('disconnect')},on:()=>{}}
  const stop=source.slice(source.indexOf('function stop() {'),source.indexOf('function reply('))
  const reply=source.slice(source.indexOf('function reply(')).replace('value: unknown','value').replace('value as object','value')
- const a=vm.runInNewContext(stop+reply+';({stop,reply})',{state,operations:new Set(),events:{emit:(s:string)=>events.push(s)},process,Promise,Error})
+ const a=vm.runInNewContext(new Bun.Transpiler({loader:'ts'}).transformSync(stop+reply)+';({stop,reply})',{state,operations:new Set(),events:{emit:(s:string)=>events.push(s)},process,Promise,Error,
+   recordClose:async()=>{state.shutdown??={stages:[]}},closeRejection:(value:unknown)=>value})
  const first=a.stop();expect(a.stop()).toBe(first);await expect(first).rejects.toThrow('LOGINOM_HOST_CLEANUP_FAILED')
  a.reply({error:'LOGINOM_HOST_CLEANUP_FAILED'})
  expect(state.closed).not.toBe(true);expect(process.connected).toBe(true);expect(events).toEqual(['LOGINOM_HOST_CLEANUP_FAILED']);expect(runtime.page).toBe(page)
