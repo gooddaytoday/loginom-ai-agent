@@ -46,7 +46,7 @@ process.on("disconnect", () => {
 })
 process.on("SIGTERM", () => {
   void stop()
-    .finally(() => {
+    .then(() => {
       if (process.connected) process.disconnect()
     })
     .catch(() => {
@@ -82,14 +82,28 @@ async function dispatch(message: unknown) {
         !isAbsolute(input.resources) ||
         !("headless" in input) ||
         typeof input.headless !== "boolean" ||
-        ("strictRecovery" in input && typeof input.strictRecovery !== "boolean")
+        ("strictRecovery" in input && typeof input.strictRecovery !== "boolean") ||
+        ("acceptanceCleanupPackage" in input && (typeof input.acceptanceCleanupPackage !== "string" ||
+          input.acceptanceCleanupPackage.length > 1024 ||
+          !/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/.test(input.acceptanceCleanupPackage) ||
+          input.acceptanceCleanupPackage.split("/").some(segment => segment === "." || segment === "..")))
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
+      const capture = "acceptanceCapture" in input ? input.acceptanceCapture : undefined
+      if (capture !== undefined && (!capture || typeof capture !== "object"
+          || Object.keys(capture).sort().join(",") !== "authorization,packagePath"
+          || !("authorization" in capture) || typeof capture.authorization !== "string" || !/^[a-f0-9]{64}$/.test(capture.authorization)
+          || !("packagePath" in capture) || typeof capture.packagePath !== "string" || capture.packagePath.length > 1024
+          || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(capture.packagePath)
+          || capture.packagePath.split("/").some(x => x === "." || x === "..")))
+        throw Error("LOGINOM_HANDSHAKE_INVALID")
       const options = {
         root: input.root,
+        acceptanceCapture: capture as { authorization: string; packagePath: string } | undefined,
         resources: input.resources,
         headless: input.headless,
         strictRecovery: "strictRecovery" in input && input.strictRecovery === true,
+        acceptanceCleanupPackage: "acceptanceCleanupPackage" in input ? input.acceptanceCleanupPackage as string : undefined,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
       }
@@ -110,7 +124,7 @@ async function dispatch(message: unknown) {
       void closing.then(
         () => reply({ id: message.id, result: { closed: true } }, true),
         () => {
-          reply({ id: message.id, error: "LOGINOM_HOST_CLEANUP_FAILED" }, true)
+          reply({ id: message.id, error: "LOGINOM_HOST_CLEANUP_FAILED" })
         },
       )
       return
@@ -155,17 +169,21 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
 
 function stop() {
   if (state.stopping) return state.stopping
-  state.closed = true
-  events.emit("close")
   state.stopping = (async () => {
     await state.starting
     const cancellation = Promise.allSettled([state.host?.interruptAll()])
     await Promise.all([...operations])
-    await state.port?.close()
     const results = await Promise.allSettled([state.host?.close()])
     if ([...(await cancellation), ...results].some((result) => result.status === "rejected"))
       throw new Error("LOGINOM_HOST_CLEANUP_FAILED")
+    await state.port?.close()
+    state.closed = true
+    events.emit("close")
   })()
+  const attempt = state.stopping
+  void attempt.catch(() => {
+    if (state.stopping === attempt) state.stopping = undefined
+  })
   return state.stopping
 }
 
