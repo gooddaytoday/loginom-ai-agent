@@ -22,6 +22,7 @@ export function verifyPreservationColdPin({expected,bindings,bytes}){
  need(p.bytes===167&&p.sha256===sha,'assigned bytes/SHA differ');
  need(p.format&&Object.keys(p.format).sort().join(',')===Object.keys(format).sort().join(',')
   &&Object.keys(format).every(k=>p.format[k]===format[k]),'complete canonical format required');
+ need(!('output_orders' in p),'output_orders forbidden for fixed preservation fixture');
  need(JSON.stringify(p.columns)===JSON.stringify(columns),'complete literal import schema required');
  verifyStaticSourceFixture({bytes,allowed:[p],format});
  return {pin_ready:true,native_source_verified:false,source_path:p.source_path,package_path:bindings.package_path};

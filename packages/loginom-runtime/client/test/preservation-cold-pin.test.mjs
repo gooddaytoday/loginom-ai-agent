@@ -85,3 +85,23 @@ test('full literal source pin composes with unchanged cold helper using labelled
   // Driver-issued provenance is synthetic, not independent native proof.
  }finally{await rm(output,{recursive:true,force:true});}
 });
+
+for(const [name,alternative] of [
+ ['reversed source order',[...importColumns].reverse()],
+ ['Reform output as source',[
+  {name:'RowID',label:'RowID',type:'integer'},
+  {name:'A',label:'Only A',type:'string'},
+  {name:'RenamedB',label:'Same',type:'integer'},
+  {name:'Extra',label:'Unrequested',type:'string'},
+ ]],
+])test('local preservation pin refuses output_orders '+name+' before helper or transport',async()=>{
+ const v=valid();v.expected.static_sources[0].output_orders=[structuredClone(alternative)];
+ assert.deepEqual(v.expected.static_sources[0].columns,importColumns);
+ let helperCalls=0,downstreamLoads=0;
+ await assert.rejects(async()=>{
+  verifyPreservationColdPin(v);
+  helperCalls++;
+  await verifyStaticSourceBytes({load:async()=>{downstreamLoads++;throw Error('unexpected downstream helper load');}});
+ },/PRESERVATION_COLD_PIN:output_orders forbidden/);
+ assert.equal(helperCalls,0);assert.equal(downstreamLoads,0);
+});
