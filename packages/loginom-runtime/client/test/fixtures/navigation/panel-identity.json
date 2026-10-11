@@ -1,0 +1,19 @@
+{
+  "source": "preserved navigation-probe-05 browser cache; Loginom 7.4.2",
+  "panel_tid": "MF;TF-1;NavigationBar;NavPanel",
+  "legacy_panel_tid": "MF;TF-1;NavigationBar;NavigationPanel",
+  "evidence": [
+    {
+      "file": "discovery-cache-3068df11296780fb_0.js",
+      "sha256": "b48e516d530f40589038ff70e5c105d3f2ee6538d11515194090bfeab55a7580"
+    },
+    {
+      "file": "discovery-cache-99d31a013b6fad79_0.js",
+      "sha256": "48426851bb719b86a656e8c892a0f2fe742b5b09ac3adfc279b65387c18015e1"
+    },
+    {
+      "file": "discovery-native-test-identifier.js",
+      "sha256": "8d969038c0201970f9ff57d3ab3dee2a7f3eaf8e06bfd1c221d830911810aceb"
+    }
+  ]
+}
