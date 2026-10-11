@@ -3,6 +3,7 @@ import csv
 import hashlib
 import io
 import json
+import math
 from collections import Counter
 from pathlib import Path
 from legacy_goal_contract import expected_grouping, goal_output
@@ -23,12 +24,25 @@ def compare_output(expected, observed, *, expected_execution_id,
     if observed.get("columns") != expected["columns"]:
         raise ValueError("grouping_oracle_complete_schema")
     names = [c["name"] for c in expected["columns"]]
+    def scalar(value):
+        # Exact numeric values survive JSON's loss of the int/float spelling.
+        # Tag booleans first: Python otherwise equates True with 1.
+        if value is None:
+            return ("null",)
+        if isinstance(value, bool):
+            return ("boolean", value)
+        if isinstance(value, str):
+            return ("string", value)
+        if isinstance(value, int):
+            return ("number", value, 1)
+        if isinstance(value, float) and math.isfinite(value):
+            return ("number", *value.as_integer_ratio())
+        raise ValueError("grouping_oracle_scalar_type")
     def bag(rows):
         if not isinstance(rows, list) or any(not isinstance(r, dict)
                 or set(r) != set(names) for r in rows):
             raise ValueError("grouping_oracle_row_schema")
-        return Counter(json.dumps([r[n] for n in names], ensure_ascii=False,
-                                  allow_nan=False) for r in rows)
+        return Counter(tuple(scalar(r[n]) for n in names) for r in rows)
     if bag(observed.get("rows")) != bag(expected["rows"]):
         raise ValueError("grouping_oracle_group_multiset")
     return True

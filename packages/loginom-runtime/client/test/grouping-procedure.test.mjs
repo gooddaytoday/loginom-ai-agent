@@ -9,8 +9,8 @@ const aggregations=['sum','count','min','max','average','median','mode','standar
 
 // External native-state double; production configureGrouping performs every
 // role/order/factor action and checks all its readbacks against these snapshots.
-function channelFixture(){
- const records=[['Region','string',6,0,0],['Product','string',6,1,0],['Amount','real',7,0,31],['Quantity','integer',7,1,1],['Text','string',0,-1,0]]
+function channelFixture({amountFunctions=2}={}){
+ const records=[['Region','string',6,0,0],['Product','string',6,1,0],['Amount','real',7,0,amountFunctions],['Quantity','integer',7,1,1],['Text','string',0,-1,0]]
   .map(([name,type,disposition,order,functions],i)=>({name,type,disposition,order,functions,label:name,record_id:'r'+i,concat:{separator:',',unique:false}}));
  const options={sort_result:true,cache:false},actions=[];let selected=null,editor=null;
  const section=d=>records.filter(f=>f.disposition===d).sort((a,b)=>a.order-b.order);
@@ -46,13 +46,26 @@ test('complete ordered grouping configuration replaces roles and removes default
  assert.ok(f.actions.some(a=>a.verb==='set_checked'&&a.checked===false&&a.ref==='option:10'),'default first must be disabled');
 });
 
-test('changing one fact preserves every other measure and input identity',async()=>{
- const f=channelFixture(),original=structuredClone(f.records),p={group_by:[field('Region'),field('Product')],measures:[measure('Amount','avg'),measure('Quantity','sum')]};
+test('sum to average enables average and preserves Quantity, options and input identity',async()=>{
+ const f=channelFixture({amountFunctions:1}),original=structuredClone(f.records),p={group_by:[field('Region'),field('Product')],measures:[measure('Amount','avg'),measure('Quantity','sum')]};
  const result=await run(f,p);
  assert.deepEqual(result.configuration.measures.map(x=>[x.name,x.functions]),[['Amount',16],['Quantity',1]]);
  assert.deepEqual(result.configuration.input_fields.map(({disposition,order,functions,...x})=>x),original.map(({disposition,order,functions,...x})=>x));
  assert.ok(f.actions.filter(a=>a.verb==='double_click').every(a=>a.ref==='field:Amount'));
+ assert.deepEqual(result.configuration.options,f.options);
+ assert.ok(f.actions.some(a=>a.ref==='option:4'&&a.checked===true));
+ assert.ok(f.actions.some(a=>a.ref==='option:0'&&a.checked===false));
 });
+
+for(const [fn,bit,index] of [['sum',1,0],['count',2,1],['avg',16,4],['min',4,2],['max',8,3]]){
+ test(`enables initially absent ${fn} and removes the previous function`,async()=>{
+  const f=channelFixture({amountFunctions:fn==='count'?1:2});
+  const result=await run(f,{group_by:[field('Region'),field('Product')],measures:[measure('Amount',fn),measure('Quantity','sum')]});
+  assert.deepEqual(result.configuration.measures.map(x=>[x.name,x.functions]),[['Amount',bit],['Quantity',1]]);
+  assert.ok(f.actions.some(a=>a.verb==='set_checked'&&a.ref===`option:${index}`&&a.checked===true));
+  assert.deepEqual(result.configuration.options,f.options);
+ });
+}
 
 test('invalid field/function pairs, output names and key-as-measure refuse before mutation',async()=>{
  for(const change of [p=>p.measures.push({...p.measures[0],name:'Another'}),p=>p.measures[1].name=p.measures[0].name,p=>p.measures[0].field=field('Region')]){
