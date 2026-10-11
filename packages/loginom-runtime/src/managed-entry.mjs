@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { tmpdir } from "node:os"
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { loginBrowser, checkConnection, loginomAddress } from "./connection-check.mjs"
@@ -32,23 +32,52 @@ const send = (message, disconnect = false) => {
       if (disconnect && process.connected) process.disconnect()
     })
 }
+function closeRejection(value) {
+  return value instanceof Error ? {kind:"Error",name:value.name,message:value.message,
+    ...("cause" in value?{cause:closeRejection(value.cause)}:{})} :
+    {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
+}
+async function recordClose(stage, detail) {
+  state.shutdown ??= {stages:[]}
+  state.shutdown.stages.push({stage,...detail})
+  if(state.session) await writeFile(join(state.session.directory,"managed-shutdown.json"),
+    JSON.stringify(state.shutdown,null,2)+"\n",{mode:0o600})
+}
 function close() {
   if (state.closing) return state.closing
   state.closing = (async () => {
+    await recordClose("drain",{status:"started"})
+    try {
     await Promise.allSettled([...requests])
+    if (state.authenticatedReadiness && !state.browser) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
     if (state.browser && !state.bridge) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
     if (state.bridge) {
+      await recordClose("bridge",{status:"started"})
       const receipt = await state.bridge.close()
-      if (receipt?.browser_transport_closed !== true) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      await recordClose("bridge",{status:"returned",receipt})
+      if (receipt?.browser_transport_closed !== true || receipt.cleanup_complete===false
+          || (state.authenticatedReadiness && receipt.native_logout_confirmed !== true))
+        throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", {cause:receipt})
     }
     state.controller?.abort()
     const results = []
-    for (const handle of [state.client, state.browserServer, state.browser]) {
-      results.push(...(await Promise.allSettled([Promise.resolve().then(() => handle?.close())])))
+    for (const [name,handle] of [["client",state.client],["browser_server",state.browserServer],["browser_context",state.browser]]) {
+      const result=await Promise.allSettled([Promise.resolve().then(() => handle?.close())])
+      results.push(...result)
+      await recordClose(name,{status:result[0].status,
+        ...(result[0].status==="rejected"?{rejection:closeRejection(result[0].reason)}:{})})
     }
     if (state.browserProfile)
       results.push(...(await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])))
-    if (results.some((result) => result.status === "rejected")) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    const refused=results.find(result=>result.status==="rejected")
+    if (refused) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:refused.reason})
+    await recordClose("outer_acknowledgement",{status:"allowed"})
+    } catch(error) {
+      state.closeFailure=error
+      try { await recordClose("refused",{rejection:closeRejection(error)}) }
+      catch(persistenceFailure) { state.shutdown.persistenceFailure=closeRejection(persistenceFailure) }
+      throw error
+    }
   })()
   state.closing.catch(error => { state.closeFailure = error; state.closing = undefined })
   return state.closing
@@ -149,6 +178,19 @@ async function handle(message) {
         managed: { directory, browserPath: resources.browserPath, browserRoot: resources.browserRoot },
       })
       state.session = session
+      // Bind only the document owned by this successful private login. This is
+      // not workspace preparation and confers no package-close authority.
+      const documentId=randomUUID()
+      state.authenticatedReadiness=await authenticated.context.pages()[0].evaluate(o=>{
+        const app=globalThis.bg?.app,m=app?.Application?.FInstance?.FMainForm?.FMapTree;
+        if(location.origin!==o.origin||app?.Version!=='7.4.2'||m?.FServerConnection?.UserName!==o.account
+            ||m.FServerConnection.Connected!==true||globalThis.__loginomDockReadinessV1)
+          throw Error('LOGINOM_READINESS_IDENTITY_REQUIRED');
+        globalThis.__loginomDockReadinessV1={document,documentId:o.documentId,sessionId:o.sessionId,
+          account:o.account,loginomBuild:app.Version};
+        return {documentId:o.documentId,account:o.account,loginomBuild:app.Version};
+      },{documentId,sessionId:session.metadata.sessionId,account:input.connection.username,
+        origin:new URL(config.loginomUrl).origin})
       const { Client } = require("@modelcontextprotocol/sdk/client/index.js")
       const { InMemoryTransport } = require("@modelcontextprotocol/sdk/inMemory.js")
       const { createConnection } = require("@playwright/mcp")
@@ -159,6 +201,7 @@ async function handle(message) {
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+        authenticatedReadiness:state.authenticatedReadiness,
         acceptanceCapture: acceptanceCapture ? { binding: Object.freeze({...acceptanceCapture, session:session.metadata.sessionId}),
           harness: captureHarness } : undefined })
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
@@ -217,6 +260,7 @@ async function handle(message) {
       return
     }
     if (message.operation === "interrupt") {
+      await recordClose("interrupt",{status:"received"})
       state.controller?.abort()
       send({ id: message.id, result: { interrupted: true } })
       return
