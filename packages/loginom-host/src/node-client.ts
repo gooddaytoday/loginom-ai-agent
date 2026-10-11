@@ -1,10 +1,12 @@
 import { fork } from "node:child_process"
-import { isAbsolute } from "node:path"
+import { isAbsolute, join, resolve } from "node:path"
+import { readFile, realpath } from "node:fs/promises"
+import { createHash, randomBytes } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { runtimeEnvironment } from "./supervisor"
 import { transport, type Port } from "./transport"
 
-export async function launchNodeHost(input: {
+type NodeHostInput = {
   node: string
   entry: string
   root: string
@@ -13,7 +15,34 @@ export async function launchNodeHost(input: {
   environment?: NodeJS.ProcessEnv
   strictRecovery?: boolean
   acceptanceCleanupPackage?: string
-}) {
+}
+const diagnostics = new WeakMap<object, { authorization: string; packagePath: string }>()
+
+// Closed diagnostic launcher. Resource paths and harness are fixed; callers
+// cannot supply executable code, a module path or a transport capability.
+export async function launchCalculatorDiagnostic(input: NodeHostInput & { packagePath: string }) {
+  if (!/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(input.packagePath)
+      || input.packagePath.split("/").some(x => x === "." || x === ".."))
+    throw Error("LOGINOM_HANDSHAKE_INVALID")
+  const manifest = JSON.parse(await readFile(join(input.resources, "resource-manifest.json"), "utf8"))
+  for (const [path, actual] of [["bin/node", input.node], ["host/node-host.mjs", input.entry],
+    ["runtime/acceptance/calculator-grouped-before-done-v1.mjs", join(input.resources, "runtime/acceptance/calculator-grouped-before-done-v1.mjs")]]) {
+    const item = manifest.files?.find((file: { path: string }) => file.path === path)
+    if (!item || !/^[a-f0-9]{64}$/.test(item.sha256) || await realpath(actual!) !== resolve(input.resources, path!)
+        || createHash("sha256").update(await readFile(actual!)).digest("hex") !== item.sha256)
+      throw Error("LOGINOM_HANDSHAKE_INVALID")
+  }
+  const grant = { authorization: randomBytes(32).toString("hex"), packagePath: input.packagePath }
+  const options = { ...input }
+  diagnostics.set(options, grant)
+  const host = await launchNodeHost(options)
+  return { ...host, capture: (run: string) => host.request("acceptance.capture", { run, authorization: grant.authorization }) }
+}
+
+export async function launchNodeHost(input: NodeHostInput) {
+  // Ordinary product callers cannot turn structural fields into authority.
+  if ("acceptanceCapture" in input) throw Error("LOGINOM_HANDSHAKE_INVALID")
+  const diagnostic = diagnostics.get(input)
   if (![input.node, input.entry, input.root, input.resources].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const environment = runtimeEnvironment(input.environment ?? process.env)
@@ -67,6 +96,7 @@ export async function launchNodeHost(input: {
       "start",
       {
         protocol: 1,
+        ...(diagnostic ? { acceptanceCapture: diagnostic } : {}),
         root: input.root,
         resources: input.resources,
         headless: input.headless,

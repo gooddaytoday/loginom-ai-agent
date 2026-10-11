@@ -84,7 +84,7 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session, { browserTransport: managedBrowserTransport } = {}) {
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport, acceptanceCapture } = {}) {
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
   const userWorkflows = createUserWorkflowBindings();
@@ -129,6 +129,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   const managedCleanup = userProfile && config.mode === 'executor-replay';
   let managedSave, cleanupRefused = false;
   let confirmedCleanup, cleanupReceiptWritten = false;
+  let captureConsumed = false, captureInFlight, captureUnknown = false, captureRejected = false, captureRejection;
   let closing, shutdownStarted = false;
   const skill = createSkillLoader({ directory: session.directory, transport: skillTransport(config) });
   let clipboardUncertain = false;
@@ -196,7 +197,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       if (shutdownStarted) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
       const owner = catalog.routes.get(request.params.name);
       if (!owner) throw new McpError(ErrorCode.InvalidParams, 'Unknown Dock tool');
-      if (cleanupRefused && owner !== 'remote' && !['dock_diagnostics','dock_workspace_observe',
+      if ((cleanupRefused || captureInFlight) && owner !== 'remote' && !['dock_diagnostics','dock_workspace_observe',
         'dock_operation_inspect','dock_node_status','dock_node_wait','tool_search','tool_describe'].includes(request.params.name))
         throw new McpError(ErrorCode.InvalidRequest, 'Package cleanup is unconfirmed; only read-only diagnosis is allowed');
       if (request.params.name === 'dock_diagnostics') {
@@ -444,8 +445,58 @@ export async function createBridge(config, session, { browserTransport: managedB
         return { isError: true, content: [{ type: 'text', text: message }] };
       }
     });
-    return { server, catalog, hasActiveWork: () => !clipboardUncertain && !!actionRuntime?.hasActiveWork(),
-      hasUnsettledWork: () => cleanupRefused || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0, close() {
+    async function captureAcceptance() {
+      const binding = acceptanceCapture?.binding;
+      if (!binding || typeof acceptanceCapture.harness !== 'function' || captureConsumed || shutdownStarted || cleanupRefused)
+        throw Error('LOGINOM_CAPTURE_UNAVAILABLE');
+      const assertBound = () => {
+        actionRuntime.assertPreparationAllowed();
+        const prepared=session.metadata.workspacePreparation;
+        if (clipboardUncertain || heldLeases.size || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork()
+            || Date.now() >= binding.expires || session.metadata.workspaceReady !== true
+            || binding.session !== session.metadata.sessionId || !prepared?.attempted
+            || prepared.state.loginom_account !== binding.account || !managedSave
+            || managedSave.sessionId !== binding.session || managedSave.documentId !== prepared.state.document_id
+            || managedSave.tabTid !== prepared.state.workflow_ref.tab_tid || managedSave.account !== binding.account
+            || managedSave.packagePath !== binding.packagePath || !savedPackages.has(binding.packagePath)
+            || managedSave.loginomBuild !== session.metadata.targetIdentity?.loginom_build)
+          throw Error('LOGINOM_CAPTURE_IDENTITY_REFUSED');
+      };
+      assertBound();
+      captureConsumed=true;
+      captureInFlight=browserGate(async () => {
+        assertBound();
+        const identity=Object.freeze({session_id:binding.session, document_id:managedSave.documentId,
+          tab_tid:managedSave.tabTid, account:binding.account, package_path:binding.packagePath,
+          loginom_build:managedSave.loginomBuild});
+        // Only the fixed verified resource receives this private Page transport.
+        // It is never supplied by IPC, the tool catalogue or the model.
+        captureUnknown=true;
+        const receipt=await acceptanceCapture.harness({binding, identity, browser, record:recordExecution});
+        assertBound();
+        if (!receipt || receipt.settings_applied !== false || receipt.cancel_verified !== true
+            || Object.keys(identity).some(key => receipt[key] !== identity[key]))
+          throw Error('LOGINOM_CAPTURE_CANCEL_UNCONFIRMED');
+        await writeFile(join(session.directory,'acceptance-capture.json'),JSON.stringify({binding,identity,receipt},null,2)+'\n',{mode:0o600});
+        await recordExecution({event:'acceptance_capture',binding,identity,receipt});
+        captureUnknown=false;
+        return receipt;
+      });
+      try {
+        const receipt=await captureInFlight;
+        captureInFlight=undefined;
+        const closed=await closeBridge();
+        const cleanup=JSON.parse(await readFile(join(session.directory,'package-cleanup.json'),'utf8'));
+        if (closed.browser_transport_closed !== true || cleanup.status !== 'SUCCEEDED'
+            || cleanup.package_closed !== true || cleanup.logged_out !== true)
+          throw Error('LOGINOM_CAPTURE_CLEANUP_UNCONFIRMED');
+        return {receipt,cleanup,cleanupComplete:true};
+      } catch (error) { cleanupRefused=true; captureRejected=true; captureRejection=error; throw error }
+      finally { captureInFlight=undefined }
+    }
+    function closeBridge() {
+      if (captureRejected && captureUnknown) return Promise.reject(captureRejection);
+      if (captureInFlight) return captureInFlight.then(() => closeBridge());
       shutdownStarted = true;
       closing ??= (async () => {
         if (config.acceptanceCleanupPackage || managedCleanup) {
@@ -529,7 +580,11 @@ export async function createBridge(config, session, { browserTransport: managedB
         return result;
       }, error => { if(managedCleanup)cleanupRefused=true; closing = undefined; shutdownStarted = false; throw error; });
       return closing;
-    } };
+    }
+    return {server,catalog,captureAcceptance,
+      hasActiveWork:()=>!!captureInFlight || (!clipboardUncertain && !!actionRuntime?.hasActiveWork()),
+      hasUnsettledWork:()=>cleanupRefused || !!captureInFlight || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size>0,
+      close:closeBridge};
   } catch (error) {
     await closeClients();
     throw error;
