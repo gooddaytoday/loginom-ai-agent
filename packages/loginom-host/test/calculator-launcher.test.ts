@@ -39,7 +39,7 @@ test('fixed diagnostic launcher refuses missing reviewed harness before host adm
     packagePath:'/user/draft.lgp'})).rejects.toThrow('LOGINOM_HANDSHAKE_INVALID')
  }finally{await rm(root,{recursive:true,force:true})}
 })
-for(const path of ['/foreign/../draft.lgp','/user/nested/draft.lgp','relative.lgp','/user/draft.js'])
+for(const path of ['/foreign/../draft.lgp','/user/nested/draft.lgp','relative.lgp','/user/draft.js','/user/'+ 'a'.repeat(1024)+'.lgp'])
  test('diagnostic launcher rejects a noncanonical personal destination '+path,async()=>{
   await expect(launchCalculatorDiagnostic({node:'/missing',entry:'/missing',root:'/missing',resources:'/missing',headless:true,
     packagePath:path})).rejects.toThrow('LOGINOM_HANDSHAKE_INVALID')
