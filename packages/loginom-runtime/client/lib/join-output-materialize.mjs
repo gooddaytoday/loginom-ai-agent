@@ -61,12 +61,17 @@ export async function materializeJoinDefaultOutput(channel,initial,orderedIds){
    need(es.length===1,'Join single unlink control unavailable');return {verb:'click',ref:es[0].ref};}}));
   const unbound=structuredClone(baseline);unbound.target_fields.find(t=>t.record_id===pair.targetId).source=null;
   state=await channel.observe({condition:'one settled unbound Join pair',readMappings:true,ready:s=>bound(s)&&mappingSame(s.node_mapping,unbound)&&settled(s,pair.sourceId,pair.targetId,true)?.link.source_display_name===null&&settled(s,pair.sourceId,pair.targetId,true)?.link.source_data_type===null});
-  const vacant=proof(state,pair.sourceId,pair.targetId,true);
-  need(vacant.link.source_display_name===null&&vacant.link.source_data_type===null,'Join unbound source hints are stale');
-  for(const p of planned){const records=vacant.link.inventory?.records;need(Array.isArray(records)&&records.length===2,'Join unbound inventory unavailable');for(const [i,id,expected] of [[0,p.sourceId,p.original.source],[1,p.targetId,{...p.original.target,OriginType:completed.has(p.targetId)?1:p.original.target.OriginType}]]){const rows=records[i].filter(r=>r.record_id===id);need(rows.length===1&&same(rows[0].definition,expected),'Join unbound retained definition changed');}}
-  need(same(vacant.link.source,pair.original.source)&&same(vacant.link.target,pair.original.target), 'Join unlink changed definitions');
-  receipts.push(await channel.perform({condition:'restore exact settled Join pair',initialObservation:state,ready:s=>bound(s)&&mappingSame(s.node_mapping,unbound),identity:()=>({owner,pair}),resolve:s=>{
-   const p=proof(s,pair.sourceId,pair.targetId,true);need(p.source.allowed_actions.includes('drag')&&p.target.allowed_actions.includes('drag'),'Join reconnect unavailable');
+  const vacantPreflight=snapshot=>{
+   need(bound(snapshot)&&mappingSame(snapshot.node_mapping,unbound),'Join unbound mapping changed');
+   const vacant=proof(snapshot,pair.sourceId,pair.targetId,true);
+   need(vacant.link.source_display_name===null&&vacant.link.source_data_type===null,'Join unbound source hints are stale');
+   for(const p of planned){const records=vacant.link.inventory?.records;need(Array.isArray(records)&&records.length===2,'Join unbound inventory unavailable');for(const [i,id,expected] of [[0,p.sourceId,p.original.source],[1,p.targetId,{...p.original.target,OriginType:completed.has(p.targetId)?1:p.original.target.OriginType}]]){const rows=records[i].filter(r=>r.record_id===id);need(rows.length===1&&same(rows[0].definition,expected),'Join unbound retained definition changed');}}
+   need(same(vacant.link.source,pair.original.source)&&same(vacant.link.target,pair.original.target), 'Join unlink changed definitions');
+   return vacant;
+  };
+  vacantPreflight(state);
+  receipts.push(await channel.perform({condition:'restore exact settled Join pair',initialObservation:state,ready:s=>{try{vacantPreflight(s);return true;}catch{return false;}},identity:()=>({owner,pair}),resolve:s=>{
+   const p=vacantPreflight(s);need(p.source.allowed_actions.includes('drag')&&p.target.allowed_actions.includes('drag'),'Join reconnect unavailable');
    return {verb:'drag',source_ref:p.source.ref,target_ref:p.target.ref};}}));
   state=await channel.observe({condition:'complete restored Join mapping',readMappings:true,ready:s=>unchanged(s)&&settled(s,pair.sourceId,pair.targetId)?.link.target.OriginType===1});
   const restored=pairProof(state);need(same(restored.link.source,pair.original.source)&&same(restored.link.target,{...pair.original.target,OriginType:1}), 'Join reconnect changed definition or origin');completed.add(pair.targetId);definitions(state);
