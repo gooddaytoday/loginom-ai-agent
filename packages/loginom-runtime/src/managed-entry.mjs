@@ -50,7 +50,12 @@ function close() {
     let primary
     try {
     await Promise.allSettled([...requests])
-    if (state.authenticatedReadiness && !state.browser) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    if(state.startupOwner && !state.bridge) {
+      const receipt=await state.startupOwner.close()
+      if(receipt?.cleanup_complete!==true) throw new Error('LOGINOM_RUNTIME_CLEANUP_FAILED',{cause:receipt})
+      if(state.startupOwner.contextClosed) state.browser=undefined
+    }
+    if (state.authenticatedReadiness && !state.browser && !state.startupOwner?.closed) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
     if (state.browser && !state.bridge) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
     if (state.bridge) {
       await recordClose("bridge",{status:"started"})
@@ -142,7 +147,9 @@ async function handle(message) {
       const browserProfile =
         process.platform === "win32" ? await mkdtemp(join(tmpdir(), "lb")) : join(directory, "browser-profile")
       state.browserProfile = process.platform === "win32" ? browserProfile : undefined
+      state.startupOwner={directory,generation:input.generation,chat:input.chat}
       const login = {
+        owner:state.startupOwner,
         browserPath: resources.browserPath,
         profile: browserProfile,
         candidate: input.connection,
@@ -291,6 +298,8 @@ async function handle(message) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
     send({ id: message.id, error: code })
     if (message.operation === "start") {
+      state.startupFailure=error
+      if(state.startupOwner?.context) state.browser=state.startupOwner.context
       // Clean up immediately, but keep IPC until the owner requests an acknowledged close.
       // close() retains a rejection so that the later close request reports cleanup failure.
       setImmediate(() => {
