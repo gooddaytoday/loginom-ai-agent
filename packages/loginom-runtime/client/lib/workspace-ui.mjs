@@ -2773,6 +2773,30 @@ function readRenderedInputMapping(observation) {
       if(!dom||!d.FmxGraph.container.contains(dom)||getTid(dom)!==workflow.prefix+';Graph;'+getTid(dom)?.split(';Graph;')[1])return null;
       return {node_id:preparedNodeId,node_ref:refOf(dom),mode:execute?'execute':'deactivate',source:'native_selected_graph_node'};
     };
+    // Close controls belong to the one current native dialog, never to a
+    // message-box prefix alone. Keep deactivation and other dialog gates separate.
+    const closeDialogControls=(()=>{
+      if(dialogElements.length!==1)return null;
+      const dialog=dialogElements[0],cmp=globalThis.Ext?.getCmp(dialog.id);
+      if(!cmp||cmp.el?.dom!==dialog||cmp.hidden!==false||cmp.disabled===true)return null;
+      const controls={};let prefix,toolbar;
+      for(const name of ['yes','no']){
+        const matches=all.filter(e=>dialog.contains(e)&&/^(msgbox(?:-\d+)?);tlb;(yes|no)$/.test(getTid(e)??'')&&(getTid(e)??'').endsWith(';'+name));
+        if(matches.length!==1)return null;
+        const element=matches[0],parts=/^(msgbox(?:-\d+)?);tlb;(yes|no)$/.exec(getTid(element));
+        if(prefix&&prefix!==parts[1]||!visible(element)||!enabled(element)||sensitive(element))return null;
+        prefix=parts[1];
+        const button=globalThis.Ext?.getCmp(element.id),bar=button?.ownerCt;
+        if(!button||button.el?.dom!==element||button.hidden!==false||button.disabled===true
+          ||!bar||bar.el?.dom?.contains(element)!==true||getTid(bar.el.dom)!==prefix+';tlb'
+          ||bar.ownerCt!==cmp||!dialog.contains(bar.el.dom)||toolbar&&toolbar!==bar)return null;
+        toolbar=bar;
+        if((tids.get(getTid(element))??[]).length!==1)return null;
+        controls[name]={ref:refOf(element),tid:getTid(element),native_ref:refOf(button)};
+      }
+      if(controls.yes.ref===controls.no.ref||controls.yes.native_ref===controls.no.native_ref)return null;
+      return {dialog_ref:refOf(dialog),dialog_native_ref:refOf(cmp),toolbar_native_ref:refOf(toolbar),controls};
+    })();
     // Cancellation may own an overflowed port without making mapping or
     // navigation ready. Bind hidden captions to the current native opening.
     const inputCancellationOwner=(()=>{
@@ -2801,8 +2825,7 @@ function readRenderedInputMapping(observation) {
         ||roots.length!==1||model.FView?.el?.dom!==roots[0])return null;
       const panels=tids.get(workflow.prefix+';NavigationBar;NavigationPanel')??[];
       if(panels.length!==1||!visible(panels[0]))return null;
-      if(['yes','no'].some(name=>{const buttons=tids.get('msgbox;tlb;'+name)??[];
-        return buttons.length!==1||globalThis.Ext?.getCmp(buttons[0].id)?.el?.dom!==buttons[0];}))return null;
+      if(!closeDialogControls)return null;
       const panel=panels[0],prefix=workflow.prefix+';cnrNaviMode;b.s_';
       const crumbs=all.filter(e=>panel.contains(e)&&(getTid(e)??'').startsWith(prefix));
       if(crumbs.length!==9||crumbs.some(e=>sensitive(e)))return null;
@@ -2876,15 +2899,27 @@ function readRenderedInputMapping(observation) {
       const inputCloseOwner=preparedInputPort?.direction==='input'&&Number.isInteger(preparedInputPort.port)&&preparedInputPort.port>=0&&preparedInputPort.port<100
         &&wizard.stage==='input_mapping'
         ? inputCancellationOwner:null;
-      const outputCloseOwner=preparedOutputPort?.direction==='output'&&Number.isInteger(preparedOutputPort.port)&&preparedOutputPort.port>=0&&preparedOutputPort.port<100
-        &&wizard.stage==='output_mapping'&&wizard.port_context?.status==='observed'&&wizard.port_context.kind==='output_data'
-        &&wizard.port_context.node?.ref&&wizard.port_context.port?.ref ? wizard.port_context:null;
-      const closeConfirmation=tid==='msgbox;tlb;yes' && wizard.status==='observed'
-        && (wizard.stage==='input_mapping'?inputCloseOwner:wizard.owner_context?.status==='observed'||outputCloseOwner)
+      const outputCloseOwner=(()=>{
+        if(preparedOutputPort?.direction!=='output'||wizard.stage!=='output_mapping'
+          ||wizard.port_context?.status!=='observed'||wizard.port_context.kind!=='output_data'
+          ||!wizard.port_context.node?.ref||!wizard.port_context.port?.ref)return null;
+        const p=globalThis.__loginomDockPreparationV1,card=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
+        const model=card?.Controller?.FController;
+        const openings=[...(p?.outputPortOpenReceipts?.values()??[])].filter(o=>o.phase==='verified'&&o.wizard===model),o=openings[0];
+        if(openings.length!==1||p.document!==document||p.id!==o.document_id||p.outputPortOpenReceipts.get(o.operation_id)!==o
+          ||o.operation_id!==preparedOutputPort.opening_operation_id||o.node_id!==preparedNodeId
+          ||o.direction!=='output'||o.portIndex!==preparedOutputPort.port||o.nativeIndex!==preparedOutputPort.native_index||o.portGuid!==preparedOutputPort.port_guid
+          ||o.node?.FGuid!==preparedNodeId||o.node.data!==o.nodeData||o.port?.data!==o.portData||o.port?.parent!==o.node||o.port?.FGuid!==o.portGuid
+          ||o.portTree?.FIndex!==o.nativeIndex||o.enginePort!==model?.FModelEnginePort
+          ||model.FView?.el?.dom!== (tids.get(wizard.root_tid)??[])[0])return null;
+        return wizard.port_context;
+      })();
+      const closeConfirmation=closeDialogControls?.controls.yes.ref===refOf(element) && wizard.status==='observed'
+        && (wizard.stage==='input_mapping'?inputCloseOwner:preparedOutputPort?.direction==='output'?outputCloseOwner:wizard.owner_context?.status==='observed')
         && dialogs.length===1 && dialogs[0].ref===dialogRef(element) && dialogs[0].title==='Подтвердить'
         && dialogs[0].text==='Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'
         ? {root_ref:wizard.root_ref,root_tid:wizard.root_tid,stage:wizard.stage,
-          owner:inputCloseOwner??outputCloseOwner??wizard.owner_context,...(inputCloseOwner?{input_port:preparedInputPort}:outputCloseOwner?{output_port:preparedOutputPort}:{}),dialog_ref:dialogs[0].ref}:null;
+          owner:inputCloseOwner??outputCloseOwner??wizard.owner_context,...(inputCloseOwner?{input_port:preparedInputPort}:outputCloseOwner?{output_port:preparedOutputPort}:{}),...closeDialogControls}:null;
       const deactivationConfirmation=tid==='msgbox;tlb;yes' && wizard.status==='absent' && pendingWizardOwner.status==='observed'
         && dialogs.length===1 && dialogs[0].ref===dialogRef(element)
         && dialogs[0].title==='Loginom '+(globalThis.bg?.app?.Version??'')
