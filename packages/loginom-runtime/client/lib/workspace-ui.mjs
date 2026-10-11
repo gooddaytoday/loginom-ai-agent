@@ -2336,6 +2336,15 @@ function readRenderedInputMapping(observation) {
     // Output Links refs require the current opening and complete cached native
     // record/Ext/DOM aliases. They do not authorize a hidden toolbar control.
     const outputLinksUnsettled=new Set();
+    // Reserve current Links cells before any native proof can fail. Only the
+    // complete proof below may release them; a failed proof must not downgrade
+    // a binding cell to manual/generic click from an earlier observer branch.
+    if(!discoverRoots&&wizard.stage==='output_mapping'&&preparedOutputPort?.direction==='output'){
+      const base=wizard.root_tid+';DerivedDataSourceOutputSocketWizard;';
+      if((tids.get(base+'rbLinks')??[]).some(e=>e.classList.contains('x-form-cb-checked')))
+        for(const [tid,elements] of tids)if(tid.startsWith(base+'colSourceName_')||tid.startsWith(base+'colDisplayName_'))
+          for(const e of elements)outputLinksUnsettled.add(e);
+    }
     if(!discoverRoots&&wizard.stage==='output_mapping'&&preparedOutputPort?.direction==='output')try{
       const p=globalThis.__loginomDockPreparationV1,card=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab();
       const model=card?.Controller?.FController,entries=[...(p?.outputPortOpenReceipts?.entries()??[])];
@@ -2391,9 +2400,6 @@ function readRenderedInputMapping(observation) {
       const settlement={controller_ref:refOf(controller),draw_ref:refOf(d),
         FLinksUpdateMode:controller.FLinksUpdateMode,FRelationRefreshMode:controller.FRelationRefreshMode,FWaitingRedraw:d.FWaitingRedraw};
       const settled=settlement.FLinksUpdateMode===false&&settlement.FRelationRefreshMode===false&&settlement.FWaitingRedraw===false;
-      if(!settled)for(const [i,records] of inventories.entries())for(const record of records)
-        for(const e of tids.get(base+(i===0?'colSourceName_':'colDisplayName_')+record.data.Name)??[])
-          if(grids[i][0].contains(e))outputLinksUnsettled.add(e);
       requireLink(settled,'output_link_settlement');
       requireLink(d.FSelectedLinks&&typeof d.FSelectedLinks==='object'&&!Array.isArray(d.FSelectedLinks),'output_link_selection_inventory');
       const pairs=Object.entries(d.FLinks??{}),selected=Object.entries(d.FSelectedLinks);
@@ -2466,6 +2472,7 @@ function readRenderedInputMapping(observation) {
         }
       }
       for(const [element,metadata] of staged){
+        outputLinksUnsettled.delete(element);
         dateTimeCells.set(refOf(element),metadata);
         if(metadata.role==='output_relation_remove'&&!candidates.includes(element))candidates.push(element);
       }
