@@ -128,6 +128,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   // settled save on this bridge, never from a caller-supplied cleanup path.
   const managedCleanup = userProfile && config.mode === 'executor-replay';
   let managedSave, cleanupRefused = false;
+  let confirmedCleanup, cleanupReceiptWritten = false;
   let closing, shutdownStarted = false;
   const skill = createSkillLoader({ directory: session.directory, transport: skillTransport(config) });
   let clipboardUncertain = false;
@@ -451,7 +452,8 @@ export async function createBridge(config, session, { browserTransport: managedB
           if (managedCleanup) cleanupRefused=true;
           let cleanup;
           const prepared = session.metadata.workspacePreparation;
-          if (managedCleanup && (clipboardUncertain || heldLeases.size || actionRuntime?.hasUnsettledWork?.()))
+          if (confirmedCleanup) cleanup=confirmedCleanup;
+          else if (managedCleanup && (clipboardUncertain || heldLeases.size || actionRuntime?.hasUnsettledWork?.()))
             cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'};
           else if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
           else {
@@ -477,7 +479,16 @@ export async function createBridge(config, session, { browserTransport: managedB
                   packagePath:path, loginomUrl:config.loginomUrl,
                   loginomBuild:session.metadata.targetIdentity.loginom_build,
                 };
-                const response = await browser.callTool({name:'browser_run_code_unsafe', arguments:{code:makePackageCleanupCode(cleanupOptions)}}, undefined, {timeout:30000});
+                // Keep the shared helper unchanged. Add the current native tab
+                // guard inside its existing evaluate, immediately before ClosePackage.
+                const anchor='const state = globalThis.__loginomDockCleanupV1 =';
+                const original=makePackageCleanupCode(cleanupOptions);
+                if (!original.includes(anchor)) throw Error('Cleanup guard insertion unavailable');
+                const code=original.replace(anchor, `
+                  const tabs=[...document.querySelectorAll('[data-tid]')].filter(el=>el.getAttribute('data-tid')===o.tabTid);
+                  if(tabs.length!==1 || !visible(tabs[0])) return {reason:'CURRENT_TAB_CHANGED'};
+                  ${anchor}`);
+                const response = await browser.callTool({name:'browser_run_code_unsafe', arguments:{code}}, undefined, {timeout:30000});
                 return parsePackageCleanupResult(response, cleanupOptions);
               });
             } catch { cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'}; }
@@ -485,7 +496,13 @@ export async function createBridge(config, session, { browserTransport: managedB
           cleanup = {...cleanup, session_id:session.metadata.sessionId,
             save_operation_id:savedPackages.get(config.acceptanceCleanupPackage ?? managedSave?.packagePath) ?? null};
           if (managedCleanup && !['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) cleanupRefused=true;
-          await writeFile(join(session.directory,'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
+          // Preserve the verified native result across persistence failures on
+          // this same foreground owner. No cache is minted for unknown responses.
+          if (cleanup.status==='SUCCEEDED' && !confirmedCleanup) confirmedCleanup=Object.freeze(cleanup);
+          if (!confirmedCleanup || !cleanupReceiptWritten) {
+            await writeFile(join(session.directory,'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
+            if (confirmedCleanup) cleanupReceiptWritten=true;
+          }
           await recordExecution({event:'isolated_package_cleanup', cleanup});
           if (managedCleanup && ['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) cleanupRefused=false;
           if (!['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) return {
