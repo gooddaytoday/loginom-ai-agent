@@ -24,7 +24,11 @@ export async function createLoginomHost(options: {
   const resources = options.resources
   const environment = { ...(options.environment ?? process.env) }
   const inputs = inputStore(join(root, "inputs"))
-  const journal = await recoveryStore(join(root, "recovery"), { strict: options.strictRecovery === true })
+  // A closed diagnostic capture retains uncertainty durably even when ordinary
+  // model calls use advisory recovery. Caller settings cannot weaken admission.
+  const journal = await recoveryStore(join(root, "recovery"), {
+    strict: options.acceptanceCapture !== undefined || options.strictRecovery === true,
+  })
   const generations = new Map<
     number,
     { connection: ActiveConnection; children: Map<string, Promise<Awaited<ReturnType<typeof supervise>>>> }

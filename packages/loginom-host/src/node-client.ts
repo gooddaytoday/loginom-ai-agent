@@ -25,10 +25,23 @@ export async function launchCalculatorDiagnostic(input: NodeHostInput & { packag
       || input.packagePath.split("/").some(x => x === "." || x === ".."))
     throw Error("LOGINOM_HANDSHAKE_INVALID")
   const manifest = JSON.parse(await readFile(join(input.resources, "resource-manifest.json"), "utf8"))
-  for (const [path, actual] of [["bin/node", input.node], ["host/node-host.mjs", input.entry],
+  // The post-staging Node host belongs to the product inventory, not the
+  // runtime resource inventory. Use its canonical receiving product location.
+  const product = resolve(input.resources, "../..")
+  if (await realpath(input.resources) !== join(product, "resources/loginom"))
+    throw Error("LOGINOM_HANDSHAKE_INVALID")
+  const cli = JSON.parse(await readFile(join(product, "cli-manifest.json"), "utf8"))
+  const hosts = cli.files?.filter((file: { path: string }) => file.path === "resources/loginom/host/node-host.mjs")
+  const hostItem = hosts?.[0]
+  if (cli.format !== "loginom-cli-artifact-v1" || hosts?.length !== 1 || !/^[a-f0-9]{64}$/.test(hostItem.sha256)
+      || await realpath(input.entry) !== join(product, "resources/loginom/host/node-host.mjs")
+      || createHash("sha256").update(await readFile(input.entry)).digest("hex") !== hostItem.sha256)
+    throw Error("LOGINOM_HANDSHAKE_INVALID")
+  for (const [path, actual] of [["bin/node", input.node],
     ["runtime/src/acceptance/calculator-grouped-before-done-v1.mjs", join(input.resources, "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs")]]) {
-    const item = manifest.files?.find((file: { path: string }) => file.path === path)
-    if (!item || !/^[a-f0-9]{64}$/.test(item.sha256) || await realpath(actual!) !== resolve(input.resources, path!)
+    const items = manifest.files?.filter((file: { path: string }) => file.path === path)
+    const item = items?.[0]
+    if (items?.length !== 1 || !/^[a-f0-9]{64}$/.test(item.sha256) || await realpath(actual!) !== resolve(input.resources, path!)
         || createHash("sha256").update(await readFile(actual!)).digest("hex") !== item.sha256)
       throw Error("LOGINOM_HANDSHAKE_INVALID")
   }
