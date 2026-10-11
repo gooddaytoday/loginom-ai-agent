@@ -190,3 +190,46 @@ for(const scenario of ['remote-error','remote-zero','remote-false','remote-empty
    }
   }finally{a.close=originalClose;await originalClose();await browserServer.close();await rm(directory,{recursive:true,force:true})}
  });
+
+// Linked production bridge -> managed close. Real SDK and disk, labelled Page,
+// remote client and outer browser/owner doubles. No native/live resource.
+for(const rejected of [0,false,'',null,undefined,Error('linked remote refusal')])
+for(const diagnosticFails of [false,true])
+ test('managed retains bridge refusal receipt '+String(rejected)+' when stage write fails='+diagnosticFails,async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'review-linked-refusal-'));
+  const f=current={events:[],unsettled:false,remoteRejected:true,remoteRejection:rejected,logout:0};
+  const m={FServerConnection:{Connected:true,UserName:'user'},PackageNodes:{Count:0},HasRunningNodes:()=>false};
+  const document={querySelectorAll:()=>[]};
+  const context=vm.createContext({document,location:{origin:'https://loginom.invalid'},
+    bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:m}}}}}});
+  context.__loginomDockReadinessV1={document,documentId:'original-document',sessionId:'original-session',account:'user',loginomBuild:'7.4.2'};
+  const page={evaluate:async(fn,arg)=>vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context),
+    locator(selector){const avatar=selector.includes('btnAvatar'),logout=selector.includes('btnLogOut');
+      return {locator(){return this},innerText:async()=>m.FServerConnection.UserName,
+        async click(){if(logout){f.logout++;m.FServerConnection.Connected=false}},async waitFor(){},
+        async isVisible(){return avatar&&m.FServerConnection.Connected}}}};
+  const browserServer=new Server({name:'fixture-browser',version:'1'},{capabilities:{tools:{}}});
+  browserServer.setRequestHandler(ListToolsRequestSchema,()=>({tools:[{name:'browser_run_code_unsafe',inputSchema:{type:'object'}}]}));
+  browserServer.setRequestHandler(CallToolRequestSchema,async request=>({content:[{type:'text',text:JSON.stringify(await vm.runInContext('('+request.params.arguments.code+')',context)(page))}]}));
+  const [a,b]=InMemoryTransport.createLinkedPair();await browserServer.connect(b);
+  const originalClose=a.close.bind(a);
+  const session={directory,browserRoot:'/fixture',async save(){},metadata:{client:'test',clientRevision:'a'.repeat(64),sessionId:'original-session'},artifactStore:{list:()=>[],async releaseUploads(){f.events.push('release')}}};
+  try{
+    const bridge=await createBridge({mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',stateDir:directory,loginomUrl:'https://loginom.invalid/app',endpoint:'https://fixture.invalid/mcp'},session,
+      {browserTransport:a,authenticatedReadiness:{account:'user',documentId:'original-document',loginomBuild:'7.4.2'}});
+    let receipt;
+    const state={session,authenticatedReadiness:{},bridge:{close:async()=>{
+      receipt=await bridge.close();
+      if(diagnosticFails){await rename(join(directory,'managed-shutdown.json'),join(directory,'managed-shutdown.json.prior'));await mkdir(join(directory,'managed-shutdown.json'));}
+      return receipt;
+    }},client:{close:async()=>f.events.push('outer-client-close')},browser:{close:async()=>f.events.push('outer-context-close')}};
+    const managed=vm.runInNewContext(managedCode+';({close})',{state,requests:new Set(),writeFile,join,rm,Promise,Error});
+    let caught;try{await managed.close()}catch(e){caught=e}
+    const evidence={diagnosticFails,receipt,caught:{message:caught?.message,code:caught?.code,cause:caught?.cause},shutdown:state.shutdown,events:f.events,nativeLogoutCalls:f.logout,live:false};
+    if(process.env.READINESS_RESULTS_DIR)await writeFile(join(process.env.READINESS_RESULTS_DIR,'managed-receipt-'+String(rejected)+'-'+diagnosticFails+'.json'),JSON.stringify(evidence,null,2)+'\n');
+    assert.equal(receipt.cleanup_complete,false);const expected=rejected instanceof Error?{kind:'Error',name:rejected.name,message:rejected.message}:{kind:'value',value:rejected===undefined?null:rejected,is_undefined:rejected===undefined};assert.deepEqual(receipt.rejection,expected);assert.equal(f.logout,1);
+    assert.equal(f.events.includes('release'),false);assert.equal(f.events.includes('outer-context-close'),false);
+    assert.equal(caught.message,'LOGINOM_RUNTIME_CLEANUP_FAILED');assert.deepEqual(caught.cause.rejection,expected);assert.equal(state.shutdown.primaryFailure.stage,'bridge');
+    if(diagnosticFails)assert.equal(state.shutdown.persistenceFailure.kind,'Error');else assert.equal(state.shutdown.persistenceFailure,undefined);
+  }finally{await originalClose();await browserServer.close();await rm(directory,{recursive:true,force:true})}
+ });

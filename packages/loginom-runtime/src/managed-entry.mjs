@@ -55,10 +55,11 @@ function close() {
     if (state.bridge) {
       await recordClose("bridge",{status:"started"})
       const receipt = await state.bridge.close()
-      await recordClose("bridge",{status:"returned",receipt})
       if (receipt?.browser_transport_closed !== true || receipt.cleanup_complete!==true
           || (state.authenticatedReadiness && receipt.native_logout_confirmed !== true))
-        throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", {cause:receipt})
+        primary={stage:"bridge",error:new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", {cause:receipt})}
+      await recordClose("bridge",{status:"returned",receipt})
+      if (primary) throw primary.error
     }
     state.controller?.abort()
     const results = []
