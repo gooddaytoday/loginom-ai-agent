@@ -9,7 +9,7 @@ import {readCapturePreparation} from './calculator-grouped-before-done-v1.mjs';
 
 // Explicit receiving observer pin. A new observer requires an addressed review;
 // source collector PASS or a runtime-generated checksum is not this binding.
-export const AMOUNT_OBSERVER_SHA256='75c10dcbd62332872fcda0ca9f85b26bf048866065f214df7ce58be9f6473ab8';
+export const AMOUNT_OBSERVER_SHA256='af3bdad6eb3542f4e9bd9723f43bf804d9e9e0deec8c5cc20a4f9bb8be2c4427';
 const need=(ok,why)=>{if(!ok)throw Error('LOGINOM_AMOUNT_CAPTURE_'+why);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 

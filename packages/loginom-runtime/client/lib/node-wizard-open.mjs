@@ -3,7 +3,8 @@ const requireValue=(value,message)=>{if(!value)throw Error(message);};
 // A changed path is accepted only with the native reader's verified rebinding.
 const ownerPathMatches=(n,path,opening)=>same(path,opening)
  ||n?.verified===true&&same(n.navigation_rebinding?.prepared_path,opening)
-   &&same(n.navigation_rebinding?.observed_path,path);
+   &&same(n.navigation_rebinding?.observed_path,path)
+ ||n?.verified===true&&same(n.navigation_alias?.original_path,opening)&&same(n.navigation_alias?.path,path);
 const question='Настройка узла приведет к его деактивации. Вы действительно хотите начать настраивать узел? Да Да, больше не спрашивать Нет';
 
 export function wizardOpenBinding(state) {

@@ -1,0 +1,161 @@
+{
+  "provenance": {
+    "issue": "LAB-66",
+    "review": "01a12cc9-0aa2-7ebc-8f9d-edc88c010728",
+    "files": {
+      "012.json": "8f1f673fd018d70283882f516e26b36881859df894c7fabdb8b43edfacaa22c3",
+      "020.json": "b1ccfecb1ac19471323b60839f32d327df6edb418d8a339a5086a8c1f5ca1368"
+    },
+    "native_objects": "not captured; VM doubles required"
+  },
+  "preparation": {
+    "document_id": "47111cfa-9c81-4ce6-81ac-81cc7feb94fd",
+    "session_id": "e01204dc-0764-4e1b-b6e4-ff702c1528c2",
+    "operation_id": "cdiag-b073-canonical-open",
+    "workflow_ref": {
+      "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+      "prefix": "MF;TF-1",
+      "navigation_path": [
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+          "label": ""
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+          "label": "Пакеты"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+          "label": "cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+          "label": "Модуль1"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+          "label": "Сценарий"
+        }
+      ],
+      "workflow_id": "47111cfa-9c81-4ce6-81ac-81cc7feb94fd-2"
+    },
+    "package_ref": {
+      "path": "/lab-66-monkey-0c4060b2-98ec-4cf8-a450-66ebfcfb2dc0/cdiag_b073b1a2-c5ec-482e-9d1f-e7822a4a86d2.lgp",
+      "name": "cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2",
+      "persisted": true
+    },
+    "target": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    }
+  },
+  "owner": {
+    "status": "observed",
+    "opening_verified": false,
+    "panel_ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-151",
+    "node": {
+      "ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-349",
+      "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2>Модуль1>Сценарий>DiagInput",
+      "label": "DiagInput"
+    },
+    "path": [
+      {
+        "ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-344",
+        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+        "label": ""
+      },
+      {
+        "ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-345",
+        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+        "label": "Пакеты"
+      },
+      {
+        "ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-346",
+        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2",
+        "label": "cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2"
+      },
+      {
+        "ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-347",
+        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2>Модуль1",
+        "label": "Модуль1"
+      },
+      {
+        "ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-348",
+        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2>Модуль1>Сценарий",
+        "label": "Сценарий"
+      },
+      {
+        "ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-349",
+        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2>Модуль1>Сценарий>DiagInput",
+        "label": "DiagInput"
+      },
+      {
+        "ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-350",
+        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>cdiag_b073b1a2_c5ec_482e_9d1f_e7822a4a86d2>Модуль1>Сценарий>DiagInput>Настройка",
+        "label": "Настройка"
+      }
+    ]
+  },
+  "import_source": {
+    "status": "draft_ui_values",
+    "settings_applied": false,
+    "file_bytes_verified": false,
+    "schema_complete": false,
+    "fields": {
+      "source_path": {
+        "status": "observed",
+        "value": "",
+        "value_length_utf16": 0,
+        "truncated": false,
+        "input_ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-351",
+        "owner_ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-352",
+        "enabled": true,
+        "read_only": false,
+        "value_kind": "displayed_input_text"
+      },
+      "connection": {
+        "status": "observed",
+        "value": "Локальное",
+        "value_length_utf16": 9,
+        "truncated": false,
+        "input_ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-353",
+        "owner_ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-354",
+        "enabled": true,
+        "read_only": true,
+        "value_kind": "displayed_input_text"
+      },
+      "encoding": {
+        "status": "observed",
+        "value": "UTF-8 (65001)",
+        "value_length_utf16": 13,
+        "truncated": false,
+        "input_ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-355",
+        "owner_ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-356",
+        "enabled": true,
+        "read_only": false,
+        "value_kind": "displayed_input_text"
+      },
+      "rows_to_skip": {
+        "status": "observed",
+        "value": "0",
+        "value_length_utf16": 1,
+        "truncated": false,
+        "input_ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-357",
+        "owner_ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-358",
+        "enabled": true,
+        "read_only": false,
+        "value_kind": "displayed_input_text"
+      },
+      "first_line_as_title": {
+        "status": "observed",
+        "value": true,
+        "owner_ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-359",
+        "display_ref": "ui-3b4c8a7e-9a89-4e08-96be-8e550cdba84f-360",
+        "enabled": true,
+        "value_kind": "loginom_ext_checkbox"
+      }
+    }
+  }
+}
