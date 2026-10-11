@@ -4,6 +4,7 @@ import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {runReviewerStorage} from '../reviewer-matrix15-storage.mjs';
+import {makePackageCleanupCode} from '../../../packages/loginom-runtime/client/lib/package-cleanup.mjs';
 async function setup(){
  const directory=await mkdtemp(join(tmpdir(),'reviewer-storage-'));
  const identity={sessionId:'session',account:'own',packagePath:'/shared/source.lgp',personalDirectory:'/own',loginomUrl:'http://fixture.invalid',loginomBuild:'7.4.2'};
@@ -40,3 +41,13 @@ test('dirty own state saves absent private UUID with fail policy before cleanup'
  }finally{await x.finish()}
 });
 test('existing save path refuses before mutation',async()=>{const x=await setup();try{x.options.scenario=async({bindPrepared})=>{await bindPrepared(x.prepared);throw Error('scenario')};x.options.observeIdentity=async()=>({account:'own',sessionId:'session',documentId:'document',tabTid:'tab',personalDirectory:'/own',path:x.identity.packagePath,running:false,modified:true,readOnly:false,owned:true});x.options.pathExists=async()=>true;await runReviewerStorage(x.options,x.owner);await assert.rejects(x.owner.recover(),/PATH_EXISTS/);assert.deepEqual(x.events,[])}finally{await x.finish()}});
+for(const candidate of [undefined,{status:'BLOCKED',document_id:'document',workflow_ref:{tab_tid:'tab'},package_ref:{path:'/shared/source.lgp'}},{status:'READY',document_id:'',workflow_ref:{tab_tid:''},package_ref:{path:'/shared/source.lgp'}},{status:'READY',document_id:'document',workflow_ref:{tab_tid:'tab'},package_ref:{path:'/foreign.lgp'}}])test('unverified prepared refuses before preservation admission '+JSON.stringify(candidate),async()=>{
+ const x=await setup();try{
+ let saves=0,cleanups=0;x.options.makeCleanupCode=makePackageCleanupCode;x.options.execute=async()=>{cleanups++};
+ x.options.scenario=async({bindPrepared})=>{if(candidate!==undefined)await bindPrepared(candidate);throw Error('scenario')};
+ x.options.observeIdentity=async()=>({account:'own',sessionId:'session',documentId:candidate?.document_id,tabTid:candidate?.workflow_ref?.tab_tid,path:x.identity.packagePath,personalDirectory:'/own',modified:true,running:false,readOnly:false,owned:true});
+ x.options.pathExists=async()=>false;x.runtime.run=async(_action,input)=>{saves++;return {status:'SUCCEEDED',output:{save_completed:true,package_ref:{path:input.path}}}};
+ await runReviewerStorage(x.options,x.owner);const error=x.owner.error;
+ await assert.rejects(x.owner.recover());assert.equal(saves,0);assert.equal(cleanups,0);assert.deepEqual(x.events,[]);assert.equal(x.owner.error,error);assert.equal(x.owner.page,x.page);
+ }finally{await x.finish()}
+});

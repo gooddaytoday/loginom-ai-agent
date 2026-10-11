@@ -14,8 +14,19 @@ export async function runReviewerStorage(options, owner) {
   if(runtime.hasUnsettledWork())throw Error('DIAGNOSTIC_RUNTIME_UNSETTLED');
  };
  owner.runtime=runtime;
+ let verifiedPrepared, binding;
+ const requireBinding=()=>{
+  const p=owner.prepared;
+  if(!binding || p!==verifiedPrepared || p?.status!=='READY'
+    || typeof p.document_id!=='string' || !p.document_id || p.document_id!==binding.documentId
+    || typeof p.workflow_ref?.tab_tid!=='string' || !p.workflow_ref.tab_tid || p.workflow_ref.tab_tid!==binding.tabTid
+    || p.package_ref?.path!==binding.path || owner.identity.packagePath!==binding.path
+    || owner.identity.account!==identity.account || owner.identity.sessionId!==identity.sessionId)
+    throw Error('DIAGNOSTIC_PACKAGE_IDENTITY_UNCONFIRMED');
+ };
  owner.recover=async()=>{
   settled();
+  requireBinding();
   const state=await options.observeIdentity();
   if(state.account!==identity.account || state.sessionId!==identity.sessionId || state.documentId!==owner.prepared?.document_id
     || state.tabTid!==owner.prepared?.workflow_ref?.tab_tid || state.path!==owner.identity.packagePath || state.running!==false || state.readOnly!==false || state.owned!==true)
@@ -27,11 +38,14 @@ export async function runReviewerStorage(options, owner) {
    if(!identity.personalDirectory || identity.personalDirectory==='/' || !identity.personalDirectory.startsWith('/') || /[\\]|\.\./.test(identity.personalDirectory))throw Error('DIAGNOSTIC_PERSONAL_PATH_UNCONFIRMED');
    if(await options.pathExists(path)!==false)throw Error('DIAGNOSTIC_SAVE_PATH_EXISTS');
    settled();
+   requireBinding();
    const result=await runtime.run('package.save_checkpoint',{path,conflict_policy:'fail'},{operationId:'reviewer-preserve-'+randomUUID()});
    await writeFile(join(output,'preservation.json'),JSON.stringify(result,null,2)+'\n',{mode:0o600});
    if(result?.status!=='SUCCEEDED' || result.output?.save_completed!==true || result.output?.package_ref?.path!==path)throw Error('DIAGNOSTIC_SAVE_UNCONFIRMED');
    owner.identity={...identity,packagePath:path};
    owner.prepared={...owner.prepared,package_ref:result.output.package_ref};
+   verifiedPrepared=owner.prepared;
+   binding={...binding,path};
   }
   settled();
   await withDiagnosticSession({context,execute,directory:output,identity:owner.identity,makeCleanupCode},async({bindPrepared})=>bindPrepared(owner.prepared));
@@ -40,7 +54,15 @@ export async function runReviewerStorage(options, owner) {
  };
  try{
   await withDiagnosticSession({context,execute,directory:output,identity,makeCleanupCode},async({bindPrepared})=>{
-   const bind=async p=>{owner.prepared=p;return bindPrepared(p)};
+   const bind=async p=>{
+    owner.preparedCandidate=p;
+    verifiedPrepared=undefined;binding=undefined;
+    const accepted=await bindPrepared(p);
+    verifiedPrepared=structuredClone(accepted);
+    binding={documentId:accepted.document_id,tabTid:accepted.workflow_ref.tab_tid,path:accepted.package_ref.path};
+    owner.prepared=verifiedPrepared;
+    return accepted;
+   };
    if(options.scenario){const value=await options.scenario({...owner,bindPrepared:bind});settled();return value;}
    const {config,archive}=options,report=owner.report={account:identity.account,files:[]};
    const sessionId=identity.sessionId,makeWorkspacePrepareCode=makePrepareCode;
