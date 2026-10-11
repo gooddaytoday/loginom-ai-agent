@@ -51,6 +51,7 @@ test("startup timeout retains the writer through Help close and permits a real s
           }, 10);
         }
         if (message.operation === "list") process.send({ id: message.id, result: { tools: [] } });
+        if (message.operation === "interrupt") process.send({ id: message.id, result: { interrupted: true } });
         if (message.operation === "close") {
           fs.writeFileSync(${JSON.stringify(closing)}, "closing");
           const gate = setInterval(() => {

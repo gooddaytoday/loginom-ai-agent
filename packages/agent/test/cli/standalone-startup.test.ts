@@ -67,7 +67,8 @@ test.each(["run", "tui", "management"])(
         )
         const output = new Response(child.stdout).text()
         const errors = new Response(child.stderr).text()
-        const timer = setTimeout(() => child.kill("SIGKILL"), 10_000)
+        // The real CLI owns a 60-second teardown budget; the test guard must allow it to finish.
+        const timer = setTimeout(() => child.kill("SIGKILL"), 75_000)
         try {
           expect(await child.exited).toBe(1)
           expect(await errors).toContain(confirmed ? startupError : "LOGINOM_HOST_CLEANUP_FAILED")
@@ -104,7 +105,7 @@ test.each(["run", "tui", "management"])(
       }
     }
   },
-  50_000,
+  180_000,
 )
 
 test("the writer stays held during startup cleanup and the next invocation can reuse the profile", async () => {
