@@ -61,7 +61,8 @@ test.each([false, true])("recovery resets only idle runtimes; shutdown race = %s
     const closing = shutdown ? service.close() : undefined
     reset.resolve()
     expect(await outcome).toBe(shutdown ? "LOGINOM_HOST_CLOSED" : "ok")
-    await closing
+    if (shutdown) await expect(closing!).rejects.toThrow("LOGINOM_HOST_CLOSED")
+    else await closing
     expect(journal.pending()).toEqual(shutdown ? [id] : [])
     if (!shutdown) {
       const next = service.acquire("two")
