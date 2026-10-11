@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {makeCalculatorCaptureCode} from './calculator-capture-adapter.mjs';
 import {parseCapabilityResult,withBrowserReceipt} from '../../client/lib/executor.mjs';
 import {readGraph} from '../../client/lib/node-target-browser.mjs';
 import {NODE_TYPES} from '../../client/lib/node-contracts.mjs';
@@ -60,8 +61,9 @@ export async function captureCalculator({binding,identity,browser,record}) {
   const read=${readPreparedNodeContext.toString()},binding=${JSON.stringify(preparedNodeContext)};
   const before=await read(page,binding);
   if(before.verified!==true||before.surface!=='wizard'||before.document_id!==binding.document_id
-   ||before.node_id!==binding.node.node_id)throw Error('LOGINOM_CAPTURE_RAW_NODE');
-  const value=await page.evaluate(${readCaptureSurface.toString()},${JSON.stringify({owner,root_tid:state.wizard.root_tid,root_ref:state.wizard.root_ref,limits:CAPTURE_LIMITS})});
+   ||before.node_id!==binding.node.node_id||before.workflow_id!==binding.workflow_ref.workflow_id
+   ||before.tid!==${JSON.stringify(state.wizard.root_tid)})throw Error('LOGINOM_CAPTURE_RAW_NODE');
+  const value=await (${makeCalculatorCaptureCode({owner,root_tid:state.wizard.root_tid,root_ref:state.wizard.root_ref,limits:CAPTURE_LIMITS})})(page);
   const after=await read(page,binding);if(JSON.stringify(before)!==JSON.stringify(after))throw Error('LOGINOM_CAPTURE_RAW_NODE_CHANGED');
   return value;
  }`);
@@ -122,7 +124,7 @@ export async function captureDraft({owner,current,observe,snapshot,exclude,cance
  await record({event:'calculator_capture_cancel',owner,cancellation});
  if(failed)throw failure; // Preserve Error and all falsy rejection values exactly.
  return {settings_applied:false,cancel_verified:true,execution_started:false,paused_before_done:true,
-  capture_complete:false,missing:['actual_complete_window_predicate_collector'],
+  capture_complete:false,missing:['ordinary_coverage','addressed_complete','native_window','full_geometry_trace'],
   before,after,region_transition:{source:baseline.region.source,before:baseline.region,after:changed.region},cancellation,
   native_verified:false};
 }
@@ -136,7 +138,8 @@ export function validateCapture(capture,owner,state) {
   &&r.data?.Name==='Region');
  need(matches.length===1,'RAW_REGION_CHANGED');
  need(Buffer.byteLength(JSON.stringify(capture))<=CAPTURE_LIMITS.bytes,'BYTE_BOUND');
- need(capture.predicates?.status==='not_instrumented'&&capture.predicates.evaluated===false,'PREDICATE_CLAIM');
+ need(capture.collector_revision===1&&capture.predicates?.status==='partial'&&capture.predicates.evaluated===false,'PREDICATE_CLAIM');
+ need(capture.predicates.cached_windows?.length===2&&capture.predicates.cached_windows.every(p=>p.evaluated===true&&p.value===true),'CACHED_WINDOW');
  return createHash('sha256').update(JSON.stringify(capture)).digest('hex');
 }
 

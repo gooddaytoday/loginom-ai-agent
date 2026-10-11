@@ -16,7 +16,7 @@ function fixture(scenario){
   events.push('capture');if(scenario==='capture-error')throw Error('capture-failed');
   return {owner,root_tid:'root',root_ref:scenario==='root'?'foreign':'ref',dom:[],
    stores:[{records:[]},{records:[{internalId:scenario==='record'?'foreign':region().record_id,data:{Name:'Region'}}]}],
-   predicates:{status:'not_instrumented',evaluated:false},...(scenario==='bytes'?{extra:'x'.repeat(CAPTURE_LIMITS.bytes)}:{})};
+   collector_revision:1,predicates:{status:'partial',evaluated:false,cached_windows:[{evaluated:true,value:true},{evaluated:true,value:true}]},...(scenario==='bytes'?{extra:'x'.repeat(CAPTURE_LIMITS.bytes)}:{})};
  };
  return {events,drivers:{owner,current:()=>{if(scenario==='owner')throw Error('owner-changed');},observe,snapshot,
   exclude:async()=>{events.push('exclude');if(scenario==='uncertain')throw Error('unknown-effect');edited=true;return {verified:true,cleanup_complete:true,settings_applied:false};},
@@ -48,6 +48,6 @@ test('fixed entry refuses binding before any browser invocation',async()=>{
  let calls=0;await assert.rejects(captureCalculator({binding:{},identity:{},browser:{callTool(){calls++;}},record(){}}));assert.equal(calls,0);
 });
 test('raw record and DOM bounds refuse without completeness claims',()=>{
- const capture={owner,root_tid:'root',root_ref:'ref',dom:Array(CAPTURE_LIMITS.dom+1),stores:[{records:[]},{records:[]}],predicates:{status:'not_instrumented',evaluated:false}};
+ const capture={owner,root_tid:'root',root_ref:'ref',dom:Array(CAPTURE_LIMITS.dom+1),stores:[{records:[]},{records:[]}],collector_revision:1,predicates:{status:'partial',evaluated:false,cached_windows:[{evaluated:true,value:true},{evaluated:true,value:true}]}};
  assert.throws(()=>validateCapture(capture,owner,{root_tid:'root',root_ref:'ref',region:{record_id:'x'}}));
 });

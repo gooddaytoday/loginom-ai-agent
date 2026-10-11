@@ -25,19 +25,20 @@ const {captureCalculator}=await import(pathToFileURL(root+'/src/acceptance/calcu
 function pageDouble(scenario){
  const events=[];
  const element=(tid,id)=>({id,tagName:'DIV',children:[],parentElement:null,
-  getAttribute:k=>k==='data-tid'?tid:k==='id'?id:null,
+  isConnected:true,getAttribute:k=>k==='data-tid'?tid:k==='id'?id:null,
   getBoundingClientRect:()=>({x:0,y:0,width:50,height:20}),clientWidth:50,clientHeight:20,scrollWidth:50,scrollHeight:20,scrollLeft:0,scrollTop:0,
   classList:{contains:()=>true}});
  const tab=element('MF;cntMain;cntWorkspace;Workspace;t.br;tb','tab');
  const grids=[element('root;grdSourceColumns;tbl','source-grid'),element('root;grdTargetColumns;tbl','target-grid')];
  const root=element('root','root');root.children=grids;grids.forEach(e=>e.parentElement=root);
+ grids.forEach((g,i)=>{const r=element('row-'+i,'row-'+i);r.parentElement=g;r.getAttribute=k=>({'data-recordindex':'0','data-recordid':state.edited?'after':'before','data-boundview':g.id}[k]??null);g.children=[r];g.querySelectorAll=()=>[r];});
  root.querySelectorAll=selector=>[grids[selector.includes('Source')?0:1]];
  const document={querySelectorAll:selector=>selector.includes('t.br;tb')?[tab]:selector.includes('root')?[root]:[]};
  const records=()=>[{internalId:state.edited?'after':'before',data:{Name:'Region',ID:20,Index:0,GroupField:state.edited?'Исключенные':''}}];
  const view=e=>({el:{dom:e},getStore:()=>{
-  const items=records();return {$className:'Ext.data.Store',currentPage:1,loading:false,getData:()=>({items,getSource:()=>({items})}),getProxy:()=>({$className:'bg.ext.CollectionProxy',pendingOperations:{}})};
+  const items=records();return {$className:'Ext.data.Store',isBufferedStore:false,currentPage:1,loading:false,getCount:()=>items.length,getTotalCount:()=>items.length,isLoading:()=>false,getRemoteFilter:()=>false,getRemoteSort:()=>false,getData:()=>({items,getSource:()=>({items})}),getProxy:()=>({$className:'bg.ext.CollectionProxy',pendingOperations:{}})};
  }});
- state={events,open:false,edited:false,snapshot:()=>({prepared_node_context:{verified:true,surface:state.open?'wizard':'graph',document_id:'doc',workflow_id:'flow',node_id:'node'},
+ state={events,open:false,edited:false,snapshot:()=>({prepared_node_context:{verified:true,surface:state.open?'wizard':'graph',document_id:'doc',workflow_id:'flow',node_id:'node',tid:'root'},
   wizard:state.open?{status:'observed',stage:'output_mapping',root_tid:'root',root_ref:'ref'}:{status:'absent'},
   node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',
    target_fields:[{name:'Region',record_id:state.edited?'after':'before',excluded:state.edited,
@@ -45,6 +46,7 @@ function pageDouble(scenario){
  globalThis.document=document;globalThis.location={origin:'https://loginom.invalid'};
  globalThis.bg={app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:'account'}}}}}}};
  globalThis.Ext={getCmp:id=>view(grids.find(e=>e.id===id))};
+ globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')]={document,refs:new Map([['ref',new WeakRef(root)]])};
  globalThis.__loginomDockPreparationV1={document,id:scenario==='document'?'foreign':'doc',receipts:new Map([['r',{phase:'verified',tab,packageNode:{},workflowId:'flow',crumbs:[]}]])};
  const page={get nodeContext(){return state.snapshot().prepared_node_context;},graph:{complete:true,nodes:[{type:'transform.calculator',label:'LAB66CaptureCalculator',ref:{document_id:'doc',workflow_id:'flow',node_id:'node'}}]},evaluate:async(fn,arg)=>fn(arg)};
  const browser={callTool:async({arguments:{code}})=>{
@@ -61,9 +63,9 @@ for(const scenario of ['success','document','lease','run','session'])test('fixed
   if(scenario==='success'){
    const result=await captureCalculator({binding,identity,browser,record:async()=>{}});
    assert.equal(result.cancel_verified,true);assert.equal(result.capture_complete,false);
-   assert.equal(result.before.dom.length,3);assert.equal(result.before.stores[1].records[0].internalId,'before');
+   assert.equal(result.before.dom.length,5);assert.equal(result.before.stores[1].records[0].internalId,'before');
    assert.equal(result.after.stores[1].records[0].data.GroupField,'Исключенные');
    assert.deepEqual(events.filter(e=>e!=='browser'),['select','open-output','exclude','cancel']);
   }else {await assert.rejects(captureCalculator({binding,identity,browser,record:async()=>{}}));assert.equal(events.includes('exclude'),false);}
- }finally{for(const k of ['document','location','bg','Ext','__loginomDockPreparationV1'])delete globalThis[k];}
+ }finally{for(const k of ['document','location','bg','Ext','__loginomDockPreparationV1'])delete globalThis[k];delete globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];}
 });
