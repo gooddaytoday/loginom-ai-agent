@@ -8,6 +8,16 @@ const expression=(name,index=0)=>({name,index,record_id:'r'+index,expression_id:
 const observed=()=>({verified:true,inventory_complete:true,mode:'expression',expressions:[expression('A'),expression('B',1)]});
 const inputs=[{name:'Amount',type:'real'}];
 const request=()=>({target:{kind:'existing'},inputs:[],read:{ports:[0]},mappings:[]});
+test('accepted expression and formula limits refuse overflow before mutation',()=>{
+ const make=i=>({target:{kind:'new'},name:'Field'+i,label:'Field'+i,type:'real',formula:'1',replace:false});
+ const full={expressions:Array.from({length:128},(_,i)=>make(i))};
+ assert.doesNotThrow(()=>validateCalculatorParameters(full,'expression',request()));
+ assert.throws(()=>validateCalculatorParameters({expressions:[...full.expressions,make(128)]},'expression',request()),/Bounded calculator expressions/);
+ const longest={expressions:[{...make(0),formula:'1'+' '.repeat(2047)}]};
+ assert.doesNotThrow(()=>validateCalculatorParameters(longest,'expression',request()));
+ assert.throws(()=>validateCalculatorParameters({expressions:[{...longest.expressions[0],formula:longest.expressions[0].formula+' '}]},'expression',request()),/Bounded nonempty LF expression/);
+ assert.throws(()=>resolveCalculatorPatch({expressions:[{...make(0),name:'Amount'}]},observed(),inputs),/explicitly choose replacement/);
+});
 test('published calculator schema and handler agree on new expressions and saved patches',()=>{
  const check=new AjvJsonSchemaValidator().getValidator(calculatorParametersSchema);
  const added={target:{kind:'new'},name:'Ratio',label:'Ratio',type:'real',formula:'Amount / 3',replace:false};
