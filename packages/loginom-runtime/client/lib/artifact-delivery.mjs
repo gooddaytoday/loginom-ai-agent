@@ -52,15 +52,15 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    }
   };
   const roots=()=>observe({scope:'roots'});
-  const click=async(s,element,verb='click',extra={},allowStaleFolder=false)=>{
+  const click=async(s,element,verb='click',extra={},allowStaleNavigation=false)=>{
    check();const id=job.id+':nav'+(job.navigationStep=(job.navigationStep??0)+1);
    job.navigationUncertain=true;
    effectPossible=true;const r=await runtime.uiAct({verb,ref:element.ref,...extra},{operationId:id,observationId:s.observation_id,signal});
-   // Only a matched, cleaned-up precondition refusal permits a fresh folder lookup.
+   // Only a matched, cleaned-up precondition refusal permits a fresh target lookup.
    // Never reuse its ref/observation or repeat an uncertain child operation.
    // The proven no-effect gesture leaves navigation certain, so the pre-upload
    // checkpoint remains available if the bounded retry stops.
-   if(allowStaleFolder&&r.operation_id===id&&r.status==='NOT_APPLIED'&&r.phase==='preconditions'
+   if(allowStaleNavigation&&r.operation_id===id&&r.status==='NOT_APPLIED'&&r.phase==='preconditions'
      &&r.effect_possible===false&&r.cleanup_complete===true&&r.error?.code==='UI_EPOCH_CHANGED'){job.navigationUncertain=false;return false;}
    requireValue(r.status==='SUCCEEDED'&&r.cleanup_complete===true,'Delivery navigation requires inspection: '+id);
    job.navigationUncertain=false;
@@ -137,12 +137,29 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    job.navigationDocument??=r.dom_epoch.document;
    job.preUploadResume=false;
    if(!r.ui.elements.some(e=>e.tid?.includes(';FileStorageForm;'))) {
+    requireValue(job.toolbarRefreshUsed!==true,'Delivery toolbar refresh already exhausted');
     // Global all-scope scans can fall back to roots on a populated graph.
     // Read the already observed toolbar directly to retain complete controls.
-    const toolbar=one(r.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'Main toolbar root unavailable');
-    const full=await detail(r,toolbar);
-    const files=one(full.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'&&e.allowed_actions.includes('click')),'Files workspace control unavailable');
-    await click(full,files);
+    let toolbar=one(r.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'Main toolbar root unavailable');
+    let full=await detail(r,toolbar);
+    const binding=s=>JSON.stringify([s.dom_epoch?.document,s.origin,s.authenticated,s.loginom_build,
+      s.workflow_ref,s.active_tab_ref,s.package_identity]);
+    const owner=binding(full);
+    let files=one(full.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'&&e.allowed_actions.includes('click')),'Files workspace control unavailable');
+    const target=JSON.stringify([files.tid,files.identity,files.signature]);
+    for(let attempt=0;;attempt++) {
+     if(await click(full,files,'click',{},true))break;
+     requireValue(attempt===0,'Delivery toolbar navigation remained stale; inspection required');
+     job.toolbarRefreshUsed=true;
+     check();const previous=full.observation_id;
+     r=await roots();requireValue(binding(r)===owner,'Delivery toolbar owner changed');
+     requireValue(!r.ui.elements.some(e=>e.tid?.includes(';FileStorageForm;')),'Delivery toolbar workspace changed');
+     toolbar=one(r.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'Main toolbar root unavailable');
+     full=await detail(r,toolbar);
+     requireValue(binding(full)===owner&&full.observation_id!==previous,'Delivery toolbar observation changed owner or was reused');
+     files=one(full.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'&&e.allowed_actions.includes('click')),'Files workspace control unavailable');
+     requireValue(JSON.stringify([files.tid,files.identity,files.signature])===target,'Delivery toolbar target changed');
+    }
    }
    let s=await directory();
    requireValue(s.file_storage?.status==='observed','Storage path is not observed');

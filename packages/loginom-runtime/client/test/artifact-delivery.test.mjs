@@ -307,6 +307,63 @@ test('delivery reads the observed toolbar when a populated graph only yields roo
  const result=await f.service.deliver(request);assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(opened,true);
 });
 
+function toolbarFixture(fault=null) {
+ const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;
+ let reads=0,opened=false,time=0;const attempts=[];
+ f.runtime.observe=async options=>{
+  if(opened)return observe(options);
+  const root=options?.scope==='roots',id=++reads;
+  const s={observation_id:'obs-'+id,dom_epoch:{document:'doc',revision:id},origin:'https://example.test',authenticated:true,loginom_build:'7.4.2',
+   workflow_ref:{prefix:'MF;TF',tab_tid:'tab'},active_tab_ref:'tab',package_identity:null,
+   ui:{elements:root?[{ref:'toolbar-'+id,tid:'MF;cntMain;tlbMainToolbar',allowed_actions:[]}]:[
+    {ref:'files-'+id,tid:'MF;cntMain;tlbMainToolbar;btnFilestorage',identity:{anchor_tid:'files'},signature:{tag:'a'},allowed_actions:['click']}],dialogs:[],masks:[]}};
+  if(attempts.length){
+   if(fault==='document')s.dom_epoch.document='foreign';
+   if(fault==='workflow')s.workflow_ref.prefix='foreign';
+   if(fault==='tab')s.active_tab_ref='foreign';
+   if(fault==='origin')s.origin='https://foreign.test';
+   if(fault==='logout')s.authenticated=false;
+   if(fault==='package')s.package_identity='foreign';
+   if(fault==='same_observation')s.observation_id='obs-2';
+   if(!root&&fault==='target')s.ui.elements[0].signature.tag='button';
+   if(!root&&fault==='disabled')s.ui.elements[0].allowed_actions=[];
+  }
+  return {status:'SUCCEEDED',output:s};
+ };
+ f.runtime.uiAct=async(a,o)=>{
+  if(!a.ref.startsWith('files-'))return act(a,o);
+  assert.equal(f.calls.includes('upload'),false);
+  attempts.push({ref:a.ref,observation:o.observationId,id:o.operationId});
+  if(attempts.length===1||fault==='persistent'){
+   if(fault==='throw')throw Error('Lost reply');
+   if(fault==='deadline')time=120000;
+   return {operation_id:fault==='foreign_id'?'foreign':o.operationId,status:fault==='ambiguous'?'AMBIGUOUS':'NOT_APPLIED',
+    phase:fault==='phase'?'execution':'preconditions',effect_possible:fault==='missing_effect'?undefined:fault==='effect',cleanup_complete:fault!=='cleanup',
+    error:{code:fault==='code'?'OTHER':'UI_EPOCH_CHANGED'}};
+  }
+  opened=true;return {status:'SUCCEEDED',cleanup_complete:true};
+ };
+ // The fake clock changes only after the first refusal, never extends the deadline.
+ f.service=createArtifactDelivery({runtime:f.runtime,artifactStore:{getUploadGrant:()=>f.artifact},admit:()=>{},record:async e=>e,now:()=>time});
+ return {...f,attempts};
+}
+test('toolbar refresh uses one fresh same-owner observation before upload',async()=>{
+ const f=toolbarFixture(),result=await f.service.deliver(request);
+ assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(f.calls.filter(x=>x==='upload').length,1);
+ assert.equal(f.attempts.length,2);
+ for(const field of ['id','observation','ref'])assert.notEqual(f.attempts[0][field],f.attempts[1][field]);
+});
+for(const fault of ['foreign_id','ambiguous','phase','effect','missing_effect','cleanup','code','throw','deadline','persistent',
+ 'document','workflow','tab','origin','logout','package','same_observation','target','disabled'])test('toolbar refresh refuses '+fault,async()=>{
+ const f=toolbarFixture(fault),result=await f.service.deliver(request);
+ assert.notEqual(result.outcome.status,'SUCCEEDED');assert.equal(f.calls.includes('upload'),false);
+ assert.equal(f.attempts.length,fault==='persistent'?2:1);
+ if(fault==='persistent'){
+  await f.service.resume({operation_id:'delivery',resume_id:'again',budget_ms:1000});
+  assert.equal(f.attempts.length,2);assert.equal(f.calls.includes('upload'),false);
+ }
+});
+
 test('an inaccessible input folder reports an admitted artifact and never uploads',async()=>{
  const f=fixture(),observe=f.runtime.observe;
  f.runtime.observe=async options=>{
