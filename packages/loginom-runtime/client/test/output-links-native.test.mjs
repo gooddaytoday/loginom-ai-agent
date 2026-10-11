@@ -14,7 +14,9 @@ test('serialized output Links preserve native pair ownership across guarded gest
  const context=await browser.newContext({viewport:after.viewport});
  await context.route('**/*',route=>route.fulfill({status:200,contentType:'text/html',body:'<html><body></body></html>'}));
  const execute=(page,options)=>new Function('page',`return (${makeWorkspaceUiCode({expected_build:after.loginom_build,expected_origin:after.origin,prepared_node_context:binding,...options})})(page)`)(page);
- const hydrate=(page,capture,mode)=>hydrateNative(page,capture,mode,prepared);
+ // Older capture lacks settlement reads. This explicit counterfactual false
+ // state keeps the original identity tests; measured positives are separate.
+ const hydrate=(page,capture,mode)=>hydrateNative(page,capture,mode,prepared,{FLinksUpdateMode:false,FRelationRefreshMode:false,FWaitingRedraw:false});
  const observe=async page=>{const initial=await execute(page,{mode:'observe'});assert.equal(initial.status,'SUCCEEDED');const ref=initial.output.wizard.root_ref;const result=await execute(page,{mode:'observe',root_ref:ref});assert.equal(result.status,'SUCCEEDED');return result.output;};
  const metadata=e=>e.signature?.date_time_cell;
  const linked=s=>s.ui.elements.filter(e=>metadata(e)?.link);

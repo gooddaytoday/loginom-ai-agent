@@ -19,7 +19,7 @@ test('measured output Links property presence survives guarded removal', {skip:!
  const observe=async page=>{const initial=await execute(page,{mode:'observe'});assert.equal(initial.status,'SUCCEEDED');const result=await execute(page,{mode:'observe',root_ref:initial.output.wizard.root_ref});assert.equal(result.status,'SUCCEEDED');return result.output;};
  const linked=s=>s.ui.elements.filter(e=>e.signature?.date_time_cell?.link);
  const removal=s=>linked(s).filter(e=>e.signature.date_time_cell.role==='output_relation_remove');
- const setup=async()=>{const page=await context.newPage();await hydrate(page,capture,null,prepared);return page;};
+ const setup=async()=>{const page=await context.newPage();await hydrate(page,capture,null,prepared,fixture['draw-button-presence-preflight.json'].controller_pending);return page;};
  const save=async(name,value)=>{if(process.env.LOGINOM_PRESENCE_EVIDENCE){await mkdir(process.env.LOGINOM_PRESENCE_EVIDENCE,{recursive:true});await writeFile(join(process.env.LOGINOM_PRESENCE_EVIDENCE,name+'.json'),JSON.stringify(value,null,2)+'\n');}};
  try{
   await t.test('measured five absent properties and selected own array permit one guarded click',async()=>{
@@ -32,7 +32,7 @@ test('measured output Links property presence survives guarded removal', {skip:!
   });
   for(const kind of ['absent','undefined','null','array'])await t.test('hydrator preserves synthetic '+kind+' and hasOwn without normalization',async()=>{
    const d=structuredClone(capture),link=d.linkNative.links.find(x=>!x.selected);link.drawItem.buttonPresence={hasOwn:kind!=='absent',kind};link.drawItem.buttons=[];
-   const page=await context.newPage();await hydrate(page,d,null,prepared);const state=await page.evaluate(key=>{const x=globalThis.__nativeFixture.draw.FDrawLinkItems[key];return {hasOwn:Object.hasOwn(x,'DrawDeleteButton'),type:typeof x.DrawDeleteButton,isNull:x.DrawDeleteButton===null,isArray:Array.isArray(x.DrawDeleteButton)};},link.key);
+   const page=await context.newPage();await hydrate(page,d,null,prepared,fixture['draw-button-presence-preflight.json'].controller_pending);const state=await page.evaluate(key=>{const x=globalThis.__nativeFixture.draw.FDrawLinkItems[key];return {hasOwn:Object.hasOwn(x,'DrawDeleteButton'),type:typeof x.DrawDeleteButton,isNull:x.DrawDeleteButton===null,isArray:Array.isArray(x.DrawDeleteButton)};},link.key);
    assert.equal(state.hasOwn,kind!=='absent');assert.equal(state.isNull,kind==='null');assert.equal(state.isArray,kind==='array');assert.equal(state.type,kind==='absent'||kind==='undefined'?'undefined':'object');
    const s=await observe(page);assert.equal(removal(s).length,kind==='absent'||kind==='array'?2:0);await page.close();
   });

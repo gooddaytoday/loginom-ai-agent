@@ -1,6 +1,6 @@
-export async function hydrate(page,capture,mode,prepared){
+export async function hydrate(page,capture,mode,prepared,settlement){
  await page.goto(capture.origin+'/offline-output-links-fixture');
- await page.evaluate(({d,p,mode})=>{
+ await page.evaluate(({d,p,mode,settlement})=>{
   const objects=new Map(),get=id=>{if(!id)return null;if(!objects.has(id))objects.set(id,{});return objects.get(id);};
   const classes={};for(const t of d.tree_chain){classes[t.constructor]??=({[t.constructor]:class{}})[t.constructor];objects.set(t.object,new classes[t.constructor]());}
   const WizardModelComponentForm=class WizardModelComponentForm{};objects.set(d.active.model,new WizardModelComponentForm());
@@ -28,6 +28,9 @@ export async function hydrate(page,capture,mode,prepared){
    }else if(presence.kind!=='absent')throw Error('Unsupported absent property');
    draw.FDrawLinkItems[link.key]=item;}
   c.constructor={name:'DerivedDataSourceOutputSocketWizard'};
+  // Explicit fixture evidence only; absent keys remain absent, never false.
+  if(settlement)for(const key of ['FLinksUpdateMode','FRelationRefreshMode','FWaitingRedraw'])
+   if(Object.hasOwn(settlement,key))(key==='FWaitingRedraw'?draw:c)[key]=settlement[key];
   globalThis.Ext={getCmp:id=>{const n=d.dom.nodes.find(n=>n.attributes.id===id&&n.ext);return n?get(n.ext):null;}};
   const model=get(d.active.model);Object.assign(model,{FView:get(d.active.FView),FModelEnginePort:get(d.active.FModelEnginePort),FModelNode:get(d.active.FModelNode),FWizardItems:{FItems:d.linkNative.modelWizardItems.map(x=>({Wizard:get(x.wizard)}))}});
   const card=get(d.active.card);card.Controller={FController:model,Node:{data:{node:get(d.active.wizardTree)}}};
@@ -42,5 +45,5 @@ export async function hydrate(page,capture,mode,prepared){
   const r=ledger[0];globalThis.__loginomDockPreparationV1={document,id:d.document_id,receipts:new Map([['fixture-preparation',{phase:'verified',workflowId:p.workflow_ref.workflow_id,tab,packageNode:r.packageNode,nodeTargetWorkflowNode:r.workflow}]]),outputPortOpenReceipts:new Map(ledger.map(r=>[r.key,r]))};
   globalThis.__nativeFixture={get,ledger,model,c,draw,grids:d.grids,link:d.linkNative};
 
- },{d:capture,p:prepared,mode});
+ },{d:capture,p:prepared,mode,settlement});
 }

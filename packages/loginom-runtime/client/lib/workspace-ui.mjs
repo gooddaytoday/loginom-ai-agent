@@ -2335,6 +2335,7 @@ function readRenderedInputMapping(observation) {
     }
     // Output Links refs require the current opening and complete cached native
     // record/Ext/DOM aliases. They do not authorize a hidden toolbar control.
+    const outputLinksUnsettled=new Set();
     if(!discoverRoots&&wizard.stage==='output_mapping'&&preparedOutputPort?.direction==='output')try{
       const p=globalThis.__loginomDockPreparationV1,card=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab();
       const model=card?.Controller?.FController,entries=[...(p?.outputPortOpenReceipts?.entries()??[])];
@@ -2385,6 +2386,15 @@ function readRenderedInputMapping(observation) {
       });
       const [sources,targets]=inventories,g=controller.Items?.LinkGrid,d=g?.FLinkDrawContainer;
       requireLink(sources.length===targets.length&&d?.FTables?.length===2&&d.FTables.every((v,i)=>v.getView?.()===views[i]&&v.getStore?.()===stores[i]),'output_link_native_tables');
+      // Stores alone do not establish settlement of the native relation/draw
+      // update. Missing or non-boolean flags are not evidence of false.
+      const settlement={controller_ref:refOf(controller),draw_ref:refOf(d),
+        FLinksUpdateMode:controller.FLinksUpdateMode,FRelationRefreshMode:controller.FRelationRefreshMode,FWaitingRedraw:d.FWaitingRedraw};
+      const settled=settlement.FLinksUpdateMode===false&&settlement.FRelationRefreshMode===false&&settlement.FWaitingRedraw===false;
+      if(!settled)for(const [i,records] of inventories.entries())for(const record of records)
+        for(const e of tids.get(base+(i===0?'colSourceName_':'colDisplayName_')+record.data.Name)??[])
+          if(grids[i][0].contains(e))outputLinksUnsettled.add(e);
+      requireLink(settled,'output_link_settlement');
       requireLink(d.FSelectedLinks&&typeof d.FSelectedLinks==='object'&&!Array.isArray(d.FSelectedLinks),'output_link_selection_inventory');
       const pairs=Object.entries(d.FLinks??{}),selected=Object.entries(d.FSelectedLinks);
       const boundSources=new Set(pairs.map(([,pair])=>pair?.[0])),boundTargets=new Set(pairs.map(([,pair])=>pair?.[1]));
@@ -2429,7 +2439,7 @@ function readRenderedInputMapping(observation) {
       const staged=[];
       for(const [key,pair] of reconnect?[]:pairs)for(const i of [0,1])staged.push([cells[i][inventories[i].indexOf(pair[i])],{
         role:i===0?'output_source':'output_target',field_key:pair[i].data.Name,record_id:String(pair[i].internalId),grid_ref:refOf(grids[i][0]),wizard_root_ref:wizard.root_ref,
-        link:{owner,key,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),selected:d.FSelectedLinks[key]===pair}}]);
+        link:{owner,settlement,key,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),selected:d.FSelectedLinks[key]===pair}}]);
       if(reconnect){const pair=[unboundSources[0],unboundTargets[0]],key=String(pair[0].internalId)+'_'+String(pair[1].internalId);
         requireLink(!Object.hasOwn(d.FLinks,key)&&!Object.hasOwn(d.FSelectedLinks,key)&&!Object.hasOwn(d.FDrawLinkItems,key),'output_link_unbound_alias');
         const inventory={controller_ref:refOf(controller),stores:stores.map(refOf),
@@ -2442,7 +2452,7 @@ function readRenderedInputMapping(observation) {
             buttons:buttonsByItem.get(drawItem).map(sprite=>({native_ref:refOf(sprite),dom_ref:refOf(sprite.element.dom)}))}))};
         for(const i of [0,1])staged.push([cells[i][inventories[i].indexOf(pair[i])],{
           role:i===0?'output_source':'output_target',field_key:pair[i].data.Name,record_id:String(pair[i].internalId),grid_ref:refOf(grids[i][0]),wizard_root_ref:wizard.root_ref,
-          link:{owner,key,state:'unbound',inventory,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),
+          link:{owner,settlement,key,state:'unbound',inventory,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),
             source_display_name:pair[1].data.SourceDisplayName??null,source_data_type:pair[1].data.SourceDataType??null,selected:false}}]);
       }
       if(selected.length===1&&!reconnect){const [key,pair]=selected[0],item=d.FDrawLinkItems?.[key],buttons=item?.DrawDeleteButton;
@@ -2452,7 +2462,7 @@ function readRenderedInputMapping(observation) {
             &&form.contains(element)&&visible(element)&&seenElements.has(element)&&element.children.length===1
             &&element.children[0].tagName.toLowerCase()==='path','output_link_remove_dom');
           staged.push([element,{role:'output_relation_remove',record_id:String(pair[1].internalId),wizard_root_ref:wizard.root_ref,
-            link:{owner,key,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),selected:true}}]);
+            link:{owner,settlement,key,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),selected:true}}]);
         }
       }
       for(const [element,metadata] of staged){
@@ -2849,7 +2859,7 @@ function readRenderedInputMapping(observation) {
       const editable = element.matches('textarea,input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),[contenteditable="true"]') && !element.readOnly;
       const label = tableScrollers.has(state.ids.get(element))?'':short(element.getAttribute('aria-label') || element.getAttribute('placeholder') || element.getAttribute('title') || textOf(element));
       const role = element.getAttribute('role'), kind = /;(?:Input|Output)_/.test(tid ?? '') ? 'port' : editable ? 'field' : /;Graph;/.test(tid ?? '') ? 'graph' : 'control';
-      const isEnabled = enabled(element), allowed = identity && isEnabled && !dangerous(element);
+      const isEnabled = enabled(element), allowed = identity && isEnabled && !dangerous(element)&&!outputLinksUnsettled.has(element);
       const scroll = scrollOf(element);
       const horizontalScroll=horizontalScrollOf(element);
       const interaction = interactionOf(element);
