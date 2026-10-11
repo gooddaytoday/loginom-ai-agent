@@ -83,7 +83,7 @@ async function handle(message) {
       let captureHarness
       if (acceptanceCapture) {
         // Fixed reviewed receiving resource, never a request-selected module.
-        const path = "runtime/acceptance/calculator-grouped-before-done-v1.mjs"
+        const path = "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs"
         if (!resources.manifest.files.some(file => file.path === path && !file.link && !file.directory))
           throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
         const module = await import(pathToFileURL(join(input.resources, path)).href)

@@ -26,7 +26,7 @@ export async function launchCalculatorDiagnostic(input: NodeHostInput & { packag
     throw Error("LOGINOM_HANDSHAKE_INVALID")
   const manifest = JSON.parse(await readFile(join(input.resources, "resource-manifest.json"), "utf8"))
   for (const [path, actual] of [["bin/node", input.node], ["host/node-host.mjs", input.entry],
-    ["runtime/acceptance/calculator-grouped-before-done-v1.mjs", join(input.resources, "runtime/acceptance/calculator-grouped-before-done-v1.mjs")]]) {
+    ["runtime/src/acceptance/calculator-grouped-before-done-v1.mjs", join(input.resources, "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs")]]) {
     const item = manifest.files?.find((file: { path: string }) => file.path === path)
     if (!item || !/^[a-f0-9]{64}$/.test(item.sha256) || await realpath(actual!) !== resolve(input.resources, path!)
         || createHash("sha256").update(await readFile(actual!)).digest("hex") !== item.sha256)

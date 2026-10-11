@@ -9,16 +9,16 @@ test('verified fixed launcher forwards authority only on its private pipe; tampe
  let host:any
  try{
   const node=process.env.LOGINOM_AI_AGENT_TEST_NODE;if(!node)throw Error('Pinned Node required')
-  for(const p of ['bin','host','runtime/acceptance'])await mkdir(join(root,p),{recursive:true})
+  for(const p of ['bin','host','runtime/src/acceptance'])await mkdir(join(root,p),{recursive:true})
   await copyFile(node,join(root,'bin/node'))
-  const entry=join(root,'host/node-host.mjs'),harness=join(root,'runtime/acceptance/calculator-grouped-before-done-v1.mjs')
+  const entry=join(root,'host/node-host.mjs'),harness=join(root,'runtime/src/acceptance/calculator-grouped-before-done-v1.mjs')
   await writeFile(harness,'export const captureCalculator=()=>{};')
   await writeFile(entry,`let grant;process.on('message',m=>{
    if(m.method==='start'){grant=m.input.acceptanceCapture;process.send({id:m.id,result:{ready:true,protocol:1,pid:process.pid}});}
    if(m.method==='acceptance.capture')process.send({id:m.id,result:{authorized:m.input.authorization===grant.authorization,packagePath:grant.packagePath}});
    if(m.method==='close')process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
   });`)
-  const files=[];for(const path of ['bin/node','host/node-host.mjs','runtime/acceptance/calculator-grouped-before-done-v1.mjs'])
+  const files=[];for(const path of ['bin/node','host/node-host.mjs','runtime/src/acceptance/calculator-grouped-before-done-v1.mjs'])
    files.push({path,sha256:createHash('sha256').update(await readFile(join(root,path))).digest('hex')})
   await writeFile(join(root,'resource-manifest.json'),JSON.stringify({files}))
   const input={node:join(root,'bin/node'),entry,root,resources:root,headless:true,environment:{},packagePath:'/user/draft.lgp'}
