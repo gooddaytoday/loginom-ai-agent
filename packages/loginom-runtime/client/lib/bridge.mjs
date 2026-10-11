@@ -594,6 +594,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         if (closed[1].status === 'fulfilled') await awaitBrowserExit();
         const browserTransportClosed = closed[1].status === 'fulfilled' && browserTransportEnded;
         const cleanupComplete=browserTransportClosed&&closed.every(result=>result.status==='fulfilled');
+        const classicReceipt=config.mode==='classic'&&!userProfile&&!managedBrowserTransport&&!config.acceptanceCleanupPackage;
         const shutdown={browser_transport_closed:browserTransportClosed,cleanup_complete:cleanupComplete,
           browser_process_terminated:!managedBrowserTransport&&browserTransportEnded,
           native_logout_confirmed:shutdownCleanup?.logged_out===true,
@@ -604,7 +605,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         shutdownStage='durable_transport_receipt';
         await writeFile(join(session.directory,'shutdown-receipt.json'),JSON.stringify(shutdown,null,2)+'\n',{mode:0o600});
         await recordExecution({event:'bridge_shutdown',shutdown});
-        if (cleanupComplete) {
+        if (cleanupComplete || (classicReceipt && browserTransportClosed)) {
           shutdownStage='release';
           await session.artifactStore.releaseUploads();
           await Promise.allSettled([...heldLeases].map(async lease => {
@@ -614,7 +615,11 @@ export async function createBridge(config, session, { browserTransport: managedB
         // A failed transport close does not prove that an unconfirmed paste has
         // stopped. Retain leases while this process lives; process exit still
         // releases kernel locks and is not cross-process recovery evidence.
-        return {...shutdown,clipboard_leases_retained:heldLeases.size};
+        // Classic callers retain their strict receipt shape. The durable record
+        // above still preserves remote refusals; managed cleanup stays gated.
+        return classicReceipt ? {browser_transport_closed:browserTransportClosed,
+          browser_process_terminated:shutdown.browser_process_terminated,clipboard_leases_retained:heldLeases.size}
+          : {...shutdown,clipboard_leases_retained:heldLeases.size};
       })().then(result => {
         if ((managedCleanup || config.acceptanceCleanupPackage) && (result?.browser_transport_closed !== true || result.cleanup_complete===false)) { if(managedCleanup)cleanupRefused=true; closing = undefined; shutdownStarted = false; }
         return result;
