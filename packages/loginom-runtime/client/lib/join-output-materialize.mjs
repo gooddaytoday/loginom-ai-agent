@@ -35,6 +35,8 @@ export async function materializeJoinDefaultOutput(channel,initial,orderedIds){
    &&(unbound?link.state==='unbound':link.state===undefined),'Join Links binding is not settled');
   return {source:sources[0],target:targets[0],link};
  };
+ const settled=(s,sourceId,targetId,unbound=false)=>{try{return proof(s,sourceId,targetId,unbound);}catch{return null;}};
+ state=await channel.observe({condition:'settled complete Join Links inventory',readMappings:true,ready:s=>unchanged(s)&&orderedIds.every(id=>settled(s,baseline.target_fields.find(t=>t.record_id===id).source.record_id,id))});
  const planned=[];
  // Validate all pairs before the first possible effect, including custom ones.
  for(const id of orderedIds){
@@ -51,14 +53,14 @@ export async function materializeJoinDefaultOutput(channel,initial,orderedIds){
   need(unchanged(state),'Join output changed before materialization');definitions(state);
   await channel.perform({condition:'select exact implicit Join binding',initialObservation:state,ready:unchanged,identity:()=>({owner,pair}),resolve:s=>{
    definitions(s);const p=pairProof(s);need(p.source.allowed_actions.includes('click'),'Join binding selection unavailable');return {verb:'click',ref:p.source.ref};}});
-  state=await channel.observe({condition:'selected implicit Join binding',readMappings:true,ready:unchanged});
+  state=await channel.observe({condition:'selected implicit Join binding',readMappings:true,ready:s=>unchanged(s)&&settled(s,pair.sourceId,pair.targetId)?.link.selected===true});
   const selected=pairProof(state);need(selected.link.selected===true&&same(selected.link.target,pair.original.target),'Join selected target definition changed');
   receipts.push(await channel.perform({condition:'unlink exact implicit Join binding',initialObservation:state,ready:unchanged,identity:()=>({owner,pair}),resolve:s=>{
    definitions(s);const p=pairProof(s);need(p.link.selected===true,'Join relation selection changed');
    const es=linked(s).filter(e=>e.date_time_cell.role==='output_relation_remove'&&same(e.date_time_cell.link,p.link)&&e.allowed_actions.includes('click'));
    need(es.length===1,'Join single unlink control unavailable');return {verb:'click',ref:es[0].ref};}}));
   const unbound=structuredClone(baseline);unbound.target_fields.find(t=>t.record_id===pair.targetId).source=null;
-  state=await channel.observe({condition:'one settled unbound Join pair',readMappings:true,ready:s=>bound(s)&&mappingSame(s.node_mapping,unbound)});
+  state=await channel.observe({condition:'one settled unbound Join pair',readMappings:true,ready:s=>bound(s)&&mappingSame(s.node_mapping,unbound)&&settled(s,pair.sourceId,pair.targetId,true)?.link.source_display_name===null&&settled(s,pair.sourceId,pair.targetId,true)?.link.source_data_type===null});
   const vacant=proof(state,pair.sourceId,pair.targetId,true);
   need(vacant.link.source_display_name===null&&vacant.link.source_data_type===null,'Join unbound source hints are stale');
   for(const p of planned){const records=vacant.link.inventory?.records;need(Array.isArray(records)&&records.length===2,'Join unbound inventory unavailable');for(const [i,id,expected] of [[0,p.sourceId,p.original.source],[1,p.targetId,{...p.original.target,OriginType:completed.has(p.targetId)?1:p.original.target.OriginType}]]){const rows=records[i].filter(r=>r.record_id===id);need(rows.length===1&&same(rows[0].definition,expected),'Join unbound retained definition changed');}}
@@ -66,7 +68,7 @@ export async function materializeJoinDefaultOutput(channel,initial,orderedIds){
   receipts.push(await channel.perform({condition:'restore exact settled Join pair',initialObservation:state,ready:s=>bound(s)&&mappingSame(s.node_mapping,unbound),identity:()=>({owner,pair}),resolve:s=>{
    const p=proof(s,pair.sourceId,pair.targetId,true);need(p.source.allowed_actions.includes('drag')&&p.target.allowed_actions.includes('drag'),'Join reconnect unavailable');
    return {verb:'drag',source_ref:p.source.ref,target_ref:p.target.ref};}}));
-  state=await channel.observe({condition:'complete restored Join mapping',readMappings:true,ready:unchanged});
+  state=await channel.observe({condition:'complete restored Join mapping',readMappings:true,ready:s=>unchanged(s)&&settled(s,pair.sourceId,pair.targetId)?.link.target.OriginType===1});
   const restored=pairProof(state);need(same(restored.link.source,pair.original.source)&&same(restored.link.target,{...pair.original.target,OriginType:1}), 'Join reconnect changed definition or origin');completed.add(pair.targetId);definitions(state);
  }
  state=await ensureMappingTableView(channel,state);
