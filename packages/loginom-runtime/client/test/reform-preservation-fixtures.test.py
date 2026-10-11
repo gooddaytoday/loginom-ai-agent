@@ -3,10 +3,26 @@ import csv
 import hashlib
 import io
 import json
+import math
 from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[4] / "docs/node-development/nodes/field-parameters/acceptance/fixtures/preservation"
+
+def require_typed_rows(rows, columns):
+    assert type(rows) is list
+    allowed = {"integer": (int,), "real": (int, float), "boolean": (bool,),
+               "string": (str,), "datetime": (str,)}
+    assert all(f["type"] in allowed for f in columns)
+    for row in rows:
+        assert type(row) is list and len(row) == len(columns)
+        for value, field in zip(row, columns):
+            if value is None:
+                continue
+            # Exact types exclude bool from Python's int subclass/equality.
+            assert type(value) in allowed[field["type"]]
+            if field["type"] == "real":
+                assert math.isfinite(value)
 
 def verify(name, *, data=None, contract=None):
     c = contract or json.loads((ROOT / (name + ".json")).read_text())
@@ -29,6 +45,9 @@ def verify(name, *, data=None, contract=None):
         return value
     assert all(len(r) == len(c["input_columns"]) for r in parsed[1:])
     rows = [[typed(v, f["type"]) for v, f in zip(r, c["input_columns"])] for r in parsed[1:]]
+    require_typed_rows(c["input_rows"], c["input_columns"])
+    require_typed_rows(c["expected"]["rows"], c["expected"]["columns"])
+    assert type(c["expected"]["cardinality"]) is int and c["expected"]["cardinality"] >= 0
     assert rows == c["input_rows"]
     assert c["expected"]["cardinality"] == len(rows) == len(c["expected"]["rows"])
     assert c["expected"]["columns"] == [{k: f[k] for k in ["name", "label", "type"]} for f in c["expected_configuration"] if not f["excluded"]]
@@ -39,6 +58,40 @@ def verify(name, *, data=None, contract=None):
     return c
 
 class Fixtures(unittest.TestCase):
+    def contract(self, name):
+        return json.loads((ROOT / (name + ".json")).read_text())
+
+    def test_expected_integer_zero_cannot_be_false(self):
+        c = self.contract("rowid-ab-c")
+        c["expected"]["rows"][1][2] = False
+        with self.assertRaises((AssertionError, ValueError, TypeError)):
+            verify("rowid-ab-c", contract=c)
+
+    def test_typed_integer_input_zero_cannot_be_false(self):
+        c = self.contract("wide-130")
+        c["input_rows"][1][5] = False
+        with self.assertRaises((AssertionError, ValueError, TypeError)):
+            verify("wide-130", contract=c)
+
+    def test_typed_boolean_input_false_cannot_be_zero(self):
+        c = self.contract("rowid-ab-c")
+        c["input_rows"][1][3] = 0
+        with self.assertRaises((AssertionError, ValueError, TypeError)):
+            verify("rowid-ab-c", contract=c)
+
+    def test_typed_boolean_input_true_cannot_be_one(self):
+        c = self.contract("rowid-ab-c")
+        c["input_rows"][0][3] = 1
+        with self.assertRaises((AssertionError, ValueError, TypeError)):
+            verify("rowid-ab-c", contract=c)
+
+    def test_empty_cardinality_must_be_integer_zero(self):
+        c = self.contract("empty-typed")
+        c["expected"]["cardinality"] = False
+        with self.assertRaises((AssertionError, ValueError, TypeError)):
+            verify("empty-typed", contract=c)
+
+
     def test_preservation(self):
         c = verify("rowid-ab-c")
         self.assertEqual(c["value_sources"], ["RowID", "A", "B", "Extra"])
