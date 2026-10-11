@@ -147,7 +147,9 @@ export async function supervise(input: Launch) {
   function close() {
     if (closing.promise) return closing.promise
     closing.promise = (async () => {
-      const reply = await request("close", undefined, 5000).catch(() => undefined)
+      const reply = await request("close", undefined, 5000)
+      if (!reply || typeof reply !== "object" || !("closed" in reply) || reply.closed !== true)
+        throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
       try {
         const outcome = await exited
@@ -164,7 +166,9 @@ export async function supervise(input: Launch) {
         clearTimeout(timer)
       }
     })()
-    return closing.promise
+    const attempt = closing.promise
+    attempt.catch(() => { if (closing.promise === attempt) closing.promise = undefined })
+    return attempt
   }
   // Connection validation can spend 30 seconds on MCP initialization and up
   // to 150 seconds navigating/authenticating Loginom. Do not race that
