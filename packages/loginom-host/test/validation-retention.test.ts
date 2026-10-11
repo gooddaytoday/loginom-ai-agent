@@ -24,8 +24,8 @@ const sourceSupervisor=transpiler.transformSync(supervisor.slice(supervisor.inde
 const sourceCloseStart=service.indexOf('    close() {')
 const sourceClose=transpiler.transformSync('const closeContainer={'+service.slice(sourceCloseStart,service.indexOf('\n    },',sourceCloseStart)+8)+'};')
 const sourceOuter=transpiler.transformSync(entry.slice(entry.indexOf('function closeRejection('),entry.indexOf('function reply(')))
-const compiledHost=bundle.slice(bundle.indexOf('async function createLoginomHost(options)'),bundle.indexOf('// src/host-port.ts'))
-const compiledSupervisor=bundle.slice(bundle.indexOf('function runtimeEnvironment('),bundle.indexOf('// src/connection/connection-service.ts',bundle.indexOf('function runtimeEnvironment(')))
+const compiledHost=bundle.slice(bundle.indexOf('async function createLoginomHost(options)'),bundle.search(/\/\/ (?:packages\/loginom-host\/)?src\/host-port\.ts/))
+const compiledSupervisor=bundle.slice(bundle.indexOf('function runtimeEnvironment('),bundle.indexOf('// packages/loginom-host/src/connection/connection-service.ts',bundle.indexOf('function runtimeEnvironment(')) >= 0 ? bundle.indexOf('// packages/loginom-host/src/connection/connection-service.ts',bundle.indexOf('function runtimeEnvironment(')) : bundle.indexOf('// src/connection/connection-service.ts',bundle.indexOf('function runtimeEnvironment(')))
 const compiledServiceStart=bundle.indexOf('    close() {',bundle.indexOf('async function connectionService('))
 const compiledClose='const closeContainer={'+bundle.slice(compiledServiceStart,bundle.indexOf('\n    }\n  };',compiledServiceStart)+6)+'};'
 const compiledOuter=bundle.slice(bundle.indexOf('function closeRejection('),bundle.indexOf('function reply(',bundle.indexOf('function closeRejection(')))
