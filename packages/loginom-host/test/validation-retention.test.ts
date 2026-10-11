@@ -138,6 +138,7 @@ for(const rejected of [Error('authentication original'),undefined,null,false,0,'
  const input={revision:0,url:'https://fixture.invalid',username:'fixture',apiKey:{operation:'replace',value:'fixture'},password:{operation:'empty'}}
  const symbols:any={state,runtime,Error,Promise,Date,setTimeout,clearTimeout,randomUUID,validations:new Map(),
   Option:{isNone:()=>false},decodeCandidate:()=>({value:input}),validateAddress:()=>{},settingsAddress:(s:string)=>s,
+  exports_Option:{isNone:()=>false},validationRunning:()=>state.checking!==undefined,
   progress:()=>{},clearValidations:()=>{throw Error('premature acknowledgement')}}
  for(let i=2;i<10;i++){symbols['randomUUID'+i]=randomUUID;symbols['Option'+i]=symbols.Option}
  const api=vm.runInNewContext((candidate?compiledCheck:sourceCheck)+';api',symbols)
