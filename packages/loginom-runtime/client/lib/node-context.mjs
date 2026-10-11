@@ -22,7 +22,9 @@ export async function readPreparedNodeContext(page, binding) {
     const r=records.find(r=>r.nodeTargetWorkflowNode);
     if (!r) return reject('workflow_unbound');
     if(r.request!==undefined&&(typeof r.request!=='string'||!r.request))return reject('navigation_request');
-    if(Object.hasOwn(r,'nodePreparedRequest')&&r.request!==r.nodePreparedRequest)return reject('navigation_request');
+    const requestPin=Object.getOwnPropertyDescriptor(r,'nodePreparedRequest');
+    if(r.nodeNavigationBinding&&(!requestPin||typeof requestPin.value!=='string'||requestPin.writable||requestPin.configurable))return reject('navigation_request');
+    if(requestPin&&r.request!==requestPin.value)return reject('navigation_request');
     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
     const tabs=exact(b.workflow_ref.tab_tid);
     if(tabs.length!==1 || tabs[0]!==r.tab || !tabs[0].classList.contains('x-tab-active')) return reject('tab');
@@ -68,7 +70,7 @@ export async function readPreparedNodeContext(page, binding) {
           ||native.length!==baseline.native.length||native.some((n,i)=>!n||n!==baseline.native[i]||n.FGuid!==baseline.guids[i]||i>0&&n.ParentNode!==native[i-1]))return null;
       }
       if(samePath(expected,observed)) {
-        if(capture&&!baseline&&samePath(receipt.crumbs,expected)&&typeof account==='string'&&account
+        if(capture&&!baseline&&typeof receipt.request==='string'&&receipt.request&&samePath(receipt.crumbs,expected)&&typeof account==='string'&&account
           &&typeof packagePath==='string'&&packagePath&&native.every((n,i)=>n&&(!i||n.ParentNode===native[i-1]))
           &&native.filter(n=>n===receipt.packageNode).length===1&&native.at(-1)===receipt.nodeTargetWorkflowNode)
           receipt.nodeNavigationBinding={path:expected.map(c=>({...c})),native,guids:native.map(n=>n.FGuid),tab:receipt.tab,packageNode:receipt.packageNode,

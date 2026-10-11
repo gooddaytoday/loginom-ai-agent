@@ -183,3 +183,10 @@ for(const request of [{intent:'open_package'},null,''])test('captured authority 
  test('foreign transition is never committed as an allowed path',async()=>{
  const f=await fixture({fault:'foreign-node'});await assert.rejects(f.run());assert.equal(f.receipt.nodeNavigationPath,undefined);
  });
+
+for(const changed of [false,true])test('copied captured authority without immutable pin refuses instead of re-pinning '+changed,async()=>{
+ const f=await fixture();assert.equal((await f.read()).verified,true);assert.ok(f.receipt.nodeNavigationBinding);
+ const legacy={...f.receipt};if(changed)legacy.request=JSON.stringify({intent:'new_draft'});
+ assert.equal(Object.hasOwn(legacy,'nodePreparedRequest'),false);f.prep.receipts.set(evidence.preparation.operation_id,legacy);
+ assert.equal((await f.read()).verified,false);assert.equal(Object.hasOwn(legacy,'nodePreparedRequest'),false);
+});
