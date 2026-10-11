@@ -79,8 +79,10 @@ export async function readPreparedNodeContext(page, binding) {
         i===index?current.tid:expected[i].tid.startsWith(old.tid+'>')?current.tid+expected[i].tid.slice(old.tid.length):null)))return null;
       return {verified:true,rebinding:{prepared_path:expected.map(c=>({...c})),observed_path:observed.map(c=>({...c}))}};
     };
-    const navigation=verifyNavigation(b.workflow_ref,r,crumbs.slice(0,b.workflow_ref.navigation_path.length));
-    if(!navigation)return reject('navigation');
+    let navigation=verifyNavigation(b.workflow_ref,r,crumbs.slice(0,b.workflow_ref.navigation_path.length));
+    // Canonical open_package can precede capture; a captured binding must
+    // still satisfy every existing account/connection/native rekey guard.
+    if(!navigation&&r.nodeNavigationBinding)return reject('navigation');
     if(new Set(crumbs.map(c=>c.tid)).size!==crumbs.length)return reject('navigation');
     const model=card?.Controller?.FController;
     let surface, tid, locked, outputPort, graphRoot, pendingWizardNode;
@@ -140,6 +142,34 @@ export async function readPreparedNodeContext(page, binding) {
     if(elements.length!==1)return reject('surface_ambiguous');
     if(elements[0].getBoundingClientRect().width<=0 || elements[0].getBoundingClientRect().height<=0
       || getComputedStyle(elements[0]).visibility==='hidden')return pending();
+    const current=crumbs.slice(0,b.workflow_ref.navigation_path.length);
+    if(r.nodeNavigationPath&&JSON.stringify(r.nodeNavigationPath)!==JSON.stringify(current))return reject('navigation');
+    let canonicalAlias;
+    if(!navigation) {
+      // LAB-66 f9916486: receipt and exact Ext/DOM/native ancestry authority,
+      // after surface checks. Never substitute pathname/labels/GUID matches.
+      const original=b.workflow_ref.navigation_path;
+      let request;try{request=JSON.parse(r.request);}catch{return reject('navigation');}
+      const path=packageNode.PackageFileName;
+      if(original.length>32||request.intent!=='open_package'||typeof path!=='string'||!path
+        ||'/'+path.replaceAll('\\','/').replace(/^\/+/, '')!==request.packagePath
+        ||JSON.stringify(r.crumbs)!==JSON.stringify(original)
+        ||current.some((c,i)=>c.label!==original[i].label))return reject('navigation');
+      const lineage=[],visited=new Set();
+      for(let n=workflowNode;n&&lineage.length<32&&!visited.has(n);n=n.ParentNode){
+        visited.add(n);lineage.unshift(n);if(n===packageNode)break;
+      }
+      const start=current.length-lineage.length;
+      if(lineage[0]!==packageNode||lineage.at(-1)!==workflowNode||start<2
+        ||current.slice(0,start).some((c,i)=>c.tid!==original[i].tid))return reject('navigation');
+      for(let i=0;i<lineage.length;i++) {
+        const elements=exact(current[start+i].tid),e=elements[0];
+        const component=elements.length===1&&e?.isConnected&&globalThis.Ext?.getCmp(e.id);
+        if(!component||component.el?.dom!==e||component._node?.data?.node!==lineage[i])return reject('navigation');
+      }
+      canonicalAlias=current;
+      navigation={verified:true,rebinding:{prepared_path:original.map(c=>({...c})),observed_path:current.map(c=>({...c}))}};
+    }
     if(navigation.rebinding&&surface!=='graph') {
       // The rebuilt owner suffix must belong to the current native node/wizard,
       // including port/group ancestors. A duplicate label cannot bind it.
@@ -153,6 +183,7 @@ export async function readPreparedNodeContext(page, binding) {
         return cmp?.el?.dom!==e||cmp?._node?.data?.node!==tail[i];
       }))return reject('navigation_owner');
     }
+    if(canonicalAlias)r.nodeNavigationPath=canonicalAlias;
     verifyNavigation(b.workflow_ref,r,crumbs.slice(0,b.workflow_ref.navigation_path.length),true);
     return {verified:true,...(navigation.rebinding?{navigation_rebinding:navigation.rebinding}:{}),document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,surface,tid,
       ...(outputPort?{[outputPort.direction==='input'?'input_port':'output_port']:outputPort}:{}),
