@@ -21,6 +21,10 @@ export async function readPreparedNodeContext(page, binding) {
     if (!records.length || records.some(r=>r.tab!==records[0].tab || r.packageNode!==records[0].packageNode)) return reject('receipt');
     const r=records.find(r=>r.nodeTargetWorkflowNode);
     if (!r) return reject('workflow_unbound');
+    if(r.request!==undefined&&(typeof r.request!=='string'||!r.request))return reject('navigation_request');
+    const requestPin=Object.getOwnPropertyDescriptor(r,'nodePreparedRequest');
+    if(r.nodeNavigationBinding&&(!requestPin||typeof requestPin.value!=='string'||requestPin.writable||requestPin.configurable))return reject('navigation_request');
+    if(requestPin&&r.request!==requestPin.value)return reject('navigation_request');
     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
     const tabs=exact(b.workflow_ref.tab_tid);
     if(tabs.length!==1 || tabs[0]!==r.tab || !tabs[0].classList.contains('x-tab-active')) return reject('tab');
@@ -67,7 +71,7 @@ export async function readPreparedNodeContext(page, binding) {
           ||native.length!==baseline.native.length||native.some((n,i)=>!n||n!==baseline.native[i]||n.FGuid!==baseline.guids[i]||i>0&&n.ParentNode!==native[i-1]))return null;
       }
       if(samePath(expected,observed)) {
-        if(capture&&!baseline&&samePath(receipt.crumbs,expected)&&typeof account==='string'&&account
+        if(capture&&!baseline&&typeof receipt.request==='string'&&receipt.request&&samePath(receipt.crumbs,expected)&&typeof account==='string'&&account
           &&typeof packagePath==='string'&&packagePath&&native.every((n,i)=>n&&(!i||n.ParentNode===native[i-1]))
           &&native.filter(n=>n===receipt.packageNode).length===1&&native.at(-1)===receipt.nodeTargetWorkflowNode)
           receipt.nodeNavigationBinding={path:expected.map(c=>({...c})),native,guids:native.map(n=>n.FGuid),tab:receipt.tab,packageNode:receipt.packageNode,
@@ -189,7 +193,8 @@ export async function readPreparedNodeContext(page, binding) {
         return cmp?.el?.dom!==e||cmp?._node?.data?.node!==tail[i];
       }))return reject('navigation_owner');
     }
-    if(canonicalAlias)r.nodeNavigationPath=canonicalAlias;
+    if(navigation.rebinding)r.nodeNavigationPath=current;
+    if(!Object.hasOwn(r,'nodePreparedRequest'))Object.defineProperty(r,'nodePreparedRequest',{value:r.request});
     verifyNavigation(b.workflow_ref,r,crumbs.slice(0,b.workflow_ref.navigation_path.length),true);
     return {verified:true,...(navigation.rebinding?{navigation_rebinding:navigation.rebinding}:{}),document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,surface,tid,
       ...(outputPort?{[outputPort.direction==='input'?'input_port':'output_port']:outputPort}:{}),
