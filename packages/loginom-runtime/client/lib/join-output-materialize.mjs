@@ -60,6 +60,7 @@ export async function materializeJoinDefaultOutput(channel,initial,orderedIds){
   const unbound=structuredClone(baseline);unbound.target_fields.find(t=>t.record_id===pair.targetId).source=null;
   state=await channel.observe({condition:'one settled unbound Join pair',readMappings:true,ready:s=>bound(s)&&mappingSame(s.node_mapping,unbound)});
   const vacant=proof(state,pair.sourceId,pair.targetId,true);
+  need(vacant.link.source_display_name===null&&vacant.link.source_data_type===null,'Join unbound source hints are stale');
   for(const p of planned){const records=vacant.link.inventory?.records;need(Array.isArray(records)&&records.length===2,'Join unbound inventory unavailable');for(const [i,id,expected] of [[0,p.sourceId,p.original.source],[1,p.targetId,{...p.original.target,OriginType:completed.has(p.targetId)?1:p.original.target.OriginType}]]){const rows=records[i].filter(r=>r.record_id===id);need(rows.length===1&&same(rows[0].definition,expected),'Join unbound retained definition changed');}}
   need(same(vacant.link.source,pair.original.source)&&same(vacant.link.target,pair.original.target), 'Join unlink changed definitions');
   receipts.push(await channel.perform({condition:'restore exact settled Join pair',initialObservation:state,ready:s=>bound(s)&&mappingSame(s.node_mapping,unbound),identity:()=>({owner,pair}),resolve:s=>{
