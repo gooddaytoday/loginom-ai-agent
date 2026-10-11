@@ -82,7 +82,11 @@ async function dispatch(message: unknown) {
         !isAbsolute(input.resources) ||
         !("headless" in input) ||
         typeof input.headless !== "boolean" ||
-        ("strictRecovery" in input && typeof input.strictRecovery !== "boolean")
+        ("strictRecovery" in input && typeof input.strictRecovery !== "boolean") ||
+        ("acceptanceCleanupPackage" in input && (typeof input.acceptanceCleanupPackage !== "string" ||
+          input.acceptanceCleanupPackage.length > 1024 ||
+          !/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/.test(input.acceptanceCleanupPackage) ||
+          input.acceptanceCleanupPackage.split("/").some(segment => segment === "." || segment === "..")))
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
       const options = {
@@ -90,6 +94,7 @@ async function dispatch(message: unknown) {
         resources: input.resources,
         headless: input.headless,
         strictRecovery: "strictRecovery" in input && input.strictRecovery === true,
+        acceptanceCleanupPackage: "acceptanceCleanupPackage" in input ? input.acceptanceCleanupPackage as string : undefined,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
       }

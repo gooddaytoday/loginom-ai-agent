@@ -8,13 +8,16 @@ const body=source.slice(start+'  } finally {'.length,source.lastIndexOf('\n  }\n
 for(const value of [Error('original refusal'),null,undefined,false,0,''])test('real caller finally retains same adapter/rejection: '+String(value),async()=>{
  let listener:any;const page={original:true},events:string[]=[]
  LoginomHost.connect({on:(_,f)=>listener=f,start(){},postMessage(m:any){queueMicrotask(()=>listener({data:{id:m.id,result:m.method==='acquire'?{generation:1}:page}}))}})
- const owner=await LoginomHost.acquire('old')
- const finish=vm.runInNewContext('async function finish(){try{}finally{'+body+'}};finish',{host:{close:async()=>{events.push('close');throw value}},cleanup:{dispose:async()=>events.push('dispose'),detach:()=>events.push('detach')},LoginomHost,signal:undefined,process:{exitCode:undefined},failure:()=>events.push('failure')})
+ const retained={deferRelease:true,leases:new Set<any>()}
+ LoginomHost.disconnect()
+ LoginomHost.connect({on:(_,f)=>listener=f,start(){},postMessage(m:any){queueMicrotask(()=>listener({data:{id:m.id,result:m.method==='acquire'?{generation:1}:page}}))}},retained)
+ const owner=await LoginomHost.acquire('old');await owner!.release()
+ const finish=vm.runInNewContext('async function finish(){try{}finally{'+body+'}};finish',{owner:retained,host:{close:async()=>{events.push('close');throw value}},cleanup:{dispose:async()=>events.push('dispose'),detach:()=>events.push('detach')},LoginomHost,signal:undefined,process:{exitCode:undefined},failure:()=>events.push('failure')})
  let caught=false,rejected;try{await finish()}catch(e){caught=true;rejected=e}
- expect(caught).toBe(true);expect(Object.is(rejected,value)).toBe(true);expect(events).toEqual(['close']);expect(await owner!.tools()).toEqual(page)
+ expect(caught).toBe(true);expect((rejected as any).cleanupRefused).toBe(true);expect(Object.is((rejected as any).rejectedValue,value)).toBe(true);expect((rejected as any).owner).toBe(retained);expect(retained.leases.has(owner!)).toBe(true);expect(events).toEqual(['close']);expect(await owner!.tools()).toEqual(page)
  LoginomHost.disconnect()
 })
 test('real caller releases transport only after successful receipt',async()=>{
- const events:string[]=[],finish=vm.runInNewContext('async function finish(){try{}finally{'+body+'}};finish',{host:{close:async()=>events.push('receipt')},cleanup:{dispose:async()=>events.push('dispose'),detach:()=>events.push('detach')},LoginomHost:{disconnect:()=>events.push('disconnect')},signal:undefined,process:{exitCode:undefined},failure:()=>events.push('failure')})
+ const events:string[]=[],finish=vm.runInNewContext('async function finish(){try{}finally{'+body+'}};finish',{owner:{deferRelease:true,leases:new Set()},host:{close:async()=>events.push('receipt')},cleanup:{dispose:async()=>events.push('dispose'),detach:()=>events.push('detach')},LoginomHost:{disconnect:()=>events.push('disconnect')},signal:undefined,process:{exitCode:undefined},failure:()=>events.push('failure')})
  await finish();expect(events).toEqual(['receipt','dispose','detach','disconnect'])
 })

@@ -12,6 +12,7 @@ export async function launchNodeHost(input: {
   headless: boolean
   environment?: NodeJS.ProcessEnv
   strictRecovery?: boolean
+  acceptanceCleanupPackage?: string
 }) {
   if (![input.node, input.entry, input.root, input.resources].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
@@ -69,6 +70,7 @@ export async function launchNodeHost(input: {
         root: input.root,
         resources: input.resources,
         headless: input.headless,
+        ...(input.acceptanceCleanupPackage !== undefined ? { acceptanceCleanupPackage: input.acceptanceCleanupPackage } : {}),
         ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
       },
       // Startup restores the saved connection and waits for browser/MCP readiness.

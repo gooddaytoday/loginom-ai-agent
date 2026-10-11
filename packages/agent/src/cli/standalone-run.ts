@@ -7,7 +7,7 @@ import { Product } from "@loginom-ai-agent/product"
 import { standaloneCancellation } from "./standalone-cancellation"
 import { standaloneBundle } from "./standalone-bundle"
 
-export async function standaloneRun(args: string[], paths: ReturnType<typeof cliProfile>, mode: "run" | "tui" = "run") {
+export async function standaloneRun(args: string[], paths: ReturnType<typeof cliProfile>, mode: "run" | "tui" = "run", acceptanceCleanupPackage?: string) {
   const signal = mode === "run" ? standaloneCancellation() : undefined
   const boundary = args.indexOf("--") < 0 ? args.length : args.indexOf("--")
   const flags = args.slice(0, boundary)
@@ -54,8 +54,10 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     root: paths.loginom,
     headless,
     environment: process.env,
+    acceptanceCleanupPackage,
     strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
   })
+  const owner = { deferRelease: true, leases: new Set<{ release(): Promise<void> }>() }
   const cleanup: { dispose?: () => Promise<void>; detach?: () => void } = {}
   try {
     if (signal?.aborted) throw Error("CLI_CANCELLED")
@@ -97,7 +99,7 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     process.env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH = "1"
     const { applyCliSystemProxy, systemProxyNoticeLine } = await import("./standalone-proxy")
     const systemProxy = await applyCliSystemProxy()
-    LoginomHost.connect(host.port)
+    LoginomHost.connect(host.port, owner)
     const { AppRuntime } = await import("../effect/app-runtime")
     cleanup.dispose = async () => {
       const { HttpApiApp } = await import("../server/routes/instance/httpapi/server")
@@ -147,7 +149,17 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
       error instanceof Error && error.message === "CLI_ARGUMENT_INVALID" ? 2 : 1,
     )
   } finally {
-    await host.close()
+    try {
+      await host.close()
+    } catch (rejectedValue) {
+      // Internal handoff to the existing foreground caller. Never infer refusal
+      // from truthiness: undefined/null/false/0/empty string are valid rejections.
+      throw Object.assign(new Error("LOGINOM_OWNER_CLEANUP_REFUSED"), {
+        cleanupRefused: true, rejectedValue, host, owner, cleanup,
+      })
+    }
+    owner.deferRelease = false
+    for (const lease of owner.leases) await lease.release()
     await cleanup.dispose?.()
     cleanup.detach?.()
     LoginomHost.disconnect()
