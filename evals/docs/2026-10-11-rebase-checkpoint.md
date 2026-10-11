@@ -1,0 +1,16 @@
+# Rebase evals на loginom — 2026-10-11
+- Исходный evals: `684e729cf0f2c4fa014783a814d34f6dfb28fd17`.
+- Целевой loginom: `a3d8e294763342edc4bb0a6e194ea5afa6a63304`; общий предок: `485ba00e47f8f3ff0bf834801f3f11faed85a8db`.
+- Проверенный код после rebase и адаптации CLI-тестов: `4ae770cc37ba7affef3fc2df13b0d973ee7aa847`.
+- Range-diff: перенесены все 313 немержевых коммитов; 311 без изменения patch, 2 адаптированы при конфликтах. Содержимое интеграционного merge LAB31 сохранено.
+- В host сохранены независимый Help, ленивый browser runtime и подтверждённая очистка startup через acknowledgement и фактический exit; неподтверждённая очистка запрещает успешную validation/shutdown.
+- В `packages/agent/AGENTS.md` сохранены актуальные правила loginom и добавлено правило очистки профиля из evals.
+- Отдельный `test(cli)`-коммит согласует fixture Help с interrupt и лимит startup-теста с существующим 60-секундным cleanup; продуктовые таймауты не изменены.
+- До этого checkpoint дерево evals совпадает с исходным: `910b6733a4a8cc6e11fc21278c62945cafe88738`; harness не изменялся.
+- Host: 55 PASS / 0 FAIL; CLI: 22 PASS / 1 SKIP / 0 FAIL (Bun 1.4.2, закреплённый Node 24.19.0).
+- Runtime/client: 336 PASS / 0 FAIL / 0 SKIP на закреплённом Node 24.19.0.
+- Полный evals: 530 PASS / 14 SKIP / 0 FAIL, 544 теста в 53 файлах; Bun 1.3.14 и xmllint 2.9.14, последовательный запуск без конкурирующих native CLI-тестов.
+- Typecheck evals, loginom-host и agent: PASS на Bun 1.3.14; зависимости подготовлены только в изолированной рабочей копии.
+- Ограничения: Docker fixture image недоступен (14 SKIP); compiled CLI artifact не задан (1 SKIP). Live evals, установленные артефакты и CI не проверялись.
+- Резервная ссылка исходной ветки: `refs/backup/evals-rebase-20261011`. Push, слияние и выпуск не выполнялись.
+- Следующий шаг: review локальной rebased ветки владельцем; повторять harness на закреплённом Bun 1.3.14 с xmllint.
