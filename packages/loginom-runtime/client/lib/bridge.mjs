@@ -667,10 +667,14 @@ export async function createBridge(config, session, { browserTransport: managedB
         // releases kernel locks and is not cross-process recovery evidence.
         return {...shutdown,clipboard_leases_retained:heldLeases.size};
       })().then(result => {
-        if (result?.browser_transport_closed !== true || result.cleanup_complete===false) { if(managedCleanup)cleanupRefused=true; closing = undefined; shutdownStarted = false; }
+        // Only guarded package cleanup can reconcile and retry on this owner.
+        // Classic transport shutdown has an unknown effect and stays one-shot.
+        if ((managedCleanup || config.acceptanceCleanupPackage)
+            && (result?.browser_transport_closed !== true || result.cleanup_complete===false)) { if(managedCleanup)cleanupRefused=true; closing = undefined; shutdownStarted = false; }
         return result;
       }, async error => {
-        if(managedCleanup)cleanupRefused=true; closing = undefined; shutdownStarted = false;
+        if(managedCleanup)cleanupRefused=true;
+        if (managedCleanup || config.acceptanceCleanupPackage) { closing = undefined; shutdownStarted = false; }
         try { await writeFile(join(session.directory,'bridge-shutdown-failure.json'),
           JSON.stringify({stage:shutdownStage,rejection:shutdownPrimary?shutdownRejection(shutdownPrimary.reason):shutdownRejection(error),
             ...(shutdownPrimary?{primary_phase:shutdownPrimary.stage,primary_rejection:shutdownRejection(shutdownPrimary.reason),rejections:shutdownPrimary.rejections,persistence_failure:shutdownRejection(error)}:{})},null,2)+'\n',{mode:0o600}); }
