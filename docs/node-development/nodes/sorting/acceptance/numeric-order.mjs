@@ -10,9 +10,20 @@ function compareDecimal(a,b){
  const n=x.n*10n**BigInt(scale-x.scale),m=y.n*10n**BigInt(scale-y.scale);
  return n<m?-1:n>m?1:0;
 }
+// Scalar transport format only: NULL, string, boolean, finite number.
+// Big integers use decimal strings. Reject holes/undefined and non-JSON values.
+// Tagged number strings preserve signed zero without invoking cell.toJSON().
+function rowKey(row){return JSON.stringify(row.map(v=>v===null?['null']:
+ typeof v==='number'?['number',Object.is(v,-0)?'-0':String(v)]:[typeof v,v]));}
 export function auditNumericOrder({schema,input,output,keys}){
  need(Array.isArray(schema)&&schema.length>0&&new Set(schema.map(f=>f.name)).size===schema.length,'UNIQUE_SCHEMA_REQUIRED');
  need(Array.isArray(input)&&Array.isArray(output)&&input.every(r=>Array.isArray(r)&&r.length===schema.length)&&output.every(r=>Array.isArray(r)&&r.length===schema.length),'POSITIONAL_ROWS_REQUIRED');
+ for(const row of [...input,...output]){
+  need(Array.isArray(row),'POSITIONAL_ROWS_REQUIRED');
+  for(let i=0;i<row.length;i++){
+   const v=row[i];need(Object.hasOwn(row,i)&&(v===null||typeof v==='string'||typeof v==='boolean'||typeof v==='number'&&Number.isFinite(v)),'CELL_FORMAT_UNSUPPORTED');
+  }
+ }
  need(Array.isArray(keys)&&keys.length>0&&new Set(keys.map(k=>k.field)).size===keys.length,'UNIQUE_KEYS_REQUIRED');
  const plan=keys.map(k=>{
   const index=schema.findIndex(f=>f.name===k.field);need(index>=0&&['ASC','DESC'].includes(k.direction),'KEY_OR_DIRECTION_INVALID');
@@ -20,8 +31,8 @@ export function auditNumericOrder({schema,input,output,keys}){
   return {index,direction:k.direction};
  });
  for(const row of [...input,...output])for(const k of plan)decimal(row[k.index]);
- const counts=new Map();for(const row of input){const s=JSON.stringify(row);counts.set(s,(counts.get(s)??0)+1)}
- for(const row of output){const s=JSON.stringify(row),n=counts.get(s)??0;need(n>0,'CELL_MULTISET_CHANGED');counts.set(s,n-1)}
+ const counts=new Map();for(const row of input){const s=rowKey(row);counts.set(s,(counts.get(s)??0)+1)}
+ for(const row of output){const s=rowKey(row),n=counts.get(s)??0;need(n>0,'CELL_MULTISET_CHANGED');counts.set(s,n-1)}
  need([...counts.values()].every(n=>n===0),'CELL_MULTISET_CHANGED');
  for(let i=1;i<output.length;i++){
   let cmp=0;for(const k of plan){cmp=compareDecimal(output[i-1][k.index],output[i][k.index])*(k.direction==='ASC'?1:-1);if(cmp)break}

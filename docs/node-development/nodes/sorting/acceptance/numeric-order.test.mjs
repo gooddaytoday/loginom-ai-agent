@@ -29,3 +29,23 @@ test('audit rejects duplicate/missing keys, invalid direction and partial rows',
  for(const keys of [[key('Value','ASC'),key('Value','DESC')],[key('Missing','ASC')],[key('Value','asc')]])assert.throws(()=>auditNumericOrder({schema,input:[],output:[],keys}));
  assert.throws(()=>auditNumericOrder({schema,input:[[1]],output:[[1]],keys:[key('Value','ASC')]}),/POSITIONAL/);
 });
+
+const cellsSchema=[{name:'Id',type:'integer'},{name:'Payload',type:'string'}];
+for(const [label,value] of [['undefined',undefined],['NaN',NaN],['positive infinity',Infinity],['negative infinity',-Infinity],['missing cell','hole']])test('nonkey '+label+' cannot collapse to NULL in multiset',()=>{
+ const row=value==='hole'?[1,,]:[1,value];
+ for(const [input,output] of [[[row],[[1,null]]],[[[1,null]],[row]]]){
+  assert.throws(()=>auditNumericOrder({schema:cellsSchema,input,output,keys:[key('Id','ASC')]}),/CELL_FORMAT/);
+ }
+});
+test('supported scalar cells retain NULL, empty string, zero and boolean separately',()=>{
+ const rows=[null,'',0,false,true,'0'].map(v=>[1,v]);
+ assert.equal(auditNumericOrder({schema:cellsSchema,input:rows,output:[...rows].reverse(),keys:[key('Id','ASC')]}).multiset,true);
+ for(const value of ['',0,false,'null'])assert.throws(()=>auditNumericOrder({schema:cellsSchema,input:[[1,null]],output:[[1,value]],keys:[key('Id','ASC')]}),/MULTISET/);
+});
+for(const value of [{toJSON:()=>null},[],1n,()=>null,Symbol('cell')])test('unsupported scalar format '+typeof value+' refuses before PASS',()=>{
+ assert.throws(()=>auditNumericOrder({schema:cellsSchema,input:[[1,value]],output:[[1,value]],keys:[key('Id','ASC')]}),/CELL_FORMAT/);
+});
+test('signed zero payload is preserved rather than collapsed by JSON.stringify',()=>{
+ assert.equal(auditNumericOrder({schema:cellsSchema,input:[[1,-0]],output:[[1,-0]],keys:[key('Id','ASC')]}).multiset,true);
+ assert.throws(()=>auditNumericOrder({schema:cellsSchema,input:[[1,-0]],output:[[1,0]],keys:[key('Id','ASC')]}),/MULTISET/);
+});
