@@ -3,10 +3,35 @@ import csv
 import hashlib
 import io
 import json
+from collections import Counter
 from pathlib import Path
 from legacy_goal_contract import expected_grouping, goal_output
 
 ROOT = Path(__file__).resolve().parent
+
+def compare_output(expected, observed, *, expected_execution_id,
+                   observed_execution_id, read_complete, read_fresh):
+    """Compare caller-proven fresh output; never infer freshness from values.
+
+    The caller supplies execution/read evidence from its existing receipts.
+    This local oracle helper does not execute Loginom or validate all-null native
+    semantics; matrix status remains not_checked until an independent live run.
+    """
+    if (not expected_execution_id or observed_execution_id != expected_execution_id
+            or read_complete is not True or read_fresh is not True):
+        raise ValueError("grouping_oracle_fresh_complete_read_required")
+    if observed.get("columns") != expected["columns"]:
+        raise ValueError("grouping_oracle_complete_schema")
+    names = [c["name"] for c in expected["columns"]]
+    def bag(rows):
+        if not isinstance(rows, list) or any(not isinstance(r, dict)
+                or set(r) != set(names) for r in rows):
+            raise ValueError("grouping_oracle_row_schema")
+        return Counter(json.dumps([r[n] for n in names], ensure_ascii=False,
+                                  allow_nan=False) for r in rows)
+    if bag(observed.get("rows")) != bag(expected["rows"]):
+        raise ValueError("grouping_oracle_group_multiset")
+    return True
 
 def output(schema, rows, label="Итоги"):
     return {"output_node_type": "transform.group_data", "output_node_label": label,
