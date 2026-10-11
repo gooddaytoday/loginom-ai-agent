@@ -3424,7 +3424,11 @@ function readRenderedInputMapping(observation) {
             ||!(current.wizard_pending_owner.node?.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
               ||typeof n.pending_wizard_node?.tid==='string'&&n.pending_wizard_node.tid===current.wizard_pending_owner.node?.tid
                 &&n.pending_wizard_node.label===current.wizard_pending_owner.node?.label)
-            ||!same(current.wizard_pending_owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path)
+            ||!(same(current.wizard_pending_owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path)
+              ||n?.verified===true&&Array.isArray(n.navigation_rebinding?.prepared_path)&&n.navigation_rebinding.prepared_path.length>0
+                &&Array.isArray(n.navigation_rebinding?.observed_path)&&n.navigation_rebinding.observed_path.length===n.navigation_rebinding.prepared_path.length
+                &&same(n.navigation_rebinding.prepared_path,binding.opening.workflow_path)
+                &&same(n.navigation_rebinding?.observed_path,current.wizard_pending_owner.path.slice(0,-2).map(({tid,label})=>({tid,label}))))
             ||current.ui.dialogs.length!==1||!Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'}).every(([name,label])=>
               current.ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name&&e.label===label
                 &&e.signature?.dialog_ref===current.ui.dialogs[0].ref&&e.allowed_actions.includes('click')).length===1))

@@ -21,6 +21,10 @@ export async function readPreparedNodeContext(page, binding) {
     if (!records.length || records.some(r=>r.tab!==records[0].tab || r.packageNode!==records[0].packageNode)) return reject('receipt');
     const r=records.find(r=>r.nodeTargetWorkflowNode);
     if (!r) return reject('workflow_unbound');
+    if(r.request!==undefined&&(typeof r.request!=='string'||!r.request))return reject('navigation_request');
+    const requestPin=Object.getOwnPropertyDescriptor(r,'nodePreparedRequest');
+    if(r.nodeNavigationBinding&&(!requestPin||typeof requestPin.value!=='string'||requestPin.writable||requestPin.configurable))return reject('navigation_request');
+    if(requestPin&&r.request!==requestPin.value)return reject('navigation_request');
     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
     const tabs=exact(b.workflow_ref.tab_tid);
     if(tabs.length!==1 || tabs[0]!==r.tab || !tabs[0].classList.contains('x-tab-active')) return reject('tab');
@@ -43,14 +47,17 @@ export async function readPreparedNodeContext(page, binding) {
     }
     // A save can rekey Package1 only when the original rendered/native path
     // was bound before the transition. Labels alone never establish ownership.
+    const hasReceiptAuthority = (wf, receipt) => {
+      const peers=[...p.receipts.values()].filter(v=>v.phase==='verified'&&v.workflowId===wf.workflow_id);
+      return !peers.some(v=>v.tab!==receipt.tab||v.packageNode!==receipt.packageNode
+        ||v.nodeTargetWorkflowNode&&receipt.nodeTargetWorkflowNode&&v.nodeTargetWorkflowNode!==receipt.nodeTargetWorkflowNode);
+    };
     const verifyNavigation = (wf, receipt, observed, capture=false) => {
       const expected=wf.navigation_path, samePath=(a,b)=>Array.isArray(a)&&a.length===b.length
         &&a.every((c,i)=>c.tid===b[i].tid&&c.label===b[i].label);
       if(!Array.isArray(expected)||!expected.length||expected.length>32||observed.length!==expected.length
         ||new Set(observed.map(c=>c.tid)).size!==observed.length)return null;
-      const peers=[...globalThis.__loginomDockPreparationV1.receipts.values()].filter(v=>v.phase==='verified'&&v.workflowId===wf.workflow_id);
-      if(peers.some(v=>v.tab!==receipt.tab||v.packageNode!==receipt.packageNode
-        ||v.nodeTargetWorkflowNode&&receipt.nodeTargetWorkflowNode&&v.nodeTargetWorkflowNode!==receipt.nodeTargetWorkflowNode)
+      if(!hasReceiptAuthority(wf,receipt)
         ||receipt.crumbs&&!samePath(receipt.crumbs,expected))return null;
       const native=observed.map(c=>{const es=exact(c.tid),e=es.length===1&&es[0],cmp=e&&globalThis.Ext?.getCmp?.(e.id);
         return cmp?.el?.dom===e?cmp?._node?.data?.node:null;});
@@ -64,7 +71,7 @@ export async function readPreparedNodeContext(page, binding) {
           ||native.length!==baseline.native.length||native.some((n,i)=>!n||n!==baseline.native[i]||n.FGuid!==baseline.guids[i]||i>0&&n.ParentNode!==native[i-1]))return null;
       }
       if(samePath(expected,observed)) {
-        if(capture&&!baseline&&samePath(receipt.crumbs,expected)&&typeof account==='string'&&account
+        if(capture&&!baseline&&typeof receipt.request==='string'&&receipt.request&&samePath(receipt.crumbs,expected)&&typeof account==='string'&&account
           &&typeof packagePath==='string'&&packagePath&&native.every((n,i)=>n&&(!i||n.ParentNode===native[i-1]))
           &&native.filter(n=>n===receipt.packageNode).length===1&&native.at(-1)===receipt.nodeTargetWorkflowNode)
           receipt.nodeNavigationBinding={path:expected.map(c=>({...c})),native,guids:native.map(n=>n.FGuid),tab:receipt.tab,packageNode:receipt.packageNode,
@@ -79,8 +86,13 @@ export async function readPreparedNodeContext(page, binding) {
         i===index?current.tid:expected[i].tid.startsWith(old.tid+'>')?current.tid+expected[i].tid.slice(old.tid.length):null)))return null;
       return {verified:true,rebinding:{prepared_path:expected.map(c=>({...c})),observed_path:observed.map(c=>({...c}))}};
     };
-    const navigation=verifyNavigation(b.workflow_ref,r,crumbs.slice(0,b.workflow_ref.navigation_path.length));
-    if(!navigation)return reject('navigation');
+    // A canonical path transition cannot turn conflicting verified receipts
+    // into authority, even before the first navigation binding is captured.
+    if(!hasReceiptAuthority(b.workflow_ref,r))return reject('navigation');
+    let navigation=verifyNavigation(b.workflow_ref,r,crumbs.slice(0,b.workflow_ref.navigation_path.length));
+    // Canonical open_package can precede capture; a captured binding must
+    // still satisfy every existing account/connection/native rekey guard.
+    if(!navigation&&r.nodeNavigationBinding)return reject('navigation');
     if(new Set(crumbs.map(c=>c.tid)).size!==crumbs.length)return reject('navigation');
     const model=card?.Controller?.FController;
     let surface, tid, locked, outputPort, graphRoot, pendingWizardNode;
@@ -140,6 +152,34 @@ export async function readPreparedNodeContext(page, binding) {
     if(elements.length!==1)return reject('surface_ambiguous');
     if(elements[0].getBoundingClientRect().width<=0 || elements[0].getBoundingClientRect().height<=0
       || getComputedStyle(elements[0]).visibility==='hidden')return pending();
+    const current=crumbs.slice(0,b.workflow_ref.navigation_path.length);
+    if(r.nodeNavigationPath&&JSON.stringify(r.nodeNavigationPath)!==JSON.stringify(current))return reject('navigation');
+    let canonicalAlias;
+    if(!navigation) {
+      // LAB-66 f9916486: receipt and exact Ext/DOM/native ancestry authority,
+      // after surface checks. Never substitute pathname/labels/GUID matches.
+      const original=b.workflow_ref.navigation_path;
+      let request;try{request=JSON.parse(r.request);}catch{return reject('navigation');}
+      const path=packageNode.PackageFileName;
+      if(original.length>32||request.intent!=='open_package'||typeof path!=='string'||!path
+        ||'/'+path.replaceAll('\\','/').replace(/^\/+/, '')!==request.packagePath
+        ||JSON.stringify(r.crumbs)!==JSON.stringify(original)
+        ||current.some((c,i)=>c.label!==original[i].label))return reject('navigation');
+      const lineage=[],visited=new Set();
+      for(let n=workflowNode;n&&lineage.length<32&&!visited.has(n);n=n.ParentNode){
+        visited.add(n);lineage.unshift(n);if(n===packageNode)break;
+      }
+      const start=current.length-lineage.length;
+      if(lineage[0]!==packageNode||lineage.at(-1)!==workflowNode||start<2
+        ||current.slice(0,start).some((c,i)=>c.tid!==original[i].tid))return reject('navigation');
+      for(let i=0;i<lineage.length;i++) {
+        const elements=exact(current[start+i].tid),e=elements[0];
+        const component=elements.length===1&&e?.isConnected&&globalThis.Ext?.getCmp(e.id);
+        if(!component||component.el?.dom!==e||component._node?.data?.node!==lineage[i])return reject('navigation');
+      }
+      canonicalAlias=current;
+      navigation={verified:true,rebinding:{prepared_path:original.map(c=>({...c})),observed_path:current.map(c=>({...c}))}};
+    }
     if(navigation.rebinding&&surface!=='graph') {
       // The rebuilt owner suffix must belong to the current native node/wizard,
       // including port/group ancestors. A duplicate label cannot bind it.
@@ -153,6 +193,8 @@ export async function readPreparedNodeContext(page, binding) {
         return cmp?.el?.dom!==e||cmp?._node?.data?.node!==tail[i];
       }))return reject('navigation_owner');
     }
+    if(navigation.rebinding)r.nodeNavigationPath=current;
+    if(!Object.hasOwn(r,'nodePreparedRequest'))Object.defineProperty(r,'nodePreparedRequest',{value:r.request});
     verifyNavigation(b.workflow_ref,r,crumbs.slice(0,b.workflow_ref.navigation_path.length),true);
     return {verified:true,...(navigation.rebinding?{navigation_rebinding:navigation.rebinding}:{}),document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,surface,tid,
       ...(outputPort?{[outputPort.direction==='input'?'input_port':'output_port']:outputPort}:{}),
