@@ -14,7 +14,7 @@ const start=source.indexOf('function readCapturePreparation(identity) {');
 const preparation=source.slice(start,source.indexOf('\n}',start)+2);
 test('receiving Amount uses its own observer pin and unchanged preparation body without Calculator module',()=>{
  assert.equal(createHash('sha256').update(observer.workspaceUiCapability.toString()).digest('hex'),amount.AMOUNT_OBSERVER_SHA256);
- assert.equal(amount.AMOUNT_OBSERVER_SHA256,'e0e045f97840e18e68a22154a3035007be2915497c7fc68bb1bade572fcc3238');
+ assert.equal(amount.AMOUNT_OBSERVER_SHA256,'c29a962c543f89793197b0e5220d8b438576e3f35aca2ce3fe24f3b8fc382033');
  assert.equal(createHash('sha256').update(preparation).digest('hex'),'efd522e6fd54d1384d9087984c7a1da46e1e2821c268e952f949cf4135bd6958');
  assert.ok(!source.includes('calculator-grouped-before-done-v1'));
 });

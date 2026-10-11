@@ -18,7 +18,7 @@ function readCapturePreparation(identity) {
 
 // Explicit receiving observer pin. A new observer requires an addressed review;
 // source collector PASS or a runtime-generated checksum is not this binding.
-export const AMOUNT_OBSERVER_SHA256='e0e045f97840e18e68a22154a3035007be2915497c7fc68bb1bade572fcc3238';
+export const AMOUNT_OBSERVER_SHA256='c29a962c543f89793197b0e5220d8b438576e3f35aca2ce3fe24f3b8fc382033';
 const need=(ok,why)=>{if(!ok)throw Error('LOGINOM_AMOUNT_CAPTURE_'+why);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 

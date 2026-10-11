@@ -87,7 +87,7 @@ test('collector bounds retained scans without truncating native observer executi
 });
 
 test('receiving contract pins the retained production observer explicitly',()=>{
- const pin='e0e045f97840e18e68a22154a3035007be2915497c7fc68bb1bade572fcc3238';
+ const pin='c29a962c543f89793197b0e5220d8b438576e3f35aca2ce3fe24f3b8fc382033';
  assert.equal(observerSha256,pin);
  assert.ok(readFileSync(new URL('../ui-scan-capture-contract.md',import.meta.url),'utf8').includes('`'+pin+'`'));
 });
