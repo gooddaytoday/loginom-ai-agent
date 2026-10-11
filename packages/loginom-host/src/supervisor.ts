@@ -123,6 +123,7 @@ export async function supervise(input: Launch) {
           typeof message.error === "string" && /^LOGINOM_[A-Z_]+$/.test(message.error)
             ? message.error
             : "LOGINOM_RUNTIME_FAILED",
+          { cause: message.error },
         ),
       )
       return
@@ -149,7 +150,7 @@ export async function supervise(input: Launch) {
     closing.promise = (async () => {
       const reply = await request("close", undefined, 5000)
       if (!reply || typeof reply !== "object" || !("closed" in reply) || reply.closed !== true)
-        throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+        throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: reply })
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
       try {
         const outcome = await exited
@@ -173,16 +174,25 @@ export async function supervise(input: Launch) {
   // Connection validation can spend 30 seconds on MCP initialization and up
   // to 150 seconds navigating/authenticating Loginom. Do not race that
   // documented budget with the ordinary 120-second runtime handshake.
+  const runtime = { ready: undefined as unknown, request, close, exited }
+  async function failedStart(error: unknown): Promise<never> {
+    try { await close() }
+    catch (cleanupFailure) {
+      const failure = new Error("LOGINOM_RUNTIME_START_FAILED", { cause: error })
+      // Private foreground ownership handoff, never serialized into IPC.
+      Object.defineProperties(failure, {
+        runtime: { value: runtime },
+        cleanupFailure: { value: cleanupFailure },
+      })
+      throw failure
+    }
+    throw error
+  }
   const ready = await request(
     "start",
     { ...input, environment: undefined, protocol: 1 },
     input.validation ? 210_000 : 120_000,
-  ).catch(
-    async (error: Error) => {
-      await close()
-      throw error
-    },
-  )
+  ).catch(failedStart)
   if (
     !ready ||
     typeof ready !== "object" ||
@@ -194,8 +204,8 @@ export async function supervise(input: Launch) {
       ? !("checked" in ready) || ready.checked !== true
       : !("ready" in ready) || ready.ready !== true || !("chat" in ready) || ready.chat !== input.chat)
   ) {
-    await close()
-    throw new Error("LOGINOM_HANDSHAKE_INVALID")
+    return failedStart(new Error("LOGINOM_HANDSHAKE_INVALID", { cause: ready }))
   }
-  return { ready, request, close, exited }
+  runtime.ready = ready
+  return runtime
 }
