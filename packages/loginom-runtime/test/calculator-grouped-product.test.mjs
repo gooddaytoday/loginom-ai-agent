@@ -17,7 +17,7 @@ test('unaltered clean receiving product inventories the actual fixed harness and
  const source=await readFile(new URL('../src/acceptance/calculator-grouped-before-done-v1.mjs',import.meta.url));
  assert.deepEqual(bytes,source); // No successful fixture substituted in the inventory.
  const metadata=JSON.parse(await readFile(join(product,'cli-manifest.json')));
- assert.equal(metadata.sourceDirty,false);
+ assert.equal(metadata.metadata.sourceDirty,false);
  const node=join(root,'bin/node');
  const verified=await promisify(execFile)(node,['--input-type=module','-e',
   `import {verifyResources} from ${JSON.stringify(pathToFileURL(join(root,'runtime/src/resources.mjs')).href)};await verifyResources(${JSON.stringify(root)});console.log('verified');`]);
