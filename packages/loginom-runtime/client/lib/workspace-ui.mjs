@@ -3236,7 +3236,7 @@ function readRenderedInputMapping(observation) {
     columnPage:task.import_column_page??(task.snapshot?.wizard?.import_columns?.page?{offset:task.snapshot.wizard.import_columns.page.offset,limit:task.snapshot.wizard.import_columns.page.limit}:null),
     mappingPage:task.output_column_page??(task.snapshot?.wizard?.output_columns?.page?{offset:task.snapshot.wizard.output_columns.page.offset,limit:task.snapshot.wizard.output_columns.page.limit}:null),
     tableFormatPage:task.table_format_page??(task.snapshot?.table_settings?.format?.page?{offset:task.snapshot.table_settings.format.page.offset,limit:task.snapshot.table_settings.format.page.limit}:null),
-    preparedWorkflowPath:task.prepared_node_context?.workflow_ref.navigation_path??null,
+    preparedWorkflowPath:nodeContext?.navigation_rebinding?.observed_path??task.prepared_node_context?.workflow_ref.navigation_path??null,
     preparedNodeId:task.prepared_node_context?.node.node_id??null,
     preparedGraphTid:nodeContext?.surface==='graph'?nodeContext.tid:null,
     preparedNavigationNode:nodeContext?.surface==='graph'?nodeContext.navigation_node??null:null,
