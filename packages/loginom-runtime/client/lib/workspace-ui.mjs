@@ -2333,6 +2333,150 @@ function readRenderedInputMapping(observation) {
           dateTimeCells.set(refOf(cells[0]),{role:'output_source',field_key:d.Name,record_id:String(r.internalId),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
       }
     }
+    // Output Links refs require the current opening and complete cached native
+    // record/Ext/DOM aliases. They do not authorize a hidden toolbar control.
+    const outputLinksUnsettled=new Set();
+    // Reserve current Links cells before any native proof can fail. Only the
+    // complete proof below may release them; a failed proof must not downgrade
+    // a binding cell to manual/generic click from an earlier observer branch.
+    if(!discoverRoots&&wizard.stage==='output_mapping'&&preparedOutputPort?.direction==='output'){
+      const base=wizard.root_tid+';DerivedDataSourceOutputSocketWizard;';
+      if((tids.get(base+'rbLinks')??[]).some(e=>e.classList.contains('x-form-cb-checked')))
+        for(const [tid,elements] of tids)if(tid.startsWith(base+'colSourceName_')||tid.startsWith(base+'colDisplayName_'))
+          for(const e of elements)outputLinksUnsettled.add(e);
+    }
+    if(!discoverRoots&&wizard.stage==='output_mapping'&&preparedOutputPort?.direction==='output')try{
+      const p=globalThis.__loginomDockPreparationV1,card=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab();
+      const model=card?.Controller?.FController,entries=[...(p?.outputPortOpenReceipts?.entries()??[])];
+      const matched=entries.filter(([key,r])=>key===preparedOutputPort.opening_operation_id&&r.operation_id===key&&r.phase==='verified'
+        &&r.document_id===p.id&&r.node_id===preparedNodeId&&r.wizard===model);
+      const requireLink=(v,m)=>{if(!v)throw Error(m);};
+      requireLink(p?.document===document&&matched.length===1,'output_link_opening');
+      const r=matched[0][1],root=(tids.get(wizard.root_tid)??[]),base=wizard.root_tid+';DerivedDataSourceOutputSocketWizard;';
+      requireLink(entries.filter(([,x])=>x.phase==='verified'&&x.wizard===model).length===1&&r.direction==='output'
+        &&r.portIndex===preparedOutputPort.port&&r.nativeIndex===preparedOutputPort.native_index&&r.portGuid===preparedOutputPort.port_guid
+        &&r.enginePort===model.FModelEnginePort&&r.port?.data===r.portData&&r.node?.data===r.nodeData&&r.port.parent===r.node
+        &&[...(p.receipts?.values()??[])].filter(x=>x.phase==='verified'&&x.workflowId===r.workflow_id
+          &&x.nodeTargetWorkflowNode===r.workflow&&x.packageNode===r.packageNode).length===1
+        &&r.port.FGuid===r.portGuid&&r.node.FGuid===r.node_id&&r.portTree?.FIndex===r.nativeIndex
+        &&card.Controller?.Node?.data?.node?.ParentNode===r.portTree&&r.portTree.FModelNodePort===r.portData
+        &&r.portTree.ParentNode?.constructor?.name==='ModelOutputPortsTreeNode'&&r.portTree.ParentNode.ParentNode===r.nodeTree
+        &&r.nodeTree?.FGuid===r.node_id&&r.nodeTree.FModelNode===r.nodeData&&r.nodeTree.ParentNode===r.workflow
+        &&root.length===1&&model.FView?.el?.dom===root[0]&&!dialogs.length&&!select('.x-mask,.bg-mask-message,.x-mask-msg').some(visible),'output_link_owner');
+      const forms=(tids.get(base.slice(0,-1))??[]).filter(e=>root[0].contains(e)&&visible(e));
+      requireLink(forms.length===1,'output_link_form');
+      const form=forms[0],cmp=globalThis.Ext?.getCmp?.(form.id),controller=cmp?.['@@TestCmpController'];
+      const items=model.FWizardItems?.FItems;
+      requireLink(cmp?.el?.dom===form&&Array.isArray(items)&&items.filter(x=>x.Wizard===controller).length===1
+        &&controller?.constructor?.name==='DerivedDataSourceOutputSocketWizard','output_link_controller');
+      const exact=tail=>(tids.get(base+tail)??[]).filter(e=>form.contains(e));
+      const modes=['rbLinks','rbTable'].map(t=>exact(t));
+      requireLink(modes.every(es=>es.length===1)&&modes[0][0].classList.contains('x-form-cb-checked')
+        &&!modes[1][0].classList.contains('x-form-cb-checked'),'output_link_mode');
+      for(const [i,es] of modes.entries()){const c=Ext.getCmp(es[0].id);requireLink(c?.el?.dom===es[0]&&c.getValue?.()===(i===0),'output_link_radio');}
+      const grids=['grdSourceColumns;tbl','grdTargetColumns;tbl'].map(t=>exact(t));
+      requireLink(grids.every(es=>es.length===1&&visible(es[0])),'output_link_grids');
+      const views=grids.map(es=>Ext.getCmp(es[0].id)),stores=views.map(v=>v?.getStore?.());
+      requireLink(views.every((v,i)=>v?.el?.dom===grids[i][0])&&stores[0]!==stores[1]
+        &&controller.FSourceStore===stores[0]&&controller.FTargetStore===stores[1],'output_link_stores');
+      const inventories=stores.map(s=>{
+        const data=s?.getData?.(),records=data?.items,full=data?.getSource?.()?.items;
+        requireLink(s?.$className==='Ext.data.Store'&&!s.isBufferedStore&&!s.isLoading?.()&&s.currentPage===1
+          &&s.getRemoteFilter?.()===false&&s.getRemoteSort?.()===false&&Array.isArray(records)&&records.length>0&&records.length<=200
+          &&s.getCount?.()===records.length&&s.getTotalCount?.()===records.length&&Array.isArray(full)&&full.length===records.length
+          &&new Set(full).size===records.length&&full.every(x=>records.includes(x))
+          &&s.getProxy?.()?.pendingOperations&&Object.keys(s.getProxy().pendingOperations).length===0,'output_link_inventory');
+        requireLink(['internalId'].every(k=>new Set(records.map(x=>String(x[k]))).size===records.length)
+          &&new Set(records.map(x=>x.data?.ID)).size===records.length&&new Set(records.map(x=>x.data?.Name)).size===records.length
+          &&records.every((x,i)=>x.isModel&&String(x.internalId)&&Number.isSafeInteger(x.data?.ID)&&x.data.ID>=0&&x.data.Index===i
+            &&typeof x.data.Name==='string'&&x.data.Name&&typeof x.data.DisplayName==='string'&&x.data.DisplayName
+            &&[1,2,3,4,5,6].includes(x.data.DataType)&&x.data.Broken===false&&x.data.Required===false&&x.data.GroupField===''),'output_link_records');
+        return records;
+      });
+      const [sources,targets]=inventories,g=controller.Items?.LinkGrid,d=g?.FLinkDrawContainer;
+      requireLink(sources.length===targets.length&&d?.FTables?.length===2&&d.FTables.every((v,i)=>v.getView?.()===views[i]&&v.getStore?.()===stores[i]),'output_link_native_tables');
+      // Stores alone do not establish settlement of the native relation/draw
+      // update. Missing or non-boolean flags are not evidence of false.
+      const settlement={controller_ref:refOf(controller),draw_ref:refOf(d),
+        FLinksUpdateMode:controller.FLinksUpdateMode,FRelationRefreshMode:controller.FRelationRefreshMode,FWaitingRedraw:d.FWaitingRedraw};
+      const settled=settlement.FLinksUpdateMode===false&&settlement.FRelationRefreshMode===false&&settlement.FWaitingRedraw===false;
+      requireLink(settled,'output_link_settlement');
+      requireLink(d.FSelectedLinks&&typeof d.FSelectedLinks==='object'&&!Array.isArray(d.FSelectedLinks),'output_link_selection_inventory');
+      const pairs=Object.entries(d.FLinks??{}),selected=Object.entries(d.FSelectedLinks);
+      const boundSources=new Set(pairs.map(([,pair])=>pair?.[0])),boundTargets=new Set(pairs.map(([,pair])=>pair?.[1]));
+      const unboundSources=sources.filter(record=>!boundSources.has(record)),unboundTargets=targets.filter(record=>!boundTargets.has(record));
+      // A null endpoint is not a relation. Reconnect stages only one completely
+      // observed vacant pair, beside five unchanged reciprocal native pairs.
+      const reconnect=sources.length===6&&pairs.length===5&&unboundSources.length===1&&unboundTargets.length===1
+        &&unboundSources[0].data.ConnectedRecord===null&&unboundTargets[0].data.ConnectedRecord===null;
+      requireLink((pairs.length===targets.length||reconnect)&&pairs.every(([key,pair])=>Array.isArray(pair)&&pair.length===2&&sources.includes(pair[0])&&targets.includes(pair[1])
+        &&key===String(pair[0].internalId)+'_'+String(pair[1].internalId)&&pair[0].data.ConnectedRecord===pair[1]&&pair[1].data.ConnectedRecord===pair[0])
+        &&boundSources.size===pairs.length&&boundTargets.size===pairs.length
+        &&selected.every(([key,pair])=>d.FLinks[key]===pair),'output_link_pairs');
+      // A sprite object alone does not own its DOM alias. Prove the complete
+      // current draw inventory, including hidden controls of other links.
+      const drawItems=Object.entries(d.FDrawLinkItems??{}),pairKeys=new Set(pairs.map(([pairKey])=>pairKey)),allButtons=[],buttonsByItem=new Map();
+      requireLink(drawItems.length===pairs.length&&drawItems.every(([drawKey,drawItem])=>{
+        if(!pairKeys.has(drawKey)||drawItem?.LinkID!==drawKey)return false;
+        if(!Object.hasOwn(drawItem,'DrawDeleteButton')){
+          // Only a proven unselected item may have no removal control. An
+          // inherited control, missing selection inventory, or explicit
+          // undefined/null is not the measured absent-property state.
+          if(selected.some(([key])=>key===drawKey)||'DrawDeleteButton' in drawItem)return false;
+          buttonsByItem.set(drawItem,[]);return true;
+        }
+        if(!Array.isArray(drawItem.DrawDeleteButton)||drawItem.DrawDeleteButton.length>2)return false;
+        buttonsByItem.set(drawItem,drawItem.DrawDeleteButton);
+        allButtons.push(...drawItem.DrawDeleteButton);return true;
+      }),'output_link_remove_inventory');
+      requireLink(allButtons.every(sprite=>sprite?.element?.dom instanceof Element
+          &&form.contains(sprite.element.dom)&&seenElements.has(sprite.element.dom))
+        &&new Set(allButtons).size===allButtons.length
+        &&new Set(allButtons.map(sprite=>sprite.element.dom)).size===allButtons.length,'output_link_remove_aliases');
+      const cells=inventories.map((records,i)=>records.map(record=>{
+        const rows=[...grids[i][0].querySelectorAll('table.x-grid-item')].filter(e=>e.getAttribute('data-recordid')===String(record.internalId));
+        requireLink(rows.length===1&&rows[0].getAttribute('data-boundview')===grids[i][0].id&&rows[0].getAttribute('data-recordindex')===String(records.indexOf(record)),'output_link_row');
+        const tid=base+(i===0?'colSourceName_':'colDisplayName_')+record.data.Name;
+        const es=(tids.get(tid)??[]).filter(e=>rows[0].contains(e));
+        requireLink(es.length===1&&visible(es[0])&&es[0].textContent.trim()===record.data.DisplayName,'output_link_cell');return es[0];
+      }));
+      const owner={document_id:r.document_id,workflow_id:r.workflow_id,node_id:r.node_id,port:preparedOutputPort,root_ref:wizard.root_ref};
+      const definition=x=>({...Object.fromEntries(['ID','Index','Name','DisplayName','DataType','DataKind','UsageType','OriginType','IsDerived','Required','Broken','GroupField'].map(k=>[k,x.data[k]??null])),dirty:x.dirty??null});
+      const staged=[];
+      for(const [key,pair] of reconnect?[]:pairs)for(const i of [0,1])staged.push([cells[i][inventories[i].indexOf(pair[i])],{
+        role:i===0?'output_source':'output_target',field_key:pair[i].data.Name,record_id:String(pair[i].internalId),grid_ref:refOf(grids[i][0]),wizard_root_ref:wizard.root_ref,
+        link:{owner,settlement,key,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),selected:d.FSelectedLinks[key]===pair}}]);
+      if(reconnect){const pair=[unboundSources[0],unboundTargets[0]],key=String(pair[0].internalId)+'_'+String(pair[1].internalId);
+        requireLink(!Object.hasOwn(d.FLinks,key)&&!Object.hasOwn(d.FSelectedLinks,key)&&!Object.hasOwn(d.FDrawLinkItems,key),'output_link_unbound_alias');
+        const inventory={controller_ref:refOf(controller),stores:stores.map(refOf),
+          records:inventories.map(records=>records.map(record=>({native_ref:refOf(record),record_id:String(record.internalId),definition:definition(record),
+            connected_record:record.data.ConnectedRecord===null?null:refOf(record.data.ConnectedRecord),
+            source_display_name:record.data.SourceDisplayName??null,source_data_type:record.data.SourceDataType??null}))),
+          pairs:pairs.map(([pairKey,endpoints])=>({key:pairKey,records:endpoints.map(refOf)})),
+          draw:drawItems.map(([drawKey,drawItem])=>({key:drawKey,native_ref:refOf(drawItem),
+            delete_buttons_present:Object.hasOwn(drawItem,'DrawDeleteButton'),
+            buttons:buttonsByItem.get(drawItem).map(sprite=>({native_ref:refOf(sprite),dom_ref:refOf(sprite.element.dom)}))}))};
+        for(const i of [0,1])staged.push([cells[i][inventories[i].indexOf(pair[i])],{
+          role:i===0?'output_source':'output_target',field_key:pair[i].data.Name,record_id:String(pair[i].internalId),grid_ref:refOf(grids[i][0]),wizard_root_ref:wizard.root_ref,
+          link:{owner,settlement,key,state:'unbound',inventory,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),
+            source_display_name:pair[1].data.SourceDisplayName??null,source_data_type:pair[1].data.SourceDataType??null,selected:false}}]);
+      }
+      if(selected.length===1&&!reconnect){const [key,pair]=selected[0],item=d.FDrawLinkItems?.[key],buttons=item?.DrawDeleteButton;
+        requireLink(item?.LinkID===key&&Array.isArray(buttons)&&buttons.length===2&&new Set(buttons).size===2,'output_link_remove_items');
+        for(const sprite of buttons){const element=sprite?.element?.dom;
+          requireLink(sprite.type==='path'&&sprite.attr?.hidden===false&&sprite.attr.globalAlpha===1&&element?.tagName?.toLowerCase()==='g'
+            &&form.contains(element)&&visible(element)&&seenElements.has(element)&&element.children.length===1
+            &&element.children[0].tagName.toLowerCase()==='path','output_link_remove_dom');
+          staged.push([element,{role:'output_relation_remove',record_id:String(pair[1].internalId),wizard_root_ref:wizard.root_ref,
+            link:{owner,settlement,key,source_record:String(pair[0].internalId),target_record:String(pair[1].internalId),source:definition(pair[0]),target:definition(pair[1]),selected:true}}]);
+        }
+      }
+      for(const [element,metadata] of staged){
+        outputLinksUnsettled.delete(element);
+        dateTimeCells.set(refOf(element),metadata);
+        if(metadata.role==='output_relation_remove'&&!candidates.includes(element))candidates.push(element);
+      }
+    }catch(error){if(error?.code==='UI_SCAN_LIMIT')throw error;}
     // The constant trigger is a role-less Ext div. Bind it to the active
     // method editor and its exact cached field before exposing a gesture.
     if(!discoverRoots&&wizard.stage==='missing_values'){
@@ -2646,12 +2790,83 @@ function readRenderedInputMapping(observation) {
       if(!dom||!d.FmxGraph.container.contains(dom)||getTid(dom)!==workflow.prefix+';Graph;'+getTid(dom)?.split(';Graph;')[1])return null;
       return {node_id:preparedNodeId,node_ref:refOf(dom),mode:execute?'execute':'deactivate',source:'native_selected_graph_node'};
     };
+    // Close controls belong to the one current native dialog, never to a
+    // message-box prefix alone. Keep deactivation and other dialog gates separate.
+    const closeDialogControls=(()=>{
+      if(dialogElements.length!==1)return null;
+      const dialog=dialogElements[0],cmp=globalThis.Ext?.getCmp(dialog.id);
+      if(!cmp||cmp.el?.dom!==dialog||cmp.hidden!==false||cmp.disabled===true)return null;
+      const controls={};let prefix,toolbar;
+      for(const name of ['yes','no']){
+        const matches=all.filter(e=>dialog.contains(e)&&/^(msgbox(?:-\d+)?);tlb;(yes|no)$/.test(getTid(e)??'')&&(getTid(e)??'').endsWith(';'+name));
+        if(matches.length!==1)return null;
+        const element=matches[0],parts=/^(msgbox(?:-\d+)?);tlb;(yes|no)$/.exec(getTid(element));
+        if(prefix&&prefix!==parts[1]||!visible(element)||!enabled(element)||sensitive(element))return null;
+        prefix=parts[1];
+        const button=globalThis.Ext?.getCmp(element.id),bar=button?.ownerCt;
+        if(!button||button.el?.dom!==element||button.hidden!==false||button.disabled===true
+          ||!bar||bar.el?.dom?.contains(element)!==true||getTid(bar.el.dom)!==prefix+';tlb'
+          ||bar.ownerCt!==cmp||!dialog.contains(bar.el.dom)||toolbar&&toolbar!==bar)return null;
+        toolbar=bar;
+        if((tids.get(getTid(element))??[]).length!==1)return null;
+        controls[name]={ref:refOf(element),tid:getTid(element),native_ref:refOf(button)};
+      }
+      if(controls.yes.ref===controls.no.ref||controls.yes.native_ref===controls.no.native_ref)return null;
+      return {dialog_ref:refOf(dialog),dialog_native_ref:refOf(cmp),toolbar_native_ref:refOf(toolbar),controls};
+    })();
+    // Cancellation may own an overflowed port without making mapping or
+    // navigation ready. Bind hidden captions to the current native opening.
+    const inputCancellationOwner=(()=>{
+      if(wizard.status!=='observed'||wizard.stage!=='input_mapping'||preparedInputPort?.direction!=='input')return null;
+      const p=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
+      const card=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
+      const model=card?.Controller?.FController,w=card?.Controller?.Node?.data?.node;
+      const port=w?.ParentNode,group=port?.ParentNode,node=group?.ParentNode,flow=node?.ParentNode;
+      const openings=[...(p?.inputPortOpenReceipts?.values()??[])].filter(o=>o.phase==='verified'&&o.wizard===model);
+      const o=openings[0],roots=tids.get(wizard.root_tid)??[];
+      if(p?.document!==document||!p.id||openings.length!==1||o.document_id!==p.id
+        ||![...(p.receipts?.values()??[])].some(r=>r.phase==='verified'&&r.workflowId===o.workflow_id&&r.nodeTargetWorkflowNode===flow&&r.packageNode===o.packageNode)
+        ||o.node_id!==preparedNodeId||node?.FGuid!==preparedNodeId
+        ||o.direction!=='input'||o.portIndex!==preparedInputPort.port||o.nativeIndex!==preparedInputPort.native_index
+        ||o.portGuid!==preparedInputPort.port_guid||o.operation_id!==preparedInputPort.opening_operation_id
+        ||p.inputPortOpenReceipts.get(o.operation_id)!==o
+        ||!app?.WizardTreeNode||!(w instanceof app.WizardTreeNode)
+        ||!app.ModelPortTreeNode||!(port instanceof app.ModelPortTreeNode)
+        ||!app.ModelInputPortsTreeNode||!(group instanceof app.ModelInputPortsTreeNode)
+        ||o.nodeTree!==node||o.portTree!==port||o.workflow!==flow||o.packageNode!==flow?.ParentNode?.ParentNode
+        ||o.node?.FGuid!==o.node_id||o.node?.data!==o.nodeData||o.nodeData!==node?.FModelNode
+        ||o.port?.data!==o.portData||o.portData!==port?.FModelNodePort||o.port?.parent!==o.node
+        ||o.port?.FGuid!==o.portGuid||port?.FIndex!==o.nativeIndex
+        ||o.port.FPortIndex!==undefined&&o.port.FPortIndex!==o.nativeIndex
+        ||!o.enginePort||model?.FModelSocket!==o.enginePort||model.FModelNode
+        ||roots.length!==1||model.FView?.el?.dom!==roots[0])return null;
+      const panels=tids.get(workflow.prefix+';NavigationBar;NavigationPanel')??[];
+      if(panels.length!==1||!visible(panels[0]))return null;
+      if(!closeDialogControls)return null;
+      const panel=panels[0],prefix=workflow.prefix+';cnrNaviMode;b.s_';
+      const crumbs=all.filter(e=>panel.contains(e)&&(getTid(e)??'').startsWith(prefix));
+      if(crumbs.length!==9||crumbs.some(e=>sensitive(e)))return null;
+      const native=[flow,node,group,port,w];
+      if(native.some((n,i)=>{const e=crumbs[i+4],cmp=globalThis.Ext?.getCmp(e.id);
+        return !n||cmp?.el?.dom!==e||cmp?._node?.data?.node!==n;}))return null;
+      if(crumbs.slice(0,7).some(e=>!visible(e)))return null;
+      const items=crumbs.map((e,i)=>({ref:refOf(e),tid:getTid(e),label:i>=7?e.textContent.trim():textOf(e,true)}));
+      const format=s=>s.replace(/\s/g,'_').replace(/,/g,'');
+      if(new Set(items.map(i=>i.tid)).size!==9||items.some((i,n)=>n>0&&!i.label||i.label.length>=240||i.tid.length>2048)
+        ||items.reduce((n,i)=>n+i.tid.length+i.label.length,0)>4096
+        ||items.some((i,n)=>i.tid.slice(prefix.length).split('>').length!==n+1||n&&!i.tid.startsWith(items[n-1].tid+'>'))
+        ||items[0].tid!==prefix+'Сервер'||items[1].label!=='Пакеты'||items[6].label!=='Входные порты'
+        ||items[6].tid!==items[5].tid+'>Входные_порты'||items[7].tid!==items[6].tid+'>'+format(items[7].label)
+        ||items[8].label!=='Настройка'||items[8].tid!==items[7].tid+'>Настройка')return null;
+      return {status:'observed',direction:'input',panel_ref:refOf(panel),node:items[5],node_path:items.slice(0,6),
+        port_display_label:items[7].label,port_ref:items[7].ref,port_path:items.slice(0,8),path:items};
+    })();
     const elements = controls.slice(0, 240).map(element => {
       const identity = identityOf(element), tag = element.tagName.toLowerCase(), tid = getTid(element);
       const editable = element.matches('textarea,input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),[contenteditable="true"]') && !element.readOnly;
       const label = tableScrollers.has(state.ids.get(element))?'':short(element.getAttribute('aria-label') || element.getAttribute('placeholder') || element.getAttribute('title') || textOf(element));
       const role = element.getAttribute('role'), kind = /;(?:Input|Output)_/.test(tid ?? '') ? 'port' : editable ? 'field' : /;Graph;/.test(tid ?? '') ? 'graph' : 'control';
-      const isEnabled = enabled(element), allowed = identity && isEnabled && !dangerous(element);
+      const isEnabled = enabled(element), allowed = identity && isEnabled && !dangerous(element)&&!outputLinksUnsettled.has(element);
       const scroll = scrollOf(element);
       const horizontalScroll=horizontalScrollOf(element);
       const interaction = interactionOf(element);
@@ -2699,16 +2914,29 @@ function readRenderedInputMapping(observation) {
             &&wizard.output_columns.page.returned===wizard.output_columns.fields?.length)
         && wizard.output_columns.auto_sync?.status==='observed';
       const inputCloseOwner=preparedInputPort?.direction==='input'&&Number.isInteger(preparedInputPort.port)&&preparedInputPort.port>=0&&preparedInputPort.port<100
-        &&wizard.stage==='input_mapping'&&wizard.input_port_context?.status==='observed'
-        ? wizard.input_port_context:null;
-      const outputCloseOwner=preparedOutputPort?.direction==='output'&&Number.isInteger(preparedOutputPort.port)&&preparedOutputPort.port>=0&&preparedOutputPort.port<100
-        &&wizard.stage==='output_mapping'&&wizard.port_context?.status==='observed'&&wizard.port_context.kind==='output_data'
-        &&wizard.port_context.node?.ref&&wizard.port_context.port?.ref ? wizard.port_context:null;
-      const closeConfirmation=tid==='msgbox;tlb;yes' && wizard.status==='observed' && (wizard.owner_context?.status==='observed'||inputCloseOwner||outputCloseOwner)
+        &&wizard.stage==='input_mapping'
+        ? inputCancellationOwner:null;
+      const outputCloseOwner=(()=>{
+        if(preparedOutputPort?.direction!=='output'||wizard.stage!=='output_mapping'
+          ||wizard.port_context?.status!=='observed'||wizard.port_context.kind!=='output_data'
+          ||!wizard.port_context.node?.ref||!wizard.port_context.port?.ref)return null;
+        const p=globalThis.__loginomDockPreparationV1,card=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
+        const model=card?.Controller?.FController;
+        const openings=[...(p?.outputPortOpenReceipts?.values()??[])].filter(o=>o.phase==='verified'&&o.wizard===model),o=openings[0];
+        if(openings.length!==1||p.document!==document||p.id!==o.document_id||p.outputPortOpenReceipts.get(o.operation_id)!==o
+          ||o.operation_id!==preparedOutputPort.opening_operation_id||o.node_id!==preparedNodeId
+          ||o.direction!=='output'||o.portIndex!==preparedOutputPort.port||o.nativeIndex!==preparedOutputPort.native_index||o.portGuid!==preparedOutputPort.port_guid
+          ||o.node?.FGuid!==preparedNodeId||o.node.data!==o.nodeData||o.port?.data!==o.portData||o.port?.parent!==o.node||o.port?.FGuid!==o.portGuid
+          ||o.portTree?.FIndex!==o.nativeIndex||o.enginePort!==model?.FModelEnginePort
+          ||model.FView?.el?.dom!== (tids.get(wizard.root_tid)??[])[0])return null;
+        return wizard.port_context;
+      })();
+      const closeConfirmation=closeDialogControls?.controls.yes.ref===refOf(element) && wizard.status==='observed'
+        && (wizard.stage==='input_mapping'?inputCloseOwner:preparedOutputPort?.direction==='output'?outputCloseOwner:wizard.owner_context?.status==='observed')
         && dialogs.length===1 && dialogs[0].ref===dialogRef(element) && dialogs[0].title==='Подтвердить'
         && dialogs[0].text==='Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'
         ? {root_ref:wizard.root_ref,root_tid:wizard.root_tid,stage:wizard.stage,
-          owner:inputCloseOwner??outputCloseOwner??wizard.owner_context,...(inputCloseOwner?{input_port:preparedInputPort}:outputCloseOwner?{output_port:preparedOutputPort}:{}),dialog_ref:dialogs[0].ref}:null;
+          owner:inputCloseOwner??outputCloseOwner??wizard.owner_context,...(inputCloseOwner?{input_port:preparedInputPort}:outputCloseOwner?{output_port:preparedOutputPort}:{}),...closeDialogControls}:null;
       const deactivationConfirmation=tid==='msgbox;tlb;yes' && wizard.status==='absent' && pendingWizardOwner.status==='observed'
         && dialogs.length===1 && dialogs[0].ref===dialogRef(element)
         && dialogs[0].title==='Loginom '+(globalThis.bg?.app?.Version??'')
@@ -2801,7 +3029,7 @@ function readRenderedInputMapping(observation) {
         enabled: isEnabled, visible: true, interaction, bounding_box: boxOf(element),
         // A bounded prefix is not a sufficient value precondition. A dedicated
         // large-field driver must establish its own complete read/write contract.
-        allowed_actions: crossTableField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && interaction.state==='point_observed'?[...(scroll?.ref===refOf(element)?['scroll']:[]),...(horizontalScroll?.ref===refOf(element)?['scroll_horizontal']:[])]:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
+        allowed_actions: crossTableField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(dateTimeCell.link&&dateTimeCell.role!=='output_relation_remove'?['drag']:[]),...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && interaction.state==='point_observed'?[...(scroll?.ref===refOf(element)?['scroll']:[]),...(horizontalScroll?.ref===refOf(element)?['scroll_horizontal']:[])]:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
     });
     scanStage='data_views';
     const nodes = labels.slice(0, 200).map(label => {
