@@ -8,7 +8,7 @@
 
 Обработчика нет; статус `discovery_required`. Следующая карточка Multica — этап 0 отдельно: живое исследование, контракт и независимые ожидания. Type/mode `exports.kafka` / `publish` — предложение. Этап 1 — после решения владельца по W1 и W2; W1; W2; W3 подробно описаны в подплане. Готовность реестра не повышалась.
 
-Внешняя среда: Loginom Enterprise/Cloud с Kafka; изолированный broker, выделенный topic/ACL и отдельный consumer; этап 2 — PLAINTEXT, SASL_Plaintext, SSL, SASL_SSL и SASL PLAIN/SCRAM-SHA-256/SCRAM-SHA-512 по отдельным профилям. Если среда/компонент недоступны — Blocked, документальное покрытие сохраняется.
+Внешняя среда: Loginom Enterprise/Cloud с Kafka; изолированный broker, выделенный topic/ACL и отдельный consumer; этап 2 — PLAINTEXT, SASL_Plaintext, SSL, SASL_SSL и SASL PLAIN/SCRAM-SHA-256/SCRAM-SHA-512 по отдельным профилям. Недоступность среды/компонента сначала диагностировать по [регламенту Multica](../../../testing/loginom-ai-agent/multica-mas.md); `blocked` — только реальное внешнее ожидание, документальное покрытие сохраняется.
 
 ## Планируемый объём по этапам
 
