@@ -5,14 +5,16 @@ import {withDiagnosticSession} from './diagnostic-session.mjs';
 
 // The foreground caller owns these original handles through refusal and recovery.
 export async function runReviewerStorage(options, owner) {
- const {context,page,execute,directory:output,identity,makePrepareCode,makeCleanupCode}=options;
+ const {context,page,execute,directory:output,identity:inputIdentity,makePrepareCode,makeCleanupCode}=options;
+ const identity=Object.freeze(structuredClone(inputIdentity));
  if(!owner || owner.context || !context || !page || typeof execute!=='function')throw Error('FOREGROUND_OWNER_REQUIRED');
- Object.assign(owner,{context,page,execute,identity,failed:false,closed:false});
+ Object.assign(owner,{context,page,execute,identity:{...identity},failed:false,closed:false});
  const runtime=options.runtime;
  const settled=()=>{
   if(!runtime || owner.runtime!==runtime || typeof runtime.hasUnsettledWork!=='function')throw Error('DIAGNOSTIC_RUNTIME_UNVERIFIED');
   if(runtime.hasUnsettledWork())throw Error('DIAGNOSTIC_RUNTIME_UNSETTLED');
  };
+ const cleanupExecute=code=>{requireBinding();return execute(code)};
  owner.runtime=runtime;
  let verifiedPrepared, binding;
  const requireBinding=()=>{
@@ -48,12 +50,12 @@ export async function runReviewerStorage(options, owner) {
    binding={...binding,path};
   }
   settled();
-  await withDiagnosticSession({context,execute,directory:output,identity:owner.identity,makeCleanupCode},async({bindPrepared})=>bindPrepared(owner.prepared));
+  await withDiagnosticSession({context,execute:cleanupExecute,directory:output,identity:{...identity,packagePath:binding.path},makeCleanupCode},async({bindPrepared})=>bindPrepared(owner.prepared));
   owner.closed=true;
   return owner;
  };
  try{
-  await withDiagnosticSession({context,execute,directory:output,identity,makeCleanupCode},async({bindPrepared})=>{
+  await withDiagnosticSession({context,execute:cleanupExecute,directory:output,identity,makeCleanupCode},async({bindPrepared})=>{
    const bind=async p=>{
     owner.preparedCandidate=p;
     verifiedPrepared=undefined;binding=undefined;

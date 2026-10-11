@@ -51,3 +51,14 @@ for(const candidate of [undefined,{status:'BLOCKED',document_id:'document',workf
  await assert.rejects(x.owner.recover());assert.equal(saves,0);assert.equal(cleanups,0);assert.deepEqual(x.events,[]);assert.equal(x.owner.error,error);assert.equal(x.owner.page,x.page);
  }finally{await x.finish()}
 });
+for(const field of ['account','sessionId'])test('identity field mutation during path preflight refuses before save '+field,async()=>{
+ const x=await setup();try{
+ let saves=0,cleanups=0;x.options.makeCleanupCode=makePackageCleanupCode;x.options.execute=async()=>{cleanups++};
+ x.options.scenario=async({bindPrepared})=>{await bindPrepared(x.prepared);throw Error('original')};
+ x.options.observeIdentity=async()=>({account:'own',sessionId:'session',documentId:'document',tabTid:'tab',path:'/shared/source.lgp',personalDirectory:'/own',modified:true,running:false,readOnly:false,owned:true});
+ x.options.pathExists=async()=>{x.owner.identity[field]='foreign';return false};
+ x.runtime.run=async(_action,input)=>{saves++;return {status:'SUCCEEDED',output:{save_completed:true,package_ref:{path:input.path}}}};
+ await runReviewerStorage(x.options,x.owner);const error=x.owner.error;
+ await assert.rejects(x.owner.recover());assert.equal(saves,0);assert.equal(cleanups,0);assert.deepEqual(x.events,[]);assert.equal(x.owner.error,error);assert.equal(x.owner.page,x.page);
+ }finally{await x.finish()}
+});
