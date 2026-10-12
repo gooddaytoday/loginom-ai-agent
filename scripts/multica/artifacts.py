@@ -580,19 +580,124 @@ def use(ctx, args):
         os.close(fd)
 
 
+def legacy_cli(ctx, *arguments):
+    """Read only through the supported CLI; never substitute a failed/partial read."""
+    environment = dict(os.environ, MULTICA_WORKSPACE_ID=ctx['workspace'], MULTICA_SERVER_URL=ctx['server'])
+    try:
+        result = subprocess.run(['multica', *arguments, '--output', 'json'],
+                                env=environment, capture_output=True, text=True, check=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise DeliveryError('Legacy CLI read failed; retain artifacts') from error
+    # Cursor/truncation warnings are on stderr, not in the JSON array. Treat any
+    # warning as unqualified rather than interpreting it as an empty/full read.
+    if result.stderr.strip():
+        raise DeliveryError('Legacy CLI read has warnings; retain artifacts') from subprocess.CalledProcessError(
+            result.returncode, result.args, output=result.stdout, stderr=result.stderr)
+    try:
+        return json.loads(result.stdout)
+    except (ValueError, TypeError) as error:
+        raise DeliveryError('Legacy CLI body invalid; retain artifacts') from error
+
+
+def legacy_issues(ctx):
+    """Complete traversal, not an atomic snapshot of a changing workspace."""
+    issues, seen, offset, total = [], set(), 0, None
+    while True:
+        page = legacy_cli(ctx, 'issue', 'list', '--limit', '100', '--offset', str(offset))
+        if (not isinstance(page, dict) or not isinstance(page.get('issues'), list)
+                or type(page.get('has_more')) is not bool
+                or type(page.get('total')) is not int or page['total'] < 0
+                or type(page.get('offset')) is not int or page['offset'] != offset
+                or type(page.get('limit')) is not int or page['limit'] != 100):
+            raise DeliveryError('Issue pagination incomplete; retain legacy artifacts')
+        if total is None:
+            total = page['total']
+        if page['total'] != total:
+            raise DeliveryError('Issue pagination changed; retain legacy artifacts')
+        rows = page['issues']
+        if len(rows) > 100 or offset + len(rows) > total:
+            raise DeliveryError('Issue pagination inconsistent; retain legacy artifacts')
+        for issue in rows:
+            if (not isinstance(issue, dict) or not isinstance(issue.get('status'), str)
+                    or not issue['status'] or not isinstance(issue.get('id'), str)
+                    or 'description' not in issue
+                    or issue.get('description') is not None and not isinstance(issue['description'], str)):
+                raise DeliveryError('Issue projection incomplete; retain legacy artifacts')
+            try:
+                key = str(uuid.UUID(issue['id']))
+            except ValueError as error:
+                raise DeliveryError('Issue identity invalid; retain legacy artifacts') from error
+            if key in seen:
+                raise DeliveryError('Issue pagination overlaps; retain legacy artifacts')
+            seen.add(key)
+        issues.extend(rows)
+        offset += len(rows)
+        if not page['has_more']:
+            if offset != total:
+                raise DeliveryError('Issue pagination ended early; retain legacy artifacts')
+            return issues
+        if not rows or offset >= total:
+            raise DeliveryError('Issue pagination did not advance; retain legacy artifacts')
+
+
+def legacy_relations(ctx, issue):
+    comments = legacy_cli(ctx, 'issue', 'comment', 'list', issue['id'], '--full')
+    runs = legacy_cli(ctx, 'issue', 'runs', issue['id'])
+    if not isinstance(comments, list) or not isinstance(runs, list):
+        raise DeliveryError('Legacy relation projection incomplete; retain artifacts')
+    for rows in (comments, runs):
+        seen = set()
+        for row in rows:
+            if (not isinstance(row, dict) or not isinstance(row.get('id'), str)
+                    or row['id'] in seen or row.get('issue_id', issue['id']) != issue['id']
+                    or row.get('content_truncated') or row.get('folded_reply_count')):
+                raise DeliveryError('Legacy relation incomplete or foreign; retain artifacts')
+            try:
+                key = str(uuid.UUID(row['id']))
+            except ValueError as error:
+                raise DeliveryError('Legacy relation identity invalid; retain artifacts') from error
+            if key in seen:
+                raise DeliveryError('Legacy relation identity repeated; retain artifacts')
+            seen.add(key)
+    for comment in comments:
+        if not isinstance(comment.get('content'), str) or not isinstance(comment.get('created_at'), str):
+            raise DeliveryError('Legacy comment projection incomplete; retain artifacts')
+        try:
+            stamp = datetime.datetime.fromisoformat(comment['created_at'])
+            if stamp.tzinfo is None:
+                raise ValueError('missing timezone')
+        except ValueError as error:
+            raise DeliveryError('Legacy comment time invalid; retain artifacts') from error
+    for run in runs:
+        if not isinstance(run.get('status'), str) or not run['status']:
+            raise DeliveryError('Legacy run projection incomplete; retain artifacts')
+        if run.get('trigger_comment_id') is not None and not isinstance(run['trigger_comment_id'], str):
+            raise DeliveryError('Legacy run trigger incomplete; retain artifacts')
+        for field in ('delivered_comment_ids', 'coalesced_comment_ids', 'planned_comment_ids'):
+            if run.get(field) is not None and (not isinstance(run[field], list)
+                    or any(not isinstance(key, str) for key in run[field])):
+                raise DeliveryError('Legacy run references incomplete; retain artifacts')
+        try:
+            for key in ([run['trigger_comment_id']] if run.get('trigger_comment_id') else []) + [
+                    key for field in ('delivered_comment_ids', 'coalesced_comment_ids', 'planned_comment_ids')
+                    for key in run.get(field) or []]:
+                uuid.UUID(key)
+        except ValueError as error:
+            raise DeliveryError('Legacy run reference identity invalid; retain artifacts') from error
+    return comments, runs
+
+
 def legacy_references(ctx):
-    issues = api(ctx, 'issues')
-    issues = issues if isinstance(issues, list) else issues['issues']
+    issues = legacy_issues(ctx)
     for issue in issues:
         if not isinstance(issue, dict) or not issue.get('id') or not isinstance(issue.get('status'), str):
             raise DeliveryError('Issue projection incomplete; retain legacy artifacts')
     issues = [i for i in issues if i['status'] not in ('done', 'cancelled')]
-    routes = [f"issues/{uuid.UUID(i['id'])}/{suffix}" for i in issues for suffix in ('comments', 'task-runs')]
     with ThreadPoolExecutor(max_workers=4) as pool:
-        responses = list(pool.map(lambda route: api(ctx, route), routes))
+        responses = list(pool.map(lambda issue: legacy_relations(ctx, issue), issues))
     fragments = []
     for index, issue in enumerate(issues):
-        comments, runs = responses[2 * index:2 * index + 2]
+        comments, runs = responses[index]
         fragments.append(issue.get('description') or '')
         active_ids = {r.get('trigger_comment_id') for r in runs if r['status'] not in ('completed', 'failed', 'cancelled')}
         active_ids.update(c for r in runs if r['status'] not in ('completed', 'failed', 'cancelled') for field in ('delivered_comment_ids', 'coalesced_comment_ids', 'planned_comment_ids') for c in (r.get(field) or []))
