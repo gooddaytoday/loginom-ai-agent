@@ -1,9 +1,9 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка: 2026-10-12T18:06:06Z; fresh issues/active/metadata/roots всех 8 + LAB-55 и latest LAB-57 report/evidence/source прочитаны; появился внешний CLI pin blocker.
+- Проверка: 2026-10-12T18:17:19.980804+00:00; fresh issues/active/metadata/roots всех8 + LAB-55 и latest LAB-57 report/evidence/source/handoff прочитаны; внешний CLI pin blocker, owner decision pending.
 - Расписание lab-56-lab-63-30 ACTIVE каждые30 минут; все8 ещё не done, условие удаления не достигнуто.
 - LAB-56: in_review rev65; Ben ACCEPT + Evaler verified evidence/cleanup, done не выставлен, runs нет.
-- LAB-57: blocked rev139; Rich autonomy task01a130ff-f583-7158-a212-250ff18600cf завершён, Evaler01a13138-6f0f-7266-8736-a3fd9734a8ad running, Rich/Ben pending нет. Metadata ещё содержит прежний owner blocker/counters.
+- LAB-57: blocked rev141; Rich autonomy task01a130ff-f583-7158-a212-250ff18600cf завершён, Evaler current run+proposal follow-up active/queued, Rich/Ben pending нет. Старую metadata не считать новым acceptance.
 - LAB-58–LAB-63: in_progress/admission rev9, runs нет, ждут ACCEPT/cleanup LAB-57. LAB-55: in_review rev16, runs нет, не затронут.
 - Partial49522d83318bac29779e497798becb2f799bc84e прежний. CP1251 ref2 native journal независимо проверен: actual owner observed, один begin_wizard, viewport1920×1080, document/workflow/node совпали; delivered full cold verdict PASS/cleanup подтверждён.
 - Report01a13138-6ee4-7a6d-aea5-f798eea0bb9f: 5/6 reference/cold PASS (TXT/CSV/CP1251/pipe/TSV8), по17 negatives; UTF16 reference1 FAIL до генерации, product всех0, full frozen SHA/READY_FOR_BEN отсутствуют.
@@ -16,5 +16,5 @@
 - Repeat2/10, остаток8; Rich native ordinal10 completed, общего native cap10 нет; новый TSV cause первый/charge0, прежние budget/history не сброшены, неизменённый отказ не повторялся.
 - Автономный LAB-57 stage16:40:20Z→22:40:20Z без сброса; остановлен по external pin blocker. П.6 owner command01a130f3 требует отдельного решения для нового CLI/runtime pin; запрос владельцу отправлен, ответ ожидается, новые генерации не разрешены автоматически.
 - Публичные proofs77 primary assistant rows Luna/high по7 архивам проверены как доставленные; UTF16 последняя row — failed request, не completed response. Private DB здесь не открывались; recorded cost0 не означает billing0. Rich/Ben/Evaler модели/concurrency прежние.
-- Verified blocker receipt сохранён; proposal review local only. Готовые checks/test proposal будут переданы текущему Evaler с correct report parent, без нового Rich dispatch; сам CLI patch до owner decision не применять.
+- Verified blocker/combined test proposal опубликованы d68d433be; Evaler handoff01a13153-b51a-7a8b-811a-3ad541305164, parent текущего BLOCKED; exact body/parent/one routed mention и attached proof bytes/SHA PASS, trigger queued, нового Rich dispatch нет.
 - Следующий шаг: Evaler независимо проверяет новый BLOCKED/evidence; после разрешения владельца — functional tests/build/admission изолированного нового CLI pin от5cd, затем UTF16 с сохранёнными попытками/deadline, full product и Ben. Мониторинг не отменять.

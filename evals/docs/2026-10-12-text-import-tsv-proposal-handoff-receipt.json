@@ -1,0 +1,25 @@
+{
+  "checked_utc": "2026-10-12T18:17:19.980804+00:00",
+  "issue": "LAB-57",
+  "comment_id": "01a13153-b51a-7a8b-811a-3ad541305164",
+  "parent_id": "01a13138-6ee4-7a6d-aea5-f798eea0bb9f",
+  "body_sha256": "a1a5b5a260dccf0bf66d87af638cf687a34e5ed51639a5b71c52895e29d9f7a8",
+  "body_parent_readback_exact": true,
+  "routed_Evaler_mentions": 1,
+  "trigger_outcomes": [
+    {
+      "reason_code": "queued",
+      "status": "queued",
+      "target_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "target_type": "agent"
+    }
+  ],
+  "attachment_id": "01a13153-b389-7783-a0b7-86d6ca4bc8b1",
+  "attachment_bytes": 3649,
+  "attachment_sha256": "83bfbd0b7115a4be54a676c1254196632d7b8ba5f1852de4a1718b4c50da6ad8",
+  "attachment_download_bytes_exact": true,
+  "proposal_commit": "d68d433bed8cc2be72eec3f590c0ffd09cc47af6",
+  "new_Rich_dispatch": false,
+  "owner_CLI_pin_approval": "pending; no approval inferred",
+  "installed_or_shared_CLI_modified": false
+}
