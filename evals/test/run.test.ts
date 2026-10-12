@@ -5,6 +5,7 @@ import { cp, mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
 import { parseArtifactSource } from "../src/artifact"
 import { agentCommand } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
+import { gitInfo } from "../src/preflight"
 import { afterAttempt, main, redact, runAttempt, stamp } from "../src/run"
 import type { RunSummary } from "../src/report"
 import { loadTasks } from "../src/task"
@@ -104,6 +105,54 @@ test("main --dry-run --repeat 2: статусы по фикстурам, поп�
 test("stamp: YYYYMMDD-HHmmss", () => {
   expect(stamp(new Date("2026-09-18T12:34:56.789Z"))).toBe("20260918-123456")
 })
+
+test("main --dry-run: совпавшие время и SHA не перезаписывают прежние результаты", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-run-collision-"))
+  try {
+    const git = await gitInfo()
+    const now = Date.now()
+    const previous = Array.from({ length: 41 }, (_, index) => path.join(directory, "results",
+      `${stamp(new Date(now + (index - 20) * 1000))}-${git?.sha ?? "nogit"}${git?.dirty ? "-dirty" : ""}`))
+    await Promise.all(previous.map(async (dir) => {
+      await mkdir(dir, { recursive: true })
+      await Bun.write(path.join(dir, "config.json"), "previous config")
+      await Bun.write(path.join(dir, "summary.json"), "previous summary")
+    }))
+    const result = await main(["--dry-run", "--only", "group-sum-qty", "--label", "new run"], {
+      EVAL_RESULTS_DIR: path.join(directory, "results"), EVAL_WORKSPACE_ROOT: path.join(directory, "workspace"),
+    })
+    expect(result.code).toBe(0)
+    expect(previous).not.toContain(result.runDir)
+    const summary = await Bun.file(path.join(result.runDir, "summary.json")).json() as RunSummary
+    expect(summary.run_id).toBe(path.basename(result.runDir))
+    expect(summary.label).toBe("new run")
+    await Promise.all(previous.map(async (dir) => {
+      expect(await Bun.file(path.join(dir, "config.json")).text()).toBe("previous config")
+      expect(await Bun.file(path.join(dir, "summary.json")).text()).toBe("previous summary")
+    }))
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 30_000)
+
+test("main --dry-run: параллельные прогоны сохраняют отдельные результаты и workspace", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-runs-"))
+  try {
+    const runs = await Promise.all(["first", "second"].map(async (label) => ({ label,
+      ...await main(["--dry-run", "--only", "group-sum-qty", "--label", label], {
+        EVAL_RESULTS_DIR: path.join(directory, "results"), EVAL_WORKSPACE_ROOT: path.join(directory, "workspace"),
+      }),
+    })))
+    expect(new Set(runs.map((run) => run.runDir)).size).toBe(runs.length)
+    await Promise.all(runs.map(async (run) => {
+      expect(run.code).toBe(0)
+      const summary = await Bun.file(path.join(run.runDir, "summary.json")).json() as RunSummary
+      expect(summary.label).toBe(run.label)
+      expect(summary.run_id).toBe(path.basename(run.runDir))
+      expect((await Bun.file(path.join(run.runDir, "config.json")).json()).label).toBe(run.label)
+      expect(await Bun.file(path.join(directory, "workspace", summary.run_id, "group-sum-qty/1/sales.csv")).text())
+        .toBe(await Bun.file(path.join(evalsRoot, "tasks/group-sum-qty/data/sales.csv")).text())
+    }))
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 30_000)
 
 test("main: failed cleanup пишет summary/result/report, сохраняет качество и не запускает второй кейс", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "evals-pipeline-"))

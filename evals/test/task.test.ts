@@ -36,6 +36,25 @@ test("loadTasks: only фильтрует, неизвестный id — EvalFail
   await expect(loadTasks(tasksDir, ["nope"])).rejects.toThrow(EvalFailure)
 })
 
+test("loadTasks: inputs с одинаковым именем отклоняются до копирования с обоими путями", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-input-collision-"))
+  try {
+    await cp(path.join(tasksDir, "group-sum-qty"), path.join(dir, "group-sum-qty"), { recursive: true })
+    const file = path.join(dir, "group-sum-qty", "task.json")
+    const raw = await Bun.file(file).json()
+    await Bun.write(path.join(dir, "group-sum-qty", "left/data.csv"), "value\nleft\n")
+    await Bun.write(path.join(dir, "group-sum-qty", "right/data.csv"), "value\nright\n")
+    await Bun.write(file, JSON.stringify({ ...raw, inputs: ["left/data.csv", "right/data.csv"] }))
+    const error = await loadTasks(dir).catch((error: unknown) => error)
+    expect(error).toBeInstanceOf(EvalFailure)
+    if (!(error instanceof EvalFailure)) throw Error("Ожидался отказ загрузки inputs")
+    expect(error.exitCode).toBe(2)
+    expect(error.message).toContain("group-sum-qty")
+    expect(error.message).toContain("left/data.csv")
+    expect(error.message).toContain("right/data.csv")
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
 test("loadTasks: посторонний каталог без task.json не мешает загрузке задач", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-task-discovery-"))
   try {

@@ -9,14 +9,14 @@ import { describe, redact, stamp } from "./run"
 import { evalsRoot } from "./config"
 import { prepareCalibrationCases } from "./calibration-cases"
 import { checkOracle } from "./oracle"
+import { reserveRunDirectory } from "./run-directory"
 
 export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsRoot, "calibration")) {
   const tasks = await loadTasks(config.tasksDir, config.only)
   await preflight(config, parseArtifactSource("docker", config.loginom))
   const judge = await judgeInfo(config)
-  const runId = `${stamp(new Date())}-calibrate`
-  const runDir = path.join(config.resultsDir, runId)
-  await mkdir(runDir, { recursive: true })
+  const runDir = await reserveRunDirectory(config.resultsDir, `${stamp(new Date())}-calibrate`)
+  const runId = path.basename(runDir)
   await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2))
   const settings: JudgeSettings = {
     command: config.judge.command,

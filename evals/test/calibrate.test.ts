@@ -1,11 +1,35 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { cp, mkdtemp, rm } from "node:fs/promises"
-import { main } from "../src/run"
+import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
+import { main, stamp } from "../src/run"
 import { evalsRoot } from "../src/config"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
+
+test("--calibrate: совпавшее время не перезаписывает прежнюю калибровку", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-calibration-collision-"))
+  try {
+    const now = Date.now()
+    const previous = Array.from({ length: 41 }, (_, index) => path.join(directory, "results",
+      `${stamp(new Date(now + (index - 20) * 1000))}-calibrate`))
+    await Promise.all(previous.map(async (dir) => {
+      await mkdir(dir, { recursive: true })
+      await Bun.write(path.join(dir, "config.json"), "previous config")
+      await Bun.write(path.join(dir, "calibration.json"), "previous calibration")
+    }))
+    const result = await main(["--calibrate", "--only", "group-sum-qty"], {
+      JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: fakeJudge, EVAL_RESULTS_DIR: path.join(directory, "results"),
+    })
+    expect(result.code).toBe(0)
+    expect(previous).not.toContain(result.runDir)
+    expect((await Bun.file(path.join(result.runDir, "calibration.json")).json()).run_id).toBe(path.basename(result.runDir))
+    await Promise.all(previous.map(async (dir) => {
+      expect(await Bun.file(path.join(dir, "config.json")).text()).toBe("previous config")
+      expect(await Bun.file(path.join(dir, "calibration.json")).text()).toBe("previous calibration")
+    }))
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 30_000)
 
 test("--calibrate: выполненные пороги оставляют нулевой код", async () => {
   const originalModel = process.env.JUDGE_MODEL

@@ -13,6 +13,7 @@ import { archiveDiagnostics } from "./diagnostics"
 import type { ProcessCleanup } from "./process-supervisor"
 import { acquireRunHarnessLease } from "./node-eval-ops"
 import { SandboxFailure } from "./sandbox"
+import { reserveRunDirectory } from "./run-directory"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
 export async function main(argv: string[], env: Record<string, string | undefined> = process.env) {
@@ -41,9 +42,9 @@ async function executeRun(config: EvalConfig) {
   const controller = new AbortController()
   installSigint(controller)
   const startedAt = new Date()
-  const runId = `${stamp(startedAt)}-${environment.git?.sha ?? "nogit"}${environment.git?.dirty ? "-dirty" : ""}`
-  const runDir = path.join(config.resultsDir, runId)
-  await mkdir(runDir, { recursive: true })
+  const runDir = await reserveRunDirectory(config.resultsDir,
+    `${stamp(startedAt)}-${environment.git?.sha ?? "nogit"}${environment.git?.dirty ? "-dirty" : ""}`)
+  const runId = path.basename(runDir)
   await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2))
   const command: AgentCommand = { ...agentCommand(config), cleanupDir: path.join(runDir, "preparation"),
     cleanupSecrets: [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""] }

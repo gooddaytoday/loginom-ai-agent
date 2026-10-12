@@ -58,6 +58,10 @@ async function loadTask(dir: string) {
     oracle: await Bun.file(path.join(dir, "oracle.csv")).exists() ? "oracle.csv" : undefined,
     oracleTolerance: oracleTolerance(raw, id),
   }
+  const collisions = task.inputs.filter((file, index, files) =>
+    files.some((other, otherIndex) => index !== otherIndex && path.basename(file) === path.basename(other)))
+  if (collisions.length)
+    throw new EvalFailure(`${id}: inputs должны иметь уникальные имена файлов; конфликт: ${collisions.join(", ")}`, 2)
   for (const rel of [task.reference, task.spec, ...task.inputs, ...checkerFiles].filter(Boolean)) {
     if (!(await Bun.file(path.join(dir, rel)).exists())) throw new EvalFailure(`${id}: файл "${rel}" не найден`, 2)
   }
