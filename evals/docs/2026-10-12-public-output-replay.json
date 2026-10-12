@@ -1,0 +1,36 @@
+{
+  "scope": "NATIVE_PUBLIC_BINDING_AND_TYPED_TABLE_ONLY",
+  "case_id": "txt-comma-utf8",
+  "operation_id": "import-comma-utf8-001",
+  "checked_at": "2026-10-12T09:37:31.586654+00:00",
+  "producer_cli_sha": "5cd74d8ee5d6125692d953eb327b4d4f833c27a1",
+  "source_archive_sha256": "5a846d7b044ec975fd518d07d49d9b598e5cb48d5463f94c13c279f26c04104b",
+  "source_events_sha256": "b3f07cc49bc3a0fe3b9ae114afb18742833c627ebbd37cfd8a3d59b5f2c2828e",
+  "native_journal_sha256": "be5e6423d6a5b8bbfd12b91d75b3201ff64c9355cf5559375e604107396e6ae3",
+  "expected_table_sha256": "1cd04ea52121acea352cfa0ec74c00efc3a594c1e0575d9dc05f60464f847084",
+  "previous_checker_sha": "7c463a35fe19887a2c3d38b4e32c7dc665ab2ffa",
+  "previous_result": {
+    "verdict": "FAIL",
+    "reason": "native: settled checkpoint differs"
+  },
+  "patched_result": "PASS",
+  "patched_checker_sha256": "e9a5ab9a61486e2a6f83b9e7cd1c5b3a71fa022daa05c9060ea2fc93642b44dd",
+  "native_public_typed_tables": "IDENTICAL",
+  "native_oracle_comparison": {
+    "status": "DATA_MATCH",
+    "rows": 3,
+    "columns": 5,
+    "comparison": "ordered",
+    "runtime_evaluation": "NOT_ESTABLISHED"
+  },
+  "public_oracle_comparison": {
+    "status": "DATA_MATCH",
+    "rows": 3,
+    "columns": 5,
+    "comparison": "ordered",
+    "runtime_evaluation": "NOT_ESTABLISHED"
+  },
+  "runtime": "NOT_RUN",
+  "new_reference_product_cold_model_attempts": 0,
+  "full_warm_cold_reference_acceptance": "NOT_CONFIRMED_BY_THIS_REPLAY"
+}
