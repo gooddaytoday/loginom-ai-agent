@@ -1,6 +1,6 @@
 Sorting receiving pre-close contract (consumer preparation)
 
-Process: node-orchestration-v1. Runtime baseline: c4572d85bc38977994361ebb973a46fa80116525,
+Process: node-orchestration-v2. Runtime baseline: c4572d85bc38977994361ebb973a46fa80116525,
 PR49. Owner approval: 01a12d6c. Source implementation belongs to LAB-68;
 this document and its tests do not implement or grant upstream authority.
 Import approval 01a12d74 belongs to LAB-68/LAB-71 and is excluded here.
@@ -84,6 +84,6 @@ bridge capture/proof/cleanup consumers; exact inventory entry and addressed
 tests. No whole bridge/host blob, Import/Calculator/Amount, navigation/observer
 changes or new source implementation belongs to this preparation.
 
-Offline command: `bun test ./packages/agent/test/cli/sorting-preclose-consumer.test.ts`.
+From `packages/agent`, run: `bun test ./test/cli/sorting-preclose-consumer.test.ts`.
 No native/model/setup/execute/replay is authorized by this contract. The current
 product remains the clean c4572d85 product; docs/tests alone need no rebuild.
