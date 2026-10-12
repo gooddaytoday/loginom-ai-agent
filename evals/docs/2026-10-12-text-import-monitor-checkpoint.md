@@ -1,6 +1,6 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка: 2026-10-12T23:21:44Z; bounded read LAB-57 FAILED: тот же CLI TLS handshake timeout, server JSON нет. Statuses/runs/comments/metadata и новые owner команды UNKNOWN; ниже только состояние19:21:58Z. Известный deadline22:40:20Z прошёл, отсутствие текущих runs не доказано.
+- Проверка: 2026-10-12T23:56:58Z; CLI default/scoped proxy/proxy+TLS workaround FAIL; explicit curl proxy CONNECT200, затем SSL timeout; SSH auth denied. Server JSON нет, statuses/runs/comments/metadata/новые owner команды UNKNOWN; ниже состояние19:21:58Z. Известный deadline22:40:20Z прошёл.
 - Расписание lab-56-lab-63-30 ACTIVE каждые30 минут; выполнение всех8 не подтверждено, условие удаления не достигнуто.
 - LAB-56: in_review rev65; Ben ACCEPT + Evaler verified evidence/cleanup, done не выставлен, runs нет.
 - LAB-57: blocked rev149; оба Evaler runs01a13138-6f0f-7266-8736-a3fd9734a8ad/01a13153-b536-7ae8-9b14-4993a38f1f77 completed; active/queued всех работников нет. Metadata обновлена: TSV pin blocker, full frozen/READY_FOR_BEN/ACCEPT отсутствуют.
@@ -17,4 +17,4 @@
 - Известный LAB-57 stage16:40:20Z→22:40:20Z ИСТЁК; deadline/21600s/no-reset сверены с receipts и UTC. Новое server разрешение UNKNOWN; прежний этап не продлён. П.6 owner command01a130f3 требует решения о CLI pin; запрос остаётся без ответа здесь; stage-deadline-observation.json сохранён.
 - Публичные proofs77 primary assistant rows Luna/high по7 архивам проверены как доставленные; UTF16 последняя row — failed request, не completed response. Private DB здесь не открывались; recorded cost0 не означает billing0. Rich/Ben/Evaler модели/concurrency прежние.
 - Evaler reviews01a1315c-afd7-7588-a622-313a9a772eb7/01a13165-089f-7b14-9101-2b6e1dad98ad подтвердили delivery и combined proposal d68d433be; receipt2026-10-12-text-import-tsv-evaler-review-receipt.json. NOT_APPLIED/NOT_ADMITTED, functional/typecheck/build не выполнены; нового handoff/dispatch нет.
-- Следующий шаг: восстановить fresh read-back и проверить новые owner команды/runs; продолжение через Evaler требует решения о pin и явного нового ограниченного этапа с прежними накопленными ledger, без сброса истёкшего. В старом этапе новые работы не запускать; собственных model/lease процессов мониторинга нет. Мониторинг не отменять.
+- Следующий шаг: нужен рабочий HTTPS либо существующий SSH-профиль для read-only server access; запрос alias/profile без секретов отправлен пользователю, ответа нет. Далее fresh read-back/owner команды/runs; продолжение через Evaler требует pin решения и нового ограниченного этапа с сохранёнными ledger. Старый этап не сбрасывать; мониторинг не отменять.

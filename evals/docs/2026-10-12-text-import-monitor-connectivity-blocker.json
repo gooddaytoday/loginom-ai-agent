@@ -39,7 +39,7 @@
   "owner_CLI_pin_decision": "Last verified pending; no new approval inferred",
   "automation": "lab-56-lab-63-30 remains ACTIVE; all-eight completion not confirmed",
   "next_step": "Re-read current Multica state on next scheduled check; diagnose changed connectivity before any handoff or execution. Preserve prior evidence and fixed LAB-57 stage deadline.",
-  "latest_checked_utc": "2026-10-12T23:21:44.698832+00:00",
+  "latest_checked_utc": "2026-10-12T23:56:58.758358+00:00",
   "subsequent_checks": [
     {
       "checked_utc": "2026-10-12T20:21:47.151206+00:00",
@@ -128,6 +128,45 @@
       "later_server_authorization_or_extension": "UNKNOWN",
       "persistent_changes": false,
       "scenario_or_Rich_budget_charge": 0
+    },
+    {
+      "checked_utc": "2026-10-12T23:51:55.005546+00:00",
+      "operation": "bounded CLI read LAB-57 plus documented alternate-path diagnostics",
+      "exit_code": 2,
+      "result": "same TLS handshake timeout",
+      "current_server_state": "UNKNOWN",
+      "full_snapshot_attempted": false,
+      "remote_path_source": "evals/docs/evaler-orchestration.md; evals/docs/2026-10-07-eval-tests-runtime.md",
+      "SSH": {
+        "host": "user@10.200.13.152",
+        "strict_known_host_checking": true,
+        "batch_mode": true,
+        "exit_code": 255,
+        "result": "Permission denied (publickey,password); no remote command ran; configured target identities unavailable, no relevant SSH settings found in selected private configuration."
+      },
+      "scoped_proxy": {
+        "checked_utc": "2026-10-12T23:53:56.814869+00:00",
+        "exit_code": 2,
+        "result": "TLS timeout; environment changes confined to root read invocation."
+      },
+      "scoped_proxy_with_classic_TLS": {
+        "checked_utc": "2026-10-12T23:55:41.117959+00:00",
+        "exit_code": 2,
+        "result": "TLS timeout; tested combined routing/handshake-size hypothesis; TLS encryption and certificate validation retained."
+      },
+      "independent_explicit_proxy": {
+        "checked_utc": "2026-10-12T23:56:58.758358+00:00",
+        "exit_code": 28,
+        "CONNECT_status": 200,
+        "origin_HTTP_status": 0,
+        "result": "SSL connection timeout; CONNECT is a proxy response, not fresh server/card evidence."
+      },
+      "existing_read_only_access_question_pending": true,
+      "known_old_stage_deadline_passed": true,
+      "later_server_authorization_or_extension": "UNKNOWN",
+      "persistent_CLI_credentials_VPN_or_worker_changes": false,
+      "scenario_or_Rich_budget_charge": 0
     }
-  ]
+  ],
+  "existing_read_only_access_question": "Pending: user asked for existing SSH alias/profile for user@10.200.13.152, without secrets; no new access or credentials requested/installed."
 }
