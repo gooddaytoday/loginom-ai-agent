@@ -252,6 +252,18 @@ async function handle(message) {
         managed: { directory, browserPath: resources.browserPath, browserRoot: resources.browserRoot },
       })
       state.session = session
+      const originalStartup=state.startupBinding,originalOwner=state.startupOwner,originalMetadata=session.metadata,
+        originalDirectory=session.directory,originalSessionId=session.metadata.sessionId;
+      const assertStartup=()=>{
+        if(state.session!==session || session.metadata!==originalMetadata || session.directory!==originalDirectory
+            || session.metadata.sessionId!==originalSessionId || state.startupBinding!==originalStartup || state.startupOwner!==originalOwner
+            || originalStartup.owner!==originalOwner || originalStartup.id!==originalOwner.id
+            || originalStartup.page!==originalOwner.page || originalStartup.context!==originalOwner.context
+            || originalStartup.account!==originalOwner.account || originalStartup.origin!==originalOwner.origin
+            || originalStartup.generation!==originalOwner.generation || originalStartup.chat!==originalOwner.chat)
+          throw Error("LOGINOM_STARTUP_OWNER_CHANGED");
+      };
+      assertStartup();
       // Bind only the document owned by this successful private login. This is
       // not workspace preparation and confers no package-close authority.
       const documentId=randomUUID()
@@ -265,6 +277,7 @@ async function handle(message) {
         return {documentId:o.documentId,account:o.account,loginomBuild:app.Version};
       },{documentId,sessionId:session.metadata.sessionId,account:input.connection.username,
         origin:new URL(config.loginomUrl).origin})
+      assertStartup();
       const { Client } = require("@modelcontextprotocol/sdk/client/index.js")
       const { InMemoryTransport } = require("@modelcontextprotocol/sdk/inMemory.js")
       const { createConnection } = require("@playwright/mcp")
@@ -272,8 +285,10 @@ async function handle(message) {
         JSON.parse(await readFile(session.browserConfig, "utf8")),
         async () => authenticated.context,
       )
+      assertStartup();
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
+      assertStartup();
       const captureBinding=acceptanceCapture ? Object.freeze({...acceptanceCapture,session:session.metadata.sessionId}) : undefined
       const retained=captureRegistration ? retainCaptureOwner(state,captureBinding,captureResource) : undefined
       state.captureRetained=retained
@@ -281,14 +296,17 @@ async function handle(message) {
         authenticatedReadiness:state.authenticatedReadiness,
         acceptanceCapture: acceptanceCapture ? { binding:captureBinding, harness:captureHarness,
           registration:captureRegistration, retained } : undefined })
+      assertStartup();
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })
       state.readonlyBinding=Object.freeze({startup:state.startupBinding,owner:state.startupOwner,
-        bridge:state.bridge,client:state.client,session:state.session})
+        bridge:state.bridge,client:state.client,session})
       if(retained)bindCaptureRuntime(retained,state.bridge,state.client)
       await state.bridge.server.connect(serverTransport)
+      assertStartup();
       if(retained)assertCaptureOwner(retained)
       await state.client.connect(clientTransport)
+      assertStartup();
       if(retained)assertCaptureOwner(retained)
       send({
         id: message.id,

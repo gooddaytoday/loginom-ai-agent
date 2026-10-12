@@ -560,7 +560,12 @@ export async function createBridge(config, session, { browserTransport: managedB
           }));
           if(write){phase='file_write';await callback(done=>captureWrite(file.fd,bytes,done))}
           phase=write?'file_sync':'directory_sync';await callback(done=>captureSync(file.fd,done));
-        }catch(value){failed(value)}
+        }catch(value){
+          // No operation object means the guard refused before invoking open.
+          // A dispatched callback/projection remains retained, even without an FD.
+          if(!file.io)captureWriters.delete(file);
+          failed(value);
+        }
         if(file.fd!==undefined){
           phase=write?'file_close':'directory_close';
           try{await closeCaptureWriter(file);captureWriters.delete(file)}
