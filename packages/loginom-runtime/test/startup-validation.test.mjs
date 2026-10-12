@@ -1,7 +1,8 @@
+import {constants} from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {readFile,mkdir,writeFile,mkdtemp,rm,rename,open} from 'node:fs/promises';
+import {readFile,mkdir,writeFile,mkdtemp,rm,rename,open,unlink} from 'node:fs/promises';
 import {join,dirname} from 'node:path';
 import {tmpdir} from 'node:os';
 import {randomUUID,createHash} from 'node:crypto';
@@ -44,7 +45,7 @@ function fixture(directory,phase,rejected){
  class Client {async connect(){events.push('knowledge');if(phase==='knowledge')throw rejected}async close(){events.push('knowledge-close');if(phase==='knowledge-close')throw rejected}}
  const require=name=>{if(phase==='require'||phase==='knowledge-require')throw rejected;return name==='playwright-core'?{chromium:{async launchPersistentContext(){events.push('launch');if(phase==='launch')throw rejected;return context}}}:
   name.includes('streamableHttp')?{StreamableHTTPClientTransport:class{}}:{Client}};
- const functions=vm.runInNewContext(code+';({loginBrowser,checkConnection})',{require,mkdir,writeFile,readFile,createHash,runtimeModulePath:path instanceof URL?path.pathname:path,join,dirname,randomUUID,URL,process,Error,
+ const functions=vm.runInNewContext(code+';({loginBrowser,checkConnection})',{require,mkdir,open,rename,unlink,constants,writeFile,readFile,createHash,runtimeModulePath:path instanceof URL?path.pathname:path,join,dirname,randomUUID,URL,process,Error,
   browserLaunch:()=>({args:[],viewport:{}}),browserDownloadScript:()=>''});
  const options={profile:directory,browserPath:'/fixture',candidate:{url:'https://loginom.invalid/app',username:'user',password:'',apiKey:'fixture'},endpoint:'https://knowledge.invalid',owner};
  return {owner,options,functions,events,context,page,logout:()=>logout,contextClose:()=>contextClose};

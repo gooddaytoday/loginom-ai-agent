@@ -5,6 +5,7 @@ import {readFile} from 'node:fs/promises';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {dirname,join} from 'node:path';
 import * as fs from 'node:fs/promises';
+import * as nativeFs from 'node:fs';
 import * as module from 'node:module';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
@@ -25,13 +26,20 @@ const page={
  async evaluate(fn,arg){if(fn.toString().includes('?? null')){events.push('authentication-read');throw primary}return vm.runInContext('('+fn.toString()+')',context)(arg)},
  locator(selector){const avatar=selector.includes('btnAvatar'),logout=selector.includes('btnLogOut'),login=selector.includes('btnLogin');return {locator(){return this},or(){return this},first(){return this},fill:async()=>{},inputValue:async()=>'',innerText:async()=>connection.UserName,isVisible:async()=>avatar?connection.Connected:true,waitFor:async()=>{},async click(){if(login){connection.Connected=true;events.push('login-double')}if(logout){logoutCalls++;events.push('logout-double');if(scenario.startsWith('native-'))throw native;connection.Connected=false}}}},
 };
-const browser={pages:()=>[page],async addInitScript(){},async close(){contextCalls++;events.push('context-close-double')}};
+const browser={pages:()=>[page],async addInitScript(){},async close(){if(scenario.startsWith('producer-')&&events.lastIndexOf('producer-directory_close')<events.lastIndexOf('logout-double'))throw Error('PRODUCER_NOT_DURABLE');contextCalls++;events.push('context-close-double')}};
 const requireDouble=name=>name==='playwright-core'?{chromium:{async launchPersistentContext(){const owner=entry.namespace.state.startupOwner;const close=owner.close;owner.close=async()=>{ownerCalls++;return close()};events.push('owner-before-await');return browser}}}:name==='@modelcontextprotocol/sdk/client/index.js'?{Client:class{async connect(){}async close(){}}}:name==='@modelcontextprotocol/sdk/client/streamableHttp.js'?{StreamableHTTPClientTransport:class{}}:(()=>{throw Error('unexpected require '+name)})();
+const producerPhase=scenario.startsWith('producer-')?scenario.slice(9,scenario.lastIndexOf('-')):null;
+const producerFault=phase=>{if(producerPhase===phase&&persistenceBlocked&&logoutCalls>0)throw primary};
 const fsDouble={...fs,
+ async rename(a,b){events.push('producer-rename');producerFault('rename');await fs.rename(a,b);events.push('producer-rename-complete')},
  async writeFile(p,data,options){if(scenario==='write-error'&&persistenceBlocked&&String(p).endsWith('managed-shutdown.json'))throw Error('managed write rejected');return fs.writeFile(p,data,options)},
- async open(p,...args){const handle=await fs.open(p,...args);if(String(p).endsWith('managed-shutdown.json'))return {async sync(){events.push('receipt-sync');if(persistenceBlocked&&scenario==='sync-error')throw Error('managed sync rejected');if(persistenceBlocked&&scenario==='sync-confirmed-error'&&String(await fs.readFile(p,'utf8')).includes('"stage": "startup_owner"'))throw Error('confirmed receipt sync rejected');await handle.sync()},async close(){events.push('receipt-handle-close');await handle.close()}};return handle},
+ async open(p,...args){
+ const producer=String(p).includes('.startup-cleanup-')||((args[0]&nativeFs.constants.O_DIRECTORY)!==0),kind=(args[0]&nativeFs.constants.O_DIRECTORY)!==0?'directory':'file';
+ if(producer){events.push('producer-'+kind+'_open');producerFault(kind+'_open')}
+ const handle=await fs.open(p,...args);
+ if(producer)return {async writeFile(data){events.push('producer-write');producerFault('write');await handle.writeFile(data);events.push('producer-write-complete')},async sync(){events.push('producer-'+kind+'_sync');producerFault(kind+'_sync');await handle.sync();events.push('producer-'+kind+'_sync-complete')},async close(){events.push('producer-'+kind+'_close-attempt');producerFault(kind+'_close');await handle.close();events.push('producer-'+kind+'_close')}};if(String(p).endsWith('managed-shutdown.json'))return {async sync(){events.push('receipt-sync');if(persistenceBlocked&&scenario==='sync-error')throw Error('managed sync rejected');if(persistenceBlocked&&scenario==='sync-confirmed-error'&&String(await fs.readFile(p,'utf8')).includes('"stage": "startup_owner"'))throw Error('confirmed receipt sync rejected');await handle.sync()},async close(){events.push('receipt-handle-close');await handle.close()}};return handle},
 };
-const builtins={'node:fs/promises':fsDouble,'node:module':{...module,createRequire:()=>requireDouble},'node:crypto':crypto,'node:path':path,'node:url':url,'node:os':os};
+const builtins={'node:fs/promises':fsDouble,'node:fs':nativeFs,'node:module':{...module,createRequire:()=>requireDouble},'node:crypto':crypto,'node:path':path,'node:url':url,'node:os':os};
 const synthetic=exports=>new vm.SyntheticModule(Object.keys(exports),function(){for(const [k,v] of Object.entries(exports))this.setExport(k,v)},{context});
 const helper=new vm.SourceTextModule(await readFile(helperPath,'utf8'),{context,identifier:pathToFileURL(helperPath).href,initializeImportMeta(meta){meta.url=pathToFileURL(helperPath).href}});
 await helper.link(spec=>synthetic(builtins[spec]??({'../client/lib/browser-downloads.mjs':{browserDownloadScript:()=>''},'../client/lib/browser-launch.mjs':{browserLaunch:()=>({args:[],viewport:{}})}})[spec]));await helper.evaluate();

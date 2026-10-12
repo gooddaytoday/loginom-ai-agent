@@ -31,3 +31,17 @@ test('whole linked lost reply/disconnect keeps unknown native cleanup without re
 
 test('whole linked confirmed cleanup retry rejects replacement of original context',()=>fixture('sync-confirmed-error',async f=>{f.send({id:'blocked',operation:'close'});await f.wait(()=>f.messages.some(m=>m.id==='blocked'));assert.ok(f.messages.find(m=>m.id==='blocked').error);const p=await f.probe();assert.equal(p.logoutCalls,1);f.send({fixture:'change-context'});f.send({fixture:'unblock'});f.send({id:'retry',operation:'close'});await f.wait(()=>f.messages.some(m=>m.id==='retry'));assert.ok(f.messages.find(m=>m.id==='retry').error);assert.equal(f.exited,undefined);const after=await f.probe();assert.equal(after.logoutCalls,1);assert.equal(after.contextCalls,1)}));
 test('whole linked partial navigation preserves owner and cleanup refusal',()=>fixture('partial-error',async f=>{const p=await f.probe();assert.equal(p.ownerRetained,true);assert.equal(p.contextRetained,true);assert.equal(p.logoutCalls,0);assert.equal(p.contextCalls,0);f.send({id:'close',operation:'close'});await f.wait(()=>f.messages.some(m=>m.id==='close'));assert.ok(f.messages.find(m=>m.id==='close').error);assert.equal(f.exited,undefined)}));
+
+// Receiving producer+accepted caller: full serialized modules, real FS and IPC.
+// Page/native/auth are doubles; completed sync events precede double context exit.
+for(const phase of ['file_open','write','file_sync','file_close','rename','directory_open','directory_sync','directory_close'])
+for(const label of ['error','zero'])test('whole receiving producer '+phase+' '+label+' refuses ACK then storage-only redelivery',()=>fixture('producer-'+phase+'-'+label,async f=>{
+ const p=await f.probe();assert.equal(p.ownerRetained,true);assert.equal(p.contextRetained,true);assert.equal(p.logoutCalls,1);assert.equal(p.contextCalls,0);assert.notEqual(p.ownerClosed,true);
+ const firstPrimary=JSON.stringify(p.startupFailure);
+ f.send({id:'blocked',operation:'close'});await f.wait(()=>f.messages.some(m=>m.id==='blocked'));assert.ok(f.messages.find(m=>m.id==='blocked').error);assert.equal(f.exited,undefined);
+ const blocked=await f.probe();assert.equal(blocked.logoutCalls,1);assert.equal(blocked.contextCalls,0);assert.equal(JSON.stringify(blocked.startupFailure),firstPrimary);
+ f.send({fixture:'unblock'});f.send({id:'retry',operation:'close'});await f.wait(()=>!!f.exited);assert.equal(f.messages.find(m=>m.id==='retry').result.closed,true);assert.equal(f.exited.code,0);
+ const paths=await fsPaths(f.directory);const producer=JSON.parse(await readFile(paths.find(p=>p.endsWith('startup-cleanup.json')),'utf8'));assert.equal(producer.cleanup_complete,true);assert.ok(producer.persistence_attempts.length>0);
+ const caller=JSON.parse(await readFile(paths.find(p=>p.endsWith('managed-shutdown.json')),'utf8'));assert.equal(caller.stages.at(-1).stage,'outer_acknowledgement');assert.equal(caller.stages.at(-1).status,'allowed');
+ const final=caller.stages.find(s=>s.stage==='startup_owner'&&s.status==='returned');assert.equal(final.receipt.cleanup_complete,true);
+}));
