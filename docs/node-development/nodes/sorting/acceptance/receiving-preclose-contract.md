@@ -16,7 +16,7 @@ not a new protocol. Source PASS does not establish receiving or native PASS.
 
 | Current source | Existing state/route | Receiving implication |
 | --- | --- | --- |
-| agent/src/cli/standalone-run.ts:53–60,100–101,129–136,149–169 | Original Node host, deferRelease owner and lease Set; parser completes before cleanup finally | Audit must use this owner before close, including primary Error/falsy handling. Currently there is no pre-close audit invocation. |
+| agent/src/cli/standalone-run.ts:53–60,100–101,124–127,149–169 | Original Node host, deferRelease owner and lease Set; ordinary run parser completes before cleanup finally | Audit must use this owner before close, including primary Error/falsy handling. Currently there is no pre-close audit invocation. |
 | loginom-host/src/adapter.ts:16–69 | Closure captures the original transport; acquire creates private run UUID and stores generation; deferred release retains lease | Do not reconnect or acquire another run for audit. Generation alone is not authority. Run/chat/deadline are not exported by this lease. |
 | loginom-host/src/host-port.ts:13–27,55–73,96–123,132–195 | Host maps run→hashed session chat→actual lease; tools uses readiness child, call/admit use run.chat | tools/readiness is not the original run Page. Fixed audit must route to the actual retained run.chat under host authority. No such Sorting selector exists yet. |
 | loginom-host/src/host.ts:53–93,213–224 | generation→connection/children; supervised runtime keyed by generation/chat | A new child/restart/validation/readiness Page cannot substitute for the original. Preserve journal and runtime identity. |
