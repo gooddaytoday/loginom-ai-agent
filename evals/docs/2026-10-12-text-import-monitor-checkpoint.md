@@ -1,6 +1,6 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка: 2026-10-12T16:57:59Z; fresh issues/active/metadata/roots всех 8 + LAB-55, latest LAB-57 comments/evidence/source и native progress прочитаны.
+- Проверка: 2026-10-12T17:22:38Z; fresh issues/active/metadata/roots всех 8 + LAB-55, latest LAB-57 thread/worker models/native progress прочитаны. Статусы/поставка/блокер прежние, нового terminal report/evidence нет.
 - Расписание lab-56-lab-63-30 ACTIVE каждые 30 минут; все 8 ещё не done, условие удаления не достигнуто.
 - LAB-56: in_review rev65; Ben ACCEPT + Evaler verified evidence/cleanup; done не выставлен, runs нет.
 - LAB-57: in_progress rev130; Rich autonomy task 01a130ff-f583-7158-a212-250ff18600cf running, Evaler/Ben pending нет, дубликатов Rich нет; metadata queued устарела относительно native running.
@@ -16,5 +16,5 @@
 - Repeat ledger2/10, остаток8; native ordinal10 running, общего native cap10 нет. Charge sum2 и история9 завершённых tasks/server status проверены; dispatch заранее не списывается, старые ERROR/receipts сохранены.
 - Последний принятый ledger: reference TXT1/3, CSV1/3, CP1251 2/3, остальные0/3; product всех0; cold calls5/launch4/completed2, cleanup continuations2/recovery0. Текущие расходы ждут evidence; repair cold считается отдельно, generation limits прежние.
 - Rich/Ben/Evaler gpt-6.1-sol/xhigh/concurrency1 прежние; actual исторических53/53 rows Luna/high подтверждены server review. Admission3/3 и wrapper1/1 исчерпаны, нового generation/smoke/probe/recovery допуска нет.
-- Этот heartbeat: fresh reads/7 downloads/offline source+hash+ledger audit, source-plan/checkpoint/receipt docs; seq89 tool_result в16:57:51Z. Monitor handoff/dispatch/model/browser/lease действий не делал; нового terminal report текущего Rich нет.
+- Этот heartbeat: fresh reads и native progress after seq89; 109 новых сообщений, последний seq198 tool_result в17:22:37Z, Rich продолжает текущий run. Monitor handoff/dispatch/model/browser/lease действий не делал; завершение/cleanup/PASS по одному browser_close не утверждается.
 - Следующий шаг: дождаться реального CP1251 ref2 native/cold результата и автономного авторского пилота; Rich сам диагностирует локальные дефекты в текущем этапе, Ben независимо проверит итоговые кейсы и изменения валидаторов. Не создавать дубликат/не отменять мониторинг.
