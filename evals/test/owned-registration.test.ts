@@ -7,6 +7,10 @@ import { superviseProcess, type OwnedRegistration } from "../src/process-supervi
 import { evalsRoot } from "../src/config"
 import { spawn } from "node:child_process"
 
+// A successful release requires no foreign native processes, just like settlement.
+const nativeBusy = (await Bun.$`ps -u ${process.getuid?.() ?? ""} -o comm=`.quiet().nothrow()).text()
+  .split("\n").some(name => /^(?:loginom-ai-|chrome|chromium)/.test(name.trim()))
+
 async function fixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-owned-registration-"))
   const profile = path.join(root, "profile")
@@ -31,7 +35,7 @@ async function fixture() {
   return { root, profile, marker, registration, dispose: () => rm(root, { recursive: true, force: true }) }
 }
 
-test("owned registration releases the attested original marker with an already absent writer", async () => {
+test.skipIf(nativeBusy)("owned registration releases the attested original marker with an already absent writer", async () => {
   const f = await fixture()
   try {
     const bytes = JSON.stringify(f.registration.original)

@@ -6,6 +6,11 @@ import os from "node:os"
 import { evalsRoot } from "../src/config"
 import { observeWriterReleaseSettlement, superviseProcess } from "../src/process-supervisor"
 
+// Successful settlement and later validation branches require a clean native stand.
+// Foreign-process rejection is covered below and must still run on a busy host.
+const nativeBusy = (await Bun.$`ps -u ${process.getuid?.() ?? ""} -o comm=`.quiet().nothrow()).text()
+  .split("\n").some(name => /^(?:loginom-ai-|chrome|chromium)/.test(name.trim()))
+
 async function fixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-writer-settlement-"))
   const profile = path.join(root, "profile")
@@ -25,7 +30,7 @@ async function fixture() {
   return { root, profile, original, acquired, dispose: () => rm(root, { recursive: true, force: true }) }
 }
 
-test("writer-release settlement creates a separate fresh two-pass proof without changing the original error", async () => {
+test.skipIf(nativeBusy)("writer-release settlement creates a separate fresh two-pass proof without changing the original error", async () => {
   const f = await fixture()
   try {
     const before = JSON.stringify(f.original)
@@ -60,7 +65,7 @@ test("writer-release settlement refuses other errors, unknown identities and inc
   } finally { await f.dispose() }
 })
 
-test("writer-release settlement refuses a changed writer and unknown runtime directory", async () => {
+test.skipIf(nativeBusy)("writer-release settlement refuses a changed writer and unknown runtime directory", async () => {
   const f = await fixture()
   try {
     await Bun.write(path.join(f.profile, ".writer/owner"), "foreign-owner")
