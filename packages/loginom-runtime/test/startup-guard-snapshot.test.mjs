@@ -40,11 +40,11 @@ for(const options of [{running:undefined},{running:null},{running:true},{parent:
 });
 for(const value of [Error('running-read'),undefined,null,false,0,''])test('snapshot exact running rejection '+String(value),async()=>{
  const f=await fixture({throwRunning:{value},blocked:true});
- try{let error;try{await f.owner.close()}catch(e){error=e}assert.equal(error.message,'LOGINOM_STARTUP_CLEANUP_BLOCKED');
+ try{let error;try{await f.owner.close()}catch(e){error=e}assert.equal(error,value);assert.equal(f.owner.cleanupFailure,value);
   assert.equal(f.owner.evidence.first_guard.running.available,false);assert.ok(f.owner.evidence.guard_persistence_failure);
-  assert.equal(error.cause.snapshot.running.rejection.is_undefined,value===undefined?true:value instanceof Error?undefined:false);
+  assert.equal(f.owner.evidence.first_guard.running.rejection.is_undefined,value===undefined?true:value instanceof Error?undefined:false);
   const first=JSON.stringify(f.owner.evidence.first_guard);await rename(join(f.directory,'startup-cleanup.json'),join(f.directory,'failed-write'));
-  await assert.rejects(f.owner.close());assert.equal(JSON.stringify(f.owner.evidence.first_guard),first);assert.deepEqual(f.events,[]);
+  try{await f.owner.close();assert.fail('expected rejection')}catch(retry){assert.equal(retry,value)}assert.equal(JSON.stringify(f.owner.evidence.first_guard),first);assert.deepEqual(f.events,[]);
   assert.equal(JSON.parse(await readFile(join(f.directory,'startup-cleanup.json'),'utf8')).first_guard.running.available,false);
  }finally{await f.dispose()}
 });
