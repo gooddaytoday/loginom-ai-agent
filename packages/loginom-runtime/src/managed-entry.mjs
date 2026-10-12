@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { tmpdir } from "node:os"
-import { mkdir, mkdtemp, readFile, rm, writeFile, open } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile, open, lstat } from "node:fs/promises"
+import { open as evidenceOpen, writeFile as evidenceWrite, fsync as evidenceSync, close as evidenceClose, rename as evidenceRename, constants } from "node:fs"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { loginBrowser, checkConnection, loginomAddress } from "./connection-check.mjs"
@@ -37,16 +38,128 @@ function closeRejection(value) {
     ...("cause" in value?{cause:closeRejection(value.cause)}:{})} :
     {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
 }
+async function closeEvidenceFile(file) {
+  if (file.closeComplete) return
+  if (file.io?.pending) throw Error("LOGINOM_MANAGED_WRITER_IO_UNKNOWN")
+  if (file.closeStarted) throw file.closeFailure ? file.closeFailure.value : Error("LOGINOM_MANAGED_WRITER_CLOSE_UNKNOWN")
+  file.closeStarted=true
+  let projection
+  const completion=new Promise((resolve,reject)=>{
+    try {projection=evidenceClose(file.fd,error=>{
+      if(error===null||error===undefined){file.closeComplete=true;resolve()}
+      else {file.closeFailure={value:error};reject(error)}
+    })}catch(value){file.closeFailure ??= {value};reject(value)}
+  })
+  // A returned thenable may report a failure, but fulfillment never replaces
+  // the original kernel callback (the standard Node API returns void).
+  await Promise.all([completion,projection])
+}
 async function recordClose(stage, detail) {
   state.shutdown ??= {stages:[]}
   if (Object.hasOwn(state,"startupFailure")) state.shutdown.startupFailure ??= closeRejection(state.startupFailure)
   state.shutdown.stages.push({stage,...detail})
   const directory=state.session?.directory??state.startupOwner?.directory
   if (!directory) return // No-start has acquired no native resources.
+  if(state.evidencePublication?.pending)throw state.evidencePrimary?state.evidencePrimary.value:Error("LOGINOM_MANAGED_PUBLICATION_UNKNOWN")
+  const parent=await lstat(directory)
+  if(!parent.isDirectory()||parent.isSymbolicLink())throw Error("LOGINOM_MANAGED_DIRECTORY_REFUSED")
   const path=join(directory,"managed-shutdown.json")
-  await writeFile(path,JSON.stringify(state.shutdown,null,2)+"\n",{mode:0o600})
-  const file=await open(path,"r+")
-  try {await file.sync()} finally {await file.close()}
+  const existing=await lstat(path).catch(error=>{if(error.code!=="ENOENT")throw error;return null})
+  if(existing&&(!existing.isFile()||existing.isSymbolicLink()||existing.nlink!==1))throw Error("LOGINOM_MANAGED_TARGET_REFUSED")
+  const guardPublication=async()=>{
+    if((state.session?.directory??state.startupOwner?.directory)!==directory)throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
+    const current=await lstat(directory)
+    if(!current.isDirectory()||current.isSymbolicLink()||current.dev!==parent.dev||current.ino!==parent.ino)throw Error("LOGINOM_MANAGED_DIRECTORY_CHANGED")
+    const target=await lstat(path).catch(error=>{if(error.code!=="ENOENT")throw error;return null})
+    if(existing? !target||target.dev!==existing.dev||target.ino!==existing.ino||!target.isFile()||target.isSymbolicLink()||target.nlink!==1 : target!==null)throw Error("LOGINOM_MANAGED_TARGET_CHANGED")
+  }
+  state.evidenceWriters ??= new Set()
+  // Descriptor retirement (including FileHandle's fd=-1/close event) is not
+  // kernel completion. Only the original fs.close success callback is proof.
+  for (const file of state.evidenceWriters) {
+    // An original open callback may arrive after its caller lost the reply.
+    // Retire that same confirmed descriptor once, never open a replacement first.
+    if (!file.closeStarted && file.openComplete && file.fd!==undefined) {
+      try {await closeEvidenceFile(file)} catch(error) {file.closeFailure ??= {value:error}}
+    }
+    if (!file.closeComplete) {
+      const error=file.closeFailure ? file.closeFailure.value : Error("LOGINOM_MANAGED_WRITER_CLOSE_UNKNOWN")
+      state.shutdown.persistenceFailures ??= []
+      state.shutdown.persistenceFailures.push({phase:"retained_file_close",rejection:closeRejection(error)})
+      throw state.evidencePrimary ? state.evidencePrimary.value : error
+    }
+    state.evidenceWriters.delete(file)
+  }
+  const temporary=join(directory,`.managed-shutdown.${randomUUID()}.tmp`)
+  const persist=async(target,write)=>{
+    const file={fd:undefined,closeComplete:false}
+    state.evidenceWriters.add(file)
+    let phase=write?"file_open":"directory_open",primary
+    const remember=value=>{
+      primary ??= {phase,value}
+      state.evidencePrimary ??= primary
+      state.shutdown.persistencePrimary ??= {phase:primary.phase,rejection:closeRejection(primary.value)}
+      state.shutdown.persistenceFailures ??= []
+      state.shutdown.persistenceFailures.push({phase,rejection:closeRejection(value)})
+    }
+    const callback=invoke=>{
+      const operation={pending:true,phase}
+      file.io=operation
+      let projection
+      const completion=new Promise((resolve,reject)=>{
+        try {projection=invoke((error,result)=>{
+          operation.pending=false
+          if(error!==null&&error!==undefined){operation.failure={value:error};reject(error)}
+          else resolve(result)
+        })}catch(value){reject(value)}
+      })
+      return Promise.all([completion,projection]).then(([result])=>result)
+    }
+    try {
+      await callback(done=>evidenceOpen(target,write?constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW:constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW,0o600,(error,fd)=>{
+        file.openComplete=true
+        if(error===null||error===undefined)file.fd=fd
+        else state.evidenceWriters.delete(file) // authoritative open failure acquired no writer
+        done(error,fd)
+      }))
+      if(write){phase="file_write";await callback(done=>evidenceWrite(file.fd,JSON.stringify(state.shutdown,null,2)+"\n",done))}
+      phase=write?"file_sync":"directory_sync";await callback(done=>evidenceSync(file.fd,done))
+    }catch(value){remember(value)}
+    if(file.fd!==undefined){
+      phase=write?"file_close":"directory_close"
+      // Register the native operation before invoking it. A wrapper may throw
+      // after scheduling close: retain the original callback, never retry it.
+      try {
+        await closeEvidenceFile(file)
+        state.evidenceWriters.delete(file)
+      }catch(value){file.closeFailure ??= {value};remember(value)}
+    }
+    if(primary)throw primary.value
+    if(!file.closeComplete)throw Error("LOGINOM_MANAGED_WRITER_CLOSE_UNKNOWN")
+  }
+  await guardPublication()
+  await persist(temporary,true)
+  await guardPublication()
+  // Retain the original publication callback independently of its projection.
+  const publication={pending:true,temporary,path}
+  state.evidencePublication=publication
+  let projection
+  const completion=new Promise((resolve,reject)=>{
+    try {projection=evidenceRename(temporary,path,error=>{
+      publication.pending=false
+      if(error!==null&&error!==undefined){publication.failure={value:error};reject(error)}
+      else {publication.confirmed=true;resolve()}
+    })}catch(value){reject(value)}
+  })
+  try {await Promise.all([completion,projection])}
+  catch(value){
+    state.evidencePrimary ??= {phase:"rename",value}
+    state.shutdown.persistencePrimary ??= {phase:"rename",rejection:closeRejection(value)}
+    state.shutdown.persistenceFailures ??= []
+    state.shutdown.persistenceFailures.push({phase:"rename",rejection:closeRejection(value)})
+    throw value
+  }
+  await persist(directory,false)
 }
 function close() {
   if (state.closing) return state.closing
