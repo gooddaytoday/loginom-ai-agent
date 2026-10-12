@@ -11,6 +11,9 @@ const root=resolve(args[0]),out=resolve(args[2]),load=n=>import(pathToFileURL(jo
 await mkdir(out,{recursive:true});const config=JSON.parse(await readFile(args[1]));
 const account=config.workflow_profile.loginom_user,storage='/'+account,name='replacement-null-live-'+randomUUID()+'.lgp',packagePath=storage+'/'+name,sid=randomUUID();
 const startupOwner={directory:join(out,'startup')};startupBridge=createReplacementStartupBridge(startupOwner,owner);
+// ee8's exclusive atomic producer requires its owned directory to exist.
+// Keep directory refusal inside the same startup owner/error boundary.
+await mkdir(startupOwner.directory,{recursive:true,mode:0o700});
 const {verifyResources}=await load('src/resources.mjs'),resources=await verifyResources(root),{loginBrowser}=await load('src/connection-check.mjs');
 const {createActionRuntime}=await load('client/lib/executor.mjs'),{createCandidateNodeSupport}=await load('client/lib/node-support.mjs'),{createArtifactStore}=await load('client/lib/artifacts.mjs'),{createExecutionJournal}=await load('client/lib/execution-journal.mjs'),{makeWorkspacePrepareCode}=await load('client/lib/workspace.mjs'),{makePackageCleanupCode}=await load('client/lib/package-cleanup.mjs');
 const save=(n,v)=>writeFile(join(out,n+'.json'),JSON.stringify(v,null,2));const need=(v,m)=>{if(!v)throw Error(m);};
