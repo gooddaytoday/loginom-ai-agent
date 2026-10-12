@@ -1,0 +1,50 @@
+{
+  "checked_utc": "2026-10-12T18:53:56.241119+00:00",
+  "issue": "LAB-57",
+  "status": "blocked",
+  "revision": 149,
+  "active_or_queued_runs": 0,
+  "independent_delivery_review_comment": "01a1315c-afd7-7588-a622-313a9a772eb7",
+  "independent_proposal_review_comment": "01a13165-089f-7b14-9101-2b6e1dad98ad",
+  "downloaded_attachments": [
+    {
+      "id": "01a1315c-af02-7391-af03-c79b38c1ca40",
+      "bytes": 20297,
+      "sha256": "1d96e22234b908ad9ca9a2ad0ce7048d0bb439173fefb6895d44673c63174355"
+    },
+    {
+      "id": "01a13165-07b6-7bf6-a667-d3a2081cea41",
+      "bytes": 2296,
+      "sha256": "53cfe82b5485683bf5d410b2242ee5f6e696c76bac08b2651f3edd1a1c58a339"
+    }
+  ],
+  "verification_scope": "Attachment bytes/SHA, safe ZIP member paths, delivered review/ledger against current metadata, prior independently verified archive and local proposal; no live/native/model execution, private SQL or replay of attachment commands.",
+  "archive_files": 306,
+  "independently_reported_warm_cold_cases": 5,
+  "independently_reported_rejected_cold_mutations": 85,
+  "proposal_patch_sha256": "7f7a0153a331a6fd9af7caa82391d5ac165fb99c80744b99ac0e8a2353931465",
+  "proposal_status": "NOT_APPLIED; existing owner decision pending",
+  "functional_tests": "NOT_RUN",
+  "typecheck": "NOT_RUN",
+  "build": "NOT_RUN",
+  "cli_admission": "NOT_ADMITTED",
+  "repeat_budget": {
+    "limit": 10,
+    "consumed": 2,
+    "remaining": 8
+  },
+  "reference_consumed": {
+    "txt-comma-utf8": 1,
+    "csv-comma-utf8": 1,
+    "txt-semicolon-cp1251-decimal": 2,
+    "csv-pipe-multiline": 1,
+    "tsv-utf8": 1,
+    "tsv-utf16le": 1
+  },
+  "product_consumed": 0,
+  "preserved_deadline_utc": "2026-10-12T22:40:20.846510+00:00",
+  "cleanup_completion_sha256": "0c9fafaf5f938db5d0c4b53fabbda15eabfa25c35559821c00e9233958fcc074",
+  "owner_CLI_pin_approval": "pending; no new permission inferred",
+  "new_Rich_dispatch": false,
+  "all_eight_done": false
+}
