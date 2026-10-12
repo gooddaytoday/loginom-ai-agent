@@ -1,6 +1,7 @@
 import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
+import { pathToFileURL } from "node:url"
 import { tmpdir } from "node:os"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { verifyResources } from "./resources.mjs"
@@ -119,8 +120,18 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage } = validateStartInput(input)
+      const { acceptanceCleanupPackage, acceptanceCapture } = validateStartInput(input)
       const resources = await verifyResources(input.resources)
+      let captureHarness
+      if (acceptanceCapture) {
+        // Fixed reviewed receiving resource, never a request-selected module.
+        const path = "runtime/src/acceptance/sorting-before-close-v1.mjs"
+        if (!resources.manifest.files.some(file => file.path === path && !file.link && !file.directory))
+          throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
+        const module = await import(pathToFileURL(join(input.resources, path)).href)
+        if (typeof module.captureSorting !== "function") throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
+        captureHarness = module.captureSorting
+      }
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
       const directory = join(
         input.stateDir,
@@ -205,7 +216,8 @@ async function handle(message) {
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
-        authenticatedReadiness:state.authenticatedReadiness })
+        authenticatedReadiness:state.authenticatedReadiness,
+        acceptanceCapture: acceptanceCapture ? {binding:Object.freeze({...acceptanceCapture,session:session.metadata.sessionId}),harness:captureHarness} : undefined })
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })
       await state.bridge.server.connect(serverTransport)
@@ -231,6 +243,20 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (message.operation === "acceptance.capture") {
+      if (message.input !== undefined || state.controller || state.closeFailure !== undefined)
+        throw Error("LOGINOM_REQUEST_INVALID")
+      try {
+        const result = await state.bridge.captureAcceptance()
+        send({id:message.id,result})
+      } catch (rejected) {
+        send({id:message.id,result:{cleanupComplete:false,refused:true,
+          rejectedIsUndefined:rejected === undefined,
+          failed:true, rejection:closeRejection(rejected),
+          rejected:rejected instanceof Error ? closeRejection(rejected) : rejected}})
+      }
+      return
+    }
     if (message.operation === "admit") {
       if (typeof message.input.userMessage !== "string" || !message.input.userMessage)
         throw Error("LOGINOM_INPUT_INVALID")

@@ -17,13 +17,18 @@ export async function createLoginomHost(options: {
   strictRecovery?: boolean
   // Acceptance-only forwarding of the existing managed shutdown binding.
   acceptanceCleanupPackage?: string
+  acceptanceCapture?: { authorization: string; packagePath: string; harness: "sorting-before-close-v1" }
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
   const resources = options.resources
   const environment = { ...(options.environment ?? process.env) }
   const inputs = inputStore(join(root, "inputs"))
-  const journal = await recoveryStore(join(root, "recovery"), { strict: options.strictRecovery === true })
+  // A closed diagnostic capture retains uncertainty durably even when ordinary
+  // model calls use advisory recovery. Caller settings cannot weaken admission.
+  const journal = await recoveryStore(join(root, "recovery"), {
+    strict: options.acceptanceCapture !== undefined || options.strictRecovery === true,
+  })
   const generations = new Map<
     number,
     { connection: ActiveConnection; children: Map<string, Promise<Awaited<ReturnType<typeof supervise>>>> }
@@ -31,6 +36,9 @@ export async function createLoginomHost(options: {
   const restarts = new Map<string, number>()
   const lost = new Set<string>()
   const stale = new Set<string>()
+  type CaptureBinding = NonNullable<Parameters<typeof supervise>[0]["acceptanceCapture"]>
+  const captures = new Map<string, CaptureBinding>()
+  const captureLeases = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
   type Runtime = Awaited<ReturnType<typeof supervise>>
   // Includes validation and failed-start children, even without a prepared
   // service handle. Removal requires confirmed close/exit, never merely failure.
@@ -67,7 +75,7 @@ export async function createLoginomHost(options: {
     })
     return tracked
   }
-  async function launch(connection: ActiveConnection, chat: string, validation = false) {
+  async function launch(connection: ActiveConnection, chat: string, validation = false, acceptanceCapture?: CaptureBinding) {
     guardOwners()
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
     const key = `${validation ? "validation" : "runtime"}:${connection.generation}:${chat}`
@@ -88,6 +96,7 @@ export async function createLoginomHost(options: {
       actionManifestUri: manifest.actionManifestUri,
       actionManifestSha256: manifest.actionManifestSha256,
       acceptanceCleanupPackage: options.acceptanceCleanupPackage,
+      acceptanceCapture,
     })
     owner.settled = launched.then(child => { owner.child = child }, error => {
       owner.failure = { value: error }
@@ -175,6 +184,25 @@ export async function createLoginomHost(options: {
     },
     journal,
     recoveries,
+    authorizeCapture(authorization: unknown, owner?: string, run?: string, chat?: string, lease?: unknown) {
+      if (!options.acceptanceCapture || authorization !== options.acceptanceCapture.authorization) return false
+      const bound=chat?captures.get(chat):undefined
+      return !!bound && bound.owner===owner && bound.run===run && bound.chat===chat
+        && bound.expires>Date.now() && captureLeases.get(chat!)===lease
+        && generations.get(bound.generation)?.connection.username===bound.account
+        && !lost.has(chat!) && !stale.has(chat!)
+    },
+    bindCapture(owner: string, run: string, chat: string, lease: NonNullable<ReturnType<typeof service.acquire>>) {
+      if (!options.acceptanceCapture) return
+      const current = generations.get(lease.generation)
+      if (!current || current.children.has(chat) || captures.has(chat) || captures.size !== 0
+          || !options.acceptanceCapture.packagePath.startsWith(`/${current.connection.username}/`))
+        throw Error("LOGINOM_HANDSHAKE_INVALID")
+      captures.set(chat, { revision: 1, harness: "sorting-before-close-v1", owner, run,
+        lease: `${owner}:${run}`, generation: lease.generation, chat, account: current.connection.username,
+        packagePath: options.acceptanceCapture.packagePath, admission: randomUUID(), expires: Date.now()+600000 })
+      captureLeases.set(chat,lease)
+    },
     resetRestarts(chat: string) {
       restarts.delete(chat)
       lost.delete(chat)
@@ -215,13 +243,14 @@ export async function createLoginomHost(options: {
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
       const previous = current.children.get(chat)
       if (previous) return previous
+      if (captures.has(chat) && (lost.has(chat) || stale.has(chat))) throw Error("LOGINOM_RUNTIME_UNAVAILABLE")
       if (lost.has(chat)) {
         const count = restarts.get(chat) ?? 0
         if (count >= 2) throw new Error("LOGINOM_RUNTIME_UNAVAILABLE")
         restarts.set(chat, count + 1)
         lost.delete(chat)
       }
-      return retain(current, chat, launch(current.connection, chat))
+      return retain(current, chat, launch(current.connection, chat, false, captures.get(chat)))
     },
   }
 }

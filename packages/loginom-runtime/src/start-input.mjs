@@ -27,5 +27,20 @@ export function validateStartInput(input) {
       cleanup.split("/").some((segment) => segment === "." || segment === ".."))
   )
     throw Error("LOGINOM_START_INVALID")
-  return { acceptanceCleanupPackage: cleanup }
+  const capture = input.acceptanceCapture
+  if (capture !== undefined) {
+    const keys = 'account,admission,chat,expires,generation,harness,lease,owner,packagePath,revision,run'
+    if (!capture || typeof capture !== 'object' || Object.keys(capture).sort().join(',') !== keys
+        || capture.revision !== 1 || capture.harness !== 'sorting-before-close-v1'
+        || !['owner','run','lease','chat','account','admission'].every(key =>
+          typeof capture[key] === 'string' && /^[a-zA-Z0-9_:-]{1,200}$/.test(capture[key]))
+        || capture.generation !== input.generation || capture.chat !== input.chat
+        || capture.account !== input.connection?.username || capture.lease !== `${capture.owner}:${capture.run}`
+        || !Number.isSafeInteger(capture.expires) || capture.expires <= Date.now() || capture.expires > Date.now()+600000
+        || typeof capture.packagePath !== 'string' || capture.packagePath.length > 1024
+        || !packagePath.test(capture.packagePath) || !capture.packagePath.startsWith(`/${capture.account}/`)
+        || capture.packagePath.split('/').some(x => x === '.' || x === '..'))
+      throw Error('LOGINOM_START_INVALID')
+  }
+  return { acceptanceCleanupPackage: cleanup, ...(capture ? {acceptanceCapture:capture} : {}) }
 }

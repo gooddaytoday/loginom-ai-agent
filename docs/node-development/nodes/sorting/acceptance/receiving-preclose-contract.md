@@ -12,7 +12,7 @@ The exact selector, receipt encoding and inventory entry must come from the
 independently accepted LAB-68 source; specimen field names below are test data,
 not a new protocol. Source PASS does not establish receiving or native PASS.
 
-## Existing route and missing seams
+## Preparation baseline route and missing seams
 
 | Current source | Existing state/route | Receiving implication |
 | --- | --- | --- |
@@ -87,3 +87,5 @@ changes or new source implementation belongs to this preparation.
 From `packages/agent`, run: `bun test ./test/cli/sorting-preclose-consumer.test.ts`.
 No native/model/setup/execute/replay is authorized by this contract. The current
 product remains the clean c4572d85 product; docs/tests alone need no rebuild.
+
+Receiving integration note: the accepted Sorting source uses the original host-minted grant `expires`, created once at admission. It is not a RunCommand deadline. Capture/retry/repair may not extend it. The table above records the preparation baseline; the current receiving diff adds only generic Sorting admission and the fixed readonly resource, with the same startup/owner/cleanup guards. See `pre-close-contract.md` for the source contract.
