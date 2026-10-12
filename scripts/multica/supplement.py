@@ -13,10 +13,12 @@ import urllib.request
 import uuid
 
 
-def request(base, headers, route, payload=None):
+def request(base, headers, route, payload=None, *, require_complete=False):
     req = urllib.request.Request(base + '/api/' + route,
         data=None if payload is None else json.dumps(payload).encode(), headers=headers)
     with urllib.request.urlopen(req, timeout=30) as response:
+        if require_complete and response.headers.get('X-Comments-Truncated'):
+            raise ValueError('Comment history truncated; reconcile before dispatch')
         return json.load(response)
 
 

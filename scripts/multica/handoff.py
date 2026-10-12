@@ -47,7 +47,7 @@ def deliver(args):
             json.dump(record, stream)
             stream.flush()
             os.fsync(stream.fileno())
-    comments = request(base, headers, f'issues/{issue}/comments')
+    comments = request(base, headers, f'issues/{issue}/comments', require_complete=True)
     if args.existing_comment:
         existing = next((c for c in comments if c['id'] == str(uuid.UUID(args.existing_comment))), None)
         if not existing or existing['content'] != content or args.sha not in content or re.findall(r'mention://agent/([0-9a-f-]+)', content) != [agent] or 'mention://all/' in content or 'mention://squad/' in content:
@@ -83,7 +83,7 @@ def deliver(args):
             raise ValueError('Comment stored but dispatch not admitted; reconcile without repost')
         record['state'] = 'admitted'
         save(path, record)
-        comments = request(base, headers, f'issues/{issue}/comments')
+        comments = request(base, headers, f'issues/{issue}/comments', require_complete=True)
         found = next((c for c in comments if c['id'] == record['comment'] and c.get('content') == text), None)
     if not found:
         raise ValueError('Read-back missing; preserve receipt')

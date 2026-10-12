@@ -31,6 +31,7 @@ class HandoffTest(unittest.TestCase):
         self.finish_on_preview = False
         self.no_projection = False
         self.block_preview = False
+        self.truncated = False
         self.sender = ''
         self.parent = None
         case = self
@@ -41,6 +42,8 @@ class HandoffTest(unittest.TestCase):
 
             def reply(self, value):
                 self.send_response(200)
+                if case.truncated:
+                    self.send_header('X-Comments-Truncated', 'true')
                 self.end_headers()
                 self.wfile.write(json.dumps(value).encode())
 
@@ -187,4 +190,9 @@ class HandoffTest(unittest.TestCase):
         (self.root / 'message').write_text(text)
         self.comments = [{'id': COMMENT, 'content': text}]
         self.assertNotEqual(self.client(existing=COMMENT).returncode, 0)
+        self.assertEqual(self.posts, 0)
+
+    def test_truncated_history_cannot_hide_a_duplicate(self):
+        self.truncated = True
+        self.assertNotEqual(self.client().returncode, 0)
         self.assertEqual(self.posts, 0)
