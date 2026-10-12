@@ -135,6 +135,55 @@ test("text import checks full typed warm data and raw native settings", async ()
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
 
+// The port/socket structure is copied from the original LAB-57 reference XML.
+// These synthetic mutations test the checker; they are not live evidence.
+async function structuralImportPackage(f: Awaited<ReturnType<typeof positiveFixture>>, mutation = "") {
+  const pack = Bun.spawn(["python3", "-c", `import pathlib,zipfile,sys,xml.etree.ElementTree as E
+p=pathlib.Path(sys.argv[1]);mutation=sys.argv[2];destination=sys.argv[3]
+root=E.fromstring('<Root xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><WorkFlow><Nodes><Item Guid="node"><Component><Engine xsi:type="TBGImportTextFile"/><InputSockets><Item Guid="connection" Name="Connection"><Socket xsi:type="TBGConnectionInputSocket" Virgin="true"><Constraints/></Socket></Item><Item Guid="control" Name="ControlVariables"><Socket xsi:type="TBGTuneVariablesSocket" Virgin="true"><Constraints/><Variables SyncThroughVariables="true"><Elements/></Variables></Socket></Item></InputSockets></Component><InputPorts><Item Guid="connection" Name="Connection"/><Item Guid="control" Name="ControlVariables"/></InputPorts><ServiceInputPorts><Item Guid="sync" Name="SynchronizationInputPort"/></ServiceInputPorts><OutputPorts><Item Guid="port" Name="DataSet"/></OutputPorts></Item></Nodes><Links/></WorkFlow></Root>')
+n=root.find('./WorkFlow/Nodes/Item');engine=n.find('./Component/Engine');engine.set('FileName',destination)
+ports=n.find('./InputPorts');sockets=n.find('./Component/InputSockets');out=n.find('./OutputPorts')
+if mutation=='link':
+ link=E.SubElement(root.find('./WorkFlow/Links'),'Item');E.SubElement(link,'SourcePort',{'NodeGuid':'other','PortGuid':'data'});E.SubElement(link,'TargetPort',{'NodeGuid':'node','PortGuid':'connection'})
+elif mutation=='foreign-input':ports[0].set('Name','DataSource')
+elif mutation=='duplicate-input-name':ports[1].set('Name','Connection')
+elif mutation=='duplicate-input-guid':ports[1].set('Guid','connection')
+elif mutation=='extra-input':E.SubElement(ports,'Item',{'Guid':'extra','Name':'Other'})
+elif mutation=='socket-guid':sockets[0].set('Guid','other')
+elif mutation=='socket-type':sockets[0][0].set('{http://www.w3.org/2001/XMLSchema-instance}type','TBGDataSetInputSocket')
+elif mutation=='not-virgin':sockets[0][0].set('Virgin','false')
+elif mutation=='bound-variable':E.SubElement(sockets[1].find('./Socket/Variables/Elements'),'Item',{'Name':'bound'})
+elif mutation=='foreign-service':n.find('./ServiceInputPorts')[0].set('Name','Other')
+elif mutation=='source':engine.set('FileName','/eval/other.txt')
+elif mutation=='node-guid':n.set('Guid','other')
+elif mutation=='node-type':engine.set('{http://www.w3.org/2001/XMLSchema-instance}type','TBGCalculator')
+elif mutation=='output-guid':out[0].set('Guid','other')
+elif mutation=='output-name':out[0].set('Name','Other')
+elif mutation=='extra-output':E.SubElement(out,'Item',{'Guid':'extra','Name':'Other'})
+data=E.tostring(root);(p/'unpacked/Unit_1/Unit.xml').write_bytes(data)
+with zipfile.ZipFile(p/'package.lgp','w') as z:z.writestr('Unit_1/Unit.xml',data)`,
+    path.join(f.attempt, "artifact"), mutation, f.apply.input.parameters.settings.source.source_path], { stdout: "pipe", stderr: "pipe" })
+  const [code, error] = await Promise.all([pack.exited, new Response(pack.stderr).text()])
+  expect(error).toBe("")
+  expect(code).toBe(0)
+}
+
+test("persisted text import accepts only unused native structural ports and its bound output", async () => {
+  const f = await positiveFixture()
+  try {
+    await structuralImportPackage(f)
+    expect(await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")).toEqual({ errors: [], failures: [] })
+    for (const mutation of ["link", "foreign-input", "duplicate-input-name", "duplicate-input-guid", "extra-input",
+      "socket-guid", "socket-type", "not-virgin", "bound-variable", "foreign-service", "source", "node-guid",
+      "node-type", "output-guid", "output-name", "extra-output"]) {
+      await structuralImportPackage(f, mutation)
+      const result = await validateNodeAttempt(f.task, f.attempt, "/eval/result.lgp")
+      expect(result.errors).toEqual([])
+      expect(result.failures.join(" ")).toContain("graph:")
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
 test("text import binds the compact public output to a complete native checkpoint", async () => {
   const f = await positiveFixture()
   try {
