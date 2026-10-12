@@ -40,7 +40,7 @@ const root=process.env.PREREADY_RUNTIME_ROOT??new URL('../../',import.meta.url).
 const text=await readFile(join(root,'src/managed-entry.mjs'),'utf8');
 const handleCode=text.slice(text.indexOf('async function handle(message)'))+';handle';
 const directories=[];after(async()=>{for(const d of directories)await rm(d,{recursive:true,force:true})});
-async function fixture(){
+async function fixture({lateSession=false}={}){
  const directory=await mkdtemp(join(tmpdir(),'pre-ready-control-'));directories.push(directory);
  const f={state:{inputs:new Map()},dispatches:0,deadline:Date.now()+30000};current=f;
  const avatar={getAttribute:()=> 'MF;cntMain;tlbMainToolbar;btnAvatar',matches:()=>false,getBoundingClientRect:()=>({width:10,height:10}),hasAttribute:()=>false};
@@ -51,9 +51,9 @@ async function fixture(){
   validateStartInput:()=>({}),verifyResources:async()=>({browserPath:'double',browserRoot:'double'}),
   loginBrowser:async({owner})=>{Object.assign(owner,{id:'original',account:'worker',origin:'https://fixture.invalid',page:f.page,context:f.context});return {context:f.context}},loginomAddress:x=>x,
   createSession:async(config,{managed})=>{const browserConfig=join(managed.directory,'browser.json');await writeFile(browserConfig,'{}');return {save:async()=>writeFile(join(managed.directory,'session.json'),'{}'),directory:managed.directory,browserConfig,metadata:{sessionId:'original-session',clientRevision:'fixture'}}},
-  createBridge,require:s=>s.includes('inMemory')?{InMemoryTransport}:s==='@playwright/mcp'?{createConnection:async()=>({connect:async()=>{}})}:{Client}});
+  createBridge:async(...args)=>{const bridge=await createBridge(...args);if(lateSession)f.state.session={...f.state.session};return bridge},require:s=>s.includes('inMemory')?{InMemoryTransport}:s==='@playwright/mcp'?{createConnection:async()=>({connect:async()=>{}})}:{Client}});
  await f.handle({id:'start',operation:'start',input:{generation:7,chat:'original-chat',stateDir:directory,resources:'fixture',endpoint:'https://fixture.invalid/mcp',connection:{username:'worker',apiKey:'fixture',url:'https://fixture.invalid/app/'}}});
- assert.equal(f.reply.result?.ready,true,String(f.state.startupFailure?.stack));return f;
+ if(!lateSession)assert.equal(f.reply.result?.ready,true,String(f.state.startupFailure?.stack));return f;
 }
 async function read(f){await f.handle({id:'read',operation:'readonly.preReady',input:{deadline:f.deadline}});return f.reply}
 async function unchanged(f){const before=f.dispatches;await f.handle({id:'mutation',operation:'call',input:{name:'dock_node_apply',arguments:{}}});assert.equal(f.dispatches,before);assert.equal(f.reply.error,'LOGINOM_RECOVERY_REQUIRED');assert.equal(f.state.session.metadata.workspaceReady,undefined);assert.equal(f.state.bridgeCleanup,undefined);for(const operation of ['admit','close']){await f.handle({id:operation,operation,input:{}});assert.equal(f.reply.error,'LOGINOM_RECOVERY_REQUIRED')}assert.equal(f.state.closing,undefined)}
@@ -70,3 +70,5 @@ for(const mode of ['missing','mixed','closed','multiple','controller','origin'])
 
 test('indeterminate observation never projected or READY',async()=>{const f=await fixture();f.page.evaluate=async()=>({origin:'https://fixture.invalid',target_state:'indeterminate',observation_only:true});assert.equal((await read(f)).result.readonlyPreReady,false);await unchanged(f)});
 test('pending original read refuses second dispatch, original refusal retained',async()=>{const f=await fixture();let unblock;f.hook=()=>new Promise(r=>unblock=r);const original=read(f);while(!unblock)await new Promise(r=>setImmediate(r));await f.handle({id:'second',operation:'readonly.preReady',input:{deadline:f.deadline}});assert.equal(f.reply.error,'LOGINOM_PRE_READY_READ_REFUSED');assert.equal(f.dispatches,1);unblock();await original;assert.equal(f.dispatches,1);await unchanged(f)});
+
+test('session replacement during bridge creation is refused before READY/mint',async()=>{const f=await fixture({lateSession:true});assert.equal(f.reply.error,'LOGINOM_STARTUP_OWNER_CHANGED');assert.equal(f.state.preReadyOwner,undefined);assert.equal(f.dispatches,0)});
