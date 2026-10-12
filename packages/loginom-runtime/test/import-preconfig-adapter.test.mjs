@@ -6,13 +6,13 @@ const base=process.env.IMPORT_RUNTIME_ROOT?pathToFileURL(process.env.IMPORT_RUNT
 const {createImportPreconfigAdapter,captureImportPreconfig,validateCaptureResult,IMPORT_ADAPTER_PATH}=await import(new URL('src/acceptance/import-preconfig-adapter-v1.mjs',base));
 const {retainCaptureOwner,bindCaptureRuntime}=await import(new URL('src/retained-capture.mjs',base));
 const {assertPreconfigSample}=await import(new URL('../../../docs/node-development/nodes/join/receiving/preconfig/consumer-contract.mjs',import.meta.url));
-function fixture({afterRead,afterRecord,failRead,failRecord,reply}={}){
- const events=[],signal=new AbortController(),page={isClosed:()=>false},context={pages:()=>[page]};
- const binding=Object.freeze({revision:1,harness:'import-before-configure-v1',owner:'owner',run:'run',lease:'owner:run',generation:7,chat:'chat',account:'account',session:'session',admission:'admission',packagePath:'/account/left.lgp',expires:Date.now()+60000});
+function fixture({afterRead,afterRecord,failRead,failRecord,reply,nodeBudget=60000,grantBudget=60000}={}){
+ const events=[],calls=[],signal=new AbortController(),page={isClosed:()=>false},context={pages:()=>[page]};
+ const binding=Object.freeze({revision:1,harness:'import-before-configure-v1',owner:'owner',run:'run',lease:'owner:run',generation:7,chat:'chat',account:'account',session:'session',admission:'admission',packagePath:'/account/left.lgp',expires:Date.now()+grantBudget});
  const identity={session_id:'session',document_id:'doc',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb',account:'account',package_path:binding.packagePath,loginom_build:'7.4.2'};
  const request={document_id:'doc',workflow_ref:{workflow_id:'workflow',tab_tid:identity.tab_tid,prefix:'MF;TF',navigation_path:[{tid:'root',label:'root'}]},target:{kind:'existing',type:'imports.text',ref:{document_id:'doc',workflow_id:'workflow',node_id:'node'}}};
  const opening={phase:'open',status:'verified',effect_possible:false,value:{verified:true,cleanup_complete:true}};
- const node={request,opening,signal:signal.signal,deadline:binding.expires,state:{pending:null,effect_possible:false,phases:[opening]},assertCurrent(){}};
+ const node={request,opening,signal:signal.signal,deadline:Date.now()+nodeBudget,state:{pending:null,effect_possible:false,phases:[opening]},assertCurrent(){}};
  const owner={id:'native-owner',page,context,account:'account',origin:'https://fixture.invalid',generation:7,chat:'chat'};
  const session={directory:'/synthetic-owned-session',metadata:{sessionId:'session',clientRevision:'a'.repeat(40),workspacePreparation:{attempted:true,state:{status:'READY',created_draft:false}}}};
  const state={startupOwner:owner,session,controller:signal};state.captureStartupBinding=Object.freeze({...owner,owner});
@@ -21,14 +21,41 @@ function fixture({afterRead,afterRecord,failRead,failRecord,reply}={}){
  const publication=Object.freeze({...identity,workflow_id:'workflow',node_id:'node'});
  const observation={revision:1,harness:binding.harness,...identity,status:'PARTIAL',complete:false,settings_applied:false,effect_possible:false,close_authority:false,reason:'UNKNOWN_NATIVE_ENUM_OUTPUT_ACTIVITY_FRESHNESS'};
  const runtime={hasActiveWork:()=>false,hasUnsettledWork:()=>false};
- const browser={async callTool({arguments:{code}}){events.push('read');assert.ok(code.includes('readImportSurface'));if(failRead)throw failRead.value;
+ const browser={async callTool({arguments:{code}},extra,options){calls.push({receiver:this,extra,options});events.push('read');assert.ok(code.includes('readImportSurface'));if(failRead)throw failRead.value;
   // Execute the actual serialized resource on missing-native doubles, never a fixture flag.
   const fn=/page.evaluate\(([\s\S]*),\{"session_id"/.exec(code)?.[1];
   const refused=vm.runInNewContext('('+fn+')',{document:{},Date})(identity);assert.equal(refused.status,'REFUSED');
   afterRead?.({state,node,owner,identity,runtime,browser});return {content:[{type:'text',text:JSON.stringify(reply??refused)}]};}};
  const record=async event=>{events.push('record');if(failRecord)throw failRecord.value;afterRecord?.({state,node,owner,identity,runtime,browser,event});};
- return {state,node,owner,identity,runtime,browser,events,signal,ctx:{retained,node,publication,identity,browser,record,runtime,signal:signal.signal}};
+ return {state,node,owner,identity,runtime,browser,events,calls,signal,ctx:{retained,node,publication,identity,browser,record,runtime,signal:signal.signal}};
 }
+for(const [nodeBudget,grantBudget,elapsed] of [[6000,60000,0],[60000,6000,0],[6000,60000,1700],[6000,6000,1700]])test('preconfig transport retains minimum original budget '+[nodeBudget,grantBudget,elapsed],async t=>{
+ let now=1800000000000;t.mock.method(Date,'now',()=>now);
+ const f=fixture({nodeBudget,grantBudget}),binding=f.ctx.retained.binding,bytes=JSON.stringify(binding),a=createImportPreconfigAdapter(f.ctx);
+ now+=elapsed;await a.readPreconfigSample();
+ assert.equal(f.calls[0].options.timeout,Math.min(nodeBudget,grantBudget)-elapsed);
+ assert.equal(f.calls[0].receiver,f.browser);assert.equal(f.calls[0].extra,undefined);
+ assert.equal(f.ctx.retained.binding,binding);assert.equal(JSON.stringify(binding),bytes);
+ await a.readPreconfigSample();assert.equal(f.calls.length,1);assert.deepEqual(f.events,['read','record']);
+});
+test('delayed response expires shorter node before any publication',async t=>{
+ let now=1800000000000;t.mock.method(Date,'now',()=>now);
+ const f=fixture({nodeBudget:6000,afterRead:()=>{now+=6001;}}),a=createImportPreconfigAdapter(f.ctx);
+ await assert.rejects(a.readPreconfigSample(),/CURRENT_BINDING/);
+ assert.equal(f.calls[0].options.timeout,6000);assert.deepEqual(f.events,['read']);
+ await assert.rejects(a.readPreconfigSample());assert.equal(f.calls.length,1);
+});
+test('expired shorter node refuses before transport without renewal',async t=>{
+ let now=1800000000000;t.mock.method(Date,'now',()=>now);
+ const f=fixture({nodeBudget:6000}),a=createImportPreconfigAdapter(f.ctx);now+=6000;
+ await assert.rejects(a.readPreconfigSample(),/CURRENT_BINDING/);assert.deepEqual(f.calls,[]);assert.deepEqual(f.events,[]);
+});
+test('shorter-node transport rejection preserves primary and never replays',async t=>{
+ let now=1800000000000;t.mock.method(Date,'now',()=>now);const primary=Error('transport deadline',{cause:0});
+ const f=fixture({nodeBudget:6000,failRead:{value:primary}}),a=createImportPreconfigAdapter(f.ctx);
+ for(let i=0;i<2;i++)await assert.rejects(a.readPreconfigSample(),e=>e===primary);
+ assert.equal(f.calls[0].options.timeout,6000);assert.equal(f.calls.length,1);assert.deepEqual(f.events,['read']);
+});
 test('fixed adapter forwards actual serialized REFUSED and refuses consumer/Close without Save',async()=>{
  const f=fixture(),a=createImportPreconfigAdapter(f.ctx),r=await a.readPreconfigSample();assert.equal(validateCaptureResult(r,f.ctx),true);
  assert.equal(r.preconfig_complete,false);assert.equal(r.configure_authority,false);assert.equal(r.close_authority,false);assert.equal(r.native_proof,false);

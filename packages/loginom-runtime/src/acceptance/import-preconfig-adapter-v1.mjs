@@ -55,12 +55,18 @@ export function createImportPreconfigAdapter({retained,node,publication,identity
   assertCaptureOwner(retained);node.assertCurrent();
  };
  assertCurrent();
+ // Keep the original grant binding intact. The resource's grant timeout must
+ // also fit the retained node deadline, without renewing either budget.
+ const boundedBrowser=Object.freeze({callTool(args,extra,options){
+  assertCurrent();const remaining=deadline-Date.now();need(remaining>0,'CURRENT_BINDING');
+  return original.browserCall.call(browser,args,extra,{...options,timeout:Math.min(options.timeout,remaining)});
+ }});
  let read,cleanRead,receipt;
  const model=createImportCleanModel({assertCurrent,deadline});
  const readPreconfigSample=async()=>{
   assertCurrent();
   if(!read)read=(async()=>{
-   const observation=await captureImport({binding,identity,browser,record:async event=>{assertCurrent();await record(event);assertCurrent();}});
+   const observation=await captureImport({binding,identity,browser:boundedBrowser,record:async event=>{assertCurrent();await record(event);assertCurrent();}});
    assertCurrent();
    const result={status:observation.status==='REFUSED'?'NOT_APPLIED':'DIAGNOSTIC_READ',settings_applied:false,effect_possible:false,
     admission_confirmed:false,publication:{...publication},root:Object.fromEntries(rootKeys.map(k=>[k,publication[k]])),
