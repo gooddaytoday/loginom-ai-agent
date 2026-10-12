@@ -60,5 +60,8 @@
       "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
       "started_at": "2026-10-12T13:08:40+03:00"
     }
-  ]
+  ],
+  "status": "HISTORICAL_INTERPRETATION_SUPERSEDED_BY_OWNER_CLARIFICATION",
+  "current_policy_file": "2026-10-12-rich-repeat-budget-policy.json",
+  "old_total_run_tally_is_not_current_repeat_budget": true
 }
