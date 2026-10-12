@@ -1,0 +1,9 @@
+# Fixed resource PATH common correction
+
+Base913d3f1397b35e54009d9b71cd4a7aa0357f8ecd, separate lab71-fixed-resource-path branch. Only launcher fixed preflight and managed fixed loader are changed. Both require runtime/src/acceptance/calculator-grouped-before-done-v1.mjs. No user path/public ABI/kind mapping added. Loader verifies unique non-link/non-directory entry, hash, canonical realpath and captureCalculator function export. Preflight also excludes link/directory entries.
+
+PATH-only E2E test runs genuine closed launcher, real hash/inventory/FS and child IPC; fixture host executes the exact published/installed managed registration block with the genuine source/installed verifyResources. The same labelled canonical module is returned, with a conflicting alternate module present. Hash/path/duplicate/link/directory refuse admission; wrong export refuses registration (raw LOGINOM_CAPTURE_UNAVAILABLE, redacted host error). No startup/login/Page/bridge/native/cleanup is invoked. Node-only controls additionally check exact loader path/hash/duplicate/export/symlink/missing refusal.
+
+Source caller and separately compiled exact caller run the same E2E test. Compiled caller bundle is review instrumentation from pinned source, not a stock CLI capability. Actual loader/verifier bytes come from the canonical clean exact product. Product remains missing the acceptance resource in stock inventory; the affirmative fixture is explicitly separate and does not prove native/full common-cut/Import readiness.
+
+Capture writer P2 stays LAB68; managed writers, bridge authority/persistence, supervisor and resource algorithms are unchanged. PR52/runtime950 and accepted prototype87 are preserved. No closed suites are repeated. Bounded PATH PASS requires independent review before receiving; full common/Import receiving additionally waits for capture-writer PASS.
