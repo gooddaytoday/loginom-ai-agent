@@ -43,10 +43,36 @@ async function recordClose(stage, detail) {
   state.shutdown.stages.push({stage,...detail})
   const directory=state.session?.directory??state.startupOwner?.directory
   if (!directory) return // No-start has acquired no native resources.
+  state.evidenceWriters ??= new Set()
+  // A rejected close does not establish physical FD completion. Keep the
+  // original writer on this owner and finish it before opening another one.
+  for (const file of state.evidenceWriters) {
+    try {
+      if (file.fd!==-1) await file.close()
+      state.evidenceWriters.delete(file)
+    } catch (error) {
+      state.shutdown.persistenceFailures ??= []
+      state.shutdown.persistenceFailures.push({phase:"retained_file_close",rejection:closeRejection(error)})
+      throw state.evidencePrimary ? state.evidencePrimary.value : error
+    }
+  }
   const path=join(directory,"managed-shutdown.json")
   await writeFile(path,JSON.stringify(state.shutdown,null,2)+"\n",{mode:0o600})
   const file=await open(path,"r+")
-  try {await file.sync()} finally {await file.close()}
+  state.evidenceWriters.add(file)
+  let primary
+  try {await file.sync()} catch (value) {primary={phase:"file_sync",value}}
+  try {await file.close();state.evidenceWriters.delete(file)} catch (value) {
+    const failure={phase:"file_close",rejection:closeRejection(value)}
+    state.shutdown.persistenceFailures ??= []
+    state.shutdown.persistenceFailures.push(failure)
+    primary ??= {phase:"file_close",value}
+  }
+  if (primary) {
+    state.evidencePrimary ??= primary
+    state.shutdown.persistencePrimary ??= {phase:primary.phase,rejection:closeRejection(primary.value)}
+    throw primary.value
+  }
 }
 function close() {
   if (state.closing) return state.closing
