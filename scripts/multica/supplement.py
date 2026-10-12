@@ -13,12 +13,16 @@ import urllib.request
 import uuid
 
 
+class DeliveryError(ValueError):
+    """A deliberate diagnostic whose text contains no credentials or input values."""
+
+
 def request(base, headers, route, payload=None, *, require_complete=False):
     req = urllib.request.Request(base + '/api/' + route,
         data=None if payload is None else json.dumps(payload).encode(), headers=headers)
     with urllib.request.urlopen(req, timeout=30) as response:
         if require_complete and response.headers.get('X-Comments-Truncated'):
-            raise ValueError('Comment history truncated; reconcile before dispatch')
+            raise DeliveryError('Comment history truncated; reconcile before dispatch')
         return json.load(response)
 
 
@@ -35,20 +39,20 @@ def deliver(args):
     base = os.environ['MULTICA_SERVER_URL'].rstrip('/')
     parsed = urllib.parse.urlsplit(base)
     if parsed.scheme not in ('https', 'http') or not parsed.netloc or parsed.username or parsed.query or parsed.fragment:
-        raise ValueError('Invalid server URL')
+        raise DeliveryError('Invalid server URL')
     # IDs are path components, never arbitrary API routes.
     issue, task = str(uuid.UUID(args.issue)), str(uuid.UUID(args.task))
     content = Path(args.message).read_text()
     if not content.strip():
-        raise ValueError('Empty update')
+        raise DeliveryError('Empty update')
     receipt = Path(args.receipt)
     if receipt.is_symlink():
-        raise ValueError('Receipt must not be a symlink')
+        raise DeliveryError('Receipt must not be a symlink')
     fingerprint = hashlib.sha256(json.dumps([base, issue, task, content]).encode()).hexdigest()
     if receipt.exists():
         record = json.loads(receipt.read_text())
         if record['fingerprint'] != fingerprint:
-            raise ValueError('Receipt belongs to a different update; do not overwrite it')
+            raise DeliveryError('Receipt belongs to a different update; do not overwrite it')
     else:
         record = {'fingerprint': fingerprint, 'request_id': str(uuid.uuid4()), 'issue': issue, 'task': task, 'state': 'prepared'}
         # Claim the receipt before sending: retries keep the same server deduplication key.
@@ -67,13 +71,13 @@ def deliver(args):
         result = request(base, headers, f'issues/{issue}/tasks/{task}/supplements',
             {'content': content, 'client_request_id': record['request_id']})
         if result.get('supplement_task_id') != task or not result.get('id'):
-            raise ValueError('Server did not confirm the intended run; inspect receipt before retry')
+            raise DeliveryError('Server did not confirm the intended run; inspect receipt before retry')
         record.update(state='accepted', comment=result['id'], delivery_status=result.get('supplement_status'))
         save(receipt, record)
     comments = request(base, headers, f'issues/{issue}/comments')
     comment = next((x for x in comments if x['id'] == record['comment']), None)
     if not comment or comment.get('content') != content:
-        raise ValueError('Comment read-back failed; preserve receipt and inspect delivery')
+        raise DeliveryError('Comment read-back failed; preserve receipt and inspect delivery')
     record['state'] = 'verified'
     save(receipt, record)
     print(json.dumps(record))
@@ -93,7 +97,8 @@ def main():
         return 1
     except (OSError, ValueError, KeyError, StopIteration, http.client.HTTPException) as error:
         # Never print response bodies, credentials, or environment values.
-        print(f'{type(error).__name__}: update not confirmed; preserve receipt and inspect inputs/delivery.', file=sys.stderr)
+        reason = str(error) if isinstance(error, DeliveryError) else type(error).__name__
+        print(f'{reason}: update not confirmed; preserve receipt and inspect inputs/delivery.', file=sys.stderr)
         return 1
     return 0
 

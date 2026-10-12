@@ -123,7 +123,10 @@ class HandoffTest(unittest.TestCase):
     def test_unknown_response_without_comment_never_reposts(self):
         self.drop, self.store_drop = True, False
         self.assertNotEqual(self.client().returncode, 0)
-        self.assertNotEqual(self.client().returncode, 0)
+        retry = self.client()
+        self.assertNotEqual(retry.returncode, 0)
+        self.assertIn('Unknown POST outcome', retry.stderr)
+        self.assertNotIn('test-only', retry.stderr)
         self.assertEqual(self.posts, 1)
 
     def test_blocked_post_is_not_assignment(self):

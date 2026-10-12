@@ -9,7 +9,7 @@ import sys
 import uuid
 import urllib.error
 
-from supplement import request, save
+from supplement import DeliveryError, request, save
 
 
 def deliver(args):
@@ -20,16 +20,16 @@ def deliver(args):
         headers['X-Workspace-ID'] = os.environ['MULTICA_WORKSPACE_ID']
     content = Path(args.message).read_text()
     if not content.strip() or 'mention://agent/' in content or 'mention://squad/' in content:
-        raise ValueError('Update must be nonempty and must not contain dispatch mentions')
+        raise DeliveryError('Update must be nonempty and must not contain dispatch mentions')
     path = Path(args.receipt)
     if path.is_symlink():
-        raise ValueError('Receipt must not be a symlink')
+        raise DeliveryError('Receipt must not be a symlink')
     sender = os.environ.get('MULTICA_TASK_ID', '')
     fingerprint = hashlib.sha256(json.dumps([base, issue, task, content, sender, args.parent]).encode()).hexdigest()
     if path.exists():
         record = json.loads(path.read_text())
         if record['fingerprint'] != fingerprint:
-            raise ValueError('Receipt belongs to another update')
+            raise DeliveryError('Receipt belongs to another update')
     else:
         record = {'fingerprint': fingerprint, 'request_id': str(uuid.uuid4()), 'issue': issue, 'task': task, 'state': 'prepared'}
         with open(path, 'x', opener=lambda name, flags: os.open(name, flags, 0o600)) as stream:
@@ -41,11 +41,11 @@ def deliver(args):
     found = next((c for c in comments if c.get('content') == text), None)
     if found is None:
         if record['state'] != 'prepared':
-            raise ValueError('Delivery outcome unknown; inspect existing comments, never blindly repost')
+            raise DeliveryError('Delivery outcome unknown; inspect existing comments, never blindly repost')
         runs = request(base, headers, f'issues/{issue}/task-runs')
         target = next((r for r in runs if r['id'] == task), None)
         if not target or target['status'] not in ('running', 'queued'):
-            raise ValueError('Target ended; reconcile its result before a new assignment')
+            raise DeliveryError('Target ended; reconcile its result before a new assignment')
         payload = {'content': text}
         current = next((r for r in runs if r['id'] == sender), None)
         parent = args.parent or (current.get('trigger_comment_id') if current else None)
@@ -53,7 +53,7 @@ def deliver(args):
             payload['parent_id'] = str(uuid.UUID(parent))
         preview = request(base, headers, f'issues/{issue}/comments/trigger-preview', payload)
         if preview.get('agents') or preview.get('squads') or preview.get('blocked'):
-            raise ValueError('Information unexpectedly triggers work')
+            raise DeliveryError('Information unexpectedly triggers work')
         record['state'] = 'sending'
         save(path, record)
         result = request(base, headers, f'issues/{issue}/comments', payload)
@@ -62,7 +62,7 @@ def deliver(args):
         comments = request(base, headers, f'issues/{issue}/comments')
         found = next((c for c in comments if c['id'] == record['comment'] and c.get('content') == text), None)
     if found is None:
-        raise ValueError('Read-back missing; preserve receipt')
+        raise DeliveryError('Read-back missing; preserve receipt')
     record.update(state='recorded', comment=found['id'], delivery='pull_at_safe_boundary')
     save(path, record)
     print(json.dumps(record))
@@ -81,7 +81,8 @@ def main():
         print(f'HTTP {error.code}: delivery not confirmed; inspect receipt/comments and reply parent, never repost blindly.', file=sys.stderr)
         return 1
     except Exception as error:
-        print(f'{type(error).__name__}: delivery not confirmed; preserve receipt, inspect state, do not repost blindly.', file=sys.stderr)
+        reason = str(error) if isinstance(error, DeliveryError) else type(error).__name__
+        print(f'{reason}: delivery not confirmed; preserve receipt, inspect state, do not repost blindly.', file=sys.stderr)
         return 1
     return 0
 
