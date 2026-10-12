@@ -14,6 +14,11 @@ import * as workspace from '../../lib/workspace.mjs';
 // Bridge lifecycle test: external services and the action executor are fixtures.
 // The serialized Loginom close body is exercised separately in package-cleanup.test.
 let current;
+let fullResource,activateFull;
+if(process.env.SORTING_FULL_RESOURCE){
+ ({activateFixture:activateFull}=await import('../../../test/sorting-full-resource-response.test.mjs'));
+ ({captureSorting:fullResource}=await import(process.env.SORTING_FULL_RESOURCE));
+}
 const target={profile_id:'test',loginom_build:'7.4.2',platform:'macos',browser:'chromium'};
 const path='/test-2/packages/result.lgp';
 class ExternalClient {
@@ -23,8 +28,9 @@ class ExternalClient {
   async listTools(){return {tools:[{name:this.browser?'browser_run_code_unsafe':'read',inputSchema:{type:'object'}}]};}
   async callTool({arguments:{code}}){
     let value;
+    if(this.f.full && ['function readCapturePreparation','async function bindSortingNative','async function bindLoadedNativeRuntime','async function readNativeVariant'].some(k=>code.includes(k)))return this.f.full.browser.callTool({arguments:{code}});
     if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,
-      target,loginom_account:'test-2',document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
+      target,loginom_account:'test-2',document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:this.f.full?'w':'own-workflow',navigation_path:[]},package_ref:{path:null}};
     else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
     else if(code.includes('function readSavedPackageState')){
       this.f.events.push('saved-state');
@@ -33,6 +39,7 @@ class ExternalClient {
         modified:this.f.scenario==='dirty-after-save'&&this.f.saves===1,observation:'after_confirmed_save',read_only:true,persisted_content_verified:false};
     }
     else if(code.includes('async function closeOwnedPackage')){
+      if(this.f.full){const receipt=JSON.parse(await readFile(join(this.f.directory,'acceptance-capture.json'),'utf8'));assert.equal(receipt.receipt.capture_complete,true);this.f.events.push('capture-durable-before-helper')}
       this.f.events.push('package-cleanup');
       if(this.f.native){value=await this.f.native.execute(code);this.f.nativeReceipts.push(structuredClone(value));return {content:[{type:'text',text:JSON.stringify(value)}]};}
       const blocked=['native-blocked','managed-unsaved'].includes(this.f.scenario);
@@ -52,7 +59,7 @@ mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExport
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>{
   const f=current;return {tools:[{name:'dock_node_status',inputSchema:{type:'object'}}],describe:()=>({actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){if(f.busy||f.unknown)throw Error('busy');},
-    hasUnsettledWork:()=>!!f.unknown,hasActiveWork:()=>!!f.busy,
+    hasUnsettledWork:()=>!!f.unknown,hasActiveWork:()=>!!f.busy,requestFailure:e=>{throw e},
     run:async(key,parameters,{operationId})=>{f.saves++;return {status:'SUCCEEDED',cleanup_complete:f.scenario!=='managed-unsettled-save',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};},
   };
 }}});
@@ -136,5 +143,41 @@ for(const scenario of ['success','journal-refusal','capture-refused','native-blo
  if(scenario==='journal-refusal'){assert.equal(f.native.events.includes('close'),false);await rm(join(directory,'acceptance-capture.json'),{recursive:true});const r=await bridge.close();assert.equal(r.browser_transport_closed,true);assert.equal(calls,1);assert.equal(f.native.events.filter(x=>x==='close').length,1)}
  }
  await assert.rejects(()=>bridge.captureAcceptance());
+ }finally{await client.close();await rm(directory,{recursive:true,force:true})}
+});
+
+if(fullResource)for(const scenario of ['full-success','full-journal-refusal','full-lost-reply','full-native-blocked'])test('real fixed resource -> real bridge durable capture -> serialized cleanup: '+scenario+'; Page/executor/RPC/service responses are doubles',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'sorting-composition-'));
+ const native=nativeFixture(),full=activateFull(scenario==='full-lost-reply'?'lost-reply':'mixed',{session_id:'own-session',document_id:'own-doc',account:'test-2',package_path:path,tab_tid:'own-tab'});
+ const f=current={scenario,directory,full,native,events:[],saves:0,nativeReceipts:[],ordinary:full.ordinary};
+ const binding={...full.binding,expires:Date.now()+60000};
+ const session={directory,metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){f.events.push('release-uploads')}}};
+ let calls=0;const harness=async input=>{calls++;return fullResource(input)};
+ const bridge=await createBridge({mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,loginomUrl:'http://loginom.invalid/app/?testable=true',acceptanceCleanupPackage:path},session,{acceptanceCapture:{binding,harness}});
+ const [a,b]=InMemoryTransport.createLinkedPair(),client=new AgentClient({name:'test',version:'1'},{capabilities:{}});await bridge.server.connect(a);await client.connect(b);
+ try{
+ await client.callTool({name:'dock_prepare',arguments:{}});
+ await client.callTool({name:'dock_node_status',arguments:{operation_id:'ordinary'}});
+ await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'save'}});
+ if(scenario==='full-native-blocked')native.state.modified=true;
+ if(scenario==='full-journal-refusal')await mkdir(join(directory,'acceptance-capture.json'));
+ if(scenario==='full-lost-reply'){
+  await assert.rejects(()=>bridge.captureAcceptance(),e=>e===0);await assert.rejects(()=>bridge.close(),e=>e===0);
+  assert.equal(native.events.includes('close'),false);assert.equal(f.events.includes('browser-close'),false);
+ }else{
+  if(scenario==='full-native-blocked'){await assert.rejects(()=>bridge.captureAcceptance());assert.equal(native.events.includes('close'),false);native.state.modified=false;await bridge.close()}
+  else if(scenario==='full-journal-refusal'){
+   await assert.rejects(()=>bridge.captureAcceptance());assert.equal(native.events.includes('close'),false);
+   await rm(join(directory,'acceptance-capture.json'),{recursive:true});await bridge.close();
+  }else assert.equal((await bridge.captureAcceptance()).cleanupComplete,true);
+  const saved=JSON.parse(await readFile(join(directory,'acceptance-capture.json'),'utf8'));assert.equal(saved.receipt.capture_complete,true);assert.equal(saved.receipt.output.exact_table.rows.length,3);
+  assert.equal(native.events.filter(x=>x==='close').length,1);assert.equal(native.events.filter(x=>x==='logout').length,1);assert.equal(f.events.includes('release-uploads'),true);
+  assert.equal(JSON.parse(await readFile(join(directory,'package-cleanup.json'),'utf8')).status,'SUCCEEDED');
+  assert.ok(f.events.indexOf('capture-durable-before-helper')<f.events.indexOf('package-cleanup'));
+  assert.ok(f.events.indexOf('package-cleanup')<f.events.indexOf('browser-close'));
+  assert.ok(f.events.indexOf('browser-close')<f.events.indexOf('release-uploads'));
+  if(process.env.SORTING_RESULTS)await writeFile(join(process.env.SORTING_RESULTS,scenario+'.json'),JSON.stringify({fixture:true,scope:'real resource/bridge/helper; executor/Page/RPC/service responses are doubles',capture:saved,native_receipts:f.nativeReceipts,events:f.events,native_fixture_events:native.events,capture_calls:calls},null,2)+'\n');
+ }
+ assert.equal(calls,1);await assert.rejects(()=>bridge.captureAcceptance());
  }finally{await client.close();await rm(directory,{recursive:true,force:true})}
 });

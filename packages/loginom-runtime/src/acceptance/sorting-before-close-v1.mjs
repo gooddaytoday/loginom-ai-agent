@@ -26,8 +26,10 @@ export function checkSortingAdmission(binding,identity,ordinary,now=Date.now()) 
  need(c?.kind==='sorting'&&c.scope==='observed_before_verified_finish'&&c.values_are==='observed_ui_values'
   &&same(c.node,n)&&Array.isArray(c.keys)&&c.keys.length>0&&c.keys.length<=8
   &&c.receipt_ids?.length===5&&new Set(c.receipt_ids).size===5,'SETTINGS');
- need(c.keys.every((k,i)=>k.order===i&&['ASC','DESC'].includes(k.direction)
-  &&typeof k.name==='string'&&(typeof k.case_sensitive==='boolean'||k.type!=='string'&&k.case_sensitive===undefined)),'KEYS');
+ need(new Set(c.keys.map(k=>k?.name)).size===c.keys.length
+  &&c.keys.every((k,i)=>k?.order===i&&['ASC','DESC'].includes(k.direction)
+    &&typeof k.name==='string'&&['boolean','datetime','real','integer','string','variant'].includes(k.type)
+    &&(['string','variant'].includes(k.type)?typeof k.case_sensitive==='boolean':k.case_sensitive===undefined)),'KEYS');
  const ports=ordinary.output?.ports;
  need(Array.isArray(ports)&&ports.length===1&&ports[0].port===0&&ports[0].fresh===true
   &&ports[0].execution_id===e.execution_id&&typeof ports[0].port_guid==='string'
