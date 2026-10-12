@@ -2223,7 +2223,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if(!operation){
           operation={id:operationId,signature,parameters:request,
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
-            checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:now()+request.budgets.total_ms};
+            checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:now()+request.budgets.total_ms,
+            captureSignal:signal,captureRequestBytes:JSON.stringify(request)};
           operation.nodeTargetAdapter=targetAdapter(operation);
           // Only trusted host code supplies drivers, never a tool request.
           // Internal node readers return both typed action outcomes and plain
@@ -2448,6 +2449,35 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // running. Keep the same host lease so the next model turn can use the
     // explicitly bounded status/resume tools instead of dead-ending in global
     // recovery mode.
+    retainCaptureNode(operationId) {
+      const operation=operations.get(operationId),state=operation?.nodeApply;
+      const opening=state?.phases.find(p=>p.phase==='open');
+      const assert=()=>{
+        if (operations.get(operationId)!==operation || !state || operation.nodeApply!==state
+            || operation.captureNodeState!==state || operation.captureNode!==state.node
+            || operation.action.capability!=='node.apply' || !operation.captureSignal
+            || operation.captureSignal.aborted || running || pending || nodeJobs.unsettled || delivery.unsettled
+            || state.pending || operation.transportUncertain || operation.cleanupConfirmed!==true
+            || state.cleanup_complete!==true || !state.node || !opening || opening.status!=='verified'
+            || opening!==operation.captureOpening || JSON.stringify(opening)!==operation.captureOpeningBytes
+            || JSON.stringify(state.request)!==operation.captureRequestBytes || state.deadline!==operation.captureDeadline
+            || JSON.stringify(state.node)!==operation.captureTargetNodeBytes
+            || opening.value?.verified!==true || opening.value.cleanup_complete!==true
+            || state.phases.find(p=>p.phase==='open')!==opening || now()>=state.deadline)
+          throw Error('LOGINOM_CAPTURE_NODE_REFUSED');
+      };
+      assert();
+      const request=state.request,deadline=state.deadline;
+      const requestBytes=JSON.stringify(request),openingBytes=JSON.stringify(opening),nodeBytes=JSON.stringify(state.node);
+      return Object.freeze({request,state,opening,signal:operation.captureSignal,deadline,
+        requestSha256:createHash('sha256').update(requestBytes).digest('hex'),
+        openingSha256:createHash('sha256').update(openingBytes).digest('hex'),
+        assertCurrent() {
+          assert();
+          if(state.request!==request || state.deadline!==deadline || JSON.stringify(request)!==requestBytes
+              || JSON.stringify(opening)!==openingBytes || JSON.stringify(state.node)!==nodeBytes)throw Error('LOGINOM_CAPTURE_NODE_CHANGED');
+        }});
+    },
     hasActiveWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled),
     hasUnsettledWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),
