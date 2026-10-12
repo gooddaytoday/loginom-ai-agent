@@ -68,6 +68,18 @@ identity` собственной CLI вместо ожидаемого отка�
 изменения — **19 PASS / 0 FAIL**, 86 assertions, 93 с. Точный syscall исходных
 двух редких отказов не установлен; финальный полный rerun требуется.
 
+Полный rerun с новой диагностикой: **557 PASS / 1 FAIL**, 558 тестов,
+53 файла, 577 с. Оба прежних supervisor-случая прошли; единственный отказ —
+sandbox fixture, ожидавшая только `sleep` вместо уже отклонённой `dash`.
+Shell может быть наблюдена/усыновлена раньше фонового sleep. Пять узких повторов
+старого теста проходили; отдельные controlled probes доказали оба допустимых
+native-refusal состояния. Исправленный тест сохраняет исходную shell fixture,
+требует failed/complete capture, unknown identities строго sh/sleep, точный
+refusal на неизвестный PID и non-allowed admission; binding refusal дополнительно
+сверяется по birth и executable mismatch. Inspection fault не принимается как
+штатный refusal. Весь sandbox-файл × 5: **40 PASS / 0 FAIL**, 200 assertions;
+`bun typecheck` — PASS. Adoption отдельно покрыто последним supervisor-тестом.
+
 `actionlint` 1.7.10 проверяет изменённый workflow с единственным исключением
 для существующей функции `case`, неизвестной этому валидатору; GitHub принял
 workflow и запустил jobs. SHA-256 скачанного официального actionlint проверен.
@@ -83,6 +95,17 @@ Release/tag/publish не создаются. Окончательный candidat
 source `525ad4ff64bef76704f2be5fbb9fbfb99eaad1bb`. Последующее изменение
 касается только диагностик harness и теста; `packages/`, pins и build scripts
 после этого candidate не изменялись.
+
+На `525ad4ff6` job `evals-unit` прошёл: **502 PASS / 0 FAIL**, 49 файлов,
+426 с; native Windows PR build и Windows product candidate также прошли.
+Linux product build остановился до компиляции продукта: Setup Bun выбрал
+плавающий Node 24.21.0, `node-gyp` 12.4.0 упал с `undici assert(!this.paused)`
+при HTTP-скачивании Node headers для tree-sitter-powershell.
+Общий Setup Bun закреплён на `.node-version` (24.19.0); POSIX native dependencies
+используют headers установленной полной Node distribution через документированный
+`npm_package_config_node_gyp_nodedir`, без отдельного HTTP download.
+Повторный candidate должен проверить этот setup на Linux и macOS. Windows сохраняет
+свой native installer path; общая setup action использует тот же Node pin.
 
 ## Границы доказательств
 

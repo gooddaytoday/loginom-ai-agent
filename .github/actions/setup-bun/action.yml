@@ -8,12 +8,25 @@ inputs:
 runs:
   using: "composite"
   steps:
-    # node-gyp@latest (invoked via bunx for native install scripts) requires Node >=22;
-    # some runner images ship an older system Node on PATH
+    # Native install scripts use the product's Node version before resource staging.
     - name: Setup Node
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       with:
-        node-version: "24"
+        node-version-file: packages/loginom-runtime/client/.node-version
+
+    - name: Use installed Node headers for native dependencies
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        node <<'NODE'
+        const fs = require("node:fs")
+        const path = require("node:path")
+        const nodeDir = path.dirname(path.dirname(process.execPath))
+        if (!fs.existsSync(path.join(nodeDir, "include", "node", "node.h"))) {
+          throw new Error("Pinned Node distribution headers are missing")
+        }
+        fs.appendFileSync(process.env.GITHUB_ENV, `npm_package_config_node_gyp_nodedir=${nodeDir}\n`)
+        NODE
 
     - name: Get baseline download URL
       id: bun-url

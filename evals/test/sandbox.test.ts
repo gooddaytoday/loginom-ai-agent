@@ -159,7 +159,7 @@ test("debuggerEndpoints: находит Node inspector на случайном �
   }
 }, 10_000)
 
-test("superviseProcess: усыновление неизвестного helper внутри bwrap не обходит native admission", async () => {
+test("superviseProcess: неизвестная shell или helper внутри bwrap не обходят native admission", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-sandbox-adoption-"))
   try {
     await Promise.all([mkdir(path.join(dir, "installation/bin"), { recursive: true }), mkdir(path.join(dir, "installation/resources/loginom"), { recursive: true }),
@@ -174,6 +174,20 @@ test("superviseProcess: усыновление неизвестного helper �
     const boundary = await sandboxCommand({ cmd, profileDir, workdir: path.join(dir, "workspace"), env: {} })
     const run = await superviseProcess({ cmd, cwd: boundary.cwd, env: boundary.env, sandbox: boundary.cmd, profileDir, timeoutMs: 5_000 })
     expect(run.processCleanup.status).toBe("failed")
-    expect(run.processCleanup.unknownProcesses?.map((entry) => entry.executable)).toContain(await realpath("/usr/bin/sleep"))
+    expect(run.processCleanup.capture_complete).toBe(true)
+    // The shell can be adopted before its sleep child. Both are undeclared
+    // native helpers; refusal must identify one of them rather than an IO fault.
+    const executables = await Promise.all(["/bin/sh", "/usr/bin/sleep"].map(file => realpath(file)))
+    expect(run.processCleanup.unknownProcesses?.every(entry => executables.includes(entry.executable))).toBe(true)
+    expect(run.processCleanup.error).toMatch(/^(Unexplained browser\/helper|Browser binding differs) PID \d+$/)
+    const rejected = run.processCleanup.unknownProcesses?.find(entry => entry.pid === Number(run.processCleanup.error?.match(/\d+$/)?.[0]))
+    expect(executables).toContain(rejected?.executable ?? "")
+    const admission = run.processCleanup.admissions?.find(entry => entry.pid === rejected?.pid && entry.starttime === rejected.starttime)
+    expect(["pending", "refused"]).toContain(admission?.status ?? "")
+    if (run.processCleanup.error?.startsWith("Browser binding differs")) {
+      expect(admission?.status).toBe("refused")
+      expect(run.processCleanup.bindingRefusals?.find(entry => entry.process.pid === rejected?.pid && entry.process.starttime === rejected.starttime))
+        .toMatchObject({ executable_match: false })
+    }
   } finally { await rm(dir, { recursive: true, force: true }) }
 }, 15_000)
