@@ -42,7 +42,7 @@ for(const scenario of ['normal','collision','symlink','file-callback','directory
  };
  const receipt={status:'SUCCEEDED',session_id:'own',logged_out:true,package_closed:true};
  const session={directory,metadata:{sessionId:'own'}};
- const code=`let confirmedCleanup=receipt,cleanupEvidenceBinding,cleanupPublication,cleanupReceiptWritten=false,cleanupPersistencePrimary;const cleanupWriters=new Set(),cleanupPersistenceFailures=[];${rejection}\n${writer}\n({write:writeCleanupReceipt,writers:cleanupWriters,inspect:()=>({marker:cleanupReceiptWritten,publication:cleanupPublication})})`;
+ const code=`let confirmedCleanup=receipt,cleanupShutdownBinding,cleanupEvidenceBinding,cleanupPublication,cleanupReceiptWritten=false,cleanupPersistencePrimary;const cleanupWriters=new Set(),cleanupPersistenceFailures=[];${rejection}\n${writer}\n({write:writeCleanupReceipt,writers:cleanupWriters,inspect:()=>({marker:cleanupReceiptWritten,publication:cleanupPublication})})`;
  const f=vm.runInNewContext(code,{receipt,session,constants:fs.constants,randomUUID,join,Promise,Error,
   receiptOpen:open,receiptWrite:fs.writeFile,receiptSync:sync,receiptClose:close,receiptRename:rename,receiptUnlink:fs.unlink});
  state.evidenceWriters=f.writers;

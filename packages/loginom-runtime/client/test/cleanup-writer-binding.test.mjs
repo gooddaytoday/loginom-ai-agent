@@ -38,7 +38,7 @@ for(const scenario of ['canonical','directory-replaced-after-file-close','sessio
     events.push({event:'rename',target:to.startsWith(original)?'original':'replacement'});
     fs.rename(from,to,callback);
   };
-  const body=`let confirmedCleanup=receipt,cleanupEvidenceBinding,cleanupPublication,cleanupReceiptWritten=false,cleanupPersistencePrimary;const cleanupWriters=new Set(),cleanupPersistenceFailures=[];${rejection}\n${writer}\n({write:writeCleanupReceipt,inspect:()=>({marker:cleanupReceiptWritten,boundDirectory:cleanupEvidenceBinding.directory,boundSessionId:cleanupEvidenceBinding.sessionId,writers:cleanupWriters.size})})`;
+  const body=`let confirmedCleanup=receipt,cleanupShutdownBinding,cleanupEvidenceBinding,cleanupPublication,cleanupReceiptWritten=false,cleanupPersistencePrimary;const cleanupWriters=new Set(),cleanupPersistenceFailures=[];${rejection}\n${writer}\n({write:writeCleanupReceipt,inspect:()=>({marker:cleanupReceiptWritten,boundDirectory:cleanupEvidenceBinding.directory,boundSessionId:cleanupEvidenceBinding.sessionId,writers:cleanupWriters.size})})`;
   const f=vm.runInNewContext(body,{receipt,session,constants:fs.constants,randomUUID,join,Promise,Error,
     receiptOpen:open,receiptWrite:fs.writeFile,receiptSync:fs.fsync,receiptClose:close,receiptRename:rename,receiptUnlink:fs.unlink});
   try {

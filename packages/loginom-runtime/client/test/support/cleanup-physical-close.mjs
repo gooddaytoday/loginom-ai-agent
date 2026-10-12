@@ -178,7 +178,7 @@ for(const scenario of scenarios)test('whole bridge kernel receipt '+scenario,asy
     if(f.case==='missing-callback'){assert.equal(finished,false);assert.equal(physical(f.fd),false);assert.equal(f.events.includes('browser-close'),false);f.original()}
    }else{
     const result=await pending;assert.ok(result.e);assert.equal(f.events.includes('browser-close'),false);assert.equal(f.events.includes('release-uploads'),false);assert.equal(bridge.hasUnsettledWork(),true);
-    if(['sync-','write-','dirsync-'].some(p=>f.case.startsWith(p))){assert.equal(first.cause,failValues[f.case.slice(f.case.indexOf('-')+1)]);const failure=JSON.parse(await readFile(join(directory,'bridge-shutdown-failure.json'),'utf8'));assert.equal(failure.primary_phase,'cleanup_receipt');assert.equal(failure.rejections.at(-1).rejection.value,false)}
+    if(['sync-','write-','dirsync-'].some(p=>f.case.startsWith(p))){assert.equal(first.cause,failValues[f.case.slice(f.case.indexOf('-')+1)]);await assert.rejects(readFile(join(directory,'bridge-shutdown-failure.json'),'utf8'),{code:'ENOENT'});assert.equal(session.metadata.cleanupFailurePublicationRefusal.message,'LOGINOM_CLEANUP_WRITER_UNCONFIRMED')}
     if(f.case==='callback-error'){assert.equal(physical(f.fd),true);await assert.rejects(bridge.close());return}
     await ready;
     if(f.case.startsWith('io-')){

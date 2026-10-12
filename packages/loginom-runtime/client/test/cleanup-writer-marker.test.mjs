@@ -48,7 +48,7 @@ for(const scenario of ['lost-file','early-file','withheld-file','lost-directory'
     }
     fs.close(value,e=>{if(!e)owned.delete(value);cb(e)});
   };
-  const body=`let confirmedCleanup=receipt,cleanupEvidenceBinding,cleanupPublication,cleanupReceiptWritten=false,cleanupPersistencePrimary;const cleanupPersistenceFailures=[],cleanupWriters=new Set();${rejection}\n${writer}\n({write:writeCleanupReceipt,inspect:()=>({marker:cleanupReceiptWritten,writers:cleanupWriters.size,primary:cleanupPersistencePrimary,failures:cleanupPersistenceFailures})})`;
+  const body=`let confirmedCleanup=receipt,cleanupShutdownBinding,cleanupEvidenceBinding,cleanupPublication,cleanupReceiptWritten=false,cleanupPersistencePrimary;const cleanupPersistenceFailures=[],cleanupWriters=new Set();${rejection}\n${writer}\n({write:writeCleanupReceipt,inspect:()=>({marker:cleanupReceiptWritten,writers:cleanupWriters.size,primary:cleanupPersistencePrimary,failures:cleanupPersistenceFailures})})`;
   const f=vm.runInNewContext(body,{receipt,session,receiptOpen:open,receiptWrite:write,receiptSync:sync,receiptClose:close,constants:fs.constants,randomUUID,receiptRename:fs.rename,receiptUnlink:fs.unlink,join,Promise,Error});
   const until=async predicate=>{const end=Date.now()+5000;while(!predicate()){assert.ok(Date.now()<end,'fixture timeout');await new Promise(resolve=>setTimeout(resolve,2))}};
   let outcome;
