@@ -257,6 +257,20 @@ class ArtifactsTest(unittest.TestCase):
         (path / 'private-ignored-data').write_text('retained private evidence')
         self.assertNotEqual(self.cli(*args).returncode, 0)
 
+    def test_published_git_recovery_refs_are_protected(self):
+        path = self.repository()
+        args = ('register', '--issue', ISSUE, '--path', str(path), '--kind', 'source')
+        artifact = self.successful(*args)['id']
+        self.successful('retire', '--id', artifact, '--reason', 'completed source stage')
+        self.age(artifact)
+        subprocess.run(['git', '-C', str(path), 'update-ref', 'refs/cleanup/test/retained', 'HEAD'], check=True)
+        result = self.cli(*args)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Git recovery history is protected', result.stderr)
+        self.successful('cleanup', '--apply')
+        self.assertTrue(path.exists())
+        self.assertTrue(subprocess.check_output(['git', '-C', str(path), 'rev-parse', 'refs/cleanup/test/retained'], text=True))
+
     @unittest.skipUnless(sys.platform == 'linux', 'MAS cleanup uses Linux process/mount evidence')
     def test_registered_worktree_removed_through_git_and_primary_survives(self):
         primary = self.repository()

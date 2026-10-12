@@ -1,4 +1,6 @@
 import http.server
+import datetime
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -38,6 +40,7 @@ class HandoffTest(unittest.TestCase):
         self.agent_runs = []
         self.read_gate = None
         self.read_started = threading.Event()
+        self.description = ''
         case = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
@@ -58,7 +61,7 @@ class HandoffTest(unittest.TestCase):
                     if case.read_gate:
                         case.read_started.set()
                         case.read_gate.wait(10)
-                    return self.reply([{'id': ISSUE, 'status': 'in_progress', 'description': ''}])
+                    return self.reply([{'id': ISSUE, 'status': 'in_progress', 'description': case.description}])
                 if self.path.endswith('/task-runs'):
                     sender = [{'id': SENDER, 'status': 'running', 'trigger_comment_id': PARENT}] if case.sender == SENDER else []
                     return self.reply(case.runs + sender)
@@ -111,7 +114,7 @@ class HandoffTest(unittest.TestCase):
             env=dict(os.environ, MULTICA_SERVER_URL=f'http://127.0.0.1:{self.server.server_port}',
                      MULTICA_TOKEN='test-only', MULTICA_TASK_ID=self.sender, MULTICA_WORKSPACE_ID=ISSUE), capture_output=True, text=True)
 
-    def attach_artifact(self):
+    def attach_artifact(self, history=False):
         from test_artifacts import ArtifactsTest
         fixture = ArtifactsTest('test_complete_payload_is_registered_and_identity_is_stable')
         fixture.setUp()
@@ -123,8 +126,88 @@ class HandoffTest(unittest.TestCase):
         fixture.owner = SENDER
         fixture.workspace = ISSUE
         path = fixture.build()
+        if history:
+            repository = fixture.native / 'source-history'
+            repository.mkdir()
+            subprocess.run(['git', 'init', '-q', str(repository)], check=True)
+            (repository / 'source.txt').write_text('preserved source')
+            subprocess.run(['git', '-C', str(repository), 'add', '.'], check=True)
+            subprocess.run(['git', '-C', str(repository), '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'source'], check=True)
+            sha = subprocess.check_output(['git', '-C', str(repository), 'rev-parse', 'HEAD'], text=True).strip()
+            subprocess.run(['git', '-C', str(repository), 'update-ref', 'refs/cleanup/test/source', sha], check=True)
+            manifest = json.loads((path / 'cli-manifest.json').read_text())
+            manifest['metadata']['sourceCommit'] = sha
+            (path / 'cli-manifest.json').write_text(json.dumps(manifest))
+            self.source_history = {'repo': str(repository), 'ref': 'refs/cleanup/test/source'}
         self.artifact = fixture.register(path)['id']
         return fixture, path
+
+    def attach_legacy(self, history=False):
+        fixture, path = self.attach_artifact(history)
+        catalog = fixture.state / ISSUE / SENDER / 'catalog.json'
+        data = json.loads(catalog.read_text())
+        data['records'][self.artifact].update(state='retired', retired_at=1, legacy_released_at=1)
+        catalog.write_text(json.dumps(data))
+        if history:
+            proof = self.root / 'source-proof.json'
+            proof.write_text(json.dumps({'owner': SENDER, 'workspace': ISSUE, 'issue': data['records'][self.artifact]['issue'], 'path': str(path),
+                'all_consumers_released': True, 'unresolved': False, 'evidence': ['Preserved exact source'], 'source_history': self.source_history}))
+            fixture.successful('protect', '--id', self.artifact, '--confirmation', str(proof))
+        return fixture, path
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Linux deletion safety')
+    def test_source_parent_reference_retains_git_and_releases_only_unused_binary(self):
+        fixture, path = self.attach_legacy(history=True)
+        sha = json.loads((path / 'cli-manifest.json').read_text())['metadata']['sourceCommit']
+        self.description = f'workspace-ui.mjs: diff относительно parent `{sha}`'
+        self.assertEqual(fixture.successful('cleanup', '--apply')['items'][0]['status'], 'deleted')
+        self.assertFalse(path.exists())
+        self.assertEqual(subprocess.check_output(['git', '-C', self.source_history['repo'], 'rev-parse', self.source_history['ref']], text=True).strip(), sha)
+
+    def test_source_parent_exception_preserves_artifact_references_and_missing_history(self):
+        fixture, path = self.attach_legacy(history=True)
+        manifest = json.loads((path / 'cli-manifest.json').read_text())
+        sha = manifest['metadata']['sourceCommit']
+        catalog = json.loads((fixture.state / ISSUE / SENDER / 'catalog.json').read_text())
+        for reference in [f'Product-SHA: {sha}', f'baseline parent `{sha}`', f'workspace-ui.mjs: CLI diff parent `{sha}`', str(path), self.artifact, catalog['records'][self.artifact]['build']['manifest_sha256']]:
+            self.description = reference
+            self.assertEqual(fixture.successful('cleanup')['items'][0]['reason'], 'current_checkpoint_or_assignment_reference')
+        self.description = f'workspace-ui.mjs: diff parent `{sha}`'
+        subprocess.run(['git', '-C', self.source_history['repo'], 'update-ref', '-d', self.source_history['ref']], check=True)
+        self.assertEqual(fixture.successful('cleanup')['items'][0]['reason'], 'current_checkpoint_or_assignment_reference')
+        self.assertTrue(path.exists())
+
+    def test_verified_cleanup_control_is_not_a_consumer_but_edits_restore_retention(self):
+        fixture, path = self.attach_legacy()
+        content = 'Владелец явно возобновил очистку MAS.\n' + str(path)
+        self.runs = [{'id': TASK, 'agent_id': SENDER, 'status': 'running', 'trigger_comment_id': PARENT, 'delivered_comment_ids': [COMMENT]}]
+        self.comments = [{'id': COMMENT, 'author_type': 'member', 'author_id': AGENT, 'parent_id': PARENT, 'content': content, 'created_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}]
+        receipt = self.root / 'cleanup-control.json'
+        receipt.write_text(json.dumps({'state': 'verified', 'issue': ISSUE, 'task': TASK, 'comment': COMMENT,
+            'fingerprint': hashlib.sha256(json.dumps([fixture.environment['MULTICA_SERVER_URL'], ISSUE, TASK, content]).encode()).hexdigest()}))
+        self.assertEqual(fixture.successful('cleanup')['items'][0]['reason'], 'current_checkpoint_or_assignment_reference')
+        fixture.successful('maintenance', '--receipt', str(receipt))
+        self.assertNotEqual(fixture.successful('cleanup')['items'][0].get('reason'), 'current_checkpoint_or_assignment_reference')
+        self.comments[0]['content'] += '\nReview requires this candidate.'
+        self.assertEqual(fixture.successful('cleanup')['items'][0]['reason'], 'current_checkpoint_or_assignment_reference')
+        self.assertNotEqual(fixture.cli('maintenance', '--receipt', str(receipt)).returncode, 0)
+        self.assertTrue(path.exists())
+
+    def test_cleanup_control_requires_verified_human_delivery_to_the_owner(self):
+        fixture, path = self.attach_legacy()
+        content = 'Владелец явно возобновил очистку MAS.\n' + str(path)
+        self.runs = [{'id': TASK, 'agent_id': AGENT, 'status': 'running', 'trigger_comment_id': PARENT}]
+        self.comments = [{'id': COMMENT, 'author_type': 'member', 'author_id': AGENT, 'parent_id': PARENT, 'content': content, 'created_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}]
+        receipt = self.root / 'cleanup-control.json'
+        data = {'state': 'prepared', 'issue': ISSUE, 'task': TASK, 'comment': COMMENT,
+            'fingerprint': hashlib.sha256(json.dumps([fixture.environment['MULTICA_SERVER_URL'], ISSUE, TASK, content]).encode()).hexdigest()}
+        receipt.write_text(json.dumps(data))
+        self.assertNotEqual(fixture.cli('maintenance', '--receipt', str(receipt)).returncode, 0)
+        data['state'] = 'verified'; receipt.write_text(json.dumps(data))
+        self.assertNotEqual(fixture.cli('maintenance', '--receipt', str(receipt)).returncode, 0)
+        self.runs[0]['agent_id'] = SENDER
+        self.comments[0]['author_type'] = 'agent'
+        self.assertNotEqual(fixture.cli('maintenance', '--receipt', str(receipt)).returncode, 0)
 
     def test_artifact_pin_survives_lost_dispatch_response(self):
         fixture, path = self.attach_artifact()

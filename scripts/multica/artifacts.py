@@ -224,6 +224,8 @@ def source_state(path):
     if not git(path, 'for-each-ref', '--format=%(refname)', '--contains=' + head, 'refs/remotes/origin/'):
         raise DeliveryError('Unpublished source HEAD is protected')
     common = git(path, 'rev-parse', '--path-format=absolute', '--git-common-dir')
+    if Path(common) == path / '.git' and git(path, 'for-each-ref', '--format=%(refname)', 'refs/cleanup/'):
+        raise DeliveryError('Git recovery history is protected')
     if Path(common) == path / '.git' and git(path, 'rev-list', '--all', '--reflog', '--not', '--remotes=origin'):
         raise DeliveryError('Unpublished refs or reflog commits are protected')
     reflog = sorted(set(git(path, 'reflog', 'show', '--format=%H', 'HEAD').splitlines()))
@@ -434,6 +436,12 @@ def protect(ctx, args):
             confirmation = json.loads(proof.read_text())
             if any(confirmation.get(k) != item[k] for k in ('owner', 'workspace', 'issue', 'path')) or confirmation.get('all_consumers_released') is not True or confirmation.get('unresolved') is not False or not confirmation.get('evidence'):
                 raise DeliveryError('Legacy evidence must confirm this exact owner/path and all releases')
+            if confirmation.get('source_history'):
+                history = confirmation['source_history']
+                repository = canonical(history['repo'])
+                if not ctx['operator'] or item['kind'] != 'build' or not repository.is_relative_to(ctx['native']) or not history['ref'].startswith('refs/cleanup/') or git(repository, 'rev-parse', '--verify', history['ref'] + '^{commit}') != item['sha']:
+                    raise DeliveryError('Source-only references require preserved exact Git history')
+                item['source_history'] = {'repo': str(repository), 'ref': history['ref']}
             if confirmation.get('historical_release'):
                 if not ctx['operator'] or item['kind'] not in ('source', 'build'):
                     raise DeliveryError('Historical adoption is restricted to operator-reviewed clean sources/builds')
@@ -580,6 +588,27 @@ def use(ctx, args):
         os.close(fd)
 
 
+def maintenance(ctx, args):
+    if not ctx['operator']:
+        raise DeliveryError('Only the human operator may register a cleanup control receipt')
+    receipt = json.loads(canonical(args.receipt).read_text())
+    if receipt.get('state') != 'verified':
+        raise DeliveryError('Cleanup control delivery must have verified read-back')
+    comments = api(ctx, f"issues/{uuid.UUID(receipt['issue'])}/comments")
+    comment = next((c for c in comments if c['id'] == receipt['comment']), None)
+    runs = api(ctx, f"issues/{uuid.UUID(receipt['issue'])}/task-runs")
+    run = next((r for r in runs if r['id'] == receipt['task']), None)
+    if not comment or not run or run['agent_id'] != ctx['owner'] or comment.get('author_type') != 'member' or comment.get('parent_id') != run.get('trigger_comment_id') or not comment.get('content', '').startswith('Владелец явно возобновил очистку MAS.'):
+        raise DeliveryError('Receipt does not identify a human cleanup-only instruction for this owner')
+    fingerprint = hashlib.sha256(json.dumps([ctx['server'], receipt['issue'], receipt['task'], comment['content']]).encode()).hexdigest()
+    if fingerprint != receipt.get('fingerprint'):
+        raise DeliveryError('Cleanup instruction differs from the verified receipt')
+    with catalog(ctx) as (value, target):
+        value.setdefault('maintenance_comments', {})[comment['id']] = {'author_id': comment['author_id'], 'content_sha256': hashlib.sha256(comment['content'].encode()).hexdigest()}
+        atomic(target, value)
+    print(json.dumps({'maintenance_comment': comment['id']}))
+
+
 def legacy_references(ctx):
     issues = api(ctx, 'issues')
     issues = issues if isinstance(issues, list) else issues['issues']
@@ -596,8 +625,44 @@ def legacy_references(ctx):
         fragments.append(issue.get('description') or '')
         active_ids = {r.get('trigger_comment_id') for r in runs if r['status'] not in ('completed', 'failed', 'cancelled')}
         active_ids.update(c for r in runs if r['status'] not in ('completed', 'failed', 'cancelled') for field in ('delivered_comment_ids', 'coalesced_comment_ids', 'planned_comment_ids') for c in (r.get(field) or []))
-        fragments.extend(c.get('content', '') for c in comments if c['id'] in active_ids or time.time() - datetime.datetime.fromisoformat(c['created_at']).timestamp() < DAY)
+        for comment in comments:
+            control = ctx.get('maintenance_comments', {}).get(comment['id'])
+            content = comment.get('content', '')
+            # A verified human deletion request is control data, not a consumer.
+            # An edit, different author, or unverified receipt restores retention.
+            if control and comment.get('author_type') == 'member' and comment.get('author_id') == control['author_id'] and hashlib.sha256(content.encode()).hexdigest() == control['content_sha256']:
+                continue
+            if comment['id'] in active_ids or time.time() - datetime.datetime.fromisoformat(comment['created_at']).timestamp() < DAY:
+                fragments.append(content)
     return '\n'.join(fragments)
+
+
+def legacy_reference(item, artifact, references):
+    if any(s in references for s in (item['path'], Path(item['path']).name, artifact, item.get('build', {}).get('manifest_sha256', '')) if s):
+        return True
+    sha = item.get('sha', '')[:9]
+    if not sha or sha not in references:
+        return False
+    history = item.get('source_history')
+    if item['kind'] != 'build' or not isinstance(history, dict):
+        return True
+    try:
+        if not history['ref'].startswith('refs/cleanup/') or git(canonical(history['repo']), 'rev-parse', '--verify', history['ref'] + '^{commit}') != item['sha']:
+            return True
+    except (DeliveryError, OSError, ValueError, KeyError):
+        return True
+    for line in references.splitlines():
+        if sha not in line:
+            continue
+        if not re.search(r'\b(?:git|diff)\b|[\w-]+\.(?:mjs|[cm]?js|tsx?|py)\b', line, re.I) or re.search(r'\b(?:cli|artifact|candidate|manifest|product-sha|installed)\b|сборк|кандидат|установлен', line, re.I):
+            return True
+        # Only explicit Git-parent tokens in a source-file/diff statement qualify.
+        # Source-SHA, Product-SHA and unspecified SHA references still retain it.
+        line = re.sub(r'(?:parent|родител[ья])\s*[:=]?\s*((?:`?[a-f0-9]{9,40}`?)(?:\s*[/,]\s*`?[a-f0-9]{9,40}`?)*)',
+            lambda m: m[0].replace(m[1], re.sub(r'[a-f0-9]{9,40}', lambda token: '' if token[0].startswith(sha) else token[0], m[1])), line, flags=re.I)
+        if sha in line:
+            return True
+    return False
 
 
 def cleanup(ctx, args):
@@ -605,6 +670,7 @@ def cleanup(ctx, args):
               'at': time.time(), 'free_before': shutil.disk_usage(ctx['root'] if ctx['root'].exists() else Path.home()).free, 'items': []}
     with catalog(ctx) as (value, target):
         needs_legacy = any(i.get('legacy_released_at') and i['state'] != 'deleted' for i in value['records'].values())
+        ctx = dict(ctx, maintenance_comments=value.get('maintenance_comments', {}))
     # Network reconciliation must not block other cards from recording pins or
     # protections. Reopen the catalog afterwards and use its current state.
     references = legacy_references(ctx) if needs_legacy else None
@@ -622,7 +688,7 @@ def cleanup(ctx, args):
             if item.get('legacy_released_at') and references is None:
                 entry['reason'] = 'legacy_reconciliation_required'
                 continue
-            if item.get('legacy_released_at') and any(s in references for s in (item.get('sha', '')[:9], item['path'], Path(item['path']).name) if s):
+            if item.get('legacy_released_at') and legacy_reference(item, artifact, references):
                 entry['reason'] = 'current_checkpoint_or_assignment_reference'
                 continue
             ttl = 7 * DAY if item['kind'] == 'evidence' else DAY
@@ -730,6 +796,8 @@ def main():
     p.add_argument('command', nargs=argparse.REMAINDER)
     p = commands.add_parser('cleanup')
     p.add_argument('--apply', action='store_true')
+    p = commands.add_parser('maintenance', help='Human only: register a verified cleanup-control supplement receipt')
+    p.add_argument('--receipt', required=True)
     commands.add_parser('preflight', help='Apply permitted cleanup and refuse a heavy build below 10 GiB free')
     args = parser.parse_args()
     try:
