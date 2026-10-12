@@ -1,3 +1,4 @@
+import {decodePreReadyRejection} from "./qualified-pre-ready.mjs"
 import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
@@ -27,6 +28,7 @@ const state = {
   inputs: new Map(),
 }
 const requests = new Set()
+const preReadyRequests = new Map()
 const send = (message, disconnect = false) => {
   if (process.connected)
     process.send(message, () => {
@@ -177,6 +179,7 @@ async function recordClose(stage, detail) {
     throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
 }
 function close() {
+  if(state.preReadyReadHeld)return Promise.reject(Error("LOGINOM_RECOVERY_REQUIRED"))
   if (state.closing) return state.closing
   state.closing = (async () => {
     state.shutdown ??= {stages:[]}
@@ -349,7 +352,7 @@ async function handle(message) {
       try {authenticated = await loginBrowser({ ...login, keepOpen: true })}
       finally {state.startupController=undefined}
       state.browser = authenticated.context
-      state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
+      state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page,generation:state.startupOwner.generation,chat:state.startupOwner.chat})
       const config = {
         endpoint: input.endpoint,
         apiKey: input.connection.apiKey,
@@ -379,6 +382,18 @@ async function handle(message) {
         managed: { directory, browserPath: resources.browserPath, browserRoot: resources.browserRoot },
       })
       state.session = session
+      const originalStartup=state.startupBinding,originalOwner=state.startupOwner,originalMetadata=session.metadata,
+        originalDirectory=session.directory,originalSessionId=session.metadata.sessionId;
+      const assertStartup=()=>{
+        if(state.session!==session || session.metadata!==originalMetadata || session.directory!==originalDirectory
+            || session.metadata.sessionId!==originalSessionId || state.startupBinding!==originalStartup || state.startupOwner!==originalOwner
+            || originalStartup.owner!==originalOwner || originalStartup.id!==originalOwner.id
+            || originalStartup.page!==originalOwner.page || originalStartup.context!==originalOwner.context
+            || originalStartup.account!==originalOwner.account || originalStartup.origin!==originalOwner.origin
+            || originalStartup.generation!==originalOwner.generation || originalStartup.chat!==originalOwner.chat)
+          throw Error("LOGINOM_STARTUP_OWNER_CHANGED");
+      };
+      assertStartup();
       // Bind only the document owned by this successful private login. This is
       // not workspace preparation and confers no package-close authority.
       const documentId=randomUUID()
@@ -392,6 +407,7 @@ async function handle(message) {
         return {documentId:o.documentId,account:o.account,loginomBuild:app.Version};
       },{documentId,sessionId:session.metadata.sessionId,account:input.connection.username,
         origin:new URL(config.loginomUrl).origin})
+      assertStartup();
       const { Client } = require("@modelcontextprotocol/sdk/client/index.js")
       const { InMemoryTransport } = require("@modelcontextprotocol/sdk/inMemory.js")
       const { createConnection } = require("@playwright/mcp")
@@ -399,16 +415,25 @@ async function handle(message) {
         JSON.parse(await readFile(session.browserConfig, "utf8")),
         async () => authenticated.context,
       )
+      assertStartup();
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
+      assertStartup();
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
         authenticatedReadiness:state.authenticatedReadiness,
         acceptanceCapture: acceptanceCapture ? { binding: Object.freeze({...acceptanceCapture, session:session.metadata.sessionId}),
           harness: captureHarness } : undefined })
+      assertStartup();
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })
+      state.readonlyBinding=Object.freeze({startup:state.startupBinding,owner:state.startupOwner,
+        bridge:state.bridge,client:state.client,session,state,metadata:session.metadata,
+        directory:session.directory,sessionId:session.metadata.sessionId,reader:state.bridge.readPreReady})
+      state.preReadyOwner=state.readonlyBinding
       await state.bridge.server.connect(serverTransport)
+      assertStartup();
       await state.client.connect(clientTransport)
+      assertStartup();
       send({
         id: message.id,
         result: {
@@ -423,6 +448,8 @@ async function handle(message) {
       })
       return
     }
+    if(state.preReadyReadHeld && !["readonly.preReady","readonly.preReady.cancel","interrupt"].includes(message.operation))
+      throw Error("LOGINOM_RECOVERY_REQUIRED")
     if (message.operation === "close") {
       await close()
       send({ id: message.id, result: { closed: true } }, true)
@@ -435,7 +462,27 @@ async function handle(message) {
       send({id:message.id,result:{interrupted:true}})
       return
     }
+    if (message.operation === "readonly.preReady.cancel") {
+      const pending=preReadyRequests.get(message.input?.requestId);
+      if(!pending)throw Error("LOGINOM_PRE_READY_READ_REFUSED");
+      pending.abort(decodePreReadyRejection(message.input.rejection));return;
+    }
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if(message.operation === "readonly.preReady") {
+      if(state.controller || state.admitting || !message.input || Object.keys(message.input).join(',')!=='deadline')
+        throw Error("LOGINOM_PRE_READY_READ_REFUSED");
+      const controller=new AbortController();state.controller=controller;state.preReadyReadHeld=true;preReadyRequests.set(message.id,controller);
+      try {
+        const result=await state.preReadyOwner.reader({retained:state.preReadyOwner,signal:controller.signal,deadline:message.input.deadline});
+        state.readonlyRetained=true;
+        send({id:message.id,result:{readonlyPreReady:true,result}});
+      } catch(value) {
+        state.preReadyReadRefusal??={value};state.readonlyRetained=true;
+        send({id:message.id,result:{readonlyPreReady:false,rejection:closeRejection(value)}});
+      } finally {preReadyRequests.delete(message.id);if(state.controller===controller)state.controller=undefined}
+      return;
+    }
+
     if (message.operation === "acceptance.capture") {
       if (message.input !== undefined || state.controller || state.closeFailure !== undefined)
         throw Error("LOGINOM_REQUEST_INVALID")
@@ -457,9 +504,12 @@ async function handle(message) {
         send({ id: message.id, result: previous })
         return
       }
-      const result = await admitStartupArtifacts(state.session.artifactStore, message.input.files)
-      state.inputs.set(message.input.userMessage, result)
-      send({ id: message.id, result })
+      state.admitting=(state.admitting??0)+1
+      try {
+        const result = await admitStartupArtifacts(state.session.artifactStore, message.input.files)
+        state.inputs.set(message.input.userMessage, result)
+        send({ id: message.id, result })
+      } finally {state.admitting--}
       return
     }
     if (message.operation === "list") {

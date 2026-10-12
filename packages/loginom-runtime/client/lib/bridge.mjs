@@ -1,3 +1,4 @@
+import {qualifyPreReadyRead} from "../../src/qualified-pre-ready.mjs";
 import {makeFieldParametersNativeContextCode} from '../../src/acceptance/field-parameters-native-context.mjs';
 import {nodeResultReply} from './node-result-reply.mjs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -18,7 +19,7 @@ import { pinActionCatalog, assertCatalogTarget, validateActionParameters } from 
 import { createActionRuntime, parseCapabilityResult } from './executor.mjs';
 import {createCandidateNodeSupport} from './node-support.mjs';
 import {isNodeApiTool,dispatchNodeApi} from './node-api.mjs';
-import { makeWorkspacePrepareCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace, workspaceObserveTool } from './workspace.mjs';
+import { makeWorkspaceBootstrapCode, makeWorkspacePrepareCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace, workspaceObserveTool } from './workspace.mjs';
 import { makeBrowserGeometryCode, parseBrowserGeometry } from './browser-geometry.mjs';
 import { createExecutionJournal } from './execution-journal.mjs';
 import { createRecoveryContext } from './recovery-context.mjs';
@@ -915,7 +916,32 @@ export async function createBridge(config, session, { browserTransport: managedB
       });
       return closing;
     }
-    return {server,catalog,captureAcceptance,
+    let preReadyReading=false;
+    async function readPreReady({retained,signal,deadline}={}) {
+      const assert=()=>{
+        qualifyPreReadyRead(retained,{signal,deadline});
+        if(retained.bridge?.readPreReady!==readPreReady || retained.session!==session
+            || cleanupRefused || retainedNativeCleanup || cleanupShutdownBinding || confirmedCleanup || shutdownStarted
+            || captureConsumed || captureInFlight || captureUnknown || cleanupWriters.size || cleanupPublication || fpDraftRetained
+            || clipboardUncertain || heldLeases.size || !actionRuntime
+            || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork())
+          throw Error('LOGINOM_PRE_READY_READ_REFUSED');
+      };
+      if(preReadyReading)throw Error('LOGINOM_PRE_READY_READ_REFUSED');
+      assert();preReadyReading=true;
+      try {
+        const code=makeWorkspaceBootstrapCode({origin:retained.startup.origin,build:pinnedActions.compatibility.loginom_build});
+        const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,
+          {signal,timeout:deadline-Date.now()});
+        assert();
+        const result=parseCapabilityResult(response);
+        if(result?.status!=='SUCCEEDED' || result.effect_possible!==false || result.output?.observation_only!==true
+            || result.output.origin!==retained.startup.origin || result.output.target_state==='indeterminate')
+          throw Error('LOGINOM_PRE_READY_READ_REFUSED');
+        return Object.freeze({kind:'PRE_READY_CLOSED_READ',ready:false,cleanupComplete:false,observation:result.output});
+      } finally {preReadyReading=false}
+    }
+    return {server,catalog,captureAcceptance,readPreReady,
       hasActiveWork:()=>!!captureInFlight || (!clipboardUncertain && !!actionRuntime?.hasActiveWork()),
       hasUnsettledWork:()=>cleanupRefused || !!captureInFlight || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size>0,
       close:closeBridge};

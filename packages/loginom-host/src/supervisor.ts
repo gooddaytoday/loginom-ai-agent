@@ -97,7 +97,7 @@ export async function supervise(input: Launch) {
   })
   const pending = new Map<
     string,
-    { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
+    { resolve(value: unknown): void; reject(error: unknown): void; timer: ReturnType<typeof setTimeout>; dispose?: () => void }
   >()
   const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
     child.once("exit", (code, signal) => resolve({ code, signal }))
@@ -106,6 +106,7 @@ export async function supervise(input: Launch) {
   function fail() {
     pending.forEach((request) => {
       clearTimeout(request.timer)
+    request.dispose?.()
       request.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     })
     pending.clear()
@@ -119,6 +120,7 @@ export async function supervise(input: Launch) {
     if (!request) return
     pending.delete(message.id)
     clearTimeout(request.timer)
+    request.dispose?.()
     if ("error" in message) {
       request.reject(
         new Error(
@@ -132,19 +134,33 @@ export async function supervise(input: Launch) {
     }
     request.resolve("result" in message ? message.result : undefined)
   })
-  function request(operation: string, value?: unknown, timeout = 120_000) {
+  function encodeReadRejection(value: unknown): unknown {
+    if(value instanceof Error)return {kind:"Error",name:value.name,message:value.message,...("cause" in value?{cause:encodeReadRejection(value.cause)}:{})}
+    return {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
+  }
+  function request(operation: string, value?: unknown, timeout = 120_000, control?: {signal: AbortSignal; deadline: number}) {
+    if(control) {
+      control.signal.throwIfAborted()
+      if(!Number.isSafeInteger(control.deadline) || Date.now()>=control.deadline) throw Error("LOGINOM_PRE_READY_READ_EXPIRED")
+      timeout=control.deadline-Date.now()
+    }
     if (!child.connected) return Promise.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     const id = randomUUID()
     return new Promise<unknown>((resolve, reject) => {
-      const deadline = Date.now() + timeout
-      const timer = setTimeout(() => {
-        pending.delete(id)
-        reject(new Error("LOGINOM_RUNTIME_TIMEOUT"))
-      }, timeout)
-      pending.set(id, { resolve, reject, timer })
-      child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}) }, (error) => {
-        if (error) fail()
-      })
+      const deadline=control?.deadline??Date.now()+timeout
+      const cancel = (reason: unknown) => {
+        if(!pending.has(id)) return
+        pending.delete(id);clearTimeout(timer);control?.signal.removeEventListener("abort",abort)
+        // Cancellation belongs to this original request, never the next call.
+        if(control && child.connected)child.send({id:randomUUID(),operation:"readonly.preReady.cancel",input:{requestId:id,rejection:encodeReadRejection(reason)}})
+        reject(reason)
+      }
+      const abort = () => cancel(control!.signal.reason)
+      const timer = setTimeout(() => cancel(new Error(control?"LOGINOM_PRE_READY_READ_EXPIRED":"LOGINOM_RUNTIME_TIMEOUT")),timeout)
+      pending.set(id, { resolve, reject, timer, dispose:()=>control?.signal.removeEventListener("abort",abort) })
+      control?.signal.addEventListener("abort",abort,{once:true})
+      child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}) }, (error) => { if (error) fail() })
+      if(control?.signal.aborted)abort()
     })
   }
   const closing: { promise?: Promise<void> } = {}
@@ -177,7 +193,18 @@ export async function supervise(input: Launch) {
   // Connection validation can spend 30 seconds on MCP initialization and up
   // to 150 seconds navigating/authenticating Loginom. Do not race that
   // documented budget with the ordinary 120-second runtime handshake.
-  const runtime = { ready: undefined as unknown, request, close, exited }
+  function rejection(value: any): unknown {
+    if(value?.kind==="Error") {const e=new Error(value.message,"cause" in value?{cause:rejection(value.cause)}:undefined);e.name=value.name;return e}
+    return value?.is_undefined?undefined:value?.value
+  }
+  async function readPreReady({signal,deadline}: {signal:AbortSignal;deadline:number}) {
+    const reply=await request("readonly.preReady",{deadline},0,{signal,deadline}) as any
+    signal.throwIfAborted()
+    if(Date.now()>=deadline)throw Error("LOGINOM_PRE_READY_READ_EXPIRED")
+    if(reply?.readonlyPreReady!==true)throw rejection(reply?.rejection)
+    return reply.result
+  }
+  const runtime = { ready: undefined as unknown, request, readPreReady, close, exited }
   async function failedStart(error: unknown): Promise<never> {
     try { await close() }
     catch (cleanupFailure) {
