@@ -1,0 +1,88 @@
+{
+  "package_path": "/lab-65-field-parameters/cleanup-{{ATTEMPT_ID}}.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.reform_columns"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.reform_columns",
+      "output_node_label": "Очистка",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "integer"
+        },
+        {
+          "name": "Amount",
+          "label": "Значение",
+          "type": "real"
+        },
+        {
+          "name": "Enabled",
+          "label": "Значение",
+          "type": "boolean"
+        },
+        {
+          "name": "Timestamp",
+          "label": "Время",
+          "type": "datetime"
+        },
+        {
+          "name": "Comment",
+          "label": "Comment",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Amount": 3.545,
+          "Enabled": true,
+          "Timestamp": "2024-02-29T23:59:58.000",
+          "Comment": "Привет"
+        },
+        {
+          "Id": 2,
+          "Amount": -42.2,
+          "Enabled": false,
+          "Timestamp": "2000-01-01T00:00:00.000",
+          "Comment": ""
+        },
+        {
+          "Id": 3,
+          "Amount": null,
+          "Enabled": null,
+          "Timestamp": null,
+          "Comment": "東京"
+        },
+        {
+          "Id": 4,
+          "Amount": null,
+          "Enabled": null,
+          "Timestamp": null,
+          "Comment": ""
+        },
+        {
+          "Id": 5,
+          "Amount": null,
+          "Enabled": null,
+          "Timestamp": null,
+          "Comment": null
+        },
+        {
+          "Id": 6,
+          "Amount": 0.0,
+          "Enabled": false,
+          "Timestamp": "1899-12-30T00:00:00.000",
+          "Comment": "Конец"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "source": "packages/loginom-runtime/tools/loginom-acceptance/fixtures/field-parameters",
+  "inputs": [
+    {
+      "path": "data/cleanup.csv",
+      "bytes": 248,
+      "sha256": "c1204e8bb03a0a686ec291de1fa5d532f19830589d4040e695f2f17e186f2a2e",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "null_marker": "NULL",
+      "decimal_separator": ",",
+      "header": true,
+      "columns": ["Id", "RawAmount", "RawFlag", "RawWhen", "Comment", "Unused"],
+      "records": 6
+    },
+    {
+      "path": "data/scalar-matrix.csv",
+      "bytes": 2200,
+      "sha256": "351c5a12660a1a016a565a0e909e680a5b00eae9abecae10d0310b86bcf69334",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "null_marker": "NULL",
+      "decimal_separator": ",",
+      "header": true,
+      "columns": [
+        "S_to_S",
+        "S_to_I",
+        "S_to_R",
+        "S_to_B",
+        "S_to_D",
+        "I_to_S",
+        "I_to_I",
+        "I_to_R",
+        "I_to_B",
+        "I_to_D",
+        "R_to_S",
+        "R_to_I",
+        "R_to_R",
+        "R_to_B",
+        "R_to_D",
+        "B_to_S",
+        "B_to_I",
+        "B_to_R",
+        "B_to_B",
+        "B_to_D",
+        "D_to_S",
+        "D_to_I",
+        "D_to_R",
+        "D_to_B",
+        "D_to_D"
+      ],
+      "records": 10
+    }
+  ],
+  "historical_matrix": {
+    "path": "fixtures/scalar-matrix.historical.json",
+    "purpose": "historical_diagnostics_only",
+    "current_runtime_validation": "not_checked"
+  }
+}
