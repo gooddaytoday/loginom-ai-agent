@@ -280,6 +280,17 @@ export async function createBridge(config, session, { browserTransport: managedB
       }
       try {
         if (request.params.name === 'dock_prepare') {
+          const importBinding=acceptanceCapture?.binding?.harness==='import-before-configure-v1'?acceptanceCapture.binding:null;
+          const importIdentity=importBinding?JSON.stringify(importBinding):null;
+          const importBudget=()=>{
+            if (!importBinding) return null;
+            assertImportPhase(importBinding,'dock_prepare');
+            if (acceptanceCapture.binding!==importBinding || JSON.stringify(importBinding)!==importIdentity
+                || importBinding.session!==session.metadata.sessionId
+                || (authenticatedReadiness && authenticatedReadiness.account!==importBinding.account))
+              throw Error('LOGINOM_IMPORT_PREPARATION_IDENTITY_CHANGED');
+            return importBinding.expires-Date.now();
+          };
           let args = request.params.arguments ?? {};
           validateActionParameters(prepareTool.inputSchema, args);
           if (userProfile) args = userWorkflows.normalizePreparation(args);
@@ -300,13 +311,24 @@ export async function createBridge(config, session, { browserTransport: managedB
           let workspace = null;
           if (actionRuntime) {
             workspace = await browserGate(async () => {
+              importBudget();
               const state = await prepareWorkspaceSession({ metadata: session.metadata,
               request: preparationRequest, signal: extra.signal,
-              assertAllowed() { extra.signal.throwIfAborted(); actionRuntime.assertPreparationAllowed(); },
+              assertAllowed() { extra.signal.throwIfAborted(); importBudget(); actionRuntime.assertPreparationAllowed(); },
               async prepare({ recoverOnly }) {
+                const remaining=importBudget();
                 if (!config.loginomUrl) throw new Error('Workspace preparation requires the configured Loginom URL');
-                const code = makeWorkspacePrepareCode({ ...workspaceOptions, recoverOnly });
-                const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: { code } }, undefined, { timeout: 125000 });
+                let code = makeWorkspacePrepareCode({ ...workspaceOptions, recoverOnly,
+                  ...(remaining!==null?{timeoutMs:Math.min(workspaceOptions.timeoutMs,remaining)}:{}) });
+                if(importBinding) {
+                  const anchor='const deadline = Date.now() + options.timeoutMs;';
+                  if(!code.includes(anchor))throw Error('LOGINOM_IMPORT_PREPARATION_DEADLINE_UNAVAILABLE');
+                  code=code.replace(anchor,`const deadline = Math.min(${importBinding.expires},Date.now() + options.timeoutMs);`);
+                }
+                const transportRemaining=importBudget();
+                if(transportRemaining!==null && transportRemaining<=0)throw Error('LOGINOM_IMPORT_PRECONFIGURE_GATE');
+                const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: { code } }, undefined,
+                  { timeout: transportRemaining===null?125000:Math.min(125000,transportRemaining) });
                 const state = parseWorkspacePreparation(response);
                 if (state.status === 'READY') {
                   if (config.storageDirectories) session.metadata.storageBinding = createStorageBinding({
