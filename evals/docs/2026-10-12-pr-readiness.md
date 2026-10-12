@@ -80,6 +80,13 @@ refusal на неизвестный PID и non-allowed admission; binding refusa
 штатный refusal. Весь sandbox-файл × 5: **40 PASS / 0 FAIL**, 200 assertions;
 `bun typecheck` — PASS. Adoption отдельно покрыто последним supervisor-тестом.
 
+Итоговый полный набор на `3ce4ae1381168a6ff48957b831470d0aefcea07b`:
+**558 PASS / 0 FAIL / 0 SKIP**, 2873 assertions, 53 файла, 573.77 с.
+Команда — `unshare --user --map-current-user --pid --fork --mount-proc bun test`
+из `evals/`. Прежние два inspection-отказа не повторились; assertions, retries
+и native identity guards не ослаблялись. Их точная исходная причина не установлена;
+добавленная диагностика сохраняет cause для нового воспроизведения.
+
 `actionlint` 1.7.10 проверяет изменённый workflow с единственным исключением
 для существующей функции `case`, неизвестной этому валидатору; GitHub принял
 workflow и запустил jobs. SHA-256 скачанного официального actionlint проверен.
@@ -106,6 +113,20 @@ Linux product build остановился до компиляции проду�
 `npm_package_config_node_gyp_nodedir`, без отдельного HTTP download.
 Повторный candidate должен проверить этот setup на Linux и macOS. Windows сохраняет
 свой native installer path; общая setup action использует тот же Node pin.
+
+Исправление Linux setup проверено локальным `node-gyp` 12.4.0 configure с
+установленными headers (локальный Node 22.16.0; это проверка механизма, не продукта).
+На GitHub Desktop job `114835920690` из `3ce4ae138` подтвердил Node 24.19.0,
+существующий header directory `/opt/hostedtoolcache/node/24.19.0/x64`, frozen install
+и успешные Desktop tests. Новый полный product candidate:
+[run 38256608207](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/38256608207),
+source **`3ce4ae1381168a6ff48957b831470d0aefcea07b`**, `candidate/prod`.
+
+Этот checkpoint сохраняет исходники и результаты локальной приёмки перед
+окончанием внешних gates. Финальные job conclusions, CI URLs и снятие Draft
+фиксируются в [описании PR #61](https://github.com/gooddaytoday/loginom-ai-agent/pull/61).
+После `3ce4ae138` меняется только этот отчёт и план; продуктовый source, harness,
+pins, lockfiles и build workflows идентичны проверенному tree.
 
 ## Границы доказательств
 
