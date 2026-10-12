@@ -1,7 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';
+import {open as captureOpen,writeFile as captureWrite,fsync as captureSync,close as captureClose} from 'node:fs';
 import {readFile,writeFile,open,mkdtemp,mkdir,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
 const source=await readFile(process.env.CAPTURE_BRIDGE_SOURCE??new URL('../client/lib/bridge.mjs',import.meta.url),'utf8');
-const code=source.slice(source.indexOf('    async function persistCapture()'),source.indexOf('    function closeBridge()',source.indexOf('    async function persistCapture()')));
+const code=source.slice(source.indexOf('    async function closeCaptureWriter('),source.indexOf('    function closeBridge()',source.indexOf('    async function closeCaptureWriter(')));
 for(const scenario of ['success','foreign-account','expired','pending','running','unknown','changed-after','missing-receipt','write-refusal','throw-error','throw-undefined','throw-null','throw-false','throw-zero','throw-empty'])test('common capture transaction '+scenario,async()=>{
  const directory=await mkdtemp(join(tmpdir(),'common-capture-')),events=[];
  const binding={revision:1,harness:'calculator-grouped-before-done-v1',owner:'owner',run:'run',lease:'owner:run',generation:7,chat:'chat',account:'user',packagePath:'/user/p.lgp',admission:'admission',session:'session',expires:Date.now()+60000};
@@ -11,7 +12,7 @@ for(const scenario of ['success','foreign-account','expired','pending','running'
  if(scenario==='foreign-account')binding.account='foreign';if(scenario==='expired')binding.expires=0;
  const throws={error:Error('primary',{cause:0}),undefined:undefined,null:null,false:false,zero:0,empty:''};
  const raw=throws[scenario.slice(6)];
- const globals={session,binding,managedSave,Error,Date,JSON,open,writeFile,readFile,join,
+ const globals={captureOpen,captureWrite,captureSync,captureClose,captureWriters:new Set(),capturePersistenceFailures:[],capturePersistencePrimary:undefined,captureEvidenceBinding:undefined,captureReceiptWritten:false,captureJournalWritten:false,session,binding,managedSave,Error,Date,JSON,open,writeFile,readFile,join,
   actionRuntime:{assertPreparationAllowed(){if(scenario==='pending')throw Error('pending')},hasUnsettledWork:()=>scenario==='unknown',hasActiveWork:()=>scenario==='running'},
   clipboardUncertain:false,heldLeases:new Set(),savedPackages:new Set(['/user/p.lgp']),browser:{fixture:true},
   browserGate:async fn=>{events.push('gate');return fn()},
