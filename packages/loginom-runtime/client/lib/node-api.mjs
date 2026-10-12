@@ -187,7 +187,7 @@ export async function dispatchNodeApi(runtime,name,args,{signal}={}) {
  if(name==='dock_node_apply'||name==='dock_node_resume'&&Object.keys(args).length>1)validateNodeApplyEnvelope(args);
  signal?.throwIfAborted();
  switch(name){
-  case 'dock_node_read':return runtime.startNodeRead(args);
+  case 'dock_node_read':return runtime.startNodeRead(args,{signal});
   case 'dock_node_apply':return runtime.startNodeApply(args);
   case 'dock_node_resume':
    if(Object.keys(args).length>1)validateActionParameters(nodeApplyInputSchema,args);

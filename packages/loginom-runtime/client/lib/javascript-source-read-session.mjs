@@ -48,17 +48,18 @@ export function createJavascriptSourceReadSession({request, uiEpoch, deadline, a
     get deadline() { return deadline; },
     get uncertain() { return reader.uncertain; },
     get cleanupUnconfirmed() { return adapter.uncertain === true || adapter.active === true; },
-    async read(next) {
+    async read(next, {signal} = {}) {
+      signal?.throwIfAborted();
       const kind = validateJavascriptSourceReadRequest(next);
       need(next.operation_id === initial.operation_id, 'JavaScript source operation changed');
       if (kind === 'initial') {
         need(!started && same(next, initial), 'JavaScript source initial request changed');
         started = true;
-        return (await reader.read({owner})).receipt;
+        return (await reader.read({owner}, {signal})).receipt;
       }
       need(started, 'JavaScript source continuation before initial read');
       return (await reader.read({owner, cursor: next.cursor,
-        expected_source_sha256: next.expected_source_sha256})).receipt;
+        expected_source_sha256: next.expected_source_sha256}, {signal})).receipt;
     }
   });
 }

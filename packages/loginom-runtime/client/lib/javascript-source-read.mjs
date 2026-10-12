@@ -94,7 +94,8 @@ export function createJavascriptSourceReader({owner, deadline, adapter, redactor
   const prepare=source=>prepareJavascriptSourceDelivery({source,owner:identity,redactor,chunkBytes});
   return {
     get uncertain() { return uncertain; },
-    async read(request) {
+    async read(request, {signal} = {}) {
+      signal?.throwIfAborted();
       need(!busy && !uncertain, 'Source reader busy or uncertain; no replay');
       need(request && equal(request.owner, identity), 'Source request owner changed');
       need(Object.keys(request).every(key => ['owner','cursor','expected_source_sha256'].includes(key)), 'Source request fields refused');
@@ -107,6 +108,7 @@ export function createJavascriptSourceReader({owner, deadline, adapter, redactor
       const step = ++sequence;
       try {
         await journal('source_open_dispatch', step);
+        signal?.throwIfAborted();
         const handle = await bounded(() => adapter.open({owner: identity, deadline}));
         await journal('source_open_settled', step);
         const first = await bounded(() => adapter.read(handle, {owner: identity, deadline}));
@@ -115,10 +117,14 @@ export function createJavascriptSourceReader({owner, deadline, adapter, redactor
         const fresh = await bounded(() => adapter.read(handle, {owner: identity, deadline}));
         need(equal(fresh?.owner, identity) && fresh.source === first.source && equal(fresh.settings, settings), 'Source changed during owned read');
         let prepared, refusal;
-        try {
-          prepared = prepare(first.source);
-          need(!retained || equal(retained, prepared.metadata), 'Source continuation digest changed');
-        } catch (error) { refusal = error; }
+        if (!signal?.aborted) {
+          try {
+            prepared = prepare(first.source);
+            need(!retained || equal(retained, prepared.metadata), 'Source continuation digest changed');
+          } catch (error) { refusal = error; }
+        }
+        // Cancellation cannot abandon a settled opening or interrupt its Close.
+        // Keep all three source/settings reads before one journaled discard.
         await journal('source_discard_dispatch', step);
         const closing = await bounded(() => adapter.read(handle, {owner: identity, deadline}));
         need(equal(closing?.owner, identity) && closing.source === first.source && equal(closing.settings, settings),
@@ -126,6 +132,7 @@ export function createJavascriptSourceReader({owner, deadline, adapter, redactor
         const closed = await bounded(() => adapter.discard(handle, {owner: identity, deadline}));
         need(closed?.closed === true && equal(closed.owner, identity), 'Source discard unconfirmed');
         await journal('source_discard_settled', step);
+        signal?.throwIfAborted();
         if (refusal) throw refusal;
         const index = entry?.index ?? 0, offset = entry?.offset ?? 0;
         const chunk = prepared.chunks[index];
@@ -135,6 +142,7 @@ export function createJavascriptSourceReader({owner, deadline, adapter, redactor
         await journal('source_delivery_verified', step, {...prepared.metadata,
           offset_utf8_bytes: receipt.offset_utf8_bytes, chunk_utf8_bytes: receipt.chunk_utf8_bytes,
           chunk_sha256: hash(chunk), cursor_sha256: cursor ? hash(cursor) : null});
+        signal?.throwIfAborted();
         // Recheck the actual response after ACK: shared redactor context may grow.
         const delivered = exact(receipt);
         retained = prepared.metadata;

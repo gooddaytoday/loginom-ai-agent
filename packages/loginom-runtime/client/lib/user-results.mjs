@@ -1,5 +1,5 @@
 import {nodeOutputPortSchema} from './node-result-schema.mjs';
-import {budgetUserPreview} from './user-preview-budget.mjs';
+import {budgetUserPreview,previewWireSize} from './user-preview-budget.mjs';
 import {calculatorPrecisionWarnings} from './calculator-precision-warning.mjs';
 const pick = (value, keys) => Object.fromEntries(keys.filter(key => value?.[key] !== undefined).map(key => [key, value[key]]));
 export const userResultSchema = {
@@ -50,7 +50,7 @@ export function compactNodeRequestFailure(outcome,request={}) {
           instruction:'Correct the indicated request using its schema and submit it with a NEW operation_id. No browser recovery is required.'}};
 }
 
-export function compactNodeResult(result) {
+export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   const outcome = result.outcome, node = outcome?.output, data = node?.output;
   const output = data ? pick(data, ['status', 'evidence_ref', 'execution_id', 'no_output_requested', 'javascript_source']) : {};
   if (data?.ports) output.ports = data.ports.map(port => {
@@ -79,7 +79,7 @@ export function compactNodeResult(result) {
     :null);
   const reply={
     result_version: 'user-v1', ...pick(result, ['operation_id', 'attempt', 'state', 'cancel_requested', 'server_stop_requested']),
-    ...(result.state === 'running' ? { progress: result.progress } : {}),
+    ...(result.state === 'running'||result.outcome==null&&result.progress ? { progress: result.progress } : {}),
     ...pick(outcome, ['status', 'action_key', 'phase', 'effect_possible', 'cleanup_complete']),
     ...pick(node, ['node', 'execution', 'package_saved', 'configuration']), output,
     error: result.error ?? outcome?.error ?? null,
@@ -88,7 +88,14 @@ export function compactNodeResult(result) {
   };
   // JS readback carries the complete observed mappings and schema. Refuse an
   // oversized final reply instead of converting these facts into a summary.
-  if(node?.configuration?.readback?.kind!=='javascript'&&data?.javascript_source?.policy!=='javascript-module-v1')budgetUserPreview(reply);
+  if(node?.configuration?.readback?.kind!=='javascript'&&data?.javascript_source?.policy!=='javascript-module-v1')budgetUserPreview(reply,
+    {wireSize:value=>wireSize({...value,limitations:[...value.limitations,...previewLimitations(value.output)]})});
+  limitations.push(...previewLimitations(output));
+  return reply;
+}
+
+function previewLimitations(output) {
+  const limitations=[];
   for(const port of output.ports??[])if(Number.isSafeInteger(port.row_count)&&port.sample_rows<port.row_count)
     limitations.push('Output port '+port.port+': only '+port.sample_rows+' of '+port.row_count+' rows returned. Do not report unseen rows or a complete ranking from this preview. Compute report statistics in nodes and request the needed output.');
   for(const port of output.ports??[])if(port.sample.length){
@@ -101,7 +108,7 @@ export function compactNodeResult(result) {
       +(names.length>8?' (and '+(names.length-8)+' more fields)':'')+'. This describes only the '+port.sample.length
       +' returned rows. Check expression input types if these NULL values are unexpected; do not infer values for unread rows.');
   }
-  return reply;
+  return limitations;
 }
 
 export function compactActionResult(result) {

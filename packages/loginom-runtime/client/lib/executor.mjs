@@ -1837,10 +1837,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         wrapMutation:(code,reference)=>withBrowserReceipt('('+code+')(page)',{
           ...receiptOptions(operation,reference.id,reference.action_key,reference.signature),
           operation_id:reference.id})})});
-    const contextChannel=until=>{
+    const contextChannel=(until,{signal}={})=>{
       if(until!==deadline)throw Error('JavaScript context original deadline changed');
       return createNodeProcedure({operation,execute:executeSourceScript,record:onRecord,
-      targetOrigin,targetBuild,preparedNodeContext:prepared,maxSteps:4096,
+      targetOrigin,targetBuild,preparedNodeContext:prepared,maxSteps:4096,signal,
       wrapMutation:(code,reference)=>withBrowserReceipt('('+code+')(page)',{
         ...receiptOptions(operation,reference.id,reference.action_key,reference.signature),operation_id:reference.id})});
     };
@@ -1855,23 +1855,28 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const runtime=Object.freeze({
     startNodeApply:(request,options)=>{
       if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
+      if(sourceReads.has(request.operation_id))throw Error('Operation ID belongs to a JavaScript read');
       return nodeJobs.start(request,options);
     },
-    startNodeRead:async args=>{
+    startNodeRead:async (args,options)=>{
       if(!['source','context'].includes(args.kind)){
         if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
+        if(sourceReads.has(args.operation_id))throw Error('Operation ID belongs to a JavaScript read');
         return nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id)));
       }
-      if(sourceReads.busy)return sourceReads.read(args);
+      if(!sourceReads.has(args.operation_id)
+        &&(operations.has(args.operation_id)||auxiliary.has(args.operation_id)||nodeJobs.has(args.operation_id)))
+        throw Error('JavaScript source operation ID conflicts with another operation');
+      if(sourceReads.busy)return sourceReads.read(args,options);
       if(running||pending||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled)
         throw Error('Resolve the pending Dock operation before JavaScript source reading');
       running=true;
-      try{return await sourceReads.read(args);}
+      try{return await sourceReads.read(args,options);}
       finally{running=false;}
     },
-    nodeApplyStatus:id=>nodeJobs.status(id),
-    waitNodeApply:(id,options)=>nodeJobs.wait(id,options),
-    cancelNodeApply:id=>nodeJobs.cancel(id),
+    nodeApplyStatus:id=>sourceReads.has(id)?sourceReads.status(id):nodeJobs.status(id),
+    waitNodeApply:(id,options)=>sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options),
+    cancelNodeApply:id=>sourceReads.has(id)?sourceReads.cancel(id):nodeJobs.cancel(id),
     stopNodeApply:id=>nodeJobs.stop(id),
     tools: [...executorTools,...(allowCandidate && artifactStore ? [artifactUploadTool,artifactVerifyTool,...deliveryApiTools] : []),
       ...(allowCandidate&&nodeApplyHandlers.has('imports.text')&&nodeApplyDriverFactory?nodeApiTools:[])],

@@ -25,7 +25,7 @@ function fixture({source = 'const name = "Сумма 😀";', secret, chunkBytes
   const session = createJavascriptSourceReadSession({request: initial, uiEpoch: 5, deadline,
     adapter, redactor: createRedactor(secret ? [secret] : []), chunkBytes,
     record: async event => {events.push(structuredClone(event)); return event;}});
-  return {session, calls, events, state};
+  return {session, calls, events, state, adapter};
 }
 
 test('source request admits only an owned existing JS node or a bounded cursor continuation', () => {
@@ -90,4 +90,12 @@ test('structured redaction that rewrites JSON-like source refuses exact delivery
   await assert.rejects(() => f.session.read(initial), /structured redaction refused/);
   assert.equal(f.calls.filter(call => call === 'close').length, 1);
   assert.equal(f.events.filter(event => event.phase === 'source_delivery_verified').length, 0);
+});
+
+test('source session passes cancellation to its owned reader and keeps cleanup confirmed',async()=>{
+  const f=fixture({source:'const value=1;',chunkBytes:4096}),controller=new AbortController(),reason=Error('session cancelled'),open=f.adapter.open;
+  f.adapter.open=async(...args)=>{const handle=await open(...args);controller.abort(reason);return handle;};
+  await assert.rejects(f.session.read(initial,{signal:controller.signal}),error=>error===reason);
+  assert.deepEqual(f.calls,['open','read','read','read','close']);assert.equal(f.session.cleanupUnconfirmed,false);
+  assert.equal(f.events.some(event=>event.phase==='source_delivery_verified'),false);
 });

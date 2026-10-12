@@ -280,6 +280,19 @@ node-table-context,package-cleanup,text-import-source-replacement,workspace}.tes
 Документационный validator остаётся FAIL только по трём прежним проблемам:
 `evidence hash migration-map` и related historical hash для
 `services/loginom-ai/docs/loginom-dock/{operations,agent-handoff}.md`.
+
+### Review follow-up — 2026-10-12
+
+- Base SHA `9e4a7ea8d1c1376e88efc17688efb5ee594633b2`; scope approved by owner.
+- Both inherited P2 fixed: actual MCP preview sizing and source/context cancellation.
+- Plan/result: [review-followup-plan.md](review-followup-plan.md);42 regression/safety cases added.
+- Full Client3751 PASS/10 SKIP/0 FAIL; two subsequent real MCP interruption cases PASS.
+- Runtime61 PASS/3 SKIP; Host typecheck and read-timeouts PASS; diff check PASS.
+- Cancel/status/wait retain the original read ID; verified owned Close releases the gate.
+- Unknown opening/read/Close/foreign port keeps uncertainty; mutation transport is not aborted.
+- Source attribution5045 records:19 unchanged historical mismatches, no new ones.
+- No new live Loginom/CLI/installed Desktop acceptance; previous live PASS keeps its original SHA.
+- Next step: live verification of the new source revision before acceptance/release.
 Все три присутствуют в неизменённом snapshot loginom; новых ошибок и битых ссылок нет.
 Возобновление: повторную native/model приёмку и дальнейший охват назначать отдельно;
 источник для неё — чистый новый SHA, не старый installed snapshot.

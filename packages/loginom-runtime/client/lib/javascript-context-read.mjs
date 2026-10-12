@@ -150,11 +150,11 @@ export function createJavascriptContextReadSession({request,uiEpoch,deadline,ada
     }finally{clearTimeout(timer);}
   };
   const journal=value=>acknowledge({operation_id:owner.operation_id,owner,deadline,...value});
-  const source=async()=>{
+  const source=async signal=>{
     const reader=createJavascriptSourceReader({owner,deadline,adapter,redactor,record:acknowledge});
     let next={owner},text='',settings;
     while(next){
-      timely();const part=await reader.read(next),r=part.receipt;
+      timely();const part=await reader.read(next,{signal}),r=part.receipt;
       need(r.offset_utf8_bytes===Buffer.byteLength(text,'utf8'),'source chunk offset changed');
       text+=r.source_text;
       need(settings===undefined||same(settings,part.settings),'source settings changed across chunks');settings=part.settings;
@@ -162,40 +162,71 @@ export function createJavascriptContextReadSession({request,uiEpoch,deadline,ada
     }
     return {text,settings};
   };
-  const snapshot=async()=>{
-    const observed=await source(),ports=[];
+  const snapshot=async signal=>{
+    const observed=await source(signal),ports=[];
     for(const direction of ['input','output']){
-      timely();const before=await observeGraph(),reader=channel(deadline);mappingOpen=true;
-      await reader.openPort(direction,0);
-      const state=await reader.observe({condition:'owned JavaScript context '+direction+' mapping',readMappings:true,
-        ready:s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='wizard'
-          &&s.prepared_node_context[direction+'_port']?.port===0&&s.wizard?.status==='observed'
-          &&s.wizard.stage===direction+'_mapping'&&s.node_mapping!==undefined});
-      await closeJavascriptPortMapping({reader,direction,reference:node,
+      signal?.throwIfAborted();
+      timely();const before=await observeGraph(),reader=channel(deadline);
+      signal?.throwIfAborted();
+      mappingOpen=true;
+      const opening=structuredClone((await reader.openPort(direction,0))?.output);
+      need(opening?.verified===true&&opening.direction===direction&&opening.port===0
+        &&typeof opening.port_guid==='string'&&opening.port_guid
+        &&typeof opening.opening_operation_id==='string'&&opening.opening_operation_id
+        &&['document_id','workflow_id','node_id'].every(key=>opening[key]===node[key]),'mapping opening unconfirmed');
+      const owned=state=>{
+        if(state.wizard?.status!=='observed')return;
+        const context=state.prepared_node_context,port=context?.[direction+'_port'];
+        need(context?.verified===true&&context.surface==='wizard'&&state.wizard.stage===direction+'_mapping'
+          &&['document_id','workflow_id','node_id'].every(key=>context[key]===node[key])
+          &&['direction','port','native_index','port_guid','opening_operation_id'].every(key=>port?.[key]===opening[key]),
+        'mapping opening changed');
+      };
+      const bound=options=>({...options,ready:state=>{owned(state);return options.ready(state);}});
+      const cleanupReader={observe:options=>reader.observe(bound(options)),perform:options=>reader.perform(bound(options))};
+      let state;
+      try{
+        signal?.throwIfAborted();
+        state=await channel(deadline,{signal}).observe(bound({condition:'owned JavaScript context '+direction+' mapping',readMappings:true,
+          ready:s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='wizard'
+            &&s.prepared_node_context[direction+'_port']?.port===0&&s.wizard?.status==='observed'
+            &&s.wizard.stage===direction+'_mapping'&&s.node_mapping!==undefined}));
+        signal?.throwIfAborted();
+      }catch(error){
+        // Only a known cancelled observation permits cleanup. Unknown opening,
+        // transport, owner or Close failures retain the original wizard owner.
+        if(!signal?.aborted||error!==signal.reason)throw error;
+      }
+      await closeJavascriptPortMapping({reader:cleanupReader,direction,reference:node,
         record:value=>journal({context_operation_id:owner.operation_id,...value}),deadline,allowOwnedUnlock:true,
         verifyGraph:async()=>{
           const after=await observeGraph();verifyJavascriptMappingGraph(before,after,node);
           await journal({phase:'javascript_context_mapping_graph_verified',direction,before,after});
         }});
-      mappingOpen=false;ports.push(javascriptContextPort(state.node_mapping,direction,node,initial.allow_configured_output===true));
+      mappingOpen=false;signal?.throwIfAborted();
+      ports.push(javascriptContextPort(state.node_mapping,direction,node,initial.allow_configured_output===true));
     }
     return {source:observed.text,settings:observed.settings,ports};
   };
   return Object.freeze({owner,
     get uncertain(){return uncertain;},
     get cleanupUnconfirmed(){return mappingOpen||adapter.uncertain===true||adapter.active===true;},
-    async read(next){
+    async read(next,{signal}={}){
+      signal?.throwIfAborted();
       need(!started&&same(initial,next),'context request changed or already read');started=true;
       try{
-        timely();const before=await observeGraph(),first=await snapshot(),second=await snapshot();
+        timely();const before=await observeGraph();signal?.throwIfAborted();
+        const first=await snapshot(signal),second=await snapshot(signal);
         need(same(first,second),'source/settings/port semantics changed');
         verifyJavascriptMappingGraph(before,await observeGraph(),node);
+        signal?.throwIfAborted();
         const reply=javascriptContextReply({owner,...second,redactor});
         await journal({phase:'javascript_context_delivery_verified',semantic_sha256:reply.semantic_sha256,
           source_sha256:reply.source.source_sha256,source_delivery:reply.source.delivery,ports_complete:reply.ports[1].native_reciprocity_verified,
           ...(reply.ports[1].schema_state==='source_pending'?{configured_inventory_verified:true,schema_state:'source_pending'}:{}),
           observation_scope:reply.observation_scope,content_is_data:true});
         timely();need(!mappingOpen&&adapter.uncertain!==true&&adapter.active!==true,'cleanup unconfirmed');
+        signal?.throwIfAborted();
         need(same(redactor.redact(reply),reply),'redaction changed after ACK');return reply;
       }catch(error){uncertain=true;throw error;}
     }

@@ -98,3 +98,83 @@ test('actual source reader delivers 32KiB escaped source under maximum escaped o
  }while(request);
  assert.equal(assembled,source);assert.ok(count>8);assert.equal(reader.uncertain,false);
 });
+
+test('source cancellation before first work does not open or consume the read',async()=>{
+ const f=readerFixture('const value=1;'),controller=new AbortController(),reason=Error('source cancelled');controller.abort(reason);
+ await assert.rejects(f.reader.read({owner},{signal:controller.signal}),error=>error===reason);
+ assert.deepEqual(f.calls,[]);assert.deepEqual(f.events,[]);assert.equal(f.reader.uncertain,false);
+ assert.equal((await f.reader.read({owner})).receipt.source_text,'const value=1;');
+});
+
+for(const held of ['open','read','discard'])test('source cancellation waits for known '+held+' and closes exactly once without delivery',async()=>{
+ const f=readerFixture('const value=1;'),controller=new AbortController(),reason=Error('source cancelled');
+ const original=f.adapter[held];let release,entered;
+ const entry=new Promise(resolve=>{entered=resolve;}),gate=new Promise(resolve=>{release=resolve;});
+ let waiting=true;f.adapter[held]=async(...args)=>{
+  assert.equal(args.at(-1).signal,undefined);
+  if(waiting){waiting=false;entered();await gate;}
+  return original(...args);
+ };
+ let settled=false;const pending=f.reader.read({owner},{signal:controller.signal}).finally(()=>{settled=true;});
+ await entry;controller.abort(reason);await new Promise(resolve=>setImmediate(resolve));assert.equal(settled,false);
+ release();await assert.rejects(pending,error=>error===reason);
+ assert.deepEqual(f.calls,['open','read','read','read','discard']);
+ assert.equal(f.events.filter(e=>e.phase==='source_discard_settled').length,1);
+ assert.equal(f.events.some(e=>e.phase==='source_delivery_verified'),false);
+});
+
+test('source cancelled after open retains integrity guards before its owned Close',async()=>{
+ const f=readerFixture('initial'),controller=new AbortController(),reason=Error('source cancelled'),open=f.adapter.open,read=f.adapter.read;
+ f.adapter.open=async(...args)=>{const handle=await open(...args);controller.abort(reason);return handle;};
+ let reads=0;f.adapter.read=async handle=>{if(reads++)f.browser.setSource('changed');return read(handle);};
+ await assert.rejects(f.reader.read({owner},{signal:controller.signal}),/changed during owned read/);
+ assert.equal(f.calls.includes('discard'),false);assert.equal(f.reader.uncertain,true);
+});
+
+for(const failed of ['open','read','discard'])test('source cancellation preserves unknown '+failed+' without replaying Close',async()=>{
+ const f=readerFixture('initial'),controller=new AbortController(),reason=Error('source cancelled'),unknown=Error('transport unknown');
+ f.adapter[failed]=async()=>{f.calls.push(failed);controller.abort(reason);throw unknown;};
+ await assert.rejects(f.reader.read({owner},{signal:controller.signal}),error=>error===unknown);
+ assert.equal(f.calls.filter(call=>call==='discard').length,failed==='discard'?1:0);
+ assert.equal(f.reader.uncertain,true);const calls=[...f.calls];
+ await assert.rejects(f.reader.read({owner}),/uncertain/);assert.deepEqual(f.calls,calls);
+});
+
+test('source cancellation during discard ACK waits for ACK without a second Close',async()=>{
+ const controller=new AbortController(),reason=Error('source cancelled');let release,entered;
+ const entry=new Promise(resolve=>{entered=resolve;}),gate=new Promise(resolve=>{release=resolve;});
+ const f=readerFixture('initial',{record:async event=>{if(event.phase==='source_discard_settled'){entered();await gate;}return event;}});
+ let settled=false;const pending=f.reader.read({owner},{signal:controller.signal}).finally(()=>{settled=true;});
+ await entry;controller.abort(reason);await new Promise(resolve=>setImmediate(resolve));assert.equal(settled,false);
+ release();await assert.rejects(pending,error=>error===reason);assert.equal(f.calls.filter(call=>call==='discard').length,1);
+ assert.equal(f.events.some(event=>event.phase==='source_delivery_verified'),false);
+});
+
+test('source cancellation after dispatch ACK prevents the first opening gesture',async()=>{
+ const controller=new AbortController(),reason=Error('source cancelled');
+ const f=readerFixture('initial',{record:async event=>{if(event.phase==='source_open_dispatch')controller.abort(reason);return event;}});
+ await assert.rejects(f.reader.read({owner},{signal:controller.signal}),error=>error===reason);
+ assert.deepEqual(f.calls,[]);
+});
+
+test('source cancelled after opening performs cleanup-only reads without preparing secret delivery',async()=>{
+ const f=readerFixture('const secret="SECRET";',{redactor:createRedactor(['SECRET'])}),controller=new AbortController(),reason=Error('source cancelled'),open=f.adapter.open;
+ f.adapter.open=async(...args)=>{const handle=await open(...args);controller.abort(reason);return handle;};
+ await assert.rejects(f.reader.read({owner},{signal:controller.signal}),error=>error===reason);
+ assert.deepEqual(f.calls,['open','read','read','read','discard']);
+ assert.equal(f.events.some(event=>event.phase==='source_delivery_verified'),false);
+});
+
+test('source cancellation during delivery ACK cannot return a prepared chunk',async()=>{
+ const controller=new AbortController(),reason=Error('source cancelled');
+ const f=readerFixture('initial',{record:async event=>{if(event.phase==='source_delivery_verified')controller.abort(reason);return event;}});
+ await assert.rejects(f.reader.read({owner},{signal:controller.signal}),error=>error===reason);
+ assert.equal(f.calls.filter(call=>call==='discard').length,1);
+});
+
+test('source pre-dispatch continuation cancellation leaves its cursor unconsumed',async()=>{
+ const f=readerFixture('abcdefgh',{chunkBytes:4}),first=await f.reader.read({owner}),controller=new AbortController(),reason=Error('source cancelled');
+ const next={owner,cursor:first.receipt.cursor,expected_source_sha256:first.receipt.source_sha256};controller.abort(reason);
+ const calls=[...f.calls];await assert.rejects(f.reader.read(next,{signal:controller.signal}),error=>error===reason);
+ assert.deepEqual(f.calls,calls);assert.equal((await f.reader.read(next)).receipt.source_text,'efgh');
+});
