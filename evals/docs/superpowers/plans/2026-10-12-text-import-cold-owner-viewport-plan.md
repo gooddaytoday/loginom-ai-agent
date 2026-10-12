@@ -19,15 +19,16 @@ public test evals/test/text-import-cold-reader.test.ts, без mocks/source asse
 - [x] Read-only spec review ACCEPT; resize внутри diagnostic callback для cleanup.
 - [x] Handoff Evaler 01a130cd-5c11-7aff-a072-583fdbf8113b; body/parent/attachment
   exact readback PASS, follow-up queued, явное ограничение cold бюджета.
-- [ ] Evaler: проверить текущий worker, original receipts, resolution/release и cold allowance.
-- [ ] Rich: минимально добавить внутри callback withDiagnosticSession, перед
+- [x] Evaler: worker/receipts/release проверены; автономное native/cold продолжение
+  LAB-57 разрешено владельцем 01a130f3-a16d-719a-a3b5-1930817d7cb4 до 22:40:20 UTC.
+- [x] Rich: source partial 49522d83318bac29779e497798becb2f799bc84e — внутри callback withDiagnosticSession, перед
   первым bindPrepared/workspace prepare:
 
 ```js
 await page.setViewportSize({width:1920,height:1080});
 ```
 
-- [ ] Обновить только provenance adaptation и SHA256 reader, сохранить source/original SHA.
+- [x] Provenance adaptation/current SHA обновлены, все source/original/current hashes проверены.
 - [ ] Допустить существующий public test к прежним saved/events CP1251 ref №2;
   GREEN — настоящий owner observed, полный прежний cold checker, cleanup,
   fresh execution/bytes/typed oracle. Не повторять unchanged RED и не делать probe.
@@ -38,6 +39,11 @@ await page.setViewportSize({width:1920,height:1080});
 - [ ] Если GREEN не разрешён прежним cold бюджетом или сохраняется ambiguity,
   сохранить конкретное ограничение; новый budget/pin/criteria этим планом не выдаётся.
 
-Реализация/реальный GREEN пока не выполнялись мониторингом. Полный локальный
+Авторское source исправление опубликовано и проверено; реальный GREEN ещё
+не подтверждён. Поручение владельца LAB57-RICH-AUTONOMY-20261012 сняло прежнее
+offline-only для LAB-57: Rich выполняет ремонт/native/cold проверку в одном этапе
+до 2026-10-12T22:40:20Z без сброса срока/счётчиков; generation/recovery limits прежние.
+Это не меняет инструкции других карточек и не предоставляет мониторингу новый run.
+Мониторинг проверил 56 файлов, Git/source/provenance и unit release без native запуска. Полный локальный
 cold audit исходной поставки требует абсолютных private native journals сервера;
 публичные bytes/typed oracle/model rows проверены, proofs/пути не переписывались.

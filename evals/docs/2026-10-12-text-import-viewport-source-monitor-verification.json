@@ -1,0 +1,110 @@
+{
+  "checked_utc": "2026-10-12T16:57:59.745710+00:00",
+  "issue": "LAB-57",
+  "issue_revision": 130,
+  "report_id": "01a130ed-c71f-74a9-8fdc-8200d79023f7",
+  "source_sha": "49522d83318bac29779e497798becb2f799bc84e",
+  "published_ref": "origin/rich-text-pilot",
+  "remote_ref_sha_verified": true,
+  "changed_source_files": [
+    "evals/script/text-import-cold/reader.mjs",
+    "evals/script/text-import-cold/provenance.json",
+    "evals/test/text-import-cold-reader.test.ts"
+  ],
+  "source_git_archive_bytes_exact": 3,
+  "exact_CLI_modules_bytes_verified": 6,
+  "all_provenance_source_original_current_sha_verified": true,
+  "archive_files_verified": 56,
+  "safe_regular_archive_paths": true,
+  "historical_raw_cold_files_exact_bytes_verified": 21,
+  "original_CP1251_journal_sha256": "0c0a3678ac7c4d53006f9bc8044672b568bdc01c3c1f389d5eeaa15be00969cd",
+  "guard_proof_count_consistent": 29,
+  "guard_proofs_locally_reexecuted": false,
+  "unit_report": {
+    "pass": 533,
+    "skip": 15,
+    "fail": 0,
+    "typecheck": "PASS",
+    "monitor_reran_suite": false
+  },
+  "unit_release": {
+    "status": "RELEASED",
+    "kind": "unit",
+    "stand": "FREE at closed unit phase",
+    "owner_acquisition_matched": true,
+    "raw_completion_sha256": "4a8bf9f325d87a8420dc0605291cca991925ecd80e9c8f772d12031343004f53",
+    "private_owner_token_excluded": true
+  },
+  "root_classification": "UNCLASSIFIED; overflow hypothesis, native GREEN not yet reported",
+  "repeat_consumed": 2,
+  "repeat_limit": 10,
+  "ledger_charge_sum_verified": 2,
+  "historical_native_tasks_server_status_matches": 9,
+  "active_native_ordinal": 10,
+  "active_task_id": "01a130ff-f583-7158-a212-250ff18600cf",
+  "active_status": "running",
+  "owner_authorization_comment_id": "01a130f3-a16d-719a-a3b5-1930817d7cb4",
+  "owner_authorization_scope": "LAB-57 only; autonomous technical repairs and needed nonmodel native/cold verification; no global agent/other-card rewrite",
+  "owner_instruction_exact_stage_copy": true,
+  "evaler_dispatch_comment_id": "01a130ff-f560-7bab-8c79-239aa6cc7e5c",
+  "autonomy_marker": "LAB57-RICH-AUTONOMY-20261012",
+  "autonomous_stage_budget": {
+    "started_utc": "2026-10-12T16:40:20.846510+00:00",
+    "deadline_utc": "2026-10-12T22:40:20.846510+00:00",
+    "wall_seconds": 21600,
+    "reset_on_new_blocker_or_task": false,
+    "deadline_policy": "Stop new work at deadline; safely finish own cleanup/release, preserve checkpoint. No orphaned processes."
+  },
+  "cost_limit": "Existing reference<=3/case, product repeat=1/case/executor; no new generation/recovery allowance",
+  "admission": "3/3 exhausted",
+  "diagnostic_wrapper": "1/1 exhausted",
+  "artifact_digests": [
+    {
+      "filename": "lab57-wizard-owner-offline-evidence.tar.gz",
+      "id": "01a130ed-c1a6-7571-99d4-d7b32b0ca483",
+      "bytes": 744421,
+      "sha256": "271be112d7fea221b44ffa0c8932c4d39144ef643696f64b415f9fd18b8c5da9"
+    },
+    {
+      "filename": "manifest.json",
+      "id": "01a130ed-c43e-761f-80cc-ab032799d8d9",
+      "bytes": 10083,
+      "sha256": "a3f297eb5d1eb91e3f57039aa53eddae0419270c40a0b5672f303233a3bd33b2"
+    },
+    {
+      "filename": "lab57-wizard-owner-offline-evidence.tar.gz.sha256",
+      "id": "01a130ed-c59f-7be0-a007-4c6c8a49f4cf",
+      "bytes": 109,
+      "sha256": "5f4d9e9901afaa2cbba796cb2867ba109bfb374e503e3d39d36869ead49f5362"
+    },
+    {
+      "filename": "lab57-viewport-review.json",
+      "id": "01a130ff-ed1b-7dad-835b-47a94fbe8c45",
+      "bytes": 1544,
+      "sha256": "e896e6b0150d51d6262e68aec483e069d1f310fde18ea9d9c655c7cc19759d87"
+    },
+    {
+      "filename": "lab57-autonomy-ledger.json",
+      "id": "01a130ff-ee20-71f1-9b37-595e560d502f",
+      "bytes": 8983,
+      "sha256": "6a88b13b8eee7284b1b160b81517357a44d99cfe2ae2b6ad7afc6aa1b219ce4d"
+    },
+    {
+      "filename": "lab57-autonomy-history.json",
+      "id": "01a130ff-ef1d-7321-b4f6-754a521ebaa7",
+      "bytes": 11245,
+      "sha256": "954dfd2beb67715d6a3d057c72b467090db6f3c7659ccb3fc0c184342642f9ae"
+    },
+    {
+      "filename": "lab57-autonomous-stage.json",
+      "id": "01a130ff-f467-78ef-8324-902daca43e6c",
+      "bytes": 12031,
+      "sha256": "9e8f46bcce665a2dabd4c7f6a45373e3b5b2d92acbc2403491b28c9353c500e8"
+    }
+  ],
+  "latest_native_seq": 89,
+  "latest_native_time": "2026-10-12T16:57:51.121215Z",
+  "monitor_native_model_browser_lease_actions": false,
+  "monitor_new_handoff_or_worker_dispatch": false,
+  "all_eight_done": false
+}

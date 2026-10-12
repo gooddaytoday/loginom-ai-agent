@@ -1,20 +1,20 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка: 2026-10-12T16:22:31Z; fresh issue/active/metadata/roots всех 8 + LAB-55, latest LAB-57 thread, модели работников и native progress прочитаны; нового terminal report/blocker нет.
+- Проверка: 2026-10-12T16:57:59Z; fresh issues/active/metadata/roots всех 8 + LAB-55, latest LAB-57 comments/evidence/source и native progress прочитаны.
 - Расписание lab-56-lab-63-30 ACTIVE каждые 30 минут; все 8 ещё не done, условие удаления не достигнуто.
 - LAB-56: in_review rev65; Ben ACCEPT + Evaler verified evidence/cleanup; done не выставлен, runs нет.
-- LAB-57: in_progress rev117; Rich diagnosis task 01a130cf-f462-77ae-925b-7883730d80b7 running, Evaler runs завершены; active/queued дубликатов Rich нет. Metadata observation queued устарела относительно native status.
+- LAB-57: in_progress rev130; Rich autonomy task 01a130ff-f583-7158-a212-250ff18600cf running, Evaler/Ben pending нет, дубликатов Rich нет; metadata queued устарела относительно native running.
 - LAB-58–LAB-63: in_progress/admission rev9, runs нет, ждут последовательные ACCEPT/cleanup. LAB-55: in_review rev16, runs нет, не затронут.
-- Evaler независимо принял headless как partial1cdbc18ad6c87e3f6f584cdb7cfa1c52d4eaed8a: TXT/CSV warm+cold PASS, по17 negatives; CP1251 ref2 warm PASS. Full pilot/frozen SHA/Ben отсутствуют; monitor native тесты не запускал.
-- Архив b00080ea…d7bda6: прежние8/8 частей/348 файлов bytes/SHA и TXT/CSV typed/source audit сохранены; новые review d869b64d…fb92, ledger e734a49b…4f81, history119b7bbe…abd7 download bytes/metadata SHA совпали; история8 tasks/server status и charge sum2 проверены.
-- Полный локальный cold replay ограничен абсолютными private native journals сервера; пути/proofs не переписывались, полного независимого cold verdict здесь нет.
-- CP1251 ref1 sequence FAIL сохранён; ref2 warm PASS, cold AMBIGUOUS/WIZARD_OPEN_NOT_CONFIRMED после одного click, GUID verified, owner unobserved; original ERROR/cleanup=false неизменны.
-- Safety resolution проверен: owner/acquisition match, RELEASED(kind=cold)/FREE; raw completion SHA = release evidence SHA addefc56…77d2. Own cleanup, logout/lock/handles/process observations подтверждены evidence; resolution не cold PASS.
-- Differential journals: TXT/CSV owner observed, 7 breadcrumbs/package label48; CP1251 5 breadcrumbs/label76. Exact CLI viewport1280×800 и видимые breadcrumbs поддерживают гипотезу overflow; root UNCLASSIFIED, charge0.
-- Evaler принял viewport spec/plan в reply 01a130d8-7515-7d47-9394-3657abfca329 к handoff 01a130cd-5c11-7aff-a072-583fdbf8113b; существующее назначение Rich уточнено, новый worker не создан. Server review подтверждает 53/53 actual-model rows/receipts/release.
-- Repeat ledger 2/10, остаток 8; native ordinal9 running, общего native cap10 нет; новый отказ unclassified/charge0, dispatch заранее не списывается. Исходные ERROR/receipts/history сохранены.
-- Reviewed viewport spec/plan ACCEPT опубликованы fe47a3e6d34f89cc1761c771b8db6d1b5548dca2; resize1920×1080 внутри withDiagnosticSession callback до prepare, прежние ownership/one-gesture/cleanup gates и provenance pins сохраняются.
-- Reference TXT1/3, CSV1/3, CP1251 2/3, остальные3=0/3; product всех0; cold calls5/launch4/completed2; normal cleanup continuations2, helper recovery0. Admission3/3 и diagnostic wrapper1/1 исчерпаны.
-- Rich/Ben/Evaler gpt-6.1-sol/xhigh, concurrency1 неизменны; публичные actual-model proofs53/53 openai/gpt-6-luna/high проверены, private DB здесь не открывались. Pins/CLI/oracle/criteria/budgets не менялись.
-- Этот heartbeat сделал fresh reads и native progress check; seq196 tool_result в 16:22:01Z, промежуточные unit signals533 PASS/15 SKIP/0FAIL. Нового terminal source/evidence report нет; handoff/dispatch/model/browser/lease действий monitor не делал.
-- Следующий шаг: дождаться отчёта активного Rich по viewport hypothesis/TDD source fix; Native GREEN NOT_ASSIGNED до проверки существующего cold/операционного допуска Evaler. Не запускать дубликат/не повторять unchanged cold; full pilot/frozen SHA/Ben ждут прежних gates.
+- Viewport source repair опубликован 49522d83318bac29779e497798becb2f799bc84e в origin/rich-text-pilot; remote ref, 3 source bytes и 6 exact CLI modules сверены. Только reader/provenance/public regression, gates/pins прежние.
+- Новая поставка archive271be112…5da9/manifest a3f297eb…33b2: 56/56 файлов bytes/SHA/safe paths, все source/original/current provenance hashes проверены; 21 historical cold file byte-equal прежнему архиву, CP1251 journal0c0a3678…69cd сохранён.
+- Offline receipts29/29, Evaler unit533 PASS/15 SKIP/0FAIL/typecheck PASS; monitor suite/API/native tests не повторял, native regression SKIP. Unit cleanup: owner/acquisition match, RELEASED(kind=unit)/FREE, raw SHA4a8bf9f3…4f53 = release evidence; это не cold GREEN.
+- Исторические TXT/CSV warm+cold PASS/17 negatives, CP1251 ref1 sequence FAIL/ref2 warm PASS сохранены; CP1251 old cold ERROR/cleanup=false не изменён. Full pilot/frozen SHA/READY_FOR_BEN отсутствуют.
+- Viewport/overflow ещё гипотеза, root UNCLASSIFIED/charge0; нужен настоящий owner/GUID/one-gesture/full cold checker/confirmed cleanup на исправленном reader. Монитор private DB/journals сервера не открывал.
+- Новое human-owner поручение 01a130f3-a16d-719a-a3b5-1930817d7cb4 (LAB-57 only) сверено с stage exact body: прежнее offline-only снято, разрешены автономные local repairs и необходимые немодельные native/cold проверки без согласования каждого дефекта.
+- Evaler review e896e6b0…9d87/ledger6a88b13b…ce4d/history954dfd2b…f9ae/stage9e8f46bc…00e8 download bytes/metadata SHA проверены; dispatch01a130ff-f560-7bab-8c79-239aa6cc7e5c уже принят, нового handoff не требуется.
+- Общий автономный этап6h: 2026-10-12T16:40:20Z → 22:40:20Z, срок/стоимость не сбрасываются при новом blocker/task; на пределе новые действия прекращаются с own cleanup/release и checkpoint. Другие карточки/глобальные инструкции не переписаны.
+- Repeat ledger2/10, остаток8; native ordinal10 running, общего native cap10 нет. Charge sum2 и история9 завершённых tasks/server status проверены; dispatch заранее не списывается, старые ERROR/receipts сохранены.
+- Последний принятый ledger: reference TXT1/3, CSV1/3, CP1251 2/3, остальные0/3; product всех0; cold calls5/launch4/completed2, cleanup continuations2/recovery0. Текущие расходы ждут evidence; repair cold считается отдельно, generation limits прежние.
+- Rich/Ben/Evaler gpt-6.1-sol/xhigh/concurrency1 прежние; actual исторических53/53 rows Luna/high подтверждены server review. Admission3/3 и wrapper1/1 исчерпаны, нового generation/smoke/probe/recovery допуска нет.
+- Этот heartbeat: fresh reads/7 downloads/offline source+hash+ledger audit, source-plan/checkpoint/receipt docs; seq89 tool_result в16:57:51Z. Monitor handoff/dispatch/model/browser/lease действий не делал; нового terminal report текущего Rich нет.
+- Следующий шаг: дождаться реального CP1251 ref2 native/cold результата и автономного авторского пилота; Rich сам диагностирует локальные дефекты в текущем этапе, Ben независимо проверит итоговые кейсы и изменения валидаторов. Не создавать дубликат/не отменять мониторинг.
