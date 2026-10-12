@@ -624,13 +624,14 @@ export async function createBridge(config, session, { browserTransport: managedB
         cleanupPersistencePrimary ??= primary;
         cleanupPersistenceFailures.push({phase:failedPhase,rejection:shutdownRejection(value)});
       };
-      const removeTemporary=async target=>{
+      const removeTemporary=async file=>{
+        const target=file.temporary;
         const operation={pending:true};cleanupPublication=operation;
         let projection;
         const completion=new Promise((resolve,reject)=>{
           try{projection=receiptUnlink(target,error=>{
             operation.pending=false;
-            if(error!==null&&error!==undefined&&error.code!=='ENOENT'){operation.failure={value:error};reject(error)}else resolve();
+            if(error!==null&&error!==undefined&&error.code!=='ENOENT'){operation.failure={value:error};reject(error)}else{file.ownsTemporary=false;resolve();}
           })}catch(value){reject(value)}
         });
         try{await Promise.all([completion,projection]);assertBinding()}
@@ -661,8 +662,11 @@ export async function createBridge(config, session, { browserTransport: managedB
           throw cleanupPersistencePrimary.value;
         }
         assertBinding();
+        // FD retirement does not discharge ownership of its original temp.
+        // Keep custody through refusal/unknown until the original unlink reply.
+        if(file.temporary&&file.ownsTemporary)await removeTemporary(file);
+        assertBinding();
         cleanupWriters.delete(file);
-        if(file.temporary&&file.ownsTemporary)await removeTemporary(file.temporary);
       }
       const persistHandle=async(path,mode,write)=>{
         const file={fd:undefined,closeComplete:false,...(write?{temporary:path}:{})};
@@ -692,22 +696,23 @@ export async function createBridge(config, session, { browserTransport: managedB
         }catch(value){remember(value,phase)}
         if(file.fd!==undefined){
           const closePhase=write?'file_close':'directory_close';
-          try{await closeWriter(file);assertBinding();cleanupWriters.delete(file)}
+          try{await closeWriter(file);assertBinding();if(!file.ownsTemporary)cleanupWriters.delete(file)}
           catch(value){file.closeFailure??={value};remember(value,closePhase)}
         }
         if(primary)throw primary.value;
         if(!file.closeComplete)throw Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN');
+        return file;
       };
       const temporary=join(directory,`.package-cleanup.${randomUUID()}.tmp`);
       await guard();
-      await persistHandle(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,true);
+      const temporaryOwner=await persistHandle(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,true);
       await guard();
       const publication={pending:true};cleanupPublication=publication;
       let projection;
       const completion=new Promise((resolve,reject)=>{
         try{projection=receiptRename(temporary,path,error=>{
           publication.pending=false;
-          if(error!==null&&error!==undefined)reject(error);else{publication.confirmed=true;resolve()}
+          if(error!==null&&error!==undefined)reject(error);else{publication.confirmed=true;temporaryOwner.ownsTemporary=false;cleanupWriters.delete(temporaryOwner);resolve()}
         })}catch(value){reject(value)}
       });
       try{await Promise.all([completion,projection])}catch(value){remember(value,'rename');throw value}
