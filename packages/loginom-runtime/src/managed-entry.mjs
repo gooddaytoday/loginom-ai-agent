@@ -167,7 +167,8 @@ async function handle(message) {
       let captureHarness, captureRegistration, captureResource
       if (acceptanceCapture) {
         // Fixed reviewed receiving resource, never a request-selected module.
-        const path = "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs"
+        const replacement=acceptanceCapture.harness==="replacement-input0-readonly-v1"
+        const path = replacement ? "runtime/src/acceptance/replacement-input0-readonly-v1.mjs" : "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs"
         const entries = resources.manifest.files.filter(file => file.path === path)
         if (entries.length !== 1 || entries[0].link || entries[0].directory
             || !/^[a-f0-9]{64}$/.test(entries[0].sha256)
@@ -175,9 +176,11 @@ async function handle(message) {
             || createHash("sha256").update(await readFile(join(input.resources, path))).digest("hex") !== entries[0].sha256)
           throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
         const module = await import(pathToFileURL(join(input.resources, path)).href)
-        if (typeof module.captureCalculator !== "function") throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
-        captureHarness = module.captureCalculator
+        if (typeof (replacement ? module.captureReplacement : module.captureCalculator) !== "function") throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
+        captureHarness = replacement ? module.captureReplacement : module.captureCalculator
         captureResource = Object.freeze({path,sha256:entries[0].sha256})
+        if (replacement && (module.captureMode!=="readonly" || typeof module.validateCaptureResult!=="function"))
+          throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
         if (module.captureMode !== undefined) {
           if (module.captureMode !== "readonly" || typeof module.validateCaptureResult !== "function")
             throw Error("LOGINOM_CAPTURE_UNAVAILABLE")

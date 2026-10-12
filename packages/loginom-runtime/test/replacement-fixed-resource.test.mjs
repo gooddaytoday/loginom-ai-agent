@@ -30,7 +30,19 @@ test('fixed Replacement consumer real native reader/serialized observer, no host
  const bad=structuredClone(r);bad.final_observation.output.prepared_node_context.input_port.port_guid='foreign';assert.throws(()=>validateCaptureResult(bad,f.args));
  }finally{await f.cleanup()}
 });
+test('native opening and outer phase receipt are independently pinned',async()=>{
+ const f=await fixture();try{f.node.opening.receipt_id='original-node:open';f.args.publication.opening_operation_id='original-node:open';
+ // Repin only fixture construction, before the invocation; the actual executor
+ // creates these distinct immutable IDs in the whole managed composition.
+ const opening=hash(f.node.opening),request=hash(f.node.request),state=hash(f.node.state.node),deadline=f.node.deadline;
+ f.node.openingSha256=opening;f.args.publication.opening_sha256=opening;
+ f.node.assertCurrent=()=>{assert.equal(hash(f.node.opening),opening);assert.equal(hash(f.node.request),request);assert.equal(hash(f.node.state.node),state);assert.equal(f.node.deadline,deadline)};
+ const r=await captureReplacement(f.args);assert.equal(r.status,'DIAGNOSTIC_READ');assert.equal(validateCaptureResult(r,f.args),true);
+ assert.notEqual(r.publication.opening_operation_id,r.native_before.input_port.opening_operation_id);
+ }finally{await f.cleanup()}
+});
 const before={
+ outer_phase:f=>{f.args.publication.opening_operation_id='foreign'},
  wrong_kind:f=>{f.args.binding=Object.freeze({...f.args.binding,harness:'calculator-grouped-before-done-v1'})},
  foreign_owner:f=>{f.owner.id='foreign'},foreign_page:f=>{f.owner.page={}},foreign_context:f=>{f.owner.context={}},foreign_generation:f=>{f.owner.generation++},foreign_chat:f=>{f.owner.chat='foreign'},foreign_session:f=>{f.args.session={}},resource_path:f=>{f.args.retained={...f.args.retained,resource:Object.freeze({...resource,path:'foreign'})}},
  account:f=>{f.args.publication.account='foreign'},lease:f=>{f.args.publication.lease='foreign'},run:f=>{f.args.publication.run='foreign'},admission:f=>{f.args.publication.admission='foreign'},resource_hash:f=>{f.args.publication.resource_sha256='0'.repeat(64)},request:f=>{f.node.request.target.type='imports.text'},node:f=>{f.node.state.node.node_id='foreign'},opening:f=>{f.node.opening.value.opening_operation_id='foreign'},epoch:f=>{f.args.publication.opening_sha256='foreign'},root:f=>{f.args.publication.document_id='foreign'},

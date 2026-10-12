@@ -25,6 +25,7 @@ export async function captureReplacement({binding,identity,retained,runtime,sess
     ||publication.session_id!==binding.session ||publication.owner!==binding.owner ||publication.run!==binding.run
     ||publication.lease!==binding.lease ||publication.generation!==binding.generation ||publication.chat!==binding.chat
     ||publication.admission!==binding.admission ||publication.deadline!==deadline
+    ||publication.opening_operation_id!==node.opening.receipt_id
     ||Object.keys(identity).some(k=>identity[k]!==publication[k])
     ||runtime.hasActiveWork()!==false ||runtime.hasUnsettledWork()!==false)
    throw Error('REPLACEMENT_FIXED_OWNER_REFUSED');
@@ -42,13 +43,14 @@ export async function captureReplacement({binding,identity,retained,runtime,sess
    throw Error('REPLACEMENT_FIXED_NATIVE_SAFETY_REFUSED');return raw;};
  await safety();
  const proof=await readPreparedNodeContext(readPage,nativeBinding);guard();
+ // The phase receipt ID pins publication; its value pins the native opening.
+ // Those two IDs are intentionally different in the real node runner.
  const port=proof?.input_port;
  if(proof?.verified!==true ||proof.surface!=='wizard' ||proof.node_id!==publication.node_id
    ||proof.document_id!==publication.document_id ||proof.workflow_id!==publication.workflow_id
    ||proof.tid!==nativeBinding.workflow_ref.prefix+';WizrdMCF' ||proof.output_port
    ||port?.direction!=='input' ||port.port!==0 ||port.native_index!==0 ||typeof port.port_guid!=='string' ||!port.port_guid
-   ||port.opening_operation_id!==node.opening.value?.opening_operation_id
-   ||port.opening_operation_id!==publication.opening_operation_id)
+   ||port.opening_operation_id!==node.opening.value?.opening_operation_id)
   throw Error('REPLACEMENT_FIXED_NATIVE_BINDING_REFUSED');
  const request={binding:nativeBinding,account:binding.account,package_path:binding.packagePath,origin:retained.startup.origin,
   build:identity.loginom_build,port_guid:port.port_guid,opening_operation_id:port.opening_operation_id};
@@ -70,7 +72,7 @@ export function validateCaptureResult(receipt,{retained,node,publication}) {
  const pin=issued.get(receipt);
  if(!pin ||pin.node!==node ||pin.retained!==retained ||pin.publication!==publication)throw Error('REPLACEMENT_FIXED_RESULT');
  const request=pin.request,port=receipt.native_before?.input_port;
- if(receipt.status==='DIAGNOSTIC_READ'&&(!port ||port.opening_operation_id!==publication.opening_operation_id))throw Error('REPLACEMENT_FIXED_RESULT');
+ if(receipt.status==='DIAGNOSTIC_READ'&&(!port ||port.opening_operation_id!==node.opening.value?.opening_operation_id))throw Error('REPLACEMENT_FIXED_RESULT');
  validateReplacementReadContract(receipt,request);return true;
 }
 // Native facts, no caller ready/verified/admission flags. Snapshot proxy identity
