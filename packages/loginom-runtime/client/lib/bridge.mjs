@@ -499,14 +499,19 @@ export async function createBridge(config, session, { browserTransport: managedB
       }
     });
     async function writeCleanupReceipt(cleanup) {
-      if(confirmedCleanup){
-        cleanupEvidenceBinding ??= Object.freeze({receipt:confirmedCleanup,
-          directory:session.directory,sessionId:session.metadata.sessionId});
-        if(cleanupEvidenceBinding.receipt!==confirmedCleanup || cleanup!==confirmedCleanup
-            || cleanupEvidenceBinding.directory!==session.directory
-            || cleanupEvidenceBinding.sessionId!==session.metadata.sessionId)
+      const receipt=cleanup,cached=confirmedCleanup;
+      const directory=session.directory,sessionId=session.metadata.sessionId;
+      if(cached)cleanupEvidenceBinding ??= Object.freeze({receipt:cached,directory,sessionId});
+      const assertBinding=()=>{
+        if(typeof directory!=='string'||!directory||typeof sessionId!=='string'||!sessionId
+            ||session.directory!==directory||session.metadata.sessionId!==sessionId
+            ||confirmedCleanup!==cached||(cached&&(receipt!==cached
+              ||cleanupEvidenceBinding.receipt!==cached||cleanupEvidenceBinding.directory!==directory
+              ||cleanupEvidenceBinding.sessionId!==sessionId)))
           throw Error('LOGINOM_CLEANUP_RECEIPT_BINDING_CHANGED');
-      }
+      };
+      assertBinding();
+      const bytes=JSON.stringify(receipt,null,2)+'\n';
       let phase='retained_close',primary;
       if(cleanupPublication?.pending)throw cleanupPersistencePrimary?cleanupPersistencePrimary.value:Error('LOGINOM_CLEANUP_PUBLICATION_UNKNOWN');
       const remember=(value,failedPhase)=>{
@@ -523,7 +528,8 @@ export async function createBridge(config, session, { browserTransport: managedB
             if(error!==null&&error!==undefined){operation.failure={value:error};reject(error)}else resolve();
           })}catch(value){reject(value)}
         });
-        return Promise.all([completion,projection]);
+        await Promise.all([completion,projection]);
+        assertBinding();
       };
       const removeTemporary=async target=>{
         try{await publishOperation(done=>receiptUnlink(target,error=>done(error?.code==='ENOENT'?null:error)))}
@@ -553,10 +559,11 @@ export async function createBridge(config, session, { browserTransport: managedB
           remember(file.closeFailure?file.closeFailure.value:Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN'),'retained_close');
           throw cleanupPersistencePrimary.value;
         }
+        assertBinding();
         cleanupWriters.delete(file);
         if(file.temporary&&file.ownsTemporary)await removeTemporary(file.temporary);
       }
-      const temporary=join(session.directory,'.package-cleanup-'+randomUUID()+'.json');
+      const temporary=join(directory,'.package-cleanup-'+randomUUID()+'.json');
       const attempt={created:false,published:false};
       const persistHandle=async(path,mode,write)=>{
         const file={fd:undefined,closeComplete:false,...(write?{temporary:path}:{})};
@@ -580,12 +587,13 @@ export async function createBridge(config, session, { browserTransport: managedB
             else cleanupWriters.delete(file);
             done(error,fd);
           }));
-          if(write){phase='file_write';await callback(done=>receiptWrite(file.fd,JSON.stringify(cleanup,null,2)+'\n',done))}
-          phase=write?'file_sync':'directory_sync';await callback(done=>receiptSync(file.fd,done));
+          assertBinding();
+          if(write){phase='file_write';await callback(done=>receiptWrite(file.fd,bytes,done));assertBinding()}
+          phase=write?'file_sync':'directory_sync';await callback(done=>receiptSync(file.fd,done));assertBinding();
         }catch(value){remember(value,phase)}
         if(file.fd!==undefined){
           const closePhase=write?'file_close':'directory_close';
-          try{await closeWriter(file);cleanupWriters.delete(file)}
+          try{await closeWriter(file);assertBinding();cleanupWriters.delete(file)}
           catch(value){file.closeFailure??={value};remember(value,closePhase)}
         }
         if(primary)throw primary.value;
@@ -593,16 +601,19 @@ export async function createBridge(config, session, { browserTransport: managedB
       };
       try{
         await persistHandle(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,true);
+        assertBinding();
         phase='rename';
-        await publishOperation(done=>receiptRename(temporary,join(session.directory,'package-cleanup.json'),error=>{if(error===null||error===undefined)attempt.published=true;done(error)}));
-        await persistHandle(session.directory,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW,false);
+        await publishOperation(done=>receiptRename(temporary,join(directory,'package-cleanup.json'),error=>{if(error===null||error===undefined)attempt.published=true;done(error)}));
+        await persistHandle(directory,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW,false);
       }catch(value){
         if(!primary)remember(value,phase);
-        if(attempt.created&&!attempt.published&&!cleanupPublication?.pending&&![...cleanupWriters].some(f=>f.temporary===temporary)){
+        let bound=false;try{assertBinding();bound=true}catch{}
+        if(bound&&attempt.created&&!attempt.published&&!cleanupPublication?.pending&&![...cleanupWriters].some(f=>f.temporary===temporary)){
           try{await removeTemporary(temporary)}catch(secondary){cleanupPersistenceFailures.push({phase:'temporary_unlink',rejection:shutdownRejection(secondary)})}
         }
         throw cleanupPersistencePrimary.value;
       }
+      assertBinding();
       // No marker before both writes/syncs/closes actually complete.
       if(cleanupWriters.size)throw Error('LOGINOM_CLEANUP_WRITER_UNCONFIRMED');
       if(confirmedCleanup)cleanupReceiptWritten=true;
