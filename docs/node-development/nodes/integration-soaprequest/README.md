@@ -14,7 +14,7 @@
 - Этап 2 — Разбор ответа, fault и debugging modes.
 - Этап 3 — WSDL/auth/protocol матрица.
 
-Внешняя среда: Loginom Standard/Enterprise/Cloud; контролируемый WSDL1.1/SOAP1.1 и SOAP1.2 сервис Sum с ledger, fault/delay/malformed endpoints; тестовые TLS/auth профили и резервный WSDL. Её отсутствие — Blocked; готовность реестра этим PR не меняется.
+Внешняя среда: Loginom Standard/Enterprise/Cloud; контролируемый WSDL1.1/SOAP1.1 и SOAP1.2 сервис Sum с ledger, fault/delay/malformed endpoints; тестовые TLS/auth профили и резервный WSDL. При её отсутствии сначала выполнить доступную безопасную диагностику по [регламенту Multica](../../../testing/loginom-ai-agent/multica-mas.md); `blocked` — только реальное внешнее ожидание. Готовность реестра этим PR не меняется.
 
 ## Источники
 
