@@ -60,11 +60,17 @@ async function recordClose(stage, detail) {
   state.shutdown.stages.push({stage,...detail})
   const evidenceOwner=state.session??state.startupOwner
   const directory=state.session?.directory??state.startupOwner?.directory
-  if (!directory) return // No-start has acquired no native resources.
-  state.evidenceOwnerBinding ??= Object.freeze({owner:evidenceOwner,directory})
-  const evidenceBinding=state.evidenceOwnerBinding
-  if(evidenceBinding.owner!==evidenceOwner||evidenceBinding.directory!==directory)
+  // A retained binding remains authoritative even when the current owner or
+  // directory disappears. That refusal must precede the no-start shortcut.
+  const retainedBinding=state.evidenceOwnerBinding
+  if(retainedBinding&&(retainedBinding.owner!==evidenceOwner||retainedBinding.directory!==directory))
     throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
+  if (!directory) {
+    if(evidenceOwner||state.browser||state.browserProfile||state.browserServer||state.client||state.bridge||state.bridgeCleanup||state.evidenceWriters?.size||state.evidencePublication)
+      throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
+    return // No-start has acquired no owner, binding or native resources.
+  }
+  state.evidenceOwnerBinding ??= Object.freeze({owner:evidenceOwner,directory})
   if(state.evidencePublication?.pending)throw state.evidencePrimary?state.evidencePrimary.value:Error("LOGINOM_MANAGED_PUBLICATION_UNKNOWN")
   const parent=await lstat(directory)
   if(!parent.isDirectory()||parent.isSymbolicLink())throw Error("LOGINOM_MANAGED_DIRECTORY_REFUSED")
