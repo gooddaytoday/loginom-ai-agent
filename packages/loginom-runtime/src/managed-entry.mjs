@@ -1,3 +1,4 @@
+import {decodePreReadyRejection} from "./qualified-pre-ready.mjs"
 import { createRequire } from "node:module"
 import { randomUUID, createHash } from "node:crypto"
 import { join } from "node:path"
@@ -27,6 +28,7 @@ const state = {
   inputs: new Map(),
 }
 const requests = new Set()
+const preReadyRequests = new Map()
 const send = (message, disconnect = false) => {
   if (process.connected)
     process.send(message, () => {
@@ -50,6 +52,7 @@ async function recordClose(stage, detail) {
   try {await file.sync()} finally {await file.close()}
 }
 function close() {
+  if(state.preReadyReadHeld)return Promise.reject(Error("LOGINOM_RECOVERY_REQUIRED"))
   if (state.closing) return state.closing
   state.closing = (async () => {
     state.shutdown ??= {stages:[]}
@@ -284,8 +287,10 @@ async function handle(message) {
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })
       state.readonlyBinding=Object.freeze({startup:state.startupBinding,owner:state.startupOwner,
-        bridge:state.bridge,client:state.client,session:state.session})
+        bridge:state.bridge,client:state.client,session:state.session,state,metadata:session.metadata,
+        directory:session.directory,sessionId:session.metadata.sessionId,reader:state.bridge.readPreReady})
       if(retained)bindCaptureRuntime(retained,state.bridge,state.client)
+      state.preReadyOwner=state.readonlyBinding
       await state.bridge.server.connect(serverTransport)
       if(retained)assertCaptureOwner(retained)
       await state.client.connect(clientTransport)
@@ -304,13 +309,35 @@ async function handle(message) {
       })
       return
     }
+    if(state.preReadyReadHeld && !["readonly.preReady","readonly.preReady.cancel","interrupt"].includes(message.operation))
+      throw Error("LOGINOM_RECOVERY_REQUIRED")
     if (message.operation === "close") {
       await close()
       send({ id: message.id, result: { closed: true } }, true)
       return
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
+    if (message.operation === "readonly.preReady.cancel") {
+      const pending=preReadyRequests.get(message.input?.requestId);
+      if(!pending)throw Error("LOGINOM_PRE_READY_READ_REFUSED");
+      pending.abort(decodePreReadyRejection(message.input.rejection));return;
+    }
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if(message.operation === "readonly.preReady") {
+      if(state.controller || !message.input || Object.keys(message.input).join(',')!=='deadline')
+        throw Error("LOGINOM_PRE_READY_READ_REFUSED");
+      const controller=new AbortController();state.controller=controller;state.preReadyReadHeld=true;preReadyRequests.set(message.id,controller);
+      try {
+        const result=await state.preReadyOwner.reader({retained:state.preReadyOwner,signal:controller.signal,deadline:message.input.deadline});
+        state.readonlyRetained=true;
+        send({id:message.id,result:{readonlyPreReady:true,result}});
+      } catch(value) {
+        state.preReadyReadRefusal??={value};state.readonlyRetained=true;
+        send({id:message.id,result:{readonlyPreReady:false,rejection:closeRejection(value)}});
+      } finally {preReadyRequests.delete(message.id);if(state.controller===controller)state.controller=undefined}
+      return;
+    }
+
     if (message.operation === "acceptance.capture") {
       if (message.input !== undefined || state.controller || state.closeFailure !== undefined)
         throw Error("LOGINOM_REQUEST_INVALID")
