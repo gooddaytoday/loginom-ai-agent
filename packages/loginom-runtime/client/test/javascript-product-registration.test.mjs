@@ -19,7 +19,8 @@ const request={operation_id:'product-js',contract_revision:'1.0.0',document_id:'
 
 test('product registration describes actual general JavaScript knowledge without an injected trial',()=>{
   const support=createCandidateNodeSupport(config),handler=support.nodeApplyHandlers.get('programming.javascript');
-  assert.equal(support.nodeApplyHandlers.size,15);
+  assert.equal(support.nodeApplyHandlers.size,16);
+  assert.equal(support.nodeApplyHandlers.has('transform.cross_table'),true);
   assert.equal(handler.revision,'javascript-script-lifecycle-v5');
   assert.deepEqual(handler.parameter_schema,javascriptParametersSchema);
   const card=describeNodeTypes(['programming.javascript'],{},new Map(),support.nodeApplyHandlers,'7.4.2')[0];
@@ -28,7 +29,9 @@ test('product registration describes actual general JavaScript knowledge without
   assert.throws(()=>describeNodeTypes(['programming.javascript'],{},new Map(),support.nodeApplyHandlers,'7.4.1'),/not validated/);
   assert.equal(card.javascript_knowledge.scalar_data_api.import,'import {InputTable,OutputTable,DataType} from "builtIn/Data";');
   const offline=createCandidateNodeSupport({});
-  assert.equal(offline.nodeApplyHandlers.size,14);
+  assert.equal(offline.nodeApplyHandlers.size,15);
+  assert.equal(offline.nodeApplyHandlers.has('transform.cross_table'),true);
+  assert.equal(offline.nodeApplyHandlers.has('programming.javascript'),false);
   for(const [type,other] of offline.nodeApplyHandlers)
     assert.deepEqual([support.nodeApplyHandlers.get(type).revision,support.nodeApplyHandlers.get(type).parameter_schema],
       [other.revision,other.parameter_schema]);
@@ -36,7 +39,9 @@ test('product registration describes actual general JavaScript knowledge without
 
 for(const targetBuild of [undefined,'7.4.1','7.4.3'])test('another or unpinned build does not advertise/apply validated JavaScript '+targetBuild,()=>{
   const support=createCandidateNodeSupport({...config,targetBuild});
-  assert.equal(support.nodeApplyHandlers.size,14);
+  assert.equal(support.nodeApplyHandlers.size,15);
+  assert.equal(support.nodeApplyHandlers.has('transform.cross_table'),true);
+  assert.equal(support.nodeApplyHandlers.has('programming.javascript'),false);
   assert.throws(()=>validateNodeApplyRequest(request,support.nodeApplyHandlers));
   assert.throws(()=>support.nodeApplyDriverFactory({operation:{id:request.operation_id,parameters:request}}),/validated 7.4.2/);
 });

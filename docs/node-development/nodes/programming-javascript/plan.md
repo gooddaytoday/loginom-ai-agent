@@ -1,5 +1,13 @@
 # JavaScript: подплан исследования, разработки и приёмки
 
+Статус: ограниченное табличное ядро реализовано; исторический план и дальнейший охват.
+
+Ниже сохранён исполнявшийся план 2026-09-26: его первоначальные утверждения
+об отсутствии обработчика относятся к той дате. Текущий runtime и проверки
+после rebase описаны в [карточке](README.md) и [checkpoint](checkpoint.md).
+Дополнительный охват Multica находится в отдельном приложении; выполнение
+плана не назначается этим документом повторно.
+
 [Карточка](README.md) · [исследование](research.md) · [e2e](e2e-coverage.md) ·
 [fixtures/oracle](fixtures/README.md) · [рекомендации ревью](review-recommendations.md) ·
 [проверка рекомендаций](review-verification.md) · [регламент](../../README.md) · [реестр](../../registry.json).
@@ -27,10 +35,10 @@ headless или виртуальным экраном без отдельног�
 Первоначальный подплан подготовлен в режиме plan-authoring. Пользователь затем
 назначил исполнение; актуальная фаза и допуск памяти зафиксированы в
 [checkpoint](checkpoint.md). Сам документ не запускает очередь или live-операции.
-При исполнении использовать [single](../../workflow/single-node.md),
-[жизненный цикл](../../workflow/lifecycle.md),
-[назначение](../../templates/assignment.md),
-[completion](../../templates/completion.md) и [checkpoint](../../templates/checkpoint.md).
+При исполнении использовать [RUNBOOK](../../RUNBOOK.md) и
+[назначение](../../templates/assignment.md). Прежние
+[completion](../../history/legacy-orchestration/completion.md) и
+[checkpoint](../../history/legacy-orchestration/checkpoint.md) сохранены как история.
 
 ## Результат и границы
 
@@ -75,7 +83,7 @@ Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
 Ограниченный scope не является песочницей для произвольного JS: не обещать
 доказательство отсутствия побочных эффектов простым поиском слов в исходнике.
 
-## Фаза 0. Документация, окружение и live discovery
+## 0. Документация, окружение и live discovery
 
 Владелец — будущий разработчик single-задачи. Перед кодом прочитать источники
 ниже; файлы с точными номерами строк и хешами перечислены в
@@ -112,8 +120,8 @@ Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
    На Ubuntu учитывать фактический plugin ID, доступный Codex executable и
    права файлов из актуального `CURRENT.md`; подтверждение прежней установки
    на macOS не закрывает этот gate. Ход исполнения — в [checkpoint](checkpoint.md).
-3. Оформить минимальную single campaign по [шаблону](../../templates/campaign.json)
-   и общий [журнал хоста](../../templates/host-resources.json). Назначить отдельный
+3. Оформить минимальную single campaign по [шаблону](../../history/legacy-orchestration/campaign.json)
+   и общий [журнал хоста](../../history/legacy-orchestration/host-resources.json). Назначить отдельный
    разрешённый аккаунт Loginom, profile/browser/storage/package, все owners/leases.
    Если используется системный clipboard, учитывать его как общий ресурс.
 4. Подготовить pinned Node24.19.0, Bun1.3.14 с требуемым revision, Playwright/MCP,
@@ -224,7 +232,7 @@ source hash каждого snippet, build/ОС, observed/not_checked, резул
 или конкретный gate недоступен, оставить `discovery_required`, сохранить
 checkpoint с owner/next trigger. Никаких вымышленных controls/API.
 
-## Фаза 1. Контракт и доставка знаний модели
+## 1. Контракт и доставка знаний модели
 
 Источники образцов: `node-contracts.mjs`, `node-api.mjs`, `node-support.mjs`,
 `node-contracts.d.ts`, `node-result-schema.mjs`; compact path `bridge.mjs`,
@@ -386,7 +394,7 @@ schemas/handler, factual model-visible describe, digest/pin mutation test,
 redactor regression на несекретных литералах. Отрицательные inputs не вызывают
 graph/editor. Запрет generic browser JS остаётся действующим.
 
-## Фаза 2. Узкий редактор и конфигурация
+## 2. Узкий редактор и конфигурация
 
 Пример чтения CodeMirror и keyboard-only записи:
 `workspace-ui.mjs:2536–2597,3482–3501`; pure readback:
@@ -421,7 +429,7 @@ schema/mapping, receipts и observation scope; echo request не считает�
 исходного кода. Dedicated editor разрешён только своему узлу; общий CodeMirror
 deny тест остаётся зелёным.
 
-## Фаза 3. Жизненный цикл, схема и восстановление
+## 3. Жизненный цикл, схема и восстановление
 
 Основа: `createTabularTransformNodeSupport` из `calculator-node.mjs:35–48`,
 `node-procedure.mjs`, `node-apply.mjs`, `node-execution-procedure.mjs`,
@@ -476,14 +484,14 @@ Loginom, source digest и owner/execution. Применять redactor и явн
 ограниченный long-running stop и успешный последующий rerun. Настройка и эффект
 исполнения отражены отдельно, нет второго Execute при неизвестном исходе.
 
-## Фаза 4. Независимый oracle и сохранение
+## 4. Независимый oracle и сохранение
 
 Уже подготовлены [fixtures](fixtures/README.md) и ожидаемые бизнес-значения.
 Будущие `javascript_configuration_evidence.py`, `javascript_output_evidence.py`,
 `javascript_node_acceptance.py` — **TO_IMPLEMENT**, не существующие команды.
 Взять структуру разделения configuration/output из
 `tools/loginom-acceptance/calculator_*` и требования точности из `collapse/*`;
-старый Hermes transport не запускать. Точный CLI/driver invocation нового
+исторический Hermes transport не запускать. Точный CLI/driver invocation нового
 аудитора вписать в checkpoint до ready_for_acceptance.
 
 Oracle читает реальные source/options/ports/mappings и typed values независимо
@@ -515,7 +523,7 @@ CRLF-нормализацию ради совпадения. Если UI сох�
 `JSTableCompare.lgp` не использовать как независимый oracle JavaScript.
 Старые FAIL и evidence каждой попытки сохраняются; expected не подгоняются.
 
-## Фаза 5. Адресные тесты, ревью и кандидат
+## 5. Адресные тесты, ревью и кандидат
 
 Из каталога `packages/loginom-runtime/client`, переменная `LOGINOM_NODE`
 указывает на проверенный Node24.19.0. Это существующие baseline-команды:
@@ -574,7 +582,7 @@ absolute output directory, `LOGINOM_AI_AGENT_NODE_SOURCE`,
 exact auditor invocation, fixtures (включая отдельное declared-задание),
 oracle и candidate зафиксированы; собственный OAuth/profile готов; есть слот.
 
-## Фаза 6. Автономный CLI и критерий завершения
+## 6. Автономный CLI и критерий завершения
 
 Выполнять по [CLI-регламенту](../../workflow/acceptance-cli.md), не копировать
 старые Hermes launchers из исторических аудиторов. Модель:

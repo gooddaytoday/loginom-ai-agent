@@ -89,13 +89,13 @@
     },
     "runtime-registry": {
       "path": "../../packages/loginom-runtime/client/lib/node-support.mjs",
-      "sha256": "3ec2a882b897f24208af37eaedc7376db1f2ff7b9b24ca9cf0810b01fafab9a9",
+      "sha256": "e99b7f391c8167e4a8a02bbe57f6fbf10461ae70e223de18f47575757591247b",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
+      "source_commit": "fe372bf1e46fd6bda16984dd652072eda290f27b",
       "runtime": null,
       "platform": null,
-      "scope": "Статически зарегистрированы 14 обработчиков; код не исполнялся."
+      "scope": "Статически зарегистрированы 16 обработчиков, включая CrossTable и JavaScript; это источник регистрации, а не live-приёмка."
     },
     "migration-map": {
       "path": "../../docs/migration/source-map.json",
@@ -228,20 +228,20 @@
     },
     "text-import-handler": {
       "path": "../../packages/loginom-runtime/client/lib/text-import-node.mjs",
-      "sha256": "9914dd751a5690d8b159e4a227171744e86f3070bb65b07edacf61b0109ae8bc",
+      "sha256": "6f20da3e432c8d8c6d32a4c1f1d72072a5fc06ed7ae24f81a2fb6d827c1102e3",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
+      "source_commit": "fe372bf1e46fd6bda16984dd652072eda290f27b",
       "runtime": null,
       "platform": null,
       "scope": "Текущий handler; статическое чтение без исполнения."
     },
     "text-import-parameters": {
       "path": "../../packages/loginom-runtime/client/lib/text-import-procedure.mjs",
-      "sha256": "6723603d744b9c08193e11265d84c082271a08fdfb6af5823266a45ce95d4867",
+      "sha256": "c54b7abd0de06b7876f3bf87ee5b2aeebc9e84544b069c0b5c3e72f6e6c39a98",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
+      "source_commit": "fe372bf1e46fd6bda16984dd652072eda290f27b",
       "runtime": null,
       "platform": null,
       "scope": "Текущий parameters; статическое чтение без исполнения."
@@ -280,10 +280,10 @@
     },
     "calculator-handler": {
       "path": "../../packages/loginom-runtime/client/lib/calculator-node.mjs",
-      "sha256": "3f4dfcc7342463e768cc93dd0defda59f892989c23e3e4f305f8d60fc857dc51",
+      "sha256": "8303f9516e5fa3674bd10795e487240245d2640536bade73a8289575dc6616ca",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": null,
+      "source_commit": "fe372bf1e46fd6bda16984dd652072eda290f27b",
       "runtime": null,
       "platform": null,
       "scope": "Текущий handler; статическое чтение без исполнения."
@@ -996,6 +996,26 @@
         "loginom": "7.4.2/Enterprise"
       },
       "scope": "Независимый CSV-oracle 24 выходов; worker stage3-worker-13 на 4c1eb0f49 — 24/24 PASS после нового открытия, независимая приёмка проверяющего PASS."
+    },
+    "javascript-handler": {
+      "path": "../../packages/loginom-runtime/client/lib/javascript-code-node.mjs",
+      "sha256": "721141f4e527978345dc69542a292942e3fc3967c4d722ff15823c0d1d161389",
+      "kind": "source",
+      "availability": "retained_document",
+      "source_commit": "fe372bf1e46fd6bda16984dd652072eda290f27b",
+      "runtime": null,
+      "platform": null,
+      "scope": "Исходники ограниченного JavaScript-ядра после rebase; эта запись не подтверждает живое выполнение или установленный продукт."
+    },
+    "javascript-parameters": {
+      "path": "../../packages/loginom-runtime/client/lib/javascript-parameters.mjs",
+      "sha256": "f6482a0ae040d8a21d580cd854cef091eaa147c490d9df44e9db14b2a396cb93",
+      "kind": "source",
+      "availability": "retained_document",
+      "source_commit": "fe372bf1e46fd6bda16984dd652072eda290f27b",
+      "runtime": null,
+      "platform": null,
+      "scope": "Исходники ограниченного JavaScript-ядра после rebase; эта запись не подтверждает живое выполнение или установленный продукт."
     }
   },
   "nodes": [
@@ -4765,13 +4785,21 @@
       "name": "JavaScript",
       "slug": "programming-javascript",
       "legacy_subplan": null,
-      "queue_class": "backlog",
-      "handler": null,
+      "queue_class": "implemented",
+      "handler": {
+        "type": "programming.javascript",
+        "modes": [
+          "script"
+        ],
+        "source": "../../packages/loginom-runtime/client/lib/javascript-code-node.mjs",
+        "parameters_source": "../../packages/loginom-runtime/client/lib/javascript-parameters.mjs"
+      },
       "card": "nodes/programming-javascript/README.md",
-      "initial_scope": "Ограниченный детерминированный табличный пример: вход, вычисленные поля, выход и ошибка исполнения.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "initial_scope": "Loginom 7.4.2: синхронное табличное ядро, один вход/выход, схемы code/declared, source/context и управляемый жизненный цикл.",
+      "scope_basis": "registered_handler_and_source_tests_after_rebase",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Ограниченное ядро Loginom 7.4.2; дополнительные таблицы, variables, внешние модули и async не сертифицированы этим scope.",
+        "Исторические результаты относятся к собственным SHA; новая живая CLI/установленная Desktop-приёмка после rebase не выполнялась."
       ],
       "prerequisites": [
         "accepted_base",
@@ -4787,10 +4815,11 @@
       },
       "readiness": {
         "implementation": {
-          "status": "not_implemented",
+          "status": "implemented",
           "evidence": [
             "runtime-registry",
-            "historical-roadmap"
+            "javascript-handler",
+            "javascript-parameters"
           ]
         },
         "historical_acceptance": {
@@ -4816,9 +4845,9 @@
           "evidence": []
         }
       },
-      "next_action": "Завершить live discovery по [подплану JavaScript](nodes/programming-javascript/plan.md) на назначенном стенде, затем реализовать согласованный scope; handler и CLI-приёмка ещё не выполнены.",
+      "next_action": "Проверки rebase — в checkpoint; живую CLI/установленную Desktop-приёмку нового SHA и дальнейший охват назначать отдельно.",
       "plan": "nodes/programming-javascript/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "implemented_pending_revalidation"
     },
     {
       "component_id": "component.programming.Python",

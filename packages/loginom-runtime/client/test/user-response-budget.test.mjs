@@ -34,7 +34,7 @@ test('actual factory descriptions retain complete JS knowledge/schema/pins and r
   assert.ok(card.parameter_schema.properties.source_text);assert.ok(card.session_manifest.skillRevision);
   assert.equal(card.knowledge_sha256.length,64);
  }
- const all=reply(catalog()),before=JSON.stringify(all);assert.equal(JSON.parse(all.content[0].text).node_types.length,15);
+ const all=reply(catalog()),before=JSON.stringify(all);assert.equal(JSON.parse(all.content[0].text).node_types.length,16);
  assert.ok(bytes(all)>46000);
  const refused=boundedUserToolReply(all,{tool:'dock_action_describe'}),value=JSON.parse(refused.content[0].text);
  assert.equal(refused.isError,true);assert.equal(value.result_delivery,'refused');

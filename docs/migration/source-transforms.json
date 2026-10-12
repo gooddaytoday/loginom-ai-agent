@@ -2276,7 +2276,7 @@
   },
   "packages/loginom-runtime/client/test/node-api.test.mjs": {
     "baseHash": "665f0a90717ab46f1dabf9c3056ceea837484b68698e0a0635a4a56a10568054",
-    "hash": "64418dcafa6c2dbe89d1cae8f1a7ba099b9e47f71b4acfad0a8039b583c314f2",
+    "hash": "014e406539dd237c1f06d420ffb8bc45f05dcd1af2f1ca95497cb372873a6f63",
     "reason": "Record committed transformations after f03b2dbdf0: 7e3f608577 feat(javascript): gate complete bounded UI output reads. Original upstream source identity and hash remain in source-map.json; this record verifies transformed bytes, not behavior or CLI acceptance. Rebase node-javascript onto loginom a3d8e2947 preserves both branches; transformed bytes were checked in the rebased tree."
   },
   "packages/loginom-runtime/client/test/node-execution-evidence.test.mjs": {

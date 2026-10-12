@@ -15,11 +15,14 @@ LLM, обучение статистической модели или отде�
 для встроенной среды и получать актуальную схему узла.
 
 Прочитаны [создание подплана](../../workflow/new-node-plan.md),
-[шаблон](../../templates/node-plan.md), [single](../../workflow/single-node.md),
-[жизненный цикл](../../workflow/lifecycle.md), [CLI-приёмка](../../workflow/acceptance-cli.md),
-[назначение](../../templates/assignment.md), [checkpoint](../../templates/checkpoint.md),
-правила ресурсов [оркестратора](../../workflow/orchestrator.md) и
+[шаблон](../../templates/node-plan.md), исторический `workflow/single-node.md`,
+исторический `workflow/lifecycle.md`, [CLI-приёмка](../../workflow/acceptance-cli.md),
+[назначение](../../templates/assignment.md), исторический [checkpoint](../../history/legacy-orchestration/checkpoint.md),
+исторические правила ресурсов `workflow/orchestrator.md` и
 [регистрация памяти](../../../../services/loginom-ai/tools/project-memory/CURRENT.md).
+Удалённые регламенты описаны в [архиве](../../history/legacy-orchestration/README.md);
+действующий порядок — [RUNBOOK](../../RUNBOOK.md). Это не утверждение,
+что новый RUNBOOK читался во время исторического исследования.
 
 Из существующих узлов использованы следующие образцы:
 
@@ -91,7 +94,7 @@ LLM, обучение статистической модели или отде�
   его capture/extraction. Отсутствие локального runtime регистрации не означает
   отказ работающей памяти основного checkout.
 
-[Подготовка от 24 сентября](../../environment-2026-09-24.md) описывает macOS,
+[Подготовка от 24 сентября](../../history/legacy-orchestration/environment-2026-09-24.md) описывает macOS,
 другой checkout и конкретный исторический профиль. Её PASS, аккаунт `user`
 и пути нельзя переносить на `/home/george`. Механизм CURRENT выводит Peer из
 текущего корня: не подставлять macOS URI или глобальный Peer из примеров.

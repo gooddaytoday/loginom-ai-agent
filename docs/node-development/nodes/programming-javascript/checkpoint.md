@@ -203,3 +203,90 @@ Ubuntu-адаптация и дополнительные live-проверки 
 Goal не завершён. Next trigger — доступная копия adapter с проверяемыми hashes
 или новое явное решение о замене механизма регистрации. ОС сервера также ожидает
 подтверждения; работающий штатный OpenViking основного checkout не отключён.
+
+## Rebase 2026-10-12
+
+`node-javascript` перенесена с `e5725032cc28fc5c3069f31895a17bd0a40ababa`
+на актуальную после fetch `loginom@a3d8e294763342edc4bb0a6e194ea5afa6a63304`.
+Итог переноса 313 коммитов: `fe372bf1e46fd6bda16984dd652072eda290f27b`;
+следующий коммит содержит только адаптацию тестов и документации проверок.
+Порядок и названия всех 313 коммитов совпали; range-diff: 265 исходных патчей
+идентичны, 48 изменены при совмещении. Коммиты не пропускались.
+Исходные вершины сохранены в `refs/backup/node-javascript-20261012` и
+`refs/backup/loginom-20261012`. Рабочая копия до начала была чистой;
+другие рабочие копии не переключались. Push и установка не выполнялись.
+
+### Решения при конфликтах
+
+- Сохранены CrossTable и JavaScript, строгие отдельные схемы их общего
+  `parameters.columns`, native/full-read ограничения и оба пути проверенных отказов.
+- Сохранены точное сравнение mapping без trim, узкое NBSP исключение,
+  ownership, deadlines, startup cancellation и фактические cleanup подтверждения.
+- Сохранена новая политика loginom: любой сохранённый URL восстанавливается
+  без startup migration. Проверки явного выбора и pending settings перенесены.
+- Host сохраняет lazy leases, task scopes, отдельный Help, admissions и generation
+  observer. Browser shutdown с CLI policy ограничен 45s, NodeHost close — 60s;
+  Help сохраняет 5s. Desktop ordinary cleanup и строгий CLI cleanup не смешаны.
+- Source/context инструкции JavaScript перенесены в канонический Product-local
+  loginom-automation; удалённые общие runtime instructions и workflow не восстановлены.
+- Сохранены Chromium1246 и восстановление sandbox setuid через /bin/chmod;
+  runtime lock pin пересчитан по объединённому lockfile с YAML.
+
+Промежуточное разрешение mapping-конфликта пропустило тело pendingSource:
+синтаксическая ошибка стабильно воспроизвелась3/3 на промежуточном HEAD.
+Ветка скрытого source cell восстановлена до переноса коммита132; строгие
+NBSP/identity проверки сохранены. Адресный78/78 и полный client набор проходят.
+
+### Проверки объединённого дерева
+
+Bun1.3.14, Node24.19.0; Node SHA совпал с Product pin
+`bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12`.
+Тесты выполнялись из пакетных каталогов:
+
+- Runtime client: 3721 тест, 3711 PASS, 10 SKIP, 0 FAIL; полный повтор после
+  адаптации семи устаревших ожиданий. Runtime entry/helper: 61 PASS, 3 SKIP.
+- JavaScript operator Node tests: 18517 PASS. Python: 176 PASS, 93 SKIP.
+- Host: все49 тестовых файлов отдельными Bun-процессами, 343 PASS, 7 SKIP.
+  Общий процесс Bun воспроизводил EISDIR при импорте Effect; изолированные
+  node-host и read-timeouts проходят. CI-inputs использует полную Node distribution
+  с тем же проверенным бинарным SHA и соседним npm; packaged Node npm не содержит.
+- Agent CLI: 12 PASS. Desktop packaging/artifacts: 13 PASS, 2 macOS SKIP.
+  Product: 5 PASS. `bun typecheck` Host, Agent, Desktop и Product — PASS.
+- Исправлены только шесть несовместимых тестовых файлов: точные размеры
+  общего каталога, обязательный integer data_kind, Product-local bridge fixture,
+  новые runtime helper/cleanup ACK и explicit automation preflight.
+  Производственный код после завершения 313 коммитов не изменялся.
+- `git diff --check` для новых исправлений, source-map equality с loginom, pin/lock equality и
+  неизменность 77 остальных записей реестра проверены. Реестр JavaScript отражает
+  факт реализации, не новую live-приёмку. Ссылки на удалённые workflow исправлены;
+  исторический подробный план и дальнейший охват Multica сохранены.
+
+### Оставшиеся ограничения
+
+Новая живая CLI/установленная Desktop-приёмка и Chromium integration не запускались;
+platform/environment SKIP выше не считаются проверкой. Исторические PASS относятся
+к собственным SHA/артефактам и не переносились на новое дерево.
+
+Общий `verify_sources.py` остаётся FAIL: в исходной loginom было55 несовпадений,
+после совмещения осталось19 прежних в неизменённых файлах. Проверены5045 активных
+записей; новых несовпадений нет, исходные object/ref/hash в source-map не изменены.
+Неизменённые upstream расхождения не пересчитаны без отдельного разбора истории.
+Список: lib/{artifact-delivery,collapse-native-output,collapse-native-source,
+node-import-continuation,node-placement,node-table-context,package-cleanup,
+text-import-readback,workspace}.mjs и test/{artifact-delivery,artifact-upload,
+artifact-verification,collapse-native-source,node-apply-runtime,node-placement,
+node-table-context,package-cleanup,text-import-source-replacement,workspace}.test.mjs.
+
+Документационный validator остаётся FAIL только по трём прежним проблемам:
+`evidence hash migration-map` и related historical hash для
+`services/loginom-ai/docs/loginom-dock/{operations,agent-handoff}.md`.
+Все три присутствуют в неизменённом snapshot loginom; новых ошибок и битых ссылок нет.
+Возобновление: повторную native/model приёмку и дальнейший охват назначать отдельно;
+источник для неё — чистый новый SHA, не старый installed snapshot.
+
+Сравнение всей ветки с loginom сохраняет три исходных предупреждения blank line
+at EOF: `client/lib/javascript-column-context.mjs`,
+`client/test/support/javascript-managed-error-fixture.mjs` и
+`tools/loginom-acceptance/javascript_source_evidence.py` внутри runtime.
+Те же предупреждения присутствуют в исходной node-javascript относительно её базы;
+новых whitespace предупреждений нет.

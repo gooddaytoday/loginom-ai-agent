@@ -31,8 +31,9 @@ test.each(["run", "tui", "status"])("actual standalone entry enables package tea
         if(m.method==='close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
       });
     `)
+    // Only an explicit automation command requires Loginom preflight before model admission.
     const args = mode === "status" ? ["loginom", "status", "--format", "json"] :
-      mode === "run" ? ["run", "--no-headless", "--format", "json", "preflight only"] : ["--no-headless"]
+      mode === "run" ? ["run", "--no-headless", "--format", "json", "--command", "loginom-automation", "preflight only"] : ["--no-headless"]
     const child = Bun.spawn([process.execPath, "run", "./src/standalone.ts", ...args], {
       cwd: resolve(import.meta.dir, "../.."),
       env: { ...process.env, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",

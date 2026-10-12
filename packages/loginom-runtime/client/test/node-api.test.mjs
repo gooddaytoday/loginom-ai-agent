@@ -138,7 +138,7 @@ test('CrossTable and JavaScript keep distinct columns in the published schema an
   budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
  const javascript={...cross,operation_id:'javascript',target:{kind:'new',type:'programming.javascript'},mode:'script',
   parameters:{source_text:'',schema_mode:'declared',columns:[{name:'Result',label:'Result',type:'integer',
-   data_kind:'Дискретный',usage:'Активное'}]}};
+   data_kind:'Непрерывный',usage:'Активное'}]}};
  runtime.startNodeApply=args=>{
   if(args.target.type==='transform.cross_table')validateCrossTableParameters(args.parameters,args.mode,args);
   calls.push(args);return {state:'running'};
