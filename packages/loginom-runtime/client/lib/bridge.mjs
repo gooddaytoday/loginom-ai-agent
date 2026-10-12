@@ -506,14 +506,19 @@ export async function createBridge(config, session, { browserTransport: managedB
       finally { captureInFlight=undefined }
     }
     async function writeCleanupReceipt(cleanup) {
-      if(confirmedCleanup){
-        cleanupEvidenceBinding ??= Object.freeze({receipt:confirmedCleanup,
-          directory:session.directory,sessionId:session.metadata.sessionId});
-        if(cleanupEvidenceBinding.receipt!==confirmedCleanup || cleanup!==confirmedCleanup
-            || cleanupEvidenceBinding.directory!==session.directory
-            || cleanupEvidenceBinding.sessionId!==session.metadata.sessionId)
+      const receipt=cleanup,cached=confirmedCleanup;
+      const directory=session.directory,sessionId=session.metadata.sessionId;
+      if(cached)cleanupEvidenceBinding ??= Object.freeze({receipt:cached,directory,sessionId});
+      const assertBinding=()=>{
+        if(typeof directory!=='string'||!directory||typeof sessionId!=='string'||!sessionId
+            ||session.directory!==directory||session.metadata.sessionId!==sessionId
+            ||confirmedCleanup!==cached||(cached&&(receipt!==cached
+              ||cleanupEvidenceBinding.receipt!==cached||cleanupEvidenceBinding.directory!==directory
+              ||cleanupEvidenceBinding.sessionId!==sessionId)))
           throw Error('LOGINOM_CLEANUP_RECEIPT_BINDING_CHANGED');
-      }
+      };
+      assertBinding();
+      const bytes=JSON.stringify(receipt,null,2)+'\n';
       let phase='retained_close',primary;
       const remember=(value,failedPhase)=>{
         primary ??= {phase:failedPhase,value};
@@ -544,6 +549,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           remember(file.closeFailure?file.closeFailure.value:Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN'),'retained_close');
           throw cleanupPersistencePrimary.value;
         }
+        assertBinding();
         cleanupWriters.delete(file);
       }
       const persistHandle=async(path,mode,write)=>{
@@ -568,19 +574,22 @@ export async function createBridge(config, session, { browserTransport: managedB
             else cleanupWriters.delete(file);
             done(error,fd);
           }));
-          if(write){phase='file_write';await callback(done=>receiptWrite(file.fd,JSON.stringify(cleanup,null,2)+'\n',done))}
-          phase=write?'file_sync':'directory_sync';await callback(done=>receiptSync(file.fd,done));
+          assertBinding();
+          if(write){phase='file_write';await callback(done=>receiptWrite(file.fd,bytes,done));assertBinding()}
+          phase=write?'file_sync':'directory_sync';await callback(done=>receiptSync(file.fd,done));assertBinding();
         }catch(value){remember(value,phase)}
         if(file.fd!==undefined){
           const closePhase=write?'file_close':'directory_close';
-          try{await closeWriter(file);cleanupWriters.delete(file)}
+          try{await closeWriter(file);assertBinding();cleanupWriters.delete(file)}
           catch(value){file.closeFailure??={value};remember(value,closePhase)}
         }
         if(primary)throw primary.value;
         if(!file.closeComplete)throw Error('LOGINOM_CLEANUP_WRITER_CLOSE_UNKNOWN');
       };
-      await persistHandle(join(session.directory,'package-cleanup.json'),'w',true);
-      await persistHandle(session.directory,'r',false);
+      await persistHandle(join(directory,'package-cleanup.json'),'w',true);
+      assertBinding();
+      await persistHandle(directory,'r',false);
+      assertBinding();
       // No marker before both writes/syncs/closes actually complete.
       if(cleanupWriters.size)throw Error('LOGINOM_CLEANUP_WRITER_UNCONFIRMED');
       if(confirmedCleanup)cleanupReceiptWritten=true;

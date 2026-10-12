@@ -158,7 +158,7 @@ function nativeFixture(overrides = {}) {
 }
 
 const allScenarios=['normal','lost-reply','early-fulfilled','missing-callback','directory-lost','callback-error','io-open','io-write','io-sync',...['sync-','write-','dirsync-'].flatMap(p=>Object.keys(failValues).map(x=>p+x)),'foreign-session','foreign-directory'];
-const scenarios=process.env.CLEANUP_COUPLED?['normal']:allScenarios;
+const scenarios=process.env.CLEANUP_COUPLED?['normal']:process.env.CLEANUP_SELECTED_CASES?process.env.CLEANUP_SELECTED_CASES.split(','):allScenarios;
 for(const scenario of scenarios)test('whole bridge kernel receipt '+scenario,async()=>{
  const directory=await mkdtemp(join(tmpdir(),'cleanup-kernel-'));let signal;
  const ready=new Promise(r=>signal=r);
@@ -237,7 +237,9 @@ for(const scenario of scenarios)test('whole bridge kernel receipt '+scenario,asy
     assert.equal(JSON.parse(await nativeFs.readFile(join(directory,'managed-shutdown.json'),'utf8')).stages.findLast(x=>x.stage==='outer_acknowledgement').status,'allowed');
     f.managedEvents=managedEvents;
   }
-  assert.equal(receipt.browser_transport_closed,true); // Receiving branch retains its original transport receipt ABI, not upstream cleanup_complete.assert.equal(f.native.events.filter(e=>e==='close').length,1);assert.equal(f.native.events.filter(e=>e==='logout').length,1);
+  assert.equal(receipt.browser_transport_closed,true);
+  // Receiving branch retains its original transport receipt ABI, not upstream cleanup_complete.
+  assert.equal(f.native.events.filter(e=>e==='close').length,1);assert.equal(f.native.events.filter(e=>e==='logout').length,1);
   assert.equal(f.events.includes('new-open-before-completion'),false);
   assert.equal(owned.size,0);const e=f.events,ds=e.lastIndexOf('directory-sync-callback'),dc=e.lastIndexOf('directory-close-callback');assert.ok(ds>=0&&dc>ds&&e.indexOf('browser-close')>dc&&e.indexOf('release-uploads')>dc);
   assert.equal(JSON.parse(await readFile(join(directory,'package-cleanup.json'),'utf8')).status,'SUCCEEDED');
