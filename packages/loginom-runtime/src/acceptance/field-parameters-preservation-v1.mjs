@@ -17,11 +17,15 @@ export async function collectFieldParametersPreservation({binding,identity,retai
   &&identity.type==='transform.reform_columns'&&identity.input_port===0,'IDENTITY');
  need(retained?.channel===channel&&channel&&typeof channel.observe==='function'&&typeof channel.perform==='function'
   &&typeof record==='function'&&keys.every(k=>retained.binding?.[k]===binding[k])
-  &&ids.every(k=>retained.identity?.[k]===identity[k]),'RETAINED_CONTEXT');
+  &&ids.every(k=>retained.identity?.[k]===identity[k])
+  &&['type','input_port'].every(k=>retained.identity?.[k]===identity[k]),'RETAINED_CONTEXT');
  const owner=Object.freeze({...Object.fromEntries(keys.map(k=>[k,binding[k]])),...Object.fromEntries(ids.map(k=>[k,identity[k]]))});
  const current=()=>{
   need(Date.now()<owner.expires&&keys.every(k=>binding[k]===owner[k]&&retained.binding[k]===owner[k])
-   &&ids.every(k=>identity[k]===owner[k]&&retained.identity[k]===owner[k])&&retained.channel===channel,'OWNER_CHANGED');
+   &&ids.every(k=>identity[k]===owner[k]&&retained.identity[k]===owner[k])
+   &&identity.type==='transform.reform_columns'&&identity.input_port===0
+   &&retained.identity.type===identity.type&&retained.identity.input_port===identity.input_port
+   &&retained.channel===channel,'OWNER_CHANGED');
   need(resources&&resources.observed_at<=Date.now()&&resources.deadline===owner.expires
    &&resources.observed_at>=owner.expires-120000&&ids.every(k=>resources[k]===owner[k])
    &&keys.filter(k=>!['expires','packagePath','account','session'].includes(k)).every(k=>resources[k]===owner[k])
@@ -71,7 +75,7 @@ export async function collectFieldParametersPreservation({binding,identity,retai
   const result={revision:1,kind:'field_parameters_preservation_draft',owner,before,after,configured,
    stopped_before_done:true,settings_applied:false,execution_started:false,native_verified:false,
    values_verified:false,package_persistence_verified:false};
-  await record({event:'fp_preservation_readback',owner,result});return result;
+  await record({event:'fp_preservation_readback',owner,result});current();return result;
  }catch(primary){
   // Awaited record is not fsync. Persistence refusal never replaces primary.
   try{await record({event:'fp_preservation_refusal',owner,uncertain,rejection:fpRejection(primary)})}catch{}

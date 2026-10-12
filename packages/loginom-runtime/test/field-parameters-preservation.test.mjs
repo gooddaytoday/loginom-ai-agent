@@ -93,3 +93,18 @@ test('FP retained owner change after baseline write refuses before edit',async()
  const f=setup();f.args.record=async r=>{f.recordsLog.push(r);if(r.event==='fp_preservation_baseline')f.args.binding.generation++};
  await assert.rejects(collectFieldParametersPreservation(f.args),/OWNER_CHANGED/);assert.equal(f.events.length,0);
 });
+
+for(const [name,value]of [['type','transform.calculator'],['input_port',1]])test('FP retained '+name+' mismatch refuses before effects',async()=>{
+ const f=setup();f.args.retained.identity[name]=value;
+ await assert.rejects(collectFieldParametersPreservation(f.args),/RETAINED_CONTEXT/);assert.equal(f.events.length,0);
+});
+for(const change of ['generation','pending'])test('FP checks '+change+' again after final record without replay/cleanup',async()=>{
+ const f=setup();f.args.record=async r=>{f.recordsLog.push(r);if(r.event==='fp_preservation_readback'){
+  if(change==='generation')f.args.binding.generation++;else f.args.resources.pending=true;
+ }};
+ await assert.rejects(collectFieldParametersPreservation(f.args),change==='generation'?/OWNER_CHANGED/:/RESOURCE_UNKNOWN/);
+ assert.equal(f.events.filter(e=>e.verb==='apply_reform_column').length,3);
+ assert.equal(f.events.some(e=>['finish_wizard','cancel_wizard','execute','save'].includes(e.verb)),false);
+ assert.equal(f.recordsLog.at(-1).event,'fp_preservation_refusal');
+ assert.equal(f.recordsLog.at(-1).uncertain,false,'confirmed draft is retained; no unknown effect is invented');
+});
