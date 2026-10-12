@@ -1,0 +1,110 @@
+{
+  "checked_utc": "2026-10-12T15:41:12.303252+00:00",
+  "report_id": "01a130b1-248a-7537-b29d-8fc2d9b5c26f",
+  "archive_sha256": "b00080eaf311869bf242fd27f8bf271e9eb5b883d2f7d6ee6c8a27beb8d7bda6",
+  "archive_bytes": 24032683,
+  "parts_verified": 8,
+  "internal_files_verified": 348,
+  "manifest_sha256": "ced34517b6136839a0c65aba8ed8b34d50fa29129a62fd7cf02fc253e753a5e9",
+  "selected_data_audits": [
+    {
+      "case": "txt-comma-utf8",
+      "typed_values_oracle_comparison": "PASS",
+      "source_bytes_sha": "PASS",
+      "result_cleanup_flags": true,
+      "fresh_owned_execution_flags": true,
+      "full_cold_verdict_replay": "BLOCKED locally by absolute private native journal path; no paths/proofs rewritten"
+    },
+    {
+      "case": "csv-comma-utf8",
+      "typed_values_oracle_comparison": "PASS",
+      "source_bytes_sha": "PASS",
+      "result_cleanup_flags": true,
+      "fresh_owned_execution_flags": true,
+      "full_cold_verdict_replay": "BLOCKED locally by absolute private native journal path; no paths/proofs rewritten"
+    }
+  ],
+  "actual_model_public_proof_rows": [
+    {
+      "attempt": "txt-comma-utf8",
+      "rows": 13,
+      "all_actual": "openai/gpt-6-luna/high",
+      "sqlite_handling": "ro, normal WAL/SHM handling; not immutable",
+      "private_db_reopened_by_monitor": false
+    },
+    {
+      "attempt": "csv-comma-utf8",
+      "rows": 12,
+      "all_actual": "openai/gpt-6-luna/high",
+      "sqlite_handling": "ro, normal WAL/SHM handling; not immutable",
+      "private_db_reopened_by_monitor": false
+    },
+    {
+      "attempt": "txt-semicolon-cp1251-decimal",
+      "rows": 16,
+      "all_actual": "openai/gpt-6-luna/high",
+      "sqlite_handling": "ro, normal WAL/SHM handling; not immutable",
+      "private_db_reopened_by_monitor": false
+    },
+    {
+      "attempt": "txt-semicolon-cp1251-decimal-2",
+      "rows": 12,
+      "all_actual": "openai/gpt-6-luna/high",
+      "sqlite_handling": "ro, normal WAL/SHM handling; not immutable",
+      "private_db_reopened_by_monitor": false
+    }
+  ],
+  "release_resolution": "checked owner/acquisition match; RELEASED(kind=cold), FREE; original cold cleanup=false preserved",
+  "private_owner_token_excluded": true,
+  "release_evidence_sha256": "addefc5660c93de25a79663ff8eec932a7dd776f0da150292b8f8c863dbc77d2",
+  "completion_raw_sha256": "addefc5660c93de25a79663ff8eec932a7dd776f0da150292b8f8c863dbc77d2",
+  "repeat_consumed": 2,
+  "repeat_limit": 10,
+  "new_root_classification": "UNCLASSIFIED",
+  "reference_consumed": {
+    "txt-comma-utf8": 1,
+    "csv-comma-utf8": 1,
+    "txt-semicolon-cp1251-decimal": 2,
+    "csv-pipe-multiline": 0,
+    "tsv-utf8": 0,
+    "tsv-utf16le": 0
+  },
+  "product_consumed": {
+    "txt-comma-utf8": 0,
+    "csv-comma-utf8": 0,
+    "txt-semicolon-cp1251-decimal": 0,
+    "csv-pipe-multiline": 0,
+    "tsv-utf8": 0,
+    "tsv-utf16le": 0
+  },
+  "cold_counts": {
+    "calls": 5,
+    "launch": 4,
+    "completed": 2
+  },
+  "normal_cleanup_browser_continuations": 2,
+  "helper_recovery_consumed": 0,
+  "monitor_live_model_or_lease_actions": false,
+  "all_eight_done": false,
+  "release_evidence_digest_binding": "raw_bytes",
+  "owner_breadcrumb_comparison": {
+    "txt_comma": {
+      "owner": "observed",
+      "crumbs": 7,
+      "package_label_chars": 48
+    },
+    "csv_comma": {
+      "owner": "observed",
+      "crumbs": 7,
+      "package_label_chars": 48
+    },
+    "cp1251_ref2": {
+      "owner": "unobserved",
+      "crumbs": 5,
+      "package_label_chars": 76,
+      "native_guid_verified": true,
+      "wizard_stage": "text_import_file"
+    },
+    "root_cause": "UNCLASSIFIED; viewport/toolbar-overflow hypothesis awaits real GREEN"
+  }
+}
