@@ -61,3 +61,22 @@ test('synthetic compatible trace never mints authority',async()=>{const s=fixtur
 test('historical pins cannot supply current owner',()=>assert.throws(()=>assertPreconfigSample(pins,{now}),/TRACE_CLASSIFICATION/));
 test('missing closed adapter refused without dispatch',async()=>assert.rejects(checkReadAdapter({},{now}),/MISSING_CLOSED_PRECONFIG_ADAPTER/));
 test('synthetic cannot be relabelled source',async()=>assert.rejects(checkReadAdapter({source_sha:'45d37e1f99b2cbe3f9184398f285cbb456ba3700',path_kind:'source',readPreconfigSample:async()=>fixture()},{now}),/ADAPTER_CLASSIFICATION/));
+
+for(const position of ['prefix','suffix'])test('refuse '+position+' write missing operation_id',()=>{
+ const s=fixture(),d=s.imports[0].delivery,w={...d.lineage.records[0],sequence:position==='prefix'?0:2};
+ delete w.operation_id;if(position==='prefix')d.lineage.records.unshift(w);else d.lineage.records.push(w);
+ assert.throws(()=>assertPreconfigSample(s,{now}),/WRITE_OPERATION_ID/);assert.ok(Object.values(s.dispatch).every(n=>n===0));
+});
+for(const [name,value] of [['empty',''],['null',null],['number',7]])test('refuse write '+name+' operation_id',()=>{
+ const s=fixture(),d=s.imports[1].delivery;d.lineage.records.push({...d.lineage.records[0],sequence:2,operation_id:value});
+ assert.throws(()=>assertPreconfigSample(s,{now}),/WRITE_OPERATION_ID/);assert.ok(Object.values(s.dispatch).every(n=>n===0));
+});
+test('refuse inherited write operation_id',()=>{
+ const s=fixture(),d=s.imports[0].delivery,w={...d.lineage.records[0],sequence:2};delete w.operation_id;Object.setPrototypeOf(w,{operation_id:id()});d.lineage.records.push(w);
+ assert.throws(()=>assertPreconfigSample(s,{now}),/WRITE_OPERATION_ID/);
+});
+test('correct prefix and suffix verified writes preserve non-authoritative compatibility',()=>{
+ const s=fixture();for(const item of s.imports){const d=item.delivery;d.lineage.records.unshift({...d.lineage.records[0],sequence:0,operation_id:id()});d.lineage.records.push({...d.lineage.records[1],sequence:2,operation_id:id()});}
+ const result=assertPreconfigSample(s,{now});assert.equal(result.status,'SYNTHETIC_CONTRACT_COMPATIBLE');
+ assert.equal(result.configure_authority,false);assert.equal(result.close_authority,false);assert.equal(result.native_proof,false);assert.equal(result.dispatch_count,0);
+});

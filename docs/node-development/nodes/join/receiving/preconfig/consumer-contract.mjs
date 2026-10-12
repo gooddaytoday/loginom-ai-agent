@@ -51,7 +51,7 @@ export function assertPreconfigSample(sample,{now=Date.now()}={}) {
   need(d.destination!==expected.retained_path,'NO_HISTORICAL_PATH_ADOPTION');
   need(d.lineage?.complete===true&&Array.isArray(d.lineage.records)&&d.lineage.records.length>0,'COMPLETE_ORDERED_LINEAGE');
   let previous=-1;const writes=new Set();
-  for(const write of d.lineage.records){need(Number.isSafeInteger(write.sequence)&&write.sequence>previous&&!writes.has(write.operation_id),'ORDERED_UNIQUE_WRITES');previous=write.sequence;writes.add(write.operation_id);need(write.destination===d.destination&&write.verified===true&&write.uncertain===false&&write.sha256===d.sha256&&write.bytes===d.bytes,'CURRENT_PATH_WRITES');}
+  for(const write of d.lineage.records){need(Object.hasOwn(write,'operation_id')&&text(write.operation_id),'WRITE_OPERATION_ID');need(Number.isSafeInteger(write.sequence)&&write.sequence>previous&&!writes.has(write.operation_id),'ORDERED_UNIQUE_WRITES');previous=write.sequence;writes.add(write.operation_id);need(write.destination===d.destination&&write.verified===true&&write.uncertain===false&&write.sha256===d.sha256&&write.bytes===d.bytes,'CURRENT_PATH_WRITES');}
   need(d.lineage.records.some(w=>w.operation_id===d.operation_id),'SELECTED_UPLOAD_IN_LINEAGE');
   for(const k of ['encoding','rows_to_skip','first_line_as_title'])same(r.source[k],expected.settings.source[k]);
   same(r.format,expected.settings.format);
