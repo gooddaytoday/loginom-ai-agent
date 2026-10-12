@@ -1,4 +1,7 @@
 import { expect, test } from "bun:test"
+import { createHash } from "node:crypto"
+import { readdirSync, readFileSync } from "node:fs"
+import path from "path"
 import { attachmentContext, attachmentPreview } from "../../src/util/attachment-preview"
 import { FSUtil } from "@loginom-ai-agent/core/fs-util"
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
@@ -45,6 +48,42 @@ it.live("refreshes existing inline snapshots without rewriting their content bef
     yield* fs.remove(snapshot)
   }),
 )
+
+it.live("names oversized attachment snapshots with a sha256 of the full text", () =>
+  Effect.gen(function* () {
+    const fs = yield* FSUtil.Service
+    const content = "hash-source\n" + "row\n".repeat(2100)
+    const snapshot = snapshotPath(yield* attachmentContext(content))
+    const expected = createHash("sha256").update(content).digest("hex")
+    expect(path.basename(snapshot)).toBe(`tool_attachment_${expected}`)
+    yield* fs.remove(snapshot)
+  }),
+)
+
+// A Node subprocess cannot import this module: server sources use the @/ alias.
+// Scanning those sources is what fails when a Bun API returns to the Desktop sidecar.
+test("server sources do not call Bun APIs outside the CLI", () => {
+  const root = path.join(import.meta.dir, "../../src")
+  const hits: string[] = []
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (entry.name === "cli" && path.resolve(dir) === path.resolve(root)) continue
+        walk(full)
+        continue
+      }
+      if (!entry.name.endsWith(".ts")) continue
+      readFileSync(full, "utf8")
+        .split("\n")
+        .forEach((line, index) => {
+          if (/\bBun\./.test(line) && !line.includes("typeof Bun")) hits.push(`${path.relative(root, full)}:${index + 1}`)
+        })
+    }
+  }
+  walk(root)
+  expect(hits).toEqual([])
+})
 
 it.live("publishes concurrent inline snapshots only after their full bytes are available", () =>
   Effect.gen(function* () {
