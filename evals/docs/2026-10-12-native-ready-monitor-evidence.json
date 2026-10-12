@@ -40,5 +40,52 @@
   "ready_scope": "This historical diagnostic lease only; every next live lease still requires fresh native READY, resources and cleanup",
   "scenario_model": "openai/gpt-6-luna/high remains required by actual evidence; configured default of a no-model connection check is not scenario usage",
   "independent_evaler_decision": "PENDING; currently running 01a12fe8-bafe-78ac-a48b-73fba3494ba6",
-  "new_monitor_runs_or_messages": 0
+  "new_monitor_runs_or_messages": 0,
+  "later_coordinator_decision": {
+    "observed_at": "2026-10-12T15:24:42+03:00",
+    "issue_revision": 82,
+    "ready_independent_verification": "ACCEPTED by Evaler; originals/history/release verified",
+    "verification_attachment_id": "01a12ff5-e35b-7604-85ab-fcea6df41c63",
+    "verification_sha256": "83889b40406d31bba1278b5446686d7ec97624ed8099b09c6e337945ad122c79",
+    "continued_author_stage_comment_id": "01a12ff5-e43d-70d8-900c-80c967d28fd2",
+    "capacity_repeat_failed_task_id": "01a12ff5-e467-7cd5-aa26-be6e4c02d061",
+    "capacity_repeat": "Same worker model/cause verified; 4 reads only, no side effects; charge 1",
+    "capacity_inspection_attachment_id": "01a13004-e689-736e-9d8c-4098692fcca1",
+    "capacity_inspection_sha256": "039839e825cbc9355b4cab462a1e1b842b6e2edb401330244e8c3f81bd61f060",
+    "blocker_ledger_attachment_id": "01a13004-e75b-72f2-940c-fd4a3f257051",
+    "blocker_ledger_sha256": "d0db15deb976f35cd8f5edb688142330b64ddaddb59e857beef3185f12fdbb2f",
+    "confirmed_repeat_budget": {
+      "limit": 10,
+      "consumed": 2,
+      "remaining": 8
+    },
+    "active_rich_task_id": "01a13004-e856-7bd2-9cc7-6f5c5b922c3d",
+    "active_rich_since": "2026-10-12T15:11:25+03:00",
+    "active_native_progress": {
+      "run_id": "01a13004-e856-7bd2-9cc7-6f5c5b922c3d",
+      "observed_at": "2026-10-12T12:23:32.004706+00:00",
+      "messages": 151,
+      "latest": [
+        {
+          "seq": 149,
+          "type": "tool_result",
+          "created_at": "2026-10-12T12:23:24.749488Z"
+        },
+        {
+          "seq": 150,
+          "type": "tool_use",
+          "created_at": "2026-10-12T12:23:24.831937Z"
+        },
+        {
+          "seq": 151,
+          "type": "tool_result",
+          "created_at": "2026-10-12T12:23:24.832917Z"
+        }
+      ],
+      "scope": "Metadata only; content, commands and env not exported"
+    },
+    "next_live_gates": "Fresh own lease/standard READY before cold and remaining pilot; wrapper exhausted; current task not charged before outcome",
+    "scenario_budgets_note": "Last verified terminal ledger: reference txt-comma1/3, other five0/3, product/cold0; active worker progress may add attempts and requires its evidence",
+    "local_additional_runs_or_messages": 0
+  }
 }
