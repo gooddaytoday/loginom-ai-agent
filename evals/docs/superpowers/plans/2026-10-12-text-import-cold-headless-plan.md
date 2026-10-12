@@ -21,7 +21,7 @@ repeat ledger 2/10, cold calls 2, completed cold 0 до нового evidence.
 
 - [x] Проверить исходный cold archive/manifest/305 файлов и reader headless:false.
 - [x] Spec review: включить provenance adaptation/current hash, сохранить original/source pin.
-- [ ] Передача выбранного исправления Evaler без повторного запроса владельцу.
+- [x] Передача Evaler: comment 01a13039-9c44-7b1c-86a0-7be703e618ba, parent/readback проверены, queued; повторного запроса владельцу нет.
 - [ ] Rich: RED public reader на реальных pinned resources без DISPLAY; сохранить предыдущий отказ.
 - [ ] Минимальное изменение только browser mode; GREEN по реальному поведению, без mocks/source-string tests.
 - [ ] В provenance добавить adaptation `headless:true`, sha256 reader пересчитать; original_sha256/source_sha неизменны.

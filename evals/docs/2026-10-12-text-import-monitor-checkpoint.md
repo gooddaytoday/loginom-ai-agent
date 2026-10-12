@@ -1,20 +1,19 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка: 2026-10-12T15:24:42+03:00; свежие issue/active/metadata/roots всех 8 + LAB-55 и thread LAB-57 прочитаны; новые READY/capacity/ledger receipts скачаны/bytes-SHA проверены.
-- lab-56-lab-63-30 ACTIVE каждые 30 минут; все 8 ещё не done, условие удаления расписания не достигнуто.
+- Проверка: 2026-10-12T16:07:48+03:00; свежие issue/active/metadata/roots всех 8 + LAB-55 прочитаны в 15:51; LAB-57/thread повторно прочитаны перед handoff и после него.
+- Расписание lab-56-lab-63-30 ACTIVE каждые 30 минут; все 8 ещё не done, условие удаления не достигнуто.
 - LAB-56: in_review rev65; Ben ACCEPT + Evaler confirmed evidence/cleanup; done не выставлен, runs нет.
-- LAB-57: in_progress rev82, phase=rich; Rich 01a13004-e856-7bd2-9cc7-6f5c5b922c3d running с 15:11:25 MSK; 151 native messages, последние seq149–151 tool results до 15:23:24; duplicate не нужен.
-- LAB-58–LAB-63: in_progress/admission rev9, runs нет; последовательные независимые ACCEPT/cleanup ещё ожидаются.
-- LAB-55: in_review rev16, runs нет; чужие процессы/leases/defaults не затронуты.
-- Rich завершил graph TDD repair; partial 8e2bc4fc480d9037ab1a9b4f5fe269daa716e97b опубликован; owner/source/GUID/links/ports/output negatives сохранены.
-- Архив a7ff91d6…f2597a1, manifest a5d661cf…1b077f и все 183/183 файлов проверены локально; links/необычные типы/опасные paths отсутствуют.
-- Evaler независимо подтвердил полный saved warm reference №1 PASS, graph TDD/16 mutations, unit 533 PASS/14 SKIP/0 FAIL и typecheck; receipt d780bfde…9ec91. Полный пилот/cold/product ACCEPT отсутствует.
-- Исходные 27 файлов и FAIL сохранены; native reconstruction идентична; собственный unit lease RELEASED, cleanup confirmed, FREE/storage empty; private DB не публикуется.
-- Evaler независимо принял настоящий diagnostic READY/31 files/original bytes/history/release: receipt 83889b40…22c79; оставшийся author cold/пилот возобновлён штатным dispatch.
-- Новый capacity task 01a12ff5-e467-7cd5-aa26-be6e4c02d061 failed после 4 reads, без lease/CLI/scenarios; причина/модель совпали с прежними. Inspection 039839e8…1f060 проверен.
-- Старый OPERATION_FAILED сохранён UNCLASSIFIED: lower exception/trace отсутствуют и не выводятся из нового успеха. Diagnostic wrapper 1/1 использован, повтор wrapper автоматически не разрешён.
-- Владелец: лимит 10/card расходуют только одинаковые повторные blocker; новые уникальные/первая работа с ними — 0; нет cap на общее число native runs.
-- Current server ledger d0db15de…dbb2f: native7 (текущий pending), confirmed repeats2/10, remaining8. Последний terminal scenario ledger: txt-comma1/3, остальные0/3, product/cold0; новые attempts активного worker подтвердятся evidence.
-- Rich/Ben/Evaler gpt-6.1-sol/xhigh прежние; reference/product actual openai/gpt-6-luna/high подтверждать по evidence. CLI/skill/oracle/criteria/recovery/probes неизменны.
-- Локально проверены coordinator READY/capacity/ledger и fresh native progress только по metadata; content/env не экспортировались. Новых runtime/model/server/lease действий или сообщений мониторинг не создавал.
-- Следующий шаг: дождаться cold/пилота/финализации и нового frozen SHA из уже активного Rich; Evaler затем назначает Ben. Wrapper1/1 исчерпан; исторический unknown сохранён, fresh live lease требует штатного READY.
+- LAB-57: in_progress rev86; Evaler 01a1301d-60de-794c-9f13-1f9fcda9925b running; handoff Evaler 01a13039-9c71-70ee-8bfc-7b843fb4226e queued; Rich active/queued нет.
+- LAB-58–LAB-63: in_progress/admission rev9, runs нет; последовательные ACCEPT/cleanup ожидаются. LAB-55: in_review rev16, runs нет, не затронут.
+- Rich task 01a13004-e856-7bd2-9cc7-6f5c5b922c3d завершил cold BLOCKED; clean partial 8e2bc4fc480d9037ab1a9b4f5fe269daa716e97b, frozen SHA/Ben ещё нет.
+- Первый reader FAIL: неверный Node realpath; исправленная команда прошла resources verification. Второй: LOGINOM_BROWSER_START_FAILED; headless:false при отсутствии DISPLAY/X11/Xvfb. Нижняя launch-причина UNCLASSIFIED.
+- Архив 12d9f444…c94fdb/9142144 bytes, manifest 783354c3…a45cc7 и 305/305 files независимо проверены локально; исходные FAIL/27 original files сохранены.
+- Warm saved reference №1 PASS, 6 таблиц независимо пересчитаны; unit 533 PASS/14 SKIP/0 FAIL и typecheck PASS по evidence. Это не cold или полный пилот ACCEPT.
+- Safety cleanup подтверждён: собственные 2 storage файла адресно удалены, 2 zero observations, real MCP browser_close, RELEASED(kind=cold), FREE; cold completed 0.
+- Spec review ACCEPT: минимальный reader headless:true + provenance adaptation/current SHA; source/original SHA, CLI и все native/cold/cleanup gates сохраняются. Реализация и real GREEN у Rich ещё ожидаются.
+- План/spec опубликованы f5c7fa2803ddd86887769f0bbe73a701bf8aaebf origin/input-name-fix; Evaler comment 01a13039-9c44-7b1c-86a0-7be703e618ba под текущим Rich report, exact readback/parent/queued подтверждены.
+- Repeat ledger 2/10, остаток8; новые UUID/dispatch не списываются заранее. Cold calls2/launch1/completed0; reference txt-comma1/3, остальные0/3, product0; diagnostic wrapper1/1 и admission3/3 исчерпаны.
+- Исторический OPERATION_FAILED unknown/charge0 сохранён; новый cold lower cause не объявлен автоматически уникальным. Нужна диагностика при следующем отказе, неизменённый headed refusal не повторять.
+- Rich/Ben/Evaler модели прежние; actual исходной reference Luna/high 13/13 по сохранённому proof. Reference/product openai/gpt-6-luna/high, CLI/skill/oracle/criteria/scenario budgets неизменны.
+- Мониторинг сделал только reads/spec review/один routed Evaler handoff; live/model/browser/leases/defaults не менял. Канонический receipt: 2026-10-12-text-import-cold-headless-handoff.json.
+- Следующий шаг: Evaler назначает узкий TDD repair без дубля Rich; fresh lease/штатный READY, real headless cold со всеми прежними gates, затем независимый verdict/оставшийся пилот.
