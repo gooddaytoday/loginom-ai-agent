@@ -58,6 +58,7 @@ async function recordClose(stage, detail) {
   state.shutdown ??= {stages:[]}
   if (Object.hasOwn(state,"startupFailure")) state.shutdown.startupFailure ??= closeRejection(state.startupFailure)
   state.shutdown.stages.push({stage,...detail})
+  const evidenceOwner=state.session??state.startupOwner
   const directory=state.session?.directory??state.startupOwner?.directory
   if (!directory) return // No-start has acquired no native resources.
   if(state.evidencePublication?.pending)throw state.evidencePrimary?state.evidencePrimary.value:Error("LOGINOM_MANAGED_PUBLICATION_UNKNOWN")
@@ -160,6 +161,10 @@ async function recordClose(stage, detail) {
     throw value
   }
   await persist(directory,false)
+  // Directory IO can outlive the original foreground owner binding.
+  if((state.session??state.startupOwner)!==evidenceOwner
+      ||(state.session?.directory??state.startupOwner?.directory)!==directory)
+    throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
 }
 function close() {
   if (state.closing) return state.closing
