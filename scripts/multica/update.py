@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import sys
 import uuid
+import urllib.error
 
 from supplement import request, save
 
@@ -23,7 +24,8 @@ def deliver(args):
     path = Path(args.receipt)
     if path.is_symlink():
         raise ValueError('Receipt must not be a symlink')
-    fingerprint = hashlib.sha256(json.dumps([base, issue, task, content]).encode()).hexdigest()
+    sender = os.environ.get('MULTICA_TASK_ID', '')
+    fingerprint = hashlib.sha256(json.dumps([base, issue, task, content, sender, args.parent]).encode()).hexdigest()
     if path.exists():
         record = json.loads(path.read_text())
         if record['fingerprint'] != fingerprint:
@@ -44,12 +46,17 @@ def deliver(args):
         target = next((r for r in runs if r['id'] == task), None)
         if not target or target['status'] not in ('running', 'queued'):
             raise ValueError('Target ended; reconcile its result before a new assignment')
-        preview = request(base, headers, f'issues/{issue}/comments/trigger-preview', {'content': text})
+        payload = {'content': text}
+        current = next((r for r in runs if r['id'] == sender), None)
+        parent = args.parent or (current.get('trigger_comment_id') if current else None)
+        if parent:
+            payload['parent_id'] = str(uuid.UUID(parent))
+        preview = request(base, headers, f'issues/{issue}/comments/trigger-preview', payload)
         if preview.get('agents') or preview.get('squads') or preview.get('blocked'):
             raise ValueError('Information unexpectedly triggers work')
         record['state'] = 'sending'
         save(path, record)
-        result = request(base, headers, f'issues/{issue}/comments', {'content': text})
+        result = request(base, headers, f'issues/{issue}/comments', payload)
         record['comment'] = result['id']
         save(path, record)
         comments = request(base, headers, f'issues/{issue}/comments')
@@ -65,9 +72,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('issue', 'task', 'message', 'receipt'):
         parser.add_argument('--' + name, required=True)
+    parser.add_argument('--parent', help='Exact sender trigger comment when MULTICA_TASK_ID is unavailable')
     args = parser.parse_args()
     try:
         deliver(args)
+    except urllib.error.HTTPError as error:
+        # Do not expose response bodies or credentials; the status is diagnostic.
+        print(f'HTTP {error.code}: delivery not confirmed; inspect receipt/comments and reply parent, never repost blindly.', file=sys.stderr)
+        return 1
     except Exception as error:
         print(f'{type(error).__name__}: delivery not confirmed; preserve receipt, inspect state, do not repost blindly.', file=sys.stderr)
         return 1

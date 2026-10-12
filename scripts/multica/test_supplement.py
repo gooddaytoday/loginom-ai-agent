@@ -24,6 +24,8 @@ class DeliveryTest(unittest.TestCase):
         self.requests = {}
         self.calls = 0
         self.closed = False
+        self.sender = ''
+        self.last_parent = None
         self.drop = False
         self.wrong_target = False
         case = self
@@ -39,7 +41,7 @@ class DeliveryTest(unittest.TestCase):
 
             def do_GET(self):
                 if self.path == f'/api/issues/{ISSUE}/task-runs':
-                    return self.reply(200, [{'id': TASK, 'status': 'completed' if case.closed else 'running'}])
+                    return self.reply(200, [{'id': TASK, 'status': 'completed' if case.closed else 'running', 'trigger_comment_id': ISSUE}])
                 if self.path != f'/api/issues/{ISSUE}/comments':
                     return self.reply(404, {})
                 self.reply(200, case.comments)
@@ -50,7 +52,10 @@ class DeliveryTest(unittest.TestCase):
                 if self.path == f'/api/issues/{ISSUE}/comments':
                     case.calls += 1
                     payload = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
-                    if not payload['content'].startswith('[@all](mention://all/all)'):
+                    case.last_parent = payload.get('parent_id')
+                    if case.sender == TASK and case.last_parent != ISSUE:
+                        return self.reply(409, {})
+                    if not payload['content'].startswith('[@all](mention://all/all'):
                         return self.reply(400, {})
                     result = {'id': 'comment-1', 'content': payload['content']}
                     case.comments.append(result)
@@ -92,7 +97,7 @@ class DeliveryTest(unittest.TestCase):
     def run_client(self):
         return subprocess.run([sys.executable, str(self.script), '--issue', ISSUE, '--task', TASK,
             '--message', str(self.root / 'message'), '--receipt', str(self.root / 'receipt')],
-            env=dict(os.environ, MULTICA_SERVER_URL=f'http://127.0.0.1:{self.server.server_port}', MULTICA_TOKEN='test-only'), capture_output=True, text=True)
+            env=dict(os.environ, MULTICA_SERVER_URL=f'http://127.0.0.1:{self.server.server_port}', MULTICA_TOKEN='test-only', MULTICA_TASK_ID=self.sender), capture_output=True, text=True)
 
     def test_verified_retry_does_not_post(self):
         self.assertEqual(self.run_client().returncode, 0)
@@ -155,6 +160,16 @@ class AgentUpdateTest(unittest.TestCase):
         self.closed = True
         self.assertNotEqual(self.run_client().returncode, 0)
         self.assertEqual(self.calls, 0)
+
+    def test_same_issue_uses_sender_trigger_parent(self):
+        self.sender = TASK
+        self.assertEqual(self.run_client().returncode, 0)
+        self.assertEqual(self.last_parent, ISSUE)
+
+    def test_other_issue_does_not_borrow_recipient_parent(self):
+        self.sender = ISSUE
+        self.assertEqual(self.run_client().returncode, 0)
+        self.assertIsNone(self.last_parent)
 
     def test_unknown_delivery_is_not_reposted(self):
         self.drop = True
