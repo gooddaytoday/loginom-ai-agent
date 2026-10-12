@@ -56,7 +56,7 @@ const record=async event=>{const saved=await journal(event);
 
  return saved;
 };
-const {context}=await loginBrowser({browserPath:resources.browserPath,profile:join(output,'browser'),candidate:{url:config.loginom_url,username:account,password:config.workflow_profile.password},headless:false,keepOpen:true});
+const {context}=await loginBrowser({browserPath:resources.browserPath,profile:join(output,'browser'),candidate:{url:config.loginom_url,username:account,password:config.workflow_profile.password},headless:true,keepOpen:true});
 const page=context.pages()[0],execute=code=>new Function('page',`return (${code})(page)`)(page);
 const identity={sessionId:session,account,packagePath:saved.path,loginomUrl:config.loginom_url,loginomBuild:'7.4.2'};
 let report={status:'FAIL',all_values_compared:false};
