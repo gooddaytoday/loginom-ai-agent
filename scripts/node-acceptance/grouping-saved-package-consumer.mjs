@@ -47,7 +47,7 @@ export function consumeSavedPackageRecords(rawRecords,expected,{now,maxJournalAg
    ||JSON.stringify(request.parameters)!==JSON.stringify(save.parameters))return refuse('SAVE_REQUEST_CHANGED');
   const outcome=save.outcome;
   if(outcome?.status!=='SUCCEEDED'||outcome.operation_id!==expected.saveOperationId||outcome.action_key!==request.action_key
-   ||outcome.phase!=='completed'||outcome.cleanup_complete!==true||outcome.error!==null
+   ||outcome.phase!=='verified'||outcome.cleanup_complete!==true||outcome.error!==null
    ||outcome.output?.package_ref?.path!==expected.packagePath)return refuse('CONFIRMED_SAVE_REQUIRED');
   const state=parseSavedPackageState(text(dirty.state),expected);
   // The existing v1 state has no native Guid, reference epoch or capture clock.

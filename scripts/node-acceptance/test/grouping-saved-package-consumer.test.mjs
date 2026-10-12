@@ -17,7 +17,7 @@ function fixture(modified=false,action='package.save_checkpoint'){
  const records={workspace:{...meta,recorded_at:new Date(now-4000).toISOString(),event:'workspace_prepared',state:prepared},
   request:{...meta,recorded_at:new Date(now-3000).toISOString(),phase:'prepared',operation_id:'save',action_key:action,checkpoint:{workflow_ref:workflowRef},parameters:{path:expected.packagePath,conflict_policy:'replace'}},
   save:{...meta,recorded_at:new Date(now-2000).toISOString(),phase:'completed',operation_id:'save',action_key:action,checkpoint:{workflow_ref:workflowRef},parameters:{path:expected.packagePath,conflict_policy:'replace'},
-   outcome:{status:'SUCCEEDED',operation_id:'save',action_key:action,phase:'completed',cleanup_complete:true,error:null,output:{package_ref:{path:expected.packagePath}}}},
+   outcome:{status:'SUCCEEDED',operation_id:'save',action_key:action,phase:'verified',cleanup_complete:true,error:null,output:{package_ref:{path:expected.packagePath}}}},
   dirty:{...meta,recorded_at:new Date(now-1000).toISOString(),phase:'saved_package_state_observed',operation_id:'save',state}};
  const pin=()=>{const raw=Object.fromEntries(Object.entries(records).map(([k,v])=>[k,JSON.stringify(v)]));expected.recordPins=Object.fromEntries(Object.entries(raw).map(([k,v])=>[k,savedRecordHash(v)]));return raw;};
  return {now,expected,records,pin};
@@ -40,7 +40,8 @@ const faults={
  not_ready:f=>f.records.workspace.state.status='NOT_READY',save_id:f=>f.records.save.operation_id='other',dirty_id:f=>f.records.dirty.operation_id='other',
  request_path:f=>f.records.request.parameters.path='/foreign/grouping.lgp',parameters:f=>f.records.save.parameters.conflict_policy='reject',
  action:f=>f.records.save.action_key='node.add',ambiguous:f=>f.records.save.outcome.status='AMBIGUOUS',
- pending:f=>f.records.save.outcome.phase='observing',cleanup:f=>f.records.save.outcome.cleanup_complete=false,
+ pending:f=>f.records.save.outcome.phase='observing',
+ completed_nested:f=>f.records.save.outcome.phase='completed',failed:f=>f.records.save.outcome.status='FAILED',cleanup:f=>f.records.save.outcome.cleanup_complete=false,
  error:f=>f.records.save.outcome.error={message:'primary'},outcome_id:f=>f.records.save.outcome.operation_id='other',
  outcome_action:f=>f.records.save.outcome.action_key='node.add',outcome_path:f=>f.records.save.outcome.output.package_ref.path='/foreign/grouping.lgp',
  state_session:f=>f.records.dirty.state.session_id='foreign',state_document:f=>f.records.dirty.state.document_id='foreign',
