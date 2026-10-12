@@ -20,12 +20,14 @@ export function privateFPTransport(port: Port) {
   return {
     request: client.request, close: client.close,
     readPreReady(input: { run: string; authorization: string }, control: Control) {
-      control.signal.throwIfAborted()
-      if (!Number.isSafeInteger(control.deadline) || Date.now() >= control.deadline)
+      const { signal, deadline } = control
+      const { run, authorization } = input
+      signal.throwIfAborted()
+      if (!Number.isSafeInteger(deadline) || Date.now() >= deadline)
         return Promise.reject(Error("LOGINOM_PRE_READY_READ_EXPIRED"))
-      if (consumed.has(input.run)) return Promise.reject(Error("LOGINOM_RECOVERY_REQUIRED"))
-      consumed.add(input.run)
-      return client.controlled(input, control)
+      if (consumed.has(run)) return Promise.reject(Error("LOGINOM_RECOVERY_REQUIRED"))
+      consumed.add(run)
+      return client.controlled({ run, authorization }, { signal, deadline })
     },
   }
 }
