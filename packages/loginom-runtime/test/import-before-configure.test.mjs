@@ -52,7 +52,7 @@ for(const [name,change] of [
 for(const [name,change] of [
  ['field-order',f=>f.records.reverse()],['duplicate-names',f=>f.records[1].data.Name='LKey'],
  ['missing-type',f=>delete f.records[1].data.DataType],['missing-kind',f=>delete f.records[1].data.DataKind],['foreign-record',f=>f.records[1].isModel=false],['partial-store',f=>f.store.getTotalCount=()=>4],
- ['loading',f=>f.store.isLoading=()=>true],['missing-source',f=>f.entries.delete('MF;TF-1;WizrdMCF;ImportTextFilePreviewWizard;edtFileName;ValueControl')],
+ ['source-cache-membership',f=>f.store.getData=()=>({items:f.records,getSource:()=>({items:f.records.map(r=>({...r}))})})],['missing-record-id',f=>delete f.records[0].internalId],['loading',f=>f.store.isLoading=()=>true],['missing-source',f=>f.entries.delete('MF;TF-1;WizrdMCF;ImportTextFilePreviewWizard;edtFileName;ValueControl')],
 ])test(name+': partial, never inferred from pins',()=>{const f=fixture();change(f);const r=read(f);assert.equal(r.status,'PARTIAL');assert.equal(r.complete,false);assert.equal(r.close_authority,false);if(name!=='missing-source')assert.equal(r.columns.status,'unknown');});
 function context(f){return {binding:{revision:1,harness:'import-before-configure-v1',owner:'host',run:'run',lease:'host:run',chat:'chat',account:'own',session:'dock-session',admission:'admission',generation:1,expires:Date.now()+10000,packagePath:'/own/left.lgp'},identity:f.identity,browser:{callTool:async request=>{
  const page={evaluate:(fn,o)=>{f.env.o=o;return runInNewContext('('+fn.toString()+')(o)',f.env);}};
@@ -60,7 +60,7 @@ function context(f){return {binding:{revision:1,harness:'import-before-configure
  return {content:[{type:'text',text:JSON.stringify(value)}]};}},record:async()=>{}};}
 test('closed capture ABI executes actual serialized function and awaits record',async()=>{const f=fixture(),c=context(f);let recorded=false;c.record=async e=>{assert.equal(e.result.complete,false);recorded=true;};const r=await resource.captureImport(c);assert.equal(recorded,true);assert.equal(r.status,'PARTIAL');});
 for(const [name,change] of [
- ['wrong-lease',c=>c.binding.lease='foreign'],['expired',c=>c.binding.expires=Date.now()-1],
+ ['forged-close-authority',c=>{const old=c.browser.callTool;c.browser.callTool=async q=>{const r=await old(q),v=JSON.parse(r.content[0].text);v.close_authority=true;r.content[0].text=JSON.stringify(v);return r;};}],['wrong-lease',c=>c.binding.lease='foreign'],['expired',c=>c.binding.expires=Date.now()-1],
  ['persistence',c=>c.record=async()=>{throw Error('fixture fsync refusal');}],
  ['deadline-after-read',c=>{const old=c.browser.callTool;c.browser.callTool=async r=>{const v=await old(r);c.binding.expires=Date.now()-1;return v;};}],
  ['identity-after-record',c=>c.record=async()=>{c.identity.document_id='changed';}],

@@ -20,7 +20,7 @@ export async function captureImport({binding,identity,browser,record}) {
  const values=(response?.content??[]).filter(b=>b.type==='text').flatMap(b=>{try{return [JSON.parse(b.text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/)?.[1]??b.text)];}catch{return [];}});
  need(values.length===1&&values[0]?.revision===1&&values[0].harness===harness&&values[0].document_id===expected.document_id
   &&values[0].session_id===expected.session_id&&values[0].account===expected.account
-  &&['PARTIAL','REFUSED'].includes(values[0].status)&&values[0].complete===false&&values[0].settings_applied===false,'RESULT');
+  &&['PARTIAL','REFUSED'].includes(values[0].status)&&values[0].complete===false&&values[0].settings_applied===false&&values[0].close_authority===false&&values[0].effect_possible===false,'RESULT');
  // Await caller's durable journal; persistence failure propagates, never a mint.
  await record({event:'fixed_import_preconfigure_observation',binding_admission:retained.admission,result:values[0]});
  need(Date.now()<retained.expires&&Object.keys(retained).every(k=>retained[k]===binding[k])&&Object.keys(expected).every(k=>expected[k]===identity[k]),'DEADLINE_AFTER_RECORD');
@@ -110,11 +110,12 @@ export function readImportSurface(o) {
   const view=globalThis.Ext?.getCmp?.(grids[0].id),store=view?.getStore?.(),data=store?.getData?.(),records=data?.items;
   if(view?.el?.dom===grids[0]&&store.isLoading?.()===false&&Array.isArray(records)&&records.length>0&&records.length<=1000
    &&records.every(r=>r.isModel===true)&&store.getCount?.()===records.length&&store.getTotalCount?.()===records.length
-   &&(!data.getSource?.()||data.getSource().items?.length===records.length)){
+   &&(!data.getSource?.()||(Array.isArray(data.getSource().items)&&data.getSource().items.length===records.length&&new Set(data.getSource().items).size===records.length&&data.getSource().items.every(r=>records.includes(r))))){
    const fields=records.map((r,i)=>({index:r.data?.Index,name:r.data?.Name,label:r.data?.DisplayName,
     type:r.data?.DataType,data_kind:r.data?.DataKind,representation:'native_enum',native_record_id:r.internalId}));
    if(fields.every((f,i)=>f.index===i&&typeof f.name==='string'&&f.name.length>0&&f.name.length<=120
     &&typeof f.label==='string'&&f.label.length<=120&&Number.isInteger(f.type)&&Number.isInteger(f.data_kind))
+    &&fields.every(f=>(typeof f.native_record_id==='string'&&f.native_record_id.length>0)||Number.isSafeInteger(f.native_record_id))
     &&new Set(fields.map(f=>f.name)).size===fields.length&&new Set(fields.map(f=>f.native_record_id)).size===fields.length){
     result.columns={status:'observed_native_codes',fields,complete_native_inventory:true,canonical_types_verified:false};
    }
