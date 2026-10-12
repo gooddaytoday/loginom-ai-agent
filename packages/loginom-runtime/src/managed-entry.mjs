@@ -2,7 +2,7 @@ import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile, open } from "node:fs/promises"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { loginBrowser, checkConnection, loginomAddress } from "./connection-check.mjs"
@@ -31,32 +31,121 @@ const send = (message, disconnect = false) => {
       if (disconnect && process.connected) process.disconnect()
     })
 }
+function closeRejection(value) {
+  return value instanceof Error ? {kind:"Error",name:value.name,message:value.message,
+    ...("cause" in value?{cause:closeRejection(value.cause)}:{})} :
+    {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
+}
+async function recordClose(stage, detail) {
+  state.shutdown ??= {stages:[]}
+  if (Object.hasOwn(state,"startupFailure")) state.shutdown.startupFailure ??= closeRejection(state.startupFailure)
+  state.shutdown.stages.push({stage,...detail})
+  const directory=state.session?.directory??state.startupOwner?.directory
+  if (!directory) return // No-start has acquired no native resources.
+  const path=join(directory,"managed-shutdown.json")
+  await writeFile(path,JSON.stringify(state.shutdown,null,2)+"\n",{mode:0o600})
+  const file=await open(path,"r+")
+  try {await file.sync()} finally {await file.close()}
+}
 function close() {
   if (state.closing) return state.closing
-  state.controller?.abort()
   state.closing = (async () => {
-    await Promise.allSettled([...requests])
-    const results = []
-    for (const handle of [state.client, state.bridge, state.browserServer, state.browser]) {
-      results.push(...(await Promise.allSettled([Promise.resolve().then(() => handle?.close())])))
+    state.shutdown ??= {stages:[]}
+    state.release ??= {}
+    let stage="drain",primary
+    try {
+      await recordClose(stage,{status:"started"})
+      await Promise.allSettled([...requests])
+      if (state.startupOwner && !state.bridge) {
+        stage="startup_owner"
+        const owner=state.startupOwner
+        state.startupBinding ??= Object.freeze({owner,id:owner.id,account:owner.account,origin:owner.origin,context:owner.context,page:owner.page})
+        const binding=state.startupBinding
+        if (binding.owner!==owner || binding.id!==owner.id || binding.account!==owner.account
+            || binding.origin!==owner.origin || binding.context!==owner.context || binding.page!==owner.page)
+          throw Error("LOGINOM_STARTUP_OWNER_CHANGED")
+        if (state.startupCleanup && state.startupCleanup.owner!==owner) throw Error("LOGINOM_STARTUP_OWNER_CHANGED")
+        if (!state.startupCleanup) {
+          try {
+            const receipt=owner.closed===true?owner.receipt:await owner.close()
+            if (receipt?.cleanup_complete!==true || owner.closed!==true
+                || (owner.context && owner.contextClosed!==true))
+              throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:receipt})
+            state.startupCleanup={owner,receipt}
+          } catch (error) {
+            // Preserve the original native value, including undefined/falsy,
+            // independently of authentication and later persistence failures.
+            primary={stage,error:new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{
+              cause:owner.nativeFailure?owner.nativeFailure.value:error})}
+            throw primary.error
+          }
+        }
+        await recordClose(stage,{status:"returned",receipt:state.startupCleanup.receipt})
+        if (owner.contextClosed) state.browser=undefined
+      }
+      if (state.browser && !state.bridge) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      if (state.bridge) {
+        stage="bridge"
+        if (!state.bridgeCleanup) {
+          if (state.bridgeCloseAttempted) throw state.bridgeCloseFailure
+          await recordClose(stage,{status:"started"})
+          state.bridgeCloseAttempted=true
+          try {
+            const receipt=await state.bridge.close()
+            // Preserve this receiving branch's existing bridge receipt contract.
+            if (receipt?.browser_transport_closed!==true) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:receipt})
+            state.bridgeCleanup=receipt
+          } catch (error) {
+            state.bridgeCloseFailure=new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:error})
+            throw state.bridgeCloseFailure
+          }
+        }
+        await recordClose(stage,{status:"returned",receipt:state.bridgeCleanup})
+      }
+      state.controller?.abort()
+      for (const [name,handle] of [["client",state.client],["browser_server",state.browserServer],["browser_context",state.browser]]) {
+        stage=name
+        if (!state.release[name]) {
+          if (state.release[name+"_attempted"]) throw state.release[name+"_failure"]
+          await recordClose(stage,{status:"started"})
+          state.release[name+"_attempted"]=true
+          try {await handle?.close();state.release[name]=true}
+          catch (error) {state.release[name+"_failure"]=new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:error});throw state.release[name+"_failure"]}
+        }
+        await recordClose(stage,{status:"returned"})
+      }
+      stage="browser_profile"
+      if (state.browserProfile && !state.release.browser_profile) {
+        await rm(state.browserProfile,{recursive:true,force:true})
+        state.release.browser_profile=true
+      }
+      await recordClose("outer_acknowledgement",{status:"allowed"})
+    } catch (error) {
+      const rejection=primary?.error??(error instanceof Error?error:new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:error}))
+      state.closeFailure=rejection
+      state.shutdown.primaryFailure ??= {stage,rejection:closeRejection(rejection)}
+      if (Object.hasOwn(state,"startupFailure")) state.shutdown.startupFailure ??= closeRejection(state.startupFailure)
+      if (primary && error!==rejection) state.shutdown.persistenceFailure=closeRejection(error)
+      try {await recordClose("refused",{rejection:closeRejection(rejection)})}
+      catch (persistenceFailure) {state.shutdown.persistenceFailure=closeRejection(persistenceFailure)}
+      throw rejection
     }
-    if (state.browserProfile)
-      results.push(...(await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])))
-    if (results.some((result) => result.status === "rejected")) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
   })()
+  state.closing.catch(error=>{state.closeFailure=error;state.closing=undefined})
   return state.closing
 }
 const stop = () => {
   void close().then(
     () => process.exit(0),
-    () => process.exit(1),
+    error => { state.closeFailure = error },
   )
 }
 process.on("disconnect", stop)
 process.on("SIGTERM", stop)
 process.on("message", (message) => {
   const request = handle(message)
-  requests.add(request)
+  // Close must not wait for its own control handler.
+  if (message?.operation !== "close") requests.add(request)
   void request
     .finally(() => requests.delete(request))
     .catch(() => {
@@ -90,7 +179,9 @@ async function handle(message) {
       const browserProfile =
         process.platform === "win32" ? await mkdtemp(join(tmpdir(), "lb")) : join(directory, "browser-profile")
       state.browserProfile = process.platform === "win32" ? browserProfile : undefined
+      state.startupOwner={directory,generation:input.generation,chat:input.chat}
       const login = {
+        owner:state.startupOwner,
         browserPath: resources.browserPath,
         profile: browserProfile,
         candidate: input.connection,
@@ -103,6 +194,7 @@ async function handle(message) {
       }
       const authenticated = await loginBrowser({ ...login, keepOpen: true })
       state.browser = authenticated.context
+      state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
       const config = {
         endpoint: input.endpoint,
         apiKey: input.connection.apiKey,
@@ -207,8 +299,13 @@ async function handle(message) {
     }
   } catch (error) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
-    send({ id: message.id, error: code }, message.operation === "close")
+    send({ id: message.id, error: code })
     if (message.operation === "start") {
+      state.startupFailure=error
+      if (state.startupOwner?.context) {
+        state.browser=state.startupOwner.context
+        state.startupBinding ??= Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
+      }
       // Clean up immediately, but keep IPC until the owner requests an acknowledged close.
       // close() retains a rejection so that the later close request reports cleanup failure.
       setImmediate(() => {
