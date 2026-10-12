@@ -68,3 +68,23 @@ for(const value of [Error('primary',{cause:false}),undefined,null,false,0,''])te
 for(const scenario of ['owner','pending','running','deadline','original_signal','native_proxy','native_connection','native_session','opening','input0','dirty'])test('read-await drift '+scenario,async()=>{
  const f=await fixture();try{f.conn.Session.IsPackageModified=async()=>{if(scenario==='owner')f.owner.id='foreign';if(scenario==='pending')f.args.runtime.hasUnsettledWork=()=>true;if(scenario==='running')f.args.runtime.hasActiveWork=()=>true;if(scenario==='deadline')f.node.deadline=0;if(scenario==='original_signal')f.originalSignal.abort();if(scenario==='native_proxy')f.pkg.Package={};if(scenario==='native_connection')f.main.FMapTree.FServerConnection={...f.conn};if(scenario==='native_session')f.conn.Session={...f.conn.Session};if(scenario==='opening')f.prep.inputPortOpenReceipts.values().next().value.operation_id='foreign';if(scenario==='input0')f.port.FIndex=1;if(scenario==='dirty')return true;return false;};await assert.rejects(captureReplacement(f.args));assert.deepEqual(f.page.events,[])}finally{await f.cleanup()}
 });
+for(const scenario of ['dirty','running','disconnected','inventory'])test('final native/resource drift '+scenario,async()=>{
+ const baseline=await fixture();let last;
+ try{const r=await captureReplacement(baseline.args);assert.equal(validateCaptureResult(r,baseline.args),true);last=baseline.reads();}finally{await baseline.cleanup()}
+ const f=await fixture();try{
+  let changed=false;const evaluate=f.page.evaluate;
+  f.page.evaluate=async(...args)=>{
+   // The terminal safety RPC contributes one read. Change the resource before
+   // the preceding last native-context read, not just before that RPC.
+   if(f.reads()===last-2){changed=true;
+    if(scenario==='dirty')f.setDirty(true);
+    if(scenario==='running')f.pkg.HasRunningNodes=()=>true;
+    if(scenario==='disconnected')f.conn.Connected=false;
+    if(scenario==='inventory')f.main.FMapTree.PackageNodes.Count=2;
+   }
+   return evaluate(...args);
+  };
+  await assert.rejects(captureReplacement(f.args),/REPLACEMENT_FIXED_NATIVE_(SAFETY|RESOURCE)_REFUSED/);
+  assert.equal(changed,true);assert.deepEqual(f.page.events,[]);
+ }finally{await f.cleanup()}
+});

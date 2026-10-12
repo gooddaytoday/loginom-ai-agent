@@ -61,6 +61,10 @@ export async function captureReplacement({binding,identity,retained,runtime,sess
  await safety();guard();
  const finalProof=await readPreparedNodeContext(readPage,nativeBinding);guard();
  if(JSON.stringify(finalProof)!==JSON.stringify(proof))throw Error('REPLACEMENT_FIXED_NATIVE_CHANGED');
+ // The final native reader awaits too: its successful binding proof cannot
+ // stand in for current resource safety. End with the owned safety snapshot,
+ // including its checks on both sides of the dirty-state RPC, before issuance.
+ await safety();guard();
  const receipt={...diagnostic,admission_confirmed:false,settings_applied:false,execution_started:false,
   publication:{...publication},root:Object.fromEntries(rootKeys.map(k=>[k,publication[k]]))};
  captureData(receipt);assertCapturePublication(receipt,publication);issued.set(receipt,{request,node,retained,publication});return receipt;
