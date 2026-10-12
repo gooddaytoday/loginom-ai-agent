@@ -1,9 +1,9 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка: 2026-10-12T12:46:20+03:00; fresh issue/runs/metadata/roots всех 8 + LAB-55 прочитаны 12:39 MSK; thread LAB-57 и handoff read-back проверены.
+- Проверка: 2026-10-12T12:49:40+03:00; свежие issue/runs/metadata/roots всех 8 + LAB-55 и последние thread comments LAB-57 прочитаны; нового report/evidence нет.
 - lab-56-lab-63-30 ACTIVE, каждые 30 минут; все 8 ещё не done, условие удаления расписания не достигнуто.
 - LAB-56: in_review rev65, Ben ACCEPT + Evaler confirmed evidence/cleanup; новых runs нет, done не выставлен.
-- LAB-57: blocked rev43; Evaler offline verification run 01a12f7e-8744-7bac-968d-4e02a606ea18 running с 12:43:04 MSK.
+- LAB-57: in_progress rev44, metadata phase=blocked; Evaler offline verification run 01a12f7e-8744-7bac-968d-4e02a606ea18 running с 12:43:04 MSK; дублирование не требуется.
 - LAB-58–LAB-63: in_progress/admission rev9, runs отсутствуют; ждут последовательные независимые ACCEPT/cleanup.
 - LAB-55: in_review rev16, runs нет; чужие процессы/leases/defaults не затронуты.
 - Первый name fix перенесён Rich: partial 2c02eb9c5fde7eea2ff013ccd40c8a4417a1e9a7; source admission/delivery PASS.
