@@ -555,7 +555,11 @@ export async function createBridge(config, session, { browserTransport: managedB
           fpDraftRetained=true;
           const draft=await actionRuntime.captureFieldParametersPreservation(binding);
           await recordExecution({event:'fp_capture_draft',binding,receipt:draft});
-          return {draft,cleanupComplete:false,draftRetained:true,stoppedBeforeDone:true};
+          // Journal persistence can outlive the observed owner/resources. The retained
+          // delivery path rereads the same native context without replaying Apply.
+          const freshDraft=await actionRuntime.captureFieldParametersPreservation(binding);
+          assertBound();
+          return {draft:freshDraft,cleanupComplete:false,draftRetained:true,stoppedBeforeDone:true};
         }
         const receipt=await acceptanceCapture.harness({binding, identity, browser, record:recordExecution});
         assertBound();
