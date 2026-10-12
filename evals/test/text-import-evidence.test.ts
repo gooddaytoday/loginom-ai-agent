@@ -272,7 +272,8 @@ test("damaged Unicode may be diagnosed after a full read without inventing a nat
   const f = await positiveFixture("txt-wrong-encoding")
   try {
     const spec = await Bun.file(path.join(f.task, "SPEC.json")).json()
-    f.port.schema = spec.columns
+    f.port.schema = spec.columns.map((column: { name: string; label: string; type: string; data_kind: string }, index: number) =>
+      ({ index, name: column.name, label: column.label, type: column.type, data_kind: column.data_kind }))
     f.port.row_count = 1; f.port.sample_rows = 1
     f.port.sample = [[{ type: "string", value: "1", is_null: false }, { type: "string", value: "������", is_null: false }]]
     await f.write()
