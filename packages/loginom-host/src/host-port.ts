@@ -23,10 +23,12 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       captured: boolean
       captureRefused: boolean
       draftRetained?: boolean
+      preReadyHeld?: boolean
     }
   >()
   const state = { closed: false, stopping: undefined as Promise<void> | undefined }
   const pending = new Set<Promise<void>>()
+  const reads = new Map<string, {run: NonNullable<ReturnType<typeof runs.get>>; controller: AbortController; authorization: string}>()
   async function abandon(run: NonNullable<ReturnType<typeof runs.get>>) {
     for (const id of run.active) await service.journal.settle(id, false)
     const retained = [...run.active].filter((id) => service.journal.pending().includes(id))
@@ -81,6 +83,58 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       }
       const run = runs.get(input.run)
       if (!run || run.released) throw new Error("LOGINOM_RUN_INVALID")
+      if (data.method === "readonly.preReady.cancel") {
+        if (Object.keys(input).sort().join(",") !== "authorization,rejection,requestId,run"
+            || !("authorization" in input) || !service.authorizeCapture(input.authorization)
+            || !("requestId" in input) || typeof input.requestId !== "string") throw Error("LOGINOM_METHOD_INVALID")
+        const reading = reads.get(input.requestId)
+        if (!reading || reading.run !== run || reading.authorization !== input.authorization) throw Error("LOGINOM_METHOD_INVALID")
+        reading.controller.abort(decodeReadRejection("rejection" in input ? input.rejection : undefined))
+        reply({id:data.id,result:false}); return
+      }
+      if (data.method === "readonly.preReady") {
+        if (Object.keys(input).sort().join(",") !== "authorization,run" || !("authorization" in input)
+            || typeof input.authorization !== "string" || !service.authorizeCapture(input.authorization)
+            || service.captureHarness(run.chat) !== "field-parameters-preservation-v1"
+            || !("deadline" in data) || !Number.isSafeInteger(data.deadline)) throw Error("LOGINOM_METHOD_INVALID")
+        const deadline = data.deadline as number
+        if (run.preReadyHeld || run.captured || run.captureRefused || run.dispatching || run.calls || run.active.size
+            || service.journal.pending().length) throw Error("LOGINOM_RECOVERY_REQUIRED")
+        const grant = service.captureBinding(run.chat), lease = run.lease
+        const tuple = grant && JSON.stringify(grant)
+        const controller = new AbortController()
+        const originalRun = run, runId = input.run
+        function guard() {
+          controller.signal.throwIfAborted()
+          if (Date.now() >= deadline) throw Error("LOGINOM_PRE_READY_READ_EXPIRED")
+          if (state.closed || runs.get(runId) !== originalRun || originalRun.released || originalRun.lease !== lease
+              || !grant || service.captureBinding(originalRun.chat) !== grant || JSON.stringify(grant) !== tuple
+              || grant.harness !== "field-parameters-preservation-v1" || grant.owner !== owner || grant.run !== runId
+              || grant.generation !== lease.generation || grant.chat !== originalRun.chat || Date.now() >= grant.expires
+              || deadline > grant.expires || service.journal.pending().length) throw Error("LOGINOM_RECOVERY_REQUIRED")
+        }
+        guard()
+        run.preReadyHeld = true; run.calls++; run.dispatching = true
+        reads.set(data.id, {run,controller,authorization:input.authorization})
+        try {
+          const lookup = service.runtime(lease.generation, run.chat)
+          const retained = service.retainedRuntime(lease.generation, run.chat)
+          const runtime = await lookup
+          guard()
+          if (!retained || service.retainedRuntime(lease.generation, run.chat) !== retained) throw Error("LOGINOM_RECOVERY_REQUIRED")
+          const result = await runtime.readPreReady({signal:controller.signal,deadline})
+          guard()
+          if (service.retainedRuntime(lease.generation, run.chat) !== retained || !result || typeof result !== "object"
+              || !("ready" in result) || result.ready !== false || !("cleanupComplete" in result) || result.cleanupComplete !== false
+              || !("kind" in result) || result.kind !== "PRE_READY_CLOSED_READ") throw Error("LOGINOM_RECOVERY_REQUIRED")
+          reply({id:data.id,result})
+        } catch (error) {
+          run.lease.holdRecovery(); service.recoveries.set(run.chat,run.lease)
+          reply({id:data.id,rejection:encodeReadRejection(error)})
+        } finally { reads.delete(data.id); run.calls--; run.dispatching = false }
+        return
+      }
+      if (run.preReadyHeld) throw Error("LOGINOM_RECOVERY_REQUIRED")
       if (run.captureRefused) {
         if (data.method !== "call" || !("name" in input) || typeof input.name !== "string"
             || !["dock_diagnostics", "dock_workspace_observe", "dock_operation_inspect", "dock_node_status"].includes(input.name)
@@ -277,7 +331,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     if (state.stopping) return state.stopping
     // In-flight operations retain their leases until their finally handlers run.
     state.stopping = Promise.all([...pending]).then(async () => {
-      if (service.journal.pending().length || [...runs.values()].some((run) => run.active.size || run.captureRefused))
+      if (service.journal.pending().length || [...runs.values()].some((run) => run.active.size || run.captureRefused || run.preReadyHeld))
         throw new Error("LOGINOM_RECOVERY_REQUIRED")
       for (const [id, run] of runs) await release(id, run)
       state.closed = true
@@ -297,4 +351,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       await stop()
     },
   }
+}
+
+function encodeReadRejection(value: unknown): unknown {
+  if(value instanceof Error)return {kind:"Error",name:value.name,message:value.message,...("cause" in value?{cause:encodeReadRejection(value.cause)}:{})}
+  return {kind:"value",value:value===undefined?null:value,is_undefined:value===undefined}
+}
+function decodeReadRejection(value: any): unknown {
+  if(value?.kind==="Error"){const error=new Error(value.message,"cause" in value?{cause:decodeReadRejection(value.cause)}:undefined);error.name=value.name;return error}
+  return value?.is_undefined?undefined:value?.value
 }

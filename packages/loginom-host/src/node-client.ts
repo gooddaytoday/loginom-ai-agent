@@ -4,7 +4,7 @@ import { readFile, realpath } from "node:fs/promises"
 import { createHash, randomBytes } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { runtimeEnvironment } from "./supervisor"
-import { transport, type Port } from "./transport"
+import { transport, privateFPTransport, type Port } from "./transport"
 
 type NodeHostInput = {
   node: string
@@ -105,16 +105,19 @@ export async function launchNodeHost(input: NodeHostInput) {
     on: (event, listener) => {
       events.on(event, listener)
     },
+    off: (event, listener) => { events.off(event, listener) },
     onClose: (listener) => {
       if (state.closed) {
         listener()
         return
       }
       events.on("close", listener)
+      return () => { events.off("close", listener) }
     },
     start() {},
   }
-  const client = transport(port)
+  const fpClient = diagnostic?.harness === "field-parameters-preservation-v1" ? privateFPTransport(port) : undefined
+  const client = fpClient ?? transport(port)
   const ready = await client
     .request(
       "start",
@@ -154,6 +157,7 @@ export async function launchNodeHost(input: NodeHostInput) {
     port,
     exited,
     request: client.request,
+    ...(fpClient && diagnostic ? { readPreReady: (run: string, control: {signal:AbortSignal;deadline:number}) => fpClient.readPreReady({run,authorization:diagnostic.authorization},control) } : {}),
     get alive() {
       return !state.closed
     },
