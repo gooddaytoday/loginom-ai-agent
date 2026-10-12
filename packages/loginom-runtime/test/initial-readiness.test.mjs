@@ -106,3 +106,39 @@ for(const scenario of scenarios)test('bounded initial readiness '+scenario,async
   if(process.env.READINESS_RESULTS){await mkdir(process.env.READINESS_RESULTS,{recursive:true});await writeFile(join(process.env.READINESS_RESULTS,scenario+'.json'),JSON.stringify({scenario,fixture:true,source:String(path),reads,native_logout_calls:f.logout(),context_close_calls:f.contextClose(),evidence:f.owner.evidence,failure:failure&&{message:failure.message,cause:failure.cause},scope:'whole actual connection-check functions; labelled Page/Application/auth doubles, real FS; original owner retained; no native Loginom'},null,2)+'\n')}
  }finally{if(f.owner.guardReadOperation?.state==='pending')await f.owner.guardReadOperation.promise.catch(()=>{});await rm(root,{recursive:true,force:true})}
 });
+
+// Joint tuple controls: a missing Count must not hide a terminal running
+// value/rejection. These invoke the actual gate without cleanup/native gestures.
+for(const count of [undefined,null])for(const running of [true,0,'throw-zero'])test(`joint operands Count=${String(count)} running=${running}`,async()=>{
+ const root=await mkdtemp(join(tmpdir(),'joint-ready-')),f=fixture(root);
+ try{
+  await f.functions.loginBrowser({...f.options,keepOpen:true});
+  delete f.owner.evidence.first_guard;delete f.owner.evidence.initial_refusal;f.owner.evidence.guard_observations=[];
+  let reads=0,runningReads=0,countReads=0;
+  f.page.onGuard=()=>{reads++;const m=f.pageState.bg.app.Application.FInstance.FMainForm.FMapTree;
+   Object.defineProperty(m.PackageNodes,'Count',{configurable:true,get(){countReads++;return reads===1?count:0}});
+   m.HasRunningNodes=()=>{runningReads++;if(reads>1)return false;if(running==='throw-zero')throw 0;return running};
+  };
+  let result,rejected=false,value;try{result=await f.functions.startupReadiness(f.owner)}catch(error){rejected=true;value=error}
+  assert.equal(reads,1);assert.equal(countReads,1);assert.equal(runningReads,1);
+  assert.equal(f.owner.evidence.first_guard.count.is_undefined,count===undefined);
+  if(running==='throw-zero'){assert.equal(rejected,true);assert.equal(value,0);assert.equal(f.owner.guardFailure.value,0);assert.equal(f.owner.evidence.guard_rejection.value,0)}
+  else {assert.equal(rejected,false);assert.equal(result.authenticated,undefined);assert.equal(result.snapshot.running.value,running)}
+  const evidence=JSON.parse(await readFile(join(root,'startup-cleanup.json'),'utf8'));
+  assert.equal(evidence.first_guard.running.observed,true);assert.equal(f.logout(),0);assert.equal(f.contextClose(),0);
+  if(process.env.READINESS_RESULTS)await writeFile(join(process.env.READINESS_RESULTS,`joint-${String(count)}-${running}.json`),JSON.stringify({fixture:true,reads,countReads,runningReads,rejected,value,evidence},null,2));
+ }finally{await rm(root,{recursive:true,force:true})}
+});
+for(const [kind,value] of Object.entries({error:Error('joint running',{cause:0}),undefined:undefined,null:null,false:false,zero:0,empty:''}))for(const persistence of [false,true])test(`joint missing Count rejection ${kind} persistence=${persistence}`,async()=>{
+ const root=await mkdtemp(join(tmpdir(),'joint-reject-')),f=fixture(root);
+ try{
+  await f.functions.loginBrowser({...f.options,keepOpen:true});
+  let reads=0;f.page.onGuard=async()=>{reads++;const m=f.pageState.bg.app.Application.FInstance.FMainForm.FMapTree;m.PackageNodes.Count=undefined;m.HasRunningNodes=()=>{throw value};if(persistence)await mkdir(join(root,'startup-cleanup.json'))};
+  if(persistence)await rm(join(root,'startup-cleanup.json'));
+  let rejected=false,raw;try{await f.functions.startupReadiness(f.owner)}catch(error){rejected=true;raw=error}
+  assert.equal(rejected,true);assert.equal(raw,value);assert.equal(f.owner.guardFailure.value,value);assert.equal(reads,1);
+  if(kind==='error')assert.equal(f.owner.evidence.guard_rejection.cause.value,0);
+  if(persistence)assert.ok(f.owner.evidence.guard_persistence_failure);
+  assert.equal(f.logout(),0);assert.equal(f.contextClose(),0);
+ }finally{await rm(root,{recursive:true,force:true})}
+});

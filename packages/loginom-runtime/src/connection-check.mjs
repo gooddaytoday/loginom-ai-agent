@@ -184,7 +184,7 @@ async function startupReadiness(owner, initial=true, persist=true) {
       snapshot.dialogs={available:true,visible:[...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)};
       if(snapshot.dialogs.visible) return result({reason:'STARTUP_OPERATION_OPEN'});
       if(connected!==true) return result({unauthenticatedCandidate:!o.loginSubmitted,reason:'LOGIN_EFFECT_UNKNOWN'});
-      if(build!=='7.4.2'||account!==o.account||count!==0) return result({reason:'STARTUP_NOT_OWN_EMPTY_IDLE'});
+      if(build!=='7.4.2'||account!==o.account) return result({reason:'STARTUP_NOT_OWN_EMPTY_IDLE'});
       let running;
       try {running=m.HasRunningNodes();snapshot.running={...exact(running),available:true,observed:true}}
       catch(error){
@@ -194,7 +194,7 @@ async function startupReadiness(owner, initial=true, persist=true) {
         // Error causes even when browser serialization omits them.
         return result({reason:'STARTUP_GUARD_READ_REJECTED',guardFailure:{value:error,rejection:detail}});
       }
-      if(running!==false) return result({reason:'STARTUP_NOT_OWN_EMPTY_IDLE'});
+      if(count!==0||running!==false) return result({reason:'STARTUP_NOT_OWN_EMPTY_IDLE'});
       return result({authenticated:true});
     },{id:owner.id,account:owner.account,origin:owner.origin,navigationStarted:owner.navigationStarted===true,loginSubmitted:owner.loginSubmitted===true,deadline:owner.deadline??null})
     reading.promise.then(()=>{reading.state='settled'},value=>{reading.state='settled';reading.rejection=startupRejection(value)});
@@ -252,7 +252,10 @@ async function startupReadiness(owner, initial=true, persist=true) {
     const pending=initial&&observed.reason==='STARTUP_NOT_OWN_EMPTY_IDLE'
       &&x.document_matches&&x.origin_matches&&x.identity_matches&&x.build.value==='7.4.2'
       &&x.connected.value===true&&x.dialogs.available&&x.dialogs.visible===false
-      &&(unknown(x.count)||(x.count.value===0&&x.running.observed===true&&unknown(x.running)));
+      &&x.running.observed===true&&x.running.available===true
+      &&(unknown(x.count)||x.count.value===0)
+      &&(unknown(x.running)||x.running.value===false)
+      &&(unknown(x.count)||unknown(x.running));
     if(!pending)return observed;
     owner.evidence.initial_readiness={...budget,status:'pending',observations:++iteration};
     await startupEvidence(owner);
