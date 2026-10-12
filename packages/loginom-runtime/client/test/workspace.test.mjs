@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runInNewContext, createContext, runInContext } from 'node:vm';
-import { makeWorkspacePrepareCode, makeWorkspaceBootstrapCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace } from '../lib/workspace.mjs';
+import {pathToFileURL} from 'node:url';
+const {makeWorkspacePrepareCode,makeWorkspaceBootstrapCode,parseWorkspacePreparation,prepareWorkspaceSession,requirePreparedWorkspace}=await import(process.env.WORKSPACE_HELPER?pathToFileURL(process.env.WORKSPACE_HELPER):new URL('../lib/workspace.mjs',import.meta.url));
 import {prepareTool} from '../lib/skill.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 import { createSerialGate } from '../lib/clipboard.mjs';
@@ -21,10 +22,10 @@ async function bootstrap({ url='https://loginom.test/app', actualBuild=build, ti
   }));
   const page={url:()=>url, async evaluate(fn,args) {
     evaluations++;
-    return runInNewContext(`(${fn.toString()})(args)`,{args,location:{origin:'https://loginom.test'},bg:{app:{Version:actualBuild}},
+    return runInNewContext(`(${fn.toString()})(args)`,{URL,args,location:{origin:'https://loginom.test'},bg:{app:{Version:actualBuild}},
       Date:{now:()=>0},getComputedStyle:()=>({}),document:{documentElement:{},createTreeWalker:()=>({nextNode:()=>elements[scanned++]??null})}});
   }};
-  const result=await runInNewContext(makeWorkspaceBootstrapCode({origin:'https://loginom.test',build}),{URL})(page);
+  const result=await runInNewContext(makeWorkspaceBootstrapCode({origin:'https://loginom.test',build}),{page,__end__:()=>{}})(page);
   return {result:JSON.parse(JSON.stringify(result)),evaluations,scanned};
 }
 
