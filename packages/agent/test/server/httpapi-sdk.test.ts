@@ -1096,6 +1096,83 @@ describe("HttpApi SDK", () => {
     ),
   )
 
+  httpapi(
+    "preserves busy when a concurrent prompt_async fails before the loop",
+    withFakeLlm("default", ({ sdk, directory, llm }) =>
+      Effect.gen(function* () {
+        const gate = Promise.withResolvers<void>()
+        yield* Effect.addFinalizer(() => Effect.sync(() => gate.resolve()))
+        yield* llm.hold("first request completed", gate.promise)
+        const session = yield* capture(() => sdk.session.create({ title: "concurrent prompt failure" }))
+        const sessionID = String(record(session.data).id)
+        const controller = new AbortController()
+        yield* Effect.addFinalizer(() => Effect.sync(() => controller.abort()))
+        const events = yield* call(() => sdk.event.subscribe(undefined, { signal: controller.signal }))
+        yield* Effect.addFinalizer(() =>
+          call(async () => void (await events.stream.return?.(undefined))).pipe(Effect.ignore),
+        )
+        const ready = yield* Deferred.make<void>()
+        const failed = yield* Deferred.make<void>()
+        const idle = yield* Deferred.make<void>()
+        yield* call(async () => {
+          for await (const event of events.stream) {
+            const payload = record(event).payload ?? event
+            const type = record(payload).type
+            if (type === "server.connected") {
+              Deferred.doneUnsafe(ready, Effect.void)
+              continue
+            }
+            const properties = record(record(payload).properties)
+            if (properties.sessionID !== sessionID) continue
+            if (type === "session.error") Deferred.doneUnsafe(failed, Effect.void)
+            if (type === "session.status" && record(properties.status).type === "idle") {
+              Deferred.doneUnsafe(idle, Effect.void)
+              return
+            }
+          }
+        }).pipe(Effect.forkScoped)
+        yield* awaitWithTimeout(Deferred.await(ready), "timed out waiting for /event server.connected", "2 seconds")
+        const first = yield* capture(() =>
+          sdk.session.promptAsync({
+            sessionID,
+            agent: "build",
+            model: { providerID: "test", modelID: "test-model" },
+            parts: [{ type: "text", text: "keep the first request active" }],
+          }),
+        )
+        expect(first.status).toBe(204)
+        yield* awaitWithTimeout(llm.wait(1), "timed out waiting for the active model request", "5 seconds")
+        expect(record(record((yield* capture(() => sdk.session.status())).data)[sessionID]).type).toBe("busy")
+        const second = yield* capture(() =>
+          sdk.session.promptAsync({
+            sessionID,
+            agent: "build",
+            model: { providerID: "test", modelID: "test-model" },
+            parts: [
+              {
+                type: "file",
+                mime: "application/octet-stream",
+                filename: "missing.bin",
+                url: pathToFileURL(path.join(directory, "missing.bin")).href,
+              },
+            ],
+          }),
+        )
+        expect(second.status).toBe(204)
+        yield* awaitWithTimeout(Deferred.await(failed), "timed out waiting for the second prompt failure", "5 seconds")
+        const shell = yield* capture(() => sdk.session.shell({ sessionID, agent: "build", command: "true" }))
+        expect(shell.status).toBe(409)
+        expect(record(record((yield* capture(() => sdk.session.status())).data)[sessionID]).type).toBe("busy")
+        expect(yield* Deferred.isDone(idle)).toBe(false)
+        gate.resolve()
+        yield* awaitWithTimeout(Deferred.await(idle), "timed out waiting for the first request to become idle", "5 seconds")
+        const messages = yield* capture(() => sdk.session.messages({ sessionID }))
+        expect(JSON.stringify(messages.data)).toContain("first request completed")
+        expect(record((yield* capture(() => sdk.session.status())).data)[sessionID]).toBeUndefined()
+      }),
+    ),
+  )
+
   serverPathParity("matches generated SDK project git initialization", (serverPath) =>
     withProject(serverPath, {}, ({ sdk, directory }) =>
       Effect.gen(function* () {
