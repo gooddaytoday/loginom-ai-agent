@@ -56,3 +56,5 @@ changed. This includes wizard data/tree/engine/opening and process ModelNode/
 record/parent/children/diagram. Row record/view/index/cell/icon aliases are checked
 after final getStore/getAt. A defined native FPortIndex must equal nativeIndex;
 undefined remains permitted by node-context's existing contract.
+
+The outer active-tab read and all late selection/state/Ext/store/root provider reads finish before the common owner check. Process observations resample the current views, their stores and the current root; retained root equality alone is insufficient. Only then are all retained claim bindings checked, without calling those providers again. Account/tree drift refuses all observations; a changed process view/store/root drops its process claim. These are bounded SOURCE prototype controls on doubles, with no production integration or native proof.

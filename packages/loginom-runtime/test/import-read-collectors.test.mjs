@@ -100,3 +100,15 @@ for(const [name,change]of [['opening-tree',f=>f.opening.portTree={}],['opening-w
 
 for(const [name,change]of [['selection',f=>f.graph.getSelectionCells=()=>[{}]],['toggle-native',f=>{const old=f.env.Ext.getCmp;f.env.Ext.getCmp=id=>id==='toggle'?{}:old(id)}]])
  test('late getRoot same-node activity '+name+' unknown',()=>{const f=graph();let reads=0;f.store.getRoot=()=>{if(++reads===2)change(f);return f.root};assert.equal(read(f).activity.status,'unknown')});
+
+for(const kind of ['account','current-tree'])test('final selection provider owner drift '+kind+' refuses all observed claims',()=>{
+ const f=graph();let armed=false;let reads=0;
+ f.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>{if(++reads===2)armed=true;return f.card};
+ f.graph.getSelectionCells=()=>{if(armed){if(kind==='account')f.connection.UserName='foreign';else f.card.Controller.Node.data.node={}}return [f.n.FCell]};
+ const r=read(f);assert.equal(r.status,'REFUSED');assert.equal(r.activity.status,'unknown');assert.equal(r.process_owner.status,'unknown');assert.equal(r.effect_possible,false);assert.equal(r.close_authority,false);
+});
+for(const kind of ['store','root'])test('final outer provider replaces current process '+kind+' drops claim',()=>{
+ const f=graph();let reads=0;const foreign={};
+ f.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>{if(++reads===2){if(kind==='store')f.views.right.getStore=()=>foreign;else f.store.getRoot=()=>foreign}return f.card};
+ const r=read(f);assert.equal(r.process_owner.status,'unknown');assert.equal(r.activity.status,'observed_toggle');assert.equal(r.freshness.execution_verified,false);assert.equal(r.complete,false);
+});

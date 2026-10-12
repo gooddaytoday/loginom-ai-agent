@@ -94,16 +94,16 @@ export function readFixedImportCandidates(identity) {
    const mode=['Выполнить узел','Выполнить узел (F9)'].includes(tip)&&run===1&&stop===0?'execute':tip==='Деактивировать узел'&&stop===1&&run===0?'deactivate':null;
    if(mode&&graph.getSelectionCells()?.length===1&&graph.getSelectionCells()[0]===n.FCell&&native.el.dom===button&&button.getAttribute('data-qtip')===tip){
     const retained={node:n,nodeGuid:n.FGuid,cell:n.FCell,body,button,native,tip,root:graphRoots[0]};
-    claims.push({key:'activity',valid:()=>{
-     const currentSelection=graph.getSelectionCells?.(),currentBody=graph.view?.getState?.(retained.cell)?.shape?.node;
+    claims.push({key:'activity',sample:()=>({selection:graph.getSelectionCells?.(),body:graph.view?.getState?.(retained.cell)?.shape?.node,native:globalThis.Ext?.getCmp?.(retained.button.id),tip:retained.button.getAttribute('data-qtip'),run:retained.button.querySelectorAll('.bg-icon-run_current').length,stop:retained.button.querySelectorAll('.bg-icon-stop').length}),valid:current=>{
+     const currentSelection=current.selection,currentBody=current.body;
      return Array.isArray(currentSelection)&&currentSelection.length===1&&currentSelection[0]===retained.cell
      &&nodes.includes(retained.node)&&nodes.filter(x=>x.FGuid===retained.nodeGuid).length===1&&currentBody===retained.body
-     &&globalThis.Ext?.getCmp?.(retained.button.id)===retained.native
+     &&current.native===retained.native
      &&model.FDiagram===diagram&&diagram.FNodes.FCollection===nodes&&diagram.FmxGraph===graph
      &&retained.node.FGuid===retained.nodeGuid&&retained.node.FCell===retained.cell&&retained.node.FIconCls==='bg-vendor-icon-importtextfile'
      &&retained.native.el?.dom===retained.button&&retained.native.disabled!==true&&retained.native.tooltip==='Выполнить узел'
-     &&retained.button.getAttribute('data-qtip')===retained.tip&&retained.root===graph.container
-     &&retained.button.querySelectorAll('.bg-icon-run_current').length===run&&retained.button.querySelectorAll('.bg-icon-stop').length===stop;}});
+     &&current.tip===retained.tip&&retained.root===graph.container
+     &&current.run===run&&current.stop===stop;}});
     result.activity={status:'observed_toggle',node_id:n.FGuid,mode,activation_verified:false};
    }
   }
@@ -124,7 +124,12 @@ export function readFixedImportCandidates(identity) {
    if(valid&&new Set(records.map(r=>r.internalId)).size===records.length&&new Set(records.map(r=>String(own(r,'data').id))).size===records.length&&owned.length===1
     &&views.every(v=>v.getStore()===store)&&(store.getRoot?.()??store.getRootNode?.())===root){
     const retained={node:n,nodeGuid:n.FGuid,nodeData:data,root,record:owned[0],records:retainedRecords};
-    claims.push({key:'process_owner',valid:()=>model.FDiagram===diagram&&diagram.FNodes.FCollection===nodes&&diagram.FmxGraph===graph&&own(retained.node,'data')===retained.nodeData&&retained.node.FGuid===retained.nodeGuid&&nodes.includes(retained.node)&&nodes.filter(x=>x.FGuid===retained.nodeGuid).length===1
+    claims.push({key:'process_owner',sample:()=>{
+     const currentViews=grids.map(xs=>globalThis.Ext?.getCmp?.(xs[0].id));
+     const currentStores=currentViews.map(v=>v?.getStore?.()),currentStore=currentStores[0];
+     const currentRoot=currentStore?.getRoot?.()??currentStore?.getRootNode?.(),loading=currentStore?.isLoading?.();
+     return {views:currentViews,stores:currentStores,root:currentRoot,loading};
+    },valid:current=>current.views.every((v,i)=>v===views[i])&&current.stores.every(s=>s===store)&&current.root===root&&current.loading===false&&model.FDiagram===diagram&&diagram.FNodes.FCollection===nodes&&diagram.FmxGraph===graph&&own(retained.node,'data')===retained.nodeData&&retained.node.FGuid===retained.nodeGuid&&nodes.includes(retained.node)&&nodes.filter(x=>x.FGuid===retained.nodeGuid).length===1
      &&own(retained.record,'data')?.ModelNode===retained.nodeData&&retained.root===root&&root.internalId===rootBinding.id&&own(root,'data')===rootBinding.data&&own(root,'data')?.loaded===true
      &&root.childNodes.length===rootBinding.children.length&&rootBinding.children.every((r,i)=>root.childNodes[i]===r)
      &&retained.records.every(b=>own(b.r,'data')===b.data&&b.r.internalId===b.id&&own(b.data,'id')===b.processId&&own(b.data,'ModelNode')===b.owner
@@ -134,11 +139,14 @@ export function readFixedImportCandidates(identity) {
    }
   }
  }
- if(main.Items.Workspace.getActiveTab()!==card||card.Controller!==controller||controller.FController!==model||controller.Node?.data?.node!==start
+ // Finish outer and claim provider reads before checking any emitted owner/binding.
+ const currentCard=main.Items.Workspace.getActiveTab();
+ const samples=claims.map(claim=>claim.sample?.());
+ if(currentCard!==card||card.Controller!==controller||controller.FController!==model||controller.Node?.data?.node!==start
   ||ancestry.some(b=>b.n.ParentNode!==b.parent)||map.FServerConnection!==connection||connection.UserName!==identity.account||connection.Connected!==true
   ||p.document!==document||p.id!==identity.document_id)return refuse('OWNER_CHANGED');
- // Last outer owner read has completed; revalidate every emitted relation.
- for(const claim of claims)if(!claim.valid())result[claim.key]=unknown('CLAIM_BINDING_CHANGED');
+ // Validators below do not invoke selection/state/Ext/store/root providers.
+ for(const [i,claim] of claims.entries())if(!claim.valid(samples[i]))result[claim.key]=unknown('CLAIM_BINDING_CHANGED');
  return result;
 }
 
