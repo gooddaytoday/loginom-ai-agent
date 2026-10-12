@@ -176,6 +176,12 @@ async function handle(message) {
             || createHash("sha256").update(await readFile(join(input.resources, path))).digest("hex") !== entries[0].sha256)
           throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
         const module = await import(pathToFileURL(join(input.resources, path)).href)
+        // Replacement must still match its original resource/deadline after import.
+        if (replacement && (Date.now() >= acceptanceCapture.expires
+            || await realpath(join(input.resources, path)) !== join(await realpath(input.resources), path)
+            || createHash("sha256").update(await readFile(join(input.resources, path))).digest("hex") !== entries[0].sha256
+            || Date.now() >= acceptanceCapture.expires))
+          throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
         if (typeof (replacement ? module.captureReplacement : module.captureCalculator) !== "function") throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
         captureHarness = replacement ? module.captureReplacement : module.captureCalculator
         captureResource = Object.freeze({path,sha256:entries[0].sha256})

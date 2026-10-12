@@ -81,19 +81,21 @@ for(const scenario of ['valid','native-error','undefined','null','false','zero',
   await expect(host.capture('whole-run')).rejects.toThrow();await expect(host.request('release',{run:'whole-run'})).rejects.toThrow()
  }finally {await host?.close().catch((e:any)=>console.log('WHOLE_FIXTURE_RECOVERY '+e.message));if(host)await host.exited;await writeFile(entryPath,projection);files=originalFiles;await manifest(files)}
 },30000)
-for(const scenario of ['missing','duplicate','hash','link','directory','wrong-export','wrong-mode','missing-validator','foreign-path'])test('fixed registration inventory '+scenario,async()=>{
+for(const scenario of ['missing','duplicate','hash','link','directory','wrong-export','wrong-mode','missing-validator','await-byte-drift','await-expiry','foreign-path'])test('fixed registration inventory '+scenario,async()=>{
  let items=files.map(f=>({...f}));const item=items.find(f=>f.path===fixed)
  if(scenario==='missing')items=items.filter(f=>f.path!==fixed);if(scenario==='duplicate')items.push({...item});if(scenario==='hash')item.sha256='0'.repeat(64);if(scenario==='link')item.link='foreign';if(scenario==='directory')item.directory=true
  if(scenario==='foreign-path')item.path='runtime/acceptance/replacement-input0-readonly-v1.mjs'
+ if(scenario==='await-expiry'){const bytes="export const captureReplacement=()=>{};export const captureMode='readonly';export const validateCaptureResult=()=>true;await Promise.resolve();Date.now=()=>Number.MAX_SAFE_INTEGER;";await writeFile(join(root,fixed),bytes);item.sha256=hash(bytes)}
+ if(scenario==='await-byte-drift'){const bytes="import {writeFile} from 'node:fs/promises';export const captureReplacement=()=>{};export const captureMode='readonly';export const validateCaptureResult=()=>true;await writeFile(new URL(import.meta.url),'export const changed=true;');";await writeFile(join(root,fixed),bytes);item.sha256=hash(bytes)}
  if(['wrong-export','wrong-mode','missing-validator'].includes(scenario)){const bytes='export const '+(scenario==='wrong-export'?'captureCalculator':'captureReplacement')+'=()=>{};export const captureMode='+JSON.stringify(scenario==='wrong-mode'?'foreign':'readonly')+';'+(scenario==='missing-validator'?'':'export const validateCaptureResult=()=>true;');await writeFile(join(root,fixed),bytes);item.sha256=hash(bytes)}
  await manifest(items)
  let host:any
  const directory=join(product,'bad-'+scenario)
- if(['wrong-export','wrong-mode','missing-validator'].includes(scenario)){
+ if(['wrong-export','wrong-mode','missing-validator','await-byte-drift','await-expiry'].includes(scenario)){
   const store=connectionStore(join(directory,'connection'),cliCredentials('linux'));await store.stage({generation:3,revision:1,url:'https://loginom.test',username:account,apiKey:'synthetic-only',password:'synthetic-only'});await store.activate(3)
  }
- try{host=await launchReplacementDiagnostic(input(directory));if(['wrong-export','wrong-mode','missing-validator'].includes(scenario)){await host.request('acquire',{run:'bad-run',session:'bad-session'});await host.capture('bad-run')}throw Error('UNEXPECTED_REGISTRATION')}
- catch(e:any){expect(e.message).toBe(['wrong-export','wrong-mode','missing-validator'].includes(scenario)?'LOGINOM_HOST_REQUEST_FAILED':'LOGINOM_HANDSHAKE_INVALID')}
+ try{host=await launchReplacementDiagnostic(input(directory));if(['wrong-export','wrong-mode','missing-validator','await-byte-drift','await-expiry'].includes(scenario)){await host.request('acquire',{run:'bad-run',session:'bad-session'});await host.capture('bad-run')}throw Error('UNEXPECTED_REGISTRATION')}
+ catch(e:any){expect(e.message).toBe(['wrong-export','wrong-mode','missing-validator','await-byte-drift','await-expiry'].includes(scenario)?'LOGINOM_HOST_REQUEST_FAILED':'LOGINOM_HANDSHAKE_INVALID');if(['await-byte-drift','await-expiry'].includes(scenario))await expect(readFile(join(root,'loaded-'+hash('bad-session')+'.json'))).rejects.toThrow()}
  finally{await host?.close().catch(()=>{});await writeFile(join(root,fixed),original);await manifest(files)}
 },20000)
 test('structural registration cannot bypass factory',async()=>{await expect(launchNodeHost({...input(join(product,'forged')),acceptanceCapture:{authorization:'a'.repeat(64),packagePath,harness:'replacement-input0-readonly-v1'}} as any)).rejects.toThrow('LOGINOM_HANDSHAKE_INVALID')})

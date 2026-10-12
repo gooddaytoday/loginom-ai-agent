@@ -8,7 +8,9 @@ before host creation. The selector grants no authority by itself.
 Host/port mint owner/run/lease/generation/chat/account/admission from the actual
 connection lease. Managed entry validates that tuple, verifies resource bytes,
 canonical realpath and the unique inventory entry, loads only the fixed export
-and requires its read-only validator. Generic ownership, publication, persistence,
+and requires its read-only validator. Replacement rechecks realpath/hash and the
+original expiry after awaited import; self-modifying resources refuse before
+registration. Generic ownership, publication, persistence,
 no-replay and close paths are unchanged.
 
 The fixed adapter distinguishes the original outer phase receipt ID from the

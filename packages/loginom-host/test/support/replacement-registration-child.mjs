@@ -19,7 +19,7 @@ process.on('message',async m=>{
    if(acceptanceCapture){
     const source=await readFile(loaderSource,'utf8'),begin=source.indexOf('      let captureHarness'),end=source.indexOf('      // A new process',begin);
     if(begin<0||end<0)throw Error('EXACT_LOADER_BLOCK_UNAVAILABLE');
-    const context=vm.createContext({acceptanceCapture,resources,input,Error,join,pathToFileURL,realpath,readFile,createHash});
+    const context=vm.createContext({acceptanceCapture,resources,input,Error,Date,join,pathToFileURL,realpath,readFile,createHash});
     registration=await new vm.Script('(async()=>{'+source.slice(begin,end)+';return {captureHarness,captureRegistration,captureResource}})()', {importModuleDynamically:vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER}).runInContext(context);
     await writeFile(join(root,'loaded-'+input.chat+'.json'),JSON.stringify({binding:acceptanceCapture,resource:registration.captureResource,mode:registration.captureRegistration?.mode,fixture:true}));
    }
