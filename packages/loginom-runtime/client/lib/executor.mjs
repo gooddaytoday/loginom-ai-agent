@@ -1322,7 +1322,7 @@ export function parseCapabilityResult(response) {
 }
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, fieldParametersCapture }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   let pending = null;
   let running = false;
@@ -1763,6 +1763,29 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         effect_possible:state.effect_possible,cleanup_complete:state.cleanup_complete}):null;
     }});
   const runtime=Object.freeze({
+    fieldParametersState(operationId){
+      const op=operations.get(operationId);
+      if(!fieldParametersCapture||op?.fpCapture!==fieldParametersCapture||op?.nodeApply?.request.target.type!=='transform.reform_columns')throw Error('LOGINOM_FP_OPERATION_UNOWNED');
+      return {owned:pending===op,foreign_pending:!!pending&&pending!==op,
+        unknown:op.transportUncertain===true||op.fpUncertain===true,
+        pending_phase:op.nodeApply.pending?.phase,delivery_unsettled:delivery.unsettled===true};
+    },
+    assertFieldParametersDraftAllowed(binding){
+      if(fieldParametersCapture?.binding===binding&&pending?.fpCapture===fieldParametersCapture&&pending.fpFailure)throw pending.fpFailure.value;
+      if(!fieldParametersCapture||fieldParametersCapture.binding!==binding||running||delivery.unsettled
+        ||!pending?.fpDraft||pending.fpCapture!==fieldParametersCapture||pending.transportUncertain||pending.fpUncertain
+        ||pending.nodeApply?.pending?.phase!=='configure'||Date.now()>=binding.expires)throw Error('LOGINOM_FP_DRAFT_UNKNOWN');
+    },
+    async captureFieldParametersPreservation(binding){
+      if(fieldParametersCapture?.binding===binding&&pending?.fpCapture===fieldParametersCapture&&pending.fpFailure)throw pending.fpFailure.value;
+      runtime.assertFieldParametersDraftAllowed(binding);
+      const candidates=[...operations.values()].filter(op=>op.fpCapture===fieldParametersCapture&&op.fpCaptureConsumed);
+      if(candidates.length!==1||pending!==candidates[0]||!candidates[0].fpDraft||candidates[0].transportUncertain||candidates[0].fpUncertain)throw Error('LOGINOM_FP_DRAFT_UNKNOWN');
+      const op=candidates[0];await fieldParametersCapture.context(op);
+      await remember(op,'fp_draft_delivery',op.fpDraft);
+      await fieldParametersCapture.context(op);
+      return structuredClone(op.fpDraft); // retained pending; no finish/cleanup/release
+    },
     startNodeApply:(request,options)=>nodeJobs.start(request,options),
     startNodeRead:args=>nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id))),
     nodeApplyStatus:id=>nodeJobs.status(id),
@@ -2159,6 +2182,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       running=true;
       try{
         if(!operation){operation={id:operationId,signature,parameters:structuredClone(request),action:{action_key:'node.target.internal',capability:'node.target.internal',revision:'1'}};
+          if(fieldParametersCapture){
+            if(request.target.type!=='transform.reform_columns'||request.read.ports.some(p=>p!==0)||request.inputs.some(p=>p.input!==0))throw Error('LOGINOM_FP_FIXED_REQUEST_REQUIRED');
+            operation.fpCapture=fieldParametersCapture;
+          }
           operation.nodeTargetAdapter=targetAdapter(operation);
           operation.checkpoint={workflow_ref:request.workflow_ref,document_id:request.document_id};
         }
@@ -2224,6 +2251,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           operation={id:operationId,signature,parameters:request,
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
             checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:now()+request.budgets.total_ms};
+          if(fieldParametersCapture){
+            if(request.target.type!=='transform.reform_columns'||request.read.ports.some(p=>p!==0)||request.inputs.some(p=>p.input!==0))throw Error('LOGINOM_FP_FIXED_REQUEST_REQUIRED');
+            operation.fpCapture=fieldParametersCapture;
+          }
           operation.nodeTargetAdapter=targetAdapter(operation);
           // Only trusted host code supplies drivers, never a tool request.
           // Internal node readers return both typed action outcomes and plain
@@ -2434,7 +2465,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   // Internal delivery calls retain the original runtime methods. The returned
   // facade prevents a second caller from changing UI between transfer stages.
   const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','waitNodeApply']);
-  const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply']);
+  const nodeControls=new Set([...readOnly,'fieldParametersState','startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{
       if(delivery.busy){const error=Error('Artifact delivery is in progress');

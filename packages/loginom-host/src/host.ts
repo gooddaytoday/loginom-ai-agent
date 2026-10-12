@@ -17,7 +17,7 @@ export async function createLoginomHost(options: {
   strictRecovery?: boolean
   // Acceptance-only forwarding of the existing managed shutdown binding.
   acceptanceCleanupPackage?: string
-  acceptanceCapture?: { authorization: string; packagePath: string; harness?: "amount-import-type-v1" }
+  acceptanceCapture?: { authorization: string; packagePath: string; harness?: "amount-import-type-v1" | "field-parameters-preservation-v1" }
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
@@ -183,6 +183,8 @@ export async function createLoginomHost(options: {
     },
     journal,
     recoveries,
+    captureHarness(chat: string) { return captures.get(chat)?.harness },
+    captureBinding(chat: string) { return captures.get(chat) },
     authorizeCapture(authorization: unknown) {
       return !!options.acceptanceCapture && authorization === options.acceptanceCapture.authorization
     },
@@ -194,7 +196,7 @@ export async function createLoginomHost(options: {
         throw Error("LOGINOM_HANDSHAKE_INVALID")
       captures.set(chat, { revision: 1, harness: options.acceptanceCapture.harness ?? "calculator-grouped-before-done-v1", owner, run,
         lease: `${owner}:${run}`, generation: lease.generation, chat, account: current.connection.username,
-        packagePath: options.acceptanceCapture.packagePath, admission: randomUUID(), expires: Date.now()+600000 })
+        packagePath: options.acceptanceCapture.packagePath, admission: randomUUID(), expires: Date.now()+(options.acceptanceCapture.harness==="field-parameters-preservation-v1"?120000:600000) })
     },
     resetRestarts(chat: string) {
       restarts.delete(chat)

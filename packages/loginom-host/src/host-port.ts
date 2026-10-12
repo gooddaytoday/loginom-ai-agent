@@ -22,6 +22,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       active: Set<string>
       captured: boolean
       captureRefused: boolean
+      draftRetained?: boolean
     }
   >()
   const state = { closed: false, stopping: undefined as Promise<void> | undefined }
@@ -110,6 +111,17 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           id = await service.journal.begin(run.chat, run.lease.generation)
           run.active.add(id)
           const result = await runtime.request("acceptance.capture")
+          if(service.captureHarness?.(run.chat)==='field-parameters-preservation-v1'){
+            const grant=service.captureBinding(run.chat),draft=result&&typeof result==='object'&&'draft' in result?result.draft as any:undefined;
+            if(!result||typeof result!=='object'||!('draftRetained' in result)||result.draftRetained!==true
+              ||!('cleanupComplete' in result)||result.cleanupComplete!==false||!('stoppedBeforeDone' in result)||result.stoppedBeforeDone!==true
+              ||!grant||grant.owner!==owner||grant.run!==input.run||grant.generation!==run.lease.generation||grant.chat!==run.chat
+              ||Date.now()>=grant.expires||draft?.kind!=='field_parameters_preservation_draft'||draft.stopped_before_done!==true
+              ||draft.settings_applied!==false||draft.execution_started!==false
+              ||!['owner','run','lease','generation','chat','account','packagePath','admission','expires'].every(k=>draft.owner?.[k]===(grant as any)[k]))throw Error('LOGINOM_REPLY_INVALID')
+            run.draftRetained=true;run.captureRefused=true;run.lease.holdRecovery();service.recoveries.set(run.chat,run.lease);
+            await service.journal.settle(id,false);reply({id:data.id,result});return;
+          }
           if (!result || typeof result !== "object" || !("cleanupComplete" in result) || result.cleanupComplete !== true) {
             run.captureRefused = true
             run.lease.holdRecovery()

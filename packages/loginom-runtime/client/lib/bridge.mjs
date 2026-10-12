@@ -1,3 +1,4 @@
+import {makeFieldParametersNativeContextCode} from '../../src/acceptance/field-parameters-native-context.mjs';
 import {nodeResultReply} from './node-result-reply.mjs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -133,6 +134,7 @@ function shutdownRejection(value) {
 }
 
 export async function createBridge(config, session, { browserTransport: managedBrowserTransport, acceptanceCapture, authenticatedReadiness } = {}) {
+  if(acceptanceCapture?.binding?.harness==='field-parameters-preservation-v1'&&config.mode!=='executor-replay')throw Error('LOGINOM_FP_EXECUTOR_REQUIRED');
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
   const userWorkflows = createUserWorkflowBindings();
@@ -178,6 +180,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   let managedSave, cleanupRefused = false;
   let confirmedCleanup, cleanupReceiptWritten = false;
   let captureConsumed = false, captureInFlight, captureUnknown = false, captureRejected = false, captureRejection;
+  let fpDraftRetained=false;
   let closing, shutdownStarted = false, shutdownStage;
   const skill = createSkillLoader({ directory: session.directory, transport: skillTransport(config) });
   let clipboardUncertain = false;
@@ -202,7 +205,34 @@ export async function createBridge(config, session, { browserTransport: managedB
       pinnedActions = pinned;
       recoveryContext = createRecoveryContext({ remote, pinned, knownSecrets: [config.apiKey] });
       Object.assign(session.metadata, pinned.pins);
-      actionRuntime = createActionRuntime({ pinned,
+      const fpBinding=acceptanceCapture?.binding?.harness==='field-parameters-preservation-v1'?acceptanceCapture.binding:null;
+      const fieldParametersCapture=fpBinding?{binding:fpBinding,context:async operation=>{
+        fpDraftRetained=true; // native/typed FP attempt keeps the original transport, even before delivery
+        const prepared=session.metadata.workspacePreparation,state=prepared?.state,request=operation.nodeApply?.request,node=operation.nodeApply?.node;
+        const retained=actionRuntime.fieldParametersState(operation.id);
+        if(shutdownStarted||clipboardUncertain||heldLeases.size||Date.now()>=Math.min(fpBinding.expires,operation.deadline)||session.metadata.workspaceReady!==true
+          ||fpBinding.session!==session.metadata.sessionId||!prepared?.attempted||!managedSave
+          ||managedSave.sessionId!==fpBinding.session||managedSave.documentId!==state?.document_id
+          ||state?.loginom_account!==fpBinding.account||managedSave.tabTid!==state?.workflow_ref?.tab_tid
+          ||managedSave.loginomBuild!==session.metadata.targetIdentity?.loginom_build||managedSave.account!==fpBinding.account||managedSave.packagePath!==fpBinding.packagePath
+          ||!savedPackages.has(fpBinding.packagePath)||request?.target.type!=='transform.reform_columns'
+          ||request.document_id!==state.document_id||request.workflow_ref.workflow_id!==state.workflow_ref.workflow_id
+          ||!node||!retained.owned||retained.foreign_pending||retained.unknown||retained.delivery_unsettled
+          ||retained.pending_phase!=='configure')throw Error('LOGINOM_FP_RETAINED_AUTHORITY_UNKNOWN');
+        const identity={session_id:fpBinding.session,account:fpBinding.account,package_path:fpBinding.packagePath,
+          document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,node_id:node.node_id,type:request.target.type,input_port:0};
+        const options={prepared:{document_id:request.document_id,workflow_ref:request.workflow_ref,node},
+          account:fpBinding.account,packagePath:fpBinding.packagePath,origin:new URL(config.loginomUrl).origin,loginomBuild:session.metadata.targetIdentity.loginom_build,operationId:operation.id};
+        const raw=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code:makeFieldParametersNativeContextCode(options)}},undefined,{timeout:Math.max(1,Math.min(15000,fpBinding.expires-Date.now()))});
+        if(Date.now()>=Math.min(fpBinding.expires,operation.deadline)||session.metadata.workspacePreparation!==prepared||managedSave.documentId!==identity.document_id||!actionRuntime.fieldParametersState(operation.id).owned)throw Error('LOGINOM_FP_LATE_AUTHORITY_REFUSED');
+        const result=parseCapabilityResult(raw);if(result.action_key!=='acceptance.fp.context'||result.action_revision!=='1'||result.phase!=='read'||result.operation_id!==operation.id||result.effect_possible!==false)throw Error('LOGINOM_FP_NATIVE_REPLY_REFUSED');if(result.status==='FAILED'&&result.operation_id===operation.id&&result.output?.rejection){const restore=r=>r.kind==='value'?(r.is_undefined?undefined:r.value):Object.assign(new Error(r.message, 'cause' in r?{cause:restore(r.cause)}:undefined),{name:r.name});throw restore(result.output.rejection);}
+        if(result.status!=='SUCCEEDED'||result.cleanup_complete!==true||result.effect_possible!==false
+          ||result.operation_id!==operation.id||!['account','package_path','document_id','workflow_id','node_id'].every(k=>result.output?.[k]===identity[k])||!Number.isSafeInteger(result.output?.observed_at)
+          ||result.output.dirty!==false||result.output.running!==false)throw Error('LOGINOM_FP_NATIVE_RESOURCE_UNKNOWN');
+        return {binding:fpBinding,identity,resources:{...fpBinding,...identity,...result.output,
+          deadline:fpBinding.expires,pending:retained.foreign_pending,unsettled:retained.delivery_unsettled,unknown_effect:retained.unknown}};
+      }}:undefined;
+      actionRuntime = createActionRuntime({ pinned,fieldParametersCapture,
         ...(replay?createCandidateNodeSupport({targetOrigin:config.loginomUrl?new URL(config.loginomUrl).origin:undefined,targetBuild:pinned.compatibility?.loginom_build,storageDirectories:config.storageDirectories}):{}),
         getStorageBinding: () => session.metadata.storageBinding ?? null,
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
@@ -498,9 +528,10 @@ export async function createBridge(config, session, { browserTransport: managedB
       if (!binding || typeof acceptanceCapture.harness !== 'function' || captureConsumed || shutdownStarted || cleanupRefused)
         throw Error('LOGINOM_CAPTURE_UNAVAILABLE');
       const assertBound = () => {
-        actionRuntime.assertPreparationAllowed();
+        const fp=binding.harness==='field-parameters-preservation-v1';
+        if(fp)actionRuntime.assertFieldParametersDraftAllowed(binding);else actionRuntime.assertPreparationAllowed();
         const prepared=session.metadata.workspacePreparation;
-        if (clipboardUncertain || heldLeases.size || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork()
+        if (clipboardUncertain || heldLeases.size || !fp&&(actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork())
             || Date.now() >= binding.expires || session.metadata.workspaceReady !== true
             || binding.session !== session.metadata.sessionId || !prepared?.attempted
             || prepared.state.loginom_account !== binding.account || !managedSave
@@ -520,6 +551,12 @@ export async function createBridge(config, session, { browserTransport: managedB
         // Only the fixed verified resource receives this private Page transport.
         // It is never supplied by IPC, the tool catalogue or the model.
         captureUnknown=true;
+        if(binding.harness==='field-parameters-preservation-v1'){
+          fpDraftRetained=true;
+          const draft=await actionRuntime.captureFieldParametersPreservation(binding);
+          await recordExecution({event:'fp_capture_draft',binding,receipt:draft});
+          return {draft,cleanupComplete:false,draftRetained:true,stoppedBeforeDone:true};
+        }
         const receipt=await acceptanceCapture.harness({binding, identity, browser, record:recordExecution});
         assertBound();
         if (!receipt || receipt.settings_applied !== false || receipt.cancel_verified !== true
@@ -533,6 +570,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       try {
         const receipt=await captureInFlight;
         captureInFlight=undefined;
+        if(binding.harness==='field-parameters-preservation-v1')return receipt;
         const closed=await closeBridge();
         const cleanup=JSON.parse(await readFile(join(session.directory,'package-cleanup.json'),'utf8'));
         if (closed.browser_transport_closed !== true || cleanup.status !== 'SUCCEEDED'
@@ -543,6 +581,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       finally { captureInFlight=undefined }
     }
     function closeBridge() {
+      if(fpDraftRetained)return Promise.reject(Error('LOGINOM_FP_DRAFT_RETAINED'));
       if (captureRejected && captureUnknown) return Promise.reject(captureRejection);
       if (captureInFlight) return captureInFlight.then(() => closeBridge());
       shutdownStarted = true;

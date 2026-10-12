@@ -97,7 +97,7 @@ async function dispatch(message: unknown) {
       const capture = "acceptanceCapture" in input ? input.acceptanceCapture : undefined
       if (capture !== undefined && (!capture || typeof capture !== "object"
           || !["authorization,packagePath", "authorization,harness,packagePath"].includes(Object.keys(capture).sort().join(","))
-          || ("harness" in capture && capture.harness !== "amount-import-type-v1")
+          || ("harness" in capture && capture.harness !== "amount-import-type-v1" && capture.harness !== "field-parameters-preservation-v1")
           || !("authorization" in capture) || typeof capture.authorization !== "string" || !/^[a-f0-9]{64}$/.test(capture.authorization)
           || !("packagePath" in capture) || typeof capture.packagePath !== "string" || capture.packagePath.length > 1024
           || !/^\/[^/\\\x00-\x1f]+\/[^/\\\x00-\x1f]+\.lgp$/.test(capture.packagePath)
@@ -105,7 +105,7 @@ async function dispatch(message: unknown) {
         throw Error("LOGINOM_HANDSHAKE_INVALID")
       const options = {
         root: input.root,
-        acceptanceCapture: capture as { authorization: string; packagePath: string; harness?: "amount-import-type-v1" } | undefined,
+        acceptanceCapture: capture as { authorization: string; packagePath: string; harness?: "amount-import-type-v1" | "field-parameters-preservation-v1" } | undefined,
         resources: input.resources,
         headless: input.headless,
         strictRecovery: "strictRecovery" in input && input.strictRecovery === true,

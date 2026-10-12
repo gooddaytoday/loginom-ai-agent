@@ -31,7 +31,7 @@ export function validateStartInput(input) {
   if (capture !== undefined) {
     const keys = 'account,admission,chat,expires,generation,harness,lease,owner,packagePath,revision,run'
     if (!capture || typeof capture !== 'object' || Object.keys(capture).sort().join(',') !== keys
-        || capture.revision !== 1 || !['calculator-grouped-before-done-v1','amount-import-type-v1'].includes(capture.harness)
+        || capture.revision !== 1 || !['calculator-grouped-before-done-v1','amount-import-type-v1','field-parameters-preservation-v1'].includes(capture.harness)
         || !['owner','run','lease','chat','account','admission'].every(key =>
           typeof capture[key] === 'string' && /^[a-zA-Z0-9_:-]{1,200}$/.test(capture[key]))
         || capture.generation !== input.generation || capture.chat !== input.chat
