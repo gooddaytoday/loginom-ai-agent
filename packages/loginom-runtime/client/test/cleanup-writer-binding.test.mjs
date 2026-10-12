@@ -6,7 +6,7 @@ import * as fsp from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 const text=await fsp.readFile(process.env.BRIDGE_MODULE??new URL('../lib/bridge.mjs',import.meta.url),'utf8');
-const start=text.indexOf('    async function writeCleanupReceipt(cleanup) {');
+const start=text.indexOf('    function assertCleanupDestination(binding) {');
 const writer=text.slice(start,text.indexOf('    function closeBridge() {',start));
 const rs=text.indexOf('function shutdownRejection('),rejection=text.slice(rs,text.indexOf('\n}',rs)+2);
 const primaryValues={error:Error('first IO failure',{cause:0}),undefined:undefined,null:null,false:false,zero:0,empty:''};

@@ -8,7 +8,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 
 const source=await fsp.readFile(process.env.BRIDGE_MODULE,'utf8');
-const writer=source.slice(source.indexOf('    async function writeCleanupReceipt(cleanup) {'),source.indexOf('    function closeBridge() {'));
+const writer=source.slice(source.indexOf('    function assertCleanupDestination(binding) {'),source.indexOf('    function closeBridge() {'));
 const rejection=source.slice(source.indexOf('function shutdownRejection('),source.indexOf('\n}',source.indexOf('function shutdownRejection('))+2);
 for(const scenario of ['lost-file','early-file','withheld-file','lost-directory','pending-write','first-cause','foreign-binding'])test(scenario,async()=>{
   const directory=await fsp.mkdtemp(join(tmpdir(),'review-cleanup-callback-'));
