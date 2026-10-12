@@ -125,8 +125,33 @@ source **`3ce4ae1381168a6ff48957b831470d0aefcea07b`**, `candidate/prod`.
 Этот checkpoint сохраняет исходники и результаты локальной приёмки перед
 окончанием внешних gates. Финальные job conclusions, CI URLs и снятие Draft
 фиксируются в [описании PR #61](https://github.com/gooddaytoday/loginom-ai-agent/pull/61).
-После `3ce4ae138` меняется только этот отчёт и план; продуктовый source, harness,
-pins, lockfiles и build workflows идентичны проверенному tree.
+
+Candidate `38256608207` завершился **SUCCESS**: все 15 исполняемых jobs прошли;
+`cut` и `release` штатно пропущены для candidate. Linux, macOS и Windows builds,
+общие unit/typecheck/Desktop/E2E, `evals-unit`, native Chromium/cleanup прошли.
+Артефакт `loginom-linux-matrix` прочитан: Ubuntu 22.04/24.04/26.04,
+Debian 12/13 — **5 PASS / 0 FAIL**, offline non-root launch.
+
+На документирующем head `4d9e3dfa` один PR unit-job
+[114841464129](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/38258080537/job/114841464129)
+нестабильно отказал в Host test `during-admission` с `LOGINOM_SCOPE_DENIED`.
+Другой unit-job того же head и candidate unit прошли; исходный узкий тест × 5
+также прошёл. Тест немедленно готовил замену после uncertain kill, хотя supervisor
+может отклонить IPC request на disconnect раньше фактического exit.
+
+Controlled probe (disconnect, затем SIGKILL через 50 мс) даёт **3/3 RED** на
+первой повторной подготовке: `LOGINOM_CALL_UNCERTAIN`, прежний runtime ещё retained.
+Ожидание `exited` захваченного собственного runtime даёт **5/5 GREEN** с исходными
+assertions. Точный CI `LOGINOM_SCOPE_DENIED` этим probe не воспроизведён;
+регрессия Host не установлена. Owning test теперь ждёт actual exit перед заменой
+и отдельно покрывает disconnect-before-exit; все ограничения числа перезапусков,
+отказы и журналирование сохранены. Четыре варианта × 5 — **20 PASS / 0 FAIL**,
+175 assertions; package `bun typecheck` — PASS.
+
+После candidate меняются отчёт, план и только Host test. Продуктовый source,
+harness, pins, lockfiles и build workflows идентичны собранному tree.
+CI нового head должен завершиться до снятия Draft; финальные conclusions
+записываются в описание PR без нового документирующего push.
 
 ## Границы доказательств
 
