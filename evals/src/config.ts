@@ -37,6 +37,11 @@ export function loadConfig(argv: string[], env: Env = process.env) {
       throw new EvalFailure(`${name}: ожидается положительное целое, получено "${raw}"`, 2)
     return parsed
   }
+  const threshold = (name: string, raw: string | undefined, fallback: number) => {
+    const parsed = positive(name, raw, fallback)
+    if (parsed > 100) throw new EvalFailure(`${name}: ожидается целое от 1 до 100, получено "${raw}"`, 2)
+    return parsed
+  }
   const providerId = env.EVAL_AGENT_PROVIDER_ID
   return {
     dryRun,
@@ -56,10 +61,10 @@ export function loadConfig(argv: string[], env: Env = process.env) {
     resetProfile: values["reset-profile"],
     taskTimeoutMs: positive("EVAL_TASK_TIMEOUT_MS", env.EVAL_TASK_TIMEOUT_MS, 900_000),
     judgeTimeoutMs: positive("EVAL_JUDGE_TIMEOUT_MS", env.EVAL_JUDGE_TIMEOUT_MS, 300_000),
-    passThreshold: positive("EVAL_PASS_THRESHOLD", env.EVAL_PASS_THRESHOLD, 70),
+    passThreshold: threshold("EVAL_PASS_THRESHOLD", env.EVAL_PASS_THRESHOLD, 70),
     calibration: {
-      positiveMin: positive("EVAL_CALIBRATION_POSITIVE_MIN", env.EVAL_CALIBRATION_POSITIVE_MIN, 90),
-      negativeMax: positive("EVAL_CALIBRATION_NEGATIVE_MAX", env.EVAL_CALIBRATION_NEGATIVE_MAX, 40),
+      positiveMin: threshold("EVAL_CALIBRATION_POSITIVE_MIN", env.EVAL_CALIBRATION_POSITIVE_MIN, 90),
+      negativeMax: threshold("EVAL_CALIBRATION_NEGATIVE_MAX", env.EVAL_CALIBRATION_NEGATIVE_MAX, 40),
     },
     profileDir: path.resolve(evalsRoot, env.EVAL_PROFILE_DIR ?? ".profile/agent"),
     resultsDir: path.resolve(evalsRoot, env.EVAL_RESULTS_DIR ?? "results"),

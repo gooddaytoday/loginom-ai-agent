@@ -14,6 +14,8 @@ test("loadConfig: значения по умолчанию при полном .
   expect(config.agent.model).toBe("openai/gpt-5.6-sol")
   expect(config.repeat).toBe(1)
   expect(config.taskTimeoutMs).toBe(900_000)
+  expect(config.passThreshold).toBe(70)
+  expect(config.calibration).toEqual({ positiveMin: 90, negativeMax: 40 })
   expect(config.judge.reasoning).toBe("high")
   expect(config.judge.command).toEqual(["codex"])
   expect(config.artifactSource).toBe("docker")
@@ -45,6 +47,46 @@ test("loadConfig: --repeat перекрывает EVAL_REPEAT, нечисло о
   expect(loadConfig(["--repeat", "3"], { ...full, EVAL_REPEAT: "2" }).repeat).toBe(3)
   expect(loadConfig([], { ...full, EVAL_REPEAT: "2" }).repeat).toBe(2)
   expect(() => loadConfig(["--repeat", "x"], full)).toThrow("--repeat")
+})
+
+test.each(["EVAL_PASS_THRESHOLD", "EVAL_CALIBRATION_POSITIVE_MIN", "EVAL_CALIBRATION_NEGATIVE_MAX"])(
+  "loadConfig: %s выше 100 отклоняется",
+  (name) => {
+    expect(() => loadConfig([], { ...full, [name]: "101" })).toThrow(EvalFailure)
+    expect(() => loadConfig([], { ...full, [name]: "101" })).toThrow(name)
+    expect(() => loadConfig([], { ...full, [name]: "101" })).toThrow(expect.objectContaining({ exitCode: 2 }))
+  },
+)
+
+test.each(["1", "100"])("loadConfig: процентные пороги принимают границу %s", (value) => {
+  expect(loadConfig([], {
+    ...full,
+    EVAL_PASS_THRESHOLD: value,
+    EVAL_CALIBRATION_POSITIVE_MIN: value,
+    EVAL_CALIBRATION_NEGATIVE_MAX: value,
+  })).toMatchObject({
+    passThreshold: Number(value),
+    calibration: { positiveMin: Number(value), negativeMax: Number(value) },
+  })
+})
+
+test.each(
+  ["EVAL_PASS_THRESHOLD", "EVAL_CALIBRATION_POSITIVE_MIN", "EVAL_CALIBRATION_NEGATIVE_MAX"].flatMap((name) =>
+    ["0", "-1", "1.5", "NaN", "Infinity"].map((value) => [name, value] as const),
+  ),
+)("loadConfig: %s отклоняет %s", (name, value) => {
+  expect(() => loadConfig([], { ...full, [name]: value })).toThrow(EvalFailure)
+  expect(() => loadConfig([], { ...full, [name]: value })).toThrow(name)
+  expect(() => loadConfig([], { ...full, [name]: value })).toThrow(expect.objectContaining({ exitCode: 2 }))
+})
+
+test("loadConfig: большие повторы и таймауты не ограничиваются процентным максимумом", () => {
+  expect(loadConfig(["--timeout-ms", "3000000"], {
+    ...full,
+    EVAL_REPEAT: "1000",
+    EVAL_TASK_TIMEOUT_MS: "1000000",
+    EVAL_JUDGE_TIMEOUT_MS: "2000000",
+  })).toMatchObject({ repeat: 1000, taskTimeoutMs: 1000000, judgeTimeoutMs: 2000000, timeoutMs: 3000000 })
 })
 
 test("loadConfig: binary без EVAL_CLI_BIN отклоняется", () => {
