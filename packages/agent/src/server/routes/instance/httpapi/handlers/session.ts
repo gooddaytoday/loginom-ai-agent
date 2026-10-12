@@ -322,6 +322,12 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
               sessionID: ctx.params.sessionID,
               error: new NamedError.Unknown({ message: Cause.pretty(cause) }).toObject(),
             })
+            // The client marks the session busy before this request returns.
+            // Preparation can fail while another prompt or shell still owns the session.
+            yield* runState.assertNotBusy(ctx.params.sessionID).pipe(
+              Effect.andThen(statusSvc.set(ctx.params.sessionID, { type: "idle" })),
+              Effect.catchTag("SessionBusyError", () => Effect.void),
+            )
           }),
         ),
         Effect.forkIn(scope, { startImmediately: true }),

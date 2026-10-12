@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { FSUtil } from "@loginom-ai-agent/core/fs-util"
 import { DateTime, Effect } from "effect"
 import path from "path"
@@ -32,7 +33,7 @@ export const attachmentContext = Effect.fn("Attachment.context")(function* (text
   const fs = yield* FSUtil.Service
   const snapshot = path.join(
     TRUNCATION_DIR,
-    `tool_attachment_${new Bun.CryptoHasher("sha256").update(text).digest("hex")}`,
+    `tool_attachment_${createHash("sha256").update(text).digest("hex")}`,
   )
   yield* TRUNCATION_LOCK.withPermit(
     Effect.gen(function* () {
