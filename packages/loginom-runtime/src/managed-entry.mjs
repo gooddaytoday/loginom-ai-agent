@@ -164,6 +164,7 @@ async function handle(message) {
       }
       const authenticated = await loginBrowser({ ...login, keepOpen: true })
       state.browser = authenticated.context
+      state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page,generation:input.generation,chat:input.chat})
       const config = {
         endpoint: input.endpoint,
         apiKey: input.connection.apiKey,
@@ -193,6 +194,18 @@ async function handle(message) {
         managed: { directory, browserPath: resources.browserPath, browserRoot: resources.browserRoot },
       })
       state.session = session
+      const originalStartup=state.startupBinding,originalOwner=state.startupOwner,originalMetadata=session.metadata,
+        originalDirectory=session.directory,originalSessionId=session.metadata.sessionId;
+      const assertStartup=()=>{
+        if(state.session!==session || session.metadata!==originalMetadata || session.directory!==originalDirectory
+            || session.metadata.sessionId!==originalSessionId || state.startupBinding!==originalStartup || state.startupOwner!==originalOwner
+            || originalStartup.owner!==originalOwner || originalStartup.id!==originalOwner.id
+            || originalStartup.page!==originalOwner.page || originalStartup.context!==originalOwner.context
+            || originalStartup.account!==originalOwner.account || originalStartup.origin!==originalOwner.origin
+            || originalStartup.generation!==originalOwner.generation || originalStartup.chat!==originalOwner.chat)
+          throw Error("LOGINOM_STARTUP_OWNER_CHANGED");
+      };
+      assertStartup();
       // Bind only the document owned by this successful private login. This is
       // not workspace preparation and confers no package-close authority.
       const documentId=randomUUID()
@@ -206,6 +219,7 @@ async function handle(message) {
         return {documentId:o.documentId,account:o.account,loginomBuild:app.Version};
       },{documentId,sessionId:session.metadata.sessionId,account:input.connection.username,
         origin:new URL(config.loginomUrl).origin})
+      assertStartup();
       const { Client } = require("@modelcontextprotocol/sdk/client/index.js")
       const { InMemoryTransport } = require("@modelcontextprotocol/sdk/inMemory.js")
       const { createConnection } = require("@playwright/mcp")
@@ -213,15 +227,22 @@ async function handle(message) {
         JSON.parse(await readFile(session.browserConfig, "utf8")),
         async () => authenticated.context,
       )
+      assertStartup();
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
+      assertStartup();
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
         authenticatedReadiness:state.authenticatedReadiness,
         acceptanceCapture: acceptanceCapture ? {binding:Object.freeze({...acceptanceCapture,session:session.metadata.sessionId}),harness:captureHarness} : undefined })
+      assertStartup();
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })
+      state.readonlyBinding=Object.freeze({startup:state.startupBinding,owner:state.startupOwner,
+        bridge:state.bridge,client:state.client,session,metadata:originalMetadata,directory:originalDirectory,sessionId:originalSessionId})
       await state.bridge.server.connect(serverTransport)
+      assertStartup();
       await state.client.connect(clientTransport)
+      assertStartup();
       send({
         id: message.id,
         result: {
@@ -281,6 +302,22 @@ async function handle(message) {
       return
     }
     if (message.operation !== "call" || state.controller) throw Error("LOGINOM_REQUEST_INVALID")
+    const bound=state.readonlyBinding,original=bound?.startup,current=bound?.owner,
+      originalBridge=bound?.bridge,originalClient=bound?.client,originalSession=bound?.session;
+    const qualified=originalBridge?.readonlyContinuation?.(message.input.name,message.input.arguments)===true;
+    const readonlyRequired=state.readonlyRetained===true || qualified;
+    const retainedOwner=()=>!!bound && state.readonlyBinding===bound
+      && state.startupBinding===original && state.startupOwner===current
+      && state.bridge===originalBridge && state.client===originalClient && state.session===originalSession
+      && originalSession.metadata===bound.metadata && originalSession.directory===bound.directory
+      && originalSession.metadata.sessionId===bound.sessionId
+      && !!original && original.owner===current && original.id===current?.id
+      && !!original.context && !!original.page && original.context===current.context && original.page===current.page
+      && original.account===current.account && original.origin===current.origin
+      && original.generation===current.generation && original.chat===current.chat
+      && !current.closed && !current.contextClosed && !state.bridgeCleanup;
+    if (readonlyRequired && (!retainedOwner() || !qualified))
+      throw Error("LOGINOM_RECOVERY_REQUIRED")
     const controller = new AbortController()
     state.controller = controller
     try {
@@ -290,7 +327,11 @@ async function handle(message) {
         signal: controller.signal,
         timeout: 105_000,
       })
+      const readonlyContinuation=retainedOwner() && originalBridge?.readonlyContinuation?.(message.input.name,message.input.arguments)===true;
+      if (readonlyRequired && !readonlyContinuation) throw Error("LOGINOM_RECOVERY_REQUIRED")
+      if (readonlyContinuation) state.readonlyRetained=true;
       send({ id: message.id, result: {
+        readonlyContinuation,
         result, recoveryPending: state.bridge.hasUnsettledWork(), activeWork: state.bridge.hasActiveWork(),
       } })
     } finally {
