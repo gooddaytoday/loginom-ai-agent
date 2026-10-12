@@ -169,7 +169,7 @@ class HandoffTest(unittest.TestCase):
         manifest = json.loads((path / 'cli-manifest.json').read_text())
         sha = manifest['metadata']['sourceCommit']
         catalog = json.loads((fixture.state / ISSUE / SENDER / 'catalog.json').read_text())
-        for reference in [f'Product-SHA: {sha}', f'baseline parent `{sha}`', f'workspace-ui.mjs: CLI diff parent `{sha}`', str(path), self.artifact, catalog['records'][self.artifact]['build']['manifest_sha256']]:
+        for reference in [f'Product-SHA: {sha}', f'baseline parent `{sha}`', f'workspace-ui.mjs: run parent `{sha}`', f'workspace-ui.mjs: CLI diff parent `{sha}`', str(path), self.artifact, catalog['records'][self.artifact]['build']['manifest_sha256']]:
             self.description = reference
             self.assertEqual(fixture.successful('cleanup')['items'][0]['reason'], 'current_checkpoint_or_assignment_reference')
         self.description = f'workspace-ui.mjs: diff parent `{sha}`'

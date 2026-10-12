@@ -654,7 +654,7 @@ def legacy_reference(item, artifact, references):
     for line in references.splitlines():
         if sha not in line:
             continue
-        if not re.search(r'\b(?:git|diff)\b|[\w-]+\.(?:mjs|[cm]?js|tsx?|py)\b', line, re.I) or re.search(r'\b(?:cli|artifact|candidate|manifest|product-sha|installed)\b|сборк|кандидат|установлен', line, re.I):
+        if not re.search(r'\b(?:git|diff|baseline)\b', line, re.I) or not re.search(r'\bgit\b|[\w-]+\.(?:mjs|[cm]?js|tsx?|py)\b', line, re.I) or re.search(r'\b(?:cli|artifact|candidate|manifest|product-sha|installed)\b|сборк|кандидат|установлен', line, re.I):
             return True
         # Only explicit Git-parent tokens in a source-file/diff statement qualify.
         # Source-SHA, Product-SHA and unspecified SHA references still retain it.
