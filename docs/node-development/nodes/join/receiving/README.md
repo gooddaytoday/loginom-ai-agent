@@ -119,6 +119,9 @@ python3 ../../docs/node-development/nodes/join/receiving/matrix-check.py
 the runner reports SOURCE_PENDING and exits2; no scenarios count as PASS. The
 adapter is local test plumbing, not a production API/IPC/callback. It must return
 actual instrumented source/bundle lifecycle traces, not modelled expected output.
+Negative fixtures must attempt all four guarded phase routes/resumes and report
+refused_phase_attempts; idle observation alone cannot pass gate assertions. The
+adapter receives fixture changes only, never the expected counters/order.
 Positive fixture results do not certify native Loginom. Matrix checker is a new
 independent grouped-join cross-check and adversarial 78-cell sensitivity audit;
 it imports no handler/runtime/oracle. Its PASS is offline expectation integrity,

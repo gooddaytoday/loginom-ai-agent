@@ -16,7 +16,7 @@ assert.equal(typeof adapter.exerciseCase,'function');assert.match(adapter.source
 assert.ok(['source','actual_bundle'].includes(adapter.path_kind));assert.equal(adapter.native_is_fixture,true);
 const results=[];
 for(const c of spec.cases){
- const r=await adapter.exerciseCase(structuredClone(c));
+ const r=await adapter.exerciseCase({id:c.id,fixture_changes:structuredClone(c.fixture_changes)});
  for(const key of ['configure','apply','finish','execute','native_close','native_logout'])assert.equal(r.calls?.[key],c.expected[key],c.id+': '+key);
  assert.equal(r.ack,c.expected.ack,c.id+': ack');assert.equal(r.release,c.expected.release,c.id+': release');
  assert.equal(r.same_owner_retained_until_settled,true,c.id+': retained owner');
@@ -28,6 +28,8 @@ for(const c of spec.cases){
  const positions=c.expected.ordered_events.map(e=>{const matches=r.events.flatMap((v,i)=>v===e?[i]:[]);assert.equal(matches.length,1,c.id+': unique '+e);return matches[0];});
  assert.deepEqual(positions,[...positions].sort((a,b)=>a-b),c.id+': ordering');
  if(!c.expected.ack){assert.ok(!r.events.includes('ack'));assert.ok(!r.events.includes('release'));}
+ if(c.expected.native_close===0){assert.deepEqual([...r.refused_phase_attempts].sort(),['apply','configure','execute','finish'],c.id+': exercise gates, not just idle observation');}
+ assert.equal(r.replay_attempts,0,c.id+': native replay');
  if(c.id==='confirmed-evidence-retry-no-replay')assert.equal(r.evidence_write_attempts,2,c.id);
  if(c.id==='lost-native-reply')assert.equal(r.replay_attempts,0,c.id);
  results.push({id:c.id,status:'FIXTURE_PASS'});
