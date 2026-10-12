@@ -10,7 +10,7 @@ await entry.link(specifier=>{
  const exports=builtin[specifier]??({
  './resources.mjs':{verifyResources:()=>({browserPath:'/fixture',manifest:{files:[]}})},
  './start-input.mjs':{validateStartInput:()=>({})},
- './connection-check.mjs':{loginBrowser(){throw Error('fixture forbids login')},checkConnection(){const e=Error('LOGINOM_LOGIN_UNAVAILABLE');e.startupOwner={close:async()=>{events.push('startup-owner-close');throw Error('fixture UNKNOWN')}};throw e},loginomAddress(){}},
+ './connection-check.mjs':{loginBrowser(){throw Error('fixture forbids login')},checkConnection(options){const owner=options.owner;owner.context={close:async()=>events.push('startup-context-close')};owner.close=async()=>{events.push('startup-owner-close');throw Error('fixture UNKNOWN')};const e=Error('LOGINOM_LOGIN_UNAVAILABLE');e.startupOwner=owner;throw e},loginomAddress(){}},
  '../client/lib/session.mjs':{createSession(){}},'../client/lib/artifacts.mjs':{admitStartupArtifacts(){}},'../client/lib/bridge.mjs':{createBridge(){}},
  })[specifier];if(!exports)throw Error('Unexpected dependency '+specifier);
  return new vm.SyntheticModule(Object.keys(exports),function(){for(const [k,v]of Object.entries(exports))this.setExport(k,v)},{context});
