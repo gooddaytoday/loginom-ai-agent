@@ -1,0 +1,42 @@
+{
+  "checked_utc": "2026-10-12T19:55:17.958911+00:00",
+  "scope": [
+    "LAB-55",
+    "LAB-56",
+    "LAB-57",
+    "LAB-58",
+    "LAB-59",
+    "LAB-60",
+    "LAB-61",
+    "LAB-62",
+    "LAB-63"
+  ],
+  "current_server_state": "UNKNOWN: no fresh issue/run/metadata/comment JSON retrieved",
+  "blocker_fingerprint": "monitor:Multica:TLS-secure-handshake-timeout",
+  "observed_evidence": [
+    "CLI batch returned TLS handshake timeout for issue/run reads; no JSON responses saved",
+    "Independent Python HTTPS request to same host failed during TLS handshake",
+    "One invocation-only GODEBUG=tlsmlkem=0 read of LAB-57 failed with same TLS timeout; no persistent configuration changes"
+  ],
+  "scoped_read": {
+    "checked_utc": "2026-10-12T19:54:16.061657+00:00",
+    "exit_code": 2,
+    "result": "TLS handshake timeout"
+  },
+  "last_successful_snapshot": "evals/.bundle/text-import-monitor-20261012T192149Z",
+  "last_verified_utc": "2026-10-12T19:21:58Z",
+  "last_verified_states": {
+    "LAB-55": "in_review rev16",
+    "LAB-56": "in_review rev65",
+    "LAB-57": "blocked rev149",
+    "LAB-58–LAB-63": "in_progress/admission rev9",
+    "active_or_queued_runs": 0
+  },
+  "snapshot_limitation": "Failed responses are not state changes or evidence of absent runs; cached statuses are historical only.",
+  "confirmed_action": "Recorded outage; no model/native/reference/product/recovery/probe execution or Multica mutations",
+  "Rich_repeat_budget_change": 0,
+  "shared_CLI_credentials_VPN_modified": false,
+  "owner_CLI_pin_decision": "Last verified pending; no new approval inferred",
+  "automation": "lab-56-lab-63-30 remains ACTIVE; all-eight completion not confirmed",
+  "next_step": "Re-read current Multica state on next scheduled check; diagnose changed connectivity before any handoff or execution. Preserve prior evidence and fixed LAB-57 stage deadline."
+}
