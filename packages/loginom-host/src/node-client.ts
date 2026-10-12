@@ -44,7 +44,7 @@ async function launchDiagnostic(input: NodeHostInput & { packagePath: string }, 
     [`runtime/src/acceptance/${harness}.mjs`, join(input.resources, `runtime/src/acceptance/${harness}.mjs`)]]) {
     const items = manifest.files?.filter((file: { path: string }) => file.path === path)
     const item = items?.[0]
-    if (items?.length !== 1 || !/^[a-f0-9]{64}$/.test(item.sha256) || await realpath(actual!) !== resolve(input.resources, path!)
+    if (items?.length !== 1 || item.link || item.directory || !/^[a-f0-9]{64}$/.test(item.sha256) || await realpath(actual!) !== resolve(input.resources, path!)
         || createHash("sha256").update(await readFile(actual!)).digest("hex") !== item.sha256)
       throw Error("LOGINOM_HANDSHAKE_INVALID")
   }

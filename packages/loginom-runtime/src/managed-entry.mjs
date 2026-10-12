@@ -1,9 +1,9 @@
 import { createRequire } from "node:module"
-import { randomUUID } from "node:crypto"
+import { randomUUID, createHash } from "node:crypto"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { tmpdir } from "node:os"
-import { mkdir, mkdtemp, readFile, rm, writeFile, open } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile, open, realpath } from "node:fs/promises"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { loginBrowser, checkConnection, loginomAddress } from "./connection-check.mjs"
@@ -169,8 +169,12 @@ async function handle(message) {
       let captureHarness
       if (acceptanceCapture) {
         // Fixed reviewed receiving resource, never a request-selected module.
-        const path = "runtime/acceptance/calculator-grouped-before-done-v1.mjs"
-        if (!resources.manifest.files.some(file => file.path === path && !file.link && !file.directory))
+        const path = "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs"
+        const entries = resources.manifest.files.filter(file => file.path === path)
+        if (entries.length !== 1 || entries[0].link || entries[0].directory
+            || !/^[a-f0-9]{64}$/.test(entries[0].sha256)
+            || await realpath(join(input.resources, path)) !== join(await realpath(input.resources), path)
+            || createHash("sha256").update(await readFile(join(input.resources, path))).digest("hex") !== entries[0].sha256)
           throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
         const module = await import(pathToFileURL(join(input.resources, path)).href)
         if (typeof module.captureCalculator !== "function") throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
