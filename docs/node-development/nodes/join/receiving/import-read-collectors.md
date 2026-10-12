@@ -49,3 +49,10 @@ No full product build is required for this docs/test preparation. The minimal
 production integration remains a later step after collector review, current
 native proof availability and LAB-68 exact Import routing/gate/opaque proof PASS.
 No new live/native/server/model/prepare/upload/rebind/Done/Save/execute/replay.
+
+Prototype claim revalidation retains native/DOM identities before final provider
+reads and removes observed claims after the last outer owner read if relations
+changed. This includes wizard data/tree/engine/opening and process ModelNode/
+record/parent/children/diagram. Row record/view/index/cell/icon aliases are checked
+after final getStore/getAt. A defined native FPortIndex must equal nativeIndex;
+undefined remains permitted by node-context's existing contract.

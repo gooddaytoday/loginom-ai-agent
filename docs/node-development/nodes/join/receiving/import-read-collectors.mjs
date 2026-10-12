@@ -30,7 +30,7 @@ export function readFixedImportCandidates(identity) {
   ||'/'+String(pack.PackageFileName).replaceAll('\\','/').replace(/^\/+/, '')!==identity.package_path)return refuse('PACKAGE_WORKFLOW');
  const fixed=['e78dbebd-942a-4ef4-ac45-654eec157c31','6774e6c2-a207-4293-b7ea-8db76e168f98'];
  const prefix='MF;TF'+(identity.tab_tid.match(/;tb(-\d+)?$/)?.[1]??'');
- const roots=exact(prefix+';WizrdMCF');
+ const roots=exact(prefix+';WizrdMCF'),claims=[];
  // Import format uses transposed properties, not output-mapping row records.
  // Without a measured native record association, keep enum binding unknown;
  // collect only bounded rendered draft labels from the actual fixed selectors.
@@ -62,8 +62,23 @@ export function readFixedImportCandidates(identity) {
     &&o.node_id===node.FGuid&&o.workflow_id===receipts[0].workflowId&&o.workflow===workflow&&o.packageNode===pack
     &&o.portTree===portTree&&portTree.FIndex===o.nativeIndex&&portTree.FModelNodePort===data&&data===o.portData
     &&o.node.FGuid===node.FGuid&&nodeData===node.FModelNode&&nodeData===o.nodeData&&o.port.parent===o.node
+    &&(o.port.FPortIndex===undefined||o.port.FPortIndex===o.nativeIndex)
     &&o.port.FGuid===o.portGuid&&typeof o.portGuid==='string'&&o.portGuid&&o.enginePort===model.FModelEnginePort&&o.enginePort&&!model.FModelNode
-    &&model.FView?.el?.dom===roots[0])result.wizard_output0={status:'observed_cached_opening',node_id:node.FGuid,port:0,port_guid:o.portGuid,native_index:o.nativeIndex,authority_verified:false};
+    &&model.FView?.el?.dom===roots[0]){
+     const retained={port:o.port,node:o.node,data,nodeData,portGuid:o.portGuid,nativeIndex:o.nativeIndex,portIndex:o.portIndex,portTree,group,engine:o.enginePort,root:roots[0],nodeGuid:node.FGuid};
+     claims.push({key:'wizard_output0',valid:()=>own(retained.port,'data')===retained.data&&own(retained.node,'data')===retained.nodeData
+      &&retained.node.FGuid===retained.nodeGuid&&retained.port.parent===retained.node&&retained.port.FGuid===retained.portGuid
+      &&(retained.port.FPortIndex===undefined||retained.port.FPortIndex===retained.nativeIndex)
+      &&retained.portTree.FModelNodePort===retained.data&&retained.portTree.FIndex===retained.nativeIndex
+      &&retained.portTree.ParentNode===retained.group&&retained.group.ParentNode===node&&node.FModelNode===retained.nodeData&&node.FGuid===retained.nodeGuid
+      &&!model.FModelNode&&model.FModelEnginePort===retained.engine&&model.FView?.el?.dom===retained.root
+      &&p.outputPortOpenReceipts instanceof Map&&[...p.outputPortOpenReceipts.values()].filter(x=>x.phase==='verified'&&x.wizard===model&&x.nodeTree===node).length===1
+      &&[...p.outputPortOpenReceipts.values()].includes(o)&&o.port===retained.port&&o.node===retained.node&&o.portData===retained.data&&o.nodeData===retained.nodeData
+      &&o.portGuid===retained.portGuid&&o.portIndex===retained.portIndex&&o.nativeIndex===retained.nativeIndex&&o.enginePort===retained.engine
+      &&o.portTree===retained.portTree&&o.nodeTree===node&&o.wizard===model&&o.workflow_id===receipts[0].workflowId
+      &&o.document_id===p.id&&o.workflow===workflow&&o.packageNode===pack&&o.node_id===retained.nodeGuid&&o.direction==='output'});
+     result.wizard_output0={status:'observed_cached_opening',node_id:node.FGuid,port:0,port_guid:o.portGuid,native_index:o.nativeIndex,authority_verified:false};
+    }
   }
  }
  // The toggle is a same-selected-node UI observation, not activation/freshness.
@@ -77,8 +92,20 @@ export function readFixedImportCandidates(identity) {
   if(buttons.length===1&&native&&body&&graphRoots[0].contains(body)&&n.FLocked!==true&&native.el?.dom===button&&native.disabled!==true&&native.tooltip==='Выполнить узел'){
    const tip=button.getAttribute('data-qtip'),run=button.querySelectorAll('.bg-icon-run_current').length,stop=button.querySelectorAll('.bg-icon-stop').length;
    const mode=['Выполнить узел','Выполнить узел (F9)'].includes(tip)&&run===1&&stop===0?'execute':tip==='Деактивировать узел'&&stop===1&&run===0?'deactivate':null;
-   if(mode&&graph.getSelectionCells()?.length===1&&graph.getSelectionCells()[0]===n.FCell&&native.el.dom===button&&button.getAttribute('data-qtip')===tip)
+   if(mode&&graph.getSelectionCells()?.length===1&&graph.getSelectionCells()[0]===n.FCell&&native.el.dom===button&&button.getAttribute('data-qtip')===tip){
+    const retained={node:n,nodeGuid:n.FGuid,cell:n.FCell,body,button,native,tip,root:graphRoots[0]};
+    claims.push({key:'activity',valid:()=>{
+     const currentSelection=graph.getSelectionCells?.(),currentBody=graph.view?.getState?.(retained.cell)?.shape?.node;
+     return Array.isArray(currentSelection)&&currentSelection.length===1&&currentSelection[0]===retained.cell
+     &&nodes.includes(retained.node)&&nodes.filter(x=>x.FGuid===retained.nodeGuid).length===1&&currentBody===retained.body
+     &&globalThis.Ext?.getCmp?.(retained.button.id)===retained.native
+     &&model.FDiagram===diagram&&diagram.FNodes.FCollection===nodes&&diagram.FmxGraph===graph
+     &&retained.node.FGuid===retained.nodeGuid&&retained.node.FCell===retained.cell&&retained.node.FIconCls==='bg-vendor-icon-importtextfile'
+     &&retained.native.el?.dom===retained.button&&retained.native.disabled!==true&&retained.native.tooltip==='Выполнить узел'
+     &&retained.button.getAttribute('data-qtip')===retained.tip&&retained.root===graph.container
+     &&retained.button.querySelectorAll('.bg-icon-run_current').length===run&&retained.button.querySelectorAll('.bg-icon-stop').length===stop;}});
     result.activity={status:'observed_toggle',node_id:n.FGuid,mode,activation_verified:false};
+   }
   }
   // Both cached process views must own one native TreeStore and node data.
   const consoles=exact('ConsoleForm'),grids=['treepanel;tree','grd;tbl'].map(s=>exact('ConsoleForm;ProgressForm;trpProgress;'+s));
@@ -92,14 +119,26 @@ export function readFixedImportCandidates(identity) {
    }};
    if(root?.isModel===true&&own(root,'data')?.loaded===true&&!own(root,'data').loading)walk(root.childNodes,root);else valid=false;
    const data=own(n,'data'),owned=records.filter(r=>data&&own(r,'data')?.ModelNode===data);
+   const rootBinding={root,id:root?.internalId,data:own(root,'data'),children:[...(root?.childNodes??[])]};
+   const retainedRecords=records.map(r=>({r,data:own(r,'data'),id:r.internalId,processId:own(r,'data')?.id,owner:own(r,'data')?.ModelNode,parent:r.parentNode,children:[...r.childNodes]}));
    if(valid&&new Set(records.map(r=>r.internalId)).size===records.length&&new Set(records.map(r=>String(own(r,'data').id))).size===records.length&&owned.length===1
-    &&views.every(v=>v.getStore()===store)&&(store.getRoot?.()??store.getRootNode?.())===root)
+    &&views.every(v=>v.getStore()===store)&&(store.getRoot?.()??store.getRootNode?.())===root){
+    const retained={node:n,nodeGuid:n.FGuid,nodeData:data,root,record:owned[0],records:retainedRecords};
+    claims.push({key:'process_owner',valid:()=>model.FDiagram===diagram&&diagram.FNodes.FCollection===nodes&&diagram.FmxGraph===graph&&own(retained.node,'data')===retained.nodeData&&retained.node.FGuid===retained.nodeGuid&&nodes.includes(retained.node)&&nodes.filter(x=>x.FGuid===retained.nodeGuid).length===1
+     &&own(retained.record,'data')?.ModelNode===retained.nodeData&&retained.root===root&&root.internalId===rootBinding.id&&own(root,'data')===rootBinding.data&&own(root,'data')?.loaded===true
+     &&root.childNodes.length===rootBinding.children.length&&rootBinding.children.every((r,i)=>root.childNodes[i]===r)
+     &&retained.records.every(b=>own(b.r,'data')===b.data&&b.r.internalId===b.id&&own(b.data,'id')===b.processId&&own(b.data,'ModelNode')===b.owner
+      &&b.r.parentNode===b.parent&&b.r.childNodes.length===b.children.length&&b.children.every((c,i)=>b.r.childNodes[i]===c))
+     &&views.every((v,i)=>v.el?.dom===grids[i][0])});
     result.process_owner={status:'observed_cached_model_owner',node_id:n.FGuid,root_record_id:root.internalId,record_id:owned[0].internalId,process_id:String(own(owned[0],'data').id),execution_verified:false,inventory_complete:false};
+   }
   }
  }
  if(main.Items.Workspace.getActiveTab()!==card||card.Controller!==controller||controller.FController!==model||controller.Node?.data?.node!==start
   ||ancestry.some(b=>b.n.ParentNode!==b.parent)||map.FServerConnection!==connection||connection.UserName!==identity.account||connection.Connected!==true
   ||p.document!==document||p.id!==identity.document_id)return refuse('OWNER_CHANGED');
+ // Last outer owner read has completed; revalidate every emitted relation.
+ for(const claim of claims)if(!claim.valid())result[claim.key]=unknown('CLAIM_BINDING_CHANGED');
  return result;
 }
 
@@ -116,19 +155,24 @@ export function collectRecordLabelPair(view,grid,row) {
   ||row.getAttribute('data-boundview')!==grid.id||row.getAttribute('data-recordid')!==record.internalId
   ||own(data,'Index')!==index||typeof own(data,'Name')!=='string'||!own(data,'Name')
   ||typeof own(data,'DisplayName')!=='string'||!Number.isInteger(own(data,'DataType'))||!Number.isInteger(own(data,'DataKind')))return unknown('RECORD_ROW_OWNER');
- const cells=[...row.querySelectorAll('[data-tid]')],name=own(data,'Name'),label=own(data,'DisplayName');
+ const gridId=grid.id,cells=[...row.querySelectorAll('[data-tid]')],name=own(data,'Name'),label=own(data,'DisplayName');
  const names=cells.filter(e=>e.getAttribute('data-tid')?.endsWith(';colName_'+name));
  const labels=cells.filter(e=>e.getAttribute('data-tid')?.endsWith(';colDisplayName_'+name));
  const kinds=cells.filter(e=>e.getAttribute('data-tid')?.endsWith(';colDataKind_'+name));
  const icons=labels.length===1?[...labels[0].querySelectorAll('[class*="bg-TBGDataType-dt"]')]:[];
  const types={String:'string',Integer:'integer',Float:'real',Boolean:'boolean',DateTime:'datetime',Variant:'variant'};
  const markers=Object.entries(types).filter(([css])=>icons.length===1&&icons[0].classList.contains('bg-TBGDataType-dt'+css));
- if(names.length!==1||labels.length!==1||kinds.length!==1||names[0].textContent!==name||labels[0].textContent!==label||markers.length!==1
+ if(cells.length>32||names.length!==1||labels.length!==1||kinds.length!==1||names[0].textContent!==name||labels[0].textContent!==label||markers.length!==1
   ||!['Неопределенное','Непрерывный','Дискретный'].includes(kinds[0].textContent))return unknown('RENDERED_LABEL_ICON');
  const result={status:'observed_candidate_pair',record_id:record.internalId,index,name,label,native_type_code:own(data,'DataType'),native_kind_code:own(data,'DataKind'),
   icon_type:markers[0][1],kind_label:kinds[0].textContent,enum_mapping_verified:false};
- if(view.getStore()!==store||store.getAt(index)!==record||own(record,'data')!==data||own(data,'Name')!==result.name
+ // Complete the potentially changing provider calls before validating DOM/native facts.
+ const currentStore=view.getStore(),currentRecord=store.getAt(index),loading=store.isLoading?.();
+ const currentCells=[...row.querySelectorAll('[data-tid]')],currentIcons=[...labels[0].querySelectorAll('[class*="bg-TBGDataType-dt"]')];
+ if(currentStore!==store||currentRecord!==record||loading!==false||record.isModel!==true||record.internalId!==result.record_id||own(data,'Index')!==index||grid.id!==gridId||currentCells.length!==cells.length||cells.some((c,i)=>currentCells[i]!==c)
+  ||currentIcons.length!==1||currentIcons[0]!==icons[0]||!currentIcons[0].classList.contains('bg-TBGDataType-dt'+markers[0][0])||own(record,'data')!==data||own(data,'Name')!==result.name
   ||own(data,'DisplayName')!==result.label||own(data,'DataType')!==result.native_type_code||own(data,'DataKind')!==result.native_kind_code
-  ||names[0].textContent!==name||labels[0].textContent!==label||kinds[0].textContent!==result.kind_label)return unknown('RECORD_BINDING_CHANGED');
+  ||row.getAttribute('data-recordindex')!==rawIndex||row.getAttribute('data-recordid')!==result.record_id||row.getAttribute('data-boundview')!==grid.id
+  ||view.el?.dom!==grid||!grid.contains(row)||names[0].textContent!==name||labels[0].textContent!==label||kinds[0].textContent!==result.kind_label)return unknown('RECORD_BINDING_CHANGED');
  return result;
 }

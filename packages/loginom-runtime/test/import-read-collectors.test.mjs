@@ -64,3 +64,39 @@ for(const field of ['node','port','enginePort'])test('missing native opening '+f
 
 test('foreign native component cannot supply Import toggle/owner candidates',()=>{const f=graph();f.n.FIconCls='calculator';const r=read(f);assert.equal(r.activity.status,'unknown');assert.equal(r.process_owner.status,'unknown')});
 test('missing native record index cannot coerce to zero',()=>{const f=pair(),old=f.row.getAttribute;f.row.getAttribute=k=>k==='data-recordindex'?null:old(k);assert.equal(readPair(f).status,'unknown')});
+
+for(const [name,change]of [
+ ['record-id',f=>{const old=f.row.getAttribute;f.row.getAttribute=k=>k==='data-recordid'?'foreign':old(k)}],
+ ['bound-view',f=>{const old=f.row.getAttribute;f.row.getAttribute=k=>k==='data-boundview'?'foreign':old(k)}],
+ ['index',f=>{const old=f.row.getAttribute;f.row.getAttribute=k=>k==='data-recordindex'?'1':old(k)}],
+ ['record-data',f=>f.record.data={...f.data}],['cell-inventory',f=>f.row.querySelectorAll=()=>[]],['icon',f=>f.icon.classList.contains=()=>false],
+])test('late getAt drift '+name+' drops row claim',()=>{
+ const f=pair();let reads=0;f.store.getAt=()=>{if(++reads===2)change(f);return f.record};assert.equal(readPair(f).status,'unknown');
+});
+for(const [name,change]of [
+ ['port-data',f=>f.port.data={}],['port-parent',f=>f.port.parent={}],['port-guid',f=>f.port.FGuid='foreign'],
+ ['engine',f=>f.model.FModelEnginePort={}],['tree-index',f=>f.portTree.FIndex=1],['opening-data',f=>f.opening.portData={}],
+])test('late activeTab drift '+name+' drops wizard claim',()=>{
+ const f=portWizard();let reads=0;f.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>{if(++reads===2)change(f);return f.card};const r=read(f);assert.equal(r.wizard_output0.status,'unknown');assert.equal(r.complete,false);
+});
+for(const index of [undefined,0,1,null,false,'0',-1])test('defined native port index must match '+String(index),()=>{
+ const f=portWizard();f.port.FPortIndex=index;const r=read(f);assert.equal(r.wizard_output0.status,index===undefined||index===0?'observed_cached_opening':'unknown');
+});
+for(const [name,change]of [
+ ['model-owner',f=>f.record.data.ModelNode={}],['record-data',f=>f.record.data={...f.record.data}],['record-id',f=>f.record.internalId='foreign'],
+ ['process-id',f=>f.record.data.id='9.9'],['parent',f=>f.record.parentNode={}],['children',f=>f.record.childNodes.push({})],
+ ['diagram',f=>f.card.Controller.FController.FDiagram={}],['activity-tip',f=>f.button.getAttribute=()=> 'foreign'],
+])test('late getRoot drift '+name+' drops emitted relation',()=>{
+ const f=graph();let reads=0;f.store.getRoot=()=>{if(++reads===2)change(f);return f.root};const r=read(f);
+ assert.equal(r[name==='activity-tip'?'activity':'process_owner'].status,'unknown');assert.equal(r.freshness.execution_verified,false);
+});
+
+for(const [name,change]of [['native-index',f=>f.data.Index=1],['native-record-id',f=>f.record.internalId='foreign'],['loading',f=>f.store.isLoading=()=>true]])
+ test('late final native row '+name+' unknown',()=>{const f=pair();let reads=0;f.store.getAt=()=>{if(++reads===2)change(f);return f.record};assert.equal(readPair(f).status,'unknown')});
+for(const [name,change]of [['root-id',f=>f.root.internalId='foreign'],['root-data',f=>f.root.data={loaded:true}],['root-children',f=>f.root.childNodes.push({...f.record})]])
+ test('late final native root '+name+' unknown',()=>{const f=graph();let reads=0;f.store.getRoot=()=>{if(++reads===2)change(f);return f.root};assert.equal(read(f).process_owner.status,'unknown')});
+for(const [name,change]of [['opening-tree',f=>f.opening.portTree={}],['opening-workflow-id',f=>f.opening.workflow_id='foreign'],['native-node-guid',f=>f.opening.node.FGuid='foreign'],['defined-port-index',f=>f.port.FPortIndex=1],['component-model',f=>f.model.FModelNode={}]])
+ test('late final opening '+name+' unknown',()=>{const f=portWizard();let reads=0;f.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>{if(++reads===2)change(f);return f.card};assert.equal(read(f).wizard_output0.status,'unknown')});
+
+for(const [name,change]of [['selection',f=>f.graph.getSelectionCells=()=>[{}]],['toggle-native',f=>{const old=f.env.Ext.getCmp;f.env.Ext.getCmp=id=>id==='toggle'?{}:old(id)}]])
+ test('late getRoot same-node activity '+name+' unknown',()=>{const f=graph();let reads=0;f.store.getRoot=()=>{if(++reads===2)change(f);return f.root};assert.equal(read(f).activity.status,'unknown')});
