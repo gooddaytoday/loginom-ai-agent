@@ -163,6 +163,8 @@ async function handle(message) {
       state.starting = true
       const input = message.input
       const { acceptanceCleanupPackage, acceptanceCapture } = validateStartInput(input)
+      if (Object.hasOwn(message,"deadline") && (!Number.isSafeInteger(message.deadline) || message.deadline<=Date.now()))
+        throw Error("LOGINOM_INITIAL_READINESS_DEADLINE")
       const resources = await verifyResources(input.resources)
       let captureHarness
       if (acceptanceCapture) {
@@ -191,7 +193,11 @@ async function handle(message) {
       const browserProfile =
         process.platform === "win32" ? await mkdtemp(join(tmpdir(), "lb")) : join(directory, "browser-profile")
       state.browserProfile = process.platform === "win32" ? browserProfile : undefined
-      state.startupOwner={directory,generation:input.generation,chat:input.chat}
+      state.startupController=new AbortController()
+      state.startupOwner={directory,generation:input.generation,chat:input.chat,
+        deadline:Number.isSafeInteger(message.deadline)?message.deadline:null,
+        deadlineSource:Number.isSafeInteger(message.deadline)?"supervisor.request.start":"NOT_SUPPLIED",
+        signal:state.startupController.signal}
       const login = {
         owner:state.startupOwner,
         browserPath: resources.browserPath,
@@ -200,11 +206,14 @@ async function handle(message) {
         headless: input.headless === true,
       }
       if (input.validation === true) {
-        await checkConnection({ ...login, endpoint: input.endpoint })
+        try {await checkConnection({ ...login, endpoint: input.endpoint })}
+        finally {state.startupController=undefined}
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
-      const authenticated = await loginBrowser({ ...login, keepOpen: true })
+      let authenticated
+      try {authenticated = await loginBrowser({ ...login, keepOpen: true })}
+      finally {state.startupController=undefined}
       state.browser = authenticated.context
       state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
       const config = {
@@ -272,6 +281,12 @@ async function handle(message) {
       return
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
+    if (message.operation === "interrupt" && state.startupController) {
+      state.startupController.abort(Error("LOGINOM_INITIAL_STARTUP_CANCELLED"))
+      await recordClose("interrupt",{status:"startup_cancelled"})
+      send({id:message.id,result:{interrupted:true}})
+      return
+    }
     if (!state.client) throw Error("LOGINOM_NOT_READY")
     if (message.operation === "acceptance.capture") {
       if (message.input !== undefined || state.controller || state.closeFailure !== undefined)
