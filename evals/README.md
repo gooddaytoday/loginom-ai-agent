@@ -7,10 +7,18 @@
 - Bun ≥ 1.3; Linux; установленный binary CLI и bubblewrap; preflight требует `unzip`, `git`, `pgrep`, `ps`, `docker` и `xmllint` для live, минимум 1 GiB свободного места для evals и workspace.
 - Выделенный чистый Loginom в docker (`http://localhost/app/`, пользователь `user`), подготовленный ниже. Default `loginom-server-master` не разрешает широкую очистку.
 - Отдельный API-ключ Dock для eval (не ключ Desktop): память OpenViking привязана к ключу. Dock должен отвечать этим ключом; preflight забирает манифест skill с `include_integrity=true`.
-- Codex CLI с входом по подписке (`codex login`); судья — `gpt-6-astra`/`high`.
+- Codex CLI с входом по подписке (`codex login`); судья — `gpt-6-sol`/`xhigh`.
 - Live использует `EVAL_CLI_MODE=binary`, `EVAL_CLI_BIN` установленного `loginom-ai-agent-cli` с соседним `cli-manifest.json`. Source остаётся доступен для management/dev, но его live-выполнение запрещено. Binary несёт Node, Chromium и остальные ресурсы продукта; dev-bundle ему не нужен.
 
 ## Настройка
+
+С 2026-10-12 для новых прогонов судья — `gpt-6-sol/xhigh`
+(`JUDGE_MODEL=gpt-6-sol`, `JUDGE_REASONING=xhigh`). Настройки заданы
+в `.env.example`, локальном `.env` и role env EvalRunner/EvalBaseline
+на `eval-tests`. Старые серии сохраняют свои judge pins; при продолжении
+или восстановлении серии используются её исходные настройки. Калибровка
+`gpt-6-astra/high` ниже относится к прежнему судье; калибровка новой модели
+пока не выполнялась. `compare` учитывает смену модели и reasoning судьи.
 
 ```bash
 cd evals
@@ -177,7 +185,7 @@ oracle не заменяют обнаружение дефекта судьёй.
 закреплены SHA256. Команды выполняются из evals/:
 ```bash
 python3 script/check-calibration-corpus.py --tasks tasks/analytic
-JUDGE_MODEL=gpt-6-astra JUDGE_REASONING=high bun run src/run.ts --calibrate --tasks tasks/analytic
+JUDGE_MODEL=gpt-6-sol JUDGE_REASONING=xhigh bun run src/run.ts --calibrate --tasks tasks/analytic
 ```
 При подготовке мутаций требуются zip, unzip и xmllint. После всех замен
 изменённые XML проверяются командой `xmllint --nonet --noout` до пересборки ZIP
