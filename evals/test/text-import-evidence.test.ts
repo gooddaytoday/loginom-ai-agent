@@ -242,6 +242,8 @@ test("CSV to TSV refresh requires two deliveries and fresh full reads on the sam
     const prepare = JSON.parse(JSON.stringify(f.calls[0]))
     prepare.output.input_artifacts.push({ artifact_id: "changed", name: "changed.tsv", bytes: changed.bytes, sha256: changed.sha256,
       upload: { grant_id: "grant2", destination } })
+    prepare.output.input_artifacts = prepare.output.input_artifacts.map((artifact: { name: string }, index: number) =>
+      ({ ...artifact, name: `${"a".repeat(64)}-${index}-${artifact.name}` }))
     f.calls[0] = prepare
     const delivery = { tool: "loginom_dock_artifact_deliver", input: { artifact_id: "changed", upload_grant_id: "grant2" },
       output: { status: "SUCCEEDED", cleanup_complete: true, output: { artifact_id: "changed", bytes: changed.bytes, sha256: changed.sha256,
