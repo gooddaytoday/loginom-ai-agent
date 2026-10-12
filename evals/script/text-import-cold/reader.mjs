@@ -62,6 +62,7 @@ const identity={sessionId:session,account,packagePath:saved.path,loginomUrl:conf
 let report={status:'FAIL',all_values_compared:false};
 try{
  await withDiagnosticSession({context,execute,directory:output,identity,makeCleanupCode:options=>makePackageCleanupCode({...options,diagnosticDiscard:true})},async({bindPrepared})=>{
+  await page.setViewportSize({width:1920,height:1080});
   const prepared=await bindPrepared(await execute(makeWorkspacePrepareCode({loginomUrl:page.url(),compatibility:{loginom_build:'7.4.2',platform:'linux',browser:'chromium'},sessionId:session,operationId:'txt-cold-open',intent:'open_package',packagePath:saved.path})));
   need(!prepared.workflow_ref.navigation_path.some(x=>x.label.endsWith('(только чтение)')),'SAVED_PACKAGE_READONLY');
   const adapter=createNodeTargetBrowserAdapter({execute,origin,build:'7.4.2'});

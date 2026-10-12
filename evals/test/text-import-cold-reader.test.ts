@@ -40,6 +40,39 @@ test.skipIf(!process.env.EVAL_TEXT_IMPORT_COLD_REGRESSION)("cold reader without 
   await writeFile(path.join(admission.output, "reader-stdout.txt"), output, { mode: 0o600 })
   await writeFile(path.join(admission.output, "reader-stderr.txt"), error, { mode: 0o600 })
   expect(code).toBe(0)
+  const journal = (await Bun.file(path.join(admission.output, "execution-events.jsonl")).text()).trim().split("\n").map(line => JSON.parse(line))
+  const opens = journal.filter(row => row.operation_id === "txt-cold-settings" && row.phase === "node_step_prepared" && row.action.verb === "begin_wizard")
+  expect(opens).toHaveLength(1)
+  const before = journal.find(row => row.phase === "node_observation_completed" && row.step === opens[0].step - 1).outcome.output
+  const receipt = journal.find(row => row.phase === "node_step_completed" && row.internal_operation_id === opens[0].internal_operation_id).outcome
+  expect(receipt.status).toBe("SUCCEEDED")
+  expect(receipt.trace.filter((entry: { event: string; verb?: string }) => entry.event === "ui_gesture_applied" && entry.verb === "begin_wizard")).toHaveLength(1)
+  expect(receipt.output.geometry.viewport).toEqual({ width: 1920, height: 1080 })
+  expect(receipt.output.wizard.owner_context.status).toBe("observed")
+  for (const key of ["document_id", "workflow_id", "node_id"]) expect(receipt.output.prepared_node_context[key]).toBe(before.prepared_node_context[key])
+  const { validateUiAction } = await import(path.join(admission.resources, "runtime/client/lib/workspace-ui.mjs"))
+  const { wizardOpenBinding, boundWizardDeactivationConfirmation } = await import(path.join(admission.resources, "runtime/client/lib/node-wizard-open.mjs"))
+  const { wizardCloseBinding, wizardCloseDialogOwner, boundWizardCloseConfirmation } = await import(path.join(admission.resources, "runtime/client/lib/node-wizard-close.mjs"))
+  expect(() => validateUiAction(opens[0].action, receipt.output)).toThrow("absent, ambiguous")
+  expect(boundWizardDeactivationConfirmation(receipt.output, wizardOpenBinding(before))).toBe(false)
+  const ambiguous = structuredClone(before)
+  ambiguous.ui.elements.push(structuredClone(ambiguous.ui.elements.find((element: { ref: string }) => element.ref === opens[0].action.ref)))
+  expect(() => wizardOpenBinding(ambiguous)).toThrow("One prepared settings control")
+  for (const status of ["unobserved", "ambiguous"]) {
+    const unowned = structuredClone(receipt.output)
+    unowned.wizard.owner_context.status = status
+    expect(() => wizardCloseBinding(unowned)).toThrow("prepared wizard")
+  }
+  const confirmation = journal.find(row => row.outcome?.output?.node_wizard_confirmation?.kind === "close").outcome.output
+  expect(boundWizardCloseConfirmation(confirmation, confirmation.node_wizard_confirmation)).toBe(true)
+  for (const key of ["document_id", "workflow_id", "node_id"]) {
+    const foreign = structuredClone(confirmation)
+    foreign.prepared_node_context[key] += "-foreign"
+    expect(wizardCloseDialogOwner(foreign, confirmation.node_wizard_confirmation)).toBe(false)
+  }
+  const foreignOwner = structuredClone(confirmation)
+  foreignOwner.wizard.owner_context.node.tid += ">foreign"
+  expect(wizardCloseDialogOwner(foreignOwner, confirmation.node_wizard_confirmation)).toBe(false)
   const checker = Bun.spawn(["python3", path.join(evalsRoot, "script/check-text-import-cold.py"), admission.task, admission.attempt, admission.output],
     { stdout: "pipe", stderr: "pipe" })
   const [checked, verdict, diagnostics] = await Promise.all([checker.exited, new Response(checker.stdout).text(), new Response(checker.stderr).text()])

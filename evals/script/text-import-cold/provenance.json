@@ -28,9 +28,10 @@
         "exact accepted CLI source pin before browser loading",
         "final source delivery with exact one/two count",
         "bind unique import by original GUID rather than optional node label",
-        "headless:true through exact CLI launcher for runtime without a display server"
+        "headless:true through exact CLI launcher for runtime without a display server",
+        "1920x1080 viewport through supported page API inside diagnostic session before workspace preparation; native ownership remains mandatory"
       ],
-      "sha256": "c901c6fd24fde338f77b370e819661657a8b1cb0196add79b72276c81a1fbf42"
+      "sha256": "8f1f2d3ada78d35e5b95ee986aa9b90107720d8dec41b4b185983bd3772a26f6"
     }
   ]
 }
