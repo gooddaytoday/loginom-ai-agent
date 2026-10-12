@@ -1,10 +1,12 @@
 import { createRequire } from "node:module"
-import { randomUUID } from "node:crypto"
+import { randomUUID, createHash } from "node:crypto"
 import { join } from "node:path"
+import { pathToFileURL } from "node:url"
 import { tmpdir } from "node:os"
-import { mkdir, mkdtemp, readFile, rm, writeFile, open } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile, open, realpath } from "node:fs/promises"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
+import { retainCaptureOwner, bindCaptureRuntime, assertCaptureOwner } from "./retained-capture.mjs"
 import { loginBrowser, checkConnection, loginomAddress } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts } from "../client/lib/artifacts.mjs"
@@ -163,8 +165,28 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage } = validateStartInput(input)
+      const { acceptanceCleanupPackage, acceptanceCapture } = validateStartInput(input)
       const resources = await verifyResources(input.resources)
+      let captureHarness, captureRegistration, captureResource
+      if (acceptanceCapture) {
+        // Fixed reviewed receiving resource, never a request-selected module.
+        const path = "runtime/src/acceptance/calculator-grouped-before-done-v1.mjs"
+        const entries = resources.manifest.files.filter(file => file.path === path)
+        if (entries.length !== 1 || entries[0].link || entries[0].directory
+            || !/^[a-f0-9]{64}$/.test(entries[0].sha256)
+            || await realpath(join(input.resources, path)) !== join(await realpath(input.resources), path)
+            || createHash("sha256").update(await readFile(join(input.resources, path))).digest("hex") !== entries[0].sha256)
+          throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
+        const module = await import(pathToFileURL(join(input.resources, path)).href)
+        if (typeof module.captureCalculator !== "function") throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
+        captureHarness = module.captureCalculator
+        captureResource = Object.freeze({path,sha256:entries[0].sha256})
+        if (module.captureMode !== undefined) {
+          if (module.captureMode !== "readonly" || typeof module.validateCaptureResult !== "function")
+            throw Error("LOGINOM_CAPTURE_UNAVAILABLE")
+          captureRegistration = Object.freeze({mode:"readonly",validate:module.validateCaptureResult,resource:captureResource})
+        }
+      }
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
       const directory = join(
         input.stateDir,
@@ -197,7 +219,10 @@ async function handle(message) {
       }
       const authenticated = await loginBrowser({ ...login, keepOpen: true })
       state.browser = authenticated.context
-      state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
+      if(captureRegistration)state.captureStartupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,
+        account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,
+        page:state.startupOwner.page,generation:input.generation,chat:input.chat})
+      state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page,generation:state.startupOwner.generation,chat:state.startupOwner.chat})
       const config = {
         endpoint: input.endpoint,
         apiKey: input.connection.apiKey,
@@ -227,6 +252,18 @@ async function handle(message) {
         managed: { directory, browserPath: resources.browserPath, browserRoot: resources.browserRoot },
       })
       state.session = session
+      const originalStartup=state.startupBinding,originalOwner=state.startupOwner,originalMetadata=session.metadata,
+        originalDirectory=session.directory,originalSessionId=session.metadata.sessionId;
+      const assertStartup=()=>{
+        if(state.session!==session || session.metadata!==originalMetadata || session.directory!==originalDirectory
+            || session.metadata.sessionId!==originalSessionId || state.startupBinding!==originalStartup || state.startupOwner!==originalOwner
+            || originalStartup.owner!==originalOwner || originalStartup.id!==originalOwner.id
+            || originalStartup.page!==originalOwner.page || originalStartup.context!==originalOwner.context
+            || originalStartup.account!==originalOwner.account || originalStartup.origin!==originalOwner.origin
+            || originalStartup.generation!==originalOwner.generation || originalStartup.chat!==originalOwner.chat)
+          throw Error("LOGINOM_STARTUP_OWNER_CHANGED");
+      };
+      assertStartup();
       // Bind only the document owned by this successful private login. This is
       // not workspace preparation and confers no package-close authority.
       const documentId=randomUUID()
@@ -240,6 +277,7 @@ async function handle(message) {
         return {documentId:o.documentId,account:o.account,loginomBuild:app.Version};
       },{documentId,sessionId:session.metadata.sessionId,account:input.connection.username,
         origin:new URL(config.loginomUrl).origin})
+      assertStartup();
       const { Client } = require("@modelcontextprotocol/sdk/client/index.js")
       const { InMemoryTransport } = require("@modelcontextprotocol/sdk/inMemory.js")
       const { createConnection } = require("@playwright/mcp")
@@ -247,14 +285,27 @@ async function handle(message) {
         JSON.parse(await readFile(session.browserConfig, "utf8")),
         async () => authenticated.context,
       )
+      assertStartup();
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
+      assertStartup();
+      const captureBinding=acceptanceCapture ? Object.freeze({...acceptanceCapture,session:session.metadata.sessionId}) : undefined
+      const retained=captureRegistration ? retainCaptureOwner(state,captureBinding,captureResource) : undefined
+      state.captureRetained=retained
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
-        authenticatedReadiness:state.authenticatedReadiness })
+        authenticatedReadiness:state.authenticatedReadiness,
+        acceptanceCapture: acceptanceCapture ? { binding:captureBinding, harness:captureHarness,
+          registration:captureRegistration, retained } : undefined })
+      assertStartup();
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })
+      if(retained)bindCaptureRuntime(retained,state.bridge,state.client)
       await state.bridge.server.connect(serverTransport)
+      assertStartup();
+      if(retained)assertCaptureOwner(retained)
       await state.client.connect(clientTransport)
+      assertStartup();
+      if(retained)assertCaptureOwner(retained)
       send({
         id: message.id,
         result: {
@@ -276,6 +327,31 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (message.operation === "acceptance.capture") {
+      if (message.input !== undefined || state.controller || state.closeFailure !== undefined)
+        throw Error("LOGINOM_REQUEST_INVALID")
+      const controller = new AbortController()
+      state.controller = controller
+      try {
+        const result = await state.bridge.captureAcceptance({signal:controller.signal})
+        if(result?.diagnosticRead===true) {
+          if(!state.captureRetained || state.controller!==controller
+              || Date.now()>=result.receipt.publication.deadline)
+            throw Error("LOGINOM_CAPTURE_RETAINED_OWNER_REFUSED")
+          assertCaptureOwner(state.captureRetained)
+          controller.signal.throwIfAborted()
+        }
+        send({id:message.id,result})
+      } catch (rejected) {
+        send({id:message.id,result:{cleanupComplete:false,refused:true,
+          rejectedIsUndefined:rejected === undefined,
+          rejected:rejected instanceof Error ? {name:rejected.name,message:rejected.message,
+            ...(Object.hasOwn(rejected,"cause")?{cause:closeRejection(rejected.cause)}:{})} : rejected}})
+      } finally {
+        state.controller = undefined
+      }
+      return
+    }
     if (message.operation === "admit") {
       if (typeof message.input.userMessage !== "string" || !message.input.userMessage)
         throw Error("LOGINOM_INPUT_INVALID")
@@ -322,7 +398,7 @@ async function handle(message) {
       state.startupFailure=error
       if(state.startupOwner?.context) {
         state.browser=state.startupOwner.context
-        state.startupBinding ??= Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
+        state.startupBinding ??= Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page,generation:state.startupOwner.generation,chat:state.startupOwner.chat})
       }
       // Clean up immediately, but keep IPC until the owner requests an acknowledged close.
       // close() retains a rejection so that the later close request reports cleanup failure.
