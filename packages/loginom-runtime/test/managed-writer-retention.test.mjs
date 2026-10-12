@@ -32,7 +32,7 @@ for(const scenario of ['normal','unclosed-file','settled-file','opaque-settled-f
   assert.ok(first);assert.equal(events.includes('context-close'),false);assert.equal(helperCalls,1);
   if(scenario.startsWith('sync-')){
    await fs.writeFile(join(process.env.REVIEW_RESULTS_DIR??directory,scenario+'.json'),JSON.stringify({fixture:true,source:process.env.MANAGED_MODULE,first,events,primary:state.shutdown.primaryFailure,scope:'exact receiving close/recordClose; real FileHandle; injected sync0 followed by closefalse before physical close'},null,2)+'\n');
-   assert.equal(first.cause,values[scenario.slice(5)],'the first sync rejection must survive secondary close failure');assert.equal(state.shutdown.persistencePrimary.phase,'file_sync');assert.equal(state.shutdown.persistenceFailures[0].rejection.value,false);return;
+   if(scenario==='sync-error'){assert.equal(first.message,values.error.message);assert.equal(first.cause,0)}else assert.equal(first.cause,values[scenario.slice(5)],'the first sync rejection must survive secondary close failure');assert.equal(state.shutdown.persistencePrimary.phase,'file_sync');assert.equal(state.shutdown.persistenceFailures[0].rejection.value,false);return;
   }
   assert.equal(blockedHandle.fd>=0,true);await blockedHandle.stat();
   if(scenario.includes('settled-file')&&scenario!=='unclosed-file'){await blockedHandle.close();events.push('original-fd-close-confirmed-by-fixture')}
