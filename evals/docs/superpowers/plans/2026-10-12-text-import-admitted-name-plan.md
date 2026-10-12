@@ -22,4 +22,4 @@ source_bindings, сохранив все data/ownership/lineage gates. Изме�
 - [x] Выполнить bun typecheck из evals/; не вызывать live Loginom/модель.
 - [x] Проверить реальные доставленные events source admission и оформить offline receipt.
 - [x] Сохранить patch commit и checkpoint до 20 строк, исходные бюджеты/ERROR сохраняются.
-- [ ] Передать reviewable SHA/evidence только после разрешения на сообщение Evaler.
+- [x] Передать reviewable SHA/evidence только после разрешения на сообщение Evaler.

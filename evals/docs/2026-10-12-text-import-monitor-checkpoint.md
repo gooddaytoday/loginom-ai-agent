@@ -13,5 +13,5 @@
 - Reference-бюджет txt-comma-utf8 1/3, остальные пять 0/3; model admission ledger 3/3; ERROR не переписан, новых модельных запусков/probes нет.
 - LAB-58–LAB-63 ждут предыдущих независимых ACCEPT/cleanup; их active runs отсутствуют.
 - Worker models/CLI pin/oracle/критерии сохраняются; серверные процессы/leases/profiles/default CLI не менялись.
-- Готов ZIP repair SHA256 f2dece4f042a293bd9947b739958e0f26e284268d387b343ac672b7c4c193b60; вопрос о прямом разрешении передать Evaler задан владельцу, ответа ещё нет.
-- После передачи — штатное решение Evaler о code pin/допуске продолжения, без дублирующего dispatch; heartbeat продолжает проверки.
+- Владелец разрешил координацию через Evaler; handoff comment 01a12f39-f6bb-7833-ab55-4b301920b902 принят queued, ZIP скачан/bytes-SHA проверены; readback 2026-10-12-admitted-name-handoff.json.
+- Следующий шаг — дождаться штатного решения Evaler о code pin/продолжении и новых evidence; разрешение на координацию записано в heartbeat, повторно не спрашивать.
