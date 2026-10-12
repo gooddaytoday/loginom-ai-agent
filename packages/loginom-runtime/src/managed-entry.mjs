@@ -342,7 +342,7 @@ async function handle(message) {
     }
     if (!state.client) throw Error("LOGINOM_NOT_READY")
     if(message.operation === "readonly.preReady") {
-      if(state.controller || !message.input || Object.keys(message.input).join(',')!=='deadline')
+      if(state.controller || state.admitting || !message.input || Object.keys(message.input).join(',')!=='deadline')
         throw Error("LOGINOM_PRE_READY_READ_REFUSED");
       const controller=new AbortController();state.controller=controller;state.preReadyReadHeld=true;preReadyRequests.set(message.id,controller);
       try {
@@ -389,9 +389,12 @@ async function handle(message) {
         send({ id: message.id, result: previous })
         return
       }
-      const result = await admitStartupArtifacts(state.session.artifactStore, message.input.files)
-      state.inputs.set(message.input.userMessage, result)
-      send({ id: message.id, result })
+      state.admitting=(state.admitting??0)+1
+      try {
+        const result = await admitStartupArtifacts(state.session.artifactStore, message.input.files)
+        state.inputs.set(message.input.userMessage, result)
+        send({ id: message.id, result })
+      } finally {state.admitting--}
       return
     }
     if (message.operation === "list") {

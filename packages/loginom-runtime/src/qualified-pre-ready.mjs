@@ -16,7 +16,7 @@ export function assertPreReadyOwner(retained) {
       || session.metadata!==retained.metadata || session.directory!==retained.directory
       || !retained.sessionId || session.metadata.sessionId!==retained.sessionId
       || owner.closed || owner.contextClosed || state.closing || state.bridgeCleanup
-      || Object.hasOwn(state,'preReadyReadRefusal') || Object.hasOwn(state,'startupFailure') || state.closeFailure!==undefined)
+      || state.admitting || Object.hasOwn(state,'preReadyReadRefusal') || Object.hasOwn(state,'startupFailure') || state.closeFailure!==undefined)
     throw Error('LOGINOM_PRE_READY_READ_REFUSED');
   return retained;
 }
