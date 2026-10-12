@@ -76,5 +76,51 @@
       "status": "running",
       "started_at": "2026-10-12T13:47:35+03:00"
     }
-  ]
+  ],
+  "later_coordinator_verification": {
+    "observed_at": "2026-10-12T14:23:38+03:00",
+    "issue_revision": 68,
+    "attachments": [
+      {
+        "attachment_id": "01a12fcc-4c32-7add-ba9a-abe6e739ddbe",
+        "filename": "lab57-graph-preflight-verification.json",
+        "sha256": "d780bfdeb9dea484fa6de01c62142e4dd366305fe1964e3edec1b1a03d99ec91",
+        "bytes": 3460
+      },
+      {
+        "attachment_id": "01a12fcc-4d04-794e-9dc6-a1b1f10b735e",
+        "filename": "lab57-confirmed-blocker-ledger.json",
+        "sha256": "6cbab6b5cc42d45186b727588ae7d522eb5e309dd8ad17816e2c2e8b9c677f19",
+        "bytes": 5724
+      },
+      {
+        "attachment_id": "01a12fd4-7aa8-739c-9203-184cb69cb112",
+        "filename": "lab57-preflight-auth-verification.json",
+        "sha256": "a64b65ad5d03b09d8a11d3c44d8a06a5812b9bc75aefd3e4dd819668aebe5c29",
+        "bytes": 2348
+      }
+    ],
+    "ledger_sha_matches_metadata": true,
+    "independent_warm": "Evaler PASS on saved reference #1; no full pilot/cold/product acceptance",
+    "read_only_gates": {
+      "selected_eval_profile": "exact match",
+      "loadConfig": "PASS",
+      "agentInfo_exact_CLI_manifest": "PASS",
+      "statfs_free_space": "PASS",
+      "assertAuth": "PASS"
+    },
+    "auth_hypothesis": "NOT_REPRODUCED; not the proven historical cause",
+    "readonly_config_model_observation": "openai/gpt-6-sol/default; no model execution; not actual scenario model evidence",
+    "native_tasks": 5,
+    "repeat_budget": {
+      "limit": 10,
+      "consumed": 1,
+      "remaining": 9
+    },
+    "operator_diagnostic_task_id": "01a12fcc-4e05-7d01-8fc5-d2d9618bd395",
+    "operator_diagnostic_active": true,
+    "wrapper_scope": "One exported exact preflightNodeStand call within existing task after fresh lease; preserve gates, private redacted lower exception and real cleanup; no scenario/model calls before proof verification",
+    "new_monitor_runtime_calls": 0,
+    "new_monitor_messages": 0
+  }
 }
