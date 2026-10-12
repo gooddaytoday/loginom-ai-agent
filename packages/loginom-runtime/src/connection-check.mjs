@@ -1,5 +1,6 @@
 import { createRequire } from "node:module"
-import { mkdir, writeFile, readFile } from "node:fs/promises"
+import { mkdir, writeFile, readFile, open, rename, unlink } from "node:fs/promises"
+import { constants } from "node:fs"
 import { randomUUID, createHash } from "node:crypto"
 import { fileURLToPath } from "node:url"
 import { join, dirname } from "node:path"
@@ -92,7 +93,47 @@ async function startupFingerprint(path) {
   catch(error){return {available:false,rejection:startupRejection(error)}}
 }
 async function startupEvidence(owner) {
-  await writeFile(join(owner.directory,'startup-cleanup.json'),JSON.stringify(owner.evidence,null,2)+'\n',{mode:0o600})
+  // The producer owns durability. A collector syncing a later copy cannot
+  // authorize this owner's context exit. Retry only storage/confirmed results.
+  owner.evidencePendingClose??=[];
+  for(const handle of [...owner.evidencePendingClose]) {
+    await handle.close();owner.evidencePendingClose.splice(owner.evidencePendingClose.indexOf(handle),1);
+  }
+  const temporary=join(owner.directory,'.startup-cleanup-'+randomUUID()+'.json');
+  let file,directory,created=false,phase='open',failed=false,primary;
+  const closeFailures=[];
+  try {
+    file=await open(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
+    created=true;phase='write';
+    await file.writeFile(JSON.stringify(owner.evidence,null,2)+'\n');
+    phase='file_sync';await file.sync();
+  }catch(error){failed=true;primary=error}
+  if(file) {
+    try {await file.close()}
+    catch(error){owner.evidencePendingClose.push(file);closeFailures.push({phase:'file_close',rejection:startupRejection(error)});if(!failed){failed=true;primary=error;phase='file_close'}}
+  }
+  if(!failed) {
+    try {
+      phase='rename';await rename(temporary,join(owner.directory,'startup-cleanup.json'));created=false;
+      phase='directory_open';directory=await open(owner.directory,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW);
+      phase='directory_sync';await directory.sync();
+    }catch(error){failed=true;primary=error}
+  }
+  if(directory) {
+    try {await directory.close()}
+    catch(error){owner.evidencePendingClose.push(directory);closeFailures.push({phase:'directory_close',rejection:startupRejection(error)});if(!failed){failed=true;primary=error;phase='directory_close'}}
+  }
+  if(created) {
+    try {await unlink(temporary)}
+    catch(error){closeFailures.push({phase:'temporary_unlink',rejection:startupRejection(error)});if(!failed){failed=true;primary=error;phase='temporary_unlink'}}
+  }
+  if(failed) {
+    const failure={phase,rejection:startupRejection(primary),secondary:closeFailures};
+    owner.evidence.persistence_attempts??=[];
+    owner.evidence.persistence_attempts.push(failure);
+    owner.evidence.persistence_failure??=failure.rejection;
+    throw primary;
+  }
 }
 // Internal foreground owner, assigned before authentication. No IPC authority.
 function startupOwner(owner, profile, candidate) {
@@ -111,7 +152,8 @@ function startupOwner(owner, profile, candidate) {
       let nativeStage
       try {
         if(owner.launchAttempted && !owner.context) throw Error('LOGINOM_STARTUP_LAUNCH_UNKNOWN')
-        if(owner.context && (owner.context.pages().length!==1||owner.context.pages()[0]!==owner.page)) throw Error('LOGINOM_STARTUP_PAGE_CHANGED')
+        if(owner.contextCloseAttempted && !owner.contextClosed) throw new Error('LOGINOM_STARTUP_CONTEXT_UNKNOWN',{cause:owner.contextCloseFailure})
+        if(owner.context && !owner.contextClosed && (owner.context.pages().length!==1||owner.context.pages()[0]!==owner.page)) throw Error('LOGINOM_STARTUP_PAGE_CHANGED')
         if(owner.context && !owner.nativeConfirmed) {
           if(owner.nativeAttempted) throw new Error('LOGINOM_STARTUP_CLEANUP_UNKNOWN',{cause:owner.nativeFailure?.value})
           if(!owner.page) throw Error('LOGINOM_STARTUP_PAGE_UNKNOWN')
@@ -164,6 +206,12 @@ function startupOwner(owner, profile, candidate) {
             owner.guardFailure={value,rejection:detail};
             owner.evidence.guard_rejection=detail;
           }
+          // Each actual retry has its own operands/time. Never reconstruct it
+          // from a later title/idle receipt or replace the first observation.
+          owner.evidence.guard_observations??=[];
+          owner.evidence.guard_observations.push({attempt:owner.evidence.guard_observations.length+1,
+            owner_id:owner.id,account:owner.account,origin:owner.origin,snapshot:observed.snapshot,
+            result:{authenticated:observed.authenticated===true,reason:observed.reason??null}});
           // Freeze the FIRST observation; later cleanup/retries cannot replace it.
           if(!owner.evidence.first_guard) {
             owner.evidence.first_guard={...observed.snapshot,result:{authenticated:observed.authenticated===true,reason:observed.reason??null},artifacts:owner.artifacts??{available:false}}
