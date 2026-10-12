@@ -1,0 +1,64 @@
+{
+  "authorized_at": "2026-10-12",
+  "user_statement": "Разрешаю Rich в рамках одной карточки делать до 10 попыток",
+  "scope": [
+    "LAB-56",
+    "LAB-57",
+    "LAB-58",
+    "LAB-59",
+    "LAB-60",
+    "LAB-61",
+    "LAB-62",
+    "LAB-63"
+  ],
+  "agent": "Rich",
+  "agent_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+  "budget_kind": "NATIVE_AGENT_RUNS_PER_CARD",
+  "limit": 10,
+  "already_accepted_runs_count": true,
+  "failed_capacity_runs_count": true,
+  "not_additional_10": true,
+  "counting": "Distinct accepted native run/task UUID from current Multica execution history; preserve history and update tally before each dispatch",
+  "LAB57_observed_at": "2026-10-12T10:11:50.333357+00:00",
+  "LAB57_consumed": 3,
+  "LAB57_remaining": 7,
+  "LAB57_task_ids": [
+    "01a12ef8-63ec-770b-b5c6-9955890df0dd",
+    "01a12f01-84a3-74d5-87b8-fbe1d15a5a25",
+    "01a12f45-6763-7cd4-ab17-e12d502dd8bc"
+  ],
+  "old_native_capacity_continuation_limit": "1/1 retained as historical evidence; superseded by total Rich run budget 10 per card",
+  "unchanged": [
+    "worker models",
+    "scenario reference/product/cold attempt budgets",
+    "model admission 3/3",
+    "recovery/probe budgets",
+    "Ben/Evaler limits",
+    "CLI/skill/oracle/criteria",
+    "independent ACCEPT and cleanup dependencies"
+  ],
+  "authorization_comment_id": "01a12f95-f31c-7ba9-bc4e-1124d09ed7e9",
+  "parent_id": "01a12f88-61c3-762c-b4da-aa6100b9f35c",
+  "trigger_outcomes": [
+    {
+      "reason_code": "queued",
+      "status": "queued",
+      "target_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "target_type": "agent"
+    }
+  ],
+  "comment_readback": "EXACT_CONTENT_VERIFIED_EXCEPT_SERVER_TRIMMED_FINAL_NEWLINE",
+  "automation_id": "lab-56-lab-63-30",
+  "automation_prompt_readback": "VERIFIED",
+  "automation_status": "ACTIVE",
+  "cadence_minutes": 30,
+  "current_graph_blocker_receipt_sha256": "0cb9dbdfdabf11bd79c4028037076148abb515003431700319f87218b205d82e",
+  "after_handoff_active_runs": [
+    {
+      "id": "01a12f95-f33b-7ec6-b848-b204e4dd7403",
+      "status": "running",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "started_at": "2026-10-12T13:08:40+03:00"
+    }
+  ]
+}
