@@ -73,16 +73,16 @@ export function readImportSurface(o) {
    const n=matches[0],body=graph.view.getState(n.FCell)?.shape?.node,tid=body?.getAttribute('data-tid');
    if(!body||!roots[0].contains(body)||!tid?.startsWith(prefix+';Graph;'))return refuse('GRAPH_NODE_DOM');
    const candidates=[],ports=n.FPorts;
-   const native={n,guid,cell:n.FCell,body,tid,ports,groups:[],candidates};bindings.push(native);
+   const native={n,guid,cell:n.FCell,body,tid,ports,groups:[],inventory:[],candidates};bindings.push(native);
    for(const group of ports??[]){
     const collection=group.FCollection;native.groups.push({group,collection,items:[...(collection??[])]});
     for(const port of collection??[]){
-    const dom=graph.view.getState(port.FCell)?.shape?.node;
-    if(dom?.getAttribute('data-tid')===tid+';Output_Data-0'&&roots[0].contains(dom)&&port.parent===n
-     &&port.FCell.parent===n.FCell){
-     const portGuid=port.FGuid,cell=port.FCell,data=port.data;
-     if(data&&typeof portGuid==='string'&&portGuid)candidates.push({port,data,guid:portGuid,cell,dom});
-    }
+    const cell=port.FCell,dom=graph.view.getState(cell)?.shape?.node;
+    const retained={port,cell,dom,tid:dom?.getAttribute('data-tid'),parent:port.parent,
+     cellParent:cell?.parent,guid:port.FGuid,data:port.data};
+    native.inventory.push(retained);
+    if(retained.tid===tid+';Output_Data-0'&&roots[0].contains(dom)&&retained.parent===n
+     &&retained.cellParent===n.FCell&&retained.data&&typeof retained.guid==='string'&&retained.guid)candidates.push(retained);
    }}
    imports.push({role,node_id:guid,component:'imports.text',workflow_id:receipts[0].workflowId,
     output0:candidates.length===1?{status:'observed_native_binding',node_id:guid,port:0,port_guid:candidates[0].guid}:{status:'unknown'},
@@ -95,12 +95,21 @@ export function readImportSurface(o) {
     ||b.body.getAttribute('data-tid')!==b.tid||!roots[0].contains(b.body)
     ||(b.ports?.length??0)!==b.groups.length||b.groups.some((g,i)=>b.ports[i]!==g.group||g.group.FCollection!==g.collection
      ||(g.collection?.length??0)!==g.items.length||g.items.some((port,j)=>g.collection[j]!==port)))return false;
-   return b.candidates.every(c=>{
-    const data=c.port.data,guid=c.port.FGuid,cell=c.port.FCell,dom=graph.view.getState(cell)?.shape?.node;
-    const tid=dom?.getAttribute('data-tid');
-    return data===c.data&&guid===c.guid&&cell===c.cell&&dom===c.dom&&tid===b.tid+';Output_Data-0'
-     &&roots[0].contains(dom)&&c.port.parent===b.n&&cell.parent===b.cell&&b.n.FCell===b.cell;
+   // Read data for ALL retained ports first: even a non-candidate can become
+   // eligible, and a late getter can change an earlier port's DOM alias.
+   const firstData=b.inventory.map(c=>c.port.data),data=b.inventory.map(c=>c.port.data);
+   if(data.some((value,i)=>value!==firstData[i]))return false;
+   const current=b.inventory.map((c,i)=>{
+    const port=c.port,cell=port.FCell,dom=graph.view.getState(cell)?.shape?.node;
+    return {port,cell,dom,tid:dom?.getAttribute('data-tid'),parent:port.parent,
+     cellParent:cell?.parent,guid:port.FGuid,data:data[i]};
    });
+   if(current.some((c,i)=>Object.keys(c).some(k=>c[k]!==b.inventory[i][k])))return false;
+   const eligible=current.filter(c=>c.tid===b.tid+';Output_Data-0'&&roots[0].contains(c.dom)
+    &&c.parent===b.n&&c.cellParent===b.cell&&c.data&&typeof c.guid==='string'&&c.guid);
+   return eligible.length===b.candidates.length&&eligible.every((c,i)=>c.port===b.candidates[i].port)
+    &&(b.ports?.length??0)===b.groups.length&&b.groups.every((g,i)=>b.ports[i]===g.group&&g.group.FCollection===g.collection&&(g.collection?.length??0)===g.items.length
+     &&g.items.every((port,i)=>g.collection[i]===port));
   });
   if(!graphUnchanged||bindings.some(b=>b.n.FGuid!==b.guid||b.n.FCell!==b.cell||b.n.FPorts!==b.ports
    ||b.candidates.some(c=>c.port.parent!==b.n||c.port.FCell!==c.cell||c.cell.parent!==b.cell||c.port.FGuid!==c.guid))||exact(prefix+';ModelForm;cmpDiagram').length!==1

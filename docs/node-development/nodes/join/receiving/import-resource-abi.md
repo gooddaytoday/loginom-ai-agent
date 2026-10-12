@@ -86,3 +86,11 @@ Until these current native bindings are available via the approved read route,
 canonical types/kind, wizard output0, activity and execution freshness remain
 unknown; complete and close_authority stay false. No live or extra preparation
 was performed for this proof analysis. Shared host gate/clean proof remains LAB-68.
+
+Full output0 revalidation retains every native port, including non-candidates.
+Before emission it reads all retained data twice for stability, then rechecks
+all port GUID/data/cell/parent/DOM aliases and current eligible membership.
+Non-candidate promotion and duplicates cannot preserve a unique observed claim;
+changed inventory refuses, unchanged static duplicates remain unknown. This
+also covers a late candidate getter changing an earlier non-candidate's alias
+or data. Complete/close authority remain false.

@@ -131,3 +131,48 @@ for(const [name,create] of [['wizard',fixture],['graph',graphFixture]])test('cap
  else assert.equal(r.imports[0].output0.status,'observed_native_binding');
  assert.equal(r.complete,false);assert.equal(r.close_authority,false);assert.equal(r.effect_possible,false);
 });
+
+// Whole eligibility inventory: non-candidates can become output0 during re-read.
+for(const position of ['before','after'])for(const trigger of ['candidate','non-candidate'])for(const change of ['alias','parent','cell-parent','data','guid'])
+ test('capture full inventory '+position+' '+trigger+' late '+change,async()=>{
+ const f=graphFixture(),n=f.collection[0],port=n.FPorts[0].FCollection[0];
+ const tid='MF;TF-1;Graph;Операции;Output_Data-0';let alias=change==='alias'?tid.replace(/0$/,'1'):tid;
+ const dom={getAttribute:()=>alias},other={parent:change==='parent'?{}:n,FGuid:change==='guid'?'':'extra',data:change==='data'?null:{},FCell:{parent:change==='cell-parent'?{}:n.FCell,dom}};
+ const ports=n.FPorts[0].FCollection;if(position==='before')ports.unshift(other);else ports.push(other);
+ f.entries.set('extra-native-port',[dom]);
+ const target=trigger==='candidate'?port:other,retained=target.data;let reads=0;
+ Object.defineProperty(target,'data',{get(){
+  if(++reads===2){if(change==='alias')alias=tid;if(change==='parent')other.parent=n;if(change==='cell-parent')other.FCell.parent=n.FCell;if(change==='guid')other.FGuid='extra';}
+  return change==='data'&&target===other&&reads>=2?{}:retained;
+ }});
+ // A candidate getter can repair the other port's data without replacing itself.
+ if(change==='data'&&trigger==='candidate')Object.defineProperty(other,'data',{get(){return reads>=2?{}:null;}});
+ const c=context(f),events=[];c.record=async e=>events.push(e);
+ const r=await resource.captureImport(c);assert.equal(r.status,'REFUSED');assert.equal(r.imports,undefined);
+ assert.equal(r.output0.status,'unknown');assert.equal(r.complete,false);assert.equal(r.close_authority,false);
+ assert.equal(r.effect_possible,false);assert.equal(events.length,1);assert.equal(events[0].result.status,'REFUSED');
+});
+for(const duplicate of [false,true])test('capture full inventory static '+(duplicate?'duplicate':'extra')+' port',async()=>{
+ const f=graphFixture(),n=f.collection[0],tid='MF;TF-1;Graph;Операции;Output_Data-'+(duplicate?'0':'1');
+ const dom={getAttribute:()=>tid},other={parent:n,FGuid:'extra',data:{},FCell:{parent:n.FCell,dom}};
+ n.FPorts[0].FCollection.push(other);f.entries.set('extra-native-port',[dom]);
+ const c=context(f),events=[];c.record=async e=>events.push(e);const r=await resource.captureImport(c);
+ assert.equal(r.status,'PARTIAL');assert.equal(r.imports[0].output0.status,duplicate?'unknown':'observed_native_binding');
+ assert.equal(r.imports[1].output0.status,'observed_native_binding');assert.equal(events.length,1);
+ assert.equal(r.complete,false);assert.equal(r.close_authority,false);assert.equal(r.effect_possible,false);
+});
+
+for(const mutation of ['append-port','append-group','replace-group','remove-port'])test('capture late inventory membership '+mutation,async()=>{
+ const f=graphFixture(),n=f.collection[0],port=n.FPorts[0].FCollection[0],data=port.data;
+ const dom={getAttribute:()=> 'MF;TF-1;Graph;Операции;Output_Data-0'},other={parent:n,FGuid:'extra',data:{},FCell:{parent:n.FCell,dom}};
+ f.entries.set('extra-native-port',[dom]);let reads=0;
+ Object.defineProperty(port,'data',{get(){if(++reads===2){
+  if(mutation==='append-port')n.FPorts[0].FCollection.push(other);
+  if(mutation==='append-group')n.FPorts.push({FCollection:[other]});
+  if(mutation==='replace-group')n.FPorts[0]={FCollection:[port,other]};
+  if(mutation==='remove-port')n.FPorts[0].FCollection.pop();
+ }return data;}});
+ const c=context(f),events=[];c.record=async e=>events.push(e);const r=await resource.captureImport(c);
+ assert.equal(r.status,'REFUSED');assert.equal(r.imports,undefined);assert.equal(events.length,1);
+ assert.equal(r.complete,false);assert.equal(r.close_authority,false);assert.equal(r.effect_possible,false);
+});
