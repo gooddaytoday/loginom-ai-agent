@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile,mkdir,writeFile,mkdtemp,rm,rename} from 'node:fs/promises';
-import {join} from 'node:path';
+import {join,dirname} from 'node:path';
 import {tmpdir} from 'node:os';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 const path=process.env.STARTUP_SOURCE??new URL('../src/connection-check.mjs',import.meta.url);
 const source=await readFile(path,'utf8');
 const code=source.slice(source.indexOf('export function browserEnvironment')).replaceAll('export ','');
@@ -44,7 +44,7 @@ function fixture(directory,phase,rejected){
  class Client {async connect(){events.push('knowledge');if(phase==='knowledge')throw rejected}async close(){events.push('knowledge-close');if(phase==='knowledge-close')throw rejected}}
  const require=name=>{if(phase==='require'||phase==='knowledge-require')throw rejected;return name==='playwright-core'?{chromium:{async launchPersistentContext(){events.push('launch');if(phase==='launch')throw rejected;return context}}}:
   name.includes('streamableHttp')?{StreamableHTTPClientTransport:class{}}:{Client}};
- const functions=vm.runInNewContext(code+';({loginBrowser,checkConnection})',{require,mkdir,writeFile,join,randomUUID,URL,process,Error,
+ const functions=vm.runInNewContext(code+';({loginBrowser,checkConnection})',{require,mkdir,writeFile,readFile,createHash,runtimeModulePath:path instanceof URL?path.pathname:path,join,dirname,randomUUID,URL,process,Error,
   browserLaunch:()=>({args:[],viewport:{}}),browserDownloadScript:()=>''});
  const options={profile:directory,browserPath:'/fixture',candidate:{url:'https://loginom.invalid/app',username:'user',password:'',apiKey:'fixture'},endpoint:'https://knowledge.invalid',owner};
  return {owner,options,functions,events,context,page,logout:()=>logout,contextClose:()=>contextClose};
@@ -76,7 +76,7 @@ for(const rejected of values)test('primary survives evidence failure and confirm
  const root=await mkdtemp(join(tmpdir(),'startup-write-'));const f=fixture(root,'identity-write',rejected);
  try{
   let caught;try{await f.functions.loginBrowser(f.options)}catch(error){caught=error}
-  assert.equal(caught.cause,rejected);assert.equal(f.owner.primaryFailure,rejected);assert.equal(f.logout(),1);assert.equal(f.contextClose(),0);
+  assert.equal(caught.cause,rejected);assert.equal(f.owner.primaryFailure,rejected);assert.equal(f.logout(),0);assert.equal(f.contextClose(),0);
   assert.equal(f.owner.evidence.persistence_failure.kind,'Error');await rename(join(root,'startup-cleanup.json'),join(root,'failed-write'));
   assert.equal((await f.owner.close()).cleanup_complete,true);assert.equal(f.logout(),1);assert.equal(f.contextClose(),1);
   const proof=JSON.parse(await readFile(join(root,'startup-cleanup.json'),'utf8'));assert.ok(Object.hasOwn(proof,'primary_rejection'));
