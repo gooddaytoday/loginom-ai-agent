@@ -27,9 +27,10 @@
         "explicit events argument",
         "exact accepted CLI source pin before browser loading",
         "final source delivery with exact one/two count",
-        "bind unique import by original GUID rather than optional node label"
+        "bind unique import by original GUID rather than optional node label",
+        "headless:true through exact CLI launcher for runtime without a display server"
       ],
-      "sha256": "375f76c938018627a91a44d58769a5624140bf928c4f278144de55d7f5a84f42"
+      "sha256": "c901c6fd24fde338f77b370e819661657a8b1cb0196add79b72276c81a1fbf42"
     }
   ]
 }
