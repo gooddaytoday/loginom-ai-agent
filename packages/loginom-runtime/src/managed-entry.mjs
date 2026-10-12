@@ -167,16 +167,20 @@ function close() {
       if (state.bridge) {
         stage="bridge"
         if (!state.bridgeCleanup) {
-          if (state.bridgeCloseAttempted) throw state.bridgeCloseFailure
+          if (state.bridgeCloseAttempted) {primary={stage,error:state.bridgeCloseFailure};throw state.bridgeCloseFailure}
           await recordClose(stage,{status:"started"})
           state.bridgeCloseAttempted=true
           try {
             const receipt=await state.bridge.close()
             // Preserve this receiving branch's existing bridge receipt contract.
-            if (receipt?.browser_transport_closed!==true) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:receipt})
+            if (receipt?.browser_transport_closed!==true || receipt.cleanup_complete!==true) {
+              primary={stage,error:new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:receipt})}
+              throw primary.error
+            }
             state.bridgeCleanup=receipt
           } catch (error) {
-            state.bridgeCloseFailure=new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:error})
+            state.bridgeCloseFailure=primary?primary.error:error
+            primary ??= {stage,error:state.bridgeCloseFailure}
             throw state.bridgeCloseFailure
           }
         }
@@ -201,9 +205,9 @@ function close() {
       }
       await recordClose("outer_acknowledgement",{status:"allowed"})
     } catch (error) {
-      const rejection=primary?.error??(error instanceof Error?error:new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:error}))
+      const rejection=primary?primary.error:(error instanceof Error?error:new Error("LOGINOM_RUNTIME_CLEANUP_FAILED",{cause:error}))
       state.closeFailure=rejection
-      state.shutdown.primaryFailure ??= {stage,rejection:closeRejection(rejection)}
+      state.shutdown.primaryFailure ??= {stage:primary?.stage??stage,rejection:closeRejection(rejection)}
       if (Object.hasOwn(state,"startupFailure")) state.shutdown.startupFailure ??= closeRejection(state.startupFailure)
       if (primary && error!==rejection) state.shutdown.persistenceFailure=closeRejection(error)
       try {await recordClose("refused",{rejection:closeRejection(rejection)})}
