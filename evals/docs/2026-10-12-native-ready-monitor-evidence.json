@@ -18,7 +18,7 @@
   "process_cleanup": "confirmed; continuous capture; two zero observations; unknownProcesses empty",
   "owner_sha_acquiredAt_bindings": "VERIFIED for admission/completion/release",
   "completion_sha_matches_release": true,
-  "history_delivered": "archived by unchanged pinned helper; remote existence checked by Evaler, not by this local monitor",
+  "history_delivered": "Archived by unchanged pinned helper per delivered proof; remote existence still awaits independent Evaler verification",
   "release": "RELEASED; delivered closing status FREE and storage empty",
   "historical_failure": "PRESERVED_UNCLASSIFIED; lower exception missing; diagnostic success does not recover old trace",
   "wrapper_budget": {
