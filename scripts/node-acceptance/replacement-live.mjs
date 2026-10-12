@@ -3,7 +3,7 @@ import {readFile,writeFile,mkdir,appendFile} from 'node:fs/promises';
 import {resolve,join} from 'node:path';import {pathToFileURL} from 'node:url';import {randomUUID,createHash} from 'node:crypto';import {createInterface} from 'node:readline';
 export async function runLive398(args, owner) {
  if(!owner || typeof owner!=='object' || owner.context)throw Error('FOREGROUND_OWNER_REQUIRED');
-let startupBridge,observedWrites=Promise.resolve();
+let startupBridge,removeObserver=()=>{},observedWrites=Promise.resolve();
 try {
 process.umask(0o077);
 if (!process.stdin.isTTY) throw Error("DIAGNOSTIC_INTERACTIVE_STDIN_REQUIRED_BEFORE_LOGIN");
@@ -19,12 +19,41 @@ const {createRequire}=await import('node:module');const req=createRequire(join(r
 const secrets=[config.workflow_profile.password,config.api_key].filter(Boolean),redact=v=>secrets.reduce((t,s)=>t.split(s).join('[REDACTED]'),String(v));
 const redactValues=value=>typeof value==='string'?redact(value):Array.isArray(value)?value.map(redactValues):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,item])=>[key,redactValues(item)])):value;
 const observe=(stage,data={})=>{observedWrites=observedWrites.then(()=>appendFile(join(out,'login-observer.jsonl'),JSON.stringify({at:new Date().toISOString(),stage,...data})+'\n')).catch(error=>startupBridge.evidenceFailure(error));};
-const originalLaunch=chromium.launchPersistentContext.bind(chromium);
-chromium.launchPersistentContext=async(...args)=>{observe('launch-start');try{const ctx=await originalLaunch(...args);startupBridge.captureContext(ctx);observe('launch-success');
- const hook=page=>{startupBridge.capturePage(page);page.on('pageerror',e=>observe('pageerror',{error:redact(e?.message??String(e))}));page.on('requestfailed',r=>observe('requestfailed',{url:new URL(r.url()).origin+new URL(r.url()).pathname,error:redact(r.failure()?.errorText)}));
- const wrap=(obj,names)=>{for(const n of names){const original=obj[n];if(typeof original!=='function')continue;obj[n]=function(...a){observe('call:'+n);try{const value=original.apply(this,a);if(value?.then)return value.catch(e=>{observe('original-failure:'+n,{error:redact(e?.message??String(e))});throw e;});return value;}catch(e){observe('original-failure:'+n,{error:redact(e?.message??String(e))});throw e;}};}};
- wrap(page,['goto','evaluate']);const proto=Object.getPrototypeOf(page.locator('body'));if(!proto.__observed){wrap(proto,['waitFor','click','fill','inputValue','isVisible']);proto.__observed=true;}};
- ctx.pages().forEach(hook);ctx.on('page',hook);return ctx;}catch(e){observe('original-failure:launch',{error:redact(e?.message??String(e))});throw e;}};
+const originalLaunch=chromium.launchPersistentContext,restorations=[],listeners=[],objects=new WeakSet();
+const healthy=()=>{if(owner.failed)throw owner.entryFailure;};
+const patch=(object,name,build)=>{
+ const descriptor=Object.getOwnPropertyDescriptor(object,name),original=object[name];if(typeof original!=='function')return;
+ const installed=build(original);object[name]=installed;
+ restorations.push(()=>{if(object[name]!==installed)return;if(descriptor)Object.defineProperty(object,name,descriptor);else delete object[name];});
+};
+const wrap=(object,names)=>{
+ if(!object||objects.has(object))return object;objects.add(object);
+ for(const name of names)patch(object,name,original=>function(...args){
+  healthy();observe('call:'+name);
+  try{const value=original.apply(this,args);if(value?.then)return value.then(result=>{healthy();return result;},error=>{observe('original-failure:'+name,{error:redact(error?.message??String(error))});throw error;});
+   if(['locator','or','first'].includes(name))return wrap(value,['waitFor','click','fill','inputValue','isVisible','locator','or','first']);return value;
+  }catch(error){observe('original-failure:'+name,{error:redact(error?.message??String(error))});throw error;}
+ });return object;
+};
+const hook=page=>{
+ startupBridge.capturePage(page);
+ const onError=error=>observe('pageerror',{error:redact(error?.message??String(error))});
+ const onRequest=request=>{try{observe('requestfailed',{url:new URL(request.url()).origin+new URL(request.url()).pathname,error:redact(request.failure()?.errorText)});}catch(error){startupBridge.evidenceFailure(error);}};
+ page.on('pageerror',onError);listeners.push(()=>page.off?.('pageerror',onError));
+ page.on('requestfailed',onRequest);listeners.push(()=>page.off?.('requestfailed',onRequest));
+ wrap(page,['goto','evaluate','locator']);
+ // Observe the actual initial locator too, without editing its shared prototype.
+ page.locator('body');
+};
+removeObserver=()=>{for(const remove of listeners.reverse())try{remove();}catch(error){startupBridge.evidenceFailure(error);}for(const restore of restorations.reverse())try{restore();}catch(error){startupBridge.evidenceFailure(error);}};
+const onPage=page=>{try{hook(page);}catch(error){startupBridge.fail(error,'observer-page-event');observe('owned-refusal:page',{error:redact(error?.message??String(error))});}};
+const installedLaunch=async function(...args){observe('launch-start');try{
+ const context=await originalLaunch.apply(this,args);startupBridge.captureContext(context);observe('launch-success');
+ context.pages().forEach(hook);context.on('page',onPage);listeners.push(()=>context.off?.('page',onPage));return context;
+}catch(error){observe('original-failure:launch',{error:redact(error?.message??String(error))});throw error;}};
+chromium.launchPersistentContext=installedLaunch;
+// Restore only this invocation's instrumentation, preserving subsequent foreign wrappers.
+restorations.push(()=>{if(chromium.launchPersistentContext===installedLaunch)chromium.launchPersistentContext=originalLaunch;});
 console.log(JSON.stringify({diagnostic_out:out}));
 const {context}=await loginBrowser({browserPath:resources.browserPath,profile:join(out,'browser'),candidate:{url:config.loginom_url,username:account,password:config.workflow_profile.password},headless:true,keepOpen:true,owner:startupOwner}).catch(async e=>{startupBridge.fail(e,'login');try{await save('login-failure',{error:redact(e?.message??String(e)),at:new Date().toISOString(),profile:join(out,'browser'),runtime_created:!!owner.runtime});}catch(evidenceError){startupBridge.evidenceFailure(evidenceError);}throw e;});const page=startupOwner.page;
 startupBridge.fulfilled({context});
@@ -94,5 +123,5 @@ return await runReplacementDiagnostic(lifecycle,owner,async({bindPrepared})=>{
  }finally{lines.close();}
  throw Error('DIAGNOSTIC_STDIN_EOF_BEFORE_CLEANUP');
 });
-}catch(error){if(startupBridge)startupBridge.fail(error,'entry/setup');else{owner.failed=true;owner.error=error;}return owner;}finally{await observedWrites;}
+}catch(error){if(startupBridge)startupBridge.fail(error,'entry/setup');else{owner.failed=true;owner.error=error;}return owner;}finally{removeObserver();await observedWrites;}
 }

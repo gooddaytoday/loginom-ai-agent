@@ -45,7 +45,7 @@ export function createReplacementStartupBridge(startup, owner) {
  const fail=(value,stage)=>{
   if(!has(owner,'entryFailure')){owner.entryFailure=value;owner.failureStage=stage;}
   if(!has(owner,'primaryFailure'))owner.primaryFailure=has(startup,'primaryFailure')?startup.primaryFailure:value;
-  owner.failed=true;owner.error=value;
+  owner.failed=true;owner.error=owner.entryFailure;
   if(startup.closed===true&&startup.receipt?.cleanup_complete===true&&startup.receipt?.context_closed===true&&startup.receipt?.owner_id===startup.id){owner.closed=true;owner.cleanupReceipt=startup.receipt;}
   return owner;
  };
