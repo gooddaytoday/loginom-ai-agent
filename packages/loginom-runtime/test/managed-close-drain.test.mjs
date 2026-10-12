@@ -40,8 +40,8 @@ test('concurrent Close and SIGTERM share one drain and cleanup while awaiting re
 for(const scenario of ['throw-error','throw-undefined','throw-null','throw-false','throw-zero','throw-empty','pending','unknown','unsaved','missing-cleanup','receipt-failure'])test('Close refusal retains owner/evidence and denies ack: '+scenario,async()=>{
  const f=await child(scenario);try{await f.send({id:'close',operation:'close'});await f.wait(()=>f.messages.some(m=>m.id==='close'),Number(process.env.MANAGED_DRAIN_ASSERT_MS??3000));assert.ok(f.messages.find(m=>m.id==='close').error);assert.equal(f.exited,undefined);
  const p=await probe(f);assert.equal(p.native,1);assert.equal(p.events.includes('context-close'),false);assert.equal(p.shutdown.stages.some(s=>s.stage==='outer_acknowledgement'),false);
- if(scenario.startsWith('throw-')){const r=p.shutdown.stages.find(s=>s.stage==='refused').rejection;if(scenario!=='throw-error')assert.equal(r.is_undefined,scenario==='throw-undefined');if(['throw-zero','throw-null','throw-false','throw-empty'].includes(scenario))assert.equal(r.value,{'throw-zero':0,'throw-null':null,'throw-false':false,'throw-empty':''}[scenario]);if(scenario==='throw-error')assert.equal(r.message,'fixture primary')}
- else if(scenario!=='receipt-failure'){assert.equal(p.shutdown.primaryFailure.stage,'bridge');assert.equal(p.shutdown.primaryFailure.rejection.cause.value.rejection.value,0)}
+ if(scenario.startsWith('throw-')){const r=p.shutdown.stages.find(s=>s.stage==='refused').rejection.cause;if(scenario!=='throw-error')assert.equal(r.is_undefined,scenario==='throw-undefined');if(['throw-zero','throw-null','throw-false','throw-empty'].includes(scenario))assert.equal(r.value,{'throw-zero':0,'throw-null':null,'throw-false':false,'throw-empty':''}[scenario]);if(scenario==='throw-error')assert.equal(r.message,'fixture primary')}
+ else if(scenario!=='receipt-failure'){assert.equal(p.shutdown.primaryFailure.stage,'bridge');assert.equal(p.shutdown.primaryFailure.rejection.cause.cause.value.rejection.value,0)}
  if(scenario==='receipt-failure')assert.equal(p.closeFailure.message,'fixture receipt write rejected');
  else {const evidence=JSON.parse(await readFile(join(f.directory,'managed-shutdown.json'),'utf8'));assert.deepEqual(evidence,p.shutdown)}
  // The exact same retained fixture is stopped by its test parent, never an original/native owner.
@@ -49,6 +49,6 @@ for(const scenario of ['throw-error','throw-undefined','throw-null','throw-false
 });
 test('lost IPC reply/disconnect does not release an incomplete retained cleanup',async()=>{
  const f=await child('unknown');try{await f.send({id:'close',operation:'close'});f.c.disconnect();await pause(150);assert.equal(f.exited,undefined);
- const evidence=JSON.parse(await readFile(join(f.directory,'managed-shutdown.json'),'utf8'));assert.equal(evidence.stages.some(s=>s.stage==='outer_acknowledgement'),false);assert.equal(evidence.primaryFailure.rejection.cause.value.rejection.value,0);
+ const evidence=JSON.parse(await readFile(join(f.directory,'managed-shutdown.json'),'utf8'));assert.equal(evidence.stages.some(s=>s.stage==='outer_acknowledgement'),false);assert.equal(evidence.primaryFailure.rejection.cause.cause.value.rejection.value,0);
  }finally{await f.cleanup()}
 });

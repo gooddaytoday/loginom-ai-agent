@@ -94,7 +94,7 @@ test('managed close recovers exact pre-binding owner; unknown refuses acknowledg
   try{
    await assert.rejects(f.functions.checkConnection(f.options));
    const state={startupOwner:f.owner,browser:f.context,session:{directory:root}};
-   const actual=vm.runInNewContext(managedCode+';({close})',{state,requests:new Set(),writeFile,join,rm,Promise,Error});
+   const actual=vm.runInNewContext(managedCode+';({close})',{state,requests:new Set(),writeFile,open,join,rm,Promise,Error});
    if(phase==='identity'){await actual.close();assert.equal(state.browser,undefined);assert.equal(state.shutdown.stages.at(-1).status,'allowed')}
    else{await assert.rejects(actual.close());assert.notEqual(state.shutdown.stages.at(-1).status,'allowed');assert.equal(f.contextClose(),0)}
    assert.equal(f.logout(),1);
@@ -164,7 +164,7 @@ for(const [label,native] of [['Error',Error('independent native refusal')],['und
   assert.ok(contains(before,serial(native)),'first native rejection must be present');
   if(blocked)await rename(join(root,'startup-cleanup.json'),join(root,'failed-evidence-write'));
   const state={startupOwner:f.owner,browser:f.context,session:{directory:root}};
-  const close=vm.runInNewContext(managedCode+';({close})',{state,requests:new Set(),writeFile,join,rm,Promise,Error}).close;
+  const close=vm.runInNewContext(managedCode+';({close})',{state,requests:new Set(),writeFile,open,join,rm,Promise,Error}).close;
   let managedFailure;
   try{await close()}catch(error){managedFailure=error}
   assert.ok(managedFailure instanceof Error);
