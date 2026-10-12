@@ -184,6 +184,10 @@ export async function createBridge(config, session, { browserTransport: managedB
   const managedCleanup = userProfile && config.mode === 'executor-replay';
   let managedSave, cleanupRefused = false;
   let confirmedCleanup, cleanupReceiptWritten = false;
+  const cleanupWriters = new Set();
+  let cleanupEvidenceBinding;
+  let cleanupPersistencePrimary;
+  const cleanupPersistenceFailures = [];
   let sortingResult, sortingInvalid = false, captureEvidence;
   let importRefused = false;
   let captureConsumed = false, captureInFlight, captureUnknown = false, captureRejected = false, captureRejection;
@@ -657,6 +661,49 @@ export async function createBridge(config, session, { browserTransport: managedB
       }
       finally { captureInFlight=undefined }
     }
+    async function writeCleanupReceipt(cleanup) {
+      if(confirmedCleanup){
+        cleanupEvidenceBinding ??= Object.freeze({receipt:confirmedCleanup,
+          directory:session.directory,sessionId:session.metadata.sessionId});
+        if(cleanupEvidenceBinding.receipt!==confirmedCleanup || cleanup!==confirmedCleanup
+            || cleanupEvidenceBinding.directory!==session.directory
+            || cleanupEvidenceBinding.sessionId!==session.metadata.sessionId)
+          throw Error('LOGINOM_CLEANUP_RECEIPT_BINDING_CHANGED');
+      }
+      let phase='retained_close',primary;
+      const remember=(value,failedPhase)=>{
+        primary ??= {phase:failedPhase,value};
+        cleanupPersistencePrimary ??= primary;
+        cleanupPersistenceFailures.push({phase:failedPhase,rejection:shutdownRejection(value)});
+      };
+      // Keep unresolved file/directory handles on this foreground owner. Only
+      // successful close or the original FileHandle's fd=-1 proves completion.
+      for (const handle of cleanupWriters) {
+        try {if(handle.fd!==-1)await handle.close();cleanupWriters.delete(handle)}
+        catch(value){remember(value,phase);throw cleanupPersistencePrimary.value}
+      }
+      const persistHandle=async(path,mode,write)=>{
+        let handle;
+        try {
+          phase=write?'file_open':'directory_open';
+          handle=await open(path,mode,write?0o600:undefined);
+          cleanupWriters.add(handle);
+          if(write){phase='file_write';await handle.writeFile(JSON.stringify(cleanup,null,2)+'\n')}
+          phase=write?'file_sync':'directory_sync';await handle.sync();
+        }catch(value){remember(value,phase)}
+        if(handle){
+          const closePhase=write?'file_close':'directory_close';
+          try {await handle.close();cleanupWriters.delete(handle)}
+          catch(value){remember(value,closePhase)}
+        }
+        if(primary)throw primary.value;
+      };
+      await persistHandle(join(session.directory,'package-cleanup.json'),'w',true);
+      await persistHandle(session.directory,'r',false);
+      // No marker before both writes/syncs/closes actually complete.
+      if(cleanupWriters.size)throw Error('LOGINOM_CLEANUP_WRITER_UNCONFIRMED');
+      if(confirmedCleanup)cleanupReceiptWritten=true;
+    }
     function closeBridge() {
       if (importRefused) return Promise.reject(captureRejection);
       if (captureRejected && captureUnknown) return Promise.reject(captureRejection);
@@ -743,8 +790,11 @@ export async function createBridge(config, session, { browserTransport: managedB
           // this same foreground owner. No cache is minted for unknown responses.
           if (cleanup.status==='SUCCEEDED' && !confirmedCleanup) confirmedCleanup=Object.freeze(cleanup);
           if (!confirmedCleanup || !cleanupReceiptWritten) {
-            await writeFile(join(session.directory,'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
-            if (confirmedCleanup) cleanupReceiptWritten=true;
+            try {await writeCleanupReceipt(confirmedCleanup??cleanup)} catch(error) {
+              shutdownPrimary={stage:'cleanup_receipt',reason:cleanupPersistencePrimary?cleanupPersistencePrimary.value:error,
+                rejections:cleanupPersistenceFailures};
+              throw error;
+            }
           }
           await recordExecution({event:'isolated_package_cleanup', cleanup});
           if (managedCleanup && ['SUCCEEDED','SKIPPED_UNPREPARED'].includes(cleanup.status)) cleanupRefused=false;
