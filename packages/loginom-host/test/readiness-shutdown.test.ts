@@ -1,6 +1,6 @@
 import {test,expect} from 'bun:test'
 import vm from 'node:vm'
-import {readFile,writeFile,mkdtemp,rm,mkdir,rename} from 'node:fs/promises'
+import {readFile,writeFile,mkdtemp,rm,mkdir,rename,open} from 'node:fs/promises'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 
@@ -12,7 +12,7 @@ const code=new Bun.Transpiler({loader:'ts'}).transformSync(snippet)
 const managed=await readFile(process.env.SHUTDOWN_MANAGED_SOURCE??new URL('../../loginom-runtime/src/managed-entry.mjs',import.meta.url),'utf8')
 const managedCode=managed.slice(managed.indexOf('function closeRejection('),managed.indexOf('const stop ='))
 function managedFixture(state:any){return vm.runInNewContext(managedCode+';({close,recordClose})',{
- state,requests:new Set(),writeFile,join,rm,Promise,Error})}
+ state,requests:new Set(),writeFile,open,join,rm,Promise,Error})}
 
 for(const scenario of ['own','foreign-account','foreign-origin','changed-build','disconnected','existing-owner'])
  test('private readiness binds only its authenticated login document: '+scenario,async()=>{
@@ -124,7 +124,7 @@ test('authenticated managed close refuses missing cleanup_complete',async()=>{
  const state:any={session:{directory:root},authenticatedReadiness:{account:'fixture'},
   bridge:{close:async()=>({browser_transport_closed:true,native_logout_confirmed:true})},
   client:{close:async()=>events.push('client-close')},browser:{close:async()=>events.push('context-close')}}
- const f=vm.runInNewContext(managedCode+';({close})',{state,requests:new Set(),writeFile,join,rm,Promise,Error})
+ const f=vm.runInNewContext(managedCode+';({close})',{state,requests:new Set(),writeFile,open,join,rm,Promise,Error})
  try{
   let refused=false;try{await f.close()}catch{refused=true}
   expect(refused).toBe(true);expect(events).toEqual([])
@@ -151,7 +151,7 @@ test('managed context rejection survives its stage write failure',async()=>{
  const root=await mkdtemp(join(tmpdir(),'review-managed-primary-')),events:string[]=[],diagnostic=join(root,'managed-shutdown.json')
  const state:any={session:{directory:root},authenticatedReadiness:{},bridge:{close:async()=>({browser_transport_closed:true,cleanup_complete:true,native_logout_confirmed:true})},
   browser:{close:async()=>{events.push('context-close');await rename(diagnostic,diagnostic+'.prior');await mkdir(diagnostic);throw 0}}}
- const f=vm.runInNewContext(managedCode+';({close})',{state,requests:new Set(),writeFile,join,rm,Promise,Error})
+ const f=vm.runInNewContext(managedCode+';({close})',{state,requests:new Set(),writeFile,open,join,rm,Promise,Error})
  try{
   let caught:any;try{await f.close()}catch(e){caught=e}
   expect(caught.message).toBe('LOGINOM_RUNTIME_CLEANUP_FAILED');expect(caught.cause).toBe(0)

@@ -1,0 +1,63 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {fork} from 'node:child_process';
+import {mkdtemp,readFile,writeFile,mkdir,rm} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {fileURLToPath} from 'node:url';
+const entry=process.env.MANAGED_DRAIN_ENTRY??fileURLToPath(new URL('../src/managed-entry.mjs',import.meta.url));
+const labels=['error','undefined','null','false','zero','empty'];
+async function fixture(scenario,body){
+ const directory=await mkdtemp(join(tmpdir(),'linked-lifecycle-')),messages=[],logs=[];
+ const child=fork(fileURLToPath(new URL('./fixtures/managed/startup-linked-child.mjs',import.meta.url)),[],{execArgv:['--experimental-vm-modules'],stdio:['ignore','pipe','pipe','ipc'],env:{...process.env,MANAGED_DRAIN_ENTRY:entry,LINKED_SCENARIO:scenario}});
+ child.on('message',m=>messages.push(m));child.stdout.on('data',b=>logs.push(String(b)));child.stderr.on('data',b=>logs.push(String(b)));
+ let exited;const exit=new Promise(r=>child.on('exit',(code,signal)=>{exited={code,signal};r()}));
+ const wait=async predicate=>{const end=Date.now()+6000;while(!predicate()){if(Date.now()>end)throw Error('linked fixture timeout '+JSON.stringify({messages,logs,exited}));await new Promise(r=>setTimeout(r,10))}};
+ const send=m=>child.send(m),probe=async()=>{const count=messages.filter(m=>m.fixture==='linked-probe').length;send({fixture:'probe'});await wait(()=>messages.filter(m=>m.fixture==='linked-probe').length>count);return messages.filter(m=>m.fixture==='linked-probe').at(-1)};
+ const input={validation:true,resources:'/fixture',stateDir:directory,generation:1,chat:'fixture',connection:{url:'https://fixture.invalid/app/',username:'own',password:'',apiKey:'fixture'},endpoint:'https://fixture.invalid'};
+ try{await wait(()=>messages.some(m=>m.fixture==='ready'));send({id:'start',operation:'start',input});await wait(()=>messages.some(m=>m.id==='start'));assert.ok(messages.find(m=>m.id==='start').error);await body({send,wait,probe,messages,directory,child,get exited(){return exited}})}
+ finally{let receipts=[];try{const attempts=await fsPaths(directory);for(const path of attempts)receipts.push({path,value:JSON.parse(await readFile(path,'utf8'))})}catch{}if(!exited){assert.notEqual(child.pid,Number(process.env.MULTICA_DAEMON_PID));child.kill('SIGKILL');await exit}if(process.env.LINKED_RESULTS){await mkdir(process.env.LINKED_RESULTS,{recursive:true});await writeFile(join(process.env.LINKED_RESULTS,scenario+'.json'),JSON.stringify({scenario,entry,wholeManaged:true,wholeHelper:true,nativeDoubles:true,messages,logs,receipts,exit:exited,forced_fixture_disposal:exited.signal==='SIGKILL'},null,2)+'\n')}await rm(directory,{recursive:true,force:true})}
+}
+async function fsPaths(root){const {readdir}=await import('node:fs/promises');const files=[];for(const x of await readdir(root,{withFileTypes:true})){const p=join(root,x.name);if(x.isDirectory())files.push(...await fsPaths(p));else if(x.name.endsWith('.json'))files.push(p)}return files}
+for(const label of labels)test('whole linked managed/native refusal retains raw cause and denies repeated Close '+label,()=>fixture('native-'+label,async f=>{
+ const p=await f.probe();assert.equal(p.ownerRetained,true);assert.equal(p.contextRetained,true);assert.equal(p.logoutCalls,1);assert.equal(p.contextCalls,0);
+ assert.equal(p.ownerCleanup.kind,label==='error'?'Error':'value');if(label==='undefined')assert.equal(p.ownerCleanup.is_undefined,true);if(label==='zero')assert.equal(p.ownerCleanup.value,0);
+ const primary=JSON.stringify(p.startupFailure);
+ for(let i=0;i<2;i++){f.send({id:'close'+i,operation:'close'});await f.wait(()=>f.messages.some(m=>m.id==='close'+i));assert.ok(f.messages.find(m=>m.id==='close'+i).error);const after=await f.probe();assert.equal(after.logoutCalls,1);assert.equal(after.contextCalls,0);assert.equal(after.contextRetained,true);assert.equal(JSON.stringify(after.startupFailure),primary);assert.equal(after.shutdown.stages.some(s=>s.stage==='outer_acknowledgement'),false)}assert.equal(f.exited,undefined);
+}));
+for(const label of labels)test('whole linked managed raw authentication failure permits only confirmed cleanup '+label,()=>fixture('primary-'+label,async f=>{const p=await f.probe();assert.equal(p.ownerPrimary.kind,label==='error'?'Error':'value');assert.equal(p.logoutCalls,1);assert.equal(p.contextCalls,1);assert.equal(p.ownerClosed,true);f.send({id:'close',operation:'close'});await f.wait(()=>!!f.exited);assert.equal(f.messages.find(m=>m.id==='close').result.closed,true);assert.equal(f.exited.code,0)}));
+for(const scenario of ['write-error','sync-error','sync-confirmed-error'])test('whole linked persistence refusal then confirmed management retry without helper replay '+scenario,()=>fixture(scenario,async f=>{f.send({id:'blocked',operation:'close'});await f.wait(()=>f.messages.some(m=>m.id==='blocked'));assert.ok(f.messages.find(m=>m.id==='blocked').error);assert.equal(f.exited,undefined);const p=await f.probe();assert.equal(p.logoutCalls,1);assert.equal(p.contextCalls,1);assert.equal(p.ownerClosed,true);f.send({fixture:'unblock'});f.send({id:'retry',operation:'close'});await f.wait(()=>!!f.exited);assert.equal(f.messages.find(m=>m.id==='retry').result.closed,true);assert.equal(f.exited.code,0);const before=p.ownerCalls;assert.equal(before,1);const proofPaths=await fsPaths(f.directory),receipt=JSON.parse(await readFile(proofPaths.find(p=>p.endsWith('managed-shutdown.json')),'utf8'));assert.equal(receipt.stages.at(-1).status,'allowed');assert.ok(receipt.primaryFailure);assert.ok(receipt.startupFailure);assert.ok(p.events.includes('receipt-handle-close-complete')||scenario==='write-error')}));
+test('whole linked lost reply/disconnect keeps unknown native cleanup without replay',()=>fixture('native-error',async f=>{const p=await f.probe();assert.equal(p.logoutCalls,1);f.child.disconnect();await new Promise(r=>setTimeout(r,80));assert.equal(f.exited,undefined)}));
+
+test('whole linked confirmed cleanup retry rejects replacement of original context',()=>fixture('sync-confirmed-error',async f=>{f.send({id:'blocked',operation:'close'});await f.wait(()=>f.messages.some(m=>m.id==='blocked'));assert.ok(f.messages.find(m=>m.id==='blocked').error);const p=await f.probe();assert.equal(p.logoutCalls,1);f.send({fixture:'change-context'});f.send({fixture:'unblock'});f.send({id:'retry',operation:'close'});await f.wait(()=>f.messages.some(m=>m.id==='retry'));assert.ok(f.messages.find(m=>m.id==='retry').error);assert.equal(f.exited,undefined);const after=await f.probe();assert.equal(after.logoutCalls,1);assert.equal(after.contextCalls,1)}));
+test('whole linked partial navigation preserves owner and cleanup refusal',()=>fixture('partial-error',async f=>{const p=await f.probe();assert.equal(p.ownerRetained,true);assert.equal(p.contextRetained,true);assert.equal(p.logoutCalls,0);assert.equal(p.contextCalls,0);f.send({id:'close',operation:'close'});await f.wait(()=>f.messages.some(m=>m.id==='close'));assert.ok(f.messages.find(m=>m.id==='close').error);assert.equal(f.exited,undefined)}));
+
+// Receiving producer+accepted caller: full serialized modules, real FS and IPC.
+// Page/native/auth are doubles; completed sync events precede double context exit.
+for(const phase of ['file_open','write','file_sync','file_close','rename','directory_open','directory_sync','directory_close'])
+for(const label of ['error','zero'])test('whole receiving producer '+phase+' '+label+' refuses ACK then storage-only redelivery',()=>fixture('producer-'+phase+'-'+label,async f=>{
+ const p=await f.probe();assert.equal(p.ownerRetained,true);assert.equal(p.contextRetained,true);assert.equal(p.logoutCalls,1);assert.equal(p.contextCalls,0);assert.notEqual(p.ownerClosed,true);
+ const firstPrimary=JSON.stringify(p.startupFailure);
+ f.send({id:'blocked',operation:'close'});await f.wait(()=>f.messages.some(m=>m.id==='blocked'));assert.ok(f.messages.find(m=>m.id==='blocked').error);assert.equal(f.exited,undefined);
+ const blocked=await f.probe();assert.equal(blocked.logoutCalls,1);assert.equal(blocked.contextCalls,0);assert.equal(JSON.stringify(blocked.startupFailure),firstPrimary);
+ f.send({fixture:'unblock'});f.send({id:'retry',operation:'close'});await f.wait(()=>!!f.exited);assert.equal(f.messages.find(m=>m.id==='retry').result.closed,true);assert.equal(f.exited.code,0);
+ const trace=f.messages.find(m=>m.id==='retry').reviewerTrace;
+ assert.equal(trace.logoutCalls,1);assert.equal(trace.contextCalls,1);
+ const e=trace.events,logout=e.lastIndexOf('logout-double'),exit=e.indexOf('context-close-double');
+ assert.ok(logout>=0&&exit>logout);let prior=logout;
+ for(const event of ['producer-write-complete','producer-file_sync-complete','producer-file_close','producer-rename-complete','producer-directory_sync-complete','producer-directory_close']) {
+   const next=e.findIndex((value,index)=>index>prior&&index<exit&&value===event);assert.ok(next>prior);prior=next;
+ }
+ assert.ok(e.slice(exit+1).includes('receipt-sync-complete'));
+ assert.ok(e.slice(exit+1).includes('receipt-handle-close-complete'));
+ const paths=await fsPaths(f.directory);const producer=JSON.parse(await readFile(paths.find(p=>p.endsWith('startup-cleanup.json')),'utf8'));assert.equal(producer.cleanup_complete,true);assert.ok(producer.persistence_attempts.length>0);
+ const caller=JSON.parse(await readFile(paths.find(p=>p.endsWith('managed-shutdown.json')),'utf8'));assert.equal(caller.stages.at(-1).stage,'outer_acknowledgement');assert.equal(caller.stages.at(-1).status,'allowed');
+ const final=caller.stages.find(s=>s.stage==='startup_owner'&&s.status==='returned');assert.equal(final.receipt.cleanup_complete,true);
+}));
+
+for(const label of labels)test('whole receiving unknown context reply prevents second context close '+label,()=>fixture('context-'+label,async f=>{
+ const first=await f.probe();assert.equal(first.logoutCalls,1);assert.equal(first.contextCalls,1);assert.notEqual(first.ownerClosed,true);assert.notEqual(first.contextClosed,true);
+ const primary=JSON.stringify(first.startupFailure);
+ for(let i=0;i<2;i++){f.send({id:'context-close'+i,operation:'close'});await f.wait(()=>f.messages.some(m=>m.id==='context-close'+i));assert.ok(f.messages.find(m=>m.id==='context-close'+i).error);const p=await f.probe();assert.equal(p.logoutCalls,1);assert.equal(p.contextCalls,1);assert.equal(JSON.stringify(p.startupFailure),primary);assert.equal(p.shutdown.stages.some(s=>s.stage==='outer_acknowledgement'),false)}
+ assert.equal(f.exited,undefined);
+}));
