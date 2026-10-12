@@ -20,7 +20,7 @@ for(const scenario of ['success','foreign-account','expired','pending','running'
   shutdownRejection:value=>value instanceof Error?{kind:'Error',message:value.message,cause:value.cause}:{kind:'value',value:value===undefined?null:value,is_undefined:value===undefined},
   closeBridge:async()=>{events.push('cleanup');await writeFile(join(directory,'package-cleanup.json'),JSON.stringify({status:'SUCCEEDED',package_closed:true,logged_out:true}));return {cleanup_complete:true,browser_transport_closed:true}},
   acceptanceCapture:{binding,harness:async({identity})=>{events.push('harness');if(scenario.startsWith('throw-'))throw raw;if(scenario==='changed-after')state.document_id='foreign';return scenario==='missing-receipt'?undefined:{...identity,settings_applied:false,cancel_verified:true}}},
-  captureConsumed:false,captureInFlight:undefined,captureUnknown:false,captureRejected:false,captureRejection:undefined,captureEvidence:undefined,shutdownStarted:false,cleanupRefused:false};
+  captureIOAssert:undefined,diagnosticCapture:undefined,captureConsumed:false,captureInFlight:undefined,captureUnknown:false,captureRejected:false,captureRejection:undefined,captureEvidence:undefined,shutdownStarted:false,cleanupRefused:false};
  const context=vm.createContext(globals);const api=vm.runInContext(code+';({captureAcceptance})',context);
  try{
   if(scenario==='write-refusal')await mkdir(join(directory,'acceptance-capture.json'));

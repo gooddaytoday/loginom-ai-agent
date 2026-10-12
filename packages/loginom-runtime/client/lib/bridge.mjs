@@ -1,3 +1,4 @@
+import { assertCaptureOwner, capturePublication, assertCapturePublication, freezeCaptureResult } from '../../src/retained-capture.mjs';
 import {nodeResultReply} from './node-result-reply.mjs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -186,6 +187,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   const skill = createSkillLoader({ directory: session.directory, transport: skillTransport(config) });
   let clipboardUncertain = false;
   let actionRuntime = null;
+  let captureNodeOperation, diagnosticCapture, captureIOAssert;
   let pinnedActions = null;
   let recoveryContext = null;
   const recordExecution = createExecutionJournal({ directory: session.directory,
@@ -366,6 +368,8 @@ export async function createBridge(config, session, { browserTransport: managedB
                 if(request.params.name==='dock_node_read')args=userWorkflows.expandNodeRead(args);
               }
               const result=await dispatchNodeApi(actionRuntime,request.params.name,args,{signal:extra.signal});
+              if (acceptanceCapture?.registration && request.params.name==='dock_node_apply')
+                captureNodeOperation=args.operation_id;
               if(userProfile)userWorkflows.rememberDelivery(result,args);
               await logResult(request.params.name,result);
               return nodeResultReply(result,{userProfile});
@@ -408,7 +412,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             await logResult(request.params.name,outcome);
             if (outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
                 && outcome.output?.package_ref?.path) savedPackages.set(outcome.output.package_ref.path, outcome.operation_id);
-            if (managedCleanup && outcome.status === 'SUCCEEDED' && outcome.cleanup_complete === true
+            if ((managedCleanup || acceptanceCapture) && outcome.status === 'SUCCEEDED' && outcome.cleanup_complete === true
                 && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key) && outcome.output?.package_ref?.path) {
               const prepared=session.metadata.workspacePreparation?.state;
               managedSave={operationId:outcome.operation_id, sessionId:session.metadata.sessionId,
@@ -538,6 +542,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         let phase=write?'file_open':'directory_open',primary;
         const failed=value=>{primary??={phase,value};rememberCapturePersistence(value,phase)};
         const callback=invoke=>{
+          captureIOAssert?.();
           const operation={pending:true,phase};file.io=operation;let projection;
           const completion=new Promise((resolve,reject)=>{
             try{projection=invoke((error,result)=>{
@@ -582,16 +587,34 @@ export async function createBridge(config, session, { browserTransport: managedB
         captureReceiptWritten=true;
       }
       if(!captureJournalWritten){
+        captureIOAssert?.();
         try{await recordExecution({event:'acceptance_capture',...captureEvidence})}
         catch(value){rememberCapturePersistence(value,'journal');throw value}
         captureJournalWritten=true;
       }
     }
-    async function captureAcceptance() {
+    async function captureAcceptance({signal} = {}) {
       const binding = acceptanceCapture?.binding;
       if (!binding || typeof acceptanceCapture.harness !== 'function' || captureConsumed || shutdownStarted || cleanupRefused)
         throw Error('LOGINOM_CAPTURE_UNAVAILABLE');
+      const registration=acceptanceCapture.registration;
+      const retained=acceptanceCapture.retained;
+      const node=registration ? actionRuntime.retainCaptureNode(captureNodeOperation) : undefined;
+      const preparedAtCapture=session.metadata.workspacePreparation;
+      const preparedBytes=registration?JSON.stringify(preparedAtCapture):undefined;
       const assertBound = () => {
+        if (registration) {
+          signal?.throwIfAborted();
+          if(!signal || registration.mode!=='readonly' || typeof registration.validate!=='function'
+              || !Object.isFrozen(registration) || registration.resource!==retained?.resource
+              || retained?.binding!==binding || retained.session!==session || !Object.isFrozen(retained.runtime)
+              || retained.state.controller?.signal!==signal)
+            throw Error('LOGINOM_CAPTURE_RETAINED_OWNER_REFUSED');
+          assertCaptureOwner(retained); node.assertCurrent();
+          if(session.metadata.workspacePreparation!==preparedAtCapture
+              || JSON.stringify(preparedAtCapture)!==preparedBytes)
+            throw Error('LOGINOM_CAPTURE_PREPARATION_CHANGED');
+        }
         actionRuntime.assertPreparationAllowed();
         const prepared=session.metadata.workspacePreparation;
         if (clipboardUncertain || heldLeases.size || actionRuntime.hasUnsettledWork() || actionRuntime.hasActiveWork()
@@ -614,8 +637,24 @@ export async function createBridge(config, session, { browserTransport: managedB
         // Only the fixed verified resource receives this private Page transport.
         // It is never supplied by IPC, the tool catalogue or the model.
         captureUnknown=true;
-        const receipt=await acceptanceCapture.harness({binding, identity, browser, record:recordExecution});
+        const publication=registration ? capturePublication(retained,node,identity) : undefined;
+        const receipt=await acceptanceCapture.harness({binding, identity, browser, record:recordExecution,
+          ...(registration?{retained,runtime:actionRuntime,session,node,publication,signal,deadline:node.deadline}: {})});
         assertBound();
+        if (registration) {
+          assertCapturePublication(receipt,publication);
+          if (await registration.validate(receipt,{retained,node,publication}) !== true)
+            throw Error('LOGINOM_CAPTURE_RESULT_INVALID');
+          assertBound(); assertCapturePublication(receipt,publication);
+          freezeCaptureResult(receipt);
+          captureEvidence={binding,identity,receipt};
+          captureUnknown=false;
+          captureIOAssert=assertBound;
+          await persistCapture();
+          assertBound(); assertCapturePublication(receipt,publication);
+          diagnosticCapture=true;
+          return receipt;
+        }
         if (!receipt || receipt.settings_applied !== false || receipt.cancel_verified !== true
             || Object.keys(identity).some(key => receipt[key] !== identity[key]))
           throw Error('LOGINOM_CAPTURE_CANCEL_UNCONFIRMED');
@@ -628,6 +667,10 @@ export async function createBridge(config, session, { browserTransport: managedB
       try {
         const receipt=await captureInFlight;
         captureInFlight=undefined;
+        if (diagnosticCapture) {
+          cleanupRefused=true;
+          return {receipt,diagnosticRead:true,cleanupComplete:false};
+        }
         const closed=await closeBridge();
         const cleanup=JSON.parse(await readFile(join(session.directory,'package-cleanup.json'),'utf8'));
         if (closed.cleanup_complete !== true || closed.browser_transport_closed !== true || cleanup.status !== 'SUCCEEDED'
@@ -637,15 +680,21 @@ export async function createBridge(config, session, { browserTransport: managedB
       } catch (error) {
         cleanupRefused=true; captureRejected=true; captureRejection=error;
         try {
-          await writeCaptureEvidence('acceptance-capture-failure.json',JSON.stringify({binding,failed:true,
+          if (!registration) await writeCaptureEvidence('acceptance-capture-failure.json',JSON.stringify({binding,failed:true,
             rejection:shutdownRejection(error),effect_unknown:captureUnknown,
             checked_receipt_available:!!captureEvidence},null,2)+'\n');
         }catch(persistence){session.metadata.capturePersistenceFailure=shutdownRejection(persistence)}
         throw error
       }
-      finally { captureInFlight=undefined }
+      finally { captureInFlight=undefined; captureIOAssert=undefined }
     }
     function closeBridge() {
+      if (acceptanceCapture?.registration && captureConsumed) {
+        // Only evidence repair is possible here. A read never permits teardown.
+        if(captureEvidence && captureRejected && !captureUnknown)
+          return persistCapture().then(()=>{throw captureRejection});
+        return Promise.reject(captureRejected?captureRejection:Error('LOGINOM_CAPTURE_DIAGNOSTIC_RETAINED'));
+      }
       if (captureRejected && captureUnknown) return Promise.reject(captureRejection);
       if(captureEvidence&&captureRejected&&!captureUnknown) return persistCapture().then(()=>{captureRejected=false;return closeBridge()});
       if (captureInFlight) return captureInFlight.then(() => closeBridge());
