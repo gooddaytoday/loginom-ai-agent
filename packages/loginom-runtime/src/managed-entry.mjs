@@ -53,7 +53,19 @@ async function closeEvidenceFile(file) {
   // the original kernel callback (the standard Node API returns void).
   await Promise.all([completion,projection])
 }
+function assertNormalStartupBinding() {
+  const binding=state.normalStartupBinding
+  if (!binding) return
+  const owner=binding.owner
+  if (state.startupOwner!==owner || state.startupRequest!==binding.request
+      || owner.directory!==binding.directory || owner.id!==binding.id
+      || owner.account!==binding.account || owner.origin!==binding.origin
+      || ((!binding.pending || binding.context!==undefined) && owner.context!==binding.context)
+      || ((!binding.pending || binding.page!==undefined) && owner.page!==binding.page))
+    throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
+}
 async function recordClose(stage, detail) {
+  assertNormalStartupBinding()
   state.shutdown ??= {stages:[]}
   if (Object.hasOwn(state,"startupFailure")) state.shutdown.startupFailure ??= closeRejection(state.startupFailure)
   state.shutdown.stages.push({stage,...detail})
@@ -74,6 +86,7 @@ async function recordClose(stage, detail) {
     startupRequest:state.startupRequest})
   const binding=state.evidenceOwnerBinding
   const assertBinding=()=>{
+    assertNormalStartupBinding()
     if (binding.owner!==(state.session??state.startupOwner) || binding.directory!==binding.owner.directory
         || binding.session!==state.session || binding.startupOwner!==state.startupOwner
         || binding.id!==owner.id || binding.account!==owner.account || binding.origin!==owner.origin
@@ -205,11 +218,19 @@ function close() {
       // throughout and can durably record its provisional drain before waiting.
       if (state.startupPending && state.startupValidation!==true) {
         const owner=state.startupOwner
-        const early=owner?{owner,directory:owner.directory,id:owner.id,account:owner.account,origin:owner.origin}:undefined
+        if (owner) state.normalStartupBinding ??= Object.freeze({owner,directory:owner.directory,
+          id:owner.id,account:owner.account,origin:owner.origin,context:owner.context,page:owner.page,
+          request:state.startupRequest,pending:true})
+        assertNormalStartupBinding()
         await Promise.allSettled([...requests])
-        if (early && (state.startupOwner!==early.owner || owner.directory!==early.directory
-            || owner.id!==early.id || owner.account!==early.account || owner.origin!==early.origin))
-          throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
+      }
+      assertNormalStartupBinding()
+      const early=state.normalStartupBinding
+      if (early?.pending) {
+        if (state.startupPending) throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
+        // Refusal retains this tuple; only its original request may qualify late handles.
+        state.normalStartupBinding=Object.freeze({...early,pending:false,
+          context:early.owner.context,page:early.owner.page})
       }
       await recordClose(stage,{status:"started"})
       await Promise.allSettled([...requests])
@@ -384,8 +405,8 @@ async function handle(message) {
       let authenticated
       try {authenticated = await loginBrowser({ ...login, keepOpen: true })}
       finally {state.startupController=undefined}
-      state.browser = authenticated.context
-      state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
+      state.browser = state.normalStartupBinding?.context ?? authenticated.context
+      if (!state.normalStartupBinding) state.startupBinding=Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
       const config = {
         endpoint: input.endpoint,
         apiKey: input.connection.apiKey,
@@ -515,8 +536,8 @@ async function handle(message) {
     if (message.operation === "start") {
       state.startupFailure=error
       if(state.startupOwner?.context) {
-        state.browser=state.startupOwner.context
-        state.startupBinding ??= Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
+        state.browser=state.normalStartupBinding?.context ?? state.startupOwner.context
+        if (!state.normalStartupBinding) state.startupBinding ??= Object.freeze({owner:state.startupOwner,id:state.startupOwner.id,account:state.startupOwner.account,origin:state.startupOwner.origin,context:state.startupOwner.context,page:state.startupOwner.page})
       }
       // Clean up immediately, but keep IPC until the owner requests an acknowledged close.
       // close() retains a rejection so that the later close request reports cleanup failure.
