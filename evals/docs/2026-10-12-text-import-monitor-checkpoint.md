@@ -1,6 +1,6 @@
 # Мониторинг LAB-56–LAB-63
 
-- Проверка: 2026-10-12T18:51:57Z; fresh issues/active/metadata/roots всех8 + LAB-55 и latest LAB-57 thread прочитаны; Evaler завершил независимые delivery/proposal reviews, внешний CLI pin blocker и owner decision pending сохраняются.
+- Проверка: 2026-10-12T19:21:58Z; fresh issues/active/metadata/roots всех8 + LAB-55 и latest LAB-57 thread прочитаны; статусы, metadata и comments без изменений, active/queued0, внешний CLI pin blocker и owner decision pending сохраняются.
 - Расписание lab-56-lab-63-30 ACTIVE каждые30 минут; все8 ещё не done, условие удаления не достигнуто.
 - LAB-56: in_review rev65; Ben ACCEPT + Evaler verified evidence/cleanup, done не выставлен, runs нет.
 - LAB-57: blocked rev149; оба Evaler runs01a13138-6f0f-7266-8736-a3fd9734a8ad/01a13153-b536-7ae8-9b14-4993a38f1f77 completed; active/queued всех работников нет. Metadata обновлена: TSV pin blocker, full frozen/READY_FOR_BEN/ACCEPT отсутствуют.
