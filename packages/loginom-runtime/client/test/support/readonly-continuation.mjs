@@ -84,6 +84,8 @@ for(const scenario of ['pre-native-save-refusal','receipt-write-failure','unknow
     assert.equal(receipt.package_cleanup.reason,'CONFIRMED_SAVE_REQUIRED');
     const observed=await client.callTool({name:'dock_workspace_observe',arguments:{scope:'all'}});assert.equal(observed.isError,undefined);
     await assert.rejects(client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_as',parameters:{path},operation_id:'forbidden'}}));
+    await rm(join(directory,'package-cleanup.json'));await mkdir(join(directory,'package-cleanup.json'));
+    await assert.rejects(bridge.close());assert.equal(bridge.readonlyContinuation('dock_diagnostics',{checkConnections:false}),false);
   }
  if(process.connected)await new Promise((resolve,reject)=>process.send({scenario,nativeCalls:f.events.filter(x=>x==='package-cleanup').length,release:false},e=>e?reject(e):resolve()));
  }finally{await client.close();await bridge.server.close();await rm(directory,{recursive:true,force:true})}

@@ -649,6 +649,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       if (captureRejected && captureUnknown) return Promise.reject(captureRejection);
       if(captureEvidence&&captureRejected&&!captureUnknown) return persistCapture().then(()=>{captureRejected=false;return closeBridge()});
       if (captureInFlight) return captureInFlight.then(() => closeBridge());
+      readonlyCleanupRefusal=false;
       shutdownStarted = true;
       let shutdownPrimary;
       closing ??= (async () => {
