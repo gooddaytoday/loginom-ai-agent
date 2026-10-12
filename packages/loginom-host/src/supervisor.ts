@@ -134,12 +134,13 @@ export async function supervise(input: Launch) {
     if (!child.connected) return Promise.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     const id = randomUUID()
     return new Promise<unknown>((resolve, reject) => {
+      const deadline = Date.now() + timeout
       const timer = setTimeout(() => {
         pending.delete(id)
         reject(new Error("LOGINOM_RUNTIME_TIMEOUT"))
       }, timeout)
       pending.set(id, { resolve, reject, timer })
-      child.send({ id, operation, input: value }, (error) => {
+      child.send({ id, operation, input: value, ...(operation === "start" ? { deadline } : {}) }, (error) => {
         if (error) fail()
       })
     })
