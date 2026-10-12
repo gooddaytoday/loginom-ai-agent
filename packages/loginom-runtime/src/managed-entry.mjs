@@ -69,13 +69,16 @@ async function recordClose(stage, detail) {
     throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
   state.evidenceOwnerBinding ??= Object.freeze({owner,directory,session:state.session,
     startupOwner:state.startupOwner,id:owner.id,account:owner.account,origin:owner.origin,
-    context:owner.context,page:owner.page,metadata:owner.metadata,sessionId:owner.metadata?.sessionId})
+    context:owner.context,page:owner.page,metadata:owner.metadata,sessionId:owner.metadata?.sessionId,
+    pendingStartup:owner===state.startupOwner && state.startupPending===true,
+    startupRequest:state.startupRequest})
   const binding=state.evidenceOwnerBinding
   const assertBinding=()=>{
     if (binding.owner!==(state.session??state.startupOwner) || binding.directory!==binding.owner.directory
         || binding.session!==state.session || binding.startupOwner!==state.startupOwner
         || binding.id!==owner.id || binding.account!==owner.account || binding.origin!==owner.origin
-        || binding.context!==owner.context || binding.page!==owner.page
+        || ((!binding.pendingStartup || binding.context!==undefined) && binding.context!==owner.context)
+        || ((!binding.pendingStartup || binding.page!==undefined) && binding.page!==owner.page)
         || binding.metadata!==owner.metadata || binding.sessionId!==owner.metadata?.sessionId)
       throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
   }
@@ -197,8 +200,33 @@ function close() {
     state.release ??= {}
     let stage="drain",primary
     try {
+      // Normal start may acquire a session after launch; wait for its original
+      // request before taking session identity. Validation owns the same owner
+      // throughout and can durably record its provisional drain before waiting.
+      if (state.startupPending && state.startupValidation!==true) {
+        const owner=state.startupOwner
+        const early=owner?{owner,directory:owner.directory,id:owner.id,account:owner.account,origin:owner.origin}:undefined
+        await Promise.allSettled([...requests])
+        if (early && (state.startupOwner!==early.owner || owner.directory!==early.directory
+            || owner.id!==early.id || owner.account!==early.account || owner.origin!==early.origin))
+          throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
+      }
       await recordClose(stage,{status:"started"})
       await Promise.allSettled([...requests])
+      const pendingBinding=state.evidenceOwnerBinding
+      if (pendingBinding?.pendingStartup) {
+        const owner=pendingBinding.owner
+        if (state.startupPending || state.startupRequest!==pendingBinding.startupRequest
+            || state.startupOwner!==owner || state.session!==pendingBinding.session
+            || owner.directory!==pendingBinding.directory || owner.id!==pendingBinding.id
+            || owner.account!==pendingBinding.account || owner.origin!==pendingBinding.origin
+            || (pendingBinding.context!==undefined && owner.context!==pendingBinding.context)
+            || (pendingBinding.page!==undefined && owner.page!==pendingBinding.page))
+          throw Error("LOGINOM_MANAGED_OWNER_DIRECTORY_CHANGED")
+        // Only settlement of this original tracked start qualifies late handles.
+        state.evidenceOwnerBinding=Object.freeze({...pendingBinding,pendingStartup:false,
+          context:owner.context,page:owner.page})
+      }
       if (state.startupOwner && !state.bridge) {
         stage="startup_owner"
         const owner=state.startupOwner
@@ -292,8 +320,15 @@ process.on("message", (message) => {
   // Close awaits the ordinary requests; tracking its own control handler would
   // make that drain wait for itself (and for every concurrent Close handler).
   if (message?.operation !== "close") requests.add(request)
+  if (message?.operation === "start" && !state.startupRequest) {
+    state.startupRequest=request
+    state.startupPending=true
+  }
   void request
-    .finally(() => requests.delete(request))
+    .finally(() => {
+      requests.delete(request)
+      if (state.startupRequest===request) state.startupPending=false
+    })
     .catch(() => {
       process.exitCode = 1
     })
@@ -305,6 +340,7 @@ async function handle(message) {
     if (message.operation === "start") {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
+      state.startupValidation=message.input?.validation===true
       const input = message.input
       const { acceptanceCleanupPackage } = validateStartInput(input)
       if (Object.hasOwn(message,"deadline") && (!Number.isSafeInteger(message.deadline) || message.deadline<=Date.now()))
