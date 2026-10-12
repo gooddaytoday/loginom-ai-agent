@@ -35,6 +35,8 @@ class HandoffTest(unittest.TestCase):
         self.sender = ''
         self.parent = None
         self.artifact = None
+        self.read_gate = None
+        self.read_started = threading.Event()
         case = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
@@ -50,6 +52,9 @@ class HandoffTest(unittest.TestCase):
 
             def do_GET(self):
                 if self.path == '/api/issues':
+                    if case.read_gate:
+                        case.read_started.set()
+                        case.read_gate.wait(10)
                     return self.reply([{'id': ISSUE, 'status': 'in_progress', 'description': ''}])
                 if self.path.endswith('/task-runs'):
                     sender = [{'id': SENDER, 'status': 'running', 'trigger_comment_id': PARENT}] if case.sender == SENDER else []
@@ -146,6 +151,53 @@ class HandoffTest(unittest.TestCase):
         self.assertEqual(fixture.cli(*args).returncode, 0)
         self.assertEqual(fixture.cli(*args).returncode, 0)
         self.assertTrue(path.exists())
+
+    def test_receiver_uses_exact_producer_payload_without_another_build(self):
+        fixture, path = self.attach_artifact()
+        before = (path / 'cli-manifest.json').read_bytes()
+        self.assertNotEqual(fixture.cli('use', '--id', self.artifact,
+            '--producer', SENDER, owner=AGENT).returncode, 0)
+        self.assertEqual(self.client().returncode, 0)
+        expected = self.root / 'expected.json'
+        expected.write_text(json.dumps(json.loads(before)['metadata']))
+        command = [sys.executable, '-c',
+            'import json,os;print(json.dumps({"path":os.environ["LOGINOM_ARTIFACT_PATH"],'
+            '"task_environment":any(k.startswith("MULTICA_") for k in os.environ)}))']
+        result = fixture.successful('use', '--id', self.artifact, '--producer', SENDER,
+            '--expected', str(expected), '--', *command, owner=AGENT)
+        self.assertEqual(result, {'path': str(path), 'task_environment': False})
+        self.assertEqual(fixture.successful('use', '--id', self.artifact)['path'], result['path'])
+        self.assertEqual((path / 'cli-manifest.json').read_bytes(), before)
+        self.assertEqual(list(path.parent.iterdir()), [path])
+
+    def test_legacy_lookup_allows_a_new_protection_and_reloads_it(self):
+        fixture, path = self.attach_artifact()
+        catalog = fixture.state / ISSUE / SENDER / 'catalog.json'
+        data = json.loads(catalog.read_text())
+        data['records'][self.artifact].update(state='retired', retired_at=1, legacy_released_at=1)
+        catalog.write_text(json.dumps(data))
+        self.read_gate = threading.Event()
+        process = subprocess.Popen([sys.executable, str(Path(__file__).with_name('artifacts.py')),
+            '--owner', SENDER, '--workspace', ISSUE, '--state-root', str(fixture.state),
+            '--workspaces-root', str(fixture.native), 'cleanup'], env=fixture.environment,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            self.assertTrue(self.read_started.wait(5))
+            result = subprocess.run([sys.executable, str(Path(__file__).with_name('artifacts.py')),
+                '--owner', SENDER, '--workspace', ISSUE, '--state-root', str(fixture.state),
+                '--workspaces-root', str(fixture.native), 'protect', '--id', self.artifact,
+                '--add', 'current'], env=fixture.environment, capture_output=True, text=True, timeout=3)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.read_gate.set()
+            output, error = process.communicate(timeout=10)
+            self.assertEqual(process.returncode, 0, error)
+            self.assertEqual(json.loads(output)['items'][0]['reason'], 'protected_or_pinned')
+            self.assertTrue(path.exists())
+        finally:
+            self.read_gate.set()
+            if process.poll() is None:
+                process.kill()
+                process.communicate()
 
     def test_checker_sha_requires_explicit_unchanged_product_identity(self):
         fixture, path = self.attach_artifact()

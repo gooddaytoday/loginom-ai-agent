@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Owner-scoped artifact lifecycle. Cleanup is a dry run unless --apply is given."""
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import contextlib
 import datetime
 import fcntl
@@ -577,27 +578,35 @@ def use(ctx, args):
         os.close(fd)
 
 
+def legacy_references(ctx):
+    issues = api(ctx, 'issues')
+    issues = issues if isinstance(issues, list) else issues['issues']
+    for issue in issues:
+        if not isinstance(issue, dict) or not issue.get('id') or not isinstance(issue.get('status'), str):
+            raise DeliveryError('Issue projection incomplete; retain legacy artifacts')
+    issues = [i for i in issues if i['status'] not in ('done', 'cancelled')]
+    routes = [f"issues/{uuid.UUID(i['id'])}/{suffix}" for i in issues for suffix in ('comments', 'task-runs')]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        responses = list(pool.map(lambda route: api(ctx, route), routes))
+    fragments = []
+    for index, issue in enumerate(issues):
+        comments, runs = responses[2 * index:2 * index + 2]
+        fragments.append(issue.get('description') or '')
+        active_ids = {r.get('trigger_comment_id') for r in runs if r['status'] not in ('completed', 'failed', 'cancelled')}
+        active_ids.update(c for r in runs if r['status'] not in ('completed', 'failed', 'cancelled') for field in ('delivered_comment_ids', 'coalesced_comment_ids', 'planned_comment_ids') for c in (r.get(field) or []))
+        fragments.extend(c.get('content', '') for c in comments if c['id'] in active_ids or time.time() - datetime.datetime.fromisoformat(c['created_at']).timestamp() < DAY)
+    return '\n'.join(fragments)
+
+
 def cleanup(ctx, args):
     report = {'owner': ctx['owner'], 'workspace': ctx['workspace'], 'apply': args.apply,
               'at': time.time(), 'free_before': shutil.disk_usage(ctx['root'] if ctx['root'].exists() else Path.home()).free, 'items': []}
     with catalog(ctx) as (value, target):
-        legacy_references = ''
-        if any(i.get('legacy_released_at') and i['state'] != 'deleted' for i in value['records'].values()):
-            issues = api(ctx, 'issues')
-            issues = issues if isinstance(issues, list) else issues['issues']
-            fragments = []
-            for issue in issues:
-                if not isinstance(issue, dict) or not issue.get('id') or not isinstance(issue.get('status'), str):
-                    raise DeliveryError('Issue projection incomplete; retain legacy artifacts')
-                if issue['status'] in ('done', 'cancelled'):
-                    continue
-                fragments.append(issue.get('description') or '')
-                comments = api(ctx, f"issues/{issue['id']}/comments")
-                runs = api(ctx, f"issues/{issue['id']}/task-runs")
-                active_ids = {r.get('trigger_comment_id') for r in runs if r['status'] not in ('completed', 'failed', 'cancelled')}
-                active_ids.update(c for r in runs if r['status'] not in ('completed', 'failed', 'cancelled') for field in ('delivered_comment_ids', 'coalesced_comment_ids', 'planned_comment_ids') for c in (r.get(field) or []))
-                fragments.extend(c.get('content', '') for c in comments if c['id'] in active_ids or time.time() - datetime.datetime.fromisoformat(c['created_at']).timestamp() < DAY)
-            legacy_references = '\n'.join(fragments)
+        needs_legacy = any(i.get('legacy_released_at') and i['state'] != 'deleted' for i in value['records'].values())
+    # Network reconciliation must not block other cards from recording pins or
+    # protections. Reopen the catalog afterwards and use its current state.
+    references = legacy_references(ctx) if needs_legacy else None
+    with catalog(ctx) as (value, target):
         for artifact, item in value['records'].items():
             record(value, artifact, ctx)
             entry = {'id': artifact, 'path': item['path'], 'kind': item['kind'], 'status': 'retained'}
@@ -608,7 +617,10 @@ def cleanup(ctx, args):
             if item['protections'] or item['pins']:
                 entry['reason'] = 'protected_or_pinned'
                 continue
-            if item.get('legacy_released_at') and any(s in legacy_references for s in (item.get('sha', '')[:9], item['path'], Path(item['path']).name) if s):
+            if item.get('legacy_released_at') and references is None:
+                entry['reason'] = 'legacy_reconciliation_required'
+                continue
+            if item.get('legacy_released_at') and any(s in references for s in (item.get('sha', '')[:9], item['path'], Path(item['path']).name) if s):
                 entry['reason'] = 'current_checkpoint_or_assignment_reference'
                 continue
             ttl = 7 * DAY if item['kind'] == 'evidence' else DAY
