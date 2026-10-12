@@ -9,7 +9,7 @@ import {tmpdir} from 'node:os';
 const source=await fsp.readFile(process.env.BRIDGE_MODULE??new URL('../lib/bridge.mjs',import.meta.url),'utf8');
 const writer=source.slice(source.indexOf('    async function writeCleanupReceipt(cleanup) {'),source.indexOf('    function closeBridge() {'));
 const start=source.indexOf('function shutdownRejection('),rejection=source.slice(start,source.indexOf('\n}',start)+2);
-for(const scenario of ['normal','rename-pending','directory-sync-failure','collision','symlink'])test('atomic cleanup publication '+scenario,async()=>{
+for(const scenario of ['normal','rename-pending','directory-sync-failure','collision','symlink','blocked-to-succeeded'])test('atomic cleanup publication '+scenario,async()=>{
  const directory=await fsp.mkdtemp(join(tmpdir(),'cleanup-atomic-')),target=join(directory,'package-cleanup.json');
  const receipt=Object.freeze({status:'SUCCEEDED',session_id:'s',package_closed:true,logged_out:true});
  const events=[],kinds=new Map();let deliver,selected=false,fileOpens=0;
@@ -29,13 +29,13 @@ for(const scenario of ['normal','rename-pending','directory-sync-failure','colli
  const close=(fd,done)=>fs.close(fd,error=>{events.push(kinds.get(fd)+'-close');done(error)});
  const rename=(a,b,done)=>{
   events.push('rename-dispatch');
-  assert.equal(fs.readFileSync(target,'utf8'),'previous receipt');
+  if(events.filter(e=>e==='rename-dispatch').length===1)assert.equal(fs.readFileSync(target,'utf8'),'previous receipt');
   assert.ok(events.indexOf('file-sync')<events.indexOf('file-close'));
   assert.ok(events.indexOf('file-close')<events.indexOf('rename-dispatch'));
   if(scenario==='rename-pending'&&!selected){selected=true;fs.rename(a,b,error=>{deliver=()=>done(error)});throw 0}
   fs.rename(a,b,done)
  };
- const f=vm.runInNewContext(`let confirmedCleanup=receipt,cleanupEvidenceBinding,cleanupReceiptWritten=false,cleanupPersistencePrimary,cleanupPublication;const cleanupPersistenceFailures=[],cleanupWriters=new Set();${rejection}\n${writer}\n({write:writeCleanupReceipt,inspect:()=>({marker:cleanupReceiptWritten,writers:cleanupWriters.size})})`,{
+ const f=vm.runInNewContext(`let confirmedCleanup=${scenario==='blocked-to-succeeded'?'undefined':'receipt'},cleanupEvidenceBinding,cleanupReceiptWritten=false,cleanupPersistencePrimary,cleanupPublication;const cleanupPersistenceFailures=[],cleanupWriters=new Set();${rejection}\n${writer}\n({write:writeCleanupReceipt,confirm:r=>{confirmedCleanup=r},inspect:()=>({marker:cleanupReceiptWritten,writers:cleanupWriters.size})})`,{
   receipt,session:{directory,metadata:{sessionId:'s'}},receiptOpen:open,receiptWrite:fs.writeFile,receiptSync:sync,receiptClose:close,receiptRename:rename,receiptFlags:fs.constants,receiptUUID:()=>['collision','symlink'].includes(scenario)?'fixed':randomUUID(),join,Promise,Error,
  });
  try{
@@ -48,8 +48,11 @@ for(const scenario of ['normal','rename-pending','directory-sync-failure','colli
    }else if(scenario==='directory-sync-failure'){
     await assert.rejects(f.write(receipt),e=>e===false);assert.equal(f.inspect().marker,false);assert.equal(fileOpens,1);
    }
-   await f.write(receipt);assert.equal(f.inspect().marker,true);assert.equal(f.inspect().writers,0);assert.deepEqual(JSON.parse(await fsp.readFile(target,'utf8')),receipt);assert.equal(fileOpens,1);
-   assert.ok(events.lastIndexOf('directory-sync')<events.lastIndexOf('directory-close'));assert.equal(events.filter(e=>e==='rename-dispatch').length,1);
+   if(scenario==='blocked-to-succeeded'){
+    await f.write(Object.freeze({...receipt,status:'BLOCKED',package_closed:false,logged_out:false}));assert.equal(f.inspect().marker,false);assert.equal(JSON.parse(await fsp.readFile(target,'utf8')).status,'BLOCKED');f.confirm(receipt);
+   }
+   await f.write(receipt);assert.equal(f.inspect().marker,true);assert.equal(f.inspect().writers,0);assert.deepEqual(JSON.parse(await fsp.readFile(target,'utf8')),receipt);assert.equal(fileOpens,scenario==='blocked-to-succeeded'?2:1);
+   assert.ok(events.lastIndexOf('directory-sync')<events.lastIndexOf('directory-close'));assert.equal(events.filter(e=>e==='rename-dispatch').length,scenario==='blocked-to-succeeded'?2:1);
   }
  }finally{await fsp.rm(directory,{recursive:true,force:true})}
 });

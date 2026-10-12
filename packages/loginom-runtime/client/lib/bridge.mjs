@@ -659,7 +659,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         remember(Error('LOGINOM_CLEANUP_PUBLICATION_UNKNOWN'),'publication_rename');
         throw cleanupPersistencePrimary.value;
       }
-      cleanupPublication ??= {renamed:false};
+      if(cleanupPublication?.receipt!==cleanup)cleanupPublication={receipt:cleanup,renamed:false};
       if(!cleanupPublication.written){
         cleanupPublication.temporary=join(session.directory,'.package-cleanup.'+receiptUUID()+'.tmp');
         await persistHandle(cleanupPublication.temporary,
