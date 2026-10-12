@@ -143,9 +143,11 @@ def provenance(ctx, path, issue):
         if native.get('managed_by') != 'multica-daemon-managed-env' or native.get('agent_id') != ctx['owner'] or native.get('workspace_id') != ctx['workspace'] or native.get('issue_id') != issue or owner.get('workspace_id') != ctx['workspace'] or not owner.get('task_id'):
             raise DeliveryError('Native artifact ownership mismatch')
         if ctx['task']:
-            runs = api(ctx, f'issues/{issue}/task-runs')
+            # The current run can belong to another card: the agent also owns
+            # its old artifacts. Verify the actor independently of this path.
+            runs = api(ctx, f"agents/{ctx['owner']}/tasks")
             current = next((r for r in runs if r['id'] == ctx['task']), None)
-            if not current or current['agent_id'] != ctx['owner'] or current['status'] != 'running':
+            if not current or current['agent_id'] != ctx['owner'] or current.get('workspace_id') != ctx['workspace'] or current['status'] != 'running':
                 raise DeliveryError('Active task identity not confirmed')
         return {'kind': 'native', 'root': str(parent), 'marker_sha256': digest(marker),
                 'owner_sha256': digest(owner_path)}

@@ -35,6 +35,7 @@ class HandoffTest(unittest.TestCase):
         self.sender = ''
         self.parent = None
         self.artifact = None
+        self.agent_runs = []
         self.read_gate = None
         self.read_started = threading.Event()
         case = self
@@ -51,6 +52,8 @@ class HandoffTest(unittest.TestCase):
                 self.wfile.write(json.dumps(value).encode())
 
             def do_GET(self):
+                if self.path.startswith('/api/agents/') and self.path.endswith('/tasks'):
+                    return self.reply(case.agent_runs)
                 if self.path == '/api/issues':
                     if case.read_gate:
                         case.read_started.set()
@@ -198,6 +201,32 @@ class HandoffTest(unittest.TestCase):
             if process.poll() is None:
                 process.kill()
                 process.communicate()
+
+    def test_active_agent_can_register_its_previous_card_but_not_another_owner(self):
+        fixture, path = self.attach_artifact()
+        fixture.state = fixture.root / '.local/state/loginom-multica/artifacts'
+        native = fixture.native / ('lab-' + ISSUE[-12:]) / 'old-card'
+        evidence = native / 'workdir/evidence'
+        evidence.mkdir(parents=True)
+        (evidence / 'result.txt').write_text('previous completed stage')
+        marker = native / '.managed_env.json'
+        managed = {'managed_by': 'multica-daemon-managed-env', 'workspace_id': ISSUE,
+                   'agent_id': SENDER, 'issue_id': ISSUE}
+        marker.write_text(json.dumps(managed))
+        (native / '.task_owner').write_text(json.dumps({'workspace_id': ISSUE, 'task_id': SENDER}))
+        self.agent_runs = [{'id': TASK, 'agent_id': SENDER, 'workspace_id': ISSUE,
+                           'issue_id': AGENT, 'status': 'running'}]
+        environment = dict(fixture.environment, HOME=str(fixture.root), MULTICA_AGENT_ID=SENDER,
+            MULTICA_TASK_ID=TASK, MULTICA_WORKSPACE_ID=ISSUE, MULTICA_TOKEN='mat_test')
+        args = ('register', '--issue', ISSUE, '--path', str(evidence), '--kind', 'evidence', '--sha', 'a' * 40)
+        self.assertEqual(fixture.cli(*args, environment=environment).returncode, 0)
+        managed['agent_id'] = AGENT
+        marker.write_text(json.dumps(managed))
+        self.assertNotEqual(fixture.cli(*args, environment=environment).returncode, 0)
+        managed['agent_id'] = SENDER
+        marker.write_text(json.dumps(managed))
+        self.agent_runs[0]['status'] = 'completed'
+        self.assertNotEqual(fixture.cli(*args, environment=environment).returncode, 0)
 
     def test_checker_sha_requires_explicit_unchanged_product_identity(self):
         fixture, path = self.attach_artifact()
