@@ -88,3 +88,22 @@ for(const scenario of ['dirty','running','disconnected','inventory'])test('final
   assert.equal(changed,true);assert.deepEqual(f.page.events,[]);
  }finally{await f.cleanup()}
 });
+for(const scenario of ['opening','input-index','input-guid','native-node'])test('terminal native binding through dirty RPC '+scenario,async()=>{
+ const baseline=await fixture();let lastRpc=0;
+ try{const rpc=baseline.conn.Session.IsPackageModified;baseline.conn.Session.IsPackageModified=async(...args)=>{lastRpc++;return rpc(...args)};
+  const r=await captureReplacement(baseline.args);assert.equal(validateCaptureResult(r,baseline.args),true);
+ }finally{await baseline.cleanup()}
+ const f=await fixture();try{let calls=0,changed=false;
+  f.conn.Session.IsPackageModified=async()=>{
+   if(++calls===lastRpc){changed=true;const o=f.prep.inputPortOpenReceipts.values().next().value;
+    if(scenario==='opening')o.operation_id='terminal-foreign-opening';
+    if(scenario==='input-index')f.port.FIndex=1;
+    if(scenario==='input-guid')o.portGuid='terminal-foreign-guid';
+    if(scenario==='native-node')f.native[5].FGuid='terminal-foreign-node';
+   }
+   await Promise.resolve();return false;
+  };
+  await assert.rejects(captureReplacement(f.args),/REPLACEMENT_FIXED_NATIVE_BINDING_REFUSED/);
+  assert.equal(changed,true);assert.equal(calls,lastRpc);assert.deepEqual(f.page.events,[]);
+ }finally{await f.cleanup()}
+});

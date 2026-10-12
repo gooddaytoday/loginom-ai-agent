@@ -32,13 +32,18 @@ export async function captureReplacement({binding,identity,retained,runtime,sess
  };
  guard();
  const nativeBinding={document_id:node.request.document_id,workflow_ref:node.request.workflow_ref,node:node.state.node};
+ // Compile the browser half of the actual canonical reader, not a caller
+ // callback/proof. It must run synchronously inside the terminal RPC snapshot.
+ const readerSource=await readPreparedNodeContext({evaluate:fn=>fn.toString()},nativeBinding);guard();
+ const terminalSafety=new Function('return q=>('+readOwnSafety.toString()+')(q,('+readerSource+'))')();
  // Checks wrap every asynchronous read on the same original Page. No gestures.
  const readPage=new Proxy(page,{get(target,key){
   if(key==='evaluate')return async(...args)=>{guard();const value=await target.evaluate(...args);guard();return value;};
   const v=Reflect.get(target,key,target);return typeof v==='function'?v.bind(target):v;
  }});
- const safety=async()=>{guard();const raw=await readPage.evaluate(readOwnSafety,{document_id:publication.document_id,
-  account:binding.account,package_path:binding.packagePath,origin:retained.startup.origin,build:identity.loginom_build});guard();
+ const safety=async nativeProof=>{guard();const raw=await readPage.evaluate(nativeProof?terminalSafety:readOwnSafety,{document_id:publication.document_id,
+  account:binding.account,package_path:binding.packagePath,origin:retained.startup.origin,build:identity.loginom_build,
+  ...(nativeProof?{native_binding:nativeBinding,native_proof:nativeProof}:{})});guard();
   if(raw?.owned!==true ||raw.running!==false ||raw.modified!==false ||raw.read_only!==false ||raw.packages!==1)
    throw Error('REPLACEMENT_FIXED_NATIVE_SAFETY_REFUSED');return raw;};
  await safety();
@@ -61,10 +66,9 @@ export async function captureReplacement({binding,identity,retained,runtime,sess
  await safety();guard();
  const finalProof=await readPreparedNodeContext(readPage,nativeBinding);guard();
  if(JSON.stringify(finalProof)!==JSON.stringify(proof))throw Error('REPLACEMENT_FIXED_NATIVE_CHANGED');
- // The final native reader awaits too: its successful binding proof cannot
- // stand in for current resource safety. End with the owned safety snapshot,
- // including its checks on both sides of the dirty-state RPC, before issuance.
- await safety();guard();
+ // One browser evaluation checks resource AND canonical native binding on
+ // both sides of the dirty RPC. No independent read is moved past this await.
+ await safety(proof);guard();
  const receipt={...diagnostic,admission_confirmed:false,settings_applied:false,execution_started:false,
   publication:{...publication},root:Object.fromEntries(rootKeys.map(k=>[k,publication[k]]))};
  captureData(receipt);assertCapturePublication(receipt,publication);issued.set(receipt,{request,node,retained,publication});return receipt;
@@ -81,11 +85,13 @@ export function validateCaptureResult(receipt,{retained,node,publication}) {
 }
 // Native facts, no caller ready/verified/admission flags. Snapshot proxy identity
 // and inventory around the async dirty-state RPC; unknown/falsy is not false.
-function readOwnSafety(q){return (async()=>{
+function readOwnSafety(q,nativeRead){return (async()=>{
  const app=globalThis.bg?.app,main=app?.Application?.FInstance?.FMainForm,map=main?.FMapTree,prep=globalThis.__loginomDockPreparationV1;
  const no=()=>{throw Error('REPLACEMENT_FIXED_NATIVE_RESOURCE_REFUSED');};
  const snapshot=()=>{
-  if(location.origin!==q.origin ||app?.Version!==q.build ||prep?.document!==document ||prep.id!==q.document_id
+  if(globalThis.bg?.app!==app||app?.Application?.FInstance?.FMainForm!==main||main?.FMapTree!==map
+    ||globalThis.__loginomDockPreparationV1!==prep
+    ||location.origin!==q.origin ||app?.Version!==q.build ||prep?.document!==document ||prep.id!==q.document_id
     ||map?.FServerConnection?.Connected!==true ||map.FServerConnection.UserName!==q.account)no();
   const tab=main.Items?.Workspace?.getActiveTab?.(),controller=tab?.Controller;let n=controller?.Node?.data?.node,pack;
   const seen=new Set();for(let i=0;n&&i<32&&!seen.has(n);i++,n=n.ParentNode){seen.add(n);if(n instanceof app.PackageTreeNode){pack=n;break;}}
@@ -93,7 +99,21 @@ function readOwnSafety(q){return (async()=>{
   if(!pack ||pack.PackageFileName!==q.package_path ||pack.ReadOnly!==false ||count!==1 ||inventory.Items(0)!==pack
     ||typeof pack.HasRunningNodes!=='function' ||pack.HasRunningNodes()!==false ||!pack.Package
     ||typeof map.FServerConnection.Session?.IsPackageModified!=='function')no();
-  return {tab,controller,pack,proxy:pack.Package,connection:map.FServerConnection,session:map.FServerConnection.Session,inventory,count};
+  const linked={};
+  if(nativeRead){
+   const proof=nativeRead(q.native_binding);
+   if(proof?.verified!==true||JSON.stringify(proof)!==JSON.stringify(q.native_proof))
+    throw Error('REPLACEMENT_FIXED_NATIVE_BINDING_REFUSED');
+   const wizard=controller?.FController,portTree=controller?.Node?.data?.node?.ParentNode;
+   const openings=[...(prep.inputPortOpenReceipts?.values()??[])].filter(o=>o.phase==='verified'
+    &&o.document_id===q.native_binding.document_id&&o.workflow_id===q.native_binding.workflow_ref.workflow_id
+    &&o.node_id===q.native_binding.node.node_id&&o.wizard===wizard&&o.portTree===portTree);
+   if(openings.length!==1)throw Error('REPLACEMENT_FIXED_NATIVE_BINDING_REFUSED');
+   const o=openings[0];Object.assign(linked,{preparation:prep,receipts:prep.receipts,openings:prep.inputPortOpenReceipts,
+    opening:o,operation:o.operation_id,wizard,wizardTree:controller.Node.data.node,portTree,
+    nodeTree:o.nodeTree,workflow:o.workflow,node:o.node,nodeData:o.nodeData,port:o.port,portData:o.portData,engine:o.enginePort});
+  }
+  return {tab,controller,pack,proxy:pack.Package,connection:map.FServerConnection,session:map.FServerConnection.Session,inventory,count,...linked};
  };
  const before=snapshot(),modified=await before.session.IsPackageModified(before.proxy),after=snapshot();
  if(Object.keys(before).some(k=>before[k]!==after[k]) ||typeof modified!=='boolean')no();
