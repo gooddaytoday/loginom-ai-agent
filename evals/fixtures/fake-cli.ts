@@ -1,6 +1,6 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
-import { chmod, mkdir, rm } from "node:fs/promises"
+import { appendFile, chmod, mkdir, rm } from "node:fs/promises"
 
 const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
@@ -75,6 +75,14 @@ if (process.env.EVAL_FAKE_ORPHAN_PID_FILE) {
 if (process.env.EVAL_FAKE_EXIT_DELAY_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_EXIT_DELAY_MS))
 
 if (command === "loginom") {
+  if (process.env.EVAL_FAKE_MANAGEMENT_CALLS_FILE)
+    await appendFile(process.env.EVAL_FAKE_MANAGEMENT_CALLS_FILE, JSON.stringify(Bun.argv.slice(2)) + "\n")
+  if (sub === "check" && process.env.EVAL_FAKE_CHECK_FILE) {
+    const check = await Bun.file(process.env.EVAL_FAKE_CHECK_FILE).json()
+    if (check.pendingRecovery) await Bun.write(path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, "loginom/recovery/operation.json"), '{"id":"pending-check"}')
+    process.stdout.write(JSON.stringify(check.receipt) + "\n")
+    process.exit(check.exitCode ?? 0)
+  }
   if (process.env.EVAL_FAKE_ENFORCE_WRITER && await Bun.file(path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, ".writer", "owner")).exists()) {
     process.stderr.write("PROFILE_BUSY\n")
     process.exit(3)
@@ -96,7 +104,7 @@ if (command === "loginom") {
     sub === "setup" && stateFile
       ? { state: "ready", hasApiKey: true }
       : sub === "recover"
-        ? { ...view, recoveries: [] }
+        ? process.env.EVAL_FAKE_RECOVERY_PERSISTS ? view : { ...view, recoveries: [] }
         : view
   if (stateFile && (sub === "recover" || sub === "setup")) await Bun.write(stateFile, JSON.stringify(next))
   process.stdout.write(JSON.stringify(next) + "\n")

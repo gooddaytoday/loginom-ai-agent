@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdir, mkdtemp, readFile, stat, symlink, writeFile, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, stat, symlink, writeFile, rm } from "node:fs/promises"
 import os from "node:os"
 import { spawn } from "node:child_process"
 import { loadConfig, repoRoot } from "../src/config"
@@ -399,9 +399,96 @@ test("recoverIfNeeded: ready без recoveries — ничего не делае�
   expect((await recoverIfNeeded(command, 1)).recovered).toBe(false)
 })
 
+test("recoverIfNeeded: process-local starting требует подтверждённый check в одном CLI процессе", async () => {
+  const file = await stateFile({ state: "starting", hasApiKey: true })
+  const check = await stateFile({ receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" }, browser: { state: "unknown" } } })
+  const calls = path.join(path.dirname(file), "calls.jsonl")
+  const context = await fakeProfile({ EVAL_FAKE_STATE_FILE: file, EVAL_FAKE_CHECK_FILE: check, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls })
+  const command = { ...context.command, cleanupDir: path.join(context.profileDir, "evidence") }
+  try {
+    const result = await recoverIfNeeded(command, 1)
+    expect(result.recovered).toBe(false)
+    expect(result.view.state).toBe("starting")
+    expect((await Bun.file(file).json()).state).toBe("starting")
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "check"])
+    const receipts = await readdir(command.cleanupDir)
+    const proof = await Promise.all(receipts.map(name => Bun.file(path.join(command.cleanupDir, name, "connection-check.json")).json().catch(() => undefined)))
+    expect(proof.filter(value => value !== undefined)).toEqual([{ ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" } }])
+  } finally {
+    await rm(context.profileDir, { recursive: true, force: true })
+    await rm(path.dirname(file), { recursive: true, force: true })
+    await rm(path.dirname(check), { recursive: true, force: true })
+  }
+}, 20_000)
+
 test("recoverIfNeeded: recoverable-error — EvalFailure с состоянием", async () => {
   const { command } = await fakeProfile({ EVAL_FAKE_STATE_FILE: await stateFile({ state: "recoverable-error", failure: "LOGIN_FAILED" }) })
   await expect(recoverIfNeeded(command, 1)).rejects.toThrow("state=recoverable-error")
+})
+
+test.each([
+  { name: "nonzero exit", exitCode: 1, receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" } } },
+  { name: "missing receipt", receipt: null },
+  { name: "missing Help proof", receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID" } },
+  { name: "wrong connection code", receipt: { ok: true, code: "OTHER", help: { state: "ready" } } },
+  { name: "Help still starting", receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "starting" } } },
+])("recoverIfNeeded: starting rejects $name", async value => {
+  const file = await stateFile({ state: "starting", hasApiKey: true })
+  const check = await stateFile(value)
+  const context = await fakeProfile({ EVAL_FAKE_STATE_FILE: file, EVAL_FAKE_CHECK_FILE: check })
+  try {
+    await expect(recoverIfNeeded(context.command, 1)).rejects.toThrow("loginom check не подтвердил")
+  } finally {
+    await rm(context.profileDir, { recursive: true, force: true })
+    await rm(path.dirname(file), { recursive: true, force: true })
+    await rm(path.dirname(check), { recursive: true, force: true })
+  }
+})
+
+test.each([
+  { state: "pending", hasApiKey: true },
+  { state: "unconfigured", hasApiKey: false },
+  { state: "recoverable-error", hasApiKey: true },
+  { state: "starting", hasApiKey: true, failure: "LOGINOM_RUNTIME_START_FAILED" },
+  { state: "starting", hasApiKey: true, recoveries: ["still-pending"] },
+])("recoverIfNeeded: $state with unresolved state never invokes connection check", async view => {
+  const file = await stateFile(view)
+  const calls = path.join(path.dirname(file), "calls.jsonl")
+  const context = await fakeProfile({ EVAL_FAKE_STATE_FILE: file, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls, EVAL_FAKE_RECOVERY_PERSISTS: "1" })
+  try {
+    await expect(recoverIfNeeded(context.command, 1)).rejects.toThrow("Профиль Loginom не готов")
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).not.toContain("check")
+  } finally {
+    await rm(context.profileDir, { recursive: true, force: true })
+    await rm(path.dirname(file), { recursive: true, force: true })
+  }
+})
+
+test("recoverIfNeeded: verified Help does not erase a browser warning", async () => {
+  const file = await stateFile({ state: "starting", hasApiKey: true, browser: { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" } })
+  const check = await stateFile({ receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" }, browser: { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" } } })
+  const context = await fakeProfile({ EVAL_FAKE_STATE_FILE: file, EVAL_FAKE_CHECK_FILE: check })
+  try {
+    expect((await recoverIfNeeded(context.command, 1)).view).toEqual(await Bun.file(file).json())
+  } finally {
+    await rm(context.profileDir, { recursive: true, force: true })
+    await rm(path.dirname(file), { recursive: true, force: true })
+    await rm(path.dirname(check), { recursive: true, force: true })
+  }
+})
+
+test("recoverIfNeeded: pending recovery created during valid check remains a blocker", async () => {
+  const file = await stateFile({ state: "starting", hasApiKey: true })
+  const check = await stateFile({ pendingRecovery: true, receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" } } })
+  const context = await fakeProfile({ EVAL_FAKE_STATE_FILE: file, EVAL_FAKE_CHECK_FILE: check })
+  try {
+    await expect(recoverIfNeeded(context.command, 1)).rejects.toThrow("незавершённое состояние")
+    expect(await Bun.file(path.join(context.profileDir, "loginom/recovery/operation.json")).exists()).toBe(true)
+  } finally {
+    await rm(context.profileDir, { recursive: true, force: true })
+    await rm(path.dirname(file), { recursive: true, force: true })
+    await rm(path.dirname(check), { recursive: true, force: true })
+  }
 })
 
 test("recoverIfNeeded: starting ожидается до ready", async () => {

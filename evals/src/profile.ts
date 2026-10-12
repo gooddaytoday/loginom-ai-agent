@@ -1,4 +1,5 @@
 import path from "node:path"
+import os from "node:os"
 import { mkdir, mkdtemp, lstat, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises"
 import { repoRoot, type EvalConfig } from "./config"
 import type { AgentCommand } from "./cli"
@@ -6,6 +7,7 @@ import { EvalFailure } from "./fail"
 import { groupProcesses } from "./process-group"
 import { superviseProcess, verifyOwnedRegistration, writerIdentity, type OwnedRegistration, type ProcessCleanup, type WriterIdentity } from "./process-supervisor"
 import { archiveDiagnostics } from "./diagnostics"
+import { sandboxCommand, assertNoDebuggers } from "./sandbox"
 
 type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean }
 
@@ -94,8 +96,14 @@ const exists = (file: string) =>
 export async function management(command: AgentCommand, args: string[], stdin?: string, timeoutMs = 120_000) {
   const out = command.cleanupDir ? path.join(command.cleanupDir, `${Date.now()}-${crypto.randomUUID()}`) : undefined
   if (out) await mkdir(out, { recursive: true, mode: 0o700 })
-  const result = await superviseProcess({ cmd: [...command.cmd, ...args], cwd: command.cwd,
-    env: command.env, profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs })
+  const workdir = command.mode === "binary" && args[0] === "loginom" && args[1] === "check"
+    ? await mkdtemp(path.join(os.tmpdir(), "evals-management-check-")) : undefined
+  if (workdir) await assertNoDebuggers()
+  const boundary = workdir ? await sandboxCommand({ cmd: [...command.cmd, ...args],
+    profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE!, workdir, env: command.env }) : undefined
+  const result = await superviseProcess({ cmd: [...command.cmd, ...args], cwd: boundary?.cwd ?? command.cwd,
+    env: boundary?.env ?? command.env, sandbox: boundary?.cmd,
+    profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs })
   if (out) await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ command: args.slice(0, 2), processes: result.processCleanup }, null, 2))
   if (result.processCleanup.status !== "confirmed")
     throw new EvalFailure(`Management cleanup failed: ${result.processCleanup.error ?? "unconfirmed"}`, 1)
@@ -103,7 +111,8 @@ export async function management(command: AgentCommand, args: string[], stdin?: 
     await archiveDiagnostics(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.runtimeDirectories, out, command.cleanupSecrets)
   if (command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
     await releaseStaleWriter(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.writer)
-  return result
+  if (workdir) await rm(workdir, { recursive: true })
+  return { ...result, evidenceDir: out }
 }
 
 export async function managementRuntimeDirectories(command: AgentCommand) {
@@ -335,14 +344,32 @@ export async function recoverIfNeeded(command: AgentCommand, exitCode: 1 | 2) {
     if (recover.exitCode !== 0)
       throw new EvalFailure(`loginom recover завершился кодом ${recover.exitCode}:\n${recover.stderr.trim()}`, exitCode)
   }
-  const view = await settle(command, acknowledged ? await status(command, exitCode) : first, exitCode)
-  if (view.state !== "ready" || view.recoveries?.length)
+  const restored = acknowledged ? await status(command, exitCode) : first
+  // Each standalone status has its own Help startup. Polling another process
+  // cannot finish that startup; an explicit check proves readiness in one host.
+  const checked = restored.state === "starting" && restored.hasApiKey === true && !restored.failure && !restored.recoveries?.length
+    ? await checkStarting(command, exitCode) : false
+  const view = checked ? restored : await settle(command, restored, exitCode)
+  if ((view.state !== "ready" && !checked) || view.recoveries?.length || view.failure)
     throw new EvalFailure(
       `Профиль Loginom не готов: state=${view.state} failure=${view.failure ?? "—"} recoveries=${view.recoveries?.length ?? 0}` +
         (view.state === "unconfigured" ? " — выполните `--reset-profile` или проверьте LOGINOM_DOCK_API_KEY" : ""),
       exitCode,
     )
   return { recovered: acknowledged, view }
+}
+
+async function checkStarting(command: AgentCommand, exitCode: 1 | 2) {
+  const result = await management(command, ["loginom", "check", "--format", "json"])
+  const receipt = parseJson(result.stdout.trim().split("\n").at(-1) ?? "") as
+    { ok?: unknown; code?: unknown; help?: { state?: unknown } } | null | undefined
+  if (result.exitCode !== 0 || result.sandboxError || result.timedOut || result.interrupted ||
+    receipt?.ok !== true || receipt.code !== "LOGINOM_CONNECTION_VALID" || receipt.help?.state !== "ready")
+    throw new EvalFailure("loginom check не подтвердил готовность Help в текущем CLI-процессе", exitCode)
+  await assertProfileSettled(command.env.LOGINOM_AI_AGENT_CLI_PROFILE!)
+  if (result.evidenceDir) await Bun.write(path.join(result.evidenceDir, "connection-check.json"),
+    JSON.stringify({ ok: receipt.ok, code: receipt.code, help: { state: receipt.help.state } }, null, 2))
+  return true
 }
 
 export async function resetProfile(config: EvalConfig) {
@@ -420,7 +447,7 @@ async function status(command: AgentCommand, exitCode: 1 | 2) {
 
 // starting — транзитное состояние сразу после setup; ждём до 10 с повторными status.
 async function settle(command: AgentCommand, view: View, exitCode: 1 | 2, deadline = Date.now() + 10_000): Promise<View> {
-  if (view.state !== "starting" || Date.now() >= deadline) return view
+  if (view.state !== "starting" || view.failure || view.recoveries?.length || Date.now() >= deadline) return view
   await Bun.sleep(1_000)
   return settle(command, await status(command, exitCode), exitCode, deadline)
 }
