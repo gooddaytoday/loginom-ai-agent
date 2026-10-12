@@ -1,9 +1,13 @@
 import { createRequire } from "node:module"
-import { mkdir, writeFile } from "node:fs/promises"
-import { randomUUID } from "node:crypto"
-import { join } from "node:path"
+import { mkdir, writeFile, readFile, open, rename, unlink } from "node:fs/promises"
+import { constants } from "node:fs"
+import { randomUUID, createHash } from "node:crypto"
+import { fileURLToPath } from "node:url"
+import { join, dirname } from "node:path"
 import { browserDownloadScript } from "../client/lib/browser-downloads.mjs"
 import { browserLaunch } from "../client/lib/browser-launch.mjs"
+
+const runtimeModulePath = fileURLToPath(import.meta.url)
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 
@@ -80,8 +84,56 @@ function startupRejection(value) {
     ...('cause' in value?{cause:startupRejection(value.cause)}:{})}:
     {kind:'value',value:value===undefined?null:value,is_undefined:value===undefined}
 }
+function startupRejectionValue(detail) {
+  if(detail.kind==='Error') {const value=new Error(detail.message);value.name=detail.name;if('cause' in detail)value.cause=startupRejectionValue(detail.cause);return value}
+  return detail.is_undefined?undefined:detail.value
+}
+async function startupFingerprint(path) {
+  try {const bytes=await readFile(path);return {available:true,size:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}}
+  catch(error){return {available:false,rejection:startupRejection(error)}}
+}
 async function startupEvidence(owner) {
-  await writeFile(join(owner.directory,'startup-cleanup.json'),JSON.stringify(owner.evidence,null,2)+'\n',{mode:0o600})
+  // The producer owns durability. A collector syncing a later copy cannot
+  // authorize this owner's context exit. Retry only storage/confirmed results.
+  owner.evidencePendingClose??=[];
+  for(const handle of [...owner.evidencePendingClose]) {
+    await handle.close();owner.evidencePendingClose.splice(owner.evidencePendingClose.indexOf(handle),1);
+  }
+  const temporary=join(owner.directory,'.startup-cleanup-'+randomUUID()+'.json');
+  let file,directory,created=false,phase='open',failed=false,primary;
+  const closeFailures=[];
+  try {
+    file=await open(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
+    created=true;phase='write';
+    await file.writeFile(JSON.stringify(owner.evidence,null,2)+'\n');
+    phase='file_sync';await file.sync();
+  }catch(error){failed=true;primary=error}
+  if(file) {
+    try {await file.close()}
+    catch(error){owner.evidencePendingClose.push(file);closeFailures.push({phase:'file_close',rejection:startupRejection(error)});if(!failed){failed=true;primary=error;phase='file_close'}}
+  }
+  if(!failed) {
+    try {
+      phase='rename';await rename(temporary,join(owner.directory,'startup-cleanup.json'));created=false;
+      phase='directory_open';directory=await open(owner.directory,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW);
+      phase='directory_sync';await directory.sync();
+    }catch(error){failed=true;primary=error}
+  }
+  if(directory) {
+    try {await directory.close()}
+    catch(error){owner.evidencePendingClose.push(directory);closeFailures.push({phase:'directory_close',rejection:startupRejection(error)});if(!failed){failed=true;primary=error;phase='directory_close'}}
+  }
+  if(created) {
+    try {await unlink(temporary)}
+    catch(error){closeFailures.push({phase:'temporary_unlink',rejection:startupRejection(error)});if(!failed){failed=true;primary=error;phase='temporary_unlink'}}
+  }
+  if(failed) {
+    const failure={phase,rejection:startupRejection(primary),secondary:closeFailures};
+    owner.evidence.persistence_attempts??=[];
+    owner.evidence.persistence_attempts.push(failure);
+    owner.evidence.persistence_failure??=failure.rejection;
+    throw primary;
+  }
 }
 // Internal foreground owner, assigned before authentication. No IPC authority.
 function startupOwner(owner, profile, candidate) {
@@ -100,23 +152,78 @@ function startupOwner(owner, profile, candidate) {
       let nativeStage
       try {
         if(owner.launchAttempted && !owner.context) throw Error('LOGINOM_STARTUP_LAUNCH_UNKNOWN')
-        if(owner.context && (owner.context.pages().length!==1||owner.context.pages()[0]!==owner.page)) throw Error('LOGINOM_STARTUP_PAGE_CHANGED')
+        if(owner.contextCloseAttempted && !owner.contextClosed) throw new Error('LOGINOM_STARTUP_CONTEXT_UNKNOWN',{cause:owner.contextCloseFailure})
+        if(owner.context && !owner.contextClosed && (owner.context.pages().length!==1||owner.context.pages()[0]!==owner.page)) throw Error('LOGINOM_STARTUP_PAGE_CHANGED')
         if(owner.context && !owner.nativeConfirmed) {
           if(owner.nativeAttempted) throw new Error('LOGINOM_STARTUP_CLEANUP_UNKNOWN',{cause:owner.nativeFailure?.value})
           if(!owner.page) throw Error('LOGINOM_STARTUP_PAGE_UNKNOWN')
           const observed=await owner.page.evaluate(o=>{
             const own=globalThis.__loginomStartupV1,app=globalThis.bg?.app,m=app?.Application?.FInstance?.FMainForm?.FMapTree;
-            if(!o.navigationStarted && location.href==='about:blank' && !app) return {unauthenticated:true}
-            if(!own||own.document!==document||own.id!==o.id||own.account!==o.account||location.origin!==o.origin)
-              return {reason:'STARTUP_DOCUMENT_CHANGED'}
+            const exact=value=>({type:typeof value,is_undefined:value===undefined,value:value===undefined?null:value});
+            const rejection=value=>value instanceof Error?{kind:'Error',name:value.name,message:value.message,
+              ...('cause' in value?{cause:rejection(value.cause)}:{})}:{kind:'value',value:value===undefined?null:value,is_undefined:value===undefined};
+            // Sample each operand once. The later pre-logout native identity
+            // check is intentionally independent; it cannot rewrite this sample.
+            const documentMatches=own?.document===document&&own?.id===o.id&&own?.account===o.account;
+            const origin=location.origin,build=app?.Version,connection=m?.FServerConnection;
+            const account=connection?.UserName,connected=connection?.Connected;
+            const parent=m?.FPackagesParentNode,count=m?.PackageNodes?.Count;
+            const snapshot={observed_at:new Date().toISOString(),deadline:o.deadline,deadline_available:o.deadline!==null,
+              document_matches:documentMatches,origin_matches:origin===o.origin,identity_matches:account===o.account,
+              build:exact(build),connected:exact(connected),
+              package_parent:{type:typeof parent,is_undefined:parent===undefined,is_null:parent===null},
+              package_parent_ready:!!parent,count:exact(count),dialogs:{available:false},running:{...exact(undefined),available:false,observed:false}};
+            const result=value=>({...value,snapshot});
+            if(!o.navigationStarted && location.href==='about:blank' && !app) return result({unauthenticated:true});
+            if(!documentMatches||origin!==o.origin) return result({reason:'STARTUP_DOCUMENT_CHANGED'});
             const visible=e=>!!e.getBoundingClientRect().width&&!!e.getBoundingClientRect().height&&getComputedStyle(e).visibility!=='hidden';
-            if([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible))
-              return {reason:'STARTUP_OPERATION_OPEN'}
-            if(m?.FServerConnection?.Connected!==true) return {unauthenticatedCandidate:!o.loginSubmitted,reason:'LOGIN_EFFECT_UNKNOWN'}
-            if(app.Version!=='7.4.2'||m.FServerConnection.UserName!==o.account||m.PackageNodes?.Count!==0||m.HasRunningNodes()!==false)
-              return {reason:'STARTUP_NOT_OWN_EMPTY_IDLE'}
-            return {authenticated:true}
-          },{id:owner.id,account:owner.account,origin:owner.origin,navigationStarted:owner.navigationStarted===true,loginSubmitted:owner.loginSubmitted===true})
+            snapshot.dialogs={available:true,visible:[...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)};
+            if(snapshot.dialogs.visible) return result({reason:'STARTUP_OPERATION_OPEN'});
+            if(connected!==true) return result({unauthenticatedCandidate:!o.loginSubmitted,reason:'LOGIN_EFFECT_UNKNOWN'});
+            if(build!=='7.4.2'||account!==o.account||count!==0) return result({reason:'STARTUP_NOT_OWN_EMPTY_IDLE'});
+            let running;
+            try {running=m.HasRunningNodes();snapshot.running={...exact(running),available:true,observed:true}}
+            catch(error){
+              const detail=rejection(error);
+              snapshot.running={available:false,observed:true,rejection:detail};
+              // Raw values preserve VM/transport identity; the DTO preserves
+              // Error causes even when browser serialization omits them.
+              return result({reason:'STARTUP_GUARD_READ_REJECTED',guardFailure:{value:error,rejection:detail}});
+            }
+            if(running!==false) return result({reason:'STARTUP_NOT_OWN_EMPTY_IDLE'});
+            return result({authenticated:true});
+          },{id:owner.id,account:owner.account,origin:owner.origin,navigationStarted:owner.navigationStarted===true,loginSubmitted:owner.loginSubmitted===true,deadline:owner.deadline??null})
+          if(observed.guardFailure && !owner.guardFailure) {
+            const detail=observed.guardFailure.rejection;
+            let value=observed.guardFailure.value;
+            if(detail.kind==='Error') {
+              if(!(value instanceof Error)) {value=new Error(detail.message);value.name=detail.name;}
+              value.name=detail.name;value.message=detail.message;
+              if('cause' in detail && (!('cause' in value)
+                  || JSON.stringify(startupRejection(value.cause))!==JSON.stringify(detail.cause)))
+                value.cause=startupRejectionValue(detail.cause);
+            } else if(detail.is_undefined) value=undefined;
+            owner.guardFailure={value,rejection:detail};
+            owner.evidence.guard_rejection=detail;
+          }
+          // Each actual retry has its own operands/time. Never reconstruct it
+          // from a later title/idle receipt or replace the first observation.
+          owner.evidence.guard_observations??=[];
+          owner.evidence.guard_observations.push({attempt:owner.evidence.guard_observations.length+1,
+            owner_id:owner.id,account:owner.account,origin:owner.origin,snapshot:observed.snapshot,
+            result:{authenticated:observed.authenticated===true,reason:observed.reason??null}});
+          // Freeze the FIRST observation; later cleanup/retries cannot replace it.
+          if(!owner.evidence.first_guard) {
+            owner.evidence.first_guard={...observed.snapshot,result:{authenticated:observed.authenticated===true,reason:observed.reason??null},artifacts:owner.artifacts??{available:false}}
+          }
+          try {await startupEvidence(owner)}
+            catch(error) {
+              owner.evidence.guard_persistence_failure=startupRejection(error)
+              if(observed.guardFailure) throw owner.guardFailure.value
+              if(!observed.authenticated&&!observed.unauthenticated) throw new Error('LOGINOM_STARTUP_CLEANUP_BLOCKED',{cause:observed})
+              throw error // no native gesture without durable first evidence
+          }
+          if(observed.guardFailure) throw owner.guardFailure.value
           if(observed.authenticated) {
             owner.nativeAttempted=true
             nativeStage='native_menu_open'
@@ -167,12 +274,13 @@ function startupOwner(owner, profile, candidate) {
           owner.evidence.native_failure={stage:nativeStage,rejection:startupRejection(error)}
           owner.evidence.stages.push({stage:nativeStage,status:'rejected',rejection:startupRejection(error)})
         }
-        owner.cleanupFailure=owner.nativeFailure?owner.nativeFailure.value:error
+        owner.cleanupFailure=owner.nativeFailure?owner.nativeFailure.value:owner.guardFailure?owner.guardFailure.value:error
         owner.evidence.cleanup_complete=false
         owner.evidence.effect_possible=owner.nativeAttempted===true||owner.loginSubmitted===true||(owner.launchAttempted===true&&!owner.context)
         owner.evidence.cleanup_rejection=startupRejection(owner.cleanupFailure)
         owner.evidence.cleanup_attempt_rejection=startupRejection(error)
         try { await startupEvidence(owner) } catch(persistenceFailure) {owner.evidence.persistence_failure=startupRejection(persistenceFailure)}
+        if(owner.guardFailure && !nativeStage && !owner.nativeConfirmed) throw owner.guardFailure.value
         throw error
       }
     })()
@@ -183,6 +291,8 @@ function startupOwner(owner, profile, candidate) {
 }
 export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, owner = {} }) {
   startupOwner(owner,profile,candidate)
+  owner.deadline??=null // No upstream absolute deadline is supplied by the existing start contract.
+  owner.artifacts??={node:await startupFingerprint(process.execPath),browser:await startupFingerprint(browserPath),runtime:await startupFingerprint(runtimeModulePath),resource_manifest:await startupFingerprint(join(dirname(runtimeModulePath),'../../resource-manifest.json')),cli_manifest:await startupFingerprint(join(dirname(runtimeModulePath),'../../../../cli-manifest.json')),foreground_caller:{available:false,reason:'NOT_SUPPLIED_BY_START_CONTRACT'}}
   try {
     const { chromium } = require('playwright-core')
     const launch=browserLaunch(headless)

@@ -5,6 +5,7 @@ import {readFile} from 'node:fs/promises';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {dirname,join} from 'node:path';
 import * as fs from 'node:fs/promises';
+import {constants} from 'node:fs';
 import * as module from 'node:module';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
@@ -33,7 +34,7 @@ const fsDouble={...fs,
  async writeFile(p,data,options){if(scenario==='write-error'&&persistenceBlocked&&String(p).endsWith('managed-shutdown.json'))throw Error('managed write rejected');return fs.writeFile(p,data,options)},
  async open(p,...args){const handle=await fs.open(p,...args);if(String(p).endsWith('managed-shutdown.json'))return {async sync(){events.push('receipt-sync');if(persistenceBlocked&&scenario==='sync-error')throw Error('managed sync rejected');if(persistenceBlocked&&scenario==='sync-confirmed-error'&&String(await fs.readFile(p,'utf8')).includes('"stage": "startup_owner"'))throw Error('confirmed receipt sync rejected');await handle.sync();fsTrace.push({event:"fsync-completed",receipt:JSON.parse(await fs.readFile(p,"utf8")).stages.at(-1)})},async close(){events.push('receipt-handle-close');await handle.close()}};return handle},
 };
-const builtins={'node:fs/promises':fsDouble,'node:module':{...module,createRequire:()=>requireDouble},'node:crypto':crypto,'node:path':path,'node:url':url,'node:os':os};
+const builtins={'node:fs':{constants},'node:fs/promises':fsDouble,'node:module':{...module,createRequire:()=>requireDouble},'node:crypto':crypto,'node:path':path,'node:url':url,'node:os':os};
 const synthetic=exports=>new vm.SyntheticModule(Object.keys(exports),function(){for(const [k,v] of Object.entries(exports))this.setExport(k,v)},{context});
 const helper=new vm.SourceTextModule(await readFile(helperPath,'utf8'),{context,identifier:pathToFileURL(helperPath).href,initializeImportMeta(meta){meta.url=pathToFileURL(helperPath).href}});
 await helper.link(spec=>synthetic(builtins[spec]??({'../client/lib/browser-downloads.mjs':{browserDownloadScript:()=>''},'../client/lib/browser-launch.mjs':{browserLaunch:()=>({args:[],viewport:{}})}})[spec]));await helper.evaluate();
