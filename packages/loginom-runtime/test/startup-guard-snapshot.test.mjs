@@ -1,7 +1,8 @@
+import {constants} from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {readFile,writeFile,mkdir,mkdtemp,rm,rename} from 'node:fs/promises';
+import {open,unlink,readFile,writeFile,mkdir,mkdtemp,rm,rename} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {randomUUID} from 'node:crypto';
@@ -14,7 +15,7 @@ async function fixture({count=0,running=false,parent=true,dialogs=false,foreign=
   HasRunningNodes:()=>{if(throwRunning)throw throwRunning.value;return running}};
  const state=vm.createContext({document,location:{origin:'https://own.invalid'},bg:{app:{Version:build,Application:{FInstance:{FMainForm:{FMapTree:map}}}}},getComputedStyle:()=>({visibility:'visible'}),Error});
  const owner={directory,deadline:1700000000123,artifacts:{fixture:true}},events=[];
- const {startupOwner}=vm.runInNewContext(code+';({startupOwner})',{writeFile,mkdir,join,randomUUID,URL,Error});
+ const {startupOwner}=vm.runInNewContext(code+';({startupOwner})',{open,rename,unlink,constants,writeFile,mkdir,join,randomUUID,URL,Error});
  startupOwner(owner,directory,{username:'own',url:'https://own.invalid'});
  state.__loginomStartupV1={document,id:owner.id,account:'own'};
  owner.context={pages:()=>[owner.page],close:async()=>events.push('context')};
