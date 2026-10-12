@@ -20,7 +20,7 @@ COMMENT = '66666666-6666-4666-8666-666666666666'
 class HandoffTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
-        self.root = Path(self.directory.name)
+        self.root = Path(self.directory.name).resolve()
         (self.root / 'message').write_text('Integrate the accepted source patch; preserve runtime guards.')
         self.comments = []
         self.runs = []
@@ -34,6 +34,7 @@ class HandoffTest(unittest.TestCase):
         self.truncated = False
         self.sender = ''
         self.parent = None
+        self.artifact = None
         case = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
@@ -48,6 +49,8 @@ class HandoffTest(unittest.TestCase):
                 self.wfile.write(json.dumps(value).encode())
 
             def do_GET(self):
+                if self.path == '/api/issues':
+                    return self.reply([{'id': ISSUE, 'status': 'in_progress', 'description': ''}])
                 if self.path.endswith('/task-runs'):
                     sender = [{'id': SENDER, 'status': 'running', 'trigger_comment_id': PARENT}] if case.sender == SENDER else []
                     return self.reply(case.runs + sender)
@@ -90,13 +93,95 @@ class HandoffTest(unittest.TestCase):
         self.thread.join()
         self.directory.cleanup()
 
-    def client(self, receipt='receipt', sha='a' * 40, existing=None):
+    def client(self, receipt='receipt', sha='a' * 40, existing=None, product=None):
         return subprocess.run([sys.executable, str(Path(__file__).with_name('handoff.py')),
             '--issue', ISSUE, '--agent', AGENT, '--sha', sha, '--scope', 'capture-receiving',
             '--message', str(self.root / 'message'), '--receipt', str(self.root / receipt)] +
-            (['--existing-comment', existing] if existing else []),
+            (['--existing-comment', existing] if existing else []) +
+            (['--artifact', self.artifact, '--artifact-owner', SENDER, '--artifact-state-root', str(self.root / 'state')] if self.artifact else []) +
+            (['--product-sha', product] if product else []),
             env=dict(os.environ, MULTICA_SERVER_URL=f'http://127.0.0.1:{self.server.server_port}',
-                     MULTICA_TOKEN='test-only', MULTICA_TASK_ID=self.sender), capture_output=True, text=True)
+                     MULTICA_TOKEN='test-only', MULTICA_TASK_ID=self.sender, MULTICA_WORKSPACE_ID=ISSUE), capture_output=True, text=True)
+
+    def attach_artifact(self):
+        from test_artifacts import ArtifactsTest
+        fixture = ArtifactsTest('test_complete_payload_is_registered_and_identity_is_stable')
+        fixture.setUp()
+        self.addCleanup(fixture.tearDown)
+        # Use real CLI allocation/registration, with the same server identity
+        # as the HTTP fixture rather than mocking the artifact implementation.
+        fixture.state = self.root / 'state'
+        fixture.environment['MULTICA_SERVER_URL'] = f'http://127.0.0.1:{self.server.server_port}'
+        fixture.owner = SENDER
+        fixture.workspace = ISSUE
+        path = fixture.build()
+        self.artifact = fixture.register(path)['id']
+        return fixture, path
+
+    def test_artifact_pin_survives_lost_dispatch_response(self):
+        fixture, path = self.attach_artifact()
+        self.drop = True
+        self.assertNotEqual(self.client().returncode, 0)
+        catalog = json.loads((fixture.state / ISSUE / SENDER / 'catalog.json').read_text())
+        pin = next(iter(catalog['records'][self.artifact]['pins']))
+        self.assertIn('Artifact-handoff:', self.comments[0]['content'])
+        self.assertTrue(path.exists())
+        self.assertEqual(self.client().returncode, 0)
+        self.assertEqual(self.posts, 1)
+        self.assertIn(pin, json.loads((fixture.state / ISSUE / SENDER / 'catalog.json').read_text())['records'][self.artifact]['pins'])
+
+    def test_release_needs_completed_receiver_and_its_explicit_result(self):
+        fixture, path = self.attach_artifact()
+        self.assertEqual(self.client().returncode, 0)
+        receipt = json.loads((self.root / 'receipt').read_text())
+        result_id = '77777777-7777-4777-8777-777777777777'
+        self.comments.append({'id': result_id, 'author_type': 'agent', 'author_id': AGENT,
+            'source_task_id': TASK, 'content': f'Artifact-release: {self.artifact}\nHandoff-ID: {receipt["key"]}'})
+        args = ('release', '--id', self.artifact, '--handoff', receipt['key'], '--result-comment', result_id)
+        self.assertNotEqual(fixture.cli(*args).returncode, 0)
+        self.runs[0]['status'] = 'completed'
+        self.comments[-1]['author_id'] = SENDER
+        self.assertNotEqual(fixture.cli(*args).returncode, 0)
+        self.comments[-1]['author_id'] = AGENT
+        self.assertEqual(fixture.cli(*args).returncode, 0)
+        self.assertEqual(fixture.cli(*args).returncode, 0)
+        self.assertTrue(path.exists())
+
+    def test_checker_sha_requires_explicit_unchanged_product_identity(self):
+        fixture, path = self.attach_artifact()
+        self.assertNotEqual(self.client(sha='c' * 40).returncode, 0)
+        self.assertEqual(self.posts, 0)
+        self.assertEqual(self.client(sha='c' * 40, product='a' * 40).returncode, 0)
+        self.assertIn('Product-SHA: ' + 'a' * 40, self.comments[0]['content'])
+        self.assertIn('Source-SHA: ' + 'c' * 40, self.comments[0]['content'])
+        self.assertTrue(path.exists())
+
+    def test_historical_build_requires_exact_manifest_and_completed_positive_verdict(self):
+        fixture, path = self.attach_artifact()
+        record = json.loads((fixture.state / ISSUE / SENDER / 'catalog.json').read_text())['records'][self.artifact]
+        result_id = '77777777-7777-4777-8777-777777777777'
+        import datetime
+        old = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=3)).isoformat()
+        self.runs = [{'id': TASK, 'status': 'completed', 'agent_id': AGENT}]
+        self.comments = [{'id': result_id, 'author_type': 'agent', 'author_id': AGENT,
+            'source_task_id': TASK, 'content': 'SOURCE/INSTALLED OFFLINE PASS ' + 'a' * 40,
+            'created_at': old}]
+        fixture.successful('protect', '--id', self.artifact, '--add', 'legacy-unreconciled')
+        proof = {k: record[k] for k in ('owner', 'workspace', 'issue', 'path')}
+        proof.update(all_consumers_released=True, unresolved=False, evidence=['completed exact review'],
+            manifest_sha256='f' * 64, historical_release={'issue': ISSUE, 'comment': result_id,
+                'task': TASK, 'reviewed_no_consumers': True})
+        file = self.root / 'legacy-proof.json'
+        file.write_text(json.dumps(proof))
+        args = ('protect', '--id', self.artifact, '--remove', 'legacy-unreconciled', '--confirmation', str(file))
+        self.assertNotEqual(fixture.cli(*args).returncode, 0)
+        proof['manifest_sha256'] = record['build']['manifest_sha256']
+        file.write_text(json.dumps(proof))
+        self.successful_artifact = fixture.successful(*args)
+        fixture.successful('retire', '--id', self.artifact, '--reason', 'superseded completed stage')
+        updated = json.loads((fixture.state / ISSUE / SENDER / 'catalog.json').read_text())['records'][self.artifact]
+        self.assertEqual(updated['retired_at'], datetime.datetime.fromisoformat(old).timestamp())
+        self.assertTrue(path.exists())
 
     def test_finished_receiver_still_creates_durable_new_work(self):
         self.runs = [{'id': SENDER, 'agent_id': AGENT, 'status': 'running', 'trigger_comment_id': 'old', 'delivered_comment_ids': []}]
