@@ -8,6 +8,7 @@ import { readCatalog, combineCatalogs, connectRemote, selectToolGroups } from '.
 import { makeClipboardCode, runClipboardTransfer, createSerialGate, clipboardTool } from './clipboard.mjs';
 import { createSkillLoader, skillTransport, skillUri, prepareTool } from './skill.mjs';
 import { readFile, writeFile, open } from 'node:fs/promises';
+import {open as captureOpen,writeFile as captureWrite,fsync as captureSync,close as captureClose} from 'node:fs';
 import {open as receiptOpen,writeFile as receiptWrite,fsync as receiptSync,close as receiptClose,rename as receiptRename,constants as receiptFlags} from 'node:fs';
 import {randomUUID as receiptUUID} from 'node:crypto';
 import { join } from 'node:path';
@@ -186,6 +187,8 @@ export async function createBridge(config, session, { browserTransport: managedB
   let cleanupPublication;
   let sortingResult, sortingInvalid = false, captureEvidence;
   let captureConsumed = false, captureInFlight, captureUnknown = false, captureRejected = false, captureRejection;
+  const captureWriters=new Set(),capturePersistenceFailures=[];
+  let capturePersistencePrimary,captureEvidenceBinding,captureReceiptWritten=false,captureJournalWritten=false;
   let closing, shutdownStarted = false, shutdownStage;
   const skill = createSkillLoader({ directory: session.directory, transport: skillTransport(config) });
   let clipboardUncertain = false;
@@ -514,12 +517,93 @@ export async function createBridge(config, session, { browserTransport: managedB
         return { isError: true, content: [{ type: 'text', text: message }] };
       }
     });
+    async function closeCaptureWriter(file) {
+      if(file.closeComplete)return;
+      if(file.io?.pending)throw Error('LOGINOM_CAPTURE_WRITER_IO_UNKNOWN');
+      if(file.closeStarted)throw file.closeFailure?file.closeFailure.value:Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
+      file.closeStarted=true;let projection;
+      const completion=new Promise((resolve,reject)=>{
+        try{projection=captureClose(file.fd,error=>{
+          if(error===null||error===undefined){file.closeComplete=true;resolve()}
+          else{file.closeFailure={value:error};reject(error)}
+        })}catch(value){file.closeFailure??={value};reject(value)}
+      });
+      await Promise.all([completion,projection]);
+    }
+    function rememberCapturePersistence(value,phase) {
+        capturePersistencePrimary??={phase,value};
+        capturePersistenceFailures.push({phase,rejection:shutdownRejection(value)});
+        session.metadata.capturePersistencePrimary??={phase:capturePersistencePrimary.phase,
+          rejection:shutdownRejection(capturePersistencePrimary.value)};
+        session.metadata.capturePersistenceFailures=capturePersistenceFailures;
+    }
+    async function drainCaptureWriters() {
+      for(const file of captureWriters){
+        if(!file.closeStarted&&file.openComplete&&file.fd!==undefined){
+          try{await closeCaptureWriter(file)}catch(value){file.closeFailure??={value};rememberCapturePersistence(value,'retained_close')}
+        }
+        if(!file.closeComplete){
+          rememberCapturePersistence(file.closeFailure?file.closeFailure.value:Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN'),'retained_close');
+          throw capturePersistencePrimary.value;
+        }
+        captureWriters.delete(file);
+      }
+    }
+    async function writeCaptureEvidence(name,bytes) {
+      await drainCaptureWriters();
+      const persist=async(path,write)=>{
+        const file={fd:undefined,closeComplete:false};captureWriters.add(file);
+        let phase=write?'file_open':'directory_open',primary;
+        const failed=value=>{primary??={phase,value};rememberCapturePersistence(value,phase)};
+        const callback=invoke=>{
+          const operation={pending:true,phase};file.io=operation;let projection;
+          const completion=new Promise((resolve,reject)=>{
+            try{projection=invoke((error,result)=>{
+              operation.pending=false;
+              if(error!==null&&error!==undefined){operation.failure={value:error};reject(error)}else resolve(result);
+            })}catch(value){reject(value)}
+          });
+          return Promise.all([completion,projection]).then(([result])=>result);
+        };
+        try{
+          await callback(done=>captureOpen(path,write?'w':'r',0o600,(error,fd)=>{
+            file.openComplete=true;
+            if(error===null||error===undefined)file.fd=fd;else captureWriters.delete(file);
+            done(error,fd);
+          }));
+          if(write){phase='file_write';await callback(done=>captureWrite(file.fd,bytes,done))}
+          phase=write?'file_sync':'directory_sync';await callback(done=>captureSync(file.fd,done));
+        }catch(value){failed(value)}
+        if(file.fd!==undefined){
+          phase=write?'file_close':'directory_close';
+          try{await closeCaptureWriter(file);captureWriters.delete(file)}
+          catch(value){file.closeFailure??={value};failed(value)}
+        }
+        if(primary)throw primary.value;
+        if(!file.closeComplete)throw Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
+      };
+      await persist(join(session.directory,name),true);
+      await persist(session.directory,false);
+      if(captureWriters.size)throw Error('LOGINOM_CAPTURE_WRITER_CLOSE_UNKNOWN');
+    }
     async function persistCapture() {
       const bytes=JSON.stringify(captureEvidence,null,2)+'\n';
-      const file=await open(join(session.directory,'acceptance-capture.json'),'w',0o600);
-      try {await file.writeFile(bytes);await file.sync()}finally{await file.close()}
-      const directory=await open(session.directory,'r');try{await directory.sync()}finally{await directory.close()}
-      await recordExecution({event:'acceptance_capture',...captureEvidence});
+      captureEvidenceBinding??=Object.freeze({evidence:captureEvidence,bytes,
+        directory:session.directory,sessionId:session.metadata.sessionId});
+      if(captureEvidenceBinding.evidence!==captureEvidence || captureEvidenceBinding.bytes!==bytes
+          || captureEvidenceBinding.directory!==session.directory
+          || captureEvidenceBinding.sessionId!==session.metadata.sessionId)
+        throw Error('LOGINOM_CAPTURE_EVIDENCE_BINDING_CHANGED');
+      await drainCaptureWriters();
+      if(!captureReceiptWritten){
+        await writeCaptureEvidence('acceptance-capture.json',captureEvidenceBinding.bytes);
+        captureReceiptWritten=true;
+      }
+      if(!captureJournalWritten){
+        try{await recordExecution({event:'acceptance_capture',...captureEvidence})}
+        catch(value){rememberCapturePersistence(value,'journal');throw value}
+        captureJournalWritten=true;
+      }
     }
     async function captureAcceptance() {
       const binding = acceptanceCapture?.binding;
@@ -573,9 +657,9 @@ export async function createBridge(config, session, { browserTransport: managedB
       } catch (error) {
         cleanupRefused=true; captureRejected=true; captureRejection=error;
         try {
-          const file=await open(join(session.directory,'acceptance-capture-failure.json'),'w',0o600);
-          try{await file.writeFile(JSON.stringify({binding,failed:true,rejection:shutdownRejection(error),
-            effect_unknown:captureUnknown,checked_receipt_available:!!captureEvidence},null,2)+'\n');await file.sync()}finally{await file.close()}
+          await writeCaptureEvidence('acceptance-capture-failure.json',JSON.stringify({binding,failed:true,
+            rejection:shutdownRejection(error),effect_unknown:captureUnknown,
+            checked_receipt_available:!!captureEvidence},null,2)+'\n');
         }catch(persistence){session.metadata.capturePersistenceFailure=shutdownRejection(persistence)}
         throw error
       }
