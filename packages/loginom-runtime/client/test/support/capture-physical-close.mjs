@@ -65,7 +65,20 @@ import {pbkdf2} from 'node:crypto';
 const fdKind=new Map(),fdTarget=new Map(),owned=new Set();
 const physical=fd=>{try{nativeCallbackFs.fstatSync(fd);return true}catch{return false}};
 const failValues={error:Error('receipt primary',{cause:0}),undefined:undefined,null:null,false:false,zero:0,empty:''};
+const renamePrimary=Error('original capture rename reply lost',{cause:0});
 mock.module('node:fs',{defaultExport:{},namedExports:{...nativeCallbackFs,
+ rename(from,to,callback){
+  const f=current;
+  if(f.case==='rename-lost-diagnostic'&&!f.selected&&String(to).endsWith('/acceptance-capture.json')){
+   f.selected=true;
+   f.kernel=new Promise(resolve=>nativeCallbackFs.rename(from,to,error=>{
+    f.events.push('receipt-rename-kernel-complete');
+    f.original=()=>{f.finished=true;f.events.push('receipt-original-rename-callback-delivered');callback(error)};
+    f.signal();resolve();
+   }));throw renamePrimary;
+  }
+  return nativeCallbackFs.rename(from,to,callback);
+ },
  open(name,mode,permissions,callback){
   const rawName=name;name=String(name).includes('.acceptance-capture-failure.json-')?join(current.directory,'acceptance-capture-failure.json'):String(name).includes('.acceptance-capture.json-')?join(current.directory,'acceptance-capture.json'):name;
   const f=current,kind=(String(name).endsWith('/acceptance-capture.json')||String(name).endsWith('/acceptance-capture-failure.json'))?'file':String(name)===f?.directory?'directory':null;
@@ -161,8 +174,8 @@ function nativeFixture(overrides = {}) {
   return {state,events,context, execute:code=>vm.runInThisContext('('+code+')')(page), run:changed => vm.runInThisContext('('+makePackageCleanupCode({...options,...changed})+')')(page)};
 }
 
-const scenarios=['normal','lost-reply','early-fulfilled','missing-callback','directory-lost','callback-error','io-open','io-write','io-sync',...['sync-','write-','dirsync-'].flatMap(p=>Object.keys(failValues).map(x=>p+x)),'foreign-session','foreign-directory','foreign-receipt','foreign-binding','journal-failure-close'];
-for(const scenario of scenarios.filter(s=>!process.env.CAPTURE_ONLY_JOURNAL||s==='journal-failure-close'))test('whole bridge capture writer '+scenario,async()=>{
+const scenarios=['normal','lost-reply','early-fulfilled','missing-callback','directory-lost','callback-error','io-open','io-write','io-sync',...['sync-','write-','dirsync-'].flatMap(p=>Object.keys(failValues).map(x=>p+x)),'foreign-session','foreign-directory','foreign-receipt','foreign-binding','journal-failure-close','rename-lost-diagnostic'];
+for(const scenario of scenarios.filter(s=>process.env.CAPTURE_ONLY_RENAME?s==='rename-lost-diagnostic':!process.env.CAPTURE_ONLY_JOURNAL||s==='journal-failure-close'))test('whole bridge capture writer '+scenario,async()=>{
  const directory=await mkdtemp(join(tmpdir(),'capture-kernel-'));let signal;
  const ready=new Promise(r=>signal=r);
  const f=current={case:scenario,scenario:'hybrid-success',directory,events:[],native:nativeFixture(),nativeReceipts:[],saves:0,signal,finished:false,captureWrites:0};
@@ -178,6 +191,18 @@ for(const scenario of scenarios.filter(s=>!process.env.CAPTURE_ONLY_JOURNAL||s==
   const pending=bridge.captureAcceptance().then(r=>{finished=true;return {r}},e=>{finished=true;firstRejected=true;first=e;return {e}});
   await assert.rejects(bridge.captureAcceptance());
   const concurrent=bridge.close().then(r=>({r}),e=>({e}));
+  if(f.case==='rename-lost-diagnostic'){
+   const result=await pending;await concurrent;await ready;
+   assert.equal(result.e,renamePrimary);assert.equal(captureCalls,1);
+   assert.equal(f.events.includes('browser-close'),false);
+   assert.equal(f.events.includes('release-uploads'),false);
+   await assert.rejects(bridge.close(),error=>error===renamePrimary);
+   assert.equal(f.events.includes('new-open-before-completion'),false,
+     'diagnostic publication must not start before original capture rename callback');
+   f.original();await f.kernel;await bridge.close();
+   assert.equal(captureCalls,1);assert.equal(f.captureWrites,1,'confirmed receipt cannot be rewritten on repair');
+   assert.equal(f.native.events.filter(x=>x==='logout').length,1);return;
+  }
   if(f.case!=='normal'){
    if(['early-fulfilled','missing-callback'].includes(f.case)){
     await ready;
@@ -206,6 +231,7 @@ for(const scenario of scenarios.filter(s=>!process.env.CAPTURE_ONLY_JOURNAL||s==
   assert.equal(JSON.parse(await readFile(join(directory,'acceptance-capture.json'),'utf8')).receipt.cancel_verified,true);
  }finally{
   if(f.blocker)await f.blocker;if(f.kernel)await f.kernel;
+  if(f.original&&!f.finished)f.original();
   const report={scenario,fixture:true,events:f.events,native:f.native.events,receipt,primary:firstRejected?first instanceof Error?{kind:'Error',message:first.message,cause:first.cause}:{kind:'value',value:first===undefined?null:first,is_undefined:first===undefined}:undefined,captureCalls,firstRejected,captureWrites:f.captureWrites,scope:'exact whole bridge capture writer, real filesystem/kernel/MCP InMemory and child IPC; fixed harness/native/Page/services and fault replies doubles'};
   if(process.send)await new Promise(r=>process.send({...report,fixture:'report'},r));
   if(process.env.CAPTURE_RESULTS){await nativeFs.mkdir(process.env.CAPTURE_RESULTS,{recursive:true});await nativeFs.writeFile(join(process.env.CAPTURE_RESULTS,scenario+'.json'),JSON.stringify(report,null,2))}

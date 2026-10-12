@@ -522,6 +522,10 @@ export async function createBridge(config, session, { browserTransport: managedB
         session.metadata.capturePersistenceFailures=capturePersistenceFailures;
     }
     async function drainCaptureWriters() {
+      if([...capturePublications.values()].some(publication=>publication.pending)){
+        rememberCapturePersistence(Error('LOGINOM_CAPTURE_RENAME_UNKNOWN'),'rename');
+        throw capturePersistencePrimary.value;
+      }
       for(const file of captureWriters){
         if(!file.closeStarted&&file.openComplete&&file.fd!==undefined){
           try{await closeCaptureWriter(file)}catch(value){file.closeFailure??={value};rememberCapturePersistence(value,'retained_close')}
