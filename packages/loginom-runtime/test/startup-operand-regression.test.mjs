@@ -1,7 +1,8 @@
+import {constants} from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {readFile,writeFile,mkdir,mkdtemp,rm,rename} from 'node:fs/promises';
+import {open,unlink,readFile,writeFile,mkdir,mkdtemp,rm,rename} from 'node:fs/promises';
 import {join,dirname} from 'node:path';
 import {tmpdir} from 'node:os';
 import {randomUUID,createHash} from 'node:crypto';
@@ -11,7 +12,7 @@ assert.ok(sourcePath);
 const source=await readFile(sourcePath,'utf8');
 const code=source.slice(source.indexOf('export function browserEnvironment')).replaceAll('export ','');
 const {startupOwner}=vm.runInNewContext(code+';({startupOwner})',{
- writeFile,mkdir,readFile,createHash,join,dirname,randomUUID,URL,process,Error,runtimeModulePath:sourcePath,
+ open,rename,unlink,constants,writeFile,mkdir,readFile,createHash,join,dirname,randomUUID,URL,process,Error,runtimeModulePath:sourcePath,
 });
 const serial=value=>value instanceof Error?{kind:'Error',name:value.name,message:value.message,
  ...('cause' in value?{cause:serial(value.cause)}:{})}:{kind:'value',value:value===undefined?null:value,is_undefined:value===undefined};
