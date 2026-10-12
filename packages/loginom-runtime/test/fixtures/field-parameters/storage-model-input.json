@@ -1,0 +1,7 @@
+{
+  "scope": "proposed offline model task; not executed",
+  "input": "rowid-ab-c.csv",
+  "node_type": "transform.reform_columns",
+  "input_port": 0,
+  "task": "Use the provided CSV and the Field Parameters node. Change only A label to Only A; change B name to RenamedB, usage to factor (6) and data kind to Undefined; exclude C. Preserve other fields, values, types, labels, ordering and authored caching. Stop before Next/Done. Do not replay unknown operations."
+}
